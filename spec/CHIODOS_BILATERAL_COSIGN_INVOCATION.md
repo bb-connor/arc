@@ -86,10 +86,11 @@ break signature verification).
 
 Implementation status: the current `crates/chio-federation` DSSE helper
 does not emit either strict predicate type above. It emits the bounded
-`chio.bilateral-signature-slice.v1` profile, whose signed predicate is a
-local bilateral signature slice for receipt binding and peer signature
-checks. Strict CHIODOS bilateral predicate conformance remains future
-work until the producer emits every required section 5 field and removes
+`DSSE signature-slice local profile` identified on the wire as
+`chio.bilateral-signature-slice.v1`. Its signed predicate is a local
+bilateral signature slice for receipt binding and peer signature checks.
+Strict CHIODOS bilateral predicate conformance remains future work until
+the producer emits every required target predicate field and removes
 signature-slice-only helper fields.
 
 ---
@@ -140,9 +141,9 @@ The predicate is a JSON object with the following JSON Schema (Draft
 schema before signature verification.
 
 This schema is the strict CHIODOS target, not the currently emitted
-`chio.bilateral-signature-slice.v1` compatibility profile. A signature
-slice MUST NOT be described as conforming to this section unless its
-predicate validates against the schema below.
+`DSSE signature-slice local profile`. A signature slice MUST NOT be
+described as conforming to this target unless its predicate validates
+against the schema below.
 
 ```json
 {

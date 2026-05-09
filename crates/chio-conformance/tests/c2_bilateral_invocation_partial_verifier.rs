@@ -1,8 +1,8 @@
 //! Drives [`chio_federation::bilateral::execute_local_bilateral_invocation_fixture`]
 //! end-to-end (NOT a mock - exercises the production
-//! `sign_dsse_envelope_full` signature-slice producer and the production partial local verifier
-//! `verify_bilateral_cosign_invocation`, which covers a subset of the
-//! §7 step list), then mutates one byte at a time and asserts the
+//! `sign_dsse_envelope_full` DSSE signature-slice local profile producer and
+//! the production local-profile verifier `verify_bilateral_cosign_invocation`,
+//! then mutates one byte at a time and asserts the
 //! verifier rejects with the correct spec §7.1 code. Coverage:
 //!
 //! | Step | Tampering              | Expected code                          |
@@ -760,11 +760,11 @@ fn step_15_receipt_backed_class_with_resolvable_governance_ref_passes() {
 }
 
 // ---------------------------------------------------------------------------
-// Step 16: consistency anchor reconciliation
+// Local-profile consistency boundary
 // ---------------------------------------------------------------------------
 
 #[test]
-fn step_16_totally_ordered_without_anchor_fails() {
+fn local_profile_rejects_totally_ordered_without_anchor() {
     let setup = setup();
     let mut ext = happy_extensions();
     ext.consistency_model = Some("totally-ordered".to_string());
@@ -788,7 +788,7 @@ fn step_16_totally_ordered_without_anchor_fails() {
 }
 
 #[test]
-fn step_16_quorum_required_without_anchor_fails() {
+fn local_profile_rejects_quorum_required_without_anchor() {
     let setup = setup();
     let mut ext = happy_extensions();
     ext.consistency_model = Some("quorum-required".to_string());
@@ -812,7 +812,7 @@ fn step_16_quorum_required_without_anchor_fails() {
 }
 
 #[test]
-fn step_16_quorum_required_with_bare_anchor_still_fails_without_quorum_proof() {
+fn local_profile_rejects_quorum_required_with_bare_anchor() {
     let setup = setup();
     let mut ext = happy_extensions();
     ext.consistency_model = Some("quorum-required".to_string());
@@ -866,7 +866,7 @@ fn co_sign_n_of_m_is_rejected_until_quorum_verification_exists() {
 }
 
 #[test]
-fn step_16_totally_ordered_with_bare_anchor_still_fails_without_reconciliation() {
+fn local_profile_rejects_totally_ordered_with_bare_anchor() {
     let setup = setup();
     let mut ext = happy_extensions();
     ext.consistency_model = Some("totally-ordered".to_string());

@@ -52,10 +52,11 @@ path = "src/bin/chio_native_conformance_fixture.rs"
 default = ["in-repo-fixtures"]
 in-repo-fixtures = []
 # Opt-in selective-disclosure conformance test. Forwards to
-# chio-federation's `bbs-stub` feature so the projection module compiles.
-# The feature is `bbs-stub`, not `zk`, because the implementation is a
-# SHA-256-commitment stub without any privacy-preserving cryptographic property; this is a
-# separate CI matrix entry, not the default build path.
+# chio-federation's `bbs-stub` feature so the stub projection module
+# compiles. The feature is `bbs-stub`, not `zk`, because the implementation
+# is SHA-256-commitment bookkeeping only: no BBS+, zk, or
+# privacy-preserving cryptographic behavior. This is a separate CI matrix
+# entry, not the default build path.
 bbs-stub = ["chio-federation/bbs-stub"]
 
 [dependencies]

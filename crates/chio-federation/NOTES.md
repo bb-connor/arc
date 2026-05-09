@@ -1,11 +1,12 @@
 # chio-federation NOTES
 
-## Bilateral verifier schema completion
+## Bilateral verifier profile boundary
 
-The bilateral verifier in `bilateral_verifier.rs` is currently labeled
-a **partial local verifier**, not the full step-list conformance
-verifier. This note records the remaining work required before callers
-may advertise full bilateral invocation verifier conformance.
+The bilateral verifier in `bilateral_verifier.rs` is the canonical
+trust-boundary verifier for the current `DSSE signature-slice local
+profile`. It is not the strict CHIODOS target-predicate verifier. This
+note records the remaining work required before callers may advertise
+strict bilateral invocation verifier conformance.
 
 ### Open items
 
@@ -35,7 +36,8 @@ may advertise full bilateral invocation verifier conformance.
 
 ### Why this is deferred
 
-The `chio-federation` crate already builds with the partial verifier
-and callers must not advertise full conformance based on its output.
-The next protocol completion PR should close the schema gaps in one
-focused change instead of widening this local fixture path.
+The `chio-federation` crate already builds with the local-profile
+verifier and callers must not advertise strict CHIODOS predicate
+conformance based on its output. The next protocol completion PR should
+close the schema gaps in one focused change instead of widening this
+local profile into the strict target path.

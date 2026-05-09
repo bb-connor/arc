@@ -14,11 +14,10 @@ pub mod bilateral_dsse;
 pub mod bilateral_verifier;
 pub mod metrics;
 pub mod revocation_gossip;
-// spec/CHIODOS_SELECTIVE_DISCLOSURE.md §6 BBS+ projection. Default-off
-// behind the honestly-named `bbs-stub` feature: the implementation is a
-// STUB BBS+ that captures the deterministic projection and
-// disclose/withhold semantics but offers no privacy-preserving cryptographic property.
-// Real BLS12-381 BBS+ signing is deferred.
+// Stub selective-disclosure projection. Default-off behind the
+// `bbs-stub` feature: the implementation captures deterministic
+// projection and disclose/withhold bookkeeping with a SHA-256
+// commitment placeholder only.
 #[cfg(feature = "bbs-stub")]
 pub mod selective_disclosure;
 pub mod trust_establishment;

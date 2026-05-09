@@ -22,12 +22,14 @@
 #![cfg(feature = "bbs-stub")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::{sha256_hex, Keypair};
 use chio_core::receipt::{ChioReceiptBody, Decision, ToolCallAction, TrustLevel};
 use chio_federation::selective_disclosure::{
-    project_audit_view, verify_audit_view, BbsAuditView, DisclosureSet, SelectiveDisclosureError,
-    AUDIT_VIEW_SCHEMA_STUB, PROJECTION_VERSION_RECEIPT_V1,
+    project_audit_view, verify_audit_view, BbsAuditView, BbsMessage, DisclosureSet,
+    SelectiveDisclosureError, AUDIT_VIEW_SCHEMA_STUB, PROJECTION_VERSION_RECEIPT_V1,
 };
+use sha2::{Digest, Sha256};
 
 fn fixture_body(kp: &Keypair) -> ChioReceiptBody {
     ChioReceiptBody {
@@ -49,6 +51,56 @@ fn fixture_body(kp: &Keypair) -> ChioReceiptBody {
     }
 }
 
+fn fixture_projection(body: &ChioReceiptBody) -> Vec<BbsMessage> {
+    let all_indices: Vec<u8> = (0u8..14).collect();
+    let all_view = project_audit_view(body, &DisclosureSet(all_indices))
+        .expect("all-index projection must succeed");
+    all_view
+        .disclosed
+        .into_iter()
+        .map(|m| BbsMessage {
+            index: m.index,
+            field: m.field,
+            encoding: m.encoding,
+            bytes_hex: m.bytes_hex,
+            wholesale_only: matches!(m.index, 0 | 3 | 4 | 7),
+        })
+        .collect()
+}
+
+fn matching_stub_proof_for_indices(body: &ChioReceiptBody, indices: &[u8]) -> String {
+    let projection = fixture_projection(body);
+    let mut disclosed_indices = indices.to_vec();
+    disclosed_indices.sort_unstable();
+    let withheld: Vec<&BbsMessage> = projection
+        .iter()
+        .filter(|m| !disclosed_indices.contains(&m.index))
+        .collect();
+    let disclosed_encodings: Vec<serde_json::Value> = disclosed_indices
+        .iter()
+        .map(|idx| {
+            let enc = projection
+                .iter()
+                .find(|m| m.index == *idx)
+                .map(|m| m.encoding.as_str())
+                .unwrap_or("");
+            serde_json::json!({
+                "index": idx,
+                "encoding": enc,
+            })
+        })
+        .collect();
+    let payload = serde_json::json!({
+        "disclosed_indices": disclosed_indices,
+        "withheld": withheld,
+        "disclosed_encodings": disclosed_encodings,
+    });
+    let bytes = canonical_json_bytes(&payload).expect("stub proof payload must canonicalize");
+    let mut hasher = Sha256::new();
+    hasher.update(&bytes);
+    hex::encode(hasher.finalize())
+}
+
 #[test]
 fn audit_view_reveals_only_disclosed_indices_and_round_trips() {
     let kp = Keypair::generate();
@@ -62,7 +114,7 @@ fn audit_view_reveals_only_disclosed_indices_and_round_trips() {
 
     assert_eq!(
         view.schema, AUDIT_VIEW_SCHEMA_STUB,
-        "audit view must declare the .stub schema so verifiers can discriminate stub vs real BBS+"
+        "audit view must declare the .stub schema so verifiers can discriminate stub vs non-stub"
     );
     assert_eq!(view.projection_version, PROJECTION_VERSION_RECEIPT_V1);
     assert_eq!(view.disclosed.len(), 3);
@@ -153,6 +205,35 @@ fn audit_view_rejects_disclosed_field_substitution() {
             Err(SelectiveDisclosureError::DisclosedMessageMismatch(_))
         ),
         "substituted disclosed field MUST fail at the projection-rebind gate"
+    );
+}
+
+#[test]
+fn audit_view_rejects_duplicate_indices_even_when_stub_proof_matches() {
+    let kp = Keypair::generate();
+    let body = fixture_body(&kp);
+    let mut view =
+        project_audit_view(&body, &DisclosureSet(vec![1, 5, 11])).expect("projection must succeed");
+
+    let duplicate = view
+        .disclosed
+        .iter()
+        .find(|m| m.index == 1)
+        .expect("capability_id must be disclosed")
+        .clone();
+    view.disclosed.insert(1, duplicate);
+    view.proof_bytes_hex = matching_stub_proof_for_indices(&body, &[1, 1, 5, 11]);
+
+    let bytes = serde_json::to_vec(&view).expect("view must serialize");
+    let parsed: BbsAuditView = serde_json::from_slice(&bytes).expect("view must parse");
+    let result = verify_audit_view(&parsed, &body);
+
+    assert!(
+        matches!(
+            result,
+            Err(SelectiveDisclosureError::DisclosureDuplicateIndex(1))
+        ),
+        "duplicate disclosed index must be rejected before proof recomputation"
     );
 }
 

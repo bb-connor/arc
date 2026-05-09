@@ -26,8 +26,8 @@
 //!
 //! ## Scope boundary
 //!
-//! This module intentionally emits a DSSE signature-slice profile, not the
-//! strict `CHIODOS_BILATERAL_COSIGN_INVOCATION` predicate. The strict
+//! This module intentionally emits the DSSE signature-slice local profile,
+//! not the strict `CHIODOS_BILATERAL_COSIGN_INVOCATION` predicate. The strict
 //! CHIODOS schema requires fields this API does not receive
 //! (`tool_args_hash`, non-optional lease and policy summaries) and forbids
 //! the local `receipt_canonical_json` helper field. Callers must not present
@@ -44,7 +44,7 @@ use sha2::{Digest, Sha256};
 use crate::bilateral::BilateralCoSigningError;
 
 // ---------------------------------------------------------------------------
-// Constants (DSSE signature-slice profile)
+// Constants (DSSE signature-slice local profile)
 // ---------------------------------------------------------------------------
 
 /// DSSE v1 payload type used by chiodos bilateral signature-slice envelopes.
@@ -53,9 +53,9 @@ use crate::bilateral::BilateralCoSigningError;
 /// signed bytes.
 pub const PAYLOAD_TYPE_IN_TOTO: &str = "application/vnd.in-toto+json";
 
-/// Predicate type for the in-toto Statement carried in the DSSE signature
-/// slice. Deliberately distinct from the strict CHIODOS bilateral
-/// invocation predicate.
+/// Predicate type for the in-toto Statement carried in the DSSE
+/// signature-slice local profile. Deliberately distinct from the strict
+/// CHIODOS bilateral invocation predicate.
 pub const PREDICATE_TYPE_BILATERAL: &str = "chio.bilateral-signature-slice.v1";
 
 /// In-toto Statement `_type` per the v1 attestation framework (DSSE doc).
@@ -69,7 +69,7 @@ pub const PREDICATE_BODY_SCHEMA: &str = PREDICATE_TYPE_BILATERAL;
 /// Fixed prefix tag of the DSSE Pre-Authentication Encoding (DSSE v1).
 const PAE_PREFIX: &str = "DSSEv1";
 
-/// Historical profile identifier for the Chio bilateral DSSE signature-slice.
+/// Historical profile identifier for the Chio DSSE signature-slice local profile.
 ///
 /// Standard DSSE envelopes do not carry a top-level `schema` member. This
 /// value is retained only for callers that need an out-of-band profile label;
@@ -94,7 +94,7 @@ pub const VALID_CROSS_ORG_VISIBILITY: &[&str] = &["private", "treaty_only", "fed
 
 /// SHA-256 fingerprint of a kernel's passport public key (hex, lowercase),
 /// used as the DSSE `keyid` and as the `tool_server_*`
-/// `passport_key_fingerprint` in this signature-slice profile.
+/// `passport_key_fingerprint` in this DSSE signature-slice local profile.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Keyid(pub String);
@@ -303,7 +303,7 @@ impl DsseStatement {
     }
 }
 
-/// One signature inside a [`DsseEnvelope`] (`signatures[i]` per spec §6).
+/// One signature inside a [`DsseEnvelope`] (`signatures[i]`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DsseSignature {
@@ -356,10 +356,11 @@ impl DsseEnvelope {
 
 /// DSSE Pre-Authentication Encoding (DSSE v1 spec, secure-systems-lab/dsse).
 ///
-/// The output bytes are what each kernel's Ed25519 signature covers per spec
-/// §6 lines 338-343. The encoding is deterministic and does NOT include any
-/// kernel-derived nonce: two kernels signing the same `(payload_type,
-/// payload_bytes)` produce signatures over identical preimages.
+/// The output bytes are what each kernel's Ed25519 signature covers in the
+/// DSSE signature-slice local profile. The encoding is deterministic and
+/// does NOT include any kernel-derived nonce: two kernels signing the same
+/// `(payload_type, payload_bytes)` produce signatures over identical
+/// preimages.
 ///
 /// Format: `"DSSEv1" SP LEN(type) SP type SP LEN(body) SP body` where SP is a
 /// single ASCII space (0x20) and LEN values are decimal ASCII.
@@ -440,8 +441,9 @@ pub struct BilateralPredicateExtensions {
     /// Spec §5 `governance_receipt_ref`; required by §7 step 15 when
     /// the action-class is `receipt-backed`.
     pub governance_receipt_ref: Option<GovernanceReceiptRef>,
-    /// Spec §5 `consistency_anchor`; required by §7 step 16 for
-    /// non-`crdt-commutative` consistency models.
+    /// Future target-predicate `consistency_anchor`. The local profile
+    /// rejects non-`crdt-commutative` consistency models until ordered
+    /// and quorum reconciliation are implemented.
     pub consistency_anchor: Option<String>,
     /// Override `consistency_model`. None = `DEFAULT_CONSISTENCY_MODEL`
     /// (`crdt-commutative`).
@@ -797,7 +799,7 @@ fn validate_signature_slice_predicate(
     }
     if pred.consistency_model != DEFAULT_CONSISTENCY_MODEL {
         return Err(BilateralCoSigningError::CanonicalJson(format!(
-            "predicate.schema_invalid: consistency_model {:?} is not supported by the signature-slice profile",
+            "predicate.schema_invalid: consistency_model {:?} is not supported by the DSSE signature-slice local profile",
             pred.consistency_model
         )));
     }
@@ -1213,7 +1215,9 @@ mod tests {
             resign_payload(&mut envelope, &kp_a, &kp_b, &bytes);
 
             let err = verify_dsse_envelope(&envelope, &kp_a.public_key(), &kp_b.public_key())
-                .expect_err("signature-slice profile cannot verify ordered/quorum claims");
+                .expect_err(
+                    "DSSE signature-slice local profile cannot verify ordered/quorum claims",
+                );
             assert!(err.to_string().contains(&format!(
                 "consistency_model \"{unsupported}\" is not supported"
             )));

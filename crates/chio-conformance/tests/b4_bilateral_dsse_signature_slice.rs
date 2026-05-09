@@ -1,9 +1,9 @@
-//! DSSE signature-slice regression tests.
+//! DSSE signature-slice local profile regression tests.
 //!
 //! This fixture intentionally does NOT claim
 //! `CHIODOS_BILATERAL_COSIGN_INVOCATION` predicate conformance. The
-//! production emitter signs a local signature-slice predicate that carries
-//! `receipt_canonical_json` and omits strict-schema fields such as
+//! production emitter signs the DSSE signature-slice local profile, which
+//! carries `receipt_canonical_json` and omits strict-target fields such as
 //! `tool_args_hash`.
 //!
 //! ## What this fixture checks
@@ -11,7 +11,7 @@
 //! 1. **Byte-level non-overlap**: the legacy `CoSigningBody` canonical bytes
 //!    and the DSSE PAE preimage bytes share zero positions (byte-stream
 //!    inequivalence).
-//! 2. **Signature-slice verifier accepts the envelope** under matching public keys.
+//! 2. **Local-profile verifier accepts the envelope** under matching public keys.
 //! 3. **Tampered payload bytes are rejected** (changes LEN(payload) and the
 //!    payload bytes; PAE preimage diverges).
 //! 4. **Mismatched payloadType is rejected** (payload-type is part of PAE).
@@ -90,7 +90,8 @@ fn legacy_preimage_and_dsse_pae_preimage_share_zero_bytes() {
         CoSigningBody::from_receipt(&receipt, ORG_A_KERNEL_ID, ORG_B_KERNEL_ID).unwrap();
     let legacy_preimage = legacy_body.canonical_bytes().unwrap();
 
-    // Signature-slice preimage: DSSE PAE bytes wrapping the in-toto Statement.
+    // DSSE signature-slice local profile preimage: DSSE PAE bytes wrapping
+    // the in-toto Statement.
     let envelope = sign_dsse_envelope(
         &receipt,
         &kp_a,
@@ -134,7 +135,7 @@ fn legacy_preimage_and_dsse_pae_preimage_share_zero_bytes() {
     );
 }
 
-/// The signature-slice verifier accepts a freshly-signed envelope when the
+/// The local-profile verifier accepts a freshly-signed envelope when the
 /// public keys match the keyids carried in the envelope's signatures array.
 #[test]
 fn signature_slice_verifier_accepts_freshly_signed_envelope() {
@@ -176,7 +177,7 @@ fn signature_slice_verifier_accepts_freshly_signed_envelope() {
 }
 
 #[test]
-fn emitted_predicate_is_explicit_signature_slice_not_chiodos_invocation_schema() {
+fn emitted_predicate_is_explicit_local_profile_not_chiodos_invocation_schema() {
     let kp_a = Keypair::generate();
     let kp_b = Keypair::generate();
     let receipt = sample_receipt(&kp_b);
@@ -207,15 +208,15 @@ fn emitted_predicate_is_explicit_signature_slice_not_chiodos_invocation_schema()
     assert_eq!(predicate_json["schema"], PREDICATE_BODY_SCHEMA);
     assert_ne!(
         statement.predicate_type, "chio.bilateral-cosign-invocation.v1",
-        "signature-slice output must not claim the strict CHIODOS predicate type"
+        "DSSE signature-slice local profile output must not claim the strict CHIODOS predicate type"
     );
     assert!(
         predicate_json.get("receipt_canonical_json").is_some(),
-        "signature-slice profile carries the local receipt helper field"
+        "DSSE signature-slice local profile carries the local receipt helper field"
     );
     assert!(
         predicate_json.get("tool_args_hash").is_none(),
-        "missing strict-schema tool_args_hash is why this profile is not CHIODOS invocation conformance"
+        "missing strict-target tool_args_hash is why this local profile is not CHIODOS invocation conformance"
     );
 }
 
@@ -241,7 +242,7 @@ fn signature_slice_profile_is_registered_as_signed_artifact_schema() {
     let entry = artifacts
         .iter()
         .find(|artifact| artifact["schema"] == PREDICATE_TYPE_BILATERAL)
-        .expect("signature-slice profile is registered");
+        .expect("DSSE signature-slice local profile is registered");
     assert_eq!(
         entry["artifactKind"], "bilateral_dsse_signature_slice",
         "registry entry must be verifier-facing, not a generic receipt artifact"

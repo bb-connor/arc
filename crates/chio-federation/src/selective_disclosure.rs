@@ -11,19 +11,19 @@
 //!    bytes, `Hx` hex-decoded SHA-256, `H` SHA-256 over canonical-JSON
 //!    of a structured sub-body, `U64` little-endian, `Opt<S>` with
 //!    `None` projected as `"\u{0000}"`).
-//! 3. Emits a `BbsAuditView` that exposes a disclosed-message subset
+//! 3. Emits a `BbsAuditView` that serializes a disclosed-message subset
 //!    plus an opaque `proof_bytes` placeholder. The placeholder is a
 //!    SHA-256 commitment to the *withheld* messages plus the disclosed
-//!    indices; this is NOT a privacy-preserving cryptographic proof - a verifier with
-//!    access to the full receipt body can reconstruct withheld
-//!    messages and re-hash.
+//!    indices; this is NOT a cryptographic hiding proof. A verifier with
+//!    access to the full receipt body can reconstruct withheld messages
+//!    and re-hash.
 //! 4. `verify_audit_view` re-runs the projection against the pinned
 //!    receipt, recomputes the commitment over the withheld messages,
 //!    and asserts it matches `proof_bytes`. This delivers the auditor
 //!    *workflow* (the auditor sees only disclosed fields plus a binding
 //!    proof that ties them to a real receipt) without delivering
-//!    zero-knowledge of the withheld content from a verifier that
-//!    holds the full receipt.
+//!    hiding withheld content from a verifier that holds the full
+//!    receipt.
 //!
 //! - Actual BLS12-381 BBS+ signing (no `bbs_plus` dep is pulled in).
 //! - Predicate language v1 (`eq`, `cmp`, `member`) - those need real
@@ -61,7 +61,7 @@ pub struct BbsMessage {
     pub encoding: String,
     /// Encoded message bytes per §5.2. Hex-encoded for serde
     /// transport so the audit view round-trips through JSON cleanly.
-    /// In a real BBS+ implementation these bytes feed `hash_to_scalar`.
+    /// In a future non-stub implementation these bytes feed the proof backend.
     pub bytes_hex: String,
     /// True iff the §5.2 table marks this row as wholesale-only
     /// (i.e. predicates cannot reach inside the structured sub-body).
@@ -85,8 +85,8 @@ pub struct DisclosedMessage {
 }
 
 /// The auditor view: disclosed messages plus a SHA-256 commitment to
-/// the withheld message vector. This is the §6-shape stand-in for the
-/// real BBS+ proof.
+/// the withheld message vector. This is a target-proof shape stand-in,
+/// not a BBS+ proof.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BbsAuditView {
     /// `AUDIT_VIEW_SCHEMA_STUB` - note the `.stub` suffix.
@@ -504,6 +504,14 @@ pub fn verify_audit_view(
             view.projection_version.clone(),
         ));
     }
+    // Validate the disclosure indices exactly as received on the
+    // serialized verifier input before doing projection or proof work.
+    // Without this gate, a duplicate disclosed index can be paired with
+    // a matching stub commitment and accepted as if it were a valid set.
+    let disclosed_indices: Vec<u8> = view.disclosed.iter().map(|m| m.index).collect();
+    let disclosure = DisclosureSet(disclosed_indices);
+    validate_disclosure_set(&disclosure)?;
+
     let pinned_subject_hex = hex::encode(subject_receipt_sha256(pinned)?);
     if view.subject_receipt_sha256_hex != pinned_subject_hex {
         return Err(SelectiveDisclosureError::SubjectReceiptMismatch);
@@ -511,9 +519,6 @@ pub fn verify_audit_view(
     // Re-run the projection against the pinned receipt and re-derive
     // the disclosure set from the disclosed indices on the view.
     let projection = project_receipt_body(pinned)?;
-    let disclosed_indices: Vec<u8> = view.disclosed.iter().map(|m| m.index).collect();
-    let disclosure = DisclosureSet(disclosed_indices);
-    validate_disclosure_set(&disclosure)?;
     // For each disclosed message in the view, the bytes MUST match the
     // pinned projection. This is the "auditor sees what the projection
     // allows" check - a producer who tried to alter the disclosed
