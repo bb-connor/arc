@@ -122,6 +122,7 @@ if run_gates:
         env = os.environ.copy()
         if command == "./scripts/check-rust-verification-gates.sh":
             env.pop("CHIO_RUST_VERIFICATION_METADATA_ONLY", None)
+            env.pop("CHIO_RUST_VERIFICATION_INVENTORY_LINT_ONLY", None)
         completed = subprocess.run(
             command,
             cwd=repo,
@@ -224,6 +225,8 @@ report = {
     "assumptionRegistry": str(assumptions_path),
     "proofBoundaryStatus": manifest.get("proof_boundary_status"),
     "verificationTarget": manifest.get("verification_target"),
+    "excludedSurfaces": manifest.get("excluded_surfaces", []),
+    "nonClaimedSurfaces": manifest.get("non_claimed_surfaces", []),
     "primaryToolchain": manifest.get("primary_toolchain", []),
     "rustRefinementLanes": manifest.get("rust_refinement_lanes", []),
     "propertyCoverage": property_coverage,

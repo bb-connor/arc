@@ -29,6 +29,9 @@ trap 'rm -rf "$work"' EXIT
 EMPTY_MANIFEST="$work/empty.toml"
 cat > "$EMPTY_MANIFEST" <<'EOF'
 schema = "chio.kani.multi-crate.v1"
+evidence_class = "bounded_no_unwinding"
+unwinding_assertions = false
+full_soundness_evidence = false
 harness = []
 EOF
 
@@ -39,6 +42,9 @@ EOF
 POPULATED_MANIFEST="$work/populated.toml"
 cat > "$POPULATED_MANIFEST" <<'EOF'
 schema = "chio.kani.multi-crate.v1"
+evidence_class = "bounded_no_unwinding"
+unwinding_assertions = false
+full_soundness_evidence = false
 
 [[harness]]
 crate = "fake-crate"

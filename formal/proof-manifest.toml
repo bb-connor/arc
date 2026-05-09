@@ -1,7 +1,7 @@
 schema = "chio.proof-manifest.v1"
 manifest_version = 1
-proof_boundary_status = "implementation_linked_protocol_core"
-verification_target = "security_critical_protocol_semantics"
+proof_boundary_status = "bounded_implementation_linked_protocol_core"
+verification_target = "bounded_security_critical_protocol_semantics_not_full_implementation"
 assumption_registry = "formal/assumptions.toml"
 claim_registry = "docs/reference/CLAIM_REGISTRY.md"
 lean_root_module = "Chio"
@@ -87,9 +87,9 @@ shell_entrypoints = [
 required_property_ids = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10"]
 
 property_matrix = [
-  "P1|capability attenuation|lean_root_imported,differential_test,rust_projection,aeneas_equivalence,public_kani|spec.capability_monotonicity,proof.scope_subset_of_grants_subset,proof.reduced_budget_is_subset,proof.added_constraint_is_subset,proof.aeneas_optionalCapIsSubset_preserves_parent_cap",
+  "P1|capability attenuation|lean_root_imported,differential_test,rust_projection,aeneas_equivalence,public_kani_bounded_no_unwinding|spec.capability_monotonicity,proof.scope_subset_of_grants_subset,proof.reduced_budget_is_subset,proof.added_constraint_is_subset,proof.aeneas_optionalCapIsSubset_preserves_parent_cap",
   "P2|presented revocation coverage|lean_root_imported,audited_storage_assumption,sqlite_projection,aeneas_equivalence|proof.revoke_marks_capability_revoked,proof.checkRevocation_revoked_token_errors,proof.evalToolCall_revoked_token_never_allows,proof.revocationSnapshot_revoked_token_denies,proof.revocationSnapshot_revoked_ancestor_denies,proof.aeneas_revocationSnapshot_equiv_model",
-  "P3|fail-closed evaluation|lean_root_imported,rust_core,audited_subprocess_assumption,public_kani,adapter_no_bypass|proof.evalToolCall_total,proof.evalToolCall_invalid_signature_denies,proof.evalToolCall_out_of_scope_denies,proof.admitSession_invalid_dpop_rejects,proof.governedApproval_required_without_token_fails,proof.dpop_required_missing_proof_rejects,proof.dpop_required_invalid_proof_rejects,proof.guardPipeline_deny_dominates,proof.guardPipeline_error_dominates,proof.delegation_max_depth_failure_denies",
+  "P3|fail-closed evaluation|lean_root_imported,rust_core,audited_subprocess_assumption,public_kani_bounded_no_unwinding,adapter_no_bypass|proof.evalToolCall_total,proof.evalToolCall_invalid_signature_denies,proof.evalToolCall_out_of_scope_denies,proof.admitSession_invalid_dpop_rejects,proof.governedApproval_required_without_token_fails,proof.dpop_required_missing_proof_rejects,proof.dpop_required_invalid_proof_rejects,proof.guardPipeline_deny_dominates,proof.guardPipeline_error_dominates,proof.delegation_max_depth_failure_denies",
   "P4|receipt integrity|lean_root_imported,symbolic_crypto,audited_crypto_assumption,receipt_totality,aeneas_equivalence|proof.membership_proof_sound,proof.receipt_sign_then_verify,proof.receipt_immutability,proof.receiptFieldsCoupled_preserves_all_fields,proof.aeneas_receiptCoupling_equiv_model",
   "P5|presented delegation-chain semantic validity|lean_root_imported,sqlite_projection|proof.delegation_chain_integrity,proof.delegation_step_allow_requires_attenuation,proof.delegation_step_allow_requires_subject_continuity,proof.delegation_step_allow_requires_expiry_monotonicity,proof.delegation_revoked_ancestor_denies,proof.delegation_max_depth_failure_denies",
   "P6|local parent-link soundness|lean_root_imported,audited_storage_assumption|proof.observed_parent_edge_sound",
@@ -139,12 +139,20 @@ excluded_surfaces = [
   "cluster consensus, external settlement rails, and third-party registry availability beyond fail-closed Chio handling",
   "Aeneas extraction from async, IO, SQLite, crypto, and string-heavy production modules outside crates/chio-kernel-core/src/formal_aeneas.rs",
   "Symlink resolution and OS filesystem root enforcement beyond Chio's normalized path-prefix fail-closed checks",
+  "Kani public-core paths beyond default_unwind=8 while --no-unwinding-checks is used",
+]
+
+non_claimed_surfaces = [
+  "full implementation-complete proof of all Rust crates",
+  "full Rust soundness from Kani lanes that run without unwinding assertions",
+  "release evidence from Rust verification inventory-lint-only mode",
 ]
 
 notes = [
   "The implementation-linked protocol core is the pure security decision surface plus bounded models for adjacent state transitions. Concrete platform effects are tracked as audited assumptions.",
   "Lean assets are release evidence only when root-imported, sorry-free, and mapped to property_matrix entries.",
-  "Creusot and Kani are required strict-CI lanes for production implementation linkage; public Kani harnesses target verify_capability, NormalizedScope::is_subset_of, resolve_matching_grants, evaluate, and sign_receipt.",
+  "Creusot and Kani are required strict-CI lanes for production implementation linkage; public Kani harnesses target verify_capability, NormalizedScope::is_subset_of, resolve_matching_grants, evaluate, and sign_receipt as bounded/no-unwinding evidence, not full Rust soundness evidence.",
+  "Rust verification inventory-lint-only mode checks manifests only and is never release evidence.",
   "Aeneas production extraction covers the pure numeric/boolean core and is paired with tracked Lean equivalence theorems.",
   "Release-facing formal claims must name this manifest, the theorem inventory, and the audited assumptions.",
   "RETIRED-SQLITE-CROSS-ROW is a discharged assumption: prior cross-row SQLite atomicity is now reduced to per single-row write atomicity (ASSUME-SQLITE-ATOMICITY) plus the MonotoneLog TLA invariant on the audit log and the per-row budget invariant in crates/chio-kernel/src/budget_store.rs. See discharged_assumptions below.",

@@ -15,7 +15,8 @@
 #      recognised test/evidence allowlist (rejects e.g. Cargo.toml, README.md);
 #   6. any DONE row relies on assumed/proposed theorem status;
 #   7. any Theorem status=proven row points at a missing file;
-#   8. any row regresses against the snapshot (DONE -> PARTIAL/NONE, PARTIAL -> NONE).
+#   8. any DONE row cites no-unwinding Kani as full soundness evidence;
+#   9. any row regresses against the snapshot (DONE -> PARTIAL/NONE, PARTIAL -> NONE).
 #
 # Environment overrides (used by the integration tests in scripts/tests):
 #   CHIO_CLOSE_BAR_TRACKER       path to the tracker markdown
@@ -64,6 +65,12 @@ min_rows = int(min_rows_str)
 ALLOWED_BUCKETS = {"DONE", "PARTIAL", "NONE"}
 ALLOWED_WIRED = {"y", "n"}
 ALLOWED_THEOREM = {"proven", "proposed", "assumed", "n-a"}
+KANI_FULL_SOUNDNESS_TERMS = (
+    "full rust soundness",
+    "full soundness",
+    "complete rust verification",
+    "implementation-complete proof",
+)
 
 # Higher = closer to closure. Used for regression detection.
 BUCKET_RANK = {"NONE": 0, "PARTIAL": 1, "DONE": 2}
@@ -221,8 +228,23 @@ for r in rows:
                 errors.append(
                     f"{r['id']}: Theorem status=proven but no referenced .lean file exists on disk: {candidate_paths!r}"
                 )
+    # 8. no-unwinding Kani cannot close a release row as full soundness.
+    searchable = " ".join(
+        [
+            r["title"],
+            r["negative_conformance_test"],
+            r["notes"],
+        ]
+    ).lower()
+    if r["bucket"] == "DONE" and "kani" in searchable:
+        for term in KANI_FULL_SOUNDNESS_TERMS:
+            if term in searchable:
+                errors.append(
+                    f"{r['id']}: Bucket=DONE cites Kani as {term!r} while public Kani uses --no-unwinding-checks"
+                )
+                break
 
-# 8. snapshot regression check
+# 9. snapshot regression check
 with open(snapshot_path, "r", encoding="utf-8") as fh:
     snap = json.load(fh)
 snap_rows = {snapshot_id(r["id"]): r for r in snap.get("rows", [])}

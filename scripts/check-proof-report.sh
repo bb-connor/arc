@@ -22,6 +22,7 @@ required_top = [
     "sourceLocations",
     "git",
     "claimGate",
+    "excludedSurfaces",
 ]
 missing = [key for key in required_top if key not in report]
 if missing:
@@ -50,6 +51,8 @@ if not report.get("artifactHashes", {}).get("tracked"):
     raise SystemExit("proof report missing tracked artifact hashes")
 if not report.get("sourceLocations"):
     raise SystemExit("proof report missing source theorem locations")
+if not report.get("excludedSurfaces"):
+    raise SystemExit("proof report missing excluded formal surfaces")
 PY
 
 echo "Proof report shape check passed"

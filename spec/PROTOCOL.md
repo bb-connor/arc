@@ -647,7 +647,8 @@ Chio intentionally distinguishes evidence classes for these claims:
   for that extracted lane; the older pilot lane remains as compatibility
   evidence
 - Creusot/Kani strict lanes are declared in `formal/rust-verification` for
-  production implementation linkage, including public Kani harnesses for
+  production implementation linkage, including bounded/no-unwinding public Kani
+  harnesses for
   `verify_capability`, `NormalizedScope::is_subset_of`,
   `resolve_matching_grants`, `evaluate`, and `sign_receipt`
 - `scripts/check-adapter-no-bypass.sh` checks adapter mediation markers so

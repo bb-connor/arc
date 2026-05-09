@@ -101,7 +101,7 @@ if [[ ! -f "$MANIFEST" ]]; then
 fi
 
 # Emit one TSV row per matching harness:
-#   crate \t harness \t default_unwind \t timeout_secs \t features
+#   crate \t harness \t default_unwind \t timeout_secs \t features \t unwinding_assertions
 ROWS=$(python3 - "$MANIFEST" "$LANE_FILTER" "$CRATE_FILTER" "$EXCLUDE_CRATES" <<'PY'
 import sys
 from pathlib import Path
@@ -135,6 +135,22 @@ schema = data.get("schema")
 if schema != required_schema:
     sys.stderr.write(
         f"run-kani-manifest.sh: unexpected schema {schema!r}; expected {required_schema!r}\n"
+    )
+    sys.exit(2)
+if data.get("evidence_class") != "bounded_no_unwinding":
+    sys.stderr.write(
+        "run-kani-manifest.sh: manifest must declare evidence_class='bounded_no_unwinding'\n"
+    )
+    sys.exit(2)
+if data.get("full_soundness_evidence") is not False:
+    sys.stderr.write(
+        "run-kani-manifest.sh: manifest must declare full_soundness_evidence=false\n"
+    )
+    sys.exit(2)
+unwinding_assertions = data.get("unwinding_assertions")
+if unwinding_assertions is not False:
+    sys.stderr.write(
+        "run-kani-manifest.sh: this runner currently requires unwinding_assertions=false\n"
     )
     sys.exit(2)
 
@@ -175,6 +191,7 @@ for idx, entry in enumerate(entries):
             f"harness[{idx}].features must be a list of strings\n"
         )
         sys.exit(2)
+    features_field = ",".join(features) if features else "-"
     print(
         "\t".join(
             [
@@ -182,7 +199,8 @@ for idx, entry in enumerate(entries):
                 str(entry["harness"]),
                 str(int(entry["default_unwind"])),
                 str(int(entry["timeout_secs"])),
-                ",".join(features),
+                features_field,
+                "false",
             ]
         )
     )
@@ -203,7 +221,7 @@ if [[ -z "$ROWS" ]]; then
 fi
 
 if [[ "$LIST_ONLY" -eq 1 ]]; then
-  while IFS=$'\t' read -r crate harness _ _ _; do
+  while IFS=$'\t' read -r crate harness _ _ _ _; do
     [[ -z "$crate" ]] && continue
     printf '%s::%s\n' "$crate" "$harness"
   done <<< "$ROWS"
@@ -227,13 +245,18 @@ if command -v timeout >/dev/null 2>&1; then
 fi
 
 COUNT=0
-while IFS=$'\t' read -r crate harness unwind timeout features; do
+while IFS=$'\t' read -r crate harness unwind timeout features unwinding_assertions; do
   [[ -z "$crate" ]] && continue
   COUNT=$((COUNT + 1))
 
   CMD=(cargo kani -p "$crate" --lib --harness "$harness"
-       --default-unwind "$unwind" --no-unwinding-checks)
-  if [[ -n "$features" ]]; then
+       --default-unwind "$unwind")
+  if [[ "$unwinding_assertions" == "true" ]]; then
+    CMD+=(--unwinding-assertions)
+  else
+    CMD+=(--no-unwinding-checks)
+  fi
+  if [[ "$features" != "-" ]]; then
     CMD+=(--features "$features")
   fi
 

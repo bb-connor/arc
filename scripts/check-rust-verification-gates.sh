@@ -38,10 +38,22 @@ for rel, schema in expected.items():
         raise SystemExit(f"schema mismatch in {rel}")
     if not data.get("covered_symbols") and not data.get("harness_groups"):
         raise SystemExit(f"missing coverage declaration in {rel}")
+    if rel.endswith("kani-public-harnesses.toml"):
+        if data.get("evidence_class") != "bounded_no_unwinding":
+            raise SystemExit(f"{rel}: expected evidence_class=bounded_no_unwinding")
+        if data.get("full_soundness_evidence") is not False:
+            raise SystemExit(f"{rel}: expected full_soundness_evidence=false")
+        if data.get("unwinding_assertions") is not False:
+            raise SystemExit(f"{rel}: strict release wording requires explicit bounded/no-unwinding posture")
 PY
 
 if [[ "${CHIO_RUST_VERIFICATION_METADATA_ONLY:-0}" == "1" ]]; then
-  echo "Rust verification gate metadata passed; strict Creusot/Kani execution explicitly disabled"
+  echo "CHIO_RUST_VERIFICATION_METADATA_ONLY is deprecated and cannot satisfy release evidence; use CHIO_RUST_VERIFICATION_INVENTORY_LINT_ONLY=1 for non-release inventory lint" >&2
+  exit 1
+fi
+
+if [[ "${CHIO_RUST_VERIFICATION_INVENTORY_LINT_ONLY:-0}" == "1" ]]; then
+  echo "Rust verification inventory lint passed; strict Creusot/Kani execution was not run and this output is not release evidence"
   exit 0
 fi
 

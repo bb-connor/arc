@@ -24,6 +24,8 @@ A registry change is complete when:
 - The new artifact (or behavior) is registered in `claim-registry.v1.json`.
 - A `proof-manifest.v1.json` row ties the claim to one or more entries in `theorem-inventory.v1.json` and / or named conformance tests.
 - Lean theorem entries in release evidence are status `proven`. `proposed`, `assumed`, `proven_partial`, and `advisory_only` theorem entries belong in `evidence_proposed` until the proof evidence is promotable.
+- Kani entries that run with `--no-unwinding-checks` are bounded/no-unwinding evidence only. They cannot be promoted as full soundness evidence or used to mark release rows DONE for full Rust verification.
+- Rust verification inventory-lint-only output is manifest hygiene, not release evidence.
 
 ## Status conventions
 

@@ -178,8 +178,9 @@ The current release does not claim first-principles proofs of crypto
 libraries, OS clocks, TLS, SQLite, subprocess isolation, hosted registries,
 external chains, clustering, or settlement. Those surfaces are defended through
 audited assumptions, Rust tests, conformance tests, smoke tests, release
-qualification, and the strict Rust verification lanes declared for
-Creusot/Kani.
+qualification, strict Rust verification lanes declared for Creusot/Kani, and
+bounded/no-unwinding public Kani checks where those checks still run with
+`--no-unwinding-checks`.
 
 ### HA Distributed Control Plane
 

@@ -12,8 +12,8 @@ cd "$(dirname "$0")/.."
 ./scripts/check-rust-verification-gates.sh
 ./scripts/check-adapter-no-bypass.sh
 ./scripts/check-portable-kernel.sh
-if [[ "${CHIO_RUST_VERIFICATION_METADATA_ONLY:-0}" == "1" ]]; then
-  echo "Skipping proof report generation because Rust verification is in metadata-only mode"
+if [[ "${CHIO_RUST_VERIFICATION_INVENTORY_LINT_ONLY:-0}" == "1" ]]; then
+  echo "Skipping proof report generation because Rust verification ran inventory-lint-only mode; no release evidence generated"
 else
   ./scripts/generate-proof-report.sh
   ./scripts/check-proof-report.sh

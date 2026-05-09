@@ -126,7 +126,7 @@ jobs:
               --default-unwind 8 --no-unwinding-checks
             echo "::endgroup::"
           done
-          echo "Nightly chio-kernel-core Kani sweep passed (${#HARNESSES[@]} harnesses)"
+          echo "Nightly bounded/no-unwinding chio-kernel-core Kani sweep passed (${#HARNESSES[@]} harnesses; not full soundness evidence)"
 
       # Multi-crate manifest sweep (Kani multi-crate manifest). Picks up every
       # `[[harness]]` entry in `.kani/harnesses.toml` whose `lane = "pr"`

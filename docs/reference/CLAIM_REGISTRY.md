@@ -24,6 +24,8 @@ The source-of-truth inputs are:
 | `aeneas_pilot` | safe Rust extraction through Charon/Aeneas has generated Lean for the current proof-facing pilot source |
 | `aeneas_production` | safe Rust extraction through Charon/Aeneas has generated Lean for the production-linked pure core in `chio-kernel-core` |
 | `rust_refinement_gate` | Creusot/Kani linkage is declared for strict CI and must pass before claiming concrete Rust refinement beyond the current pure core |
+| `public_kani_bounded_no_unwinding` | Kani public-core harnesses ran with the declared unwind bound and `--no-unwinding-checks`; this is bounded reachability evidence, not full Rust soundness evidence |
+| `rust_verification_inventory_lint` | manifest/schema lint only; this is never release evidence |
 | `claim_gate` | release-facing language is constrained by this registry and the proof manifest |
 | `differential_test` | executable spec or diff test is the release gate |
 | `runtime_qualification` | property is backed by Rust tests, conformance, or release-qualification lanes rather than Lean |
@@ -54,7 +56,7 @@ are machine-readably enumerated in `formal/assumptions.toml`.
 | Claim ID | Status | Allowed wording | Evidence |
 | --- | --- | --- | --- |
 | `FORM-BOUNDARY` | approved | Chio has an implementation-linked verified core defined in `formal/proof-manifest.toml`. | `lean_root_imported`, `differential_test`, `runtime_qualification` |
-| `FORM-IMPLEMENTATION-LINKED` | approved_with_scope | Chio's security-critical protocol semantics are formally verified and implementation-linked, subject to the published audited assumptions and strict Rust verification gates. | `lean_root_imported`, `audited_assumption`, `aeneas_production`, `aeneas_equivalence`, `public_kani`, `adapter_no_bypass`, `runtime_projection_tests`, `target/formal/proof-report.json` |
+| `FORM-IMPLEMENTATION-LINKED` | approved_with_scope | Chio's bounded security-critical protocol semantics are formally verified and implementation-linked, subject to the published audited assumptions and strict Rust verification gates. | `lean_root_imported`, `audited_assumption`, `aeneas_production`, `aeneas_equivalence`, `public_kani_bounded_no_unwinding`, `adapter_no_bypass`, `runtime_projection_tests`, `target/formal/proof-report.json` |
 | `P1` | approved_with_scope | Chio has bounded Lean mechanization and executable tests for capability attenuation over the current verified-core model. | `lean_root_imported`, `differential_test` |
 | `P2` | approved_with_scope | Chio has bounded Lean proofs that revoked tokens and revoked presented ancestors cannot pass the pure revocation/evaluation model. | `lean_root_imported` |
 | `P3` | approved_with_scope | Chio has bounded Lean proofs that the pure evaluator is total and fail-closed for invalid signature, time-window, revocation, and out-of-scope paths. | `lean_root_imported` |
@@ -76,6 +78,8 @@ are machine-readably enumerated in `formal/assumptions.toml`.
 | `P3-END-TO-END` | disallowed | "all kernel fail-closed behavior is formally verified end to end" | say P3 has bounded Lean coverage for the pure evaluator and shell/runtime behavior is separately qualified |
 | `P4-END-TO-END` | disallowed | "Ed25519 receipts and Merkle log semantics are formally verified end to end" | say receipt proofs are symbolic/model-level and runtime signing is separately tested |
 | `P5-ACYCLICITY` | downgraded | "delegation graph acyclicity is proven" | say presented delegation-chain structure is proven in the bounded model |
+| `KANI-FULL-SOUNDNESS` | disallowed | "Kani proves public-core full soundness" while `--no-unwinding-checks` is used | say Kani provides bounded/no-unwinding public-core reachability evidence |
+| `RUST-VERIFY-METADATA-ONLY` | disallowed | "Rust verification metadata-only passed as release evidence" | say inventory-lint-only mode checks manifests and is not release evidence |
 
 ## Current Source Notes
 
@@ -92,8 +96,13 @@ are machine-readably enumerated in `formal/assumptions.toml`.
   `scripts/check-aeneas-equivalence.sh` builds the tracked Lean equivalence
   module before the Aeneas lane can pass; the older pilot remains as
   compatibility evidence for `formal/aeneas/pilot.toml`.
-- `scripts/check-kani-public-core.sh` requires bounded Kani harnesses over
-  the public kernel-core functions named in the proof manifest.
+- `scripts/check-kani-public-core.sh` requires bounded/no-unwinding Kani
+  harnesses over the public kernel-core functions named in the proof manifest;
+  it is not full Rust soundness evidence unless the runner uses unwinding
+  assertions and the manifest is promoted.
+- `CHIO_RUST_VERIFICATION_INVENTORY_LINT_ONLY=1` is a non-release inventory
+  lint path. `scripts/generate-proof-report.sh` clears that environment before
+  running release evidence gates.
 - `scripts/check-adapter-no-bypass.sh` is the static adapter gate for MCP,
   API protect, and OpenAPI sidecar mediation markers.
 - `scripts/generate-proof-report.sh` writes `target/formal/proof-report.json`

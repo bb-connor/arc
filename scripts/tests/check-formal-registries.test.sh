@@ -61,6 +61,13 @@ write_spec_inventory_pass() {
       "status": "assumed",
       "statement": "Assumed theorem.",
       "depends_on": ["proof.safe"]
+    },
+    {
+      "id": "proof.advisory",
+      "kind": "lean",
+      "status": "advisory_only",
+      "statement": "Advisory theorem.",
+      "depends_on": ["proof.safe"]
     }
   ]
 }
@@ -143,6 +150,18 @@ open(path, "w").write(json.dumps(doc, indent=2) + "\n")
 PY
 assert_fails "assumed theorem in release evidence"
 grep -q "assumed theorem proof.assumed appears in release evidence" "${OUT}"
+
+write_manifest_pass
+python3 - "${SPEC_MANIFEST}" <<'PY'
+import json
+import sys
+path = sys.argv[1]
+doc = json.load(open(path))
+doc["manifests"][0]["evidence"].append({"kind": "lean_theorem", "ref": "proof.advisory"})
+open(path, "w").write(json.dumps(doc, indent=2) + "\n")
+PY
+assert_fails "advisory theorem in release evidence"
+grep -q "non-release theorem proof.advisory status=advisory_only appears in release evidence" "${OUT}"
 
 write_manifest_pass
 python3 - "${SPEC_INV}" <<'PY'

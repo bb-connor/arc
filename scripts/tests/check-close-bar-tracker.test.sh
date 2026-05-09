@@ -6,7 +6,8 @@
 #   2. DONE + Wired runtime path=n fails the gate.
 #   3. Theorem-proven row with a missing .lean file fails the gate.
 #   4. Snapshot regression (snapshot DONE -> tracker PARTIAL) fails the gate.
-#   5. Baseline tracker passes the gate.
+#   5. DONE row citing Kani as full soundness fails while Kani is no-unwinding.
+#   6. Baseline tracker passes the gate.
 #
 # Each case writes a tracker + snapshot pair into a temp dir and points the
 # gate at them via the CHIO_CLOSE_BAR_* env overrides.
@@ -221,15 +222,26 @@ assert_fails "DONE + proposed theorem status" "$T11" "$S11" 1
 grep -q "formal release evidence is not proven" "$ERR" \
     || { echo "FAIL: missing diagnostic for DONE + proposed theorem status"; cat "$ERR"; exit 1; }
 
-# ---- Case 10: DONE + recognised scripts/*.sh path passes -------------------
+# ---- Case 10: DONE + Kani full-soundness wording fails ----------------------
+T12="$TMP_DIR/done-kani-full-soundness.md"
+S12="$TMP_DIR/done-kani-full-soundness.snapshot.json"
+write_tracker "$T12" \
+    "row-1 | Kani public core | DONE | y | scripts/check-kani-public-core.sh | n-a | 06 | Kani full Rust soundness evidence"
+write_snapshot "$S12" \
+    "row-1 | Kani public core | NONE | n | NONE | n-a | 06 | placeholder"
+assert_fails "DONE + Kani full soundness wording" "$T12" "$S12" 1
+grep -q "public Kani uses --no-unwinding-checks" "$ERR" \
+    || { echo "FAIL: missing diagnostic for Kani full soundness wording"; cat "$ERR"; exit 1; }
+
+# ---- Case 11: DONE + recognised scripts/*.sh path passes -------------------
 # The path allowlist accepts scripts/*.sh; pointing at the gate script itself
 # is a real on-disk file and matches the allowlist, so this row should pass.
-T12="$TMP_DIR/done-allowed.md"
-S12="$TMP_DIR/done-allowed.snapshot.json"
-write_tracker "$T12" \
+T13="$TMP_DIR/done-allowed.md"
+S13="$TMP_DIR/done-allowed.snapshot.json"
+write_tracker "$T13" \
     "row-1 | t1 | DONE | y | scripts/check-close-bar-tracker.sh | n-a | 04 | DONE with allowlisted test"
-write_snapshot "$S12" \
+write_snapshot "$S13" \
     "row-1 | t1 | NONE | n | NONE | n-a | 04 | placeholder"
-assert_passes "DONE + allowlisted scripts/*.sh path" "$T12" "$S12" 1
+assert_passes "DONE + allowlisted scripts/*.sh path" "$T13" "$S13" 1
 
 echo "PASS: check-close-bar-tracker integration test"

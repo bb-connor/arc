@@ -1,6 +1,17 @@
 schema = "chio.kani-public-harnesses.v1"
 crate = "chio-kernel-core"
 script = "scripts/check-kani-public-core.sh"
+evidence_class = "bounded_no_unwinding"
+default_unwind = 8
+unwinding_assertions = false
+full_soundness_evidence = false
+release_evidence = "bounded_reachability_only"
+
+# This manifest is intentionally not full Rust soundness evidence. The runner
+# uses `--no-unwinding-checks`, so successful harnesses prove only the bounded
+# paths reached under `default_unwind`. Release wording must describe this as
+# bounded/no-unwinding Kani evidence unless `unwinding_assertions` is set true
+# and the runner switches to unwinding assertions.
 
 # `harness_groups` is the flat-array catalog (one entry per logical edge or
 # algebraic property the harnesses exercise). Entries cover scope intersection
@@ -41,15 +52,15 @@ covered_symbols = [
   "chio_revocation_oracle::api::InclusionProof::verify",
 ]
 
-# Lane assignment. All 18 current public harnesses run in `lanes.pr`.
-# Keep timing claims in CI output instead of this manifest so additions do not
-# leave stale local wall-clock numbers behind. The `lanes.nightly_only` bucket
-# is preserved so future re-measurements can move slow harnesses without a
-# schema migration. The nightly Kani job runs the union of `lanes.pr` and
-# `lanes.nightly_only`, so moving a harness to `nightly_only` strictly reduces
-# PR coverage, never nightly coverage.
+# Lane assignment. All 18 current public harnesses run in `lanes.pr` as bounded
+# no-unwinding checks. Keep timing claims in CI output instead of this manifest
+# so additions do not leave stale local wall-clock numbers behind. The
+# `lanes.nightly_only` bucket is preserved so future re-measurements can move
+# slow harnesses without a schema migration. The nightly Kani job runs the union
+# of `lanes.pr` and `lanes.nightly_only`, so moving a harness to `nightly_only`
+# strictly reduces PR coverage, never nightly coverage.
 [lanes.pr]
-description = "Fast Kani harnesses run on every pull request (full sweep)"
+description = "Fast bounded/no-unwinding Kani harnesses run on every pull request"
 harnesses = [
   "public_verify_capability_rejects_untrusted_issuer_before_signature",
   "public_normalized_scope_subset_rejects_widened_child",

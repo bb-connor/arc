@@ -10,4 +10,4 @@ fi
 
 cargo kani -p chio-kernel-core --lib --default-unwind 8 --no-unwinding-checks
 
-echo "Kani core harnesses passed"
+echo "Bounded/no-unwinding Kani core harnesses passed (not full soundness evidence)"

@@ -87,7 +87,9 @@ Source file: `crates/chio-kernel-core/src/kani_public_harnesses.rs`. The
 script extracts every function name immediately following a
 `#[kani::proof]` attribute in this file and asserts it appears as a row
 below. Helper functions (e.g. `one_step_attenuation_predicate`) are not
-themselves harnesses and are not enforced.
+themselves harnesses and are not enforced. The public-core Kani lane currently
+runs with `--no-unwinding-checks`, so these rows are bounded/no-unwinding
+evidence only and must not be cited as full Rust soundness evidence.
 
 | Property                                                          | Source line | Rust path constrained                                                                                | Assumption discharge                                                                  | One-line description                                                                                                                  |
 | ----------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |

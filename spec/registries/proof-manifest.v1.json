@@ -1,7 +1,7 @@
 {
   "$schema": "https://chio-protocol.dev/schemas/registries/proof-manifest/v1",
   "version": "v1",
-  "description": "Mapping from each verifiable claim in the claim registry to the evidence that backs it: Lean theorems, Apalache modules, Kani harnesses, conformance tests, or signed assertions.",
+  "description": "Mapping from each verifiable claim in the claim registry to the evidence that backs it: Lean theorems, Apalache modules, bounded Kani harnesses, conformance tests, or signed assertions. Kani lanes using --no-unwinding-checks are bounded/no-unwinding evidence only, not full Rust soundness evidence.",
   "owner": "protocol-eng",
   "bootstrapped_by": "protocol-registry/v1",
   "manifests": [

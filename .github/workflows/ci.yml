@@ -219,8 +219,8 @@ jobs:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: |
-          if [[ "${CHIO_RUST_VERIFICATION_METADATA_ONLY:-0}" == "1" ]]; then
-            echo "Skipping proof report generation because Rust verification is in metadata-only mode"
+          if [[ "${CHIO_RUST_VERIFICATION_INVENTORY_LINT_ONLY:-0}" == "1" ]]; then
+            echo "Skipping proof report generation because Rust verification ran inventory-lint-only mode; no release evidence generated"
           else
             ./scripts/generate-proof-report.sh
             ./scripts/check-proof-report.sh
@@ -481,7 +481,8 @@ jobs:
   # Kani multi-crate manifest). Each `[[harness]]` entry whose `lane = "pr"` is run with
   #   cargo kani -p <crate> --lib --harness <name> \
   #     --default-unwind <unwind> --no-unwinding-checks
-  # under a per-harness `timeout(1)` budget.
+  # under a per-harness `timeout(1)` budget. This is bounded/no-unwinding
+  # reachability evidence only, not full Rust soundness evidence.
   #
   # chio-kernel-core retains its dedicated narrowing pass (for PRs we
   # restrict the chio-kernel-core sweep to harnesses whose source line

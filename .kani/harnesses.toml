@@ -1,4 +1,8 @@
 schema = "chio.kani.multi-crate.v1"
+evidence_class = "bounded_no_unwinding"
+unwinding_assertions = false
+full_soundness_evidence = false
+release_evidence = "bounded_reachability_only"
 
 # Multi-crate Kani harness manifest (Kani multi-crate manifest).
 #
@@ -8,7 +12,9 @@ schema = "chio.kani.multi-crate.v1"
 #     cargo kani -p <crate> --lib --harness <name> \
 #       --default-unwind <default_unwind> --no-unwinding-checks
 #
-# Wrapped under a per-harness wall-clock cap of `timeout_secs`.
+# Wrapped under a per-harness wall-clock cap of `timeout_secs`. Because
+# `unwinding_assertions = false`, this is bounded/no-unwinding reachability
+# evidence only. It must not be described as full Rust soundness evidence.
 #
 # Lanes:
 #   * lane = "pr"      Always runs on every PR and on push-to-main.
