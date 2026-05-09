@@ -6,8 +6,8 @@
 # ============================================================================
 #
 # This script is a blocking CI companion for the load-bearing runtime gate.
-# It is intentionally a grep-window heuristic, not a sound proof. Per the R3
-# review (BLOCKER #2 fix), the lint's contract is:
+# It is intentionally a grep-window heuristic, not a sound proof and not
+# release evidence. Per the R3 review (BLOCKER #2 fix), the lint's contract is:
 #
 #   - False POSITIVES are tolerated. The window can flag advisory-mode
 #     callers if a `require_public_witness: true` literal happens to live
@@ -49,8 +49,8 @@
 #      printed.
 #
 # Idempotent: running the script repeatedly returns the same exit code on
-# the same tree. Exit 0 means no obvious-case violations; exit 1 means a
-# violation was found.
+# the same tree. Exit 0 means no obvious-case violations; it does not prove
+# public-witness soundness. Exit 1 means a violation was found.
 #
 # ============================================================================
 # USAGE
@@ -68,7 +68,8 @@
 # violations, but a clean exit does NOT prove the absence of a bypass.
 # Audit R4 P1-010 requires CI posture to be non-advisory; the
 # [PUBLIC-WITNESS-LINT] prefix below makes the blocking companion
-# contract visible in logs.
+# contract visible in logs. It is never a substitute for the typed runtime
+# gate or its negative conformance tests.
 
 set -uo pipefail
 
@@ -175,8 +176,10 @@ fi
 
 if [[ "$advisory_caller" -eq 1 ]]; then
     echo "[PUBLIC-WITNESS-LINT] anchor-batch async-witness lint passed (best-effort; --advisory caller acknowledged the load-bearing runtime gate at crates/chio-anchor/src/batch.rs)"
+    echo "[PUBLIC-WITNESS-LINT] NOTE: this lint is NOT proof or release evidence; use the typed runtime gate and negative conformance tests for load-bearing assurance."
 else
     echo "[PUBLIC-WITNESS-LINT] anchor-batch async-witness lint passed"
     echo "[PUBLIC-WITNESS-LINT] NOTE: this is a best-effort grep heuristic. A clean exit does NOT prove the absence of a bypass; the load-bearing public-witness lane gate is the runtime AnchorError::SyncRouteRequiresAdvisoryPolicy arm in crates/chio-anchor/src/batch.rs. Pass --advisory only for explicit local advisory runs."
+    echo "[PUBLIC-WITNESS-LINT] NOTE: this lint is NOT proof or release evidence; use the typed runtime gate and negative conformance tests for load-bearing assurance."
 fi
 exit 0

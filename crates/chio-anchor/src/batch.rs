@@ -215,8 +215,9 @@ pub fn verify_anchor_batch(batch: &AnchorBatch) -> Result<(), AnchorError> {
 /// through [`verify_anchor_batch_with_witness_policy_async`] so that
 /// [`AnchorWitnessClient::verify_inclusion`] runs and the verifier-owned
 /// stale cache is consulted. The runtime gate at this entry point is
+/// the load-bearing enforcement. The
 /// `scripts/check-anchor-batch-async-witness.sh` lint is best-effort
-/// fast feedback only.
+/// fast feedback only and must not be cited as proof or release evidence.
 ///
 /// Advisory mode (`require_public_witness=false`) remains available
 /// for callers that intentionally treat witness state as non-binding.
