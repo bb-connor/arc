@@ -2,7 +2,7 @@
 # This is planning control data from PR #620. It is not release approval.
 
 schema_version = 1
-updated_utc = "2026-05-09T09:10:03Z"
+updated_utc = "2026-05-09T09:58:17Z"
 policy_owner = "rw6-graph-topology-owner"
 source_pr = 620
 base_ref = "origin/main"
@@ -267,20 +267,22 @@ notes = "Packaging seed only. It is not active package evidence for Trajectory 5
 
 [[quarantined_tail]]
 pr = 627
-observed_head = "c6e4c3ff3d61299f7f2e2a7b6edc1da017317c87"
+observed_head = "1bd936e5ee5a3ed8906ae21059c1bc07bf6b84d9"
 draft = true
 disposition = "quarantined_deferred_tail"
 release_review_unit = false
 security_review_unit = false
 merge_eligible = false
 allowed_next = "Split useful changes back into owned source, evidence, or planning PRs and rerun the active train."
+known_conflict_pairs = [610, 615, 628]
 
 [[quarantined_tail]]
 pr = 628
-observed_head = "a9f58307d1f51a00a6940265e74512501986ec9a"
+observed_head = "7669b7f3ce0ebff840ce9859af4cd06a9653881e"
 draft = true
 disposition = "quarantined_deferred_tail"
 release_review_unit = false
 security_review_unit = false
 merge_eligible = false
 allowed_next = "Split useful changes back into owned source, evidence, or planning PRs and rerun the active train."
+known_conflict_pairs = [610, 615, 627]
