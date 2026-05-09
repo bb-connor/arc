@@ -54,7 +54,7 @@ formal_theorems = {
     if item.get("id")
 }
 spec_entries: list[tuple[str, dict]] = []
-for section in ("theorems", "trj4_proposed_theorems"):
+for section in ("theorems", "proposed_theorems", "trj4_proposed_theorems"):
     for item in spec_theorems_doc.get(section, []):
         spec_entries.append((section, item))
 
