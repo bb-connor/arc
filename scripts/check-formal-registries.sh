@@ -122,7 +122,7 @@ def validate_manifest_group(group_name: str, manifests: list[dict]) -> None:
                     errors.append(
                         f"{manifest_id}: proposed theorem {ref} appears in release evidence; move it to evidence_proposed"
                     )
-                if field_name == "evidence" and status in {"advisory_only", "proven_partial"}:
+                if field_name == "evidence" and status in {"advisory_only", "proven_partial", "assumed"}:
                     errors.append(
                         f"{manifest_id}: non-release theorem {ref} status={status} appears in release evidence"
                     )
