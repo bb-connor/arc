@@ -2,7 +2,7 @@
 # This is planning control data from PR #620. It is not release approval.
 
 schema_version = 1
-updated_utc = "2026-05-09T09:58:17Z"
+updated_utc = "2026-05-09T10:12:55Z"
 policy_owner = "rw6-graph-topology-owner"
 source_pr = 620
 base_ref = "origin/main"
@@ -285,4 +285,4 @@ release_review_unit = false
 security_review_unit = false
 merge_eligible = false
 allowed_next = "Split useful changes back into owned source, evidence, or planning PRs and rerun the active train."
-known_conflict_pairs = [610, 615, 627]
+known_conflict_pairs = [609, 610, 615, 627]
