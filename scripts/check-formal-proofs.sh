@@ -5,6 +5,8 @@ cd "$(dirname "$0")/.."
 
 formal_root="formal/lean4/Chio"
 
+./scripts/check-formal-registries.sh
+
 if ! command -v lake >/dev/null 2>&1; then
   echo "formal proof check requires lake on PATH (install Lean 4 / elan first)" >&2
   exit 1

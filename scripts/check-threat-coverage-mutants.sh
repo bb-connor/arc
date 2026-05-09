@@ -33,10 +33,9 @@
 #
 #      A row with `needs_real_run: true` is treated as
 #      `weak_coverage` regardless of `caught`, and a downgrade hint
-#      is emitted with reason `bootstrap_placeholder`. The script
-#      does NOT exit 1 on bootstrap placeholders (this is the
-#      temporary scaffolding accommodation that lets the PR land
-#      while wave 4 backfills real evidence).
+#      is emitted with reason `bootstrap_placeholder`. By default
+#      bootstrap placeholders are hard failures: they are not release
+#      evidence and must not count as covered.
 #
 #   3. If the evidence file is missing, emit a downgrade hint with
 #      reason `missing_evidence` and exit 1 (unless `--dry-run`).
@@ -55,8 +54,8 @@
 #   - `missing_evidence` - audits/evidence/threats/<id>.json is missing
 #   - `zero_kills`       - the evidence file records caught == 0
 #   - `no_coveredby`     - no coveredBy / covered_by_tests cross-link
-#   - `bootstrap_placeholder` - needs_real_run is true (informational, only
-#     while the bootstrap accommodation is still in date)
+#   - `bootstrap_placeholder` - needs_real_run is true before expiry; still a
+#     normal failure unless --allow-bootstrap-placeholders is explicitly set
 #   - `bootstrap_expired` - needs_real_run is true but today >=
 #     BOOTSTRAP_EXPIRES_DATE; the accommodation has expired and the
 #     row is now a real failure
@@ -65,11 +64,15 @@
 #     contradicts the placeholder claim
 #
 # Modes:
-#   - default: any non-bootstrap downgrade hint causes exit 1.
+#   - default: any downgrade hint causes exit 1, including
+#     bootstrap_placeholder.
 #   - --dry-run: every downgrade hint is reported but exit code is 0,
 #     so authors can iterate locally before wiring evidence. NOTE:
 #     --dry-run is refused when CI=true so a CI run cannot land a PR
 #     by relying on the lenient mode.
+#   - --allow-bootstrap-placeholders: bootstrap placeholders are
+#     reported but do not fail. This exists only for non-release
+#     scaffolding fixtures; release and preflight callers must not use it.
 #
 # Bootstrap expiry:
 #   The `needs_real_run: true` accommodation is bounded by
@@ -80,8 +83,8 @@
 #   development and tests.
 #
 # Exit codes:
-#   0 - all covered rows have caught >= 1 evidence (or every offending
-#       row is a bootstrap placeholder, or --dry-run).
+#   0 - all covered rows have caught >= 1 evidence (or --dry-run, or
+#       --allow-bootstrap-placeholders for bootstrap-only fixtures).
 #   1 - one or more covered rows are missing real evidence and we are
 #       not in --dry-run.
 #   2 - argument or config error (unknown flag, --dry-run in CI,
@@ -100,10 +103,14 @@ BOOTSTRAP_EXPIRES_DATE="2026-08-01"
 BOOTSTRAP_EXPIRES_DATE="${CHIO_BOOTSTRAP_EXPIRY:-$BOOTSTRAP_EXPIRES_DATE}"
 
 DRY_RUN=0
+ALLOW_BOOTSTRAP_PLACEHOLDERS=0
 for arg in "$@"; do
     case "$arg" in
         --dry-run)
             DRY_RUN=1
+            ;;
+        --allow-bootstrap-placeholders)
+            ALLOW_BOOTSTRAP_PLACEHOLDERS=1
             ;;
         -h|--help)
             sed -n '1,80p' "$0"
@@ -111,7 +118,7 @@ for arg in "$@"; do
             ;;
         *)
             echo "error: unknown argument $arg" >&2
-            echo "usage: $(basename "$0") [--dry-run]" >&2
+            echo "usage: $(basename "$0") [--dry-run] [--allow-bootstrap-placeholders]" >&2
             exit 2
             ;;
     esac
@@ -254,8 +261,10 @@ while IFS=$'\t' read -r tid state has_coveredby; do
             fail=1
             continue
         fi
-        # Bootstrap placeholder still valid. Emit hint but DO NOT raise fail.
         bootstrap_hints+=("WEAK: $tid should be marked weak_coverage; reason=bootstrap_placeholder")
+        if [[ "$ALLOW_BOOTSTRAP_PLACEHOLDERS" != "1" ]]; then
+            fail=1
+        fi
         continue
     fi
 
@@ -274,11 +283,11 @@ echo "  weak (real failures): ${#weak_hints[@]}"
 echo "  bootstrap placeholders: ${#bootstrap_hints[@]}"
 
 # Always print every hint so authors see the full picture.
-for h in "${bootstrap_hints[@]}"; do
-    echo "$h"
+for ((i = 0; i < ${#bootstrap_hints[@]}; i++)); do
+    echo "${bootstrap_hints[$i]}"
 done
-for h in "${weak_hints[@]}"; do
-    echo "$h" >&2
+for ((i = 0; i < ${#weak_hints[@]}; i++)); do
+    echo "${weak_hints[$i]}" >&2
 done
 
 if [[ "$fail" -eq 1 && "$DRY_RUN" -ne 1 ]]; then

@@ -7,7 +7,7 @@
 #
 #   1. A row with valid evidence (caught >= 1) PASSES.
 #   2. A row with `needs_real_run: true` produces a downgrade hint
-#      (`bootstrap_placeholder`) but does NOT fail the gate.
+#      (`bootstrap_placeholder`) and fails by default.
 #   3. A row with `coverage_state: weak_coverage` in the JSON
 #      causes `check-threat-coverage.sh` (the file-existence gate
 #      that owns enum policy) to FAIL with a clear message naming
@@ -98,10 +98,9 @@ write_stub() {
 }
 
 run_mutants_gate() {
-    local extra_args=("$@")
     CHIO_THREAT_MODEL_PATH="$MODEL" \
     CHIO_THREAT_EVIDENCE_DIR="$EVIDENCE_DIR" \
-        bash "$REPO_ROOT/scripts/check-threat-coverage-mutants.sh" "${extra_args[@]}" \
+        bash "$REPO_ROOT/scripts/check-threat-coverage-mutants.sh" "$@" \
         >"$OUT" 2>"$ERR"
 }
 
@@ -142,15 +141,22 @@ write_evidence "valid_threat" 7 false
 assert_passes "valid evidence passes" run_mutants_gate
 grep -q "passed: 1" "$OUT"
 
-# Case 2: bootstrap placeholder produces hint but does NOT fail.
+# Case 2: bootstrap placeholder produces hint and fails by default because
+# placeholders are not release-covered evidence.
 reset_fixture
 write_model_single "bootstrap_threat" "covered"
 write_evidence "bootstrap_threat" 0 true
-assert_passes "bootstrap placeholder does not fail" run_mutants_gate
+assert_fails "bootstrap placeholder fails by default" run_mutants_gate
 grep -q "bootstrap placeholders: 1" "$OUT"
 grep -q "WEAK: bootstrap_threat should be marked weak_coverage; reason=bootstrap_placeholder" "$OUT"
 
-# Case 2b: same input, dry-run, also passes.
+# Case 2b: same input passes only under the explicit placeholder fixture mode
+# or dry-run. Release/preflight callers do not use this flag.
+assert_passes "bootstrap placeholder passes under explicit fixture mode" \
+    run_mutants_gate --allow-bootstrap-placeholders
+grep -q "bootstrap placeholders: 1" "$OUT"
+
+# Case 2c: same input, dry-run, also passes.
 assert_passes "bootstrap placeholder passes under --dry-run" run_mutants_gate --dry-run
 grep -q "bootstrap placeholders: 1" "$OUT"
 
@@ -199,10 +205,14 @@ CHIO_BOOTSTRAP_EXPIRY="1970-01-01" \
 grep -q "WEAK: expired_bootstrap_threat should be marked weak_coverage; reason=bootstrap_expired" "$ERR" \
     || { echo "FAIL: missing bootstrap_expired diagnostic"; cat "$ERR"; exit 1; }
 
-# Case 7b: same input WITHOUT the expiry override still passes (the default
-# expiry is well in the future at the time this test was written).
+# Case 7b: same input WITHOUT the expiry override still fails by default.
 CHIO_BOOTSTRAP_EXPIRY="2099-01-01" \
-    assert_passes "bootstrap placeholder still valid before expiry" run_mutants_gate
+    assert_fails "bootstrap placeholder fails before expiry by default" run_mutants_gate
+
+# Case 7c: explicit fixture mode can still admit the pre-expiry placeholder.
+CHIO_BOOTSTRAP_EXPIRY="2099-01-01" \
+    assert_passes "bootstrap placeholder fixture mode before expiry" \
+    run_mutants_gate --allow-bootstrap-placeholders
 
 # Case 8 (wave-0.5 hardening): needs_real_run=true with non-1970 ran_at is
 # rejected as inconsistent_bootstrap.

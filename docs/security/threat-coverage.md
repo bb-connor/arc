@@ -17,7 +17,7 @@ The trajectory-4 closeout audit found that the original `scripts/check-threat-co
 
 The schema enum gains a new `weak_coverage` state for rows whose tests exist but whose mutation-testing evidence is missing or shows zero kills; the existing `check-threat-coverage.sh` fails closed on that state with a clear message naming the row.
 
-To allow the new gate to land alongside placeholder evidence, the bootstrap files set `"needs_real_run": true` and the per-row script reports them as informational (`reason=bootstrap_placeholder`) without failing the build. Trajectory-4 wave 4 backfills real cargo-mutants results for each row and removes the `needs_real_run` flag.
+Bootstrap files that set `"needs_real_run": true` are not release evidence. The per-row script reports them as `reason=bootstrap_placeholder` and fails normal release/preflight runs until real cargo-mutants results replace the placeholder and remove the flag.
 
 Coverage states:
 - `Covered` - the threat ID has a populated test body at `crates/chio-conformance/tests/threats/<id>.rs` AND a mutation-testing evidence file at `audits/evidence/threats/<id>.json` recording at least one caught mutant.
@@ -229,4 +229,3 @@ Coverage states:
 - **Surfaces:** mobile_android, capability_issuance
 - **Test stub:** `crates/chio-conformance/tests/threats/play_integrity_token_replay.rs`
 - **Corpus cases:** (none cite this threat ID)
-

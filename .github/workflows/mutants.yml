@@ -176,6 +176,11 @@ jobs:
           git diff "origin/${BASE_REF}...HEAD" > "${diff_file}"
           wc -l "${diff_file}" || true
           echo "diff_file=${diff_file}" >> "${GITHUB_OUTPUT}"
+          if [[ -s "${diff_file}" ]]; then
+            echo "no_diff=0" >> "${GITHUB_OUTPUT}"
+          else
+            echo "no_diff=1" >> "${GITHUB_OUTPUT}"
+          fi
 
       - name: Run cargo-mutants --in-diff against PR base
         id: mutate
@@ -238,6 +243,7 @@ jobs:
           # a blocking-fail to a loud advisory pass. Title-based override is
           # preferred; this env-var is for in-flight CI runs only.
           MUTANTS_GATE_OVERRIDE_REASON: ${{ vars.MUTANTS_GATE_OVERRIDE_REASON }}
+          MUTANTS_NO_DIFF: ${{ steps.diff.outputs.no_diff }}
           GITHUB_ACTOR: ${{ github.actor }}
           CHIO_MUTANTS_GATE: blocking
         run: |

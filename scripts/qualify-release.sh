@@ -15,6 +15,8 @@ fi
 
 # ci-workspace remains the fast regression gate. The bounded Chio release lane
 # is the ship-facing qualification boundary.
+./scripts/check-threat-coverage.sh
+./scripts/check-threat-coverage-mutants.sh
 ./scripts/ci-workspace.sh
 ./scripts/qualify-bounded-chio.sh
 ./scripts/qualify-trust-control.sh

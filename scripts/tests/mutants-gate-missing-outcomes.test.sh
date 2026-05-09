@@ -6,8 +6,19 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "${TMP_DIR}"' EXIT
 
+RELEASES_TOML="${TMP_DIR}/releases.toml"
+cat >"${RELEASES_TOML}" <<'TOML'
+[mutants]
+target_catch_ratio_percent = 80
+activation_threshold_percent_per_crate = 65
+required_consecutive_nightly_successes = 2
+observed_consecutive_nightly_successes = 2
+cycle_end_tag = "v-test-blocking"
+TOML
+
 status=0
 env \
+  CHIO_RELEASES_TOML="${RELEASES_TOML}" \
   MUTANTS_PACKAGE=chio-kernel-core \
   MUTANTS_OUTPUT_DIR="${TMP_DIR}/mutants-out" \
   MUTANTS_EXIT=0 \
@@ -28,4 +39,56 @@ if ! grep -q "outcomes_json=missing" "${TMP_DIR}/stderr"; then
   exit 1
 fi
 
-echo "PASS: blocking mutation gate fails closed when outcomes.json is missing"
+status=0
+env \
+  CHIO_RELEASES_TOML="${RELEASES_TOML}" \
+  MUTANTS_PACKAGE=chio-kernel-core \
+  MUTANTS_OUTPUT_DIR="${TMP_DIR}/mutants-out" \
+  MUTANTS_EXIT=0 \
+  MUTANTS_NO_DIFF=1 \
+  bash "${REPO_ROOT}/scripts/mutants-gate.sh" \
+  >"${TMP_DIR}/stdout" 2>"${TMP_DIR}/stderr" || status=$?
+
+if [[ "${status}" -ne 0 ]]; then
+  echo "FAIL: explicit no-diff mode should pass missing outcomes.json in blocking posture" >&2
+  cat "${TMP_DIR}/stdout" >&2
+  cat "${TMP_DIR}/stderr" >&2
+  exit 1
+fi
+
+if ! grep -q "verdict=pass-no-diff" "${TMP_DIR}/stdout"; then
+  echo "FAIL: explicit no-diff success did not report pass-no-diff" >&2
+  cat "${TMP_DIR}/stdout" >&2
+  cat "${TMP_DIR}/stderr" >&2
+  exit 1
+fi
+
+mkdir -p "${TMP_DIR}/mutants-out"
+cat >"${TMP_DIR}/mutants-out/outcomes.json" <<'JSON'
+{"outcomes":[]}
+JSON
+
+status=0
+env \
+  CHIO_RELEASES_TOML="${RELEASES_TOML}" \
+  MUTANTS_PACKAGE=chio-kernel-core \
+  MUTANTS_OUTPUT_DIR="${TMP_DIR}/mutants-out" \
+  MUTANTS_EXIT=0 \
+  bash "${REPO_ROOT}/scripts/mutants-gate.sh" \
+  >"${TMP_DIR}/stdout" 2>"${TMP_DIR}/stderr" || status=$?
+
+if [[ "${status}" -eq 0 ]]; then
+  echo "FAIL: blocking mutation gate passed with empty outcomes.json" >&2
+  cat "${TMP_DIR}/stdout" >&2
+  cat "${TMP_DIR}/stderr" >&2
+  exit 1
+fi
+
+if ! grep -q "scoreable=0" "${TMP_DIR}/stderr"; then
+  echo "FAIL: empty outcomes failure did not report scoreable=0" >&2
+  cat "${TMP_DIR}/stdout" >&2
+  cat "${TMP_DIR}/stderr" >&2
+  exit 1
+fi
+
+echo "PASS: blocking mutation gate fails closed on missing/empty outcomes without explicit no-diff mode"

@@ -15,11 +15,10 @@
 #      testing gate, trajectory-4 wave-0 / E0.4): for each
 #      `covered` row, asserts the existence of an evidence file at
 #      `audits/evidence/threats/<id>.json` recording at least one
-#      caught mutant. Rows whose evidence is missing or zero-kills
+#      caught mutant. Rows whose evidence is missing, zero-kills, or
+#      marked `needs_real_run: true`
 #      get a `WEAK: <id>` downgrade hint. Bootstrap placeholders
-#      (`needs_real_run: true`) are reported as informational and
-#      do not fail the build, so the per-row gate can be wired in
-#      ahead of trajectory-4 wave 4 backfilling real evidence.
+#      are hard failures because they are not release evidence.
 #
 # Pending vectors auto-promoted by the M05.P2 fuzz-seed promoter
 # (D14) live in the corpus, not the threat list, and are excluded

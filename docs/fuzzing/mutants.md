@@ -210,6 +210,11 @@ After merge, `scripts/mutants-gate.sh` reads the non-empty
 `mutants-pr` gate from "exit 0 below target" (advisory) to "exit 1
 below target" (blocking). PR comments emitted by `mutants-pr` switch
 from advisory to blocking mode once gate metadata activates blocking.
+In blocking mode, missing or zero-scoreable `outcomes.json` is a failure.
+The only pass-through is explicit no-diff mode (`MUTANTS_NO_DIFF=1` or
+`CHIO_MUTANTS_NO_DIFF=1`) for a PR lane whose diff is intentionally empty
+for that package and whose cargo-mutants exit code is 0. Full sweeps and
+non-empty scoped runs must produce scoreable outcomes.
 
 If the workflow re-runs against an older tag (workflow_dispatch, repush,
 etc.) the empty-string regex guard makes the write a no-op, so a single

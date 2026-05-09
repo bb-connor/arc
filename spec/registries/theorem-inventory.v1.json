@@ -8,23 +8,47 @@
     {
       "id": "theorem.capability.signature_correctness",
       "kind": "lean",
-      "status": "proven",
-      "statement": "For any well-formed CapabilityTokenBody and Keypair, sign(body, kp).verify(body, kp.public_key) returns Ok.",
+      "status": "proposed",
+      "statement": "For any well-formed CapabilityTokenBody and Keypair, sign(body, kp).verify(body, kp.public_key) returns Ok. This coarse theorem is not active release evidence until it has a matching formal/theorem-inventory.json entry and proof_path.",
       "depends_on": []
     },
     {
       "id": "theorem.receipt.signature_correctness",
       "kind": "lean",
-      "status": "proven",
-      "statement": "For any well-formed ChioReceipt body and Keypair, sign(body, kp).verify(body, kp.public_key) returns Ok.",
+      "status": "proposed",
+      "statement": "For any well-formed ChioReceipt body and Keypair, sign(body, kp).verify(body, kp.public_key) returns Ok. Active release evidence uses the exact symbolic theorem proof.receipt_sign_then_verify instead.",
       "depends_on": []
     },
     {
       "id": "theorem.attenuation.subset_correctness",
       "kind": "lean",
-      "status": "proven",
-      "statement": "validate_attenuation(parent, child) returns Ok iff child.is_subset_of(parent) under the canonical scope normalization.",
+      "status": "proposed",
+      "statement": "validate_attenuation(parent, child) returns Ok iff child.is_subset_of(parent) under the canonical scope normalization. Active release evidence uses exact bounded-model theorems spec.capability_monotonicity and proof.scope_subset_of_grants_subset.",
       "depends_on": []
+    },
+    {
+      "id": "proof.receipt_sign_then_verify",
+      "kind": "lean",
+      "status": "proven",
+      "proof_path": "formal/lean4/Chio/Chio/Proofs/Receipt.lean",
+      "statement": "Receipt signing followed by verification succeeds in the symbolic receipt-signature model.",
+      "depends_on": []
+    },
+    {
+      "id": "spec.capability_monotonicity",
+      "kind": "lean",
+      "status": "proven",
+      "proof_path": "formal/lean4/Chio/Chio/Spec/Properties.lean",
+      "statement": "Capability attenuation is monotonic over the bounded ChioScope grant model.",
+      "depends_on": []
+    },
+    {
+      "id": "proof.scope_subset_of_grants_subset",
+      "kind": "lean",
+      "status": "proven",
+      "proof_path": "formal/lean4/Chio/Chio/Proofs/Monotonicity.lean",
+      "statement": "Grant-wise subset assumptions imply ChioScope subset truth in the bounded model.",
+      "depends_on": ["spec.capability_monotonicity"]
     },
     {
       "id": "theorem.revocation.cut_completeness",
@@ -50,7 +74,7 @@
       "statement": "If verify_attenuation_witness(parent_hash, child_hash, witness) returns Ok, then there exists a parent scope and a child scope such that H(canonical(parent)) = parent_hash, H(canonical(child)) = child_hash, and child.is_subset_of(parent) holds. W1.1 chain-binding extension: the verifier additionally requires `attenuation_proof.parent_scope_hash` to match the trust-root scope hash (direct issue) or the last delegation link's signed scope_hash (delegated chain), closing the inflated-parent-scope P0 soundness gap.",
       "introduced_by": "trajectory-4/T1.1",
       "promoted_by": "trajectory-4/wave-1.5",
-      "depends_on": ["theorem.attenuation.subset_correctness"]
+      "depends_on": ["spec.capability_monotonicity"]
     },
     {
       "id": "theorem.handshake.negotiation_safety",
@@ -76,6 +100,7 @@
       "id": "theorem.receipt.body_hash_input_set_pinned",
       "kind": "lean",
       "status": "assumed",
+      "proof_path": "formal/lean4/Chio/Chio/Proofs/Receipt.lean",
       "statement": "For any chio.receipt.v2 body B, the set of fields contributing to body_hash is exactly fields(B) \\\\ {body_hash, signature, receipt_id}. The Lean proof regenerates from the JSON schema; any drift fails the proof. W2.1 hot-path extension: the kernel mints `ChioReceiptV2` whose `body_hash` field equals H(canonical_jcs(ReceiptV2BodyHashInput)) at production mint time, and the replay store keys on body_hash exclusively (the legacy UUIDv7 alias is non-authoritative).",
       "introduced_by": "trajectory-4/T1.2",
       "promoted_by": "trajectory-4/W2.1",

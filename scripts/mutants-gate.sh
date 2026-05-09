@@ -40,6 +40,16 @@
 #                         and clears
 #                         cycle_end_tag in releases.toml; CODEOWNERS gates
 #                         that PR on principal-engineer review.
+#   MUTANTS_NO_DIFF / CHIO_MUTANTS_NO_DIFF
+#                       : explicit no-diff mode for blocking PR lanes where
+#                         cargo-mutants was intentionally scoped to an empty
+#                         diff. Missing or zero-scoreable outcomes pass only
+#                         when one of these is set to 1 and MUTANTS_EXIT=0.
+#   MUTANTS_MIN_SCOREABLE
+#                       : minimum number of scoreable mutants required in
+#                         blocking mode unless explicit no-diff mode is set.
+#                         Defaults to 1.
+#   CHIO_RELEASES_TOML  : optional path to a releases.toml fixture.
 #
 # Exit codes:
 #   0 advisory pass (or blocking pass when caught ratio meets target, or
@@ -66,12 +76,14 @@ PACKAGE="${MUTANTS_PACKAGE:-unknown}"
 OUTPUT_DIR="${MUTANTS_OUTPUT_DIR:-}"
 EXIT_CODE="${MUTANTS_EXIT:-0}"
 OVERRIDE_REASON="${MUTANTS_GATE_OVERRIDE_REASON:-}"
+NO_DIFF_MODE="${MUTANTS_NO_DIFF:-${CHIO_MUTANTS_NO_DIFF:-0}}"
+MIN_SCOREABLE="${MUTANTS_MIN_SCOREABLE:-1}"
 
 # Locate releases.toml relative to the script. The script lives in
 # scripts/ at the repo root, so releases.toml sits one directory up.
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
-releases_toml="${repo_root}/releases.toml"
+releases_toml="${CHIO_RELEASES_TOML:-${repo_root}/releases.toml}"
 
 if [[ ! -f "${releases_toml}" ]]; then
     printf 'mutants-gate: releases.toml missing at %s; defaulting to advisory\n' \
@@ -137,6 +149,16 @@ fi
 if [[ ! "${observed_successes}" =~ ^[0-9]+$ ]]; then
     printf 'mutants-gate: invalid observed_consecutive_nightly_successes=%s in releases.toml\n' \
         "${observed_successes}" >&2
+    exit 2
+fi
+if [[ ! "${NO_DIFF_MODE}" =~ ^(0|1)$ ]]; then
+    printf 'mutants-gate: invalid MUTANTS_NO_DIFF/CHIO_MUTANTS_NO_DIFF=%s; expected 0 or 1\n' \
+        "${NO_DIFF_MODE}" >&2
+    exit 2
+fi
+if [[ ! "${MIN_SCOREABLE}" =~ ^[0-9]+$ ]]; then
+    printf 'mutants-gate: invalid MUTANTS_MIN_SCOREABLE=%s; expected integer\n' \
+        "${MIN_SCOREABLE}" >&2
     exit 2
 fi
 
@@ -211,14 +233,14 @@ if [[ -f "${outcomes_json}" ]]; then
         exit 2
     fi
 
-    if (( scoreable == 0 )); then
-        if (( EXIT_CODE == 0 )); then
-            printf 'mutants-gate: package=%s exit=0 posture=blocking verdict=pass (cycle_end_tag=%s target=%s%% activation_threshold=%s%% scoreable=0 caught=0 total=%s unviable=%s)\n' \
-                "${PACKAGE}" "${cycle_end_tag}" "${target_percent}" "${threshold_percent}" "${total}" "${unviable}"
+    if (( scoreable < MIN_SCOREABLE )); then
+        if [[ "${NO_DIFF_MODE}" == "1" && "${EXIT_CODE}" == "0" ]]; then
+            printf 'mutants-gate: package=%s exit=0 posture=blocking verdict=pass-no-diff (cycle_end_tag=%s target=%s%% activation_threshold=%s%% scoreable=%s min_scoreable=%s total=%s unviable=%s)\n' \
+                "${PACKAGE}" "${cycle_end_tag}" "${target_percent}" "${threshold_percent}" "${scoreable}" "${MIN_SCOREABLE}" "${total}" "${unviable}"
             exit 0
         fi
-        printf 'mutants-gate: package=%s exit=%s posture=blocking verdict=fail (cycle_end_tag=%s target=%s%% activation_threshold=%s%% scoreable=0 total=%s unviable=%s; cargo-mutants exited non-zero without scoreable outcomes)\n' \
-            "${PACKAGE}" "${EXIT_CODE}" "${cycle_end_tag}" "${target_percent}" "${threshold_percent}" "${total}" "${unviable}" >&2
+        printf 'mutants-gate: package=%s exit=%s posture=blocking verdict=fail (cycle_end_tag=%s target=%s%% activation_threshold=%s%% scoreable=%s min_scoreable=%s total=%s unviable=%s; refusing empty or partial outcomes without explicit no-diff mode)\n' \
+            "${PACKAGE}" "${EXIT_CODE}" "${cycle_end_tag}" "${target_percent}" "${threshold_percent}" "${scoreable}" "${MIN_SCOREABLE}" "${total}" "${unviable}" >&2
     elif (( caught * 100 >= threshold_percent * scoreable )); then
         pct_x10=$(( caught * 1000 / scoreable ))
         printf 'mutants-gate: package=%s exit=%s posture=blocking verdict=pass (cycle_end_tag=%s target=%s%% activation_threshold=%s%% caught_ratio=%s.%s%% caught=%s scoreable=%s total=%s unviable=%s observed_nightly_successes=%s/%s)\n' \
@@ -233,6 +255,10 @@ if [[ -f "${outcomes_json}" ]]; then
             "$(( pct_x10 / 10 ))" "$(( pct_x10 % 10 ))" "${caught}" "${scoreable}" "${total}" "${unviable}" \
             "${observed_successes}" "${required_successes}" >&2
     fi
+elif [[ "${NO_DIFF_MODE}" == "1" && "${EXIT_CODE}" == "0" ]]; then
+    printf 'mutants-gate: package=%s exit=0 posture=blocking verdict=pass-no-diff (cycle_end_tag=%s target=%s%% activation_threshold=%s%% outcomes_json=missing explicit_no_diff=1)\n' \
+        "${PACKAGE}" "${cycle_end_tag}" "${target_percent}" "${threshold_percent}"
+    exit 0
 elif (( EXIT_CODE == 0 )); then
     printf 'mutants-gate: package=%s exit=0 posture=blocking verdict=fail (cycle_end_tag=%s target=%s%% activation_threshold=%s%% outcomes_json=missing; refusing to trust cargo-mutants success without score data)\n' \
         "${PACKAGE}" "${cycle_end_tag}" "${target_percent}" "${threshold_percent}" >&2
