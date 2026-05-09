@@ -1,11 +1,20 @@
 {
   "caught": 1,
   "needs_real_run": false,
-  "note": "Conformance evidence: real conformance test at crates/chio-conformance/tests/threats/agent_velocity_abuse.rs constructs an attack input (second request from the same agent under a 1/window ceiling), calls AgentVelocityGuard::evaluate (production code from chio-guards), and asserts Verdict::Deny. The header in that file documents the revert-to-prove-it-fails recipe (flip the per-agent ceiling Ok(Verdict::Deny) to Ok(Verdict::Allow) in chio-guards/src/agent_velocity.rs).",
-  "ran_at": "2026-05-08T00:00:00Z",
+  "note": "Real cargo-mutants evidence: a targeted in-place cargo-mutants run against crates/chio-guards/src/agent_velocity.rs caught the TokenBucket::try_consume -> false mutant through crates/chio-conformance/tests/threats/agent_velocity_abuse.rs. This is executable mutation evidence for the denied repeat-request sub-vector, not generated conformance metadata.",
+  "ran_at": "2026-05-09T10:55:48Z",
   "survivors": [],
   "test_path": "crates/chio-conformance/tests/threats/agent_velocity_abuse.rs",
-  "timestamp_kind": "generated-metadata",
-  "timestamp_note": "ran_at is a normalized batch date for this evidence JSON. No command wall-clock transcript was committed, so ran_at must not be interpreted as the real cargo test or cargo-mutants start/finish time.",
-  "reproduction_command": "cargo test -p chio-conformance --test threats agent_velocity_abuse"
+  "timestamp_kind": "cargo-mutants-run",
+  "timestamp_note": "UTC timestamp captured after the local cargo-mutants run completed.",
+  "evidence_status": "cargo-mutants-run",
+  "mutation_evidence_status": "complete",
+  "promotion_status": "promoted",
+  "mutation_scope": "targeted-single-mutant",
+  "mutants_tested": 1,
+  "mutants_caught": [
+    "crates/chio-guards/src/agent_velocity.rs:48:9: replace TokenBucket::try_consume -> bool with false"
+  ],
+  "artifact_dir": "audits/evidence/threats/agent_velocity_abuse.mutants.out",
+  "reproduction_command": "CARGO_TARGET_DIR=/Users/connor/Medica/backbay/standalone/arc/target cargo mutants --in-place --no-config --package chio-guards --file crates/chio-guards/src/agent_velocity.rs --re 'replace TokenBucket::try_consume -> bool with false' --baseline skip --timeout 120 --no-shuffle --output /tmp/arc-rw7-agent-velocity-mutants-inplace -- --package chio-conformance --test threats agent_velocity_abuse"
 }

@@ -1,0 +1,28 @@
+--- crates/chio-guards/src/agent_velocity.rs
++++ replace TokenBucket::try_consume -> bool with false
+@@ -40,24 +40,17 @@
+             capacity_mt: capacity_tokens.saturating_mul(MT_PER_TOKEN),
+             tokens_mt: capacity_tokens.saturating_mul(MT_PER_TOKEN),
+             refill_rate_mpm,
+             last_refill: Instant::now(),
+         }
+     }
+ 
+     fn try_consume(&mut self, amount_tokens: u64) -> bool {
+-        self.refill();
+-        let cost_mt = amount_tokens.saturating_mul(MT_PER_TOKEN);
+-        if self.tokens_mt >= cost_mt {
+-            self.tokens_mt -= cost_mt;
+-            true
+-        } else {
+-            false
+-        }
++        false /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     fn refill(&mut self) {
+         let elapsed_ms = self.last_refill.elapsed().as_millis() as u64;
+         if elapsed_ms == 0 {
+             return;
+         }
+         let added = elapsed_ms.saturating_mul(self.refill_rate_mpm);

@@ -1,0 +1,32 @@
+[
+  {
+    "package": "chio-guards",
+    "file": "crates/chio-guards/src/agent_velocity.rs",
+    "function": {
+      "function_name": "TokenBucket::try_consume",
+      "return_type": "-> bool",
+      "span": {
+        "start": {
+          "line": 47,
+          "column": 5
+        },
+        "end": {
+          "line": 56,
+          "column": 6
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 48,
+        "column": 9
+      },
+      "end": {
+        "line": 55,
+        "column": 10
+      }
+    },
+    "replacement": "false",
+    "genre": "FnValue"
+  }
+]
