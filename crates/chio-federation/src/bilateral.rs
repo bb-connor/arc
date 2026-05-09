@@ -1,13 +1,19 @@
 //! Bilateral cross-kernel runtime co-signing.
 //!
 //! When an agent from Organisation A invokes a tool hosted by Organisation B,
-//! both kernels need to sign the same receipt so that either org can
-//! independently verify the chain. This module defines the wire-level
+//! both kernels need a compatibility detached-signature artifact for older
+//! federation deployments. This module defines the wire-level
 //! [`CoSigningRequest`] / [`CoSigningResponse`] envelope, the
-//! [`DualSignedReceipt`] artifact (which carries both signatures side-by-
-//! side without mutating the core `ChioReceipt` body), and a
+//! legacy [`DualSignedReceipt`] compatibility artifact (which carries both
+//! signatures side-by-side without mutating the core `ChioReceipt` body), and a
 //! [`BilateralCoSigningProtocol`] trait that the kernel calls after it
 //! signs a receipt locally.
+//!
+//! `DualSignedReceipt::verify*` is not DSSE and is not CHIODOS bilateral
+//! protocol acceptance. It verifies only the older `CoSigningBody`
+//! detached-signature preimage. Protocol acceptance requires the
+//! DSSE envelope shape described by
+//! `spec/CHIODOS_BILATERAL_COSIGN_INVOCATION.md`.
 //!
 //! ## Design notes
 //!
@@ -76,7 +82,8 @@ impl CoSigningBody {
     }
 }
 
-/// A receipt co-signed by two kernels across a federation boundary.
+/// Compatibility-only receipt co-signed by two kernels across a federation
+/// boundary.
 ///
 /// * `body` -- the underlying `ChioReceipt` that both kernels agreed on.
 /// * `org_a_signature` -- detached signature by the origin (Org A) kernel
@@ -87,7 +94,9 @@ impl CoSigningBody {
 /// The existing receipt's built-in `signature` and `kernel_key` fields are
 /// unchanged: a classic verifier can still check the receipt in isolation,
 /// while a federation-aware verifier additionally checks both detached
-/// signatures via [`DualSignedReceipt::verify`].
+/// signatures via [`DualSignedReceipt::verify`]. This is not a DSSE
+/// signature-slice artifact and must not be used as CHIODOS protocol
+/// acceptance.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DualSignedReceipt {
@@ -105,6 +114,10 @@ impl DualSignedReceipt {
     ///
     /// Neither half of the dual signature is sufficient on its own; a
     /// caller that can only check one side must still refuse the receipt.
+    ///
+    /// This method verifies the legacy `CoSigningBody` preimage only. It
+    /// is not a DSSE verifier and is not CHIODOS bilateral protocol
+    /// acceptance.
     pub fn verify(
         &self,
         org_a_public_key: &PublicKey,
@@ -358,9 +371,8 @@ fn co_sign_with_origin_inner(
         org_a_signature: response.org_a_signature,
         org_b_signature,
     };
-    // Double-check the assembled artifact verifies end-to-end. The kernel
-    // relies on this invariant to persist only dual-signed artifacts that
-    // would themselves pass third-party verification.
+    // Double-check the assembled compatibility artifact verifies against
+    // the legacy CoSigningBody preimage before it is exposed.
     dual.verify(origin_public_key, &tool_host_keypair.public_key())?;
     Ok(dual)
 }

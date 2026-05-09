@@ -7,7 +7,8 @@
 //
 // Acceptance coverage:
 //   * post-sign hook fires on federated requests and persists a
-//     DualSignedReceipt that verifies against both pinned peer keys,
+//     compatibility DualSignedReceipt that verifies against both pinned
+//     peer keys for the legacy CoSigningBody shape,
 //   * non-federated requests still work and leave no dual-signed
 //     artifact behind,
 //   * missing peer pin fails closed.
@@ -87,7 +88,7 @@ fn handshake_and_pin(
 }
 
 #[test]
-fn federated_request_produces_dual_signed_receipt_verifiable_by_both_orgs() {
+fn federated_request_records_compat_dual_signed_receipt() {
     // Org A holds the origin kernel; Org B hosts the tool.
     let origin_kp = Keypair::generate(); // Org A (origin) kernel key
     let origin_kernel_id = "kernel.org-a";
@@ -148,17 +149,19 @@ fn federated_request_produces_dual_signed_receipt_verifiable_by_both_orgs() {
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Allow);
 
-    // The post-sign hook fired and a DualSignedReceipt was stashed.
+    // The post-sign hook fired and a compatibility DualSignedReceipt
+    // was stashed.
     let dual = kernel
-        .dual_signed_receipt(&response.receipt.id)
-        .expect("dual-signed receipt must exist for federated request");
+        .compat_dual_signed_receipt(&response.receipt.id)
+        .expect("compat dual-signed receipt must exist for federated request");
     assert_eq!(dual.org_a_kernel_id, origin_kernel_id);
     assert_eq!(dual.org_b_kernel_id, tool_host_kernel_id);
     assert_eq!(dual.body.id, response.receipt.id);
 
-    // Either org can independently verify the receipt chain.
+    // This proves only the legacy CoSigningBody compatibility artifact.
+    // DSSE acceptance is covered by the bilateral DSSE verifier tests.
     dual.verify(&origin_kp.public_key(), &tool_host_public_key)
-        .expect("dual-signed receipt must verify against both pinned peer keys");
+        .expect("compat dual-signed receipt must verify against both pinned peer keys");
 }
 
 #[test]
@@ -309,7 +312,7 @@ fn federation_cosigner_not_called_when_local_v1_persistence_fails_after_v2() {
         "cosigner must not be called until local v2 and v1 receipt state is durable"
     );
     assert!(
-        kernel.dual_signed_receipt(&receipt.id).is_none(),
+        kernel.compat_dual_signed_receipt(&receipt.id).is_none(),
         "failed local persistence must not leave a federated artifact"
     );
 }
@@ -375,7 +378,7 @@ fn federation_cosigner_not_called_without_durable_v1_store() {
         "cosigner must not be called without durable local receipt evidence"
     );
     assert!(
-        kernel.dual_signed_receipt(&receipt.id).is_none(),
+        kernel.compat_dual_signed_receipt(&receipt.id).is_none(),
         "missing local durability must not leave a federated artifact"
     );
 }
@@ -406,7 +409,9 @@ fn non_federated_request_leaves_no_dual_signed_artifact_behind() {
     );
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Allow);
-    assert!(kernel.dual_signed_receipt(&response.receipt.id).is_none());
+    assert!(kernel
+        .compat_dual_signed_receipt(&response.receipt.id)
+        .is_none());
 }
 
 #[test]

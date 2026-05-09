@@ -84,6 +84,11 @@ deployment but MUST NOT silently rewrite one into the other (the
 predicate type is part of the signed Statement and rewriting would
 break signature verification).
 
+The legacy `chio.federation-dual-signed-receipt.v1`
+`DualSignedReceipt` remains a compatibility artifact only. It signs
+`CoSigningBody` bytes, not DSSE PAE bytes, and MUST NOT be presented as
+acceptance of this protocol or of the signature-slice profile.
+
 ---
 
 ## 4. Subject Definition
