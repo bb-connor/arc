@@ -416,21 +416,21 @@ fn forged_envelope_using_legacy_signature_bytes_is_rejected() {
     )
     .expect("hot path must produce both artifacts");
 
-    // The hot-path-produced DSSE envelope verifies under the signature-slice verifier
-    // (sanity check: the test setup is healthy before forging).
+    // The hot-path-produced DSSE envelope verifies under the local-profile
+    // verifier (sanity check: the test setup is healthy before forging).
     verify_dsse_envelope(
         &artifacts.dsse_envelope,
         &kp_a.public_key(),
         &kp_b.public_key(),
     )
-    .expect("hot-path-emitted DSSE envelope must verify under the signature-slice verifier");
+    .expect("hot-path-emitted DSSE envelope must verify under the signature-slice local profile");
 
     // Forge: build a DSSE envelope shape but stuff it with the legacy
     // signature bytes. The legacy signatures authenticate
     // `canonical_json(CoSigningBody)`, NOT the DSSE PAE bytes. A naive
     // verifier that only checked "two signatures present, keyid present"
-    // would accept this; the signature-slice verifier rejects because Ed25519 fails
-    // against the wrong preimage.
+    // would accept this; the local-profile verifier rejects because
+    // Ed25519 fails against the wrong preimage.
     let mut forged: DsseEnvelope = artifacts.dsse_envelope.clone();
     let legacy_sig_a_bytes = artifacts.dual_signed_receipt.org_a_signature.to_bytes();
     let legacy_sig_b_bytes = artifacts.dual_signed_receipt.org_b_signature.to_bytes();
@@ -441,8 +441,8 @@ fn forged_envelope_using_legacy_signature_bytes_is_rejected() {
     assert!(
         result.is_err(),
         "DSSE envelope forged from legacy DualSignedReceipt signatures MUST \
-         fail signature-slice verification because a legacy signature cannot \
-         authenticate the DSSE preimage"
+         fail signature-slice local-profile verification because a legacy \
+         signature cannot authenticate the DSSE PAE preimage"
     );
 }
 
@@ -502,8 +502,7 @@ fn hot_path_emits_both_artifacts_and_each_verifies() {
 #[test]
 fn pae_helper_matches_spec_format() {
     // Known vector: payloadType "application/x" (13 bytes), payload "hello"
-    // (5 bytes): "DSSEv1 SP LEN(type) SP type SP
-    // LEN(body) SP body".
+    // (5 bytes): "DSSEv1 SP LEN(type) SP type SP LEN(body) SP body".
     let bytes = pae("application/x", b"hello");
     assert_eq!(
         std::str::from_utf8(&bytes).unwrap(),
