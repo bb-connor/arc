@@ -1,6 +1,5 @@
 # HITRUST De-identification and Minimum-Necessary Policy
 
-**Milestone:** M09.P2.T8
 **Scope:** Chio v3.18 healthcare design-partner deployment
 **HIPAA reference:** 45 CFR 164.514
 **Default posture:** no PHI in Chio kernel telemetry

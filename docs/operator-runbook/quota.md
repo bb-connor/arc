@@ -1,8 +1,8 @@
 # Healthcare Pilot Quota Lane
 
 This page records quota lane sizing for the M01 healthcare design-partner
-pilot. It consumes the P2 capacity report in
-`compliance/hitrust/evidence-bundles/2026-05-02/M01/audit/M01-healthcare-pilot.md`.
+pilot. Capacity evidence is maintained under `compliance/hitrust/`
+(see `compliance/hitrust/control-mapping.csv` for the per-control mapping).
 
 ## Bound
 

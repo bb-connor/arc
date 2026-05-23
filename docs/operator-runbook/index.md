@@ -71,7 +71,8 @@ shadow mode.
 
 ## Evidence Links
 
-Evidence lands in `compliance/hitrust/evidence-bundles/2026-05-02/M01/audit/M01-healthcare-pilot.md`.
+Internal self-assessment artifacts are maintained under `compliance/hitrust/`
+(see `compliance/hitrust/control-mapping.csv` for the per-control mapping).
 
 - P0 opened audit hard counts and the topology baseline.
 - P1 hardens this runbook and wires PagerDuty.

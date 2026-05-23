@@ -1,6 +1,8 @@
 # Chio HITRUST Incident Response Runbook
 
-**Milestone:** M09.P2.T4
+> **Status: internal readiness.** This runbook is documented; it has not
+> yet been exercised, so first-cycle execution evidence is an open gap.
+
 **Scope:** Chio v3.18 healthcare design-partner deployment
 **Owner:** Chio incident commander
 **HIPAA reference:** 45 CFR 164.400-414

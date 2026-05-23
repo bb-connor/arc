@@ -23,9 +23,7 @@ unrelated Backbay systems, or future released Chio versions.
 | Repository readiness-package record | `compliance/hitrust/readiness-package/readiness-package.md` |
 | HITRUST MyCSF object | `TODO(M09-followup): pending MyCSF tenant creation` |
 | Results distribution record | `TODO(M09-followup): pending MyCSF results-distribution record` |
-| M09 evidence bundle | `compliance/hitrust/evidence-bundles/2026-05-02/M09/` |
-| Evidence bundle manifest | `compliance/hitrust/evidence-bundles/2026-05-02/SHA256SUMS` |
-| Renewal trigger | `compliance/hitrust/renewal/renewal-trigger.md` |
+| HITRUST control mapping (readiness self-assessment) | `compliance/hitrust/control-mapping.csv` |
 
 No signed external certificate scan exists yet. The repository
 readiness-package record above is the public activation artifact for

@@ -50,8 +50,8 @@ gh workflow run m05-freeze-guard.yml --ref main
 gh workflow run ci.yml --ref main
 ```
 
-6. Record the run URLs in
-   `compliance/hitrust/evidence-bundles/2026-05-02/M03/audit/M03-ci-restoration.md`.
+6. Record the run URLs in the M03 incident log under `compliance/hitrust/`
+   (see `compliance/hitrust/control-mapping.csv` for the relevant control entries).
 
 ## Verification
 
