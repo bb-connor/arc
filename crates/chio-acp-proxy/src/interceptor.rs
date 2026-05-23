@@ -662,7 +662,7 @@ impl MessageInterceptor {
                 if request
                     .authorization_correlation_id
                     .as_deref()
-                    .map_or(true, str::is_empty)
+                    .is_none_or(str::is_empty)
                 {
                     return CapabilityGate::Block(json_rpc_error(
                         id,
@@ -681,7 +681,7 @@ impl MessageInterceptor {
                     && request
                         .tool_call_id
                         .as_deref()
-                        .map_or(true, str::is_empty)
+                        .is_none_or(str::is_empty)
                 {
                     return CapabilityGate::Block(json_rpc_error(
                         id,
@@ -689,11 +689,11 @@ impl MessageInterceptor {
                         "capability checker allowed access without a tool_call_id binding",
                     ));
                 }
-                if verdict.receipt_id.as_deref().map_or(true, str::is_empty)
+                if verdict.receipt_id.as_deref().is_none_or(str::is_empty)
                     || verdict
                         .receipt_request_id
                         .as_deref()
-                        .map_or(true, str::is_empty)
+                        .is_none_or(str::is_empty)
                 {
                     return CapabilityGate::Block(json_rpc_error(
                         id,

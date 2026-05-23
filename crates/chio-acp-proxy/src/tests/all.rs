@@ -2468,6 +2468,7 @@ mod attestation_and_telemetry_tests {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn make_authorization_receipt_with_semantics(
         signer: &Keypair,
         capability_id: &str,

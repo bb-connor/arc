@@ -397,7 +397,7 @@ fn sample_receipt_with_keypair(id: &str, timestamp: u64, keypair: &Keypair) -> C
             tenant_id: None,
             kernel_key: keypair.public_key(),
         },
-        &keypair,
+        keypair,
     )
     .test_unwrap()
 }

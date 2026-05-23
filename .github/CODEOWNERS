@@ -45,7 +45,7 @@ sdks/typescript/packages/wire/**             @bb-connor
 sdks/python/**/_generated/**                 @bb-connor
 sdks/python/**                               @bb-connor
 formal/lean4/**                              @bb-connor
-formal/lean4/Chio/Capability/Delegation.lean @bb-connor
+formal/lean4/Chio/Chio/Capability/Delegation.lean @bb-connor
 formal/tla/**                                @bb-connor
 formal/tla/DelegationDepthBound.tla          @bb-connor
 formal/rust-verification/**                  @bb-connor

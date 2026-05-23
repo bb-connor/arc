@@ -1117,15 +1117,12 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> Result<GuardPipeline,
 
     if let Some(secret_patterns) = &config.secret_patterns {
         if secret_patterns.enabled {
-            let guard =
-                match SecretLeakGuard::with_config(chio_guards::secret_leak::SecretLeakConfig {
-                    enabled: true,
-                    skip_paths: secret_patterns.skip_paths.clone(),
-                    custom_patterns: Vec::new(),
-                }) {
-                    Ok(guard) => guard,
-                    Err(error) => panic!("invalid secret leak guard config: {error}"),
-                };
+            let guard = SecretLeakGuard::with_config(chio_guards::secret_leak::SecretLeakConfig {
+                enabled: true,
+                skip_paths: secret_patterns.skip_paths.clone(),
+                custom_patterns: Vec::new(),
+            })
+            .map_err(|error| PolicyError::Invalid(error.to_string()))?;
             pipeline.add(Box::new(guard));
         }
     }
