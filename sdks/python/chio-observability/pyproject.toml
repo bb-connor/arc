@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "chio-observability"
 version = "0.1.0"
 description = "LangSmith and LangFuse observability bridges for the Chio protocol -- receipts as enriched spans in agent observability platforms"
-license = "MIT"
+license = "Apache-2.0"
 requires-python = ">=3.11"
 authors = [
     { name = "Backbay Labs", email = "connor@backbay.io" },

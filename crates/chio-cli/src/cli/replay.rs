@@ -1,7 +1,34 @@
 // Replay subcommand handler for the `chio` CLI.
+//
+// The replay engine retains a number of helper/API-completeness items
+// (renderers, schema accessors, receipt-id helpers) that are exercised by
+// integration tests and the broader replay surface rather than by the CLI
+// dispatch path. Under the flat `include!` layout these were crate-root
+// `pub` items and not flagged; now that the subtree is a real module they
+// are allowed explicitly so the structural refactor does not delete them.
+#![allow(dead_code, unused_imports)]
+
+use super::*;
+
+include!("replay/reader.rs");
+include!("replay/verify.rs");
+include!("replay/merkle.rs");
+include!("replay/verdict.rs");
+include!("replay/report.rs");
+include!("replay/ndjson.rs");
+include!("replay/validate.rs");
+include!("replay/schema_gate.rs");
+include!("replay/policy_ref.rs");
+include!("replay/receipt_partition.rs");
+include!("replay/execute.rs");
+include!("replay/diff.rs");
+include!("replay/traffic.rs");
+include!("replay/bless/strip.rs");
+include!("replay/bless/fixture_layout.rs");
+include!("replay/bless.rs");
 
 /// Dispatch entry-point for `chio replay`.
-fn cmd_replay(args: &ReplayArgs) -> Result<(), CliError> {
+pub(crate) fn cmd_replay(args: &ReplayArgs) -> Result<(), CliError> {
     if let Some(ReplaySubcommand::Traffic(traffic)) = args.command.as_ref() {
         return cmd_replay_traffic(traffic);
     }

@@ -6,6 +6,8 @@
 // `chio arena evolve`: run the co-evolution driver under the bounded-budget
 // gate and render a leaderboard.
 
+use super::*;
+
 const MAX_ARENA_EVOLVE_GENERATIONS: u32 = 200;
 const MAX_ARENA_EVOLVE_WALL_SECONDS: u64 = 30 * 60;
 
@@ -23,7 +25,7 @@ fn arena_resolve_output_root(override_path: Option<&std::path::Path>) -> std::pa
 }
 
 #[allow(dead_code)]
-fn cmd_arena_run(
+pub(crate) fn cmd_arena_run(
     scenario_path: &std::path::Path,
     output_root: Option<&std::path::Path>,
     json_output: bool,
@@ -74,7 +76,7 @@ fn cmd_arena_run(
 }
 
 #[allow(dead_code)]
-fn cmd_arena_replay(
+pub(crate) fn cmd_arena_replay(
     scenario_id: &str,
     output_root: Option<&std::path::Path>,
     bundle_dir: Option<&std::path::Path>,
@@ -121,7 +123,7 @@ fn cmd_arena_replay(
 }
 
 #[allow(dead_code)]
-fn cmd_arena_evolve(
+pub(crate) fn cmd_arena_evolve(
     seed_path: &std::path::Path,
     generations: u32,
     wall_seconds: u64,

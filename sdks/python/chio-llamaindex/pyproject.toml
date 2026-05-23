@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "chio-llamaindex"
 version = "0.1.1"
 description = "LlamaIndex integration for the Chio protocol -- capability-scoped FunctionTool and QueryEngineTool with vector-collection scoping"
-license = "MIT"
+license = "Apache-2.0"
 requires-python = ">=3.11"
 authors = [
     { name = "Backbay Labs", email = "connor@backbay.io" },

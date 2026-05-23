@@ -9,14 +9,9 @@
 // modules so they compose with the rest of the CLI without re-importing the
 // already in-scope helper types from `cli/types.rs` and `cli/runtime.rs`.
 
-use chio_mcp_adapter::McpTransport as _;
+use super::*;
 
-include!("mcp/ide.rs");
-include!("mcp/scope.rs");
-include!("mcp/attestation.rs");
-include!("mcp/wrap.rs");
-include!("mcp/manifest.rs");
-include!("mcp/emit_config.rs");
+use chio_mcp_adapter::McpTransport as _;
 
 /// Dispatch entry-point for `arc mcp wrap`.
 ///
@@ -25,7 +20,7 @@ include!("mcp/emit_config.rs");
 /// renders an inferred capability-scope manifest scaffold, and (when
 /// `--emit-config` is supplied) emits a paste-ready IDE configuration blob
 /// for Cursor / Claude Desktop / Continue / Zed.
-fn cmd_mcp_wrap(args: &McpWrapArgs) -> Result<(), CliError> {
+pub(crate) fn cmd_mcp_wrap(args: &McpWrapArgs) -> Result<(), CliError> {
     if let Some(tool) = args.self_test_attestation.as_ref() {
         let header = build_chio_verified_header(tool);
         let mut payload = serde_json::json!({
@@ -77,7 +72,7 @@ fn cmd_mcp_wrap(args: &McpWrapArgs) -> Result<(), CliError> {
 /// [`chio_mcp_adapter::McpToolInfo`]. The fixture format is the same
 /// shape MCP servers return, e.g. `{ "tools": [ ... ] }` or a bare
 /// array.
-fn load_tools_fixture(
+pub(crate) fn load_tools_fixture(
     path: &std::path::Path,
 ) -> Result<Vec<chio_mcp_adapter::McpToolInfo>, CliError> {
     let raw = std::fs::read_to_string(path).map_err(|e| {
@@ -104,3 +99,14 @@ fn load_tools_fixture(
     })?;
     Ok(tools)
 }
+
+// The sibling `mcp/*.rs` files are composed in at the end of the module so
+// all non-test items precede any `#[cfg(test)]` blocks they carry. `wrap.rs`
+// (the only sibling that carries a test module) is included last so no
+// non-test items follow a test module within this composed module.
+include!("mcp/ide.rs");
+include!("mcp/scope.rs");
+include!("mcp/attestation.rs");
+include!("mcp/manifest.rs");
+include!("mcp/emit_config.rs");
+include!("mcp/wrap.rs");

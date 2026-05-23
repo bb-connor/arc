@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "chio-streaming"
 version = "0.2.1"
 description = "Chio streaming middleware: per-event capability evaluation, receipt publishing, and DLQ governance for Kafka, NATS, Pulsar, EventBridge, Pub/Sub, and Redis Streams"
-license = "MIT"
+license = "Apache-2.0"
 requires-python = ">=3.11"
 authors = [
     { name = "Backbay Labs", email = "connor@backbay.io" },

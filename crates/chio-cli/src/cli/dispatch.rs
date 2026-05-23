@@ -1,4 +1,6 @@
-fn main() {
+use super::*;
+
+pub(crate) fn run() {
     let cli = Cli::parse();
     let receipt_db = cli.receipt_db.clone();
     let revocation_db = cli.revocation_db.clone();
@@ -2535,7 +2537,7 @@ fn main() {
     }
 }
 
-fn write_cli_error(
+pub(crate) fn write_cli_error(
     writer: &mut impl Write,
     error: &CliError,
     json_output: bool,
@@ -2551,7 +2553,7 @@ fn write_cli_error(
     }
 }
 
-fn parse_market_tier(value: &str) -> Result<chio_reputation::ReputationTier, CliError> {
+pub(crate) fn parse_market_tier(value: &str) -> Result<chio_reputation::ReputationTier, CliError> {
     match value {
         "tier0" | "tier_0" => Ok(chio_reputation::ReputationTier::Tier0),
         "tier1" | "tier_1" => Ok(chio_reputation::ReputationTier::Tier1),
@@ -2563,7 +2565,7 @@ fn parse_market_tier(value: &str) -> Result<chio_reputation::ReputationTier, Cli
     }
 }
 
-fn cmd_market_list(
+pub(crate) fn cmd_market_list(
     catalog: &Path,
     tenant: &str,
     tier_str: &str,
@@ -2593,7 +2595,7 @@ fn cmd_market_list(
     Ok(())
 }
 
-fn cmd_market_info(
+pub(crate) fn cmd_market_info(
     catalog: &Path,
     reference: &str,
     tenant: &str,
@@ -2626,7 +2628,7 @@ fn cmd_market_info(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn cmd_market_install(
+pub(crate) fn cmd_market_install(
     catalog: &Path,
     bundle_dir: &Path,
     reference: &str,
@@ -2668,7 +2670,7 @@ fn cmd_market_install(
     Ok(())
 }
 
-fn dispatch_lineage(command: LineageCommands, json_output: bool) -> Result<(), CliError> {
+pub(crate) fn dispatch_lineage(command: LineageCommands, json_output: bool) -> Result<(), CliError> {
     use crate::lineage as ln;
     use chio_lineage::query::QueryBounds;
     match command {
@@ -2739,7 +2741,7 @@ fn dispatch_lineage(command: LineageCommands, json_output: bool) -> Result<(), C
     }
 }
 
-fn emit_lineage_report<T: serde::Serialize>(report: &T, json: bool) -> Result<(), CliError> {
+pub(crate) fn emit_lineage_report<T: serde::Serialize>(report: &T, json: bool) -> Result<(), CliError> {
     if json {
         let bytes = serde_json::to_vec_pretty(report)
             .map_err(|e| CliError::Other(format!("lineage serialize: {e}")))?;
@@ -2758,14 +2760,14 @@ fn emit_lineage_report<T: serde::Serialize>(report: &T, json: bool) -> Result<()
     Ok(())
 }
 
-fn dispatch_chio_federation_command(command: ChioFederationCommands) -> Result<(), CliError> {
+pub(crate) fn dispatch_chio_federation_command(command: ChioFederationCommands) -> Result<(), CliError> {
     match command {
         ChioFederationCommands::Authority { command } => dispatch_chio_authority_command(command),
         ChioFederationCommands::Treaty { command } => dispatch_chio_treaty_command(command),
     }
 }
 
-fn dispatch_chio_authority_command(command: ChioAuthorityCommands) -> Result<(), CliError> {
+pub(crate) fn dispatch_chio_authority_command(command: ChioAuthorityCommands) -> Result<(), CliError> {
     match command {
         ChioAuthorityCommands::Issue {
             profile,
@@ -2799,7 +2801,7 @@ fn dispatch_chio_authority_command(command: ChioAuthorityCommands) -> Result<(),
     }
 }
 
-fn dispatch_chio_treaty_command(command: ChioTreatyCommands) -> Result<(), CliError> {
+pub(crate) fn dispatch_chio_treaty_command(command: ChioTreatyCommands) -> Result<(), CliError> {
     match command {
         ChioTreatyCommands::Intersect {
             treaty_scope,
@@ -2842,7 +2844,7 @@ fn dispatch_chio_treaty_command(command: ChioTreatyCommands) -> Result<(), CliEr
     }
 }
 
-fn dispatch_chio_attest_command(command: ChioAttestCommands) -> Result<(), CliError> {
+pub(crate) fn dispatch_chio_attest_command(command: ChioAttestCommands) -> Result<(), CliError> {
     match command {
         ChioAttestCommands::Buyer { command } => dispatch_chio_buyer_command(command),
         ChioAttestCommands::SupplyChain { command } => match command {
@@ -2882,7 +2884,7 @@ fn dispatch_chio_attest_command(command: ChioAttestCommands) -> Result<(), CliEr
     }
 }
 
-fn dispatch_chio_buyer_command(command: ChioBuyerCommands) -> Result<(), CliError> {
+pub(crate) fn dispatch_chio_buyer_command(command: ChioBuyerCommands) -> Result<(), CliError> {
     match command {
         ChioBuyerCommands::Packet { run_output, out } => {
             cmd_chio_attest_buyer_package(&run_output, &out)
@@ -2922,7 +2924,7 @@ fn dispatch_chio_buyer_command(command: ChioBuyerCommands) -> Result<(), CliErro
     }
 }
 
-fn dispatch_chio_runtime_command(command: ChioRuntimeCommands) -> Result<(), CliError> {
+pub(crate) fn dispatch_chio_runtime_command(command: ChioRuntimeCommands) -> Result<(), CliError> {
     match command {
         ChioRuntimeCommands::Admit {
             request,
@@ -3193,7 +3195,7 @@ fn dispatch_chio_runtime_command(command: ChioRuntimeCommands) -> Result<(), Cli
     }
 }
 
-fn dispatch_chio_pheromone_command(command: ChioPheromoneCommands) -> Result<(), CliError> {
+pub(crate) fn dispatch_chio_pheromone_command(command: ChioPheromoneCommands) -> Result<(), CliError> {
     match command {
         ChioPheromoneCommands::Receive {
             batch,
@@ -3828,7 +3830,7 @@ fn dispatch_chio_pheromone_command(command: ChioPheromoneCommands) -> Result<(),
     }
 }
 
-fn cmd_chio_attest_supply_chain_verify(
+pub(crate) fn cmd_chio_attest_supply_chain_verify(
     artifact: &Path,
     bundle: &Path,
     issuer_san_regex: &str,
@@ -3868,7 +3870,7 @@ fn cmd_chio_attest_supply_chain_verify(
     write_chio_attest_report(&report_json, report)
 }
 
-fn cmd_chio_attest_runtime_quote_verify(
+pub(crate) fn cmd_chio_attest_runtime_quote_verify(
     kernel_public_key: &str,
     receipt_root: &str,
     report_data: Option<&str>,
@@ -3973,7 +3975,7 @@ fn cmd_chio_attest_runtime_quote_verify(
     }
 }
 
-struct RuntimeQuoteBackendReport {
+pub(crate) struct RuntimeQuoteBackendReport {
     tee_kind: String,
     report_data: [u8; 64],
     tcb_status: String,
@@ -3981,7 +3983,7 @@ struct RuntimeQuoteBackendReport {
 }
 
 #[cfg(feature = "tee-quotes")]
-fn verify_runtime_quote_with_backend(
+pub(crate) fn verify_runtime_quote_with_backend(
     tee_kind: &str,
     quote: &Path,
     collateral: &Path,
@@ -4124,7 +4126,7 @@ fn verify_runtime_quote_with_backend(
 }
 
 #[cfg(not(feature = "tee-quotes"))]
-fn verify_runtime_quote_with_backend(
+pub(crate) fn verify_runtime_quote_with_backend(
     _tee_kind: &str,
     _quote: &Path,
     _collateral: &Path,
@@ -4139,7 +4141,7 @@ fn verify_runtime_quote_with_backend(
 #[cfg(feature = "tee-quotes")]
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct RuntimeQuoteCollateralDocument {
+pub(crate) struct RuntimeQuoteCollateralDocument {
     #[serde(rename = "schema")]
     _schema: Option<String>,
     tcb_status: String,
@@ -4161,7 +4163,7 @@ struct RuntimeQuoteCollateralDocument {
 }
 
 #[cfg(feature = "tee-quotes")]
-fn parse_quote_tcb_status(
+pub(crate) fn parse_quote_tcb_status(
     value: &str,
 ) -> Result<chio_attest_verify::QuoteTcbStatus, CliError> {
     match value {
@@ -4179,24 +4181,24 @@ fn parse_quote_tcb_status(
 }
 
 #[cfg(feature = "tee-quotes")]
-fn unix_seconds_to_system_time(seconds: u64) -> Result<std::time::SystemTime, CliError> {
+pub(crate) fn unix_seconds_to_system_time(seconds: u64) -> Result<std::time::SystemTime, CliError> {
     std::time::SystemTime::UNIX_EPOCH
         .checked_add(std::time::Duration::from_secs(seconds))
         .ok_or_else(|| CliError::Other("runtime quote timestamp overflow".to_string()))
 }
 
 #[cfg(feature = "tee-quotes")]
-fn collateral_required_str<'a>(value: Option<&'a str>, name: &str) -> Result<&'a str, CliError> {
+pub(crate) fn collateral_required_str<'a>(value: Option<&'a str>, name: &str) -> Result<&'a str, CliError> {
     value.ok_or_else(|| CliError::Other(format!("runtime quote collateral missing {name}")))
 }
 
 #[cfg(feature = "tee-quotes")]
-fn collateral_required_u32(value: Option<u32>, name: &str) -> Result<u32, CliError> {
+pub(crate) fn collateral_required_u32(value: Option<u32>, name: &str) -> Result<u32, CliError> {
     value.ok_or_else(|| CliError::Other(format!("runtime quote collateral missing {name}")))
 }
 
 #[cfg(feature = "tee-quotes")]
-fn decode_hex_required(value: Option<&str>, name: &str) -> Result<Vec<u8>, CliError> {
+pub(crate) fn decode_hex_required(value: Option<&str>, name: &str) -> Result<Vec<u8>, CliError> {
     let value = collateral_required_str(value, name)?;
     hex::decode(value).map_err(|error| {
         CliError::Other(format!("runtime quote collateral {name} is not hex: {error}"))
@@ -4204,7 +4206,7 @@ fn decode_hex_required(value: Option<&str>, name: &str) -> Result<Vec<u8>, CliEr
 }
 
 #[cfg(feature = "tee-quotes")]
-fn decode_hex_vec_required(values: Option<&[String]>, name: &str) -> Result<Vec<Vec<u8>>, CliError> {
+pub(crate) fn decode_hex_vec_required(values: Option<&[String]>, name: &str) -> Result<Vec<Vec<u8>>, CliError> {
     let values =
         values.ok_or_else(|| CliError::Other(format!("runtime quote collateral missing {name}")))?;
     values
@@ -4220,14 +4222,14 @@ fn decode_hex_vec_required(values: Option<&[String]>, name: &str) -> Result<Vec<
         .collect()
 }
 
-fn decode_fixed_hex<const N: usize>(value: &str, name: &str) -> Result<[u8; N], CliError> {
+pub(crate) fn decode_fixed_hex<const N: usize>(value: &str, name: &str) -> Result<[u8; N], CliError> {
     let mut bytes = [0_u8; N];
     hex::decode_to_slice(value, &mut bytes)
         .map_err(|error| CliError::Other(format!("{name}: expected {N} bytes of hex: {error}")))?;
     Ok(bytes)
 }
 
-fn write_chio_attest_report(
+pub(crate) fn write_chio_attest_report(
     report_json: &serde_json::Value,
     report: Option<&Path>,
 ) -> Result<(), CliError> {

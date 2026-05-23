@@ -31,7 +31,59 @@ mod policies;
 mod scaffold;
 mod settle;
 
-include!("cli/types.rs");
+// Shared imports for the CLI module tree. These live at the crate root so the
+// `cli/*` submodules (which each begin with `use super::*;`) inherit them,
+// matching the single coherent `#[path] mod` strategy. The `pub use`
+// re-exports keep `crate::CliError`, `crate::policy`, and the sibling
+// control-plane modules reachable from the standalone `src/*.rs` command
+// modules.
+pub use chio_control_plane::{
+    CliError, authority_public_key_from_seed_file, build_kernel, certify, configure_budget_store,
+    configure_capability_authority, configure_receipt_store, configure_revocation_store,
+    enterprise_federation, evidence_export, federation_policy, issuance,
+    issue_default_capabilities, load_or_create_authority_keypair, passport_verifier, policy,
+    reputation, require_control_token, rotate_authority_keypair, scim_lifecycle, trust_control,
+};
+pub use chio_mcp_remote as remote_mcp;
+
+use std::fs;
+use std::io::Write;
+use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+
+use clap::{Parser, Subcommand};
+use serde::de::DeserializeOwned;
+use tracing::{debug, error, info, warn};
+
+use chio_api_protect::{ProtectConfig, ProtectProxy};
+use chio_core::appraisal::{
+    RuntimeAttestationAppraisalImportRequest, RuntimeAttestationAppraisalRequest,
+    RuntimeAttestationAppraisalResultExportRequest, RuntimeAttestationImportedAppraisalPolicy,
+    SignedRuntimeAttestationAppraisalResult,
+};
+use chio_core::capability::{
+    ChioScope, GovernedAutonomyTier, MonetaryAmount, RuntimeAssuranceTier,
+    RuntimeAttestationEvidence,
+};
+use chio_core::crypto::Keypair;
+use chio_core::message::{AgentMessage, KernelMessage, ToolCallError, ToolCallResult};
+use chio_core::session::{
+    OperationContext, OperationTerminalState, RequestId, SessionId, SessionOperation,
+    ToolCallOperation,
+};
+use chio_kernel::transport::{ChioTransport, TransportError};
+use chio_kernel::{
+    ChioKernel, RevocationStore, SessionOperationResponse, ToolCallOutput,
+    ToolCallRequest as KernelToolCallRequest, ToolCallStream,
+};
+use chio_mcp_adapter::{AdaptedMcpServer, ChioMcpEdge, McpAdapterConfig, McpEdgeConfig};
+
+use crate::policy::load_policy;
+
+#[path = "cli/types.rs"]
+mod types_cli;
+pub(crate) use types_cli::*;
 #[path = "cli/chio/types.rs"]
 mod chio_types;
 use chio_types::{
@@ -48,34 +100,41 @@ use chio_types::{
     ChioRuntimeOrchestrateCommands, ChioRuntimePeerWeightsCommands, ChioRuntimePheromoneCommands,
     ChioRuntimePolicyCommands, ChioTreatyCommands, ChioTrustBundleCommands,
 };
-include!("cli/doctor.rs");
-include!("cli/dispatch.rs");
+#[path = "cli/doctor.rs"]
+mod doctor_cli;
+pub(crate) use doctor_cli::*;
+#[path = "cli/dispatch.rs"]
+mod dispatch_cli;
+#[cfg(test)]
+pub(crate) use dispatch_cli::{cmd_chio_attest_runtime_quote_verify, write_cli_error};
 #[path = "cli/chio/dispatch.rs"]
 mod chio_dispatch;
 use chio_dispatch::*;
-include!("cli/runtime.rs");
-include!("cli/trust_commands.rs");
-include!("cli/session.rs");
-include!("cli/conformance.rs");
-include!("cli/mcp.rs");
-include!("cli/replay.rs");
-include!("cli/replay/reader.rs");
-include!("cli/replay/verify.rs");
-include!("cli/replay/merkle.rs");
-include!("cli/replay/verdict.rs");
-include!("cli/replay/report.rs");
-include!("cli/replay/ndjson.rs");
-include!("cli/replay/validate.rs");
-include!("cli/replay/schema_gate.rs");
-include!("cli/replay/policy_ref.rs");
-include!("cli/replay/receipt_partition.rs");
-include!("cli/replay/execute.rs");
-include!("cli/replay/diff.rs");
-include!("cli/replay/traffic.rs");
-include!("cli/replay/bless/strip.rs");
-include!("cli/replay/bless/fixture_layout.rs");
-include!("cli/replay/bless.rs");
-include!("cli/arena.rs");
+
+fn main() {
+    dispatch_cli::run();
+}
+#[path = "cli/runtime.rs"]
+mod runtime_cli;
+pub(crate) use runtime_cli::*;
+#[path = "cli/trust_commands.rs"]
+mod trust_commands_cli;
+pub(crate) use trust_commands_cli::*;
+#[path = "cli/session.rs"]
+mod session_cli;
+pub(crate) use session_cli::*;
+#[path = "cli/conformance.rs"]
+mod conformance_cli;
+pub(crate) use conformance_cli::*;
+#[path = "cli/mcp.rs"]
+mod mcp_cli;
+pub(crate) use mcp_cli::*;
+#[path = "cli/replay.rs"]
+mod replay_cli;
+pub(crate) use replay_cli::{cmd_replay, load_trusted_kernel_pubkey};
+#[path = "cli/arena.rs"]
+mod arena_cli;
+pub(crate) use arena_cli::{cmd_arena_evolve, cmd_arena_replay, cmd_arena_run};
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]

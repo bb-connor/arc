@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "chio-langchain"
 version = "0.1.1"
 description = "LangChain integration for Chio protocol tools with conformance tests"
-license = "MIT"
+license = "Apache-2.0"
 requires-python = ">=3.11"
 authors = [
     { name = "Backbay Labs", email = "connor@backbay.io" },

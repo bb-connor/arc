@@ -1,53 +1,12 @@
-pub use chio_control_plane::{
-    CliError, authority_public_key_from_seed_file, build_kernel, certify, configure_budget_store,
-    configure_capability_authority, configure_receipt_store, configure_revocation_store,
-    enterprise_federation, evidence_export, federation_policy, issuance,
-    issue_default_capabilities, load_or_create_authority_keypair, passport_verifier, policy,
-    reputation, require_control_token, rotate_authority_keypair, scim_lifecycle, trust_control,
-};
-pub use chio_mcp_remote as remote_mcp;
+use super::*;
 
-use std::fs;
-use std::io::Write;
-use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-
-use clap::{Parser, Subcommand};
-use serde::de::DeserializeOwned;
-use tracing::{debug, error, info, warn};
-
-use chio_api_protect::{ProtectConfig, ProtectProxy};
-use chio_core::appraisal::{
-    RuntimeAttestationAppraisalImportRequest, RuntimeAttestationAppraisalRequest,
-    RuntimeAttestationAppraisalResultExportRequest, RuntimeAttestationImportedAppraisalPolicy,
-    SignedRuntimeAttestationAppraisalResult,
-};
-use chio_core::capability::{
-    ChioScope, GovernedAutonomyTier, MonetaryAmount, RuntimeAssuranceTier,
-    RuntimeAttestationEvidence,
-};
-use chio_core::crypto::Keypair;
-use chio_core::message::{AgentMessage, KernelMessage, ToolCallError, ToolCallResult};
-use chio_core::session::{
-    OperationContext, OperationTerminalState, RequestId, SessionId, SessionOperation,
-    ToolCallOperation,
-};
-use chio_kernel::transport::{ChioTransport, TransportError};
-use chio_kernel::{
-    ChioKernel, RevocationStore, SessionOperationResponse, ToolCallOutput,
-    ToolCallRequest as KernelToolCallRequest, ToolCallStream,
-};
-use chio_mcp_adapter::{AdaptedMcpServer, ChioMcpEdge, McpAdapterConfig, McpEdgeConfig};
-
-use crate::policy::load_policy;
 
 /// Chio -- Chio.
 ///
 /// Runtime security enforcement for AI agents via capability-based
 /// authorization and signed audit receipts.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, clap::ValueEnum)]
-enum OutputFormat {
+pub(crate) enum OutputFormat {
     #[default]
     Human,
     Json,
@@ -55,9 +14,9 @@ enum OutputFormat {
 
 #[derive(Parser)]
 #[command(version, about)]
-struct Cli {
+pub(crate) struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    pub(crate) command: Commands,
 
     /// Backward-compatible alias for `--format json`.
     #[arg(long, global = true, default_value_t = false)]
@@ -69,31 +28,31 @@ struct Cli {
 
     /// Optional SQLite database path for durable receipt persistence.
     #[arg(long, global = true)]
-    receipt_db: Option<PathBuf>,
+    pub(crate) receipt_db: Option<PathBuf>,
 
     /// Optional SQLite database path for durable capability revocation persistence.
     #[arg(long, global = true)]
-    revocation_db: Option<PathBuf>,
+    pub(crate) revocation_db: Option<PathBuf>,
 
     /// Optional file path for a persistent capability-authority seed.
     #[arg(long, global = true)]
-    authority_seed_file: Option<PathBuf>,
+    pub(crate) authority_seed_file: Option<PathBuf>,
 
     /// Optional SQLite database path for shared capability-authority state.
     #[arg(long, global = true)]
-    authority_db: Option<PathBuf>,
+    pub(crate) authority_db: Option<PathBuf>,
 
     /// Optional SQLite database path for durable shared capability budget state.
     #[arg(long, global = true)]
-    budget_db: Option<PathBuf>,
+    pub(crate) budget_db: Option<PathBuf>,
 
     /// Optional SQLite database path for durable remote MCP session tombstones.
     #[arg(long, global = true)]
-    session_db: Option<PathBuf>,
+    pub(crate) session_db: Option<PathBuf>,
 
     /// Optional shared trust-control service base URL.
     #[arg(long, global = true)]
-    control_url: Option<String>,
+    pub(crate) control_url: Option<String>,
 
     /// Bearer token used to authenticate to the shared trust-control service.
     /// Prefer `CHIO_CONTROL_TOKEN` env over the argv form so the bearer does
@@ -104,11 +63,11 @@ struct Cli {
         env = "CHIO_CONTROL_TOKEN",
         hide_env_values = true
     )]
-    control_token: Option<String>,
+    pub(crate) control_token: Option<String>,
 }
 
 impl Cli {
-    fn json_output(&self) -> bool {
+    pub(crate) fn json_output(&self) -> bool {
         self.json || matches!(self.format, OutputFormat::Json)
     }
 }
@@ -253,7 +212,7 @@ mod cli_env_tests {
 }
 
 #[derive(Subcommand)]
-enum Commands {
+pub(crate) enum Commands {
     /// Spawn an agent subprocess and enforce policy via the kernel.
     Run {
         /// Path to the policy YAML file.
@@ -536,7 +495,7 @@ enum Commands {
 }
 
 #[derive(Subcommand)]
-enum ChioFederationCommands {
+pub(crate) enum ChioFederationCommands {
     /// Produce local federation authority artifacts for offline verification.
     Authority {
         #[command(subcommand)]
@@ -551,7 +510,7 @@ enum ChioFederationCommands {
 }
 
 #[derive(Subcommand)]
-enum ChioAttestCommands {
+pub(crate) enum ChioAttestCommands {
     /// Package, verify, and explain buyer-facing attestation evidence.
     Buyer {
         #[command(subcommand)]
@@ -573,7 +532,7 @@ enum ChioAttestCommands {
 }
 
 #[derive(Subcommand)]
-enum ChioBuyerCommands {
+pub(crate) enum ChioBuyerCommands {
     /// Build a buyer review packet from a local runtime output directory.
     Packet {
         /// Runtime output directory containing buyer review artifacts.
@@ -667,7 +626,7 @@ enum ChioBuyerCommands {
 }
 
 #[derive(Subcommand)]
-enum ChioSupplyChainCommands {
+pub(crate) enum ChioSupplyChainCommands {
     /// Verify a Sigstore bundle against the artifact bytes and expected identity.
     Verify {
         /// Artifact bytes covered by the Sigstore bundle.
@@ -693,7 +652,7 @@ enum ChioSupplyChainCommands {
 }
 
 #[derive(Subcommand)]
-enum ChioRuntimeQuoteCommands {
+pub(crate) enum ChioRuntimeQuoteCommands {
     /// Verify runtime quote evidence through chio-attest-verify.
     Verify {
         /// Kernel signing public key in Chio canonical text form.
@@ -732,7 +691,7 @@ enum ChioRuntimeQuoteCommands {
 
 /// Sub-subcommands for `chio arena`.
 #[derive(clap::Subcommand)]
-enum ArenaCommands {
+pub(crate) enum ArenaCommands {
     /// Run a scenario file and write an arena bundle under target/arena/.
     Run {
         /// Path to the scenario TOML file.
@@ -893,7 +852,7 @@ pub struct TrafficArgs {
 /// further verbs (e.g. `clear`, `replay`) can attach here without
 /// breaking the `arc settle status` contract.
 #[derive(Subcommand)]
-enum SettleCommands {
+pub(crate) enum SettleCommands {
     /// Show pending IOU envelopes, settled receipts, and dead-lettered
     /// settlements for the local store.
     Status {
@@ -913,7 +872,7 @@ enum SettleCommands {
 /// `arc lineage` subcommands. Surfaces three verbs that the underlying
 /// library and tests share.
 #[derive(Subcommand)]
-enum LineageCommands {
+pub(crate) enum LineageCommands {
     /// Walk forward or reverse from a seed node id over a lineage JSON dump.
     Query {
         /// Path to the lineage JSON dump (the same format the static
@@ -962,7 +921,7 @@ enum LineageCommands {
 
 /// Conformance harness commands.
 #[derive(Subcommand)]
-enum ConformanceCommands {
+pub(crate) enum ConformanceCommands {
     /// Execute conformance scenarios against a peer language adapter.
     Run {
         /// Peer language adapter to exercise (`js`, `python`, `go`, `cpp`, or `all`).
@@ -1011,7 +970,7 @@ enum ConformanceCommands {
 
 /// Guard development lifecycle commands.
 #[derive(Subcommand)]
-enum GuardCommands {
+pub(crate) enum GuardCommands {
     /// Scaffold a new guard project with Cargo.toml, src/lib.rs, and guard-manifest.yaml.
     New {
         /// Name of the guard project to create.
@@ -1165,7 +1124,7 @@ enum GuardCommands {
 
 /// Subcommands under `arc guard market`.
 #[derive(Subcommand)]
-enum GuardMarketCommands {
+pub(crate) enum GuardMarketCommands {
     /// List guards visible to the tenant under the tenant's reputation
     /// tier.
     List {
@@ -1240,7 +1199,7 @@ enum GuardMarketCommands {
 }
 
 #[derive(Subcommand)]
-enum GuardBlocklistCommands {
+pub(crate) enum GuardBlocklistCommands {
     /// Remove a digest from the local guard blocklist.
     Remove {
         /// Digest to remove, as sha256:<64-hex> or bare 64-hex.
@@ -1249,7 +1208,7 @@ enum GuardBlocklistCommands {
 }
 
 #[derive(Subcommand)]
-enum McpCommands {
+pub(crate) enum McpCommands {
     /// Wrap a stdio MCP server with verdict gating and emit IDE configs.
     ///
     /// Spawns the wrapped server, gates each
@@ -1450,7 +1409,7 @@ enum McpCommands {
 }
 
 #[derive(Subcommand)]
-enum ApiCommands {
+pub(crate) enum ApiCommands {
     /// Start the Chio HTTP sidecar/reverse proxy.
     Protect {
         /// Upstream base URL to proxy to.
@@ -1472,7 +1431,7 @@ enum ApiCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustCommands {
+pub(crate) enum TrustCommands {
     /// Serve the shared trust-control plane over HTTP.
     Serve {
         /// Socket address to bind the trust-control service to.
@@ -1485,6 +1444,13 @@ enum TrustCommands {
         /// secret is not visible to other users via `ps`/`/proc`.
         #[arg(long, env = "CHIO_TRUST_SERVICE_TOKEN", hide_env_values = true)]
         service_token: String,
+
+        /// Tenant-scoped read token mapping in `tenant_id=token` form. Repeat
+        /// for multiple tenants. Requests presenting one of these tokens are
+        /// confined to reading the matching tenant's receipts; the
+        /// `--service-token` retains administrative cross-tenant access.
+        #[arg(long = "tenant-read-token", value_name = "TENANT=TOKEN")]
+        tenant_read_tokens: Vec<String>,
 
         /// Public base URL this trust-control node advertises to peers and clients.
         #[arg(long)]
@@ -1755,7 +1721,7 @@ enum TrustCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustProviderCommands {
+pub(crate) enum TrustProviderCommands {
     /// List enterprise provider records from the shared registry.
     List {
         /// Local registry file to inspect when not using --control-url.
@@ -1798,7 +1764,7 @@ enum TrustProviderCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustFederationPolicyCommands {
+pub(crate) enum TrustFederationPolicyCommands {
     /// List published permissionless federation policies.
     List {
         /// Local registry file to inspect when not using --control-url.
@@ -1848,7 +1814,7 @@ enum TrustFederationPolicyCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustEvidenceShareCommands {
+pub(crate) enum TrustEvidenceShareCommands {
     /// List shared-evidence references visible from local activity or the remote trust service.
     List {
         /// Filter by local capability ID.
@@ -1882,7 +1848,7 @@ enum TrustEvidenceShareCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustAuthorizationContextCommands {
+pub(crate) enum TrustAuthorizationContextCommands {
     /// Export machine-readable Chio authorization-profile metadata for enterprise IAM review.
     Metadata,
 
@@ -1938,7 +1904,7 @@ enum TrustAuthorizationContextCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustRuntimeAttestationAppraisalCommands {
+pub(crate) enum TrustRuntimeAttestationAppraisalCommands {
     /// Export a signed runtime-attestation appraisal report from local input or trust-control.
     Export {
         /// Input JSON or YAML file containing a RuntimeAttestationEvidence payload.
@@ -1976,7 +1942,7 @@ enum TrustRuntimeAttestationAppraisalCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustBehavioralFeedCommands {
+pub(crate) enum TrustBehavioralFeedCommands {
     /// Export a signed behavioral feed from local state or trust-control.
     Export {
         /// Filter by capability ID.
@@ -2004,7 +1970,7 @@ enum TrustBehavioralFeedCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustExposureLedgerCommands {
+pub(crate) enum TrustExposureLedgerCommands {
     /// Export a signed exposure ledger from local state or trust-control.
     Export {
         /// Filter by capability ID.
@@ -2035,7 +2001,7 @@ enum TrustExposureLedgerCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustCreditScorecardCommands {
+pub(crate) enum TrustCreditScorecardCommands {
     /// Export a signed credit scorecard from local state or trust-control.
     Export {
         /// Subject public key to score.
@@ -2066,7 +2032,7 @@ enum TrustCreditScorecardCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustCapitalBookCommands {
+pub(crate) enum TrustCapitalBookCommands {
     /// Export a signed live capital book from canonical facility, bond, and loss posture.
     Export {
         /// Subject public key to evaluate.
@@ -2103,7 +2069,7 @@ enum TrustCapitalBookCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustCapitalInstructionCommands {
+pub(crate) enum TrustCapitalInstructionCommands {
     /// Issue one custody-neutral escrow or reserve instruction artifact from JSON or YAML input.
     Issue {
         /// JSON or YAML capital-instruction input file.
@@ -2113,7 +2079,7 @@ enum TrustCapitalInstructionCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustCapitalAllocationCommands {
+pub(crate) enum TrustCapitalAllocationCommands {
     /// Issue one live capital-allocation decision artifact from JSON or YAML input.
     Issue {
         /// JSON or YAML capital-allocation input file.
@@ -2126,7 +2092,7 @@ enum TrustCapitalAllocationCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustCreditFacilityCommands {
+pub(crate) enum TrustCreditFacilityCommands {
     /// Evaluate a deterministic facility-policy report without persisting an artifact.
     Evaluate {
         /// Subject public key to evaluate.
@@ -2222,7 +2188,7 @@ enum TrustCreditFacilityCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustCreditBondCommands {
+pub(crate) enum TrustCreditBondCommands {
     /// Evaluate a deterministic bond-policy report without persisting an artifact.
     Evaluate {
         /// Subject public key to evaluate.
@@ -2340,7 +2306,7 @@ enum TrustCreditBondCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustCreditLossLifecycleCommands {
+pub(crate) enum TrustCreditLossLifecycleCommands {
     /// Evaluate a deterministic bond loss-lifecycle transition without persisting an artifact.
     Evaluate {
         /// Bond ID to evaluate against.
@@ -2424,7 +2390,7 @@ enum TrustCreditLossLifecycleCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustCreditBacktestCommands {
+pub(crate) enum TrustCreditBacktestCommands {
     /// Export one deterministic credit backtest report over historical evidence windows.
     Export {
         /// Subject public key to evaluate.
@@ -2467,7 +2433,7 @@ enum TrustCreditBacktestCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustProviderRiskPackageCommands {
+pub(crate) enum TrustProviderRiskPackageCommands {
     /// Export one signed provider-facing risk package over canonical subject-scoped evidence.
     Export {
         /// Subject public key to evaluate.
@@ -2504,7 +2470,7 @@ enum TrustProviderRiskPackageCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustLiabilityProviderCommands {
+pub(crate) enum TrustLiabilityProviderCommands {
     /// Issue and persist a signed curated liability-provider artifact from JSON or YAML input.
     Issue {
         /// JSON or YAML provider report input file.
@@ -2555,7 +2521,7 @@ enum TrustLiabilityProviderCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustLiabilityMarketCommands {
+pub(crate) enum TrustLiabilityMarketCommands {
     /// Issue and persist a signed liability quote request from JSON or YAML input.
     QuoteRequestIssue {
         /// JSON or YAML quote-request input file.
@@ -2703,7 +2669,7 @@ enum TrustLiabilityMarketCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustUnderwritingInputCommands {
+pub(crate) enum TrustUnderwritingInputCommands {
     /// Export a signed underwriting policy-input snapshot from local state or trust-control.
     Export {
         /// Filter by capability ID.
@@ -2734,7 +2700,7 @@ enum TrustUnderwritingInputCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustUnderwritingDecisionCommands {
+pub(crate) enum TrustUnderwritingDecisionCommands {
     /// Evaluate a bounded underwriting decision from local state or trust-control.
     Evaluate {
         /// Filter by capability ID.
@@ -2858,7 +2824,7 @@ enum TrustUnderwritingDecisionCommands {
 }
 
 #[derive(Subcommand)]
-enum TrustUnderwritingAppealCommands {
+pub(crate) enum TrustUnderwritingAppealCommands {
     /// Create an underwriting appeal record for one persisted decision.
     Create {
         /// Decision ID to appeal.
@@ -2896,7 +2862,7 @@ enum TrustUnderwritingAppealCommands {
 }
 
 #[derive(Subcommand)]
-enum ReceiptCommands {
+pub(crate) enum ReceiptCommands {
     /// List receipts with optional filters. Output: one JSON receipt per line (JSON Lines).
     List {
         /// Filter by capability ID.
@@ -2929,6 +2895,26 @@ enum ReceiptCommands {
         /// Cursor for pagination (seq value to start after).
         #[arg(long)]
         cursor: Option<u64>,
+        /// Tenant read boundary for the listing. The reading path fails closed
+        /// when neither `--tenant` nor `--admin-all` is supplied.
+        #[arg(long)]
+        tenant: Option<String>,
+        /// Explicitly read across all tenants as an administrative operation.
+        #[arg(long, default_value_t = false, conflicts_with = "tenant")]
+        admin_all: bool,
+    },
+    /// Report receipt-store write health and durability status.
+    Health,
+    /// Flush pending receipt writes to durable storage, bounded by a timeout.
+    Flush {
+        /// Maximum time to wait for the flush to complete, in milliseconds.
+        #[arg(long, default_value_t = 5000, value_parser = clap::value_parser!(u64).range(1..))]
+        timeout_ms: u64,
+    },
+    /// Inspect or advance the receipt-checkpoint chain.
+    Checkpoint {
+        #[command(subcommand)]
+        command: ReceiptCheckpointCommands,
     },
     /// Explain why a receipt was allowed or denied.
     ///
@@ -2971,11 +2957,39 @@ enum ReceiptCommands {
         /// against pinned passport keys.
         #[arg(long, alias = "explain-bilateral", default_value_t = false)]
         inspect_bilateral: bool,
+        /// Tenant read boundary for the explanation. The reading path fails
+        /// closed when neither `--tenant` nor `--admin-all` is supplied.
+        #[arg(long)]
+        tenant: Option<String>,
+        /// Explicitly read across all tenants as an administrative operation.
+        #[arg(long, default_value_t = false, conflicts_with = "tenant")]
+        admin_all: bool,
     },
 }
 
 #[derive(Subcommand)]
-enum EvidenceCommands {
+pub(crate) enum ReceiptCheckpointCommands {
+    /// Report the current receipt-checkpoint chain status.
+    Status {
+        /// Maximum number of receipts to consider per checkpoint batch.
+        #[arg(long, default_value_t = 1024, value_parser = clap::value_parser!(u64).range(1..))]
+        max_batch: u64,
+    },
+    /// Create the next receipt checkpoint, signed by the kernel keypair.
+    Create {
+        /// Kernel checkpoint signing-seed file.
+        #[arg(long)]
+        kernel_seed_file: PathBuf,
+        /// Maximum number of receipts to include in the checkpoint batch.
+        #[arg(long, default_value_t = 1024, value_parser = clap::value_parser!(u64).range(1..))]
+        max_batch: u64,
+    },
+    /// Verify the integrity of the receipt-checkpoint chain.
+    Verify,
+}
+
+#[derive(Subcommand)]
+pub(crate) enum EvidenceCommands {
     /// Export a verifiable local evidence package into a directory.
     Export {
         /// Output directory for the evidence package. Must not already contain files.
@@ -3029,7 +3043,7 @@ enum EvidenceCommands {
 }
 
 #[derive(Subcommand)]
-enum EvidenceFederationPolicyCommands {
+pub(crate) enum EvidenceFederationPolicyCommands {
     /// Create a signed bilateral federation policy for receipt sharing.
     Create {
         /// Output JSON file for the signed policy document.
@@ -3075,7 +3089,7 @@ enum EvidenceFederationPolicyCommands {
 }
 
 #[derive(Subcommand)]
-enum CertifyCommands {
+pub(crate) enum CertifyCommands {
     /// Evaluate conformance evidence and emit a signed pass/fail certification artifact.
     Check {
         /// Directory containing conformance scenario descriptor JSON files.
@@ -3119,7 +3133,7 @@ enum CertifyCommands {
 }
 
 #[derive(Subcommand)]
-enum CertifyRegistryCommands {
+pub(crate) enum CertifyRegistryCommands {
     /// Publish one signed certification artifact into a local or remote registry.
     Publish {
         /// Input path for the signed certification artifact JSON.
@@ -3271,7 +3285,7 @@ enum CertifyRegistryCommands {
 }
 
 #[derive(Subcommand)]
-enum DidCommands {
+pub(crate) enum DidCommands {
     /// Resolve a did:chio identifier or Ed25519 public key into a DID Document.
     Resolve {
         /// Fully-qualified did:chio identifier to resolve.
@@ -3290,7 +3304,7 @@ enum DidCommands {
 }
 
 #[derive(Subcommand)]
-enum PassportCommands {
+pub(crate) enum PassportCommands {
     /// Synthesize a trust-tier-enriched Agent Passport for a named agent.
     ///
     /// Computes the agent's compliance score (Phase 19.1) and behavioral
@@ -3426,7 +3440,7 @@ enum PassportCommands {
 }
 
 #[derive(Subcommand)]
-enum PassportChallengeCommands {
+pub(crate) enum PassportChallengeCommands {
     /// Create a presentation challenge for a relying party.
     Create {
         /// Output path for the challenge JSON.
@@ -3514,7 +3528,7 @@ enum PassportChallengeCommands {
 }
 
 #[derive(Subcommand)]
-enum PassportOid4vpCommands {
+pub(crate) enum PassportOid4vpCommands {
     /// Create a replay-safe verifier request on the running trust-control service.
     Create {
         /// Optional output path for the verifier request JSON.
@@ -3596,7 +3610,7 @@ enum PassportOid4vpCommands {
 }
 
 #[derive(Subcommand)]
-enum PassportPolicyCommands {
+pub(crate) enum PassportPolicyCommands {
     /// Create a signed verifier-policy artifact from a raw policy file.
     Create {
         /// Output path for the signed verifier-policy document JSON.
@@ -3671,7 +3685,7 @@ enum PassportPolicyCommands {
 }
 
 #[derive(Subcommand)]
-enum PassportStatusCommands {
+pub(crate) enum PassportStatusCommands {
     /// Publish one passport into the lifecycle registry as the current active artifact.
     Publish {
         /// Passport JSON file to publish.
@@ -3733,7 +3747,7 @@ enum PassportStatusCommands {
 }
 
 #[derive(Subcommand)]
-enum PassportIssuanceCommands {
+pub(crate) enum PassportIssuanceCommands {
     /// Render OID4VCI-style issuer metadata for Chio passport issuance.
     Metadata {
         /// Local credential issuer base URL when not using --control-url.
@@ -3821,7 +3835,7 @@ enum PassportIssuanceCommands {
 }
 
 #[derive(Subcommand)]
-enum ReputationCommands {
+pub(crate) enum ReputationCommands {
     /// Compute the local reputation scorecard for one subject.
     Local {
         /// Subject Ed25519 public key in hex.
@@ -3862,7 +3876,7 @@ enum ReputationCommands {
 }
 
 #[derive(Subcommand)]
-enum CertCommands {
+pub(crate) enum CertCommands {
     /// Generate a compliance certificate for an ACP session.
     Generate {
         /// ACP session ID to certify.
@@ -3887,6 +3901,12 @@ enum CertCommands {
         /// Path to the certificate JSON file.
         #[arg(long)]
         certificate: PathBuf,
+
+        /// Trusted kernel public-key file used to verify the certificate
+        /// signature. Raw 32-byte Ed25519 and algorithm-aware hex files are
+        /// accepted.
+        #[arg(long, value_name = "PATH")]
+        trusted_kernel_pubkey: PathBuf,
 
         /// Enable full-bundle verification (re-verify all receipt signatures).
         #[arg(long, default_value_t = false)]
