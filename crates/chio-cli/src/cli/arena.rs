@@ -100,7 +100,7 @@ pub(crate) fn cmd_arena_replay(
         "schema_version": "chio.arena.replay/v1",
         "scenario_id": scenario_id,
         "bundle_dir": resolved.display().to_string(),
-        "engine": "chio-replay-corpus@m04",
+        "engine": "chio-replay-corpus",
     });
     if json_output {
         let bytes = serde_json::to_vec(&summary).map_err(|err| {

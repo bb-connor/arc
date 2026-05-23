@@ -278,7 +278,7 @@ pub struct FrameValidation {
     pub ok: bool,
     /// Human-readable failure detail, when `!ok`.
     pub error: Option<String>,
-    /// Canonical M04 exit code corresponding to `error`, when `!ok`.
+    /// Canonical exit code corresponding to `error`, when `!ok`.
     pub exit_code: Option<i32>,
 }
 
@@ -545,7 +545,7 @@ mod replay_validate_tests {
     }
 
     #[test]
-    fn exit_code_constants_match_m04_registry() {
+    fn exit_code_constants_match_canonical_registry() {
         assert_eq!(EXIT_SCHEMA_MISMATCH, 40);
         assert_eq!(EXIT_BAD_TENANT_SIG, 20);
         assert_eq!(EXIT_REDACTION_MISMATCH, 50);

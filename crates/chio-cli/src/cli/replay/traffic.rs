@@ -401,7 +401,7 @@ mod replay_traffic_tests {
     }
 
     #[test]
-    fn exit_parse_error_constant_matches_m04_registry() {
+    fn exit_parse_error_constant_matches_canonical_registry() {
         assert_eq!(EXIT_PARSE_ERROR, 30);
     }
 }

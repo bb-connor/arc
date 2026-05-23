@@ -39,7 +39,7 @@ fn arena_replay_resolves_bundle_directory() {
         .as_str()
         .unwrap()
         .contains("cli_replay"));
-    assert_eq!(parsed["engine"], "chio-replay-corpus@m04");
+    assert_eq!(parsed["engine"], "chio-replay-corpus");
 }
 
 #[test]

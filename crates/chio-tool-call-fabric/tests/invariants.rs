@@ -10,7 +10,7 @@
 //!   (f) `ProviderError` Display is em-dash-free.
 //!   (g) `ProvenanceStamp.received_at` round-trips through canonical JSON
 //!       without precision loss above ms granularity.
-//!   (h) Schema subsumption (gated on the `m01-schema-subsumption` feature;
+//!   (h) Schema subsumption (gated on the `schema-subsumption` feature;
 //!       runs as a structural self-check over the canonical-JSON pipeline
 //!       when the schema is not present).
 //!
@@ -342,9 +342,9 @@ proptest! {
     /// load-bearing fields (`provider`, `tool_name`, `arguments`,
     /// `provenance`), and the `provenance` sub-object must carry the five
     /// load-bearing fields (`provider`, `request_id`, `api_version`,
-    /// `principal`, `received_at`). When the M01 schema lands the test will
-    /// be promoted to a real jsonschema validation behind the
-    /// `m01-schema-subsumption` cargo feature.
+    /// `principal`, `received_at`). When the canonical schema lands the test
+    /// will be promoted to a real jsonschema validation behind the
+    /// `schema-subsumption` cargo feature.
     #[test]
     fn invariant_h_schema_subsumption_self_check(inv in arb_tool_invocation()) {
         let bytes = canonical_json_bytes(&inv).expect("invocation canonicalises");
@@ -376,10 +376,10 @@ proptest! {
             );
         }
 
-        // When the M01 capability schema is vendored, this branch tightens
+        // When the canonical capability schema is vendored, this branch tightens
         // the property into a real jsonschema validation. The feature gate
         // keeps the default build green until the schema lands.
-        #[cfg(feature = "m01-schema-subsumption")]
+        #[cfg(feature = "schema-subsumption")]
         {
             // Intentionally minimal stub: the actual schema path will be
             // wired here once `spec/schemas/chio-tool-call-fabric/v1.json`
