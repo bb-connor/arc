@@ -37,7 +37,6 @@ jobs:
             "MSRV build and test"
             "cargo-vet (supply-chain audit)"
             "cargo-deny (supply-chain bans/advisories/licenses)"
-            "freeze-guard"
             "bench-regression"
           )
 

@@ -39,7 +39,7 @@ limit annotation:
 4. Re-run one lightweight workflow on `main`:
 
 ```bash
-gh workflow run m05-freeze-guard.yml --ref main
+gh workflow run audit-log-schema-lint.yml --ref main
 ```
 
 5. Re-run the main CI workflow when the lightweight workflow starts:

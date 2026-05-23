@@ -14,7 +14,7 @@ Chio is a protocol for secure, attested tool access in AI agent systems. It repl
 
 ## Crate Map
 
-The workspace ships ~65 crates. The table below lists representative crates per group; see `Cargo.toml` for the full list.
+The workspace ships ~103 crates. The table below lists representative crates per group; see `Cargo.toml` for the full list.
 
 | Group | Representative crates | Purpose |
 |-------|-----------------------|---------|

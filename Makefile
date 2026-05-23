@@ -5,7 +5,7 @@
 # does not duplicate logic. Source of truth for codegen stays in
 # `xtask/src/main.rs` and `xtask/codegen-tools.lock.toml`.
 #
-# Owner: M01 (single-owner trajectory, see EXECUTION-BOARD.md section 5).
+# Owner: see CODEOWNERS.
 
 .PHONY: codegen-check codegen-check-rust codegen-check-python codegen-check-ts codegen-check-go ts-codegen-deps kb-lock-check kb-up kb-down kb-reset kb-reseed kb-update kb-live kb-status kb-smoke kb-eval kb-seed-memory kb-dogfood
 

@@ -63,5 +63,5 @@ Optional environment variables:
 
 See also:
 
-- [docs/PROGRESSIVE_TUTORIAL.md](../../docs/PROGRESSIVE_TUTORIAL.md)
+- [docs/start-here/PROGRESSIVE_TUTORIAL.md](../../docs/start-here/PROGRESSIVE_TUTORIAL.md)
 - [examples/docker/README.md](../docker/README.md)
