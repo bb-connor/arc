@@ -288,7 +288,7 @@ where
     ExpectedIdentity: Sized,
 {
     expected_identity_from_config(
-        "https://github\\.com/backbay/chio/\\.github/workflows/release-binaries\\.yml@refs/tags/v.*",
+        "https://github\\.com/backbay-labs/chio/\\.github/workflows/release-binaries\\.yml@refs/tags/v.*",
         "https://token.actions.githubusercontent.com",
     )
 }

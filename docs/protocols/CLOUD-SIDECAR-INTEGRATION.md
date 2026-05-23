@@ -394,7 +394,7 @@ request arrives after a cold start:
 # Reference Terraform module for deploying Chio-governed services
 
 module "chio_cloud_run" {
-  source = "github.com/backbay/chio//terraform/modules/cloud-run-sidecar"
+  source = "github.com/backbay-labs/chio//terraform/modules/cloud-run-sidecar"
 
   project_id    = var.project_id
   region        = var.region

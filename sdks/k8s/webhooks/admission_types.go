@@ -17,11 +17,11 @@ const (
 	// AnnotationLegacyRequiredScopes is a pod-supplied annotation that the
 	// webhook does not trust. Required scopes are read from webhook
 	// configuration only.
-	AnnotationLegacyRequiredScopes = "chio.backbay.io/required-scopes"
+	AnnotationLegacyRequiredScopes = "chio.world/required-scopes"
 
 	// AnnotationLegacyExempt is a pod-supplied annotation that the webhook
 	// does not trust. The webhook never honors self-asserted exemptions.
-	AnnotationLegacyExempt = "chio.backbay.io/exempt"
+	AnnotationLegacyExempt = "chio.world/exempt"
 )
 
 // AdmissionReview wraps an admission request and response.

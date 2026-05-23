@@ -9,7 +9,7 @@ description = "AutoGen integration for the Chio protocol -- capability-scoped fu
 license = "MIT"
 requires-python = ">=3.11"
 authors = [
-    { name = "Backbay Industries" },
+    { name = "Backbay Labs", email = "connor@backbay.io" },
 ]
 keywords = ["chio", "autogen", "pyautogen", "agent", "tool", "security", "capability"]
 classifiers = [

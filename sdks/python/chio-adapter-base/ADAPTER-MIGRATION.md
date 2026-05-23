@@ -182,7 +182,7 @@ Recipe:
    per signature shape your adapter wraps.
 
 The chio-prefect collapse landed in
-[PR #679](https://github.com/bb-connor/arc/pull/679): see it for the
+[PR #679](https://github.com/backbay-labs/chio/pull/679): see it for the
 helper hardening + prefect canary collapse; the post-merge
 worked example lives at
 `sdks/python/chio-prefect/src/chio_prefect/decorators.py`'s

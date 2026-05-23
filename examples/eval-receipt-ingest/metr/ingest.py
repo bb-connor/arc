@@ -47,9 +47,9 @@ def build_bundle():
         "created_at": "2026-05-02T00:00:00Z",
         "producer": {
             "name": "Chio",
-            "repository": "https://github.com/bb-connor/arc",
+            "repository": "https://github.com/backbay-labs/chio",
             "commit": "trajectory-3-m02-p4",
-            "workflow_run_url": "https://github.com/bb-connor/arc/actions/runs/25246581763",
+            "workflow_run_url": "https://github.com/backbay-labs/chio/actions/runs/25246581763",
         },
         "eval_run": {
             "run_id": "metr-p4-vivaria-export",

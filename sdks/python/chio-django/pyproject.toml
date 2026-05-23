@@ -9,7 +9,7 @@ description = "Django middleware and DRF integration for the Chio protocol"
 license = "MIT"
 requires-python = ">=3.11"
 authors = [
-    { name = "Backbay Industries" },
+    { name = "Backbay Labs", email = "connor@backbay.io" },
 ]
 keywords = ["chio", "django", "security", "capability", "middleware"]
 classifiers = [

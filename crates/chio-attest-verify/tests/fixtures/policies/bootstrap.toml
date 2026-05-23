@@ -15,7 +15,7 @@
 tenant_id = "bootstrap"
 version = 1
 identity_regexps = [
-    "https://github\\.com/backbay/chio/\\.github/workflows/release-binaries\\.yml@refs/tags/v.*",
+    "https://github\\.com/backbay-labs/chio/\\.github/workflows/release-binaries\\.yml@refs/tags/v.*",
 ]
 oidc_issuers = ["https://token.actions.githubusercontent.com"]
 signed_at = "2026-04-01T00:00:00Z"

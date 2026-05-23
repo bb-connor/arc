@@ -1,8 +1,8 @@
 name: Release C++ SDKs
 
-# Tag-driven publish for the four Chio C++ SDKs to the private Conan remote
-# (Sonatype Nexus on the platform-dev OKE cluster) and the private vcpkg
-# overlay registry (backbay-labs/chio-vcpkg-registry).
+# Tag-driven publish for the four Chio C++ SDKs to GitHub Releases under
+# github.com/backbay-labs/chio and the private vcpkg overlay registry
+# (backbay-labs/chio-vcpkg-registry).
 #
 # Tag format: cpp/v<X.Y.Z> publishes all four SDKs. The four SDK versions
 # stay coupled while the C ABI invariant boundary is pre-1.0; once any SDK
@@ -10,15 +10,15 @@ name: Release C++ SDKs
 # release-npm.yml precedent.
 #
 # Required GitHub Actions secrets (configured at repo level):
-#   - CHIO_NEXUS_PUBLISHER_TOKEN: bearer token for the chio-publisher Nexus
-#     account, sourced from OCI Vault secret chio-registry/chio-publisher
 #   - CHIO_VCPKG_REGISTRY_DEPLOY_KEY: SSH private key whose public half is
 #     a deploy key on backbay-labs/chio-vcpkg-registry with write access
 #
-# Network reachability: this workflow assumes nexus.dev.backbay.io is
-# publicly resolvable and accepts traffic from GitHub-hosted runners. If
-# the gateway is ACL'd to internal CIDRs, swap to a self-hosted runner
-# pinned to the OKE cluster network.
+# TODO: The previous publish step uploaded Conan packages to a private Nexus
+# instance (decommissioned). That private server reference has been removed.
+# Conan packages should now be published to GitHub Releases assets
+# under github.com/backbay-labs/chio (using GITHUB_TOKEN / a deploy PAT) or
+# to the public Conan Center if the packages become open. Wire up the new
+# publish step before cutting the next cpp/v* release.
 
 on:
   push:
@@ -44,9 +44,8 @@ env:
   CHIO_CPP_CBINDGEN_VERSION: "0.29.2"
   CHIO_CPP_CONAN_VERSION: "2.28.0"
   CHIO_CPP_VCPKG_REF: 7a9071743140154391b0e18b77d46cc66c5f3663
-  # No trailing slash. Some Conan/Nexus combos loop on redirects when the
-  # configured remote URL doesn't match the canonical form Nexus serves.
-  CHIO_NEXUS_REMOTE_URL: https://nexus.dev.backbay.io/repository/chio-conan
+  # TODO: Set CHIO_CONAN_PUBLISH_URL to the new publish endpoint once
+  # the GitHub Releases-based Conan distribution is wired up.
   CHIO_VCPKG_REGISTRY_REPO: backbay-labs/chio-vcpkg-registry
 
 jobs:
@@ -143,59 +142,14 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
-  publish-conan:
-    name: Upload to Nexus
-    needs: qualify
-    if: needs.qualify.outputs.dry_run != 'true'
-    runs-on: ubuntu-latest
-    environment:
-      name: chio-conan-private
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-
-      - name: Install conan
-        run: |
-          python3 -m pip install --user "conan==${CHIO_CPP_CONAN_VERSION}"
-          echo "$(python3 -m site --user-base)/bin" >> "$GITHUB_PATH"
-
-      - name: Restore Conan cache snapshot
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: conan-cache-${{ needs.qualify.outputs.version }}
-          path: ${{ runner.temp }}/snapshot
-
-      - name: Hydrate local Conan cache
-        run: |
-          set -euo pipefail
-          mkdir -p "$HOME/.conan2"
-          tar -C "$HOME/.conan2" -xzf "${RUNNER_TEMP}/snapshot/conan-cache.tar.gz"
-
-      - name: Configure Nexus remote
-        run: |
-          set -euo pipefail
-          if ! conan profile path default >/dev/null 2>&1; then
-            conan profile detect --force
-          fi
-          conan remote add chio-private "${CHIO_NEXUS_REMOTE_URL}" || true
-
-      - name: Upload SDK packages
-        # Conan v2 `remote login` obtains a session token but the token
-        # storage doesn't reliably persist across separate `conan` invocations
-        # in CI; subsequent commands re-prompt for credentials and EOF on
-        # closed stdin. The supported non-interactive path is per-remote
-        # env vars, which Conan reads on every command. Per
-        # https://docs.conan.io/2/reference/environment.html the remote
-        # name is uppercased and hyphens are replaced with underscores in
-        # the variable name; "chio-private" -> "CHIO_PRIVATE".
-        env:
-          CONAN_LOGIN_USERNAME_CHIO_PRIVATE: chio-publisher
-          CONAN_PASSWORD_CHIO_PRIVATE: ${{ secrets.CHIO_NEXUS_PUBLISHER_TOKEN }}
-        run: |
-          set -euo pipefail
-          for sdk in chio-cpp chio-cpp-kernel chio-guard-cpp chio-drogon; do
-            conan upload "${sdk}/${{ needs.qualify.outputs.version }}" \
-              -r=chio-private --confirm
-          done
+  # TODO: publish-conan - upload Conan packages to GitHub Releases under
+  # github.com/backbay-labs/chio (or Conan Center if the packages go public).
+  # The previous step published to a private Nexus instance (decommissioned).
+  # Implement a new publish job here that:
+  #   1. Downloads the conan-cache artifact from the qualify job.
+  #   2. Uploads the packed .tgz archives as GitHub Release assets via
+  #      `gh release upload cpp/v<VERSION> <archive>` with GITHUB_TOKEN.
+  # Wire this job before cutting the next cpp/v* release tag.
 
   publish-vcpkg:
     name: Sync vcpkg overlay

@@ -103,7 +103,7 @@
           "const": "CEF:0"
         },
         "device_vendor": {
-          "const": "Backbay Industries"
+          "const": "Backbay Labs"
         },
         "device_product": {
           "const": "Chio"

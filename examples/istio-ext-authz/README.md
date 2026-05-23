@@ -33,9 +33,9 @@ action.
 - `curl` and `awk` on the workstation running `test-harness.sh`.
 - A dedicated Chio Envoy ext_authz adapter image pushed to a registry your
   cluster can pull. The reference manifest uses
-  `ghcr.io/backbay/chio-ext-authz:latest` as a placeholder. Replace it with
+  `ghcr.io/backbay-labs/chio-ext-authz:latest` as a placeholder. Replace it with
   the adapter image you built and published for your environment. Do not use
-  the generic `ghcr.io/backbay/chio-sidecar` image here; that image is the
+  the generic `ghcr.io/backbay-labs/chio-sidecar` image here; that image is the
   HTTP sidecar and does not expose Envoy's gRPC `Authorization/Check`
   service.
 - A capability token issued by a Chio capability authority (or the demo

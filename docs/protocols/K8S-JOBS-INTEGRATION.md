@@ -153,7 +153,7 @@ import (
     "sigs.k8s.io/controller-runtime/pkg/client"
     "sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-    arcv1 "github.com/backbay/chio/sdks/k8s/api/v1alpha1"
+    arcv1 "github.com/backbay-labs/chio/sdks/k8s/api/v1alpha1"
 )
 
 type JobReconciler struct {
@@ -257,7 +257,7 @@ spec:
         - name: CHIO_SIDECAR_URL
           value: "http://localhost:9090"
     - name: chio-sidecar
-      image: ghcr.io/backbay/chio-sidecar:latest
+      image: ghcr.io/backbay-labs/chio-sidecar:latest
       ports:
         - containerPort: 9090
       env:

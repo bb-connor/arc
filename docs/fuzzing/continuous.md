@@ -177,7 +177,7 @@ The CFLite builder image lives under `.clusterfuzzlite/`:
   `.github/workflows/cflite_pr.yml` and `.github/workflows/cflite_batch.yml`
   per ClusterFuzzLite's published schema (it is not a `project.yaml` field).
 
-Storage backend: `bb-connor/arc-fuzz-corpus` (sibling private repo). The
+Storage backend: `backbay-labs/arc-fuzz-corpus` (sibling private repo). The
 repo is created out-of-band before the first `cflite_batch.yml` run; until
 it exists, ClusterFuzzLite falls back to per-run artifact storage and the
 rotation still passes its crash-search criterion. Keeping corpus storage in
@@ -196,7 +196,7 @@ secret is unavailable.
 - Acceptance lag: typically 2-6 weeks. ClusterFuzzLite carries coverage
   through the lag.
 - Backup contact slot: tracked in the M02 P2 follow-up issue (current
-  primary contact: `whelan.connor11@gmail.com`; backup TBD before the
+  primary contact: `connor@backbay.io`; backup TBD before the
   application opens).
 - On acceptance: repoint the bug-tracker integration in
   `.clusterfuzzlite/project.yaml` (`report_to_oss_fuzz: true`); keep
@@ -212,7 +212,7 @@ files live under `infra/oss-fuzz/` and are mirrored into the upstream
 `google/oss-fuzz` repo as a follow-up PR after the in-tree files merge:
 
 - `infra/oss-fuzz/project.yaml` declares `language: rust`, the primary
-  contact (`whelan.connor11@gmail.com`), `auto_ccs`, the `address` plus
+  contact (`connor@backbay.io`), `auto_ccs`, the `address` plus
   `undefined` sanitizer pair, the `x86_64` architecture, and the
   `libfuzzer` engine. The backup-contact slot is held open with a
   `TODO(M02.P2)` comment and is tracked in the M02 P2 follow-up issue.
@@ -293,7 +293,7 @@ Crash artifacts from CI:
 - ClusterFuzzLite (`cflite_pr`, `cflite_batch`) writes crash artifacts
   into the workflow's GitHub Actions artifact store and (when OSS-Fuzz
   reporting is enabled post-acceptance) opens issues labelled `fuzz-crash`
-  on `bb-connor/arc`.
+  on `backbay-labs/chio`.
 - The in-tree `fuzz.yml` matrix uploads the libFuzzer crash file plus the
   raw stderr as a workflow artifact named `fuzz-crash-<target>-<run-id>`.
 

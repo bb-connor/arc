@@ -9,7 +9,7 @@ description = "CrewAI integration for the Chio protocol -- capability-scoped too
 license = "MIT"
 requires-python = ">=3.11"
 authors = [
-    { name = "Backbay Industries" },
+    { name = "Backbay Labs", email = "connor@backbay.io" },
 ]
 keywords = ["chio", "crewai", "agent", "tool", "security", "capability"]
 classifiers = [

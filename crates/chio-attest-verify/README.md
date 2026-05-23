@@ -17,7 +17,7 @@ use chio_attest_verify::{AttestVerifier, ExpectedIdentity, SigstoreVerifier};
 let verifier = SigstoreVerifier::with_embedded_root()?;
 let expected = ExpectedIdentity {
     certificate_identity_regexp:
-        r"https://github\.com/backbay/chio/\.github/workflows/release-binaries\.yml@refs/tags/v.*"
+        r"https://github\.com/backbay-labs/chio/\.github/workflows/release-binaries\.yml@refs/tags/v.*"
             .into(),
     certificate_oidc_issuer: "https://token.actions.githubusercontent.com".into(),
 };
@@ -64,7 +64,7 @@ For chio's GitHub-hosted release workflows the canonical
 
 - `certificate_oidc_issuer = "https://token.actions.githubusercontent.com"`
 - `certificate_identity_regexp =
-  "https://github\.com/backbay/chio/\.github/workflows/release-binaries\.yml@refs/tags/v.*"`
+  "https://github\.com/backbay-labs/chio/\.github/workflows/release-binaries\.yml@refs/tags/v.*"`
 
 The verifier anchors the regex with `^...$` internally; callers may omit
 or include their own anchors without behavioural difference.

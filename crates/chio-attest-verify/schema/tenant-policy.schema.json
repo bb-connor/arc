@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/backbay/chio/spec/security/tenant-policy.schema.json",
+  "$id": "https://github.com/backbay-labs/chio/spec/security/tenant-policy.schema.json",
   "title": "Chio TenantPolicy",
   "description": "Per-tenant ExpectedIdentity policy file (M05.P4.T1). TOML on disk, canonical JSON for signing. Single source of truth: `crates/chio-attest-verify/src/policy.rs`. Trajectory-2 M03 fills in `pq_identity_regexps` once ML-DSA cert identities stabilise.",
   "type": "object",

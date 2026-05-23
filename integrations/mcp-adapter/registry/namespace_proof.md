@@ -3,12 +3,12 @@
 Namespace: `dev.chio`
 
 Validation method for trajectory-3 submission: GitHub challenge in the
-`backbay/chio` repository. DNS challenge remains the fallback if the
+`backbay-labs/chio` repository. DNS challenge remains the fallback if the
 registry reviewer requires domain-level proof for `chio.dev`.
 
 Planned challenge record:
 
-- Repository: `https://github.com/backbay/chio`
+- Repository: `https://github.com/backbay-labs/chio`
 - File: `.well-known/mcp-registry/dev.chio.json`
 - Subject: `dev.chio`
 - Contact: `security@chio.dev`

@@ -58,7 +58,7 @@ pub const OCSF_CATEGORY_NAME: &str = "Identity & Access Management";
 pub const OCSF_PRODUCT_NAME: &str = "Chio";
 
 /// Product vendor surfaced in OCSF metadata.
-pub const OCSF_PRODUCT_VENDOR: &str = "Backbay Industries";
+pub const OCSF_PRODUCT_VENDOR: &str = "Backbay Labs";
 
 /// Convert an [`ChioReceipt`] into an OCSF 1.3.0 Authorization event.
 ///

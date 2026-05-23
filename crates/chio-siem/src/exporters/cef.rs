@@ -19,7 +19,7 @@ pub struct CefExporterConfig {
 impl Default for CefExporterConfig {
     fn default() -> Self {
         Self {
-            device_vendor: "Backbay Industries".to_string(),
+            device_vendor: "Backbay Labs".to_string(),
             device_product: "Chio".to_string(),
             device_version: env!("CARGO_PKG_VERSION").to_string(),
         }

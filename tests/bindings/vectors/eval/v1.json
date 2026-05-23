@@ -4,7 +4,7 @@
   "created_at": "2026-05-02T00:00:00Z",
   "producer": {
     "name": "Chio",
-    "repository": "https://github.com/bb-connor/arc",
+    "repository": "https://github.com/backbay-labs/chio",
     "commit": "golden-v1",
     "workflow_run_url": "local-eval-receipt-regen"
   },

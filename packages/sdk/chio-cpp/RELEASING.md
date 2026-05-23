@@ -61,15 +61,17 @@ from-source CMake options.
 
 ## Private registry endpoints
 
-### Conan: Sonatype Nexus 3 OSS on the platform-dev OKE cluster
+### Conan: private remote
 
-Remote URL: `https://nexus.dev.backbay.io/repository/chio-conan/`
+Remote URL: TODO (replace with the canonical Conan remote; the C++ SDK
+artifacts are distributed via GitHub Releases at
+`https://github.com/backbay-labs/chio/releases` until the remote is finalized).
 
 Add the remote and authenticate as the publisher service account (token lives
-in OCI Vault at `chio-registry/chio-publisher`, property `token`):
+in the secrets manager at `chio-registry/chio-publisher`, property `token`):
 
 ```bash
-conan remote add chio-private https://nexus.dev.backbay.io/repository/chio-conan/
+conan remote add chio-private <CONAN_REMOTE_URL>  # TODO: set canonical remote
 conan remote login chio-private chio-publisher --password-stdin <<< "${CHIO_NEXUS_PUBLISHER_TOKEN}"
 ```
 

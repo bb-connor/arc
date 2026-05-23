@@ -13,7 +13,7 @@
 // the driver invokes through the sidecar; the binding wiring lands in a
 // follow-on operator-tactical ticket and is out of M07.P6.T1 scope.
 
-package io.backbay.chio.verdictmatrix.jvm
+package world.chio.verdictmatrix.jvm
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule

@@ -14,29 +14,29 @@ const (
 
 	// AnnotationRequiredScopes is a legacy pod annotation name. The admission
 	// webhook does not trust pod-supplied scope requirements.
-	AnnotationRequiredScopes = "chio.backbay.io/required-scopes"
+	AnnotationRequiredScopes = "chio.world/required-scopes"
 
 	// AnnotationExempt is a legacy pod annotation name. The admission webhook
 	// does not trust pod-supplied exemptions.
-	AnnotationExempt = "chio.backbay.io/exempt"
+	AnnotationExempt = "chio.world/exempt"
 
 	// AnnotationInject triggers sidecar injection when set to "true".
-	AnnotationInject = "chio.backbay.io/inject"
+	AnnotationInject = "chio.world/inject"
 
 	// AnnotationSidecarImage overrides the default sidecar container image.
-	AnnotationSidecarImage = "chio.backbay.io/sidecar-image"
+	AnnotationSidecarImage = "chio.world/sidecar-image"
 
 	// AnnotationUpstream sets the upstream URL the sidecar proxies to.
-	AnnotationUpstream = "chio.backbay.io/upstream"
+	AnnotationUpstream = "chio.world/upstream"
 
 	// AnnotationSpecPath sets the path to the OpenAPI spec file in the pod.
-	AnnotationSpecPath = "chio.backbay.io/spec-path"
+	AnnotationSpecPath = "chio.world/spec-path"
 
 	// AnnotationReceiptStore sets the receipt storage backend for the sidecar.
-	AnnotationReceiptStore = "chio.backbay.io/receipt-store"
+	AnnotationReceiptStore = "chio.world/receipt-store"
 
 	// DefaultSidecarImage is the default container image for the Chio sidecar.
-	DefaultSidecarImage = "ghcr.io/backbay/chio-sidecar:latest"
+	DefaultSidecarImage = "ghcr.io/backbay-labs/chio-sidecar:latest"
 )
 
 // AdmissionReview wraps an admission request and response.

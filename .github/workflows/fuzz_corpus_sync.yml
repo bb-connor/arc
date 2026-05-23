@@ -34,7 +34,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  CORPUS_REPO: "bb-connor/arc-fuzz-corpus"
+  CORPUS_REPO: "backbay-labs/arc-fuzz-corpus"
   SOURCE_REF: ${{ inputs.source_ref || 'main' }}
 
 jobs:
@@ -55,7 +55,7 @@ jobs:
         working-directory: chio
         run: bash scripts/check-upstream-skips.sh
 
-      # The sibling private corpus repo `bb-connor/arc-fuzz-corpus` and the
+      # The sibling private corpus repo `backbay-labs/arc-fuzz-corpus` and the
       # `FUZZ_CORPUS_PAT` token are provisioned out-of-band; until they
       # exist this workflow has nothing to pull, so skip the sync cleanly
       # rather than hard-failing every Sunday cron with `Input required and

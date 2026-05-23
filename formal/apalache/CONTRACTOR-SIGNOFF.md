@@ -28,7 +28,7 @@ stabilization pass.
 - Installer pin: `tools/install-apalache.sh` `APALACHE_VERSION="0.50.1"`.
 - SMT solver: default Apalache Z3 backend.
 - Runner posture: local macOS smoke plus hosted `ubuntu-24.04` workflow
-  dispatch at `https://github.com/bb-connor/arc/actions/runs/25251783773`.
+  dispatch at `https://github.com/backbay-labs/chio/actions/runs/25251783773`.
 
 ## SMT Invocations
 

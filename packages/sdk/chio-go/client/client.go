@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/backbay/chio/packages/sdk/chio-go/auth"
-	"github.com/backbay/chio/packages/sdk/chio-go/session"
-	"github.com/backbay/chio/packages/sdk/chio-go/transport"
-	"github.com/backbay/chio/packages/sdk/chio-go/version"
+	"github.com/backbay-labs/chio/packages/sdk/chio-go/auth"
+	"github.com/backbay-labs/chio/packages/sdk/chio-go/session"
+	"github.com/backbay-labs/chio/packages/sdk/chio-go/transport"
+	"github.com/backbay-labs/chio/packages/sdk/chio-go/version"
 )
 
 type MessageHandler func(context.Context, map[string]any, *session.Session) error

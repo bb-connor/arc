@@ -3,7 +3,7 @@
 # Chio sidecar image.
 #
 # Build:
-#   docker build -f deploy/sidecar/Dockerfile -t ghcr.io/backbay/chio-sidecar:latest .
+#   docker build -f deploy/sidecar/Dockerfile -t ghcr.io/backbay-labs/chio-sidecar:latest .
 #
 # The sidecar exposes :9090 and responds to GET /chio/health. It reads policy and
 # signing material from env vars documented in
@@ -96,7 +96,7 @@ FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
 # Metadata.
 LABEL org.opencontainers.image.title="chio-sidecar" \
       org.opencontainers.image.description="Chio (Chio) kernel sidecar for multi-container platforms" \
-      org.opencontainers.image.source="https://github.com/backbay/chio" \
+      org.opencontainers.image.source="https://github.com/backbay-labs/chio" \
       org.opencontainers.image.licenses="Apache-2.0"
 
 # Runtime config defaults (overridable at deploy time).

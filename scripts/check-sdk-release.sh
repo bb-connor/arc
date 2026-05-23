@@ -192,9 +192,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/backbay/chio/packages/sdk/chio-go/auth"
-	"github.com/backbay/chio/packages/sdk/chio-go/client"
-	"github.com/backbay/chio/packages/sdk/chio-go/version"
+	"github.com/backbay-labs/chio/packages/sdk/chio-go/auth"
+	"github.com/backbay-labs/chio/packages/sdk/chio-go/client"
+	"github.com/backbay-labs/chio/packages/sdk/chio-go/version"
 )
 
 func main() {
@@ -211,8 +211,8 @@ EOF
     (
       cd "${consumer_dir}"
       go mod init example.com/chio-go-release-smoke
-      go mod edit -require=github.com/backbay/chio/packages/sdk/chio-go@"${release_version}"
-      go mod edit -replace=github.com/backbay/chio/packages/sdk/chio-go="${sdk_dir}"
+      go mod edit -require=github.com/backbay-labs/chio/packages/sdk/chio-go@"${release_version}"
+      go mod edit -replace=github.com/backbay-labs/chio/packages/sdk/chio-go="${sdk_dir}"
       CGO_ENABLED=0 go mod tidy
       CGO_ENABLED=0 go build ./...
     )

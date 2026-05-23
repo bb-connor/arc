@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	chioapi "github.com/backbay/chio-k8s-controller/internal/chio"
+	chioapi "github.com/backbay-labs/chio-k8s-controller/internal/chio"
 )
 
 // Label and annotation keys used to coordinate with governed Jobs.

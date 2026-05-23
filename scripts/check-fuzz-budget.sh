@@ -20,7 +20,7 @@
 # the 1,800-min budget.
 #
 # Usage:
-#   scripts/check-fuzz-budget.sh                      # default repo: bb-connor/arc
+#   scripts/check-fuzz-budget.sh                      # default repo: backbay-labs/chio
 #   scripts/check-fuzz-budget.sh OWNER/REPO
 #   GH_FUZZ_BUDGET_MINUTES=900 scripts/check-fuzz-budget.sh    # override cap
 #   GH_FUZZ_BUDGET_RATE_LIMIT_MODE=warn scripts/check-fuzz-budget.sh
@@ -35,7 +35,7 @@
 
 set -euo pipefail
 
-REPO="${1:-bb-connor/arc}"
+REPO="${1:-backbay-labs/chio}"
 CAP_MINUTES="${GH_FUZZ_BUDGET_MINUTES:-1800}"
 WINDOW_DAYS=30
 WORKFLOWS=("cflite_pr.yml" "cflite_batch.yml" "fuzz.yml" "mutants.yml" "mutants-fuzz-cocoverage.yml")

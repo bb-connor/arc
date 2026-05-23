@@ -129,7 +129,7 @@ fn export_record_from_receipt(fixture: &ReceiptFixture, receipt: &ChioReceipt) -
         },
         "cef": {
             "version": "CEF:0",
-            "device_vendor": "Backbay Industries",
+            "device_vendor": "Backbay Labs",
             "device_product": "Chio",
             "signature_id": fixture.reason_code,
             "name": "Mobile receipt oracle verification",

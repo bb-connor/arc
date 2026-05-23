@@ -107,7 +107,7 @@ ENV CHIO_HOME=/var/lib/chio \
 LABEL org.opencontainers.image.title="chio-sidecar" \
       org.opencontainers.image.description="Chio sidecar runtime (capability kernel)" \
       org.opencontainers.image.licenses="Apache-2.0" \
-      org.opencontainers.image.source="https://github.com/backbay/chio"
+      org.opencontainers.image.source="https://github.com/backbay-labs/chio"
 
 ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/chio"]
 # No sensible zero-argument default — `chio run` and `chio mcp serve-http`

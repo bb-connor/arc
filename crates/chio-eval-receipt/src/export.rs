@@ -20,7 +20,7 @@ pub const VERDICT_MATRIX_SCENARIO_COUNT: u16 = 48;
 pub const VERDICT_MATRIX_MANIFEST_PATH: &str =
     "crates/chio-conformance/verdict_matrix/manifest.toml";
 
-const PRODUCER_REPOSITORY: &str = "https://github.com/bb-connor/arc";
+const PRODUCER_REPOSITORY: &str = "https://github.com/backbay-labs/chio";
 const CORPUS_NAME: &str = "chio-verdict-matrix";
 
 /// Error returned by typed export input constructors.

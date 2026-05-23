@@ -75,7 +75,7 @@
         "sdks/python/chio-asgi/src/chio_asgi/middleware.py",
         "sdks/python/chio-django/src/chio_django/middleware.py",
         "sdks/python/chio-fastapi/src/chio_fastapi/dependencies.py",
-        "sdks/jvm/chio-spring-boot/src/main/kotlin/io/backbay/chio/ChioFilter.kt",
+        "sdks/jvm/chio-spring-boot/src/main/kotlin/world/chio/ChioFilter.kt",
         "sdks/dotnet/ChioMiddleware/src/ChioMiddlewareExtensions.cs"
       ]
     },

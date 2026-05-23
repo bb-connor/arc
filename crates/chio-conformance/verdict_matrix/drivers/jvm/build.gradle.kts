@@ -29,7 +29,7 @@ dependencies {
 }
 
 application {
-    mainClass.set("io.backbay.chio.verdictmatrix.jvm.DriverKt")
+    mainClass.set("world.chio.verdictmatrix.jvm.DriverKt")
 }
 
 tasks.withType<Test> {

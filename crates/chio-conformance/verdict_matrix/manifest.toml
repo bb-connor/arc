@@ -83,7 +83,7 @@ entrypoint = "drivers/jvm"
 command = "cd crates/chio-conformance/verdict_matrix/drivers/jvm && ./gradlew --quiet test"
 underlying_driver = "rust-kernel"
 matrix_role = "deployment-shape"
-package = "io.backbay.chio:chio-sdk-jvm"
+package = "world.chio:chio-sdk-jvm"
 requires_sidecar_env = ["CHIO_VERDICT_MATRIX_SIDECAR_URL", "CHIO_SIDECAR_URL"]
 blocked_on = "M07.P6 sidecar wiring (operator-tactical)"
 

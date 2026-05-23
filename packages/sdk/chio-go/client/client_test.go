@@ -8,8 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/backbay/chio/packages/sdk/chio-go/client"
-	"github.com/backbay/chio/packages/sdk/chio-go/version"
+	"github.com/backbay-labs/chio/packages/sdk/chio-go/client"
+	"github.com/backbay-labs/chio/packages/sdk/chio-go/version"
 )
 
 func TestClientInitializeReturnsSessionAndMCPCoreHelpers(t *testing.T) {

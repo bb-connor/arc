@@ -104,7 +104,7 @@ Before:
 fn expected_identity() -> ExpectedIdentity {
     ExpectedIdentity {
         certificate_identity_regexp:
-            "https://github\\.com/backbay/chio/\\.github/workflows/iam\\.yml@refs/heads/main"
+            "https://github\\.com/backbay-labs/chio/\\.github/workflows/iam\\.yml@refs/heads/main"
                 .to_string(),
         certificate_oidc_issuer: "https://token.actions.githubusercontent.com".to_string(),
     }
@@ -116,7 +116,7 @@ After:
 ```rust
 fn expected_identity() -> ExpectedIdentity { // doc-hidden return type
     ExpectedIdentity::doc_hidden_inline(
-        "https://github\\.com/backbay/chio/\\.github/workflows/iam\\.yml@refs/heads/main",
+        "https://github\\.com/backbay-labs/chio/\\.github/workflows/iam\\.yml@refs/heads/main",
         "https://token.actions.githubusercontent.com",
     )
 }
@@ -144,7 +144,7 @@ so even a placeholder bootstrap is rejected after 2026-06-30 unless rotated.
 
 The bootstrap signing identity is the workspace release identity:
 
-- `certificate_identity_regexp`: `https://github\.com/backbay/chio/\.github/workflows/release-binaries\.yml@refs/tags/v.*`
+- `certificate_identity_regexp`: `https://github\.com/backbay-labs/chio/\.github/workflows/release-binaries\.yml@refs/tags/v.*`
 - `certificate_oidc_issuer`: `https://token.actions.githubusercontent.com`
 
 This is the same identity M06 uses for binary releases. The bootstrap policy

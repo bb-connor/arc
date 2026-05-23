@@ -14,7 +14,7 @@ admin-merge bypass window.
 ## Cap value
 
 Cap value: set the GitHub Actions paid spending limit to at least
-$2,500 per month for the account that owns `bb-connor/arc`.
+$2,500 per month for the account that owns `backbay-labs/chio`.
 
 Rationale:
 

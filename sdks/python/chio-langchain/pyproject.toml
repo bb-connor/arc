@@ -9,7 +9,7 @@ description = "LangChain integration for Chio protocol tools with conformance te
 license = "MIT"
 requires-python = ">=3.11"
 authors = [
-    { name = "Backbay Industries" },
+    { name = "Backbay Labs", email = "connor@backbay.io" },
 ]
 keywords = ["chio", "langchain", "agent", "tool", "security"]
 classifiers = [

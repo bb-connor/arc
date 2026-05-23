@@ -23,7 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	chioapi "github.com/backbay/chio-k8s-controller/internal/chio"
+	chioapi "github.com/backbay-labs/chio-k8s-controller/internal/chio"
 )
 
 func newScheme(t *testing.T) *runtime.Scheme {

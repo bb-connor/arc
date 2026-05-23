@@ -380,7 +380,7 @@ def evaluate(req):
 ```go
 package main
 
-import "github.com/backbay/chio-guard-sdk-go"
+import "github.com/backbay-labs/chio-guard-sdk-go"
 
 //export evaluate
 func evaluate(ptr, len int32) int32 {

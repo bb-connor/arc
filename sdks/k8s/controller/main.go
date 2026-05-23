@@ -4,7 +4,7 @@
 //  1. Rejects pods without valid Chio capability tokens issued by configured Chio
 //     trust anchors.
 //  2. Injects the chio-api-protect sidecar container into pods that have the
-//     chio.backbay.io/inject: "true" annotation.
+//     chio.world/inject: "true" annotation.
 //
 // The sidecar container communicates with the application container over
 // localhost, proxying HTTP traffic through the Chio kernel for capability

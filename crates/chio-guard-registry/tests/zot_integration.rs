@@ -29,7 +29,7 @@ const ZOT_PORT: u16 = 5000;
 const REPOSITORY: &str = "chio/guard-registry/zot-integration";
 const TAG: &str = "suite";
 const SIGNER_SUBJECT: &str =
-    "https://github.com/backbay/chio/.github/workflows/release-binaries.yml@refs/tags/v1.0.0";
+    "https://github.com/backbay-labs/chio/.github/workflows/release-binaries.yml@refs/tags/v1.0.0";
 const OFFLINE_MISS_DIGEST: &str =
     "sha256:9999999999999999999999999999999999999999999999999999999999999999";
 const WIT_BYTES: &[u8] = b"package chio:guard@0.2.0;";
@@ -259,7 +259,7 @@ where
     ExpectedIdentity: Sized,
 {
     expected_identity_from_config(
-        "https://github\\.com/backbay/chio/\\.github/workflows/release-binaries\\.yml@refs/tags/v.*",
+        "https://github\\.com/backbay-labs/chio/\\.github/workflows/release-binaries\\.yml@refs/tags/v.*",
         "https://token.actions.githubusercontent.com",
     )
 }

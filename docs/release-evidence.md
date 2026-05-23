@@ -8,7 +8,7 @@ assessor.
 
 For release `v<tag>`, fetch:
 
-- GitHub Release assets from `https://github.com/bb-connor/arc/releases/tag/v<tag>`
+- GitHub Release assets from `https://github.com/backbay-labs/chio/releases/tag/v<tag>`
 - Checksum index from `supply-chain/checksums/v<tag>.txt`
 - Checksum index signature from `supply-chain/checksums/v<tag>.txt.sig`
 - Checksum index certificate from `supply-chain/checksums/v<tag>.txt.pem`
@@ -45,7 +45,7 @@ cosign verify-blob \
 ```
 
 Use the certificate identity and issuer printed by `cosign verify-blob` to
-confirm the signer is GitHub Actions for `bb-connor/arc`.
+confirm the signer is GitHub Actions for `backbay-labs/chio`.
 
 ## Rekor Witness
 

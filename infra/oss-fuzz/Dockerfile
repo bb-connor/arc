@@ -32,7 +32,7 @@ ENV OPENSSL_INCLUDE_DIR=/opt/openssl-3/include
 ENV OPENSSL_LIB_DIR=/opt/openssl-3/lib64
 ENV PKG_CONFIG_PATH=/opt/openssl-3/lib64/pkgconfig
 
-RUN git clone --depth 1 https://github.com/bb-connor/arc /src/arc
+RUN git clone --depth 1 https://github.com/backbay-labs/chio /src/arc
 WORKDIR $SRC/arc
 
 COPY build.sh $SRC/build.sh

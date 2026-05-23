@@ -4,7 +4,7 @@ description = "Rust compatibility package for the chio:guard@0.2.0 guest SDK"
 version = "0.2.0"
 edition = "2021"
 license = "Apache-2.0"
-repository = "https://github.com/bb-connor/arc"
+repository = "https://github.com/backbay-labs/chio"
 publish = false
 
 [lib]

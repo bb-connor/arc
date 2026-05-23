@@ -23,7 +23,7 @@ You will need:
 
 - A Rust toolchain at the workspace MSRV (stable, see `rust-toolchain.toml`
   for the exact pin) so that `cargo install` can build the harness.
-- Network access to crates.io and to `github.com/bb-connor/arc/releases`
+- Network access to crates.io and to `github.com/backbay-labs/chio/releases`
   (the default `peers.lock.toml` URLs point at GitHub release assets).
 - One of the following, depending on which peer you intend to verify:
   - Python 3.10+ if you plan to run the bundled Python peer from source.
@@ -41,7 +41,7 @@ The full external-consumer flow is three commands.
 ```bash
 # 1. Install the chio CLI (which provides the `chio conformance` subcommand)
 #    plus the conformance harness library / runner binaries.
-cargo install --git https://github.com/bb-connor/arc chio-cli
+cargo install --git https://github.com/backbay-labs/chio chio-cli
 cargo install chio-conformance
 
 # 2. Fetch sha256-pinned peer binaries for the languages you care about.
@@ -64,7 +64,7 @@ earlier draft that conflated the two.
 
 ```bash
 # `chio` binary (the surface this guide demonstrates).
-cargo install --git https://github.com/bb-connor/arc chio-cli
+cargo install --git https://github.com/backbay-labs/chio chio-cli
 
 # Bundled harness + scenarios + reference peers (published on crates.io).
 cargo install chio-conformance
@@ -334,7 +334,7 @@ itself is intact, then either:
 
 - Pin to an older release of `chio-conformance` whose lockfile entries
   still match the live release assets, or
-- File an issue on `github.com/bb-connor/arc` with the mismatched url
+- File an issue on `github.com/backbay-labs/chio` with the mismatched url
   and observed sha256; the M01 release pipeline regenerates the
   lockfile on every release tag.
 
@@ -368,7 +368,7 @@ External consumers can copy the same pattern into their own CI:
 
 ```yaml
 - name: Install Chio CLI (provides the `chio conformance` subcommand)
-  run: cargo install --git https://github.com/bb-connor/arc chio-cli
+  run: cargo install --git https://github.com/backbay-labs/chio chio-cli
 
 - name: Install Chio conformance harness
   run: cargo install chio-conformance --version 0.1.0

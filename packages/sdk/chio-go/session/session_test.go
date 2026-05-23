@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/backbay/chio/packages/sdk/chio-go/session"
+	"github.com/backbay-labs/chio/packages/sdk/chio-go/session"
 )
 
 func TestSessionSupportsNotificationsSubscriptionsAndTasks(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/backbay/chio/packages/sdk/chio-go/auth"
+	"github.com/backbay-labs/chio/packages/sdk/chio-go/auth"
 )
 
 func TestPKCEChallengeAndMetadataURL(t *testing.T) {

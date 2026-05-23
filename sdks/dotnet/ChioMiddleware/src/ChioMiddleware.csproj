@@ -10,7 +10,7 @@
     <Description>ASP.NET Core middleware for Chio capability validation and receipt signing</Description>
     <Authors>Backbay Labs</Authors>
     <License>MIT</License>
-    <RepositoryUrl>https://github.com/backbay/chio</RepositoryUrl>
+    <RepositoryUrl>https://github.com/backbay-labs/chio</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>

@@ -9,7 +9,7 @@ description = "Apache Airflow integration for the Chio protocol -- ChioOperator 
 license = "MIT"
 requires-python = ">=3.11"
 authors = [
-    { name = "Backbay Industries" },
+    { name = "Backbay Labs", email = "connor@backbay.io" },
 ]
 keywords = ["chio", "airflow", "workflow", "orchestration", "security", "capability"]
 classifiers = [

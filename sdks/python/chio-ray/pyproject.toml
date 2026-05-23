@@ -9,7 +9,7 @@ description = "Ray integration for the Chio protocol -- @chio_remote decorator, 
 license = "MIT"
 requires-python = ">=3.11"
 authors = [
-    { name = "Backbay Industries" },
+    { name = "Backbay Labs", email = "connor@backbay.io" },
 ]
 keywords = ["chio", "ray", "distributed", "actor", "agent", "security", "capability"]
 classifiers = [

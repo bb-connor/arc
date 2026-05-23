@@ -78,8 +78,8 @@ shipped `config/manager/manager.yaml` requires that token via the
 ## Installation
 
 ```bash
-make docker-build IMG=ghcr.io/backbay/chio-k8s-controller:dev
-kind load docker-image ghcr.io/backbay/chio-k8s-controller:dev   # or push to a registry
+make docker-build IMG=ghcr.io/backbay-labs/chio-k8s-controller:dev
+kind load docker-image ghcr.io/backbay-labs/chio-k8s-controller:dev   # or push to a registry
 make deploy
 ```
 
@@ -110,7 +110,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: worker
-          image: ghcr.io/backbay/chio-demo-job:latest
+          image: ghcr.io/backbay-labs/chio-demo-job:latest
 ```
 
 Apply it with `kubectl apply -f demo.yaml`. Watch the annotations land:

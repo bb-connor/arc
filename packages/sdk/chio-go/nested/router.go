@@ -3,8 +3,8 @@ package nested
 import (
 	"context"
 
-	"github.com/backbay/chio/packages/sdk/chio-go/session"
-	"github.com/backbay/chio/packages/sdk/chio-go/transport"
+	"github.com/backbay-labs/chio/packages/sdk/chio-go/session"
+	"github.com/backbay-labs/chio/packages/sdk/chio-go/transport"
 )
 
 type Builder func(map[string]any, *session.Session) map[string]any

@@ -4,7 +4,7 @@
 // path. Active execution against a live Chio sidecar is operator-tactical
 // and out of P6 scope.
 
-package io.backbay.chio.verdictmatrix.jvm
+package world.chio.verdictmatrix.jvm
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

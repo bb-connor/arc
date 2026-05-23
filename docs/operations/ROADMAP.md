@@ -135,7 +135,7 @@ don't need the Rust toolchain.
 
 **Refs**: `docs/protocols/DX-AND-ADOPTION-ROADMAP.md` section 3
 
-**Acceptance**: `brew install chio` or `docker run ghcr.io/backbay/chio-sidecar:latest` works without Rust installed.
+**Acceptance**: `brew install chio` or `docker run ghcr.io/backbay-labs/chio-sidecar:latest` works without Rust installed.
 
 ### 0.5 Error Message Improvements [SHIPPED 224a05c]
 

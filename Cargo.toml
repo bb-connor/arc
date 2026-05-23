@@ -171,7 +171,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.93"
 license = "Apache-2.0"
-repository = "https://github.com/backbay/chio"
+repository = "https://github.com/backbay-labs/chio"
 
 [workspace.metadata.chio]
 rust_public_entrypoints = [

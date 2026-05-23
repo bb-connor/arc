@@ -4,13 +4,13 @@
   "type": "module",
   "description": "TypeScript SDK for the Chio (Chio) protocol",
   "keywords": ["chio", "mcp", "receipts", "capabilities", "agent-governance"],
-  "homepage": "https://github.com/bb-connor/chio/tree/main/packages/sdk/chio-ts",
+  "homepage": "https://github.com/backbay-labs/chio/tree/main/packages/sdk/chio-ts",
   "bugs": {
-    "url": "https://github.com/bb-connor/chio/issues"
+    "url": "https://github.com/backbay-labs/chio/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bb-connor/chio.git",
+    "url": "git+https://github.com/backbay-labs/chio.git",
     "directory": "packages/sdk/chio-ts"
   },
   "main": "./dist/index.js",

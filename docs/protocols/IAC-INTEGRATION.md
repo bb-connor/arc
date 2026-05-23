@@ -326,7 +326,7 @@ capabilities before delegating to the real provider:
 terraform {
   required_providers {
     chio = {
-      source = "backbay/chio"
+      source = "backbay-labs/chio"
       version = "~> 0.1"
     }
   }
@@ -801,7 +801,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Chio Evaluate Plan
-        uses: backbay/chio-action@v1
+        uses: backbay-labs/chio-action@v1
         with:
           tool: terraform:plan
           scope: infra:plan
@@ -812,7 +812,7 @@ jobs:
         run: terraform plan -out=tfplan -json > plan.json
 
       - name: Chio Plan Review Guard
-        uses: backbay/chio-action@v1
+        uses: backbay-labs/chio-action@v1
         with:
           tool: terraform:plan-review
           scope: infra:plan
@@ -825,7 +825,7 @@ jobs:
     environment: production  # Requires GitHub environment approval
     steps:
       - name: Chio Evaluate Apply
-        uses: backbay/chio-action@v1
+        uses: backbay-labs/chio-action@v1
         with:
           tool: terraform:apply
           scope: infra:apply
@@ -837,7 +837,7 @@ jobs:
         run: terraform apply tfplan
 
       - name: Record Chio Receipt
-        uses: backbay/chio-action@v1
+        uses: backbay-labs/chio-action@v1
         with:
           action: record
           state-file: terraform.tfstate

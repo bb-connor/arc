@@ -23,8 +23,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	chioapi "github.com/backbay/chio-k8s-controller/internal/chio"
-	"github.com/backbay/chio-k8s-controller/internal/reconciler"
+	chioapi "github.com/backbay-labs/chio-k8s-controller/internal/chio"
+	"github.com/backbay-labs/chio-k8s-controller/internal/reconciler"
 )
 
 var (

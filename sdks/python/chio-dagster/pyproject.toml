@@ -9,7 +9,7 @@ description = "Dagster integration for the Chio protocol -- @chio_asset / @chio_
 license = "MIT"
 requires-python = ">=3.11"
 authors = [
-    { name = "Backbay Industries" },
+    { name = "Backbay Labs", email = "connor@backbay.io" },
 ]
 keywords = ["chio", "dagster", "asset", "orchestration", "security", "capability"]
 classifiers = [

@@ -12,8 +12,7 @@ Trajectory 5.2 baseline: `7f56cf5383fc1caa7a4f06b4cd59e45177f00496`
 check-apalache-formal-slice: OK
 ```
 
-The local Apalache toolchain was present at
-`/Users/connor/.local/bin/apalache-mc`. The bounded smoke command used
+The local Apalache toolchain was present on `PATH` as `apalache-mc`. The bounded smoke command used
 the same loop as `.github/workflows/apalache-safety.yml`:
 
 ```bash

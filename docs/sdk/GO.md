@@ -5,7 +5,7 @@ This document covers the `chio-go-http` package, which provides HTTP middleware 
 ## Quick Start
 
 ```bash
-go get github.com/backbay/chio/sdks/go/chio-go-http
+go get github.com/backbay-labs/chio/sdks/go/chio-go-http
 ```
 
 ```go
@@ -14,7 +14,7 @@ package main
 import (
 	"net/http"
 
-	chio "github.com/backbay/chio/sdks/go/chio-go-http"
+	chio "github.com/backbay-labs/chio/sdks/go/chio-go-http"
 )
 
 func main() {
@@ -330,7 +330,7 @@ type SidecarError struct {
 ```go
 import (
 	"github.com/go-chi/chi/v5"
-	chio "github.com/backbay/chio/sdks/go/chio-go-http"
+	chio "github.com/backbay-labs/chio/sdks/go/chio-go-http"
 )
 
 r := chi.NewRouter()
@@ -352,7 +352,7 @@ http.ListenAndServe(":8080", protected)
 ```go
 import (
 	"github.com/gorilla/mux"
-	chio "github.com/backbay/chio/sdks/go/chio-go-http"
+	chio "github.com/backbay-labs/chio/sdks/go/chio-go-http"
 )
 
 r := mux.NewRouter()
