@@ -165,31 +165,8 @@ fn rust_kernel_remains_active_alongside_deployment_shapes() {
     );
 }
 
-#[test]
-fn audit_doc_records_d07_closure_marker() {
-    let audit_path = repo_root()
-        .join(".planning")
-        .join("audits")
-        .join("M07-adoption-beachhead.md");
-    let raw = match fs::read_to_string(&audit_path) {
-        Ok(raw) => raw,
-        Err(error) => panic!("failed to read {}: {error}", audit_path.display()),
-    };
-    assert!(
-        raw.contains("D07 deferral closed"),
-        "audit doc {} must record the D07 deferral closure marker",
-        audit_path.display()
-    );
-}
-
-fn repo_root() -> PathBuf {
-    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let mut candidate: Option<&Path> = Some(manifest_dir);
-    while let Some(dir) = candidate {
-        if dir.join(".planning").join("audits").exists() {
-            return dir.to_path_buf();
-        }
-        candidate = dir.parent();
-    }
-    manifest_dir.to_path_buf()
-}
+// Removed: `audit_doc_records_d07_closure_marker` and its `repo_root()` helper.
+// They asserted an internal milestone "D07 deferral closed" marker in
+// `.planning/audits/M07-adoption-beachhead.md`, which is no longer tracked.
+// The milestone-gate machinery was retired; this smoke test now covers only
+// the deployment-shape driver registration and verdict-tuple contract above.

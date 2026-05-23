@@ -1,6 +1,6 @@
 # Legal References
 
-This file enumerates the citations the paper requires. The placeholder keys used in the .tex files follow the convention `TODO_*` and must be replaced with verified bibliographic records before submission. The list is grouped by subject. Citations marked **VERIFY** are claims the author is reasonably confident of but has not personally vetted against the primary source; a constitutional-law co-author or law-library staff should confirm.
+This file enumerates the citations the paper requires. The placeholder keys used in the .tex files follow the convention `TODO_*` and must be replaced with verified bibliographic records before submission. The list is grouped by subject. Citations marked **VERIFY** are claims the author is reasonably confident of but has not personally vetted against the primary source; a constitutional-law scholar or law-library staff should confirm.
 
 ---
 
@@ -153,6 +153,6 @@ The following categories of citation are not currently in the paper but should b
 All `TODO_*` keys in the .tex files correspond to entries in this document. Before submission:
 
 1. Replace each placeholder with a verified bibliographic record using a `plainurl`, `acmrefs`, or law-journal Bluebook style as the venue requires.
-2. For each **VERIFY** entry, the legal-scholar co-author or library reference staff should confirm the citation is accurate to the source and that the paper's characterization of the source is faithful.
+2. For each **VERIFY** entry, a constitutional-law scholar or library reference staff should confirm the citation is accurate to the source and that the paper's characterization of the source is faithful.
 3. Several citations in §3 may be sharpened by adding pinpoint cites (page or section). The paper currently cites at the work level; the law-review revision process typically requires deeper specificity.
 4. The paper does not currently include footnotes-as-citations of the law-review style. The revision to law-journal format will convert most parenthetical-style citations to footnote citations and add Bluebook formatting.

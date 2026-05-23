@@ -2,8 +2,8 @@
 /target/
 /target-shared/
 **/*.rs.bk
-# Nested cargo/qualification output dirs (not the workspace root /target/).
-crates/*/target/
+# Nested cargo/qualification output dirs at any depth (not the workspace root /target/).
+crates/**/target/
 
 # Transient SQLite journal files must never be committed (only the .sqlite3
 # fixture itself is tracked, never its write-ahead log or shared-memory file).
