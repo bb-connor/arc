@@ -110,7 +110,7 @@ LABEL org.opencontainers.image.title="chio-sidecar" \
       org.opencontainers.image.source="https://github.com/backbay-labs/chio"
 
 ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/chio"]
-# No sensible zero-argument default — `chio run` and `chio mcp serve-http`
+# No sensible zero-argument default - `chio run` and `chio mcp serve-http`
 # both require `--policy` plus additional positional input. Fall through
 # to `--help` so bare `docker run <image>` prints usage instead of
 # exiting non-zero before the health endpoint opens. Operators override

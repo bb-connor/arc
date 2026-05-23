@@ -1,4 +1,4 @@
-// Mock artifact bundle — clearly placeholder, lorem-style identifiers.
+// Mock artifact bundle - clearly placeholder, lorem-style identifiers.
 // Modeled after the PRD's artifact contract. Not real data.
 
 window.BUNDLE = (() => {
@@ -227,10 +227,10 @@ window.BUNDLE = (() => {
     })),
   };
 
-  // File contents — schema-aware placeholders
+  // File contents - schema-aware placeholders
   const fileContent = (path) => {
     const base = {
-      $comment: "LOREM PLACEHOLDER — not real artifact data",
+      $comment: "LOREM PLACEHOLDER - not real artifact data",
       path,
       sha256: manifest.files.find((f) => f.path === path)?.sha256,
     };
@@ -309,7 +309,7 @@ window.BUNDLE = (() => {
     return { ...base, lorem: "placeholder payload for " + path, value: h(path).slice(0, 16) };
   };
 
-  // Narrative beats — each points to artifacts.
+  // Narrative beats - each points to artifacts.
   const beats = [
     { n: 1, title: "Budget delegated", caption: "treasury → procurement via signed capability envelope.", artifacts: ["chio/capabilities/treasury-budget-lorem.json", "chio/budgets/exposure.json"], edges: ["e1"] },
     { n: 2, title: "RFQ opens", caption: "market-broker publishes RFQ through chio api protect.", artifacts: ["market/rfq.json"], edges: ["e2", "e5"] },

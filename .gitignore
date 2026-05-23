@@ -2,6 +2,13 @@
 /target/
 /target-shared/
 **/*.rs.bk
+# Nested cargo/qualification output dirs (not the workspace root /target/).
+crates/*/target/
+
+# Transient SQLite journal files must never be committed (only the .sqlite3
+# fixture itself is tracked, never its write-ahead log or shared-memory file).
+*.sqlite3-wal
+*.sqlite3-shm
 
 # Release SBOM evidence is committed under supply-chain/sbom/v{tag}/.
 !supply-chain/sbom/

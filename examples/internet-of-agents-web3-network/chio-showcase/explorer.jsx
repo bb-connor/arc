@@ -24,7 +24,7 @@ function Explorer({ bundle, selectedPath, onSelectPath, filter, onFilter }) {
       <div className="explorer-col">
         <div className="col-title">
           <span>json viewer</span>
-          <span className="n">{selectedPath ? "read-only" : "—"}</span>
+          <span className="n">{selectedPath ? "read-only" : "-"}</span>
         </div>
         {selectedPath ? (
           <>
@@ -139,7 +139,7 @@ function JsonHeader({ path, meta }) {
     <div className="json-header">
       <div className="path">{path}</div>
       <div className="hash-grid">
-        <span className="hk">sha256</span><span className="hv muted">—</span>
+        <span className="hk">sha256</span><span className="hv muted">-</span>
       </div>
     </div>
   );
@@ -215,7 +215,7 @@ function JsonTree({ value, depth, rootKey, defaultOpen }) {
 
 /* ---- Lineage pane ---- */
 function LineagePane({ bundle, path, onJump }) {
-  if (!path) return <div className="lineage-body muted">—</div>;
+  if (!path) return <div className="lineage-body muted">-</div>;
   const content = bundle.fileContent(path);
 
   const isReceipt = path.startsWith("chio/receipts/");
