@@ -1,12 +1,12 @@
-# ARC-Anchor: Blockchain Anchoring for the ARC Receipt Log
+# Chio-Anchor: Blockchain Anchoring for the Chio Receipt Log
 
 > Research document -- produced 2026-03-30.
 > Status: **Draft / Research Only** -- no implementation code.
 >
 > Realization status (2026-04-02): this document fed the shipped bounded
 > `arc-anchor` runtime, but the authoritative runtime boundary is now
-> [ARC_ANCHOR_PROFILE.md](../standards/ARC_ANCHOR_PROFILE.md) plus
-> [ARC_WEB3_PROFILE.md](../standards/ARC_WEB3_PROFILE.md). For shipped proof
+> [CHIO_ANCHOR_PROFILE.md](../standards/CHIO_ANCHOR_PROFILE.md) plus
+> [CHIO_WEB3_PROFILE.md](../standards/CHIO_WEB3_PROFILE.md). For shipped proof
 > bundles, discovery artifacts, and qualification claims, prefer the checked-in
 > `ARC_ANCHOR_*` standards artifacts and the `crates/arc-anchor/` runtime.
 
@@ -22,7 +22,7 @@
 6. [Data Availability Layers](#6-data-availability-layers)
 7. [Recommended Contract Design](#7-recommended-contract-design)
 8. [Rust Ecosystem](#8-rust-ecosystem)
-9. [Integration Points with ARC](#9-integration-points-with-arc)
+9. [Integration Points with Chio](#9-integration-points-with-arc)
 10. [Recommended Architecture](#10-recommended-architecture)
 11. [Compliance and Legal Value](#11-compliance-and-legal-value)
 12. [Open Questions](#12-open-questions)
@@ -33,7 +33,7 @@
 
 ## 1. Executive Summary
 
-ARC already produces a Merkle-committed, append-only receipt log. Every tool
+Chio already produces a Merkle-committed, append-only receipt log. Every tool
 invocation -- whether allowed or denied -- generates a signed `ArcReceipt`.
 The kernel periodically batches receipts into `KernelCheckpoint` statements
 that commit a Merkle root over a contiguous range of receipt sequence numbers
@@ -49,13 +49,13 @@ prove:
 - The receipt log has not been retroactively altered since that point.
 - The operator's checkpoint statements are consistent over time.
 
-The core insight is that ARC's existing `KernelCheckpoint` already contains
+The core insight is that Chio's existing `KernelCheckpoint` already contains
 the `merkle_root` (a 32-byte SHA-256 hash stored as `arc_core::hashing::Hash`)
 that needs to be anchored. The arc-anchor crate only needs to (a) read
 finalized checkpoints from the receipt store and (b) publish that 32-byte root
 to one or more chains.
 
-**Note on the Merkle tree implementation**: ARC uses an RFC 6962-compatible
+**Note on the Merkle tree implementation**: Chio uses an RFC 6962-compatible
 (Certificate Transparency style) Merkle tree. Leaf hashes are computed as
 `SHA256(0x00 || leaf_bytes)` and node hashes as
 `SHA256(0x01 || left || right)`. The tree does not duplicate the last leaf when
@@ -129,7 +129,7 @@ retains the hash and can re-submit when service resumes. Operators who need
 guaranteed availability should run a private calendar server (the software is
 open-source).
 
-**Relevance to ARC**: OTS is the cheapest possible Bitcoin anchor. ARC could
+**Relevance to Chio**: OTS is the cheapest possible Bitcoin anchor. Chio could
 submit its checkpoint Merkle root to an OTS calendar and receive back a proof
 tying that root to a specific Bitcoin block. The downside is latency -- you
 must wait for the next block (up to ~10 min) and ideally 6 confirmations
@@ -155,8 +155,8 @@ proofs via a hierarchical aggregation network.
   less reliable than OpenTimestamps in recent years.
 - No actively maintained Rust library.
 
-**Relevance to ARC**: Chainpoint's architecture is instructive (hierarchical
-aggregation is similar to what ARC would do internally), but the protocol
+**Relevance to Chio**: Chainpoint's architecture is instructive (hierarchical
+aggregation is similar to what Chio would do internally), but the protocol
 itself is not recommended as a dependency due to operational reliability
 concerns. The Chainpoint proof format is also heavier than OTS.
 
@@ -182,11 +182,11 @@ Optimism, Arbitrum, Polygon, Scroll, zkSync, Celo, Linea, and others.
 | Optimism    | `0x4200000000000000000000000000000000000021` | `0x4200000000000000000000000000000000000020` |
 | Arbitrum    | `0xbD75f629A22Dc1ceD33dDA0b68c546A1c035c458` | `0xA310da9c5B885E7fb3fbA9D66E9Ba6Df512b78eB` |
 
-**Relevance to ARC**: EAS provides a ready-made on-chain attestation
-framework. ARC could register a schema like
+**Relevance to Chio**: EAS provides a ready-made on-chain attestation
+framework. Chio could register a schema like
 `(bytes32 merkleRoot, uint64 checkpointSeq, uint64 batchStartSeq, uint64 batchEndSeq, bytes32 kernelKey)`
 and create attestations for each anchor. The advantage is interoperability --
-anyone can query EAS for ARC anchors. The disadvantage is that EAS
+anyone can query EAS for Chio anchors. The disadvantage is that EAS
 attestations cost more gas than a raw storage write because of the schema
 machinery and event overhead.
 
@@ -204,9 +204,9 @@ tamper-evident timestamps.
 - Conflict resolution uses "earliest anchor wins" -- the stream update with
   the earlier blockchain timestamp prevails.
 
-**Relevance to ARC**: Ceramic's model is conceptually similar to arc-anchor
+**Relevance to Chio**: Ceramic's model is conceptually similar to arc-anchor
 (append-only event log + periodic Merkle anchoring). However, Ceramic is a
-full data network with its own replication layer -- far more than ARC needs.
+full data network with its own replication layer -- far more than Chio needs.
 The CAS component is interesting as a reference design for batched Ethereum
 anchoring.
 
@@ -215,7 +215,7 @@ anchoring.
 **What it is**: A commercial timestamping service that anchors hashes to
 Bitcoin, Ethereum, and other chains. Offers an API for programmatic use.
 
-**Relevance to ARC**: Useful as a fallback or convenience layer, but
+**Relevance to Chio**: Useful as a fallback or convenience layer, but
 introduces a third-party dependency. Not recommended as the primary anchor
 path for a protocol that values self-sovereignty.
 
@@ -232,7 +232,7 @@ trails to blockchains using Merkle roots. The closest analogues are:
 - **Virtuals Protocol escrowed jobs** -- on-chain evidence of job completion
   but not Merkle-committed audit trails.
 
-ARC would be a first mover in providing Merkle-committed, blockchain-anchored
+Chio would be a first mover in providing Merkle-committed, blockchain-anchored
 agent audit trails with standard inclusion proofs. This is a differentiator
 worth emphasizing in positioning.
 
@@ -303,7 +303,7 @@ dust limit (~546 sats).
 
 **Recommendation**: OP_RETURN is simpler and more transparent for an audit
 protocol whose entire purpose is public verifiability. Taproot commitments
-add unnecessary complexity without clear benefit for ARC's use case.
+add unnecessary complexity without clear benefit for Chio's use case.
 
 ### 3.3 OpenTimestamps Integration
 
@@ -336,7 +336,7 @@ root to a Bitcoin block.
 **Cost**: Free (public calendars absorb transaction fees). Private calendar
 operation costs one Bitcoin transaction per block (~144/day).
 
-**Recommendation**: OTS is ideal as the Bitcoin anchoring path for ARC. It
+**Recommendation**: OTS is ideal as the Bitcoin anchoring path for Chio. It
 provides the strongest possible timestamp guarantee at zero marginal cost.
 The tradeoff is latency (minutes to hours), which is acceptable for a
 secondary assurance layer.
@@ -347,7 +347,7 @@ secondary assurance layer.
 
 ### 4.1 Chain Selection
 
-The three leading EVM L2 candidates for ARC anchoring are:
+The three leading EVM L2 candidates for Chio anchoring are:
 
 | Chain     | Type              | Finality  | Base Fee (2025) | Notes                        |
 |----------|-------------------|-----------|----------------|------------------------------|
@@ -385,7 +385,7 @@ verification purposes, a verifier must decide how much finality they require:
 - **Challenge period expiry** (~7 days): the anchor is irrevocable. No fraud
   proof can undo it.
 
-For ARC's use case, sequencer confirmation is likely sufficient for day-to-day
+For Chio's use case, sequencer confirmation is likely sufficient for day-to-day
 operations, with the Bitcoin anchor providing the ultimate assurance layer.
 But the document should not conflate L2 "finality" with Bitcoin-level
 irreversibility.
@@ -401,12 +401,12 @@ irreversibility.
 
 **Using a custom Merkle root registry contract**:
 
-- Pros: minimal gas cost (~45,000 gas), exact event structure for ARC's
+- Pros: minimal gas cost (~45,000 gas), exact event structure for Chio's
   needs, no dependency on EAS availability.
 - Cons: requires deploying and maintaining a contract on each target chain.
 
 **Recommendation**: Deploy a minimal custom contract. The gas savings are
-meaningful at scale, and ARC benefits from a purpose-built event structure
+meaningful at scale, and Chio benefits from a purpose-built event structure
 that indexers can subscribe to directly. EAS can be supported as an optional
 secondary output for interoperability.
 
@@ -434,20 +434,20 @@ target, particularly for high-throughput operators:
 ### 5.2 Anchoring via Memo Program
 
 **Mechanism**: Submit a Solana transaction with a Memo instruction containing
-the ARC checkpoint metadata (Merkle root, checkpoint sequence, timestamp).
+the Chio checkpoint metadata (Merkle root, checkpoint sequence, timestamp).
 
 **Cost**: ~5,000 lamports base fee + optional priority fee. At $120 SOL, this
 is approximately $0.0003 per anchor -- roughly 30x cheaper than an L2 EVM
 anchor.
 
 **Verification**: A verifier queries the Solana transaction log for the Memo
-program, parses the ARC-prefixed data, and compares against the expected
+program, parses the Chio-prefixed data, and compares against the expected
 checkpoint root. Solana transaction history is available via RPC and multiple
 block explorers.
 
 ### 5.3 Anchoring via a Solana Program
 
-For structured data and on-chain queryability, ARC could deploy a small
+For structured data and on-chain queryability, Chio could deploy a small
 Solana program (smart contract) that stores anchor records in program-derived
 accounts. This would allow direct on-chain reads by other Solana programs.
 
@@ -503,7 +503,7 @@ without downloading entire blocks.
   with O(sqrt(n)) samples. This is stronger than L2 sequencer confirmation
   but weaker than Bitcoin's proof-of-work.
 
-**Relevance to ARC**: Celestia is an interesting middle ground -- faster
+**Relevance to Chio**: Celestia is an interesting middle ground -- faster
 finality than Bitcoin, cheaper than L2, and with stronger availability
 guarantees than a single L2 sequencer. However, Celestia adds a new chain
 dependency without the ecosystem benefits of EVM (where arc-settle lives) or
@@ -529,9 +529,9 @@ Mainnet supports 10 MB/s throughput with ambitions for 100+ MB/s.
 - **Integration**: Primarily designed for rollup DA (replacing Ethereum
   calldata). Not a natural fit for single-hash anchoring.
 
-**Relevance to ARC**: EigenDA is overkill for anchoring a 32-byte hash. Its
+**Relevance to Chio**: EigenDA is overkill for anchoring a 32-byte hash. Its
 value proposition is high-throughput DA for rollup block data, not lightweight
-timestamping. Unless ARC wants to publish full receipt batches (not just
+timestamping. Unless Chio wants to publish full receipt batches (not just
 roots), EigenDA adds complexity without meaningful benefit over a simple L2
 storage write. **Not recommended for v1.**
 
@@ -623,7 +623,7 @@ contract ArcAnchorRegistry {
 ### 7.2 Design Decisions
 
 **Multi-operator support**: The contract is keyed by `msg.sender` (the
-operator's Ethereum address). Multiple ARC operators can anchor to the same
+operator's Ethereum address). Multiple Chio operators can anchor to the same
 contract instance without interfering with each other.
 
 **Monotonic sequence enforcement**: `checkpointSeq` must strictly increase per
@@ -635,7 +635,7 @@ off-chain indexing. A verifier can reconstruct the full anchor history from
 event logs without reading storage (cheaper for light clients).
 
 **No admin/pause**: The contract is stateless from a governance perspective.
-No owner, no pause, no upgradability. This matches ARC's fail-closed
+No owner, no pause, no upgradability. This matches Chio's fail-closed
 philosophy.
 
 **No on-chain proof verification**: The contract does not verify Merkle proofs
@@ -707,7 +707,7 @@ SP1 zkVM.
 **Key features for arc-anchor**:
 
 - `sol!` macro: compile-time Solidity parser that generates type-safe Rust
-  bindings. ARC can define the `ArcAnchorRegistry` interface directly in Rust
+  bindings. Chio can define the `ArcAnchorRegistry` interface directly in Rust
   without ABI JSON files.
 - `ProviderBuilder`: connect to any EVM node (Base, Arbitrum, Optimism) with
   a single abstraction.
@@ -768,7 +768,7 @@ sol! {
   broadcasting.
 - Supports Electrum, Esplora, and compact block filter backends.
 - Reached stable 2.0 in 2025 with improved performance and test coverage.
-- Suitable for building the Bitcoin anchor path if ARC manages its own UTXO
+- Suitable for building the Bitcoin anchor path if Chio manages its own UTXO
   set for OP_RETURN transactions.
 
 **`opentimestamps` crate**:
@@ -776,7 +776,7 @@ sol! {
 - Rust library for parsing, verifying, and serializing OpenTimestamps proofs.
 - Maintained by the official OpenTimestamps project.
 - Supports `.ots` file format, calendar interaction, and proof verification.
-- If ARC uses the OTS path, this crate handles proof management.
+- If Chio uses the OTS path, this crate handles proof management.
 
 ### 8.3 Solana Interaction
 
@@ -809,11 +809,11 @@ sol! {
 
 ---
 
-## 9. Integration Points with ARC
+## 9. Integration Points with Chio
 
 ### 9.1 Existing Receipt Infrastructure
 
-ARC's receipt pipeline already provides everything arc-anchor needs:
+Chio's receipt pipeline already provides everything arc-anchor needs:
 
 1. **`ArcReceipt`** (`crates/arc-core/src/receipt.rs`): Signed proof of a
    tool call evaluation. Contains `id`, `timestamp`, `capability_id`,
@@ -951,7 +951,7 @@ If all checks pass, the verifier has cryptographic proof that:
 **Gap in the verification chain**: The current design does not address how a
 verifier discovers which operator's contract and chain to query. A future
 extension should define a discovery mechanism -- either a canonical registry
-contract address published by ARC, or a DID document extension that lists the
+contract address published by Chio, or a DID document extension that lists the
 operator's anchor targets.
 
 ---
@@ -1052,7 +1052,7 @@ pub enum ChainTarget {
 
 ### 10.4 Super-Root Aggregation for Bitcoin
 
-Since Bitcoin anchoring is expensive relative to L2, ARC should aggregate
+Since Bitcoin anchoring is expensive relative to L2, Chio should aggregate
 multiple checkpoint roots before anchoring:
 
 ```
@@ -1074,11 +1074,11 @@ in that checkpoint's tree. This is a two-level Merkle proof.
 `arc-core/src/merkle.rs` already accepts `Vec<Hash>` and produces a tree
 whose root can serve as the super-root. The `inclusion_proof` method generates
 the audit path. This means the super-root aggregation logic is a thin wrapper
-around existing ARC primitives -- no new Merkle code is needed.
+around existing Chio primitives -- no new Merkle code is needed.
 
 ### 10.5 Fail-Closed Semantics
 
-Consistent with ARC's design philosophy:
+Consistent with Chio's design philosophy:
 
 - Anchor failures do NOT block the receipt pipeline. Receipts continue to be
   signed and checkpointed regardless of anchor status.
@@ -1135,7 +1135,7 @@ Trust Services Criteria (TSC) relevant to arc-anchor include:
 - **CC8.1 (Change Management)**: Requires controls to detect unauthorized
   changes. An anchor chain creates an independent, immutable reference point.
 - **CC6.1 (Logical and Physical Access Controls)**: Requires audit logging
-  of access. ARC's signed receipts satisfy this; anchoring strengthens the
+  of access. Chio's signed receipts satisfy this; anchoring strengthens the
   non-repudiation claim.
 
 Blockchain anchors do not replace SOC 2 controls but provide **additional
@@ -1177,7 +1177,7 @@ extremely difficult for major L2s.
 ### 12.1 Protocol Design
 
 1. **Should arc-anchor be in-process or a separate daemon?** Running as a
-   background task within the ARC kernel keeps the architecture simple, but
+   background task within the Chio kernel keeps the architecture simple, but
    coupling blockchain I/O to the kernel introduces latency risk. A separate
    daemon process that reads from the receipt store is cleaner but adds
    operational complexity. **Recommendation**: A separate daemon (or at least
@@ -1194,7 +1194,7 @@ extremely difficult for major L2s.
    storage is cheap enough. An events-only variant (no storage writes) is
    also viable for operators who prioritize cost over on-chain queryability.
 
-3. **Should ARC publish a canonical contract address per chain?** If ARC
+3. **Should Chio publish a canonical contract address per chain?** If Chio
    deploys a single registry contract on each supported L2, any operator can
    anchor to it. This creates a shared public good. Alternatively, each
    operator could deploy their own contract instance. **Recommendation**: A
@@ -1303,7 +1303,7 @@ be shared across all three crates.
 
 ### 13.3 Shared Key Management
 
-The arc-settle doc proposes a dual-signing approach: Ed25519 for ARC-native
+The arc-settle doc proposes a dual-signing approach: Ed25519 for Chio-native
 signing, secp256k1 for on-chain evidence. The secp256k1 key is bound to the
 Ed25519 key via a certificate.
 
@@ -1382,7 +1382,7 @@ This section documents changes made during technical review (2026-03-30).
 
 ### Corrections
 
-1. **Merkle tree algorithm specificity**: Added detailed description of ARC's
+1. **Merkle tree algorithm specificity**: Added detailed description of Chio's
    RFC 6962-compatible Merkle tree construction (0x00 leaf prefix, 0x01 node
    prefix, carry-last-node-up for odd levels) to the executive summary and
    verification flow. The original document did not mention this, which is a
@@ -1392,7 +1392,7 @@ This section documents changes made during technical review (2026-03-30).
 2. **OP_RETURN size context**: Clarified the distinction between Bitcoin
    Core's `datacarriersize` (raised to 100,000 in v30.0 for non-standard
    transactions) and the per-output relay limit (still 80 bytes). Also noted
-   that ARC's 36-byte payload fits within Bitcoin Knots' default 40-byte
+   that Chio's 36-byte payload fits within Bitcoin Knots' default 40-byte
    limit, which is relevant given the Knots/OCEAN controversy.
 
 3. **Gas cost breakdown**: The original "~45,000 gas" estimate for the
@@ -1461,7 +1461,7 @@ This section documents changes made during technical review (2026-03-30).
 
 16. **AI/agent audit trail landscape**: Researched whether any existing
     projects do Merkle root anchoring for AI/agent audit trails. Found none
-    in production. Noted ARC's first-mover position.
+    in production. Noted Chio's first-mover position.
 
 17. **Super-root implementation note**: Added observation that
     `MerkleTree::from_hashes` already supports the super-root aggregation
@@ -1524,7 +1524,7 @@ This section documents changes made during technical review (2026-03-30).
 - rust-opentimestamps (GitHub) -- https://github.com/opentimestamps/rust-opentimestamps
 - opentimestamps crate -- https://crates.io/crates/opentimestamps
 
-### ARC Source References
+### Chio Source References
 
 - `crates/arc-core/src/receipt.rs` -- ArcReceipt, ChildRequestReceipt, Decision, ToolCallAction
 - `crates/arc-core/src/merkle.rs` -- MerkleTree, MerkleProof (RFC 6962)
@@ -1535,5 +1535,5 @@ This section documents changes made during technical review (2026-03-30).
 
 ### Cross-Document References
 
-- `docs/research/ARC_SETTLE_RESEARCH.md` -- ArcReceiptVerifier, ArcEscrow, dual-signing, Merkle commitment settlement
-- `docs/research/ARC_LINK_RESEARCH.md` -- Chainlink Automation for periodic anchoring, Functions for Ed25519 batch verification
+- `docs/research/CHIO_SETTLE_RESEARCH.md` -- ArcReceiptVerifier, ArcEscrow, dual-signing, Merkle commitment settlement
+- `docs/research/CHIO_LINK_RESEARCH.md` -- Chainlink Automation for periodic anchoring, Functions for Ed25519 batch verification

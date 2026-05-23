@@ -26,12 +26,12 @@ fi
 
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
 
-PROOF_FIXTURE="$ROOT/examples/chiodos-3vendor/fixtures/selective-disclosure-proof.json"
-PACKAGE_FIXTURE="$ROOT/examples/chiodos-3vendor/fixtures/buyer-auditor-proof-package.json"
-TRUST_BUNDLE_FIXTURE="$ROOT/examples/chiodos-3vendor/fixtures/verifier-trust-bundle.json"
-CONTEXT_FIXTURE="$ROOT/examples/chiodos-3vendor/fixtures/verification-context.json"
-REPORT_FIXTURE="$ROOT/examples/chiodos-3vendor/fixtures/verifier-report.json"
-NEGATIVE_CASES_FIXTURE="$ROOT/examples/chiodos-3vendor/fixtures/negative-cases.json"
+PROOF_FIXTURE="$ROOT/examples/chio-3vendor/fixtures/selective-disclosure-proof.json"
+PACKAGE_FIXTURE="$ROOT/examples/chio-3vendor/fixtures/buyer-auditor-proof-package.json"
+TRUST_BUNDLE_FIXTURE="$ROOT/examples/chio-3vendor/fixtures/verifier-trust-bundle.json"
+CONTEXT_FIXTURE="$ROOT/examples/chio-3vendor/fixtures/verification-context.json"
+REPORT_FIXTURE="$ROOT/examples/chio-3vendor/fixtures/verifier-report.json"
+NEGATIVE_CASES_FIXTURE="$ROOT/examples/chio-3vendor/fixtures/negative-cases.json"
 SCHEMA_DIR="$ROOT/spec/schemas/chiodos/v1"
 SCHEMA_REGISTRY="$ROOT/spec/schemas/registry.json"
 

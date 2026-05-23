@@ -24,7 +24,7 @@ sketches are illustrative (not strict canonical JSON); fields annotated
 `// illustrative, not normative` make a choice neither spec yet pins.
 
 Runnable artifacts live under
-`examples/chiodos-3vendor/fixtures/`. The committed buyer/auditor proof
+`examples/chio-3vendor/fixtures/`. The committed buyer/auditor proof
 package is verified by `chio-chiodos` and by
 `chio chiodos verify --package <path> --trust-bundle <path> --context <path> --report <path>`.
 The BBS issuer key, peer pins, ladder refs, action-class policy,
@@ -543,7 +543,7 @@ a first reveal-set BBS proof package over `WorkflowReceipt` in
 
 The illustrative envelope below predates the implemented proof package. The
 committed runnable fixture is
-`examples/chiodos-3vendor/fixtures/selective-disclosure-proof.json`.
+`examples/chio-3vendor/fixtures/selective-disclosure-proof.json`.
 
 ### 8.1 BBS+ disclosure envelope (illustrative)
 

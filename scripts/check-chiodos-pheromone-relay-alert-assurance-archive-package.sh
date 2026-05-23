@@ -28,7 +28,7 @@ export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
 
 SCHEMA_DIR="$ROOT/spec/schemas/chio-pheromone/v1"
 SCHEMA_REGISTRY="$ROOT/spec/schemas/registry.json"
-ASSURANCE_DIR="$ROOT/examples/chiodos-3vendor/fixtures/pheromone/relay/alert-assurance"
+ASSURANCE_DIR="$ROOT/examples/chio-3vendor/fixtures/pheromone/relay/alert-assurance"
 NOW_UNIX_MS=1766000100000
 TMP_DIRS=()
 cleanup() {

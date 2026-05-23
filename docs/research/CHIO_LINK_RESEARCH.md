@@ -1,4 +1,4 @@
-# arc-link v1: Price Oracle Integration for ARC Budget Enforcement
+# arc-link v1: Price Oracle Integration for Chio Budget Enforcement
 
 Status: Research
 Authors: Engineering
@@ -6,24 +6,24 @@ Date: 2026-03-30
 
 > Realization status (2026-04-02): this research fed the shipped bounded
 > `arc-link` runtime, but the authoritative runtime boundary is now
-> [ARC_LINK_PROFILE.md](../standards/ARC_LINK_PROFILE.md) plus
-> [ARC_WEB3_PROFILE.md](../standards/ARC_WEB3_PROFILE.md). For shipped chain
+> [CHIO_LINK_PROFILE.md](../standards/CHIO_LINK_PROFILE.md) plus
+> [CHIO_WEB3_PROFILE.md](../standards/CHIO_WEB3_PROFILE.md). For shipped chain
 > inventory and receipt-side FX authority, prefer
-> `docs/standards/ARC_LINK_BASE_MAINNET_CONFIG.json` and
+> `docs/standards/CHIO_LINK_BASE_MAINNET_CONFIG.json` and
 > `authority = arc_link_runtime_v1`. The adjacent backlog topics remain in
-> [ARC_LINK_FUTURE_TRACKS.md](./ARC_LINK_FUTURE_TRACKS.md).
+> [CHIO_LINK_FUTURE_TRACKS.md](./CHIO_LINK_FUTURE_TRACKS.md).
 
 ---
 
 ## 1. Executive Summary
 
-ARC's economic substrate enforces multi-currency monetary budgets on capability tokens. The `MonetaryAmount` type (defined in `crates/arc-core/src/capability.rs`) supports arbitrary currency codes (USD, EUR, USDC, ETH), and the kernel charges costs in minor-unit integers against per-grant caps. However, when a grant's budget is denominated in one currency (e.g., USD) and the tool server settles in another (e.g., ETH), the kernel has no native mechanism for currency conversion. The `ExposureLedgerSupportBoundary` already models this gap explicitly: `cross_currency_netting_supported: false`.
+Chio's economic substrate enforces multi-currency monetary budgets on capability tokens. The `MonetaryAmount` type (defined in `crates/arc-core/src/capability.rs`) supports arbitrary currency codes (USD, EUR, USDC, ETH), and the kernel charges costs in minor-unit integers against per-grant caps. However, when a grant's budget is denominated in one currency (e.g., USD) and the tool server settles in another (e.g., ETH), the kernel has no native mechanism for currency conversion. The `ExposureLedgerSupportBoundary` already models this gap explicitly: `cross_currency_netting_supported: false`.
 
-**arc-link** is the crate that bridges ARC's off-chain Rust kernel with oracle infrastructure to solve one problem well:
+**arc-link** is the crate that bridges Chio's off-chain Rust kernel with oracle infrastructure to solve one problem well:
 
 **Price feeds for cross-currency budget enforcement.** A USD-denominated grant must be able to gate an ETH-denominated tool invocation. This requires a reliable, timely ETH/USD exchange rate.
 
-**Scope boundary.** This document covers only the off-chain price oracle integration needed for kernel-level budget enforcement. Adjacent integration topics -- CCIP for cross-chain delegation, Chainlink Functions for Ed25519 verification, Chainlink Automation for receipt anchoring, and the x402 protocol -- are documented separately in [ARC_LINK_FUTURE_TRACKS.md](./ARC_LINK_FUTURE_TRACKS.md).
+**Scope boundary.** This document covers only the off-chain price oracle integration needed for kernel-level budget enforcement. Adjacent integration topics -- CCIP for cross-chain delegation, Chainlink Functions for Ed25519 verification, Chainlink Automation for receipt anchoring, and the x402 protocol -- are documented separately in [CHIO_LINK_FUTURE_TRACKS.md](./CHIO_LINK_FUTURE_TRACKS.md).
 
 **Key findings:**
 
@@ -155,7 +155,7 @@ Source: [github.com/smartcontractkit/data-streams-sdk/rust](https://github.com/s
 
 This is the only official Chainlink product with a maintained Rust SDK. For arc-link, this means Data Streams integration could be cleaner than the alloy-based Data Feeds approach, at the cost of requiring a Chainlink subscription.
 
-### 3.4 ARC Relevance
+### 3.4 Chio Relevance
 
 - **Sub-second resolution** is valuable for volatile-asset budget enforcement where Data Feeds' heartbeat (minutes) is too coarse.
 - **LWBA spreads** can feed into risk-aware budget enforcement: a wide bid-ask spread could trigger more conservative (lower) price assumptions for cross-currency conversion.
@@ -194,7 +194,7 @@ These IDs are verified against the Hermes API as of 2026-03-30.
 
 ### 4.4 Consuming from Rust
 
-The `pyth-sdk-rs` repository primarily contains Solana on-chain crates. The last substantive update was August 2025 (v0.10.6), with a deprecation notice directing users toward newer products (Pyth Lazer). For ARC's off-chain kernel, the Hermes REST API is the practical consumption path:
+The `pyth-sdk-rs` repository primarily contains Solana on-chain crates. The last substantive update was August 2025 (v0.10.6), with a deprecation notice directing users toward newer products (Pyth Lazer). For Chio's off-chain kernel, the Hermes REST API is the practical consumption path:
 
 ```rust
 // Fetch latest ETH/USD price from Hermes
@@ -209,15 +209,15 @@ A simple `reqwest`-based client avoids taking a dependency on the Solana runtime
 
 ### 4.5 Limitations
 
-- **Hermes is a centralized bottleneck.** If Hermes goes down, the kernel loses access to Pyth prices entirely. Unlike Chainlink's on-chain feeds, which persist their last value in contract storage, Hermes availability is a real-time dependency. ARC must treat Hermes as a fallback, not a sole source.
+- **Hermes is a centralized bottleneck.** If Hermes goes down, the kernel loses access to Pyth prices entirely. Unlike Chainlink's on-chain feeds, which persist their last value in contract storage, Hermes availability is a real-time dependency. Chio must treat Hermes as a fallback, not a sole source.
 - Pyth's data providers are first-party (exchanges themselves), which is both a strength (low latency, direct data) and a risk (provider collusion is theoretically easier than Chainlink's node operator network).
 - Less battle-tested for high-value DeFi than Chainlink (though TVS is growing rapidly).
 
-### 4.6 ARC Relevance
+### 4.6 Chio Relevance
 
 - Pyth's 400ms updates are ideal for volatile-asset budget enforcement where Chainlink's heartbeat is too coarse.
-- The pull model aligns well with ARC's off-chain kernel: the kernel fetches the price only when it needs to enforce a cross-currency budget.
-- Confidence intervals can be mapped to ARC's risk tiers -- wider confidence could trigger more conservative budget enforcement.
+- The pull model aligns well with Chio's off-chain kernel: the kernel fetches the price only when it needs to enforce a cross-currency budget.
+- Confidence intervals can be mapped to Chio's risk tiers -- wider confidence could trigger more conservative budget enforcement.
 
 ---
 
@@ -233,7 +233,7 @@ This section provides a brief assessment of other oracle networks for completene
 | Chronicle | Push (Schnorr/MuSig2) | Minutes | 100+ | No | No -- narrow ecosystem (MakerDAO/Sky) |
 | Flare FTSOv2 | Enshrined (protocol-level) | ~1.8s | 1000 | No | No -- requires Flare chain |
 
-**Key takeaway:** No alternative oracle has a Rust SDK or a compelling advantage over Chainlink + Pyth for ARC's specific use case (off-chain price reads from a Rust kernel targeting Base). The `PriceOracle` trait should be generic enough to support any backend, but v1 ships with Chainlink and Pyth only.
+**Key takeaway:** No alternative oracle has a Rust SDK or a compelling advantage over Chainlink + Pyth for Chio's specific use case (off-chain price reads from a Rust kernel targeting Base). The `PriceOracle` trait should be generic enough to support any backend, but v1 ships with Chainlink and Pyth only.
 
 ---
 
@@ -301,7 +301,7 @@ The kernel should:
 5. Expose the cache state in the operator report for observability.
 6. **Circuit-breaker:** If Chainlink and Pyth report prices that diverge by more than a configurable threshold (e.g., 5%), deny cross-currency invocations and alert the operator. This protects against oracle manipulation or data feed divergence during market dislocations.
 
-This pattern matches ARC's existing architectural principle of fail-closed enforcement with operator visibility.
+This pattern matches Chio's existing architectural principle of fail-closed enforcement with operator visibility.
 
 ### 6.6 Global Staleness Scenario
 
@@ -323,11 +323,11 @@ The kernel's response must be deterministic:
 
 Chainlink Data Feeds are resistant to spot manipulation because they aggregate across many independent nodes and exchanges. However, Pyth's first-party model (exchanges self-report) has a smaller trust set. A colluding group of exchanges could temporarily move Pyth's reported price.
 
-**ARC-specific risk:** An attacker could manipulate a price feed to make a cheap tool invocation appear more expensive (draining the grant budget faster) or make an expensive invocation appear cheap (exceeding the grant's intended spending limit).
+**Chio-specific risk:** An attacker could manipulate a price feed to make a cheap tool invocation appear more expensive (draining the grant budget faster) or make an expensive invocation appear cheap (exceeding the grant's intended spending limit).
 
 ### 7.2 Flash Loan Price Oracle Attacks
 
-Classic DeFi flash loan attacks exploit spot-price oracles by manipulating DEX prices. ARC's off-chain kernel is inherently resistant to atomic flash loan attacks because the kernel reads prices from on-chain aggregators (not DEX spot prices), and the read + budget enforcement + tool invocation sequence is not atomic with any on-chain transaction. However, DEX-based oracle sources or Data Streams' DEX State Price feeds could be vulnerable.
+Classic DeFi flash loan attacks exploit spot-price oracles by manipulating DEX prices. Chio's off-chain kernel is inherently resistant to atomic flash loan attacks because the kernel reads prices from on-chain aggregators (not DEX spot prices), and the read + budget enforcement + tool invocation sequence is not atomic with any on-chain transaction. However, DEX-based oracle sources or Data Streams' DEX State Price feeds could be vulnerable.
 
 ### 7.3 TWAP vs Spot for Budget Enforcement
 
@@ -343,7 +343,7 @@ Using spot prices introduces volatility risk: a brief price spike could cause an
 
 OEV is the value that can be extracted by controlling the timing and ordering of oracle price updates -- analogous to MEV but specific to oracle-dependent operations.
 
-For ARC, OEV manifests as: if a price update would trigger a budget exhaustion or cause a delegation bond to become undercollateralized, the entity controlling update timing can front-run affected transactions.
+For Chio, OEV manifests as: if a price update would trigger a budget exhaustion or cause a delegation bond to become undercollateralized, the entity controlling update timing can front-run affected transactions.
 
 **Mitigations:**
 - Use Chainlink's push-based feeds where update timing is determined by the decentralized DON, not by any single party.
@@ -435,7 +435,7 @@ let effective_cost_units = if tool_currency != grant_currency {
 
 ### 8.5 Integer Arithmetic for Currency Conversion
 
-All ARC monetary amounts are `u64` minor units. The exchange rate must be applied as a rational number (numerator/denominator) to avoid floating-point precision loss:
+All Chio monetary amounts are `u64` minor units. The exchange rate must be applied as a rational number (numerator/denominator) to avoid floating-point precision loss:
 
 ```
 Tool cost: 10^15 wei (0.001 ETH)
@@ -609,7 +609,7 @@ feeds = [
 
 ### 11.1 Trust Boundary
 
-ARC's existing trust model places the kernel in the TCB. Introducing an oracle dependency moves the trust boundary. Questions:
+Chio's existing trust model places the kernel in the TCB. Introducing an oracle dependency moves the trust boundary. Questions:
 
 - **Should oracle prices be signed and included in receipts?** Recommendation: yes. This makes economic decisions auditable.
 - **If a price feed was wrong, should receipts be challengeable?** This is where UMA integration (future track) becomes relevant.
@@ -617,7 +617,7 @@ ARC's existing trust model places the kernel in the TCB. Introducing an oracle d
 
 ### 11.2 Currency Pair Coverage
 
-ARC's `MonetaryAmount.currency` is a free-form string. Not every currency pair has an oracle feed.
+Chio's `MonetaryAmount.currency` is a free-form string. Not every currency pair has an oracle feed.
 
 - **Should the kernel maintain a registry of supported cross-currency pairs?** Yes. The `price_oracle.feeds` configuration is this registry.
 - **What happens when a grant uses a currency with no oracle feed?** Fail-closed. `PriceOracle::get_rate` returns `NoPairAvailable`, and the kernel denies the invocation.

@@ -1,4 +1,4 @@
-# ARC Research Memo: ZK Verification Over Signed Receipt Chains
+# Chio Research Memo: ZK Verification Over Signed Receipt Chains
 
 Date: 2026-04-16
 
@@ -10,39 +10,39 @@ Related roadmap docs:
 ## Scope
 
 This memo covers a post-31 research track for layering zero-knowledge proofs over
-ARC's existing signed receipts, receipt-lineage statements, and Merkle
-checkpoints. It does not change ARC's current non-research thesis. The working
+Chio's existing signed receipts, receipt-lineage statements, and Merkle
+checkpoints. It does not change Chio's current non-research thesis. The working
 constraint is to keep signed receipts and checkpoint semantics authoritative,
 then add ZK as an optional proof layer over that evidence.
 
 ## Bottom Line
 
-ZK over ARC receipt chains is technically plausible, but only as a layer on top
-of ARC's existing receipt and checkpoint plane. The most credible near-term
+ZK over Chio receipt chains is technically plausible, but only as a layer on top
+of Chio's existing receipt and checkpoint plane. The most credible near-term
 pattern is not a new signature scheme or a new receipt format. It is a proof
-that an existing ARC verifier accepted a private set of signed receipts,
+that an existing Chio verifier accepted a private set of signed receipts,
 lineage edges, and checkpoint proofs, then produced a narrow public claim.
 
 That makes this a research track, not a Phase 26 through 31 prerequisite:
 
-- ARC's current thesis is already expressible through signed receipts,
+- Chio's current thesis is already expressible through signed receipts,
   checkpointing, runtime correctness, qualification, and external evidence.
 - ZK can compress or selectively disclose those results, but it does not create
-  the non-research ARC thesis by itself.
+  the non-research Chio thesis by itself.
 - The hardest open work is not "can a proof be generated at all". It is how to
-  bind ARC's current receipt semantics, append-only semantics, and verifier
+  bind Chio's current receipt semantics, append-only semantics, and verifier
   costs without introducing a second source of truth.
 
 ## 1. Feasible Architecture Patterns
 
 ### Pattern A: Proof over existing checkpoint membership and receipt validity
 
-Keep ARC's signed receipts and checkpoint statements unchanged. A prover
+Keep Chio's signed receipts and checkpoint statements unchanged. A prover
 privately holds:
 
-- one or more signed ARC receipts
+- one or more signed Chio receipts
 - any receipt-lineage statements or continuation tokens needed for the claim
-- Merkle inclusion proofs into an ARC checkpoint or receipt-log view
+- Merkle inclusion proofs into an Chio checkpoint or receipt-log view
 - consistency proofs that connect a later checkpoint root to an earlier one
 
 The ZK proof exposes only narrow public outputs such as:
@@ -52,14 +52,14 @@ The ZK proof exposes only narrow public outputs such as:
 - a policy result such as "a valid receipt chain exists"
 - a bounded aggregate such as count, amount cap, or rule satisfaction
 
-This is the cleanest fit with the current ARC spec because it treats ZK as a
+This is the cleanest fit with the current Chio spec because it treats ZK as a
 private verifier for already-issued evidence. It also matches the roadmap
-boundary: ARC first needs stronger claim-complete checkpoint and receipt-family
+boundary: Chio first needs stronger claim-complete checkpoint and receipt-family
 semantics, then can prove predicates over them.
 
-### Pattern B: zkVM proof of ARC verifier execution
+### Pattern B: zkVM proof of Chio verifier execution
 
-Compile ARC's existing receipt verifier logic into a zkVM flow and prove that
+Compile Chio's existing receipt verifier logic into a zkVM flow and prove that
 the verifier:
 
 - canonicalized receipt payloads correctly
@@ -78,20 +78,20 @@ compress many receipt checks into one succinct proof.
 Keep signed canonical-JSON receipts authoritative, but add a secondary
 zk-friendly commitment index for proving efficiency. For example:
 
-- the signed receipt remains the source of truth for normal ARC verification
-- ARC derives a second commitment from the signed receipt payload
+- the signed receipt remains the source of truth for normal Chio verification
+- Chio derives a second commitment from the signed receipt payload
 - the ZK proof works primarily over the secondary commitment tree
 - the proof also binds that secondary commitment back to the signed receipt or
   checkpoint root
 
-This can reduce proving cost, especially if ARC's existing JSON-plus-signature
+This can reduce proving cost, especially if Chio's existing JSON-plus-signature
 pipeline is expensive inside a custom proof system. The risk is conceptual:
-ARC would now have an authoritative signed form and an auxiliary proving form,
+Chio would now have an authoritative signed form and an auxiliary proving form,
 so the binding between them becomes security-critical.
 
 ### Pattern D: Aggregate proof bundles over receipt windows
 
-Instead of proving one receipt chain at a time, ARC could prove statements over
+Instead of proving one receipt chain at a time, Chio could prove statements over
 bounded receipt windows:
 
 - all receipts in a checkpoint window satisfy a policy predicate
@@ -106,31 +106,31 @@ because it depends on stable report semantics and claim-complete checkpointing.
 
 ### Hard prerequisites
 
-- ARC needs claim-complete receipt and checkpoint semantics first.
+- Chio needs claim-complete receipt and checkpoint semantics first.
   `spec/PROTOCOL.md` currently says checkpoints support `audit` and
   `transparency_preview` style claims, not full public append-only or strong
   non-repudiation semantics.
-- ARC needs stable verifier inputs first.
+- Chio needs stable verifier inputs first.
   If receipt canonicalization, lineage rules, checkpoint leaf layout, or signed
   claim surfaces keep moving, any circuit or zkVM image will churn with them.
-- ARC needs a precise public statement language first.
+- Chio needs a precise public statement language first.
   The proof target has to be explicit: membership, continuity, bounded sum,
   policy satisfaction, or report derivation.
 
 ### Open research questions
 
-- Should ARC prototype with a zkVM, a custom circuit, or a folding-based
+- Should Chio prototype with a zkVM, a custom circuit, or a folding-based
   recursive system?
-- Is proving receipt signature verification directly acceptable, or should ARC
+- Is proving receipt signature verification directly acceptable, or should Chio
   derive an auxiliary proving commitment after normal receipt issuance?
-- How should ARC treat proof freshness, revocation, and receipt supersession?
+- How should Chio treat proof freshness, revocation, and receipt supersession?
 - What privacy model is actually desired: selective disclosure, hidden
   aggregates, hidden lineage, or hidden counterparty details?
 - What must be public for independent verification: checkpoint root, log size,
   verifier key, proof-system version, trusted-kernel set, and report schema?
-- How does ARC prove completeness of a family or window instead of just
+- How does Chio prove completeness of a family or window instead of just
   membership of selected receipts?
-- How should ARC handle algorithm agility without invalidating prior proofs or
+- How should Chio handle algorithm agility without invalidating prior proofs or
   forcing verifier fragmentation?
 
 ## 3. Operational Risks And Verifier-Cost Tradeoffs
@@ -139,9 +139,9 @@ because it depends on stable report semantics and claim-complete checkpointing.
 
 Pros:
 
-- reuses ARC verifier logic
+- reuses Chio verifier logic
 - avoids bespoke circuit engineering for JSON and signature handling
-- aligns well with proving "ARC verified this evidence" rather than inventing a
+- aligns well with proving "Chio verified this evidence" rather than inventing a
   new proof relation
 
 Costs and risks:
@@ -161,7 +161,7 @@ Pros:
 Costs and risks:
 
 - highest engineering risk
-- brittle under ARC protocol evolution
+- brittle under Chio protocol evolution
 - JSON canonicalization, signature verification, and SHA-style hashing are poor
   places to start if the goal is fast iteration
 
@@ -182,7 +182,7 @@ Costs and risks:
 ### Append-only and witness risks
 
 - A ZK proof can hide receipt contents, but it does not solve equivocation by
-  itself. ARC still needs publication, witness-sharing, or monitor semantics for
+  itself. Chio still needs publication, witness-sharing, or monitor semantics for
   stronger append-only claims.
 - Inclusion-proof fetching can leak verifier interest if the log or publication
   surface learns what specific receipt is being checked.
@@ -191,7 +191,7 @@ Costs and risks:
 
 ## 4. Why This Must Stay A Post-31 Research Track
 
-- It is not required to establish the non-research ARC thesis.
+- It is not required to establish the non-research Chio thesis.
   The addendum and post-31 program docs already separate product closure,
   external evidence, and research.
 - ZK does not replace the need for claim-complete receipt semantics,
@@ -199,25 +199,25 @@ Costs and risks:
 - The research surface crosses proof-system choice, hardware economics, privacy
   design, and long-term verifier maintenance. Those are poor milestone
   prerequisites for product closure.
-- ARC should first prove the stronger non-research story with ordinary signed
+- Chio should first prove the stronger non-research story with ordinary signed
   receipts, bounded checkpoint claims, external qualification harnesses, and
   external proof bundles.
 - After that, ZK can strengthen privacy and compression properties over the
-  evidence ARC already knows how to produce and qualify.
+  evidence Chio already knows how to produce and qualify.
 
 ## 5. Doc-Ready Bullets
 
-- ZK receipt proofs should layer over ARC's signed receipts and checkpoints, not
+- ZK receipt proofs should layer over Chio's signed receipts and checkpoints, not
   replace them.
-- The cleanest prototype path is a zkVM proof that ARC's existing verifier
+- The cleanest prototype path is a zkVM proof that Chio's existing verifier
   accepted a private receipt set and produced a narrow public claim.
-- Recursive aggregation is relevant because ARC will likely need to compress
+- Recursive aggregation is relevant because Chio will likely need to compress
   many receipt checks into one verifier-friendly proof.
-- ARC should not make ZK a roadmap prerequisite before Phases 26 through 31
+- Chio should not make ZK a roadmap prerequisite before Phases 26 through 31
   finish the non-research receipt, checkpoint, and qualification story.
-- ARC's current checkpoint model is still bounded. Proving over it does not
-  automatically upgrade ARC into a full public append-only transparency system.
-- If ARC adds zk-friendly commitments for proving speed, the signed receipt must
+- Chio's current checkpoint model is still bounded. Proving over it does not
+  automatically upgrade Chio into a full public append-only transparency system.
+- If Chio adds zk-friendly commitments for proving speed, the signed receipt must
   remain authoritative and the binding between the two forms must be explicit.
 - The biggest risks are verifier-cost inflation, proof-system churn,
   equivocation not solved by ZK alone, and accidental creation of dual truth
@@ -225,7 +225,7 @@ Costs and risks:
 
 ## Primary Sources
 
-- ARC protocol and roadmap context:
+- Chio protocol and roadmap context:
   - `spec/PROTOCOL.md`
   - `docs/POST_ROADMAP_ADDENDUM.md`
   - `docs/POST_31_EXTERNAL_PROGRAMS.md`

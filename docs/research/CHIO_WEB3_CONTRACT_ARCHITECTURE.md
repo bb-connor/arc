@@ -1,15 +1,15 @@
-# ARC Web3 Contract Architecture: Unified On-Chain Interface
+# Chio Web3 Contract Architecture: Unified On-Chain Interface
 
 Status: Architecture Specification
 Date: 2026-03-30
 Authors: Engineering
-Inputs: ARC_ANCHOR_RESEARCH.md, ARC_SETTLE_RESEARCH.md, ARC_LINK_RESEARCH.md
+Inputs: CHIO_ANCHOR_RESEARCH.md, CHIO_SETTLE_RESEARCH.md, CHIO_LINK_RESEARCH.md
 
 > Realization status (2026-04-02): this architecture is now realized in the
 > shipped contract package under `contracts/`, the bindings in
 > `crates/arc-web3-bindings/`, and the standards boundary in
-> [ARC_WEB3_PROFILE.md](../standards/ARC_WEB3_PROFILE.md). The authoritative
-> package inventory is `docs/standards/ARC_WEB3_CONTRACT_PACKAGE.json`; it
+> [CHIO_WEB3_PROFILE.md](../standards/CHIO_WEB3_PROFILE.md). The authoritative
+> package inventory is `docs/standards/CHIO_WEB3_CONTRACT_PACKAGE.json`; it
 > keeps four contracts immutable and the identity registry owner-managed and
 > mutable.
 
@@ -31,17 +31,17 @@ Inputs: ARC_ANCHOR_RESEARCH.md, ARC_SETTLE_RESEARCH.md, ARC_LINK_RESEARCH.md
 
 ## 1. Problem Statement
 
-Three ARC research documents independently propose overlapping on-chain contract designs:
+Three Chio research documents independently propose overlapping on-chain contract designs:
 
-**ARC_ANCHOR_RESEARCH.md** proposes `ArcAnchorRegistry` -- a minimal Merkle root storage contract. The operator calls `anchor()` with checkpoint metadata. The contract stores one `Anchor` struct per operator per checkpoint sequence number. No on-chain proof verification. ~45k-52k gas per anchor. No admin, no pause, no upgradeability.
+**CHIO_ANCHOR_RESEARCH.md** proposes `ArcAnchorRegistry` -- a minimal Merkle root storage contract. The operator calls `anchor()` with checkpoint metadata. The contract stores one `Anchor` struct per operator per checkpoint sequence number. No on-chain proof verification. ~45k-52k gas per anchor. No admin, no pause, no upgradeability.
 
-**ARC_SETTLE_RESEARCH.md** proposes four contracts:
+**CHIO_SETTLE_RESEARCH.md** proposes four contracts:
 - `ArcReceiptVerifier` -- Merkle root registry (similar to ArcAnchorRegistry) PLUS on-chain Merkle proof verification PLUS secp256k1 signature verification for the dual-signing path.
 - `ArcEscrow` -- conditional escrow for tool call settlement, with release via Merkle proof or dual-sign evidence.
 - `ArcBondVault` -- collateral locking for `CreditBond` enforcement with slash/release mechanics.
-- `ArcSettleRegistry` -- maps ARC entity keys (Ed25519) to Ethereum addresses and manages operator authorization.
+- `ArcSettleRegistry` -- maps Chio entity keys (Ed25519) to Ethereum addresses and manages operator authorization.
 
-**ARC_LINK_RESEARCH.md** proposes a third shape:
+**CHIO_LINK_RESEARCH.md** proposes a third shape:
 - `ArcAnchor.sol` -- Merkle root storage with timestamp and receipt count (different field set from the anchor doc's `ArcAnchorRegistry`).
 - `ArcDelegationVerifier.sol` -- Chainlink Functions consumer for Ed25519 batch verification.
 - `ArcPriceResolver.sol` -- optional on-chain price resolution wrapping Chainlink feeds.
@@ -61,11 +61,11 @@ Both the anchor and settle documents independently noted in their cross-integrat
 
 ## 2. Design Principles
 
-These principles are derived from ARC's core philosophy and the three research documents' shared conclusions.
+These principles are derived from Chio's core philosophy and the three research documents' shared conclusions.
 
 1. **Fail-closed.** On-chain contracts must never release funds on ambiguous evidence. If a proof is invalid, the contract reverts. If a deadline passes without valid release, funds return to the depositor. No admin override.
 
-2. **Immutable deployment.** ARC's fail-closed philosophy favors immutable contracts over upgradeable proxies. Proxy patterns introduce a governance trust assumption (who controls the upgrade?) that conflicts with ARC's minimize-trust model. Exception: the identity registry (IArcIdentityRegistry) uses a minimal owner for operator registration, since operator sets change over time.
+2. **Immutable deployment.** Chio's fail-closed philosophy favors immutable contracts over upgradeable proxies. Proxy patterns introduce a governance trust assumption (who controls the upgrade?) that conflicts with Chio's minimize-trust model. Exception: the identity registry (IArcIdentityRegistry) uses a minimal owner for operator registration, since operator sets change over time.
 
 3. **Single Merkle root source of truth.** One contract publishes and stores Merkle roots per operator. All downstream consumers (escrow, bond vault, external verifiers, arc-anchor verifiers) read from the same root.
 
@@ -77,7 +77,7 @@ These principles are derived from ARC's core philosophy and the three research d
 
 7. **Stablecoin-first.** USDC is the primary settlement token. All escrow and bond amounts are denominated in ERC-20 stablecoins. No native ETH handling in settlement contracts.
 
-8. **Multi-operator by default.** Every contract is keyed by operator address. Multiple ARC kernel operators share a single contract deployment. No per-operator contract instances.
+8. **Multi-operator by default.** Every contract is keyed by operator address. Multiple Chio kernel operators share a single contract deployment. No per-operator contract instances.
 
 ---
 
@@ -183,8 +183,8 @@ interface IArcRootRegistry {
 **Design notes:**
 
 - `publishedAt` is set by `block.timestamp` inside the implementation, not passed by the caller. This prevents timestamp spoofing.
-- `operatorKeyHash` is `keccak256(ed25519_public_key_bytes)`, providing a binding between the EVM address (msg.sender) and the ARC Ed25519 identity without putting raw Ed25519 keys on-chain.
-- `verifyInclusion` uses OpenZeppelin's `MerkleProof.verify` internally. ARC uses RFC 6962-compatible Merkle trees (0x00 leaf prefix, 0x01 node prefix, carry-last-node-up for odd levels). The Solidity implementation must match this construction. OpenZeppelin's `MerkleProof` uses a different convention (sorted pairs), so the implementation must use a custom verifier that matches RFC 6962 semantics. This is an implementation detail, not an interface concern.
+- `operatorKeyHash` is `keccak256(ed25519_public_key_bytes)`, providing a binding between the EVM address (msg.sender) and the Chio Ed25519 identity without putting raw Ed25519 keys on-chain.
+- `verifyInclusion` uses OpenZeppelin's `MerkleProof.verify` internally. Chio uses RFC 6962-compatible Merkle trees (0x00 leaf prefix, 0x01 node prefix, carry-last-node-up for odd levels). The Solidity implementation must match this construction. OpenZeppelin's `MerkleProof` uses a different convention (sorted pairs), so the implementation must use a custom verifier that matches RFC 6962 semantics. This is an implementation detail, not an interface concern.
 - The `operator` parameter on `verifyInclusion` ensures that escrow contracts verify receipts against the correct operator's roots, preventing cross-operator proof confusion.
 
 ### 3.2 IArcEscrow
@@ -315,7 +315,7 @@ interface IArcEscrow {
 
 ### 3.3 IArcBondVault
 
-Collateral locking for ARC's `CreditBond` lifecycle. Maps directly to `CreditBondDisposition` (Lock, Hold, Release, Impair) and `CreditBondLifecycleState` (Active, Superseded, Released, Impaired, Expired).
+Collateral locking for Chio's `CreditBond` lifecycle. Maps directly to `CreditBondDisposition` (Lock, Hold, Release, Impair) and `CreditBondLifecycleState` (Active, Superseded, Released, Impaired, Expired).
 
 ```solidity
 // SPDX-License-Identifier: MIT
@@ -419,7 +419,7 @@ interface IArcBondVault {
 
 ### 3.4 IArcIdentityRegistry
 
-Maps ARC Ed25519 identities to on-chain addresses and manages operator authorization. This is the only contract with an admin role (for operator registration).
+Maps Chio Ed25519 identities to on-chain addresses and manages operator authorization. This is the only contract with an admin role (for operator registration).
 
 ```solidity
 // SPDX-License-Identifier: MIT
@@ -508,7 +508,7 @@ interface IArcIdentityRegistry {
 
 ### 3.5 IArcPriceResolver
 
-Optional on-chain price resolution wrapping Chainlink AggregatorV3. Used by downstream contracts or off-chain readers who want a single ARC-curated view of price feeds.
+Optional on-chain price resolution wrapping Chainlink AggregatorV3. Used by downstream contracts or off-chain readers who want a single Chio-curated view of price feeds.
 
 ```solidity
 // SPDX-License-Identifier: MIT
@@ -559,7 +559,7 @@ interface IArcPriceResolver {
 **Design notes:**
 
 - The price resolver is NOT required for escrow or bond operations. It is an optional utility. The kernel consumes prices off-chain via the `PriceOracle` trait (arc-link). On-chain price reads are only needed for advanced use cases like automated bond adequacy checks.
-- Staleness is enforced at the contract level. If the Chainlink feed has not updated within `maxStalenessSeconds`, the call reverts. This matches ARC's fail-closed philosophy.
+- Staleness is enforced at the contract level. If the Chainlink feed has not updated within `maxStalenessSeconds`, the call reverts. This matches Chio's fail-closed philosophy.
 - The L2 sequencer uptime check (via Chainlink's L2 Sequencer Uptime Feed) is included because stale prices on L2 during sequencer downtime are a known risk.
 
 ---
@@ -657,7 +657,7 @@ All five contracts are deployed on Base (Chain ID: 8453).
 4. `IArcEscrow` -- references root registry and identity registry.
 5. `IArcBondVault` -- references root registry and identity registry.
 
-**Deterministic deployment:** Use CREATE2 via a factory contract to ensure identical addresses across all chains. The salt includes the ARC protocol version to allow clean upgrades via new deployments.
+**Deterministic deployment:** Use CREATE2 via a factory contract to ensure identical addresses across all chains. The salt includes the Chio protocol version to allow clean upgrades via new deployments.
 
 **Immutability:** All contracts except IArcIdentityRegistry are deployed without proxy patterns. IArcIdentityRegistry uses a minimal Ownable pattern (not a full proxy) because the operator set changes over time.
 
@@ -675,7 +675,7 @@ Solana programs replace the EVM contracts for operators who want native Ed25519 
 | IArcIdentityRegistry | arc_identity program | Simpler -- no secp256k1 binding needed since Ed25519 is native |
 | IArcPriceResolver | Not needed | Pyth feeds consumed directly via CPI |
 
-**Key advantage on Solana:** The entire dual-signing complexity disappears. ARC receipts are verified directly using the Solana Ed25519 precompile program. This is the strongest argument for Solana as a parallel settlement rail.
+**Key advantage on Solana:** The entire dual-signing complexity disappears. Chio receipts are verified directly using the Solana Ed25519 precompile program. This is the strongest argument for Solana as a parallel settlement rail.
 
 ### 5.3 Secondary EVM Chains
 
@@ -697,7 +697,7 @@ Recommendation: Option 1 (independent publication) for v1. The cost is negligibl
 
 ### 6.1 Base Mainnet Addresses
 
-The following addresses are canonical for ARC's primary deployment on Base (Chain ID: 8453).
+The following addresses are canonical for Chio's primary deployment on Base (Chain ID: 8453).
 
 **Core tokens:**
 
@@ -731,7 +731,7 @@ The following addresses are canonical for ARC's primary deployment on Base (Chai
 
 ### 6.2 Corrected Configuration (replacing Arbitrum addresses from arc-link)
 
-The arc-link research document's section 12.4 used Arbitrum addresses. The canonical configuration for ARC uses Base:
+The arc-link research document's section 12.4 used Arbitrum addresses. The canonical configuration for Chio uses Base:
 
 ```toml
 [price_oracle]
@@ -836,7 +836,7 @@ For large operators, the batch Merkle settlement path amortizes cost across many
 
 ### 8.1 The Problem
 
-ARC signs all receipts and capability tokens with Ed25519. The EVM natively supports only secp256k1 (`ecrecover` at 3,000 gas). There is no production Ed25519 precompile on any EVM chain.
+Chio signs all receipts and capability tokens with Ed25519. The EVM natively supports only secp256k1 (`ecrecover` at 3,000 gas). There is no production Ed25519 precompile on any EVM chain.
 
 ### 8.2 Unified Strategy (Three Tiers)
 
@@ -861,7 +861,7 @@ The three research documents each proposed different approaches. The unified str
 **Tier 3: Native Ed25519 on Solana (Solana settlement rail)**
 
 - Solana's `Ed25519SigVerify111111111111111111111111111` precompile verifies Ed25519 signatures natively at compute-unit cost.
-- ARC receipts are verified directly -- no dual-signing, no Merkle proof intermediary needed (though Merkle proofs are still used for batch efficiency).
+- Chio receipts are verified directly -- no dual-signing, no Merkle proof intermediary needed (though Merkle proofs are still used for batch efficiency).
 - This eliminates the entire dual-key management complexity for operators who settle on Solana.
 - Recommended for operators who prioritize cryptographic purity (single key scheme) over EVM ecosystem access.
 
@@ -901,7 +901,7 @@ The three research documents each proposed different approaches. The unified str
 
 **Data mapping:**
 
-| ARC type | Contract field |
+| Chio type | Contract field |
 |----------|---------------|
 | `KernelCheckpoint.merkle_root` | `merkleRoot` (bytes32) |
 | `KernelCheckpoint.checkpoint_seq` | `checkpointSeq` (uint64) |
@@ -916,7 +916,7 @@ The three research documents each proposed different approaches. The unified str
 
 **Escrow flow (CapitalExecutionInstructionAction mapping):**
 
-| ARC Action | Contract Call |
+| Chio Action | Contract Call |
 |-----------|--------------|
 | `LockReserve` | `IArcEscrow.createEscrow()` or `IArcBondVault.lockBond()` |
 | `HoldReserve` | No-op (funds already locked on-chain) |
@@ -926,7 +926,7 @@ The three research documents each proposed different approaches. The unified str
 
 **Bond lifecycle (CreditBondLifecycleState mapping):**
 
-| ARC State | Contract Call |
+| Chio State | Contract Call |
 |-----------|--------------|
 | `Active` | `IArcBondVault.lockBond()` |
 | `Superseded` | Lock new bond, release old via `releaseBond()` |
@@ -945,7 +945,7 @@ The three research documents each proposed different approaches. The unified str
 
 **MonetaryAmount to ERC-20 conversion:**
 
-ARC's `MonetaryAmount.units` represents minor units (cents for USD). USDC on-chain uses 6 decimals (1 USD = 1,000,000 micro-units). Conversion: `on_chain_amount = arc_units * 10_000` for USD/cents. This factor MUST be configurable per currency via a `CurrencyDecimals` mapping, not hardcoded.
+Chio's `MonetaryAmount.units` represents minor units (cents for USD). USDC on-chain uses 6 decimals (1 USD = 1,000,000 micro-units). Conversion: `on_chain_amount = arc_units * 10_000` for USD/cents. This factor MUST be configurable per currency via a `CurrencyDecimals` mapping, not hardcoded.
 
 **CapitalExecutionRail extension:**
 
@@ -1087,12 +1087,12 @@ For implementers referencing the original research documents, this table maps ol
 
 ## Appendix B: Merkle Tree Compatibility Note
 
-ARC uses an RFC 6962-compatible (Certificate Transparency style) Merkle tree:
+Chio uses an RFC 6962-compatible (Certificate Transparency style) Merkle tree:
 - Leaf hashes: `SHA256(0x00 || leaf_bytes)`
 - Node hashes: `SHA256(0x01 || left || right)`
 - Odd-level handling: carry the last node upward unchanged (no leaf duplication)
 
-OpenZeppelin's `MerkleProof.verify` uses a **different** convention (sorted pair hashing without domain separation prefixes). The `IArcRootRegistry` implementation MUST use a custom Merkle verification function that matches ARC's RFC 6962 construction. Using OpenZeppelin's default `MerkleProof` will produce incorrect verification results.
+OpenZeppelin's `MerkleProof.verify` uses a **different** convention (sorted pair hashing without domain separation prefixes). The `IArcRootRegistry` implementation MUST use a custom Merkle verification function that matches Chio's RFC 6962 construction. Using OpenZeppelin's default `MerkleProof` will produce incorrect verification results.
 
 A reference Solidity implementation of RFC 6962-compatible verification:
 
@@ -1117,4 +1117,4 @@ function verifyRFC6962(
 }
 ```
 
-Note: This uses `sha256` (the EVM precompile at address 0x02, ~60 gas per call) rather than `keccak256`. ARC's Merkle tree uses SHA-256, not Keccak-256. The EVM sha256 precompile makes this efficient.
+Note: This uses `sha256` (the EVM precompile at address 0x02, ~60 gas per call) rather than `keccak256`. Chio's Merkle tree uses SHA-256, not Keccak-256. The EVM sha256 precompile makes this efficient.

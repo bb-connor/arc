@@ -1,4 +1,4 @@
-# ARC Web3 Trust Boundary Decisions
+# Chio Web3 Trust Boundary Decisions
 
 Status: **Decision record**
 Date: 2026-03-30
@@ -6,10 +6,10 @@ Authors: Protocol Architecture
 Scope: arc-anchor, arc-settle, arc-link
 
 > Realization status (2026-04-02): these decisions are now realized across
-> [ARC_WEB3_PROFILE.md](../standards/ARC_WEB3_PROFILE.md),
-> [ARC_LINK_PROFILE.md](../standards/ARC_LINK_PROFILE.md),
-> [ARC_ANCHOR_PROFILE.md](../standards/ARC_ANCHOR_PROFILE.md), and
-> [ARC_SETTLE_PROFILE.md](../standards/ARC_SETTLE_PROFILE.md). Where the
+> [CHIO_WEB3_PROFILE.md](../standards/CHIO_WEB3_PROFILE.md),
+> [CHIO_LINK_PROFILE.md](../standards/CHIO_LINK_PROFILE.md),
+> [CHIO_ANCHOR_PROFILE.md](../standards/CHIO_ANCHOR_PROFILE.md), and
+> [CHIO_SETTLE_PROFILE.md](../standards/CHIO_SETTLE_PROFILE.md). Where the
 > research used older contract names or left choices open, the shipped names
 > and boundaries in those profiles supersede this document.
 
@@ -17,15 +17,15 @@ Scope: arc-anchor, arc-settle, arc-link
 
 ## 1. Context
 
-ARC's web3 integration spans three planned crates:
+Chio's web3 integration spans three planned crates:
 
 - **arc-anchor** -- blockchain anchoring of the receipt log Merkle roots for tamper evidence
 - **arc-settle** -- on-chain USDC escrow, conditional release against receipt evidence, and bond/slash mechanics
 - **arc-link** -- oracle price feeds for cross-currency budget enforcement, Chainlink Functions/Automation, and cross-chain delegation transport
 
-Each crate has a research document that describes technical options and tradeoffs. However, six trust-boundary questions remain unanswered across those documents. These questions are not implementation details -- they define where ARC's trust model ends and the blockchain layer begins. Answering them inconsistently across crates would fragment the security model.
+Each crate has a research document that describes technical options and tradeoffs. However, six trust-boundary questions remain unanswered across those documents. These questions are not implementation details -- they define where Chio's trust model ends and the blockchain layer begins. Answering them inconsistently across crates would fragment the security model.
 
-This document makes binding decisions for all six questions. Every decision is grounded in ARC's existing primitives: `ArcReceipt`, `CapabilityToken`, `KernelCheckpoint`, `MerkleTree`/`MerkleProof`, `GuardEvidence`, `did:arc` identity, and the `RuntimeAttestationAppraisal` family.
+This document makes binding decisions for all six questions. Every decision is grounded in Chio's existing primitives: `ArcReceipt`, `CapabilityToken`, `KernelCheckpoint`, `MerkleTree`/`MerkleProof`, `GuardEvidence`, `did:arc` identity, and the `RuntimeAttestationAppraisal` family.
 
 ---
 
@@ -39,7 +39,7 @@ Verifier discovery uses a two-layer scheme:
 
 1. **Primary: `did:arc` DID document service endpoint.** The operator's `did:arc:{ed25519-pubkey}` identity document is extended with an `anchorService` entry listing the chains, contract addresses, and operator EVM addresses used for anchoring. The DID document is self-certifying (signed by the same Ed25519 key), so no external registry is required for resolution.
 
-2. **Secondary: Canonical shared `ArcAnchorRegistry` contract on each supported chain.** ARC publishes a single contract instance per chain (Base as primary, Arbitrum as secondary). The contract is keyed by `msg.sender` (operator EVM address), so any verifier who knows the canonical contract address and the operator's EVM address can query `getLatest(operatorAddress)` or scan `Anchored` events without any off-chain discovery step.
+2. **Secondary: Canonical shared `ArcAnchorRegistry` contract on each supported chain.** Chio publishes a single contract instance per chain (Base as primary, Arbitrum as secondary). The contract is keyed by `msg.sender` (operator EVM address), so any verifier who knows the canonical contract address and the operator's EVM address can query `getLatest(operatorAddress)` or scan `Anchored` events without any off-chain discovery step.
 
 The `did:arc` document structure for anchor service endpoints:
 
@@ -67,9 +67,9 @@ The `did:arc` document structure for anchor service endpoints:
 
 ### Rationale
 
-ARC already ships `did:arc` as its self-certifying DID method. The DID document is the natural place for service endpoint discovery -- this follows the DID Core specification's service endpoint pattern. The canonical contract address per chain eliminates the bootstrap problem: a verifier only needs to know which chain to check, not which contract instance the operator deployed.
+Chio already ships `did:arc` as its self-certifying DID method. The DID document is the natural place for service endpoint discovery -- this follows the DID Core specification's service endpoint pattern. The canonical contract address per chain eliminates the bootstrap problem: a verifier only needs to know which chain to check, not which contract instance the operator deployed.
 
-DNS-based discovery (e.g., `_arc-anchor.operator.example.com`) was considered but rejected because it introduces a dependency on the DNS trust hierarchy, which is orthogonal to ARC's Ed25519-based identity model. On-chain registry discovery (a meta-registry listing all operators) was considered but rejected because it adds governance overhead for who can register and creates a centralization chokepoint.
+DNS-based discovery (e.g., `_arc-anchor.operator.example.com`) was considered but rejected because it introduces a dependency on the DNS trust hierarchy, which is orthogonal to Chio's Ed25519-based identity model. On-chain registry discovery (a meta-registry listing all operators) was considered but rejected because it adds governance overhead for who can register and creates a centralization chokepoint.
 
 ### Alternatives Considered
 
@@ -87,7 +87,7 @@ DNS-based discovery (e.g., `_arc-anchor.operator.example.com`) was considered bu
 
 ## 3. Decision 2: Operator Identity Binding
 
-**How does an on-chain anchor connect back to a specific ARC operator's `did:arc` identity?**
+**How does an on-chain anchor connect back to a specific Chio operator's `did:arc` identity?**
 
 ### Decision
 
@@ -113,11 +113,11 @@ The certificate format:
 
 The certificate is signed by the Ed25519 key: `signature = Ed25519.sign(canonical_json(certificate_body), ed25519_private_key)`.
 
-The same secp256k1 key (and therefore the same EVM address) is reused across arc-anchor and arc-settle. This means the operator manages exactly two keys total: one Ed25519 (authoritative ARC identity) and one secp256k1 (EVM transaction signing).
+The same secp256k1 key (and therefore the same EVM address) is reused across arc-anchor and arc-settle. This means the operator manages exactly two keys total: one Ed25519 (authoritative Chio identity) and one secp256k1 (EVM transaction signing).
 
 ### Rationale
 
-ARC's trust model places Ed25519 as the root of identity. Any on-chain action must be traceable back to an Ed25519 identity to maintain the protocol's security invariant. A key-binding certificate signed by the Ed25519 key creates a cryptographic chain from on-chain EVM address back to `did:arc`.
+Chio's trust model places Ed25519 as the root of identity. Any on-chain action must be traceable back to an Ed25519 identity to maintain the protocol's security invariant. A key-binding certificate signed by the Ed25519 key creates a cryptographic chain from on-chain EVM address back to `did:arc`.
 
 The certificate is time-bounded (`issued_at`/`expires_at`) to support key rotation. When the operator rotates either key, a new certificate is issued and published. The old certificate remains valid for verification of historical anchors until its `expires_at`.
 
@@ -229,13 +229,13 @@ The bundle includes the full receipt (not just a hash) because the verifier need
 
 - **Hash-only bundle** (receipt hash + proof, without the full receipt): Lighter, but forces the verifier to obtain the receipt from the operator separately, which defeats the self-contained property.
 - **On-chain proof storage**: Storing inclusion proofs on-chain would make them publicly queryable but at significant gas cost. Rejected -- proofs are produced and verified off-chain, with only the Merkle root published on-chain.
-- **CBOR encoding** instead of JSON: More compact, but ARC uses canonical JSON as its signing format throughout. Mixing CBOR for proof bundles would introduce a serialization inconsistency.
+- **CBOR encoding** instead of JSON: More compact, but Chio uses canonical JSON as its signing format throughout. Mixing CBOR for proof bundles would introduce a serialization inconsistency.
 
 ### Implications
 
 - arc-anchor must produce `AnchorInclusionProof` bundles on demand (given a receipt ID).
 - arc-core should define the `AnchorInclusionProof` struct and its verification function.
-- The proof bundle format becomes part of ARC's public contract -- once shipped, it must remain backward-compatible.
+- The proof bundle format becomes part of Chio's public contract -- once shipped, it must remain backward-compatible.
 - Verifier tooling (CLI or library) should accept a proof bundle and return a pass/fail verdict with detailed step-by-step results.
 
 ---
@@ -283,7 +283,7 @@ This dual placement -- in both `evidence` (for guard pipeline auditability) and 
 
 ### Rationale
 
-ARC's receipts are the immutable audit trail. If a budget decision depended on an oracle price, that price is part of the decision's provenance. Omitting it would mean the receipt is incomplete evidence -- a verifier could see that a cross-currency charge was made but not verify that the exchange rate used was reasonable at the time.
+Chio's receipts are the immutable audit trail. If a budget decision depended on an oracle price, that price is part of the decision's provenance. Omitting it would mean the receipt is incomplete evidence -- a verifier could see that a cross-currency charge was made but not verify that the exchange rate used was reasonable at the time.
 
 Including oracle evidence also supports:
 
@@ -291,7 +291,7 @@ Including oracle evidence also supports:
 - **Regulatory audit**: Auditors examining agent spending can verify that cross-currency conversions used market rates, not manipulated values.
 - **Post-hoc manipulation detection**: If the oracle source is later discovered to have been manipulated at a specific timestamp, receipts containing that timestamp's price can be flagged for review.
 
-The evidence is placed in the `details` field (as a JSON string) rather than as a separate top-level receipt field because ARC's `GuardEvidence` is the established mechanism for recording per-guard decision context. This preserves backward compatibility -- existing receipt consumers that do not understand oracle evidence will see it as opaque guard details.
+The evidence is placed in the `details` field (as a JSON string) rather than as a separate top-level receipt field because Chio's `GuardEvidence` is the established mechanism for recording per-guard decision context. This preserves backward compatibility -- existing receipt consumers that do not understand oracle evidence will see it as opaque guard details.
 
 ### Alternatives Considered
 
@@ -348,7 +348,7 @@ For high-value settlements, the DON risk is not acceptable because:
 
 ### Alternatives Considered
 
-- **DON-only for all verification**: Simpler architecture, but creates a systemic risk where DON compromise affects all ARC settlements. Rejected.
+- **DON-only for all verification**: Simpler architecture, but creates a systemic risk where DON compromise affects all Chio settlements. Rejected.
 - **Never use DON**: Forces dual-signing or ZK for all on-chain interactions, including low-value audit anchoring. This adds unnecessary key management complexity for operators who only want tamper evidence. Rejected -- DON verification is a reasonable trust trade for audit-grade (non-fund-releasing) operations.
 - **Fixed dollar threshold** ($1,000 for all contexts): Too rigid. The threshold should vary by context -- $10 for micro-settlement (where gas cost is the binding constraint) vs $10,000 for delegation registration (where one-time ZK proving cost is amortized over many invocations).
 
@@ -438,7 +438,7 @@ The delegate count is bounded (default: 3) to limit the attack surface. Each add
 
 ## 8. Summary: Trust Boundary Map
 
-The following diagram shows what trusts what in ARC's web3 integration. Arrows point from the trusting party to the trusted party. Solid lines indicate cryptographic verification; dashed lines indicate trust-by-delegation or attestation.
+The following diagram shows what trusts what in Chio's web3 integration. Arrows point from the trusting party to the trusted party. Solid lines indicate cryptographic verification; dashed lines indicate trust-by-delegation or attestation.
 
 ```
 +-------------------------------------------------------------------+
@@ -515,7 +515,7 @@ The following diagram shows what trusts what in ARC's web3 integration. Arrows p
 
 | Layer | Trust Assumption | Failure Mode |
 |-------|-----------------|--------------|
-| ARC Kernel (Ed25519 receipts) | Kernel private key is not compromised | Forged receipts |
+| Chio Kernel (Ed25519 receipts) | Kernel private key is not compromised | Forged receipts |
 | Checkpoint Merkle tree | Kernel correctly batches receipts | Incorrect tree; detected by receipt-level verification |
 | Key-binding certificate | Ed25519 key holder controls the secp256k1 key | Broken identity chain; detected by verifier |
 | ArcAnchorRegistry (L2) | L2 sequencer is honest for soft finality; Ethereum L1 for hard finality | Reorg risk for recent anchors (mitigated by Bitcoin layer) |
@@ -587,7 +587,7 @@ The following diagram shows what trusts what in ARC's web3 integration. Arrows p
 
 | Decision | Source Document | Original Open Question |
 |----------|----------------|----------------------|
-| 1 (Verifier Discovery) | arc-anchor sec. 12, item 3; arc-anchor sec. 9.4 "gap in verification chain" | "Should ARC publish a canonical contract address per chain?" and "How does a verifier discover which operator's contract and chain to query?" |
+| 1 (Verifier Discovery) | arc-anchor sec. 12, item 3; arc-anchor sec. 9.4 "gap in verification chain" | "Should Chio publish a canonical contract address per chain?" and "How does a verifier discover which operator's contract and chain to query?" |
 | 2 (Operator Identity Binding) | arc-settle sec. 14.2, item 4; arc-anchor sec. 12.2, item 5 | "How to prove that an Ed25519 key and a secp256k1 key belong to the same entity?" and "Should the EVM signing key be derived from the kernel's Ed25519 key?" |
 | 3 (Proof Bundle Format) | arc-anchor sec. 12.3, item 7 | "What is the canonical format for an anchor proof that a verifier can independently check?" |
 | 4 (Oracle Evidence in Receipts) | arc-link sec. 13.1 | "Should oracle prices be signed and included in receipts as evidence?" |

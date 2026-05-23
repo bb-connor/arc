@@ -1,4 +1,4 @@
-# ARC-Settle: On-Chain Settlement Rail Research
+# Chio-Settle: On-Chain Settlement Rail Research
 
 Status: Research draft (reviewed 2026-03-30)
 Date: 2026-03-30
@@ -7,8 +7,8 @@ Reviewer: Technical Review
 
 > Realization status (2026-04-02): this document fed the shipped bounded
 > `arc-settle` runtime, but the authoritative runtime boundary is now
-> [ARC_SETTLE_PROFILE.md](../standards/ARC_SETTLE_PROFILE.md) plus
-> [ARC_WEB3_PROFILE.md](../standards/ARC_WEB3_PROFILE.md). Several research
+> [CHIO_SETTLE_PROFILE.md](../standards/CHIO_SETTLE_PROFILE.md) plus
+> [CHIO_WEB3_PROFILE.md](../standards/CHIO_WEB3_PROFILE.md). Several research
 > names were superseded in implementation: the shared Merkle-root contract is
 > `IArcRootRegistry`, the operator-binding contract is
 > `IArcIdentityRegistry`, and the official contract package is mostly
@@ -20,17 +20,17 @@ Reviewer: Technical Review
 
 ## 1. Executive Summary
 
-ARC already models a complete economic substrate: `MonetaryAmount` in capability tokens, `CapitalExecutionInstruction` for directing fund movements, `CapitalExecutionRail` / `CapitalExecutionRailKind` for settlement rail types, `CreditBond` / `CreditBondTerms` for bonded execution, and a full underwriting-credit-loss lifecycle. The existing `CapitalExecutionRailKind` enum includes `Manual`, `Api`, `Ach`, `Wire`, `Ledger`, and `Sandbox` -- but no on-chain rail.
+Chio already models a complete economic substrate: `MonetaryAmount` in capability tokens, `CapitalExecutionInstruction` for directing fund movements, `CapitalExecutionRail` / `CapitalExecutionRailKind` for settlement rail types, `CreditBond` / `CreditBondTerms` for bonded execution, and a full underwriting-credit-loss lifecycle. The existing `CapitalExecutionRailKind` enum includes `Manual`, `Api`, `Ach`, `Wire`, `Ledger`, and `Sandbox` -- but no on-chain rail.
 
-**arc-settle** closes this gap by adding a new `CapitalExecutionRailKind::OnChain` variant backed by EVM smart contracts that implement stablecoin escrow, conditional release against signed receipt evidence, and bond/slash mechanics. The crate would be a Rust library (built on Alloy) that translates ARC's `CapitalExecutionInstruction` artifacts into on-chain transactions and monitors their settlement.
+**arc-settle** closes this gap by adding a new `CapitalExecutionRailKind::OnChain` variant backed by EVM smart contracts that implement stablecoin escrow, conditional release against signed receipt evidence, and bond/slash mechanics. The crate would be a Rust library (built on Alloy) that translates Chio's `CapitalExecutionInstruction` artifacts into on-chain transactions and monitors their settlement.
 
 Key findings from this research:
 
 - **Chain selection**: Base is the recommended primary EVM target -- native USDC, sub-cent transaction costs, deep Coinbase ecosystem integration, and the x402 agent payment standard. **Solana** is a strong secondary target due to native Ed25519 verification via its precompile program, eliminating the hardest EVM integration challenge entirely.
 - **Ed25519 on EVM** is the hardest design problem. No EVM chain has a production Ed25519 precompile. Practical options are: (a) dual-signing with secp256k1 for on-chain evidence, (b) ZK proof of Ed25519 signature (~300k gas via Groth16), or (c) a Merkle commitment approach where only a root hash goes on-chain.
 - **Alloy** (v1.0, stable since May 2025) is the clear choice for Rust-to-EVM interaction. ethers-rs is deprecated.
-- **x402** (Coinbase) is an active agent payment standard (5.8k GitHub stars, 717 commits, active daily development as of March 2026) worth monitoring. x402 supports EVM, Solana, Aptos, and Stellar chains. ARC's own protocol provides stronger attestation guarantees, but x402 compatibility could widen adoption.
-- **Circle Gateway Nanopayments** enable gas-free USDC payments down to $0.000001, purpose-built for AI agents and high-frequency sub-cent transactions. This is directly relevant for ARC micro-settlement and could serve as an alternative to custom escrow for low-value settlements.
+- **x402** (Coinbase) is an active agent payment standard (5.8k GitHub stars, 717 commits, active daily development as of March 2026) worth monitoring. x402 supports EVM, Solana, Aptos, and Stellar chains. Chio's own protocol provides stronger attestation guarantees, but x402 compatibility could widen adoption.
+- **Circle Gateway Nanopayments** enable gas-free USDC payments down to $0.000001, purpose-built for AI agents and high-frequency sub-cent transactions. This is directly relevant for Chio micro-settlement and could serve as an alternative to custom escrow for low-value settlements.
 - **ERC-4337 account abstraction** and paymaster patterns can eliminate gas management complexity for agents by allowing USDC-denominated fee payment.
 
 ---
@@ -49,31 +49,31 @@ The most directly relevant project in this space. x402 revives the HTTP 402 stat
 
 **Supported chains**: Base, Polygon, Solana, Aptos, Stellar via the CDP facilitator.
 
-**Relevance to ARC**: x402 solves a narrower problem (HTTP API monetization) than arc-settle (full escrow, bond, and conditional release). However, x402's use of EIP-3009 `TransferWithAuthorization` for gasless USDC movement is a pattern arc-settle should adopt. ARC could optionally expose an x402-compatible payment surface for tool servers that want HTTP-native billing.
+**Relevance to Chio**: x402 solves a narrower problem (HTTP API monetization) than arc-settle (full escrow, bond, and conditional release). However, x402's use of EIP-3009 `TransferWithAuthorization` for gasless USDC movement is a pattern arc-settle should adopt. Chio could optionally expose an x402-compatible payment surface for tool servers that want HTTP-native billing.
 
 ### 2.2 Fetch.ai Autonomous Payments
 
 Fetch.ai announced AI-to-AI payments launching January 2026. Each AI agent operates with a dedicated wallet and user-defined spending limits. On-chain settlement uses USDC or FET tokens with optional transaction confirmations requiring user approval before finalization.
 
-**Relevance to ARC**: Fetch.ai's spending-limit model mirrors ARC's `max_total_cost` on `ToolGrant`. The difference is that ARC enforces limits at the kernel layer with cryptographic receipts, while Fetch.ai relies on wallet-level configuration. ARC's approach is stronger -- the kernel is the trusted computing base and spending limits are capability-attenuated, not just wallet-configured.
+**Relevance to Chio**: Fetch.ai's spending-limit model mirrors Chio's `max_total_cost` on `ToolGrant`. The difference is that Chio enforces limits at the kernel layer with cryptographic receipts, while Fetch.ai relies on wallet-level configuration. Chio's approach is stronger -- the kernel is the trusted computing base and spending limits are capability-attenuated, not just wallet-configured.
 
 ### 2.3 Autonolas (Olas)
 
 Autonolas provides autonomous agent services including an "AI Portfolio Manager" operating on Base, Optimism, and Mode with multiple stablecoins. Agents implement strategies autonomously 24/7.
 
-**Relevance to ARC**: Olas demonstrates multi-chain agent execution but does not provide the attestation or receipt infrastructure that ARC has. Olas agents could potentially be wrapped as ARC tool servers with arc-settle providing the settlement rail.
+**Relevance to Chio**: Olas demonstrates multi-chain agent execution but does not provide the attestation or receipt infrastructure that Chio has. Olas agents could potentially be wrapped as Chio tool servers with arc-settle providing the settlement rail.
 
 ### 2.4 Virtuals Protocol
 
 Virtuals Protocol creates tokenized AI agents that engage in on-chain commerce. Recent integrations include Arbitrum (March 2026) and XRP Ledger (March 2026). The protocol focuses on agent-to-agent transactions with escrowed jobs and programmable settlement.
 
-**Relevance to ARC**: Virtuals' "escrowed jobs" concept is closest to ARC's governed transaction model. However, Virtuals is focused on launching agent tokens (speculative) rather than providing verifiable settlement infrastructure. ARC's signed receipt log and credit bond system provide the accountability layer that Virtuals lacks.
+**Relevance to Chio**: Virtuals' "escrowed jobs" concept is closest to Chio's governed transaction model. However, Virtuals is focused on launching agent tokens (speculative) rather than providing verifiable settlement infrastructure. Chio's signed receipt log and credit bond system provide the accountability layer that Virtuals lacks.
 
 ### 2.5 SingularityNET (AGIX / ASI Alliance)
 
 SingularityNET operates a decentralized AI service marketplace where developers publish algorithms and users pay with AGIX tokens. The ASI:Chain DevNet launched November 2025 as a Layer 1 blockDAG. Over 3 billion inference tokens processed via ASI:Cloud.
 
-**Relevance to ARC**: SingularityNET's marketplace model (pay-per-inference with smart contract settlement) validates the agent economy thesis. However, AGIX uses a proprietary token rather than stablecoins, limiting composability. ARC's stablecoin-first approach avoids token risk.
+**Relevance to Chio**: SingularityNET's marketplace model (pay-per-inference with smart contract settlement) validates the agent economy thesis. However, AGIX uses a proprietary token rather than stablecoins, limiting composability. Chio's stablecoin-first approach avoids token risk.
 
 ### 2.6 Morpheus AI
 
@@ -81,15 +81,15 @@ Morpheus is building decentralized AI agent infrastructure with a focus on compu
 
 ### 2.7 Chainlink CRE (Cross-chain Runtime Environment)
 
-Chainlink provides three relevant layers: (a) CCIP for cross-chain value transfer, (b) CRE for off-chain computation verification before on-chain payment release, and (c) data feeds for price/condition verification. Chainlink's CRE model -- verify real-world conditions off-chain, then trigger on-chain release -- maps closely to ARC's receipt-then-settle pattern.
+Chainlink provides three relevant layers: (a) CCIP for cross-chain value transfer, (b) CRE for off-chain computation verification before on-chain payment release, and (c) data feeds for price/condition verification. Chainlink's CRE model -- verify real-world conditions off-chain, then trigger on-chain release -- maps closely to Chio's receipt-then-settle pattern.
 
 ### 2.8 Circle Gateway Nanopayments
 
 Circle's Gateway product includes a Nanopayments feature that enables gas-free USDC payments down to $0.000001, purpose-built for AI agents, usage-based billing, and high-frequency sub-cent transactions. Nanopayments extends the Gateway unified balance with batched settlement, meaning individual micro-transactions are aggregated and settled in larger batches to amortize gas costs.
 
-**Relevance to ARC**: Nanopayments directly addresses ARC's micro-settlement challenge. For tool invocations costing fractions of a cent, building custom escrow contracts is over-engineered. Integrating with Gateway Nanopayments could provide immediate sub-cent settlement capability without custom smart contract deployment. The tradeoff is dependency on Circle's infrastructure and loss of ARC's self-sovereign settlement model. **Recommendation**: Evaluate Nanopayments as a v1 fast path for micro-settlement (sub-$0.10), with custom escrow contracts for higher-value governed transactions where ARC's full receipt evidence model adds value.
+**Relevance to Chio**: Nanopayments directly addresses Chio's micro-settlement challenge. For tool invocations costing fractions of a cent, building custom escrow contracts is over-engineered. Integrating with Gateway Nanopayments could provide immediate sub-cent settlement capability without custom smart contract deployment. The tradeoff is dependency on Circle's infrastructure and loss of Chio's self-sovereign settlement model. **Recommendation**: Evaluate Nanopayments as a v1 fast path for micro-settlement (sub-$0.10), with custom escrow contracts for higher-value governed transactions where Chio's full receipt evidence model adds value.
 
-**Key takeaway**: No existing project combines ARC's three strengths: (1) capability-attenuated spending limits with cryptographic receipts, (2) a full underwriting and credit lifecycle, and (3) verifiable settlement. arc-settle would be unique in providing all three.
+**Key takeaway**: No existing project combines Chio's three strengths: (1) capability-attenuated spending limits with cryptographic receipts, (2) a full underwriting and credit lifecycle, and (3) verifiable settlement. arc-settle would be unique in providing all three.
 
 ---
 
@@ -141,13 +141,13 @@ Request Network provides decentralized invoicing with an escrow feature. Funds a
 
 Superfluid enables continuous per-second token streaming via Constant Flow Agreements (CFA). Fees apply only when starting/stopping streams, not for continuous flow. Any ERC-20 can be "wrapped" into a Super Token with streaming capabilities.
 
-**Relevance to arc-settle**: Streaming payments could map to ARC's metered billing model, where tool servers charge per-unit-of-work. A Superfluid stream could back a `ToolGrant` with `max_total_cost`, with the stream rate matching the expected consumption. This is a future extension, not a v1 requirement.
+**Relevance to arc-settle**: Streaming payments could map to Chio's metered billing model, where tool servers charge per-unit-of-work. A Superfluid stream could back a `ToolGrant` with `max_total_cost`, with the stream rate matching the expected consumption. This is a future extension, not a v1 requirement.
 
 ### 3.6 Gnosis Pay
 
 Gnosis Pay connects Safe smart contract wallets to Visa card rails, settling stablecoin payments at point-of-sale. It demonstrates the pattern of: smart contract wallet (custody) -> on-chain settlement -> traditional payment rail bridging.
 
-**Relevance to arc-settle**: Gnosis Pay validates the model of smart contract wallets as settlement endpoints. ARC agents could hold funds in Safe-style wallets that arc-settle interacts with.
+**Relevance to arc-settle**: Gnosis Pay validates the model of smart contract wallets as settlement endpoints. Chio agents could hold funds in Safe-style wallets that arc-settle interacts with.
 
 ---
 
@@ -171,7 +171,7 @@ Kleros provides a decentralized escrow with dispute resolution:
 4. Smart contract enforces the ruling (ERC-792 arbitration standard)
 5. Appeals supported with escalating juror panels
 
-**Pattern for arc-settle**: The timeout-based auto-release with dispute escalation maps to ARC's credit loss lifecycle. An escrow could auto-release after the receipt window closes, with a dispute mechanism backed by ARC's underwriting decisions.
+**Pattern for arc-settle**: The timeout-based auto-release with dispute escalation maps to Chio's credit loss lifecycle. An escrow could auto-release after the receipt window closes, with a dispute mechanism backed by Chio's underwriting decisions.
 
 ### 4.3 Conditional Release via Signed Evidence
 
@@ -190,7 +190,7 @@ This requires the escrow contract to verify receipt evidence on-chain -- the cor
 
 ### 4.4 Merkle Commitment Pattern (Recommended)
 
-Instead of verifying individual signatures on-chain, the ARC kernel periodically publishes a Merkle root of recent receipts to the escrow contract. Claims are then verified via Merkle proof:
+Instead of verifying individual signatures on-chain, the Chio kernel periodically publishes a Merkle root of recent receipts to the escrow contract. Claims are then verified via Merkle proof:
 
 ```
 1. Kernel accumulates receipts into a Merkle tree
@@ -204,7 +204,7 @@ Instead of verifying individual signatures on-chain, the ARC kernel periodically
 - No Ed25519 verification on-chain
 - Amortizes gas cost across all receipts in the batch
 - Merkle proof verification is ~50k gas regardless of tree size
-- Compatible with ARC's existing receipt log (already Merkle-committed)
+- Compatible with Chio's existing receipt log (already Merkle-committed)
 
 **Disadvantages**:
 - Introduces latency (must wait for root publication)
@@ -226,13 +226,13 @@ For `CreditBond` enforcement, a bond contract:
 5. On expiry with no action: collateral auto-released
 ```
 
-This maps directly to ARC's existing `CreditBondDisposition` enum: `Lock`, `Hold`, `Release`, `Impair`.
+This maps directly to Chio's existing `CreditBondDisposition` enum: `Lock`, `Hold`, `Release`, `Impair`.
 
 ---
 
 ## 5. Ed25519 on EVM (Critical Design Question)
 
-ARC signs all receipts and capability tokens with Ed25519. The EVM natively supports only secp256k1 via the `ecrecover` precompile (3,000 gas). Verifying Ed25519 signatures on EVM is the single hardest integration challenge for arc-settle.
+Chio signs all receipts and capability tokens with Ed25519. The EVM natively supports only secp256k1 via the `ecrecover` precompile (3,000 gas). Verifying Ed25519 signatures on EVM is the single hardest integration challenge for arc-settle.
 
 ### 5.1 Option A: Pure Solidity Ed25519 Verification
 
@@ -279,7 +279,7 @@ ARC signs all receipts and capability tokens with Ed25519. The EVM natively supp
 
 ### 5.5 Option E: Dual-Signing (Recommended for v1)
 
-**Approach**: ARC entities that need to interact with on-chain settlement maintain a secondary secp256k1 keypair alongside their primary Ed25519 keypair. The kernel signs receipts with both keys. On-chain contracts use `ecrecover` (3,000 gas) to verify the secp256k1 signature.
+**Approach**: Chio entities that need to interact with on-chain settlement maintain a secondary secp256k1 keypair alongside their primary Ed25519 keypair. The kernel signs receipts with both keys. On-chain contracts use `ecrecover` (3,000 gas) to verify the secp256k1 signature.
 
 **Implementation**:
 1. Add `settlement_key: Option<secp256k1::PublicKey>` to kernel configuration
@@ -295,10 +295,10 @@ ARC signs all receipts and capability tokens with Ed25519. The EVM natively supp
 
 **Disadvantages**:
 - Introduces a second key management concern
-- The secp256k1 signature is not part of ARC's core trust model (Ed25519 remains authoritative)
+- The secp256k1 signature is not part of Chio's core trust model (Ed25519 remains authoritative)
 - Requires trust that the entity controlling both keys is the same
 
-**Key management complexity (understated risk)**: Dual-signing is operationally more burdensome than it appears. Every ARC kernel deployment must now provision, rotate, and back up two distinct key types with different cryptographic properties. The Ed25519 key lives in ARC's signing infrastructure; the secp256k1 key must interoperate with EVM wallet tooling (hardware wallets, HSMs, KMS). Key rotation requires updating both keys atomically -- if the Ed25519 key rotates but the binding certificate for the secp256k1 key is not refreshed, on-chain verification will fail. Operators running multiple kernels (HA configurations) must synchronize both key sets across nodes, doubling the surface area for misconfiguration. The binding certificate (Ed25519 signing a message containing the secp256k1 pubkey) must itself be stored and retrieved -- adding a third artifact to manage alongside the two keys.
+**Key management complexity (understated risk)**: Dual-signing is operationally more burdensome than it appears. Every Chio kernel deployment must now provision, rotate, and back up two distinct key types with different cryptographic properties. The Ed25519 key lives in Chio's signing infrastructure; the secp256k1 key must interoperate with EVM wallet tooling (hardware wallets, HSMs, KMS). Key rotation requires updating both keys atomically -- if the Ed25519 key rotates but the binding certificate for the secp256k1 key is not refreshed, on-chain verification will fail. Operators running multiple kernels (HA configurations) must synchronize both key sets across nodes, doubling the surface area for misconfiguration. The binding certificate (Ed25519 signing a message containing the secp256k1 pubkey) must itself be stored and retrieved -- adding a third artifact to manage alongside the two keys.
 
 **Mitigation**: The Ed25519 receipt remains the canonical proof. The secp256k1 signature is only used for on-chain evidence submission. A binding between the two keys can be established by having the Ed25519 key sign a certificate binding the secp256k1 public key, published on-chain during escrow setup.
 
@@ -311,7 +311,7 @@ ARC signs all receipts and capability tokens with Ed25519. The EVM natively supp
 **Advantages**:
 - No Ed25519 or secp256k1 verification on-chain at all
 - Gas cost independent of signature scheme
-- Naturally aligns with ARC's existing Merkle-committed receipt log
+- Naturally aligns with Chio's existing Merkle-committed receipt log
 
 **Disadvantages**:
 - Requires the kernel operator to publish roots (operational dependency)
@@ -326,7 +326,7 @@ ARC signs all receipts and capability tokens with Ed25519. The EVM natively supp
 
 **Advantages**:
 - Native Ed25519 verification at compute-unit cost, not hundreds of thousands of gas
-- No dual-signing required -- ARC's existing Ed25519 receipts can be verified directly
+- No dual-signing required -- Chio's existing Ed25519 receipts can be verified directly
 - USDC is native on Solana with high liquidity
 - Sub-second finality (~400ms)
 - x402 already supports Solana settlement
@@ -334,16 +334,16 @@ ARC signs all receipts and capability tokens with Ed25519. The EVM natively supp
 **Disadvantages**:
 - Solana's programming model (accounts, programs, PDAs) is fundamentally different from EVM
 - Smaller DeFi composability ecosystem than EVM L2s for escrow patterns
-- Rust-native development (positive for ARC's Rust codebase, but different toolchain from Foundry/Solidity)
+- Rust-native development (positive for Chio's Rust codebase, but different toolchain from Foundry/Solidity)
 - Network stability has been less consistent historically than EVM L2s
 
-**Verdict**: Solana is the strongest alternative settlement rail specifically because it eliminates the Ed25519 challenge. For a v2 multi-chain strategy, deploying settlement programs on Solana alongside EVM escrow contracts would allow ARC to use native signatures on Solana and dual-signing/Merkle proofs on EVM, choosing the optimal path per settlement.
+**Verdict**: Solana is the strongest alternative settlement rail specifically because it eliminates the Ed25519 challenge. For a v2 multi-chain strategy, deploying settlement programs on Solana alongside EVM escrow contracts would allow Chio to use native signatures on Solana and dual-signing/Merkle proofs on EVM, choosing the optimal path per settlement.
 
 ### 5.8 Recommended Strategy
 
 **Phase 1 (v1)**: Dual-signing (Option E) for individual, high-value EVM settlements. Merkle root commitment (Option F) for batch settlement of micro-transactions on EVM. This combination covers all EVM settlement sizes with reasonable gas costs.
 
-**Phase 1.5**: Evaluate Solana settlement (Option G) as a parallel rail. If the agent ecosystem on Solana is sufficient, deploy Solana programs that verify ARC Ed25519 receipts natively -- no dual-signing complexity.
+**Phase 1.5**: Evaluate Solana settlement (Option G) as a parallel rail. If the agent ecosystem on Solana is sufficient, deploy Solana programs that verify Chio Ed25519 receipts natively -- no dual-signing complexity.
 
 **Phase 2**: If RIP-7696 is adopted by Base/Arbitrum, migrate to native Ed25519 verification on EVM. If ZK proof infrastructure matures (faster provers, lower gas), add ZK batch verification as an option.
 
@@ -372,16 +372,16 @@ ARC signs all receipts and capability tokens with Ed25519. The EVM natively supp
 **Base** is the recommended primary EVM chain for arc-settle:
 
 1. **Native USDC with Circle APIs**: Direct integration with Circle's minting/redeeming infrastructure. No bridging required.
-2. **x402 ecosystem alignment**: If ARC tool servers want to offer HTTP-native billing via x402, Base is where that ecosystem lives (Coinbase facilitator, Stripe integration).
+2. **x402 ecosystem alignment**: If Chio tool servers want to offer HTTP-native billing via x402, Base is where that ecosystem lives (Coinbase facilitator, Stripe integration).
 3. **Coinbase distribution**: The largest US exchange provides on/off-ramp liquidity directly to Base.
 4. **Cost efficiency**: Sub-cent ERC-20 transfers make micro-settlement viable.
 5. **Embedded wallets and account abstraction**: Coinbase's developer platform provides wallet infrastructure that could simplify agent key management.
 
 **Solana** as the primary non-EVM chain:
 
-1. **Native Ed25519**: Eliminates the entire dual-signing / ZK proof complexity. ARC receipts can be verified directly on-chain.
+1. **Native Ed25519**: Eliminates the entire dual-signing / ZK proof complexity. Chio receipts can be verified directly on-chain.
 2. **Sub-second finality**: ~400ms slot time suits latency-sensitive tool calls.
-3. **Rust-native**: ARC is a Rust project; Solana programs are written in Rust. Shared toolchain and potential code reuse.
+3. **Rust-native**: Chio is a Rust project; Solana programs are written in Rust. Shared toolchain and potential code reuse.
 4. **x402 support**: x402 already supports Solana, validating the agent payment use case on this chain.
 
 **Arbitrum** as secondary EVM:
@@ -451,7 +451,7 @@ interface IArcReceiptVerifier {
 }
 ```
 
-**Root publication**: The ARC kernel operator publishes roots periodically (e.g., every 60 seconds or every 100 receipts, whichever comes first). Each root is timestamped and immutable once published.
+**Root publication**: The Chio kernel operator publishes roots periodically (e.g., every 60 seconds or every 100 receipts, whichever comes first). Each root is timestamped and immutable once published.
 
 **Operator authorization**: Only registered operators can publish roots. Operator registration requires a binding certificate (Ed25519 key signs a message containing the operator's Ethereum address, verified off-chain during registration).
 
@@ -545,7 +545,7 @@ interface IArcBondVault {
 
 ### 7.5 ArcSettleRegistry
 
-Maps ARC identities to Ethereum addresses and manages operator authorization.
+Maps Chio identities to Ethereum addresses and manages operator authorization.
 
 ```solidity
 interface IArcSettleRegistry {
@@ -669,7 +669,7 @@ k256 = "0.13"
 
 ---
 
-## 9. Integration Points with ARC's Economic Layer
+## 9. Integration Points with Chio's Economic Layer
 
 ### 9.1 CapitalExecutionRailKind Extension
 
@@ -691,7 +691,7 @@ pub enum CapitalExecutionRailKind {
 
 The existing `CapitalExecutionRail` struct maps directly:
 
-| ARC field | On-chain meaning | Code note |
+| Chio field | On-chain meaning | Code note |
 |-----------|-----------------|-----------|
 | `kind` | `OnChain` | New variant |
 | `rail_id` | Contract address (e.g., ArcEscrow deployment) | `String` |
@@ -704,7 +704,7 @@ The existing `CapitalExecutionRail` struct maps directly:
 
 The existing `CapitalExecutionInstructionAction` enum maps to on-chain operations:
 
-| ARC Action | On-chain Operation |
+| Chio Action | On-chain Operation |
 |-----------|-------------------|
 | `LockReserve` | `ArcEscrow.createEscrow()` or `ArcBondVault.lockBond()` |
 | `HoldReserve` | No-op (funds already locked on-chain) |
@@ -737,17 +737,17 @@ Note: The current `SettlementStatus` enum has exactly four variants: `NotApplica
 
 ### 9.6 MonetaryAmount Currency Mapping
 
-ARC's `MonetaryAmount.currency` maps to on-chain tokens:
+Chio's `MonetaryAmount.currency` maps to on-chain tokens:
 
-| ARC currency | On-chain token | Chain |
+| Chio currency | On-chain token | Chain |
 |-------------|---------------|-------|
 | "USD" | USDC | Base/Arbitrum/Polygon/Solana |
 | "EUR" | EURC | Base |
 | "USDC" | USDC (explicit) | Base/Arbitrum/Polygon/Solana |
 
-The `MonetaryAmount.units` field (u64, minor units) maps to ERC-20 amounts. Per the code comment in `capability.rs`, `MonetaryAmount.units` represents "amount in the currency's smallest unit (e.g. cents for USD)". USDC on-chain uses 6 decimal places (1 USD = 1,000,000 micro-units). arc-settle must handle this conversion: `on_chain_amount = arc_units * 10_000` for USD-denominated amounts where ARC uses cents.
+The `MonetaryAmount.units` field (u64, minor units) maps to ERC-20 amounts. Per the code comment in `capability.rs`, `MonetaryAmount.units` represents "amount in the currency's smallest unit (e.g. cents for USD)". USDC on-chain uses 6 decimal places (1 USD = 1,000,000 micro-units). arc-settle must handle this conversion: `on_chain_amount = arc_units * 10_000` for USD-denominated amounts where Chio uses cents.
 
-**Important**: This conversion factor is currency-specific and must be configurable. If ARC later changes its minor-unit convention (e.g., using micro-dollars natively), this conversion would break. arc-settle should define an explicit `CurrencyDecimals` configuration mapping rather than hardcoding `10_000`.
+**Important**: This conversion factor is currency-specific and must be configurable. If Chio later changes its minor-unit convention (e.g., using micro-dollars natively), this conversion would break. arc-settle should define an explicit `CurrencyDecimals` configuration mapping rather than hardcoding `10_000`.
 
 ### 9.7 Exposure Ledger Integration
 
@@ -791,10 +791,10 @@ ERC-4337 defines account abstraction without consensus-layer protocol changes. I
 
 1. **Custom signature validation**: A smart contract account could implement Ed25519 validation in its `validateUserOp()` function. While this moves the gas cost to account validation rather than escrow verification, it consolidates signature verification at the account level. Combined with ERC-4337 bundlers batching multiple UserOperations, this could amortize Ed25519 gas costs.
 
-2. **Gas sponsorship via Paymasters**: Agents do not need to hold ETH. An ARC operator (or the tool server) can deploy a Paymaster that pays gas in exchange for USDC deduction from the escrow. This aligns with ARC's economic model: the agent's `MonetaryAmount` budget covers all costs, including gas.
+2. **Gas sponsorship via Paymasters**: Agents do not need to hold ETH. An Chio operator (or the tool server) can deploy a Paymaster that pays gas in exchange for USDC deduction from the escrow. This aligns with Chio's economic model: the agent's `MonetaryAmount` budget covers all costs, including gas.
 
-**Implementation pattern for ARC agents**:
-- Each ARC agent identity maps to a smart contract account (Safe, Kernel, or custom)
+**Implementation pattern for Chio agents**:
+- Each Chio agent identity maps to a smart contract account (Safe, Kernel, or custom)
 - The account validates UserOperations using the agent's Ed25519 key (via a validation module)
 - A Paymaster contract accepts USDC payment for gas sponsorship
 - arc-settle submits settlement actions as UserOperations rather than raw transactions
@@ -807,10 +807,10 @@ Safe (formerly Gnosis Safe) provides modular smart account infrastructure with:
 - Guard contracts that can enforce spending policies
 - Transaction execution with delegatecall for composability
 
-An ARC agent could use a Safe as its on-chain wallet, with:
-- A custom guard module enforcing ARC capability constraints (spending limits, tool-server whitelists)
+An Chio agent could use a Safe as its on-chain wallet, with:
+- A custom guard module enforcing Chio capability constraints (spending limits, tool-server whitelists)
 - The Safe's module system enabling arc-settle to execute settlement transactions on behalf of the agent
-- Recovery mechanisms via social recovery or the ARC operator
+- Recovery mechanisms via social recovery or the Chio operator
 
 ### 10.3 Intent-Based Settlement
 
@@ -818,7 +818,7 @@ Intent-based architectures (CoW Protocol, UniswapX) offer a pattern relevant to 
 
 - **CoW Protocol**: Users sign "intent to trade" messages rather than raw transactions. Professional solvers compete to find optimal execution paths. Benefits include MEV protection (solvers absorb MEV risk), batch settlement at uniform clearing prices, and gas abstraction (users pay fees in sell tokens, not ETH).
 
-- **Relevance to arc-settle**: ARC's `CapitalExecutionInstruction` is already an intent -- it specifies what should happen (lock, release, transfer) without specifying exactly how. arc-settle could translate these intents to on-chain execution via a solver network rather than direct contract calls. Benefits: (a) MEV protection for settlement transactions, (b) gas optimization via batching, (c) cross-chain settlement via solver routing. This is a v2+ consideration, not v1.
+- **Relevance to arc-settle**: Chio's `CapitalExecutionInstruction` is already an intent -- it specifies what should happen (lock, release, transfer) without specifying exactly how. arc-settle could translate these intents to on-chain execution via a solver network rather than direct contract calls. Benefits: (a) MEV protection for settlement transactions, (b) gas optimization via batching, (c) cross-chain settlement via solver routing. This is a v2+ consideration, not v1.
 
 ---
 
@@ -849,16 +849,16 @@ Intent-based architectures (CoW Protocol, UniswapX) offer a pattern relevant to 
 **Flow A: Pre-funded Escrow (high-value tool calls)**
 
 1. Operator or agent creates escrow via `ArcEscrow.createEscrow()` with USDC
-2. ARC kernel processes tool call, signs receipt with Decision::Allow
+2. Chio kernel processes tool call, signs receipt with Decision::Allow
 3. Kernel produces secp256k1 dual-signature on receipt
 4. Tool server (or relayer) calls `ArcEscrow.releaseWithSignature()`
 5. USDC transferred to tool server's address
-6. arc-settle updates `SettlementStatus` to `Settled` in ARC receipt store
+6. arc-settle updates `SettlementStatus` to `Settled` in Chio receipt store
 
 **Flow B: Batch Merkle Settlement (micro-transactions)**
 
 1. Multiple tool calls execute with monetary budgets
-2. ARC kernel accumulates receipts into a Merkle tree
+2. Chio kernel accumulates receipts into a Merkle tree
 3. Kernel operator publishes Merkle root via `ArcReceiptVerifier.publishRoot()`
 4. Individual claimants submit Merkle proofs to `ArcEscrow.releaseWithProof()`
 5. Or: a settlement service batch-processes all claims in one round
@@ -869,7 +869,7 @@ Intent-based architectures (CoW Protocol, UniswapX) offer a pattern relevant to 
 2. Tool execution proceeds with the bond as backing
 3. On normal completion: `ArcBondVault.releaseBond()` returns collateral
 4. On loss event: `ArcBondVault.impairBond()` slashes per loss lifecycle
-5. Bond state changes reflected in ARC's `CreditBondLifecycleState`
+5. Bond state changes reflected in Chio's `CreditBondLifecycleState`
 
 ### 11.3 Key Design Decisions
 
@@ -882,7 +882,7 @@ Intent-based architectures (CoW Protocol, UniswapX) offer a pattern relevant to 
 ### 11.4 What arc-settle Does NOT Do
 
 - **Custody**: arc-settle does not hold private keys for agents. Agents manage their own wallets. arc-settle provides the contract interaction layer.
-- **Price feeds**: arc-settle does not provide exchange rates or token pricing. ARC's monetary amounts are denominated in specific currencies; the on-chain contracts settle in the corresponding stablecoin. Cross-currency conversion is the responsibility of arc-link.
+- **Price feeds**: arc-settle does not provide exchange rates or token pricing. Chio's monetary amounts are denominated in specific currencies; the on-chain contracts settle in the corresponding stablecoin. Cross-currency conversion is the responsibility of arc-link.
 - **Bridging**: arc-settle does not bridge funds between chains. Cross-chain settlement via CCTP (Circle) or CCIP (Chainlink) is a future concern.
 - **Gas management**: arc-settle submits transactions but does not manage gas token (ETH) balances. Operators need gas; agents can use EIP-3009/EIP-2612 for gasless token operations. ERC-4337 Paymasters are the recommended path for full gas abstraction.
 
@@ -900,7 +900,7 @@ Settlement transactions on public blockchains are visible in the mempool before 
 
 **Merkle root frontrunning**: An attacker who observes a root publication transaction could attempt to submit a fraudulent root before the legitimate one. **Mitigation**: Only registered operators can publish roots (access control on `ArcReceiptVerifier`). Use private submission channels (Flashbots) for root publication.
 
-**Sequencer-level MEV on L2**: L2 sequencers (Base, Arbitrum) have the ability to reorder transactions. For arc-settle, the primary risk is the sequencer delaying or reordering settlement transactions. **Mitigation**: ARC's fail-closed design means that delays do not cause fund loss -- funds remain in escrow until a valid release or timeout. Sequencer censorship resistance is an L2-level concern that arc-settle cannot solve unilaterally.
+**Sequencer-level MEV on L2**: L2 sequencers (Base, Arbitrum) have the ability to reorder transactions. For arc-settle, the primary risk is the sequencer delaying or reordering settlement transactions. **Mitigation**: Chio's fail-closed design means that delays do not cause fund loss -- funds remain in escrow until a valid release or timeout. Sequencer censorship resistance is an L2-level concern that arc-settle cannot solve unilaterally.
 
 ### 12.2 Settlement Failure and Revert Handling
 
@@ -909,7 +909,7 @@ On-chain transactions can fail for multiple reasons. arc-settle must handle each
 **Transaction revert**: The EVM transaction executes but reverts (e.g., insufficient escrow balance, expired deadline, blacklisted address). arc-settle must:
 1. Detect the revert via Alloy's transaction receipt (status = 0)
 2. Parse the revert reason from returndata
-3. Update `SettlementStatus` to `Failed` in the ARC receipt store
+3. Update `SettlementStatus` to `Failed` in the Chio receipt store
 4. Emit an `UnderwritingReasonCode::FailedSettlementExposure` signal
 5. Retry if the failure is transient (gas estimation, nonce collision) with exponential backoff
 6. Escalate to operator alert if retries are exhausted
@@ -948,7 +948,7 @@ USDC's administrative controls create risks unique to regulated stablecoins:
 
 Operating an escrow service that holds user funds and facilitates transfers may constitute money transmission under US federal law (FinCEN) and state money transmitter licensing regimes. Key questions:
 
-- **Who is the money transmitter?** If the ARC operator controls the escrow contract's admin keys and can direct fund releases, the operator may be classified as a money transmitter. If the smart contract is fully autonomous (no admin control, deterministic release based on receipt evidence), the analysis may differ, but regulators have not issued clear guidance on autonomous smart contract escrow.
+- **Who is the money transmitter?** If the Chio operator controls the escrow contract's admin keys and can direct fund releases, the operator may be classified as a money transmitter. If the smart contract is fully autonomous (no admin control, deterministic release based on receipt evidence), the analysis may differ, but regulators have not issued clear guidance on autonomous smart contract escrow.
 
 - **State licensing**: 49 US states (all except Montana) require money transmitter licenses. Multi-state licensing is a significant operational burden (12-18 months, $500k+ in compliance costs).
 
@@ -986,7 +986,7 @@ OFAC (Office of Foreign Assets Control) sanctions apply to on-chain transactions
 
 1. **Who publishes Merkle roots?** The kernel operator is the natural candidate, but this creates a single point of liveness failure. Options: (a) operator publishes, (b) decentralized set of root publishers with threshold agreement, (c) Chainlink Automation for scheduled publication.
 
-2. **Gas sponsorship**: Should arc-settle sponsor gas for agents, or require agents to hold ETH? ERC-4337 Paymasters are the recommended approach -- they allow USDC-denominated gas payment, aligning with ARC's stablecoin-first model. The Paymaster can deduct gas costs from the escrow balance.
+2. **Gas sponsorship**: Should arc-settle sponsor gas for agents, or require agents to hold ETH? ERC-4337 Paymasters are the recommended approach -- they allow USDC-denominated gas payment, aligning with Chio's stablecoin-first model. The Paymaster can deduct gas costs from the escrow balance.
 
 3. **Escrow sizing**: For pre-funded escrow, how should the escrow amount relate to `max_total_cost`? Options: (a) escrow the full `max_total_cost` upfront, (b) escrow a rolling window amount, (c) escrow per-invocation amounts.
 
@@ -1010,7 +1010,7 @@ OFAC (Office of Foreign Assets Control) sanctions apply to on-chain transactions
 
 10. **Contract upgradeability**: Should the settlement contracts be upgradeable (proxy pattern) or immutable? Upgradeability adds flexibility but introduces trust assumptions. Recommendation: upgradeable with a timelock and multisig governance.
 
-11. **Event-driven reconciliation**: arc-settle needs to observe on-chain events (EscrowCreated, FundsReleased, BondImpaired) and update ARC's internal state. Options: (a) poll via Alloy provider, (b) subscribe to events via WebSocket, (c) use an indexer (The Graph, Goldsky).
+11. **Event-driven reconciliation**: arc-settle needs to observe on-chain events (EscrowCreated, FundsReleased, BondImpaired) and update Chio's internal state. Options: (a) poll via Alloy provider, (b) subscribe to events via WebSocket, (c) use an indexer (The Graph, Goldsky).
 
 12. **Testing strategy**: Foundry for Solidity contract testing. Alloy + revm for Rust integration testing against a local EVM. Anvil (from Foundry) for forked mainnet testing.
 
@@ -1018,7 +1018,7 @@ OFAC (Office of Foreign Assets Control) sanctions apply to on-chain transactions
 
 ### 14.5 Protocol Evolution
 
-14. **x402 compatibility surface**: Should ARC tool servers optionally support x402's HTTP 402 flow? This would let any x402 client pay for ARC tool access without understanding ARC's full capability model. The tool server would translate x402 payment into an ARC governed transaction.
+14. **x402 compatibility surface**: Should Chio tool servers optionally support x402's HTTP 402 flow? This would let any x402 client pay for Chio tool access without understanding Chio's full capability model. The tool server would translate x402 payment into an Chio governed transaction.
 
 15. **Superfluid streaming integration**: For long-running metered tool access (e.g., GPU compute), a Superfluid stream could provide continuous settlement without individual transactions per invocation. This maps to `ToolGrant` with `max_total_cost` backed by a stream rate.
 
@@ -1054,7 +1054,7 @@ The combined contract would be deployed once per chain and shared by both crates
 
 ### 15.2 arc-settle and arc-link
 
-**Price feeds for settlement**: arc-link provides the `PriceOracle` trait for cross-currency budget enforcement. arc-settle needs price data in one specific scenario: when the escrow amount (USDC) must be derived from an ARC `MonetaryAmount` denominated in a different currency (e.g., EUR -> USDC conversion). arc-settle should consume arc-link's price cache for this conversion rather than implementing its own oracle integration.
+**Price feeds for settlement**: arc-link provides the `PriceOracle` trait for cross-currency budget enforcement. arc-settle needs price data in one specific scenario: when the escrow amount (USDC) must be derived from an Chio `MonetaryAmount` denominated in a different currency (e.g., EUR -> USDC conversion). arc-settle should consume arc-link's price cache for this conversion rather than implementing its own oracle integration.
 
 **Cross-chain settlement via CCIP**: arc-link researches Chainlink CCIP for cross-chain delegation transport. The same CCIP infrastructure could support cross-chain settlement: an escrow on Base releases funds, and CCIP transfers the USDC to the beneficiary on Arbitrum. arc-link's CCIP integration would be the transport layer; arc-settle would be the settlement logic that triggers it.
 

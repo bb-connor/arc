@@ -1,4 +1,4 @@
-# ARC Research Notes
+# Chio Research Notes
 
 This folder collects working research for turning ARC from a promising security kernel into a true MCP replacement.
 

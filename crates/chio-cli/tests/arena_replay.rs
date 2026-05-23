@@ -1,4 +1,4 @@
-//! Integration coverage for `arc arena replay`.
+//! Integration coverage for `chio arena replay`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 

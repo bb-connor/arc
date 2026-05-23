@@ -1,13 +1,13 @@
-# ARC-Settle Protocol Decisions
+# Chio-Settle Protocol Decisions
 
 Status: Decision document
 Date: 2026-03-30
 Authors: Engineering
-Prerequisite: ARC_SETTLE_RESEARCH.md, ARC_ANCHOR_RESEARCH.md, ARC_LINK_RESEARCH.md
+Prerequisite: CHIO_SETTLE_RESEARCH.md, CHIO_ANCHOR_RESEARCH.md, CHIO_LINK_RESEARCH.md
 
 > Realization status (2026-04-02): these decisions are now realized by the
 > shipped `arc-settle` runtime and official contract package. The authoritative
-> runtime boundary is [ARC_SETTLE_PROFILE.md](../standards/ARC_SETTLE_PROFILE.md).
+> runtime boundary is [CHIO_SETTLE_PROFILE.md](../standards/CHIO_SETTLE_PROFILE.md).
 > Several research names were superseded in implementation: `ArcReceiptVerifier`
 > converged into `IArcRootRegistry`, and `ArcSettleRegistry` converged into
 > `IArcIdentityRegistry`.
@@ -29,10 +29,10 @@ recovery, and multi-chain consistency.
 the `ArcEscrow`, `ArcBondVault`, and `ArcReceiptVerifier` contracts, and the
 operational runbook for kernel operators who want on-chain settlement.
 
-**Notation:** ARC types referenced here (e.g., `ArcReceipt`, `CreditBondTerms`,
+**Notation:** Chio types referenced here (e.g., `ArcReceipt`, `CreditBondTerms`,
 `CapitalExecutionRailKind`, `SettlementStatus`, `MonetaryAmount`) refer to the
 structs in `crates/arc-core/src/`. Solidity types refer to the interfaces
-proposed in ARC_SETTLE_RESEARCH.md section 7.
+proposed in CHIO_SETTLE_RESEARCH.md section 7.
 
 ---
 
@@ -40,13 +40,13 @@ proposed in ARC_SETTLE_RESEARCH.md section 7.
 
 ### Decision
 
-ARC uses Ed25519 keys (`did:arc` identities). EVM settlement uses secp256k1
+Chio uses Ed25519 keys (`did:arc` identities). EVM settlement uses secp256k1
 addresses. The binding between them is a **signed attestation certificate**
 stored in an **on-chain registry**.
 
 The binding flow:
 
-1. The ARC entity (kernel operator, agent, or tool server) generates a binding
+1. The Chio entity (kernel operator, agent, or tool server) generates a binding
    certificate: the Ed25519 private key signs a canonical JSON message of the
    form:
 
@@ -101,7 +101,7 @@ pub struct SignedIdentityBinding {
 
 **Trust model:** The binding is as strong as the Ed25519 private key's secrecy.
 If an attacker controls the Ed25519 key, they can bind it to any address. This
-is acceptable because Ed25519 key compromise already defeats all of ARC's trust
+is acceptable because Ed25519 key compromise already defeats all of Chio's trust
 guarantees. The binding certificate has a TTL (`expires_at`) and must be
 refreshed before expiry. Rotation requires registering a new binding and
 revoking the old one (the registry supports overwriting by `arc_entity_id`).
@@ -223,7 +223,7 @@ function publishRoot(
 
 - The operator must run a background service that polls for new checkpoints and
   submits `publishRoot()` transactions. This is the `arc-anchor` daemon
-  described in ARC_ANCHOR_RESEARCH.md section 9.2.
+  described in CHIO_ANCHOR_RESEARCH.md section 9.2.
 - Gas costs for root publication are the operator's responsibility. At ~52k gas
   per root on Base, this is ~$0.003 per publication or ~$130/year at one
   publication per minute.
@@ -355,15 +355,15 @@ The escrow contract verifies by:
    (converted to token minor units).
 5. Checking that the escrow has not already been released.
 
-**Leaf hash computation:** The leaf hash uses ARC's existing RFC 6962
+**Leaf hash computation:** The leaf hash uses Chio's existing RFC 6962
 convention: `SHA-256(0x00 || leaf_bytes)` where `leaf_bytes` is the canonical
 JSON serialization of `ArcReceiptBody`. On-chain, the contract recomputes
 `keccak256(receiptData)` and checks it matches `receiptId` from the decoded
-data. The actual Merkle tree uses SHA-256 (matching ARC's tree), so the
+data. The actual Merkle tree uses SHA-256 (matching Chio's tree), so the
 `leafHash` field is a SHA-256 digest. The contract trusts the Merkle proof
 against the published SHA-256 root.
 
-**Critical note on hash function:** ARC's Merkle tree uses SHA-256, but EVM
+**Critical note on hash function:** Chio's Merkle tree uses SHA-256, but EVM
 natively provides `keccak256`. The `ArcReceiptVerifier` contract must use an
 inline SHA-256 precompile (address `0x02`, 60 gas per 32-byte word) for proof
 verification. This is available on all EVM chains. OpenZeppelin's
@@ -411,7 +411,7 @@ compared to keccak256, for a total of ~55k gas for a 20-level tree.
 
 ### Decision
 
-ARC settlement uses a **two-tier optimistic dispute model** with escalation.
+Chio settlement uses a **two-tier optimistic dispute model** with escalation.
 
 ### Tier 1: Optimistic Window (on-chain)
 
@@ -516,15 +516,15 @@ disputed. This minimizes on-chain cost (most settlements will never be
 disputed) while providing a credible dispute path.
 
 - **UMA parallel:** UMA's asserter posts a bond and the assertion is accepted
-  after a liveness period unless disputed. ARC's escrow deposit serves as the
-  implicit bond. UMA escalates to DVM (token holder vote); ARC escalates to a
+  after a liveness period unless disputed. Chio's escrow deposit serves as the
+  implicit bond. UMA escalates to DVM (token holder vote); Chio escalates to a
   designated arbitrator.
 - **Kleros parallel:** Kleros uses crowdsourced jurors for dispute resolution.
-  ARC defers to a designated arbitrator for v1 simplicity, but the
+  Chio defers to a designated arbitrator for v1 simplicity, but the
   `arbitrator` address could point to a Kleros arbitration contract
   (ERC-792-compatible) in v2.
 - **Optimistic Rollup parallel:** OP Stack uses a 7-day challenge period for
-  state root disputes. ARC's 7-day arbitration deadline mirrors this.
+  state root disputes. Chio's 7-day arbitration deadline mirrors this.
 
 ### Alternatives Considered
 
@@ -535,7 +535,7 @@ disputed) while providing a credible dispute path.
    external protocol dependency, juror staking economics, and UX complexity.
    Premature for a system that does not yet have production settlement volume.
 3. **UMA optimistic oracle as dispute layer:** The UMA DVM resolves disputes
-   via token holder vote within 48-96 hours. Viable but couples ARC to UMA
+   via token holder vote within 48-96 hours. Viable but couples Chio to UMA
    token economics. Better as a v2 integration option.
 4. **Stake-based disputing (disputer must post a bond):** Considered for
    anti-griefing but deferred. In v1, only the depositor and operator can
@@ -666,7 +666,7 @@ collateral to the principal. This prevents permanent fund lock-up.
 - arc-settle must compute the appeal window end from the
   `CreditLossLifecycleArtifact.appeal_window_ends_at` field and delay the
   on-chain transaction accordingly.
-- Bond collateral is denominated in USDC (matching `CreditBondTerms.collateral_amount.currency`). The conversion from ARC minor units (cents)
+- Bond collateral is denominated in USDC (matching `CreditBondTerms.collateral_amount.currency`). The conversion from Chio minor units (cents)
   to USDC minor units (micro-dollars) uses the `CurrencyDecimals` config:
   `on_chain_amount = arc_units * 10_000` for USD (cents to 6-decimal USDC).
 
@@ -792,7 +792,7 @@ anchors are supplementary attestation layers, not settlement authorities.**
 
 ### Consistency Model
 
-ARC operates on three chains with different roles:
+Chio operates on three chains with different roles:
 
 | Chain | Role | Data stored | Authority level |
 |-------|------|-------------|-----------------|
@@ -1016,12 +1016,12 @@ concrete next steps are:
    `ArcBondVault.sol`. Target: Foundry project under `contracts/`.
 
 4. **Implement SHA-256-based Merkle proof verification** in Solidity using the
-   `0x02` precompile, matching ARC's RFC 6962 tree construction.
+   `0x02` precompile, matching Chio's RFC 6962 tree construction.
 
 ### Near-term (Sprint 2)
 
 5. **Build the `arc-settle` Rust crate** with the structure from
-   ARC_SETTLE_RESEARCH.md section 8.4. Priority modules: `client.rs` (Alloy
+   CHIO_SETTLE_RESEARCH.md section 8.4. Priority modules: `client.rs` (Alloy
    provider), `escrow.rs` (create/release/refund), `dual_sign.rs` (secp256k1
    signing via `k256`).
 

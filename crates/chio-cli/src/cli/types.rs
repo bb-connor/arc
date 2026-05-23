@@ -448,12 +448,12 @@ enum Commands {
 
     /// chio-arena coliseum: run scenarios, replay bundles, evolve adversaries.
     ///
-    /// `arc arena run scenarios/<name>.toml` loads a scenario, drives the
+    /// `chio arena run scenarios/<name>.toml` loads a scenario, drives the
     /// kernel via the async surface, and writes a receipt bundle
     /// byte-compatible with the replay corpus under
-    /// `target/arena/<scenario-id>/`. `arc arena replay <scenario-id>`
+    /// `target/arena/<scenario-id>/`. `chio arena replay <scenario-id>`
     /// resolves the bundle directory and delegates to `chio replay`.
-    /// `arc arena evolve scenarios/<seed>.toml --generations N` runs the
+    /// `chio arena evolve scenarios/<seed>.toml --generations N` runs the
     /// co-evolution driver under the bounded-budget gate.
     Arena {
         #[command(subcommand)]
@@ -730,7 +730,7 @@ enum ChioRuntimeQuoteCommands {
     },
 }
 
-/// Sub-subcommands for `arc arena`.
+/// Sub-subcommands for `chio arena`.
 #[derive(clap::Subcommand)]
 enum ArenaCommands {
     /// Run a scenario file and write an arena bundle under target/arena/.

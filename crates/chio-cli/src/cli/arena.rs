@@ -1,9 +1,9 @@
 // chio-arena CLI subcommands.
 //
-// `arc arena run`: load a scenario file, drive the runtime, write a bundle.
-// `arc arena replay`: resolve scenario id under target/arena/<id>/ and
+// `chio arena run`: load a scenario file, drive the runtime, write a bundle.
+// `chio arena replay`: resolve scenario id under target/arena/<id>/ and
 // delegate to the `chio replay` engine.
-// `arc arena evolve`: run the co-evolution driver under the bounded-budget
+// `chio arena evolve`: run the co-evolution driver under the bounded-budget
 // gate and render a leaderboard.
 
 const MAX_ARENA_EVOLVE_GENERATIONS: u32 = 200;
@@ -87,7 +87,7 @@ fn cmd_arena_replay(
     };
     if !resolved.is_dir() {
         return Err(CliError::cli_other_error(format!(
-            "arena replay: bundle directory {} does not exist (did you run `arc arena run` first?)",
+            "arena replay: bundle directory {} does not exist (did you run `chio arena run` first?)",
             resolved.display()
         )));
     }

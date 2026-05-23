@@ -1,4 +1,4 @@
-# `arc arena` CLI surface
+# `chio arena` CLI surface
 
 The chio-arena CLI exposes three subcommands on the `chio` binary, all
 guarded by the M04 deterministic-replay contract: scenarios run
@@ -6,7 +6,7 @@ deterministically, every receipt bundle is bit-exact replayable, and any
 failures auto-promote into the M04 corpus and the M05
 chio-adversarial-suite via the existing CHIO_BLESS gate.
 
-## `arc arena run scenarios/<name>.toml`
+## `chio arena run scenarios/<name>.toml`
 
 Loads a scenario TOML, drives the kernel multiplexer under the deterministic
 scheduler, and writes a receipt bundle byte-compatible with the M04 `tests/replay/goldens/` layout under `target/arena/<scenario-id>/`.
@@ -17,7 +17,7 @@ Flags:
   `target/arena/`).
 - `--json`: emit a `chio.arena.run/v1` summary to stdout.
 
-## `arc arena replay <scenario-id>`
+## `chio arena replay <scenario-id>`
 
 Resolves `target/arena/<scenario-id>/` and delegates to the M04 `chio replay` engine. The arena does not reimplement signature verification
 or root recomputation; the engine ingests the bundle directly.
@@ -29,7 +29,7 @@ Flags:
   directory.
 - `--json`: emit a `chio.arena.replay/v1` summary.
 
-## `arc arena evolve scenarios/<seed>.toml --generations N`
+## `chio arena evolve scenarios/<seed>.toml --generations N`
 
 Runs the co-evolution loop under the bounded-budget gate (default 200
 generations or 30 minutes wall, whichever fires first). Emits the

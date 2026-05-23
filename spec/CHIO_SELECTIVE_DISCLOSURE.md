@@ -19,7 +19,7 @@ The v1 contract closes Hard Problem #4 from
 ("Privacy and selective disclosure"), turning the BBS+ direction set in
 that document into a normative wire format, and it stands as the
 v1 normative version of the Pattern C dual-commitment route sketched
-in [ARC_ZK_RECEIPT_PROOFS_MEMO.md](../docs/research/ARC_ZK_RECEIPT_PROOFS_MEMO.md)
+in [CHIO_ZK_RECEIPT_PROOFS_MEMO.md](../docs/research/CHIO_ZK_RECEIPT_PROOFS_MEMO.md)
 section 1.3 (signed canonical-JSON receipts remain authoritative; a
 secondary commitment is added for proving efficiency).
 

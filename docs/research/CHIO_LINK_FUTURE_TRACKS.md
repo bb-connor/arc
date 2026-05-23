@@ -6,17 +6,17 @@ Date: 2026-03-30
 
 > Realization status (2026-04-02): these tracks remain backlog or bounded
 > overlays. The shipped v1 runtime is documented in
-> [ARC_LINK_PROFILE.md](../standards/ARC_LINK_PROFILE.md). Bounded automation,
+> [CHIO_LINK_PROFILE.md](../standards/CHIO_LINK_PROFILE.md). Bounded automation,
 > CCIP coordination, and payment-interop that did ship are defined by
-> [ARC_AUTOMATION_PROFILE.md](../standards/ARC_AUTOMATION_PROFILE.md),
-> [ARC_CCIP_PROFILE.md](../standards/ARC_CCIP_PROFILE.md), and
-> [ARC_PAYMENT_INTEROP_PROFILE.md](../standards/ARC_PAYMENT_INTEROP_PROFILE.md).
+> [CHIO_AUTOMATION_PROFILE.md](../standards/CHIO_AUTOMATION_PROFILE.md),
+> [CHIO_CCIP_PROFILE.md](../standards/CHIO_CCIP_PROFILE.md), and
+> [CHIO_PAYMENT_INTEROP_PROFILE.md](../standards/CHIO_PAYMENT_INTEROP_PROFILE.md).
 
 ---
 
 ## Overview
 
-This document captures Chainlink and ecosystem integration research that is adjacent to -- but not part of -- the [arc-link v1 price oracle crate](./ARC_LINK_RESEARCH.md). These tracks are worth pursuing after the core oracle integration ships, but each has a different owner or dependency chain.
+This document captures Chainlink and ecosystem integration research that is adjacent to -- but not part of -- the [arc-link v1 price oracle crate](./CHIO_LINK_RESEARCH.md). These tracks are worth pursuing after the core oracle integration ships, but each has a different owner or dependency chain.
 
 | Track | Likely Owner | Depends On | Priority |
 |-------|-------------|------------|----------|
@@ -62,7 +62,7 @@ As of early 2026, CCIP connects 60+ blockchain networks including EVM chains (Et
 | Message execution gas limit | 3,000,000 |
 | Maximum distinct tokens per transfer | 1 |
 
-A serialized ARC `DelegationLink` chain (including Ed25519 signatures and attenuations) would typically be 1-5 KB in canonical JSON, well within the 30 KB limit.
+A serialized Chio `DelegationLink` chain (including Ed25519 signatures and attenuations) would typically be 1-5 KB in canonical JSON, well within the 30 KB limit.
 
 ### 1.4 Fees
 
@@ -82,7 +82,7 @@ A serialized ARC `DelegationLink` chain (including Ed25519 signatures and attenu
 | Avalanche | ~1 second | ~2-5 minutes |
 | Solana | ~400ms | ~2-5 minutes |
 
-### 1.6 Could CCIP Transport ARC Delegation Proofs?
+### 1.6 Could CCIP Transport Chio Delegation Proofs?
 
 **Yes, with significant caveats on latency.** CCIP can transport arbitrary bytes cross-chain, so a serialized delegation chain fits within the 30 KB message limit. The receiving contract would need to:
 
@@ -92,7 +92,7 @@ A serialized ARC `DelegationLink` chain (including Ed25519 signatures and attenu
 
 The main concerns are:
 
-- **Latency is a deal-breaker for real-time delegation.** 2-20 minutes is far too slow for interactive tool invocation flows. ARC capability tokens have typical lifetimes of minutes to hours. A 20-minute CCIP hop on Ethereum-origin lanes consumes a material fraction of a short-lived token's validity window. For Arbitrum-to-Base (the most likely ARC lane), expect 10-15 minutes.
+- **Latency is a deal-breaker for real-time delegation.** 2-20 minutes is far too slow for interactive tool invocation flows. Chio capability tokens have typical lifetimes of minutes to hours. A 20-minute CCIP hop on Ethereum-origin lanes consumes a material fraction of a short-lived token's validity window. For Arbitrum-to-Base (the most likely Chio lane), expect 10-15 minutes.
 - **Cost.** $0.09-0.50 per message. Reasonable for high-value delegations but expensive for frequent micro-delegations.
 - **Ed25519 on EVM.** The receiving chain cannot natively verify Ed25519 signatures. This must be handled via Chainlink Functions or a pre-verification step.
 
@@ -100,7 +100,7 @@ The main concerns are:
 
 ### 1.7 Multi-Chain Identity Questions
 
-If ARC delegation proofs eventually exist on multiple chains via CCIP:
+If Chio delegation proofs eventually exist on multiple chains via CCIP:
 
 - **Revocation propagation.** Revocation must be fail-safe: if the revocation message is delayed, the destination chain should treat the capability as suspect (configurable policy).
 - **Home chain.** The CA's `home_chain` should be part of its configuration, with all revocations originating from the home chain.
@@ -183,14 +183,14 @@ return Functions.encodeUint256(isValid ? 1 : 0);
 
 ### 2.6 Receipt Batch Verification
 
-Functions could also verify batches of ARC receipts and report summary hashes on-chain:
+Functions could also verify batches of Chio receipts and report summary hashes on-chain:
 
 1. Function receives a batch of receipt canonical JSON and their Ed25519 signatures.
 2. Verifies each signature.
 3. Computes a Merkle root over verified receipts.
 4. Returns the root (32 bytes) on-chain.
 
-**Practical limit:** The 30 KB request size cap limits batch size. A typical ARC receipt is 500-1000 bytes, so roughly 20-50 receipts per batch. For larger batches, pre-compute the Merkle root off-chain and use Functions only for random-sampling spot-checks.
+**Practical limit:** The 30 KB request size cap limits batch size. A typical Chio receipt is 500-1000 bytes, so roughly 20-50 receipts per batch. For larger batches, pre-compute the Merkle root off-chain and use Functions only for random-sampling spot-checks.
 
 ---
 
@@ -250,11 +250,11 @@ The x402 protocol (HTTP 402 "Payment Required") is emerging as a standard for au
 
 Client sends HTTP request; server responds with 402 + payment requirements; client signs a USDC transfer authorization (EIP-3009 `TransferWithAuthorization`); server verifies via a "facilitator" service and settles on-chain.
 
-### 4.3 ARC Relevance
+### 4.3 Chio Relevance
 
-- x402 solves a narrower problem (HTTP API monetization) than ARC (full capability-mediated economic substrate).
+- x402 solves a narrower problem (HTTP API monetization) than Chio (full capability-mediated economic substrate).
 - x402's use of EIP-3009 for gasless USDC movement is a pattern arc-settle could adopt.
-- ARC capability tokens could serve as the authorization layer for x402 payments (the capability authorizes the spend, x402 executes the transfer).
+- Chio capability tokens could serve as the authorization layer for x402 payments (the capability authorizes the spend, x402 executes the transfer).
 - x402 settlement is USDC-on-chain. When grants are not denominated in USDC, this creates a natural requirement for arc-link's oracle integration.
 
 ### 4.4 Ownership Note
@@ -272,9 +272,9 @@ The Chainlink BUILD program provides early and mid-stage projects with:
 - Co-marketing and ecosystem introductions.
 - Access to the Chainlink Rewards program.
 
-### 5.2 ARC Relevance
+### 5.2 Chio Relevance
 
-If arc-link becomes a production dependency on Chainlink infrastructure (Data Feeds + potentially Functions + Automation + CCIP), joining BUILD could provide material benefits: priority support, early access to Data Streams, and potential co-marketing. The tradeoff is that BUILD participants are expected to allocate a portion of their native tokens to the Chainlink Rewards program. For a protocol-level project like ARC, this depends on tokenomics decisions.
+If arc-link becomes a production dependency on Chainlink infrastructure (Data Feeds + potentially Functions + Automation + CCIP), joining BUILD could provide material benefits: priority support, early access to Data Streams, and potential co-marketing. The tradeoff is that BUILD participants are expected to allocate a portion of their native tokens to the Chainlink Rewards program. For a protocol-level project like Chio, this depends on tokenomics decisions.
 
 ### 5.3 Recommendation
 
