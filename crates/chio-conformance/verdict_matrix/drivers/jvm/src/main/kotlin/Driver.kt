@@ -1,17 +1,17 @@
-// M07.P6.T1: JVM SDK verdict-matrix driver entry point.
+// JVM SDK verdict-matrix driver entry point.
 //
 // Loads the canonical scenario corpus from
 // `crates/chio-conformance/verdict_matrix/scenarios/` and emits the
 // (verdict, reason_code, scope_set) tuple per scenario as JSON on stdout.
 //
 // The deployment-shape driver does not embed kernel evaluation. It mirrors
-// the trajectory-1 TypeScript node-http driver contract: an operator-
-// supplied Chio sidecar URL is read from `CHIO_VERDICT_MATRIX_SIDECAR_URL`
+// the TypeScript node-http driver contract: an operator-supplied Chio
+// sidecar URL is read from `CHIO_VERDICT_MATRIX_SIDECAR_URL`
 // (or `CHIO_SIDECAR_URL`); when absent, every scenario is reported as
 // `unsupported` with a diagnostic that names the missing variable. The
 // production JVM SDK at `sdks/jvm/chio-sdk-jvm` provides the host bindings
-// the driver invokes through the sidecar; the binding wiring lands in a
-// follow-on operator-tactical ticket and is out of M07.P6.T1 scope.
+// the driver invokes through the sidecar; the binding wiring lands in
+// follow-on work.
 
 package world.chio.verdictmatrix.jvm
 
@@ -133,7 +133,7 @@ fun runDriver(scenarioRoot: Path, sidecarUrl: String?): DriverReport {
                 expected = expected,
                 actual = null,
                 diagnostic =
-                    "JVM SDK driver sidecar wiring is operator-tactical; the M07.P6.T1 " +
+                    "JVM SDK driver sidecar wiring is not yet implemented; the " +
                         "scaffold registers the driver shape only",
             )
     }

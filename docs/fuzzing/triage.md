@@ -2,7 +2,7 @@
 
 When a fuzz crash lands in CI (ClusterFuzzLite, the in-tree `fuzz.yml`
 matrix, or OSS-Fuzz post-acceptance), the crash-to-issue automation in
-`.github/workflows/fuzz_crash_triage.yml` (M02.P4.T1) downloads the
+`.github/workflows/fuzz_crash_triage.yml` downloads the
 crash artifact, minimizes it with `cargo fuzz tmin`, dedupes against
 open `fuzz-crash`-labelled issues by SHA-256 prefix token, and either
 comments on the existing issue or files a new one against the
@@ -44,9 +44,9 @@ The crash demonstrates one of:
 - Supply-chain attestation forge (an `attest_verify` input that
   passes verification with the wrong subject or wrong predicate).
 
-Critical crashes route to the on-call human (currently
-`@bb-connor`) and block the next release cut until fixed or
-explicitly deferred with a CVE-style writeup.
+Critical crashes route to the on-call human (`@bb-connor`) and block the
+next release cut until fixed or explicitly deferred with a
+CVE-style writeup.
 
 ### High
 
@@ -64,7 +64,7 @@ The crash demonstrates one of:
   scope is accepted for another).
 
 High crashes route to the owning sub-system maintainer per
-`CODEOWNERS` (M02.P4.T4) and must hit the 30d fix-or-defer SLO
+`CODEOWNERS` and must hit the 30d fix-or-defer SLO
 (matches the OSS-Fuzz upstream commitment documented in the
 triage SLO section below).
 
@@ -168,8 +168,8 @@ fuzz run started).
   upstream and counted against the program's overall SLO health.
 
 Critical and High issues that miss their fix-or-defer SLO escalate
-to the on-call (currently `@bb-connor`) and surface in the next
-weekly fuzz-program review. Medium and Low misses surface in the
+to the on-call (`@bb-connor`) and surface in the next weekly
+fuzz-program review. Medium and Low misses surface in the
 quarterly cleanup pass.
 
 The 24h acknowledgement applies to all severities so the dedupe
@@ -181,7 +181,7 @@ crashes that share a call-site with an existing Low ticket.
 
 When a Critical, High, or Medium crash has a useful minimized input,
 the triager promotes it to a permanent regression test using
-`scripts/promote_fuzz_seed.sh` (M02.P4.T2). The promoted test
+`scripts/promote_fuzz_seed.sh`. The promoted test
 becomes a permanent fixture under
 `crates/<owning-crate>/tests/regression_<sha>.rs` (libfuzzer mode)
 or `crates/<owning-crate>/tests/property_<sha>.rs` (proptest mode,
@@ -220,11 +220,11 @@ defect protected.
 
 Two guards enforce the policy:
 
-- `scripts/check-regression-tests.sh` (M02.P4.T3) runs from the
+- `scripts/check-regression-tests.sh` runs from the
   `check-regression-tests` job in `.github/workflows/ci.yml` and fails
   the build when a committed `regression_<sha>.rs` file is removed
   without a paired issue link that names the deleted file.
-- `CODEOWNERS` (M02.P4.T4) requires `@bb-connor` review on any
+- `CODEOWNERS` requires `@bb-connor` review on any
   diff that touches `tests/regression_*.rs` or
   `crates/*/tests/regression_*.rs`.
 
@@ -243,22 +243,17 @@ The CI guard refuses the merge until those conditions are met.
 
 - Crash-to-issue Action:
   [`.github/workflows/fuzz_crash_triage.yml`](../../.github/workflows/fuzz_crash_triage.yml)
-  (M02.P4.T1)
 - Crash-issue template:
   [`.github/ISSUE_TEMPLATE/fuzz_crash.yml`](../../.github/ISSUE_TEMPLATE/fuzz_crash.yml)
-  (M02.P4.T1)
 - Seed-promotion script:
   [`scripts/promote_fuzz_seed.sh`](../../scripts/promote_fuzz_seed.sh)
-  (M02.P4.T2)
 - Regression-deletion guard:
   [`scripts/check-regression-tests.sh`](../../scripts/check-regression-tests.sh)
-  (M02.P4.T3)
 - Code ownership for regression tests:
-  [`CODEOWNERS`](../../CODEOWNERS) (M02.P4.T4)
+  [`CODEOWNERS`](../../.github/CODEOWNERS)
 - Continuous-fuzzing program runbook:
-  [`docs/fuzzing/continuous.md`](continuous.md) (M02.P1.T7 and
-  later extensions)
+  [`docs/fuzzing/continuous.md`](continuous.md)
 - Mutation-testing runbook:
-  [`docs/fuzzing/mutants.md`](mutants.md) (M02.P2.T1)
+  [`docs/fuzzing/mutants.md`](mutants.md)
 - Continuous-fuzzing overview and OSS-Fuzz application steps:
   [`docs/fuzzing/continuous.md`](continuous.md)

@@ -1,9 +1,9 @@
 //! Placeholder surface for eval-report receipt bundle verification.
 //!
-//! M02.P0 establishes the crate and public constants so downstream P2/P3
-//! tickets can add export, schema, and signature verification without moving
-//! the workspace boundary again. Until the verifier lands, callers receive a
-//! fail-closed readiness result.
+//! This establishes the crate and public constants so later work can add
+//! export, schema, and signature verification without moving the workspace
+//! boundary again. Until the verifier lands, callers receive a fail-closed
+//! readiness result.
 
 #![forbid(unsafe_code)]
 
@@ -26,7 +26,7 @@ pub const BUNDLE_SCHEMA_ID: &str = "chio.eval-report.bundle.v1";
 /// Planned schema path for the bundle format.
 pub const BUNDLE_SCHEMA_PATH: &str = "spec/eval/receipt-format.v1.json";
 
-/// Partner contracted at M02.P0 for the initial evaluation beachhead.
+/// Partner contracted for the initial evaluation engagement.
 pub const P0_PARTNER: &str = "METR";
 
 /// Stable P0 descriptor for audit and downstream implementation checks.

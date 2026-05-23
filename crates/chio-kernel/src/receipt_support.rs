@@ -264,16 +264,16 @@ pub fn sign_receipt_body_with_backend(
 }
 
 // ---------------------------------------------------------------------------
-// M03.P5.T3: CanonicalBytes consumer wiring for the hybrid signing path
+// CanonicalBytes consumer wiring for the hybrid signing path
 // ---------------------------------------------------------------------------
 //
-// Per D16, the M06 `Arc<CanonicalBytes>` newtype lives at
+// The `Arc<CanonicalBytes>` newtype lives at
 // `chio_core_types::crypto::SharedCanonicalBytes` (already exported from
 // `chio-core-types/src/canonical.rs`). The receipt-signing path under the
 // hybrid backend consumes that newtype directly so the canonical JSON byte
 // buffer is built once, hashed once for the classical half, and signed once
-// for the ML-DSA-65 half. No byte-equivalence shim is required because M06
-// shipped the newtype before M03.P1 opened.
+// for the ML-DSA-65 half. No byte-equivalence shim is required because the
+// newtype is consumed directly rather than reserialized.
 //
 // The helper below returns the signed `ChioReceipt` paired with the
 // `SharedCanonicalBytes` it signed, so downstream consumers (receipt store,
@@ -303,10 +303,11 @@ pub struct SignedHybridReceipt {
 /// both the signed [`ChioReceipt`] and the [`SharedCanonicalBytes`] that
 /// were signed.
 ///
-/// This is the M03.P5.T3 entrypoint: the hybrid backend (classical Ed25519
-/// plus ML-DSA-65) is fed the M06 `CanonicalBytes` newtype directly so the
-/// canonical JSON byte buffer is built once, signed once, and shared by
-/// every downstream consumer (storage, lineage anchor, federation cosign).
+/// This is the shared-canonical-bytes entrypoint: the hybrid backend
+/// (classical Ed25519 plus ML-DSA-65) is fed the `CanonicalBytes` newtype
+/// directly so the canonical JSON byte buffer is built once, signed once, and
+/// shared by every downstream consumer (storage, lineage anchor, federation
+/// cosign).
 ///
 /// # Authoritative signing input
 ///
@@ -387,7 +388,7 @@ pub fn sign_receipt_body_hybrid_canonical(
     })?;
     let signing_body = ChioReceiptSigningBody::from(&body);
 
-    // Build the M06 SharedCanonicalBytes once over the authoritative
+    // Build the SharedCanonicalBytes once over the authoritative
     // signing wrapper. This is the byte buffer the classical half
     // hashes and the ML-DSA-65 half signs.
     let canonical = canonical_json_shared_bytes(&signing_body).map_err(|error| {
@@ -412,7 +413,7 @@ pub fn sign_receipt_body_hybrid_canonical(
     debug_assert_eq!(
         canonical.as_bytes(),
         signed_canonical.as_bytes(),
-        "M03.P5.T3 byte-identity drift: shared canonical bytes were re-encoded"
+        "byte-identity drift: shared canonical bytes were re-encoded"
     );
 
     let receipt = ChioReceipt {

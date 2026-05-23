@@ -13,7 +13,7 @@ use crate::BUNDLE_SCHEMA_ID;
 pub const VERDICT_MATRIX_CORPUS_SHA256: &str =
     "47e8d5394c807196d9567d97515e786cb1abfb0c7676e54db269ca82c735422f";
 
-/// M02 consumes the 48-scenario trajectory-2 verdict-matrix corpus.
+/// The reference verifier consumes the 48-scenario verdict-matrix corpus.
 pub const VERDICT_MATRIX_SCENARIO_COUNT: u16 = 48;
 
 /// Manifest path for the corpus metadata.

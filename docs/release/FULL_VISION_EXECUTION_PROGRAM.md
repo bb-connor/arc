@@ -517,7 +517,7 @@ portable-trust design.
 
 - Update this document
 - Update [V2_EXECUTION_BACKLOG.md](V2_EXECUTION_BACKLOG.md)
-- Update [STRATEGIC_ROADMAP.md](../STRATEGIC_ROADMAP.md) only when shipped reality changes sequencing
+- Update [STRATEGIC_ROADMAP.md](../operations/STRATEGIC_ROADMAP.md) only when shipped reality changes sequencing
 
 ---
 

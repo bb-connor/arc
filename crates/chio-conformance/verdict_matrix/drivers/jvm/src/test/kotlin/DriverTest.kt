@@ -1,4 +1,4 @@
-// M07.P6.T1: JVM SDK verdict-matrix driver smoke test.
+// JVM SDK verdict-matrix driver smoke test.
 //
 // Exercises the scenario-corpus loader and the unsupported-without-sidecar
 // path. Active execution against a live Chio sidecar is operator-tactical

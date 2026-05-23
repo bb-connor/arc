@@ -175,7 +175,6 @@ fn compile_rule_guards(
     //
     // Inserted between ForbiddenPathGuard and ShellCommandGuard so that
     // rate-limit denials are observed before any shell semantics fire.
-    // Wave 1.6 design; re-landed in Wave 5.0.1 after the Chio rename.
     if let Some(v) = &rules.velocity {
         if v.enabled {
             let (velocity_cfg, agent_cfg) = compile_velocity_rule(v);
@@ -734,9 +733,6 @@ fn compile_tool_constraints(
     // top-level `rules.human_in_loop` with `require_confirmation` globs that
     // match this tool does the same. Otherwise, if `human_in_loop` is
     // enabled and declares an `approve_above` threshold, use that threshold.
-    //
-    // Wave 1.6 behaviour, re-landed in Wave 5.0.1 after the Chio rename
-    // rename.
     let mut approval_threshold: Option<u64> = None;
     if confirmation_overlap(tool_pattern, &rule.require_confirmation)? {
         approval_threshold = Some(0);
@@ -768,7 +764,7 @@ fn compile_tool_constraints(
 /// Translate a `VelocityRule` into optional `VelocityConfig` +
 /// `AgentVelocityConfig`. If no invocation / spend / agent / session limit
 /// is set, returns `(None, None)` - i.e. the guard is effectively a no-op
-/// and no guard is pushed onto the pipeline. Wave 1.6 semantics.
+/// and no guard is pushed onto the pipeline.
 fn compile_velocity_rule(
     rule: &VelocityRule,
 ) -> (Option<VelocityConfig>, Option<AgentVelocityConfig>) {

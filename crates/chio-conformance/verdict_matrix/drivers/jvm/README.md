@@ -3,7 +3,7 @@
 This Gradle project is the JVM deployment-shape driver for the Chio verdict
 matrix. It is registered in
 `crates/chio-conformance/verdict_matrix/manifest.toml` as `jvm-sdk` with
-`status = "prepared"` and `matrix_role = "deployment-shape"`. The trajectory-1
+`status = "prepared"` and `matrix_role = "deployment-shape"`. The
 `sdks/jvm/chio-sdk-jvm` package provides the host kernel bindings the driver
 invokes through a Chio sidecar.
 
@@ -19,7 +19,7 @@ the Rust kernel reference for the canonical scenario subset.
 
 ## Sidecar wiring
 
-The driver mirrors the trajectory-1 `typescript-node-http` driver contract:
+The driver mirrors the `typescript-node-http` driver contract:
 the JVM SDK does not embed kernel evaluation. Active execution against a
 live Chio sidecar is operator-supplied via the
 `CHIO_VERDICT_MATRIX_SIDECAR_URL` environment variable (or the

@@ -1,7 +1,7 @@
 # Istio ext_authz integration for Chio
 
 Reference Kubernetes manifests and walkthrough for plugging the Chio
-`chio-envoy-ext-authz` gRPC adapter (Phase 9.1) into an Istio service mesh via
+`chio-envoy-ext-authz` gRPC adapter into an Istio service mesh via
 `MeshConfig.extensionProviders` and `AuthorizationPolicy` with the `CUSTOM`
 action.
 
@@ -212,8 +212,8 @@ kubectl delete -f examples/istio-ext-authz/00-chio-sidecar-deployment.yaml
 
 - `docs/protocols/ENVOY-EXT-AUTHZ-INTEGRATION.md` section 6 -- architectural
   rationale for the Istio layering.
-- `crates/chio-envoy-ext-authz/` -- Phase 9.1 adapter source.
-- `deploy/cloud-run`, `deploy/ecs`, `deploy/azure` -- Phase 17.6 sidecar
-  deploy targets for managed multi-container platforms.
+- `crates/chio-envoy-ext-authz/` -- Envoy ext_authz gRPC adapter source.
+- `deploy/cloud-run`, `deploy/ecs`, `deploy/azure` -- managed multi-container
+  sidecar deploy targets.
 - `examples/istio-ext-authz/ci-validation.md` -- how to validate these
   manifests in CI without a live cluster.

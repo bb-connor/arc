@@ -6,9 +6,9 @@ Add SDKs for TypeScript, Python, and Go without turning the Rust runtime into a 
 
 Language-specific implementation research for this plan lives in:
 
-- [research/10-sdk-typescript-plan.md](research/10-sdk-typescript-plan.md)
-- [research/11-sdk-python-plan.md](research/11-sdk-python-plan.md)
-- [research/12-sdk-go-plan.md](research/12-sdk-go-plan.md)
+- [research/10-sdk-typescript-plan.md](../research/10-sdk-typescript-plan.md)
+- [research/11-sdk-python-plan.md](../research/11-sdk-python-plan.md)
+- [research/12-sdk-go-plan.md](../research/12-sdk-go-plan.md)
 
 The recommended model is:
 

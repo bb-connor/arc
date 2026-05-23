@@ -1,6 +1,5 @@
 //! Kernel boot path: PQ signing key loads ONLY after a self-quote binds
-//! to `expect_report_data(kernel_classical_pk, receipt_root_genesis)`
-//! (M03.P5.T1).
+//! to `expect_report_data(kernel_classical_pk, receipt_root_genesis)`.
 //!
 //! Three contracts pinned here:
 //!

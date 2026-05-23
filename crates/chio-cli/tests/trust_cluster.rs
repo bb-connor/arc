@@ -1540,7 +1540,7 @@ fn trust_control_cluster_replicates_state_and_fails_closed_without_quorum() {
 }
 
 #[test]
-#[ignore = "qualification lane exercises trust-control runtime assurance issuance"]
+#[ignore = "slow scenario: exercises trust-control runtime assurance issuance"]
 fn trust_cluster_runtime_assurance_policy_gates_capability_issuance() {
     let _test_lock = trust_cluster_test_lock();
     let dir = unique_test_dir();
@@ -3134,7 +3134,7 @@ fn trust_control_cluster_multi_region_partition_qualification() {
 }
 
 #[test]
-#[ignore = "qualification lane repeats the full failover scenario"]
+#[ignore = "slow scenario: repeats the full failover scenario"]
 fn trust_control_cluster_repeat_run_qualification() {
     let _test_lock = trust_cluster_test_lock();
     for run_index in 1..=TRUST_CLUSTER_QUALIFICATION_RUNS {

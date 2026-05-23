@@ -2,8 +2,8 @@
 //! TTL ceilings, and per-session memory-entry counts on
 //! [`ToolAction::MemoryWrite`] and [`ToolAction::MemoryRead`] actions.
 //!
-//! Roadmap phase 18.1 (see `docs/protocols/STRUCTURAL-SECURITY-FIXES.md`
-//! section 3).  The guard sources its policy from two places:
+//! See `docs/protocols/STRUCTURAL-SECURITY-FIXES.md` section 3. The guard
+//! sources its policy from two places:
 //!
 //! 1. **Capability constraints** on the matched grant
 //!    ([`Constraint::MemoryStoreAllowlist`]): when present, writes and

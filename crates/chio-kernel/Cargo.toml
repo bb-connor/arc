@@ -14,9 +14,9 @@ autobenches = false
 name = "chio_kernel"
 
 [features]
-# M04.P5.T3 (default-on flip): `delegation` is now part of the kernel's
-# default feature set so the trust-boundary trajectory's recursive-
-# delegation oracle consultation runs on every dispatch out of the box.
+# `delegation` is part of the kernel's default feature set so the
+# recursive-delegation oracle consultation runs on every dispatch out of
+# the box.
 # Downstream consumers that need the legacy single-step path can opt
 # back via `default-features = false` plus an explicit `legacy-sync`
 # selection. See `docs/migrations/M04-delegation.md` for the full
@@ -177,7 +177,7 @@ name = "compliance_certificate_hybrid"
 path = "tests/compliance_certificate_hybrid.rs"
 required-features = ["pq"]
 
-# M03.P5.T1: kernel boot path gates the PQ signing key load on a verified
+# Kernel boot path gates the PQ signing key load on a verified
 # self-quote that binds expect_report_data(kernel_classical_pk,
 # receipt_root_genesis). Threat-model row pq_signature_downgrade is the
 # surface guarded here.
@@ -186,7 +186,7 @@ name = "pq_key_load_after_self_quote"
 path = "tests/pq_key_load_after_self_quote.rs"
 required-features = ["pq"]
 
-# M03.P5.T3: receipt-signing path consumes the M06 SharedCanonicalBytes
+# Receipt-signing path consumes the SharedCanonicalBytes
 # (Arc<CanonicalBytes>) newtype so the canonical JSON buffer is built once,
 # signed once, and shared by every downstream consumer.
 [[test]]

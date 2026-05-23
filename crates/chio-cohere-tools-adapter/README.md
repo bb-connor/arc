@@ -2,6 +2,17 @@
 
 Provider-native adapter for Cohere `/v2/chat` tool-use traffic.
 
+## Scaffold status
+
+This crate is an experimental scaffold. It is a byte-level lift/lower
+translator only; it does not yet ship a real Cohere HTTP client and makes no
+network calls. The sole `Transport` implementation is `MockTransport`, and the
+live HTTP path returns `TransportError::NotImplemented`. The adapter currently
+round-trips only against recorded conformance fixtures. Surface descriptions
+below ("mediates the SSE stream", "exceeds the configured budget") describe the
+contract the eventual transport must preserve, not behavior wired to a live
+provider today.
+
 The adapter pins the upstream API version to `2025-04` (see
 `crate::transport::COHERE_API_VERSION`). Bumping the pin requires a deliberate
 PR with a fixture re-record; the version string is also re-asserted by the

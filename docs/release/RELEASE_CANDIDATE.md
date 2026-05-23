@@ -487,9 +487,9 @@ The current Chio candidate does not claim:
   anchor, while the bounded public identity profile may also name `did:web`,
   `did:key`, and `did:jwk` as compatibility inputs
 - portable trust and cross-org workflows start from
-  [AGENT_PASSPORT_GUIDE.md](../AGENT_PASSPORT_GUIDE.md) and
-  [IDENTITY_FEDERATION_GUIDE.md](../IDENTITY_FEDERATION_GUIDE.md)
-- A2A integrations start from [A2A_ADAPTER_GUIDE.md](../A2A_ADAPTER_GUIDE.md)
+  [AGENT_PASSPORT_GUIDE.md](../reference/AGENT_PASSPORT_GUIDE.md) and
+  [IDENTITY_FEDERATION_GUIDE.md](../reference/IDENTITY_FEDERATION_GUIDE.md)
+- A2A integrations start from [A2A_ADAPTER_GUIDE.md](../reference/A2A_ADAPTER_GUIDE.md)
 
 ## Operator And Release Guidance
 
@@ -497,12 +497,12 @@ The current Chio candidate does not claim:
 - use `./scripts/qualify-release.sh` before treating a branch as a production
   candidate
 - use [QUALIFICATION.md](QUALIFICATION.md) as the release-proof matrix
-- use [ECONOMIC_INTEROP_GUIDE.md](../ECONOMIC_INTEROP_GUIDE.md) when IAM,
+- use [ECONOMIC_INTEROP_GUIDE.md](../reference/ECONOMIC_INTEROP_GUIDE.md) when IAM,
   finance, or partner reviewers need the focused economic-context walkthrough
 - use `chio trust credit-backtest export` and
   `chio trust provider-risk-package export` when capital reviewers need replay
   evidence or one signed provider-facing credit package
-- use [CREDENTIAL_INTEROP_GUIDE.md](../CREDENTIAL_INTEROP_GUIDE.md) when a
+- use [CREDENTIAL_INTEROP_GUIDE.md](../reference/CREDENTIAL_INTEROP_GUIDE.md) when a
   verifier, wallet, or standards reviewer needs the focused portable
   credential interop boundary, portable lifecycle semantics, and raw-HTTP
   proof lane

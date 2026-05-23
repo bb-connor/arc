@@ -1,20 +1,20 @@
-// M07.P6.T4: k8s admission-webhook deployment-shape verdict-matrix driver.
+// k8s admission-webhook deployment-shape verdict-matrix driver.
 //
 // The driver loads the canonical scenario corpus from
 // crates/chio-conformance/verdict_matrix/scenarios/ and emits a JSON report
 // on stdout shaped as (verdict, reason_code, scope_set) per scenario by
-// invoking the trajectory-1 sdks/k8s/webhooks admission surface through the
-// controller test harness. The controller does not embed kernel evaluation;
-// it forwards admission requests to a Chio sidecar. The deployment-shape
-// driver mirrors the trajectory-1 TypeScript node-http driver contract: an
+// invoking the sdks/k8s/webhooks admission surface through the controller
+// test harness. The controller does not embed kernel evaluation; it
+// forwards admission requests to a Chio sidecar. The deployment-shape
+// driver mirrors the TypeScript node-http driver contract: an
 // operator-supplied sidecar URL is read from CHIO_VERDICT_MATRIX_SIDECAR_URL
 // (with CHIO_SIDECAR_URL fallback). Without that variable, every scenario
 // is reported as unsupported with a diagnostic that names the missing
 // variable.
 //
-// The controller-test-harness wiring is operator-tactical and out of
-// M07.P6.T4 scope; the scaffold registers the driver shape so the M02
-// hash-pinned manifest can enumerate `k8s-admission-webhook` and the
+// The controller-test-harness wiring is not yet implemented; the scaffold
+// registers the driver shape so the hash-pinned manifest can enumerate
+// `k8s-admission-webhook` and the
 // `verdict_matrix.deployment_shape_smoke` integration test can assert the
 // registration.
 
@@ -191,7 +191,7 @@ func runDriver(root, sidecarURL string) (*report, error) {
 				sidecarEnv, sidecarFallbackEnv)
 		} else {
 			diagnostic = "k8s admission-webhook controller test harness wiring is " +
-				"operator-tactical; the M07.P6.T4 scaffold registers the driver shape only"
+				"not yet implemented; the scaffold registers the driver shape only"
 		}
 		outcomes = append(outcomes, outcome{
 			ScenarioID: s.ID,

@@ -632,7 +632,7 @@ mod tests {
     }}
   ],
   "partner_review": {{
-    "feedback_ref": "M02.P4 METR pair-run 2026-05-02",
+    "feedback_ref": "METR pair-run 2026-05-02",
     "review_window_days": 7,
     "reviewer_role": "partner technical reviewer",
     "disposition": "accepted-with-notes"

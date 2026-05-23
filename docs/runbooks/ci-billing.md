@@ -1,8 +1,6 @@
 # GitHub Actions Billing Runbook
 
 **Owner:** @bb-connor
-**Version:** v3.x
-**Milestone:** M03
 **Last updated:** 2026-05-02
 
 ## Purpose
@@ -50,7 +48,7 @@ gh workflow run m05-freeze-guard.yml --ref main
 gh workflow run ci.yml --ref main
 ```
 
-6. Record the run URLs in the M03 incident log under `compliance/hitrust/`
+6. Record the run URLs in the incident log under `compliance/hitrust/`
    (see `compliance/hitrust/control-mapping.csv` for the relevant control entries).
 
 ## Verification
@@ -71,11 +69,11 @@ Full release signal:
 ## Escalation
 
 Do not silently admin-merge because of a billing or spending-limit
-failure after M03 closes. If the spending limit trips again:
+failure. If the spending limit trips again:
 
 - Raise the cap or reduce workflow fan-out.
 - Document the action in this runbook.
-- Record the incident in the M03 audit doc.
+- Record the incident in the audit doc.
 - Treat a repeated trip during final stabilization as a release-gate
   blocker until a clean hosted CI run exists.
 
@@ -87,4 +85,4 @@ failure after M03 closes. If the spending limit trips again:
 - Quarantine known flaky tests by ticket and audit-doc entry rather
   than repeatedly rerunning whole matrices.
 - Prefer `gh workflow run <workflow> --ref <branch>` for targeted
-  probes during M03.P2.
+  probes.

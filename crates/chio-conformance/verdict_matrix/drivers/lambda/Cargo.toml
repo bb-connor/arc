@@ -1,6 +1,6 @@
 [package]
 name = "chio-verdict-matrix-driver-lambda"
-description = "Lambda deployment-shape driver for the Chio verdict matrix (M07.P6.T3)"
+description = "Lambda deployment-shape driver for the Chio verdict matrix"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

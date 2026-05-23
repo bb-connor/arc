@@ -27,8 +27,9 @@ use super::{Adversary, AdversaryAction, AdversaryClass, AdversaryError, Adversar
 /// evaluator searches for this string; receipt manifests can grep for it.
 pub const INJECTION_MARKER: &str = "chio:m08:prompt-injection";
 
-/// Canonical injection pattern names. The names align with the M02 fuzz
-/// corpus categories so the M02 -> M08 dataflow is greppable.
+/// Canonical injection pattern names. The names align with the fuzz
+/// corpus categories so the dataflow between the fuzz corpus and the
+/// arena adversary surface is greppable.
 pub const INJECTION_PATTERNS: &[&str] = &[
     "ignore-previous-instructions",
     "system-prompt-leak",

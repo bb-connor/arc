@@ -9,7 +9,7 @@ The signature scheme is identical across channels: a detached
 [cosign](https://github.com/sigstore/cosign) signature plus a Fulcio
 short-lived certificate. The Rust verification crate
 [`crates/chio-attest-verify`](../../crates/chio-attest-verify/README.md)
-(milestone M09.P3.T1) consumes the same trust root and identity
+consumes the same trust root and identity
 contract; CLI consumers can fall back to `cosign verify-blob` directly.
 
 ## What you need

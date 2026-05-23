@@ -1,8 +1,6 @@
 //! Validate `spec/security/chio-threat-model.v1.json` against
 //! `spec/security/chio-threat-model.schema.json`.
 //!
-//! Owner: M05.P5.T1.
-//!
 //! The schema asserts the four top-level keys (`schema`, `updatedAt`,
 //! `boundary`, `threats`), the `boundary.surfaces` and `boundary.assets`
 //! enums, and the per-threat object shape (`id`, `name`, `surfaces`,
@@ -231,7 +229,7 @@ fn schema_accepts_pending_with_deferred_to() {
                 ],
                 "residualRisk": "x",
                 "coverage_state": "pending",
-                "deferred_to": "trajectory-4.follow-up"
+                "deferred_to": "later-follow-up"
             }
         ]
     });

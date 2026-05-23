@@ -76,7 +76,7 @@ impl Leaderboard {
                 // every other arena artifact. The previous Debug-derived
                 // form produced names like "promptinjection" that
                 // diverged from the canonical "prompt-injection" tokens
-                // M09 reputation matches against.
+                // the reputation surface matches against.
                 population: name.clone(),
                 class: sample.class.as_str().to_string(),
                 survival_rate: sample.survival_rate(),

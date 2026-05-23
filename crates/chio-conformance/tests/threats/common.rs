@@ -1,4 +1,4 @@
-//! Shared helpers for the threat-model coverage tests (M05.P5.T3).
+//! Shared helpers for the threat-model coverage tests.
 //!
 //! Each per-threat test under `tests/threats/<id>.rs` asserts that at
 //! least one non-pending DENY-asserted adversarial vector cites the

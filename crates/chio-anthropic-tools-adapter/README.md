@@ -6,6 +6,17 @@ traffic through the Chio kernel. Implements the
 trait so a single Chio policy file enforces uniformly across OpenAI
 Responses, Anthropic Messages, and Bedrock Converse.
 
+## Scaffold status
+
+This crate is an experimental scaffold. It owns the mockable transport trait,
+batch lift/lower, and the SSE gate, but it does not yet ship a real Anthropic
+HTTP client and makes no network calls. The sole `Transport` implementation is
+`MockTransport`, and the live HTTP path returns
+`TransportError::NotImplemented`. The adapter currently round-trips only
+against recorded conformance fixtures. Rows marked `HTTP transport boundary` in
+the error taxonomy below pin the contract the eventual transport must preserve,
+not behavior wired to a live provider today.
+
 ## Pinned upstream API
 
 - `anthropic-version: 2023-06-01` (verbatim header value).

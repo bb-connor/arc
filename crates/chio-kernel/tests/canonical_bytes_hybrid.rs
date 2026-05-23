@@ -1,9 +1,8 @@
-//! Receipt path consumes `CanonicalBytes` for hybrid signing (M03.P5.T3).
+//! Receipt path consumes `CanonicalBytes` for hybrid signing.
 //!
-//! Per D16, the M06 `Arc<CanonicalBytes>` newtype
-//! ([`SharedCanonicalBytes`]) ships before M03.P1 opens, so the
-//! receipt-signing path consumes it directly without a byte-equivalence
-//! shim. This test pins the contract:
+//! The `Arc<CanonicalBytes>` newtype ([`SharedCanonicalBytes`]) is
+//! consumed directly by the receipt-signing path without a
+//! byte-equivalence shim. This test pins the contract:
 //!
 //! 1. **Single canonicalization.** The hybrid signing entrypoint builds
 //!    the canonical JSON byte buffer once and returns it alongside the
@@ -13,7 +12,7 @@
 //!    classical [`Ed25519Backend`] path the canonical bytes returned by
 //!    the new hybrid-canonical helper are byte-identical to the bytes
 //!    the legacy `sign_receipt_body_with_backend` flow signs. This is
-//!    the trajectory-1 byte-equivalence guarantee.
+//!    the byte-equivalence guarantee.
 //! 3. **Hybrid round-trip verifies against the shared bytes.** The
 //!    [`HybridBackend`] signs the shared canonical buffer; the
 //!    public-key `verify` path against those EXACT bytes succeeds.

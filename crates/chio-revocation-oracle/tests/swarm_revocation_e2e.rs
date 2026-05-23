@@ -1,5 +1,5 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
-//! M04.P5.T1 - 3-tier swarm acceptance test.
+//! 3-tier swarm acceptance test.
 //!
 //! Spins up a planner kernel, a coder kernel, and a tester kernel as
 //! three independent oracle + view + receipt-log triples connected by
@@ -339,7 +339,7 @@ fn three_tier_swarm_revoke_to_deny_under_500ms_median() {
     log.write_footer(median, MEDIAN_BUDGET_MS);
 
     eprintln!(
-        "M04.P5.T1: revoke->deny min={} ms, median={} ms, max={} ms across {} trials",
+        "revoke->deny min={} ms, median={} ms, max={} ms across {} trials",
         measurements.first().copied().unwrap_or(0),
         median,
         measurements.last().copied().unwrap_or(0),

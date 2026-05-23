@@ -231,7 +231,7 @@ fn kernel_hot_path_rejects_inflated_parent_scope() {
     assert_eq!(
         verdict.verdict,
         PortableVerdict::Deny,
-        "W1.1 chain-binding must DENY the inflated parent_scope_hash attack at the kernel hot path; got verdict {:?} reason {:?}",
+        "chain-binding must DENY the inflated parent_scope_hash attack at the kernel hot path; got verdict {:?} reason {:?}",
         verdict.verdict, verdict.reason
     );
     let reason = verdict.reason.as_deref().unwrap_or("");
@@ -333,7 +333,7 @@ fn kernel_hot_path_rejects_oversubscribed_siblings() {
     assert_eq!(
         verdict_b.verdict,
         PortableVerdict::Deny,
-        "W1.2 sibling-sum must DENY oversubscribed second child at the kernel hot path; got verdict {:?} reason {:?}",
+        "sibling-sum must DENY oversubscribed second child at the kernel hot path; got verdict {:?} reason {:?}",
         verdict_b.verdict, verdict_b.reason
     );
     let reason = verdict_b.reason.as_deref().unwrap_or("");

@@ -4,7 +4,7 @@ Tracks bless events for the deterministic replay corpus
 (`tests/replay/goldens/**`) and cross-version compatibility
 annotations.
 
-This file is the operator-facing audit surface for the M04
+This file is the operator-facing audit surface for the
 replay-gate's golden snapshot. Every re-bless of the corpus appends an
 entry here in the same commit that updates the goldens; the tests/replay
 `.bless-audit.log` is the machine-readable counterpart used by the
@@ -12,8 +12,7 @@ entry here in the same commit that updates the goldens; the tests/replay
 
 ## Bootstrap entry
 
-- Initial bless of corpus at branch
-  `wave/W2/m04/p2.t5-initial-fifty-goldens-bless` (M04.P2.T5).
+- Initial bless of corpus on the replay-goldens bootstrap branch.
 - 50 scenarios across 10 families:
   - `allow_metered` (5)
   - `allow_simple` (8)
@@ -69,9 +68,9 @@ The seven programmatic clauses enforced by
    while the goldens are clean (or vice versa).
 
 The eighth clause (CODEOWNERS review on `tests/replay/goldens/**`) is
-enforced by branch protection on the PR side and lands in M04.P2.T6.
+enforced by branch protection on the PR side.
 
-Use `scripts/bless-replay-goldens.sh` (lands in M04.P2.T4) for the
+Use `scripts/bless-replay-goldens.sh` for the
 operator-facing wrapper that drives the binary's `--bless` flag.
 
 ## Replay Corpus Stability
@@ -86,9 +85,9 @@ decision.
 
 ## Bless history
 
-| date       | branch                                          | reason                                              |
-| ---------- | ----------------------------------------------- | --------------------------------------------------- |
-| 2026-04-26 | `wave/W2/m04/p2.t5-initial-fifty-goldens-bless` | Initial bless of replay corpus (M04.P2.T5).         |
+| date       | branch                          | reason                          |
+| ---------- | ------------------------------- | ------------------------------- |
+| 2026-04-26 | replay-goldens bootstrap branch | Initial bless of replay corpus. |
 
 ## Future Ratchet Rule
 

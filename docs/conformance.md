@@ -294,7 +294,7 @@ The `chio conformance fetch-peers` subcommand looks for
    default).
 5. `./peers.lock.toml` (cwd-relative).
 
-The runtime resolver mirrors the M04.P3.T3 cache-dir strategy so
+The runtime resolver mirrors the kernel cache-dir strategy so
 `cargo install`-installed binaries do not depend on the compile-time
 `CARGO_MANIFEST_DIR` of the crate that is no longer on disk.
 
@@ -395,15 +395,11 @@ External consumers can copy the same pattern into their own CI:
 - `tests/conformance/reports/` - canonical location for generated
   compatibility matrices in Chio's own CI.
 
-## Related milestone work
+## What the harness provides
 
-- M01.P4.T1 - flip the crate to publishable shape and seed the stub
-  version of this document.
-- M01.P4.T2 - ship `chio conformance run` subcommand.
-- M01.P4.T3 - insta snapshot-test the JSON report shape.
-- M01.P4.T4 - ship `chio conformance fetch-peers` plus
-  `peers.lock.toml`.
-- M01.P4.T5 (this ticket) - expand this document to the final
-  consumer-facing form.
-- M01.P4.T6 - C++ peer P0 (`mcp_core`, `auth`) coverage gate.
-- M01.P5.T4 - nightly `external-consumer-smoke` workflow.
+- A publishable `chio-conformance` crate (`cargo install chio-conformance`).
+- The `chio conformance run` subcommand.
+- A snapshot-tested JSON report shape.
+- The `chio conformance fetch-peers` subcommand plus `peers.lock.toml`.
+- A C++ peer P0 coverage gate (`mcp_core`, `auth`).
+- A nightly `external-consumer-smoke` workflow.

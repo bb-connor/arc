@@ -1,9 +1,9 @@
 //! Settlement hook trait routing finalized Chio receipts through the
 //! existing `chio-settle/ops.rs` pipeline.
 //!
-//! M09 P2.T1 wakes the dormant `chio-settle` crate by exposing a
-//! kernel-evaluator observer surface (trajectory-1 M05 async-kernel
-//! post-dispatch slot). The hook is invoked once a receipt has been
+//! This exposes a kernel-evaluator observer surface for the
+//! `chio-settle` crate (the async-kernel post-dispatch slot). The hook
+//! is invoked once a receipt has been
 //! signed and durably stored; failure-to-settle never blocks dispatch
 //! (the kernel observer slot consumes the [`SettlementHookError`] and
 //! routes it to the retry/dead-letter machinery introduced by P2.T3).

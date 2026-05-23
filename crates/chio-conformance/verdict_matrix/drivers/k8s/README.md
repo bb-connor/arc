@@ -4,7 +4,7 @@ This Go module is the k8s admission-webhook deployment-shape driver for the
 Chio verdict matrix. It is registered in
 `crates/chio-conformance/verdict_matrix/manifest.toml` as
 `k8s-admission-webhook` with `status = "prepared"` and
-`matrix_role = "deployment-shape"`. The trajectory-1 `sdks/k8s/webhooks`
+`matrix_role = "deployment-shape"`. The `sdks/k8s/webhooks`
 admission surface and `sdks/k8s/controller` provide the host kernel
 bindings the driver invokes through the controller test harness.
 
@@ -20,7 +20,7 @@ tuples as the Rust kernel reference for the canonical scenario subset.
 
 ## Sidecar wiring
 
-The driver mirrors the trajectory-1 `typescript-node-http` driver contract:
+The driver mirrors the `typescript-node-http` driver contract:
 the k8s admission-webhook controller does not embed kernel evaluation.
 Active execution against a live Chio sidecar through the controller test
 harness is operator-supplied via the `CHIO_VERDICT_MATRIX_SIDECAR_URL`

@@ -1,9 +1,9 @@
-//! End-to-end PQ migration test (M03.P5.T2).
+//! End-to-end PQ migration test.
 //!
 //! Drives a v3.18 receipt bundle through three crypto-floor stages with
 //! a PQ key roll inserted between stages 2 and 3:
 //!
-//! 1. **`allow_classical`.** The trajectory-1 v3.18 bundle re-verifies
+//! 1. **`allow_classical`.** The pre-migration v3.18 bundle re-verifies
 //!    byte-identically. PQ key NOT provisioned. (Pre-migration baseline.)
 //! 2. **`allow_hybrid`.** Operator opts into hybrid; the kernel key
 //!    composes the same classical Ed25519 with an initial ML-DSA-65
@@ -223,7 +223,7 @@ fn key_roll_state_fixture_is_consistent() {
 
 #[test]
 fn stage1_allow_classical_accepts_v318_bundle_byte_identically() {
-    // Stage 1: trajectory-1 deployment that has not opted into PQ.
+    // Stage 1: pre-migration deployment that has not opted into PQ.
     // The v3.18 bundle re-verifies byte-identically under
     // `allow_classical`; the body canonical-JSON does not drift.
     let fixture = load_v318_fixture();

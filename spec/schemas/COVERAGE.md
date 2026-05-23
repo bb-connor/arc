@@ -1,4 +1,4 @@
-# Schema Coverage Audit (M01.P1.T1)
+# Schema Coverage Audit
 
 Generated: 2026-04-25
 Branch: `wave/W1/m01/p1.t1-schema-coverage-audit`

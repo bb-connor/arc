@@ -95,9 +95,8 @@ impl CapabilityNegotiation {
 
     /// T1 peer profile: current capability semantics and anchor batches.
     ///
-    /// Wave 1.5 hardening: the
-    /// [`capability_features::DELEGATION_CHAIN_BINDING`] flag is
-    /// advertised as `true` so production peers exercise the W1.1
+    /// The [`capability_features::DELEGATION_CHAIN_BINDING`] flag is
+    /// advertised as `true` so production peers exercise the
     /// chain-binding check by default. Peers that need to interoperate
     /// with a counterparty that has not rolled out chain-binding can
     /// explicitly clear the flag in the intersected profile, but the
@@ -2846,7 +2845,8 @@ impl ModelMetadata {
 /// that the delegator authorized at this step. When set, it ties the
 /// delegation chain to the underlying capability lineage so a verifier
 /// can check `proof.parent_scope_hash == chain.last().scope_hash` and
-/// reject inflated parent-scope claims (the W1.1 P0 soundness bug).
+/// reject inflated parent-scope claims (the parent-scope-inflation
+/// soundness bug).
 ///
 /// Links omit `scope_hash`; verifiers must reject attenuated tokens
 /// whose chain links lack this field via
@@ -2979,7 +2979,7 @@ pub enum Attenuation {
 /// Note: this compatibility entry point does NOT enforce chain-binding
 /// (the `parent_scope_hash` invariant). Callers verifying attenuated
 /// tokens must use [`validate_delegation_chain_with_trust_root`] to close
-/// the W1.1 P0 soundness gap.
+/// the parent-scope-inflation soundness gap.
 pub fn validate_delegation_chain(chain: &[DelegationLink], max_depth: Option<u32>) -> Result<()> {
     if let Some(max) = max_depth {
         let len = u32::try_from(chain.len()).unwrap_or(u32::MAX);
@@ -3021,7 +3021,7 @@ pub fn validate_delegation_chain(chain: &[DelegationLink], max_depth: Option<u32
 
 /// Validate a delegation chain under the chain-binding rule.
 ///
-/// Closes the W1.1 P0 soundness gap: an issuer with true authority
+/// Closes the parent-scope-inflation soundness gap: an issuer with true authority
 /// `scope_X` could previously mint a attenuated token claiming
 /// `parent_scope = scope_BIGGER` and supply an internally-consistent
 /// `attenuation_proof` because nothing tied `parent_scope_hash` to the

@@ -57,9 +57,9 @@ pub struct CoevolutionBudget {
 
 impl Default for CoevolutionBudget {
     fn default() -> Self {
-        // The M08 narrative pins the canonical defaults: 200 generations
-        // and 30 minutes wall clock. CI overrides to 5 minutes for PR
-        // lanes via `with_wall_clock_seconds`; nightly uses the default.
+        // Canonical defaults: 200 generations and 30 minutes wall clock.
+        // CI overrides to 5 minutes for PR lanes via
+        // `with_wall_clock_seconds`; nightly uses the default.
         Self {
             max_generations: 200,
             max_wall_clock: Duration::from_secs(30 * 60),

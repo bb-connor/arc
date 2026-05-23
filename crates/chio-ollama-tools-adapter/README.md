@@ -2,6 +2,19 @@
 
 Provider-native adapter for Ollama `/api/chat` tool-use traffic.
 
+## Scaffold status
+
+This crate is an experimental scaffold. It is a byte-level lift/lower
+translator only; it does not yet ship a real Ollama HTTP client and makes no
+network calls in normal builds. The sole `Transport` implementation is
+`MockTransport`, and the live HTTP path returns
+`TransportError::NotImplemented`. The adapter currently round-trips only
+against recorded conformance fixtures (the optional `tests/localhost_replay.rs`
+lane, gated on `OLLAMA_HOST`, is the only path that touches a real daemon).
+Surface descriptions below ("mediates the SSE stream", "exceeds the configured
+budget") describe the contract the eventual transport must preserve, not
+behavior wired through a shipped client today.
+
 The adapter pins the upstream API version to `2025-04` (see
 `crate::transport::OLLAMA_API_VERSION`). Bumping the pin requires a deliberate
 PR with a fixture re-record; the version string is also re-asserted by the

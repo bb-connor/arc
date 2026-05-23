@@ -1,4 +1,4 @@
-// M07.P6.T4: k8s admission-webhook driver smoke tests.
+// k8s admission-webhook driver smoke tests.
 //
 // Active execution against a live Chio sidecar through the controller test
 // harness is operator-tactical and out of P6 scope. These tests cover the

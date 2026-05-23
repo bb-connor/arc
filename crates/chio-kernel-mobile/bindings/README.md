@@ -34,9 +34,9 @@ toolchain from `src/chio_kernel_mobile.udl`.
   the Android NDK (r25+) with a `cargo-ndk` wrapper or hand-rolled
   linker config pointing at the NDK-supplied clang.
 
-## One-command qualification
+## One-command verification
 
-Run the repo-local qualification lane from the workspace root:
+Run the repo-local verification suite from the workspace root:
 
 ```bash
 ./scripts/qualify-mobile-kernel.sh

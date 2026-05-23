@@ -3,6 +3,18 @@
 Provider-native scaffold for Amazon Bedrock Runtime Converse and
 ConverseStream tool-use traffic in Chio.
 
+## Scaffold status
+
+This crate is an experimental scaffold. It owns offline lift/lower,
+deterministic stream gating, and a mockable transport, but it does not yet
+construct a real AWS client and makes no network calls in tests or normal
+builds. The sole `Transport` implementation is `MockTransport`, and the live
+SDK path returns `TransportError::NotImplemented`. The adapter currently
+round-trips only against recorded conformance fixtures. Rows marked
+`AWS Bedrock Runtime boundary` in the error taxonomy below pin the contract the
+eventual live SDK transport must preserve, not behavior wired to a live
+provider today.
+
 ## Pinned upstream SDK and region
 
 - AWS SDK crate: `aws-sdk-bedrockruntime = "1.130.0"`, pinned once in the

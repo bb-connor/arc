@@ -3,7 +3,7 @@
 //! Asserts that two model cards (A and B) bound to the canonical
 //! cross-provider scenario corpus from `chio-provider-conformance`
 //! produce verdict-equivalent kernel outputs at every fixture in the
-//! matrix. This test consumes the trajectory-1 M07 verdict-equality
+//! matrix. This test consumes the verdict-equality
 //! oracle (`assert_canonical_bytes_eq` over normalized verdict and
 //! receipt bytes); it does not fork the oracle.
 //!

@@ -1,8 +1,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
-//! M04.P5.T2 - Receipt-chain proof.
+//! Receipt-chain proof.
 //!
-//! After the swarm test (T1) writes its JSONL receipt log, walk the
-//! log and assert the trajectory-1 M03 `NoAllowAfterRevoke` invariant
+//! After the swarm test writes its JSONL receipt log, walk the
+//! log and assert the `NoAllowAfterRevoke` invariant
 //! on the real receipts: every allow receipt issued for a given trial
 //! has `seen_epoch < revoke_epoch`, and no allow receipt has
 //! `seen_epoch >= revoke_epoch`. Deny receipts are required to carry
@@ -350,6 +350,6 @@ fn no_allow_receipt_after_revoke_epoch() {
     );
 
     eprintln!(
-        "M04.P5.T2: receipt-chain proof OK across {TRIALS} trials: {allow_count} allow / {deny_count} deny receipts; min_revoke_epoch={min_revoke_epoch}; all allow seen_epoch < min_revoke_epoch."
+        "receipt-chain proof OK across {TRIALS} trials: {allow_count} allow / {deny_count} deny receipts; min_revoke_epoch={min_revoke_epoch}; all allow seen_epoch < min_revoke_epoch."
     );
 }

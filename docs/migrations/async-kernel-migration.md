@@ -1,6 +1,6 @@
-# M05 Async Kernel Migration
+# Async Kernel Migration
 
-M05 makes `ChioKernel::evaluate_tool_call` the primary tool-call evaluation
+This migration makes `ChioKernel::evaluate_tool_call` the primary tool-call evaluation
 surface. The legacy synchronous shim is still available for one compatibility
 window behind the `legacy-sync` Cargo feature, but it is no longer enabled by
 default.
@@ -31,7 +31,7 @@ chio-kernel = { version = "...", features = ["legacy-sync"] }
 
 ## In-Tree Consumer Matrix
 
-| Consumer | M05 status | Migration note |
+| Consumer | Status | Migration note |
 |----------|------------|----------------|
 | `chio-cli` | async | CLI session checks call `evaluate_tool_call(...).await`. |
 | `chio-mcp-edge` | async bridge available | Use `execute_bridge_mcp_tool_call_async` from async runtimes. The sync bridge wrapper is retained only for synchronous protocol trait adapters. |

@@ -1,6 +1,6 @@
 [package]
 name = "chio-bedrock-converse-adapter"
-description = "Amazon Bedrock Converse adapter for Chio, pinned to one workspace AWS SDK and us-east-1"
+description = "Amazon Bedrock Converse adapter for Chio (experimental scaffold; no live AWS transport yet, pinned to one workspace AWS SDK and us-east-1)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

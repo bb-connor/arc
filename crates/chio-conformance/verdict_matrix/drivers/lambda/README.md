@@ -4,7 +4,7 @@ This Rust crate is the Lambda deployment-shape driver for the Chio verdict
 matrix. It is registered in
 `crates/chio-conformance/verdict_matrix/manifest.toml` as
 `lambda-deployment-shape` with `status = "prepared"` and
-`matrix_role = "deployment-shape"`. The trajectory-1
+`matrix_role = "deployment-shape"`. The
 `sdks/lambda/chio-lambda-extension` runtime provides the host kernel
 bindings the driver invokes through a local-invoke shim.
 
@@ -20,7 +20,7 @@ tuples as the Rust kernel reference for the canonical scenario subset.
 
 ## Sidecar wiring
 
-The driver mirrors the trajectory-1 `typescript-node-http` driver contract:
+The driver mirrors the `typescript-node-http` driver contract:
 the Lambda extension does not embed kernel evaluation. Active execution
 against a live Chio sidecar is operator-supplied via the
 `CHIO_VERDICT_MATRIX_SIDECAR_URL` environment variable (or the

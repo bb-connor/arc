@@ -6,8 +6,8 @@ on the qualified authoritative surfaces, and the repo now also qualifies a
 stronger local economic boundary: Chio is comptroller-capable software on the
 documented operator, partner, and bounded federated proof surfaces. The
 broader market-position story remains strategic rather than proved. See
-[docs/protocols/STRATEGIC-VISION.md](protocols/STRATEGIC-VISION.md) and
-[docs/release/QUALIFICATION.md](release/QUALIFICATION.md).
+[docs/protocols/STRATEGIC-VISION.md](../protocols/STRATEGIC-VISION.md) and
+[docs/release/QUALIFICATION.md](../release/QUALIFICATION.md).
 
 Chio is pre-release. The current Chio-owned protocol, schema, SDK, and runtime
 surfaces are v1-only. Roadmap labels in this narrative are internal

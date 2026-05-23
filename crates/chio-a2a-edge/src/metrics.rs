@@ -1,17 +1,15 @@
 //! A2A edge metrics surfaced through the workspace `chio-metrics-spec`
-//! registry. Wave 2.4 of the trj4 closeout wires the A2A edge into the
-//! workspace registry: every A2A task response emerging from the kernel
-//! boundary increments [`CHIO_RECEIPT_WRITE_TOTAL`] with an `outcome`
-//! label.
+//! registry. The A2A edge is wired into the workspace registry: every A2A
+//! task response emerging from the kernel boundary increments
+//! [`CHIO_RECEIPT_WRITE_TOTAL`] with an `outcome` label.
 //
-// TODO(wave-3): the recorder/renderer/static-counter triplet here is
-// duplicated near-identically across `chio-mcp-edge`, `chio-acp-edge`, and
-// this crate. A Wave 3 follow-up will extract a shared
-// `ReceiptWriteCounters` helper into `chio-metrics-spec` (or a new
-// `chio-metrics-emit` crate) so each edge becomes a thin wrapper. The
-// per-edge static atomics and the renderer function names
-// (`render_<edge>_edge_metrics_prometheus`) are load-bearing for the
-// W2.4 conformance test surface, so the extraction has to preserve both.
+// TODO: the recorder/renderer/static-counter triplet here is duplicated
+// near-identically across `chio-mcp-edge`, `chio-acp-edge`, and this crate.
+// A follow-up will extract a shared `ReceiptWriteCounters` helper into
+// `chio-metrics-spec` (or a new `chio-metrics-emit` crate) so each edge
+// becomes a thin wrapper. The per-edge static atomics and the renderer
+// function names (`render_<edge>_edge_metrics_prometheus`) are load-bearing
+// for the conformance test surface, so the extraction has to preserve both.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 

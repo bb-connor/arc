@@ -1,5 +1,5 @@
-//! W2.3 negative conformance test: stale receipt replay across
-//! different batch content (HIGH-1, PR #594 round-2 review).
+//! Negative conformance test: stale receipt replay across
+//! different batch content.
 //!
 //! Threat: an attacker observes a single receipt id (e.g. a Rekor
 //! UUID, an OTS digest) that was previously verified by a verifier

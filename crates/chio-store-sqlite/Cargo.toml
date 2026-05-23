@@ -13,11 +13,11 @@ name = "chio_store_sqlite"
 
 [features]
 default = []
-# M09 lineage: gates the recursive-CTE query helpers and the lineage
+# Lineage: gates the recursive-CTE query helpers and the lineage
 # DAG view atop the existing receipt store. Default-off so the
-# trajectory-1 receipt store and capability lineage indexers keep
-# their byte-equivalent behaviour. Enabling this feature in M09 P5
-# wires the recursive-CTE query layer; P0 lands the gate only.
+# receipt store and capability lineage indexers keep their
+# byte-equivalent behaviour. Enabling this feature wires the
+# recursive-CTE query layer.
 lineage = []
 
 [dependencies]

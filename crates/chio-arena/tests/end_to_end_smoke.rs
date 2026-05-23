@@ -150,7 +150,7 @@ fn end_to_end_smoke() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(m04_parsed["expected_failure_class"], "prompt-injection");
 
     // Step 3: auto-promote to the adversarial suite (falls back to
-    // promote-pending/ since the M05 scaffold is not present).
+    // promote-pending/ since the adversarial-suite scaffold is not present).
     let suite =
         promote_to_adversarial_suite(&scenario, &run, workspace.path(), "prompt-injection")?;
     assert!(!suite.live_target);

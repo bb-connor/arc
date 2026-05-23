@@ -264,14 +264,14 @@ override paragraph.
 
 ### Rollback dry-run
 
-After M04.P3 activates the blocking gate, every release-cycle rollback
+Once the blocking gate is active, every release-cycle rollback
 must be rehearsed locally before merge. The dry-run command intentionally
 uses a failing mutant exit code and a one-run override reason:
 
 ```bash
 MUTANTS_PACKAGE=chio-kernel-core \
 MUTANTS_EXIT=1 \
-MUTANTS_GATE_OVERRIDE_REASON='M04.P3 rollback dry-run; followup PR #465' \
+MUTANTS_GATE_OVERRIDE_REASON='rollback dry-run; followup PR #465' \
   bash scripts/mutants-gate.sh
 ```
 

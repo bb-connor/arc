@@ -1,7 +1,7 @@
 //! InputInjectionCapabilityGuard - fine-grained control over `input.inject`
 //! actions.
 //!
-//! Roadmap phase 5.2.  Ported from ClawdStrike's
+//! Ported from ClawdStrike's
 //! `guards/input_injection_capability.rs` and adapted to Chio's synchronous
 //! [`chio_kernel::Guard`] trait.
 //!

@@ -1,9 +1,10 @@
 # chio-eval-receipt
 
-`chio-eval-receipt` is the M02 reference-verifier crate for
+`chio-eval-receipt` is the reference-verifier crate for
 `chio.eval-report.bundle.v1`.
 
-P0 intentionally ships only the workspace shell and stable descriptor:
+The initial release intentionally ships only the workspace shell and
+stable descriptor:
 
 - schema id: `chio.eval-report.bundle.v1`
 - planned schema path: `spec/eval/receipt-format.v1.json`
@@ -11,13 +12,12 @@ P0 intentionally ships only the workspace shell and stable descriptor:
 - current stage: `p0-placeholder`
 
 The placeholder fails closed: `EvalReceiptSurface::verifier_ready()`
-returns `false` until P3 lands schema validation, bundle verification,
-and the CLI.
+returns `false` until schema validation, bundle verification, and the CLI
+land.
 
-Planned follow-up tickets:
+Planned follow-up work:
 
-- M02.P2 adds export-contract documentation and verdict-matrix mapping.
-- M02.P3 adds schema validation, signature verification, CLI support,
-  Python binding scaffolding, and golden vectors.
-- M02.P4 adds the partner ingest sample under
-  `examples/eval-receipt-ingest/`.
+- Export-contract documentation and verdict-matrix mapping.
+- Schema validation, signature verification, CLI support, Python binding
+  scaffolding, and golden vectors.
+- A partner ingest sample under `examples/eval-receipt-ingest/`.

@@ -1,6 +1,6 @@
 //! Property tests for IOU minting invariants.
 //!
-//! M09.P1.T4: Asserts the core invariant that every finalized
+//! Asserts the core invariant that every finalized
 //! `ChioReceipt` produces exactly one `IouEnvelope` (priced allow)
 //! or zero (deny / cancelled / incomplete / zero-price / missing
 //! financial metadata). No partial state.

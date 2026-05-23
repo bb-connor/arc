@@ -45,7 +45,7 @@ runs (200 min/month headroom for everything else). Enforcement:
   lower value) in the workflow env. Do not raise the cap above 1,800
   without re-opening the locked decision.
 
-Sizing intent (steady state, 18-target inventory after M02 P1 T8 lands):
+Sizing intent (steady state, 18-target inventory):
 
 | Lane              | Cadence             | Per-run cost         | 30-day cost (est.) |
 |-------------------|---------------------|----------------------|--------------------|
@@ -63,14 +63,14 @@ filter rather than raising the cap.
 
 ## Workflow inventory
 
-Current as of M02 P1 close.
+Current inventory.
 
 | Workflow                                     | Owner | Trigger                                  | Per-run wall-time          |
 |----------------------------------------------|-------|------------------------------------------|----------------------------|
-| `.github/workflows/cflite_pr.yml`            | M02   | PR (changed-target sampling)             | 60-120s per selected target|
-| `.github/workflows/cflite_batch.yml`         | M02   | nightly cron `17 2 * * *` UTC            | 1 target x 1,800s          |
-| `.github/workflows/fuzz.yml`                 | M02   | nightly cron `23 3 * * *` UTC + dispatch | matrix, 1,800s/target ASan |
-| `.github/workflows/mutants.yml`              | M02   | nightly + PR diff (advisory; M02 P3)     | 4-hour budget per crate    |
+| `.github/workflows/cflite_pr.yml`            | core  | PR (changed-target sampling)             | 60-120s per selected target|
+| `.github/workflows/cflite_batch.yml`         | core  | nightly cron `17 2 * * *` UTC            | 1 target x 1,800s          |
+| `.github/workflows/fuzz.yml`                 | core  | nightly cron `23 3 * * *` UTC + dispatch | matrix, 1,800s/target ASan |
+| `.github/workflows/mutants.yml`              | core  | nightly + PR diff (advisory)             | 4-hour budget per crate    |
 
 Notes:
 
@@ -82,15 +82,15 @@ Notes:
   the next commit.
 - `cflite_batch.yml` rotates one target per night across an 18-day full sweep.
 - `fuzz.yml` is the in-tree `cargo +nightly fuzz` matrix authored in
-  M02.P1.T6; it complements rather than replaces ClusterFuzzLite by running
+  It complements rather than replaces ClusterFuzzLite by running
   every target every night with ASan.
-- `mutants.yml` lands in M02 P2 and is advisory for one release cycle per
-  decision 12; see `docs/fuzzing/mutants.md` (M02 P3 deliverable) when it
+- `mutants.yml` is advisory for one release cycle per
+  decision 12; see `docs/fuzzing/mutants.md` when it
   exists.
 
 ## Target inventory
 
-Current as of M02 P1 close. The in-tree matrix in `fuzz.yml` enumerates
+The in-tree matrix in `fuzz.yml` enumerates
 every target below; ClusterFuzzLite picks per-PR or per-night rotations
 from `fuzz/target-map.toml`.
 
@@ -106,31 +106,31 @@ PR #13 baseline (seven targets):
 | `policy_decision_decode`   | policy-decision decode                                |
 | `signing_envelope_decode`  | signing-envelope decode                               |
 
-M09 supply-chain (one target):
+Supply-chain (one target):
 
 | Target          | Source                                          |
 |-----------------|-------------------------------------------------|
-| `attest_verify` | M09.P3.T5; supply-chain attestation parser      |
+| `attest_verify` | supply-chain attestation parser      |
 
-M02 P1 expansion (twelve targets, T8 included):
+Target expansion (twelve targets, T8 included):
 
 | Target                          | Source                                                                |
 |---------------------------------|-----------------------------------------------------------------------|
-| `jwt_vc_verify`                 | M02.P1.T1.a; JWT VC verifier                                          |
-| `oid4vp_presentation`           | M02.P1.T1.b; OID4VP holder response                                   |
-| `did_resolve`                   | M02.P1.T1.c; chio-did parser plus resolver                            |
-| `anchor_bundle_verify`          | M02.P1.T2; anchor proof bundle plus checkpoint records                |
-| `mcp_envelope_decode`           | M02.P1.T3.a; MCP NDJSON decode plus edge dispatch                     |
-| `a2a_envelope_decode`           | M02.P1.T3.b; A2A SSE parse plus per-event fan-out                     |
-| `acp_envelope_decode`           | M02.P1.T3.c; ACP NDJSON plus handle_jsonrpc dispatch                  |
-| `wasm_preinstantiate_validate`  | M02.P1.T4.a; ComponentBackend, WasmtimeBackend, format detect         |
-| `wit_host_call_boundary`        | M02.P1.T4.b; GuardRequest/Verdict serde deserialization               |
-| `chio_yaml_parse`               | M02.P1.T5.a; chio-config YAML loader                                  |
-| `openapi_ingest`                | M02.P1.T5.b; OpenApiMcpBridge::from_spec                              |
-| `receipt_log_replay`            | M02.P1.T8; pre-included slot in fuzz.yml; binary lands in T8          |
+| `jwt_vc_verify`                 | JWT VC verifier                                          |
+| `oid4vp_presentation`           | OID4VP holder response                                   |
+| `did_resolve`                   | chio-did parser plus resolver                            |
+| `anchor_bundle_verify`          | anchor proof bundle plus checkpoint records                |
+| `mcp_envelope_decode`           | MCP NDJSON decode plus edge dispatch                     |
+| `a2a_envelope_decode`           | A2A SSE parse plus per-event fan-out                     |
+| `acp_envelope_decode`           | ACP NDJSON plus handle_jsonrpc dispatch                  |
+| `wasm_preinstantiate_validate`  | ComponentBackend, WasmtimeBackend, format detect         |
+| `wit_host_call_boundary`        | GuardRequest/Verdict serde deserialization               |
+| `chio_yaml_parse`               | chio-config YAML loader                                  |
+| `openapi_ingest`                | OpenApiMcpBridge::from_spec                              |
+| `receipt_log_replay`            | pre-included slot in fuzz.yml; binary lands in T8          |
 
-Total: 7 (PR #13) + 1 (M09) + 12 (M02 P1) = 20 targets when M02 P1 closes.
-The M02 P1 success-criteria floor is 11 new targets (7 baseline + 11 new =
+Total: 7 (PR #13) + 1 + 12 = 20 targets.
+The success-criteria floor is 11 new targets (7 baseline + 11 new =
 18 in the matrix exit-test count); T8 lifts the count from 11 to 12 and the
 total to 20.
 
@@ -189,13 +189,13 @@ secret is unavailable.
 
 ## OSS-Fuzz application status
 
-- Target submission window: M02 P2.
-- Status as of M02 P1 close: pending.
-- Infrastructure scaffolding lands under `infra/oss-fuzz/` in M02.P2.T5
+- Target submission window: during OSS-Fuzz onboarding.
+- Status: pending.
+- Infrastructure scaffolding lands under `infra/oss-fuzz/` in the OSS-Fuzz integration follow-up
   (`project.yaml`, `Dockerfile`, `build.sh`).
 - Acceptance lag: typically 2-6 weeks. ClusterFuzzLite carries coverage
   through the lag.
-- Backup contact slot: tracked in the M02 P2 follow-up issue (current
+- Backup contact slot: tracked in the OSS-Fuzz onboarding follow-up issue (current
   primary contact: `connor@backbay.io`; backup TBD before the
   application opens).
 - On acceptance: repoint the bug-tracker integration in
@@ -203,11 +203,11 @@ secret is unavailable.
   ClusterFuzzLite running as the documented fallback.
 - Triage SLO commitment to OSS-Fuzz upstream: 24h acknowledgement, 7d
   fix-or-defer for `Critical`, 30d for `High`. Tracked in
-  `docs/fuzzing/triage.md` once that doc lands (M02 P4).
+  `docs/fuzzing/triage.md`.
 
 ## OSS-Fuzz integration
 
-Chio is in the OSS-Fuzz application pipeline (M02.P2.T5). Integration
+Chio is in the OSS-Fuzz application pipeline. Integration
 files live under `infra/oss-fuzz/` and are mirrored into the upstream
 `google/oss-fuzz` repo as a follow-up PR after the in-tree files merge:
 
@@ -215,7 +215,7 @@ files live under `infra/oss-fuzz/` and are mirrored into the upstream
   contact (`connor@backbay.io`), `auto_ccs`, the `address` plus
   `undefined` sanitizer pair, the `x86_64` architecture, and the
   `libfuzzer` engine. The backup-contact slot is held open with a
-  `TODO(M02.P2)` comment and is tracked in the M02 P2 follow-up issue.
+  `TODO` comment and is tracked in a follow-up issue.
 - `infra/oss-fuzz/Dockerfile` is based on
   `gcr.io/oss-fuzz-base/base-builder-rust`, installs the rustls/openssl
   build deps plus `zip` for seed-corpus packing, and clones the repo at
@@ -319,13 +319,13 @@ cargo +nightly fuzz tmin <target> /tmp/fuzz-crash/<artifact>/crash-<sha>.bin
 ```
 
 Crash-to-issue automation, dedupe-by-input-hash, severity bands, and
-seed-promotion-to-regression-test land in M02 P4
+seed-promotion-to-regression-test land in the triage runbook
 (`.github/workflows/fuzz_crash_triage.yml`, `scripts/promote_fuzz_seed.sh`,
 `docs/fuzzing/triage.md`).
 
 ## Timing-leak detection (dudect)
 
-The `dudect` Cargo feature (M02.P2.T3) gates a set of `dudect-bencher`
+The `dudect` Cargo feature gates a set of `dudect-bencher`
 0.7-driven timing harnesses that statistically detect data-dependent
 timing leaks in the trust-boundary primitives that sit on the verdict
 hot path. The harnesses are off by default so `cargo test` stays fast
@@ -377,7 +377,7 @@ Pass criterion:
   classes' runtime distributions at a level that survives multiple
   testing correction across the ~100 t-tests dudect runs internally.
 
-CI lane: `.github/workflows/dudect.yml` (M02.P2.T4) wires these three
+CI lane: `.github/workflows/dudect.yml` wires these three
 harnesses into nightly + PR-time runs and applies the
 two-consecutive-runs `t < 4.5` pass rule.
 

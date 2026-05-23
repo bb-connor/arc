@@ -1,12 +1,12 @@
-# M04 delegation Migration
+# Delegation Migration
 
-M04 phase 5 flips `delegation` to default-on in
+This migration flips `delegation` to default-on in
 `crates/chio-kernel/Cargo.toml`. The kernel now consults the installed
 `RevocationView` snapshot on every delegated dispatch and denies the
 capability if any link in its delegation chain (or the leaf capability
 itself) appears in the revoked set. This is the trust-boundary's
 fail-closed step that has shipped behind the `delegation` feature
-gate since M04 phase 3.
+gate in an earlier phase.
 
 ## What changed
 
@@ -61,15 +61,15 @@ Deployments that wire up federation gossip should:
 
 ### Consumers that need to opt out (legacy-sync only)
 
-Downstream crates that need the pre-M04 single-step path can disable
+Downstream crates that need the pre-migration single-step path can disable
 the new default:
 
 ```toml
 chio-kernel = { version = "...", default-features = false, features = ["legacy-sync"] }
 ```
 
-This is consistent with the precedent set by M05's
-`legacy-sync` flag (see `docs/migrations/M05-async-kernel.md`):
+This is consistent with the precedent set by the async-kernel
+migration's `legacy-sync` flag (see `docs/migrations/async-kernel-migration.md`):
 default-on the new surface, leave one explicit opt-out path for
 consumers still on the legacy contract. Mixed `default-features = false`
 without `legacy-sync` is unsupported - the kernel needs at least one
@@ -87,8 +87,7 @@ chio-core-types = { workspace = true, features = ["delegation"] }
 
 This avoids a transitive surface flip for SDK consumers that depend on
 `chio-core-types` for type definitions only and never instantiate a
-kernel. M07 framework adapters continue to opt in explicitly per the
-M04 plan.
+kernel. Framework adapters continue to opt in explicitly.
 
 ## Compatibility and rollback
 
@@ -115,7 +114,7 @@ After upgrading:
 2. The kernel's revocation behaviour is unchanged when no
    `RevocationView` is installed (tested by
    `crates/chio-kernel/src/kernel/delegation.rs::tests::no_view_installed_returns_ok`).
-3. Federation-gossip-enabled deployments observe the M04 P5.T1
+3. Federation-gossip-enabled deployments observe the delegation
    acceptance gate: revoking a planner capability propagates to its
    children and produces a deny receipt within 500 ms median across
    100 trials. The acceptance harness is

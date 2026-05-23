@@ -63,7 +63,7 @@
     {
       "kind": "test-sha256",
       "key_id": "local-test",
-      "signature": "16f1800eaa0ef2767d085f3dcebfc91c484dcc08f7b7a5f73294b82bb7f037a4",
+      "signature": "40e8d6f70ab688681678fb63862052214771954ccee652377c2b9d5f554dc137",
       "signed_payload": "bundle_without_signatures:rfc8785"
     }
   ]

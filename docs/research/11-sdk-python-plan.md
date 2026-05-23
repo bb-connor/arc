@@ -23,7 +23,7 @@ Local evidence:
 
 - the current Python peer is hand-rolled in one file and already covers session init, auth, remote HTTP, SSE-style response parsing, nested callbacks, and transcript production: [tests/conformance/peers/python/client.py](../../tests/conformance/peers/python/client.py)
 - the current peer requires Python 3.11+: [tests/conformance/peers/python/pyproject.toml](../../tests/conformance/peers/python/pyproject.toml)
-- the repo already plans a narrow Rust bindings core rather than a giant FFI layer: [../BINDINGS_CORE_PLAN.md](../BINDINGS_CORE_PLAN.md)
+- the repo already plans a narrow Rust bindings core rather than a giant FFI layer: [../BINDINGS_CORE_PLAN.md](../operations/BINDINGS_CORE_PLAN.md)
 
 Implication:
 
@@ -484,7 +484,7 @@ Local:
 
 - [tests/conformance/peers/python/client.py](../../tests/conformance/peers/python/client.py)
 - [tests/conformance/peers/python/pyproject.toml](../../tests/conformance/peers/python/pyproject.toml)
-- [../BINDINGS_CORE_PLAN.md](../BINDINGS_CORE_PLAN.md)
+- [../BINDINGS_CORE_PLAN.md](../operations/BINDINGS_CORE_PLAN.md)
 
 External:
 

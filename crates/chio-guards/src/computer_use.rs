@@ -1,6 +1,6 @@
 //! ComputerUseGuard - coarse gate for Computer Use Agent (CUA) actions.
 //!
-//! Roadmap phase 5.1.  Ported from ClawdStrike's
+//! Ported from ClawdStrike's
 //! `guards/computer_use.rs` and adapted to Chio's synchronous
 //! [`chio_kernel::Guard`] trait.
 //!

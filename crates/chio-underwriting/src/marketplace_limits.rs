@@ -6,7 +6,7 @@
 //! decision the CLI surfaces in `arc guard market info`. The helper
 //! is deterministic and storage-agnostic.
 //!
-//! Soft-dep: trajectory-2 M04 revocation oracle revokes guard publisher
+//! Soft-dep: the revocation oracle revokes guard publisher
 //! credentials on the same sparse-Merkle root that revokes capabilities.
 //! When a revocation signal is provided, the helper denies regardless
 //! of reputation tier (fail-closed). Without a revocation signal the

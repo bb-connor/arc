@@ -1,6 +1,6 @@
 //! Chio model-card surface.
 //!
-//! M10 phase 4 introduces signed model cards that bind a provider's
+//! Signed model cards bind a provider's
 //! `(weights_hash, allowed_capability_set, banned_tools, training_data_class)`
 //! to a cosign-signed envelope. The kernel refuses to bind a provider whose
 //! loaded weights or requested scopes do not match the card.

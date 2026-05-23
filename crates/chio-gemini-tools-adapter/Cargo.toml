@@ -1,6 +1,6 @@
 [package]
 name = "chio-gemini-tools-adapter"
-description = "Google Gemini generateContent tool-use adapter for Chio (pinned to v1beta generateContent)"
+description = "Google Gemini generateContent tool-use adapter for Chio (experimental scaffold; no live HTTP transport yet, pinned to v1beta generateContent)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

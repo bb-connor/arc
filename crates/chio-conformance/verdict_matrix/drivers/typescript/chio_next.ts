@@ -1,10 +1,10 @@
 // Verdict-matrix driver registration for the @chio/next App Router
 // wrappers. The wrappers do not embed kernel evaluation; they delegate to
-// the typescript-node-http transport-client driver shipped by M02.P5.T2
+// the typescript-node-http transport-client driver
 // (./run_scenarios.ts) so the matrix asserts the App Router wrapper
 // preserves the verdict tuple emitted by the underlying SDK.
 //
-// While M02.P5.T2 is still in flight, this file ships as a prepared
+// While that driver is still in flight, this file ships as a prepared
 // registration. Matrix tooling enumerates this driver but skips execution
 // until the underlying transport-client driver is active.
 

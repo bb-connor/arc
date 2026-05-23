@@ -22,7 +22,7 @@
 //! advisory receipts from `publish`, but `verify_inclusion` fails
 //! closed for load-bearing public-witness policy.
 //!
-//! W2.3 step 3 also moves the legacy `verify_*` helpers from
+//! The `verify_*` helpers moved from
 //! `chio-anchor/src/bitcoin.rs` to take an `&AnchorBatch` rather
 //! than a free super-root digest. The legacy helpers remain so
 //! existing checkpoint super-root code keeps working.

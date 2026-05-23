@@ -1,7 +1,7 @@
-//! M09 P4.T2 marketplace pricing helper.
+//! Marketplace pricing helper.
 //!
 //! `chio-appraisal` already models the runtime-attestation appraisal
-//! surface. M09 P4 reuses the crate's deterministic-evaluation
+//! surface. This helper reuses the crate's deterministic-evaluation
 //! contract (output is a deterministic function of inputs) by adding
 //! a small per-invocation pricing helper for guard manifests. No new
 //! pricing primitives are introduced: the helper combines a manifest
@@ -10,8 +10,8 @@
 //!
 //! The helper is intentionally pure and storage-agnostic. Callers
 //! inject the manifest base price plus a tenant pricing context
-//! assembled from the trajectory-1 M06 publish path (manifest) and
-//! M09 P3 reputation tier ascertainment.
+//! assembled from the publish path (manifest) and reputation tier
+//! ascertainment.
 
 use serde::{Deserialize, Serialize};
 

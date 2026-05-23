@@ -1,11 +1,10 @@
 //! Legacy receipt migration test.
 //!
-//! M09.P1.T5: Existing receipts (no manifest price / no financial
-//! metadata) re-process under M09 with zero IOUs minted, and the
-//! receipt bytes are unchanged. The trajectory-1 M04 deterministic
-//! corpus shape is the soft-dep fixture; we model that shape here
-//! with a hand-built receipt that carries no `financial` metadata
-//! key. P1.T5 asserts:
+//! Existing receipts (no manifest price / no financial metadata)
+//! re-process with zero IOUs minted, and the receipt bytes are
+//! unchanged. The deterministic corpus shape is the soft-dep fixture;
+//! we model that shape here with a hand-built receipt that carries no
+//! `financial` metadata key. The test asserts:
 //!
 //! - The credit hook returns `Ok(None)` for every legacy receipt
 //!   shape (Allow, Deny, Cancelled, Incomplete; with arbitrary

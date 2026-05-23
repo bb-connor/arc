@@ -1,16 +1,16 @@
-// M07.P6.T2: dotnet SDK verdict-matrix driver entry point.
+// dotnet SDK verdict-matrix driver entry point.
 //
 // Loads the canonical scenario corpus from
 // crates/chio-conformance/verdict_matrix/scenarios/ and emits a JSON report
 // on stdout shaped as (verdict, reason_code, scope_set) per scenario. The
 // deployment-shape driver does not embed kernel evaluation; it mirrors the
-// trajectory-1 TypeScript node-http driver contract by reading an operator-
-// supplied Chio sidecar URL from CHIO_VERDICT_MATRIX_SIDECAR_URL (with
-// CHIO_SIDECAR_URL fallback). When the variable is absent, every scenario is
-// reported as unsupported with a diagnostic that names the missing variable.
-// The trajectory-1 sdks/dotnet/ChioMiddleware package provides the host
-// kernel bindings the driver invokes through the sidecar; the binding wiring
-// lands in a follow-on operator-tactical ticket and is out of M07.P6.T2 scope.
+// TypeScript node-http driver contract by reading an operator-supplied Chio
+// sidecar URL from CHIO_VERDICT_MATRIX_SIDECAR_URL (with CHIO_SIDECAR_URL
+// fallback). When the variable is absent, every scenario is reported as
+// unsupported with a diagnostic that names the missing variable. The
+// sdks/dotnet/ChioMiddleware package provides the host kernel bindings the
+// driver invokes through the sidecar; the binding wiring lands in follow-on
+// work.
 
 using System;
 using System.Collections.Generic;
@@ -143,7 +143,7 @@ public static class Driver
             var diagnostic = string.IsNullOrWhiteSpace(sidecarUrl)
                 ? $"set {SidecarEnv} (or {SidecarFallbackEnv}) to a live Chio sidecar; "
                   + "the dotnet SDK does not embed kernel evaluation"
-                : "dotnet SDK driver sidecar wiring is operator-tactical; the M07.P6.T2 "
+                : "dotnet SDK driver sidecar wiring is not yet implemented; the "
                   + "scaffold registers the driver shape only";
             outcomes.Add(new ScenarioOutcome(id, "unsupported", expected, null, diagnostic));
         }

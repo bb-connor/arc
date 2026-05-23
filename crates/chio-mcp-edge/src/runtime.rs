@@ -318,7 +318,7 @@ fn bridge_mcp_tool_call_from_response(
     });
 
     if record_receipt_write {
-        // W2.4: emit `chio_receipt_write_total` at the MCP receipt-sink
+        // Emit `chio_receipt_write_total` at the MCP receipt-sink
         // boundary. PendingApproval is normal HITL flow, so it must not feed
         // infrastructure error burn-rate numerators.
         crate::metrics::record_receipt_write_verdict(response.verdict);

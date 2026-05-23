@@ -8,7 +8,7 @@ This roadmap is intentionally narrower than the full repo roadmap. It optimizes 
 
 - make SDK parity real enough that Chio has a credible multi-language adoption surface
 
-It does not replace the broader release-closeout work tracked in [POST_REVIEW_EXECUTION_PLAN.md](POST_REVIEW_EXECUTION_PLAN.md). It is the interop and adoption lane that should feed into that closeout.
+It does not replace the broader release-closeout work tracked in [POST_REVIEW_EXECUTION_PLAN.md](../archive/POST_REVIEW_EXECUTION_PLAN.md). It is the interop and adoption lane that should feed into that closeout.
 
 ## Execution Status
 

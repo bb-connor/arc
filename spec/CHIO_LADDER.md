@@ -320,8 +320,7 @@ partition_contingency < maintenance`. (Maintenance is the highest
 intensity because it requires authenticated operator presence, not
 because it is operationally most destructive.)
 
-Each mode mirrors the in-production STS contract
-([../../../swarm-team-six/docs/CONSENSUS.md](../../../swarm-team-six/docs/CONSENSUS.md)).
+Each mode mirrors the in-production STS consensus contract.
 
 ### 3.1 Observation
 
