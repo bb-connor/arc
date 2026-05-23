@@ -33,7 +33,7 @@ fn frame(
         },
         request_blob_sha256: "a".repeat(64),
         response_blob_sha256: "b".repeat(64),
-        redaction_pass_id: "m06-redactors@1.4.0+default".to_string(),
+        redaction_pass_id: "redactors@1.4.0+default".to_string(),
         verdict,
         deny_reason: deny_reason.map(str::to_string),
         would_have_blocked,
@@ -152,7 +152,7 @@ fn capture_redact_dedupe_bless_writes_replay_gate_shape() -> Result<(), Box<dyn 
     assert_eq!(checkpoint["frames_after_dedupe"], 2);
     assert_eq!(
         checkpoint["redaction_pass_ids"],
-        json!(["m06-redactors@1.4.0+default"])
+        json!(["redactors@1.4.0+default"])
     );
 
     let root = fs::read_to_string(fixture_dir.join(ROOT_FILENAME))?;

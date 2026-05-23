@@ -31,7 +31,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// Tenants reading the manifest can pin redactor behaviour by exact
 /// `pass_id`. Bumped when default coverage changes.
-pub const PASS_ID: &str = "m06-redactors@1.4.0+default";
+pub const PASS_ID: &str = "redactors@1.4.0+default";
 
 /// Mirror of the WIT `redact-class` flags.
 ///
@@ -97,7 +97,7 @@ pub struct RedactionMatch {
 /// Mirrors WIT `redaction-manifest`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RedactionManifest {
-    /// e.g. `"m06-redactors@1.4.0+default"`.
+    /// e.g. `"redactors@1.4.0+default"`.
     pub pass_id: String,
     pub matches: Vec<RedactionMatch>,
     pub elapsed_micros: u64,

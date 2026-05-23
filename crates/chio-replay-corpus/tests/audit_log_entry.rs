@@ -32,7 +32,7 @@ fn frame(
         },
         request_blob_sha256: "c".repeat(64),
         response_blob_sha256: "d".repeat(64),
-        redaction_pass_id: "m06-redactors@1.4.0+default".to_string(),
+        redaction_pass_id: "redactors@1.4.0+default".to_string(),
         verdict,
         deny_reason: None,
         would_have_blocked: false,
@@ -87,7 +87,7 @@ fn tee_bless_audit_event_records_required_fields_and_verifies_signature(
         operator,
         capture,
         fixture,
-        "m06-redactors@1.4.0+default",
+        "redactors@1.4.0+default",
     );
     let keypair = Keypair::from_seed(&[7u8; 32]);
     let entry = TeeBlessAuditEntry::sign(body, &keypair)?;
@@ -123,7 +123,7 @@ fn tee_bless_audit_event_records_required_fields_and_verifies_signature(
     assert_eq!(value["fixture"]["name"], "tool_call_with_pii");
     assert_eq!(value["fixture"]["path"], fixture_path);
     assert_eq!(value["fixture"]["receipts_root"], summary.root_hex);
-    assert_eq!(value["redaction_pass_id"], "m06-redactors@1.4.0+default");
+    assert_eq!(value["redaction_pass_id"], "redactors@1.4.0+default");
     assert_eq!(value["control_plane_capability"], TEE_BLESS_CAPABILITY);
     assert!(value["signature"]
         .as_str()
