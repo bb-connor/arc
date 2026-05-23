@@ -23,7 +23,7 @@ pub const SCHEMA_VERSION: &str = "1";
 
 /// `$id` URI for the v1 schema (informational; surfaced in error messages
 /// and may be used by external validators).
-pub const SCHEMA_ID: &str = "https://chio.dev/schemas/chio-tee-frame/v1.json";
+pub const SCHEMA_ID: &str = "https://chio.world/schemas/chio-tee-frame/v1.json";
 
 /// All ways a frame can violate the v1 schema invariants.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

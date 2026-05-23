@@ -1,4 +1,4 @@
-//! Writer for graduating TEE captures into the M04 replay fixture shape.
+//! Writer for graduating TEE captures into the replay fixture shape.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -13,28 +13,28 @@ use thiserror::Error;
 
 use crate::{dedupe_last_wins, reredact_default};
 
-/// M04 receipt-stream filename.
+/// Receipt-stream filename.
 pub const RECEIPTS_FILENAME: &str = "receipts.ndjson";
-/// M04 checkpoint filename.
+/// Checkpoint filename.
 pub const CHECKPOINT_FILENAME: &str = "checkpoint.json";
-/// M04 Merkle-root filename.
+/// Merkle-root filename.
 pub const ROOT_FILENAME: &str = "root.hex";
 
 const ROOT_LEN: usize = 32;
 const ROOT_HEX_LEN: usize = ROOT_LEN * 2;
 const TMP_SUFFIX: &str = ".tmp";
-const CHECKPOINT_SCHEMA: &str = "chio.replay.m04.bless-checkpoint/v1";
+const CHECKPOINT_SCHEMA: &str = "chio.replay.bless-checkpoint/v1";
 
-/// Parsed `<family>/<name>` scenario identity from an M04 fixture directory.
+/// Parsed `<family>/<name>` scenario identity from a fixture directory.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct M04Scenario {
+pub struct ReplayScenario {
     /// Scenario family directory.
     pub family: String,
     /// Scenario leaf directory.
     pub name: String,
 }
 
-impl M04Scenario {
+impl ReplayScenario {
     fn id(&self) -> String {
         format!("{}/{}", self.family, self.name)
     }
@@ -42,7 +42,7 @@ impl M04Scenario {
 
 /// Per-file byte sizes from a successful fixture write.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct M04ByteSizes {
+pub struct ByteSizes {
     /// Byte length of `receipts.ndjson`.
     pub receipts: u64,
     /// Byte length of `checkpoint.json`.
@@ -51,13 +51,13 @@ pub struct M04ByteSizes {
     pub root: u64,
 }
 
-/// Summary returned after writing one M04 fixture directory.
+/// Summary returned after writing one fixture directory.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct M04FixtureSummary {
+pub struct FixtureSummary {
     /// Directory written.
     pub dir: PathBuf,
     /// Scenario identity inferred from the directory.
-    pub scenario: M04Scenario,
+    pub scenario: ReplayScenario,
     /// Frames observed before dedupe.
     pub frames_in: usize,
     /// Frames retained after canonical-invocation last-wins dedupe.
@@ -67,12 +67,12 @@ pub struct M04FixtureSummary {
     /// Lowercase 64-character root written to `root.hex`.
     pub root_hex: String,
     /// Per-file byte sizes.
-    pub byte_sizes: M04ByteSizes,
+    pub byte_sizes: ByteSizes,
 }
 
-/// Errors emitted by the M04 fixture writer.
+/// Errors emitted by the fixture writer.
 #[derive(Debug, Error)]
-pub enum M04WriterError {
+pub enum WriterError {
     /// Input capture did not contain any frames.
     #[error("cannot bless an empty capture")]
     EmptyCapture,
@@ -82,8 +82,8 @@ pub enum M04WriterError {
     /// Target path contains a non-UTF-8 component.
     #[error("fixture directory component is not valid UTF-8: {0}")]
     NonUtf8Component(PathBuf),
-    /// Existing target directory contains files outside the M04 shape.
-    #[error("fixture directory contains non-M04 entry: {0}")]
+    /// Existing target directory contains files outside the fixture shape.
+    #[error("fixture directory contains non-fixture entry: {0}")]
     ExtraEntry(PathBuf),
     /// Existing target path is not a directory.
     #[error("fixture target exists but is not a directory: {0}")]
@@ -111,14 +111,14 @@ pub enum M04WriterError {
     },
 }
 
-/// Parse and validate that `dir` has an M04 `<family>/<name>` suffix.
-pub fn scenario_from_dir(dir: &Path) -> Result<M04Scenario, M04WriterError> {
+/// Parse and validate that `dir` has a `<family>/<name>` suffix.
+pub fn scenario_from_dir(dir: &Path) -> Result<ReplayScenario, WriterError> {
     let mut normal_components = Vec::new();
     for component in dir.components() {
         match component {
             Component::Normal(value) => {
                 let Some(text) = value.to_str() else {
-                    return Err(M04WriterError::NonUtf8Component(dir.to_path_buf()));
+                    return Err(WriterError::NonUtf8Component(dir.to_path_buf()));
                 };
                 normal_components.push(text.to_string());
             }
@@ -130,51 +130,48 @@ pub fn scenario_from_dir(dir: &Path) -> Result<M04Scenario, M04WriterError> {
     }
 
     if normal_components.len() < 2 {
-        return Err(M04WriterError::InvalidScenarioDir(dir.to_path_buf()));
+        return Err(WriterError::InvalidScenarioDir(dir.to_path_buf()));
     }
 
     let name = normal_components
         .pop()
-        .ok_or_else(|| M04WriterError::InvalidScenarioDir(dir.to_path_buf()))?;
+        .ok_or_else(|| WriterError::InvalidScenarioDir(dir.to_path_buf()))?;
     let family = normal_components
         .pop()
-        .ok_or_else(|| M04WriterError::InvalidScenarioDir(dir.to_path_buf()))?;
+        .ok_or_else(|| WriterError::InvalidScenarioDir(dir.to_path_buf()))?;
 
     if !valid_segment(&family) || !valid_segment(&name) {
-        return Err(M04WriterError::InvalidScenarioDir(dir.to_path_buf()));
+        return Err(WriterError::InvalidScenarioDir(dir.to_path_buf()));
     }
 
-    Ok(M04Scenario { family, name })
+    Ok(ReplayScenario { family, name })
 }
 
-/// Verify an existing target is either absent or already shaped like M04.
-pub fn validate_m04_scenario_dir(dir: &Path) -> Result<M04Scenario, M04WriterError> {
+/// Verify an existing target is either absent or already shaped like a fixture.
+pub fn validate_scenario_dir(dir: &Path) -> Result<ReplayScenario, WriterError> {
     let scenario = scenario_from_dir(dir)?;
     ensure_existing_shape_allows_write(dir)?;
     Ok(scenario)
 }
 
-/// Write a capture into one M04-compatible fixture directory.
-pub fn write_m04_fixture<I>(
-    dir: impl AsRef<Path>,
-    frames: I,
-) -> Result<M04FixtureSummary, M04WriterError>
+/// Write a capture into one fixture directory.
+pub fn write_fixture<I>(dir: impl AsRef<Path>, frames: I) -> Result<FixtureSummary, WriterError>
 where
     I: IntoIterator<Item = Frame>,
 {
     let dir = dir.as_ref();
-    let scenario = validate_m04_scenario_dir(dir)?;
+    let scenario = validate_scenario_dir(dir)?;
     let frames: Vec<Frame> = frames.into_iter().collect();
     if frames.is_empty() {
-        return Err(M04WriterError::EmptyCapture);
+        return Err(WriterError::EmptyCapture);
     }
     let frames_in = frames.len();
     let retained = dedupe_last_wins(frames)?;
     if retained.is_empty() {
-        return Err(M04WriterError::EmptyCapture);
+        return Err(WriterError::EmptyCapture);
     }
 
-    let mut set = M04FixtureSet::new(dir, scenario.clone());
+    let mut set = FixtureSet::new(dir, scenario.clone());
     let mut root_receipts = Vec::new();
     let mut redaction_pass_ids = BTreeSet::new();
 
@@ -204,9 +201,9 @@ where
     set.set_root(root);
 
     let committed = set.commit()?;
-    verify_exact_m04_shape(&committed.dir)?;
+    verify_exact_shape(&committed.dir)?;
 
-    Ok(M04FixtureSummary {
+    Ok(FixtureSummary {
         dir: committed.dir,
         scenario: committed.scenario,
         frames_in,
@@ -224,59 +221,59 @@ fn valid_segment(value: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.'))
 }
 
-fn ensure_existing_shape_allows_write(dir: &Path) -> Result<(), M04WriterError> {
+fn ensure_existing_shape_allows_write(dir: &Path) -> Result<(), WriterError> {
     match fs::metadata(dir) {
-        Ok(meta) if !meta.is_dir() => Err(M04WriterError::TargetNotDirectory(dir.to_path_buf())),
-        Ok(_) => verify_exact_m04_shape_or_empty(dir),
+        Ok(meta) if !meta.is_dir() => Err(WriterError::TargetNotDirectory(dir.to_path_buf())),
+        Ok(_) => verify_exact_shape_or_empty(dir),
         Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(()),
-        Err(source) => Err(M04WriterError::Io {
+        Err(source) => Err(WriterError::Io {
             path: dir.to_path_buf(),
             source,
         }),
     }
 }
 
-fn verify_exact_m04_shape_or_empty(dir: &Path) -> Result<(), M04WriterError> {
-    let mut entries = fs::read_dir(dir).map_err(|source| M04WriterError::Io {
+fn verify_exact_shape_or_empty(dir: &Path) -> Result<(), WriterError> {
+    let mut entries = fs::read_dir(dir).map_err(|source| WriterError::Io {
         path: dir.to_path_buf(),
         source,
     })?;
     entries.try_for_each(|entry| {
-        let entry = entry.map_err(|source| M04WriterError::Io {
+        let entry = entry.map_err(|source| WriterError::Io {
             path: dir.to_path_buf(),
             source,
         })?;
         let path = entry.path();
-        let file_type = entry.file_type().map_err(|source| M04WriterError::Io {
+        let file_type = entry.file_type().map_err(|source| WriterError::Io {
             path: path.clone(),
             source,
         })?;
-        if !file_type.is_file() || !is_m04_filename(&entry.file_name()) {
-            return Err(M04WriterError::ExtraEntry(path));
+        if !file_type.is_file() || !is_fixture_filename(&entry.file_name()) {
+            return Err(WriterError::ExtraEntry(path));
         }
         Ok(())
     })
 }
 
-fn verify_exact_m04_shape(dir: &Path) -> Result<(), M04WriterError> {
+fn verify_exact_shape(dir: &Path) -> Result<(), WriterError> {
     let mut seen = BTreeSet::new();
-    let entries = fs::read_dir(dir).map_err(|source| M04WriterError::Io {
+    let entries = fs::read_dir(dir).map_err(|source| WriterError::Io {
         path: dir.to_path_buf(),
         source,
     })?;
     for entry in entries {
-        let entry = entry.map_err(|source| M04WriterError::Io {
+        let entry = entry.map_err(|source| WriterError::Io {
             path: dir.to_path_buf(),
             source,
         })?;
         let path = entry.path();
-        let file_type = entry.file_type().map_err(|source| M04WriterError::Io {
+        let file_type = entry.file_type().map_err(|source| WriterError::Io {
             path: path.clone(),
             source,
         })?;
         let name = entry.file_name();
-        if !file_type.is_file() || !is_m04_filename(&name) {
-            return Err(M04WriterError::ExtraEntry(path));
+        if !file_type.is_file() || !is_fixture_filename(&name) {
+            return Err(WriterError::ExtraEntry(path));
         }
         if let Some(name) = name.to_str() {
             seen.insert(name.to_string());
@@ -290,11 +287,11 @@ fn verify_exact_m04_shape(dir: &Path) -> Result<(), M04WriterError> {
     if seen == expected {
         Ok(())
     } else {
-        Err(M04WriterError::InvalidScenarioDir(dir.to_path_buf()))
+        Err(WriterError::InvalidScenarioDir(dir.to_path_buf()))
     }
 }
 
-fn is_m04_filename(name: &std::ffi::OsStr) -> bool {
+fn is_fixture_filename(name: &std::ffi::OsStr) -> bool {
     matches!(
         name.to_str(),
         Some(RECEIPTS_FILENAME | CHECKPOINT_FILENAME | ROOT_FILENAME)
@@ -306,11 +303,11 @@ struct StrippedReceipt {
     redaction_pass_id: String,
 }
 
-fn stripped_receipt(frame: &Frame) -> Result<StrippedReceipt, M04WriterError> {
+fn stripped_receipt(frame: &Frame) -> Result<StrippedReceipt, WriterError> {
     let invocation_bytes = canonical_json_bytes(&frame.invocation)?;
     let redacted = reredact_default(&invocation_bytes)?;
     let invocation: Value = serde_json::from_slice(&redacted.bytes).map_err(|error| {
-        M04WriterError::RedactedInvocationJson {
+        WriterError::RedactedInvocationJson {
             event_id: frame.event_id.clone(),
             detail: error.to_string(),
         }
@@ -345,25 +342,25 @@ fn root_bytes(receipts_without_final_lf: &[u8], checkpoint: &[u8]) -> [u8; ROOT_
     root
 }
 
-struct M04FixtureSet {
+struct FixtureSet {
     dir: PathBuf,
-    scenario: M04Scenario,
+    scenario: ReplayScenario,
     receipts: Vec<u8>,
     receipt_count: usize,
     checkpoint: Option<Vec<u8>>,
     root: Option<[u8; ROOT_LEN]>,
 }
 
-struct M04CommittedSet {
+struct CommittedSet {
     dir: PathBuf,
-    scenario: M04Scenario,
+    scenario: ReplayScenario,
     receipt_count: usize,
     root_hex: String,
-    byte_sizes: M04ByteSizes,
+    byte_sizes: ByteSizes,
 }
 
-impl M04FixtureSet {
-    fn new(dir: &Path, scenario: M04Scenario) -> Self {
+impl FixtureSet {
+    fn new(dir: &Path, scenario: ReplayScenario) -> Self {
         Self {
             dir: dir.to_path_buf(),
             scenario,
@@ -388,17 +385,17 @@ impl M04FixtureSet {
         self.root = Some(root);
     }
 
-    fn commit(self) -> Result<M04CommittedSet, M04WriterError> {
+    fn commit(self) -> Result<CommittedSet, WriterError> {
         let Some(checkpoint) = self.checkpoint else {
-            return Err(M04WriterError::InvalidScenarioDir(self.dir));
+            return Err(WriterError::InvalidScenarioDir(self.dir));
         };
         let Some(root) = self.root else {
-            return Err(M04WriterError::InvalidScenarioDir(self.dir));
+            return Err(WriterError::InvalidScenarioDir(self.dir));
         };
         if self.receipt_count == 0 {
-            return Err(M04WriterError::EmptyCapture);
+            return Err(WriterError::EmptyCapture);
         }
-        fs::create_dir_all(&self.dir).map_err(|source| M04WriterError::Io {
+        fs::create_dir_all(&self.dir).map_err(|source| WriterError::Io {
             path: self.dir.clone(),
             source,
         })?;
@@ -408,7 +405,7 @@ impl M04FixtureSet {
         let root_path = self.dir.join(ROOT_FILENAME);
         let root_hex = hex::encode(root);
         if root_hex.len() != ROOT_HEX_LEN {
-            return Err(M04WriterError::Io {
+            return Err(WriterError::Io {
                 path: root_path,
                 source: io::Error::new(io::ErrorKind::InvalidData, "root hex length drifted"),
             });
@@ -430,19 +427,19 @@ impl M04FixtureSet {
         for ((path, _), tmp) in staged.iter().zip(tmp_paths.iter()) {
             if let Err(err) = fs::rename(tmp, path) {
                 cleanup_tmp(&tmp_paths);
-                return Err(M04WriterError::Io {
+                return Err(WriterError::Io {
                     path: path.clone(),
                     source: err,
                 });
             }
         }
 
-        Ok(M04CommittedSet {
+        Ok(CommittedSet {
             dir: self.dir.clone(),
             scenario: self.scenario,
             receipt_count: self.receipt_count,
             root_hex,
-            byte_sizes: M04ByteSizes {
+            byte_sizes: ByteSizes {
                 receipts: file_size(&self.dir.join(RECEIPTS_FILENAME))?,
                 checkpoint: file_size(&self.dir.join(CHECKPOINT_FILENAME))?,
                 root: file_size(&self.dir.join(ROOT_FILENAME))?,
@@ -457,21 +454,21 @@ fn staging_path(path: &Path) -> PathBuf {
     PathBuf::from(staging)
 }
 
-fn stage_file(path: &Path, bytes: &[u8]) -> Result<(), M04WriterError> {
+fn stage_file(path: &Path, bytes: &[u8]) -> Result<(), WriterError> {
     let mut file = fs::OpenOptions::new()
         .create(true)
         .write(true)
         .truncate(true)
         .open(path)
-        .map_err(|source| M04WriterError::Io {
+        .map_err(|source| WriterError::Io {
             path: path.to_path_buf(),
             source,
         })?;
-    file.write_all(bytes).map_err(|source| M04WriterError::Io {
+    file.write_all(bytes).map_err(|source| WriterError::Io {
         path: path.to_path_buf(),
         source,
     })?;
-    file.sync_all().map_err(|source| M04WriterError::Io {
+    file.sync_all().map_err(|source| WriterError::Io {
         path: path.to_path_buf(),
         source,
     })?;
@@ -484,10 +481,10 @@ fn cleanup_tmp(paths: &[PathBuf]) {
     }
 }
 
-fn file_size(path: &Path) -> Result<u64, M04WriterError> {
+fn file_size(path: &Path) -> Result<u64, WriterError> {
     fs::metadata(path)
         .map(|meta| meta.len())
-        .map_err(|source| M04WriterError::Io {
+        .map_err(|source| WriterError::Io {
             path: path.to_path_buf(),
             source,
         })
@@ -533,7 +530,7 @@ mod tests {
     }
 
     #[test]
-    fn writes_m04_shape_and_strips_capture_only_fields() {
+    fn writes_fixture_shape_and_strips_capture_only_fields() {
         let tmp = tempfile::TempDir::new().unwrap();
         let dir = tmp
             .path()
@@ -552,7 +549,7 @@ mod tests {
             ),
         ];
 
-        let summary = write_m04_fixture(&dir, frames).unwrap();
+        let summary = write_fixture(&dir, frames).unwrap();
 
         assert_eq!(summary.frames_in, 2);
         assert_eq!(summary.frames_after_dedupe, 1);
@@ -578,21 +575,21 @@ mod tests {
     }
 
     #[test]
-    fn refuses_existing_non_m04_directory_shape() {
+    fn refuses_existing_non_fixture_directory_shape() {
         let tmp = tempfile::TempDir::new().unwrap();
         let dir = tmp.path().join("family").join("name");
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("extra.txt"), b"no").unwrap();
 
-        let err = validate_m04_scenario_dir(&dir).unwrap_err();
-        assert!(matches!(err, M04WriterError::ExtraEntry(_)));
+        let err = validate_scenario_dir(&dir).unwrap_err();
+        assert!(matches!(err, WriterError::ExtraEntry(_)));
     }
 
     #[test]
     fn root_matches_receipts_without_final_lf_plus_checkpoint() {
         let tmp = tempfile::TempDir::new().unwrap();
         let dir = tmp.path().join("family").join("name");
-        let summary = write_m04_fixture(
+        let summary = write_fixture(
             &dir,
             vec![frame(
                 "01H7ZZZZZZZZZZZZZZZZZZZZZC",

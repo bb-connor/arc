@@ -31,7 +31,7 @@ use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 
 const VC_CONTEXT_V1: &str = "https://www.w3.org/2018/credentials/v1";
-const CHIO_CREDENTIAL_CONTEXT_V1: &str = "https://chio.dev/credentials/v1";
+const CHIO_CREDENTIAL_CONTEXT_V1: &str = "https://chio.world/credentials/v1";
 const VC_TYPE: &str = "VerifiableCredential";
 const REPUTATION_ATTESTATION_TYPE: &str = "ChioReputationAttestation";
 const PASSPORT_SCHEMA: &str = "chio.agent-passport.v1";

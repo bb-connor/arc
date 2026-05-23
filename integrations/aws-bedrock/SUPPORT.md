@@ -1,8 +1,8 @@
 # Support And SLA
 
-Support contact: `support@chio.dev`
+Support contact: `support@chio.world`
 
-Security contact: `security@chio.dev`
+Security contact: `security@chio.world`
 
 ## SLA
 

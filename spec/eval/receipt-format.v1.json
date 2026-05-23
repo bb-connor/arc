@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://chio.dev/spec/eval/receipt-format.v1.json",
+  "$id": "https://chio.world/spec/eval/receipt-format.v1.json",
   "title": "Chio eval-report receipt bundle v1",
   "description": "Schema chio.eval-report.bundle.v1. The outer signature covers the bundle with signatures removed and the remaining JSON canonicalized as rfc8785.",
   "type": "object",

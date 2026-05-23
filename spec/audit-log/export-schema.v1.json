@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://chio.dev/spec/audit-log/export-schema.v1.json",
+  "$id": "https://chio.world/spec/audit-log/export-schema.v1.json",
   "title": "Chio Audit Log Export Schema v1",
   "type": "object",
   "additionalProperties": false,

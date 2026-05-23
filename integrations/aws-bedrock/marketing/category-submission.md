@@ -3,7 +3,7 @@
 Submission date: 2026-05-02
 AWS Marketplace category: AI Agents and Tools
 Listing: Chio Bedrock Governance
-Primary support contact: support@chio.dev
+Primary support contact: support@chio.world
 
 ## Placement Request
 

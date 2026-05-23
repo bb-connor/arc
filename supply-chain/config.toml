@@ -157,12 +157,6 @@ audit-as-crates-io = true
 [policy.chio-mcp-remote]
 audit-as-crates-io = true
 
-[policy.chio-mercury]
-audit-as-crates-io = true
-
-[policy.chio-mercury-core]
-audit-as-crates-io = true
-
 [policy.chio-metering]
 audit-as-crates-io = true
 
@@ -789,14 +783,6 @@ version = "0.1.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.chio-mcp-edge]]
-version = "0.1.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.chio-mercury]]
-version = "0.1.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.chio-mercury-core]]
 version = "0.1.0"
 criteria = "safe-to-deploy"
 

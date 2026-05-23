@@ -1,11 +1,11 @@
-//! Auto-promotion to M04 fixtures via the existing CHIO_BLESS gate
+//! Auto-promotion to fixtures via the existing CHIO_BLESS gate
 //! (BLESS_REASON=arena:<scenario-id>).
 
 use std::collections::HashMap;
 
 use chio_arena::{
-    parse_scenario_str, promote_to_m04_fixtures, ArenaReceipt, ArenaRun, BlessEnv, PromoteError,
-    ScenarioVerdict, ARENA_M04_PROMOTE_CAP_DEFAULT,
+    parse_scenario_str, promote_to_fixtures, ArenaReceipt, ArenaRun, BlessEnv, PromoteError,
+    ScenarioVerdict, ARENA_PROMOTE_CAP_DEFAULT,
 };
 use chio_core::crypto::{sha256_hex, Keypair};
 use chio_core::receipt::{ChioReceipt, ChioReceiptBody, Decision, ToolCallAction, TrustLevel};
@@ -135,12 +135,12 @@ fn writes_fixture_under_arena_class_namespace() -> Result<(), Box<dyn std::error
         .with("CHIO_BLESS", "1")
         .with("BLESS_REASON", "arena:promote_demo");
 
-    let summary = promote_to_m04_fixtures(
+    let summary = promote_to_fixtures(
         &scenario,
         &run,
         fixtures_root,
         "prompt-injection",
-        ARENA_M04_PROMOTE_CAP_DEFAULT,
+        ARENA_PROMOTE_CAP_DEFAULT,
         &env,
     )?;
 
@@ -156,7 +156,7 @@ fn writes_fixture_under_arena_class_namespace() -> Result<(), Box<dyn std::error
     let parsed: Value = serde_json::from_slice(&bytes)?;
     assert_eq!(
         parsed["schema_version"],
-        Value::String("chio.arena.m04-fixture/v1".to_string())
+        Value::String("chio.arena.fixture/v1".to_string())
     );
     assert_eq!(parsed["bless_reason"], "arena:promote_demo");
     assert_eq!(parsed["expected_verdict"], "deny");
@@ -171,7 +171,7 @@ fn refuses_without_chio_bless() -> Result<(), Box<dyn std::error::Error>> {
     let tmp = tempfile::tempdir()?;
     let env = StubEnv::default().with("BLESS_REASON", "arena:promote_demo");
 
-    let result = promote_to_m04_fixtures(&scenario, &run, tmp.path(), "prompt-injection", 5, &env);
+    let result = promote_to_fixtures(&scenario, &run, tmp.path(), "prompt-injection", 5, &env);
     match result {
         Err(PromoteError::BlessGate { clause }) => {
             assert!(clause.contains("CHIO_BLESS"), "got {clause}");
@@ -191,7 +191,7 @@ fn refuses_when_ci_is_truthy() -> Result<(), Box<dyn std::error::Error>> {
         .with("BLESS_REASON", "arena:promote_demo")
         .with("CI", "true");
 
-    let result = promote_to_m04_fixtures(&scenario, &run, tmp.path(), "prompt-injection", 5, &env);
+    let result = promote_to_fixtures(&scenario, &run, tmp.path(), "prompt-injection", 5, &env);
     match result {
         Err(PromoteError::BlessGate { clause }) => {
             assert!(clause.contains("CI"), "got {clause}");
@@ -211,7 +211,7 @@ fn refuses_when_bless_reason_does_not_match_scenario_id() -> Result<(), Box<dyn 
         .with("CHIO_BLESS", "1")
         .with("BLESS_REASON", "arena:other_scenario");
 
-    let result = promote_to_m04_fixtures(&scenario, &run, tmp.path(), "prompt-injection", 5, &env);
+    let result = promote_to_fixtures(&scenario, &run, tmp.path(), "prompt-injection", 5, &env);
     match result {
         Err(PromoteError::BlessGate { clause }) => {
             assert!(clause.contains("scenario-id"), "got {clause}");
@@ -241,20 +241,17 @@ fn enforces_per_run_cap() -> Result<(), Box<dyn std::error::Error>> {
         .with("CHIO_BLESS", "1")
         .with("BLESS_REASON", "arena:promote_capped");
 
-    let summary = promote_to_m04_fixtures(
+    let summary = promote_to_fixtures(
         &scenario,
         &run,
         tmp.path(),
         "prompt-injection",
-        ARENA_M04_PROMOTE_CAP_DEFAULT,
+        ARENA_PROMOTE_CAP_DEFAULT,
         &env,
     )?;
 
-    assert_eq!(summary.fixtures.len(), ARENA_M04_PROMOTE_CAP_DEFAULT);
-    assert_eq!(
-        summary.receipts_skipped_cap,
-        10 - ARENA_M04_PROMOTE_CAP_DEFAULT
-    );
+    assert_eq!(summary.fixtures.len(), ARENA_PROMOTE_CAP_DEFAULT);
+    assert_eq!(summary.receipts_skipped_cap, 10 - ARENA_PROMOTE_CAP_DEFAULT);
     Ok(())
 }
 

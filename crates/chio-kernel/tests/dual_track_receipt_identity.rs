@@ -33,7 +33,7 @@ const M04_TEST_KEY_SEED: &[u8; 32] = include_bytes!("../../../tests/replay/test-
 const M04_FIXED_CLOCK_UNIX_SECS: u64 = 1_767_225_600;
 
 #[derive(Debug, Deserialize)]
-struct M04ReplayFixture {
+struct ReplayFixtureMeta {
     clock: String,
     expected_verdict: String,
     family: String,
@@ -42,7 +42,7 @@ struct M04ReplayFixture {
 }
 
 #[derive(Debug, Deserialize)]
-struct M04GoldenReceiptLine {
+struct GoldenReceiptLine {
     nonce: String,
     scenario: String,
     verdict: String,
@@ -85,8 +85,8 @@ fn make_config(keypair: Keypair) -> KernelConfig {
     }
 }
 
-fn load_m04_fixture() -> (M04ReplayFixture, M04GoldenReceiptLine) {
-    let fixture: M04ReplayFixture =
+fn load_m04_fixture() -> (ReplayFixtureMeta, GoldenReceiptLine) {
+    let fixture: ReplayFixtureMeta =
         serde_json::from_str(M04_FIXTURE).expect("M04 replay fixture parses");
     assert_eq!(fixture.schema_version, "v1");
     assert_eq!(fixture.family, "allow_simple");
@@ -98,7 +98,7 @@ fn load_m04_fixture() -> (M04ReplayFixture, M04GoldenReceiptLine) {
         .lines()
         .next()
         .expect("M04 golden receipt stream has a first line");
-    let golden: M04GoldenReceiptLine =
+    let golden: GoldenReceiptLine =
         serde_json::from_str(golden_line).expect("M04 golden receipt line parses");
     assert_eq!(golden.scenario, fixture.name);
     assert_eq!(golden.verdict, fixture.expected_verdict);

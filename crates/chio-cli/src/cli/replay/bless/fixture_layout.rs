@@ -2,13 +2,13 @@
 
 fn validate_replay_bless_into_path(
     path: &Path,
-) -> Result<chio_replay_corpus::M04Scenario, CliError> {
-    chio_replay_corpus::validate_m04_scenario_dir(path).map_err(map_replay_fixture_error)
+) -> Result<chio_replay_corpus::ReplayScenario, CliError> {
+    chio_replay_corpus::validate_scenario_dir(path).map_err(map_replay_fixture_error)
 }
 
-fn map_replay_fixture_error(error: chio_replay_corpus::M04WriterError) -> CliError {
+fn map_replay_fixture_error(error: chio_replay_corpus::WriterError) -> CliError {
     match error {
-        chio_replay_corpus::M04WriterError::Io { path, source } => CliError::cli_io_error(format!(
+        chio_replay_corpus::WriterError::Io { path, source } => CliError::cli_io_error(format!(
             "invalid replay fixture directory {}: {source}",
             path.display()
         )),

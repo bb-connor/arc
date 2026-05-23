@@ -3732,32 +3732,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "chio-mercury"
-version = "0.1.0"
-dependencies = [
- "chio-control-plane",
- "chio-core-types",
- "chio-kernel",
- "chio-mercury-core",
- "chio-store-sqlite",
- "chrono",
- "clap 4.6.0",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "chio-mercury-core"
-version = "0.1.0"
-dependencies = [
- "chio-core-types",
- "chio-kernel",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "chio-metering"
 version = "0.1.0"
 dependencies = [

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://spec.chio.dev/errors/registry.schema.json",
+  "$id": "https://spec.chio.world/errors/registry.schema.json",
   "title": "Chio URN error registry",
   "type": "object",
   "additionalProperties": false,

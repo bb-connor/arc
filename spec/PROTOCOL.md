@@ -2654,7 +2654,7 @@ The profile is intentionally narrow:
   `response_mode=direct_post.jwt`
 - Chio currently supports exactly one requested credential with format
   `application/dc+sd-jwt` and type
-  `https://chio.dev/credentials/types/chio-passport-sd-jwt-vc/v1`
+  `https://chio.world/credentials/types/chio-passport-sd-jwt-vc/v1`
 - verifier trust bootstrap is one Chio verifier metadata document plus one
   verifier `JWKS`
 - verifier or issuer key rotation may preserve active request and credential

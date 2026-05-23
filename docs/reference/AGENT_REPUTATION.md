@@ -494,7 +494,7 @@ A receipt-derived reputation attestation maps to a W3C Verifiable Credential
 
 | VC Field | Chio Source |
 |----------|-----------------|
-| `@context` | `["https://www.w3.org/2018/credentials/v1", "https://chio.dev/credentials/v1"]` |
+| `@context` | `["https://www.w3.org/2018/credentials/v1", "https://chio.world/credentials/v1"]` |
 | `type` | `["VerifiableCredential", "ChioReputationAttestation"]` |
 | `issuer` | Kernel or authority key that computed the attestation |
 | `issuanceDate` | Attestation issuance time |

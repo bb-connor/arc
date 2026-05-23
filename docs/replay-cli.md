@@ -46,8 +46,8 @@ Required fields:
   "event": "tee.bless",
   "ts": "2026-04-25T18:02:11.418Z",
   "operator": {
-    "id": "did:web:integrations.chio.dev:alice",
-    "git_user": "alice@chio.dev"
+    "id": "did:web:integrations.chio.world:alice",
+    "git_user": "alice@chio.world"
   },
   "capture": {
     "path": "captures/01JTEE00000000000000000000.ndjson",

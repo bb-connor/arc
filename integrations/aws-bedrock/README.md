@@ -58,4 +58,4 @@ lookup, IAM principal binding, guard evaluation, receipt issuance, or
 metering preparation fails, Chio denies the request before unmetered
 Bedrock traffic is released.
 
-Support: `support@chio.dev`. Security contact: `security@chio.dev`.
+Support: `support@chio.world`. Security contact: `security@chio.world`.

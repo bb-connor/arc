@@ -108,7 +108,6 @@ The primary live release documents. Auditors and operators start here.
 
 ## Products built on Chio
 
-- [Mercury documentation suite](mercury/README.md) - finance-specific product layer for regulated trading workflows (product briefs, decision records, operations, and validation packages)
 - [Chio-Wall documentation suite](chio-wall/README.md) - companion product recording tool-boundary control evidence for information-domain separation
 
 ## Operations and planning

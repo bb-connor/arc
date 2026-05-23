@@ -2,7 +2,7 @@ use std::fs;
 
 use chio_core::Keypair;
 use chio_replay_corpus::{
-    write_m04_fixture, write_tee_bless_audit_entry, BlessCapture, BlessFixture, BlessOperator,
+    write_fixture, write_tee_bless_audit_entry, BlessCapture, BlessFixture, BlessOperator,
     TeeBlessAuditBody, TeeBlessAuditEntry, TEE_BLESS_CAPABILITY, TEE_BLESS_EVENT,
 };
 use chio_tee_frame::{Frame, FrameInputs, Otel, Provenance, Upstream, UpstreamSystem, Verdict};
@@ -64,11 +64,11 @@ fn tee_bless_audit_event_records_required_fields_and_verifies_signature(
             Verdict::Allow,
         )?,
     ];
-    let summary = write_m04_fixture(&fixture_dir, frames)?;
+    let summary = write_fixture(&fixture_dir, frames)?;
     let fixture_path = "tests/replay/fixtures/openai_responses_shadow/tool_call_with_pii/";
     let operator = BlessOperator {
-        id: "did:web:integrations.chio.dev:alice".to_string(),
-        git_user: "alice@chio.dev".to_string(),
+        id: "did:web:integrations.chio.world:alice".to_string(),
+        git_user: "alice@chio.world".to_string(),
     };
     let capture = BlessCapture {
         path: capture_path.to_string(),
@@ -106,9 +106,9 @@ fn tee_bless_audit_event_records_required_fields_and_verifies_signature(
     assert_eq!(value["event"], TEE_BLESS_EVENT);
     assert_eq!(
         value["operator"]["id"],
-        "did:web:integrations.chio.dev:alice"
+        "did:web:integrations.chio.world:alice"
     );
-    assert_eq!(value["operator"]["git_user"], "alice@chio.dev");
+    assert_eq!(value["operator"]["git_user"], "alice@chio.world");
     assert_eq!(value["capture"]["path"], capture_path);
     assert_eq!(value["capture"]["frames_in"], summary.frames_in);
     assert_eq!(

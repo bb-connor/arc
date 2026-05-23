@@ -126,7 +126,15 @@ allowed_assumption_modules = [
   "Chio.Core.Revocation",
 ]
 
-allowed_axioms = []
+allowed_axioms = [
+  # ASSUMED, not proven. Receipt content-addressing injectivity over the
+  # ChioReceiptIdInput canonical-bytes set. Declared as a Lean axiom because
+  # the bounded ReceiptBody model has no modeled JCS canonicalizer or hash;
+  # see assume.receipt.id_collision_resistant in theorem-inventory.json and
+  # ASSUME-SHA256 in formal/assumptions.toml. Replaces the prior
+  # id_input_set_pinned reflexivity tautology.
+  "Chio.Proofs.receipt_id_collision_resistant",
+]
 
 allowed_open_modules = [
   "Chio.Core",

@@ -42,7 +42,7 @@ fn cmd_replay_bless(args: &ReplayArgs, log: &Path) -> Result<(), CliError> {
         frames.push(record.frame);
     }
 
-    let summary = chio_replay_corpus::write_m04_fixture(into, frames)
+    let summary = chio_replay_corpus::write_fixture(into, frames)
         .map_err(map_replay_fixture_error)?;
 
     let mut stdout = std::io::stdout().lock();

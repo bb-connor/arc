@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://chio.dev/schemas/model-card.v1.json",
+  "$id": "https://chio.world/schemas/model-card.v1.json",
   "title": "Chio Model Card v1",
   "description": "Signed declaration that binds a model's loaded weights to an allowed capability set, banned tools, and training-data class. Locked under the M10 P4 trust-boundary milestone. The kernel refuses to bind a provider whose loaded weights or requested scopes do not match a card.",
   "type": "object",

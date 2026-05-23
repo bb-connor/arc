@@ -281,7 +281,7 @@ The `WasmGuardConfig` currently supports a filesystem `path`. Future options:
 | Source | Config field | Notes |
 |--------|-------------|-------|
 | Local file | `path: /etc/chio/guards/pii.wasm` | Current |
-| HTTP URL | `url: https://registry.chio.dev/guards/pii/1.0.0` | Download + cache |
+| HTTP URL | `url: https://registry.chio.world/guards/pii/1.0.0` | Download + cache |
 | Inline base64 | `wasm_base64: AGFzbQEA...` | Embedded in config (small guards only) |
 | OCI registry | `oci: ghcr.io/org/pii-guard:1.0` | Pull from container registry |
 

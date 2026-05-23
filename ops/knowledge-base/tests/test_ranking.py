@@ -51,9 +51,8 @@ def test_global_hubs_are_marked_for_suppression() -> None:
     assert "guard:guard" in query.GLOBAL_HUB_IDS
 
 
-def test_intent_classification_separates_release_and_mercury() -> None:
+def test_intent_classification_identifies_release_qualification() -> None:
     assert query.detect_query_intent("release qualification evidence export compliance certificate") == "release-qualification"
-    assert query.detect_query_intent("Mercury assurance release renewal qualification") == "mercury-product"
 
 
 def test_multi_intent_classification_keeps_guard_and_receipt() -> None:

@@ -251,7 +251,7 @@ pub struct IssuedScope {
     /// Tool name the capability authorises.
     pub tool: String,
     /// Set of nonces the kernel has already observed; reuse triggers
-    /// fail-closed under the M04 replay-attack family rules.
+    /// fail-closed under the replay-attack family rules.
     pub seen_nonces: BTreeMap<String, ()>,
     /// Whether the capability has been revoked or expired.
     pub revoked: bool,

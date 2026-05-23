@@ -65,6 +65,6 @@ mod tests {
     fn bridge_exposes_schema_constants() {
         assert_eq!(SCHEMA_VERSION, "1");
         assert_eq!(FRAME_VERSION, "chio-tee-frame.v1");
-        assert!(SCHEMA_ID.starts_with("https://chio.dev/schemas/chio-tee-frame/"));
+        assert!(SCHEMA_ID.starts_with("https://chio.world/schemas/chio-tee-frame/"));
     }
 }

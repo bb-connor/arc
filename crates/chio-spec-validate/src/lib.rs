@@ -183,7 +183,7 @@ impl Retrieve for LocalSchemaRetriever {
         uri: &Uri<String>,
     ) -> Result<Value, Box<dyn std::error::Error + Send + Sync>> {
         match uri.scheme().as_str() {
-            "https" if uri.as_str().starts_with("https://chio.dev/schemas/") => {
+            "https" if uri.as_str().starts_with("https://chio.world/schemas/") => {
                 let relative = uri
                     .path()
                     .as_str()
@@ -293,7 +293,7 @@ mod tests {
             &schema_path,
             serde_json::to_vec_pretty(&json!({
                 "$schema": "https://json-schema.org/draft/2020-12/schema",
-                "$id": "https://chio.dev/schemas/test/v1/root.schema.json",
+                "$id": "https://chio.world/schemas/test/v1/root.schema.json",
                 "type": "object",
                 "additionalProperties": false,
                 "required": ["name"],
@@ -310,7 +310,7 @@ mod tests {
             &sibling_path,
             serde_json::to_vec_pretty(&json!({
                 "$schema": "https://json-schema.org/draft/2020-12/schema",
-                "$id": "https://chio.dev/schemas/test/v1/sibling.schema.json",
+                "$id": "https://chio.world/schemas/test/v1/sibling.schema.json",
                 "$defs": {
                     "name": {
                         "type": "string",

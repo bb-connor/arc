@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://chio.dev/schemas/chio-tee-frame/v1.json",
+  "$id": "https://chio.world/schemas/chio-tee-frame/v1.json",
   "title": "chio-tee-frame.v1",
   "description": "Capture frame emitted by the chio-tee shadow runner per kernel evaluation. Mirrors the Rust types in crates/chio-tee-frame.",
   "type": "object",
