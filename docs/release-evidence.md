@@ -62,7 +62,7 @@ index is the stable reviewer index.
 
 ## Reproducibility Scope
 
-Trajectory-3 M03 promises Linux x86_64 reproducibility for the `chio` binary.
+M03 promises Linux x86_64 reproducibility for the `chio` binary.
 macOS and Windows release archives are still checksum-published and signed, but
 they are not claimed to be byte-reproducible in v3.18 because codesign and PE
 timestamp behavior remains platform-dependent.

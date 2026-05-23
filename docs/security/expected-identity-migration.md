@@ -1,8 +1,8 @@
 # Expected-Identity Migration Audit (M05 Phase 4)
 
-Source-of-truth design: `.planning/trajectory-2/05-adversarial-escape-threat-model.md`
-(Phase 4). This document is the M05.P4.T4 deliverable and is updated whenever
-a new `ExpectedIdentity` call site lands in the workspace.
+Source-of-truth design: the adversarial-escape threat model in
+`spec/PROTOCOL.md`. This document is the M05.P4.T4 deliverable and is
+updated whenever a new `ExpectedIdentity` call site lands in the workspace.
 
 ## Summary
 
@@ -175,7 +175,7 @@ Adding a new call site:
 
 ## Future work
 
-- **trajectory-2 M03**: when ML-DSA cert identities ship, the
+- **M03 (PQ identities)**: when ML-DSA cert identities ship, the
   `pq_identity_regexps` reserved field on `TenantPolicy` becomes load-bearing
   and the resolver gains a `pq_expected_for_tenant` accessor. The M03 PR
   updates this audit doc with the new accessor's call sites.

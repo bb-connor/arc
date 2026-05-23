@@ -8,7 +8,6 @@ name: CI
 #     - "MSRV build and test"                                # msrv job
 #     - "cargo-vet (supply-chain audit)"                     # cargo-vet job
 #     - "cargo-deny (supply-chain bans/advisories/licenses)" # cargo-deny job
-#     - "freeze-guard"                                       # m05-freeze-guard.yml
 #     - "bench-regression"                                   # bench-regression.yml
 #
 #   advisory (do not gate):
@@ -209,7 +208,6 @@ jobs:
           bash ./scripts/check-log-redaction.sh
           bash ./scripts/check-http-egress-contract.sh
           bash ./scripts/tests/check-http-egress-contract.test.sh
-          bash ./scripts/tests/check-bounded-ship-bar.test.sh
 
       - name: Anchor batch async witness lint
         run: bash ./scripts/check-anchor-batch-async-witness.sh

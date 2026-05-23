@@ -39,7 +39,7 @@ The operator must keep these constraints true:
 - One PagerDuty service named `chio-healthcare-pilot-prod`.
 
 Do not widen the pilot to multi-tenant, multi-region, public transparency-log,
-or consensus HA claims. Those claims are outside trajectory-3 M01.
+or consensus HA claims. Those claims are outside the M01 scope.
 
 ## Runtime Surfaces
 
@@ -71,7 +71,7 @@ shadow mode.
 
 ## Evidence Links
 
-Evidence lands in `.planning/trajectory-3/audits/M01-healthcare-pilot.md`.
+Evidence lands in `compliance/hitrust/evidence-bundles/2026-05-02/M01/audit/M01-healthcare-pilot.md`.
 
 - P0 opened audit hard counts and the topology baseline.
 - P1 hardens this runbook and wires PagerDuty.

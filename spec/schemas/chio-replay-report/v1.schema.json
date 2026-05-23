@@ -56,7 +56,7 @@
                 "redaction_mismatch",
                 "merkle_mismatch"
               ],
-              "description": "Divergence shape. The set of valid values mirrors the canonical exit-code registry in `.planning/trajectory/04-deterministic-replay.md` Phase 4 plus `merkle_mismatch` for the `--expect-root` mismatch case."
+              "description": "Divergence shape. The enumerated values are the canonical deterministic-replay divergence kinds (`verdict_drift`, `signature_mismatch`, `parse_error`, `schema_mismatch`, `redaction_mismatch`) plus `merkle_mismatch` for the `--expect-root` mismatch case. See `spec/PROTOCOL.md` for the deterministic-replay contract."
             },
             "receipt_index": {
               "type": "integer",

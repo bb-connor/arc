@@ -2,7 +2,7 @@
 
 Status: shipped (M10)
 Trust-boundary verdict satisfied: [docs/trust-boundary-browser-signing.md](../trust-boundary-browser-signing.md)
-Operational-equivalence oracle: trajectory-1 M07 verdict-equality oracle
+Operational-equivalence oracle: the M07 verdict-equality oracle
 Last updated: 2026-04-30
 
 This page is a one-page narrative of the policy-bound model-card
@@ -53,11 +53,11 @@ The card cosign bundle helper
 `chio_attest_verify::SigstoreVerifier::verify_bundle` from
 [`crates/chio-attest-verify/`](../../crates/chio-attest-verify/).
 M10 does not introduce a new trust root or a new signature path; the
-M09 cosign bundle verifier (and the trajectory-2 M03 PQ-hybrid
-surface) is consumed verbatim.
+M09 cosign bundle verifier (and the M03 PQ-hybrid surface) is
+consumed verbatim.
 
 `policy.weights_card_required = required_with_pin` adds an issuer
-SAN regex pin from the trajectory-2 M07 provider matrix. Invalid
+SAN regex pin from the M07 provider matrix. Invalid
 combinations (`required` with no issuer configured) reject at
 policy load (`crates/chio-policy/src/weights.rs`), not at first
 bind, so the failure surfaces immediately at deployment.
@@ -65,8 +65,8 @@ bind, so the failure surfaces immediately at deployment.
 ## 3. Operational equivalence
 
 Two model cards A and B are operationally equivalent when, given
-the canonical scenario corpus from the trajectory-1 M07
-verdict-equality oracle, providers bound under each card produce
+the canonical scenario corpus from the M07 verdict-equality
+oracle, providers bound under each card produce
 verdict-equivalent outputs at every scenario.
 
 The cross-provider equivalence test
@@ -109,7 +109,7 @@ whose digest format mirrors
    rekor_inclusion_verified
 ```
 
-The anchor reuses the trajectory-2 M09 `chio-lineage`
+The anchor reuses the M09 `chio-lineage`
 `FrontierDigest`, `CanonicalSource`, and `SigningState` shapes
 verbatim so the public registry serves a single artifact format
 across both lineage-graph and model-card anchors. M03 hybrid
@@ -148,7 +148,7 @@ of `docs/security/threat-coverage.md` once the M05 P5.T5 doc
 generator runs.
 
 `covered` and `partial` both PASS the M05 P5.T4 threat-model-
-coverage CI gate per trajectory-2 EXECUTION-BOARD.md section 9.
+coverage CI gate.
 
 ## 7. Pointers
 
@@ -160,5 +160,4 @@ coverage CI gate per trajectory-2 EXECUTION-BOARD.md section 9.
 - CLI: `crates/chio-cli/src/commands/bind.rs`
 - Lineage anchor: `crates/chio-weights/src/lineage.rs`
 - Equivalence oracle: `crates/chio-weights/tests/equivalence.rs`
-- Audit doc: `.planning/audits/M10-hardware-custody-and-model-cards.md`
 - Coverage map: `spec/security/coverage.yaml`

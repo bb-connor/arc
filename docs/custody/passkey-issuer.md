@@ -46,7 +46,7 @@ once (replay guard).
 
 ## 2. The verdict M10 satisfies
 
-The trajectory-1 M08.P3 verdict at
+The M08.P3 verdict at
 [`docs/trust-boundary-browser-signing.md`](../trust-boundary-browser-signing.md)
 named four required pieces of evidence before any browser-resident
 signing material was reconsidered. M10 lands all four, except it does
@@ -89,7 +89,7 @@ locks the contract.
 ## 5. Revocation cascade
 
 When the issuer marks a credential revoked, it pushes a revocation
-entry into the trajectory-2 M04 oracle
+entry into the M04 revocation oracle
 (`crates/chio-revocation-oracle/`) keyed by
 `(issuer_id, credential_id)`. The kernel rejects capabilities whose
 credential is revoked at the next M04 epoch. The end-to-end test
@@ -100,7 +100,7 @@ test harness).
 
 ## 6. PQ-hybrid posture
 
-Capabilities sign through the trajectory-2 M03 `HybridBackend` so
+Capabilities sign through the M03 `HybridBackend` so
 the audience pin survives PQ migration. With
 `crypto_floor=allow_classical`, capabilities are byte-identical to
 the classical case; with `crypto_floor=allow_hybrid`, capabilities
@@ -123,5 +123,4 @@ register is at `spec/security/chio-threat-model.v1.json`.
 - Browser helper: `sdks/typescript/packages/passkey/`
 - Demo: `docs/demo/passkey/index.html`
 - Verdict: `docs/trust-boundary-browser-signing.md`
-- Audit doc: `.planning/audits/M10-hardware-custody-and-model-cards.md`
 - Coverage map: `spec/security/coverage.yaml`

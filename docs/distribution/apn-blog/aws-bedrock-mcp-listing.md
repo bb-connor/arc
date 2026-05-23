@@ -131,7 +131,7 @@ surfaces.
 This draft is submitted for AWS Solutions Architect review and APN technical
 content review before public posting. Publication may follow later, because
 co-authored AWS content often has an editorial queue after the technical review
-is complete. The closure condition for trajectory-3 is therefore the submitted
+is complete. The closure condition for this milestone is therefore the submitted
 draft plus SA review, not a live blog URL. The live listing URL, MCP registry
 entry, conformance pass count, support SLA, Standard Contract for AWS
 Marketplace posture, Quick Launch template, and post-listing smoke test are the

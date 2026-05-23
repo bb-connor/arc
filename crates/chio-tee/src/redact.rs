@@ -1,17 +1,17 @@
 //! Mandatory M06 redactor pass for the tee shadow runner (M10 Phase 1
 //! Task 6).
 //!
-//! The trajectory doc (`.planning/trajectory/10-tee-replay-harness.md`)
-//! pins three normative behaviours wired by this module:
+//! The normative spec (`spec/PROTOCOL.md`) pins three normative behaviours
+//! wired by this module:
 //!
 //! 1. Every captured payload runs through the `chio:guards/redact@0.1.0`
-//!    host call before any frame is buffered (line 21, line 235).
+//!    host call before any frame is buffered.
 //! 2. The pass is fail-closed: an `Err(_)` from the redactor MUST cause
 //!    the tee to refuse persistence and write `tee.redact_failed` to
-//!    the receipt log (line 452).
+//!    the receipt log.
 //! 3. Under `--paranoid`, frames whose manifest reports zero matches on
 //!    a payload longer than 256 bytes are quarantined as a defensive
-//!    heuristic against a misconfigured redactor (line 21, line 566).
+//!    heuristic against a misconfigured redactor.
 //!
 //! The wasm host-call wiring (calling into the actual wasm guest via
 //! wasmtime) is deferred. T6 wires the **native-Rust placeholder**

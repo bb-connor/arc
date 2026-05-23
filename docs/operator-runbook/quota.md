@@ -2,7 +2,7 @@
 
 This page records quota lane sizing for the M01 healthcare design-partner
 pilot. It consumes the P2 capacity report in
-`.planning/trajectory-3/audits/M01-healthcare-pilot.md`.
+`compliance/hitrust/evidence-bundles/2026-05-02/M01/audit/M01-healthcare-pilot.md`.
 
 ## Bound
 

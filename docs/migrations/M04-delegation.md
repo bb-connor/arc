@@ -68,7 +68,7 @@ the new default:
 chio-kernel = { version = "...", default-features = false, features = ["legacy-sync"] }
 ```
 
-This is consistent with the precedent set by trajectory-1 M05's
+This is consistent with the precedent set by M05's
 `legacy-sync` flag (see `docs/migrations/M05-async-kernel.md`):
 default-on the new surface, leave one explicit opt-out path for
 consumers still on the legacy contract. Mixed `default-features = false`
@@ -87,8 +87,8 @@ chio-core-types = { workspace = true, features = ["delegation"] }
 
 This avoids a transitive surface flip for SDK consumers that depend on
 `chio-core-types` for type definitions only and never instantiate a
-kernel. trajectory-2 M07 framework adapters continue to opt in
-explicitly per the M04 plan.
+kernel. M07 framework adapters continue to opt in explicitly per the
+M04 plan.
 
 ## Compatibility and rollback
 
@@ -126,8 +126,6 @@ After upgrading:
 
 ## References
 
-- M04 design doc:
-  `.planning/trajectory-2/04-recursive-delegation-revocation-oracle.md`
 - Kernel-side consultation surface:
   `crates/chio-kernel/src/kernel/delegation.rs`
 - View cache:
@@ -137,4 +135,3 @@ After upgrading:
 - TLA+ depth bound and freshness invariants:
   `formal/tla/DelegationDepthBound.tla`,
   `formal/tla/RevocationPropagation.tla` (`RevocationFreshness`)
-- Audit doc: `.planning/audits/M04-delegation-revocation.md`

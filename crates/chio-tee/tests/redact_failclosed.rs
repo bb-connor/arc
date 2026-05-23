@@ -1,9 +1,8 @@
 //! Fail-closed and paranoid-heuristic tests for the M06 redactor pass
 //! (M10 Phase 1 Task 6).
 //!
-//! Trajectory doc references:
-//! `.planning/trajectory/10-tee-replay-harness.md` line 21 (paranoid
-//! heuristic) and line 452 (fail-closed semantics).
+//! Normative spec reference: `spec/PROTOCOL.md` (paranoid heuristic
+//! and fail-closed semantics).
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 

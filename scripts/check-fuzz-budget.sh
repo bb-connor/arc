@@ -2,9 +2,8 @@
 # check-fuzz-budget.sh - Self-imposed cap on GitHub Actions fuzz minutes.
 #
 # The public-repo free tier on GitHub Actions allows 2,000 runner-minutes
-# per month. The trajectory's continuous-fuzzing-path decision (locked in
-# .planning/trajectory/decisions.yml) holds ClusterFuzzLite at 1,800
-# runner-minutes per rolling 30-day window, leaving 200-minute headroom
+# per month. The continuous-fuzzing-path decision holds ClusterFuzzLite at
+# 1,800 runner-minutes per rolling 30-day window, leaving 200-minute headroom
 # for everything else on the free tier.
 #
 # This script queries the workflow-run history for the cflite_pr.yml,

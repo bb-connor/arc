@@ -1,8 +1,8 @@
 # Migrating Guard Components: `chio:guard@0.1.0` to `chio:guard@0.2.0`
 
 This guide covers the WIT contract bump shipped in M06 Phase 1. Read it
-alongside [.planning/trajectory/06-wasm-guard-platform.md](../../.planning/trajectory/06-wasm-guard-platform.md)
-Phase 1 and the verbatim 0.2.0 skeleton in `wit/chio-guard/world.wit`.
+alongside the wasm-guard platform contract in `spec/PROTOCOL.md` and the
+verbatim 0.2.0 skeleton in `wit/chio-guard/world.wit`.
 
 ## TL;DR
 
@@ -161,5 +161,4 @@ guards to 0.2.0 before P1.T4 ships.
 
 - `wit/chio-guard/world.wit` (the canonical 0.2.0 source)
 - `wit/chio-guards-redact/world.wit` (M10 namespace placeholder)
-- `.planning/trajectory/06-wasm-guard-platform.md` Phase 1
-- `.planning/trajectory/10-tee-attestation.md` ("Redactor host call shape")
+- `spec/PROTOCOL.md` (wasm-guard platform and redactor host call shape)

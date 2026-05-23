@@ -266,7 +266,7 @@
       "properties": {
         "kind": {
           "type": "string",
-          "description": "Closed allow-list. Trajectory-3.1 retracted real partner cryptographic attestation, so the chio-eval-receipt verifier accepts only the local self-generated test sample (`test-sha256`). Vendor labels (`sigstore-cosign`, `pgp-detached`) are deferred to trajectory-4 (M02-followup) and rejected fail-closed by the parser today; they will be re-added here when their verification lanes land.",
+          "description": "Closed allow-list. Real partner cryptographic attestation is not yet claimed, so the chio-eval-receipt verifier accepts only the local self-generated test sample (`test-sha256`). Vendor labels (`sigstore-cosign`, `pgp-detached`) are backlog work (M02-followup) and rejected fail-closed by the parser today; they will be re-added here when their verification lanes land.",
           "enum": [
             "test-sha256"
           ]

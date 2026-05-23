@@ -104,5 +104,3 @@ Licensed under Apache-2.0. See `LICENSE` in the repository root.
 
 - `docs/conformance.md` - standalone consumer flow.
 - `spec/PROTOCOL.md` - normative wire-level protocol specification.
-- `.planning/trajectory/01-spec-codegen-conformance.md` - milestone scope
-  and phase breakdown that drives this packaging work.

@@ -20,9 +20,7 @@ against a real adapter so future shape additions land once, in
 - 26 new regression tests (115 -> 141) plus a 6-axis coverage matrix
   comment block at the top of `tests/test_bind_and_redact.py` mapping
   every cell to one or more named tests. Each new test docstring
-  cites the `Closes deferred ID <bot-comment-id>` it covers; the IDs
-  trace back to the v2 review tables in
-  `.planning/chio-adapter-redact-batch/REVIEW-v2-interval-{3,4}.md`.
+  cites the `Closes deferred ID <bot-comment-id>` it covers.
 - 5 hypothesis property tests in
   `tests/test_bind_and_redact_properties.py`, each running 200
   examples on CI: JSON-serialisability of the redacted output, the
@@ -170,5 +168,4 @@ chio-prefect 0.1.2 (PR #679) is the canonical worked example.
   conformance hooks, and a smoke-test that asserts the public surface
   imports cleanly.
 - Submodule layout chosen over flat namespace and over a facade class.
-  See `.planning/chio-adapter-base/PLAN.md` section 3 for the design
-  rationale.
+  See `README.md` section "Submodule layout" for the design rationale.

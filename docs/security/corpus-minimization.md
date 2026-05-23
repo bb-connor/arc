@@ -6,7 +6,7 @@ Last sweep: 2026-04-30.
 This report records the result of running `cargo fuzz cmin` over each
 fuzz corpus that feeds the M05 trust-boundary adversarial pipeline.
 Minimization runs as a maintenance task before every milestone close;
-intermediate trajectory-2 phases append to the same table rather than
+intermediate v3.x phases append to the same table rather than
 rewriting prior rows so the audit trail stays linear.
 
 Methodology, fail-closed:

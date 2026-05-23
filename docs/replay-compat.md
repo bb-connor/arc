@@ -42,9 +42,9 @@ entry here in the same commit that updates the goldens; the tests/replay
 
 ## Re-bless protocol
 
-See `.planning/trajectory/04-deterministic-replay.md` "CHIO_BLESS gate
-logic". A re-bless is required whenever any of the following changes in
-a way that affects the on-disk goldens bytes:
+See the deterministic-replay and `CHIO_BLESS` gate contract in
+`spec/PROTOCOL.md`. A re-bless is required whenever any of the following
+changes in a way that affects the on-disk goldens bytes:
 
 - The synthesis recipe (receipt or checkpoint shape, canonical-JSON
   rules, root algorithm).

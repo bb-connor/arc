@@ -78,7 +78,6 @@ GENERATED_TERMS = {"generated", "schema", "schemas", "bindings", "codegen", "wir
 NOISY_GRAPH_KINDS = {"folder"}
 NOISY_GRAPH_PATHS = {"", "."}
 NOISY_CONTEXT_DOC_PREFIXES = (
-    ".planning/",
     "docs/archive/",
     "docs/operations/ROADMAP",
     "docs/scratchpad/",
@@ -2389,17 +2388,6 @@ async def brief_feature(
         _memory_or_error(),
     )
     memory = _sanitize_memory_for_plan(memory, plan)
-    if "planning-history" not in plan.intents:
-        docs = [
-            item
-            for item in docs
-            if not repo_model.normalize_path(item.get("normalized_path") or item.get("file_path") or "").startswith(".planning/")
-        ]
-        related_docs = [
-            item
-            for item in related_docs
-            if not repo_model.normalize_path(item.get("normalized_path") or item.get("path") or "").startswith(".planning/")
-        ]
 
     commands: list[str] = []
     for item in [*code, *docs, *tests, *related_docs]:

@@ -3,8 +3,7 @@
 Status: open. Owners: M06 (consumer) and M09 (producer of `chio-attest-verify`).
 Tracked-by: this document. Closed-by: the M06 P2 ticket that lands cosign
 keyless verification through `chio_attest_verify::AttestVerifier`
-(see `.planning/trajectory/06-wasm-guard-platform.md` Phase 2, task P2.T4
-"Wire cosign keyless verification through `chio-attest-verify` (M09)").
+(M06 P2.T4: wire cosign keyless verification through `chio-attest-verify`).
 
 ## Why this exists
 
@@ -66,9 +65,8 @@ Invariants the target state must satisfy:
   variants (`SignatureMismatch`, `IdentityMismatch`, `IssuerMismatch`,
   `RekorInclusion`, `CertificateExpired`, `TrustRoot`, `Malformed`, `Io`).
   M06 maps these into `chio.guard.verify` events with `result=fail` and
-  the `mode` field (`sigstore` or `dual`) per
-  `.planning/trajectory/06-wasm-guard-platform.md` Section "Prometheus
-  metric families".
+  the `mode` field (`sigstore` or `dual`) per the guard Prometheus
+  metric families defined in `spec/PROTOCOL.md`.
 - The cached `sigstore-bundle.json` in the M06 offline cache layout
   (`${XDG_CACHE_HOME}/chio/guards/<digest>/sigstore-bundle.json`) is
   passed to `verify_bundle` verbatim; M06 does not pre-parse the bundle.
@@ -106,9 +104,7 @@ When `chio-guard-registry` is scaffolded:
 
 ### Step 2: bundle path swap (M06 P2.T4)
 
-The verbatim cosign command in
-`.planning/trajectory/06-wasm-guard-platform.md` Section "Pull and verify"
-is:
+The verbatim cosign command for the guard "pull and verify" flow is:
 
 ```
 cosign verify-blob \
@@ -175,8 +171,8 @@ should show `ExpectedIdentity` documented as a re-export from
 ### Step 5: error mapping (M06 P2.T4 and P2.T5)
 
 `chio-guard-registry` maps `chio_attest_verify::AttestError` variants
-into the deny-by-default failure-mode table in
-`.planning/trajectory/06-wasm-guard-platform.md` Section "Failure modes".
+into the deny-by-default guard failure-mode table defined in
+`spec/PROTOCOL.md`.
 The mapping is one-to-one and must be exhaustive at the match site (with
 a `_ => deny` arm for the `#[non_exhaustive]` enum):
 

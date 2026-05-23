@@ -7,11 +7,12 @@
 !supply-chain/sbom/
 !supply-chain/sbom/**
 
-# Orchestrator runtime state
+# Local planning / orchestration state (not part of the published project)
 .worktrees/
-.planning/trajectory/*.bak
-.planning/trajectory/tool-versions.lock
-.planning/trajectory/EXECUTION-LOG.[0-9]*.ndjson
+.planning/
+
+# Local cleanup-audit working notes
+.cleanup-audit/
 
 # Editor files
 *.swp

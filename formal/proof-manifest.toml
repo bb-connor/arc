@@ -192,8 +192,6 @@ discharged_assumptions = [
 #
 # This ledger row exists so the milestone-success criterion ("the
 # `assumptions.toml` ledger updated (or explicitly documented as
-# unchanged)") is traceable from the proof-manifest, not just the
-# audit doc.
+# unchanged)") is traceable directly from the proof-manifest.
 m04_p5_t5_assumptions_decision = "ASSUME-NETWORK-TRANSPORT-unchanged"
 m04_p5_t5_rationale_anchor = "formal/tla/RevocationPropagation.tla::RevocationFreshness"
-m04_p5_t5_audit_doc = ".planning/audits/M04-delegation-revocation.md"

@@ -71,9 +71,7 @@ Cells documented as out-of-scope (covered by fail-closed semantics):
 
 Per-deferred-ID regression coverage. Each ID below maps to a test in
 this file via the ``Closes deferred ID`` docstring marker. The IDs
-trace to the v2 review tables (REVIEW-v2-interval-3 / -4) and the
-addressed_comment_ids list in
-``.planning/chio-adapter-redact-batch/poll-state-v2.json``.
+trace to the v2 review tables (REVIEW-v2-interval-3 / -4).
 """
 
 from __future__ import annotations

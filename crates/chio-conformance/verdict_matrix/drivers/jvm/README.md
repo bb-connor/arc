@@ -43,5 +43,4 @@ binaries committed under this driver, the parent repository's
 
 This driver is one of four deployment-shape SDK drivers (JVM, dotnet,
 Lambda, k8s) that close the M02 D07 deferral. The combined registration is
-audited in `.planning/audits/M07-adoption-beachhead.md` under "M07 P6
-closure".
+audited under "M07 P6 closure".

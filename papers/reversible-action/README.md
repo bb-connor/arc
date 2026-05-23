@@ -76,9 +76,7 @@ non-`rfl` based on the structural parallel to `essential_preserved_chain`.
 
 ### Empirical claims that rest on missing code
 
-Per the response-engine code review at
-`.planning/clawdstrike-chio-brainstorm/07-response-engine-code-review.md`,
-the following deployment-side claims are at risk in the empirical chapter:
+The following deployment-side claims are at risk in the empirical chapter:
 
 1. **Background TTL scheduler does not exist.** The `/expire` endpoint is
    present (`api_server.rs:18030`) but no `tokio::time::interval` or

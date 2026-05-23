@@ -65,8 +65,8 @@ The crash demonstrates one of:
 
 High crashes route to the owning sub-system maintainer per
 `CODEOWNERS` (M02.P4.T4) and must hit the 30d fix-or-defer SLO
-(matches the OSS-Fuzz upstream commitment in
-`.planning/trajectory/02-fuzzing-post-pr13.md` item 10).
+(matches the OSS-Fuzz upstream commitment documented in the
+triage SLO section below).
 
 ### Medium
 
@@ -142,9 +142,7 @@ single nightly soak.
 ## Time-to-fix SLOs
 
 Chio commits to the following triage SLOs and documents them for
-OSS-Fuzz upstream as part of the application package
-(see `.planning/trajectory/02-fuzzing-post-pr13.md` "OSS-Fuzz
-application steps" item 10):
+OSS-Fuzz upstream as part of the application package:
 
 | Severity | Acknowledgement | Fix-or-defer        |
 |----------|-----------------|---------------------|
@@ -262,7 +260,5 @@ The CI guard refuses the merge until those conditions are met.
   later extensions)
 - Mutation-testing runbook:
   [`docs/fuzzing/mutants.md`](mutants.md) (M02.P2.T1)
-- Source-of-truth milestone doc:
-  [`.planning/trajectory/02-fuzzing-post-pr13.md`](../../.planning/trajectory/02-fuzzing-post-pr13.md)
-  (Phase 4 P4.T5; OSS-Fuzz application steps item 10 for the
-  Triage SLO commitment)
+- Continuous-fuzzing overview and OSS-Fuzz application steps:
+  [`docs/fuzzing/continuous.md`](continuous.md)

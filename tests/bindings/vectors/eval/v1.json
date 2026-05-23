@@ -5,7 +5,7 @@
   "producer": {
     "name": "Chio",
     "repository": "https://github.com/bb-connor/arc",
-    "commit": "trajectory-3-m02-p3",
+    "commit": "golden-v1",
     "workflow_run_url": "local-eval-receipt-regen"
   },
   "eval_run": {
@@ -63,7 +63,7 @@
     {
       "kind": "test-sha256",
       "key_id": "local-test",
-      "signature": "b738e01ea5ef6e0dacfb709935c38014fc8525fb644db20a44ca92ba28a85447",
+      "signature": "16f1800eaa0ef2767d085f3dcebfc91c484dcc08f7b7a5f73294b82bb7f037a4",
       "signed_payload": "bundle_without_signatures:rfc8785"
     }
   ]

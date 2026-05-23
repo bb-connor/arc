@@ -59,7 +59,6 @@ surfaces are relied on outside Chio's own operator boundary.
   [`docs/release/RELEASE_AUDIT.md`](release/RELEASE_AUDIT.md),
   [`docs/standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md`](standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md),
   [`docs/standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json`](standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json),
-  [`docs/review/12-standards-positioning-remediation.md`](review/12-standards-positioning-remediation.md),
   and [`spec/PROTOCOL.md`](../spec/PROTOCOL.md).
 - Identity, passport, and federation substrate already exists in
   [`crates/chio-core/src/identity_network.rs`](../crates/chio-core/src/identity_network.rs),
@@ -87,7 +86,6 @@ surfaces are relied on outside Chio's own operator boundary.
 
 - [`docs/standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json`](standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json),
   [`docs/standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md`](standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md),
-  [`docs/review/12-standards-positioning-remediation.md`](review/12-standards-positioning-remediation.md),
   and [`spec/PROTOCOL.md`](../spec/PROTOCOL.md) already define large parts of
   Chio's claim-boundary and interoperability story, but not yet as one checked
   external-facing registry.
@@ -141,7 +139,6 @@ tracked for boundary discipline, not hidden Program A deliverables.
 **Existing substrate**:
 [`docs/standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json`](standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json),
 [`docs/standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md`](standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md),
-[`docs/review/12-standards-positioning-remediation.md`](review/12-standards-positioning-remediation.md),
 and [`spec/PROTOCOL.md`](../spec/PROTOCOL.md) already cover parts of this
 taxonomy. The missing step is unifying them into one checked claim registry.
 

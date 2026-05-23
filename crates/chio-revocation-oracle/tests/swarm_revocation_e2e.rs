@@ -13,8 +13,7 @@
 //! interval from revoke -> first deny on each child.
 //!
 //! The acceptance budget is 500 ms median across 100 trials, mirroring
-//! the milestone success criterion in
-//! `.planning/trajectory-2/04-recursive-delegation-revocation-oracle.md`.
+//! the milestone success criterion in `spec/PROTOCOL.md`.
 //!
 //! As a side-effect, the harness writes a structured JSONL receipt log
 //! to a temp path captured by a `RECEIPT_LOG_PATH` env var so the

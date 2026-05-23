@@ -8,8 +8,6 @@ Owner: spec-rust (orchestrator-driven)
 
 - Agent guide: `AGENTS.md` (canonical)
 - Normative wire spec: `spec/PROTOCOL.md` and `spec/WIRE_PROTOCOL.md`
-- Milestone plan: `.planning/trajectory/01-spec-codegen-conformance.md`
-- Phase 1 ticket file: `.planning/trajectory/tickets/M01/P1.yml`
 - Wire schema subtree note: `spec/schemas/chio-wire/v1/README.md`
 
 This document is a hand-curated audit checklist for the Phase 1 work in
@@ -143,9 +141,8 @@ reached that floor for every domain.
 
 ## Section B: Phase 1 schema add targets
 
-Source: `.planning/trajectory/01-spec-codegen-conformance.md` Phase 1 (lines
-~65 to ~103) and `.planning/trajectory/tickets/M01/P1.yml`. Boxes tick when
-the corresponding ticket merges to `main`.
+Source: the Phase 1 schema-add targets for M01 (spec-codegen conformance).
+Boxes tick when the corresponding ticket merges to `main`.
 
 ### B.1 chio-wire additions (target +16 files)
 
@@ -212,10 +209,9 @@ construction.
 
 ## Section C: Phase 2 vector corpus growth targets
 
-Source: `.planning/trajectory/01-spec-codegen-conformance.md` Phase 2 (lines
-~105 to ~125). Targets are quoted verbatim from the milestone doc; the
-"Current" column reflects what is on disk today (see A.8 for measurement
-notes).
+Source: the Phase 2 vector-corpus growth targets for M01 (spec-codegen
+conformance). The "Current" column reflects what is on disk today (see A.8
+for measurement notes).
 
 | Domain      | Current | Target | Delta | Ticket  | Notes |
 |-------------|---------|--------|-------|---------|-------|

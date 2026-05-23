@@ -17,7 +17,7 @@ def test_doc_rank_boosts_canonical_docs() -> None:
 
 def test_doc_rank_penalizes_planning_unless_requested() -> None:
     row = {
-        "file_path": ".planning/v3.14-MILESTONE-AUDIT.md",
+        "file_path": "docs/archive/v3.14-milestone-audit.md",
         "score": 0.80,
         "canonicality": "planning",
     }
@@ -99,9 +99,9 @@ def test_graph_noise_suppression_allows_scoped_concepts() -> None:
     assert query._is_noisy_graph_row({"kind": "capability", "path": "", "concept_scope": "scoped"}) is False
 
 
-def test_context_doc_noise_filter_blocks_planning_by_default() -> None:
-    assert query._is_noisy_context_doc({"path": ".planning/phases/example.md"}, "delegation revocation") is True
-    assert query._is_noisy_context_doc({"path": ".planning/phases/example.md"}, "planning history revocation") is False
+def test_context_doc_noise_filter_blocks_archive_by_default() -> None:
+    assert query._is_noisy_context_doc({"path": "docs/archive/old-design.md"}, "delegation revocation") is True
+    assert query._is_noisy_context_doc({"path": "docs/archive/old-design.md"}, "planning history revocation") is False
     assert query._is_noisy_context_doc({"path": "spec/schemas/chio-wire/v1/receipt/record.schema.json"}, "delegation revocation") is True
 
 

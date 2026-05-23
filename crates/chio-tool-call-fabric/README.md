@@ -12,6 +12,5 @@ enforcement and receipt emission stay identical across providers.
 
 T1 (this commit) scaffolds the workspace member; T2-T6 fill in the trait
 surface, provenance signing helper, streaming state machine, and
-lift/lower conformance fixtures. See
-`.planning/trajectory/07-provider-native-adapters.md` Phase 1 for the
-authoritative spec.
+lift/lower conformance fixtures. See `spec/PROTOCOL.md` for the
+normative wire-level spec.

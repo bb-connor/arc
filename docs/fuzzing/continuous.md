@@ -9,9 +9,7 @@ acceptance lag, a budget cap-out) leaves the trust-boundary surface unfuzzed.
 
 ## Decision: OSS-Fuzz primary, ClusterFuzzLite bridge
 
-Locked Wave 1 decision (`.planning/trajectory/decisions.yml`
-`id=continuous-fuzzing-path`, mirrored at
-`.planning/trajectory/README.md` decision 2):
+Locked decision (`id=continuous-fuzzing-path`):
 
 - OSS-Fuzz is the primary continuous-fuzzing host once accepted.
 - ClusterFuzzLite on GitHub Actions hosted runners is the bridge that carries
@@ -385,10 +383,6 @@ two-consecutive-runs `t < 4.5` pass rule.
 
 ## Cross-references
 
-- Source-of-truth milestone doc: [`.planning/trajectory/02-fuzzing-post-pr13.md`](../../.planning/trajectory/02-fuzzing-post-pr13.md)
-- Locked decision (Wave 1, decision 2): [`.planning/trajectory/README.md`](../../.planning/trajectory/README.md)
-  and [`.planning/trajectory/decisions.yml`](../../.planning/trajectory/decisions.yml)
-  (`id=continuous-fuzzing-path`)
 - Workflows: [`.github/workflows/cflite_pr.yml`](../../.github/workflows/cflite_pr.yml),
   [`.github/workflows/cflite_batch.yml`](../../.github/workflows/cflite_batch.yml),
   [`.github/workflows/fuzz.yml`](../../.github/workflows/fuzz.yml),

@@ -1,8 +1,6 @@
 # OSS-Fuzz builder image for Chio (formerly ARC).
 #
-# Source-of-truth: .planning/trajectory/02-fuzzing-post-pr13.md
-# (OSS-Fuzz application steps section). Companion docs in
-# docs/fuzzing/continuous.md (OSS-Fuzz integration section).
+# Companion docs in docs/fuzzing/continuous.md (OSS-Fuzz integration section).
 
 FROM gcr.io/oss-fuzz-base/base-builder-rust
 

@@ -112,46 +112,6 @@
       ]
     },
     {
-      "id": "LEDGER-01",
-      "summary": "The planning stack agrees on active milestone, latest completed milestone, and execution state.",
-      "witnesses": [
-        ".planning/STATE.md",
-        ".planning/PROJECT.md",
-        ".planning/MILESTONES.md",
-        ".planning/ROADMAP.md",
-        ".planning/REQUIREMENTS.md"
-      ]
-    },
-    {
-      "id": "LEDGER-02",
-      "summary": "Early and mid-v3 summary tables no longer describe locally implemented work as blanket Planned placeholders.",
-      "witnesses": [
-        ".planning/ROADMAP.md",
-        ".planning/MILESTONES.md"
-      ]
-    },
-    {
-      "id": "LEDGER-03",
-      "summary": "Late-v3 requirements, summaries, and milestone audits reconcile to the same implementation truth.",
-      "witnesses": [
-        ".planning/REQUIREMENTS.md",
-        ".planning/v3.13-MILESTONE-AUDIT.md",
-        ".planning/milestones/v3.13-MILESTONE-AUDIT.md"
-      ]
-    },
-    {
-      "id": "LEDGER-04",
-      "summary": "v3.12, v3.13, and v3.14 are archived locally with snapshot artifacts and archived phase directories.",
-      "witnesses": [
-        ".planning/milestones/v3.12-ROADMAP.md",
-        ".planning/milestones/v3.13-ROADMAP.md",
-        ".planning/milestones/v3.14-ROADMAP.md",
-        ".planning/milestones/v3.12-phases",
-        ".planning/milestones/v3.13-phases",
-        ".planning/milestones/v3.14-phases"
-      ]
-    },
-    {
       "id": "VISION-01",
       "summary": "Qualification evidence covers the authoritative protocol fabric, unified HTTP authority, and representative SDK surfaces without overstating unsupported paths.",
       "commands": [

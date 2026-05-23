@@ -1,7 +1,6 @@
 //! Schema invariants for `chio-tee-frame.v1`.
 //!
-//! The JSON schema is pinned in
-//! `.planning/trajectory/10-tee-replay-harness.md` lines 64-219. This module
+//! The JSON schema is defined in `spec/PROTOCOL.md`. This module
 //! mirrors the structural and pattern constraints in pure Rust so that
 //! constructors and parsers can fail-closed on malformed frames without
 //! having to drag in a JSON-Schema validator at runtime.

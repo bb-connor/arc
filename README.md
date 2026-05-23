@@ -12,10 +12,6 @@
 <p align="center">
   <strong>Governed tool access for AI systems</strong><br/>
   <em>Capability validation, fail-closed policy, budgets, and signed receipts</em>
-  <!-- chio-mutants-banner:start -->
-  <br/>
-  <strong>Mutation evidence: advisory baselines recast</strong> - six trust-boundary crates, observed 44.12%-80.21%, excluded from active bounded release claims at 7f56cf5383fc1caa7a4f06b4cd59e45177f00496 - 2026-05-10
-  <!-- chio-mutants-banner:end -->
 </p>
 
 <p align="center">
@@ -121,12 +117,8 @@ canonical example links back to the supported web-backend flow.
 
 ## External Evidence
 
-- AI lab partner eval-report memo:
-  [.planning/trajectory-3/audits/M02-memo.md](.planning/trajectory-3/audits/M02-memo.md)
 - Partner ingest sample:
   [examples/eval-receipt-ingest/metr/README.md](examples/eval-receipt-ingest/metr/README.md)
-- M02 audit closure:
-  [.planning/trajectory-3/audits/M02-ai-lab.md](.planning/trajectory-3/audits/M02-ai-lab.md)
 
 ## More
 

@@ -14,7 +14,7 @@ P0/P1/P2 response levels.
 
 Any P0 that indicates fail-open access, scoped revocation bypass, capability
 lineage break, or PHI exposure in a trust-boundary path is a halt candidate
-under trajectory-3 rules.
+under the current halt rules.
 
 ## P0 Criteria
 

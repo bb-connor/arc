@@ -1,7 +1,6 @@
 //! `chio-tee-frame.v1` types.
 //!
-//! Mirrors the JSON schema pinned in
-//! `.planning/trajectory/10-tee-replay-harness.md` lines 64-219. A frame is
+//! Mirrors the v1 JSON schema defined in `spec/PROTOCOL.md`. A frame is
 //! the unit of capture that the chio-tee shadow runner emits per kernel
 //! evaluation. Each frame is signed by the tenant key and serialized with
 //! RFC 8785 canonical JSON so downstream replay can re-verify the

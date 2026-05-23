@@ -1,8 +1,6 @@
 # ClusterFuzzLite builder image for Chio (formerly ARC).
 #
-# Source-of-truth: .planning/trajectory/02-fuzzing-post-pr13.md
-# (ClusterFuzzLite implementation section). Companion docs in
-# docs/fuzzing/continuous.md (ClusterFuzzLite bridge section).
+# Companion docs in docs/fuzzing/continuous.md (ClusterFuzzLite bridge section).
 #
 # Mirrors the OSS-Fuzz scaffold under infra/oss-fuzz/ (M02.P2.T5)
 # so the in-tree builder image and the CFLite builder image stay

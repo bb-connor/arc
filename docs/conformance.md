@@ -9,9 +9,9 @@ It pairs with two other surfaces:
 
 - `crates/chio-conformance/README.md` - quickstart for the published
   crate and its bundled fixture tree.
-- `.planning/trajectory/01-spec-codegen-conformance.md` - source-of-truth
-  trajectory document. Phase 4 (M01 P4) is the milestone that ships the
-  external-consumer flow described below.
+- `spec/PROTOCOL.md` - normative wire-level protocol specification that
+  the conformance suite checks against. The external-consumer flow
+  described below is the published surface of that contract.
 
 ## Audience and prerequisites
 
@@ -392,8 +392,6 @@ External consumers can copy the same pattern into their own CI:
 - `crates/chio-cli/README.md` - general `chio` CLI surface and global
   flags.
 - `spec/PROTOCOL.md` - normative wire-level protocol specification.
-- `.planning/trajectory/01-spec-codegen-conformance.md` - milestone
-  scope, phase breakdown, and exit-test definitions.
 - `tests/conformance/reports/` - canonical location for generated
   compatibility matrices in Chio's own CI.
 

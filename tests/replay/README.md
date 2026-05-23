@@ -11,9 +11,9 @@ kernel output across versions: a curated corpus of 50 input scenarios is
 replayed on every PR and the produced receipts, anchor checkpoint, and Merkle
 root are byte-compared against checked-in goldens.
 
-The source-of-truth specification for this gate lives in
-`.planning/trajectory/04-deterministic-replay.md`. Read it before changing
-anything that affects fixture layout, golden format, or `--bless` semantics.
+The normative specification for this gate lives in `spec/PROTOCOL.md`.
+Read it before changing anything that affects fixture layout, golden format,
+or `--bless` semantics.
 
 ## Status
 
@@ -73,6 +73,6 @@ produced by running the gate with `--bless` (Phase 2).
 ## Bless flow (placeholder; full flow lands in M04.P2)
 
 `--bless` is the only supported way to update goldens. It is gated by the rules
-documented in `.planning/trajectory/04-deterministic-replay.md` (allowed branch,
+documented in `spec/PROTOCOL.md` (allowed branch,
 environment, audit-log entry under `docs/replay-compat.md`). Direct edits to
 `tests/replay/goldens/**` are out of policy.

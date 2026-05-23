@@ -1,14 +1,14 @@
 # GitHub Actions Billing Runbook
 
 **Owner:** @bb-connor
-**Trajectory:** trajectory-3
+**Version:** v3.x
 **Milestone:** M03
 **Last updated:** 2026-05-02
 
 ## Purpose
 
 This runbook prevents a repeat of the 2026-04-26T23:00Z GitHub
-Actions billing or spending-limit trip that forced the trajectory-2
+Actions billing or spending-limit trip that forced an earlier
 admin-merge bypass window.
 
 ## Cap value
@@ -19,7 +19,7 @@ $2,500 per month for the account that owns `bb-connor/arc`.
 Rationale:
 
 - Expected full CI sweep: $3-$5 per PR.
-- Busy trajectory-3 cadence: roughly 10 PRs per day.
+- Busy development cadence: roughly 10 PRs per day.
 - Expected daily burn: $30-$50.
 - 50% headroom floor: $75 per day.
 - Monthly cap floor at 31 days: $2,325.
@@ -51,7 +51,7 @@ gh workflow run ci.yml --ref main
 ```
 
 6. Record the run URLs in
-   `.planning/trajectory-3/audits/M03-ci-restoration.md`.
+   `compliance/hitrust/evidence-bundles/2026-05-02/M03/audit/M03-ci-restoration.md`.
 
 ## Verification
 
@@ -65,8 +65,8 @@ Minimum restoration signal:
 Full release signal:
 
 - Required checks are green on the final stabilization branch.
-- Every PR listed in `.planning/trajectory-3/work/CI-DEBT.md` has been
-  replayed or covered by a later green main run.
+- Every PR in the recorded CI-debt backlog has been replayed or covered
+  by a later green main run.
 
 ## Escalation
 

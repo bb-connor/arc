@@ -21,8 +21,7 @@ continues to pass).
 
 When the project staffs up, replace `TBD-primary` and `TBD-backup` with
 real GitHub handles (for example `@alice` and `@bob`) and update
-`.planning/trajectory/OWNERS.toml` plus the generated `CODEOWNERS` so the
-formal-verification paths route to the new humans.
+`CODEOWNERS` so the formal-verification paths route to the new humans.
 
 ## Responsibilities
 
@@ -59,8 +58,6 @@ co-signed by the kernel-core owner listed in `CODEOWNERS`.
 
 ## Related files
 
-- `CODEOWNERS` (generated) - routing for the `formal/**` glob.
-- `.planning/trajectory/OWNERS.toml` - source of truth that generates
-  `CODEOWNERS`.
+- `CODEOWNERS` - routing for the `formal/**` glob (maintained manually).
 - `formal/proof-manifest.toml` - inventory of proofs and their status.
 - `formal/theorem-inventory.json` - machine-readable theorem index.

@@ -53,9 +53,8 @@ The crate ships the Sigstore Public Good Instance trust root in tree under
 - `trusted_root.json` is the runtime artifact consumed via `include_bytes!`.
 
 `build.rs` fails the compile if either file is missing. The quarterly
-CODEOWNERS-reviewed re-bake job described in
-`.planning/trajectory/09-supply-chain-attestation.md` refreshes both files
-in lockstep via `scripts/tuf-rebake.sh --write`; `scripts/tuf-rebake.sh --check`
+CODEOWNERS-reviewed re-bake job refreshes both files in lockstep via
+`scripts/tuf-rebake.sh --write`; `scripts/tuf-rebake.sh --check`
 fails closed when the checked-in materials are missing, malformed, or stale.
 
 ## OIDC issuer regex

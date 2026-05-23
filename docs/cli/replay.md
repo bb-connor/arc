@@ -5,12 +5,11 @@ current build. Re-verifies every Ed25519 signature, recomputes the Merkle
 root incrementally, and reports the first divergence by byte offset and
 JSON pointer.
 
-This page is a CLI reference. The normative source is
-`.planning/trajectory/04-deterministic-replay.md` Phase 4 ("chio replay
-subcommand surface"). The exit-code registry on this page is canonical:
-M04 owns it, and M10's `chio replay` traffic mode (see
-`.planning/trajectory/10-tee-replay-harness.md` Phase 2) consumes it
-verbatim without defining new codes.
+This page is a CLI reference. The normative source is the
+deterministic-replay contract in `spec/PROTOCOL.md` (the `chio replay`
+subcommand surface). The exit-code registry on this page is canonical:
+M04 owns it, and M10's `chio replay` traffic mode (the tee replay
+harness) consumes it verbatim without defining new codes.
 
 ## Synopsis
 
@@ -59,7 +58,7 @@ The `<LOG>` positional accepts two shapes:
 ## Exit codes
 
 M04 is the source of truth for these codes. M10's traffic-mode replay
-(`.planning/trajectory/10-tee-replay-harness.md` Phase 2) consumes them
+(the tee replay harness; see `spec/PROTOCOL.md`) consumes them
 verbatim.
 
 | Code | Name                | Meaning                                                                                                                                  |
@@ -130,8 +129,8 @@ The interplay with M10:
 
 - M10 owns the encoder. The `chio-tee` sidecar
   (`crates/chio-tee/`) writes NDJSON capture files in
-  `verdict-only`, `shadow`, and `enforce` modes. See
-  `.planning/trajectory/10-tee-replay-harness.md` Phase 2.
+  `verdict-only`, `shadow`, and `enforce` modes. See the tee replay
+  harness contract in `spec/PROTOCOL.md`.
 - M04 owns the consumer. `chio replay --from-tee <capture.ndjson>`
   re-verifies every frame's `tenant_sig`, re-derives the verdict, and
   recomputes the root. The exit-code registry is M04's; M10 does not
@@ -274,10 +273,10 @@ chio replay ./fixtures/run-42/ --json | jq -r '.first_divergence.kind'
 
 ## See also
 
-- `.planning/trajectory/04-deterministic-replay.md` Phase 4 (canonical
-  surface, exit codes, JSON schema; this page is the user-facing
-  rendering of that section).
-- `.planning/trajectory/10-tee-replay-harness.md` Phase 2 (M10 sibling
+- `spec/PROTOCOL.md` deterministic-replay contract (canonical surface,
+  exit codes, JSON schema; this page is the user-facing rendering of
+  that section).
+- `spec/PROTOCOL.md` tee replay harness contract (M10 sibling
   `chio replay --against <policy-ref>` traffic mode, which reuses this
   page's exit codes verbatim).
 - `crates/chio-cli/src/cli/replay/report.rs` (in-tree report builder

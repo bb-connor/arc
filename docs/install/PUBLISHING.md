@@ -267,10 +267,9 @@ upload; a missing or malformed SBOM fails the workflow rather than
 silently publishing without one.
 
 Cosign keyless signing of every `release-binaries.yml` archive
-landed in M09.P3.T3; the consumer verification recipe lives below
+ships today; the consumer verification recipe lives below
 in [Release-binaries archive signing](#release-binaries-archive-signing).
-See `.planning/trajectory/09-supply-chain-attestation.md` for the
-broader attestation roadmap.
+See `spec/PROTOCOL.md` for the broader attestation contract.
 
 ---
 

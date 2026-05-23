@@ -1,10 +1,8 @@
-# CODEOWNERS - GENERATED from .planning/trajectory/OWNERS.toml
-# Do not hand-edit. Regenerate with `scripts/regen-codeowners.sh`.
-# CI fails if this file drifts from OWNERS.toml.
+# CODEOWNERS - maintained manually.
 #
 # Order matters in CODEOWNERS: later patterns take precedence over earlier
-# ones. The generator places frozen entries last so they override any
-# broader pattern.
+# ones. Narrow, security-sensitive paths are listed last so they override any
+# broader pattern above.
 spec/schemas/**/*.json                       @bb-connor
 tests/bindings/vectors/**                    @bb-connor
 tests/conformance/**                         @bb-connor
@@ -60,14 +58,11 @@ Cargo.lock                                   @bb-connor
 crates/chio-core-types/src/capability.rs     @bb-connor
 deny.toml                                    @bb-connor
 .github/workflows/ci.yml                     @bb-connor
-CODEOWNERS                                   @bb-connor
+/.github/CODEOWNERS                          @bb-connor
 README.md                                    @bb-connor
 AGENTS.md                                    @bb-connor
 CLAUDE.md                                    @bb-connor
-.planning/trajectory/**                      @bb-connor
-scripts/install-orchestrator-tools.sh        @bb-connor
 scripts/check-fuzz-budget.sh                 @bb-connor
-scripts/classify-trust-diff.sh               @bb-connor
 crates/*/tests/regression_*.rs               @bb-connor
 tests/regression_*.rs                        @bb-connor
 releases.toml                                @bb-connor

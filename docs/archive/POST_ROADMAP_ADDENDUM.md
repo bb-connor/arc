@@ -9,9 +9,8 @@
 > remaining repo-solvable closure path after Phase 20.
 >
 > **Authority rule**: This document is subordinate to
-> `docs/review/17-post-closure-execution-board.md`,
-> `docs/release/QUALIFICATION.md`, `docs/release/RELEASE_AUDIT.md`, and the
-> current `.planning` state. It is not a replacement ship-boundary document.
+> `docs/release/QUALIFICATION.md` and `docs/release/RELEASE_AUDIT.md`. It is
+> not a replacement ship-boundary document.
 
 ---
 
@@ -59,8 +58,6 @@ Phases 26 through 31 are the remaining repo-solvable full-vision closure path.
 > **Depends on**: Completion of the current roadmap or an explicit decision to
 > pause lower-priority roadmap breadth.
 > **Refs**:
-> - `docs/review/07-ha-control-plane-remediation.md`
-> - `docs/review/08-distributed-budget-remediation.md`
 > - `docs/release/RELEASE_AUDIT.md`
 > - `docs/release/QUALIFICATION.md`
 
@@ -230,8 +227,6 @@ policy block lacks a runtime guard mapping.
 > truth so receipts and reports stop widening economic claims by default.
 > **Depends on**: Phase 21.
 > **Refs**:
-> - `docs/review/10-economic-authorization-remediation.md`
-> - `docs/review/17-post-closure-execution-board.md`
 > - `docs/AGENT_ECONOMY.md`
 > - `docs/TOOL_PRICING_GUIDE.md`
 
@@ -318,8 +313,6 @@ reconciliation surfaces.
 > the same thing.
 > **Depends on**: Phases 21 through 23.
 > **Refs**:
-> - `docs/review/13-ship-blocker-ladder.md`
-> - `docs/review/15-vision-gap-map.md`
 > - `docs/release/RELEASE_AUDIT.md`
 > - `docs/release/QUALIFICATION.md`
 
@@ -359,8 +352,6 @@ for milestone and claim drift against the existing bounded Chio release boundary
 - `docs/release/OPERATIONS_RUNBOOK.md`
 - `docs/release/OBSERVABILITY.md`
 - `docs/release/RISK_REGISTER.md`
-- `.planning/PROJECT.md`
-- `.planning/STATE.md`
 - new script under `scripts/`
 
 **Acceptance**:
@@ -517,8 +508,7 @@ falls into the following candidate phases.
 > **Goal**: Make Chio able to prove who authorized what across recursive,
 > cross-kernel, and cross-protocol execution with one durable provenance model.
 > **Refs**:
-> - `docs/review/04-provenance-call-chain-remediation.md`
-> - `docs/review/15-vision-gap-map.md`
+> - `spec/PROTOCOL.md`
 
 **Current repo baseline**:
 - [`spec/PROTOCOL.md`](../spec/PROTOCOL.md) already defines the
@@ -550,9 +540,7 @@ falls into the following candidate phases.
 > **Goal**: Make verified runtime attestation and strong sender-constrained
 > identity continuity the default strong path rather than a bounded profile.
 > **Refs**:
-> - `docs/review/03-runtime-attestation-remediation.md`
-> - `docs/review/06-authentication-dpop-remediation.md`
-> - `docs/review/09-session-isolation-remediation.md`
+> - `spec/PROTOCOL.md`
 
 **Current repo baseline**:
 - [`crates/chio-core-types/src/capability.rs`](../crates/chio-core-types/src/capability.rs)
@@ -587,9 +575,7 @@ falls into the following candidate phases.
 > **Goal**: Move from bounded trust-anchor publication to a real append-only,
 > externally checkable transparency substrate.
 > **Refs**:
-> - `docs/review/05-non-repudiation-remediation.md`
-> - `docs/review/15-vision-gap-map.md`
-> - `docs/review/17-post-closure-execution-board.md`
+> - `spec/PROTOCOL.md`
 
 **Current repo baseline**:
 - [`spec/PROTOCOL.md`](../spec/PROTOCOL.md) already defines checkpoint
@@ -620,9 +606,7 @@ falls into the following candidate phases.
 > **Goal**: Move from bounded leader-local control to real quorum-safe or
 > escrow-safe authority and spend invariants.
 > **Refs**:
-> - `docs/review/07-ha-control-plane-remediation.md`
-> - `docs/review/08-distributed-budget-remediation.md`
-> - `docs/review/15-vision-gap-map.md`
+> - `docs/standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md`
 
 **Current repo baseline**:
 - [`docs/standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md`](standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md)
@@ -650,8 +634,6 @@ falls into the following candidate phases.
 > **Goal**: Turn bounded reputation and multi-issuer artifact packaging into a
 > real trust-portable network.
 > **Refs**:
-> - `docs/review/11-reputation-federation-remediation.md`
-> - `docs/review/15-vision-gap-map.md`
 > - `docs/VISION.md`
 
 **Current repo baseline**:
@@ -687,8 +669,6 @@ falls into the following candidate phases.
 > **Goal**: Make Chio's formal-verification story literally true inside one
 > explicit verified core and prevent claim drift.
 > **Refs**:
-> - `docs/review/01-formal-verification-remediation.md`
-> - `docs/review/15-vision-gap-map.md`
 > - `spec/PROTOCOL.md`
 
 **Current repo baseline**:
@@ -696,9 +676,8 @@ falls into the following candidate phases.
   [`scripts/check-formal-proofs.sh`](../scripts/check-formal-proofs.sh), and
   [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) already provide a
   real formal toolchain and CI hook.
-- [`spec/PROTOCOL.md`](../spec/PROTOCOL.md) and
-  [`docs/review/01-formal-verification-remediation.md`](review/01-formal-verification-remediation.md)
-  already state that the current Lean model is informative and ongoing rather
+- [`spec/PROTOCOL.md`](../spec/PROTOCOL.md)
+  already states that the current Lean model is informative and ongoing rather
   than a closed proof of the production runtime. Phase 31 makes the public
   claim boundary line up with a named verified core and refinement story.
 
