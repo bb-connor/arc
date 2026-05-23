@@ -1,6 +1,6 @@
 # HITRUST Access Review Policy
 
-**Scope:** Chio v3.18 healthcare design-partner deployment
+**Scope:** Chio healthcare design-partner deployment (this assessed release)
 **Cadence:** quarterly
 **Owner:** Chio evidence owner and the deployment access administrator
 

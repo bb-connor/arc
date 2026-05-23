@@ -1,6 +1,6 @@
 # Formal Evidence Bridge for HITRUST
 
-**Scope:** Chio v3.18 healthcare design-partner deployment
+**Scope:** Chio healthcare design-partner deployment (this assessed release)
 **Evidence source:** in-repository TLA+, Apalache, Lean, and Kani artifacts (`formal/`)
 
 > **Status: internal readiness.** This explains, in plain language, the
@@ -18,8 +18,8 @@ property to the Rust call site it constrains is `formal/MAPPING.md`.
 
 ## Invariant mapping
 
-| M06 invariant | What it means for the assessor | HITRUST mapping |
-|---------------|--------------------------------|-----------------|
+| Formal invariant | What it means for the assessor | HITRUST mapping |
+|-----------------|--------------------------------|-----------------|
 | MonotoneLogApalache | Receipt-log state only advances; prior committed entries are not silently removed. | audit controls, integrity, operations |
 | RevocationCutCompleteness | Revocation cuts remove future authority for revoked grants within the modeled boundary. | access control, incident containment |
 | ReceiptBeforeAllow | A modeled allow decision has receipt evidence before the operation is considered complete. | audit controls, compliance evidence |

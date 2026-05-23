@@ -185,7 +185,7 @@ the triager promotes it to a permanent regression test using
 becomes a permanent fixture under
 `crates/<owning-crate>/tests/regression_<sha>.rs` (libfuzzer mode)
 or `crates/<owning-crate>/tests/property_<sha>.rs` (proptest mode,
-sibling to the M03 invariant program).
+sibling to the invariant program).
 
 Quick example invocation:
 

@@ -13,7 +13,7 @@ Security contact: `security@chio.world`
 
 ## Escalation
 
-Security issues route to the trajectory-3 security-review queue and require
+Security issues route to the security-review queue and require
 two-reviewer acknowledgement before customer-impacting changes are
 published. Marketplace entitlement or metering incidents are treated as
 fail-closed: Chio denies unmetered Bedrock access until the entitlement or
@@ -33,4 +33,4 @@ Not covered:
 
 - Customer-owned Bedrock model selection.
 - Customer account quota increases.
-- Multi-region deployment before trajectory-4.
+- Multi-region deployment (not yet available).

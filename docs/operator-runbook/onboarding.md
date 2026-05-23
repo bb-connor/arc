@@ -5,7 +5,7 @@ design-partner deployment. It does not bind the partner identity in repo docs.
 
 ## Preconditions
 
-1. Contract memo recorded in the M01 audit doc.
+1. Contract memo recorded in the audit doc.
 2. BAA-ready posture confirmed.
 3. No PHI-bearing production traffic before Business Associate Agreement chain
    sign-off.
@@ -26,7 +26,7 @@ The onboarding imports the BOUNDED_OPERATIONAL_PROFILE from
 - Receipts are signed local audit evidence with checkpoint export.
 - No public transparency-log semantics are claimed.
 - No consensus-backed HA is claimed.
-- No multi-tenant isolation claim is made in M01.
+- No multi-tenant isolation claim is made in this pilot.
 
 ## Runtime Services
 
@@ -66,7 +66,7 @@ chio mcp serve-http \
 9. Verify receipt checkpoint export.
 10. Verify OCSF JSON export to the staging SOC sink.
 11. Verify CEF preview output once P3 lands the emitter.
-12. Record the onboarding rehearsal in the M01 audit doc.
+12. Record the onboarding rehearsal in the audit doc.
 
 ## PagerDuty
 

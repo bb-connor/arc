@@ -1,15 +1,14 @@
 # Model cards: binding refusal contract
 
-Status: shipped (M10)
+Status: shipped
 Trust-boundary verdict satisfied: [docs/trust-boundary-browser-signing.md](../trust-boundary-browser-signing.md)
-Operational-equivalence oracle: the M07 verdict-equality oracle
 Last updated: 2026-04-30
 
 This page is a one-page narrative of the policy-bound model-card
-surface that M10 ships. It explains the binding refusal contract a
-provider walks through before the kernel allows a tool call to leave
-the trust boundary, names the source-of-truth crates, and points at
-the tests that lock the contract.
+surface. It explains the binding refusal contract a provider walks
+through before the kernel allows a tool call to leave the trust boundary,
+names the source-of-truth crates, and points at the tests that lock the
+contract.
 
 ## 1. The contract in one breath
 
@@ -52,31 +51,30 @@ The card cosign bundle helper
 (`crates/chio-weights/src/bundle.rs`) consumes
 `chio_attest_verify::SigstoreVerifier::verify_bundle` from
 [`crates/chio-attest-verify/`](../../crates/chio-attest-verify/).
-M10 does not introduce a new trust root or a new signature path; the
-M09 cosign bundle verifier (and the M03 PQ-hybrid surface) is
-consumed verbatim.
+This release does not introduce a new trust root or a new signature path;
+the existing cosign bundle verifier (and the PQ-hybrid surface) is consumed
+verbatim.
 
-`policy.weights_card_required = required_with_pin` adds an issuer
-SAN regex pin from the M07 provider matrix. Invalid
+`policy.weights_card_required = required_with_pin` adds an issuer SAN regex
+pin from the provider matrix. Invalid
 combinations (`required` with no issuer configured) reject at
 policy load (`crates/chio-policy/src/weights.rs`), not at first
 bind, so the failure surfaces immediately at deployment.
 
 ## 3. Operational equivalence
 
-Two model cards A and B are operationally equivalent when, given
-the canonical scenario corpus from the M07 verdict-equality
-oracle, providers bound under each card produce
-verdict-equivalent outputs at every scenario.
+Two model cards A and B are operationally equivalent when, given the
+canonical scenario corpus from the verdict-equality oracle, providers bound
+under each card produce verdict-equivalent outputs at every scenario.
 
 The cross-provider equivalence test
-(`crates/chio-weights/tests/equivalence.rs`) consumes the M07
+(`crates/chio-weights/tests/equivalence.rs`) consumes the verdict-equality
 oracle, not a forked copy. PR CI runs the smoke subset gated by
-`--features smoke` (one fixture per provider in the canonical
-8-provider cross-provider matrix at
+`--features smoke` (one fixture per provider in the canonical 8-provider
+cross-provider matrix at
 `crates/chio-provider-conformance/fixtures/cross_provider/manifest.toml`).
-The full 8-provider * 12-fixture nightly sweep (96 fixtures) runs
-through the existing M07 nightly conformance lane.
+The full 8-provider * 12-fixture nightly sweep (96 fixtures) runs through
+the existing nightly conformance lane.
 
 The equivalence claim has two halves:
 
@@ -109,12 +107,11 @@ whose digest format mirrors
    rekor_inclusion_verified
 ```
 
-The anchor reuses the M09 `chio-lineage`
-`FrontierDigest`, `CanonicalSource`, and `SigningState` shapes
-verbatim so the public registry serves a single artifact format
-across both lineage-graph and model-card anchors. M03 hybrid
-signing populates the `SigningState::Signed` slot when wired;
-absence is recorded as `SigningState::UnsignedSoftDepAbsent`.
+The anchor reuses the `chio-lineage` `FrontierDigest`, `CanonicalSource`,
+and `SigningState` shapes verbatim so the public registry serves a single
+artifact format across both lineage-graph and model-card anchors. PQ-hybrid
+signing populates the `SigningState::Signed` slot when wired; absence is
+recorded as `SigningState::UnsignedSoftDepAbsent`.
 
 ## 5. CLI surface
 
@@ -135,20 +132,17 @@ sanity-check before promoting to production policy.
 
 | Threat ID | coverage_state | Closed by |
 | --- | --- | --- |
-| `weights_hash_spoof` | partial | M10.P4.T5 |
+| `weights_hash_spoof` | partial | see coverage.yaml |
 
-The partial state is documented inline in
-`spec/security/coverage.yaml` under `partial_reason`: the kernel
-binding refusal verifies the cosign-attested `weights_hash`,
-`allowed_capability_set`, and `banned_tools` tuple, but loaded-
-weight recomputation depends on `chio-providers` exposing a
-recomputable digest. Until that lands, the provider-supplied hash
-is the attested input. The gap surfaces under the Partial heading
-of `docs/security/threat-coverage.md` once the M05 P5.T5 doc
-generator runs.
+The partial state is documented inline in `spec/security/coverage.yaml`
+under `partial_reason`: the kernel binding refusal verifies the
+cosign-attested `weights_hash`, `allowed_capability_set`, and `banned_tools`
+tuple, but loaded-weight recomputation depends on `chio-providers` exposing a
+recomputable digest. Until that lands, the provider-supplied hash is the
+attested input. The gap surfaces under the Partial heading of
+`docs/security/threat-coverage.md` once the threat-model doc generator runs.
 
-`covered` and `partial` both PASS the M05 P5.T4 threat-model-
-coverage CI gate.
+`covered` and `partial` both PASS the threat-model-coverage CI gate.
 
 ## 7. Pointers
 

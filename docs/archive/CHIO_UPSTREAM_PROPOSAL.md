@@ -1,6 +1,6 @@
 # Chio Policy: First-Class Velocity, Human-in-Loop, and Extensions
 
-Wave 1 / Agent 2. Status: decisive. Plugin-rewrite agents should code against §5 (migration table) today.
+Status: decisive. Plugin-rewrite agents should code against §5 (migration table) today.
 
 ## 0. Constraint recap
 
@@ -35,7 +35,7 @@ pub struct VelocityRule {
 }
 ```
 
-Compiler wiring (Wave-2 scope, not this PR): `compile_velocity_rule()` in `arc/crates/arc-policy/src/compiler.rs` returns `(Option<VelocityConfig>, Option<AgentVelocityConfig>)` and the `arc-cli` policy bootstrap pushes matching guards onto the pipeline between `ForbiddenPathGuard` and `ShellCommandGuard`. **No edits to `arc-guards` or `arc-kernel`.**
+Compiler wiring (follow-on work, not this PR): `compile_velocity_rule()` in `arc/crates/arc-policy/src/compiler.rs` returns `(Option<VelocityConfig>, Option<AgentVelocityConfig>)` and the `arc-cli` policy bootstrap pushes matching guards onto the pipeline between `ForbiddenPathGuard` and `ShellCommandGuard`. **No edits to `arc-guards` or `arc-kernel`.**
 
 ## 2. `human_in_loop` - Option A, first-class `Rules.human_in_loop`
 
@@ -146,7 +146,7 @@ One focused PR against arc. Files (all under the repository root):
 
 ## 7. Rust diff status
 
-Not landed in this wave. The minimal-safe edit spans 6 files across 2 crates; `models.rs`-only would add fields that silently do nothing (exactly the failure mode Debater B flags). Recommendation: Wave-2 arc engineer lands the full patch atomic, with `cargo test -p arc-policy` green. Diffs in §§1-3 are copy-paste ready.
+Not landed in this PR. The minimal-safe edit spans 6 files across 2 crates; `models.rs`-only would add fields that silently do nothing (exactly the failure mode Debater B flags). Recommendation: the arc engineer lands the full patch atomic, with `cargo test -p arc-policy` green. Diffs in §§1-3 are copy-paste ready.
 
 **Plugin agents should code against this now.** If arc-side lands with deltas, chio-bridge absorbs them via its schema normalizer. Presets don't re-rev.
 

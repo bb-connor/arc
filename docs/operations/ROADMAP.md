@@ -1515,7 +1515,7 @@ Phase 20 (Medium-Term Moats) ──────── per-item (see stories)  �
 
 These phase groups can execute concurrently:
 
-**Wave 1** (immediate, no dependencies):
+**Group 1** (immediate, no dependencies):
 - Phase 0: DX Foundation
 - Phase 1: Structural Security
 - Phase 2: Core Type Evolution
@@ -1525,7 +1525,7 @@ These phase groups can execute concurrently:
 - Phase 16: Economic Docs + Gaps
 - Phase 19: Near-Term Moats (depends only on shipped receipts/metering)
 
-**Wave 2** (after Wave 1 core types land):
+**Group 2** (after Group 1 core types land):
 - Phase 3: Content Safety + HITL
 - Phase 4: chio-code-agent
 - Phase 5: Guard Absorption
@@ -1534,18 +1534,18 @@ These phase groups can execute concurrently:
 - Phase 8: Code Execution Guards
 - Phase 10: Orchestration
 
-**Wave 3** (after Wave 2):
+**Group 3** (after Group 2):
 - Phase 11: SaaS + Streaming
 - Phase 13: Async Guards
 - Phase 14: WASM Kernel
 - Phase 17: Pipeline Integrations
 - Phase 18: Memory Governance
 
-**Wave 4** (per-item dependencies, NOT gated on Wave 3 as a whole):
-- 20.4 Capability Marketplace: independent, can start in Wave 1
-- 20.2 Agent Insurance: needs 16 (Wave 1) + 19.1/19.2 (Wave 1) -- can start in Wave 2
-- 20.1 Agent Passport: needs 14 (Wave 3) + 19.1/19.2 (Wave 1)  -- starts when WASM lands
-- 20.3 Cross-Kernel Federation: needs 1 (Wave 1) + 20.1 -- starts after passport
+**Group 4** (per-item dependencies, NOT gated on Group 3 as a whole):
+- 20.4 Capability Marketplace: independent, can start in Group 1
+- 20.2 Agent Insurance: needs 16 (Group 1) + 19.1/19.2 (Group 1) -- can start in Group 2
+- 20.1 Agent Passport: needs 14 (Group 3) + 19.1/19.2 (Group 1) -- starts when WASM lands
+- 20.3 Cross-Kernel Federation: needs 1 (Group 1) + 20.1 -- starts after passport
 
 ---
 

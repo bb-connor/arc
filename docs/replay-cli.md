@@ -1,7 +1,7 @@
 # Chio Replay CLI Runbook
 
-This file is the M10 operator runbook for `chio replay --bless`. The
-long-form CLI reference remains in `docs/cli/replay.md`.
+This file is the operator runbook for `chio replay --bless`. The long-form
+CLI reference remains in `docs/cli/replay.md`.
 
 ## Bless Graduation
 
@@ -18,7 +18,7 @@ capture -> redact -> dedupe -> review -> bless
 3. `chio replay <capture.ndjson> --bless --into <fixture-dir>` re-redacts
    the invocation under the current default redactor set, dedupes by the
    canonical JSON invocation hash with last-wins semantics, and writes the
-   M04 replay-gate fixture shape:
+   replay-gate fixture shape:
 
    ```text
    tests/replay/fixtures/<family>/<name>/
@@ -30,8 +30,8 @@ capture -> redact -> dedupe -> review -> bless
 4. The writer strips `tenant_sig`, `request_blob_sha256`, and
    `response_blob_sha256`. The blessed receipt stream retains only the
    redacted canonical invocation and verdict fields.
-5. The resulting fixture must be acceptable to the M04 replay gate before
-   it is committed.
+5. The resulting fixture must be acceptable to the replay gate before it is
+   committed.
 
 ## Bless Audit Entry
 

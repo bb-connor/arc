@@ -196,7 +196,7 @@ The JSON envelope has the shape:
 ```
 
 The schema version is stable across patch releases. Any breaking change
-to this shape is gated by the M01 Phase 5 conformance-matrix workflow
+to this shape is gated by the Phase 5 conformance-matrix workflow
 (`.github/workflows/conformance-matrix.yml`, job
 `external-consumer-smoke`).
 
@@ -264,7 +264,7 @@ C++ Phase-0 scenario coverage (`mcp_core` and `auth`) is gated by the
 `cpp_peer_p0` integration test under `crates/chio-conformance/tests/`.
 Other categories (`chio-extensions`, `tasks`, `nested_callbacks`,
 `notifications`) are deferred to a follow-on milestone for the C++
-peer per the Wave 1 roadmap decision.
+peer per the initial roadmap decision.
 
 ## Output schema and stability
 
@@ -311,7 +311,7 @@ skipping unpublished peer `python / x86_64-unknown-linux-gnu`: lockfile entry ha
 skipping unpublished peer `python / aarch64-apple-darwin`: lockfile entry has `published = false` (no real binary uploaded yet)
 ```
 
-Once the M01 release pipeline cuts a real artifact, the lockfile
+Once the release pipeline cuts a real artifact, the lockfile
 updater replaces the placeholder sha256 and flips `published = true`;
 no consumer-facing change is required.
 
@@ -335,7 +335,7 @@ itself is intact, then either:
 - Pin to an older release of `chio-conformance` whose lockfile entries
   still match the live release assets, or
 - File an issue on `github.com/backbay-labs/chio` with the mismatched url
-  and observed sha256; the M01 release pipeline regenerates the
+  and observed sha256; the release pipeline regenerates the
   lockfile on every release tag.
 
 ### `chio conformance run --peer cpp` cannot find the C++ peer

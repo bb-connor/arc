@@ -7,14 +7,14 @@
 
 **Target assessment:** HITRUST i1
 **Framework target:** HITRUST CSF v11.7
-**Product:** Chio v3.18
+**Product:** Chio (this assessed release)
 **Intended scope shape:** single-tenant, single-version, single-deployment-environment
 **Status:** internal scope definition (not assessor-signed)
 
 ## Binding scope statement
 
 If and when a HITRUST i1 assessment is undertaken, the intended scope
-covers only the Chio v3.18 deployment used by a single healthcare
+covers only the assessed Chio deployment used by a single healthcare
 design-partner tenant. The scope is not meant to bind any design-partner
 identity in this repository. A future certificate should name the
 product surface and deployment boundary, not unrelated workspace
@@ -22,7 +22,7 @@ projects.
 
 ## In-scope boundary
 
-- Chio v3.18 runtime kernel and tool-access control plane.
+- Chio runtime kernel and tool-access control plane (this assessed release).
 - Capability issuance, validation, attenuation, revocation, and sender
   constraints.
 - Guard evaluation and fail-closed policy behavior.
@@ -36,7 +36,7 @@ projects.
 ## Explicit out-of-scope decisions
 
 - Other Chio tenants: explicit-no.
-- Chio versions before or after v3.18: explicit-no.
+- Other Chio releases (before or after the assessed release): explicit-no.
 - Mobile patient-app extension: explicit-no for this intended scope.
 - AWS Bedrock listing and MCP registry surfaces: explicit-no.
 - ISO 42001: explicit-no, deferred.
@@ -50,7 +50,7 @@ If an assessor engagement begins, a scope memo would use this preimage:
 | Scope element | Decision |
 |---------------|----------|
 | Tenant count | One design-partner tenant |
-| Product version | Chio v3.18 |
+| Product version | This assessed release |
 | Deployment environment | One production deployment environment |
 | Mobile patient-app | Excluded |
 | AWS Bedrock listing | Excluded |

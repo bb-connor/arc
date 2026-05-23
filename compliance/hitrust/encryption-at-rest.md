@@ -5,7 +5,7 @@
 > WHERE encryption-at-rest and provider-inheritance evidence would come
 > from, and marks it as an open gap until collected.
 
-**Scope:** Chio v3.18 healthcare design-partner deployment
+**Scope:** Chio healthcare design-partner deployment (this assessed release)
 **Cloud provider:** AWS (intended deployment)
 
 ## Provider inheritance

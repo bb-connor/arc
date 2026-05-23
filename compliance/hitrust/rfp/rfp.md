@@ -7,7 +7,7 @@
 > firms, not a record of any outreach.
 
 **Framework target:** HITRUST CSF v11.7 i1
-**Intended assessment scope:** Chio v3.18 single healthcare design-partner deployment
+**Intended assessment scope:** Chio single healthcare design-partner deployment (this assessed release)
 **Candidate assessor firms:** any HITRUST-authorized external assessor (for example Coalfire, A-LIGN, or Schellman)
 
 ## Executive summary
@@ -15,7 +15,7 @@
 If and when Chio engages an assessor, this template would request a
 HITRUST-authorized external assessor for an Implemented, 1-year (i1)
 readiness and validated-assessment engagement. The requested scope is
-the single-tenant Chio v3.18 healthcare design-partner deployment,
+the single-tenant Chio healthcare design-partner deployment,
 including capability-mediated access control, audit-log export, receipt
 evidence, threat coverage, build provenance, SBOM, and operational
 runbook evidence.
@@ -24,7 +24,7 @@ runbook evidence.
 
 The assessment would cover:
 
-- Chio v3.18 only.
+- This assessed Chio release only.
 - One healthcare design-partner tenant.
 - One production deployment environment.
 - Audit-log export schema v1 and post-deployment evidence samples.

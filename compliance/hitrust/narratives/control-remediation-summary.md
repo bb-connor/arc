@@ -6,7 +6,7 @@
 > "gap" means evidence is still missing. No external remediation has been
 > validated by any assessor.
 
-**Scope:** Chio v3.18 healthcare design-partner deployment
+**Scope:** Chio healthcare design-partner deployment (this assessed release)
 
 ## Gap-to-artifact map
 

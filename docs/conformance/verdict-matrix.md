@@ -49,8 +49,8 @@ divergence from the Rust kernel expected tuple for each scenario.
 The corpus rotation process is intentionally narrow. A rotation changes one or
 more files under `crates/chio-conformance/verdict_matrix/scenarios/`, recomputes
 the sorted scenario index hash, updates both `scenario_index_hash` and
-`corpus_sha256` in `manifest.toml`, and updates this page plus the M02 audit
-with the new scenario count and hash. The diff-oracle self test must pass before
+`corpus_sha256` in `manifest.toml`, and updates this page with the new
+scenario count and hash. The diff-oracle self test must pass before
 the rotated corpus can be treated as active.
 
 ## Tuple Contract

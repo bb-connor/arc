@@ -112,9 +112,9 @@
 
 ---
 
-## Wave Structure
+## Release Structure
 
-## Wave 1: Launch Surface Closure
+## Phase 1: Launch Surface Closure
 
 **Objective:** finish the remaining near-term substrate and operator surface so the trust/control plane is deployable without caveats.
 
@@ -131,7 +131,7 @@
 - compliance evidence export implemented and verified
 - release and operations checklist documented
 
-**Wave 1 issue set:**
+**Phase 1 issue set:**
 - `P1-05`
 - `P1-06`
 - `P1-07`
@@ -144,7 +144,7 @@
 - dashboard build and tests green
 - no known contract drift between dashboard, SDKs, and trust-control APIs
 
-## Wave 2: Economic Execution
+## Phase 2: Economic Execution
 
 **Objective:** make Chio economically real, not just economically shaped.
 
@@ -160,10 +160,10 @@
 - delegation-chain cost attribution
 - operator-facing reporting
 
-**Wave 2 issue set:**
+**Phase 2 issue set:**
 - Completed: `P2-01`, `P2-02`, `P2-03`, `P2-04`, `P2-05`, `P2-06`
 
-## Wave 3: Local Trust Enforcement
+## Phase 3: Local Trust Enforcement
 
 **Objective:** turn receipts into usable local trust and policy decisions.
 
@@ -178,12 +178,12 @@
 - reputation-gated issuance
 - certification skeleton available to trust launch claims
 
-**Wave 3 issue set:**
+**Phase 3 issue set:**
 - Completed: `P3-01`
 - Remaining:
 - `P3-02`
 
-## Wave 4: Portable Trust
+## Phase 4: Portable Trust
 
 **Objective:** make trust portable across organizations.
 
@@ -198,11 +198,11 @@
 - Agent Passport alpha
 - first cross-org trust flow
 
-**Wave 4 issue set:**
+**Phase 4 issue set:**
 - `P3-03`
 - `P3-04`
 
-## Wave 5: Ecosystem Expansion
+## Phase 5: Ecosystem Expansion
 
 **Objective:** widen the adoption surface without losing contract integrity.
 
@@ -217,13 +217,13 @@
 - identity federation
 - conformance suite/community release
 
-**Wave 5 issue set:**
+**Phase 5 issue set:**
 - `P3-05` completed on 2026-03-23
 - identity federation work from roadmap
 
 ---
 
-## Historical Wave: Wave 5
+## Historical Work: Phase 5
 
 ### Completed In This Session
 
@@ -314,7 +314,7 @@
   - build credentials directly from the local reputation corpus plus receipt/checkpoint evidence
   - verify the slice with crate tests, CLI passport end-to-end tests, and full `cargo test --workspace`
 
-### Current Wave 4 Focus
+### Current Phase 4 Focus
 
 - `P3-01` completed on 2026-03-23
   - added the new `chio-reputation` workspace crate without creating a `chio-kernel` dependency cycle
@@ -410,11 +410,11 @@
   - kept the cross-org boundary honest by preserving local lineage foreign keys and modeling imported parents through explicit federated lineage bridges rather than pretending they are native local issuers
   - verified with new multi-hop `federated_issue` coverage, `cargo test -p chio-cli --test evidence_export`, and full `cargo test --workspace`
 
-### Wave Status
+### Release Status
 
-Wave 1 launch-surface closure is complete from the execution backlog perspective.
-Wave 2 economic execution is complete. Wave 3 local reputation work is complete.
-Wave 4 portable trust is now active. The local reputation substrate,
+Phase 1 launch-surface closure is complete. Phase 2 economic execution is
+complete. Phase 3 local reputation work is complete. Phase 4 portable trust is
+now active. The local reputation substrate,
 issuance-time enforcement, `did:chio` identity layer, and Agent Passport alpha
 are real and verified. The thin A2A adapter skeleton is now also real and
 verified against the A2A v1.0.0 discovery plus `SendMessage` surface, and now

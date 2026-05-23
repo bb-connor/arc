@@ -1,6 +1,6 @@
 # Incident Classification and MTTR
 
-This page classifies M01 healthcare pilot incidents. It maps Chio-owned
+This page classifies healthcare pilot incidents. It maps Chio-owned
 mediation, trust-control, receipt, SOC export, and PagerDuty failures into
 P0/P1/P2 response levels.
 
@@ -74,7 +74,7 @@ Every P0/P1/P2 record includes:
 8. Follow-up owner.
 
 The P4 30-day report records mean time to recovery for every P1 and P2. P0
-must be zero for a green M01 closeout.
+must be zero for a green pilot closeout.
 
 ## PHI Guardrail
 

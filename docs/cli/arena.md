@@ -1,15 +1,15 @@
 # `chio arena` CLI surface
 
 The chio-arena CLI exposes three subcommands on the `chio` binary, all
-guarded by the M04 deterministic-replay contract: scenarios run
-deterministically, every receipt bundle is bit-exact replayable, and any
-failures auto-promote into the M04 corpus and the M05
-chio-adversarial-suite via the existing CHIO_BLESS gate.
+guarded by the deterministic-replay contract: scenarios run deterministically,
+every receipt bundle is bit-exact replayable, and any failures auto-promote
+into the replay corpus and the adversarial suite via the existing CHIO_BLESS
+gate.
 
 ## `chio arena run scenarios/<name>.toml`
 
 Loads a scenario TOML, drives the kernel multiplexer under the deterministic
-scheduler, and writes a receipt bundle byte-compatible with the M04 `tests/replay/goldens/` layout under `target/arena/<scenario-id>/`.
+scheduler, and writes a receipt bundle byte-compatible with the `tests/replay/goldens/` layout under `target/arena/<scenario-id>/`.
 
 Flags:
 
@@ -19,8 +19,9 @@ Flags:
 
 ## `chio arena replay <scenario-id>`
 
-Resolves `target/arena/<scenario-id>/` and delegates to the M04 `chio replay` engine. The arena does not reimplement signature verification
-or root recomputation; the engine ingests the bundle directly.
+Resolves `target/arena/<scenario-id>/` and delegates to the `chio replay`
+engine. The arena does not reimplement signature verification or root
+recomputation; the engine ingests the bundle directly.
 
 Flags:
 
@@ -47,12 +48,12 @@ Flags:
 
 A failing arena scenario can graduate to two corpora via the CHIO_BLESS gate:
 
-1. M04 fixtures under `tests/replay/fixtures/arena/<class>/`.
+1. Replay fixtures under `tests/replay/fixtures/arena/<class>/`.
    `BLESS_REASON=arena:<scenario-id>` is the only accepted reason; the
    per-PR cap (default 5) carries forward unchanged.
-2. M05 chio-adversarial-suite under
-   `crates/chio-adversarial-suite/cases/<class>/`. Until the suite scaffold
-   lands, the writer falls back to `target/arena/promote-pending/`.
+2. The adversarial suite under `crates/chio-adversarial-suite/cases/<class>/`.
+   Until the suite scaffold lands, the writer falls back to
+   `target/arena/promote-pending/`.
 
 Neither path is wired to CI: the CHIO_BLESS gate refuses when `CI=true`, by
 design.

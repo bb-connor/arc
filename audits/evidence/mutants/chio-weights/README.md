@@ -1,7 +1,7 @@
 # chio-weights mutation baseline
 
 This directory holds the per-mutant cargo-mutants output for the
-`chio-weights` crate (the M10 phase 4 model-card surface: signed
+`chio-weights` crate (the model-card trust-boundary surface: signed
 weights cards, cosign bundle helper, kernel binding refusal,
 `arc bind --card`). The seed measurement closes the chio-weights
 BASELINE-GAP row.

@@ -6,7 +6,7 @@
 > gap.
 
 **Schema:** `spec/audit-log/export-schema.v1.json` (exists in repo)
-**Scope:** Chio v3.18 healthcare design-partner deployment
+**Scope:** Chio healthcare design-partner deployment (this assessed release)
 
 ## Sample source
 

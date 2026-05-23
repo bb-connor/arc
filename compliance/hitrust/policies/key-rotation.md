@@ -1,6 +1,6 @@
 # HITRUST Key Rotation Policy
 
-**Scope:** Chio v3.18 healthcare design-partner deployment
+**Scope:** Chio healthcare design-partner deployment (this assessed release)
 **Owner:** Chio security owner
 
 > **Status: internal readiness.** This policy is documented; rotation

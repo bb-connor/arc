@@ -6,13 +6,13 @@
 > engagement would ask, grounded in repository evidence.
 
 **Framework target:** HITRUST CSF v11.7 i1
-**Scope:** Chio v3.18, one healthcare design-partner tenant, one deployment environment
+**Scope:** Chio (this assessed release), one healthcare design-partner tenant, one deployment environment
 
 ## Scope answers
 
 | Question | Answer | Evidence |
 |----------|--------|----------|
-| Which product is assessed? | Chio v3.18 only. | `compliance/hitrust/scope-boundary.md` |
+| Which product is assessed? | This assessed Chio release only. | `compliance/hitrust/scope-boundary.md` |
 | Which tenant is in scope? | One healthcare design-partner tenant; identity is not bound in public docs. | scope boundary |
 | Which environment is in scope? | One production deployment environment. | `compliance/hitrust/ssp.md` |
 | Are mobile surfaces included? | No. Mobile patient-app is explicitly excluded. | scope boundary |

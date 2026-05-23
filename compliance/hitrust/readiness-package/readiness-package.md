@@ -10,7 +10,7 @@
 **Target assessment type:** HITRUST Implemented, 1-year (i1) Validated Assessment
 **Framework target:** HITRUST CSF v11.7 i1
 **Control population:** the i1 control set (count fixed by HITRUST at MyCSF object creation)
-**Subject system:** Chio v3.18 design-partner deployment
+**Subject system:** Chio design-partner deployment (this assessed release)
 **Target external assessor:** none engaged
 **Issuance date:** none (no assessment performed)
 **Expiration date:** none (no assessment performed)
@@ -18,12 +18,11 @@
 
 ## Bound scope
 
-This readiness record binds only the Chio v3.18 deployment used by a
+This readiness record binds only the assessed Chio deployment used by a
 single healthcare design-partner tenant. It excludes mobile patient-app
 surfaces, AWS Bedrock and MCP marketplace surfaces, other Chio tenants,
-other operator systems, and Chio versions before or after v3.18. The
-bound scope would remain the same if a real External Assessor engagement
-begins.
+other operator systems, and other Chio releases. The bound scope would
+remain the same if a real External Assessor engagement begins.
 
 ## Repository evidence
 

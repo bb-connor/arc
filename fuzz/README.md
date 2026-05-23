@@ -5,9 +5,8 @@ standalone Cargo workspace so libFuzzer / nightly requirements do not leak
 into the main stable/MSRV workspace lanes; see `Cargo.toml` for the empty
 `[workspace]` stanza that enforces that boundary.
 
-M02 owns the fuzz lane and lands the seven baseline targets enumerated in
-`target-map.toml`. Later trajectory tickets layer their target-specific
-`[[bin]]` entries alongside their `fuzz_target!` definitions.
+The seven baseline targets are enumerated in `target-map.toml`. Additional
+targets add their `[[bin]]` entries alongside their `fuzz_target!` definitions.
 
 ## Setup
 

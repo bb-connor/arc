@@ -1,8 +1,7 @@
 # Release Evidence
 
 This document is the external-reviewer entry point for Chio release evidence.
-It is written for the M08 crypto and protocol reviewer and the M09 HITRUST i1
-assessor.
+It is written for the crypto and protocol reviewer and the HITRUST i1 assessor.
 
 ## Checksum Index
 
@@ -62,7 +61,7 @@ index is the stable reviewer index.
 
 ## Reproducibility Scope
 
-M03 promises Linux x86_64 reproducibility for the `chio` binary.
-macOS and Windows release archives are still checksum-published and signed, but
-they are not claimed to be byte-reproducible in v3.18 because codesign and PE
-timestamp behavior remains platform-dependent.
+The release pipeline guarantees Linux x86_64 reproducibility for the `chio`
+binary. macOS and Windows release archives are still checksum-published and
+signed, but they are not claimed to be byte-reproducible because codesign and
+PE timestamp behavior remains platform-dependent.

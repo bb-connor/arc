@@ -13,14 +13,14 @@ Slice A research and planning are now documented in:
 The first implementation slice is now scaffolded:
 
 - `crates/chio-conformance` exists as the scenario/result/report model crate
-- `tests/conformance/` now contains the initial Wave 1 scenario catalog
+- `tests/conformance/` now contains the initial scenario catalog
 - JS and Python peer directories now exist as explicit harness targets
 - the repo can already generate a Markdown compatibility matrix from JSON result artifacts
 
 The next live execution slice is now shipped:
 
 - `tests/conformance/fixtures/wave1/` contains a reusable upstream MCP fixture and policy
-- the JS and Python peers now execute real Wave 1 Streamable HTTP client scenarios
+- the JS and Python peers now execute real Streamable HTTP client scenarios
 - `chio-conformance-runner` boots `chio mcp serve-http`, runs both peers, collects JSON artifacts, and generates a Markdown matrix
 - `crates/chio-conformance/tests/wave1_live.rs` validates the end-to-end harness against a live local Chio edge
 
@@ -29,7 +29,7 @@ The next compatibility-expansion slice is now underway:
 - `tests/conformance/scenarios/wave2/` covers task-oriented remote HTTP scenarios
 - `tasks-call-get-result` is green across the JS and Python peers
 - `tasks-cancel` is now green across the JS and Python peers under the bounded pre-execution cancellation window
-- the generated matrix now distinguishes hard failures from expected failures instead of flattening both into `fail`, but Wave 2 no longer depends on an expected-failure carve-out
+- the generated matrix now distinguishes hard failures from expected failures instead of flattening both into `fail`
 
 The next auth/discovery slice is now shipped:
 
@@ -37,7 +37,7 @@ The next auth/discovery slice is now shipped:
 - the conformance runner now supports `--auth-mode oauth-local`
 - the JS and Python peers now execute protected-resource metadata discovery, authorization-server metadata discovery, auth-code + PKCE session initialization, token-exchange session initialization, and unauthenticated challenge validation
 - `crates/chio-conformance/tests/wave3_auth_live.rs` validates the end-to-end OAuth-backed remote edge against live JS and Python peers
-- the generated Wave 3 matrix is green at `tests/conformance/reports/generated/wave3-auth.md`
+- the generated auth matrix is green at `tests/conformance/reports/generated/wave3-auth.md`
 
 The next notification/subscription slice is now shipped:
 
@@ -45,7 +45,7 @@ The next notification/subscription slice is now shipped:
 - the wrapped fixture now advertises `resources.subscribe`, resource `listChanged`, prompt `listChanged`, and tool `listChanged`, and emits upstream notifications through a real wrapped tool path
 - the JS and Python peers now validate `resources/subscribe`, forwarded `notifications/resources/updated`, and forwarded resource/tool/prompt `list_changed` notifications
 - `crates/chio-conformance/tests/wave4_notifications_live.rs` validates the end-to-end notification slice against live JS and Python peers
-- the generated Wave 4 matrix is green at `tests/conformance/reports/generated/wave4-notifications.md`
+- the generated notifications matrix is green at `tests/conformance/reports/generated/wave4-notifications.md`
 
 The next nested-flow slice is now shipped:
 
@@ -53,7 +53,7 @@ The next nested-flow slice is now shipped:
 - the wrapped fixture now issues live `sampling/createMessage`, form-mode `elicitation/create`, URL-mode `elicitation/create`, `notifications/elicitation/complete`, and `roots/list` requests through real wrapped tool calls
 - the JS and Python peers now respond to nested sampling, elicitation, and roots callbacks over remote HTTP and validate the resulting tool outputs
 - `crates/chio-conformance/tests/wave5_nested_flows_live.rs` validates the end-to-end nested-flow slice against live JS and Python peers
-- the generated Wave 5 matrix is green at `tests/conformance/reports/generated/wave5-nested-flows.md`
+- the generated nested-flows matrix is green at `tests/conformance/reports/generated/wave5-nested-flows.md`
 - the remote HTTP runtime now allows notification/response POSTs to temporarily own a stream when no request stream is active, which closes the `notifications/initialized` -> `roots/list` gap that was blocking remote nested-flow coverage
 
 This is the adoption epic.
@@ -150,7 +150,7 @@ More detailed execution guidance now exists:
 
 - keep the current `crates/chio-cli/tests` suite as the fast local integration layer
 - add a dedicated conformance harness above it, not inside it
-- start with a small Wave 1 matrix before expanding to auth and advanced notifications
+- start with a small initial matrix before expanding to auth and advanced notifications
 - separate MCP-core scenarios from Chio-extension scenarios in the generated report
 
 ### Slice B: migration fixtures
@@ -191,7 +191,7 @@ Responsibilities:
 Recommended execution order inside `T8.1`:
 
 1. define scenario descriptors and JSON result artifacts
-2. add one JS peer and one Python peer for Wave 1 scenarios only
+2. add one JS peer and one Python peer for the initial scenarios only
 3. generate the first Markdown matrix from JSON artifacts
 4. expand to remote/auth and interactive scenario families after the report shape is stable
 

@@ -7,7 +7,7 @@
 > Chio actually implements today, alongside honest gaps.
 
 **Framework target:** HITRUST CSF v11.7 i1
-**Product version:** Chio v3.18
+**Product version:** This assessed release
 **Control count target:** the i1 control set (exact count is fixed by HITRUST when a MyCSF object is created)
 
 ## System overview
@@ -18,7 +18,7 @@ tokens, evaluates guards before data crosses trust boundaries, and
 signs decisions into an append-only receipt log.
 
 The intended assessment scope is deliberately narrow: a single Chio
-v3.18 deployment for a single healthcare design-partner tenant. Other
+deployment (this assessed release) for a single healthcare design-partner tenant. Other
 tenants, other versions, mobile extensions, and AWS Bedrock listing
 surfaces are outside this intended HITRUST i1 boundary.
 
@@ -32,7 +32,7 @@ surfaces are outside this intended HITRUST i1 boundary.
   does not assert a specific count.
 - Deployment boundary: single tenant, single version, single deployment
   environment.
-- Product version: Chio v3.18.
+- Product version: this assessed release.
 - Evidence portal: MyCSF or assessor-designated equivalent (not yet
   created).
 - Assessor: none selected or engaged.
@@ -48,7 +48,7 @@ set as the target and maps controls to the evidence that exists today.
 
 In scope:
 
-- Chio kernel binaries for v3.18.
+- Chio kernel binaries (this assessed release).
 - Capability authority, kernel admission, guard pipeline, tool-server
   mediation, and receipt-log export.
 - Audit-log export schema v1 and design-partner audit-log samples.
@@ -59,7 +59,7 @@ In scope:
 Out of scope:
 
 - Non-design-partner tenants.
-- Versions earlier or later than v3.18.
+- Other Chio releases (earlier or later than this assessed release).
 - Mobile patient-app extension unless later added to scope.
 - AWS Bedrock and MCP marketplace listing surfaces.
 - Operator platform systems outside the Chio product boundary.

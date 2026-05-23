@@ -18,7 +18,7 @@ object id has been assigned because no object exists.
 |-------|---------------|
 | MyCSF object label | to be assigned at object creation |
 | Assessment type | HITRUST i1 Validated Assessment |
-| Scope | Chio v3.18, one healthcare design-partner tenant, one deployment environment |
+| Scope | Chio (this assessed release), one healthcare design-partner tenant, one deployment environment |
 | Assessor access role | External assessor reviewer with evidence-download access |
 | Chio evidence owner | chio-security |
 | Upload model | Coarse inherited evidence first, control-specific evidence after remediation |
