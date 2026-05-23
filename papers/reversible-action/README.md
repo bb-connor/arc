@@ -13,7 +13,7 @@ The parent paper conditions constitutional amendment at the type level on a
 backward-refinement witness: `enactAmendment` does not type-check without a
 `ConstitutionalDelta` carrying `proofTerm : BackwardRefines new old`. The
 response side of the same lifecycle (the positive enforcement act that
-follows admission) is described in the parent's `crates/chio-chiodos-runtime`
+follows admission) is described in the parent's `crates/chio-runtime`
 admission hook but is not lifted to a corresponding type-level invariant.
 The candidate here closes that asymmetry. An executive action is a type
 that cannot be constructed without a positive TTL witness and an action

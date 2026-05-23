@@ -15,12 +15,12 @@ case "${1:-}" in
     shift
     ;;
   *)
-    echo "usage: check-chiodos-pheromone-relay-alert-assurance-archive-hardening.sh [--schema-only|--negative-only]" >&2
+    echo "usage: check-chio-pheromone-relay-alert-assurance-archive-hardening.sh [--schema-only|--negative-only]" >&2
     exit 2
     ;;
 esac
 if [[ $# -ne 0 ]]; then
-  echo "usage: check-chiodos-pheromone-relay-alert-assurance-archive-hardening.sh [--schema-only|--negative-only]" >&2
+  echo "usage: check-chio-pheromone-relay-alert-assurance-archive-hardening.sh [--schema-only|--negative-only]" >&2
   exit 2
 fi
 
@@ -67,7 +67,7 @@ required = {
 missing = sorted(required - case_ids)
 if missing:
     raise SystemExit(f"archive restore negative corpus missing cases: {missing}")
-print("OK Chiodos relay alert assurance archive hardening metadata")
+print("OK Chio relay alert assurance archive hardening metadata")
 PY
 
 validate_schema() {

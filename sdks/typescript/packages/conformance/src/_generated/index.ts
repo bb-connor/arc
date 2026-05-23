@@ -514,7 +514,7 @@ export namespace Federation_BilateralSignatureSliceEnvelope {
 // Source: spec/schemas/chio-wire/v1/federation/bilateral-signature-slice.schema.json
 export namespace Federation_BilateralSignatureSlice {
   /**
-   * Bounded in-toto Statement payload for Chio bilateral DSSE signature slices. This is not the strict CHIODOS bilateral cosign invocation predicate.
+   * Bounded in-toto Statement payload for Chio bilateral DSSE signature slices. This is not the strict treaty-bound bilateral invocation predicate.
    */
   export interface ChioBilateralDSSESignatureSliceStatement {
     _type: "https://in-toto.io/Statement/v1";

@@ -6206,7 +6206,7 @@ for ChioBilateralDsseSignatureSliceEnvelopeSignaturesItemSig {
             })
     }
 }
-///Bounded in-toto Statement payload for Chio bilateral DSSE signature slices. This is not the strict CHIODOS bilateral cosign invocation predicate.
+///Bounded in-toto Statement payload for Chio bilateral DSSE signature slices. This is not the strict treaty-bound bilateral invocation predicate.
 ///
 /// <details><summary>JSON schema</summary>
 ///
@@ -6214,7 +6214,7 @@ for ChioBilateralDsseSignatureSliceEnvelopeSignaturesItemSig {
 ///{
 ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/federation/bilateral-signature-slice",
 ///  "title": "Chio bilateral DSSE signature-slice statement",
-///  "description": "Bounded in-toto Statement payload for Chio bilateral DSSE signature slices. This is not the strict CHIODOS bilateral cosign invocation predicate.",
+///  "description": "Bounded in-toto Statement payload for Chio bilateral DSSE signature slices. This is not the strict treaty-bound bilateral invocation predicate.",
 ///  "type": "object",
 ///  "required": [
 ///    "_type",

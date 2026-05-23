@@ -1176,7 +1176,7 @@ type ErrorToolServerError struct {
 // ErrorToolServerErrorCode defines model for ErrorToolServerError.Code.
 type ErrorToolServerErrorCode string
 
-// FederationBilateralSignatureSlice Bounded in-toto Statement payload for Chio bilateral DSSE signature slices. This is not the strict CHIODOS bilateral cosign invocation predicate.
+// FederationBilateralSignatureSlice Bounded in-toto Statement payload for Chio bilateral DSSE signature slices. This is not the strict treaty-bound bilateral invocation predicate.
 type FederationBilateralSignatureSlice struct {
 	Type      FederationBilateralSignatureSliceType `json:"_type"`
 	Predicate struct {

@@ -131,7 +131,7 @@ class Predicate(BaseModel):
 
 class ChioBilateralDsseSignatureSliceStatement(BaseModel):
     """
-    Bounded in-toto Statement payload for Chio bilateral DSSE signature slices. This is not the strict CHIODOS bilateral cosign invocation predicate.
+    Bounded in-toto Statement payload for Chio bilateral DSSE signature slices. This is not the strict treaty-bound bilateral invocation predicate.
     """
 
     model_config = ConfigDict(

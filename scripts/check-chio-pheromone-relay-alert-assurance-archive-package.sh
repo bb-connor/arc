@@ -15,12 +15,12 @@ case "${1:-}" in
     shift
     ;;
   *)
-    echo "usage: check-chiodos-pheromone-relay-alert-assurance-archive-package.sh [--schema-only|--negative-only]" >&2
+    echo "usage: check-chio-pheromone-relay-alert-assurance-archive-package.sh [--schema-only|--negative-only]" >&2
     exit 2
     ;;
 esac
 if [[ $# -ne 0 ]]; then
-  echo "usage: check-chiodos-pheromone-relay-alert-assurance-archive-package.sh [--schema-only|--negative-only]" >&2
+  echo "usage: check-chio-pheromone-relay-alert-assurance-archive-package.sh [--schema-only|--negative-only]" >&2
   exit 2
 fi
 
@@ -90,7 +90,7 @@ required = {
 missing = sorted(required - case_ids)
 if missing:
     raise SystemExit(f"archive package negative corpus missing cases: {missing}")
-print("OK Chiodos relay alert assurance archive package metadata")
+print("OK Chio relay alert assurance archive package metadata")
 PY
 
 validate_schema() {
@@ -122,7 +122,7 @@ profile["blockLegalHold"] = False
 target.write_text(json.dumps(profile, indent=2) + "\n", encoding="utf-8")
 PY
 
-cargo run -p chio-cli -- chiodos pheromone relay alert assurance export \
+cargo run -p chio-cli -- chio pheromone relay alert assurance export \
   --bundle-id relay-alert-assurance-export-package \
   --package "$ASSURANCE_DIR/relay-alert-assurance-package.json" \
   --alert-report "$ASSURANCE_DIR/relay-alert-report.json" \
@@ -139,7 +139,7 @@ cargo run -p chio-cli -- chiodos pheromone relay alert assurance export \
   --out-dir "$GENERATED_DIR/export-bundle" \
   --report "$GENERATED_DIR/relay-alert-assurance-export-report.json"
 
-cargo run -p chio-cli -- chiodos pheromone relay alert assurance archive plan \
+cargo run -p chio-cli -- chio pheromone relay alert assurance archive plan \
   --bundle-root "$GENERATED_DIR/export-bundle" \
   --trusted-exporters "$ASSURANCE_DIR/relay-alert-assurance-trusted-exporters.json" \
   --archive-profile "$ASSURANCE_DIR/relay-alert-assurance-archive-profile.json" \
@@ -147,7 +147,7 @@ cargo run -p chio-cli -- chiodos pheromone relay alert assurance archive plan \
   --now-unix-ms "$NOW_UNIX_MS" \
   --report "$GENERATED_DIR/relay-alert-assurance-archive-report.json"
 
-cargo run -p chio-cli -- chiodos pheromone relay alert assurance closeout review \
+cargo run -p chio-cli -- chio pheromone relay alert assurance closeout review \
   --bundle-root "$GENERATED_DIR/export-bundle" \
   --trusted-exporters "$ASSURANCE_DIR/relay-alert-assurance-trusted-exporters.json" \
   --closeout-profile "$GENERATED_DIR/package-closeout-profile.json" \
@@ -155,7 +155,7 @@ cargo run -p chio-cli -- chiodos pheromone relay alert assurance closeout review
   --now-unix-ms "$NOW_UNIX_MS" \
   --report "$GENERATED_DIR/relay-alert-assurance-closeout-report.json"
 
-cargo run -p chio-cli -- chiodos pheromone relay alert assurance archive package create \
+cargo run -p chio-cli -- chio pheromone relay alert assurance archive package create \
   --bundle-root "$GENERATED_DIR/export-bundle" \
   --trusted-exporters "$ASSURANCE_DIR/relay-alert-assurance-trusted-exporters.json" \
   --archive-report "$GENERATED_DIR/relay-alert-assurance-archive-report.json" \
@@ -167,7 +167,7 @@ cargo run -p chio-cli -- chiodos pheromone relay alert assurance archive package
   --out "$GENERATED_DIR/relay-alert-assurance-archive-package.tar.gz" \
   --report "$GENERATED_DIR/relay-alert-assurance-archive-package-report.json"
 
-cargo run -p chio-cli -- chiodos pheromone relay alert assurance archive package verify \
+cargo run -p chio-cli -- chio pheromone relay alert assurance archive package verify \
   --package "$GENERATED_DIR/relay-alert-assurance-archive-package.tar.gz" \
   --trusted-packagers "$ASSURANCE_DIR/relay-alert-assurance-trusted-archive-packagers.json" \
   --trusted-exporters "$ASSURANCE_DIR/relay-alert-assurance-trusted-exporters.json" \
@@ -176,7 +176,7 @@ cargo run -p chio-cli -- chiodos pheromone relay alert assurance archive package
   --now-unix-ms "$NOW_UNIX_MS" \
   --report "$GENERATED_DIR/relay-alert-assurance-archive-package-verify-report.json"
 
-cargo run -p chio-cli -- chiodos pheromone relay alert assurance archive package extract \
+cargo run -p chio-cli -- chio pheromone relay alert assurance archive package extract \
   --package "$GENERATED_DIR/relay-alert-assurance-archive-package.tar.gz" \
   --trusted-packagers "$ASSURANCE_DIR/relay-alert-assurance-trusted-archive-packagers.json" \
   --trusted-exporters "$ASSURANCE_DIR/relay-alert-assurance-trusted-exporters.json" \
@@ -248,14 +248,14 @@ PY
 validate_schema "$SCHEMA_DIR/relay-alert-assurance-physical-archive-evidence.schema.json" "$GENERATED_DIR/relay-alert-assurance-physical-archive-evidence.json"
 validate_schema "$SCHEMA_DIR/relay-alert-assurance-retention-handoff-evidence.schema.json" "$GENERATED_DIR/relay-alert-assurance-retention-handoff-evidence.json"
 
-cargo run -p chio-cli -- chiodos pheromone relay alert assurance archive physical-drill review \
+cargo run -p chio-cli -- chio pheromone relay alert assurance archive physical-drill review \
   --evidence "$GENERATED_DIR/relay-alert-assurance-physical-archive-evidence.json" \
   --package-report "$GENERATED_DIR/relay-alert-assurance-archive-package-report.json" \
   --now-unix-ms "$NOW_UNIX_MS" \
   --report "$GENERATED_DIR/relay-alert-assurance-physical-archive-drill-report.json"
 validate_schema "$SCHEMA_DIR/relay-alert-assurance-physical-archive-drill-report.schema.json" "$GENERATED_DIR/relay-alert-assurance-physical-archive-drill-report.json"
 
-cargo run -p chio-cli -- chiodos pheromone relay alert assurance retention handoff review \
+cargo run -p chio-cli -- chio pheromone relay alert assurance retention handoff review \
   --evidence "$GENERATED_DIR/relay-alert-assurance-retention-handoff-evidence.json" \
   --profile "$ASSURANCE_DIR/relay-alert-assurance-retention-handoff-profile.json" \
   --package-report "$GENERATED_DIR/relay-alert-assurance-archive-package-report.json" \
@@ -265,7 +265,7 @@ validate_schema "$SCHEMA_DIR/relay-alert-assurance-retention-handoff-report.sche
 
 cargo test -p chio-pheromone-relay alert_assurance_archive_package --test relay
 cargo test -p chio-pheromone-relay physical_drill --test relay
-cargo test -p chio-cli --bin chio chiodos_pheromone_relay_alert_assurance
+cargo test -p chio-cli --bin chio chio_pheromone_relay_alert_assurance
 
 NEGATIVE_DIR="$(mktemp -d)"
 TMP_DIRS+=("$NEGATIVE_DIR")
@@ -281,7 +281,7 @@ untrusted_path.write_text(json.dumps(trusted, indent=2) + "\n", encoding="utf-8"
 PY
 
 set +e
-cargo run -p chio-cli -- chiodos pheromone relay alert assurance archive package verify \
+cargo run -p chio-cli -- chio pheromone relay alert assurance archive package verify \
   --package "$GENERATED_DIR/relay-alert-assurance-archive-package.tar.gz" \
   --trusted-packagers "$NEGATIVE_DIR/untrusted-packagers.json" \
   --trusted-exporters "$ASSURANCE_DIR/relay-alert-assurance-trusted-exporters.json" \
@@ -318,7 +318,7 @@ with tarfile.open(target, "w:gz") as package:
 PY
 
 set +e
-cargo run -p chio-cli -- chiodos pheromone relay alert assurance archive package verify \
+cargo run -p chio-cli -- chio pheromone relay alert assurance archive package verify \
   --package "$NEGATIVE_DIR/traversal.tar.gz" \
   --trusted-packagers "$ASSURANCE_DIR/relay-alert-assurance-trusted-archive-packagers.json" \
   --trusted-exporters "$ASSURANCE_DIR/relay-alert-assurance-trusted-exporters.json" \
@@ -389,7 +389,7 @@ PY
 
 while IFS='|' read -r case_id expected_code expected_pattern; do
   set +e
-  cargo run -p chio-cli -- chiodos pheromone relay alert assurance archive package verify \
+  cargo run -p chio-cli -- chio pheromone relay alert assurance archive package verify \
     --package "$NEGATIVE_DIR/$case_id.tar.gz" \
     --trusted-packagers "$ASSURANCE_DIR/relay-alert-assurance-trusted-archive-packagers.json" \
     --trusted-exporters "$ASSURANCE_DIR/relay-alert-assurance-trusted-exporters.json" \
@@ -429,7 +429,7 @@ target.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
 PY
 
 set +e
-cargo run -p chio-cli -- chiodos pheromone relay alert assurance retention handoff review \
+cargo run -p chio-cli -- chio pheromone relay alert assurance retention handoff review \
   --evidence "$NEGATIVE_DIR/bad-handoff-evidence.json" \
   --profile "$ASSURANCE_DIR/relay-alert-assurance-retention-handoff-profile.json" \
   --package-report "$GENERATED_DIR/relay-alert-assurance-archive-package-report.json" \
@@ -477,4 +477,4 @@ if [[ "$MODE" == "negative-only" ]]; then
   exit 0
 fi
 
-bash "$ROOT/scripts/check-chiodos-pheromone-relay-alert-assurance-archive.sh" --schema-only
+bash "$ROOT/scripts/check-chio-pheromone-relay-alert-assurance-archive.sh" --schema-only

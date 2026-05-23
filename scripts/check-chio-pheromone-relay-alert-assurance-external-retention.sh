@@ -15,12 +15,12 @@ case "${1:-}" in
     shift
     ;;
   *)
-    echo "usage: check-chiodos-pheromone-relay-alert-assurance-external-retention.sh [--schema-only|--negative-only]" >&2
+    echo "usage: check-chio-pheromone-relay-alert-assurance-external-retention.sh [--schema-only|--negative-only]" >&2
     exit 2
     ;;
 esac
 if [[ $# -ne 0 ]]; then
-  echo "usage: check-chiodos-pheromone-relay-alert-assurance-external-retention.sh [--schema-only|--negative-only]" >&2
+  echo "usage: check-chio-pheromone-relay-alert-assurance-external-retention.sh [--schema-only|--negative-only]" >&2
   exit 2
 fi
 
@@ -87,7 +87,7 @@ mismatched = {
 }
 if mismatched:
     raise SystemExit(f"external retention negative corpus expectedCode mismatch: {mismatched}")
-print("OK Chiodos relay alert assurance external retention metadata")
+print("OK Chio relay alert assurance external retention metadata")
 PY
 
 validate_schema() {
@@ -106,5 +106,5 @@ fi
 
 if [[ "$MODE" == "all" || "$MODE" == "negative-only" ]]; then
   cargo test -p chio-pheromone-relay external_retention_review --test relay
-  cargo test -p chio-cli --bin chio chiodos_pheromone_relay_alert_assurance
+  cargo test -p chio-cli --bin chio chio_pheromone_relay_alert_assurance
 fi

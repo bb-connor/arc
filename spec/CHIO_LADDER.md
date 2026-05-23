@@ -1,6 +1,6 @@
 # Chio Governance Ladder Manifest
 
-**Status:** v1 (Chio-owned pre-release; wire-frozen against `chio.chiodos-ladder.v1`)
+**Status:** v1 (Chio-owned pre-release; wire-frozen against `chio.federation.governance-ladder-manifest.v1`)
 **Date:** 2026-05-04
 **Supersedes:** none
 
