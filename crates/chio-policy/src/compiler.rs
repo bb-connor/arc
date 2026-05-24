@@ -206,8 +206,8 @@ fn compile_rule_guards(
     //
     // When the policy opts into egress control we also add an internal-
     // network guard that blocks RFC1918 / cloud-metadata endpoints. This
-    // matches ClawdStrike's layered defense where the allowlist catches
-    // unknown domains and the internal-network guard catches raw IPs.
+    // provides a layered defense: the allowlist catches unknown domains and
+    // the internal-network guard catches raw IPs.
     if let Some(eg) = &rules.egress {
         if eg.enabled {
             if eg.allow.is_empty() && eg.block.is_empty() {
@@ -485,9 +485,9 @@ fn jailbreak_config_from(jb: &JailbreakDetection) -> Result<JailbreakGuardConfig
 
     if let Some(block) = jb.block_threshold {
         // HushSpec expresses thresholds as integer percentages (0-100 in
-        // practice; ClawdStrike used 0-255). Map that onto the `[0.0, 1.0]`
-        // jailbreak-guard space, capping at 1.0 so out-of-range values
-        // fail closed rather than produce an unreachable threshold.
+        // practice). Map that onto the `[0.0, 1.0]` jailbreak-guard space,
+        // capping at 1.0 so out-of-range values fail closed rather than
+        // produce an unreachable threshold.
         let capped = u32::try_from(block).unwrap_or(0).min(100);
         config.threshold = (capped as f32) / 100.0;
     }
@@ -497,8 +497,7 @@ fn jailbreak_config_from(jb: &JailbreakDetection) -> Result<JailbreakGuardConfig
     // thresholds. We accept the HushSpec value for schema compatibility but
     // do not wire it in here -- if the warn value would exceed the configured
     // block threshold we conservatively ignore it rather than fail closed,
-    // matching the ClawdStrike `compile_detection` semantics that clamp
-    // partial overlays on merge.
+    // clamping partial overlays on merge.
     let _ = jb.warn_threshold;
 
     if let Some(max_bytes) = jb.max_input_bytes {

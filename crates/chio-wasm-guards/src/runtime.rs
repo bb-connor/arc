@@ -1463,11 +1463,10 @@ pub mod wasmtime_backend {
 
     /// A single WASM guard declared in the policy YAML.
     ///
-    /// This is the Chio-side equivalent of ClawdStrike's `custom.rs` plugin
-    /// entry: it names the module, points at its `.wasm` bytes (either on
-    /// disk or inline), declares the host-function capabilities the guard
-    /// needs, and carries a JSON config blob that may contain `${ENV_VAR}`
-    /// placeholders.
+    /// A custom-guard plugin entry: it names the module, points at its `.wasm`
+    /// bytes (either on disk or inline), declares the host-function
+    /// capabilities the guard needs, and carries a JSON config blob that may
+    /// contain `${ENV_VAR}` placeholders.
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
     pub struct PolicyCustomGuard {
         /// Human-readable guard name. Used for logs, receipts, and to identify

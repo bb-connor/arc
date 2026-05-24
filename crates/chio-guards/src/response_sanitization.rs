@@ -5,9 +5,9 @@
 //!
 //! - A simple, backwards-compatible [`ResponseSanitizationGuard`] that uses a
 //!   small fixed pattern set and Block/Redact binary actions.
-//! - A full-featured [`OutputSanitizer`] that ports the ClawdStrike output
-//!   sanitizer: secret detectors (AWS, GitHub, Slack, GCP service-account
-//!   JSON, passwords, PEM private keys, JWTs, OAuth bearer tokens),
+//! - A full-featured [`OutputSanitizer`] with secret detectors (AWS, GitHub,
+//!   Slack, GCP service-account JSON, passwords, PEM private keys, JWTs,
+//!   OAuth bearer tokens),
 //!   credit-card numbers with Luhn validation, US SSNs, Shannon-entropy
 //!   high-entropy token detection, configurable allowlist/denylist,
 //!   deterministic overlap resolution (longest-match-wins with strategy

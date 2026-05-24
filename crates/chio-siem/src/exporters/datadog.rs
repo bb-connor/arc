@@ -11,9 +11,9 @@
 //!   and every guard name from `receipt.evidence`.
 //! - `event`: the full [`ChioReceipt`] payload for analyst drill-down.
 //!
-//! Port of ClawdStrike's `hushd/src/siem/exporters/datadog.rs` adapted to the
-//! Chio `Exporter` trait (dyn-compatible `Pin<Box<dyn Future>>`) and
-//! Chio receipt shape (`Decision::{Allow, Deny, ...}`).
+//! Implemented against the Chio `Exporter` trait (dyn-compatible
+//! `Pin<Box<dyn Future>>`) and Chio receipt shape
+//! (`Decision::{Allow, Deny, ...}`).
 
 use std::time::Duration;
 

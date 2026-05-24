@@ -1,17 +1,12 @@
-//! VirusTotal v3 adapter (phase 13.3).
-//!
-//! Adapted from
-//! `../clawdstrike/crates/libs/clawdstrike/src/async_guards/threat_intel/virustotal.rs`
-//! with the following deviations:
+//! VirusTotal v3 adapter.
 //!
 //! * The Chio `ExternalGuard` surface is synchronous-in-decision - we
-//!   return [`Verdict`] directly rather than the ClawdStrike `warn/block`
-//!   tri-state. Below-threshold detections surface as `Allow`; the
-//!   existing adapter `tracing::warn!`s the suspicious-but-not-blocked
-//!   signal.
+//!   return [`Verdict`] directly rather than a warn/block tri-state.
+//!   Below-threshold detections surface as `Allow`; the adapter
+//!   `tracing::warn!`s the suspicious-but-not-blocked signal.
 //! * Arguments are passed via a small JSON envelope in
 //!   [`GuardCallContext::arguments_json`] (`{"hash": ...}` or
-//!   `{"url": ...}`) instead of ClawdStrike's `GuardAction` enum.
+//!   `{"url": ...}`).
 
 use std::time::Duration;
 

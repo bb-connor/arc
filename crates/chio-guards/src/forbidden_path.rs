@@ -1,7 +1,7 @@
 //! Forbidden path guard -- blocks access to sensitive filesystem paths.
 //!
-//! Adapted from ClawdStrike's `guards/forbidden_path.rs`.  The pattern
-//! matching and path normalization logic is intentionally identical.
+//! Denies a request when the normalized target path matches a configured
+//! forbidden glob pattern.
 
 use chio_kernel::{GuardContext, KernelError, Verdict};
 use glob::Pattern;

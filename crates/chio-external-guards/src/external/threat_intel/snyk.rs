@@ -1,8 +1,6 @@
-//! Snyk vulnerability-lookup adapter (phase 13.3).
+//! Snyk vulnerability-lookup adapter.
 //!
-//! Adapted from
-//! `../clawdstrike/crates/libs/clawdstrike/src/async_guards/threat_intel/snyk.rs`,
-//! but reshaped to query a specific package + version rather than a
+//! Queries a specific package and version rather than running a
 //! manifest-level bulk test. The argument envelope is:
 //!
 //! ```json

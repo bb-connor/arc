@@ -1,9 +1,9 @@
 //! Placeholder resolution for WASM guard configuration values.
 //!
-//! This module ports ClawdStrike's `resolve_placeholders_in_json()` helper into
-//! `chio-wasm-guards`. It substitutes `${VAR}` and `${VAR:-default}` references
-//! in strings against an injected [`PlaceholderEnv`] rather than reading from
-//! `std::env` directly. Tests and callers that need a controlled environment
+//! This module resolves placeholders in JSON guard configuration. It
+//! substitutes `${VAR}` and `${VAR:-default}` references in strings against an
+//! injected [`PlaceholderEnv`] rather than reading from `std::env` directly.
+//! Tests and callers that need a controlled environment
 //! pass their own implementation; production code can use [`ProcessEnv`] which
 //! wraps `std::env::var`.
 //!

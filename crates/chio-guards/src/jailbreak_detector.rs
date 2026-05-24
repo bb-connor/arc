@@ -5,9 +5,8 @@
 //! Chio request shapes; callers pass in a canonicalized `&str` and receive a
 //! [`Detection`].  Three layers run in sequence:
 //!
-//! 1. **Heuristic** -- fast regex patterns lifted from the ClawdStrike
-//!    jailbreak port.  Each pattern fires a stable signal ID and contributes
-//!    its weight to the heuristic layer score.
+//! 1. **Heuristic** -- fast regex patterns.  Each pattern fires a stable
+//!    signal ID and contributes its weight to the heuristic layer score.
 //! 2. **Statistical** -- cheap numerical signals over the canonicalized text:
 //!    punctuation ratio, Shannon entropy of non-whitespace ASCII, presence of
 //!    long unbroken symbol runs, shingle-uniqueness (repetition detector),
@@ -60,8 +59,8 @@ pub const DEFAULT_SHINGLE_UNIQUENESS_THRESHOLD: f32 = 0.35;
 /// or above this threshold trip a deny verdict in [`crate::jailbreak::JailbreakGuard`].
 pub const DEFAULT_DENY_THRESHOLD: f32 = 0.75;
 
-/// Jailbreak category taxonomy, carried forward from the ClawdStrike port so
-/// log-analysis tools that know the upstream IDs continue to work.
+/// Jailbreak category taxonomy.  The category names form a stable taxonomy so
+/// log-analysis tools that key off the IDs continue to work.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum JailbreakCategory {
@@ -83,7 +82,7 @@ pub enum JailbreakCategory {
 /// should only emit the `id` so the detector does not leak user content.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Signal {
-    /// Stable identifier (matches upstream ClawdStrike IDs where applicable).
+    /// Stable identifier for the signal, safe to emit in logs and metrics.
     pub id: String,
     /// Logical category for taxonomy / metrics.
     pub category: JailbreakCategory,
@@ -190,10 +189,9 @@ pub struct LinearModel {
 
 impl Default for LinearModel {
     fn default() -> Self {
-        // Carried over from the ClawdStrike linear model with three additive
-        // Chio-specific weights (developer-mode flag, shingle-uniqueness
-        // penalty, zero-width-obfuscation penalty).  Bias of -2.0 keeps
-        // sigmoid output near zero for benign input.
+        // Linear model with additive weights for the developer-mode flag,
+        // shingle-uniqueness penalty, and zero-width-obfuscation penalty.
+        // Bias of -2.0 keeps sigmoid output near zero for benign input.
         Self {
             bias: -2.0,
             w_ignore_policy: 2.5,

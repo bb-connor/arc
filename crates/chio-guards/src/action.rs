@@ -9,9 +9,8 @@ use serde_json::Value;
 
 /// A categorized action derived from a tool call request.
 ///
-/// This plays the same role as ClawdStrike's `GuardAction` enum, but is
-/// produced by inspecting `ToolCallRequest` fields rather than being
-/// supplied directly.
+/// The action is produced by inspecting `ToolCallRequest` fields rather than
+/// being supplied directly.
 #[derive(Clone, Debug)]
 pub enum ToolAction {
     /// File system read (path).

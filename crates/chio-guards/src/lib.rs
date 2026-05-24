@@ -1,7 +1,6 @@
 //! Security guards for the Chio runtime kernel.
 //!
-//! This crate provides policy-driven security guards adapted from
-//! [ClawdStrike](https://github.com/backbay-labs/clawdstrike).  Each guard
+//! This crate provides policy-driven security guards.  Each guard
 //! implements `chio_kernel::Guard` and can be registered on the kernel via
 //! `kernel.add_guard(...)` or composed into a [`GuardPipeline`].
 //!

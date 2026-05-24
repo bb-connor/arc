@@ -10,10 +10,9 @@
 //!
 //! 1. **Heuristic** -- regex patterns for DAN / evil-confidant, policy-override,
 //!    role-change, system-prompt extraction, developer-mode, and encoded
-//!    payloads.  The patterns are ported from ClawdStrike's
-//!    `clawdstrike::guards::jailbreak` module and operate over canonicalised
-//!    text so Unicode homoglyph / zero-width splicing obfuscations are handled
-//!    before regex matching.
+//!    payloads.  The patterns operate over canonicalised text so Unicode
+//!    homoglyph / zero-width splicing obfuscations are handled before regex
+//!    matching.
 //! 2. **Statistical** -- punctuation ratio, Shannon entropy, long symbol runs,
 //!    shingle-uniqueness (repetition detection), and count of zero-width
 //!    codepoints in the original input.
@@ -40,13 +39,13 @@
 //! `kernel.add_guard(Box::new(JailbreakGuard::default()))` or register it in
 //! a bespoke [`crate::GuardPipeline`].
 //!
-//! # Attribution
+//! # Signal ID scheme
 //!
-//! The detector port preserves the signal ID scheme (`jb_ignore_policy`,
+//! The detector emits a stable signal ID scheme (`jb_ignore_policy`,
 //! `jb_dan_unfiltered`, `jb_system_prompt_extraction`, `jb_role_change`,
-//! `jb_encoded_payload`) from ClawdStrike so log-analysis tooling that knows
-//! the upstream taxonomy continues to work.  Chio-specific extensions
-//! (`jb_developer_mode`, `stat_low_shingle_uniqueness`) are additive.
+//! `jb_encoded_payload`) so log-analysis tooling that keys off the taxonomy
+//! continues to work.  Additional signals (`jb_developer_mode`,
+//! `stat_low_shingle_uniqueness`) are additive.
 
 use std::num::NonZeroUsize;
 use std::sync::Mutex;

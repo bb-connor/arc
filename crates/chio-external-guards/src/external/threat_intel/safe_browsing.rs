@@ -1,7 +1,5 @@
-//! Google Safe Browsing v4 adapter (phase 13.3).
+//! Google Safe Browsing v4 adapter.
 //!
-//! Adapted from
-//! `../clawdstrike/crates/libs/clawdstrike/src/async_guards/threat_intel/safe_browsing.rs`.
 //! Accepts `{"url": "<absolute-url>"}` in
 //! [`GuardCallContext::arguments_json`] and denies when Safe Browsing
 //! returns at least one match.

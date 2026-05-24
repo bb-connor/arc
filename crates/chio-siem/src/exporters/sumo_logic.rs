@@ -11,11 +11,9 @@
 //! Metadata headers (`X-Sumo-Category`, `X-Sumo-Name`, `X-Sumo-Host`) attach
 //! Sumo Logic metadata for routing and parser selection.
 //!
-//! Port of ClawdStrike's `hushd/src/siem/exporters/sumo_logic.rs`. The
-//! optional gzip compression from the ClawdStrike exporter is intentionally
-//! omitted here: gzip is not part of the 12.1 acceptance criteria and would
-//! add a `flate2` dependency to `chio-siem`. Compression can be added later
-//! without breaking the exporter's public surface.
+//! Optional gzip compression is intentionally omitted here to avoid adding a
+//! `flate2` dependency to `chio-siem`. Compression can be added later without
+//! breaking the exporter's public surface.
 
 use std::time::Duration;
 
