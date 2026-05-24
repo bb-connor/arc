@@ -603,27 +603,7 @@ mod tests {
         }
     }
 
-    trait TestUnwrap<T> {
-        fn test_unwrap(self) -> T;
-    }
-
-    impl<T, E: std::fmt::Debug> TestUnwrap<T> for Result<T, E> {
-        fn test_unwrap(self) -> T {
-            match self {
-                Ok(value) => value,
-                Err(error) => panic!("expected Ok(..), got Err({error:?})"),
-            }
-        }
-    }
-
-    impl<T> TestUnwrap<T> for Option<T> {
-        fn test_unwrap(self) -> T {
-            match self {
-                Some(value) => value,
-                None => panic!("expected Some(..), got None"),
-            }
-        }
-    }
+    use chio_test_support::prelude::*;
 
     fn must_err<T: std::fmt::Debug>(result: Result<T, CliError>, context: &str) -> CliError {
         match result {

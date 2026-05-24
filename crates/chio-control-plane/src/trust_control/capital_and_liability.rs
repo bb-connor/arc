@@ -2913,18 +2913,7 @@ pub(crate) fn build_credit_backtest_report_from_store(
 mod capital_and_liability_tests {
     use super::*;
 
-    trait TestUnwrapErr<E> {
-        fn test_unwrap_err(self) -> E;
-    }
-
-    impl<T: std::fmt::Debug, E> TestUnwrapErr<E> for Result<T, E> {
-        fn test_unwrap_err(self) -> E {
-            match self {
-                Ok(value) => panic!("expected Err(..), got Ok({value:?})"),
-                Err(error) => error,
-            }
-        }
-    }
+    use chio_test_support::prelude::*;
 
     fn monetary_receipt(receipt_id: &str, subject_key: Option<&str>) -> ExposureLedgerReceiptEntry {
         ExposureLedgerReceiptEntry {

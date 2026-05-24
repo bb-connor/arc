@@ -649,31 +649,7 @@ mod tests {
         EvmPublicationReceipt, HttpEgressContract,
     };
 
-    trait TestResultOk<T, E> {
-        fn test_expect(self, context: &'static str) -> T;
-    }
-
-    impl<T, E> TestResultOk<T, E> for Result<T, E> {
-        fn test_expect(self, context: &'static str) -> T {
-            match self {
-                Ok(value) => value,
-                Err(_) => panic!("{context}"),
-            }
-        }
-    }
-
-    trait TestResultErr<T, E> {
-        fn test_expect_err(self, context: &'static str) -> E;
-    }
-
-    impl<T, E> TestResultErr<T, E> for Result<T, E> {
-        fn test_expect_err(self, context: &'static str) -> E {
-            match self {
-                Ok(_) => panic!("{context} unexpectedly succeeded"),
-                Err(error) => error,
-            }
-        }
-    }
+    use chio_test_support::prelude::*;
 
     fn bind_mock_json_rpc_listener() -> Option<TcpListener> {
         match TcpListener::bind("127.0.0.1:0") {

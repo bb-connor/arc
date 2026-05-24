@@ -2605,6 +2605,7 @@ dependencies = [
  "chio-egress-contract",
  "chio-kernel",
  "chio-metrics-spec",
+ "chio-test-support",
  "chio-web3",
  "chio-web3-bindings",
  "hex",
@@ -2645,6 +2646,7 @@ dependencies = [
  "chio-kernel",
  "chio-openapi",
  "chio-store-sqlite",
+ "chio-test-support",
  "chrono",
  "hex",
  "hyper",
@@ -2667,6 +2669,7 @@ name = "chio-appraisal"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-test-support",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -2816,6 +2819,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core",
  "chio-manifest",
+ "chio-test-support",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -3030,6 +3034,7 @@ dependencies = [
  "chio-reputation",
  "chio-settle",
  "chio-store-sqlite",
+ "chio-test-support",
  "chrono",
  "ciborium",
  "clap 4.6.0",
@@ -3090,6 +3095,7 @@ version = "0.1.0"
 dependencies = [
  "aws-lc-rs",
  "chio-spec-codegen",
+ "chio-test-support",
  "ed25519-dalek",
  "fips204",
  "getrandom 0.2.17",
@@ -3127,6 +3133,7 @@ dependencies = [
  "chio-did",
  "chio-reputation",
  "chio-revocation-oracle",
+ "chio-test-support",
  "chrono",
  "dudect-bencher",
  "proptest",
@@ -3398,6 +3405,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core-types",
  "chio-listing",
+ "chio-test-support",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -3515,6 +3523,7 @@ dependencies = [
  "chio-egress-contract",
  "chio-kernel",
  "chio-metrics-spec",
+ "chio-test-support",
  "chrono",
  "ed25519-dalek",
  "hex",
@@ -3563,6 +3572,7 @@ dependencies = [
  "chio-open-market",
  "chio-settle",
  "chio-store-sqlite",
+ "chio-test-support",
  "chio-tool-call-fabric",
  "chio-underwriting",
  "chio-weights",
@@ -3655,6 +3665,7 @@ dependencies = [
  "alloy-transport",
  "chio-core",
  "chio-egress-contract",
+ "chio-test-support",
  "reqwest 0.13.2",
  "serde",
  "serde_json",
@@ -3734,6 +3745,7 @@ dependencies = [
  "chio-kernel",
  "chio-manifest",
  "chio-mcp-edge",
+ "chio-test-support",
  "chrono",
  "serde",
  "serde_json",
@@ -3854,6 +3866,7 @@ dependencies = [
  "chio-core-types",
  "chio-governance",
  "chio-listing",
+ "chio-test-support",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -4167,6 +4180,7 @@ dependencies = [
  "chio-egress-contract",
  "chio-kernel",
  "chio-link",
+ "chio-test-support",
  "chio-web3",
  "chio-web3-bindings",
  "hex",
@@ -4229,6 +4243,7 @@ dependencies = [
  "chio-credit",
  "chio-kernel",
  "chio-settle",
+ "chio-test-support",
  "criterion",
  "r2d2",
  "r2d2_sqlite",
@@ -4274,6 +4289,10 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
 ]
+
+[[package]]
+name = "chio-test-support"
+version = "0.1.0"
 
 [[package]]
 name = "chio-three-vendor-example"

@@ -36,6 +36,7 @@ uuid = { workspace = true, features = ["v7"] }
 zeroize = { version = "1.8", features = ["derive"] }
 
 [dev-dependencies]
+chio-test-support = { path = "../chio-test-support" }
 criterion = { workspace = true }
 tempfile = { workspace = true }
 

@@ -2145,31 +2145,7 @@ mod underwriting_and_support_tests {
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    trait TestUnwrap<T> {
-        fn test_unwrap(self) -> T;
-    }
-
-    impl<T, E: std::fmt::Debug> TestUnwrap<T> for Result<T, E> {
-        fn test_unwrap(self) -> T {
-            match self {
-                Ok(value) => value,
-                Err(error) => panic!("expected Ok(..), got Err({error:?})"),
-            }
-        }
-    }
-
-    trait TestUnwrapErr<E> {
-        fn test_unwrap_err(self) -> E;
-    }
-
-    impl<T: std::fmt::Debug, E> TestUnwrapErr<E> for Result<T, E> {
-        fn test_unwrap_err(self) -> E {
-            match self {
-                Ok(value) => panic!("expected Err(..), got Ok({value:?})"),
-                Err(error) => error,
-            }
-        }
-    }
+    use chio_test_support::prelude::*;
 
     fn unique_temp_path(prefix: &str, extension: &str) -> std::path::PathBuf {
         let nonce = SystemTime::now()

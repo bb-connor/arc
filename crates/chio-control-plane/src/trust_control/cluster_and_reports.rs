@@ -4089,40 +4089,7 @@ mod cluster_and_reports_tests {
     use std::collections::HashMap;
     use std::path::PathBuf;
 
-    trait TestUnwrap<T> {
-        fn test_unwrap(self) -> T;
-    }
-
-    impl<T, E: std::fmt::Debug> TestUnwrap<T> for Result<T, E> {
-        fn test_unwrap(self) -> T {
-            match self {
-                Ok(value) => value,
-                Err(error) => panic!("expected Ok(..), got Err({error:?})"),
-            }
-        }
-    }
-
-    impl<T> TestUnwrap<T> for Option<T> {
-        fn test_unwrap(self) -> T {
-            match self {
-                Some(value) => value,
-                None => panic!("expected Some(..), got None"),
-            }
-        }
-    }
-
-    trait TestUnwrapErr<E> {
-        fn test_unwrap_err(self) -> E;
-    }
-
-    impl<T: std::fmt::Debug, E> TestUnwrapErr<E> for Result<T, E> {
-        fn test_unwrap_err(self) -> E {
-            match self {
-                Ok(value) => panic!("expected Err(..), got Ok({value:?})"),
-                Err(error) => error,
-            }
-        }
-    }
+    use chio_test_support::prelude::*;
 
     fn base_config() -> TrustServiceConfig {
         TrustServiceConfig {

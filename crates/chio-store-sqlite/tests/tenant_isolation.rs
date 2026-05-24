@@ -23,26 +23,7 @@ use chio_core::receipt::{ChioReceipt, ChioReceiptBody, Decision, ToolCallAction}
 use chio_kernel::receipt_query::ReceiptQuery;
 use chio_store_sqlite::SqliteReceiptStore;
 
-trait TestResultOk<T, E> {
-    fn test_expect(self, context: &'static str) -> T;
-    fn test_unwrap(self) -> T;
-}
-
-impl<T, E> TestResultOk<T, E> for Result<T, E> {
-    fn test_expect(self, context: &'static str) -> T {
-        match self {
-            Ok(value) => value,
-            Err(_) => panic!("{context}"),
-        }
-    }
-
-    fn test_unwrap(self) -> T {
-        match self {
-            Ok(value) => value,
-            Err(_) => panic!("expected Ok result"),
-        }
-    }
-}
+use chio_test_support::prelude::*;
 
 fn unique_db_path(prefix: &str) -> std::path::PathBuf {
     let nonce = SystemTime::now()
@@ -123,7 +104,7 @@ fn tenant_filter_without_read_context_fails_closed() {
             read_context: None,
             ..ReceiptQuery::default()
         })
-        .expect_err("tenant_filter without read context must fail closed");
+        .test_expect_err("tenant_filter without read context must fail closed");
 
     assert!(
         err.to_string()

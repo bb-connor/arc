@@ -443,37 +443,7 @@ impl LocalDevnetDeployment {
 mod tests {
     use super::*;
 
-    trait TestResultOk<T, E> {
-        fn test_unwrap(self) -> T;
-    }
-
-    impl<T, E> TestResultOk<T, E> for Result<T, E>
-    where
-        E: std::fmt::Display,
-    {
-        fn test_unwrap(self) -> T {
-            match self {
-                Ok(value) => value,
-                Err(error) => panic!("expected Ok result: {error}"),
-            }
-        }
-    }
-
-    trait TestResultErr<T, E> {
-        fn test_unwrap_err(self) -> E;
-    }
-
-    impl<T, E> TestResultErr<T, E> for Result<T, E>
-    where
-        T: std::fmt::Debug,
-    {
-        fn test_unwrap_err(self) -> E {
-            match self {
-                Ok(value) => panic!("expected Err result, got Ok: {value:?}"),
-                Err(error) => error,
-            }
-        }
-    }
+    use chio_test_support::prelude::*;
 
     fn sample_chain_config() -> SettlementChainConfig {
         SettlementChainConfig {

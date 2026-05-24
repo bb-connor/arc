@@ -81,6 +81,7 @@ delegation = []
 delegation_v2 = ["delegation"]
 
 [dev-dependencies]
+chio-test-support = { path = "../chio-test-support" }
 jsonschema = { version = "0.46.0", default-features = false }
 proptest = { workspace = true }
 # Pulled in by the `_generated_check` integration test so the canonical

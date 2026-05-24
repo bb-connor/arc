@@ -81,6 +81,7 @@ base64 = { workspace = true }
 
 [dev-dependencies]
 chio-store-sqlite = { path = "../chio-store-sqlite" }
+chio-test-support = { path = "../chio-test-support" }
 criterion = { workspace = true }
 dhat = { workspace = true }
 loom = { workspace = true }

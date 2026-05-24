@@ -20,24 +20,7 @@ use chio_manifest::{
 };
 use serde_json::{json, Value};
 
-trait TestUnwrap<T> {
-    fn test_unwrap(self, context: &str) -> T;
-}
-
-impl<T, E> TestUnwrap<T> for Result<T, E>
-where
-    E: std::fmt::Display,
-{
-    fn test_unwrap(self, context: &str) -> T {
-        self.unwrap_or_else(|error| panic!("{context}: {error}"))
-    }
-}
-
-impl<T> TestUnwrap<T> for Option<T> {
-    fn test_unwrap(self, context: &str) -> T {
-        self.unwrap_or_else(|| panic!("{context}"))
-    }
-}
+use chio_test_support::ctx::TestUnwrap;
 
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))

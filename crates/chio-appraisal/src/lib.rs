@@ -37,49 +37,7 @@ mod tests {
     use serde_json::{json, Value};
     use std::collections::BTreeMap;
 
-    trait TestResultOk<T, E> {
-        fn test_expect(self, context: &'static str) -> T;
-        fn test_unwrap(self) -> T;
-    }
-
-    impl<T, E> TestResultOk<T, E> for Result<T, E>
-    where
-        E: std::fmt::Debug,
-    {
-        fn test_expect(self, context: &'static str) -> T {
-            self.unwrap_or_else(|error| panic!("{context}: {error:?}"))
-        }
-
-        fn test_unwrap(self) -> T {
-            self.unwrap_or_else(|error| panic!("expected Ok result: {error:?}"))
-        }
-    }
-
-    trait TestResultErr<T, E> {
-        fn test_expect_err(self, context: &'static str) -> E;
-    }
-
-    impl<T, E> TestResultErr<T, E> for Result<T, E>
-    where
-        T: std::fmt::Debug,
-    {
-        fn test_expect_err(self, context: &'static str) -> E {
-            match self {
-                Ok(value) => panic!("{context} unexpectedly succeeded: {value:?}"),
-                Err(error) => error,
-            }
-        }
-    }
-
-    trait TestOptionExt<T> {
-        fn test_expect(self, context: &'static str) -> T;
-    }
-
-    impl<T> TestOptionExt<T> for Option<T> {
-        fn test_expect(self, context: &'static str) -> T {
-            self.unwrap_or_else(|| panic!("{context}"))
-        }
-    }
+    use chio_test_support::prelude::*;
 
     fn sample_evidence() -> RuntimeAttestationEvidence {
         RuntimeAttestationEvidence {

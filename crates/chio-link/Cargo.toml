@@ -41,5 +41,8 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 tower = { workspace = true, optional = true }
 
+[dev-dependencies]
+chio-test-support = { path = "../chio-test-support" }
+
 [lints]
 workspace = true

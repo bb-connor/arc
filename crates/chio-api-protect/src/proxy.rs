@@ -88,27 +88,7 @@ mod tests {
     use std::thread;
     use tower::ServiceExt;
 
-    trait TestUnwrap<T> {
-        fn test_unwrap(self) -> T;
-    }
-
-    impl<T, E: std::fmt::Debug> TestUnwrap<T> for Result<T, E> {
-        fn test_unwrap(self) -> T {
-            match self {
-                Ok(value) => value,
-                Err(error) => panic!("expected Ok(..), got Err({error:?})"),
-            }
-        }
-    }
-
-    impl<T> TestUnwrap<T> for Option<T> {
-        fn test_unwrap(self) -> T {
-            match self {
-                Some(value) => value,
-                None => panic!("expected Some(..), got None"),
-            }
-        }
-    }
+    use chio_test_support::prelude::*;
 
     const PETSTORE_YAML: &str = r#"
 openapi: "3.0.0"

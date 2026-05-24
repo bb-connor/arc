@@ -147,6 +147,7 @@ members = [
     "examples/otel-genai",
     #
     # Tests
+    "crates/chio-test-support",
     "formal/diff-tests",
     "tests/e2e",
     "tests/replay",
