@@ -97,7 +97,7 @@ trust_boundary_crates = [
 release_status = "parked_non_release"
 integrated_merge_sha = "7f56cf5383fc1caa7a4f06b4cd59e45177f00496"
 fixture_set = "examples/chiodome-bilateral/fixtures/v0.1.0-bounded-chiodome"
-status_note = "Trajectory 5.2 parks this bounded package outside the active release scope. Deterministic fixtures remain evidence artifacts, but no bounded Chiodome package release is claimed until mutation baselines and selective-disclosure proof support are promoted by a future release lane."
+status_note = "This bounded package is parked outside the active release scope. Deterministic fixtures remain evidence artifacts, but no bounded Chiodome package release is claimed until mutation baselines and selective-disclosure proof support are promoted by a future release lane."
 
 [release_audit]
 activation_evidence = """
@@ -122,21 +122,25 @@ m09_hitrust_i1_readiness_package:
   package_path: compliance/hitrust/readiness-package/readiness-package.md
   package_sha256: b2d2b03aafed87720fd9a3865dabfc9b89e9681de2fce8405aa051837d4706ef
   internal_record: retained outside release bundle
-  scope: "Chio v3.18 plus M01 healthcare design-partner deployment (readiness scope; not assessor scope)"
+  scope: "Chio 0.1.0 baseline plus the healthcare design-partner deployment (readiness scope; not assessor scope)"
   external_assessor_engagement: deferred
   external_assessor_owner: hitrust-followup
   public_landing_page: docs/external-attestation/hitrust-i1/index.md
   note: "HITRUST i1 readiness package, not an issued certificate. No HITRUST-authorized External Assessor (e.g., A-LIGN, Coalfire, Schellman) has performed an audit. Real HITRUST i1 certification remains deferred. Calendar estimate per realist analysis: 12-36 weeks."
 """
 
+# Retraction record for earlier pre-release tagging attempts. These tags
+# were never promoted to a public release: the current baseline is 0.1.0
+# and remains unreleased. The tags, SHAs, and run URLs below are retained
+# only as provenance for the retraction.
 [release_retraction]
 prior_release_tag = "v3.18.1"
 prior_release_sha = "a9006addb7d0217727ef748e9a469b97617e6279"
 prior_release_binaries_run_url = "https://github.com/backbay-labs/chio/actions/runs/25355058222"
 prior_reproducible_build_run_url = "https://github.com/backbay-labs/chio/actions/runs/25355058217"
 prior_slsa_trigger = "workflow_run after Release Binaries succeeds"
-# The v3.20.0 closeout claim is reopened pending an erratum and closeout
-# evidence record.
+# The later v3.20.0 closeout claim was reopened pending an erratum and
+# closeout evidence record; it was likewise never a public release.
 release_status = "reopened"
 erratum_record = "release-closeout-erratum"
 release_sha = "066e6ea342de44fb08f0f578d14ad2cea995cfc4"

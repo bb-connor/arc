@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The first public baseline, version 0.1.0, is in preparation and has not yet
+been tagged or released. It establishes the wire protocol, the policy and
+guard runtime, the receipt and attestation pipeline, the federation and
+settlement layers, and the multi-language SDK surface, together with the
+supply-chain, fuzzing, and formal-verification apparatus that gate every
+change. The entries below track changes accumulating toward that baseline.
+
 ### Changed
 
 - `chio-kernel` no longer enables `legacy-sync` by default. Downstream callers
@@ -29,13 +36,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reconciled the `cargo-deny` configuration comments with the real waiver
   counts and rationale, removing stale or misleading caps.
 
-## [0.1.0]
-
-Initial public baseline of the Chio protocol kernel and its surrounding
-toolchain. This release establishes the wire protocol, the policy and guard
-runtime, the receipt and attestation pipeline, the federation and settlement
-layers, and the multi-language SDK surface, together with the supply-chain,
-fuzzing, and formal-verification apparatus that gate every change.
-
-[Unreleased]: https://github.com/backbay-labs/chio/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/backbay-labs/chio/releases/tag/v0.1.0
+[Unreleased]: https://github.com/backbay-labs/chio/commits/main

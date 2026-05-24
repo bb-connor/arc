@@ -19,12 +19,12 @@ if ((${#matches[@]} > 0)); then
 fi
 
 if ! grep -qF "m08_internal_readiness_draft:" releases.toml; then
-  echo "M08 release-audit evidence must use m08_internal_readiness_draft" >&2
+  echo "release-audit evidence must use the m08_internal_readiness_draft key" >&2
   exit 1
 fi
 
 if grep -qF "activation_evidence.m08_final_report" releases.toml; then
-  echo "M08 release-audit evidence still references legacy m08_final_report" >&2
+  echo "release-audit evidence still references the legacy m08_final_report key" >&2
   exit 1
 fi
 
@@ -37,36 +37,36 @@ m09_evidence_files=(
 m09_stale_claim_pattern='HITRUST-i1-CHIO|mycsf://|Certificate received|HITRUST QA round|Final report submitted|selected external assessor|Assessor identity|issued[[:space:]]+2026-05-02|HITRUST-QA'
 
 if ! grep -qF "m09_hitrust_i1_readiness_package:" releases.toml; then
-  echo "M09 release-audit evidence must use m09_hitrust_i1_readiness_package" >&2
+  echo "HITRUST readiness evidence must use the m09_hitrust_i1_readiness_package key" >&2
   exit 1
 fi
 
 if ! grep -qF "package_sha256: ${m09_package_sha256}" releases.toml; then
-  echo "M09 readiness package hash is not pinned in releases.toml" >&2
+  echo "HITRUST readiness package hash is not pinned in releases.toml" >&2
   exit 1
 fi
 
 actual_m09_sha="$(shasum -a 256 "${m09_package_path}" | awk '{print $1}')"
 if [[ "${actual_m09_sha}" != "${m09_package_sha256}" ]]; then
-  echo "M09 readiness package hash mismatch: expected ${m09_package_sha256}, got ${actual_m09_sha}" >&2
+  echo "HITRUST readiness package hash mismatch: expected ${m09_package_sha256}, got ${actual_m09_sha}" >&2
   exit 1
 fi
 
 for path in "${m09_evidence_files[@]}"; do
   if [[ ! -f "${path}" ]]; then
-    echo "missing M09 evidence file: ${path}" >&2
+    echo "missing HITRUST readiness evidence file: ${path}" >&2
     exit 1
   fi
 
   stale_matches="$(grep -inE "${m09_stale_claim_pattern}" "${path}" || true)"
   if [[ -n "${stale_matches}" ]]; then
-    echo "M09 evidence must remain readiness-only; stale issued-certificate wording found in ${path}:" >&2
+    echo "HITRUST readiness evidence must remain readiness-only; stale issued-certificate wording found in ${path}:" >&2
     printf '%s\n' "${stale_matches}" >&2
     exit 1
   fi
 
   if ! grep -qiF "readiness" "${path}"; then
-    echo "M09 evidence must state readiness-only wording: ${path}" >&2
+    echo "HITRUST readiness evidence must state readiness-only wording: ${path}" >&2
     exit 1
   fi
 done

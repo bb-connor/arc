@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "chio-langchain"
 version = "0.1.1"
 description = "LangChain integration for Chio protocol tools with conformance tests"
+readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"
 authors = [
@@ -24,7 +25,7 @@ classifiers = [
 
 dependencies = [
     "chio-sdk-python>=0.1.0",
-    "chio-adapter-base>=0.1.0,<0.2",
+    "chio-adapter-base>=0.2.0,<0.3",
     "langchain-core>=0.2,<1",
 ]
 

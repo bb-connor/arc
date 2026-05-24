@@ -1,8 +1,9 @@
 {
   "name": "@chio-protocol/conformance",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "type": "module",
   "description": "Conformance tests for Chio TypeScript SDK against Rust kernel",
+  "license": "Apache-2.0",
   "private": true,
   "scripts": {
     "build": "tsc",
@@ -12,9 +13,9 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@chio-protocol/node-http": "file:../node-http",
-    "@chio-protocol/express": "file:../express",
-    "@chio-protocol/fastify": "file:../fastify"
+    "@chio-protocol/node-http": "^0.1.0",
+    "@chio-protocol/express": "^0.1.0",
+    "@chio-protocol/fastify": "^0.1.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",

@@ -9,7 +9,7 @@
     <Version>0.1.0</Version>
     <Description>ASP.NET Core middleware for Chio capability validation and receipt signing</Description>
     <Authors>Backbay Labs</Authors>
-    <License>MIT</License>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/backbay-labs/chio</RepositoryUrl>
   </PropertyGroup>
 
