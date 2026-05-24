@@ -34,7 +34,8 @@ use chio_core::crypto::{
     SigningAlgorithm, SigningBackend,
 };
 use chio_core::receipt::{
-    chio_receipt_id, ChioReceiptBody, ChioReceiptSigningBody, Decision, ToolCallAction, TrustLevel,
+    bind_receipt_signing_nonce, chio_receipt_id, ChioReceiptBody, ChioReceiptSigningBody, Decision,
+    ToolCallAction, TrustLevel,
 };
 use chio_kernel::{
     sign_receipt_body_hybrid_canonical, sign_receipt_body_with_backend, SignedHybridReceipt,
@@ -47,6 +48,10 @@ use chio_kernel::{
 /// compare produced bytes against the authoritative signed bytes.
 fn canonical_signing_wrapper_bytes(body: &ChioReceiptBody) -> Vec<u8> {
     let mut body = body.clone();
+    // Bind the signing nonce before computing the id, mirroring what every
+    // signing entrypoint does, so this oracle reflects the authoritative bytes
+    // both the classical and hybrid paths actually sign.
+    bind_receipt_signing_nonce(&mut body);
     body.id = chio_receipt_id(&body).unwrap();
     let signing_body = ChioReceiptSigningBody::from(&body);
     canonical_json_bytes(&signing_body).unwrap()

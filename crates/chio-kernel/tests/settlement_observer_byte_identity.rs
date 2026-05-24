@@ -108,12 +108,13 @@ fn build_receipt(index: u64, kp: &Keypair) -> (ChioReceipt, String) {
         tenant_id: None,
         kernel_key: kp.public_key(),
     };
-    // Pre-compute the content-addressed id so the caller knows ahead of
-    // time what id the signed receipt will carry. `ChioReceipt::sign`
-    // rewrites `body.id` to this same canonical hash before signing.
+    // Seed the body id, then sign. `ChioReceipt::sign` binds the canonical
+    // signing nonce into metadata and recomputes the content-addressed id over
+    // that nonce-augmented input, so the authoritative id is the one carried by
+    // the signed receipt; read it back rather than recomputing it here.
     body.id = chio_receipt_id(&body).expect("canonical receipt id computes");
-    let canonical_id = body.id.clone();
     let receipt = ChioReceipt::sign(body, kp).expect("test receipt signs");
+    let canonical_id = receipt.id.clone();
     (receipt, canonical_id)
 }
 

@@ -356,7 +356,7 @@ pub fn sign_receipt_body_hybrid_canonical(
     use chio_core::crypto::{
         canonical_json_shared_bytes, sign_shared_canonical_with_backend, PublicKey,
     };
-    use chio_core::receipt::{chio_receipt_id, ChioReceiptSigningBody};
+    use chio_core::receipt::{bind_receipt_signing_nonce, chio_receipt_id, ChioReceiptSigningBody};
 
     // Fail-closed kernel-key match BEFORE any cryptographic work. Mirrors
     // `chio_kernel_core::sign_receipt` so the byte-identity contract holds
@@ -371,16 +371,22 @@ pub fn sign_receipt_body_hybrid_canonical(
     // Mirror the classical sibling path so the two entrypoints sign the
     // same authoritative `ChioReceiptSigningBody` wrapper (id plus
     // `ChioReceiptIdInput`). `ChioReceipt::sign_with_backend` performs
-    // three steps: validate semantics, compute the content-addressed
-    // id, and build the wrapper. We replicate them here so the bytes the
-    // hybrid backend signs are byte-identical to what the classical
-    // sibling signs for the same body.
+    // four steps: validate semantics, bind the canonical signing nonce
+    // into metadata, compute the content-addressed id, and build the
+    // wrapper. We replicate them here so the bytes the hybrid backend
+    // signs are byte-identical to what the classical sibling signs for
+    // the same body.
     let mut body = body;
     body.validate_signable_semantics().map_err(|error| {
         KernelError::ReceiptSigningFailed(format!(
             "receipt body failed semantic validation: {error}"
         ))
     })?;
+    // Bind the signing nonce BEFORE computing the id, exactly as the
+    // classical path does, so the content-addressed id (and therefore the
+    // signed bytes) cover the nonce. Omitting this step is what previously
+    // made the hybrid receipt envelope drift from the classical one.
+    bind_receipt_signing_nonce(&mut body);
     body.id = chio_receipt_id(&body).map_err(|error| {
         KernelError::ReceiptSigningFailed(format!(
             "canonical JSON encoding of receipt id input failed: {error}"

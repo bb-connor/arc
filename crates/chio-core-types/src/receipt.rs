@@ -509,7 +509,19 @@ pub struct ChioReceiptSigningBody {
 pub const CHIO_RECEIPT_SIGNING_NONCE_METADATA_KEY: &str = "chio_receipt_signing_nonce";
 const CHIO_RECEIPT_ORIGINAL_METADATA_KEY: &str = "original_metadata";
 
-fn bind_receipt_signing_nonce(body: &mut ChioReceiptBody) {
+/// Bind the canonical signing nonce into a receipt body's metadata before the
+/// content-addressed id is computed.
+///
+/// Every receipt-signing entrypoint MUST call this after
+/// `ChioReceiptBody::validate_signable_semantics` and before `chio_receipt_id`
+/// so the nonce (the caller-supplied `body.id`) is folded into the id input,
+/// and therefore into the signed bytes. The classical `ChioReceipt::sign` /
+/// `ChioReceipt::sign_with_backend` paths call it inline; the kernel's hybrid
+/// signing path (`chio_kernel::sign_receipt_body_hybrid_canonical`) calls it
+/// through this public export so both paths produce byte-identical receipts.
+///
+/// No-op when `body.id` is empty after trimming.
+pub fn bind_receipt_signing_nonce(body: &mut ChioReceiptBody) {
     let nonce = body.id.trim();
     if nonce.is_empty() {
         return;
