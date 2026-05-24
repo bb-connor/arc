@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, dead_code)]
 
-#[path = "../src/policy.rs"]
+#[path = "../../chio-control-plane/src/policy.rs"]
 mod policy;
 
 #[test]
