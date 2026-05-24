@@ -13,12 +13,11 @@
 //!    a payload longer than 256 bytes are quarantined as a defensive
 //!    heuristic against a misconfigured redactor.
 //!
-//! The wasm host-call wiring (calling into the actual wasm guest via
-//! wasmtime) is deferred. T6 wires the **native-Rust placeholder**
-//! redactor from `chio-data-guards/redactors/default/` so the M10
-//! pipeline integrates fail-closed semantics today; the wasm bridge is
-//! mechanical because the native types mirror the WIT records 1:1
-//! (default redactor crate docs).
+//! The shipping pass runs the native-Rust redactor from
+//! `chio-data-guards/redactors/default/` in-process with fail-closed
+//! semantics. The [`Redactor`] trait is the backend seam: an alternative
+//! wasmtime-hosted guest can be slotted in without touching call sites
+//! because the native types mirror the WIT records 1:1.
 
 use chio_data_guards_redactors_default::{
     redact_payload as default_redact_payload, RedactClass as DefaultRedactClass,
@@ -76,10 +75,11 @@ pub enum RedactorError {
 
 /// In-process [`Redactor`] backed by the default-redactor crate.
 ///
-/// This is the placeholder while the wasm host-call wiring is deferred
-/// (see module-level docs). Production deployments will swap this for
-/// a wasmtime-driven implementation; the [`RedactPass`] code path is
-/// trait-objected so the swap is mechanical.
+/// This is the redactor the shadow runner uses by default: a real,
+/// fail-closed native-Rust pass. Deployments that prefer a sandboxed
+/// guest can supply an alternative [`Redactor`] (e.g. a wasmtime-driven
+/// one) to [`RedactPass::new`]; the code path is trait-objected so the
+/// swap is mechanical.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct DefaultRedactor;
 

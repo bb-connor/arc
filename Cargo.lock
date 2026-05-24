@@ -4235,10 +4235,12 @@ name = "chio-tee"
 version = "0.1.0"
 dependencies = [
  "arc-swap",
+ "base64 0.22.1",
  "chio-core-types",
  "chio-data-guards-redactors-default",
  "chio-store-sqlite",
  "chio-tee-frame",
+ "chrono",
  "proptest",
  "serde",
  "serde_json",

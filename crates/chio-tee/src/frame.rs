@@ -11,8 +11,9 @@
 //! this file.
 
 pub use chio_tee_frame::{
-    canonicalize, parse, validate, Frame, FrameError, FrameInputs, Otel, Provenance, SchemaError,
-    Upstream, UpstreamSystem, Verdict, FRAME_VERSION, SCHEMA_ID, SCHEMA_VERSION,
+    canonicalize, parse, signing_payload, validate, validate_signed, verify_tenant_sig, Frame,
+    FrameError, FrameInputs, Otel, Provenance, SchemaError, Upstream, UpstreamSystem, Verdict,
+    FRAME_VERSION, SCHEMA_ID, SCHEMA_VERSION,
 };
 
 #[cfg(test)]
