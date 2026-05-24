@@ -716,7 +716,13 @@ mod tests {
         #[async_trait::async_trait]
         impl AnchorWitnessClient for AlwaysFailClient {
             async fn publish(&self, _: &AnchorBatch) -> Result<WitnessReceipt, AnchorWitnessError> {
-                unreachable!()
+                // This test exercises only `verify_inclusion`; `publish`
+                // is never invoked. Return a fail-closed error rather
+                // than panicking so the test double can never surface a
+                // forged receipt even if a future caller reaches it.
+                Err(AnchorWitnessError::Config(
+                    "AlwaysFailClient does not publish".to_string(),
+                ))
             }
             async fn verify_inclusion(&self, _: &WitnessReceipt) -> Result<(), AnchorWitnessError> {
                 Err(AnchorWitnessError::SignatureInvalid(
