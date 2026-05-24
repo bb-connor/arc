@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://chio.world/schemas/chio-replay-report/v1.json",
   "title": "chio-replay-report.v1",
-  "description": "Stable JSON report shape emitted by `chio replay --json`. Mirrors the `ReplayReport` struct in crates/chio-cli/src/cli/replay/report.rs. The schema string `chio.replay.report/v1` is pinned by M04 Phase 4 task 5; the report is emitted on every `--json` run regardless of exit code so consumers can drive triage off a single byte stream.",
+  "description": "Stable JSON report shape emitted by `chio replay --json`. Mirrors the `ReplayReport` struct in crates/chio-cli/src/cli/replay/report.rs. The schema string `chio.replay.report/v1` is stable; the report is emitted on every `--json` run regardless of exit code so consumers can drive triage off a single byte stream.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -96,7 +96,7 @@
     "exit_code": {
       "type": "integer",
       "enum": [0, 10, 20, 30, 40, 50],
-      "description": "Process exit code the dispatch layer will use after writing the JSON report. Pinned by the canonical exit-code registry in M04 Phase 4: `0` clean, `10` verdict drift, `20` signature mismatch, `30` parse error, `40` schema mismatch, `50` redaction mismatch."
+      "description": "Process exit code the dispatch layer will use after writing the JSON report. Pinned by the canonical exit-code registry: `0` clean, `10` verdict drift, `20` signature mismatch, `30` parse error, `40` schema mismatch, `50` redaction mismatch."
     }
   }
 }

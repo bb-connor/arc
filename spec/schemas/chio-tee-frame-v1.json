@@ -70,7 +70,7 @@
     },
     "invocation": {
       "type": "object",
-      "description": "Canonical-JSON ToolInvocation per the M01 schema. Validated by the M01 validator; opaque here."
+      "description": "Canonical-JSON ToolInvocation per the wire schema. Validated by the wire-schema validator; opaque here."
     },
     "provenance": {
       "type": "object",
@@ -96,7 +96,7 @@
         },
         "supply_chain": {
           "type": "object",
-          "description": "Optional M09 SBOM-style provenance superset; opaque here."
+          "description": "Optional SBOM-style supply-chain provenance superset; opaque here."
         }
       }
     },

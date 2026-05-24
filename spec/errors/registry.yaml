@@ -64,7 +64,7 @@ domains:
     description: "Hardware custody, WebAuthn assertion, and audience-pinned capability envelope failures."
   - id: weights
     class: core
-    description: "Model-card, weight hash, capability scope binding, and artifact integrity failures (M10 P4)."
+    description: "Model-card, weight hash, capability scope binding, and artifact integrity failures."
 codes:
   - urn: "urn:chio:error:capability:scope-exceeded"
     domain: capability
@@ -515,6 +515,26 @@ codes:
     consumed_by:
       - chio-kernel
       - chio-http-core
+  - urn: "urn:chio:error:transport:upstream-failure"
+    domain: transport
+    severity: error
+    summary: "Wrapped upstream MCP server returned an error while handling a relayed tool call or listing."
+    help: "Inspect the upstream MCP server response; retry only when the upstream marks the failure transient."
+    legacy_string_code: "CHIO-TRANSPORT-UPSTREAM-FAILURE"
+    since: "0.1.0"
+    stability: unstable
+    consumed_by:
+      - chio-cli
+  - urn: "urn:chio:error:transport:method-not-found"
+    domain: transport
+    severity: error
+    summary: "JSON-RPC method is not supported by the Chio MCP wrapper."
+    help: "Call a recognized method; the MCP wrapper supports tools/list, tools/call, initialize, ping, and JSON-RPC notifications."
+    legacy_string_code: "CHIO-TRANSPORT-METHOD-NOT-FOUND"
+    since: "0.1.0"
+    stability: unstable
+    consumed_by:
+      - chio-cli
   - urn: "urn:chio:error:cli:io"
     domain: cli
     severity: error
@@ -735,7 +755,7 @@ codes:
   - urn: "urn:chio:error:mobile:receipt-schema-invalid"
     domain: mobile
     severity: error
-    summary: "Mobile receipt export did not validate against the M01 audit-log export schema."
+    summary: "Mobile receipt export did not validate against the audit-log export schema."
     help: "Keep the receipt in the offline queue and regenerate the export envelope against spec/audit-log/export-schema.v1.json before retrying."
     legacy_string_code: "CHIO-MOBILE-RECEIPT-SCHEMA-INVALID"
     since: "0.1.0"
@@ -820,6 +840,137 @@ codes:
     stability: unstable
     consumed_by:
       - chio-custody-hw
+  - urn: "urn:chio:error:custody:rate-limited"
+    domain: custody
+    severity: error
+    summary: "Capability issuance was denied because the subject exceeded its rate budget."
+    help: "Retry after the rate window elapses; the mint is denied fail-closed before the revocation oracle, nonce store, or signing backend are consulted."
+    legacy_string_code: "CHIO-CUSTODY-RATE-LIMITED"
+    since: "0.1.0"
+    stability: unstable
+    consumed_by:
+      - chio-custody-hw
+  - urn: "urn:chio:error:custody:app-attest-invalid-cbor"
+    domain: custody
+    severity: error
+    summary: "Apple App Attest statement failed to decode as valid CBOR or was missing a required field."
+    help: "Reject the attestation; do not retry without a freshly generated App Attest statement from the device."
+    legacy_string_code: "CHIO-CUSTODY-APP-ATTEST-INVALID-CBOR"
+    since: "0.1.0"
+    stability: unstable
+    consumed_by:
+      - chio-custody-hw
+      - chio-kernel-mobile
+  - urn: "urn:chio:error:custody:app-attest-invalid-root"
+    domain: custody
+    severity: error
+    summary: "Apple App Attest certificate chain did not anchor to the pinned Apple App Attestation root."
+    help: "Reject the attestation; verify the device produced a genuine Apple App Attest statement and that the pinned root is current."
+    legacy_string_code: "CHIO-CUSTODY-APP-ATTEST-INVALID-ROOT"
+    since: "0.1.0"
+    stability: unstable
+    consumed_by:
+      - chio-custody-hw
+      - chio-kernel-mobile
+  - urn: "urn:chio:error:custody:app-attest-app-mismatch"
+    domain: custody
+    severity: error
+    summary: "Apple App Attest app-identifier hash did not match the expected application identity."
+    help: "Reject the attestation; the statement was minted for a different app identifier than the verifier expects."
+    legacy_string_code: "CHIO-CUSTODY-APP-ATTEST-APP-MISMATCH"
+    since: "0.1.0"
+    stability: unstable
+    consumed_by:
+      - chio-custody-hw
+      - chio-kernel-mobile
+  - urn: "urn:chio:error:custody:app-attest-challenge-mismatch"
+    domain: custody
+    severity: error
+    summary: "Apple App Attest challenge hash did not match the issued challenge."
+    help: "Reject the attestation and reissue a fresh challenge; replayed or mismatched challenges are denied fail-closed."
+    legacy_string_code: "CHIO-CUSTODY-APP-ATTEST-CHALLENGE-MISMATCH"
+    since: "0.1.0"
+    stability: unstable
+    consumed_by:
+      - chio-custody-hw
+      - chio-kernel-mobile
+  - urn: "urn:chio:error:custody:app-attest-key-mismatch"
+    domain: custody
+    severity: error
+    summary: "Apple App Attest key identifier did not match the credential bound to this capability."
+    help: "Reject the attestation; the statement was produced by a different hardware key than the one enrolled."
+    legacy_string_code: "CHIO-CUSTODY-APP-ATTEST-KEY-MISMATCH"
+    since: "0.1.0"
+    stability: unstable
+    consumed_by:
+      - chio-custody-hw
+      - chio-kernel-mobile
+  - urn: "urn:chio:error:custody:app-attest-counter-rollback"
+    domain: custody
+    severity: error
+    summary: "Apple App Attest assertion counter went backwards relative to the last accepted value."
+    help: "Reject the assertion; a counter rollback indicates replay or a cloned key and is denied fail-closed."
+    legacy_string_code: "CHIO-CUSTODY-APP-ATTEST-COUNTER-ROLLBACK"
+    since: "0.1.0"
+    stability: unstable
+    consumed_by:
+      - chio-custody-hw
+      - chio-kernel-mobile
+  - urn: "urn:chio:error:custody:app-attest-cert-chain-invalid"
+    domain: custody
+    severity: error
+    summary: "Apple App Attest certificate chain failed signature or structural verification."
+    help: "Reject the attestation; the certificate chain did not verify against the pinned Apple roots."
+    legacy_string_code: "CHIO-CUSTODY-APP-ATTEST-CERT-CHAIN-INVALID"
+    since: "0.1.0"
+    stability: unstable
+    consumed_by:
+      - chio-custody-hw
+      - chio-kernel-mobile
+  - urn: "urn:chio:error:custody:play-integrity-invalid-token"
+    domain: custody
+    severity: error
+    summary: "Google Play Integrity token failed to decode or verify."
+    help: "Reject the attestation; do not retry without a freshly minted Play Integrity token from the device."
+    legacy_string_code: "CHIO-CUSTODY-PLAY-INTEGRITY-INVALID-TOKEN"
+    since: "0.1.0"
+    stability: unstable
+    consumed_by:
+      - chio-custody-hw
+      - chio-kernel-mobile
+  - urn: "urn:chio:error:custody:play-integrity-nonce-mismatch"
+    domain: custody
+    severity: error
+    summary: "Google Play Integrity token nonce did not match the issued challenge."
+    help: "Reject the attestation and reissue a fresh nonce; replayed or mismatched nonces are denied fail-closed."
+    legacy_string_code: "CHIO-CUSTODY-PLAY-INTEGRITY-NONCE-MISMATCH"
+    since: "0.1.0"
+    stability: unstable
+    consumed_by:
+      - chio-custody-hw
+      - chio-kernel-mobile
+  - urn: "urn:chio:error:custody:play-integrity-app-rejected"
+    domain: custody
+    severity: error
+    summary: "Google Play Integrity verdict rejected the application (unrecognized or tampered package)."
+    help: "Reject the attestation; the Play Integrity verdict did not recognize the app as a genuine, unmodified install."
+    legacy_string_code: "CHIO-CUSTODY-PLAY-INTEGRITY-APP-REJECTED"
+    since: "0.1.0"
+    stability: unstable
+    consumed_by:
+      - chio-custody-hw
+      - chio-kernel-mobile
+  - urn: "urn:chio:error:custody:play-integrity-device-rejected"
+    domain: custody
+    severity: error
+    summary: "Google Play Integrity verdict rejected the device integrity signal."
+    help: "Reject the attestation; the Play Integrity verdict did not attest a trustworthy device."
+    legacy_string_code: "CHIO-CUSTODY-PLAY-INTEGRITY-DEVICE-REJECTED"
+    since: "0.1.0"
+    stability: unstable
+    consumed_by:
+      - chio-custody-hw
+      - chio-kernel-mobile
   - urn: "urn:chio:error:weights:model-card-missing"
     domain: weights
     severity: error

@@ -539,6 +539,32 @@ pub const TRANSPORT_DPOP_VERIFICATION_FAILED: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-kernel", "chio-http-core"],
 };
 
+pub const TRANSPORT_UPSTREAM_FAILURE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:upstream-failure",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "Wrapped upstream MCP server returned an error while handling a relayed tool call or listing.",
+    help: "Inspect the upstream MCP server response; retry only when the upstream marks the failure transient.",
+    legacy_string_code: "CHIO-TRANSPORT-UPSTREAM-FAILURE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-cli"],
+};
+
+pub const TRANSPORT_METHOD_NOT_FOUND: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:method-not-found",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "JSON-RPC method is not supported by the Chio MCP wrapper.",
+    help: "Call a recognized method; the MCP wrapper supports tools/list, tools/call, initialize, ping, and JSON-RPC notifications.",
+    legacy_string_code: "CHIO-TRANSPORT-METHOD-NOT-FOUND",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-cli"],
+};
+
 pub const CLI_IO: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:cli:io",
     domain: Domain::Cli,
@@ -865,6 +891,162 @@ pub const CUSTODY_INTERNAL_ENCODING: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-custody-hw"],
 };
 
+pub const CUSTODY_RATE_LIMITED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:custody:rate-limited",
+    domain: Domain::Custody,
+    severity: Severity::Error,
+    summary: "Capability issuance was denied because the subject exceeded its rate budget.",
+    help: "Retry after the rate window elapses; the mint is denied fail-closed before the revocation oracle, nonce store, or signing backend are consulted.",
+    legacy_string_code: "CHIO-CUSTODY-RATE-LIMITED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-custody-hw"],
+};
+
+pub const CUSTODY_APP_ATTEST_INVALID_CBOR: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:custody:app-attest-invalid-cbor",
+    domain: Domain::Custody,
+    severity: Severity::Error,
+    summary: "Apple App Attest statement failed to decode as valid CBOR or was missing a required field.",
+    help: "Reject the attestation; do not retry without a freshly generated App Attest statement from the device.",
+    legacy_string_code: "CHIO-CUSTODY-APP-ATTEST-INVALID-CBOR",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-custody-hw", "chio-kernel-mobile"],
+};
+
+pub const CUSTODY_APP_ATTEST_INVALID_ROOT: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:custody:app-attest-invalid-root",
+    domain: Domain::Custody,
+    severity: Severity::Error,
+    summary: "Apple App Attest certificate chain did not anchor to the pinned Apple App Attestation root.",
+    help: "Reject the attestation; verify the device produced a genuine Apple App Attest statement and that the pinned root is current.",
+    legacy_string_code: "CHIO-CUSTODY-APP-ATTEST-INVALID-ROOT",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-custody-hw", "chio-kernel-mobile"],
+};
+
+pub const CUSTODY_APP_ATTEST_APP_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:custody:app-attest-app-mismatch",
+    domain: Domain::Custody,
+    severity: Severity::Error,
+    summary: "Apple App Attest app-identifier hash did not match the expected application identity.",
+    help: "Reject the attestation; the statement was minted for a different app identifier than the verifier expects.",
+    legacy_string_code: "CHIO-CUSTODY-APP-ATTEST-APP-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-custody-hw", "chio-kernel-mobile"],
+};
+
+pub const CUSTODY_APP_ATTEST_CHALLENGE_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:custody:app-attest-challenge-mismatch",
+    domain: Domain::Custody,
+    severity: Severity::Error,
+    summary: "Apple App Attest challenge hash did not match the issued challenge.",
+    help: "Reject the attestation and reissue a fresh challenge; replayed or mismatched challenges are denied fail-closed.",
+    legacy_string_code: "CHIO-CUSTODY-APP-ATTEST-CHALLENGE-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-custody-hw", "chio-kernel-mobile"],
+};
+
+pub const CUSTODY_APP_ATTEST_KEY_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:custody:app-attest-key-mismatch",
+    domain: Domain::Custody,
+    severity: Severity::Error,
+    summary: "Apple App Attest key identifier did not match the credential bound to this capability.",
+    help: "Reject the attestation; the statement was produced by a different hardware key than the one enrolled.",
+    legacy_string_code: "CHIO-CUSTODY-APP-ATTEST-KEY-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-custody-hw", "chio-kernel-mobile"],
+};
+
+pub const CUSTODY_APP_ATTEST_COUNTER_ROLLBACK: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:custody:app-attest-counter-rollback",
+    domain: Domain::Custody,
+    severity: Severity::Error,
+    summary: "Apple App Attest assertion counter went backwards relative to the last accepted value.",
+    help: "Reject the assertion; a counter rollback indicates replay or a cloned key and is denied fail-closed.",
+    legacy_string_code: "CHIO-CUSTODY-APP-ATTEST-COUNTER-ROLLBACK",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-custody-hw", "chio-kernel-mobile"],
+};
+
+pub const CUSTODY_APP_ATTEST_CERT_CHAIN_INVALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:custody:app-attest-cert-chain-invalid",
+    domain: Domain::Custody,
+    severity: Severity::Error,
+    summary: "Apple App Attest certificate chain failed signature or structural verification.",
+    help: "Reject the attestation; the certificate chain did not verify against the pinned Apple roots.",
+    legacy_string_code: "CHIO-CUSTODY-APP-ATTEST-CERT-CHAIN-INVALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-custody-hw", "chio-kernel-mobile"],
+};
+
+pub const CUSTODY_PLAY_INTEGRITY_INVALID_TOKEN: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:custody:play-integrity-invalid-token",
+    domain: Domain::Custody,
+    severity: Severity::Error,
+    summary: "Google Play Integrity token failed to decode or verify.",
+    help: "Reject the attestation; do not retry without a freshly minted Play Integrity token from the device.",
+    legacy_string_code: "CHIO-CUSTODY-PLAY-INTEGRITY-INVALID-TOKEN",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-custody-hw", "chio-kernel-mobile"],
+};
+
+pub const CUSTODY_PLAY_INTEGRITY_NONCE_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:custody:play-integrity-nonce-mismatch",
+    domain: Domain::Custody,
+    severity: Severity::Error,
+    summary: "Google Play Integrity token nonce did not match the issued challenge.",
+    help: "Reject the attestation and reissue a fresh nonce; replayed or mismatched nonces are denied fail-closed.",
+    legacy_string_code: "CHIO-CUSTODY-PLAY-INTEGRITY-NONCE-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-custody-hw", "chio-kernel-mobile"],
+};
+
+pub const CUSTODY_PLAY_INTEGRITY_APP_REJECTED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:custody:play-integrity-app-rejected",
+    domain: Domain::Custody,
+    severity: Severity::Error,
+    summary: "Google Play Integrity verdict rejected the application (unrecognized or tampered package).",
+    help: "Reject the attestation; the Play Integrity verdict did not recognize the app as a genuine, unmodified install.",
+    legacy_string_code: "CHIO-CUSTODY-PLAY-INTEGRITY-APP-REJECTED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-custody-hw", "chio-kernel-mobile"],
+};
+
+pub const CUSTODY_PLAY_INTEGRITY_DEVICE_REJECTED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:custody:play-integrity-device-rejected",
+    domain: Domain::Custody,
+    severity: Severity::Error,
+    summary: "Google Play Integrity verdict rejected the device integrity signal.",
+    help: "Reject the attestation; the Play Integrity verdict did not attest a trustworthy device.",
+    legacy_string_code: "CHIO-CUSTODY-PLAY-INTEGRITY-DEVICE-REJECTED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-custody-hw", "chio-kernel-mobile"],
+};
+
 pub const WEIGHTS_MODEL_CARD_MISSING: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:weights:model-card-missing",
     domain: Domain::Weights,
@@ -1009,6 +1191,8 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     TRANSPORT_AUTH_MISSING_OR_INVALID,
     TRANSPORT_HTTP_FAILED,
     TRANSPORT_DPOP_VERIFICATION_FAILED,
+    TRANSPORT_UPSTREAM_FAILURE,
+    TRANSPORT_METHOD_NOT_FOUND,
     CLI_IO,
     CLI_JSON,
     CLI_YAML,
@@ -1034,6 +1218,18 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     CUSTODY_CREDENTIAL_REVOKED,
     CUSTODY_USER_VERIFICATION_REQUIRED,
     CUSTODY_INTERNAL_ENCODING,
+    CUSTODY_RATE_LIMITED,
+    CUSTODY_APP_ATTEST_INVALID_CBOR,
+    CUSTODY_APP_ATTEST_INVALID_ROOT,
+    CUSTODY_APP_ATTEST_APP_MISMATCH,
+    CUSTODY_APP_ATTEST_CHALLENGE_MISMATCH,
+    CUSTODY_APP_ATTEST_KEY_MISMATCH,
+    CUSTODY_APP_ATTEST_COUNTER_ROLLBACK,
+    CUSTODY_APP_ATTEST_CERT_CHAIN_INVALID,
+    CUSTODY_PLAY_INTEGRITY_INVALID_TOKEN,
+    CUSTODY_PLAY_INTEGRITY_NONCE_MISMATCH,
+    CUSTODY_PLAY_INTEGRITY_APP_REJECTED,
+    CUSTODY_PLAY_INTEGRITY_DEVICE_REJECTED,
     WEIGHTS_MODEL_CARD_MISSING,
     WEIGHTS_CARD_MISMATCH,
     WEIGHTS_SCOPE_NOT_SUBSET,
