@@ -1034,6 +1034,14 @@ fn run_json2ts(json2ts: &Path, schema: &Path) -> Result<String, XtaskError> {
     let output = Command::new(json2ts)
         .arg("-i")
         .arg(schema)
+        // Resolve the schema's own directory as the working directory so cross-file
+        // relative `$ref`s (e.g. `../receipt/record.schema.json`) resolve against the
+        // schema file rather than the process working directory. The json2ts CLI
+        // defaults its cwd to the process cwd (unlike the library's compileFromFile),
+        // so without this a cross-file ref fails with ENOENT when xtask runs from the
+        // workspace root.
+        .arg("--cwd")
+        .arg(schema.parent().unwrap_or_else(|| Path::new(".")))
         .arg("--no-bannerComment")
         .arg("--unreachableDefinitions=false")
         .arg("--strictIndexSignatures=false")
