@@ -1,6 +1,6 @@
 [package]
 name = "chio-ollama-tools-adapter"
-description = "Ollama /api/chat tool-use adapter for Chio (experimental scaffold; no live HTTP transport yet, pinned to /api/chat 2025-04)"
+description = "Ollama /api/chat tool-use adapter for Chio, pinned to the 2025-04 API"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -24,6 +24,9 @@ chio-tool-call-fabric = { path = "../chio-tool-call-fabric" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [[bench]]
 name = "verdict_latency"

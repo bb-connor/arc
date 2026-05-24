@@ -2870,12 +2870,15 @@ dependencies = [
 name = "chio-cohere-tools-adapter"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "chio-core-types",
  "chio-provider-adapter-core",
  "chio-tool-call-fabric",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "tokio",
+ "wiremock",
 ]
 
 [[package]]
@@ -3338,12 +3341,15 @@ dependencies = [
 name = "chio-groq-tools-adapter"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "chio-core-types",
  "chio-provider-adapter-core",
  "chio-tool-call-fabric",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "tokio",
+ "wiremock",
 ]
 
 [[package]]
@@ -3750,12 +3756,15 @@ version = "0.1.0"
 name = "chio-mistral-tools-adapter"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "chio-core-types",
  "chio-provider-adapter-core",
  "chio-tool-call-fabric",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "tokio",
+ "wiremock",
 ]
 
 [[package]]
@@ -3768,6 +3777,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "tokio",
 ]
 
 [[package]]

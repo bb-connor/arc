@@ -1,6 +1,6 @@
 [package]
 name = "chio-cohere-tools-adapter"
-description = "Cohere /v2/chat tool-use adapter for Chio (experimental scaffold; no live HTTP transport yet, pinned to v2 2025-04)"
+description = "Cohere /v2/chat tool-use adapter for Chio (pinned to v2 2025-04)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -21,9 +21,14 @@ cohere_api_version = "2025-04"
 chio-core = { package = "chio-core-types", path = "../chio-core-types" }
 chio-provider-adapter-core = { path = "../chio-provider-adapter-core" }
 chio-tool-call-fabric = { path = "../chio-tool-call-fabric" }
+async-trait = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+wiremock = { workspace = true }
 
 [[bench]]
 name = "verdict_latency"

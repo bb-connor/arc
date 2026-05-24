@@ -2,16 +2,21 @@
 
 Provider-native adapter for Mistral `chat/completions` tool-use traffic.
 
-## Scaffold status
+## Transport
 
-This crate is an experimental scaffold. It is a byte-level lift/lower
-translator only; it does not yet ship a real Mistral HTTP client and makes no
-network calls. The sole `Transport` implementation is `MockTransport`, and the
-live HTTP path returns `TransportError::NotImplemented`. The adapter currently
-round-trips only against recorded conformance fixtures. Surface descriptions
-below ("mediates the SSE stream", "exceeds the configured budget") describe the
-contract the eventual transport must preserve, not behavior wired to a live
-provider today.
+The adapter forwards a native request to Mistral's OpenAI-compatible
+chat/completions API. `MistralHttpTransport` (backed by the shared
+`chio-provider-adapter-core` HTTP client) POSTs to
+`https://api.mistral.ai/v1/chat/completions` over HTTPS with an
+`Authorization: Bearer <key>` header, buffers the response, and hands the bytes
+to the lift/gate code below. The bearer key is injected by the caller
+(`MistralHttpTransport::new`) or read from `MISTRAL_API_KEY` via
+`MistralHttpTransport::from_env`; a missing key fails closed. `MockTransport`
+implements the same contract for hermetic unit tests with scripted responses
+and no network access.
+
+Transport failures are fail-closed: a timeout, a non-2xx status, or a decode
+error becomes a `ProviderError` and is never reported as an empty success.
 
 The adapter pins the upstream API version to `2025-04` (see
 `crate::transport::MISTRAL_API_VERSION`). Bumping the pin requires a deliberate
@@ -20,6 +25,12 @@ conformance harness.
 
 ## Surface
 
+- `MistralAdapter::send_chat_completion` builds a `MistralChatRequest`
+  (`{ model, messages, tools }`), POSTs it through the transport, and lifts the
+  `tool_calls` in the response into `chio_tool_call_fabric::ToolInvocation`s.
+- `MistralAdapter::send_chat_completion_stream` POSTs a streaming request and
+  gates the SSE response so each `tool_calls` frame is held behind the kernel
+  verdict before its enclosing chunk is forwarded.
 - `MistralAdapter::lift_batch` lifts every `tool_calls` part in a non-streaming
   `chat/completions` response into a `chio_tool_call_fabric::ToolInvocation`.
 - `MistralAdapter::gate_sse_stream` mediates `chat/completions stream` SSE
