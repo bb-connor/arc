@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 5e2ef4edbea873423625045a2fcceac852ba473a2b42e9f022a1d04863dd6488
+// Schema content SHA-256: aea93e09d1c0ec0ce0ce4e2c181fc351e83b33eab34a3a86fb8c5ec0fcedfa2a
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -336,85 +336,6 @@ const (
 // Defines values for KernelToolCallChunkType.
 const (
 	KernelToolCallChunkTypeToolCallChunk KernelToolCallChunkType = "tool_call_chunk"
-)
-
-// Defines values for KernelToolCallResponseReceiptActorChainKind.
-const (
-	KernelToolCallResponseReceiptActorChainKindAgent      KernelToolCallResponseReceiptActorChainKind = "agent"
-	KernelToolCallResponseReceiptActorChainKindOther      KernelToolCallResponseReceiptActorChainKind = "other"
-	KernelToolCallResponseReceiptActorChainKindProvider   KernelToolCallResponseReceiptActorChainKind = "provider"
-	KernelToolCallResponseReceiptActorChainKindService    KernelToolCallResponseReceiptActorChainKind = "service"
-	KernelToolCallResponseReceiptActorChainKindToolServer KernelToolCallResponseReceiptActorChainKind = "tool_server"
-	KernelToolCallResponseReceiptActorChainKindUser       KernelToolCallResponseReceiptActorChainKind = "user"
-)
-
-// Defines values for KernelToolCallResponseReceiptAlgorithm.
-const (
-	KernelToolCallResponseReceiptAlgorithmEd25519 KernelToolCallResponseReceiptAlgorithm = "ed25519"
-	KernelToolCallResponseReceiptAlgorithmP256    KernelToolCallResponseReceiptAlgorithm = "p256"
-	KernelToolCallResponseReceiptAlgorithmP384    KernelToolCallResponseReceiptAlgorithm = "p384"
-)
-
-// Defines values for KernelToolCallResponseReceiptBoundaryClass.
-const (
-	KernelToolCallResponseReceiptBoundaryClassAdvisoryOnly KernelToolCallResponseReceiptBoundaryClass = "advisory_only"
-	KernelToolCallResponseReceiptBoundaryClassDetectOnly   KernelToolCallResponseReceiptBoundaryClass = "detect_only"
-	KernelToolCallResponseReceiptBoundaryClassPrevent      KernelToolCallResponseReceiptBoundaryClass = "prevent"
-)
-
-// Defines values for KernelToolCallResponseReceiptDecision0Verdict.
-const (
-	KernelToolCallResponseReceiptDecision0VerdictAllow KernelToolCallResponseReceiptDecision0Verdict = "allow"
-)
-
-// Defines values for KernelToolCallResponseReceiptDecision1Verdict.
-const (
-	KernelToolCallResponseReceiptDecision1VerdictDeny KernelToolCallResponseReceiptDecision1Verdict = "deny"
-)
-
-// Defines values for KernelToolCallResponseReceiptDecision2Verdict.
-const (
-	KernelToolCallResponseReceiptDecision2VerdictCancelled KernelToolCallResponseReceiptDecision2Verdict = "cancelled"
-)
-
-// Defines values for KernelToolCallResponseReceiptDecision3Verdict.
-const (
-	KernelToolCallResponseReceiptDecision3VerdictIncomplete KernelToolCallResponseReceiptDecision3Verdict = "incomplete"
-)
-
-// Defines values for KernelToolCallResponseReceiptObservationOutcome.
-const (
-	KernelToolCallResponseReceiptObservationOutcomeDropped   KernelToolCallResponseReceiptObservationOutcome = "dropped"
-	KernelToolCallResponseReceiptObservationOutcomeEvaluated KernelToolCallResponseReceiptObservationOutcome = "evaluated"
-	KernelToolCallResponseReceiptObservationOutcomeObserved  KernelToolCallResponseReceiptObservationOutcome = "observed"
-)
-
-// Defines values for KernelToolCallResponseReceiptReceiptKind.
-const (
-	KernelToolCallResponseReceiptReceiptKindAdvisoryEvaluation KernelToolCallResponseReceiptReceiptKind = "advisory_evaluation"
-	KernelToolCallResponseReceiptReceiptKindMediatedDecision   KernelToolCallResponseReceiptReceiptKind = "mediated_decision"
-	KernelToolCallResponseReceiptReceiptKindTraceObservation   KernelToolCallResponseReceiptReceiptKind = "trace_observation"
-)
-
-// Defines values for KernelToolCallResponseReceiptRedactionMode.
-const (
-	KernelToolCallResponseReceiptRedactionModeNone     KernelToolCallResponseReceiptRedactionMode = "none"
-	KernelToolCallResponseReceiptRedactionModeRedacted KernelToolCallResponseReceiptRedactionMode = "redacted"
-	KernelToolCallResponseReceiptRedactionModeSummary  KernelToolCallResponseReceiptRedactionMode = "summary"
-)
-
-// Defines values for KernelToolCallResponseReceiptToolOrigin.
-const (
-	KernelToolCallResponseReceiptToolOriginCallerExecuted               KernelToolCallResponseReceiptToolOrigin = "caller_executed"
-	KernelToolCallResponseReceiptToolOriginHostExecutedProviderReported KernelToolCallResponseReceiptToolOrigin = "host_executed_provider_reported"
-	KernelToolCallResponseReceiptToolOriginHostExecutedUnmediated       KernelToolCallResponseReceiptToolOrigin = "host_executed_unmediated"
-)
-
-// Defines values for KernelToolCallResponseReceiptTrustLevel.
-const (
-	KernelToolCallResponseReceiptTrustLevelAdvisory KernelToolCallResponseReceiptTrustLevel = "advisory"
-	KernelToolCallResponseReceiptTrustLevelMediated KernelToolCallResponseReceiptTrustLevel = "mediated"
-	KernelToolCallResponseReceiptTrustLevelVerified KernelToolCallResponseReceiptTrustLevel = "verified"
 )
 
 // Defines values for KernelToolCallResponseResult0Status.
@@ -1536,76 +1457,13 @@ type KernelToolCallChunkType string
 
 // KernelToolCallResponse defines model for KernelToolCallResponse.
 type KernelToolCallResponse struct {
-	Id      string                        `json:"id"`
+	Id string `json:"id"`
+
+	// Receipt A signed Chio receipt: proof that a tool call was evaluated by the Kernel. The receipt id is the authoritative content-addressed SHA-256 hash over the canonical ChioReceiptIdInput.
 	Receipt ReceiptRecord                 `json:"receipt"`
 	Result  KernelToolCallResponse_Result `json:"result"`
 	Type    KernelToolCallResponseType    `json:"type"`
 }
-
-// KernelToolCallResponseReceiptActorChainKind defines model for KernelToolCallResponse.Receipt.ActorChain.Kind.
-type KernelToolCallResponseReceiptActorChainKind string
-
-// KernelToolCallResponseReceiptAlgorithm defines model for KernelToolCallResponse.Receipt.Algorithm.
-type KernelToolCallResponseReceiptAlgorithm string
-
-// KernelToolCallResponseReceiptBoundaryClass defines model for KernelToolCallResponse.Receipt.BoundaryClass.
-type KernelToolCallResponseReceiptBoundaryClass string
-
-// KernelToolCallResponseReceiptDecision0 defines model for .
-type KernelToolCallResponseReceiptDecision0 struct {
-	Verdict KernelToolCallResponseReceiptDecision0Verdict `json:"verdict"`
-}
-
-// KernelToolCallResponseReceiptDecision0Verdict defines model for KernelToolCallResponse.Receipt.Decision.0.Verdict.
-type KernelToolCallResponseReceiptDecision0Verdict string
-
-// KernelToolCallResponseReceiptDecision1 defines model for .
-type KernelToolCallResponseReceiptDecision1 struct {
-	Guard   string                                        `json:"guard"`
-	Reason  string                                        `json:"reason"`
-	Verdict KernelToolCallResponseReceiptDecision1Verdict `json:"verdict"`
-}
-
-// KernelToolCallResponseReceiptDecision1Verdict defines model for KernelToolCallResponse.Receipt.Decision.1.Verdict.
-type KernelToolCallResponseReceiptDecision1Verdict string
-
-// KernelToolCallResponseReceiptDecision2 defines model for .
-type KernelToolCallResponseReceiptDecision2 struct {
-	Reason  string                                        `json:"reason"`
-	Verdict KernelToolCallResponseReceiptDecision2Verdict `json:"verdict"`
-}
-
-// KernelToolCallResponseReceiptDecision2Verdict defines model for KernelToolCallResponse.Receipt.Decision.2.Verdict.
-type KernelToolCallResponseReceiptDecision2Verdict string
-
-// KernelToolCallResponseReceiptDecision3 defines model for .
-type KernelToolCallResponseReceiptDecision3 struct {
-	Reason  string                                        `json:"reason"`
-	Verdict KernelToolCallResponseReceiptDecision3Verdict `json:"verdict"`
-}
-
-// KernelToolCallResponseReceiptDecision3Verdict defines model for KernelToolCallResponse.Receipt.Decision.3.Verdict.
-type KernelToolCallResponseReceiptDecision3Verdict string
-
-// KernelToolCallResponse_Receipt_Decision defines model for KernelToolCallResponse.Receipt.Decision.
-type KernelToolCallResponse_Receipt_Decision struct {
-	union json.RawMessage
-}
-
-// KernelToolCallResponseReceiptObservationOutcome defines model for KernelToolCallResponse.Receipt.ObservationOutcome.
-type KernelToolCallResponseReceiptObservationOutcome string
-
-// KernelToolCallResponseReceiptReceiptKind defines model for KernelToolCallResponse.Receipt.ReceiptKind.
-type KernelToolCallResponseReceiptReceiptKind string
-
-// KernelToolCallResponseReceiptRedactionMode defines model for KernelToolCallResponse.Receipt.RedactionMode.
-type KernelToolCallResponseReceiptRedactionMode string
-
-// KernelToolCallResponseReceiptToolOrigin defines model for KernelToolCallResponse.Receipt.ToolOrigin.
-type KernelToolCallResponseReceiptToolOrigin string
-
-// KernelToolCallResponseReceiptTrustLevel defines model for KernelToolCallResponse.Receipt.TrustLevel.
-type KernelToolCallResponseReceiptTrustLevel string
 
 // KernelToolCallResponseResult0 defines model for .
 type KernelToolCallResponseResult0 struct {
@@ -1950,7 +1808,7 @@ type ReceiptLineageStatementSessionAnchorReference struct {
 	SessionAnchorId   string `json:"sessionAnchorId"`
 }
 
-// ReceiptRecord A signed Chio receipt: proof that a tool call was evaluated by the Kernel. The receipt id is the authoritative content-addressed SHA-256 hash over the canonical receipt body excluding id, algorithm, and signature.
+// ReceiptRecord A signed Chio receipt: proof that a tool call was evaluated by the Kernel. The receipt id is the authoritative content-addressed SHA-256 hash over the canonical ChioReceiptIdInput.
 type ReceiptRecord struct {
 	// Action Describes the tool call that was evaluated. Mirrors `ToolCallAction`.
 	Action ReceiptRecordToolCallAction `json:"action"`
@@ -1997,7 +1855,7 @@ type ReceiptRecord struct {
 	// RedactionMode Signed redaction mode applied to receipt details.
 	RedactionMode ReceiptRecordRedactionMode `json:"redaction_mode"`
 
-	// Signature Hex-encoded signature over the canonical JSON of the receipt body. Bare 128-char lowercase hex for Ed25519 (`Signature::from_hex` in `crates/chio-core-types/src/crypto.rs` requires exactly 64 bytes for the bare path), or `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.
+	// Signature Hex-encoded signature over canonical JSON of ChioReceiptSigningBody { id, body: ChioReceiptIdInput }. Bare 128-char lowercase hex for Ed25519 (`Signature::from_hex` in `crates/chio-core-types/src/crypto.rs` requires exactly 64 bytes for the bare path), or `p256:<DER hex>` / `p384:<DER hex>` for FIPS algorithms. The DER-encoded ECDSA payload length varies (~70-72 bytes for P-256, ~104-110 bytes for P-384) so the FIPS hex bodies are matched as `[0-9a-f]+` and validated by length-aware decoders downstream.
 	Signature string `json:"signature"`
 
 	// TenantId Tenant identifier for multi-tenant deployments. Absent in single-tenant mode; derived from the authenticated session's enterprise identity context, never from caller-provided request fields.
@@ -3371,120 +3229,6 @@ func (t JsonrpcResponse_Id) MarshalJSON() ([]byte, error) {
 }
 
 func (t *JsonrpcResponse_Id) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsKernelToolCallResponseReceiptDecision0 returns the union data inside the KernelToolCallResponse_Receipt_Decision as a KernelToolCallResponseReceiptDecision0
-func (t KernelToolCallResponse_Receipt_Decision) AsKernelToolCallResponseReceiptDecision0() (KernelToolCallResponseReceiptDecision0, error) {
-	var body KernelToolCallResponseReceiptDecision0
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromKernelToolCallResponseReceiptDecision0 overwrites any union data inside the KernelToolCallResponse_Receipt_Decision as the provided KernelToolCallResponseReceiptDecision0
-func (t *KernelToolCallResponse_Receipt_Decision) FromKernelToolCallResponseReceiptDecision0(v KernelToolCallResponseReceiptDecision0) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeKernelToolCallResponseReceiptDecision0 performs a merge with any union data inside the KernelToolCallResponse_Receipt_Decision, using the provided KernelToolCallResponseReceiptDecision0
-func (t *KernelToolCallResponse_Receipt_Decision) MergeKernelToolCallResponseReceiptDecision0(v KernelToolCallResponseReceiptDecision0) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsKernelToolCallResponseReceiptDecision1 returns the union data inside the KernelToolCallResponse_Receipt_Decision as a KernelToolCallResponseReceiptDecision1
-func (t KernelToolCallResponse_Receipt_Decision) AsKernelToolCallResponseReceiptDecision1() (KernelToolCallResponseReceiptDecision1, error) {
-	var body KernelToolCallResponseReceiptDecision1
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromKernelToolCallResponseReceiptDecision1 overwrites any union data inside the KernelToolCallResponse_Receipt_Decision as the provided KernelToolCallResponseReceiptDecision1
-func (t *KernelToolCallResponse_Receipt_Decision) FromKernelToolCallResponseReceiptDecision1(v KernelToolCallResponseReceiptDecision1) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeKernelToolCallResponseReceiptDecision1 performs a merge with any union data inside the KernelToolCallResponse_Receipt_Decision, using the provided KernelToolCallResponseReceiptDecision1
-func (t *KernelToolCallResponse_Receipt_Decision) MergeKernelToolCallResponseReceiptDecision1(v KernelToolCallResponseReceiptDecision1) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsKernelToolCallResponseReceiptDecision2 returns the union data inside the KernelToolCallResponse_Receipt_Decision as a KernelToolCallResponseReceiptDecision2
-func (t KernelToolCallResponse_Receipt_Decision) AsKernelToolCallResponseReceiptDecision2() (KernelToolCallResponseReceiptDecision2, error) {
-	var body KernelToolCallResponseReceiptDecision2
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromKernelToolCallResponseReceiptDecision2 overwrites any union data inside the KernelToolCallResponse_Receipt_Decision as the provided KernelToolCallResponseReceiptDecision2
-func (t *KernelToolCallResponse_Receipt_Decision) FromKernelToolCallResponseReceiptDecision2(v KernelToolCallResponseReceiptDecision2) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeKernelToolCallResponseReceiptDecision2 performs a merge with any union data inside the KernelToolCallResponse_Receipt_Decision, using the provided KernelToolCallResponseReceiptDecision2
-func (t *KernelToolCallResponse_Receipt_Decision) MergeKernelToolCallResponseReceiptDecision2(v KernelToolCallResponseReceiptDecision2) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsKernelToolCallResponseReceiptDecision3 returns the union data inside the KernelToolCallResponse_Receipt_Decision as a KernelToolCallResponseReceiptDecision3
-func (t KernelToolCallResponse_Receipt_Decision) AsKernelToolCallResponseReceiptDecision3() (KernelToolCallResponseReceiptDecision3, error) {
-	var body KernelToolCallResponseReceiptDecision3
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromKernelToolCallResponseReceiptDecision3 overwrites any union data inside the KernelToolCallResponse_Receipt_Decision as the provided KernelToolCallResponseReceiptDecision3
-func (t *KernelToolCallResponse_Receipt_Decision) FromKernelToolCallResponseReceiptDecision3(v KernelToolCallResponseReceiptDecision3) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeKernelToolCallResponseReceiptDecision3 performs a merge with any union data inside the KernelToolCallResponse_Receipt_Decision, using the provided KernelToolCallResponseReceiptDecision3
-func (t *KernelToolCallResponse_Receipt_Decision) MergeKernelToolCallResponseReceiptDecision3(v KernelToolCallResponseReceiptDecision3) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t KernelToolCallResponse_Receipt_Decision) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *KernelToolCallResponse_Receipt_Decision) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
