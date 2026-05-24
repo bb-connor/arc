@@ -37,8 +37,8 @@ conformance harness.
   payloads. Each `tool_calls` part is evaluated by the kernel before its
   enclosing chunk is forwarded.
 - `MistralAdapter::lower_function_response` converts a kernel verdict and a
-  canonical tool result into a Mistral `functionResponse` part suitable for the
-  next user turn.
+  canonical tool result into the tool-result payload Mistral consumes on the
+  next turn (a `tool` role message carrying the matching `tool_call_id`).
 
 ## Error taxonomy
 
@@ -50,12 +50,12 @@ The adapter projects upstream Mistral failures onto
 | ProviderError class | Native envelope (inline JSON) | urn:chio:error:* code | Notes |
 |---|---|---|---|
 | `ProviderError::RateLimited` | `{"status": 429, "body": {"error": {"type": "rate_limit_error", "code": "RESOURCE_EXHAUSTED"}}}` | `urn:chio:error:provider:rate-limited` | Maps Mistral quota exhaustion (HTTP 429). |
-| `ProviderError::ContentPolicy` | `{"status": 200, "body": {"stop_reason": "refusal", "promptFeedback": {"blockReason": "SAFETY"}}}` | `urn:chio:error:provider:content-policy` | Triggered by Mistral safety blocks on the assistant turn. |
-| `ProviderError::BadToolArgs` | `{"type": "tool_use", "name": "get_weather", "args": "not-an-object"}` | `urn:chio:error:adapter:bad-tool-args` | Adapter refuses non-object `args`. |
+| `ProviderError::ContentPolicy` | `{"status": 200, "body": {"choices": [{"finish_reason": "content_filter", "message": {"role": "assistant", "content": null}}]}}` | `urn:chio:error:provider:content-policy` | Triggered by Mistral safety blocks (`finish_reason: content_filter`) on the assistant turn. |
+| `ProviderError::BadToolArgs` | `{"choices": [{"message": {"tool_calls": [{"type": "function", "function": {"name": "get_weather", "arguments": 42}}]}}]}` | `urn:chio:error:adapter:bad-tool-args` | Adapter refuses non-object `arguments`. |
 | `ProviderError::Upstream5xx` | `{"status": 503, "body": {"error": {"type": "overloaded_error", "code": "UNAVAILABLE"}}}` | `urn:chio:error:provider:upstream-5xx` | Surfaces Mistral infra outages (5xx). |
 | `ProviderError::TransportTimeout` | `{"transport": "timeout", "elapsed_ms": 5000}` | `urn:chio:error:adapter:transport-timeout` | Raised when the HTTP call exceeds the configured budget. |
 | `ProviderError::VerdictBudgetExceeded` | `{"observed_ms": 300, "budget_ms": 250}` | `urn:chio:error:kernel:verdict-budget` | Kernel refused to issue a verdict in time; fail-closed. |
-| `ProviderError::Malformed` | `{"event": "content_block_delta", "frame": "missing-functionCall"}` | `urn:chio:error:adapter:malformed` | Adapter cannot parse upstream payload. |
+| `ProviderError::Malformed` | `{"object": "chat.completion.chunk", "choices": "not-an-array"}` | `urn:chio:error:adapter:malformed` | Adapter cannot parse upstream payload. |
 <!-- error-taxonomy:end -->
 
 ## API pin

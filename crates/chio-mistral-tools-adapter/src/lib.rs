@@ -2,12 +2,16 @@
 //! tool-use traffic through the Chio kernel. Pinned upstream API version:
 //! `2025-04` (see [`transport::MISTRAL_API_VERSION`]).
 //!
-//! Mistral surfaces tool calls as `tool_calls` parts inside the model's
-//! `Content` payload. Tool results travel back as `functionResponse` parts
-//! on the user turn. The adapter's [`lift_batch`](MistralAdapter::lift_batch)
-//! lifts every `tool_calls` into a [`chio_tool_call_fabric::ToolInvocation`]
-//! and [`lower_function_response`](MistralAdapter::lower_function_response)
-//! lowers a kernel verdict back into a [`FunctionResponsePart`].
+//! Mistral exposes an OpenAI-compatible chat/completions API, so the model
+//! surfaces tool calls as `choices[].message.tool_calls[]` entries
+//! (`{ id, type: "function", function: { name, arguments } }`, where
+//! `arguments` is a JSON-encoded string). Tool results travel back as a
+//! `tool` role message carrying the matching `tool_call_id`.
+//!
+//! The adapter's [`lift_batch`](MistralAdapter::lift_batch) lifts every
+//! `tool_calls` entry into a [`chio_tool_call_fabric::ToolInvocation`] and
+//! [`lower_function_response`](MistralAdapter::lower_function_response) lowers a
+//! kernel verdict back into the tool-result payload returned on the next turn.
 
 #![forbid(unsafe_code)]
 
@@ -332,7 +336,7 @@ fn extract_function_calls(body: &Value) -> Result<Vec<FunctionCallPart>, Provide
     // Mistral is OpenAI-compatible: tool calls live at
     // `choices[].message.tool_calls[]` with shape
     // `{ id, type: "function", function: { name, arguments } }` where
-    // `arguments` is a JSON-encoded string. Parse that primary shape first.
+    // `arguments` is a JSON-encoded string.
     let mut calls = Vec::new();
     if let Some(choices) = body.get("choices").and_then(Value::as_array) {
         for choice in choices {
@@ -350,40 +354,6 @@ fn extract_function_calls(body: &Value) -> Result<Vec<FunctionCallPart>, Provide
         }
     }
 
-    if !calls.is_empty() {
-        return Ok(calls);
-    }
-
-    // Fall back to the legacy Gemini-shaped envelope retained for the
-    // cross-provider advisory fixtures.
-    if let Some(call) = body.get("functionCall") {
-        let parsed: FunctionCallPart = serde_json::from_value(call.clone()).map_err(|error| {
-            ProviderError::Malformed(format!("Mistral functionCall part was malformed: {error}"))
-        })?;
-        return Ok(vec![parsed]);
-    }
-    if let Some(candidates) = body.get("candidates").and_then(Value::as_array) {
-        for candidate in candidates {
-            let Some(parts) = candidate
-                .get("content")
-                .and_then(|c| c.get("parts"))
-                .and_then(Value::as_array)
-            else {
-                continue;
-            };
-            for part in parts {
-                if let Some(call) = part.get("functionCall") {
-                    let parsed: FunctionCallPart =
-                        serde_json::from_value(call.clone()).map_err(|error| {
-                            ProviderError::Malformed(format!(
-                                "Mistral functionCall part was malformed: {error}"
-                            ))
-                        })?;
-                    calls.push(parsed);
-                }
-            }
-        }
-    }
     Ok(calls)
 }
 
@@ -510,7 +480,7 @@ mod tests {
     fn config() -> MistralAdapterConfig {
         MistralAdapterConfig::new(
             "mistral-1",
-            "Mistral generateContent",
+            "Mistral chat/completions",
             "0.1.0",
             "deadbeef",
             "org_chio_demo",
@@ -567,23 +537,48 @@ mod tests {
     }
 
     #[test]
-    fn lift_batch_legacy_gemini_shape_still_works() {
+    fn lift_batch_extracts_parallel_tool_calls() {
+        // Multiple OpenAI-compatible tool_calls[] entries lift in order.
         let cfg = config();
         let adapter = MistralAdapter::new(cfg, Arc::new(transport::MockTransport::new()));
         let payload = json!({
-            "candidates": [{
-                "content": {
-                    "parts": [
-                        {"text": "Let me check the forecast."},
-                        {"functionCall": {"name": "get_weather", "args": {"city": "Paris"}}}
+            "id": "chatcmpl_parallel",
+            "object": "chat.completion",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": "call_weather_1",
+                            "type": "function",
+                            "function": {
+                                "name": "get_weather",
+                                "arguments": "{\"city\":\"Paris\"}"
+                            }
+                        },
+                        {
+                            "id": "call_time_1",
+                            "type": "function",
+                            "function": {
+                                "name": "get_time",
+                                "arguments": "{\"tz\":\"UTC\"}"
+                            }
+                        }
                     ]
-                }
+                },
+                "finish_reason": "tool_calls"
             }]
         });
         let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
         let invocations = adapter.lift_batch(raw).unwrap();
-        assert_eq!(invocations.len(), 1);
+        assert_eq!(invocations.len(), 2);
         assert_eq!(invocations[0].tool_name, "get_weather");
+        assert_eq!(invocations[1].tool_name, "get_time");
+        assert!(matches!(
+            invocations[0].provenance.principal,
+            Principal::MistralProject { .. }
+        ));
     }
 
     #[test]
