@@ -1,7 +1,7 @@
 /*
- * Chio browser-SDK M04 verify demo.
+ * Chio browser-SDK verify demo.
  *
- * Loads a stable, public-key-only receipt fixture from the M04 corpus
+ * Loads a stable, public-key-only receipt fixture
  * (tests/bindings/vectors/receipt/v1.json, case `allow_receipt`) and runs
  * `verify_receipt` from `@chio-protocol/browser` directly in the page.
  *

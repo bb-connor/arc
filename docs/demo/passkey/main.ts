@@ -115,7 +115,7 @@ async function revokeAndReplay(): Promise<void> {
   const verdict = await simulateKernelCall(KERNEL_URL, lastCapability, revocationState);
   setText(
     'verdict-revoked',
-    verdict.allowed ? 'allow' : 'deny (within M04 epoch)',
+    verdict.allowed ? 'allow' : 'deny (revoked)',
     verdict.allowed ? 'ok' : 'fail',
   );
   setText('revocation-urn', verdict.errorCode ?? '(none)', verdict.allowed ? 'info' : 'fail');
