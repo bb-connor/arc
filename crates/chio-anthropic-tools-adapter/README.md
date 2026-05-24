@@ -6,16 +6,28 @@ traffic through the Chio kernel. Implements the
 trait so a single Chio policy file enforces uniformly across OpenAI
 Responses, Anthropic Messages, and Bedrock Converse.
 
-## Scaffold status
+## Transport
 
-This crate is an experimental scaffold. It owns the mockable transport trait,
-batch lift/lower, and the SSE gate, but it does not yet ship a real Anthropic
-HTTP client and makes no network calls. The sole `Transport` implementation is
-`MockTransport`, and the live HTTP path returns
-`TransportError::NotImplemented`. The adapter currently round-trips only
-against recorded conformance fixtures. Rows marked `HTTP transport boundary` in
-the error taxonomy below pin the contract the eventual transport must preserve,
-not behavior wired to a live provider today.
+The adapter is a mediation gateway, not a validate-only shim. It forwards a
+native `messages.create` request to `https://api.anthropic.com/v1/messages`
+over the shared `chio-provider-adapter-core` HTTP transport, lifts the
+`tool_use` content blocks out of the response, runs the kernel verdict, and
+lowers the verdict back into a `tool_result` block for the next turn.
+
+- `AnthropicAdapter::send_messages` posts a batch request and lifts the
+  response.
+- `AnthropicAdapter::send_messages_stream` posts a streaming request and runs
+  the SSE gate over the buffered `text/event-stream` body.
+- Outbound requests carry `x-api-key: <key>` plus the pinned
+  `anthropic-version: 2023-06-01` header (and `anthropic-beta:
+  computer-use-2025-01-24` when the `computer-use` feature is on).
+
+The API key is injected by the caller through `anthropic_transport(api_key)` or
+read from the `ANTHROPIC_API_KEY` environment variable through
+`anthropic_transport_from_env()` (which fails closed when the variable is unset
+or empty). Unit tests use the in-memory `MockTransport`, which records calls and
+returns scripted responses without touching the network, so the test suite stays
+offline and deterministic.
 
 ## Pinned upstream API
 
@@ -39,16 +51,16 @@ server-tool surface at runtime. The adapter requires a `chio-manifest`
 feature on, including when `AnthropicAdapter::new` is used without manifest
 wiring.
 
-## Implementation Status
+## Components
 
-| Deliverable                                                                  | Status |
-| ---------------------------------------------------------------------------- | ------ |
-| Crate scaffold, API pin, `computer-use` feature, native types, transport trait | landed |
-| `ProviderAdapter::lift`/`lower` for batch `messages.create` tool_use blocks  | landed |
-| SSE streaming with verdict at `content_block_start` for `tool_use`           | landed |
-| `chio-manifest` `server_tools` allowlist gating the beta surface             | landed |
-| 12 conformance fixtures including 2 server-tool sessions behind the feature  | pending |
-| Native-error envelope -> `ProviderError` taxonomy doctest                    | landed |
+| Component                                                                    |
+| ---------------------------------------------------------------------------- |
+| API pin, `computer-use` feature, native content-block types                  |
+| `x-api-key` + `anthropic-version` HTTP transport (`send_messages`)           |
+| `ProviderAdapter::lift`/`lower` for batch `messages.create` tool_use blocks  |
+| SSE streaming with verdict at `content_block_stop` for `tool_use`            |
+| `chio-manifest` `server_tools` allowlist gating the beta surface             |
+| Native-error envelope -> `ProviderError` taxonomy doctest                    |
 
 ## Server-tool manifest gate
 
@@ -88,11 +100,10 @@ outside this allowlist.
 
 Anthropic documents HTTP errors as JSON envelopes with a top-level
 `error.type` and `error.message`, plus a `request_id`; streaming can also
-surface an `error` event after a 200 response. This crate currently owns the
-mockable transport trait, batch lift/lower, and SSE gate. It does not yet
-ship a real HTTP client, so rows marked `HTTP transport boundary` pin the
-adapter-visible taxonomy that the eventual transport must preserve. Rows
-marked `current adapter path` are emitted by the current lift/lower,
+surface an `error` event after a 200 response. Rows marked `HTTP transport
+boundary` are mapped from the upstream HTTP status by
+`chio_provider_adapter_core::http::map_transport_error` when `send_messages`
+runs. Rows marked `current adapter path` are emitted by the lift/lower,
 streaming, or evaluator path.
 
 The table is parsed by `tests/error_taxonomy_doctest.rs`; keep each envelope
@@ -121,9 +132,9 @@ crates/chio-anthropic-tools-adapter/
   Cargo.toml         pin metadata, computer-use feature, workspace lints
   README.md          this file
   src/
-    lib.rs           AnthropicAdapter, AnthropicAdapterConfig, error type
+    lib.rs           AnthropicAdapter, send_messages, AnthropicAdapterConfig, error type
     manifest.rs      manifest-derived server-tool allowlist gate
-    transport.rs     Transport trait, MockTransport, ANTHROPIC_VERSION pin
+    transport.rs     HttpTransport builders, MockTransport, ANTHROPIC_VERSION pin
     native.rs        ToolUseBlock, ToolResultBlock, server-tool variants
 ```
 

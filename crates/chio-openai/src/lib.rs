@@ -35,6 +35,15 @@ pub use adapter::{
 #[cfg(feature = "provider-adapter")]
 pub mod streaming;
 
+#[cfg(feature = "provider-adapter")]
+pub mod transport;
+
+#[cfg(feature = "provider-adapter")]
+pub use transport::{
+    ChatCompletionsOutcome, OpenAiTransport, OPENAI_API_BASE_URL, OPENAI_API_KEY_ENV,
+    OPENAI_CHAT_COMPLETIONS_PATH, OPENAI_RESPONSES_PATH,
+};
+
 /// Errors produced by the OpenAI adapter.
 #[derive(Debug, thiserror::Error)]
 pub enum OpenAiAdapterError {

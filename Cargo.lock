@@ -1610,17 +1610,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a2f165a7feee6f263028b899d0a181987f4fa7179a6411a32a439fba7c5f769"
 dependencies = [
  "aws-smithy-async",
+ "aws-smithy-protocol-test",
  "aws-smithy-runtime-api",
  "aws-smithy-types",
+ "bytes",
  "h2",
  "http 1.4.0",
+ "http-body 1.0.1",
  "hyper",
  "hyper-rustls",
  "hyper-util",
+ "indexmap 2.13.0",
  "pin-project-lite",
  "rustls",
  "rustls-native-certs",
  "rustls-pki-types",
+ "serde",
+ "serde_json",
  "tokio",
  "tokio-rustls",
  "tower 0.5.3",
@@ -1643,6 +1649,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a06c2315d173edbf1920da8ba3a7189695827002e4c0fc961973ab1c54abca9c"
 dependencies = [
  "aws-smithy-runtime-api",
+]
+
+[[package]]
+name = "aws-smithy-protocol-test"
+version = "0.63.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b227aa94af99a8e5ee52551cc7e3ee30a217019ef99207b6f0b7a1527685941"
+dependencies = [
+ "assert-json-diff",
+ "aws-smithy-runtime-api",
+ "base64-simd",
+ "cbor-diag",
+ "ciborium",
+ "http 0.2.12",
+ "pretty_assertions",
+ "regex-lite",
+ "roxmltree",
+ "serde_json",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -2373,6 +2398,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "cbor-diag"
+version = "0.1.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc245b6ecd09b23901a4fbad1ad975701fd5061ceaef6afa93a2d70605a64429"
+dependencies = [
+ "bs58",
+ "chrono",
+ "data-encoding",
+ "half 2.7.1",
+ "nom",
+ "num-bigint",
+ "num-rational",
+ "num-traits",
+ "separator",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "cc"
 version = "1.2.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2577,6 +2621,7 @@ dependencies = [
 name = "chio-anthropic-tools-adapter"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "chio-core-types",
  "chio-manifest",
  "chio-provider-adapter-core",
@@ -2584,6 +2629,8 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "tokio",
+ "wiremock",
 ]
 
 [[package]]
@@ -2745,13 +2792,19 @@ version = "0.1.0"
 dependencies = [
  "aws-sdk-bedrockruntime",
  "aws-sdk-sts",
+ "aws-smithy-http-client",
+ "aws-smithy-runtime-api",
+ "aws-smithy-types",
+ "aws-types",
  "chio-attest-verify",
  "chio-core-types",
  "chio-provider-adapter-core",
  "chio-tool-call-fabric",
+ "http 1.4.0",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "tokio",
  "toml 0.8.23",
 ]
 
@@ -3318,12 +3371,15 @@ dependencies = [
 name = "chio-gemini-tools-adapter"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "chio-core-types",
  "chio-provider-adapter-core",
  "chio-tool-call-fabric",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "tokio",
+ "wiremock",
 ]
 
 [[package]]
@@ -3801,12 +3857,15 @@ dependencies = [
  "chio-cross-protocol",
  "chio-kernel",
  "chio-manifest",
+ "chio-provider-adapter-core",
  "chio-tool-call-fabric",
  "criterion",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "tokio",
  "tracing",
+ "wiremock",
 ]
 
 [[package]]
@@ -5376,6 +5435,12 @@ dependencies = [
  "serde_json",
  "thousands",
 ]
+
+[[package]]
+name = "diff"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 
 [[package]]
 name = "digest"
@@ -8597,6 +8662,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pretty_assertions"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ae130e2f271fbc2ac3a40fb1d07180839cdbbe443c7a27e1e3c13c5cac0116d"
+dependencies = [
+ "diff",
+ "yansi",
+]
+
+[[package]]
 name = "prettyplease"
 version = "0.2.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9489,6 +9564,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "roxmltree"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "921904a62e410e37e215c40381b7117f830d9d89ba60ab5236170541dd25646b"
+dependencies = [
+ "xmlparser",
+]
+
+[[package]]
 name = "rs_merkle"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10007,6 +10091,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "separator"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f97841a747eef040fcd2e7b3b9a220a7205926e60488e673d9e4926d27772ce5"
+
+[[package]]
 name = "serde"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10084,6 +10174,7 @@ version = "1.0.149"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
 dependencies = [
+ "indexmap 2.13.0",
  "itoa",
  "memchr",
  "serde",
@@ -13509,6 +13600,12 @@ dependencies = [
  "serde_yml",
  "sha2 0.10.9",
 ]
+
+[[package]]
+name = "yansi"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfe53a6657fd280eaa890a3bc59152892ffa3e30101319d168b781ed6529b049"
 
 [[package]]
 name = "yasna"
