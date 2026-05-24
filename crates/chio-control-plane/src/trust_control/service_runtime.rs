@@ -3111,17 +3111,37 @@ impl RemoteCapabilityAuthority {
     }
 }
 
+impl RemoteCapabilityAuthority {
+    /// Fail-closed substitute for a missing current authority key.
+    ///
+    /// `AuthorityKeyCache::from_status` rejects any status without a current
+    /// key, so a primed cache always carries one. If that invariant is ever
+    /// violated we must NOT abort the process (the previous code panicked) and
+    /// must NOT return a key an attacker could control. We return a freshly
+    /// generated ephemeral public key whose private half is discarded
+    /// immediately: it can never validate a real capability, so callers that
+    /// fold this value into a trust set gain no usable issuer. The effect is a
+    /// denial (zero trust granted) rather than a panic.
+    fn deny_sentinel_public_key() -> PublicKey {
+        tracing::error!(
+            "remote capability authority cache missing current key; \
+             returning a non-trusting sentinel so admission fails closed"
+        );
+        Keypair::generate().public_key()
+    }
+}
+
 impl CapabilityAuthority for RemoteCapabilityAuthority {
     fn authority_public_key(&self) -> PublicKey {
         self.refresh_status_if_stale();
         match self.cache.lock() {
             Ok(guard) => match &guard.current {
                 Some(public_key) => public_key.clone(),
-                None => unreachable!("remote capability authority cache missing current key"),
+                None => Self::deny_sentinel_public_key(),
             },
             Err(poisoned) => match &poisoned.into_inner().current {
                 Some(public_key) => public_key.clone(),
-                None => unreachable!("remote capability authority cache missing current key"),
+                None => Self::deny_sentinel_public_key(),
             },
         }
     }
