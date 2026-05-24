@@ -44,10 +44,8 @@ pub struct GeminiAdapterConfig {
     pub public_key: String,
     /// Pinned upstream API version, always [`GEMINI_API_VERSION`].
     pub api_version: String,
-    /// Google Cloud project identifier (populates the AnthropicWorkspace
-    /// principal slot via reuse; Gemini does not yet have its own variant
-    /// in the fabric ProviderId enum's Principal taxonomy, so we reuse the
-    /// generic OpenAi org slot here).
+    /// Google Cloud project identifier that scopes Gemini tool calls. Stamped
+    /// into the [`Principal::GeminiProject`] provenance slot.
     pub project_id: String,
 }
 
@@ -139,8 +137,8 @@ impl GeminiAdapter {
                 provider: ProviderId::Gemini,
                 request_id: format!("gemini_{}_call", call.name),
                 api_version: self.config.api_version.clone(),
-                principal: Principal::OpenAiOrg {
-                    org_id: self.config.project_id.clone(),
+                principal: Principal::GeminiProject {
+                    project_id: self.config.project_id.clone(),
                 },
                 received_at: SystemTime::now(),
             },

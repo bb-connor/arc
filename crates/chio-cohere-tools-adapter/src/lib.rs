@@ -45,9 +45,8 @@ pub struct CohereAdapterConfig {
     pub public_key: String,
     /// Pinned upstream API version, always [`COHERE_API_VERSION`].
     pub api_version: String,
-    /// Cohere organization identifier. Cohere does not expose a dedicated
-    /// principal slot in the fabric `Principal` taxonomy yet; the adapter
-    /// reuses the `OpenAiOrg` slot here so receipts remain provenance-stable.
+    /// Cohere organization identifier that scopes tool calls. Stamped into the
+    /// [`Principal::CohereOrg`] provenance slot.
     pub org_id: String,
 }
 
@@ -152,7 +151,7 @@ impl CohereAdapter {
                 provider: ProviderId::Cohere,
                 request_id: call.id.clone(),
                 api_version: self.config.api_version.clone(),
-                principal: Principal::OpenAiOrg {
+                principal: Principal::CohereOrg {
                     org_id: self.config.org_id.clone(),
                 },
                 received_at: SystemTime::now(),

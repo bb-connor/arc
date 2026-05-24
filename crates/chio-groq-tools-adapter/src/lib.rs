@@ -44,10 +44,9 @@ pub struct GroqAdapterConfig {
     pub public_key: String,
     /// Pinned upstream API version, always [`GROQ_API_VERSION`].
     pub api_version: String,
-    /// Google Cloud project identifier (populates the AnthropicWorkspace
-    /// principal slot via reuse; Groq does not yet have its own variant
-    /// in the fabric ProviderId enum's Principal taxonomy, so we reuse the
-    /// generic OpenAi org slot here).
+    /// Groq project identifier that scopes tool calls on Groq's
+    /// OpenAI-compatible API. Stamped into the [`Principal::GroqProject`]
+    /// provenance slot.
     pub project_id: String,
 }
 
@@ -139,8 +138,8 @@ impl GroqAdapter {
                 provider: ProviderId::Groq,
                 request_id: format!("groq_{}_call", call.name),
                 api_version: self.config.api_version.clone(),
-                principal: Principal::OpenAiOrg {
-                    org_id: self.config.project_id.clone(),
+                principal: Principal::GroqProject {
+                    project_id: self.config.project_id.clone(),
                 },
                 received_at: SystemTime::now(),
             },

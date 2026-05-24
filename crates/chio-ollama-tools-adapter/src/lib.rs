@@ -45,10 +45,9 @@ pub struct OllamaAdapterConfig {
     pub public_key: String,
     /// Pinned upstream API version, always [`OLLAMA_API_VERSION`].
     pub api_version: String,
-    /// Local-trust-edge org identifier. Ollama is a localhost daemon and has
-    /// no upstream IAM principal; the adapter reuses the `OpenAiOrg` slot in
-    /// the fabric `Principal` taxonomy with a `local_*` prefix so receipts
-    /// remain provenance-stable.
+    /// Ollama host or instance label. Ollama is a local daemon with no upstream
+    /// identity provider, so the host is the stable provenance handle stamped
+    /// into the [`Principal::OllamaHost`] slot.
     pub org_id: String,
 }
 
@@ -142,8 +141,8 @@ impl OllamaAdapter {
                 provider: ProviderId::Ollama,
                 request_id: synthesised_request_id(&call.function.name, index),
                 api_version: self.config.api_version.clone(),
-                principal: Principal::OpenAiOrg {
-                    org_id: self.config.org_id.clone(),
+                principal: Principal::OllamaHost {
+                    host: self.config.org_id.clone(),
                 },
                 received_at: SystemTime::now(),
             },

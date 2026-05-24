@@ -44,10 +44,8 @@ pub struct MistralAdapterConfig {
     pub public_key: String,
     /// Pinned upstream API version, always [`MISTRAL_API_VERSION`].
     pub api_version: String,
-    /// Google Cloud project identifier (populates the AnthropicWorkspace
-    /// principal slot via reuse; Mistral does not yet have its own variant
-    /// in the fabric ProviderId enum's Principal taxonomy, so we reuse the
-    /// generic OpenAi org slot here).
+    /// Mistral project identifier that scopes tool calls on La Plateforme.
+    /// Stamped into the [`Principal::MistralProject`] provenance slot.
     pub project_id: String,
 }
 
@@ -139,8 +137,8 @@ impl MistralAdapter {
                 provider: ProviderId::Mistral,
                 request_id: format!("mistral_{}_call", call.name),
                 api_version: self.config.api_version.clone(),
-                principal: Principal::OpenAiOrg {
-                    org_id: self.config.project_id.clone(),
+                principal: Principal::MistralProject {
+                    project_id: self.config.project_id.clone(),
                 },
                 received_at: SystemTime::now(),
             },

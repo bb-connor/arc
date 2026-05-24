@@ -71,6 +71,11 @@ fn arb_principal() -> impl Strategy<Value = Principal> {
                     assumed_role_session_arn,
                 }
             }),
+        "[a-zA-Z0-9_]{1,16}".prop_map(|project_id| Principal::GeminiProject { project_id }),
+        "[a-zA-Z0-9_]{1,16}".prop_map(|project_id| Principal::GroqProject { project_id }),
+        "[a-zA-Z0-9_]{1,16}".prop_map(|project_id| Principal::MistralProject { project_id }),
+        "[a-zA-Z0-9_]{1,16}".prop_map(|org_id| Principal::CohereOrg { org_id }),
+        "https?://[a-z0-9.:-]{1,24}".prop_map(|host| Principal::OllamaHost { host }),
     ]
 }
 
