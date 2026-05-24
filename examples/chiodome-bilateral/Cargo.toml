@@ -1,6 +1,6 @@
 [package]
 name = "chiodome-bilateral-example"
-description = "Cross-org bilateral co-signed invocation under DSSE plus a KB MCP integration scaffold"
+description = "Cross-org bilateral co-signed invocation under DSSE plus a KB MCP integration"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

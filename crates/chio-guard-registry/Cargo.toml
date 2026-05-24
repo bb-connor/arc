@@ -1,6 +1,6 @@
 [package]
 name = "chio-guard-registry"
-description = "Chio guard OCI registry client scaffold"
+description = "Chio guard OCI registry client: cosign-verified pull and publish of guard modules with offline cache support"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

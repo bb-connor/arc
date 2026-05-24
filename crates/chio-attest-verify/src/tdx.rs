@@ -89,7 +89,7 @@ impl TdxCollateral {
     }
 }
 
-/// Intel TDX DCAP quote verifier scaffold.
+/// Intel TDX DCAP quote verifier.
 #[derive(Debug, Clone)]
 pub struct TdxDcapVerifier {
     collateral: TdxCollateral,

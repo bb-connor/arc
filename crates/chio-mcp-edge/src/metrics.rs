@@ -9,14 +9,6 @@
 //! `crates/chio-conformance/tests/metrics_registry_consumed.rs` asserts
 //! that the exposition output contains the registry-keyed series with a
 //! non-zero count after a synthetic tool-call dispatch.
-//
-// TODO: the recorder/renderer/static-counter triplet here is duplicated
-// near-identically across `chio-acp-edge`, `chio-a2a-edge`, and this crate.
-// A follow-up will extract a shared `ReceiptWriteCounters` helper into
-// `chio-metrics-spec` (or a new `chio-metrics-emit` crate) so each edge
-// becomes a thin wrapper. The per-edge static atomics and the renderer
-// function names (`render_<edge>_edge_metrics_prometheus`) are load-bearing
-// for the conformance test surface, so the extraction has to preserve both.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 

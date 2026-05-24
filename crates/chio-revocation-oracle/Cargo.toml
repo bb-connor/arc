@@ -1,6 +1,6 @@
 [package]
 name = "chio-revocation-oracle"
-description = "Chio revocation oracle scaffold"
+description = "Chio revocation oracle: signed sparse-Merkle epoch roots, freshness windows, and passport-bridge revocation lookups"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

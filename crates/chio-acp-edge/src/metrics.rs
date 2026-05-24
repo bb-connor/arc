@@ -2,14 +2,6 @@
 //! registry. The ACP edge is wired into the workspace registry: every ACP
 //! invocation result emerging from the kernel boundary increments
 //! [`CHIO_RECEIPT_WRITE_TOTAL`] with an `outcome` label.
-//
-// TODO: the recorder/renderer/static-counter triplet here is duplicated
-// near-identically across `chio-mcp-edge`, `chio-a2a-edge`, and this crate.
-// A follow-up will extract a shared `ReceiptWriteCounters` helper into
-// `chio-metrics-spec` (or a new `chio-metrics-emit` crate) so each edge
-// becomes a thin wrapper. The per-edge static atomics and the renderer
-// function names (`render_<edge>_edge_metrics_prometheus`) are load-bearing
-// for the conformance test surface, so the extraction has to preserve both.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 

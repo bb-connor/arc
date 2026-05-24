@@ -5,8 +5,8 @@
 **Status:** readiness-draft (no External Assessor engaged)
 **Target assessment type:** HITRUST Implemented, 1-year (i1) Validated Assessment
 **Framework:** HITRUST CSF v11.7 i1
-**Issuance date:** TODO: pending real audit
-**Expiration date:** TODO: pending real audit
+**Issuance date:** Not applicable. This is an internal self-assessment readiness package, not a third-party-audited HITRUST certification, so no certificate has been issued and no issuance date exists.
+**Expiration date:** Not applicable. No certificate has been issued, so there is no expiration date.
 **Target external assessor:** TODO: pending External Assessor engagement
 
 ## Scope
