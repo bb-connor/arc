@@ -651,7 +651,10 @@ mod tests {
             .send_chat_completion(&chat_request_body())
             .await
             .expect_err("a timeout must fail closed");
-        assert!(matches!(error, ProviderError::TransportTimeout { ms: 60_000 }));
+        assert!(matches!(
+            error,
+            ProviderError::TransportTimeout { ms: 60_000 }
+        ));
     }
 
     #[tokio::test]

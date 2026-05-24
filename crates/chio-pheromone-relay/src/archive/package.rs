@@ -331,7 +331,10 @@ pub fn validate_relay_alert_assurance_archive_package_report(
     }
     Ok(())
 }
-pub(crate) fn validate_archive_package_identity(value: &str, name: &str) -> Result<(), PheromoneRelayError> {
+pub(crate) fn validate_archive_package_identity(
+    value: &str,
+    name: &str,
+) -> Result<(), PheromoneRelayError> {
     if !is_bounded_route_token(value) {
         return Err(PheromoneRelayError::ArchivePackageInvalid(format!(
             "archive package {name} is not bounded"

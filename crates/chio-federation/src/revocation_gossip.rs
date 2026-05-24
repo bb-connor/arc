@@ -548,7 +548,8 @@ mod tests {
     use chio_revocation_oracle::{Ed25519RootSigner, EpochRoot, SignedEpochRoot};
 
     fn signed_root(signer_id: &str, epoch: u64) -> SignedEpochRoot {
-        let signer = Ed25519RootSigner::from_signing_key(signer_id, "generate").expect("unit test signer");
+        let signer =
+            Ed25519RootSigner::from_signing_key(signer_id, "generate").expect("unit test signer");
         let root = EpochRoot {
             epoch,
             root_hash: [0xAB; 32],

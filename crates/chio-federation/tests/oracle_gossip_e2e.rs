@@ -251,7 +251,8 @@ fn verifier_rejects_replayed_root_after_advance() {
     // verifier has already advanced past it. The kernel-core view's
     // monotone install_if_newer MUST refuse the replay and leave the
     // current snapshot intact.
-    let signer = Ed25519RootSigner::from_signing_key("oracle-a", "generate").expect("replay signer");
+    let signer =
+        Ed25519RootSigner::from_signing_key("oracle-a", "generate").expect("replay signer");
     let mut oracle = InMemoryRevocationOracle::new();
 
     oracle

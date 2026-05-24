@@ -134,8 +134,7 @@ mod tests {
     use super::*;
     use crate::{Ed25519RootSigner, EpochRoot};
 
-    const SIGNER_SEED: &str =
-        "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a";
+    const SIGNER_SEED: &str = "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a";
 
     fn signer(signer_id: &str) -> Ed25519RootSigner {
         Ed25519RootSigner::from_signing_key(signer_id, SIGNER_SEED)

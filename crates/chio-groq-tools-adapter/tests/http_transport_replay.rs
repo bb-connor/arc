@@ -10,9 +10,7 @@
 use std::sync::Arc;
 
 use chio_groq_tools_adapter::transport::{groq_transport_config, AuthScheme, HttpTransport};
-use chio_groq_tools_adapter::{
-    GroqAdapter, GroqAdapterConfig, GROQ_CHAT_COMPLETIONS_PATH,
-};
+use chio_groq_tools_adapter::{GroqAdapter, GroqAdapterConfig, GROQ_CHAT_COMPLETIONS_PATH};
 use chio_tool_call_fabric::ProviderError;
 use serde_json::json;
 use wiremock::matchers::{body_json, header, method, path};
@@ -109,5 +107,8 @@ async fn real_transport_maps_upstream_5xx_fail_closed() {
         .send_chat_completion(&body)
         .await
         .expect_err("a 503 must fail closed");
-    assert!(matches!(error, ProviderError::Upstream5xx { status: 503, .. }));
+    assert!(matches!(
+        error,
+        ProviderError::Upstream5xx { status: 503, .. }
+    ));
 }

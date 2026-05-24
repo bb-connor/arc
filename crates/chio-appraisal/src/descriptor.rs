@@ -8,8 +8,8 @@ use chio_core_types::runtime_attestation::AttestationVerifierFamily;
 
 use crate::types::*;
 use crate::validate::{
-    validate_runtime_attestation_reference_value_set,
-    validate_runtime_attestation_trust_bundle, validate_runtime_attestation_verifier_descriptor,
+    validate_runtime_attestation_reference_value_set, validate_runtime_attestation_trust_bundle,
+    validate_runtime_attestation_verifier_descriptor,
 };
 
 pub struct RuntimeAttestationVerifierDescriptorArgs<'a> {

@@ -220,11 +220,7 @@ pub trait ProviderHttpTransport: Send + Sync {
     fn base_url(&self) -> &str;
 
     /// POST `body` as `application/json` to `path` and buffer the JSON response.
-    async fn post_json(
-        &self,
-        path: &str,
-        body: &[u8],
-    ) -> Result<HttpResponse, HttpTransportError>;
+    async fn post_json(&self, path: &str, body: &[u8]) -> Result<HttpResponse, HttpTransportError>;
 
     /// POST `body` and buffer a streaming `text/event-stream` (SSE) response.
     ///
@@ -316,7 +312,10 @@ impl HttpTransport {
             request = request.query(&[(name.as_str(), value.as_str())]);
         }
 
-        let response = request.send().await.map_err(|error| map_send_error(&url, &error, self.config.timeout))?;
+        let response = request
+            .send()
+            .await
+            .map_err(|error| map_send_error(&url, &error, self.config.timeout))?;
         let status = response.status();
         let content_type = response
             .headers()
@@ -352,11 +351,12 @@ fn insert_header(
     name: &str,
     value: &str,
 ) -> Result<(), HttpTransportError> {
-    let header_name =
-        HeaderName::from_bytes(name.as_bytes()).map_err(|error| HttpTransportError::InvalidHeader {
+    let header_name = HeaderName::from_bytes(name.as_bytes()).map_err(|error| {
+        HttpTransportError::InvalidHeader {
             name: name.to_string(),
             detail: error.to_string(),
-        })?;
+        }
+    })?;
     let header_value =
         HeaderValue::from_str(value).map_err(|error| HttpTransportError::InvalidHeader {
             name: name.to_string(),
@@ -366,11 +366,7 @@ fn insert_header(
     Ok(())
 }
 
-fn map_send_error(
-    url: &str,
-    error: &reqwest::Error,
-    timeout: Duration,
-) -> HttpTransportError {
+fn map_send_error(url: &str, error: &reqwest::Error, timeout: Duration) -> HttpTransportError {
     if error.is_timeout() {
         HttpTransportError::Timeout {
             url: url.to_string(),
@@ -400,11 +396,7 @@ impl ProviderHttpTransport for HttpTransport {
         &self.config.base_url
     }
 
-    async fn post_json(
-        &self,
-        path: &str,
-        body: &[u8],
-    ) -> Result<HttpResponse, HttpTransportError> {
+    async fn post_json(&self, path: &str, body: &[u8]) -> Result<HttpResponse, HttpTransportError> {
         self.send(path, body, "application/json").await
     }
 
@@ -413,10 +405,7 @@ impl ProviderHttpTransport for HttpTransport {
     }
 
     async fn post_ndjson(&self, path: &str, body: &[u8]) -> Result<Vec<u8>, HttpTransportError> {
-        Ok(self
-            .send(path, body, "application/x-ndjson")
-            .await?
-            .body)
+        Ok(self.send(path, body, "application/x-ndjson").await?.body)
     }
 }
 
@@ -468,9 +457,7 @@ pub fn map_transport_error(provider_label: &str, error: HttpTransportError) -> P
         }
         HttpTransportError::Status { code, body } => {
             map_http_status(provider_label, code, body.as_bytes()).unwrap_or_else(|| {
-                ProviderError::Malformed(format!(
-                    "{provider_label} returned status {code}: {body}"
-                ))
+                ProviderError::Malformed(format!("{provider_label} returned status {code}: {body}"))
             })
         }
         other => ProviderError::Malformed(format!("{provider_label} transport error: {other}")),
@@ -485,7 +472,9 @@ pub fn map_transport_error(provider_label: &str, error: HttpTransportError) -> P
 /// fails closed with [`ProviderError::Malformed`].
 pub fn parse_ndjson_lines(raw: &[u8], provider_label: &str) -> Result<Vec<Value>, ProviderError> {
     let text = std::str::from_utf8(raw).map_err(|error| {
-        ProviderError::Malformed(format!("{provider_label} NDJSON bytes were not UTF-8: {error}"))
+        ProviderError::Malformed(format!(
+            "{provider_label} NDJSON bytes were not UTF-8: {error}"
+        ))
     })?;
     let mut values = Vec::new();
     for line in text.lines() {
@@ -494,7 +483,9 @@ pub fn parse_ndjson_lines(raw: &[u8], provider_label: &str) -> Result<Vec<Value>
             continue;
         }
         let value = serde_json::from_str::<Value>(trimmed).map_err(|error| {
-            ProviderError::Malformed(format!("{provider_label} NDJSON line was not JSON: {error}"))
+            ProviderError::Malformed(format!(
+                "{provider_label} NDJSON line was not JSON: {error}"
+            ))
         })?;
         values.push(value);
     }
@@ -612,11 +603,7 @@ impl ProviderHttpTransport for MockHttpTransport {
         &self.base_url
     }
 
-    async fn post_json(
-        &self,
-        path: &str,
-        body: &[u8],
-    ) -> Result<HttpResponse, HttpTransportError> {
+    async fn post_json(&self, path: &str, body: &[u8]) -> Result<HttpResponse, HttpTransportError> {
         self.record(CallKind::Json, path, body);
         self.next_response(path)
     }
@@ -688,8 +675,8 @@ mod tests {
     #[test]
     fn ndjson_parser_fails_closed_on_garbage() {
         let raw = b"{\"a\":1}\nnot json\n";
-        let error = parse_ndjson_lines(raw, "Ollama")
-            .expect_err("a non-JSON line must fail closed");
+        let error =
+            parse_ndjson_lines(raw, "Ollama").expect_err("a non-JSON line must fail closed");
         assert!(matches!(error, ProviderError::Malformed(_)));
     }
 
@@ -697,7 +684,10 @@ mod tests {
     async fn mock_transport_records_and_scripts() {
         let mock = MockHttpTransport::new("mock://provider");
         mock.push_json_response(b"{\"ok\":true}".to_vec());
-        let response = mock.post_json("/v1/chat", b"{\"model\":\"x\"}").await.unwrap();
+        let response = mock
+            .post_json("/v1/chat", b"{\"model\":\"x\"}")
+            .await
+            .unwrap();
         assert_eq!(response.status, 200);
         assert_eq!(response.body, b"{\"ok\":true}");
         let calls = mock.calls();
@@ -847,18 +837,21 @@ mod tests {
             other => panic!("expected Status error, got {other}"),
         }
         // The status maps into the fabric rate-limit variant.
-        let mapped = map_transport_error("OpenAI", HttpTransportError::Status {
-            code: 429,
-            body: "rate limited".to_string(),
-        });
+        let mapped = map_transport_error(
+            "OpenAI",
+            HttpTransportError::Status {
+                code: 429,
+                body: "rate limited".to_string(),
+            },
+        );
         assert!(matches!(mapped, ProviderError::RateLimited { .. }));
     }
 
     #[tokio::test]
     async fn http_transport_connect_error_fails_closed() {
         // Port 0 with an unroutable host: the connect attempt fails fast.
-        let config = HttpTransportConfig::new("http://127.0.0.1:1")
-            .with_timeout(Duration::from_millis(250));
+        let config =
+            HttpTransportConfig::new("http://127.0.0.1:1").with_timeout(Duration::from_millis(250));
         let transport = HttpTransport::new(config).unwrap();
         let error = transport
             .post_json("/v1/chat", b"{}")

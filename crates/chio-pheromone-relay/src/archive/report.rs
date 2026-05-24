@@ -2,8 +2,7 @@
 
 use super::*;
 use crate::{
-    canonical_sha256, contains_secret_marker,
-    generate_relay_alert_assurance_recovery_drill_report,
+    canonical_sha256, contains_secret_marker, generate_relay_alert_assurance_recovery_drill_report,
     generate_relay_alert_assurance_replay_report, generate_relay_alert_assurance_retention_report,
     is_sha256_hex, validate_export_path, validate_retention_profile,
     verify_relay_alert_assurance_export_bundle, PheromoneRelayError,

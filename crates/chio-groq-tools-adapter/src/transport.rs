@@ -58,7 +58,10 @@ pub fn groq_transport_config(auth: AuthScheme) -> HttpTransportConfig {
     HttpTransportConfig {
         base_url: GROQ_CHAT_COMPLETIONS_HOST.to_string(),
         auth,
-        extra_headers: vec![("x-groq-api-version".to_string(), GROQ_API_VERSION.to_string())],
+        extra_headers: vec![(
+            "x-groq-api-version".to_string(),
+            GROQ_API_VERSION.to_string(),
+        )],
         timeout: Duration::from_secs(60),
     }
 }
@@ -124,11 +127,7 @@ impl ProviderHttpTransport for MockTransport {
         self.inner.base_url()
     }
 
-    async fn post_json(
-        &self,
-        path: &str,
-        body: &[u8],
-    ) -> Result<HttpResponse, HttpTransportError> {
+    async fn post_json(&self, path: &str, body: &[u8]) -> Result<HttpResponse, HttpTransportError> {
         self.inner.post_json(path, body).await
     }
 
