@@ -25,7 +25,7 @@ use super::{Adversary, AdversaryAction, AdversaryClass, AdversaryError, Adversar
 
 /// Stable marker emitted into mutated step arguments. The toy guard
 /// evaluator searches for this string; receipt manifests can grep for it.
-pub const INJECTION_MARKER: &str = "chio:m08:prompt-injection";
+pub const INJECTION_MARKER: &str = "chio:adversarial:prompt-injection";
 
 /// Canonical injection pattern names. The names align with the fuzz
 /// corpus categories so the dataflow between the fuzz corpus and the

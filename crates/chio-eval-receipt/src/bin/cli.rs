@@ -95,7 +95,7 @@ fn verify_memo_path(memo_path: &str, sig_path: &str) -> Result<String, String> {
 
     require_field(&fields, "signature_format", "chio-memo-signature.v1")?;
     require_field(&fields, "scheme", SYNTHETIC_TEST_SAMPLE)?;
-    require_field(&fields, "signed_payload", "m02-memo.md:sha256")?;
+    require_field(&fields, "signed_payload", "memo.md:sha256")?;
 
     let signer = field_value(&fields, "signer_identity")?;
     let signed_hash = field_value(&fields, "memo_sha256")?;
@@ -226,7 +226,7 @@ mod tests {
             "signature_format: chio-memo-signature.v1\n\
              scheme: synthetic-test-sample\n\
              signer_identity: {signer}\n\
-             signed_payload: m02-memo.md:sha256\n\
+             signed_payload: memo.md:sha256\n\
              memo_sha256: {memo_sha}\n\
              signature: {signature}\n",
         );
@@ -270,7 +270,7 @@ mod tests {
              scheme: synthetic-test-sample\n\
              scheme: sigstore-cosign\n\
              signer_identity: {signer}\n\
-             signed_payload: m02-memo.md:sha256\n\
+             signed_payload: memo.md:sha256\n\
              memo_sha256: {memo_sha}\n\
              signature: {signature}\n",
         );
@@ -306,7 +306,7 @@ mod tests {
             "signature_format: chio-memo-signature.v1\n\
              scheme: synthetic-test-sample\n\
              signer_identity: {signer}\n\
-             signed_payload: m02-memo.md:sha256\n\
+             signed_payload: memo.md:sha256\n\
              memo_sha256: {memo_sha}\n\
              signature: {signature}\n\
              attacker_claim: forged-cosign-cert\n",
@@ -342,7 +342,7 @@ mod tests {
              signature_format: chio-memo-signature.v1\n\
              scheme: synthetic-test-sample\n\
              signer_identity: {signer}\n\
-             signed_payload: m02-memo.md:sha256\n\
+             signed_payload: memo.md:sha256\n\
              memo_sha256: {memo_sha}\n\
              signature: {signature}\n",
         );
@@ -375,7 +375,7 @@ mod tests {
             "signature_format: chio-memo-signature.v1\n\
              scheme: cosign-github-oidc-test\n\
              signer_identity: {signer}\n\
-             signed_payload: m02-memo.md:sha256\n\
+             signed_payload: memo.md:sha256\n\
              memo_sha256: {memo_sha}\n\
              signature: {signature}\n",
         );

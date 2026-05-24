@@ -227,7 +227,7 @@ fn frame_from_receipt(
         },
         request_blob_sha256: sha256_hex(&receipt_bytes),
         response_blob_sha256: sha256_hex(&arena_receipt_bytes),
-        redaction_pass_id: "m08-arena@0.1.0+p1".to_string(),
+        redaction_pass_id: "arena-redaction@0.1.0+p1".to_string(),
         verdict: frame_verdict(receipt.verdict),
         deny_reason: frame_deny_reason(receipt),
         would_have_blocked: receipt.verdict != ScenarioVerdict::Allow,
