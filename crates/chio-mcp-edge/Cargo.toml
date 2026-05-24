@@ -38,6 +38,5 @@ otel = ["chio-kernel/otel"]
 # never pull in `arbitrary` and never expose `fuzz` symbols.
 fuzz = ["dep:arbitrary"]
 
-[lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
+[lints]
+workspace = true

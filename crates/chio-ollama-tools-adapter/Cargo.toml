@@ -31,6 +31,5 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 [[bench]]
 name = "verdict_latency"
 
-[lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
+[lints]
+workspace = true

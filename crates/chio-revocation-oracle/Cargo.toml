@@ -21,7 +21,7 @@ sha2 = { workspace = true }
 
 [features]
 default = []
-# M04 P5.T1 acceptance gate: enables the 3-tier swarm e2e test which
+# Acceptance gate: enables the 3-tier swarm e2e test which
 # wires this crate's signed-epoch-root path through the federation
 # gossip push queue into a `chio-kernel-core::RevocationView` cache.
 # The feature is dev-only (no library-side surface changes); it gates
@@ -55,6 +55,5 @@ name = "receipt_chain_proof"
 path = "tests/receipt_chain_proof.rs"
 required-features = ["delegation"]
 
-[lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
+[lints]
+workspace = true

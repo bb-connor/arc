@@ -39,6 +39,5 @@ wiremock = { workspace = true }
 # be combined with an explicit `chio-manifest` `server_tools` allowlist.
 computer-use = []
 
-[lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
+[lints]
+workspace = true

@@ -17,6 +17,5 @@ serde_json = "1"
 name = "bidirectional_lookup"
 path = "tests/bidirectional_lookup.rs"
 
-[lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
+[lints]
+workspace = true

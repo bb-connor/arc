@@ -48,6 +48,5 @@ provider-adapter = ["dep:chio-tool-call-fabric", "dep:chio-provider-adapter-core
 name = "verdict_latency"
 harness = false
 
-[lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
+[lints]
+workspace = true

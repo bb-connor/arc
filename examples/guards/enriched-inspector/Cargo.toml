@@ -11,6 +11,5 @@ crate-type = ["cdylib"]
 chio-guard-sdk = { path = "../../../crates/chio-guard-sdk" }
 chio-guard-sdk-macros = { path = "../../../crates/chio-guard-sdk-macros" }
 
-[lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
+[lints]
+workspace = true

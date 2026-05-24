@@ -58,6 +58,5 @@ chio-link = { path = "../chio-link" }
 chio-settle = { path = "../chio-settle" }
 rcgen = "0.13"
 
-[lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
+[lints]
+workspace = true

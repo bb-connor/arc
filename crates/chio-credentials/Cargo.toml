@@ -57,6 +57,5 @@ path = "tests/dudect/jwt_verify.rs"
 harness = false
 required-features = ["dudect"]
 
-[lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
+[lints]
+workspace = true

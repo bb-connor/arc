@@ -43,6 +43,5 @@ tempfile = { workspace = true }
 name = "store_receipt_write_throughput"
 harness = false
 
-[lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
+[lints]
+workspace = true

@@ -19,7 +19,7 @@ name = "chio_kernel"
 # the box.
 # Downstream consumers that need the legacy single-step path can opt
 # back via `default-features = false` plus an explicit `legacy-sync`
-# selection. See `docs/migrations/M04-delegation.md` for the full
+# selection. See `docs/migrations/delegation-migration.md` for the full
 # upgrade contract.
 default = ["legacy-sync", "delegation"]
 legacy-sync = []
@@ -27,13 +27,13 @@ dhat-heap = []
 sustained-p99-nightly = []
 otel = ["dep:opentelemetry-semantic-conventions"]
 tokio-console-smoke = ["tokio/tracing"]
-# M03 hybrid signing path: pulls the pq cargo feature on chio-core-types so
+# Hybrid signing path: pulls the pq cargo feature on chio-core-types so
 # the kernel boot path can construct `HybridBackend` from a rolled
 # ML-DSA-65 key. Default-off; enabled by deployments that flip
 # `policy.crypto_floor` to `allow_hybrid` or `pq_required`.
 pq = ["chio-core-types/pq", "chio-core/pq"]
-# M04 Phase 3 recursive-delegation kernel integration. Default OFF for the
-# trust-boundary trajectory: when ON, the verifier consults the installed
+# Recursive-delegation kernel integration. Default OFF for the
+# trust boundary: when ON, the verifier consults the installed
 # `RevocationView` snapshot on every delegated dispatch and denies the
 # capability if any link's `capability_id` is in the revoked set.
 # `chio-kernel-core/revocation-view` is already default-on, so enabling

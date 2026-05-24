@@ -26,6 +26,5 @@ proptest = { workspace = true }
 # self-check over the canonical-JSON pipeline.
 schema-subsumption = []
 
-[lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
+[lints]
+workspace = true

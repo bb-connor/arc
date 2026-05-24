@@ -46,6 +46,5 @@ signal-hook = "0.3"
 proptest = { workspace = true }
 tempfile = { workspace = true }
 
-[lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
+[lints]
+workspace = true

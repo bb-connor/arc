@@ -34,6 +34,5 @@ serde_json = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }
 
-[lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
+[lints]
+workspace = true

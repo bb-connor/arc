@@ -89,6 +89,5 @@ proptest = { workspace = true }
 # only its first line.
 chio-spec-codegen = { path = "../chio-spec-codegen" }
 
-[lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
+[lints]
+workspace = true

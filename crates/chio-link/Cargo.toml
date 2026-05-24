@@ -41,6 +41,5 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 tower = { workspace = true, optional = true }
 
-[lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
+[lints]
+workspace = true

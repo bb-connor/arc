@@ -36,6 +36,5 @@ arbitrary = { version = "1", features = ["derive"], optional = true }
 # Production builds never pull in `arbitrary` and never expose `fuzz` symbols.
 fuzz = ["dep:arbitrary"]
 
-[lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
+[lints]
+workspace = true
