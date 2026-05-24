@@ -167,7 +167,7 @@ fn threat_passkey_credential_theft_supplementary_evidence_remains_in_tree() {
     // Supplementary regression net: in addition to the production
     // deny-asserting arms above (which exercise
     // `InMemoryPasskeyNonceStore::record_if_fresh` directly),
-    // pin the named M10.P2 custody-hardware integration tests so a
+    // pin the named custody-hardware integration tests so a
     // stealth removal of the verifier / revocation / end-to-end
     // proofs still trips this conformance row.
     for (evidence, needle) in EVIDENCE_FILES {

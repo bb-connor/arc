@@ -1,7 +1,6 @@
 //! Chio anchoring runtime and multi-lane proof normalization.
 //!
-//! This crate realizes the bounded `chio-anchor` milestone over the frozen
-//! checkpoint and web3 artifact family:
+//! This crate anchors the frozen checkpoint and web3 artifact family:
 //!
 //! - direct EVM root-registry publication requests plus confirmation helpers
 //! - checkpoint-to-Bitcoin super-root aggregation and OTS linkage

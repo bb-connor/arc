@@ -109,7 +109,7 @@ pub const TIER_DISCOUNT_PER_HUNDRED: [u32; 4] = [0, 5, 10, 20];
 ///
 /// The helper is deterministic in `(base, ctx)`: equal inputs produce
 /// equal outputs. Zero-priced manifests stay zero-priced regardless of
-/// tier (the M09 narrative pins free-tier guards at zero). The
+/// tier (free-tier guards are pinned at zero). The
 /// discount math is integer-only; rounding is half-down by truncation,
 /// matching minor-unit pricing semantics.
 #[must_use]

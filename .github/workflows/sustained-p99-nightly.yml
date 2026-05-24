@@ -1,4 +1,4 @@
-name: m06-sustained-p99-nightly
+name: sustained-p99-nightly
 
 on:
   schedule:
@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: m06-sustained-p99-nightly-${{ github.ref }}
+  group: sustained-p99-nightly-${{ github.ref }}
   cancel-in-progress: false
 
 env:

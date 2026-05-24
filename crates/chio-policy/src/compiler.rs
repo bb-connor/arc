@@ -73,7 +73,7 @@ pub struct CompiledPolicy {
     pub default_scope: ChioScope,
     /// Ordered list of guard names emitted by compilation.
     ///
-    /// The acceptance criteria for phase 5.5 requires the compiler to emit a
+    /// The compiler is required to emit a
     /// `Vec<Box<dyn Guard>>` containing all 12 guard types; because
     /// [`GuardPipeline`] does not publicly expose its contained guards,
     /// this sidecar records the `Guard::name()` of each guard added to the
@@ -610,7 +610,7 @@ fn compile_budget_guards(
 }
 
 // ---------------------------------------------------------------------------
-// Scope compilation (unchanged from phase 5.0)
+// Scope compilation
 // ---------------------------------------------------------------------------
 
 /// Build a default ChioScope from the policy's tool_access rules.

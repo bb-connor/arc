@@ -1,8 +1,8 @@
-//! Integration test: model card lineage anchor proof (M10 P5.T1).
+//! Integration test: model card lineage anchor proof.
 //!
 //! Asserts the published-card lineage anchor produced by
 //! [`chio_weights::anchor_model_card`] verifies through the model-card
-//! anchor surface and degrades cleanly when M03 hybrid signing is absent.
+//! anchor surface and degrades cleanly when hybrid signing is absent.
 //! The anchor digest format matches the lineage-anchor frontier digest so
 //! consumers route both through one verifier.
 

@@ -1,7 +1,5 @@
 //! Wire format for Chio TEE replay frames.
 //!
-//! Phase 1 of M10. T1 landed the skeleton; T3 lands the v1 frame schema.
-//!
 //! The Rust types in [`frame`] mirror the v1 JSON schema field-for-field;
 //! [`schema`] holds the structural and pattern invariants. The normative
 //! wire-level specification is `spec/PROTOCOL.md`.

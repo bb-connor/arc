@@ -1,4 +1,4 @@
-//! Threat-intel external guards (phase 13.3).
+//! Threat-intel external guards.
 //!
 //! Three adapters that implement [`super::ExternalGuard`] and plug into
 //! [`super::AsyncGuardAdapter`]:

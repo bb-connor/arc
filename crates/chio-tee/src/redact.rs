@@ -1,5 +1,4 @@
-//! Mandatory M06 redactor pass for the tee shadow runner (M10 Phase 1
-//! Task 6).
+//! Mandatory redactor pass for the tee shadow runner.
 //!
 //! The normative spec (`spec/PROTOCOL.md`) pins three normative behaviours
 //! wired by this module:
@@ -44,8 +43,9 @@ pub type RedactionManifest = DefaultRedactionManifest;
 pub type RedactedPayload = DefaultRedactedPayload;
 
 /// Threshold above which a zero-match manifest under `--paranoid` is
-/// treated as redactor misconfiguration. Sourced from the trajectory
-/// doc line 21 (>256 bytes).
+/// treated as redactor misconfiguration. Empirically chosen: a payload
+/// longer than 256 bytes with zero redaction matches is treated as a
+/// likely redactor misconfiguration.
 pub const PARANOID_ZERO_MATCH_THRESHOLD: usize = 256;
 
 /// Trait abstracting the redactor surface so the tee can run against
@@ -121,12 +121,11 @@ impl RedactPass {
     ///
     /// On `Err(_)` from the redactor: returns
     /// [`RedactError::FailClosed`]. The caller MUST write
-    /// `tee.redact_failed` to the receipt log and refuse persistence
-    /// (trajectory doc line 452).
+    /// `tee.redact_failed` to the receipt log and refuse persistence.
     ///
     /// On `Ok(_)` with a zero-match manifest, payload length > 256
     /// bytes, and `paranoid == true`: returns
-    /// [`RedactError::ParanoidRefusal`] (trajectory doc line 21).
+    /// [`RedactError::ParanoidRefusal`].
     ///
     /// On `Ok(_)` otherwise: returns the [`RedactedPayload`].
     ///

@@ -27,7 +27,7 @@
 //! transitive: revoking A revokes B and, if B was itself a parent of C,
 //! revokes C as well. The cascade is computed synchronously inside
 //! `revoke_credential` so a single operator revocation atomically denies
-//! the parent and the whole dependent subtree within one M04 epoch.
+//! the parent and the whole dependent subtree within one oracle epoch.
 //!
 //! Fail-closed: if the dependency graph cannot be evaluated (a poisoned
 //! lock, or an oracle insert error mid-cascade), `revoke_credential`
@@ -62,7 +62,7 @@ use crate::error::CustodyError;
 /// Fixed epoch-nonce numeric used for credential revocation leaves.
 ///
 /// We use a single nonce per credential id so the cascade has at most
-/// one leaf per WebAuthn credential. The M04 sparse-Merkle layer accepts
+/// one leaf per WebAuthn credential. The sparse-Merkle layer accepts
 /// arbitrary `EpochNonce` values; the issuer-side cascade does not need
 /// the additional dimension. The constant is a `u64` because
 /// [`EpochNonce::new`] is not currently `const fn`; see
@@ -77,7 +77,7 @@ pub fn credential_revocation_nonce() -> EpochNonce {
 
 /// Issuer-side revocation surface keyed on WebAuthn credential id.
 ///
-/// The custody surface owns this trait; the M04 sparse-Merkle oracle
+/// The custody surface owns this trait; the sparse-Merkle oracle
 /// implements [`chio_revocation_oracle::RevocationOracle`] under the
 /// hood. We translate between the two so callers do not have to know
 /// about `(SubjectId, EpochNonce)`.
@@ -102,7 +102,7 @@ pub trait CredentialRevocationOracle: Send + Sync {
     /// [`Self::is_revoked`] for the credential or any of its dependents
     /// MUST return `true`.
     ///
-    /// Returns the M04 epoch root after the insertion(s) so the operator
+    /// Returns the oracle epoch root after the insertion(s) so the operator
     /// can correlate the revocation with the appropriate epoch in
     /// downstream receipts.
     ///
@@ -122,11 +122,11 @@ pub trait CredentialRevocationOracle: Send + Sync {
     /// never mints while the revocation state is unknown.
     fn is_revoked(&self, credential_id: &str) -> Result<bool, CustodyError>;
 
-    /// Snapshot the current M04 epoch root. Surfaced for observability.
+    /// Snapshot the current oracle epoch root. Surfaced for observability.
     fn current_epoch_root(&self) -> Result<EpochRoot, CustodyError>;
 }
 
-/// Internal state guarded by a single `Mutex`: the M04 sparse-Merkle
+/// Internal state guarded by a single `Mutex`: the sparse-Merkle
 /// oracle plus the parent -> dependents adjacency used by the cascade.
 /// Both live under one lock so a revocation and its cascade are applied
 /// atomically with respect to a concurrent `is_revoked` consultation.
@@ -137,7 +137,7 @@ struct CascadeState {
 
 /// In-memory cascade backed by [`InMemoryRevocationOracle`].
 ///
-/// Wraps the M04 sparse-Merkle oracle (and the parent -> dependents
+/// Wraps the sparse-Merkle oracle (and the parent -> dependents
 /// adjacency) in a `Mutex` so the credential revocation surface is
 /// `Send + Sync` and consumable behind
 /// `Arc<dyn CredentialRevocationOracle>`. Production deployments swap
@@ -202,7 +202,9 @@ impl InMemoryCredentialRevocationOracle {
                 // so an operator retry (or a diamond-shaped dependency
                 // graph) does not advance the epoch more than necessary.
                 state.oracle.insert(key, now_unix_ms).map_err(|err| {
-                    CustodyError::Encoding(format!("M04 oracle insert failed: {err}"))
+                    CustodyError::Encoding(format!(
+                        "sparse-merkle revocation oracle insert failed: {err}"
+                    ))
                 })?;
             }
 

@@ -62,7 +62,7 @@ fn pre_revocation_mint_succeeds() {
 #[test]
 fn post_revocation_next_mint_denied_within_epoch() {
     // The cascade contract: revoking the WebAuthn credential at the
-    // issuer denies the next call within an M04 epoch. We assert that
+    // issuer denies the next call within an oracle epoch. We assert that
     // by revoking and then attempting a new mint with a different
     // nonce (so the deny path is the cascade, not the replay store).
     let oracle = Arc::new(InMemoryCredentialRevocationOracle::new());
@@ -83,7 +83,7 @@ fn post_revocation_next_mint_denied_within_epoch() {
     };
     assert!(
         post_root.epoch > pre_root.epoch,
-        "M04 epoch must advance on revocation"
+        "revocation oracle epoch must advance on revocation"
     );
 
     // Next mint within the new epoch is denied fail-closed.
@@ -110,7 +110,7 @@ fn revocation_does_not_cascade_across_credentials() {
     assert!(matches!(a, Err(CustodyError::CredentialRevoked)));
     assert!(
         b.is_ok(),
-        "revocation must not cascade across credentials in the same M04 epoch"
+        "revocation must not cascade across credentials in the same oracle epoch"
     );
 }
 
@@ -157,6 +157,6 @@ fn double_revocation_is_idempotent_for_operator_retry() {
     };
     assert_eq!(
         r1, r2,
-        "operator-side retries must not advance the M04 epoch"
+        "operator-side retries must not advance the oracle epoch"
     );
 }

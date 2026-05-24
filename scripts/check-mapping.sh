@@ -37,12 +37,12 @@ fi
 # liveness invariants for RevocationPropagation. We require: any whitelisted name
 # that is *defined* in the .tla file (top-level `<Name> ==`) must appear as
 # a row in MAPPING.md. Whitelisted-but-undefined is fine; that is just
-# "future work" (e.g. RevocationEventuallySeen lands at T3, not yet).
+# "future work" (e.g. RevocationEventuallySeen is not yet landed).
 #
 # Helper definitions like DomainsOK, States, Verdicts, ProcSet, CapSet,
 # DEPTH_MAX, Init, Next, Spec, vars, Receipt, Message, Attenuate, Revoke,
 # Propagate, Evaluate, and the aggregate SafetyInv are intentionally NOT
-# enforced: they are not the named invariants the trajectory doc and the
+# enforced: they are not the named invariants the formal mapping doc and the
 # Apalache .cfg cite. The aggregate SafetyInv is the conjunction the .cfg
 # checks; the leaf-named invariants below are the unit of cross-reference.
 named_tla_invariants=(

@@ -244,7 +244,7 @@ mod replay {
     }
 
     /// Exit code 40: the receipt declares a `schema_version` that the
-    /// current build does not support (or otherwise fails the M01
+    /// current build does not support (or otherwise fails the
     /// canonical-JSON schema validator). The fixture carries a sentinel
     /// `"schema_version":"chio.receipt/v999"` field that the dispatcher
     /// rejects before signature verification.

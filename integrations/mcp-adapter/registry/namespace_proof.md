@@ -2,7 +2,7 @@
 
 Namespace: `dev.chio`
 
-Validation method for trajectory-3 submission: GitHub challenge in the
+Validation method for the registry submission: GitHub challenge in the
 `backbay-labs/chio` repository. DNS challenge remains the fallback if the
 registry reviewer requires domain-level proof for `chio.world`.
 

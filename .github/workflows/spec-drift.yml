@@ -28,7 +28,7 @@ env:
 jobs:
   codegen-no-diff:
     name: codegen-no-diff (rust+python+ts+go)
-    # owner: M01
+    # owner: @bb-connor
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -98,7 +98,7 @@ jobs:
 
   header-stamp-untouched:
     name: header-stamp-untouched (do-not-edit grep gate)
-    # owner: M01
+    # owner: @bb-connor
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -162,7 +162,7 @@ jobs:
 
   vectors-byte-stable:
     name: vectors-byte-stable (freeze-vectors --check)
-    # owner: M01
+    # owner: @bb-connor
     # Re-runs `cargo xtask freeze-vectors --check` on every PR so a hand-edit
     # to a vector payload or MANIFEST.sha256 cannot land without a fresh
     # regeneration.
@@ -213,7 +213,7 @@ jobs:
 
   schema-coverage:
     name: schema-coverage (vectors_schema_pair)
-    # owner: M01
+    # owner: @bb-connor
     # Runs the vectors_schema_pair test: asserts every wire schema in
     # spec/schemas/ has at least one paired vector under tests/bindings/vectors/,
     # and conversely that every vector references a known schema.
@@ -240,7 +240,7 @@ jobs:
 
   cross-lang-bytes:
     name: cross-lang-bytes (canonical_json_diff proptest)
-    # owner: M01
+    # owner: @bb-connor
     # Runs the canonical_json_diff proptest, which property-checks the Rust
     # canonicalizer against RFC 8785 invariants (key ordering, string escapes,
     # number normalization). The Rust proptest is the gate until Python and

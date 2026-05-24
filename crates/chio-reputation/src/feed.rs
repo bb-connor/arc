@@ -104,7 +104,7 @@ pub trait ReputationFeed {
 /// Composition is the per-feed maximum, not the sum: a single feed dominating
 /// the floor would otherwise let a publisher whose only signal is arena
 /// survival reach the highest tier. Capping at the per-feed maximum keeps the
-/// `tier_3` requirement (P3.T4 threshold table) satisfiable only when every
+/// `tier_3` requirement (the threshold table) satisfiable only when every
 /// feed independently clears its bar.
 ///
 /// Returns `None` when the slice is empty so callers can distinguish

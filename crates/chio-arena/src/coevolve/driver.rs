@@ -243,8 +243,8 @@ pub struct CoevolutionInputs<'a> {
     pub issued_scope: &'a IssuedScope,
     /// Initial parent blueprints.
     pub parents: Vec<PopulationBlueprint>,
-    /// Seed corpus (used only for its fingerprint at this milestone; the
-    /// downstream P5 promote pipeline consumes the artifacts directly).
+    /// Seed corpus (used here only for its fingerprint; the downstream
+    /// promote pipeline consumes the artifacts directly).
     pub seed_corpus: &'a SeedCorpus,
     /// Driver configuration.
     pub config: CoevolutionConfig,

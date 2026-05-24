@@ -1,4 +1,4 @@
-//! AWS Bedrock `ApplyGuardrail` adapter (phase 13.2).
+//! AWS Bedrock `ApplyGuardrail` adapter.
 //!
 //! This module wraps the AWS Bedrock `ApplyGuardrail` API as an
 //! [`ExternalGuard`]. The guard evaluates the tool call's arguments
@@ -16,7 +16,7 @@
 //!
 //! # Authentication
 //!
-//! AWS SigV4 is non-trivial to implement in-tree. For phase 13.2 we accept
+//! AWS SigV4 is non-trivial to implement in-tree. This adapter accepts
 //! a pre-computed bearer token (`Authorization: Bearer <token>`) issued by
 //! an ambient AWS identity layer (e.g. `AWS_BEARER_TOKEN_BEDROCK` env
 //! provisioning, or a sidecar that exchanges instance credentials for a
@@ -28,7 +28,7 @@
 //!
 //! Any non-2xx HTTP response or transport error surfaces as an
 //! [`ExternalGuardError`]. The adapter then returns [`Verdict::Deny`]
-//! (fail-closed, per the phase-13.2 acceptance criteria).
+//! (fail-closed by design).
 //!
 //! [`AsyncGuardAdapter`]: super::AsyncGuardAdapter
 

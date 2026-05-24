@@ -1,6 +1,6 @@
-//! Google Vertex AI safety-classifier adapter (phase 13.2).
+//! Google Vertex AI safety-classifier adapter.
 //!
-//! Vertex AI exposes multiple safety surfaces. For phase 13.2 we use the
+//! Vertex AI exposes multiple safety surfaces. This adapter uses the
 //! generative-language `generateContent` safety-classification response:
 //! when a request is submitted, the response carries `safetyRatings[]`
 //! per category, each with a `probability` enum

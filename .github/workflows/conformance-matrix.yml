@@ -35,7 +35,7 @@ env:
 jobs:
   vectors-byte-stable:
     name: vectors-byte-stable (freeze-vectors --check nightly)
-    # owner: M01
+    # owner: @bb-connor
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -67,7 +67,7 @@ jobs:
 
   external-consumer-smoke:
     name: external-consumer-smoke (published-crate flow on fresh runner)
-    # owner: M01
+    # owner: @bb-connor
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -112,7 +112,7 @@ jobs:
 
   notify-on-failure:
     name: notify-on-failure (alarm-policy issue opener)
-    # owner: M01
+    # owner: @bb-connor
     needs: [vectors-byte-stable, external-consumer-smoke]
     if: failure() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest

@@ -22,15 +22,15 @@ use chio_kernel::{
 use serde::Deserialize;
 use serde_json::json;
 
-const M04_FIXTURE_PATH: &str = "tests/replay/fixtures/allow_simple/01_basic_capability.json";
-const M04_GOLDEN_RECEIPTS_PATH: &str =
+const REPLAY_FIXTURE_PATH: &str = "tests/replay/fixtures/allow_simple/01_basic_capability.json";
+const GOLDEN_RECEIPTS_PATH: &str =
     "tests/replay/goldens/allow_simple/01_basic_capability/receipts.ndjson";
-const M04_FIXTURE: &str =
+const REPLAY_FIXTURE: &str =
     include_str!("../../../tests/replay/fixtures/allow_simple/01_basic_capability.json");
-const M04_GOLDEN_RECEIPTS: &str =
+const GOLDEN_RECEIPTS: &str =
     include_str!("../../../tests/replay/goldens/allow_simple/01_basic_capability/receipts.ndjson");
-const M04_TEST_KEY_SEED: &[u8; 32] = include_bytes!("../../../tests/replay/test-key.seed");
-const M04_FIXED_CLOCK_UNIX_SECS: u64 = 1_767_225_600;
+const TEST_KEY_SEED: &[u8; 32] = include_bytes!("../../../tests/replay/test-key.seed");
+const FIXED_CLOCK_UNIX_SECS: u64 = 1_767_225_600;
 
 #[derive(Debug, Deserialize)]
 struct ReplayFixtureMeta {
@@ -63,8 +63,8 @@ impl ToolEvaluator for AsyncReceiptSigner {
     }
 }
 
-fn m04_keypair() -> Keypair {
-    Keypair::from_seed(M04_TEST_KEY_SEED)
+fn fixture_keypair() -> Keypair {
+    Keypair::from_seed(TEST_KEY_SEED)
 }
 
 fn make_config(keypair: Keypair) -> KernelConfig {
@@ -72,7 +72,7 @@ fn make_config(keypair: Keypair) -> KernelConfig {
         keypair,
         ca_public_keys: Vec::new(),
         max_delegation_depth: 5,
-        policy_hash: sha256_hex(b"policy:m05-p1-t7"),
+        policy_hash: sha256_hex(b"policy:dual-track-receipt"),
         allow_sampling: false,
         allow_sampling_tool_use: false,
         allow_elicitation: false,
@@ -85,49 +85,49 @@ fn make_config(keypair: Keypair) -> KernelConfig {
     }
 }
 
-fn load_m04_fixture() -> (ReplayFixtureMeta, GoldenReceiptLine) {
+fn load_replay_fixture() -> (ReplayFixtureMeta, GoldenReceiptLine) {
     let fixture: ReplayFixtureMeta =
-        serde_json::from_str(M04_FIXTURE).expect("M04 replay fixture parses");
+        serde_json::from_str(REPLAY_FIXTURE).expect("replay fixture parses");
     assert_eq!(fixture.schema_version, "v1");
     assert_eq!(fixture.family, "allow_simple");
     assert_eq!(fixture.name, "allow_simple/01_basic_capability");
     assert_eq!(fixture.expected_verdict, "allow");
     assert_eq!(fixture.clock, "2026-01-01T00:00:00Z");
 
-    let golden_line = M04_GOLDEN_RECEIPTS
+    let golden_line = GOLDEN_RECEIPTS
         .lines()
         .next()
-        .expect("M04 golden receipt stream has a first line");
+        .expect("golden receipt stream has a first line");
     let golden: GoldenReceiptLine =
-        serde_json::from_str(golden_line).expect("M04 golden receipt line parses");
+        serde_json::from_str(golden_line).expect("golden receipt line parses");
     assert_eq!(golden.scenario, fixture.name);
     assert_eq!(golden.verdict, fixture.expected_verdict);
 
     (fixture, golden)
 }
 
-fn m04_fixture_receipt_body(kernel_key: &Keypair) -> ChioReceiptBody {
-    let (fixture, golden) = load_m04_fixture();
+fn fixture_receipt_body(kernel_key: &Keypair) -> ChioReceiptBody {
+    let (fixture, golden) = load_replay_fixture();
     let fixture_name = fixture.name.clone();
     let fixed_clock = fixture.clock.clone();
     let nonce = golden.nonce.clone();
     let action = ToolCallAction::from_parameters(json!({
         "clock": fixed_clock,
         "fixture": fixture_name,
-        "golden_receipts": M04_GOLDEN_RECEIPTS_PATH,
+        "golden_receipts": GOLDEN_RECEIPTS_PATH,
         "nonce": nonce,
         "tool_call": {
-            "server_id": "m04-replay",
+            "server_id": "replay-fixture",
             "tool_name": "allow_simple"
         }
     }))
-    .expect("M04 fixture tool-call parameters canonicalise");
+    .expect("fixture tool-call parameters canonicalise");
 
     ChioReceiptBody {
         id: format!("rcpt-{}", golden.nonce),
-        timestamp: M04_FIXED_CLOCK_UNIX_SECS,
+        timestamp: FIXED_CLOCK_UNIX_SECS,
         capability_id: format!("cap-{}", fixture.name.replace('/', "-")),
-        tool_server: "m04-replay".to_string(),
+        tool_server: "replay-fixture".to_string(),
         tool_name: "allow_simple".to_string(),
         action: action.clone(),
         decision: Some(Decision::Allow),
@@ -141,8 +141,8 @@ fn m04_fixture_receipt_body(kernel_key: &Keypair) -> ChioReceiptBody {
         policy_hash: sha256_hex(format!("policy:{}", fixture.name).as_bytes()),
         evidence: Vec::new(),
         metadata: Some(json!({
-            "m04_fixture": M04_FIXTURE_PATH,
-            "m04_golden_receipts": M04_GOLDEN_RECEIPTS_PATH,
+            "replay_fixture": REPLAY_FIXTURE_PATH,
+            "golden_receipts": GOLDEN_RECEIPTS_PATH,
         })),
         trust_level: TrustLevel::default(),
         tenant_id: None,
@@ -152,10 +152,10 @@ fn m04_fixture_receipt_body(kernel_key: &Keypair) -> ChioReceiptBody {
 
 #[allow(deprecated)]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn async_and_legacy_sync_paths_emit_identical_signed_receipt_bytes_for_m04_fixture() {
-    let keypair = m04_keypair();
+async fn async_and_legacy_sync_paths_emit_identical_signed_receipt_bytes_for_replay_fixture() {
+    let keypair = fixture_keypair();
     let kernel = ChioKernel::new(make_config(keypair.clone()));
-    let body = m04_fixture_receipt_body(&keypair);
+    let body = fixture_receipt_body(&keypair);
 
     let sync_backend = Ed25519Backend::new(keypair);
     let sync_receipt =
@@ -177,6 +177,6 @@ async fn async_and_legacy_sync_paths_emit_identical_signed_receipt_bytes_for_m04
 
     assert_eq!(
         async_bytes, sync_bytes,
-        "async receipt bytes drifted from legacy sync bytes for {M04_FIXTURE_PATH}"
+        "async receipt bytes drifted from legacy sync bytes for {REPLAY_FIXTURE_PATH}"
     );
 }

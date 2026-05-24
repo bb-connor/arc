@@ -17,7 +17,7 @@ use chio_core_types::receipt::ReceiptLineageStatement;
 
 use crate::schema::{EdgeKind, EvidenceClass, LineageEdge, LineageGraph, LineageNode, NodeKind};
 
-/// One M04 corpus receipt row in the lineage-projection shape. Real M04
+/// One replay-corpus receipt row in the lineage-projection shape. Real
 /// corpus rows carry many more fields; only the lineage-relevant subset is
 /// typed here. Unknown fields are tolerated.
 #[derive(Debug, Clone, Serialize, Deserialize)]

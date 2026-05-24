@@ -138,8 +138,8 @@ pub enum RedactError {
 
 /// Build a [`Regex`] or yield `None`. A `None` here means the redactor
 /// silently skips the corresponding class for this process; the tee's
-/// `--paranoid` heuristic (zero-match-on-large-payload quarantine,
-/// trajectory doc line 21) catches the misconfiguration downstream.
+/// `--paranoid` heuristic (zero-match-on-large-payload quarantine)
+/// catches the misconfiguration downstream.
 ///
 /// To surface the failure earlier, [`validate_default_redactor_compiles`]
 /// re-attempts every default pattern at startup and returns the list of

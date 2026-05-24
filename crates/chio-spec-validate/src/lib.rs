@@ -2,8 +2,8 @@
 //!
 //! Loads a JSON Schema from disk, compiles it via the `jsonschema` crate, and
 //! validates a target document against it. Used by `cargo xtask
-//! validate-scenarios` and by downstream M04+ goldens to confirm that wire
-//! artifacts conform to the published `spec/schemas/` definitions.
+//! validate-scenarios` and by downstream conformance goldens to confirm that
+//! wire artifacts conform to the published `spec/schemas/` definitions.
 //!
 //! All errors are surfaced via [`ValidateError`]; the crate never panics on
 //! malformed input. The workspace clippy lints (`unwrap_used`, `expect_used`)

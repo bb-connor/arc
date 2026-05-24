@@ -19,7 +19,7 @@
 //!    the cause.
 //!
 //! Threat-model row `pq_signature_downgrade` is the surface this guards.
-//! Trust-boundary milestone: M03 P5.T1.
+//! Trust boundary: PQ key load after kernel self-quote.
 
 #![cfg(feature = "pq")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
@@ -113,7 +113,7 @@ impl KernelSelfQuoteVerifier for PanicVerifier {
 }
 
 fn fixture_pq_seed() -> [u8; 32] {
-    let raw = b"chio-m03-p5-t1-bootpath-pq-seed!";
+    let raw = b"chio-bootpath-pq-self-quote-seed";
     let mut out = [0u8; 32];
     out.copy_from_slice(raw);
     out

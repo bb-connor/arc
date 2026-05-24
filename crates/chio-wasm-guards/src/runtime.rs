@@ -705,7 +705,7 @@ pub mod wasmtime_backend {
         }
     }
 
-    /// Load a WASM guard enforcing the Phase 1.3 signing policy.
+    /// Load a WASM guard enforcing the signing policy.
     ///
     /// Reads `wasm_path` from disk, verifies that the signature sidecar
     /// (`wasm_path + ".sig"`) is present and valid per
@@ -1447,7 +1447,7 @@ pub mod wasmtime_backend {
     }
 
     // -------------------------------------------------------------------
-    // Phase 5.6: Policy-driven loading with placeholders and capability
+    // Policy-driven loading with placeholders and capability
     // intersection.
     // -------------------------------------------------------------------
 
@@ -1509,7 +1509,7 @@ pub mod wasmtime_backend {
         pub advisory: bool,
 
         /// Hex-encoded Ed25519 public key of the trusted signer. Enforced via
-        /// the Phase 1.3 signing path ([`crate::manifest::verify_guard_signature`]).
+        /// the signing path ([`crate::manifest::verify_guard_signature`]).
         /// When set the `.wasm.sig` sidecar MUST exist.
         #[serde(default)]
         pub signer_public_key: Option<String>,
@@ -1689,7 +1689,7 @@ pub mod wasmtime_backend {
     ///
     /// 3. **Signature verification.** If the guard declares
     ///    `signer_public_key` (or `allow_unsigned = false` with no key), the
-    ///    Phase 1.3 signing path ([`crate::manifest::verify_guard_signature`])
+    ///    signing path ([`crate::manifest::verify_guard_signature`])
     ///    is invoked. For on-disk modules the `.wasm.sig` sidecar is
     ///    consulted; for inline modules only `allow_unsigned = true` is
     ///    accepted (there is no sidecar to check).
@@ -1743,7 +1743,7 @@ pub mod wasmtime_backend {
                 })?;
             let config_map = json_object_to_string_map(&resolved_config, &guard_spec.name)?;
 
-            // 3. Obtain bytes and enforce Phase 1.3 signing.
+            // 3. Obtain bytes and enforce the signing policy.
             let wasm_bytes = match &guard_spec.module {
                 PolicyModuleSource::Path { module_path } => {
                     let bytes = std::fs::read(module_path).map_err(|e| {
@@ -1754,7 +1754,7 @@ pub mod wasmtime_backend {
                     })?;
 
                     // Build a transient GuardManifest describing just the
-                    // identity + signer, so we can reuse the Phase 1.3
+                    // identity + signer, so we can reuse the signing
                     // sidecar verification path.
                     let transient_manifest = GuardManifest {
                         name: guard_spec.name.clone(),

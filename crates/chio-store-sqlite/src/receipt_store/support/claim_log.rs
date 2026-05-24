@@ -1648,7 +1648,7 @@ pub(crate) fn ensure_tool_receipt_attribution_columns(
         )?;
     }
 
-    // Phase 1.5 multi-tenant receipt isolation: tenant_id column.
+    // Multi-tenant receipt isolation: tenant_id column.
     //
     // Pre-multitenant receipts migrate to NULL, which the
     // tenant-scoped WHERE clause treats as a "public" fallback set (a
@@ -1757,8 +1757,8 @@ pub(crate) fn backfill_tool_receipt_attribution_columns(
                 (SELECT cl.issuer_key FROM capability_lineage cl WHERE cl.capability_id = chio_tool_receipts.capability_id)
               ) IS NOT NULL;
 
-        -- Phase 1.5 multi-tenant receipt isolation: hydrate tenant_id
-        -- from the canonical receipt body. Legacy receipts (pre-1.5)
+        -- Multi-tenant receipt isolation: hydrate tenant_id
+        -- from the canonical receipt body. Legacy receipts (pre-multitenant)
         -- that were stored before the field existed stay NULL, which
         -- means "public / visible to any tenant under the default
         -- compat query mode". Operators who want to purge those

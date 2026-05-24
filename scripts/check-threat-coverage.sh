@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Threat-model coverage CI gate.
 #
-# Owner: M05.P5.T4.
+# Owner: @bb-connor.
 #
 # Reads spec/security/chio-threat-model.v1.json and asserts that
 # every threat ID either:
@@ -150,7 +150,7 @@ while IFS=$'\t' read -r id state deferred_to; do
             # uncovered with a clear remediation hint.
             stub_partial="$STUBS_DIR/$id.rs"
             if [[ -z "${deferred_to:-}" ]]; then
-                uncovered+=("$id (coverage_state partial requires a non-empty deferred_to in $THREAT_MODEL naming the future-milestone work that closes the deferred sub-vector)")
+                uncovered+=("$id (coverage_state partial requires a non-empty deferred_to in $THREAT_MODEL naming the follow-up work that closes the deferred sub-vector)")
                 continue
             fi
             if [[ ! -f "$stub_partial" ]]; then

@@ -1,16 +1,6 @@
 use super::*;
 
 impl SqliteReceiptStore {
-    #[allow(dead_code)]
-    pub(crate) fn claim_tree_canonical_bytes_range(
-        &self,
-        start_entry_seq: u64,
-        end_entry_seq: u64,
-    ) -> Result<Vec<(u64, Vec<u8>)>, ReceiptStoreError> {
-        let connection = self.connection()?;
-        load_claim_tree_canonical_bytes_range(&connection, start_entry_seq, end_entry_seq)
-    }
-
     pub fn record_session_anchor_record(
         &self,
         session_id: &str,

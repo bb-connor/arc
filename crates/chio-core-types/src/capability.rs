@@ -3269,7 +3269,7 @@ fn scope_allows_delegation(scope: &ChioScope) -> bool {
             .any(|grant| grant.operations.contains(&Operation::Delegate))
 }
 
-/// M04 Phase 3 recursive-delegation mint helper.
+/// Recursive-delegation mint helper.
 ///
 /// `delegate` wraps [`DelegationLink::sign`] with fail-closed attenuation
 /// enforcement and emits a [`DelegationReceipt`] alongside the signed
@@ -3289,8 +3289,8 @@ fn scope_allows_delegation(scope: &ChioScope) -> bool {
 /// callers pass `signed_at` and `nonce` explicitly so unit tests, replay
 /// proofs, and proptest-driven invariants stay deterministic.
 ///
-/// This function is gated behind the `delegation` feature flag (M04
-/// SDK breakage audit). Callers must opt in explicitly.
+/// This function is gated behind the `delegation` feature flag. Callers
+/// must opt in explicitly.
 pub fn delegate(
     parent: &CapabilityToken,
     child_scope: &ChioScope,
@@ -5257,7 +5257,7 @@ mod tests {
         assert!(token.verify_signature().unwrap());
     }
 
-    // ----- M04 Phase 3: `delegate` mint helper ----------------------
+    // ----- `delegate` mint helper -----------------------------------
 
     #[cfg(feature = "delegation")]
     fn delegate_parent_token(

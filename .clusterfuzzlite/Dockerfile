@@ -2,11 +2,10 @@
 #
 # Companion docs in docs/fuzzing/continuous.md (ClusterFuzzLite bridge section).
 #
-# Mirrors the OSS-Fuzz scaffold under infra/oss-fuzz/ (M02.P2.T5)
+# Mirrors the OSS-Fuzz scaffold under infra/oss-fuzz/
 # so the in-tree builder image and the CFLite builder image stay
 # behaviourally identical: same base image, same build deps, same
-# build.sh shape. Divergence between the two is a process bug and
-# blocks the M02 P4 close ledger.
+# build.sh shape. Divergence between the two is a process bug.
 
 FROM gcr.io/oss-fuzz-base/base-builder-rust
 

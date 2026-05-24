@@ -19,7 +19,6 @@
 //! pinned in `tests/fixtures/migration/key_roll_state.json` so the
 //! migration narrative is auditable and reproducible across CI runs.
 //!
-//! Trust-boundary milestone: M03 P5.T2.
 //! Threat-model rows guarded: `pq_signature_downgrade`,
 //! `tee_quote_forgery` (the latter is exercised separately in
 //! `cross_backend_conformance.rs` but the migration suite is the

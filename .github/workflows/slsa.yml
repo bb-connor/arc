@@ -1,6 +1,6 @@
 # slsa.yml - SLSA L2 provenance generation for release binaries.
 #
-# Owned by M09 per OWNERS.toml workflow lane table. Triggered on
+# Owned by the release-engineering lane. Triggered on
 # successful completion of release-binaries.yml. Consumes the
 # per-target binary digests from that workflow's uploaded artifacts
 # and emits a signed provenance attestation alongside each release.
@@ -41,7 +41,7 @@ permissions:
 jobs:
   collect-digests:
     name: Collect binary digests from release-binaries
-    # owner: M09
+    # owner: @bb-connor
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     outputs:
@@ -113,7 +113,7 @@ jobs:
 
   provenance:
     name: SLSA L2 provenance
-    # owner: M09
+    # owner: @bb-connor
     needs: [collect-digests]
     permissions:
       id-token: write

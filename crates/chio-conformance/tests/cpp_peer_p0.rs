@@ -105,7 +105,7 @@ fn cpp_peer_p0_mcp_core_and_auth_pass() {
 
 // Compile-time guard: deferred areas live on disk but are intentionally not
 // driven through the C++ peer in P0. If a deferred-area scenarios directory
-// disappears, that is a signal that the follow-on milestone has begun and the
+// disappears, that is a signal that follow-on coverage has begun and the
 // P0 gate should be revisited.
 #[test]
 fn deferred_areas_still_present_on_disk() {
@@ -115,7 +115,7 @@ fn deferred_areas_still_present_on_disk() {
         assert!(
             area_dir.exists(),
             "deferred scenario area `{area}` missing at {}; \
-             if the follow-on milestone has started, update cpp_peer_p0.rs to cover it",
+             if follow-on coverage has started, update cpp_peer_p0.rs to cover it",
             area_dir.display()
         );
     }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic guardrails for the trajectory 3 formal Apalache slice."""
+"""Deterministic guardrails for the formal Apalache slice."""
 
 from pathlib import Path
 import re

@@ -1,3 +1,19 @@
+//! Runtime attestation appraisal artifacts and marketplace pricing for the
+//! Chio protocol.
+//!
+//! This crate is used to appraise runtime attestation evidence and to derive
+//! marketplace prices from it. It defines appraisal descriptors and an
+//! artifact inventory, the attestation-verifier family taxonomy, and the
+//! deterministic marketplace invocation-pricing model
+//! (`compute_marketplace_invocation_price`, base prices, reputation tiers, and
+//! tier discounts). The underwriting, credit, and market crates build on these
+//! types.
+//!
+//! # Modules
+//!
+//! - [`marketplace_pricing`] -- per-invocation pricing with reputation-tier
+//!   discounts.
+
 pub use chio_core_types::{canonical, capability, crypto, error, receipt, Error};
 
 pub mod marketplace_pricing;

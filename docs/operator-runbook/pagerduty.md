@@ -13,7 +13,7 @@ design-partner pilot.
 - Heartbeat cadence: weekly
 
 The deployment configuration file is
-`deployments/healthcare-design-partner/chio-siem-overrides.yaml`.
+`deploy/healthcare-design-partner/chio-siem-overrides.yaml`.
 
 ## Source Contract
 

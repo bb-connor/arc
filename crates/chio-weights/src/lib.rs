@@ -11,7 +11,7 @@
 //! satisfied the named precondition fully. There is no path through this
 //! crate that returns `Ok(_)` on a partial verification: bad inputs return
 //! typed error variants that carry stable `urn:chio:error:weights:*` codes
-//! from the M01 registry.
+//! from the workspace error-code registry.
 //!
 //! # Crate surface
 //!

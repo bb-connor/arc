@@ -1,4 +1,4 @@
-//! Raw-payload buffer with zeroize-on-drop semantics (M10 Phase 1 Task 6).
+//! Raw-payload buffer with zeroize-on-drop semantics.
 //!
 //! The normative spec (`spec/PROTOCOL.md`) requires that raw,
 //! pre-redaction payloads

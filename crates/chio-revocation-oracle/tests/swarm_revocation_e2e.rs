@@ -13,7 +13,7 @@
 //! interval from revoke -> first deny on each child.
 //!
 //! The acceptance budget is 500 ms median across 100 trials, mirroring
-//! the milestone success criterion in `spec/PROTOCOL.md`.
+//! the success criterion in `spec/PROTOCOL.md`.
 //!
 //! As a side-effect, the harness writes a structured JSONL receipt log
 //! to a temp path captured by a `RECEIPT_LOG_PATH` env var so the
@@ -43,7 +43,7 @@ use common::{ReceiptLog, ReceiptRecord};
 /// chain; revoking it must propagate to both children.
 const PLANNER_CAP_ID: &str = "cap-planner-root";
 
-/// Number of acceptance trials. The milestone budget is 500ms median
+/// Number of acceptance trials. The budget is 500ms median
 /// across 100 trials; we use the same N so the test exercises the
 /// gate the success criteria specify.
 const TRIALS: usize = 100;
@@ -53,7 +53,7 @@ const TRIALS: usize = 100;
 /// fail-closed (we never silently treat a hang as 0ms).
 const TRIAL_TIMEOUT_MS: u64 = 1500;
 
-/// Median budget (ms) the milestone success criterion calls out.
+/// Median budget (ms) the success criterion calls out.
 const MEDIAN_BUDGET_MS: u128 = 500;
 
 /// Tight-loop sleep between consult attempts, in microseconds. Small

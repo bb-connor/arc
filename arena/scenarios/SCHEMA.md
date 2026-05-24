@@ -158,5 +158,5 @@ keys outside `[ext]` fail closed.
 
 ```toml
 [ext]
-owner = "m08"
+owner = "team-alpha"
 ```

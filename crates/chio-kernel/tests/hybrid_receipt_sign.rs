@@ -64,7 +64,7 @@ fn canonical_signing_wrapper_bytes(body: &ChioReceiptBody) -> Vec<u8> {
 
 fn fixture_pq_seed() -> [u8; 32] {
     // Stable test seed: reproducible across runs, never used in production.
-    let raw = b"chio-m03-p2-t2-hybrid-test-seed!";
+    let raw = b"chio-hybrid-receipt-sign-seedval";
     let mut out = [0u8; 32];
     out.copy_from_slice(raw);
     out

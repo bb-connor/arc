@@ -6,7 +6,7 @@
 //! lowers the kernel's [`VerdictResult`] back into provider-native bytes via
 //! the [`ProviderAdapter`] trait below.
 //!
-//! Phase 1 of M07 establishes:
+//! The crate establishes:
 //!
 //! - The verbatim trait surface ([`ProviderId`], [`Principal`],
 //!   [`ProvenanceStamp`], [`ToolInvocation`], [`VerdictResult`],
@@ -14,10 +14,9 @@
 //! - A [`provenance::sign_provenance`] helper that produces a stand-alone
 //!   [`provenance::SignedProvenance`] so downstream auditors can attest to a
 //!   stamp's identity without pulling the surrounding receipt.
-//!
-//! Later Phase-1 tickets layer the streaming state machine
-//! (`crates/chio-tool-call-fabric/src/stream.rs`), the kernel verdict shim,
-//! and the lift/lower fixture set on top of this surface.
+//! - The streaming state machine
+//!   (`crates/chio-tool-call-fabric/src/stream.rs`), the kernel verdict shim,
+//!   and the lift/lower fixture set on top of this surface.
 
 #![forbid(unsafe_code)]
 

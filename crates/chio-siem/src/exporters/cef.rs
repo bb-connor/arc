@@ -1,9 +1,8 @@
 //! CEF formatter for Chio receipt audit events.
 //!
-//! The M01 healthcare design-partner pilot ships CEF as the first text SIEM
-//! format alongside the existing OCSF JSON mapper. This module formats one
-//! CEF v0 event per receipt. Transport remains owned by existing webhook or
-//! collector-specific exporters.
+//! CEF is the text SIEM format shipped alongside the OCSF JSON mapper.
+//! This module formats one CEF v0 event per receipt. Transport remains
+//! owned by existing webhook or collector-specific exporters.
 
 use crate::event::SiemEvent;
 use crate::exporter::{ExportError, ExportFuture, Exporter};

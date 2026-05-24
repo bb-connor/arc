@@ -21,7 +21,7 @@
 //!    BEFORE canonicalization, so a stale-key body never produces a
 //!    canonical buffer downstream consumers might persist.
 //!
-//! Trust-boundary milestone: M03 P5.T3.
+//! Trust boundary: kernel-key / canonical-bytes binding for hybrid receipts.
 
 #![cfg(feature = "pq")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
@@ -58,14 +58,14 @@ fn canonical_signing_wrapper_bytes(body: &ChioReceiptBody) -> Vec<u8> {
 }
 
 fn fixture_classical_seed() -> [u8; 32] {
-    let raw = b"chio-m03-p5-t3-canonbytes-class!";
+    let raw = b"chio-canonical-bytes-class-seed!";
     let mut out = [0u8; 32];
     out.copy_from_slice(raw);
     out
 }
 
 fn fixture_pq_seed() -> [u8; 32] {
-    let raw = b"chio-m03-p5-t3-canonbytes-pqseed";
+    let raw = b"chio-canonical-bytes-pq-seedval!";
     let mut out = [0u8; 32];
     out.copy_from_slice(raw);
     out
@@ -115,7 +115,7 @@ fn shared_canonical_bytes_match_legacy_classical_path() {
     let wrapper_bytes = canonical_signing_wrapper_bytes(&body);
     let legacy_receipt = sign_receipt_body_with_backend(body.clone(), &backend).unwrap();
 
-    // New path: consume the M06 SharedCanonicalBytes newtype.
+    // New path: consume the SharedCanonicalBytes newtype.
     let SignedHybridReceipt { receipt, canonical } =
         sign_receipt_body_hybrid_canonical(body, &backend).unwrap();
 
@@ -178,7 +178,7 @@ fn hybrid_signing_consumes_shared_canonical_bytes_and_verifies() {
 #[test]
 fn shared_canonical_bytes_are_arc_shareable_without_recanonicalization() {
     // Contract 1: the returned canonical buffer is an
-    // `Arc<CanonicalBytes>` (the M06 newtype) so multiple downstream
+    // `Arc<CanonicalBytes>` newtype so multiple downstream
     // consumers can share a single allocation. Cloning the Arc is cheap
     // and does not reserialize.
     let classical_kp = Keypair::from_seed(&fixture_classical_seed());

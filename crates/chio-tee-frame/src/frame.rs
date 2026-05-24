@@ -31,10 +31,11 @@ pub struct Frame {
     pub tee_id: String,
     /// Upstream system + operation descriptor.
     pub upstream: Upstream,
-    /// Canonical-JSON ToolInvocation per the M01 schema. Opaque here; the
-    /// M01 validator is the source of truth.
+    /// Canonical-JSON ToolInvocation per the canonical schema. Opaque
+    /// here; the canonical-JSON validator is the source of truth.
     pub invocation: serde_json::Value,
-    /// Provenance envelope (W3C trace context + optional M09 supply chain).
+    /// Provenance envelope (W3C trace context + optional supply-chain
+    /// provenance).
     pub provenance: Provenance,
     /// Lowercase hex SHA-256 of the redacted request blob.
     pub request_blob_sha256: String,
@@ -139,7 +140,7 @@ impl FromStr for UpstreamSystem {
 #[serde(deny_unknown_fields)]
 pub struct Provenance {
     pub otel: Otel,
-    /// Optional M09 SBOM-style provenance superset; opaque here.
+    /// Optional SBOM-style supply-chain provenance superset; opaque here.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub supply_chain: Option<serde_json::Value>,
 }

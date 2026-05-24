@@ -1,6 +1,6 @@
 //! Eval-report bundle verification.
 //!
-//! The P3 verifier validates the bundle envelope, verifies local fixture
+//! The verifier validates the bundle envelope, verifies local fixture
 //! signatures, and checks every preserved receipt payload hash. Real cosign
 //! and PGP verification stay fail-closed until the release lane supplies
 //! external verifier tooling.
@@ -106,7 +106,7 @@ pub fn verify_bundle(bundle_json: &str) -> Result<VerifiedBundle, BundleError> {
 /// Verify a local eval-report fixture bundle JSON document.
 ///
 /// This mode accepts the deterministic `test-sha256` outer signature and the
-/// checked-in P2 receipt fixtures. Use [`verify_bundle`] for production inputs.
+/// checked-in receipt fixtures. Use [`verify_bundle`] for production inputs.
 pub fn verify_fixture_bundle(bundle_json: &str) -> Result<VerifiedBundle, BundleError> {
     verify_bundle_with_mode(bundle_json, VerificationMode::Fixture)
 }

@@ -1,6 +1,6 @@
 # Legal References
 
-This file enumerates the citations the paper requires. The placeholder keys used in the .tex files follow the convention `TODO_*` and must be replaced with verified bibliographic records before submission. The list is grouped by subject. Citations marked **VERIFY** are claims the author is reasonably confident of but has not personally vetted against the primary source; a constitutional-law scholar or law-library staff should confirm.
+This file enumerates the citations the paper requires. The placeholder keys used in the .tex files follow the convention `TODO_*` and are replaced with verified bibliographic records before submission. The list is grouped by subject. Some entries note a citation a constitutional-law scholar or law-library staff should confirm against the primary source.
 
 ---
 
@@ -10,21 +10,21 @@ This file enumerates the citations the paper requires. The placeholder keys used
 
 - **`TODO_schmitt_political_theology`** -- Carl Schmitt, *Political Theology: Four Chapters on the Concept of Sovereignty* (1922; G. Schwab trans., Univ. of Chicago Press, 2005). The opening sentence ("Sovereign is he who decides on the exception") is the canonical anchor for the Schmittian tradition the paper engages.
 
-- **`TODO_agamben_state_of_exception`** -- Giorgio Agamben, *State of Exception* (K. Attell trans., Univ. of Chicago Press, 2005) (original Italian, 2003). The paper takes Agamben's empirical claim that the exception has become permanent. **VERIFY** the page references in §2 if added.
+- **`TODO_agamben_state_of_exception`** -- Giorgio Agamben, *State of Exception* (K. Attell trans., Univ. of Chicago Press, 2005) (original Italian, 2003). The paper takes Agamben's empirical claim that the exception has become permanent. Confirm the page references in §2 if added.
 
-- **`TODO_kahn_political_theology`** -- Paul W. Kahn, *Political Theology: Four New Chapters on the Concept of Sovereignty* (Columbia Univ. Press, 2011). The footnote in §2 cites Kahn as a representative of the political-theology tradition in liberal constitutionalism. **VERIFY** the framing is accurate to Kahn's argument; the author has read this work but not recently.
+- **`TODO_kahn_political_theology`** -- Paul W. Kahn, *Political Theology: Four New Chapters on the Concept of Sovereignty* (Columbia Univ. Press, 2011). The footnote in §2 cites Kahn as a representative of the political-theology tradition in liberal constitutionalism. Confirm the framing is accurate to Kahn's argument.
 
 ### American emergency-powers scholarship
 
-- **`TODO_ackerman_before_next_attack`** -- Bruce Ackerman, *Before the Next Attack: Preserving Civil Liberties in an Age of Terrorism* (Yale Univ. Press, 2006). The Ackerman supermajority-default proposal is the closest existing structural-correction proposal to the typed-rollback discipline. **VERIFY** that Ackerman's framing is correctly characterized.
+- **`TODO_ackerman_before_next_attack`** -- Bruce Ackerman, *Before the Next Attack: Preserving Civil Liberties in an Age of Terrorism* (Yale Univ. Press, 2006). The Ackerman supermajority-default proposal is the closest existing structural-correction proposal to the typed-rollback discipline. Confirm that Ackerman's framing is correctly characterized.
 
 - **`TODO_posner_vermeule_terror`** -- Eric A. Posner & Adrian Vermeule, *Terror in the Balance: Security, Liberty, and the Courts* (Oxford Univ. Press, 2007). The standard counter to Ackerman from the deferentialist side.
 
-- **`TODO_sunstein_sunset_clauses`** -- Cass R. Sunstein, *Should Statutes Have Sunset Clauses?*, 80 Vand. L. Rev. (forthcoming) or relevant prior article. **VERIFY** the specific citation; Sunstein has written about sunset clauses in multiple venues including *On Rumors* and earlier work. Replace with the right Sunstein article on temporary legislation.
+- **`TODO_sunstein_sunset_clauses`** -- Cass R. Sunstein, *Should Statutes Have Sunset Clauses?*, 80 Vand. L. Rev. (forthcoming) or relevant prior article. Confirm the specific citation; Sunstein has written about sunset clauses in multiple venues including *On Rumors* and earlier work. Settle on the right Sunstein article on temporary legislation.
 
 ### Comparative emergency-powers scholarship
 
-- **`TODO_scheppele_emergency`** -- Kim Lane Scheppele's writing on constitutional emergency powers across regimes. **VERIFY** -- Scheppele has a substantial body of work; the right citation is likely her 2004 article in *International Journal of Constitutional Law* ("Law in a Time of Emergency: States of Exception and the Temptations of 9/11," 6 U. Pa. J. Const. L. 1001 (2004)) or a more recent piece on Hungary and constitutional decay.
+- **`TODO_scheppele_emergency`** -- Kim Lane Scheppele's writing on constitutional emergency powers across regimes. Scheppele has a substantial body of work; the right citation is likely her 2004 article in *International Journal of Constitutional Law* ("Law in a Time of Emergency: States of Exception and the Temptations of 9/11," 6 U. Pa. J. Const. L. 1001 (2004)) or a more recent piece on Hungary and constitutional decay.
 
 - **`TODO_dyzenhaus_legality_legitimacy`** -- David Dyzenhaus, *The Constitution of Law: Legality in a Time of Emergency* (Cambridge Univ. Press, 2006). A Canadian-comparative perspective on emergency powers in the post-September 11 era.
 
@@ -36,11 +36,11 @@ This file enumerates the citations the paper requires. The placeholder keys used
 
 ### Primary source
 
-- **`TODO_weimar_const_art48`** -- Weimar Constitution Article 48 (Aug. 11, 1919). Original German text in Reichsgesetzblatt. English translations exist in multiple anthologies; **VERIFY** the translation chosen.
+- **`TODO_weimar_const_art48`** -- Weimar Constitution Article 48 (Aug. 11, 1919). Original German text in Reichsgesetzblatt. English translations exist in multiple anthologies; confirm the translation chosen.
 
 ### Historiography
 
-- **`TODO_kershaw_hitler`** -- Ian Kershaw, *Hitler 1889-1936: Hubris* (W.W. Norton, 1999). The standard biographical-historiographical account. Pages on the use of Article 48 in 1930-1933 are likely Ch. 11-12; **VERIFY** specific page citations.
+- **`TODO_kershaw_hitler`** -- Ian Kershaw, *Hitler 1889-1936: Hubris* (W.W. Norton, 1999). The standard biographical-historiographical account. Pages on the use of Article 48 in 1930-1933 are likely Ch. 11-12; confirm specific page citations.
 
 - **`TODO_caldwell_popular_sovereignty`** -- Peter C. Caldwell, *Popular Sovereignty and the Crisis of German Constitutional Law: The Theory and Practice of Weimar Constitutionalism* (Duke Univ. Press, 1997). The canonical Anglophone work on Weimar constitutional theory. The book engages Schmitt, Kelsen, Heller, and Smend on the article.
 
@@ -60,7 +60,7 @@ This file enumerates the citations the paper requires. The placeholder keys used
 
 ### Scholarly literature
 
-- **`TODO_keller_takedowns`** -- Daphne Keller has written extensively on the structural features of intermediary takedown regimes. **VERIFY** the specific citation; candidates include her 2018 *Yale Journal of Law and Technology* article, her writing for the Stanford Cyber Policy Center, or *The Right Tools: Europe's Intermediary Liability Laws and the 2016 General Data Protection Regulation*, 33 Berkeley Tech. L.J. 287 (2018).
+- **`TODO_keller_takedowns`** -- Daphne Keller has written extensively on the structural features of intermediary takedown regimes. Confirm the specific citation; candidates include her 2018 *Yale Journal of Law and Technology* article, her writing for the Stanford Cyber Policy Center, or *The Right Tools: Europe's Intermediary Liability Laws and the 2016 General Data Protection Regulation*, 33 Berkeley Tech. L.J. 287 (2018).
 
 - **`TODO_goldman_section230`** -- Eric Goldman, *Why Section 230 Is Better Than the First Amendment*, 95 Notre Dame L. Rev. Reflection 33 (2019). Or alternatively Goldman's 2020 *Wisconsin Law Review* article on Section 230.
 
@@ -82,7 +82,7 @@ This file enumerates the citations the paper requires. The placeholder keys used
 
 ### Scholarly literature
 
-- **`TODO_kuner_gdpr_erasure`** -- Christopher Kuner, *The Internet and the Global Reach of EU Law*, in *EU Law Beyond EU Borders: The Extraterritorial Reach of EU Law* (Oxford Univ. Press, 2019). Or Kuner's commentary in *The EU General Data Protection Regulation: A Commentary* (Oxford Univ. Press, 2020). **VERIFY** the specific volume reference.
+- **`TODO_kuner_gdpr_erasure`** -- Christopher Kuner, *The Internet and the Global Reach of EU Law*, in *EU Law Beyond EU Borders: The Extraterritorial Reach of EU Law* (Oxford Univ. Press, 2019). Or Kuner's commentary in *The EU General Data Protection Regulation: A Commentary* (Oxford Univ. Press, 2020). Confirm the specific volume reference.
 
 - **`TODO_mantelero_gdpr_enforcement`** -- Alessandro Mantelero, *The EU Proposal for a Regulation on the Protection of Individuals with Regard to the Processing of Personal Data and on the Free Movement of Such Data*, 30 Computer L. & Sec. Rev. 643 (2014). Or Mantelero's more recent work on GDPR enforcement and right-to-be-forgotten implementation in practice.
 
@@ -94,15 +94,15 @@ This file enumerates the citations the paper requires. The placeholder keys used
 
 - **`TODO_fisa_702_statute`** -- 50 U.S.C. § 1881a (Section 702 of FISA, as amended).
 
-- **`TODO_pclob_702_report`** -- Privacy and Civil Liberties Oversight Board, *Report on the Surveillance Program Operated Pursuant to Section 702 of the Foreign Intelligence Surveillance Act* (July 2, 2014). The principal public-record analysis of the Section 702 program. A 2023 update report exists; **VERIFY** the current canonical citation.
+- **`TODO_pclob_702_report`** -- Privacy and Civil Liberties Oversight Board, *Report on the Surveillance Program Operated Pursuant to Section 702 of the Foreign Intelligence Surveillance Act* (July 2, 2014). The principal public-record analysis of the Section 702 program. A 2023 update report exists; confirm the current canonical citation.
 
-- **`TODO_fisc_702_opinions`** -- Declassified Foreign Intelligence Surveillance Court opinions. Multiple opinions are relevant; the paper should cite specific opinions, **VERIFY** which are central to the emergency-authorization mechanism. The 2011 Bates opinion is the most-cited; subsequent declassifications in 2018-2023 are also relevant.
+- **`TODO_fisc_702_opinions`** -- Declassified Foreign Intelligence Surveillance Court opinions. Multiple opinions are relevant; the paper should cite specific opinions and confirm which are central to the emergency-authorization mechanism. The 2011 Bates opinion is the most-cited; subsequent declassifications in 2018-2023 are also relevant.
 
 ### Scholarly literature
 
 - **`TODO_donohue_fisa`** -- Laura K. Donohue, *Section 702 and the Collection of International Telephone and Internet Content*, 38 Harv. J.L. & Pub. Pol'y 117 (2015). And/or Donohue's monograph *The Future of Foreign Intelligence: Privacy and Surveillance in a Digital Age* (Oxford Univ. Press, 2016).
 
-- **`TODO_revocable_encryption_lit`** -- The reference to revocable encryption in §3.4 is a placeholder. **VERIFY** -- candidates include work on cryptographic erasure (Boneh-Lipton), broadcast encryption with revocation, or property-preserving encryption with erasure. The paper makes only a passing reference; a single canonical citation suffices.
+- **`TODO_revocable_encryption_lit`** -- The reference to revocable encryption in §3.4 is a placeholder. Candidates include work on cryptographic erasure (Boneh-Lipton), broadcast encryption with revocation, or property-preserving encryption with erasure. The paper makes only a passing reference; a single canonical citation suffices.
 
 ---
 
@@ -112,11 +112,11 @@ This file enumerates the citations the paper requires. The placeholder keys used
 
 - **`TODO_aumf_2001`** -- Pub. L. No. 107-40, 115 Stat. 224 (Sept. 18, 2001). Authorization for Use of Military Force.
 
-- **`TODO_war_powers_reports`** -- Periodic War Powers Resolution reports submitted by the President to Congress. Multiple reports exist; the paper cites them generically. **VERIFY** -- the citation may be sharpened by referencing specific reports.
+- **`TODO_war_powers_reports`** -- Periodic War Powers Resolution reports submitted by the President to Congress. Multiple reports exist; the paper cites them generically. The citation may be sharpened by referencing specific reports.
 
 ### Scholarly literature
 
-- **`TODO_brennan_center_aumf`** -- Brennan Center for Justice, *How the 2001 AUMF Has Been Expanded Beyond Recognition* (multiple reports and updates, 2017-2024). **VERIFY** the specific report.
+- **`TODO_brennan_center_aumf`** -- Brennan Center for Justice, *How the 2001 AUMF Has Been Expanded Beyond Recognition* (multiple reports and updates, 2017-2024). Confirm the specific report.
 
 - **`TODO_chesney_aumf`** -- Robert Chesney, *Postwar*, 1 Harv. Nat'l Sec. J. 1 (2010). And subsequent work by Chesney on the AUMF's evolution. Or Robert Chesney & Jack Goldsmith, *The 2001 AUMF: A Comprehensive Look at the Statute, Its Interpretation, and What Congress Can Do About It*, Lawfare (multiple posts).
 
@@ -153,6 +153,6 @@ The following categories of citation are not currently in the paper but should b
 All `TODO_*` keys in the .tex files correspond to entries in this document. Before submission:
 
 1. Replace each placeholder with a verified bibliographic record using a `plainurl`, `acmrefs`, or law-journal Bluebook style as the venue requires.
-2. For each **VERIFY** entry, a constitutional-law scholar or library reference staff should confirm the citation is accurate to the source and that the paper's characterization of the source is faithful.
+2. For each entry flagged for confirmation, a constitutional-law scholar or library reference staff should confirm the citation is accurate to the source and that the paper's characterization of the source is faithful.
 3. Several citations in §3 may be sharpened by adding pinpoint cites (page or section). The paper currently cites at the work level; the law-review revision process typically requires deeper specificity.
 4. The paper does not currently include footnotes-as-citations of the law-review style. The revision to law-journal format will convert most parenthetical-style citations to footnote citations and add Bluebook formatting.

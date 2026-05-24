@@ -54,7 +54,7 @@ fn make_config(keypair: Keypair) -> KernelConfig {
         keypair,
         ca_public_keys: Vec::new(),
         max_delegation_depth: 5,
-        policy_hash: sha256_hex(b"policy:m05-p1-t3").to_string(),
+        policy_hash: sha256_hex(b"policy:test-async-receipt").to_string(),
         allow_sampling: false,
         allow_sampling_tool_use: false,
         allow_elicitation: false,
@@ -335,7 +335,7 @@ async fn mpsc_signing_path_applies_backpressure_at_capacity() {
 // ---------------------------------------------------------------------------
 // Test 3 (clean shutdown): in-flight requests drain before shutdown returns.
 //
-// "In-flight" per the milestone-doc contract means: a request whose
+// "In-flight" per the shutdown contract means: a request whose
 // `.send().await` returned `Ok(())` BEFORE shutdown began. Such a
 // request is already in the channel buffer and the receiver task pulls
 // it out, signs it, and replies. Shutdown must wait for that drain.

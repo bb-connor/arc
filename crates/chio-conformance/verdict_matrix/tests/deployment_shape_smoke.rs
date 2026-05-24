@@ -182,9 +182,9 @@ fn driver_sources_exist_with_readmes() {
             Err(error) => panic!("failed to read {}: {error}", readme.display()),
         };
         assert!(
-            readme_text.contains("D07"),
-            "deployment-shape driver README `{}` must reference the D07 \
-             deferral closure",
+            readme_text.contains("deployment-shape"),
+            "deployment-shape driver README `{}` must describe its \
+             deployment-shape role",
             readme.display()
         );
     }

@@ -45,8 +45,8 @@ the default PATH, point Gradle at it explicitly, for example
 is operator-supplied; on hosts without Gradle Wrapper binaries committed under
 this driver, a system `gradle` invocation works against this `build.gradle.kts`.
 
-## D07 closure
+## Deployment-shape coverage
 
 This driver is one of four deployment-shape SDK drivers (JVM, dotnet,
-Lambda, k8s) that close the M02 D07 deferral. The combined registration is
-audited under "M07 P6 closure".
+Lambda, k8s). The four register together to cover the supported
+deployment shapes.

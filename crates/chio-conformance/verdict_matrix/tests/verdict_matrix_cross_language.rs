@@ -391,10 +391,10 @@ fn wasm_browser_report_covers_capability_subset_only() {
 
 #[test]
 fn workflow_advertises_required_on_divergence_gate() {
-    // The T5 gate requires the workflow to declare `required: true` so
-    // the cross-language oracle is enforced on PR merges. This check
-    // mirrors the YAML gate from tickets/M02/P5.yml so the assertion
-    // lives next to the test that it gates.
+    // The divergence gate requires the workflow to declare `required: true`
+    // so the cross-language oracle is enforced on PR merges. This check
+    // mirrors the YAML gate in the `verdict-matrix.yml` workflow so the
+    // assertion lives next to the test that it gates.
     let workflow_path = repo_root().join(WORKFLOW_PATH);
     let raw = match fs::read_to_string(&workflow_path) {
         Ok(raw) => raw,

@@ -327,7 +327,7 @@ jobs:
       - name: Install cosign
         # Pinned to a tagged release of sigstore/cosign-installer so the
         # signing-side toolchain version is auditable. The Renovate config
-        # in .github/renovate.json (M09 NEW sub-task) tracks upstream
+        # in .github/renovate.json tracks upstream
         # cosign-installer releases for review.
         uses: sigstore/cosign-installer@1aa8e0f2454b781fbf0fbf306a4c9533a0c57409
         with:

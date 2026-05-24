@@ -1,3 +1,15 @@
+//! Open-market economics and penalty contracts for the Chio protocol.
+//!
+//! This crate models open bidding for tool access along with the bonds and
+//! penalties that back it. It defines the bidding flow (`bid`, `accept`, and
+//! the bid/ask/accepted-bid artifacts), bond classes and collateral
+//! references, abuse classes, and penalty state machines. It builds on the
+//! listing and governance surfaces in `chio-listing` and `chio-governance`.
+//!
+//! # Modules
+//!
+//! - [`bidding`] -- bid/ask/accept flow and the signed bidding artifacts.
+
 pub use chio_core_types::{canonical_json_bytes, capability, crypto, receipt};
 pub use chio_governance as governance;
 pub use chio_listing as listing;

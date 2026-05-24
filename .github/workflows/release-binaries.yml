@@ -817,7 +817,7 @@ jobs:
           # slsa_provenance chio-${CHIO_SOURCE_SHA}.intoto.jsonl
           # rekor_witness search https://search.sigstore.dev for the SLSA intoto payload after slsa.yml publishes provenance
           # rekor_tlog_scope SLSA provenance plus checksum-index cosign signature
-          # reproducible_scope linux x86_64 only for trajectory-3 M03
+          # reproducible_scope linux x86_64 only
           # format: sha256 two-space filename
           INDEX
           for checksum_file in "${checksum_files[@]}"; do
@@ -867,10 +867,10 @@ jobs:
             `supply-chain/checksums/`, including the cosign
             `verify-blob` signature pair. The text file cites the
             SLSA provenance asset name and the Rekor witness lookup
-            path so M08 and M09 reviewers can cross-check the release
+            path so reviewers can cross-check the release
             bytes without a privileged GitHub session.
 
-            Security review requested (M03 trust-boundary).
+            Security review requested (release trust-boundary).
           commit-message: "chore(release): publish ${{ steps.checksum_release.outputs.tag }} checksum index"
 
   mutants-gate-flip:

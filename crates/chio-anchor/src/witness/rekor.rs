@@ -158,10 +158,10 @@ struct RekorIntotoContent<'a> {
 /// match the SET signature input. The `rename_all` annotation
 /// fixes the wire shape.
 ///
-/// P1 (PR #594 round-3 review): the previous shape carried an empty
-/// `signatures` array. The intoto v0.0.2 schema requires a signature
-/// object with `publicKey` and `sig`, so the entry now forwards the
-/// batch signer key and batch signature into the DSSE envelope.
+/// The intoto v0.0.2 schema requires a signature object with `publicKey`
+/// and `sig` (an empty `signatures` array is rejected), so the entry
+/// forwards the batch signer key and batch signature into the DSSE
+/// envelope.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RekorIntotoEnvelope<'a> {

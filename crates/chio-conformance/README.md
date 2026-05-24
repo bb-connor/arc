@@ -24,8 +24,7 @@ chio-conformance-runner \
 ```
 
 A higher-level workflow (peer binary fetch, JSON report shape, scenario
-selectors) is exposed through the `chio` CLI in milestone P4 follow-up
-tickets:
+selectors) is exposed through the `chio` CLI:
 
 ```bash
 chio conformance fetch-peers

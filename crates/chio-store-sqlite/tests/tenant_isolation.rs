@@ -13,7 +13,7 @@
 //!     * return all 10 rows for explicit admin mode.
 //!
 //! The tenant_id is derived from the receipt body -- the store does not
-//! accept caller-injected tenant hints, per Phase 1.5 threat model.
+//! accept caller-injected tenant hints, per the multi-tenant threat model.
 
 use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};

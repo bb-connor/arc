@@ -350,7 +350,7 @@ pub(crate) enum Commands {
     /// Reads a directory of signed receipts (or an NDJSON tee stream),
     /// re-verifies every signature, recomputes the Merkle root incrementally,
     /// and reports the first divergence by byte offset and JSON pointer.
-    /// Composes with `chio tee` output (see milestone M10).
+    /// Composes with `chio tee` output.
     ///
     /// EXIT CODES:
     ///   0  All receipts (or tee frames) verify and root matches expectation.

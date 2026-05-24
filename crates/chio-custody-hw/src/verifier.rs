@@ -170,7 +170,7 @@ impl PasskeyVerifier {
             .map_err(|err| CustodyError::AssertionRejected(format!("{err:?}")))?;
 
         // The credential id is intentionally serialised as base64url string
-        // form so downstream capability minting and the M04 revocation
+        // form so downstream capability minting and the revocation
         // oracle key on a stable transport-friendly identifier.
         let cred_id = result.cred_id();
         let credential_id_b64 = base64_url_no_pad(cred_id.as_ref());

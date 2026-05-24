@@ -66,14 +66,14 @@ mod shell_command;
 pub mod text_utils;
 pub mod velocity;
 
-// Phase 5.1-5.4: Computer Use Agent (CUA) and SpiderSense guards.
+// Computer Use Agent (CUA) and SpiderSense guards.
 pub mod computer_use;
 pub mod input_injection;
 pub mod remote_desktop;
 pub mod spider_sense;
 
-// Phase 8.1-8.2, 11.1, 18.1: code execution, browser automation,
-// content review, and memory governance guards.
+// Code execution, browser automation, content review, and memory
+// governance guards.
 pub mod browser_automation;
 pub mod code_execution;
 pub mod content_review;
@@ -136,7 +136,7 @@ pub use external::{
     GuardCallContext, RateLimitedVerdict, RetryConfig, TokenBucket, TtlCache,
 };
 
-// Phase 5.1-5.4 re-exports.
+// Computer Use Agent (CUA) and SpiderSense re-exports.
 pub use computer_use::{
     default_allowed_action_types as computer_use_default_allowed_action_types, ComputerUseConfig,
     ComputerUseGuard, EnforcementMode,
@@ -151,7 +151,8 @@ pub use spider_sense::{
     DEFAULT_AMBIGUITY_BAND, DEFAULT_SIMILARITY_THRESHOLD, DEFAULT_TOP_K,
 };
 
-// Phase 8.1-8.2, 11.1, 18.1 re-exports.
+// Code execution, browser automation, content review, and memory
+// governance re-exports.
 pub use browser_automation::{
     default_allowed_verbs as browser_automation_default_allowed_verbs, BrowserAutomationConfig,
     BrowserAutomationError, BrowserAutomationGuard,

@@ -1,10 +1,10 @@
 # TTFRH (time-to-first-receipt-happy-path) gate.
 #
-# M07 P5.T5 flips this lane from advisory (P0.T4) to required CI on
-# changes under sdks/typescript/templates/** or bench/ttfrh/**. The
+# This lane is a required CI check on changes under
+# sdks/typescript/templates/** or bench/ttfrh/**. The
 # in-process Rust path runs on every PR; the container lane runs on a
 # self-hosted reference 4-core Linux runner once the path filter
-# matches. The grep gate command in the P5.T5 ticket asserts the
+# matches. A grep gate asserts the
 # `required: true` marker on the line below stays in tree.
 # required: true
 

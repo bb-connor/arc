@@ -27,7 +27,7 @@
 //! - unrecognised [`ToolAction`] -> `Verdict::Allow` (guard does not apply).
 //!
 //! The guard is NOT registered in [`crate::GuardPipeline::default_pipeline`]
-//! by design: the roadmap introduces it opt-in so existing guards remain
+//! by design: it is opt-in so existing guards remain
 //! unaffected.  Callers can register it explicitly via
 //! `kernel.add_guard(Box::new(PromptInjectionGuard::default()))` or include
 //! it in a bespoke pipeline.

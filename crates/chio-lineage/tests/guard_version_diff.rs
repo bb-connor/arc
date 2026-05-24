@@ -1,7 +1,7 @@
-//! Integration test for M09 P5.T5 differential mode.
+//! Integration test for differential mode.
 //!
 //! Two guard versions producing slightly different lineage shapes against
-//! the same M04 corpus must yield a stable JSON diff plus a stable text
+//! the same replay corpus must yield a stable JSON diff plus a stable text
 //! summary; revoking a guard publisher cascades through the diff.
 
 use chio_lineage::diff::{diff, render_text};

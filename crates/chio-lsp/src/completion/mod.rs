@@ -7,8 +7,8 @@
 //! - guard identifiers (the `guards` key, native and WASM),
 //! - policy keys (top-level keys in `chio.yaml`).
 //!
-//! The catalog stays small in P4.T3; downstream tickets and milestones
-//! contribute additional entries.
+//! The catalog stays intentionally small; additional entries can be
+//! contributed over time.
 
 pub mod guards;
 pub mod scopes;
@@ -62,8 +62,8 @@ fn complete_chio_yaml(text: &str, position: Position) -> Vec<CompletionItem> {
 }
 
 /// Walk upward from `cursor_line` looking for the nearest line that
-/// looks like `key:` at column 0. The check stays cheap because P4.T3
-/// keeps the YAML model lightweight; P4.T6 swaps in a real AST.
+/// looks like `key:` at column 0. The check stays cheap because the
+/// YAML model is kept lightweight; a full AST is the eventual direction.
 fn nearest_top_level_section<'a>(lines: &[&'a str], cursor_line: usize) -> Option<&'a str> {
     let mut idx = cursor_line;
     loop {

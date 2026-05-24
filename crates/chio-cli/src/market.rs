@@ -57,7 +57,7 @@ pub struct MarketCatalogEntry {
     pub reference: String,
     /// Human-readable name shown in the TTY table.
     pub name: String,
-    /// Manifest base price (per the marketplace block landed in P4.T1).
+    /// Manifest base price (per the manifest marketplace block).
     pub price: GuardPrice,
     /// Reputation floor required to discover this guard.
     pub reputation_floor: ReputationTier,

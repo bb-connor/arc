@@ -30,7 +30,7 @@
 //! P-256, X.509 chain, COSE/CBOR) and async network I/O; both are
 //! out of scope for symbolic execution. Their fail-closed properties
 //! are pinned by the existing integration tests under
-//! `crates/chio-anchor/tests/` and by the M01 conformance lane.
+//! `crates/chio-anchor/tests/` and by the conformance lane.
 //!
 //! # Bound parameters
 //!
@@ -90,7 +90,7 @@
 //! recomputation (canonical-JSON + SHA-256) and `WitnessPolicyError`
 //! constructors that carry hex-formatted body-hash strings. Decoupling
 //! those side-effects from the decision algebra requires touching the
-//! public error enum; doing so on the load-bearing M01 conformance
+//! public error enum; doing so on the load-bearing conformance
 //! lane risks a regression.
 //!
 //! # Cross-references

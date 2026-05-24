@@ -198,7 +198,7 @@ fn no_settlement_baseline_matches_with_settlement_canonical_bytes() {
     // Drive the same ten receipts through TWO kernels: one with a
     // recording hook, one with no hook. The receipt bytes must match
     // pairwise. This is the "byte-equivalent of the no-settlement
-    // baseline" assertion in P2.T4.
+    // baseline" assertion.
     let kp = Keypair::generate();
     let receipts_no_hook: Vec<ChioReceipt> = (0..10).map(|i| build_receipt(i, &kp).0).collect();
     let receipts_with_hook: Vec<ChioReceipt> = (0..10).map(|i| build_receipt(i, &kp).0).collect();

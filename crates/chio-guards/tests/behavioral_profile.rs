@@ -1,6 +1,6 @@
-//! Phase 19.2 behavioral-profile integration tests.
+//! Behavioral-profile integration tests.
 //!
-//! These tests confirm the roadmap acceptance criteria:
+//! These tests confirm the acceptance criteria:
 //!   1. EMA baseline stabilizes under a steady sample.
 //!   2. A 50x spike in call rate triggers an advisory signal.
 //!   3. The guard reads from chio-store-sqlite receipt queries

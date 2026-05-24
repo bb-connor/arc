@@ -1,3 +1,18 @@
+//! Liability-market provider, quote, and claims contracts for the Chio
+//! protocol.
+//!
+//! This crate models liability coverage for metered tool access: quoting,
+//! binding policies, and settling claims against signed receipt evidence. It
+//! defines the insurance flow (`quote_and_bind`, bound policies, coverage
+//! limits, premium sources) and the claim-settlement path (claim evidence,
+//! decisions, denial reasons, settlement requests), with receipt fingerprints
+//! linking claims back to the receipts they cover. It builds on the appraisal,
+//! credit, and underwriting surfaces.
+//!
+//! # Modules
+//!
+//! - [`insurance_flow`] -- quote/bind and claim-settlement flow.
+
 pub use chio_appraisal as appraisal;
 pub use chio_core_types::{capability, crypto, receipt};
 pub use chio_credit as credit;

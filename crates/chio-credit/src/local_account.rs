@@ -1,7 +1,7 @@
 //! In-memory `LocalCreditAccount` IOU mint path.
 //!
-//! M09 P1.T2 implements the credit evaluator hook against an
-//! in-memory account that signs IOU envelopes with a [`SigningBackend`].
+//! Implements the credit evaluator hook against an in-memory account
+//! that signs IOU envelopes with a [`SigningBackend`].
 //! The mint rule is deterministic and pure over `(receipt, pricing_context)`:
 //!
 //! - The receipt's signature, content-addressed id, and action hash
@@ -30,7 +30,7 @@ use crate::receipt::{chio_receipt_id, ChioReceipt};
 /// Deterministic IOU id derivation from the originating receipt id.
 ///
 /// Using a SHA-256 of the receipt id keeps the IOU id stable across
-/// re-evaluation, which the property test in P1.T4 depends on.
+/// re-evaluation, which a property test depends on.
 fn derive_iou_id(receipt_id: &str) -> String {
     format!("iou-{}", &sha256_hex(receipt_id.as_bytes())[..32])
 }

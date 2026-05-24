@@ -1,4 +1,4 @@
-//! Azure Content Safety `text:analyze` adapter (phase 13.2).
+//! Azure Content Safety `text:analyze` adapter.
 //!
 //! Wraps the Azure Content Safety `text:analyze` endpoint as an
 //! [`ExternalGuard`]. Each category returned by the API carries a

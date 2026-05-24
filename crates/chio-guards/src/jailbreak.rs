@@ -1,4 +1,4 @@
-//! Jailbreak-detection guard (roadmap phase 3.2).
+//! Jailbreak-detection guard.
 //!
 //! This guard wraps the multi-layer [`JailbreakDetector`] in the synchronous
 //! [`chio_kernel::Guard`] trait.  The detector produces a blended score in

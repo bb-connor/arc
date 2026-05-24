@@ -1,5 +1,4 @@
-//! Fail-closed and paranoid-heuristic tests for the M06 redactor pass
-//! (M10 Phase 1 Task 6).
+//! Fail-closed and paranoid-heuristic tests for the redactor pass.
 //!
 //! Normative spec reference: `spec/PROTOCOL.md` (paranoid heuristic
 //! and fail-closed semantics).
@@ -60,7 +59,6 @@ impl Redactor for EmptyManifestRedactor {
 
 // -------------------------------------------------------------------------
 // Test 1: redactor returns Err -> RedactPass returns Err(FailClosed).
-// Trajectory doc line 452.
 // -------------------------------------------------------------------------
 
 #[test]
@@ -115,7 +113,7 @@ fn returns_ok_when_redactor_succeeds() {
 
 // -------------------------------------------------------------------------
 // Test 3: paranoid=true, payload>256 bytes, manifest has zero matches
-// -> RedactError::ParanoidRefusal. Trajectory doc line 21.
+// -> RedactError::ParanoidRefusal.
 // -------------------------------------------------------------------------
 
 #[test]

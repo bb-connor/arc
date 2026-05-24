@@ -34,9 +34,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::CustodyError;
 
-/// Fixed capability lifetime. The M10 narrative pins this to five minutes
-/// to keep the audience-pinned envelope short-lived enough that revocation
-/// cascade through the M04 oracle is operationally sufficient.
+/// Fixed capability lifetime, pinned to five minutes to keep the
+/// audience-pinned envelope short-lived enough that revocation cascade
+/// through the revocation oracle is operationally sufficient.
 pub const CAPABILITY_LIFETIME_SECONDS: i64 = 300;
 
 /// Sorted set of capability scopes. Encoded as a JSON array of unique

@@ -57,7 +57,7 @@ minimum_test_timeout = 60
 
 # Trust-boundary modules to mutate, by crate. Globs are workspace-rooted.
 #
-# Scope priority (from source doc Phase 3 deliverable):
+# Scope priority (trust-boundary modules, in order):
 #   1. chio-kernel-core (capability validation, guard pipeline, receipts)
 #   2. chio-policy      (HushSpec parse/compile, evaluator)
 #   3. chio-guards      (native guard set including ShellCommandGuard)

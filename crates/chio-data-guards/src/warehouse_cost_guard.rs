@@ -1,4 +1,4 @@
-//! Warehouse cost guard (roadmap phase 7.3).
+//! Warehouse cost guard.
 //!
 //! `WarehouseCostGuard` enforces *pre-execution* cost limits on queries
 //! sent to large-scale analytical warehouses (BigQuery, Snowflake,
@@ -26,12 +26,12 @@
 //!   bound on the dry-run's estimated monetary cost.
 //!
 //! Both limits sit on the guard config rather than on the capability
-//! scope: adding `Constraint` variants would touch hot
-//! `chio-core-types` (phase 2.2 territory) and is deferred per the
-//! roadmap.  Kernel integrations can populate the guard config from
+//! scope: adding `Constraint` variants would touch the hot
+//! `chio-core-types` crate, so it is deferred.  Kernel integrations can
+//! populate the guard config from
 //! `Constraint::Custom("max_bytes_scanned", ...)` /
 //! `Constraint::Custom("max_cost_per_query_usd", ...)` today, and switch
-//! to first-class variants in a later phase.
+//! to first-class variants later.
 //!
 //! The guard emits a [`CostDimension::WarehouseQuery`] on every *allowed*
 //! query via [`WarehouseCostGuard::record_cost`] so callers can attach
@@ -243,7 +243,7 @@ impl DryRunEstimate {
 // Guard
 // ---------------------------------------------------------------------------
 
-/// Warehouse cost guard (roadmap phase 7.3).
+/// Warehouse cost guard.
 pub struct WarehouseCostGuard {
     config: WarehouseCostGuardConfig,
 }

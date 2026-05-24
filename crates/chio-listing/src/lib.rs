@@ -1,3 +1,17 @@
+//! Generic listing and trust-activation contracts for the Chio protocol.
+//!
+//! This crate is used to publish, discover, compare, and activate marketplace
+//! listings. It defines the signed `Listing` artifact, listing search and
+//! comparison, SLA and pricing-hint shapes, and the trust-activation flow that
+//! turns a discovered listing into a locally admissible one. Listings are
+//! signed by their namespace owner and verification is pure. The governance
+//! and open-market crates build on these types.
+//!
+//! # Modules
+//!
+//! - [`discovery`] -- listing search, comparison, and admissibility
+//!   resolution.
+
 pub use chio_core_types::capability::MonetaryAmount;
 pub use chio_core_types::{canonical_json_bytes, crypto, receipt};
 

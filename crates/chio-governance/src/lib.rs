@@ -1,3 +1,14 @@
+//! Generic governance charters and case evaluation for the Chio protocol.
+//!
+//! This crate is used to author and evaluate governance charters and to
+//! authorize governed actions against a signed lease. It defines the
+//! capability-lease artifacts and action classes (scoped observation,
+//! delegated action, narrow destructive), governance-receipt artifacts, and
+//! verification helpers such as [`verify_capability_lease`],
+//! [`verify_destructive_authorization`], and
+//! [`verify_step_governance_boundary`]. It builds on the listing surface in
+//! `chio-listing`.
+
 pub use chio_core_types::{canonical_json_bytes, crypto, receipt};
 pub use chio_listing as listing;
 

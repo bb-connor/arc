@@ -5,7 +5,6 @@ long-horizon C++ SDK completion effort.
 
 ## Baseline
 
-- Branch: `codex/chio-cpp-sdk-completion`
 - Baseline commit: `99d1f884a` (`feat: bootstrap chio c++ sdk`)
 - Starting gates that were green locally:
   - `./scripts/check-chio-cpp.sh`

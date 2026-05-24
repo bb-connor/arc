@@ -8,13 +8,13 @@
 # available locally.
 #
 # `published = false` flags an entry as a forward-looking placeholder: the
-# M01 release pipeline has not yet uploaded the corresponding binary, so
+# release pipeline has not yet uploaded the corresponding binary, so
 # `chio conformance fetch-peers` SKIPS the entry with a clear message
 # rather than failing the run with a sha256 mismatch. Once the release
 # pipeline cuts a real artifact, the lockfile updater MUST replace the
 # placeholder sha256 (the all-zeros / all-ones strings below), update the
-# url to the cut tag, and flip `published = true`. Cleanup C5 issue D
-# documents this gating contract.
+# url to the cut tag, and flip `published = true`. This comment documents
+# that gating contract.
 #
 # House rules:
 #   - `url` MUST be https.

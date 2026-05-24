@@ -109,7 +109,7 @@ pub struct IssuerService {
 
 impl IssuerService {
     /// Build an issuer pinned to an audience URI and a signing backend.
-    /// The signing backend is the M03 `HybridBackend` (or any
+    /// The signing backend is typically the hybrid `HybridBackend` (or any
     /// [`SigningBackend`] when `crypto_floor=allow_classical`).
     ///
     /// A default [`RateLimiter`](crate::rate_limit::RateLimiter) (the
@@ -183,7 +183,7 @@ impl IssuerService {
         &self.audience
     }
 
-    /// Mint a stub capability from a verified assertion plus a request.
+    /// Mint a capability from a verified assertion plus a request.
     ///
     /// `now` is the verifier clock; the capability's `iat` and `exp` are
     /// computed off this value (not the system clock) so tests can pin

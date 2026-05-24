@@ -85,7 +85,7 @@ impl ReputationTier {
 
 /// Map a slice of feed deltas to a `ReputationTier`.
 ///
-/// The mapping is monotonic in the input deltas (P3.T5 property test):
+/// The mapping is monotonic in the input deltas (verified by a property test):
 /// raising any single delta never lowers the tier. Empty input returns
 /// `tier_0` (no signal -> default tier).
 ///

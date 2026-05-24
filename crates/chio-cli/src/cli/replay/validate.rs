@@ -6,7 +6,7 @@
 //    except `tenant_sig`.
 // 3. Redaction-pass gate: rejects frames whose redaction pass this build
 //    cannot replay.
-// 4. M01 invocation validator: proves `frame.invocation` is RFC 8785
+// 4. Invocation validator: proves `frame.invocation` is RFC 8785
 //    canonical by round-tripping through `ToolInvocation`.
 //
 // All passes fail-closed; errors map to canonical exit codes 20/30/40/50.
@@ -51,7 +51,7 @@ pub enum ValidateError {
     /// `invocation` does not deserialize into a
     /// `chio_tool_call_fabric::ToolInvocation` or is not RFC 8785
     /// canonical.
-    #[error("M01 invocation validation failed: {0}")]
+    #[error("invocation validation failed: {0}")]
     Invocation(String),
 }
 
@@ -219,7 +219,7 @@ pub fn load_trusted_kernel_pubkey(
 /// Assert that `frame.invocation` deserializes into a
 /// `chio_tool_call_fabric::ToolInvocation` and that re-canonicalizing the
 /// round-tripped value produces byte-identical RFC 8785 bytes.
-pub fn validate_m01_invocation(frame: &chio_tee_frame::Frame) -> Result<(), ValidateError> {
+pub fn validate_invocation_canonical(frame: &chio_tee_frame::Frame) -> Result<(), ValidateError> {
     let invocation: chio_tool_call_fabric::ToolInvocation =
         serde_json::from_value(frame.invocation.clone())
             .map_err(|e| ValidateError::Invocation(format!("deserialize ToolInvocation: {e}")))?;
@@ -316,7 +316,7 @@ pub fn validate_frame(
     if let Some(pk) = tenant_pubkey {
         verify_tenant_sig(frame, pk)?;
     }
-    validate_m01_invocation(frame)?;
+    validate_invocation_canonical(frame)?;
     Ok(())
 }
 
@@ -472,13 +472,13 @@ mod replay_validate_tests {
     }
 
     #[test]
-    fn m01_invocation_validator_accepts_canonical() {
+    fn invocation_validator_accepts_canonical() {
         let frame = good_frame_with_invocation(canonical_invocation());
-        validate_m01_invocation(&frame).unwrap();
+        validate_invocation_canonical(&frame).unwrap();
     }
 
     #[test]
-    fn m01_invocation_validator_rejects_noncanonical_argument_bytes() {
+    fn invocation_validator_rejects_noncanonical_argument_bytes() {
         let invocation = ToolInvocation {
             provider: ProviderId::OpenAi,
             tool_name: "search".to_string(),
@@ -496,18 +496,18 @@ mod replay_validate_tests {
         let bytes = chio_core::canonical::canonical_json_bytes(&invocation).unwrap();
         let frame = good_frame_with_invocation(serde_json::from_slice(&bytes).unwrap());
 
-        let err = validate_m01_invocation(&frame).unwrap_err();
+        let err = validate_invocation_canonical(&frame).unwrap_err();
         assert!(matches!(err, ValidateError::Invocation(_)));
         assert!(err.to_string().contains("arguments"));
     }
 
     #[test]
-    fn m01_invocation_validator_rejects_non_toolinvocation_value() {
+    fn invocation_validator_rejects_non_toolinvocation_value() {
         // An empty object cannot deserialize into ToolInvocation: the
         // `provider`, `tool_name`, `arguments`, and `provenance` fields
         // are required.
         let frame = good_frame_with_invocation(serde_json::json!({}));
-        let err = validate_m01_invocation(&frame).unwrap_err();
+        let err = validate_invocation_canonical(&frame).unwrap_err();
         assert!(matches!(err, ValidateError::Invocation(_)));
         assert_eq!(err.exit_code(), EXIT_SCHEMA_MISMATCH);
     }

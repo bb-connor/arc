@@ -1,7 +1,7 @@
 // `chio replay traffic` dispatcher.
 //
 // Composes the NDJSON frame iterator with the validators in `replay/validate.rs`
-// (schema-version gate, tenant-sig verifier, M01 invocation validator) and emits
+// (schema-version gate, tenant-sig verifier, invocation validator) and emits
 // per-frame output. When `--against` is supplied, routes to the re-execution
 // path in `replay/execute.rs`.
 
@@ -10,7 +10,7 @@ use super::*;
 /// Dispatch `chio replay traffic` against the supplied [`TrafficArgs`].
 ///
 /// Per-frame pipeline: NDJSON parse, schema-version gate, optional tenant-sig
-/// verify, M01 invocation validate. When `--against` is supplied, routes
+/// verify, invocation validate. When `--against` is supplied, routes
 /// through [`run_traffic_replay`] instead.
 pub(crate) fn cmd_replay_traffic(args: &TrafficArgs) -> Result<(), CliError> {
     if let Some(against_str) = args.against.as_deref() {

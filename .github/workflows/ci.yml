@@ -366,7 +366,7 @@ jobs:
 
   cargo-vet:
     name: cargo-vet (supply-chain audit)
-    # owner: M09
+    # owner: @bb-connor
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -382,7 +382,7 @@ jobs:
 
   cargo-deny:
     name: cargo-deny (supply-chain bans/advisories/licenses)
-    # owner: M09
+    # owner: @bb-connor
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -420,7 +420,7 @@ jobs:
   # apalache-mc exit blocks merge.
   formal-tla:
     name: formal-tla (apalache safety)
-    # owner: M03
+    # owner: @bb-connor
     runs-on: ubuntu-latest
     timeout-minutes: 45
     concurrency:
@@ -500,7 +500,7 @@ jobs:
   # non-chio-kernel-core manifest entries.
   kani-public-pr:
     name: kani-public-pr (multi-crate)
-    # owner: M03
+    # owner: @bb-connor
     runs-on: ubuntu-latest
     timeout-minutes: 60
     concurrency:
@@ -690,7 +690,7 @@ jobs:
   # commit-message range.
   check-regression-tests:
     name: check-regression-tests
-    # owner: M02
+    # owner: @bb-connor
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5

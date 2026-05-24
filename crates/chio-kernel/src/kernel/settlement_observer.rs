@@ -106,7 +106,7 @@ fn build_observation_unchecked(receipt: &ChioReceipt) -> Option<SettlementObserv
     });
 
     // Legacy/test fallback: nested `approved_max`/`settlement_cap`/
-    // `amount` objects that some pre-M09 fixtures and external
+    // `amount` objects that some older fixtures and external
     // receipts emit. Kept so the unit tests in this module and any
     // imported corpus continue to round-trip.
     let monetary = canonical_amount.or_else(|| {

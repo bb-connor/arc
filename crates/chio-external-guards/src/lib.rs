@@ -129,6 +129,9 @@ impl<E: ExternalGuard> Guard for ScopedAsyncGuard<E> {
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<Verdict, KernelError> {
+        // By design: a tool-scoped guard returns Allow for traffic outside
+        // its scope. The deny-by-default contract is enforced by the
+        // composing authority layer, not by this single scoped guard.
         if !self.matches_tool(&ctx.request.tool_name) {
             return Ok(Verdict::Allow);
         }

@@ -2,12 +2,12 @@
 //!
 //! The crate lands the WebAuthn assertion verifier surface, the
 //! audience-pinned `PasskeyCapability` envelope, and an issuer service
-//! that signs every capability it mints through the M03 signing backend
+//! that signs every capability it mints through its signing backend
 //! (`Ed25519Backend`, the FIPS P-256/P-384 backends, or `HybridBackend`
 //! under the `pq` feature). The issuer fails closed if no signing backend
 //! is wired: it never emits an unsigned capability. Issuance is gated by a
 //! per-subject rate limiter, a per-credential replay nonce store, and the
-//! M04 revocation cascade, all consulted before a signature is produced.
+//! revocation cascade, all consulted before a signature is produced.
 //!
 //! # Trust boundary
 //!
@@ -15,7 +15,7 @@
 //! satisfied the named precondition fully. There is no path through this
 //! crate that returns `Ok(_)` on a partial verification: bad inputs return
 //! [`error::CustodyError`] variants that carry stable
-//! `urn:chio:error:custody:*` codes from the M01 registry.
+//! `urn:chio:error:custody:*` codes from the canonical error registry.
 //!
 //! Browser clients MUST NOT hold root capability or issuer signing material;
 //! they present a WebAuthn assertion to the issuer surface in

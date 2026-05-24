@@ -1,6 +1,6 @@
-//! Integration tests for Phase 8.1 CodeExecutionGuard.
+//! Integration tests for CodeExecutionGuard.
 //!
-//! Exercises the three roadmap acceptance criteria:
+//! Exercises the three acceptance criteria:
 //!
 //! * language outside the allowlist is denied;
 //! * `import subprocess` (dangerous module) is denied;

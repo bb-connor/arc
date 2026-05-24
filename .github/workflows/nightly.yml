@@ -26,7 +26,7 @@ concurrency:
 jobs:
   proptest-nightly:
     name: proptest (nightly tier)
-    # owner: M03
+    # owner: @bb-connor
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -61,7 +61,7 @@ jobs:
   # so harnesses in `lanes.nightly_only` still get daily coverage.
   kani-public-nightly:
     name: kani-public-nightly (lanes.pr + lanes.nightly_only)
-    # owner: M03
+    # owner: @bb-connor
     runs-on: ubuntu-latest
     timeout-minutes: 90
     concurrency:

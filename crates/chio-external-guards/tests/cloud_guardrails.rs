@@ -1,4 +1,4 @@
-//! Integration tests for the phase-13.2 cloud guardrail adapters.
+//! Integration tests for the cloud guardrail adapters.
 //!
 //! Each test stands up a [`wiremock::MockServer`], points the guard at
 //! the mock, wraps the guard in an [`AsyncGuardAdapter`], and verifies

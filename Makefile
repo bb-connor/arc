@@ -17,7 +17,7 @@ KB_DIR ?= ops/knowledge-base
 #     invokes `uv tool run --from datamodel-code-generator==<pin>`.
 #   - go (golang.org/dl) for the go lane; the regen script bundles schemas
 #     and feeds them to `oapi-codegen v2.4.1`.
-#   - npm (Node 18+) for the ts lane; we install the pinned
+#   - npm (Node 20+) for the ts lane; we install the pinned
 #     `json-schema-to-typescript@15.0.4` into
 #     `sdks/typescript/scripts/node_modules/` via `npm ci` automatically.
 # If any of uv / go is missing the per-language `cargo xtask codegen --lang

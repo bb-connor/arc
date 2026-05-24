@@ -105,7 +105,7 @@ impl Default for MemoryGovernanceConfig {
 /// Session key used for per-session memory-entry counting.
 type SessionKey = (String, String); // (agent_id, capability_id)
 
-/// Guard implementing memory governance (phase 18.1).
+/// Guard implementing memory governance.
 pub struct MemoryGovernanceGuard {
     enabled: bool,
     store_allowlist: Vec<String>,
