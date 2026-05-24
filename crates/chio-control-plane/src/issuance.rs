@@ -932,8 +932,8 @@ mod tests {
         subject_key: &str,
         issuer_key: &str,
         timestamp: u64,
+        kernel_kp: &Keypair,
     ) -> ChioReceipt {
-        let kernel_kp = Keypair::generate();
         ChioReceipt::sign(
             ChioReceiptBody {
                 id: id.to_string(),
@@ -967,7 +967,7 @@ mod tests {
                 tenant_id: None,
                 kernel_key: kernel_kp.public_key(),
             },
-            &kernel_kp,
+            kernel_kp,
         )
         .expect("sign receipt")
     }
@@ -1103,6 +1103,13 @@ mod tests {
         let receipt_store = SqliteReceiptStore::open(&receipt_db_path).expect("receipt store");
         let subject_kp = Keypair::generate();
         let issuer_kp = Keypair::generate();
+        // The history receipts must be signed by a kernel key the issuing
+        // authority trusts; otherwise reputation scoring fails them closed as
+        // unsigned (see chio-reputation::receipt_integrity_valid) and the
+        // subject never accumulates history. Sign every receipt with the same
+        // keypair that backs the local authority below so its public key is in
+        // the trusted set.
+        let kernel_kp = Keypair::generate();
         let subject_hex = subject_kp.public_key().to_hex();
         let issuer_hex = issuer_kp.public_key().to_hex();
         let now = unix_now();
@@ -1123,6 +1130,7 @@ mod tests {
                 &subject_hex,
                 &issuer_hex,
                 now - (11 - day) * 86_400,
+                &kernel_kp,
             );
             receipt_store
                 .append_chio_receipt(&receipt)
@@ -1131,9 +1139,7 @@ mod tests {
         drop(receipt_store);
 
         let authority = wrap_capability_authority(
-            Box::new(chio_kernel::LocalCapabilityAuthority::new(
-                Keypair::generate(),
-            )),
+            Box::new(chio_kernel::LocalCapabilityAuthority::new(kernel_kp)),
             Some(test_policy()),
             None,
             Some(&receipt_db_path),

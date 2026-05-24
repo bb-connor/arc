@@ -4609,6 +4609,11 @@ mod cluster_and_reports_tests {
         );
 
         let mut config = base_config();
+        // The admin bearer header carries "issue-token"; align the configured
+        // service token so the admin principal resolves and the downstream
+        // tenant-token-equals-service-token collision check exercises a real
+        // conflict rather than failing the bearer match first.
+        config.service_token = "issue-token".to_string();
         config
             .tenant_read_tokens
             .insert("tenant-a".to_string(), "tenant-read-token".to_string());

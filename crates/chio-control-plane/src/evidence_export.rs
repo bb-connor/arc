@@ -744,9 +744,10 @@ fn merge_read_boundary(
         (
             Some(ReceiptReadBoundary::TenantScoped { tenant: policy }),
             Some(ReceiptReadBoundary::TenantScoped { tenant: cli }),
-        ) if policy != cli => Err(CliError::attest_error(
-            "requested export read boundary falls outside the signed federation policy".to_string(),
-        )),
+        ) if policy != cli => Err(CliError::attest_error(format!(
+            "requested export tenant scope '{cli}' falls outside the signed federation policy \
+             tenant scope '{policy}'"
+        ))),
         (Some(ReceiptReadBoundary::TenantScoped { .. }), Some(ReceiptReadBoundary::AdminAll)) => {
             Err(CliError::attest_error(
                 "requested admin-all export exceeds tenant-scoped federation policy".to_string(),
