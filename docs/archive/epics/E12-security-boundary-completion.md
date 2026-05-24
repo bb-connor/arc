@@ -62,7 +62,7 @@ Out of scope:
 - `crates/chio-policy/src/compiler.rs`
 - `crates/chio-cli/src/policy.rs`
 - `crates/chio-mcp-adapter/src/edge.rs`
-- `docs/epics/E5-nested-flows-roots-sampling-elicitation.md`
+- `docs/archive/epics/E5-nested-flows-roots-sampling-elicitation.md`
 
 ## Proposed implementation slices
 

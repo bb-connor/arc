@@ -63,9 +63,9 @@ Phases 26 through 31 are the remaining repo-solvable full-vision closure path.
 
 **Current repo baseline**:
 - [`crates/chio-kernel/src/authority.rs`](../../crates/chio-kernel/src/authority.rs),
-  [`crates/chio-cli/src/trust_control/cluster_and_reports.rs`](../../crates/chio-cli/src/trust_control/cluster_and_reports.rs),
+  [`crates/chio-control-plane/src/trust_control/cluster_and_reports.rs`](../../crates/chio-control-plane/src/trust_control/cluster_and_reports.rs),
   and
-  [`crates/chio-cli/src/trust_control/service_runtime.rs`](../../crates/chio-cli/src/trust_control/service_runtime.rs)
+  [`crates/chio-control-plane/src/trust_control/service_runtime.rs`](../../crates/chio-control-plane/src/trust_control/service_runtime.rs)
   already provide a real authority and clustered trust-control surface. The
   remaining gap is fenced custody and stale-leader rejection, not absence of an
   authority subsystem.
@@ -84,10 +84,10 @@ leader fencing.
 
 **Files**:
 - `crates/chio-kernel/src/authority.rs`
-- `crates/chio-cli/src/trust_control/cluster_and_reports.rs`
-- `crates/chio-cli/src/trust_control/service_runtime.rs`
-- `crates/chio-cli/src/trust_control/service_types.rs`
-- `crates/chio-cli/src/trust_control/http_handlers_b.rs`
+- `crates/chio-control-plane/src/trust_control/cluster_and_reports.rs`
+- `crates/chio-control-plane/src/trust_control/service_runtime.rs`
+- `crates/chio-control-plane/src/trust_control/service_types.rs`
+- `crates/chio-control-plane/src/trust_control/http_handlers_b.rs`
 
 **Acceptance**:
 - authority seed material is no longer serialized and replayed as ordinary
@@ -106,8 +106,8 @@ bounded money truth into a stronger claim.
 **Files**:
 - `crates/chio-kernel/src/budget_store.rs`
 - `crates/chio-store-sqlite/src/budget_store.rs`
-- `crates/chio-cli/src/trust_control/service_runtime.rs`
-- `crates/chio-cli/src/trust_control/service_types.rs`
+- `crates/chio-control-plane/src/trust_control/service_runtime.rs`
+- `crates/chio-control-plane/src/trust_control/service_types.rs`
 - `crates/chio-cli/tests/trust_cluster.rs`
 
 **Acceptance**:

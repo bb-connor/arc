@@ -60,7 +60,7 @@ Out of scope:
 - `crates/chio-kernel/src/lib.rs`
 - `crates/chio-mcp-adapter/src/edge.rs`
 - `crates/chio-mcp-adapter/src/transport.rs`
-- `crates/chio-cli/src/remote_mcp.rs`
+- `crates/chio-mcp-remote/src/remote_mcp/`
 - `crates/chio-cli/tests/mcp_serve.rs`
 - `crates/chio-cli/tests/mcp_serve_http.rs`
 - `crates/chio-conformance/tests/`

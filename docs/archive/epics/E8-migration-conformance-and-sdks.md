@@ -6,9 +6,9 @@ In progress.
 
 Slice A research and planning are now documented in:
 
-- [CONFORMANCE_HARNESS_PLAN.md](../operations/CONFORMANCE_HARNESS_PLAN.md)
-- [../research/08-conformance-harness-research.md](../research/08-conformance-harness-research.md)
-- [../research/09-compatibility-matrix-design.md](../research/09-compatibility-matrix-design.md)
+- [CONFORMANCE_HARNESS_PLAN.md](../../operations/CONFORMANCE_HARNESS_PLAN.md)
+- [../research/08-conformance-harness-research.md](../../research/08-conformance-harness-research.md)
+- [../research/09-compatibility-matrix-design.md](../../research/09-compatibility-matrix-design.md)
 
 The first implementation slice is now scaffolded:
 

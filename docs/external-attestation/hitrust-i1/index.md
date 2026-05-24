@@ -7,7 +7,7 @@
 **Framework:** HITRUST CSF v11.7 i1
 **Issuance date:** Not applicable. This is an internal self-assessment readiness package, not a third-party-audited HITRUST certification, so no certificate has been issued and no issuance date exists.
 **Expiration date:** Not applicable. No certificate has been issued, so there is no expiration date.
-**Target external assessor:** TODO: pending External Assessor engagement
+**Target external assessor:** Not yet engaged. No HITRUST-authorized External Assessor has been retained for this readiness package.
 
 ## Scope
 
@@ -21,13 +21,13 @@ Backbay systems, or future released Chio versions.
 | Item | Reference |
 |------|-----------|
 | Repository readiness-package record | `compliance/hitrust/readiness-package/readiness-package.md` |
-| HITRUST MyCSF object | `TODO: pending MyCSF tenant creation` |
-| Results distribution record | `TODO: pending MyCSF results-distribution record` |
+| HITRUST MyCSF object | Not yet created. A MyCSF tenant is established only when a validated assessment begins. |
+| Results distribution record | Not yet created. A results-distribution record exists only after a validated assessment is completed. |
 | HITRUST control mapping (readiness self-assessment) | `compliance/hitrust/control-mapping.csv` |
 
 No signed external certificate scan exists yet. The repository
 readiness-package record above is the public activation artifact for
-the current v3.x posture and does not assert an issued HITRUST certificate.
+the current pre-release v1 posture and does not assert an issued HITRUST certificate.
 
 ## HITRUST References
 

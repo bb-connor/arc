@@ -30,7 +30,7 @@ The buyer pitch is concrete: "your auditor can verify every action your composed
 
 ### Federated detection swarms as a second-wave application
 
-The same primitives also support **federated detection swarms across organisational trust boundaries**. Each SOC runs an autonomous detection swarm internally; the Swarm Team Six runtime (sibling repository `swarm-team-six`, product name "ClawdStrike Ambush") is the in-production reference shape. Chio lets two or more such swarms compose:
+The same primitives also support **federated detection swarms across organisational trust boundaries**. Each SOC runs an autonomous detection swarm internally; Chio lets two or more such swarms compose:
 
 - pheromone deposits from peer SOCs flow into the local concentration calculation, weighted by peer reputation
 - response actions that cross organisational boundaries are co-signed by both kernels

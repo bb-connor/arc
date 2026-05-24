@@ -55,7 +55,7 @@ Out of scope:
 - `docs/POST_REVIEW_EXECUTION_PLAN.md`
 - `docs/EXECUTION_PLAN.md`
 - `docs/ROADMAP_V1.md`
-- `docs/epics/`
+- `docs/archive/epics/`
 - `crates/chio-cli/tests/`
 - `crates/chio-conformance/tests/`
 - `tests/e2e/`

@@ -32,7 +32,6 @@ The primary live release documents. Auditors and operators start here.
 - [Operations Runbook](release/OPERATIONS_RUNBOOK.md) - bounded-release operating procedures
 - [Observability](release/OBSERVABILITY.md) - metrics, logs, and alerting surface
 - [Compliance Evidence Export Plan](release/COMPLIANCE_EVIDENCE_EXPORT_PLAN.md)
-- [Full Vision Execution Program](release/FULL_VISION_EXECUTION_PROGRAM.md)
 - [Chio Rename Migration](release/CHIO_RENAME_MIGRATION.md) - operator guidance for the ARC-to-Chio rename
 - Comptroller runbooks and proofs: [Operator Runbook](release/CHIO_COMPTROLLER_OPERATOR_RUNBOOK.md), [Partner Contracts](release/CHIO_COMPTROLLER_PARTNER_CONTRACTS.md), [Federated Proof](release/CHIO_COMPTROLLER_FEDERATED_PROOF.md), [Market Position Proof](release/CHIO_COMPTROLLER_MARKET_POSITION_PROOF.md)
 - Universal control plane: [Runbook](release/CHIO_UNIVERSAL_CONTROL_PLANE_RUNBOOK.md), [Partner Proof](release/CHIO_UNIVERSAL_CONTROL_PLANE_PARTNER_PROOF.md)
@@ -115,7 +114,6 @@ The primary live release documents. Auditors and operators start here.
 - [Roadmap](operations/ROADMAP.md) - historical execution roadmap, not the current v1 protocol posture
 - [Strategic Roadmap](operations/STRATEGIC_ROADMAP.md) - historical strategic narrative
 - [Execution Plan](operations/EXECUTION_PLAN.md) - historical execution sequencing notes
-- [Epic specs](epics/README.md) - issue-ready execution specs (E0 through E14)
 - [Changelog](operations/CHANGELOG.md) - internal pre-release notes, not public protocol version history
 - [Conformance Harness Plan](operations/CONFORMANCE_HARNESS_PLAN.md) - cross-language conformance plan for JS, Python, and spec fixtures
 - [Distributed Control Plan](operations/DISTRIBUTED_CONTROL_PLAN.md) - shipped shared-control rewrite of the trust-plane architecture

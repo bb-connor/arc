@@ -146,7 +146,7 @@ The next closing work is now better modeled as five focused epics plus a final r
 - `E13` policy and adoption unification
 - `E14` hardening and release candidate
 
-See [POST_REVIEW_EXECUTION_PLAN.md](POST_REVIEW_EXECUTION_PLAN.md), [EXECUTION_PLAN.md](../operations/EXECUTION_PLAN.md), and the new issue-ready specs in [epics/README.md](../epics/README.md).
+See [POST_REVIEW_EXECUTION_PLAN.md](POST_REVIEW_EXECUTION_PLAN.md), [EXECUTION_PLAN.md](../operations/EXECUTION_PLAN.md), and the new issue-ready specs in [epics/README.md](epics/README.md).
 
 ## Phase 1: `v0.2` Protocol Foundation
 

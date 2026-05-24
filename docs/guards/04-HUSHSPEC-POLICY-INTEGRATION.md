@@ -1,7 +1,7 @@
-# WASM Guards: HushSpec and ClawdStrike Integration
+# WASM Guards: HushSpec and Policy-Engine Integration
 
 This document addresses how WASM guards fit alongside the existing HushSpec
-rule format and ClawdStrike policy engine. The prior documents (01-03) designed
+rule format and the upstream policy engine. The prior documents (01-03) designed
 the WASM guard runtime in isolation. This addendum ensures the design accounts
 for the full policy stack.
 
@@ -13,18 +13,18 @@ for the full policy stack.
   HushSpec YAML          (portable, declarative rules)
        |
        v
-  ClawdStrike            (reference engine: compiles rules to guards)
+  Policy engine          (reference engine: compiles rules to guards)
        |
        v
-  chio-guards             (Chio-native Guard trait impls, adapted from ClawdStrike)
+  chio-guards            (Chio-native Guard trait impls, adapted from the upstream suite)
        |
        v
   ChioKernel.guards       (Vec<Box<dyn Guard>>, evaluated in registration order)
 ```
 
 A HushSpec document defines declarative rules (forbidden_paths, egress, secret
-patterns, tool access, etc.). ClawdStrike compiles these into its async Guard
-trait implementations. The `chio-guards` crate adapts 11+ ClawdStrike guards
+patterns, tool access, etc.). The policy engine compiles these into its async Guard
+trait implementations. The `chio-guards` crate adapts 11+ upstream guards
 to Chio's synchronous `Guard` trait. These get registered on the kernel.
 
 WASM guards must slot into this stack without duplicating it.
@@ -36,7 +36,7 @@ WASM guards must slot into this stack without duplicating it.
 WASM guards are **not a replacement for HushSpec**. They serve different
 purposes:
 
-| Concern | HushSpec + ClawdStrike | WASM Guards |
+| Concern | HushSpec + the upstream engine | WASM Guards |
 |---------|----------------------|-------------|
 | Rule format | Declarative YAML | Programmatic (code) |
 | Rule authoring | Security teams, operators | Developers, integrators |
@@ -107,7 +107,7 @@ WASM guards complement vs. overlap:
 
 ### No overlap needed (HushSpec handles these well)
 
-| HushSpec Rule | ClawdStrike Guard | Chio Guard | WASM needed? |
+| HushSpec Rule | Upstream Guard | Chio Guard | WASM needed? |
 |---------------|------------------|-----------|-------------|
 | `forbidden_paths` | ForbiddenPathGuard | ForbiddenPathGuard | No |
 | `path_allowlist` | PathAllowlistGuard | PathAllowlistGuard | No |
@@ -176,7 +176,7 @@ It runs during HushSpec evaluation, not in the Chio kernel guard pipeline.
 **Should WASM guards also be usable as HushSpec detectors?**
 
 No. Keep the boundaries clean:
-- HushSpec detectors run during HushSpec evaluation (in ClawdStrike)
+- HushSpec detectors run during HushSpec evaluation (in the upstream guard suite)
 - WASM guards run during Chio kernel guard evaluation
 - They serve different layers of the stack
 
@@ -197,11 +197,11 @@ This is a future host function, not a launch requirement.
 
 ---
 
-## 4. ClawdStrike Guard Trait vs. Chio Guard Trait
+## 4. Upstream Guard Trait vs. Chio Guard Trait
 
-ClawdStrike and Chio have slightly different guard interfaces:
+The upstream suite and Chio have slightly different guard interfaces:
 
-| | ClawdStrike | Chio |
+| | Upstream | Chio |
 |-|-------------|-----|
 | Trait | `Guard` (async) | `Guard` (sync) |
 | Method | `check(&self, action, context)` | `evaluate(&self, ctx)` |
@@ -210,12 +210,12 @@ ClawdStrike and Chio have slightly different guard interfaces:
 | Verdict | Allowed / Denied (with message) | Allow / Deny |
 | Async | Yes (`#[async_trait]`) | No |
 
-WASM guards implement Chio's `Guard` trait, not ClawdStrike's. This is correct
-because WASM guards run inside the Chio kernel, not inside ClawdStrike.
+WASM guards implement Chio's `Guard` trait, not the upstream suite. This is correct
+because WASM guards run inside the Chio kernel, not inside the upstream suite.
 
 But the `GuardRequest` type sent to WASM guests (defined in
 `chio-wasm-guards/src/abi.rs`) should include enough context for the guest to
-make decisions that ClawdStrike's richer `GuardAction` enables. Currently
+make decisions that the upstream richer `GuardAction` enables. Currently
 `GuardRequest` has:
 
 ```rust
@@ -228,14 +228,14 @@ pub struct GuardRequest {
 }
 ```
 
-### Missing fields that ClawdStrike guards use
+### Missing fields that Upstream guards use
 
 > **The authoritative v1 `GuardRequest` shape is defined in
 > `05-V1-DECISION.md` Section 3.** The table below is the full wish-list
-> from the ClawdStrike analysis. Fields marked [v1] ship in v1; the rest
+> from the upstream guard suite analysis. Fields marked [v1] ship in v1; the rest
 > are candidates for later versions.
 
-| Field | ClawdStrike uses it for | v1? |
+| Field | The upstream suite uses it for | v1? |
 |-------|------------------------|-----|
 | Action type (FileAccess, NetworkEgress, ShellCommand, etc.) | Routing to the right guard | [v1] `action_type: Option<String>` |
 | File path (normalized) | Path-based guards | [v1] `extracted_path: Option<String>` |
@@ -345,12 +345,12 @@ Not needed for v1, but the architecture should not preclude it.
 
 ## 7. Receipt and Audit Integration
 
-Both ClawdStrike and Chio sign receipts. WASM guard decisions need to flow into
+Both the upstream suite and Chio sign receipts. WASM guard decisions need to flow into
 the same audit trail:
 
 | System | Receipt type | What it records |
 |--------|-------------|-----------------|
-| ClawdStrike | Ed25519-signed `GuardResult` | Verdict, severity, guard name, message |
+| Upstream | Ed25519-signed `GuardResult` | Verdict, severity, guard name, message |
 | Chio | Signed `Decision` in receipt log | Allow/Deny, guard name, denial reason |
 | HushSpec | `DecisionReceipt` (via `evaluate_audited`) | Decision, matched rule, reason, rule trace |
 
@@ -372,7 +372,7 @@ statement.
 ## 8. Distribution: HushSpec Rulesets vs. WASM Guard Packages
 
 HushSpec distributes rules as YAML files with `extends` chains (builtins,
-local files, remote URLs, git refs). ClawdStrike ships built-in rulesets
+local files, remote URLs, git refs). The upstream suite ships built-in rulesets
 (default, strict, permissive, ai-agent, cicd, remote-desktop, etc.).
 
 WASM guards need a parallel distribution model. The two should not be
@@ -448,7 +448,7 @@ to `WasmGuardEntry` (see Section 5, Option A above).
    HushSpec cannot express. This prevents ecosystem fragmentation.
 
 3. **Consider severity on `GuardVerdict::Deny` for receipts only.**
-   ClawdStrike's `GuardResult` includes severity. Adding it to WASM verdicts
+   the upstream `GuardResult` includes severity. Adding it to WASM verdicts
    would enrich receipt metadata. However, advisory promotion today operates
    on `AdvisorySignal` (from `AdvisoryGuard` trait), not on `Guard` verdicts.
    Severity on deterministic denials would not plug into advisory promotion

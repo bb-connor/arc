@@ -9,7 +9,7 @@ design-partner deployment. It does not bind the partner identity in repo docs.
 2. BAA-ready posture confirmed.
 3. No PHI-bearing production traffic before Business Associate Agreement chain
    sign-off.
-4. Tenant is single-tenant for the current v3.x posture.
+4. Tenant is single-tenant for the current pre-release v1 posture.
 5. Chio mediation edge runs in sidecar mode.
 6. Existing API surface remains owned by the design-partner ops team.
 7. Chio team owns the P0/P1 PagerDuty routing key.

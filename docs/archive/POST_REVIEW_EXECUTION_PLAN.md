@@ -15,7 +15,7 @@ This plan assumes the current repo state described in:
 - [research/01-current-state.md](../research/01-current-state.md)
 - [research/03-gap-analysis.md](../research/03-gap-analysis.md)
 - [EXECUTION_PLAN.md](../operations/EXECUTION_PLAN.md)
-- [epics/README.md](../epics/README.md)
+- [epics/README.md](epics/README.md)
 
 ## What The Review Confirmed
 
@@ -73,7 +73,7 @@ The next execution cycle should optimize for five outcomes:
 | `E13` | Policy and Adoption Unification | `F3` | `E2`, `E8`; benefits from `E12` |
 | `E14` | Hardening and Release Candidate | close-out | `E9` through `E13` |
 
-Issue-ready specs for `E9` through `E14` live in [epics/README.md](../epics/README.md).
+Issue-ready specs for `E9` through `E14` live in [epics/README.md](epics/README.md).
 
 ## Recommended Execution Order
 
@@ -163,12 +163,12 @@ Those may matter later, but they are not the next bottlenecks.
 
 ## Primary Artifacts
 
-- [epics/E9-ha-trust-control-reliability.md](../epics/E9-ha-trust-control-reliability.md)
-- [epics/E10-remote-runtime-hardening.md](../epics/E10-remote-runtime-hardening.md)
-- [epics/E11-cross-transport-concurrency-semantics.md](../epics/E11-cross-transport-concurrency-semantics.md)
-- [epics/E12-security-boundary-completion.md](../epics/E12-security-boundary-completion.md)
-- [epics/E13-policy-and-adoption-unification.md](../epics/E13-policy-and-adoption-unification.md)
-- [epics/E14-hardening-and-release-candidate.md](../epics/E14-hardening-and-release-candidate.md)
+- [epics/E9-ha-trust-control-reliability.md](epics/E9-ha-trust-control-reliability.md)
+- [epics/E10-remote-runtime-hardening.md](epics/E10-remote-runtime-hardening.md)
+- [epics/E11-cross-transport-concurrency-semantics.md](epics/E11-cross-transport-concurrency-semantics.md)
+- [epics/E12-security-boundary-completion.md](epics/E12-security-boundary-completion.md)
+- [epics/E13-policy-and-adoption-unification.md](epics/E13-policy-and-adoption-unification.md)
+- [epics/E14-hardening-and-release-candidate.md](epics/E14-hardening-and-release-candidate.md)
 
 ## Bottom Line
 

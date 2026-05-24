@@ -173,7 +173,7 @@ Either way, the fix is compiler-side, not guard-side.
 
 `chio-bridge@0.2.2` implements a bridge-owned spend ledger over the
 trust plane's existing `POST /v1/budgets/authorize-exposure`
-endpoint (see `arc/crates/chio-cli/src/trust_control/http_handlers_b.rs:2214`
+endpoint (see `arc/crates/chio-control-plane/src/trust_control/http_handlers_b.rs:2214`
 and `service_types.rs:2041-2062`). A new
 `ChioBridge.check(call, {capabilityId, costUsd})` option threads the
 bonded capability id + per-call cost into that endpoint; the trust

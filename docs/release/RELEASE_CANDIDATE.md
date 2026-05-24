@@ -416,9 +416,9 @@ kernel/browser/mobile qualification lanes.
 | default streamed tool total-byte limit | `256 MiB` | `crates/chio-kernel/src/lib.rs` |
 | default MCP page size | `50` | `crates/chio-mcp-adapter/src/edge.rs` |
 | background-task progression per edge tick | `8 tasks` | `crates/chio-mcp-adapter/src/edge.rs`, `crates/chio-mcp-adapter/src/transport.rs` |
-| remote session idle expiry | `15 min` | `crates/chio-cli/src/remote_mcp.rs` |
-| remote session drain grace | `5 s` | `crates/chio-cli/src/remote_mcp.rs` |
-| remote session tombstone retention | `30 min` | `crates/chio-cli/src/remote_mcp.rs` |
+| remote session idle expiry | `15 min` | `crates/chio-mcp-remote/src/remote_mcp/` |
+| remote session drain grace | `5 s` | `crates/chio-mcp-remote/src/remote_mcp/` |
+| remote session tombstone retention | `30 min` | `crates/chio-mcp-remote/src/remote_mcp/` |
 
 Release qualification depends on those defaults being covered by tests and on
 stricter user-provided values continuing to fail closed.

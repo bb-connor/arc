@@ -186,7 +186,7 @@ The important change is that both now compile into the same loaded runtime polic
 
 Relevant code:
 
-- [crates/arc-cli/src/policy.rs](../../crates/chio-cli/src/policy.rs)
+- [crates/chio-control-plane/src/policy.rs](../../crates/chio-control-plane/src/policy.rs)
 - [crates/arc-policy/src/compiler.rs](../../crates/chio-policy/src/compiler.rs)
 
 This is still a maturity issue, but it is no longer a runtime integrity problem.

@@ -1,18 +1,18 @@
-# ClawdStrike Integration Plan
+# Guard Suite Integration Plan
 
-How to port shared code from ClawdStrike into Chio and restructure the dependency
-relationship so that ClawdStrike depends on Chio, not the other way around.
+How to port shared code from the upstream guard suite into Chio and restructure the dependency
+relationship so that the guard product depends on Chio, not the other way around.
 
 ## 1. Architecture: Protocol vs Product
 
-Chio is HTTP. ClawdStrike is nginx.
+Chio is HTTP. The guard product is nginx.
 
 Chio defines the protocol layer: capability tokens, delegation chains, receipts,
 guards, and canonical serialization. It is a minimal reference implementation
 suitable for standards submissions (IETF, W3C, OpenSSF). It ships zero
 application-layer opinions about fleet management, SIEM, or threat intelligence.
 
-ClawdStrike is the batteries-included production deployment. It adds a policy
+The guard product is the batteries-included production deployment. It adds a policy
 engine, 13 guards, SIEM exporters, a control console, fleet enrollment, posture
 management, compliance templates, threat intel feeds, and desktop agents. It is
 the commercial product built on top of the protocol.
@@ -23,7 +23,7 @@ Why the separation matters:
   not adopt a spec that requires a specific product. The reference
   implementation must be self-contained.
 - **Ecosystem adoption.** Third parties should be able to build their own
-  "powered by Chio" products without pulling in ClawdStrike's application code,
+  "powered by Chio" products without pulling in the guard product's application code,
   SIEM integrations, or fleet management.
 - **Vendor neutrality.** Chio's crypto primitives (Ed25519, SHA-256, canonical
   JSON RFC 8785, RFC 6962 Merkle trees) are standard, auditable, and
@@ -43,7 +43,7 @@ chio-core (types, crypto, merkle, canonical JSON)
   |     |-- chio-policy (policy compiler, resolver, evaluator)
   |     |-- chio-mcp-adapter, chio-cli, chio-conformance
   |     |
-  |     |-- ClawdStrike (imports chio-core + chio-kernel as workspace deps)
+  |     |-- Guard product (imports chio-core + chio-kernel as workspace deps)
   |           |-- adds: 6 application-layer guards (Jailbreak, PromptInjection,
   |           |         ComputerUse, InputInjectionCapability,
   |           |         RemoteDesktopSideChannel, SpiderSense)
@@ -60,7 +60,7 @@ chio-core (types, crypto, merkle, canonical JSON)
 Today both projects maintain parallel implementations of the same crypto
 primitives:
 
-| Concept            | Chio module            | ClawdStrike module         |
+| Concept            | Chio module            | Upstream module         |
 |--------------------|------------------------|----------------------------|
 | Ed25519 signing    | `chio_core::crypto`    | `hush_core::signing`       |
 | SHA-256 hashing    | `chio_core::hashing`   | `hush_core::hashing`       |
@@ -71,13 +71,13 @@ primitives:
 
 After integration, chio-core is the single canonical source for all of these.
 
-## 3. What to Port FROM ClawdStrike INTO Chio, and What Must Still Be Built Natively
+## 3. What to Port Into Chio, and What Must Still Be Built Natively
 
 ### 3.1 DPoP Proof-of-Possession Binding
 
-**Source (ClawdStrike):**
-- `crates/services/clawdstrike-brokerd/src/capability.rs` -- `validate_dpop_binding()` (lines 233-324)
-- `crates/libs/clawdstrike-broker-protocol/src/lib.rs` -- `binding_proof_message()`, `ProofBindingMode`, `ProofBinding`, `BindingProof` types
+**Source (upstream guard suite):**
+- `crates/services/the upstream guard suite-brokerd/src/capability.rs` -- `validate_dpop_binding()` (lines 233-324)
+- `crates/libs/the upstream guard suite-broker-protocol/src/lib.rs` -- `binding_proof_message()`, `ProofBindingMode`, `ProofBinding`, `BindingProof` types
 
 **Target (Chio):**
 - `crates/chio-kernel/src/dpop.rs` (new module)
@@ -98,14 +98,14 @@ After integration, chio-core is the single canonical source for all of these.
 - Replace `ApiError` returns with `chio_kernel::KernelError` variants.
 - Remove `chrono` dependency -- use `u64` Unix timestamps to match Chio's existing convention.
 - Add a `DpopConfig` struct with `proof_ttl_secs: u64` (default 60) and `max_clock_skew_secs: u64` (default 5).
-- Add a replay-prevention store keyed by proof thumbprint + nonce (or equivalent). ClawdStrike's current source checks freshness but does not persist or reject nonce reuse.
+- Add a replay-prevention store keyed by proof thumbprint + nonce (or equivalent). The upstream current source checks freshness but does not persist or reject nonce reuse.
 - Keep SDK proof generation helpers in scope; porting only the verifier is not enough.
 
 **Effort:** ~1-2 weeks (including replay protection, tests, and integration with the kernel's capability validation path).
 
 ### 3.2 Receipt Query API
 
-**Source (ClawdStrike):**
+**Source (upstream guard suite):**
 - `crates/services/control-api/src/routes/receipts.rs` -- `ReceiptStore`, `StoredReceipt`, pagination, chain queries, batch verification
 
 **Target (Chio):**
@@ -113,23 +113,23 @@ After integration, chio-core is the single canonical source for all of these.
 - `crates/chio-kernel/src/receipt_store.rs` -- extend existing `SqliteReceiptStore` with query methods
 
 **What to port:**
-- **Pagination:** offset/limit list queries with tenant-scoped isolation. ClawdStrike's `list()` and `chain()` methods (lines 138-187 of `receipts.rs`) are useful references for paging and ordering.
+- **Pagination:** offset/limit list queries with tenant-scoped isolation. The upstream `list()` and `chain()` methods (lines 138-187 of `receipts.rs`) are useful references for paging and ordering.
 - **Payload-size validation:** `MAX_RECEIPTS_PER_TENANT`, `MAX_RECEIPT_PAYLOAD_BYTES`, and `validate_payload_size()`.
 - **Verification pattern:** signature verification over canonical receipt JSON.
 
 **Adaptations needed:**
-- Replace ClawdStrike's `StoredReceipt` with Chio's `ChioReceipt` (already defined in `chio_core::receipt`).
+- Replace the guard product's `StoredReceipt` with Chio's `ChioReceipt` (already defined in `chio_core::receipt`).
 - Replace `hush_core::receipt::{SignedReceipt, VerificationResult, PublicKeySet}` with `chio_core::receipt::ChioReceipt` (which embeds `kernel_key` and `signature`).
 - Replace Axum route handlers with a trait-based query API (`ReceiptQueryStore`) that can be consumed by chio-cli or any HTTP framework.
-- Do not treat ClawdStrike's `(tenant_id, policy_name)` chain index as a Chio lineage model. In Chio, tool-receipt queries should remain keyed by capability/tool/time/decision and child-request queries by session/request lineage; agent-level joins come later via the capability lineage index.
+- Do not treat the guard product's `(tenant_id, policy_name)` chain index as a Chio lineage model. In Chio, tool-receipt queries should remain keyed by capability/tool/time/decision and child-request queries by session/request lineage; agent-level joins come later via the capability lineage index.
 - Add SQLite FTS or LIKE queries for receipt search (tool name, decision, timestamp range).
 
 **Effort:** ~1 week.
 
 ### 3.3 Rate Limit / Velocity Guard
 
-**Source (ClawdStrike):**
-- `crates/libs/clawdstrike/src/async_guards/rate_limit.rs` -- `TokenBucket` struct (68 lines)
+**Source (upstream guard suite):**
+- `crates/libs/the upstream guard suite/src/async_guards/rate_limit.rs` -- `TokenBucket` struct (68 lines)
 
 **Target (Chio):**
 - `crates/chio-guards/src/velocity.rs` (new guard module)
@@ -148,13 +148,13 @@ After integration, chio-core is the single canonical source for all of these.
 - Add per-agent and per-grant rate tracking: e.g. `HashMap<(AgentId, grant_index), TokenBucket>` or an equivalent keyed structure. Per-agent buckets alone do not cover grant-scoped spend windows.
 - Capture `GuardEvidence` with `tokens_remaining`, `rate_per_sec`, `burst`, and `wait_estimate_ms`.
 - Add `VelocityConfig` with `rate_per_interval`, `interval_secs`, `burst`, and `per_agent: bool`.
-- For monetary velocity limits, derive debits from Chio budget/cost metadata rather than the ClawdStrike token bucket alone.
+- For monetary velocity limits, derive debits from Chio budget/cost metadata rather than the guard product token bucket alone.
 
 **Effort:** ~4-5 days.
 
 ### 3.4 SIEM Exporters
 
-**Source (ClawdStrike):**
+**Source (upstream guard suite):**
 - `crates/services/hushd/src/siem/exporters/splunk.rs` -- Splunk HEC exporter
 - `crates/services/hushd/src/siem/exporters/elastic.rs` -- Elasticsearch bulk API exporter
 - `crates/services/hushd/src/siem/exporters/datadog.rs` -- Datadog agent exporter
@@ -182,7 +182,7 @@ After integration, chio-core is the single canonical source for all of these.
 **Adaptations needed:**
 - Replace `SecurityEvent` with a Chio-native `ReceiptEvent` that wraps `ChioReceipt` plus routing metadata (exporter name, schema format, tenant context).
 - Replace `hush_core` types in the event payload with `chio_core` types.
-- Support schema formats: ECS, CEF, OCSF, Native (matching ClawdStrike's `SchemaFormat` enum).
+- Support schema formats: ECS, CEF, OCSF, Native (matching the guard product's `SchemaFormat` enum).
 - The `Exporter` trait's `export_batch()` method should accept `Vec<ReceiptEvent>` and return `ExportResult`.
 - Batch processing: configurable `batch_size` (default 100) and `flush_interval_ms` (default 5000).
 - Retry with exponential backoff: `max_retries`, `initial_backoff_ms`, `max_backoff_ms`, `backoff_multiplier`.
@@ -193,7 +193,7 @@ After integration, chio-core is the single canonical source for all of these.
 
 ### 3.5 Checkpoint Statement Pattern (Merkle Wiring)
 
-**Source (ClawdStrike):**
+**Source (upstream guard suite):**
 - `crates/libs/spine/src/checkpoint.rs` -- `checkpoint_statement()`, `checkpoint_hash()`, `checkpoint_witness_message()`, `sign_checkpoint_statement()`, `verify_witness_signature()`
 
 **Target (Chio):**
@@ -220,8 +220,8 @@ After integration, chio-core is the single canonical source for all of these.
 
 ### 3.6 Capability Lineage Index (Chio-Native Companion Work)
 
-**Source (ClawdStrike):**
-- No direct equivalent. ClawdStrike does not currently provide the capability snapshot index Chio needs for agent-centric joins.
+**Source (upstream guard suite):**
+- No direct equivalent. The guard product does not currently provide the capability snapshot index Chio needs for agent-centric joins.
 
 **Target (Chio):**
 - `crates/chio-kernel/src/capability_index.rs` (new module) or equivalent persistence integrated with the authority/store layer
@@ -235,15 +235,15 @@ After integration, chio-core is the single canonical source for all of these.
 - Provide a deterministic join path from receipts to the matched grant context
 - Make the index queryable without replaying issuance logs
 
-**Phase:** Q3 2026 native Chio work. This is a prerequisite for reputation and agent-level analytics, and it is not supplied by any direct ClawdStrike code port.
+**Phase:** Q3 2026 native Chio work. This is a prerequisite for reputation and agent-level analytics, and it is not supplied by any direct upstream code port.
 
-## 4. What ClawdStrike Should Import FROM Chio
+## 4. What the Guard Product Should Import From Chio
 
-Once chio-core becomes the canonical source of truth, ClawdStrike should add
+Once chio-core becomes the canonical source of truth, the guard product should add
 `chio-core` and `chio-kernel` as workspace dependencies and replace its internal
 implementations.
 
-| ClawdStrike module                | Replaced by                  | Notes                                                    |
+| Upstream module                | Replaced by                  | Notes                                                    |
 |-----------------------------------|------------------------------|----------------------------------------------------------|
 | `hush_core::signing`              | `chio_core::crypto`          | `Keypair`, `PublicKey`, `Signature`, `Signer` trait       |
 | `hush_core::hashing`             | `chio_core::hashing`         | `sha256()`, `sha256_hex()`, `Hash` type                  |
@@ -253,18 +253,18 @@ implementations.
 | `hush_multi_agent::token`        | `chio_core::capability`      | `CapabilityToken` replaces `DelegationClaims`; `DelegationLink` replaces `chn` chains |
 | `hush_multi_agent::revocation`   | `chio_kernel::revocation_store` | `SqliteRevocationStore` with the same bloom + SQLite pattern |
 
-Additional imports ClawdStrike should make:
+Additional imports the guard product should make:
 
-- `chio_kernel::Guard` trait replaces `clawdstrike::guards::Guard` trait. ClawdStrike's `GuardResult` maps to `chio_kernel::Verdict` + `chio_core::GuardEvidence`.
+- `chio_kernel::Guard` trait replaces the upstream `guards::Guard` trait. The upstream `GuardResult` maps to `chio_kernel::Verdict` + `chio_core::GuardEvidence`.
 - `chio_kernel::CapabilityAuthority` replaces ad-hoc token issuance in `hush_multi_agent`.
 - `chio_core::ToolManifest` replaces any internal tool discovery schemas.
 
-ClawdStrike should re-export selected Chio types under its own namespace for
+The guard product should re-export selected Chio types under its own namespace for
 backwards compatibility during the transition, while keeping adapters for
 incompatible wire formats:
 
 ```rust
-// In clawdstrike/crates/libs/hush-core/src/lib.rs (transitional)
+// In the upstream guard suite/crates/libs/hush-core/src/lib.rs (transitional)
 pub use chio_core::crypto::{Keypair, PublicKey, Signature};
 pub use chio_core::hashing::{sha256, sha256_hex, Hash};
 pub use chio_core::canonical::canonicalize as canonicalize_json;
@@ -273,10 +273,10 @@ pub use chio_core::merkle::{MerkleTree, MerkleProof};
 
 ## 5. Migration Sequence
 
-### Phase 1: Port code from ClawdStrike into Chio (Q2 2026)
+### Phase 1: Port shared code into Chio (Q2 2026)
 
 Target: Chio gains the shared building blocks from Sections 3.1-3.5, with full
-test coverage and no runtime dependency on ClawdStrike. The capability lineage
+test coverage and no runtime dependency on the guard product. The capability lineage
 index in Section 3.6 remains native Q3 work.
 
 | Week | Deliverable                         | Owner | Validation                                         |
@@ -287,7 +287,7 @@ index in Section 3.6 remains native Q3 work.
 | 4-5  | Checkpoint statement pattern        | --    | Checkpoint sign/verify tests; Merkle batch test      |
 | 5-6  | Integration test: full receipt flow | --    | End-to-end: issue cap, invoke tool, sign receipt, verify checkpoint |
 
-### Phase 2: Add chio-core as a workspace dependency in ClawdStrike + SIEM (Q3 2026)
+### Phase 2: Add chio-core as a workspace dependency in the guard product + SIEM (Q3 2026)
 
 **SIEM exporter porting** (moved from Phase 1 to align with Strategic Roadmap Q3 placement):
 
@@ -295,22 +295,22 @@ index in Section 3.6 remains native Q3 work.
 |------|-------------------------------------|-------|-----------------------------------------------------|
 | 1-2  | chio-siem crate (6 exporters)       | --    | Mock SIEM endpoint tests; DLQ round-trip test        |
 
-**ClawdStrike dependency restructure:**
+**the guard product dependency restructure:**
 
-Target: ClawdStrike's `Cargo.toml` workspace members include `chio-core` and
+Target: the upstream `Cargo.toml` workspace members include `chio-core` and
 `chio-kernel` as path or git dependencies.
 
 Steps:
-1. Add `chio-core` and `chio-kernel` to the ClawdStrike workspace `[dependencies]`.
+1. Add `chio-core` and `chio-kernel` to the guard product workspace `[dependencies]`.
 2. Create a `hush-core` compatibility shim with selective re-exports and
    adapter types. Do not use a blanket `pub use chio_core::*`; preserve the
    module structure while adapting incompatible types and wire formats.
-3. Run the full ClawdStrike test suite. Fix type mismatches (e.g., `Verdict` vs
+3. Run the full upstream test suite. Fix type mismatches (e.g., `Verdict` vs
    `Decision`, `SignedReceipt` vs `ChioReceipt`).
-4. Update the ClawdStrike CI pipeline to build both workspaces.
+4. Update the upstream CI pipeline to build both workspaces.
 
 Risk mitigation: use a feature flag `chio-backend` (default off) during this
-phase. ClawdStrike CI runs tests with both `chio-backend` on and off.
+phase. The upstream CI runs tests with both `chio-backend` on and off.
 
 ### Phase 3: Replace hush-core internals with chio-core re-exports (Q3-Q4 2026)
 
@@ -322,64 +322,64 @@ Steps:
 2. Remove `hush_core::hashing` implementation; replace with `pub use chio_core::hashing::*`.
 3. Remove `hush_core::canonical` implementation; replace with `pub use chio_core::canonical::*`.
 4. Remove `hush_core::merkle` implementation; replace with `pub use chio_core::merkle::*`.
-5. Keep `hush_core::tpm` (TPM-sealed key support is ClawdStrike-specific).
+5. Keep `hush_core::tpm` (TPM-sealed key support is upstream-specific).
 6. Keep `hush_core::duration` (human duration parsing is application-level).
 7. Remove `hush_core::receipt` implementation; replace with adapter types that
-   convert between `ChioReceipt` and ClawdStrike's `SignedReceipt` wire format.
+   convert between `ChioReceipt` and the upstream `SignedReceipt` wire format.
 
-### Phase 4: ClawdStrike fully depends on chio-core + chio-kernel (Q4 2026)
+### Phase 4: Guard product fully depends on chio-core + chio-kernel (Q4 2026)
 
 Target: `hush-core` is deprecated as the source of shared primitives. All
-ClawdStrike crates import directly from `chio_core` and `chio_kernel` for
-shared protocol types. Only ClawdStrike-specific helpers or compatibility
+The guard product crates import directly from `chio_core` and `chio_kernel` for
+shared protocol types. Only upstream-specific helpers or compatibility
 adapters remain in `hush-core` (or a successor compat crate).
 
 Steps:
-1. Replace all `use hush_core::` with `use chio_core::` across the ClawdStrike
-   workspace (`hushd`, `control-api`, `clawdstrike-brokerd`, all bridges).
+1. Replace all `use hush_core::` with `use chio_core::` across the upstream
+   workspace (`hushd`, `control-api`, `guard-brokerd`, all bridges).
 2. Replace `hush_multi_agent::token::DelegationClaims` with
    `chio_core::capability::CapabilityToken`. Write a migration for any
    persisted delegation tokens.
-3. Replace ClawdStrike's `Guard` trait with `chio_kernel::Guard`. Adapt
+3. Replace the upstream `Guard` trait with `chio_kernel::Guard`. Adapt
    the async guard runtime to wrap synchronous Chio guards with
    `tokio::task::spawn_blocking`.
-4. Move the remaining ClawdStrike-specific `hush-core` modules (`tpm`,
+4. Move the remaining upstream-specific `hush-core` modules (`tpm`,
    duration parsing, wire-format adapters) into a small compatibility crate or
    leave them as the only surviving `hush-core` modules.
 5. Delete `hush-multi-agent` crate (delegation logic now in chio-core/chio-kernel).
-6. Update ClawdStrike documentation and SDK references.
+6. Update upstream documentation and SDK references.
 
-## 6. What Stays in ClawdStrike Only
+## 6. What Stays in the Guard Product Only
 
 The following components are application-layer concerns that do not belong in a
-protocol specification. They remain exclusively in ClawdStrike.
+protocol specification. They remain exclusively in the guard product.
 
 ### Application-Layer Guards
 
 | Guard                          | Source file                                                        | Why it stays                                      |
 |--------------------------------|--------------------------------------------------------------------|---------------------------------------------------|
-| `JailbreakGuard`               | `crates/libs/clawdstrike/src/guards/jailbreak.rs`                 | ML-based detection, model-specific heuristics      |
-| `PromptInjectionGuard`         | `crates/libs/clawdstrike/src/guards/prompt_injection.rs`          | NLP pipeline, vendor-specific scoring              |
-| `ComputerUseGuard`             | `crates/libs/clawdstrike/src/guards/computer_use.rs`              | CUA-specific policy (screenshot, click, type)      |
-| `InputInjectionCapabilityGuard`| `crates/libs/clawdstrike/src/guards/input_injection_capability.rs` | Desktop input event filtering                      |
-| `RemoteDesktopSideChannelGuard`| `crates/libs/clawdstrike/src/guards/remote_desktop_side_channel.rs`| RDP/VNC side-channel detection                     |
-| `SpiderSense`                  | `crates/libs/clawdstrike/src/spider_sense.rs`                     | Behavioral anomaly scoring                         |
-| `CustomGuardRegistry`          | `crates/libs/clawdstrike/src/guards/custom.rs`                    | User-defined guard loading via WASM/plugin         |
+| `JailbreakGuard`               | the upstream `guards/jailbreak.rs`                 | ML-based detection, model-specific heuristics      |
+| `PromptInjectionGuard`         | the upstream `guards/prompt_injection.rs`          | NLP pipeline, vendor-specific scoring              |
+| `ComputerUseGuard`             | the upstream `guards/computer_use.rs`              | CUA-specific policy (screenshot, click, type)      |
+| `InputInjectionCapabilityGuard`| the upstream `guards/input_injection_capability.rs` | Desktop input event filtering                      |
+| `RemoteDesktopSideChannelGuard`| the upstream `guards/remote_desktop_side_channel.rs`| RDP/VNC side-channel detection                     |
+| `SpiderSense`                  | the upstream `spider_sense.rs`                     | Behavioral anomaly scoring                         |
+| `CustomGuardRegistry`          | the upstream `guards/custom.rs`                    | User-defined guard loading via WASM/plugin         |
 
 ### Async Guard Runtime
 
 | Component          | Source file                                                    | Why it stays                          |
 |--------------------|----------------------------------------------------------------|---------------------------------------|
-| `AsyncGuardRuntime`| `crates/libs/clawdstrike/src/async_guards/runtime.rs`         | Tokio-specific orchestration          |
-| Circuit breakers   | `crates/libs/clawdstrike/src/async_guards/circuit_breaker.rs` | Production resilience pattern         |
-| Guard caching      | `crates/libs/clawdstrike/src/async_guards/cache.rs`           | Result memoization                    |
-| Guard retry        | `crates/libs/clawdstrike/src/async_guards/retry.rs`           | Retry with backoff for external calls |
-| Threat intel feed  | `crates/libs/clawdstrike/src/async_guards/threat_intel/`      | External threat feed integration      |
+| `AsyncGuardRuntime`| the upstream `async_guards/runtime.rs`         | Tokio-specific orchestration          |
+| Circuit breakers   | the upstream `async_guards/circuit_breaker.rs` | Production resilience pattern         |
+| Guard caching      | the upstream `async_guards/cache.rs`           | Result memoization                    |
+| Guard retry        | the upstream `async_guards/retry.rs`           | Retry with backoff for external calls |
+| Threat intel feed  | the upstream `async_guards/threat_intel/` modules      | External threat feed integration      |
 
 ### Fleet Management and Control Plane
 
 - Control API (`crates/services/control-api/`) -- tenant management, agent enrollment, policy CRUD, delegation graph visualization, compliance checks, billing, hunt queries, response actions, case management
-- Posture commands (`crates/libs/clawdstrike/src/posture.rs`) -- agent health posture, compliance scoring
+- Posture commands (`crates/libs/the upstream guard suite/src/posture.rs`) -- agent health posture, compliance scoring
 - RBAC (`crates/services/hushd/src/rbac/`) -- role-based access control for the control plane itself
 - Policy engine cache (`crates/services/hushd/src/policy_engine_cache.rs`)
 - Certification webhooks (`crates/services/hushd/src/certification_webhooks.rs`)
@@ -398,25 +398,25 @@ protocol specification. They remain exclusively in ClawdStrike.
 
 - Desktop/agent apps (`apps/`)
 - WASM guard runtime (`crates/libs/hush-wasm/`)
-- Guard SDK and macros (`crates/libs/clawdstrike-guard-sdk/`, `crates/libs/clawdstrike-guard-sdk-macros/`)
-- OCSF event schema (`crates/libs/clawdstrike-ocsf/`)
-- Policy event types (`crates/libs/clawdstrike-policy-event/`)
+- Guard SDK and macros (`crates/libs/the upstream guard suite-guard-sdk/`, `crates/libs/the upstream guard suite-guard-sdk-macros/`)
+- OCSF event schema (`crates/libs/the upstream guard suite-ocsf/`)
+- Policy event types (`crates/libs/the upstream guard suite-policy-event/`)
 - Spine NATS transport (`crates/libs/spine/src/nats_transport.rs`)
 - Spine marketplace facts (`crates/libs/spine/src/marketplace_spine.rs`, `marketplace_facts.rs`)
 - Threat intelligence correlations (`crates/libs/hunt-correlate/`, `hunt-query/`, `hunt-scan/`)
-- Registry service (`crates/services/clawdstrike-registry/`)
+- Registry service (`crates/services/the upstream guard suite-registry/`)
 - EAS anchor service (`crates/services/eas-anchor/`)
 - Logos Z3 solver integration (`crates/libs/logos-z3/`)
-- Output sanitizer (`crates/libs/clawdstrike/src/output_sanitizer.rs`)
-- Watermarking (`crates/libs/clawdstrike/src/watermarking.rs`)
-- Marketplace feed (`crates/libs/clawdstrike/src/marketplace_feed.rs`)
-- Instruction hierarchy (`crates/libs/clawdstrike/src/instruction_hierarchy.rs`)
+- Output sanitizer (`crates/libs/the upstream guard suite/src/output_sanitizer.rs`)
+- Watermarking (`crates/libs/the upstream guard suite/src/watermarking.rs`)
+- Marketplace feed (`crates/libs/the upstream guard suite/src/marketplace_feed.rs`)
+- Instruction hierarchy (`crates/libs/the upstream guard suite/src/instruction_hierarchy.rs`)
 
 ## 7. Type Mapping Reference
 
 Quick reference for developers porting code between the two projects.
 
-| ClawdStrike type                          | Chio equivalent                              |
+| Upstream type                          | Chio equivalent                              |
 |-------------------------------------------|----------------------------------------------|
 | `hush_core::Keypair`                      | `chio_core::crypto::Keypair`                 |
 | `hush_core::PublicKey`                    | `chio_core::crypto::PublicKey`               |
@@ -433,23 +433,23 @@ Quick reference for developers porting code between the two projects.
 | `hush_multi_agent::DelegationClaims`     | `chio_core::capability::CapabilityToken`     |
 | `hush_multi_agent::AgentCapability`      | `chio_core::capability::ChioScope`           |
 | `hush_multi_agent::AgentId`             | `chio_core::AgentId` (`String`)              |
-| `clawdstrike::guards::Guard` (trait)     | `chio_kernel::Guard` (trait)                 |
-| `clawdstrike::guards::GuardResult`       | `chio_kernel::Verdict` + `chio_core::GuardEvidence` |
-| `clawdstrike::guards::GuardAction`       | `chio_kernel::GuardContext`                  |
-| `clawdstrike::guards::GuardContext`      | `chio_kernel::GuardContext` (different shape) |
-| `clawdstrike::guards::Severity`          | No direct equivalent; map to `GuardEvidence::details` |
+| the upstream `guards::Guard` (trait)     | `chio_kernel::Guard` (trait)                 |
+| the upstream `guards::GuardResult`       | `chio_kernel::Verdict` + `chio_core::GuardEvidence` |
+| the upstream `guards::GuardAction`       | `chio_kernel::GuardContext`                  |
+| the upstream `guards::GuardContext`      | `chio_kernel::GuardContext` (different shape) |
+| the upstream `guards::Severity`          | No direct equivalent; map to `GuardEvidence::details` |
 
 ## 8. Risk Register
 
 | Risk                                  | Impact | Mitigation                                                        |
 |---------------------------------------|--------|-------------------------------------------------------------------|
 | Type divergence during parallel dev   | High   | Freeze chio-core public API before Phase 2; semver guarantees     |
-| ClawdStrike test suite regression     | High   | Feature flag (`chio-backend`) with dual CI runs                   |
+| upstream test suite regression     | High   | Feature flag (`chio-backend`) with dual CI runs                   |
 | Canonical JSON output differs         | Critical | Property-based fuzz tests comparing `hush_core::canonicalize_json` vs `chio_core::canonicalize` output on 10k random JSON values |
 | Merkle tree compatibility             | Critical | Cross-validate tree roots: same leaves must produce same root in both implementations before deleting hush-core version |
 | Ed25519 signature compatibility       | Critical | Sign with hush-core, verify with chio-core (and vice versa) in CI |
 | Performance regression in guard eval  | Medium | Benchmark `Guard::evaluate()` latency before and after migration  |
 | DPoP replay protection missing from source port | High   | Treat broker DPoP code as verifier source material only; add a Chio-specific proof message and nonce replay store before claiming completion |
-| Capability lineage index assumed to come from ClawdStrike | High   | Build the capability snapshot/index natively in Chio; do not couple agent analytics or reputation work to ClawdStrike control-api indexes |
+| Capability lineage index assumed to come from the guard product | High   | Build the capability snapshot/index natively in Chio; do not couple agent analytics or reputation work to the guard product control-api indexes |
 | SIEM exporter API surface too large   | Medium | Put chio-siem behind a feature flag; keep chio-core/chio-kernel lean |
-| Breaking changes in chio-core affect ClawdStrike releases | Medium | Pin chio-core version in ClawdStrike; bump deliberately          |
+| Breaking changes in chio-core affect guard product releases | Medium | Pin chio-core version in the guard product; bump deliberately          |

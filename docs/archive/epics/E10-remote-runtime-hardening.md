@@ -70,7 +70,7 @@ Out of scope:
 
 ## Primary files and areas
 
-- `crates/chio-cli/src/remote_mcp.rs`
+- `crates/chio-mcp-remote/src/remote_mcp/`
 - `crates/chio-mcp-adapter/src/transport.rs`
 - `crates/chio-mcp-adapter/src/edge.rs`
 - `crates/chio-core/src/session.rs`

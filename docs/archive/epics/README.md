@@ -1,12 +1,12 @@
 # Epic Specs
 
-These documents are issue-ready execution specs for the current milestones in [../EXECUTION_PLAN.md](../operations/EXECUTION_PLAN.md).
+These documents are issue-ready execution specs for the current milestones in [../EXECUTION_PLAN.md](../../operations/EXECUTION_PLAN.md).
 
-For the current post-review closing sequence, also see [../POST_REVIEW_EXECUTION_PLAN.md](../archive/POST_REVIEW_EXECUTION_PLAN.md).
+For the current post-review closing sequence, also see [../POST_REVIEW_EXECUTION_PLAN.md](../POST_REVIEW_EXECUTION_PLAN.md).
 
-For the larger E7 trust-plane rewrites, also see [../DISTRIBUTED_CONTROL_PLAN.md](../operations/DISTRIBUTED_CONTROL_PLAN.md) and [../HA_CONTROL_AUTH_PLAN.md](../operations/HA_CONTROL_AUTH_PLAN.md).
+For the larger E7 trust-plane rewrites, also see [../DISTRIBUTED_CONTROL_PLAN.md](../../operations/DISTRIBUTED_CONTROL_PLAN.md) and [../HA_CONTROL_AUTH_PLAN.md](../../operations/HA_CONTROL_AUTH_PLAN.md).
 
-For E8 Slice A planning, also see [../CONFORMANCE_HARNESS_PLAN.md](../operations/CONFORMANCE_HARNESS_PLAN.md) and the E8 research documents in [../research/README.md](../research/README.md).
+For E8 Slice A planning, also see [../CONFORMANCE_HARNESS_PLAN.md](../../operations/CONFORMANCE_HARNESS_PLAN.md) and the E8 research documents in [../research/README.md](../../research/README.md).
 
 Current epics:
 

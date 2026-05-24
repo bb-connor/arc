@@ -19,7 +19,7 @@ This plan describes execution order, dependency management, and deliverable boun
 Initial execution artifacts:
 
 - ADRs: [adr/README.md](../adr/README.md)
-- issue-ready epics: [epics/README.md](../epics/README.md)
+- issue-ready epics: [epics/README.md](../archive/epics/README.md)
 - post-review closing plan: [POST_REVIEW_EXECUTION_PLAN.md](../archive/POST_REVIEW_EXECUTION_PLAN.md)
 
 ## Planning Assumptions
@@ -74,7 +74,7 @@ Post-review closing work is now split into focused epics:
 > implementation milestones, not Chio-owned protocol, schema, SDK, or runtime
 > versions. Current protocol posture is v1-only.
 
-See [POST_REVIEW_EXECUTION_PLAN.md](../archive/POST_REVIEW_EXECUTION_PLAN.md) and the new epic specs in [epics/README.md](../epics/README.md).
+See [POST_REVIEW_EXECUTION_PLAN.md](../archive/POST_REVIEW_EXECUTION_PLAN.md) and the new epic specs in [epics/README.md](../archive/epics/README.md).
 
 ## Pre-Release v1 Implemented Features
 
@@ -698,7 +698,7 @@ Make the clustered trust-control path deterministic enough for repeated full-sui
 
 ### Primary repo areas
 
-- `crates/chio-cli/src/trust_control.rs`
+- `crates/chio-control-plane/src/trust_control.rs`
 - `crates/chio-kernel/src/budget_store.rs`
 - authority, receipt, and revocation store implementations
 - clustered trust-control tests
@@ -744,7 +744,7 @@ Turn the authenticated remote MCP edge into a reconnect-safe, deployment-hard ru
 
 ### Primary repo areas
 
-- `crates/chio-cli/src/remote_mcp.rs`
+- `crates/chio-mcp-remote/src/remote_mcp/`
 - `crates/chio-mcp-adapter`
 - `crates/chio-core`
 - `crates/chio-kernel`
@@ -793,7 +793,7 @@ Finish one coherent ownership model for tasks, streams, cancellation, and async 
 - `crates/chio-core`
 - `crates/chio-kernel`
 - `crates/chio-mcp-adapter`
-- `crates/chio-cli/src/remote_mcp.rs`
+- `crates/chio-mcp-remote/src/remote_mcp/`
 - conformance and integration tests
 
 ### Deliverables

@@ -56,7 +56,7 @@ Out of scope:
 
 ## Primary files and areas
 
-- `crates/chio-cli/src/trust_control.rs`
+- `crates/chio-control-plane/src/trust_control.rs`
 - `crates/chio-kernel/src/budget_store.rs`
 - `crates/chio-kernel/src/authority.rs`
 - `crates/chio-kernel/src/receipt_store.rs`

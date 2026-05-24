@@ -36,7 +36,7 @@ Out of scope:
 ## Primary files and areas
 
 - `docs/adr/`
-- `docs/epics/`
+- `docs/archive/epics/`
 - `docs/EXECUTION_PLAN.md`
 - `docs/ROADMAP_V1.md`
 
@@ -69,7 +69,7 @@ Out of scope:
 
 ### `T0.7` Create epic-spec directory and first epic docs
 
-- add `docs/epics/README.md`
+- add `docs/archive/epics/README.md`
 - add issue-ready docs for E1 and E2
 
 ### `T0.8` Link all artifacts from existing docs
