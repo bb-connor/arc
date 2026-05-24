@@ -263,18 +263,26 @@ use crate::{
     CliError,
 };
 
+#[path = "trust_control/authority_handlers.rs"]
+mod authority_handlers;
+#[path = "trust_control/budget_handlers.rs"]
+mod budget_handlers;
 #[path = "trust_control/capital_and_liability.rs"]
 mod capital_and_liability;
+#[path = "trust_control/certification_handlers.rs"]
+mod certification_handlers;
 #[path = "trust_control/cluster_and_reports.rs"]
 mod cluster_and_reports;
 #[path = "trust_control/config_and_public.rs"]
 mod config_and_public;
 #[path = "trust_control/credit_and_loss.rs"]
 mod credit_and_loss;
-#[path = "trust_control/http_handlers_a.rs"]
-mod http_handlers_a;
-#[path = "trust_control/http_handlers_b.rs"]
-mod http_handlers_b;
+#[path = "trust_control/passport_handlers.rs"]
+mod passport_handlers;
+#[path = "trust_control/receipt_handlers.rs"]
+mod receipt_handlers;
+#[path = "trust_control/risk_finance_handlers.rs"]
+mod risk_finance_handlers;
 #[path = "trust_control/service_runtime.rs"]
 mod service_runtime;
 #[path = "trust_control/service_types.rs"]
@@ -289,11 +297,15 @@ mod underwriting_and_support;
 pub use self::config_and_public::*;
 pub use self::service_runtime::*;
 pub use self::service_types::*;
-// http_handlers_a, http_handlers_b, and credit_and_loss expose only crate-internal
+// The domain handler modules and credit_and_loss expose only crate-internal
 // (`pub(crate)`) items, so they are re-exported with crate visibility.
+pub(crate) use self::authority_handlers::*;
+pub(crate) use self::budget_handlers::*;
 pub use self::capital_and_liability::*;
+pub(crate) use self::certification_handlers::*;
 pub use self::cluster_and_reports::*;
 pub(crate) use self::credit_and_loss::*;
-pub(crate) use self::http_handlers_a::*;
-pub(crate) use self::http_handlers_b::*;
+pub(crate) use self::passport_handlers::*;
+pub(crate) use self::receipt_handlers::*;
+pub(crate) use self::risk_finance_handlers::*;
 pub use self::underwriting_and_support::*;
