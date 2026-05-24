@@ -97,7 +97,8 @@ mod kernel_shim {
 
 #[test]
 fn passkey_to_capability_to_kernel_call_then_revoke_within_m04_epoch() {
-    // Stage 1: assemble the issuer with all three P2 surfaces.
+    // Stage 1: assemble the issuer with all three security surfaces
+    // (signer, replay nonce store, revocation cascade).
     let backend = Ed25519Backend::new(Keypair::from_seed(&[71u8; 32]));
     let issuer_public = backend.public_key();
     let signer: Arc<dyn SigningBackend> = Arc::new(backend);
