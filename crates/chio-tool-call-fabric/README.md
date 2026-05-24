@@ -10,7 +10,8 @@ adapter implements `lift(ProviderRequest) -> ToolInvocation` and
 `lower(VerdictResult, ToolResult) -> ProviderResponse` so verdict-time
 enforcement and receipt emission stay identical across providers.
 
-T1 (this commit) scaffolds the workspace member; T2-T6 fill in the trait
-surface, provenance signing helper, streaming state machine, and
-lift/lower conformance fixtures. See `spec/PROTOCOL.md` for the
-normative wire-level spec.
+The trait surface, provenance signing helper, streaming state machine, and
+lift/lower conformance fixtures are shared by every provider adapter, so a
+single Chio policy file enforces uniformly across OpenAI Responses, Anthropic
+Messages, and Bedrock Converse. See `spec/PROTOCOL.md` for the normative
+wire-level spec.

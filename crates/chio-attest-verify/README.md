@@ -1,15 +1,15 @@
 # chio-attest-verify
 
-Single source of truth for Sigstore verification across the chio workspace.
-M09 (release-archive verification), M06 (WASM guard signing), and M02 (fuzz
-target for the verifier) all consume this crate; no other crate is permitted
-to call `sigstore-rs` directly.
+Single source of truth for Sigstore verification across the Chio workspace.
+Release-archive verification, WASM guard signing, and the verifier fuzz
+target all consume this crate; no other crate is permitted to call
+`sigstore-rs` directly.
 
 ## Trait surface
 
 The crate exposes a single `AttestVerifier` trait and one production impl,
-`SigstoreVerifier`. The trait surface is fixed and consumed verbatim by
-M06's guard registry and M02's fuzz harness:
+`SigstoreVerifier`. The trait surface is fixed and consumed verbatim by the
+guard registry and the verifier fuzz harness:
 
 ```rust
 use chio_attest_verify::{AttestVerifier, ExpectedIdentity, SigstoreVerifier};
@@ -90,8 +90,8 @@ contract on every trait method:
 
 The positive end-to-end keyless flow requires a Fulcio-issued certificate
 from a real OIDC workflow run, which is not hermetically reproducible
-inside `cargo test`. The M09 release-binaries CI workflow exercises that
-path online via `cosign verify-blob` against published release archives.
+inside `cargo test`. The release-binaries CI workflow exercises that path
+online via `cosign verify-blob` against published release archives.
 
 ## Forbidden constructs
 
