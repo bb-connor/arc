@@ -47,10 +47,7 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
-use chio_core::crypto::{
-    canonical_json_shared_bytes, sign_shared_canonical_with_backend, Ed25519Backend, Signature,
-    SigningAlgorithm, SigningBackend,
-};
+use chio_core::crypto::{Ed25519Backend, SigningBackend};
 use chio_log_redact::redacted;
 use tokio::runtime::Handle;
 use tokio::sync::{mpsc, oneshot};
@@ -490,80 +487,33 @@ fn sign_one_with_backend(
     body: ChioReceiptBody,
     backend: &dyn SigningBackend,
 ) -> Result<ChioReceipt, KernelError> {
-    use chio_core::receipt::{chio_receipt_id, ChioReceiptSigningBody};
-
-    let backend_key = backend.public_key();
-    if body.kernel_key.algorithm() != backend_key.algorithm() || body.kernel_key != backend_key {
-        return Err(KernelError::ReceiptSigningFailed(
-            "kernel signing key does not match receipt body kernel_key".to_string(),
-        ));
-    }
-
-    // Mirror the synchronous classical and hybrid sibling paths so the bytes
-    // this task signs are byte-identical to receipts produced via
-    // `build_and_sign_receipt`. `ChioReceipt::sign_with_backend` performs
-    // three steps before signing: validate semantics, compute the
-    // content-addressed id, and build the `ChioReceiptSigningBody` wrapper
-    // (id plus `ChioReceiptIdInput`). Replicating that ordering here keeps
-    // the byte-identity contract intact across the inline and async signing
-    // funnels. The reference fix lives in `receipt_support.rs` as
-    // `sign_receipt_body_hybrid_canonical`.
-    let mut body = body;
-    body.validate_signable_semantics().map_err(|error| {
-        KernelError::ReceiptSigningFailed(format!(
-            "receipt body failed semantic validation: {error}"
-        ))
-    })?;
-    body.id = chio_receipt_id(&body).map_err(|error| {
-        KernelError::ReceiptSigningFailed(format!(
-            "canonical JSON encoding of receipt id input failed: {error}"
-        ))
-    })?;
-    let signing_body = ChioReceiptSigningBody::from(&body);
-
-    let canonical = canonical_json_shared_bytes(&signing_body).map_err(|error| {
-        KernelError::ReceiptSigningFailed(format!(
-            "canonical JSON encoding of receipt signing body failed: {error}"
-        ))
-    })?;
-    let (signature, _canonical) = sign_shared_canonical_with_backend(backend, canonical)
-        .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))?
-        .into_parts();
-
-    Ok(receipt_from_signed_body(
-        body,
-        Some(backend.algorithm()),
-        signature,
-    ))
-}
-
-fn receipt_from_signed_body(
-    body: ChioReceiptBody,
-    algorithm: Option<SigningAlgorithm>,
-    signature: Signature,
-) -> ChioReceipt {
-    ChioReceipt {
-        id: body.id,
-        timestamp: body.timestamp,
-        capability_id: body.capability_id,
-        tool_server: body.tool_server,
-        tool_name: body.tool_name,
-        action: body.action,
-        decision: body.decision,
-        receipt_kind: body.receipt_kind,
-        boundary_class: body.boundary_class,
-        observation_outcome: body.observation_outcome,
-        tool_origin: body.tool_origin,
-        redaction_mode: body.redaction_mode,
-        actor_chain: body.actor_chain,
-        content_hash: body.content_hash,
-        policy_hash: body.policy_hash,
-        evidence: body.evidence,
-        metadata: body.metadata,
-        trust_level: body.trust_level,
-        tenant_id: body.tenant_id,
-        kernel_key: body.kernel_key,
-        algorithm,
-        signature,
-    }
+    // Delegate to the single canonical signing primitive
+    // `chio_kernel_core::sign_receipt`, the same function the inline builders
+    // reach through `receipt_support::sign_receipt_body_with_backend` (which is
+    // a thin error-mapping wrapper over this call). The primitive routes
+    // through `ChioReceipt::sign_with_backend`, which performs the
+    // authoritative signing sequence: validate semantics, bind the
+    // `chio_receipt_signing_nonce` metadata key to the pre-nonce receipt id,
+    // compute the content-addressed id, build the `ChioReceiptSigningBody`
+    // wrapper, and sign. Routing the mpsc task through the same primitive means
+    // there is exactly one signing implementation, so the inline and async
+    // funnels are byte-identical by construction rather than by hand
+    // synchronization. The mpsc task still owns the keypair and channel
+    // plumbing; only the pure crypto step is delegated. We call the portable
+    // kernel-core function directly (rather than the `crate::receipt_support`
+    // wrapper) because this module is also `#[path]`-included by the
+    // crash/backpressure integration tests, whose crate root does not carry
+    // the `receipt_support` module; `chio_kernel_core` is reachable in both
+    // contexts. The error mapping mirrors `sign_receipt_body_with_backend`
+    // verbatim so the surfaced `KernelError` is identical on both funnels.
+    chio_kernel_core::sign_receipt(body, backend).map_err(|error| {
+        use chio_kernel_core::ReceiptSigningError;
+        let message = match error {
+            ReceiptSigningError::KernelKeyMismatch => {
+                "kernel signing key does not match receipt body kernel_key".to_string()
+            }
+            ReceiptSigningError::SigningFailed(reason) => reason,
+        };
+        KernelError::ReceiptSigningFailed(message)
+    })
 }

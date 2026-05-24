@@ -723,6 +723,28 @@ The signature input is the typed wrapper:
 ChioReceiptSigningBody { id, body: ChioReceiptIdInput }
 ```
 
+Before the id is computed, the producer binds a signing nonce into the
+receipt body. The nonce is the pre-binding receipt `id` (the producer's
+content-addressed id for the body as first assembled), recorded under the
+reserved `metadata` key `chio_receipt_signing_nonce`:
+
+```text
+metadata["chio_receipt_signing_nonce"] = pre_nonce_id
+```
+
+The binding happens once, in order: validate the body, write
+`chio_receipt_signing_nonce` into `metadata`, then compute `id =
+H(canonical_jcs(ChioReceiptIdInput))` over the now-nonce-bound body. Because
+`metadata` is part of `ChioReceiptIdInput`, the nonce is covered by both the
+authoritative `id` and the signature. If `metadata` already holds a non-object
+JSON value the producer preserves it under the `original_metadata` key before
+inserting the nonce; an empty or whitespace-only pre-binding `id` skips the
+binding. The nonce is a fixed point of signing: re-binding an already-bound
+body is a no-op because the bound body's `id` is recomputed over the bound
+metadata. Every signed `chio.receipt.v1` carries this key, and the inline and
+asynchronous kernel signing funnels emit byte-identical receipts because both
+apply this same binding through one signing primitive.
+
 The producer canonicalizes that wrapper via RFC 8785 JCS and signs the
 resulting bytes with the kernel's identity key. Three signing
 algorithms are supported in v1, and verifiers dispatch off the
@@ -823,6 +845,9 @@ Nested flows such as sampling, elicitation, and resource reads use
 The shipped metadata surface is extensible JSON. Current first-class uses
 include:
 
+- the reserved `chio_receipt_signing_nonce` key, bound by the signing path to
+  the pre-binding receipt id (see "Receipt Identity And DAG"); it is part of
+  the signed body on every receipt
 - financial attribution and settlement metadata
 - governed transaction intent and approval metadata
 - subject and issuer attribution

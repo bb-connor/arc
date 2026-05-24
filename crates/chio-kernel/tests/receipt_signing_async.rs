@@ -27,7 +27,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chio_core::crypto::{sha256_hex, Keypair};
-use chio_core::receipt::{chio_receipt_id, ChioReceiptBody, Decision, ToolCallAction, TrustLevel};
+use chio_core::receipt::{
+    chio_receipt_id, ChioReceiptBody, Decision, ToolCallAction, TrustLevel,
+    CHIO_RECEIPT_SIGNING_NONCE_METADATA_KEY,
+};
 use chio_kernel::{
     ChioKernel, KernelConfig, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
@@ -78,13 +81,15 @@ fn make_body(n: usize, kernel_key: &Keypair) -> ChioReceiptBody {
     .expect("payload canonicalises");
     let content_hash = sha256_hex(action.parameter_hash.as_bytes());
     let policy_hash = sha256_hex(format!("policy:{nonce}").as_bytes());
-    // The signing path (sync `ChioReceipt::sign` and the mpsc-backed
-    // `sign_one_with_backend`) computes the authoritative content-addressed
-    // id via `chio_receipt_id(&body)` before signing the
-    // `ChioReceiptSigningBody` wrapper. Pre-compute that id on the input
-    // body so the test fixture matches what the signing pipeline will emit,
-    // letting downstream assertions compare receipt ids without needing to
-    // know the canonical hash up front.
+    // The input body carries the producer's pre-binding id. The signing path
+    // (sync `ChioReceipt::sign` and the mpsc-backed `sign_one_with_backend`,
+    // both routed through `chio_kernel_core::sign_receipt`) binds the
+    // `chio_receipt_signing_nonce` metadata key to this pre-binding id, then
+    // recomputes the authoritative content-addressed id over the nonce-bound
+    // body before signing the `ChioReceiptSigningBody` wrapper. The emitted
+    // receipt id therefore differs from this pre-binding id; downstream
+    // assertions reconstruct the expected post-binding id via
+    // `expected_signed_id`.
     let mut body = ChioReceiptBody {
         id: format!("rcpt-{nonce}"),
         timestamp: 1_700_000_000 + (n as u64),
@@ -111,6 +116,42 @@ fn make_body(n: usize, kernel_key: &Keypair) -> ChioReceiptBody {
     body
 }
 
+/// Bind the `chio_receipt_signing_nonce` metadata key to the pre-binding
+/// receipt id, mirroring `chio_core_types::receipt::bind_receipt_signing_nonce`
+/// (the private step `chio_kernel_core::sign_receipt` runs before computing the
+/// content-addressed id). The nonce is the trimmed pre-binding `body.id`; an
+/// existing non-object metadata value is preserved under `original_metadata`.
+fn bind_signing_nonce(body: &mut ChioReceiptBody) {
+    let nonce = body.id.trim();
+    if nonce.is_empty() {
+        return;
+    }
+    let mut metadata = match body.metadata.take() {
+        Some(serde_json::Value::Object(map)) => map,
+        Some(value) => {
+            let mut map = serde_json::Map::new();
+            map.insert("original_metadata".to_string(), value);
+            map
+        }
+        None => serde_json::Map::new(),
+    };
+    metadata.insert(
+        CHIO_RECEIPT_SIGNING_NONCE_METADATA_KEY.to_string(),
+        serde_json::Value::String(nonce.to_string()),
+    );
+    body.metadata = Some(serde_json::Value::Object(metadata));
+}
+
+/// The authoritative receipt id the signing pipeline emits for `body`:
+/// bind the signing nonce, then recompute `chio_receipt_id` over the
+/// nonce-bound body (the exact transform `sign_receipt` applies before
+/// signing).
+fn expected_signed_id(body: &ChioReceiptBody) -> String {
+    let mut bound = body.clone();
+    bind_signing_nonce(&mut bound);
+    chio_receipt_id(&bound).expect("canonical receipt id computes")
+}
+
 // ---------------------------------------------------------------------------
 // Test 1 (correctness): N receipts signed via the mpsc path, all verify.
 //
@@ -135,7 +176,9 @@ async fn mpsc_signing_path_signs_n_receipts_with_valid_signatures() {
     for i in 0..N {
         let kernel = Arc::clone(&kernel);
         let body = make_body(i, &keypair);
-        let expected_id = body.id.clone();
+        // The signer binds the signing nonce and recomputes the id before
+        // signing, so the emitted id is the post-binding id, not `body.id`.
+        let expected_id = expected_signed_id(&body);
         let expected_timestamp = body.timestamp;
         handles.push(tokio::spawn(async move {
             let receipt = kernel
@@ -160,7 +203,10 @@ async fn mpsc_signing_path_signs_n_receipts_with_valid_signatures() {
             receipt.id
         );
         assert_eq!(receipt.kernel_key, public_key, "kernel_key drift");
-        assert_eq!(&receipt.id, expected_id, "receipt id was rewritten");
+        assert_eq!(
+            &receipt.id, expected_id,
+            "receipt id diverged from the canonical nonce-bound id"
+        );
         assert_eq!(
             receipt.timestamp, *expected_timestamp,
             "receipt timestamp was rewritten"
