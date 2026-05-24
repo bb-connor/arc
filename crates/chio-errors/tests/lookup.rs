@@ -24,6 +24,7 @@ fn all_domain_slugs_round_trip() {
         "lineage",
         "custody",
         "weights",
+        "mobile",
     ];
 
     assert_eq!(Domain::ALL.len(), expected.len());

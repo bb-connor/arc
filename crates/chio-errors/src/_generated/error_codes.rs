@@ -314,7 +314,7 @@ pub const PROVIDER_OPENAI: ErrorCodeSpec = ErrorCodeSpec {
     jsonrpc_code: None,
     since: "0.1.0",
     stability: "unstable",
-    consumed_by: &["chio-openai-adapter", "chio-provider-conformance"],
+    consumed_by: &["deferred-openai-adapter-ticket", "chio-provider-conformance"],
 };
 
 pub const PROVIDER_ANTHROPIC: ErrorCodeSpec = ErrorCodeSpec {
@@ -813,6 +813,45 @@ pub const CUSTODY_ASSERTION_REJECTED: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-custody-hw", "chio-control-plane"],
 };
 
+pub const MOBILE_RECEIPT_POST_REJECTED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:mobile:receipt-post-rejected",
+    domain: Domain::Mobile,
+    severity: Severity::Error,
+    summary: "Hosted oracle rejected a mobile receipt after a successful network POST.",
+    help: "Preserve the queued receipt, surface the oracle response, and do not retry until the tenant, signature, or capability binding is repaired.",
+    legacy_string_code: "CHIO-MOBILE-RECEIPT-POST-REJECTED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-kernel-mobile", "chio-custody-hw"],
+};
+
+pub const MOBILE_RECEIPT_SCHEMA_INVALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:mobile:receipt-schema-invalid",
+    domain: Domain::Mobile,
+    severity: Severity::Error,
+    summary: "Mobile receipt export did not validate against the audit-log export schema.",
+    help: "Keep the receipt in the offline queue and regenerate the export envelope against spec/audit-log/export-schema.v1.json before retrying.",
+    legacy_string_code: "CHIO-MOBILE-RECEIPT-SCHEMA-INVALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-kernel-mobile", "chio-siem"],
+};
+
+pub const MOBILE_ORACLE_UNREACHABLE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:mobile:oracle-unreachable",
+    domain: Domain::Mobile,
+    severity: Severity::Warning,
+    summary: "Mobile SDK could not reach the hosted receipt oracle within the retry budget.",
+    help: "Keep the receipt in the encrypted offline queue and retry with bounded backoff after connectivity returns.",
+    legacy_string_code: "CHIO-MOBILE-ORACLE-UNREACHABLE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-kernel-mobile", "chio-control-plane"],
+};
+
 pub const CUSTODY_AUDIENCE_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:custody:audience-mismatch",
     domain: Domain::Custody,
@@ -1212,6 +1251,9 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     LINEAGE_ANCESTOR_MISSING,
     CUSTODY_HARDWARE_KEY_UNAVAILABLE,
     CUSTODY_ASSERTION_REJECTED,
+    MOBILE_RECEIPT_POST_REJECTED,
+    MOBILE_RECEIPT_SCHEMA_INVALID,
+    MOBILE_ORACLE_UNREACHABLE,
     CUSTODY_AUDIENCE_MISMATCH,
     CUSTODY_REPLAY_DETECTED,
     CUSTODY_CAPABILITY_EXPIRED,
