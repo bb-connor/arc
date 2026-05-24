@@ -2520,6 +2520,7 @@ dependencies = [
  "async-trait",
  "chio-core-types",
  "chio-cross-protocol",
+ "chio-edge-metrics",
  "chio-kernel",
  "chio-manifest",
  "chio-mcp-edge",
@@ -2540,6 +2541,7 @@ dependencies = [
  "async-trait",
  "chio-core-types",
  "chio-cross-protocol",
+ "chio-edge-metrics",
  "chio-kernel",
  "chio-manifest",
  "chio-mcp-edge",
@@ -3238,6 +3240,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-edge-metrics"
+version = "0.1.0"
+dependencies = [
+ "chio-kernel",
+ "chio-metrics-spec",
+]
+
+[[package]]
 name = "chio-egress-contract"
 version = "0.1.0"
 dependencies = [
@@ -3753,6 +3763,7 @@ dependencies = [
  "async-trait",
  "chio-core-types",
  "chio-cross-protocol",
+ "chio-edge-metrics",
  "chio-kernel",
  "chio-manifest",
  "chio-metrics-spec",
