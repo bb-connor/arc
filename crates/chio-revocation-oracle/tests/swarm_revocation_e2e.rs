@@ -32,7 +32,7 @@ use std::time::{Duration, Instant};
 use chio_federation::{RevocationGossipPushQueue, RevocationRootGossip};
 use chio_kernel_core::{RevocationSnapshot, RevocationView, RevocationViewSubject};
 use chio_revocation_oracle::{
-    DigestRootSigner, EpochNonce, InMemoryRevocationOracle, RevocationKey, RevocationOracle,
+    Ed25519RootSigner, EpochNonce, InMemoryRevocationOracle, RevocationKey, RevocationOracle,
     SignedEpochRoot, SubjectId,
 };
 
@@ -103,7 +103,11 @@ struct TrialOutcome {
 /// oracle rejects same-key re-insertion as `AlreadyRevoked`).
 fn run_trial(trial_idx: u64, log: &ReceiptLog) -> Result<TrialOutcome, String> {
     let planner_oracle = Arc::new(Mutex::new(InMemoryRevocationOracle::new()));
-    let signer = DigestRootSigner::new("planner-oracle", b"swarm-secret".to_vec());
+    let signer = Ed25519RootSigner::from_signing_key(
+        "planner-oracle",
+        "0505050505050505050505050505050505050505050505050505050505050505",
+    )
+    .expect("fixed seed is valid Ed25519 material");
 
     let push_queue =
         RevocationGossipPushQueue::new(8).map_err(|err| format!("push-queue init: {err:?}"))?;

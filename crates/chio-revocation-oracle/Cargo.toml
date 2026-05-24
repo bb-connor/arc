@@ -12,6 +12,7 @@ publish = false
 name = "chio_revocation_oracle"
 
 [dependencies]
+chio-core-types = { path = "../chio-core-types" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

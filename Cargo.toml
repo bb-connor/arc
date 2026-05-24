@@ -259,6 +259,7 @@ proptest = "1.10"
 criterion = "0.5"
 dhat = "0.3"
 tempfile = "3"
+wiremock = "0.6"
 testcontainers = { version = "0.27.3", default-features = false }
 jsonschema = { version = "0.46", default-features = false, features = ["resolve-file"] }
 # Pin concurrency primitives + tower feature set in the workspace so member

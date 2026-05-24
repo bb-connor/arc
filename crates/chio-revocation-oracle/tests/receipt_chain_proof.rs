@@ -27,7 +27,7 @@ use std::time::{Duration, Instant};
 use chio_federation::{RevocationGossipPushQueue, RevocationRootGossip};
 use chio_kernel_core::{RevocationSnapshot, RevocationView, RevocationViewSubject};
 use chio_revocation_oracle::{
-    DigestRootSigner, EpochNonce, InMemoryRevocationOracle, RevocationKey, RevocationOracle,
+    Ed25519RootSigner, EpochNonce, InMemoryRevocationOracle, RevocationKey, RevocationOracle,
     SignedEpochRoot, SubjectId,
 };
 
@@ -92,7 +92,11 @@ fn install_frame(child: &Arc<ChildKernel>, frame: &RevocationRootGossip) -> Resu
 
 fn run_trial(trial_idx: u64, log: &ReceiptLog) -> Result<u64, String> {
     let planner_oracle = Arc::new(Mutex::new(InMemoryRevocationOracle::new()));
-    let signer = DigestRootSigner::new("planner-oracle", b"swarm-secret".to_vec());
+    let signer = Ed25519RootSigner::from_signing_key(
+        "planner-oracle",
+        "0606060606060606060606060606060606060606060606060606060606060606",
+    )
+    .expect("fixed seed is valid Ed25519 material");
 
     let push_queue =
         RevocationGossipPushQueue::new(8).map_err(|err| format!("push-queue init: {err:?}"))?;

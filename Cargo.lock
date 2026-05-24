@@ -3919,9 +3919,14 @@ dependencies = [
 name = "chio-provider-adapter-core"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "chio-core-types",
  "chio-tool-call-fabric",
+ "reqwest 0.13.2",
  "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "wiremock",
 ]
 
 [[package]]
@@ -3996,6 +4001,7 @@ dependencies = [
 name = "chio-revocation-oracle"
 version = "0.1.0"
 dependencies = [
+ "chio-core-types",
  "chio-federation",
  "chio-kernel-core",
  "criterion",
