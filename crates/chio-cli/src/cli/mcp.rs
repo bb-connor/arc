@@ -100,13 +100,28 @@ pub(crate) fn load_tools_fixture(
     Ok(tools)
 }
 
-// The sibling `mcp/*.rs` files are composed in at the end of the module so
-// all non-test items precede any `#[cfg(test)]` blocks they carry. `wrap.rs`
-// (the only sibling that carries a test module) is included last so no
-// non-test items follow a test module within this composed module.
-include!("mcp/ide.rs");
-include!("mcp/scope.rs");
-include!("mcp/attestation.rs");
-include!("mcp/manifest.rs");
-include!("mcp/emit_config.rs");
-include!("mcp/wrap.rs");
+// The sibling `mcp/*.rs` files are real submodules wired in with
+// `#[path] mod`; each begins with `use super::*;` to inherit the shared
+// imports from this parent and `cli/types.rs`/`cli/runtime.rs`. Their
+// crate-internal items are re-exported here so the parent (`mcp_cli` in
+// `main.rs`) keeps exposing the same surface (e.g. `McpWrapArgs`,
+// `cmd_mcp_wrap`).
+#[path = "mcp/ide.rs"]
+mod ide;
+#[path = "mcp/scope.rs"]
+mod scope;
+#[path = "mcp/attestation.rs"]
+mod attestation;
+#[path = "mcp/manifest.rs"]
+mod manifest;
+#[path = "mcp/emit_config.rs"]
+mod emit_config;
+#[path = "mcp/wrap.rs"]
+mod wrap;
+
+pub(crate) use attestation::{attach_chio_verified_header, build_chio_verified_header};
+pub(crate) use emit_config::cmd_mcp_emit_config;
+pub(crate) use manifest::cmd_mcp_print_scopes;
+pub(crate) use wrap::{
+    cmd_mcp_wrap_e2e_fixture, cmd_mcp_wrap_run, McpWrapArgs,
+};

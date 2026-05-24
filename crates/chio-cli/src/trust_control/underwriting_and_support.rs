@@ -1,4 +1,6 @@
-fn latest_credit_facility_snapshot(
+use super::*;
+
+pub(crate) fn latest_credit_facility_snapshot(
     receipt_store: &SqliteReceiptStore,
     capability_id: Option<&str>,
     agent_subject: Option<&str>,
@@ -39,7 +41,7 @@ fn latest_credit_facility_snapshot(
         }))
 }
 
-fn latest_active_granted_credit_facility(
+pub(crate) fn latest_active_granted_credit_facility(
     receipt_store: &SqliteReceiptStore,
     capability_id: Option<&str>,
     agent_subject: Option<&str>,
@@ -61,7 +63,7 @@ fn latest_active_granted_credit_facility(
     Ok(report.facilities.into_iter().next().map(|row| row.facility))
 }
 
-fn build_credit_bond_terms(
+pub(crate) fn build_credit_bond_terms(
     position: &ExposureLedgerCurrencyPosition,
     facility_terms: &CreditFacilityTerms,
     facility_id: String,
@@ -103,7 +105,7 @@ fn build_credit_bond_terms(
     }
 }
 
-fn build_credit_bond_findings(
+pub(crate) fn build_credit_bond_findings(
     scorecard: &CreditScorecardReport,
     exposure: &ExposureLedgerReport,
     prerequisites: &CreditBondPrerequisites,
@@ -258,7 +260,7 @@ where
     evidence_refs
 }
 
-fn compute_credit_loss_lifecycle_accounting(
+pub(crate) fn compute_credit_loss_lifecycle_accounting(
     currency: &str,
     lifecycle_history: &CreditLossLifecycleListReport,
 ) -> Result<CreditLossLifecycleAccountingState, String> {
@@ -305,7 +307,7 @@ fn compute_credit_loss_lifecycle_accounting(
     Ok(state)
 }
 
-fn ensure_credit_loss_lifecycle_currency(
+pub(crate) fn ensure_credit_loss_lifecycle_currency(
     amount: &MonetaryAmount,
     currency: &str,
 ) -> Result<(), TrustHttpError> {
@@ -321,14 +323,14 @@ fn ensure_credit_loss_lifecycle_currency(
     Ok(())
 }
 
-fn amount_if_nonzero(units: u64, currency: &str) -> Option<MonetaryAmount> {
+pub(crate) fn amount_if_nonzero(units: u64, currency: &str) -> Option<MonetaryAmount> {
     (units > 0).then(|| MonetaryAmount {
         units,
         currency: currency.to_string(),
     })
 }
 
-fn empty_exposure_position(currency: &str) -> ExposureLedgerCurrencyPosition {
+pub(crate) fn empty_exposure_position(currency: &str) -> ExposureLedgerCurrencyPosition {
     ExposureLedgerCurrencyPosition {
         currency: currency.to_string(),
         governed_max_exposure_units: 0,
@@ -343,7 +345,7 @@ fn empty_exposure_position(currency: &str) -> ExposureLedgerCurrencyPosition {
     }
 }
 
-fn build_credit_loss_lifecycle_outstanding_loss_state(
+pub(crate) fn build_credit_loss_lifecycle_outstanding_loss_state(
     receipts: &[chio_kernel::BehavioralFeedReceiptRow],
     currency: &str,
 ) -> Result<(u64, Vec<CreditScorecardEvidenceReference>), TrustHttpError> {
@@ -388,7 +390,7 @@ fn build_credit_loss_lifecycle_outstanding_loss_state(
     Ok((outstanding_units, evidence_refs))
 }
 
-fn credit_loss_lifecycle_transition_evidence(
+pub(crate) fn credit_loss_lifecycle_transition_evidence(
     bond: &SignedCreditBond,
     lifecycle_history: &CreditLossLifecycleListReport,
     event_kind: CreditLossLifecycleEventKind,
@@ -413,7 +415,7 @@ fn credit_loss_lifecycle_transition_evidence(
     evidence_refs
 }
 
-fn credit_bond_outstanding_units(position: &ExposureLedgerCurrencyPosition) -> u64 {
+pub(crate) fn credit_bond_outstanding_units(position: &ExposureLedgerCurrencyPosition) -> u64 {
     let unsettled_units = position.pending_units.saturating_add(position.failed_units);
     let net_provisional_loss_units = position
         .provisional_loss_units
@@ -424,7 +426,7 @@ fn credit_bond_outstanding_units(position: &ExposureLedgerCurrencyPosition) -> u
         .max(net_provisional_loss_units)
 }
 
-fn credit_bond_reserve_units(units: u64, ratio_bps: u16) -> u64 {
+pub(crate) fn credit_bond_reserve_units(units: u64, ratio_bps: u16) -> u64 {
     if units == 0 || ratio_bps == 0 {
         0
     } else {
@@ -432,14 +434,14 @@ fn credit_bond_reserve_units(units: u64, ratio_bps: u16) -> u64 {
     }
 }
 
-fn credit_bond_ttl_seconds(report: &CreditBondReport) -> u64 {
+pub(crate) fn credit_bond_ttl_seconds(report: &CreditBondReport) -> u64 {
     match report.disposition {
         CreditBondDisposition::Lock | CreditBondDisposition::Hold => 7 * 86_400,
         CreditBondDisposition::Release | CreditBondDisposition::Impair => 86_400,
     }
 }
 
-fn build_credit_recent_loss_history(
+pub(crate) fn build_credit_recent_loss_history(
     matching_loss_events: u64,
     receipts: &[chio_kernel::BehavioralFeedReceiptRow],
     limit: usize,
@@ -485,7 +487,7 @@ fn build_credit_recent_loss_history(
     Ok(CreditRecentLossHistory { summary, entries })
 }
 
-fn collect_credit_provider_risk_evidence(
+pub(crate) fn collect_credit_provider_risk_evidence(
     scorecard: &CreditScorecardReport,
     underwriting_input: &UnderwritingPolicyInput,
 ) -> Vec<CreditScorecardEvidenceReference> {
@@ -522,16 +524,15 @@ fn collect_credit_provider_risk_evidence(
             kind: CreditScorecardEvidenceKind::ComplianceScore,
             reference_id: compliance_score.agent_id.clone(),
             observed_at: Some(compliance_score.generated_at),
-            locator: Some(format!(
-                "compliance-score:{}",
-                compliance_score.agent_id
-            )),
+            locator: Some(format!("compliance-score:{}", compliance_score.agent_id)),
         });
     }
     refs
 }
 
-fn capital_book_owner_role(capital_source: CreditFacilityCapitalSource) -> CapitalBookRole {
+pub(crate) fn capital_book_owner_role(
+    capital_source: CreditFacilityCapitalSource,
+) -> CapitalBookRole {
     match capital_source {
         CreditFacilityCapitalSource::OperatorInternal => CapitalBookRole::OperatorTreasury,
         CreditFacilityCapitalSource::ManualProviderReview => {
@@ -540,15 +541,17 @@ fn capital_book_owner_role(capital_source: CreditFacilityCapitalSource) -> Capit
     }
 }
 
-fn capital_book_facility_source_id(facility_id: &str) -> String {
+pub(crate) fn capital_book_facility_source_id(facility_id: &str) -> String {
     format!("capital-source:facility:{facility_id}")
 }
 
-fn capital_book_bond_source_id(bond_id: &str) -> String {
+pub(crate) fn capital_book_bond_source_id(bond_id: &str) -> String {
     format!("capital-source:bond:{bond_id}")
 }
 
-fn capital_book_facility_evidence(facility: &SignedCreditFacility) -> CapitalBookEvidenceReference {
+pub(crate) fn capital_book_facility_evidence(
+    facility: &SignedCreditFacility,
+) -> CapitalBookEvidenceReference {
     CapitalBookEvidenceReference {
         kind: CapitalBookEvidenceKind::CreditFacility,
         reference_id: facility.body.facility_id.clone(),
@@ -557,7 +560,7 @@ fn capital_book_facility_evidence(facility: &SignedCreditFacility) -> CapitalBoo
     }
 }
 
-fn capital_book_bond_evidence(bond: &SignedCreditBond) -> CapitalBookEvidenceReference {
+pub(crate) fn capital_book_bond_evidence(bond: &SignedCreditBond) -> CapitalBookEvidenceReference {
     CapitalBookEvidenceReference {
         kind: CapitalBookEvidenceKind::CreditBond,
         reference_id: bond.body.bond_id.clone(),
@@ -566,7 +569,7 @@ fn capital_book_bond_evidence(bond: &SignedCreditBond) -> CapitalBookEvidenceRef
     }
 }
 
-fn capital_book_loss_event_evidence(
+pub(crate) fn capital_book_loss_event_evidence(
     event: &SignedCreditLossLifecycle,
 ) -> CapitalBookEvidenceReference {
     CapitalBookEvidenceReference {
@@ -577,7 +580,7 @@ fn capital_book_loss_event_evidence(
     }
 }
 
-fn capital_book_receipt_evidence(
+pub(crate) fn capital_book_receipt_evidence(
     receipt: &ExposureLedgerReceiptEntry,
 ) -> Vec<CapitalBookEvidenceReference> {
     let mut evidence_refs = receipt
@@ -611,7 +614,7 @@ fn capital_book_receipt_evidence(
     evidence_refs
 }
 
-fn build_credit_scorecard_dimensions(
+pub(crate) fn build_credit_scorecard_dimensions(
     subject_key: &str,
     exposure: &ExposureLedgerReport,
     inspection: &issuance::LocalReputationInspection,
@@ -690,11 +693,11 @@ fn build_credit_scorecard_dimensions(
     ]
 }
 
-fn round_credit_score_value(value: f64) -> f64 {
+pub(crate) fn round_credit_score_value(value: f64) -> f64 {
     (value * 1_000_000.0).round() / 1_000_000.0
 }
 
-fn build_credit_scorecard_probation(
+pub(crate) fn build_credit_scorecard_probation(
     inspection: &issuance::LocalReputationInspection,
     confidence: CreditScorecardConfidence,
 ) -> CreditScorecardProbationStatus {
@@ -719,7 +722,7 @@ fn build_credit_scorecard_probation(
     }
 }
 
-fn build_credit_scorecard_anomalies(
+pub(crate) fn build_credit_scorecard_anomalies(
     subject_key: &str,
     exposure: &ExposureLedgerReport,
     inspection: &issuance::LocalReputationInspection,
@@ -848,7 +851,7 @@ fn build_credit_scorecard_anomalies(
     anomalies
 }
 
-fn resolve_credit_scorecard_confidence(
+pub(crate) fn resolve_credit_scorecard_confidence(
     inspection: &issuance::LocalReputationInspection,
 ) -> CreditScorecardConfidence {
     let receipt_count = inspection.scorecard.history_depth.receipt_count as u64;
@@ -873,7 +876,10 @@ fn resolve_credit_scorecard_confidence(
     confidence
 }
 
-fn resolve_credit_scorecard_band(overall_score: f64, probationary: bool) -> CreditScorecardBand {
+pub(crate) fn resolve_credit_scorecard_band(
+    overall_score: f64,
+    probationary: bool,
+) -> CreditScorecardBand {
     if probationary {
         CreditScorecardBand::Probationary
     } else if overall_score >= 0.85 {
@@ -887,7 +893,9 @@ fn resolve_credit_scorecard_band(overall_score: f64, probationary: bool) -> Cred
     }
 }
 
-fn compute_credit_scorecard_overall_score(dimensions: &[CreditScorecardDimension]) -> Option<f64> {
+pub(crate) fn compute_credit_scorecard_overall_score(
+    dimensions: &[CreditScorecardDimension],
+) -> Option<f64> {
     let mut weighted_sum = 0.0;
     let mut total_weight = 0.0;
     for dimension in dimensions {
@@ -906,7 +914,7 @@ fn credit_scorecard_penalty_ratio(units: f64, denominator: f64) -> f64 {
     (units / denominator).clamp(0.0, 1.0)
 }
 
-fn credit_scorecard_position_denominator(
+pub(crate) fn credit_scorecard_position_denominator(
     positions: &[ExposureLedgerCurrencyPosition],
 ) -> Option<u64> {
     let governed =
@@ -1002,7 +1010,7 @@ pub fn build_underwriting_decision_report(
     .map_err(CliError::from)
 }
 
-fn build_underwriting_decision_report_from_store(
+pub(crate) fn build_underwriting_decision_report_from_store(
     receipt_store: &SqliteReceiptStore,
     receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
@@ -1045,7 +1053,7 @@ pub fn build_underwriting_simulation_report(
     .map_err(CliError::from)
 }
 
-fn build_underwriting_simulation_report_from_store(
+pub(crate) fn build_underwriting_simulation_report_from_store(
     receipt_store: &SqliteReceiptStore,
     receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
@@ -1104,7 +1112,7 @@ pub fn issue_signed_underwriting_decision(
     .map_err(CliError::from)
 }
 
-fn issue_signed_underwriting_decision_detailed(
+pub(crate) fn issue_signed_underwriting_decision_detailed(
     receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
@@ -1177,7 +1185,7 @@ pub fn resolve_underwriting_appeal(
         .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
-fn build_exposure_ledger_receipt_entry(
+pub(crate) fn build_exposure_ledger_receipt_entry(
     receipt: &chio_kernel::BehavioralFeedReceiptRow,
 ) -> Result<ExposureLedgerReceiptEntry, TrustHttpError> {
     let governed_max_amount = receipt
@@ -1247,12 +1255,9 @@ fn build_exposure_ledger_receipt_entry(
         issuer_key: receipt.issuer_key.clone(),
         tool_server: receipt.tool_server.clone(),
         tool_name: receipt.tool_name.clone(),
-        decision: receipt
-            .decision
-            .clone()
-            .unwrap_or(Decision::Incomplete {
-                reason: "non-mediated receipt has no decision".to_string(),
-            }),
+        decision: receipt.decision.clone().unwrap_or(Decision::Incomplete {
+            reason: "non-mediated receipt has no decision".to_string(),
+        }),
         settlement_status: receipt.settlement_status.clone(),
         action_required: receipt.action_required,
         governed_max_amount,
@@ -1265,7 +1270,7 @@ fn build_exposure_ledger_receipt_entry(
     })
 }
 
-fn build_exposure_ledger_decision_entry(
+pub(crate) fn build_exposure_ledger_decision_entry(
     row: &chio_kernel::UnderwritingDecisionRow,
 ) -> ExposureLedgerDecisionEntry {
     let filters = &row.decision.body.evaluation.input.filters;
@@ -1305,7 +1310,7 @@ fn exposure_ledger_financial_amount(
     })
 }
 
-fn accumulate_exposure_position<F>(
+pub(crate) fn accumulate_exposure_position<F>(
     positions_by_currency: &mut BTreeMap<String, ExposureLedgerCurrencyPosition>,
     amount: Option<&MonetaryAmount>,
     update: F,
@@ -1428,11 +1433,15 @@ fn underwriting_runtime_family_label(
         chio_core::appraisal::AttestationVerifierFamily::AzureMaa => "azure_maa",
         chio_core::appraisal::AttestationVerifierFamily::AwsNitro => "aws_nitro",
         chio_core::appraisal::AttestationVerifierFamily::GoogleAttestation => "google_attestation",
-        chio_core::appraisal::AttestationVerifierFamily::EnterpriseVerifier => "enterprise_verifier",
+        chio_core::appraisal::AttestationVerifierFamily::EnterpriseVerifier => {
+            "enterprise_verifier"
+        }
     }
 }
 
-fn underwriting_simulation_reason_key(finding: &chio_kernel::UnderwritingDecisionFinding) -> String {
+fn underwriting_simulation_reason_key(
+    finding: &chio_kernel::UnderwritingDecisionFinding,
+) -> String {
     if let Some(reason) = finding.signal_reason {
         serde_json::to_string(&reason)
             .unwrap_or_else(|_| format!("{reason:?}"))
@@ -1446,7 +1455,7 @@ fn underwriting_simulation_reason_key(finding: &chio_kernel::UnderwritingDecisio
     }
 }
 
-fn build_underwriting_policy_input(
+pub(crate) fn build_underwriting_policy_input(
     receipt_store: &SqliteReceiptStore,
     receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
@@ -1578,7 +1587,11 @@ fn build_underwriting_compliance_evidence(
         .map(|receipt| receipt.capability_id.clone())
         .collect::<std::collections::BTreeSet<_>>()
         .len() as u64;
-    let latest_receipt_timestamp = selection.receipts.iter().map(|receipt| receipt.timestamp).max();
+    let latest_receipt_timestamp = selection
+        .receipts
+        .iter()
+        .map(|receipt| receipt.timestamp)
+        .max();
     let inputs = chio_kernel::ComplianceScoreInputs::new(
         activity.summary.total_receipts,
         activity.summary.deny_count,
@@ -1996,7 +2009,7 @@ fn derive_underwriting_signals(
     signals
 }
 
-fn trust_http_error_from_receipt_store(error: ReceiptStoreError) -> TrustHttpError {
+pub(crate) fn trust_http_error_from_receipt_store(error: ReceiptStoreError) -> TrustHttpError {
     match error {
         ReceiptStoreError::NotFound(message) => TrustHttpError::new(StatusCode::NOT_FOUND, message),
         ReceiptStoreError::Conflict(message) => TrustHttpError::new(StatusCode::CONFLICT, message),
@@ -2083,7 +2096,7 @@ fn underwriting_receipt_call_chain(
         })
 }
 
-fn load_behavioral_feed_signing_keypair(
+pub(crate) fn load_behavioral_feed_signing_keypair(
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
 ) -> Result<Keypair, CliError> {
@@ -2171,19 +2184,16 @@ mod underwriting_and_support_tests {
         let source_path = unique_temp_path("chio-behavioral-feed-source", "sqlite");
         let follower_path = unique_temp_path("chio-behavioral-feed-follower", "sqlite");
         let source = SqliteCapabilityAuthority::open(&source_path).test_unwrap();
-        let follower =
-            SqliteCapabilityAuthority::open(&follower_path).test_unwrap();
+        let follower = SqliteCapabilityAuthority::open(&follower_path).test_unwrap();
         let follower_local_key = follower.local_keypair().test_unwrap();
 
         source.rotate().test_unwrap();
         let snapshot = source.snapshot().test_unwrap();
-        assert!(follower
-            .apply_snapshot(&snapshot)
-            .test_unwrap());
+        assert!(follower.apply_snapshot(&snapshot).test_unwrap());
         assert!(follower.current_keypair().is_err());
 
-        let signing_key = load_behavioral_feed_signing_keypair(None, Some(&follower_path))
-            .test_unwrap();
+        let signing_key =
+            load_behavioral_feed_signing_keypair(None, Some(&follower_path)).test_unwrap();
         assert_eq!(signing_key.public_key(), follower_local_key.public_key());
 
         let _ = fs::remove_file(source_path);
@@ -2234,11 +2244,11 @@ mod underwriting_and_support_tests {
     }
 }
 
-fn response_status_text(response: &Response) -> String {
+pub(crate) fn response_status_text(response: &Response) -> String {
     format!("request failed with status {}", response.status())
 }
 
-fn build_budget_utilization_report(
+pub(crate) fn build_budget_utilization_report(
     receipt_store: &SqliteReceiptStore,
     budget_store: &SqliteBudgetStore,
     query: &OperatorReportQuery,
@@ -2310,11 +2320,9 @@ fn build_budget_utilization_report(
             }
         }
 
-        let committed_cost_units = usage
-            .committed_cost_units()
-            .map_err(|error| {
-                plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-            })?;
+        let committed_cost_units = usage.committed_cost_units().map_err(|error| {
+            plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+        })?;
         let invocation_utilization_rate = resolved
             .max_invocations
             .and_then(|max| ratio_option(usage.invocation_count as u64, max as u64));
@@ -2480,14 +2488,16 @@ fn ratio_option(numerator: u64, denominator: u64) -> Option<f64> {
     }
 }
 
-fn unix_timestamp_now() -> u64 {
+pub(crate) fn unix_timestamp_now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_secs())
         .unwrap_or(0)
 }
 
-fn open_receipt_store(config: &TrustServiceConfig) -> Result<SqliteReceiptStore, Response> {
+pub(crate) fn open_receipt_store(
+    config: &TrustServiceConfig,
+) -> Result<SqliteReceiptStore, Response> {
     let Some(path) = config.receipt_db_path.as_deref() else {
         return Err(plain_http_error(
             StatusCode::CONFLICT,
@@ -2498,7 +2508,9 @@ fn open_receipt_store(config: &TrustServiceConfig) -> Result<SqliteReceiptStore,
         .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))
 }
 
-fn open_revocation_store(config: &TrustServiceConfig) -> Result<SqliteRevocationStore, Response> {
+pub(crate) fn open_revocation_store(
+    config: &TrustServiceConfig,
+) -> Result<SqliteRevocationStore, Response> {
     let Some(path) = config.revocation_db_path.as_deref() else {
         return Err(plain_http_error(
             StatusCode::CONFLICT,
@@ -2509,7 +2521,9 @@ fn open_revocation_store(config: &TrustServiceConfig) -> Result<SqliteRevocation
         .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))
 }
 
-fn open_budget_store(config: &TrustServiceConfig) -> Result<SqliteBudgetStore, Response> {
+pub(crate) fn open_budget_store(
+    config: &TrustServiceConfig,
+) -> Result<SqliteBudgetStore, Response> {
     let Some(path) = config.budget_db_path.as_deref() else {
         return Err(plain_http_error(
             StatusCode::CONFLICT,
@@ -2520,7 +2534,7 @@ fn open_budget_store(config: &TrustServiceConfig) -> Result<SqliteBudgetStore, R
         .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))
 }
 
-fn revocation_list_response(
+pub(crate) fn revocation_list_response(
     capability_id: Option<String>,
     revoked: Option<bool>,
     revocations: Vec<RevocationRecord>,
@@ -2541,12 +2555,12 @@ fn revocation_list_response(
     }
 }
 
-fn list_limit(requested: Option<usize>) -> usize {
+pub(crate) fn list_limit(requested: Option<usize>) -> usize {
     requested
         .unwrap_or(DEFAULT_LIST_LIMIT)
         .clamp(1, MAX_LIST_LIMIT)
 }
 
-fn plain_http_error(status: StatusCode, message: &str) -> Response {
+pub(crate) fn plain_http_error(status: StatusCode, message: &str) -> Response {
     (status, Json(json!({ "error": message }))).into_response()
 }

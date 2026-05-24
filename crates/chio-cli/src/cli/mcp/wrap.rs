@@ -19,6 +19,12 @@
 // stabilizes for the stdio wrap path. The trait surface is identical
 // either way.
 
+use super::*;
+
+use super::attestation::attach_chio_verified_header;
+use super::ide::IdeTarget;
+use super::manifest::load_manifest_allowlist;
+
 const MCP_WRAP_PROTOCOL_VERSION: &str = "2025-11-25";
 const MAX_MCP_WRAP_FRAME_BYTES: usize = 1024 * 1024;
 
@@ -119,7 +125,7 @@ pub(crate) struct McpWrapArgs {
 /// Render the wrap loop output for the dispatch arm. The default gate
 /// reads the user's promoted manifest from disk; if no manifest is
 /// supplied, every tool denies.
-fn cmd_mcp_wrap_run(args: &McpWrapArgs) -> Result<(), CliError> {
+pub(crate) fn cmd_mcp_wrap_run(args: &McpWrapArgs) -> Result<(), CliError> {
     let allowed = match args.manifest.as_ref() {
         Some(path) => load_manifest_allowlist(path)?,
         None => std::collections::BTreeSet::new(),
@@ -156,7 +162,9 @@ fn cmd_mcp_wrap_run(args: &McpWrapArgs) -> Result<(), CliError> {
 }
 
 /// Split the trailing `command` slice into the program plus its argv.
-fn split_wrapped_command(command: &[String]) -> Result<(String, Vec<String>), CliError> {
+pub(crate) fn split_wrapped_command(
+    command: &[String],
+) -> Result<(String, Vec<String>), CliError> {
     let mut iter = command.iter();
     let program = iter.next().ok_or_else(|| {
         CliError::cli_other_error("chio mcp wrap requires a wrapped command".to_string())
@@ -433,7 +441,7 @@ impl chio_mcp_adapter::McpTransport for FixtureMcpTransport {
 ///   "allow": ["<tool>", ...]   // promoted tools; everything else denies
 /// }
 /// ```
-fn cmd_mcp_wrap_e2e_fixture(
+pub(crate) fn cmd_mcp_wrap_e2e_fixture(
     _args: &McpWrapArgs,
     path: &std::path::Path,
 ) -> Result<(), CliError> {

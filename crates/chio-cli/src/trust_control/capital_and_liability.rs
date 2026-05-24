@@ -1,4 +1,6 @@
-fn build_capital_book_report_from_store(
+use super::*;
+
+pub(crate) fn build_capital_book_report_from_store(
     receipt_store: &SqliteReceiptStore,
     query: &CapitalBookQuery,
 ) -> Result<CapitalBookReport, TrustHttpError> {
@@ -612,7 +614,7 @@ fn validate_capital_book_receipts(
     Ok(())
 }
 
-fn build_capital_execution_instruction_artifact_from_store(
+pub(crate) fn build_capital_execution_instruction_artifact_from_store(
     receipt_store: &SqliteReceiptStore,
     request: &CapitalExecutionInstructionRequest,
 ) -> Result<CapitalExecutionInstructionArtifact, TrustHttpError> {
@@ -922,7 +924,7 @@ fn validate_capital_execution_instruction_request(
     Ok(transfer_governed_receipt_id)
 }
 
-fn validate_capital_execution_envelope(
+pub(crate) fn validate_capital_execution_envelope(
     authority_chain: &[CapitalExecutionAuthorityStep],
     execution_window: &CapitalExecutionWindow,
     rail: &CapitalExecutionRail,
@@ -988,7 +990,7 @@ fn validate_capital_execution_envelope(
     Ok(())
 }
 
-fn ensure_capital_execution_owner_authority(
+pub(crate) fn ensure_capital_execution_owner_authority(
     authority_chain: &[CapitalExecutionAuthorityStep],
     owner_role: CapitalExecutionRole,
 ) -> Result<(), TrustHttpError> {
@@ -1002,7 +1004,7 @@ fn ensure_capital_execution_owner_authority(
     }
 }
 
-fn ensure_capital_execution_custodian_authority(
+pub(crate) fn ensure_capital_execution_custodian_authority(
     authority_chain: &[CapitalExecutionAuthorityStep],
     rail: &CapitalExecutionRail,
 ) -> Result<(), TrustHttpError> {
@@ -1019,7 +1021,7 @@ fn ensure_capital_execution_custodian_authority(
     }
 }
 
-fn select_capital_allocation_receipt<'a>(
+pub(crate) fn select_capital_allocation_receipt<'a>(
     receipts: &'a [BehavioralFeedReceiptRow],
     receipt_id: Option<&str>,
 ) -> Result<&'a BehavioralFeedReceiptRow, TrustHttpError> {
@@ -1068,7 +1070,7 @@ fn select_capital_allocation_receipt<'a>(
     }
 }
 
-fn capital_allocation_ceiling_units(units: u64, ceiling_bps: u16) -> u64 {
+pub(crate) fn capital_allocation_ceiling_units(units: u64, ceiling_bps: u16) -> u64 {
     if units == 0 || ceiling_bps == 0 {
         0
     } else {
@@ -1076,7 +1078,7 @@ fn capital_allocation_ceiling_units(units: u64, ceiling_bps: u16) -> u64 {
     }
 }
 
-fn capital_book_evidence_from_exposure_refs(
+pub(crate) fn capital_book_evidence_from_exposure_refs(
     refs: &[ExposureLedgerEvidenceReference],
 ) -> Vec<CapitalBookEvidenceReference> {
     refs.iter()
@@ -1126,7 +1128,7 @@ fn economic_completion_flow_row_id(receipt_id: &str) -> String {
     format!("economic-completion-flow:{receipt_id}")
 }
 
-fn capital_execution_role_from_book_role(role: CapitalBookRole) -> CapitalExecutionRole {
+pub(crate) fn capital_execution_role_from_book_role(role: CapitalBookRole) -> CapitalExecutionRole {
     match role {
         CapitalBookRole::OperatorTreasury => CapitalExecutionRole::OperatorTreasury,
         CapitalBookRole::ExternalCapitalProvider => CapitalExecutionRole::ExternalCapitalProvider,
@@ -1134,7 +1136,7 @@ fn capital_execution_role_from_book_role(role: CapitalBookRole) -> CapitalExecut
     }
 }
 
-fn push_unique_capital_book_evidence(
+pub(crate) fn push_unique_capital_book_evidence(
     refs: &mut Vec<CapitalBookEvidenceReference>,
     evidence: CapitalBookEvidenceReference,
 ) {
@@ -1175,7 +1177,9 @@ pub struct CreditIssuanceArgs<'a> {
     pub supersedes_artifact_id: Option<&'a str>,
 }
 
-pub fn issue_signed_credit_facility(args: CreditIssuanceArgs<'_>) -> Result<SignedCreditFacility, CliError> {
+pub fn issue_signed_credit_facility(
+    args: CreditIssuanceArgs<'_>,
+) -> Result<SignedCreditFacility, CliError> {
     issue_signed_credit_facility_detailed(args).map_err(CliError::from)
 }
 
@@ -1210,7 +1214,9 @@ pub fn build_credit_bond_report(
     .map_err(CliError::from)
 }
 
-pub fn issue_signed_credit_bond(args: CreditIssuanceArgs<'_>) -> Result<SignedCreditBond, CliError> {
+pub fn issue_signed_credit_bond(
+    args: CreditIssuanceArgs<'_>,
+) -> Result<SignedCreditBond, CliError> {
     issue_signed_credit_bond_detailed(args).map_err(CliError::from)
 }
 
@@ -1784,7 +1790,9 @@ pub fn issue_signed_liability_auto_bind(
         .quoted_terms
         .as_ref()
         .ok_or_else(|| {
-            CliError::cli_other_error("liability auto-bind requires a quoted quote response".to_string())
+            CliError::cli_other_error(
+                "liability auto-bind requires a quoted quote response".to_string(),
+            )
         })?;
     if quoted_terms.expires_at <= unix_timestamp_now() {
         return Err(CliError::cli_other_error(format!(
@@ -2719,7 +2727,7 @@ fn build_liability_claim_settlement_receipt_artifact(
     Ok(artifact)
 }
 
-fn build_credit_backtest_report_from_store(
+pub(crate) fn build_credit_backtest_report_from_store(
     receipt_store: &SqliteReceiptStore,
     receipt_db_path: &Path,
     budget_db_path: Option<&Path>,

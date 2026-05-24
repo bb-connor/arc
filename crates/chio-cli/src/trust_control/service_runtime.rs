@@ -1,4 +1,6 @@
-async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
+use super::*;
+
+pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
     let listener = tokio::net::TcpListener::bind(config.listen).await?;
     let local_addr = listener.local_addr()?;
     let enterprise_provider_registry = load_enterprise_provider_registry(
@@ -563,9 +565,9 @@ async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
     info!(listen_addr = %local_addr, "serving Chio trust control service");
     eprintln!("Chio trust control service listening on http://{local_addr}");
 
-    axum::serve(listener, router)
-        .await
-        .map_err(|error| CliError::cli_other_error(format!("trust control service failed: {error}")))
+    axum::serve(listener, router).await.map_err(|error| {
+        CliError::cli_other_error(format!("trust control service failed: {error}"))
+    })
 }
 
 pub fn build_client(
@@ -575,7 +577,7 @@ pub fn build_client(
     build_client_with_cluster_peer(control_url, control_token, None)
 }
 
-fn build_cluster_peer_client(
+pub(crate) fn build_cluster_peer_client(
     control_url: &str,
     control_token: &str,
     node_id: &str,
@@ -601,7 +603,9 @@ fn build_client_with_cluster_peer(
         .map(|value| value.trim_end_matches('/').to_string())
         .collect::<Vec<_>>();
     if endpoints.is_empty() {
-        return Err(CliError::cli_other_error("control URL must not be empty".to_string()));
+        return Err(CliError::cli_other_error(
+            "control URL must not be empty".to_string(),
+        ));
     }
     let http = ureq::AgentBuilder::new()
         .timeout(CONTROL_HTTP_TIMEOUT)
@@ -619,7 +623,7 @@ fn encode_path_segment(segment: &str) -> String {
     utf8_percent_encode(segment, NON_ALPHANUMERIC).to_string()
 }
 
-fn path_with_encoded_param(template: &str, param_name: &str, value: &str) -> String {
+pub(crate) fn path_with_encoded_param(template: &str, param_name: &str, value: &str) -> String {
     template.replace(&format!("{{{param_name}}}"), &encode_path_segment(value))
 }
 
@@ -1033,10 +1037,11 @@ pub fn evaluate_portable_reputation_request(
     request: &PortableReputationEvaluationRequest,
 ) -> Result<PortableReputationEvaluation, CliError> {
     let now = request.evaluated_at.unwrap_or(now_unix_secs()?);
-    evaluate_portable_reputation(request, now).map_err(|error| CliError::cli_other_error(error.to_string()))
+    evaluate_portable_reputation(request, now)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
-fn evaluate_federation_policy_request(
+pub(crate) fn evaluate_federation_policy_request(
     state: &TrustServiceState,
     request: &FederationAdmissionEvaluationRequest,
     now: u64,
@@ -1146,7 +1151,9 @@ fn evaluate_federation_policy_request(
             .federation_admission_rate_limiter
             .lock()
             .map_err(|_| {
-                CliError::cli_other_error("federation admission rate limiter is poisoned".to_string())
+                CliError::cli_other_error(
+                    "federation admission rate limiter is poisoned".to_string(),
+                )
             })?;
         let status = limiter.check_and_record(&request.policy_id, &request.subject_key, limit, now);
         let limited = status.retry_after_seconds.is_some();
@@ -2498,44 +2505,50 @@ impl TrustControlClient {
         )
     }
 
-    fn cluster_status(&self) -> Result<ClusterStatusResponse, CliError> {
+    pub(crate) fn cluster_status(&self) -> Result<ClusterStatusResponse, CliError> {
         self.get_internal_json(INTERNAL_CLUSTER_STATUS_PATH, None)
     }
 
-    fn authority_snapshot(&self) -> Result<AuthoritySnapshotView, CliError> {
+    pub(crate) fn authority_snapshot(&self) -> Result<AuthoritySnapshotView, CliError> {
         self.get_internal_json(INTERNAL_AUTHORITY_SNAPSHOT_PATH, None)
     }
 
-    fn cluster_snapshot(&self) -> Result<ClusterStateSnapshotResponse, CliError> {
+    pub(crate) fn cluster_snapshot(&self) -> Result<ClusterStateSnapshotResponse, CliError> {
         self.get_internal_json(INTERNAL_CLUSTER_SNAPSHOT_PATH, None)
     }
 
-    fn revocation_deltas(
+    pub(crate) fn revocation_deltas(
         &self,
         query: &RevocationDeltaQuery,
     ) -> Result<RevocationDeltaResponse, CliError> {
         self.get_internal_json_with_query(INTERNAL_REVOCATIONS_DELTA_PATH, query, None)
     }
 
-    fn tool_receipt_deltas(
+    pub(crate) fn tool_receipt_deltas(
         &self,
         query: &ReceiptDeltaQuery,
     ) -> Result<ReceiptDeltaResponse, CliError> {
         self.get_internal_json_with_query(INTERNAL_TOOL_RECEIPTS_DELTA_PATH, query, None)
     }
 
-    fn child_receipt_deltas(
+    pub(crate) fn child_receipt_deltas(
         &self,
         query: &ReceiptDeltaQuery,
     ) -> Result<ReceiptDeltaResponse, CliError> {
         self.get_internal_json_with_query(INTERNAL_CHILD_RECEIPTS_DELTA_PATH, query, None)
     }
 
-    fn lineage_deltas(&self, query: &ReceiptDeltaQuery) -> Result<LineageDeltaResponse, CliError> {
+    pub(crate) fn lineage_deltas(
+        &self,
+        query: &ReceiptDeltaQuery,
+    ) -> Result<LineageDeltaResponse, CliError> {
         self.get_internal_json_with_query(INTERNAL_LINEAGE_DELTA_PATH, query, None)
     }
 
-    fn budget_deltas(&self, query: &BudgetDeltaQuery) -> Result<BudgetDeltaResponse, CliError> {
+    pub(crate) fn budget_deltas(
+        &self,
+        query: &BudgetDeltaQuery,
+    ) -> Result<BudgetDeltaResponse, CliError> {
         self.get_internal_json_with_query(INTERNAL_BUDGETS_DELTA_PATH, query, None)
     }
 
@@ -2608,7 +2621,7 @@ impl TrustControlClient {
         )
     }
 
-    fn post_json<B: Serialize, T: for<'de> Deserialize<'de>>(
+    pub(crate) fn post_json<B: Serialize, T: for<'de> Deserialize<'de>>(
         &self,
         path: &str,
         body: &B,
@@ -2629,7 +2642,7 @@ impl TrustControlClient {
         )
     }
 
-    fn post_internal_json<B: Serialize, T: for<'de> Deserialize<'de>>(
+    pub(crate) fn post_internal_json<B: Serialize, T: for<'de> Deserialize<'de>>(
         &self,
         path: &str,
         body: &B,
@@ -2710,7 +2723,10 @@ impl TrustControlClient {
         )
     }
 
-    fn delete_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, CliError> {
+    pub(crate) fn delete_json<T: for<'de> Deserialize<'de>>(
+        &self,
+        path: &str,
+    ) -> Result<T, CliError> {
         self.request_json(
             |client, url, token| {
                 client
@@ -2906,7 +2922,9 @@ impl TrustControlClient {
             }
         }
         Err(last_error.unwrap_or_else(|| {
-            CliError::cli_other_error("trust control service request failed with no endpoints".to_string())
+            CliError::cli_other_error(
+                "trust control service request failed with no endpoints".to_string(),
+            )
         }))
     }
 
@@ -2948,7 +2966,9 @@ impl TrustControlClient {
             }
         }
         Err(last_error.unwrap_or_else(|| {
-            CliError::cli_other_error("trust control service request failed with no endpoints".to_string())
+            CliError::cli_other_error(
+                "trust control service request failed with no endpoints".to_string(),
+            )
         }))
     }
 
@@ -2993,7 +3013,9 @@ impl TrustControlClient {
             }
         }
         Err(last_error.unwrap_or_else(|| {
-            CliError::cli_other_error("trust control service request failed with no endpoints".to_string())
+            CliError::cli_other_error(
+                "trust control service request failed with no endpoints".to_string(),
+            )
         }))
     }
 
@@ -3181,10 +3203,7 @@ impl ReceiptStore for RemoteReceiptStore {
             .map_err(into_receipt_store_error)
     }
 
-    fn append_child_receipt(
-        &self,
-        receipt: &ChildRequestReceipt,
-    ) -> Result<(), ReceiptStoreError> {
+    fn append_child_receipt(&self, receipt: &ChildRequestReceipt) -> Result<(), ReceiptStoreError> {
         self.client
             .append_child_receipt(receipt)
             .map_err(into_receipt_store_error)
@@ -3771,8 +3790,8 @@ impl RemoteBudgetStore {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
         }
-            .get(&(capability_id.to_string(), grant_index as u32))
-            .cloned()
+        .get(&(capability_id.to_string(), grant_index as u32))
+        .cloned()
     }
 
     fn replace_cached_usages(&self, capability_id: Option<&str>, usages: &[BudgetUsageRecord]) {
@@ -5119,9 +5138,8 @@ mod service_runtime_tests {
 
         ensure_signed_by_trusted_authority("trust activation", &previous, &trusted)
             .expect("previous authority key should remain trusted");
-        let error =
-            ensure_signed_by_trusted_authority("trust activation", &outsider, &trusted)
-                .expect_err("outsider signer should fail closed");
+        let error = ensure_signed_by_trusted_authority("trust activation", &outsider, &trusted)
+            .expect_err("outsider signer should fail closed");
         assert!(error
             .to_string()
             .contains("does not match a trusted trust-control authority signer"));
@@ -5138,7 +5156,8 @@ mod service_runtime_tests {
 
         let message = "backend unavailable".to_string();
         let receipt_error = into_receipt_store_error(CliError::cli_other_error(message.clone()));
-        let revocation_error = into_revocation_store_error(CliError::cli_other_error(message.clone()));
+        let revocation_error =
+            into_revocation_store_error(CliError::cli_other_error(message.clone()));
         let budget_error = into_budget_store_error(CliError::cli_other_error(message.clone()));
 
         assert!(receipt_error.to_string().contains(&message));

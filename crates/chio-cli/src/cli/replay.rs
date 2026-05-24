@@ -3,29 +3,66 @@
 // The replay engine retains a number of helper/API-completeness items
 // (renderers, schema accessors, receipt-id helpers) that are exercised by
 // integration tests and the broader replay surface rather than by the CLI
-// dispatch path. Under the flat `include!` layout these were crate-root
-// `pub` items and not flagged; now that the subtree is a real module they
-// are allowed explicitly so the structural refactor does not delete them.
-#![allow(dead_code, unused_imports)]
+// dispatch path. They are re-exported through this parent module so the
+// crate-internal `use` graph matches the prior flat `include!` layout.
+#![allow(dead_code)]
 
 use super::*;
 
-include!("replay/reader.rs");
-include!("replay/verify.rs");
-include!("replay/merkle.rs");
-include!("replay/verdict.rs");
-include!("replay/report.rs");
-include!("replay/ndjson.rs");
-include!("replay/validate.rs");
-include!("replay/schema_gate.rs");
-include!("replay/policy_ref.rs");
-include!("replay/receipt_partition.rs");
-include!("replay/execute.rs");
-include!("replay/diff.rs");
-include!("replay/traffic.rs");
-include!("replay/bless/strip.rs");
-include!("replay/bless/fixture_layout.rs");
-include!("replay/bless.rs");
+#[path = "replay/reader.rs"]
+mod reader;
+#[path = "replay/verify.rs"]
+mod verify;
+#[path = "replay/merkle.rs"]
+mod merkle;
+#[path = "replay/verdict.rs"]
+mod verdict;
+#[path = "replay/report.rs"]
+mod report;
+#[path = "replay/ndjson.rs"]
+mod ndjson;
+#[path = "replay/validate.rs"]
+mod validate;
+#[path = "replay/schema_gate.rs"]
+mod schema_gate;
+#[path = "replay/policy_ref.rs"]
+mod policy_ref;
+#[path = "replay/receipt_partition.rs"]
+mod receipt_partition;
+#[path = "replay/execute.rs"]
+mod execute;
+#[path = "replay/diff.rs"]
+mod diff;
+#[path = "replay/traffic.rs"]
+mod traffic;
+#[path = "replay/bless/strip.rs"]
+mod bless_strip;
+#[path = "replay/bless/fixture_layout.rs"]
+mod bless_fixture_layout;
+#[path = "replay/bless.rs"]
+mod bless;
+
+// Re-export every submodule's crate-internal surface so cross-file
+// references (and the `cmd_replay`/`load_trusted_kernel_pubkey` symbols
+// re-exported from `main.rs`) resolve exactly as they did under the prior
+// flat `include!` scope. The submodules carry no colliding public item
+// names, so the globs are unambiguous.
+pub(crate) use self::bless::*;
+pub(crate) use self::bless_fixture_layout::*;
+pub(crate) use self::bless_strip::*;
+pub(crate) use self::diff::*;
+pub(crate) use self::execute::*;
+pub(crate) use self::merkle::*;
+pub(crate) use self::ndjson::*;
+pub(crate) use self::policy_ref::*;
+pub(crate) use self::reader::*;
+pub(crate) use self::receipt_partition::*;
+pub(crate) use self::report::*;
+pub(crate) use self::schema_gate::*;
+pub(crate) use self::traffic::*;
+pub(crate) use self::validate::*;
+pub(crate) use self::verdict::*;
+pub(crate) use self::verify::*;
 
 /// Dispatch entry-point for `chio replay`.
 pub(crate) fn cmd_replay(args: &ReplayArgs) -> Result<(), CliError> {

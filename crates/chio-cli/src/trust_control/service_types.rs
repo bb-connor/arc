@@ -1,444 +1,218 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
-use std::path::Path;
-use std::path::PathBuf;
-use std::str::FromStr;
-use std::sync::{Arc, LazyLock, Mutex};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+// Trust-control service wire types and shared helpers.
+//
+// This module owns the data types for the trust-control surface. The shared
+// import set lives in the parent `trust_control.rs` and is inherited here via
+// `use super::*;` so every sibling module composes against the same scope.
 
-use axum::extract::Form;
-use axum::extract::{Path as AxumPath, Query, State};
-use axum::http::header::{AUTHORIZATION, CONTENT_TYPE, WWW_AUTHENTICATE};
-use axum::http::{HeaderMap, HeaderValue, StatusCode};
-use axum::response::{IntoResponse, Redirect, Response};
-use axum::routing::{delete, get, post};
-use axum::{Json, Router};
-use chio_core::appraisal::{
-    RUNTIME_ATTESTATION_APPRAISAL_REPORT_SCHEMA, RuntimeAttestationAppraisalImportReport,
-    RuntimeAttestationAppraisalImportRequest, RuntimeAttestationAppraisalReport,
-    RuntimeAttestationAppraisalRequest, RuntimeAttestationAppraisalResult,
-    RuntimeAttestationAppraisalResultExportRequest, RuntimeAttestationPolicyOutcome,
-    SignedRuntimeAttestationAppraisalReport, SignedRuntimeAttestationAppraisalResult,
-    derive_runtime_attestation_appraisal, evaluate_imported_runtime_attestation_appraisal,
-};
-use chio_core::capability::{
-    CapabilityToken, ChioScope, MonetaryAmount, RuntimeAssuranceTier, RuntimeAttestationEvidence,
-};
-use chio_core::crypto::{Keypair, PublicKey};
-use chio_core::listing::GenericTrustAdmissionClass;
-use chio_core::receipt::{
-    ChildRequestReceipt, ChioReceipt, ChioReceiptBody, Decision, ReceiptAttributionMetadata,
-    SettlementStatus, ToolCallAction,
-};
-use chio_core::session::{
-    ChioIdentityAssertion, EnterpriseIdentityContext, OperationTerminalState,
-};
-use chio_core::{Signature, canonical_json_bytes, sha256_hex};
-use chio_credentials::{
-    AgentPassport, CHIO_PASSPORT_JWT_VC_JSON_TYPE_METADATA_PATH, CHIO_PASSPORT_SD_JWT_VC_FORMAT,
-    CHIO_PASSPORT_SD_JWT_VC_TYPE, CHIO_PASSPORT_SD_JWT_VC_TYPE_METADATA_PATH,
-    EnterpriseIdentityProvenance, OID4VCI_ISSUER_METADATA_PATH, OID4VCI_JWKS_PATH,
-    OID4VCI_PASSPORT_CREDENTIAL_PATH, OID4VCI_PASSPORT_OFFERS_PATH, OID4VCI_PASSPORT_TOKEN_PATH,
-    OID4VP_CLIENT_ID_SCHEME_REDIRECT_URI, OID4VP_OPENID4VP_SCHEME,
-    OID4VP_RESPONSE_MODE_DIRECT_POST_JWT, OID4VP_RESPONSE_TYPE_VP_TOKEN,
-    OID4VP_VERIFIER_METADATA_PATH, Oid4vciCredentialIssuerMetadata, Oid4vciCredentialRequest,
-    Oid4vciCredentialResponse, Oid4vciTokenRequest, Oid4vciTokenResponse,
-    Oid4vpPresentationVerification, Oid4vpRequestObject, Oid4vpRequestedCredential,
-    Oid4vpVerifierMetadata, PassportLifecycleRecord, PassportLifecycleResolution,
-    PassportLifecycleState, PassportPresentationChallenge, PassportPresentationResponse,
-    PassportPresentationVerification, PassportStatusDistribution, PassportVerifierPolicy,
-    PassportVerifierPolicyReference, PortableJwkSet, PortableNegativeEventIssueRequest,
-    PortableReputationEvaluation, PortableReputationEvaluationRequest,
-    PortableReputationSummaryIssueRequest, PublicDiscoveryEntryKind,
-    PublicDiscoveryImportGuardrails, PublicDiscoveryTransparencyEntry,
-    SignedPassportVerifierPolicy, SignedPortableNegativeEvent, SignedPortableReputationSummary,
-    SignedPublicDiscoveryTransparency, SignedPublicIssuerDiscovery, SignedPublicVerifierDiscovery,
-    WalletExchangeDescriptor, WalletExchangeTransactionState,
-    build_chio_passport_jwt_vc_json_type_metadata, build_chio_passport_sd_jwt_type_metadata,
-    build_oid4vp_request_transport, build_portable_jwks, build_portable_negative_event_artifact,
-    build_portable_reputation_summary_artifact, build_wallet_exchange_descriptor_for_oid4vp,
-    create_passport_presentation_challenge_with_reference,
-    create_signed_public_discovery_transparency, create_signed_public_issuer_discovery,
-    create_signed_public_verifier_discovery,
-    default_oid4vci_passport_issuer_metadata_with_signing_key,
-    ensure_signed_passport_verifier_policy_active, evaluate_portable_reputation,
-    inspect_chio_passport_sd_jwt_vc_unverified, inspect_oid4vp_direct_post_response,
-    verify_oid4vp_direct_post_response_with_any_issuer_key,
-    verify_passport_presentation_response_with_policy,
-    verify_signed_oid4vp_request_object_with_any_key, verify_signed_passport_verifier_policy,
-};
-use chio_did::DidChio;
-use chio_kernel::budget_store::{
-    AuthorizedBudgetHold, BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
-    BudgetCommitMetadata, BudgetEventAuthority, BudgetGuaranteeLevel, BudgetHoldMutationDecision,
-    BudgetMutationKind, BudgetMutationRecord, BudgetReconcileHoldRequest, BudgetReleaseHoldRequest,
-    BudgetReverseHoldRequest, DeniedBudgetHold,
-};
-use chio_kernel::{
-    AuthoritySnapshot, AuthorityStatus, AuthorizationContextReport, BEHAVIORAL_FEED_SCHEMA,
-    BehavioralFeedDecisionSummary, BehavioralFeedPrivacyBoundary, BehavioralFeedQuery,
-    BehavioralFeedReceiptRow, BehavioralFeedReport, BudgetDimensionProfile, BudgetDimensionUsage,
-    BudgetStore, BudgetStoreError, BudgetUsageRecord, BudgetUtilizationReport,
-    BudgetUtilizationRow, BudgetUtilizationSummary, CAPITAL_ALLOCATION_DECISION_ARTIFACT_SCHEMA,
-    CAPITAL_BOOK_REPORT_SCHEMA, CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA,
-    CREDIT_BACKTEST_REPORT_SCHEMA, CREDIT_BOND_ARTIFACT_SCHEMA, CREDIT_BOND_REPORT_SCHEMA,
-    CREDIT_BONDED_EXECUTION_SIMULATION_REPORT_SCHEMA, CREDIT_FACILITY_ARTIFACT_SCHEMA,
-    CREDIT_FACILITY_REPORT_SCHEMA, CREDIT_LOSS_LIFECYCLE_ARTIFACT_SCHEMA,
-    CREDIT_LOSS_LIFECYCLE_REPORT_SCHEMA, CREDIT_PROVIDER_RISK_PACKAGE_SCHEMA,
-    CREDIT_SCORECARD_SCHEMA, CapabilityAuthority, CapabilitySnapshot,
-    CapitalAllocationDecisionArtifact, CapitalAllocationDecisionFinding,
-    CapitalAllocationDecisionOutcome, CapitalAllocationDecisionReasonCode,
-    CapitalAllocationDecisionSupportBoundary, CapitalAllocationInstructionDraft, CapitalBookEvent,
-    CapitalBookEventKind, CapitalBookEvidenceKind, CapitalBookEvidenceReference, CapitalBookQuery,
-    CapitalBookReport, CapitalBookRole, CapitalBookSource, CapitalBookSourceKind,
-    CapitalBookSummary, CapitalBookSupportBoundary, CapitalExecutionAuthorityStep,
-    CapitalExecutionInstructionAction, CapitalExecutionInstructionArtifact,
-    CapitalExecutionInstructionSupportBoundary, CapitalExecutionIntendedState,
-    CapitalExecutionObservation, CapitalExecutionRail, CapitalExecutionReconciledState,
-    CapitalExecutionRole, CapitalExecutionWindow, ChioOAuthAuthorizationMetadataReport,
-    ChioOAuthAuthorizationReviewPack, CostAttributionQuery, CostAttributionReport,
-    CreditBacktestQuery, CreditBacktestReasonCode, CreditBacktestReport, CreditBacktestSummary,
-    CreditBacktestWindow, CreditBondArtifact, CreditBondDisposition, CreditBondFinding,
-    CreditBondLifecycleState, CreditBondListQuery, CreditBondListReport, CreditBondPrerequisites,
-    CreditBondReasonCode, CreditBondReport, CreditBondSupportBoundary, CreditBondTerms,
-    CreditBondedExecutionControlPolicy, CreditBondedExecutionDecision,
-    CreditBondedExecutionEvaluation, CreditBondedExecutionFinding,
-    CreditBondedExecutionFindingCode, CreditBondedExecutionSimulationDelta,
-    CreditBondedExecutionSimulationReport, CreditBondedExecutionSimulationRequest,
-    CreditBondedExecutionSupportBoundary, CreditCertificationState, CreditFacilityArtifact,
-    CreditFacilityCapitalSource, CreditFacilityDisposition, CreditFacilityFinding,
-    CreditFacilityLifecycleState, CreditFacilityListQuery, CreditFacilityListReport,
-    CreditFacilityPrerequisites, CreditFacilityReasonCode, CreditFacilityReport,
-    CreditFacilitySupportBoundary, CreditFacilityTerms, CreditLossLifecycleArtifact,
-    CreditLossLifecycleEventKind, CreditLossLifecycleFinding, CreditLossLifecycleListQuery,
-    CreditLossLifecycleListReport, CreditLossLifecycleQuery, CreditLossLifecycleReasonCode,
-    CreditLossLifecycleReport, CreditLossLifecycleSupportBoundary, CreditProviderFacilitySnapshot,
-    CreditProviderRiskPackage, CreditProviderRiskPackageQuery,
-    CreditProviderRiskPackageSupportBoundary, CreditRecentLossEntry, CreditRecentLossHistory,
-    CreditRecentLossSummary, CreditReserveControlAppealState, CreditReserveControlExecutionState,
-    CreditRuntimeAssuranceState, CreditScorecardAnomaly, CreditScorecardAnomalySeverity,
-    CreditScorecardBand, CreditScorecardConfidence, CreditScorecardDimension,
-    CreditScorecardDimensionKind, CreditScorecardEvidenceKind, CreditScorecardEvidenceReference,
-    CreditScorecardProbationStatus, CreditScorecardReasonCode, CreditScorecardReport,
-    CreditScorecardReputationContext, CreditScorecardSummary, CreditScorecardSupportBoundary,
-    EXPOSURE_LEDGER_SCHEMA, EconomicCompletionFlowReport, EconomicReceiptProjectionReport,
-    EvidenceExportQuery, ExposureLedgerCurrencyPosition, ExposureLedgerDecisionEntry,
-    ExposureLedgerEvidenceKind, ExposureLedgerEvidenceReference, ExposureLedgerQuery,
-    ExposureLedgerReceiptEntry, ExposureLedgerReport, ExposureLedgerSummary,
-    ExposureLedgerSupportBoundary, LIABILITY_AUTO_BIND_DECISION_ARTIFACT_SCHEMA,
-    LIABILITY_BOUND_COVERAGE_ARTIFACT_SCHEMA, LIABILITY_CLAIM_ADJUDICATION_ARTIFACT_SCHEMA,
-    LIABILITY_CLAIM_DISPUTE_ARTIFACT_SCHEMA, LIABILITY_CLAIM_PACKAGE_ARTIFACT_SCHEMA,
-    LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ARTIFACT_SCHEMA,
-    LIABILITY_CLAIM_PAYOUT_RECEIPT_ARTIFACT_SCHEMA, LIABILITY_CLAIM_RESPONSE_ARTIFACT_SCHEMA,
-    LIABILITY_CLAIM_SETTLEMENT_INSTRUCTION_ARTIFACT_SCHEMA,
-    LIABILITY_CLAIM_SETTLEMENT_RECEIPT_ARTIFACT_SCHEMA, LIABILITY_PLACEMENT_ARTIFACT_SCHEMA,
-    LIABILITY_PRICING_AUTHORITY_ARTIFACT_SCHEMA, LIABILITY_PROVIDER_ARTIFACT_SCHEMA,
-    LIABILITY_QUOTE_REQUEST_ARTIFACT_SCHEMA, LIABILITY_QUOTE_RESPONSE_ARTIFACT_SCHEMA,
-    LiabilityAutoBindDecisionArtifact, LiabilityAutoBindDisposition,
-    LiabilityBoundCoverageArtifact, LiabilityClaimAdjudicationArtifact,
-    LiabilityClaimAdjudicationOutcome, LiabilityClaimDisputeArtifact, LiabilityClaimEvidenceKind,
-    LiabilityClaimEvidenceReference, LiabilityClaimPackageArtifact,
-    LiabilityClaimPayoutInstructionArtifact, LiabilityClaimPayoutReceiptArtifact,
-    LiabilityClaimPayoutReconciliationState, LiabilityClaimResponseArtifact,
-    LiabilityClaimResponseDisposition, LiabilityClaimSettlementInstructionArtifact,
-    LiabilityClaimSettlementKind, LiabilityClaimSettlementReceiptArtifact,
-    LiabilityClaimSettlementReconciliationState, LiabilityClaimSettlementRoleTopology,
-    LiabilityClaimWorkflowQuery, LiabilityClaimWorkflowReport, LiabilityCoverageClass,
-    LiabilityMarketWorkflowQuery, LiabilityMarketWorkflowReport, LiabilityPlacementArtifact,
-    LiabilityPricingAuthorityArtifact, LiabilityPricingAuthorityEnvelope,
-    LiabilityProviderArtifact, LiabilityProviderListQuery, LiabilityProviderListReport,
-    LiabilityProviderPolicyReference, LiabilityProviderReport, LiabilityProviderResolutionQuery,
-    LiabilityProviderResolutionReport, LiabilityQuoteDisposition, LiabilityQuoteRequestArtifact,
-    LiabilityQuoteResponseArtifact, LiabilityQuoteTerms, LocalCapabilityAuthority,
-    MAX_CREDIT_BOND_LIST_LIMIT, MAX_CREDIT_FACILITY_LIST_LIMIT,
-    MAX_CREDIT_LOSS_LIFECYCLE_LIST_LIMIT, MeteredBillingEvidenceRecord,
-    MeteredBillingReconciliationReport, MeteredBillingReconciliationState, OperatorReport,
-    OperatorReportQuery, ReceiptAnalyticsQuery, ReceiptAnalyticsResponse, ReceiptQuery,
-    ReceiptReadBoundary, ReceiptReadContext, ReceiptStore, ReceiptStoreError, RevocationRecord,
-    RevocationStore, RevocationStoreError, SettlementReconciliationReport,
-    SettlementReconciliationState, SharedEvidenceQuery, SharedEvidenceReferenceReport,
-    SignedBehavioralFeed, SignedCapitalAllocationDecision, SignedCapitalBookReport,
-    SignedCapitalExecutionInstruction, SignedCreditBond, SignedCreditFacility,
-    SignedCreditLossLifecycle, SignedCreditProviderRiskPackage, SignedCreditScorecardReport,
-    SignedExposureLedgerReport, SignedLiabilityAutoBindDecision, SignedLiabilityBoundCoverage,
-    SignedLiabilityClaimAdjudication, SignedLiabilityClaimDispute, SignedLiabilityClaimPackage,
-    SignedLiabilityClaimPayoutInstruction, SignedLiabilityClaimPayoutReceipt,
-    SignedLiabilityClaimResponse, SignedLiabilityClaimSettlementInstruction,
-    SignedLiabilityClaimSettlementReceipt, SignedLiabilityPlacement,
-    SignedLiabilityPricingAuthority, SignedLiabilityProvider, SignedLiabilityQuoteRequest,
-    SignedLiabilityQuoteResponse, SignedUnderwritingDecision, SignedUnderwritingPolicyInput,
-    StoredCapabilitySnapshot, StoredChildReceipt, StoredToolReceipt,
-    UNDERWRITING_POLICY_INPUT_SCHEMA, UNDERWRITING_SIMULATION_REPORT_SCHEMA,
-    UnderwritingAppealCreateRequest, UnderwritingAppealRecord, UnderwritingAppealResolveRequest,
-    UnderwritingCertificationEvidence, UnderwritingCertificationState,
-    UnderwritingDecisionListReport, UnderwritingDecisionPolicy, UnderwritingDecisionQuery,
-    UnderwritingDecisionReport, UnderwritingEvidenceKind, UnderwritingEvidenceReference,
-    UnderwritingPolicyInput, UnderwritingPolicyInputQuery, UnderwritingReasonCode,
-    UnderwritingReceiptEvidence, UnderwritingReputationEvidence, UnderwritingRiskClass,
-    UnderwritingRiskTaxonomy, UnderwritingRuntimeAssuranceEvidence, UnderwritingSignal,
-    UnderwritingSimulationDelta, UnderwritingSimulationReport, UnderwritingSimulationRequest,
-};
-use chio_kernel::{
-    DEFAULT_GENERIC_LISTING_REPORT_MAX_AGE_SECS, GENERIC_LISTING_ARTIFACT_SCHEMA,
-    GENERIC_LISTING_REPORT_SCHEMA, GENERIC_NAMESPACE_ARTIFACT_SCHEMA,
-    GenericGovernanceCaseEvaluation, GenericGovernanceCaseEvaluationRequest,
-    GenericGovernanceCaseIssueRequest, GenericGovernanceCharterIssueRequest,
-    GenericListingActorKind, GenericListingArtifact, GenericListingBoundary,
-    GenericListingCompatibilityReference, GenericListingFreshnessWindow, GenericListingQuery,
-    GenericListingReport, GenericListingSearchPolicy, GenericListingStatus, GenericListingSubject,
-    GenericListingSummary, GenericNamespaceArtifact, GenericNamespaceLifecycleState,
-    GenericNamespaceOwnership, GenericRegistryPublisher, GenericRegistryPublisherRole,
-    GenericTrustActivationEvaluation, GenericTrustActivationEvaluationRequest,
-    GenericTrustActivationIssueRequest, OpenMarketFeeScheduleIssueRequest,
-    OpenMarketPenaltyEvaluation, OpenMarketPenaltyEvaluationRequest, OpenMarketPenaltyIssueRequest,
-    SignedGenericGovernanceCase, SignedGenericGovernanceCharter, SignedGenericListing,
-    SignedGenericNamespace, SignedGenericTrustActivation, SignedOpenMarketFeeSchedule,
-    SignedOpenMarketPenalty, build_generic_governance_case_artifact,
-    build_generic_governance_charter_artifact, build_generic_trust_activation_artifact,
-    build_open_market_fee_schedule_artifact,
-    build_open_market_penalty_artifact_with_trusted_signers,
-    ensure_generic_listing_namespace_consistency, evaluate_generic_governance_case,
-    evaluate_generic_trust_activation, evaluate_open_market_penalty_with_trusted_signers,
-    normalize_namespace,
-};
-use chio_store_sqlite::{
-    SqliteBudgetStore, SqliteCapabilityAuthority, SqliteReceiptStore, SqliteRevocationStore,
-};
-use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use serde_json::{Value, json};
-use subtle::ConstantTimeEq;
-use tower_http::services::{ServeDir, ServeFile};
-use tower_http::set_header::SetResponseHeaderLayer;
-use tracing::{info, warn};
-use ureq::Agent;
-use url::form_urlencoded::Serializer as UrlFormSerializer;
-use url::{Host, Url};
-
-use crate::{
-    CliError, authority_public_key_from_seed_file,
-    certify::{
-        CertificationConsumptionRequest, CertificationConsumptionResponse,
-        CertificationDiscoveryResponse, CertificationDisputeRequest,
-        CertificationMarketplaceSearchQuery, CertificationMarketplaceTransparencyQuery,
-        CertificationNetworkPublishRequest, CertificationNetworkPublishResponse,
-        CertificationPublicMetadata, CertificationPublicSearchQuery,
-        CertificationPublicSearchResponse, CertificationRegistry, CertificationRegistryEntry,
-        CertificationRegistryListResponse, CertificationRegistryState,
-        CertificationResolutionResponse, CertificationResolutionState,
-        CertificationRevocationRequest, CertificationTransparencyQuery,
-        CertificationTransparencyResponse, SignedCertificationCheck,
-    },
-    enterprise_federation::{
-        CertificationDiscoveryNetwork, EnterpriseProviderKind, EnterpriseProviderRecord,
-        EnterpriseProviderRegistry,
-    },
-    evidence_export,
-    federation_policy::{
-        FederationAdmissionEvaluationRequest, FederationAdmissionEvaluationResponse,
-        FederationAdmissionPolicyDeleteResponse, FederationAdmissionPolicyListResponse,
-        FederationAdmissionPolicyRecord, FederationAdmissionPolicyRegistry,
-        FederationAdmissionRateLimit, FederationAdmissionRateLimitStatus,
-        verify_admission_proof_of_work, verify_federation_admission_policy_record,
-    },
-    issuance, load_or_create_authority_keypair,
-    passport_verifier::{
-        Oid4vpVerifierTransactionStore, PassportIssuanceOfferRecord, PassportIssuanceOfferRegistry,
-        PassportStatusListResponse, PassportStatusRegistry, PassportStatusRevocationRequest,
-        PassportVerifierChallengeStore, PublishPassportStatusRequest, VerifierPolicyRegistry,
-    },
-    reputation, rotate_authority_keypair,
-    scim_lifecycle::{
-        ScimLifecycleRegistry, ScimUserResource, build_scim_error, build_scim_user_record,
-        ensure_scim_provider, required_chio_extension,
-    },
-};
+use super::*;
 
 // Content Security Policy applied to all responses from the dashboard/API server.
 // Restricts resource loading to same-origin only; unsafe-inline is allowed for
 // styles because Vite injects inline style tags at build time.
-const CSP_VALUE: &str = "default-src 'self'; script-src 'self'; \
+pub(crate) const CSP_VALUE: &str = "default-src 'self'; script-src 'self'; \
     style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:";
 
-const HEALTH_PATH: &str = "/health";
-const AUTHORITY_PATH: &str = "/v1/authority";
-const ISSUE_CAPABILITY_PATH: &str = "/v1/capabilities/issue";
-const FEDERATED_ISSUE_PATH: &str = "/v1/federation/capabilities/issue";
-const FEDERATION_PROVIDERS_PATH: &str = "/v1/federation/providers";
-const FEDERATION_PROVIDER_PATH: &str = "/v1/federation/providers/{provider_id}";
-const FEDERATION_POLICIES_PATH: &str = "/v1/federation/open-admission-policies";
-const FEDERATION_POLICY_PATH: &str = "/v1/federation/open-admission-policies/{policy_id}";
-const FEDERATION_POLICY_EVALUATE_PATH: &str = "/v1/federation/open-admission-policies/evaluate";
-const SCIM_USERS_PATH: &str = "/scim/v2/Users";
-const SCIM_USER_PATH: &str = "/scim/v2/Users/{user_id}";
-const CERTIFICATIONS_PATH: &str = "/v1/certifications";
-const CERTIFICATION_PATH: &str = "/v1/certifications/{artifact_id}";
-const CERTIFICATION_RESOLVE_PATH: &str = "/v1/certifications/resolve/{tool_server_id}";
-const CERTIFICATION_REVOKE_PATH: &str = "/v1/certifications/{artifact_id}/revoke";
-const CERTIFICATION_DISCOVERY_PATH: &str = "/v1/certifications/discovery/publish";
-const CERTIFICATION_DISCOVERY_RESOLVE_PATH: &str =
+pub(crate) const HEALTH_PATH: &str = "/health";
+pub(crate) const AUTHORITY_PATH: &str = "/v1/authority";
+pub(crate) const ISSUE_CAPABILITY_PATH: &str = "/v1/capabilities/issue";
+pub(crate) const FEDERATED_ISSUE_PATH: &str = "/v1/federation/capabilities/issue";
+pub(crate) const FEDERATION_PROVIDERS_PATH: &str = "/v1/federation/providers";
+pub(crate) const FEDERATION_PROVIDER_PATH: &str = "/v1/federation/providers/{provider_id}";
+pub(crate) const FEDERATION_POLICIES_PATH: &str = "/v1/federation/open-admission-policies";
+pub(crate) const FEDERATION_POLICY_PATH: &str =
+    "/v1/federation/open-admission-policies/{policy_id}";
+pub(crate) const FEDERATION_POLICY_EVALUATE_PATH: &str =
+    "/v1/federation/open-admission-policies/evaluate";
+pub(crate) const SCIM_USERS_PATH: &str = "/scim/v2/Users";
+pub(crate) const SCIM_USER_PATH: &str = "/scim/v2/Users/{user_id}";
+pub(crate) const CERTIFICATIONS_PATH: &str = "/v1/certifications";
+pub(crate) const CERTIFICATION_PATH: &str = "/v1/certifications/{artifact_id}";
+pub(crate) const CERTIFICATION_RESOLVE_PATH: &str = "/v1/certifications/resolve/{tool_server_id}";
+pub(crate) const CERTIFICATION_REVOKE_PATH: &str = "/v1/certifications/{artifact_id}/revoke";
+pub(crate) const CERTIFICATION_DISCOVERY_PATH: &str = "/v1/certifications/discovery/publish";
+pub(crate) const CERTIFICATION_DISCOVERY_RESOLVE_PATH: &str =
     "/v1/certifications/discovery/resolve/{tool_server_id}";
-const CERTIFICATION_DISCOVERY_SEARCH_PATH: &str = "/v1/certifications/discovery/search";
-const CERTIFICATION_DISCOVERY_TRANSPARENCY_PATH: &str = "/v1/certifications/discovery/transparency";
-const CERTIFICATION_DISCOVERY_CONSUME_PATH: &str = "/v1/certifications/discovery/consume";
-const CERTIFICATION_DISPUTE_PATH: &str = "/v1/certifications/{artifact_id}/dispute";
-const PUBLIC_CERTIFICATION_METADATA_PATH: &str = "/v1/public/certifications/metadata";
-const PUBLIC_CERTIFICATION_RESOLVE_PATH: &str =
+pub(crate) const CERTIFICATION_DISCOVERY_SEARCH_PATH: &str = "/v1/certifications/discovery/search";
+pub(crate) const CERTIFICATION_DISCOVERY_TRANSPARENCY_PATH: &str =
+    "/v1/certifications/discovery/transparency";
+pub(crate) const CERTIFICATION_DISCOVERY_CONSUME_PATH: &str =
+    "/v1/certifications/discovery/consume";
+pub(crate) const CERTIFICATION_DISPUTE_PATH: &str = "/v1/certifications/{artifact_id}/dispute";
+pub(crate) const PUBLIC_CERTIFICATION_METADATA_PATH: &str = "/v1/public/certifications/metadata";
+pub(crate) const PUBLIC_CERTIFICATION_RESOLVE_PATH: &str =
     "/v1/public/certifications/resolve/{tool_server_id}";
-const PUBLIC_CERTIFICATION_SEARCH_PATH: &str = "/v1/public/certifications/search";
-const PUBLIC_CERTIFICATION_TRANSPARENCY_PATH: &str = "/v1/public/certifications/transparency";
-const PUBLIC_GENERIC_NAMESPACE_PATH: &str = "/v1/public/registry/namespace";
-const PUBLIC_GENERIC_LISTINGS_PATH: &str = "/v1/public/registry/listings/search";
-const GENERIC_TRUST_ACTIVATION_ISSUE_PATH: &str = "/v1/registry/trust-activations/issue";
-const GENERIC_TRUST_ACTIVATION_EVALUATE_PATH: &str = "/v1/registry/trust-activations/evaluate";
-const GENERIC_GOVERNANCE_CHARTER_ISSUE_PATH: &str = "/v1/registry/governance/charters/issue";
-const GENERIC_GOVERNANCE_CASE_ISSUE_PATH: &str = "/v1/registry/governance/cases/issue";
-const GENERIC_GOVERNANCE_CASE_EVALUATE_PATH: &str = "/v1/registry/governance/cases/evaluate";
-const OPEN_MARKET_FEE_SCHEDULE_ISSUE_PATH: &str = "/v1/registry/market/fees/issue";
-const OPEN_MARKET_PENALTY_ISSUE_PATH: &str = "/v1/registry/market/penalties/issue";
-const OPEN_MARKET_PENALTY_EVALUATE_PATH: &str = "/v1/registry/market/penalties/evaluate";
-const PASSPORT_ISSUER_METADATA_PATH: &str = OID4VCI_ISSUER_METADATA_PATH;
-const PASSPORT_ISSUER_JWKS_PATH: &str = OID4VCI_JWKS_PATH;
-const PASSPORT_SD_JWT_TYPE_METADATA_PATH: &str = CHIO_PASSPORT_SD_JWT_VC_TYPE_METADATA_PATH;
-const PASSPORT_ISSUANCE_OFFERS_PATH: &str = OID4VCI_PASSPORT_OFFERS_PATH;
-const PASSPORT_ISSUANCE_TOKEN_PATH: &str = OID4VCI_PASSPORT_TOKEN_PATH;
-const PASSPORT_ISSUANCE_CREDENTIAL_PATH: &str = OID4VCI_PASSPORT_CREDENTIAL_PATH;
-const PASSPORT_STATUSES_PATH: &str = "/v1/passport/statuses";
-const PASSPORT_STATUS_PATH: &str = "/v1/passport/statuses/{passport_id}";
-const PASSPORT_STATUS_RESOLVE_PATH: &str = "/v1/passport/statuses/resolve/{passport_id}";
-const PUBLIC_PASSPORT_STATUS_RESOLVE_PATH: &str =
+pub(crate) const PUBLIC_CERTIFICATION_SEARCH_PATH: &str = "/v1/public/certifications/search";
+pub(crate) const PUBLIC_CERTIFICATION_TRANSPARENCY_PATH: &str =
+    "/v1/public/certifications/transparency";
+pub(crate) const PUBLIC_GENERIC_NAMESPACE_PATH: &str = "/v1/public/registry/namespace";
+pub(crate) const PUBLIC_GENERIC_LISTINGS_PATH: &str = "/v1/public/registry/listings/search";
+pub(crate) const GENERIC_TRUST_ACTIVATION_ISSUE_PATH: &str = "/v1/registry/trust-activations/issue";
+pub(crate) const GENERIC_TRUST_ACTIVATION_EVALUATE_PATH: &str =
+    "/v1/registry/trust-activations/evaluate";
+pub(crate) const GENERIC_GOVERNANCE_CHARTER_ISSUE_PATH: &str =
+    "/v1/registry/governance/charters/issue";
+pub(crate) const GENERIC_GOVERNANCE_CASE_ISSUE_PATH: &str = "/v1/registry/governance/cases/issue";
+pub(crate) const GENERIC_GOVERNANCE_CASE_EVALUATE_PATH: &str =
+    "/v1/registry/governance/cases/evaluate";
+pub(crate) const OPEN_MARKET_FEE_SCHEDULE_ISSUE_PATH: &str = "/v1/registry/market/fees/issue";
+pub(crate) const OPEN_MARKET_PENALTY_ISSUE_PATH: &str = "/v1/registry/market/penalties/issue";
+pub(crate) const OPEN_MARKET_PENALTY_EVALUATE_PATH: &str = "/v1/registry/market/penalties/evaluate";
+pub(crate) const PASSPORT_ISSUER_METADATA_PATH: &str = OID4VCI_ISSUER_METADATA_PATH;
+pub(crate) const PASSPORT_ISSUER_JWKS_PATH: &str = OID4VCI_JWKS_PATH;
+pub(crate) const PASSPORT_SD_JWT_TYPE_METADATA_PATH: &str =
+    CHIO_PASSPORT_SD_JWT_VC_TYPE_METADATA_PATH;
+pub(crate) const PASSPORT_ISSUANCE_OFFERS_PATH: &str = OID4VCI_PASSPORT_OFFERS_PATH;
+pub(crate) const PASSPORT_ISSUANCE_TOKEN_PATH: &str = OID4VCI_PASSPORT_TOKEN_PATH;
+pub(crate) const PASSPORT_ISSUANCE_CREDENTIAL_PATH: &str = OID4VCI_PASSPORT_CREDENTIAL_PATH;
+pub(crate) const PASSPORT_STATUSES_PATH: &str = "/v1/passport/statuses";
+pub(crate) const PASSPORT_STATUS_PATH: &str = "/v1/passport/statuses/{passport_id}";
+pub(crate) const PASSPORT_STATUS_RESOLVE_PATH: &str = "/v1/passport/statuses/resolve/{passport_id}";
+pub(crate) const PUBLIC_PASSPORT_STATUS_RESOLVE_PATH: &str =
     "/v1/public/passport/statuses/resolve/{passport_id}";
-const PUBLIC_PASSPORT_ISSUER_DISCOVERY_PATH: &str = "/v1/public/passport/discovery/issuer";
-const PUBLIC_PASSPORT_VERIFIER_DISCOVERY_PATH: &str = "/v1/public/passport/discovery/verifier";
-const PUBLIC_PASSPORT_DISCOVERY_TRANSPARENCY_PATH: &str =
+pub(crate) const PUBLIC_PASSPORT_ISSUER_DISCOVERY_PATH: &str =
+    "/v1/public/passport/discovery/issuer";
+pub(crate) const PUBLIC_PASSPORT_VERIFIER_DISCOVERY_PATH: &str =
+    "/v1/public/passport/discovery/verifier";
+pub(crate) const PUBLIC_PASSPORT_DISCOVERY_TRANSPARENCY_PATH: &str =
     "/v1/public/passport/discovery/transparency";
-const PASSPORT_STATUS_REVOKE_PATH: &str = "/v1/passport/statuses/{passport_id}/revoke";
-const PASSPORT_VERIFIER_POLICIES_PATH: &str = "/v1/passport/verifier-policies";
-const PASSPORT_VERIFIER_POLICY_PATH: &str = "/v1/passport/verifier-policies/{policy_id}";
-const PASSPORT_CHALLENGES_PATH: &str = "/v1/passport/challenges";
-const PASSPORT_CHALLENGE_VERIFY_PATH: &str = "/v1/passport/challenges/verify";
-const PUBLIC_PASSPORT_CHALLENGE_PATH: &str = "/v1/public/passport/challenges/{challenge_id}";
-const PUBLIC_PASSPORT_CHALLENGE_VERIFY_PATH: &str = "/v1/public/passport/challenges/verify";
-const PASSPORT_OID4VP_REQUESTS_PATH: &str = "/v1/passport/oid4vp/requests";
-const PUBLIC_PASSPORT_WALLET_EXCHANGE_PATH: &str =
+pub(crate) const PASSPORT_STATUS_REVOKE_PATH: &str = "/v1/passport/statuses/{passport_id}/revoke";
+pub(crate) const PASSPORT_VERIFIER_POLICIES_PATH: &str = "/v1/passport/verifier-policies";
+pub(crate) const PASSPORT_VERIFIER_POLICY_PATH: &str = "/v1/passport/verifier-policies/{policy_id}";
+pub(crate) const PASSPORT_CHALLENGES_PATH: &str = "/v1/passport/challenges";
+pub(crate) const PASSPORT_CHALLENGE_VERIFY_PATH: &str = "/v1/passport/challenges/verify";
+pub(crate) const PUBLIC_PASSPORT_CHALLENGE_PATH: &str =
+    "/v1/public/passport/challenges/{challenge_id}";
+pub(crate) const PUBLIC_PASSPORT_CHALLENGE_VERIFY_PATH: &str =
+    "/v1/public/passport/challenges/verify";
+pub(crate) const PASSPORT_OID4VP_REQUESTS_PATH: &str = "/v1/passport/oid4vp/requests";
+pub(crate) const PUBLIC_PASSPORT_WALLET_EXCHANGE_PATH: &str =
     "/v1/public/passport/wallet-exchanges/{request_id}";
-const PUBLIC_PASSPORT_OID4VP_REQUEST_PATH: &str =
+pub(crate) const PUBLIC_PASSPORT_OID4VP_REQUEST_PATH: &str =
     "/v1/public/passport/oid4vp/requests/{request_id}";
-const PUBLIC_PASSPORT_OID4VP_LAUNCH_PATH: &str = "/v1/public/passport/oid4vp/launch/{request_id}";
-const PUBLIC_PASSPORT_OID4VP_DIRECT_POST_PATH: &str = "/v1/public/passport/oid4vp/direct-post";
-const PUBLIC_DISCOVERY_TTL_SECS: u64 = 300;
+pub(crate) const PUBLIC_PASSPORT_OID4VP_LAUNCH_PATH: &str =
+    "/v1/public/passport/oid4vp/launch/{request_id}";
+pub(crate) const PUBLIC_PASSPORT_OID4VP_DIRECT_POST_PATH: &str =
+    "/v1/public/passport/oid4vp/direct-post";
+pub(crate) const PUBLIC_DISCOVERY_TTL_SECS: u64 = 300;
 pub const FEDERATED_DELEGATION_POLICY_SCHEMA: &str = "chio.federated-delegation-policy.v1";
 const LEGACY_FEDERATED_DELEGATION_POLICY_SCHEMA: &str = "chio.federated-delegation-policy.v1";
-const REVOCATIONS_PATH: &str = "/v1/revocations";
-const TOOL_RECEIPTS_PATH: &str = "/v1/receipts/tools";
-const CHILD_RECEIPTS_PATH: &str = "/v1/receipts/children";
-const BUDGETS_PATH: &str = "/v1/budgets";
-const BUDGET_INCREMENT_PATH: &str = "/v1/budgets/increment";
-const BUDGET_AUTHORIZE_EXPOSURE_PATH: &str = "/v1/budgets/authorize-exposure";
-const BUDGET_RELEASE_EXPOSURE_PATH: &str = "/v1/budgets/release-exposure";
-const BUDGET_RECONCILE_SPEND_PATH: &str = "/v1/budgets/reconcile-spend";
-const INTERNAL_CLUSTER_STATUS_PATH: &str = "/v1/internal/cluster/status";
-const INTERNAL_CLUSTER_SNAPSHOT_PATH: &str = "/v1/internal/cluster/snapshot";
-const INTERNAL_CLUSTER_PARTITION_PATH: &str = "/v1/internal/cluster/partition";
-const INTERNAL_AUTHORITY_SNAPSHOT_PATH: &str = "/v1/internal/authority/snapshot";
-const INTERNAL_REVOCATIONS_DELTA_PATH: &str = "/v1/internal/revocations/delta";
-const INTERNAL_TOOL_RECEIPTS_DELTA_PATH: &str = "/v1/internal/receipts/tools/delta";
-const INTERNAL_CHILD_RECEIPTS_DELTA_PATH: &str = "/v1/internal/receipts/children/delta";
-const INTERNAL_BUDGETS_DELTA_PATH: &str = "/v1/internal/budgets/delta";
-const INTERNAL_LINEAGE_DELTA_PATH: &str = "/v1/internal/lineage/delta";
-const CLUSTER_NODE_ID_HEADER: &str = "x-chio-cluster-node-id";
-const CLUSTER_AUTH_ISSUED_AT_HEADER: &str = "x-chio-cluster-auth-issued-at";
-const CLUSTER_AUTH_SIGNATURE_HEADER: &str = "x-chio-cluster-auth-signature";
-const CLUSTER_AUTH_TERM_HEADER: &str = "x-chio-cluster-auth-term";
-const CLUSTER_AUTH_SCHEME: &str = "chio.cluster.peer.v1";
-const CLUSTER_AUTH_MAX_SKEW_SECS: i64 = 60;
-const CLUSTER_AUTH_FAILURE_WINDOW_SECS: u64 = 60;
-const CLUSTER_AUTH_FAILURE_BURST: usize = 8;
-const RECEIPT_QUERY_PATH: &str = "/v1/receipts/query";
-const RECEIPT_ANALYTICS_PATH: &str = "/v1/receipts/analytics";
-const EVIDENCE_EXPORT_PATH: &str = "/v1/evidence/export";
-const EVIDENCE_IMPORT_PATH: &str = "/v1/evidence/import";
-const FEDERATION_EVIDENCE_SHARES_PATH: &str = "/v1/federation/evidence-shares";
-const COST_ATTRIBUTION_PATH: &str = "/v1/reports/cost-attribution";
-const OPERATOR_REPORT_PATH: &str = "/v1/reports/operator";
-const RUNTIME_ATTESTATION_APPRAISAL_PATH: &str = "/v1/reports/runtime-attestation-appraisal";
-const RUNTIME_ATTESTATION_APPRAISAL_RESULT_PATH: &str =
+pub(crate) const REVOCATIONS_PATH: &str = "/v1/revocations";
+pub(crate) const TOOL_RECEIPTS_PATH: &str = "/v1/receipts/tools";
+pub(crate) const CHILD_RECEIPTS_PATH: &str = "/v1/receipts/children";
+pub(crate) const BUDGETS_PATH: &str = "/v1/budgets";
+pub(crate) const BUDGET_INCREMENT_PATH: &str = "/v1/budgets/increment";
+pub(crate) const BUDGET_AUTHORIZE_EXPOSURE_PATH: &str = "/v1/budgets/authorize-exposure";
+pub(crate) const BUDGET_RELEASE_EXPOSURE_PATH: &str = "/v1/budgets/release-exposure";
+pub(crate) const BUDGET_RECONCILE_SPEND_PATH: &str = "/v1/budgets/reconcile-spend";
+pub(crate) const INTERNAL_CLUSTER_STATUS_PATH: &str = "/v1/internal/cluster/status";
+pub(crate) const INTERNAL_CLUSTER_SNAPSHOT_PATH: &str = "/v1/internal/cluster/snapshot";
+pub(crate) const INTERNAL_CLUSTER_PARTITION_PATH: &str = "/v1/internal/cluster/partition";
+pub(crate) const INTERNAL_AUTHORITY_SNAPSHOT_PATH: &str = "/v1/internal/authority/snapshot";
+pub(crate) const INTERNAL_REVOCATIONS_DELTA_PATH: &str = "/v1/internal/revocations/delta";
+pub(crate) const INTERNAL_TOOL_RECEIPTS_DELTA_PATH: &str = "/v1/internal/receipts/tools/delta";
+pub(crate) const INTERNAL_CHILD_RECEIPTS_DELTA_PATH: &str = "/v1/internal/receipts/children/delta";
+pub(crate) const INTERNAL_BUDGETS_DELTA_PATH: &str = "/v1/internal/budgets/delta";
+pub(crate) const INTERNAL_LINEAGE_DELTA_PATH: &str = "/v1/internal/lineage/delta";
+pub(crate) const CLUSTER_NODE_ID_HEADER: &str = "x-chio-cluster-node-id";
+pub(crate) const CLUSTER_AUTH_ISSUED_AT_HEADER: &str = "x-chio-cluster-auth-issued-at";
+pub(crate) const CLUSTER_AUTH_SIGNATURE_HEADER: &str = "x-chio-cluster-auth-signature";
+pub(crate) const CLUSTER_AUTH_TERM_HEADER: &str = "x-chio-cluster-auth-term";
+pub(crate) const CLUSTER_AUTH_SCHEME: &str = "chio.cluster.peer.v1";
+pub(crate) const CLUSTER_AUTH_MAX_SKEW_SECS: i64 = 60;
+pub(crate) const CLUSTER_AUTH_FAILURE_WINDOW_SECS: u64 = 60;
+pub(crate) const CLUSTER_AUTH_FAILURE_BURST: usize = 8;
+pub(crate) const RECEIPT_QUERY_PATH: &str = "/v1/receipts/query";
+pub(crate) const RECEIPT_ANALYTICS_PATH: &str = "/v1/receipts/analytics";
+pub(crate) const EVIDENCE_EXPORT_PATH: &str = "/v1/evidence/export";
+pub(crate) const EVIDENCE_IMPORT_PATH: &str = "/v1/evidence/import";
+pub(crate) const FEDERATION_EVIDENCE_SHARES_PATH: &str = "/v1/federation/evidence-shares";
+pub(crate) const COST_ATTRIBUTION_PATH: &str = "/v1/reports/cost-attribution";
+pub(crate) const OPERATOR_REPORT_PATH: &str = "/v1/reports/operator";
+pub(crate) const RUNTIME_ATTESTATION_APPRAISAL_PATH: &str =
+    "/v1/reports/runtime-attestation-appraisal";
+pub(crate) const RUNTIME_ATTESTATION_APPRAISAL_RESULT_PATH: &str =
     "/v1/reports/runtime-attestation-appraisal-result";
-const RUNTIME_ATTESTATION_APPRAISAL_IMPORT_PATH: &str =
+pub(crate) const RUNTIME_ATTESTATION_APPRAISAL_IMPORT_PATH: &str =
     "/v1/reports/runtime-attestation-appraisal/import";
-const BEHAVIORAL_FEED_PATH: &str = "/v1/reports/behavioral-feed";
-const EXPOSURE_LEDGER_PATH: &str = "/v1/reports/exposure-ledger";
-const CREDIT_SCORECARD_PATH: &str = "/v1/reports/credit-scorecard";
-const CAPITAL_BOOK_PATH: &str = "/v1/reports/capital-book";
-const CAPITAL_INSTRUCTION_ISSUE_PATH: &str = "/v1/capital/instructions/issue";
-const CAPITAL_ALLOCATION_ISSUE_PATH: &str = "/v1/capital/allocations/issue";
-const CREDIT_FACILITY_REPORT_PATH: &str = "/v1/reports/facility-policy";
-const CREDIT_FACILITY_ISSUE_PATH: &str = "/v1/facilities/issue";
-const CREDIT_FACILITIES_REPORT_PATH: &str = "/v1/reports/facilities";
-const CREDIT_BOND_REPORT_PATH: &str = "/v1/reports/bond-policy";
-const CREDIT_BOND_ISSUE_PATH: &str = "/v1/bonds/issue";
-const CREDIT_BONDS_REPORT_PATH: &str = "/v1/reports/bonds";
-const CREDIT_BONDED_EXECUTION_SIMULATION_PATH: &str = "/v1/reports/bonded-execution-simulation";
-const CREDIT_LOSS_LIFECYCLE_REPORT_PATH: &str = "/v1/reports/bond-loss-policy";
-const CREDIT_LOSS_LIFECYCLE_ISSUE_PATH: &str = "/v1/bond-losses/issue";
-const CREDIT_LOSS_LIFECYCLE_LIST_PATH: &str = "/v1/reports/bond-losses";
-const CREDIT_BACKTEST_PATH: &str = "/v1/reports/credit-backtest";
-const CREDIT_PROVIDER_RISK_PACKAGE_PATH: &str = "/v1/reports/provider-risk-package";
-const LIABILITY_PROVIDER_ISSUE_PATH: &str = "/v1/liability/providers/issue";
-const LIABILITY_PROVIDERS_REPORT_PATH: &str = "/v1/reports/liability-providers";
-const LIABILITY_PROVIDER_RESOLVE_PATH: &str = "/v1/liability/providers/resolve";
-const LIABILITY_QUOTE_REQUEST_ISSUE_PATH: &str = "/v1/liability/quote-requests/issue";
-const LIABILITY_QUOTE_RESPONSE_ISSUE_PATH: &str = "/v1/liability/quote-responses/issue";
-const LIABILITY_PRICING_AUTHORITY_ISSUE_PATH: &str = "/v1/liability/pricing-authorities/issue";
-const LIABILITY_PLACEMENT_ISSUE_PATH: &str = "/v1/liability/placements/issue";
-const LIABILITY_BOUND_COVERAGE_ISSUE_PATH: &str = "/v1/liability/bound-coverages/issue";
-const LIABILITY_AUTO_BIND_DECISION_ISSUE_PATH: &str = "/v1/liability/auto-bind/issue";
-const LIABILITY_MARKET_WORKFLOW_REPORT_PATH: &str = "/v1/reports/liability-market";
-const LIABILITY_CLAIM_PACKAGE_ISSUE_PATH: &str = "/v1/liability/claims/issue";
-const LIABILITY_CLAIM_RESPONSE_ISSUE_PATH: &str = "/v1/liability/claim-responses/issue";
-const LIABILITY_CLAIM_DISPUTE_ISSUE_PATH: &str = "/v1/liability/disputes/issue";
-const LIABILITY_CLAIM_ADJUDICATION_ISSUE_PATH: &str = "/v1/liability/adjudications/issue";
-const LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ISSUE_PATH: &str =
+pub(crate) const BEHAVIORAL_FEED_PATH: &str = "/v1/reports/behavioral-feed";
+pub(crate) const EXPOSURE_LEDGER_PATH: &str = "/v1/reports/exposure-ledger";
+pub(crate) const CREDIT_SCORECARD_PATH: &str = "/v1/reports/credit-scorecard";
+pub(crate) const CAPITAL_BOOK_PATH: &str = "/v1/reports/capital-book";
+pub(crate) const CAPITAL_INSTRUCTION_ISSUE_PATH: &str = "/v1/capital/instructions/issue";
+pub(crate) const CAPITAL_ALLOCATION_ISSUE_PATH: &str = "/v1/capital/allocations/issue";
+pub(crate) const CREDIT_FACILITY_REPORT_PATH: &str = "/v1/reports/facility-policy";
+pub(crate) const CREDIT_FACILITY_ISSUE_PATH: &str = "/v1/facilities/issue";
+pub(crate) const CREDIT_FACILITIES_REPORT_PATH: &str = "/v1/reports/facilities";
+pub(crate) const CREDIT_BOND_REPORT_PATH: &str = "/v1/reports/bond-policy";
+pub(crate) const CREDIT_BOND_ISSUE_PATH: &str = "/v1/bonds/issue";
+pub(crate) const CREDIT_BONDS_REPORT_PATH: &str = "/v1/reports/bonds";
+pub(crate) const CREDIT_BONDED_EXECUTION_SIMULATION_PATH: &str =
+    "/v1/reports/bonded-execution-simulation";
+pub(crate) const CREDIT_LOSS_LIFECYCLE_REPORT_PATH: &str = "/v1/reports/bond-loss-policy";
+pub(crate) const CREDIT_LOSS_LIFECYCLE_ISSUE_PATH: &str = "/v1/bond-losses/issue";
+pub(crate) const CREDIT_LOSS_LIFECYCLE_LIST_PATH: &str = "/v1/reports/bond-losses";
+pub(crate) const CREDIT_BACKTEST_PATH: &str = "/v1/reports/credit-backtest";
+pub(crate) const CREDIT_PROVIDER_RISK_PACKAGE_PATH: &str = "/v1/reports/provider-risk-package";
+pub(crate) const LIABILITY_PROVIDER_ISSUE_PATH: &str = "/v1/liability/providers/issue";
+pub(crate) const LIABILITY_PROVIDERS_REPORT_PATH: &str = "/v1/reports/liability-providers";
+pub(crate) const LIABILITY_PROVIDER_RESOLVE_PATH: &str = "/v1/liability/providers/resolve";
+pub(crate) const LIABILITY_QUOTE_REQUEST_ISSUE_PATH: &str = "/v1/liability/quote-requests/issue";
+pub(crate) const LIABILITY_QUOTE_RESPONSE_ISSUE_PATH: &str = "/v1/liability/quote-responses/issue";
+pub(crate) const LIABILITY_PRICING_AUTHORITY_ISSUE_PATH: &str =
+    "/v1/liability/pricing-authorities/issue";
+pub(crate) const LIABILITY_PLACEMENT_ISSUE_PATH: &str = "/v1/liability/placements/issue";
+pub(crate) const LIABILITY_BOUND_COVERAGE_ISSUE_PATH: &str = "/v1/liability/bound-coverages/issue";
+pub(crate) const LIABILITY_AUTO_BIND_DECISION_ISSUE_PATH: &str = "/v1/liability/auto-bind/issue";
+pub(crate) const LIABILITY_MARKET_WORKFLOW_REPORT_PATH: &str = "/v1/reports/liability-market";
+pub(crate) const LIABILITY_CLAIM_PACKAGE_ISSUE_PATH: &str = "/v1/liability/claims/issue";
+pub(crate) const LIABILITY_CLAIM_RESPONSE_ISSUE_PATH: &str = "/v1/liability/claim-responses/issue";
+pub(crate) const LIABILITY_CLAIM_DISPUTE_ISSUE_PATH: &str = "/v1/liability/disputes/issue";
+pub(crate) const LIABILITY_CLAIM_ADJUDICATION_ISSUE_PATH: &str =
+    "/v1/liability/adjudications/issue";
+pub(crate) const LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ISSUE_PATH: &str =
     "/v1/liability/claim-payouts/instructions/issue";
-const LIABILITY_CLAIM_PAYOUT_RECEIPT_ISSUE_PATH: &str =
+pub(crate) const LIABILITY_CLAIM_PAYOUT_RECEIPT_ISSUE_PATH: &str =
     "/v1/liability/claim-payouts/receipts/issue";
-const LIABILITY_CLAIM_SETTLEMENT_INSTRUCTION_ISSUE_PATH: &str =
+pub(crate) const LIABILITY_CLAIM_SETTLEMENT_INSTRUCTION_ISSUE_PATH: &str =
     "/v1/liability/claim-settlements/instructions/issue";
-const LIABILITY_CLAIM_SETTLEMENT_RECEIPT_ISSUE_PATH: &str =
+pub(crate) const LIABILITY_CLAIM_SETTLEMENT_RECEIPT_ISSUE_PATH: &str =
     "/v1/liability/claim-settlements/receipts/issue";
-const LIABILITY_CLAIM_WORKFLOW_REPORT_PATH: &str = "/v1/reports/liability-claims";
-const SETTLEMENT_REPORT_PATH: &str = "/v1/reports/settlements";
-const SETTLEMENT_RECONCILE_PATH: &str = "/v1/settlements/reconcile";
-const METERED_BILLING_REPORT_PATH: &str = "/v1/reports/metered-billing";
-const METERED_BILLING_RECONCILE_PATH: &str = "/v1/metered-billing/reconcile";
-const ECONOMIC_RECEIPT_REPORT_PATH: &str = "/v1/reports/economic-receipts";
-const ECONOMIC_COMPLETION_FLOW_REPORT_PATH: &str = "/v1/reports/economic-completion-flow";
-const AUTHORIZATION_CONTEXT_REPORT_PATH: &str = "/v1/reports/authorization-context";
-const AUTHORIZATION_PROFILE_METADATA_PATH: &str = "/v1/reports/authorization-profile-metadata";
-const AUTHORIZATION_REVIEW_PACK_PATH: &str = "/v1/reports/authorization-review-pack";
-const UNDERWRITING_INPUT_PATH: &str = "/v1/reports/underwriting-input";
-const UNDERWRITING_DECISION_PATH: &str = "/v1/reports/underwriting-decision";
-const UNDERWRITING_SIMULATION_PATH: &str = "/v1/reports/underwriting-simulation";
-const UNDERWRITING_DECISIONS_REPORT_PATH: &str = "/v1/reports/underwriting-decisions";
-const UNDERWRITING_DECISION_ISSUE_PATH: &str = "/v1/underwriting/decisions/issue";
-const UNDERWRITING_APPEALS_PATH: &str = "/v1/underwriting/appeals";
-const UNDERWRITING_APPEAL_RESOLVE_PATH: &str = "/v1/underwriting/appeals/resolve";
-const LOCAL_REPUTATION_PATH: &str = "/v1/reputation/local/{subject_key}";
-const REPUTATION_COMPARE_PATH: &str = "/v1/reputation/compare/{subject_key}";
-const PORTABLE_REPUTATION_SUMMARY_ISSUE_PATH: &str = "/v1/reputation/portable/summaries/issue";
-const PORTABLE_NEGATIVE_EVENT_ISSUE_PATH: &str = "/v1/reputation/portable/events/issue";
-const PORTABLE_REPUTATION_EVALUATE_PATH: &str = "/v1/reputation/portable/evaluate";
-const LINEAGE_RECORD_PATH: &str = "/v1/lineage";
-const LINEAGE_PATH: &str = "/v1/lineage/{capability_id}";
-const LINEAGE_CHAIN_PATH: &str = "/v1/lineage/{capability_id}/chain";
-const AGENT_RECEIPTS_PATH: &str = "/v1/agents/{subject_key}/receipts";
-const DASHBOARD_DIST_DIR: &str = "dashboard/dist";
-const DEFAULT_LIST_LIMIT: usize = 50;
-const MAX_LIST_LIMIT: usize = 200;
-const BUDGET_DELTA_MAX_RECORDS: usize = MAX_LIST_LIMIT * 2;
-const AUTHORITY_CACHE_TTL: Duration = Duration::from_secs(2);
-const CONTROL_HTTP_TIMEOUT: Duration = Duration::from_secs(15);
-const CLUSTER_SNAPSHOT_RECORD_THRESHOLD: u64 = 8;
+pub(crate) const LIABILITY_CLAIM_WORKFLOW_REPORT_PATH: &str = "/v1/reports/liability-claims";
+pub(crate) const SETTLEMENT_REPORT_PATH: &str = "/v1/reports/settlements";
+pub(crate) const SETTLEMENT_RECONCILE_PATH: &str = "/v1/settlements/reconcile";
+pub(crate) const METERED_BILLING_REPORT_PATH: &str = "/v1/reports/metered-billing";
+pub(crate) const METERED_BILLING_RECONCILE_PATH: &str = "/v1/metered-billing/reconcile";
+pub(crate) const ECONOMIC_RECEIPT_REPORT_PATH: &str = "/v1/reports/economic-receipts";
+pub(crate) const ECONOMIC_COMPLETION_FLOW_REPORT_PATH: &str =
+    "/v1/reports/economic-completion-flow";
+pub(crate) const AUTHORIZATION_CONTEXT_REPORT_PATH: &str = "/v1/reports/authorization-context";
+pub(crate) const AUTHORIZATION_PROFILE_METADATA_PATH: &str =
+    "/v1/reports/authorization-profile-metadata";
+pub(crate) const AUTHORIZATION_REVIEW_PACK_PATH: &str = "/v1/reports/authorization-review-pack";
+pub(crate) const UNDERWRITING_INPUT_PATH: &str = "/v1/reports/underwriting-input";
+pub(crate) const UNDERWRITING_DECISION_PATH: &str = "/v1/reports/underwriting-decision";
+pub(crate) const UNDERWRITING_SIMULATION_PATH: &str = "/v1/reports/underwriting-simulation";
+pub(crate) const UNDERWRITING_DECISIONS_REPORT_PATH: &str = "/v1/reports/underwriting-decisions";
+pub(crate) const UNDERWRITING_DECISION_ISSUE_PATH: &str = "/v1/underwriting/decisions/issue";
+pub(crate) const UNDERWRITING_APPEALS_PATH: &str = "/v1/underwriting/appeals";
+pub(crate) const UNDERWRITING_APPEAL_RESOLVE_PATH: &str = "/v1/underwriting/appeals/resolve";
+pub(crate) const LOCAL_REPUTATION_PATH: &str = "/v1/reputation/local/{subject_key}";
+pub(crate) const REPUTATION_COMPARE_PATH: &str = "/v1/reputation/compare/{subject_key}";
+pub(crate) const PORTABLE_REPUTATION_SUMMARY_ISSUE_PATH: &str =
+    "/v1/reputation/portable/summaries/issue";
+pub(crate) const PORTABLE_NEGATIVE_EVENT_ISSUE_PATH: &str = "/v1/reputation/portable/events/issue";
+pub(crate) const PORTABLE_REPUTATION_EVALUATE_PATH: &str = "/v1/reputation/portable/evaluate";
+pub(crate) const LINEAGE_RECORD_PATH: &str = "/v1/lineage";
+pub(crate) const LINEAGE_PATH: &str = "/v1/lineage/{capability_id}";
+pub(crate) const LINEAGE_CHAIN_PATH: &str = "/v1/lineage/{capability_id}/chain";
+pub(crate) const AGENT_RECEIPTS_PATH: &str = "/v1/agents/{subject_key}/receipts";
+pub(crate) const DASHBOARD_DIST_DIR: &str = "dashboard/dist";
+pub(crate) const DEFAULT_LIST_LIMIT: usize = 50;
+pub(crate) const MAX_LIST_LIMIT: usize = 200;
+pub(crate) const BUDGET_DELTA_MAX_RECORDS: usize = MAX_LIST_LIMIT * 2;
+pub(crate) const AUTHORITY_CACHE_TTL: Duration = Duration::from_secs(2);
+pub(crate) const CONTROL_HTTP_TIMEOUT: Duration = Duration::from_secs(15);
+pub(crate) const CLUSTER_SNAPSHOT_RECORD_THRESHOLD: u64 = 8;
 
 #[derive(Clone)]
 pub struct TrustServiceConfig {
@@ -469,64 +243,64 @@ pub struct TrustServiceConfig {
 }
 
 #[derive(Clone)]
-struct TrustServiceState {
-    config: TrustServiceConfig,
-    enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
-    verifier_policy_registry: Option<Arc<VerifierPolicyRegistry>>,
-    federation_admission_rate_limiter: Arc<Mutex<FederationAdmissionRateLimiter>>,
-    cluster: Option<Arc<Mutex<ClusterRuntimeState>>>,
+pub(crate) struct TrustServiceState {
+    pub(crate) config: TrustServiceConfig,
+    pub(crate) enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
+    pub(crate) verifier_policy_registry: Option<Arc<VerifierPolicyRegistry>>,
+    pub(crate) federation_admission_rate_limiter: Arc<Mutex<FederationAdmissionRateLimiter>>,
+    pub(crate) cluster: Option<Arc<Mutex<ClusterRuntimeState>>>,
 }
 
 #[derive(Clone)]
 pub struct TrustControlClient {
-    endpoints: Arc<Vec<String>>,
-    preferred_index: Arc<Mutex<usize>>,
-    token: Arc<str>,
-    http: Agent,
-    cluster_peer_auth: Option<ClusterPeerClientAuth>,
+    pub(crate) endpoints: Arc<Vec<String>>,
+    pub(crate) preferred_index: Arc<Mutex<usize>>,
+    pub(crate) token: Arc<str>,
+    pub(crate) http: Agent,
+    pub(crate) cluster_peer_auth: Option<ClusterPeerClientAuth>,
 }
 
 #[derive(Clone)]
-struct ClusterPeerClientAuth {
-    node_id: Arc<str>,
+pub(crate) struct ClusterPeerClientAuth {
+    pub(crate) node_id: Arc<str>,
 }
 
-struct RemoteCapabilityAuthority {
-    client: TrustControlClient,
-    cache: Mutex<AuthorityKeyCache>,
+pub(crate) struct RemoteCapabilityAuthority {
+    pub(crate) client: TrustControlClient,
+    pub(crate) cache: Mutex<AuthorityKeyCache>,
 }
 
-struct AuthorityKeyCache {
-    current: Option<PublicKey>,
-    trusted: Vec<PublicKey>,
-    refreshed_at: Instant,
+pub(crate) struct AuthorityKeyCache {
+    pub(crate) current: Option<PublicKey>,
+    pub(crate) trusted: Vec<PublicKey>,
+    pub(crate) refreshed_at: Instant,
 }
 
-struct RemoteRevocationStore {
-    client: TrustControlClient,
+pub(crate) struct RemoteRevocationStore {
+    pub(crate) client: TrustControlClient,
 }
 
-struct RemoteReceiptStore {
-    client: TrustControlClient,
+pub(crate) struct RemoteReceiptStore {
+    pub(crate) client: TrustControlClient,
 }
 
-struct RemoteBudgetStore {
-    client: TrustControlClient,
-    cached_usage: Mutex<HashMap<(String, u32), BudgetUsageRecord>>,
+pub(crate) struct RemoteBudgetStore {
+    pub(crate) client: TrustControlClient,
+    pub(crate) cached_usage: Mutex<HashMap<(String, u32), BudgetUsageRecord>>,
 }
 
 impl TrustServiceState {
     // Retained for enterprise-provider validation paths that share this state
     // shape even though current readers do not call the helper directly.
     #[allow(dead_code)]
-    fn enterprise_provider_registry(&self) -> Option<&EnterpriseProviderRegistry> {
+    pub(crate) fn enterprise_provider_registry(&self) -> Option<&EnterpriseProviderRegistry> {
         self.enterprise_provider_registry.as_deref()
     }
 
     // Retained for enterprise-provider validation paths that share this state
     // shape even though current readers do not call the helper directly.
     #[allow(dead_code)]
-    fn validated_enterprise_provider(
+    pub(crate) fn validated_enterprise_provider(
         &self,
         provider_id: &str,
     ) -> Option<&EnterpriseProviderRecord> {
@@ -534,46 +308,46 @@ impl TrustServiceState {
             .and_then(|registry| registry.validated_provider(provider_id))
     }
 
-    fn verifier_policy_registry(&self) -> Option<&VerifierPolicyRegistry> {
+    pub(crate) fn verifier_policy_registry(&self) -> Option<&VerifierPolicyRegistry> {
         self.verifier_policy_registry.as_deref()
     }
 }
 
 #[derive(Debug, Clone)]
-struct ClusterRuntimeState {
-    self_url: String,
-    peers: HashMap<String, PeerSyncState>,
-    election_term: u64,
-    last_leader_url: Option<String>,
-    term_started_at: Option<u64>,
-    lease_expires_at: Option<u64>,
-    lease_ttl_ms: u64,
+pub(crate) struct ClusterRuntimeState {
+    pub(crate) self_url: String,
+    pub(crate) peers: HashMap<String, PeerSyncState>,
+    pub(crate) election_term: u64,
+    pub(crate) last_leader_url: Option<String>,
+    pub(crate) term_started_at: Option<u64>,
+    pub(crate) lease_expires_at: Option<u64>,
+    pub(crate) lease_ttl_ms: u64,
 }
 
 #[derive(Debug, Clone)]
-struct PeerSyncState {
-    health: PeerHealth,
-    partitioned: bool,
-    last_error: Option<String>,
-    last_contact_at: Option<u64>,
-    tool_seq: u64,
-    child_seq: u64,
-    lineage_seq: u64,
-    revocation_cursor: Option<RevocationCursor>,
-    budget_cursor: Option<BudgetCursor>,
-    delta_records_since_snapshot: u64,
-    snapshot_applied_count: u64,
-    last_snapshot_at: Option<u64>,
-    force_snapshot: bool,
+pub(crate) struct PeerSyncState {
+    pub(crate) health: PeerHealth,
+    pub(crate) partitioned: bool,
+    pub(crate) last_error: Option<String>,
+    pub(crate) last_contact_at: Option<u64>,
+    pub(crate) tool_seq: u64,
+    pub(crate) child_seq: u64,
+    pub(crate) lineage_seq: u64,
+    pub(crate) revocation_cursor: Option<RevocationCursor>,
+    pub(crate) budget_cursor: Option<BudgetCursor>,
+    pub(crate) delta_records_since_snapshot: u64,
+    pub(crate) snapshot_applied_count: u64,
+    pub(crate) last_snapshot_at: Option<u64>,
+    pub(crate) force_snapshot: bool,
 }
 
 #[derive(Debug, Default)]
-struct FederationAdmissionRateLimiter {
+pub(crate) struct FederationAdmissionRateLimiter {
     attempts: HashMap<String, Vec<u64>>,
 }
 
 impl FederationAdmissionRateLimiter {
-    fn check_and_record(
+    pub(crate) fn check_and_record(
         &mut self,
         policy_id: &str,
         subject_key: &str,
@@ -611,35 +385,35 @@ impl FederationAdmissionRateLimiter {
 }
 
 #[derive(Debug, Clone)]
-enum PeerHealth {
+pub(crate) enum PeerHealth {
     Unknown,
     Healthy,
     Unhealthy,
 }
 
 #[derive(Debug, Clone)]
-struct RevocationCursor {
-    revoked_at: i64,
-    capability_id: String,
+pub(crate) struct RevocationCursor {
+    pub(crate) revoked_at: i64,
+    pub(crate) capability_id: String,
 }
 
 #[derive(Debug, Clone)]
-struct BudgetCursor {
-    seq: u64,
-    updated_at: i64,
-    capability_id: String,
-    grant_index: u32,
+pub(crate) struct BudgetCursor {
+    pub(crate) seq: u64,
+    pub(crate) updated_at: i64,
+    pub(crate) capability_id: String,
+    pub(crate) grant_index: u32,
 }
 
 #[derive(Debug, Clone)]
-struct ClusterConsensusView {
-    self_url: String,
-    leader_url: Option<String>,
-    role: &'static str,
-    has_quorum: bool,
-    quorum_size: usize,
-    reachable_nodes: usize,
-    election_term: u64,
+pub(crate) struct ClusterConsensusView {
+    pub(crate) self_url: String,
+    pub(crate) leader_url: Option<String>,
+    pub(crate) role: &'static str,
+    pub(crate) has_quorum: bool,
+    pub(crate) quorum_size: usize,
+    pub(crate) reachable_nodes: usize,
+    pub(crate) election_term: u64,
 }
 
 impl Default for PeerSyncState {
@@ -663,11 +437,11 @@ impl Default for PeerSyncState {
 }
 
 impl PeerHealth {
-    fn is_reachable(&self) -> bool {
+    pub(crate) fn is_reachable(&self) -> bool {
         matches!(self, Self::Healthy)
     }
 
-    fn label(&self) -> &'static str {
+    pub(crate) fn label(&self) -> &'static str {
         match self {
             Self::Unknown => "unknown",
             Self::Healthy => "healthy",
@@ -691,18 +465,18 @@ pub struct TrustAuthorityStatus {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct IssueCapabilityRequest {
-    subject_public_key: String,
-    scope: ChioScope,
-    ttl_seconds: u64,
+pub(crate) struct IssueCapabilityRequest {
+    pub(crate) subject_public_key: String,
+    pub(crate) scope: ChioScope,
+    pub(crate) ttl_seconds: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    runtime_attestation: Option<RuntimeAttestationEvidence>,
+    pub(crate) runtime_attestation: Option<RuntimeAttestationEvidence>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct IssueCapabilityResponse {
-    capability: CapabilityToken,
+pub(crate) struct IssueCapabilityResponse {
+    pub(crate) capability: CapabilityToken,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -918,10 +692,10 @@ pub struct FederatedDelegationPolicyDocument {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct RecordCapabilitySnapshotRequest {
-    capability: CapabilityToken,
+pub(crate) struct RecordCapabilitySnapshotRequest {
+    pub(crate) capability: CapabilityToken,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    parent_capability_id: Option<String>,
+    pub(crate) parent_capability_id: Option<String>,
 }
 
 pub fn verify_federated_delegation_policy(
@@ -960,7 +734,7 @@ pub fn verify_federated_delegation_policy(
     Ok(())
 }
 
-fn ensure_federated_delegation_policy_active(
+pub(crate) fn ensure_federated_delegation_policy_active(
     policy: &FederatedDelegationPolicyDocument,
     now: u64,
 ) -> Result<(), CliError> {
@@ -977,7 +751,7 @@ fn ensure_federated_delegation_policy_active(
     Ok(())
 }
 
-fn ensure_requested_capability_within_delegation_policy(
+pub(crate) fn ensure_requested_capability_within_delegation_policy(
     capability: &crate::policy::DefaultCapability,
     policy: &FederatedDelegationPolicyDocument,
     now: u64,
@@ -1004,7 +778,7 @@ fn ensure_requested_capability_within_delegation_policy(
     Ok(())
 }
 
-fn ensure_requested_capability_within_parent_snapshot(
+pub(crate) fn ensure_requested_capability_within_parent_snapshot(
     capability: &crate::policy::DefaultCapability,
     parent_snapshot: &CapabilitySnapshot,
     now: u64,
@@ -1030,7 +804,7 @@ fn ensure_requested_capability_within_parent_snapshot(
     Ok(())
 }
 
-fn build_capability_snapshot(
+pub(crate) fn build_capability_snapshot(
     token: &CapabilityToken,
     delegation_depth: u64,
     parent_capability_id: Option<String>,
@@ -1047,7 +821,7 @@ fn build_capability_snapshot(
     })
 }
 
-fn build_federated_delegation_anchor_snapshot(
+pub(crate) fn build_federated_delegation_anchor_snapshot(
     policy: &FederatedDelegationPolicyDocument,
     subject_key: &str,
     challenge: &PassportPresentationChallenge,
@@ -1487,28 +1261,28 @@ pub struct LiabilityClaimSettlementReceiptIssueRequest {
 }
 
 #[derive(Debug, Clone)]
-struct TrustHttpError {
-    status: StatusCode,
-    message: String,
+pub(crate) struct TrustHttpError {
+    pub(crate) status: StatusCode,
+    pub(crate) message: String,
 }
 
 impl TrustHttpError {
-    fn new(status: StatusCode, message: impl Into<String>) -> Self {
+    pub(crate) fn new(status: StatusCode, message: impl Into<String>) -> Self {
         Self {
             status,
             message: message.into(),
         }
     }
 
-    fn bad_request(message: impl Into<String>) -> Self {
+    pub(crate) fn bad_request(message: impl Into<String>) -> Self {
         Self::new(StatusCode::BAD_REQUEST, message)
     }
 
-    fn internal(message: impl Into<String>) -> Self {
+    pub(crate) fn internal(message: impl Into<String>) -> Self {
         Self::new(StatusCode::INTERNAL_SERVER_ERROR, message)
     }
 
-    fn into_response(self) -> Response {
+    pub(crate) fn into_response(self) -> Response {
         plain_http_error(self.status, &self.message)
     }
 }
@@ -1531,7 +1305,7 @@ impl From<CliError> for TrustHttpError {
     }
 }
 
-fn liability_market_http_error(message: &str) -> Response {
+pub(crate) fn liability_market_http_error(message: &str) -> Response {
     let status = if message.contains("not found") {
         StatusCode::NOT_FOUND
     } else if message.contains("already")
@@ -1552,21 +1326,24 @@ fn liability_market_http_error(message: &str) -> Response {
 }
 
 #[derive(Debug, Clone)]
-enum UnderwritingQuotedExposure {
+pub(crate) enum UnderwritingQuotedExposure {
     None,
     Single(MonetaryAmount),
     MixedCurrencies(BTreeSet<String>),
 }
 
 impl UnderwritingQuotedExposure {
-    fn amount_for_pricing(&self) -> Option<MonetaryAmount> {
+    pub(crate) fn amount_for_pricing(&self) -> Option<MonetaryAmount> {
         match self {
             Self::Single(amount) => Some(amount.clone()),
             Self::None | Self::MixedCurrencies(_) => None,
         }
     }
 
-    fn apply_to_artifact(&self, artifact: &mut chio_kernel::UnderwritingDecisionArtifact) {
+    pub(crate) fn apply_to_artifact(
+        &self,
+        artifact: &mut chio_kernel::UnderwritingDecisionArtifact,
+    ) {
         let Self::MixedCurrencies(currencies) = self else {
             return;
         };
@@ -1742,369 +1519,422 @@ pub struct BudgetListResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ClusterStatusResponse {
-    self_url: String,
+pub(crate) struct ClusterStatusResponse {
+    pub(crate) self_url: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    leader_url: Option<String>,
-    role: String,
-    has_quorum: bool,
-    quorum_size: usize,
-    reachable_nodes: usize,
-    election_term: u64,
+    pub(crate) leader_url: Option<String>,
+    pub(crate) role: String,
+    pub(crate) has_quorum: bool,
+    pub(crate) quorum_size: usize,
+    pub(crate) reachable_nodes: usize,
+    pub(crate) election_term: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    authority_lease: Option<ClusterAuthorityLeaseView>,
-    replication: ClusterReplicationHeadsView,
-    peers: Vec<PeerStatusView>,
+    pub(crate) authority_lease: Option<ClusterAuthorityLeaseView>,
+    pub(crate) replication: ClusterReplicationHeadsView,
+    pub(crate) peers: Vec<PeerStatusView>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct PeerStatusView {
-    peer_url: String,
-    health: String,
-    partitioned: bool,
+pub(crate) struct PeerStatusView {
+    pub(crate) peer_url: String,
+    pub(crate) health: String,
+    pub(crate) partitioned: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    last_error: Option<String>,
+    pub(crate) last_error: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    last_contact_at: Option<u64>,
-    tool_seq: u64,
-    child_seq: u64,
-    lineage_seq: u64,
+    pub(crate) last_contact_at: Option<u64>,
+    pub(crate) tool_seq: u64,
+    pub(crate) child_seq: u64,
+    pub(crate) lineage_seq: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    revocation_cursor: Option<RevocationCursorView>,
+    pub(crate) revocation_cursor: Option<RevocationCursorView>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    budget_cursor: Option<BudgetCursorView>,
-    snapshot_applied_count: u64,
+    pub(crate) budget_cursor: Option<BudgetCursorView>,
+    pub(crate) snapshot_applied_count: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    last_snapshot_at: Option<u64>,
-    delta_records_since_snapshot: u64,
-    force_snapshot: bool,
+    pub(crate) last_snapshot_at: Option<u64>,
+    pub(crate) delta_records_since_snapshot: u64,
+    pub(crate) force_snapshot: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-struct ClusterReplicationHeadsView {
-    tool_seq: u64,
-    child_seq: u64,
-    lineage_seq: u64,
-    budget_seq: u64,
+pub(crate) struct ClusterReplicationHeadsView {
+    pub(crate) tool_seq: u64,
+    pub(crate) child_seq: u64,
+    pub(crate) lineage_seq: u64,
+    pub(crate) budget_seq: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    revocation_cursor: Option<RevocationCursorView>,
+    pub(crate) revocation_cursor: Option<RevocationCursorView>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ClusterStateSnapshotResponse {
-    generated_at: u64,
+pub(crate) struct ClusterStateSnapshotResponse {
+    pub(crate) generated_at: u64,
     #[serde(default)]
-    election_term: u64,
-    replication: ClusterReplicationHeadsView,
+    pub(crate) election_term: u64,
+    pub(crate) replication: ClusterReplicationHeadsView,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    authority_lease: Option<ClusterAuthorityLeaseView>,
+    pub(crate) authority_lease: Option<ClusterAuthorityLeaseView>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    authority: Option<AuthoritySnapshotView>,
-    revocations: Vec<RevocationRecordView>,
-    tool_receipts: Vec<StoredReceiptView>,
-    child_receipts: Vec<StoredReceiptView>,
-    lineage: Vec<StoredLineageView>,
-    budgets: Vec<BudgetUsageView>,
+    pub(crate) authority: Option<AuthoritySnapshotView>,
+    pub(crate) revocations: Vec<RevocationRecordView>,
+    pub(crate) tool_receipts: Vec<StoredReceiptView>,
+    pub(crate) child_receipts: Vec<StoredReceiptView>,
+    pub(crate) lineage: Vec<StoredLineageView>,
+    pub(crate) budgets: Vec<BudgetUsageView>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    budget_mutation_events: Vec<BudgetMutationEventView>,
+    pub(crate) budget_mutation_events: Vec<BudgetMutationEventView>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ClusterPartitionRequest {
+pub(crate) struct ClusterPartitionRequest {
     #[serde(default)]
-    blocked_peer_urls: Vec<String>,
+    pub(crate) blocked_peer_urls: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ClusterPartitionResponse {
-    self_url: String,
-    blocked_peer_urls: Vec<String>,
+pub(crate) struct ClusterPartitionResponse {
+    pub(crate) self_url: String,
+    pub(crate) blocked_peer_urls: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    leader_url: Option<String>,
-    role: String,
-    has_quorum: bool,
-    reachable_nodes: usize,
-    quorum_size: usize,
-    election_term: u64,
+    pub(crate) leader_url: Option<String>,
+    pub(crate) role: String,
+    pub(crate) has_quorum: bool,
+    pub(crate) reachable_nodes: usize,
+    pub(crate) quorum_size: usize,
+    pub(crate) election_term: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    authority_lease: Option<ClusterAuthorityLeaseView>,
+    pub(crate) authority_lease: Option<ClusterAuthorityLeaseView>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ClusterAuthorityLeaseView {
-    authority_id: String,
-    leader_url: String,
-    term: u64,
-    lease_id: String,
-    lease_epoch: u64,
+pub(crate) struct ClusterAuthorityLeaseView {
+    pub(crate) authority_id: String,
+    pub(crate) leader_url: String,
+    pub(crate) term: u64,
+    pub(crate) lease_id: String,
+    pub(crate) lease_epoch: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    term_started_at: Option<u64>,
-    lease_expires_at: u64,
-    lease_ttl_ms: u64,
-    lease_valid: bool,
+    pub(crate) term_started_at: Option<u64>,
+    pub(crate) lease_expires_at: u64,
+    pub(crate) lease_ttl_ms: u64,
+    pub(crate) lease_valid: bool,
+}
+
+/// Trust-control heartbeat that refreshes a held authority lease before it
+/// expires. Wire shape mirrors
+/// `spec/schemas/chio-wire/v1/trust-control/heartbeat.schema.json`: the lease
+/// is named by (`leaseId`, `leaseEpoch`), the leader claiming continued
+/// ownership by `leaderUrl`, and the observation instant by `observedAt`
+/// (unix milliseconds). Deserialization is fail-closed: unknown fields are
+/// rejected and the non-negative integer fields decode as unsigned so a
+/// negative timestamp or epoch cannot be smuggled in.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LeaseHeartbeatRequest {
+    pub lease_id: String,
+    pub lease_epoch: u64,
+    pub leader_url: String,
+    pub observed_at: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proposed_expires_at: Option<u64>,
+}
+
+/// Typed reason carried by a [`LeaseTerminateRequest`]. Mirrors the `reason`
+/// enum in `spec/schemas/chio-wire/v1/trust-control/terminate.schema.json`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LeaseTerminationReason {
+    /// Planned reassignment of the lease to a successor leader.
+    LeaderHandoff,
+    /// Detected loss of cluster quorum.
+    QuorumLost,
+    /// Explicit operator-initiated stepdown.
+    OperatorStepdown,
+    /// A higher election term superseded the lease.
+    TermAdvanced,
+}
+
+/// Trust-control request that voluntarily releases a held authority lease
+/// before its TTL expires. Wire shape mirrors
+/// `spec/schemas/chio-wire/v1/trust-control/terminate.schema.json`: the lease
+/// is named by (`leaseId`, `leaseEpoch`), the releasing leader by `leaderUrl`,
+/// and a typed `reason` distinguishes leader handoff from quorum loss or
+/// operator stepdown. Deserialization is fail-closed (unknown fields rejected,
+/// non-negative integers decode as unsigned).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LeaseTerminateRequest {
+    pub lease_id: String,
+    pub lease_epoch: u64,
+    pub leader_url: String,
+    pub reason: LeaseTerminationReason,
+    pub observed_at: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub successor_leader_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct RevocationCursorView {
-    revoked_at: i64,
-    capability_id: String,
+pub(crate) struct RevocationCursorView {
+    pub(crate) revoked_at: i64,
+    pub(crate) capability_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct BudgetCursorView {
-    seq: u64,
-    updated_at: i64,
-    capability_id: String,
-    grant_index: u32,
+pub(crate) struct BudgetCursorView {
+    pub(crate) seq: u64,
+    pub(crate) updated_at: i64,
+    pub(crate) capability_id: String,
+    pub(crate) grant_index: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct BudgetMutationAuthorityView {
-    authority_id: String,
-    lease_id: String,
-    lease_epoch: u64,
+pub(crate) struct BudgetMutationAuthorityView {
+    pub(crate) authority_id: String,
+    pub(crate) lease_id: String,
+    pub(crate) lease_epoch: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct BudgetMutationEventView {
-    event_id: String,
+pub(crate) struct BudgetMutationEventView {
+    pub(crate) event_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    hold_id: Option<String>,
-    capability_id: String,
-    grant_index: u32,
-    kind: String,
+    pub(crate) hold_id: Option<String>,
+    pub(crate) capability_id: String,
+    pub(crate) grant_index: u32,
+    pub(crate) kind: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    allowed: Option<bool>,
-    recorded_at: i64,
-    event_seq: u64,
+    pub(crate) allowed: Option<bool>,
+    pub(crate) recorded_at: i64,
+    pub(crate) event_seq: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    usage_seq: Option<u64>,
-    exposure_units: u64,
-    realized_spend_units: u64,
+    pub(crate) usage_seq: Option<u64>,
+    pub(crate) exposure_units: u64,
+    pub(crate) realized_spend_units: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    max_invocations: Option<u32>,
+    pub(crate) max_invocations: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    max_cost_per_invocation: Option<u64>,
+    pub(crate) max_cost_per_invocation: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    max_total_cost_units: Option<u64>,
-    invocation_count_after: u32,
-    total_cost_exposed_after: u64,
-    total_cost_realized_spend_after: u64,
+    pub(crate) max_total_cost_units: Option<u64>,
+    pub(crate) invocation_count_after: u32,
+    pub(crate) total_cost_exposed_after: u64,
+    pub(crate) total_cost_realized_spend_after: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    authority: Option<BudgetMutationAuthorityView>,
+    pub(crate) authority: Option<BudgetMutationAuthorityView>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct AuthoritySnapshotView {
-    public_key_hex: String,
-    generation: u64,
-    rotated_at: u64,
-    trusted_keys: Vec<AuthorityTrustedKeyView>,
+pub(crate) struct AuthoritySnapshotView {
+    pub(crate) public_key_hex: String,
+    pub(crate) generation: u64,
+    pub(crate) rotated_at: u64,
+    pub(crate) trusted_keys: Vec<AuthorityTrustedKeyView>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct AuthorityTrustedKeyView {
-    public_key_hex: String,
-    generation: u64,
-    activated_at: u64,
+pub(crate) struct AuthorityTrustedKeyView {
+    pub(crate) public_key_hex: String,
+    pub(crate) generation: u64,
+    pub(crate) activated_at: u64,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct RevocationDeltaQuery {
+pub(crate) struct RevocationDeltaQuery {
     #[serde(default)]
-    after_revoked_at: Option<i64>,
+    pub(crate) after_revoked_at: Option<i64>,
     #[serde(default)]
-    after_capability_id: Option<String>,
+    pub(crate) after_capability_id: Option<String>,
     #[serde(default)]
-    limit: Option<usize>,
+    pub(crate) limit: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct RevocationDeltaResponse {
-    records: Vec<RevocationRecordView>,
+pub(crate) struct RevocationDeltaResponse {
+    pub(crate) records: Vec<RevocationRecordView>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ReceiptDeltaQuery {
+pub(crate) struct ReceiptDeltaQuery {
     #[serde(default)]
-    after_seq: Option<u64>,
+    pub(crate) after_seq: Option<u64>,
     #[serde(default)]
-    limit: Option<usize>,
+    pub(crate) limit: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct StoredReceiptView {
-    seq: u64,
-    receipt: Value,
+pub(crate) struct StoredReceiptView {
+    pub(crate) seq: u64,
+    pub(crate) receipt: Value,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ReceiptDeltaResponse {
-    records: Vec<StoredReceiptView>,
+pub(crate) struct ReceiptDeltaResponse {
+    pub(crate) records: Vec<StoredReceiptView>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct StoredLineageView {
-    seq: u64,
-    snapshot: CapabilitySnapshot,
+pub(crate) struct StoredLineageView {
+    pub(crate) seq: u64,
+    pub(crate) snapshot: CapabilitySnapshot,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct LineageDeltaResponse {
-    records: Vec<StoredLineageView>,
+pub(crate) struct LineageDeltaResponse {
+    pub(crate) records: Vec<StoredLineageView>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct BudgetDeltaQuery {
+pub(crate) struct BudgetDeltaQuery {
     #[serde(default)]
-    after_seq: Option<u64>,
+    pub(crate) after_seq: Option<u64>,
     #[serde(default)]
-    limit: Option<usize>,
+    pub(crate) limit: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct BudgetDeltaResponse {
-    records: Vec<BudgetUsageView>,
+pub(crate) struct BudgetDeltaResponse {
+    pub(crate) records: Vec<BudgetUsageView>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    mutation_events: Vec<BudgetMutationEventView>,
+    pub(crate) mutation_events: Vec<BudgetMutationEventView>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct BudgetWriteCommitView {
-    budget_seq: u64,
-    commit_index: u64,
-    quorum_committed: bool,
-    quorum_size: usize,
-    committed_nodes: usize,
-    witness_urls: Vec<String>,
-    authority_id: String,
-    budget_term: u64,
-    lease_id: String,
-    lease_epoch: u64,
+pub(crate) struct BudgetWriteCommitView {
+    pub(crate) budget_seq: u64,
+    pub(crate) commit_index: u64,
+    pub(crate) quorum_committed: bool,
+    pub(crate) quorum_size: usize,
+    pub(crate) committed_nodes: usize,
+    pub(crate) witness_urls: Vec<String>,
+    pub(crate) authority_id: String,
+    pub(crate) budget_term: u64,
+    pub(crate) lease_id: String,
+    pub(crate) lease_epoch: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct BudgetAuthorityMetadataView {
-    authority_id: String,
-    leader_url: String,
-    budget_term: u64,
-    lease_id: String,
-    lease_epoch: u64,
-    lease_expires_at: u64,
-    lease_ttl_ms: u64,
-    guarantee_level: String,
+pub(crate) struct BudgetAuthorityMetadataView {
+    pub(crate) authority_id: String,
+    pub(crate) leader_url: String,
+    pub(crate) budget_term: u64,
+    pub(crate) lease_id: String,
+    pub(crate) lease_epoch: u64,
+    pub(crate) lease_expires_at: u64,
+    pub(crate) lease_ttl_ms: u64,
+    pub(crate) guarantee_level: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    budget_commit_index: Option<u64>,
+    pub(crate) budget_commit_index: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct TryIncrementBudgetRequest {
-    capability_id: String,
-    grant_index: usize,
-    max_invocations: Option<u32>,
+pub(crate) struct TryIncrementBudgetRequest {
+    pub(crate) capability_id: String,
+    pub(crate) grant_index: usize,
+    pub(crate) max_invocations: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct TryIncrementBudgetResponse {
-    capability_id: String,
-    grant_index: usize,
-    allowed: bool,
+pub(crate) struct TryIncrementBudgetResponse {
+    pub(crate) capability_id: String,
+    pub(crate) grant_index: usize,
+    pub(crate) allowed: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    invocation_count: Option<u32>,
+    pub(crate) invocation_count: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    budget_authority: Option<BudgetAuthorityMetadataView>,
+    pub(crate) budget_authority: Option<BudgetAuthorityMetadataView>,
 }
 
 #[derive(Debug)]
-struct TryChargeCostRequest {
-    capability_id: String,
-    grant_index: usize,
-    max_invocations: Option<u32>,
-    cost_units: u64,
-    max_cost_per_invocation: Option<u64>,
-    max_total_cost_units: Option<u64>,
-    hold_id: Option<String>,
-    event_id: Option<String>,
+pub(crate) struct TryChargeCostRequest {
+    pub(crate) capability_id: String,
+    pub(crate) grant_index: usize,
+    pub(crate) max_invocations: Option<u32>,
+    pub(crate) cost_units: u64,
+    pub(crate) max_cost_per_invocation: Option<u64>,
+    pub(crate) max_total_cost_units: Option<u64>,
+    pub(crate) hold_id: Option<String>,
+    pub(crate) event_id: Option<String>,
 }
 
 #[derive(Debug)]
-struct TryChargeCostResponse {
-    capability_id: String,
-    grant_index: usize,
-    allowed: bool,
-    invocation_count: Option<u32>,
-    total_cost_exposed: Option<u64>,
-    total_cost_realized_spend: Option<u64>,
-    budget_authority: Option<BudgetAuthorityMetadataView>,
-    budget_commit: Option<BudgetWriteCommitView>,
+pub(crate) struct TryChargeCostResponse {
+    pub(crate) capability_id: String,
+    pub(crate) grant_index: usize,
+    pub(crate) allowed: bool,
+    pub(crate) invocation_count: Option<u32>,
+    pub(crate) total_cost_exposed: Option<u64>,
+    pub(crate) total_cost_realized_spend: Option<u64>,
+    pub(crate) budget_authority: Option<BudgetAuthorityMetadataView>,
+    pub(crate) budget_commit: Option<BudgetWriteCommitView>,
 }
 
 #[derive(Debug)]
-struct ReverseChargeCostRequest {
-    capability_id: String,
-    grant_index: usize,
-    cost_units: u64,
-    hold_id: Option<String>,
-    event_id: Option<String>,
+pub(crate) struct ReverseChargeCostRequest {
+    pub(crate) capability_id: String,
+    pub(crate) grant_index: usize,
+    pub(crate) cost_units: u64,
+    pub(crate) hold_id: Option<String>,
+    pub(crate) event_id: Option<String>,
 }
 
 #[derive(Debug)]
-struct ReverseChargeCostResponse {
-    capability_id: String,
-    grant_index: usize,
-    invocation_count: Option<u32>,
-    total_cost_exposed: Option<u64>,
-    total_cost_realized_spend: Option<u64>,
-    budget_authority: Option<BudgetAuthorityMetadataView>,
-    budget_commit: Option<BudgetWriteCommitView>,
+pub(crate) struct ReverseChargeCostResponse {
+    pub(crate) capability_id: String,
+    pub(crate) grant_index: usize,
+    pub(crate) invocation_count: Option<u32>,
+    pub(crate) total_cost_exposed: Option<u64>,
+    pub(crate) total_cost_realized_spend: Option<u64>,
+    pub(crate) budget_authority: Option<BudgetAuthorityMetadataView>,
+    pub(crate) budget_commit: Option<BudgetWriteCommitView>,
 }
 
 #[derive(Debug)]
-struct ReduceChargeCostRequest {
-    capability_id: String,
-    grant_index: usize,
-    cost_units: u64,
-    exposure_units: Option<u64>,
-    realized_spend_units: Option<u64>,
-    hold_id: Option<String>,
-    event_id: Option<String>,
+pub(crate) struct ReduceChargeCostRequest {
+    pub(crate) capability_id: String,
+    pub(crate) grant_index: usize,
+    pub(crate) cost_units: u64,
+    pub(crate) exposure_units: Option<u64>,
+    pub(crate) realized_spend_units: Option<u64>,
+    pub(crate) hold_id: Option<String>,
+    pub(crate) event_id: Option<String>,
 }
 
 #[derive(Debug)]
-struct ReduceChargeCostResponse {
-    capability_id: String,
-    grant_index: usize,
-    invocation_count: Option<u32>,
-    total_cost_exposed: Option<u64>,
-    total_cost_realized_spend: Option<u64>,
-    released_exposure_units: Option<u64>,
-    budget_authority: Option<BudgetAuthorityMetadataView>,
-    budget_commit: Option<BudgetWriteCommitView>,
+pub(crate) struct ReduceChargeCostResponse {
+    pub(crate) capability_id: String,
+    pub(crate) grant_index: usize,
+    pub(crate) invocation_count: Option<u32>,
+    pub(crate) total_cost_exposed: Option<u64>,
+    pub(crate) total_cost_realized_spend: Option<u64>,
+    pub(crate) released_exposure_units: Option<u64>,
+    pub(crate) budget_authority: Option<BudgetAuthorityMetadataView>,
+    pub(crate) budget_commit: Option<BudgetWriteCommitView>,
 }
 
 #[derive(Debug, Serialize)]
@@ -2417,7 +2247,7 @@ struct ReduceChargeCostRequestWireInput {
 }
 
 impl ReduceChargeCostRequest {
-    fn release_units(&self) -> u64 {
+    pub(crate) fn release_units(&self) -> u64 {
         self.cost_units
     }
 }
@@ -2560,4 +2390,104 @@ where
     E: serde::de::Error,
 {
     amount.ok_or_else(|| E::custom(format!("missing required field {missing_field_name}")))
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod cluster_lease_rpc_tests {
+    use super::{LeaseHeartbeatRequest, LeaseTerminateRequest, LeaseTerminationReason};
+
+    #[test]
+    fn lease_heartbeat_request_round_trips_camel_case() {
+        let request = LeaseHeartbeatRequest {
+            lease_id: "lease-7".to_string(),
+            lease_epoch: 3,
+            leader_url: "https://node-a.example/v1".to_string(),
+            observed_at: 1_700_000_000_000,
+            proposed_expires_at: Some(1_700_000_030_000),
+        };
+        let value = serde_json::to_value(&request).unwrap();
+        assert_eq!(value["leaseId"], "lease-7");
+        assert_eq!(value["leaseEpoch"], 3);
+        assert_eq!(value["leaderUrl"], "https://node-a.example/v1");
+        assert_eq!(value["observedAt"], 1_700_000_000_000u64);
+        assert_eq!(value["proposedExpiresAt"], 1_700_000_030_000u64);
+
+        let decoded: LeaseHeartbeatRequest = serde_json::from_value(value).unwrap();
+        assert_eq!(decoded.lease_id, request.lease_id);
+        assert_eq!(decoded.lease_epoch, request.lease_epoch);
+        assert_eq!(decoded.proposed_expires_at, request.proposed_expires_at);
+    }
+
+    #[test]
+    fn lease_heartbeat_request_optional_expiry_is_omitted_when_absent() {
+        let json =
+            r#"{"leaseId":"lease-1","leaseEpoch":0,"leaderUrl":"https://n/1","observedAt":1}"#;
+        let decoded: LeaseHeartbeatRequest = serde_json::from_str(json).unwrap();
+        assert!(decoded.proposed_expires_at.is_none());
+        let reserialized = serde_json::to_value(&decoded).unwrap();
+        assert!(reserialized.get("proposedExpiresAt").is_none());
+    }
+
+    #[test]
+    fn lease_heartbeat_request_rejects_unknown_field() {
+        let json = r#"{"leaseId":"lease-1","leaseEpoch":0,"leaderUrl":"https://n/1","observedAt":1,"rogue":true}"#;
+        assert!(serde_json::from_str::<LeaseHeartbeatRequest>(json).is_err());
+    }
+
+    #[test]
+    fn lease_heartbeat_request_rejects_negative_epoch() {
+        let json =
+            r#"{"leaseId":"lease-1","leaseEpoch":-1,"leaderUrl":"https://n/1","observedAt":1}"#;
+        assert!(serde_json::from_str::<LeaseHeartbeatRequest>(json).is_err());
+    }
+
+    #[test]
+    fn lease_terminate_request_round_trips_with_typed_reason() {
+        let request = LeaseTerminateRequest {
+            lease_id: "lease-9".to_string(),
+            lease_epoch: 5,
+            leader_url: "https://node-b.example/v1".to_string(),
+            reason: LeaseTerminationReason::LeaderHandoff,
+            observed_at: 1_700_000_100_000,
+            successor_leader_url: Some("https://node-c.example/v1".to_string()),
+        };
+        let value = serde_json::to_value(&request).unwrap();
+        assert_eq!(value["reason"], "leader_handoff");
+        assert_eq!(value["successorLeaderUrl"], "https://node-c.example/v1");
+
+        let decoded: LeaseTerminateRequest = serde_json::from_value(value).unwrap();
+        assert_eq!(decoded.reason, LeaseTerminationReason::LeaderHandoff);
+        assert_eq!(decoded.successor_leader_url, request.successor_leader_url);
+    }
+
+    #[test]
+    fn lease_termination_reason_variants_use_snake_case() {
+        for (reason, wire) in [
+            (LeaseTerminationReason::LeaderHandoff, "leader_handoff"),
+            (LeaseTerminationReason::QuorumLost, "quorum_lost"),
+            (
+                LeaseTerminationReason::OperatorStepdown,
+                "operator_stepdown",
+            ),
+            (LeaseTerminationReason::TermAdvanced, "term_advanced"),
+        ] {
+            assert_eq!(serde_json::to_value(reason).unwrap(), wire);
+            let decoded: LeaseTerminationReason =
+                serde_json::from_value(serde_json::json!(wire)).unwrap();
+            assert_eq!(decoded, reason);
+        }
+    }
+
+    #[test]
+    fn lease_terminate_request_rejects_unknown_reason() {
+        let json = r#"{"leaseId":"l","leaseEpoch":0,"leaderUrl":"https://n/1","reason":"mutiny","observedAt":1}"#;
+        assert!(serde_json::from_str::<LeaseTerminateRequest>(json).is_err());
+    }
+
+    #[test]
+    fn lease_terminate_request_rejects_unknown_field() {
+        let json = r#"{"leaseId":"l","leaseEpoch":0,"leaderUrl":"https://n/1","reason":"quorum_lost","observedAt":1,"rogue":1}"#;
+        assert!(serde_json::from_str::<LeaseTerminateRequest>(json).is_err());
+    }
 }

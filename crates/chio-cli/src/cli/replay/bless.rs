@@ -1,6 +1,8 @@
 // `chio replay --bless --into <fixture-dir>` dispatcher.
 
-fn cmd_replay_bless(args: &ReplayArgs, log: &Path) -> Result<(), CliError> {
+use super::*;
+
+pub(crate) fn cmd_replay_bless(args: &ReplayArgs, log: &Path) -> Result<(), CliError> {
     let into = args.into.as_ref().ok_or_else(|| {
         CliError::cli_other_error("chio replay --bless requires --into <fixture-dir>".to_string())
     })?;

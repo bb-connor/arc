@@ -1,7 +1,9 @@
+use super::*;
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct RevokeCapabilityRequest {
-    capability_id: String,
+pub(crate) struct RevokeCapabilityRequest {
+    pub(crate) capability_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -19,11 +21,13 @@ pub fn serve(config: TrustServiceConfig) -> Result<(), CliError> {
         // during request validation and response serialization.
         .thread_stack_size(8 * 1024 * 1024)
         .build()
-        .map_err(|error| CliError::cli_other_error(format!("failed to start async runtime: {error}")))?;
+        .map_err(|error| {
+            CliError::cli_other_error(format!("failed to start async runtime: {error}"))
+        })?;
     runtime.block_on(async move { serve_async(config).await })
 }
 
-fn load_enterprise_provider_registry(
+pub(crate) fn load_enterprise_provider_registry(
     path: Option<&std::path::Path>,
     surface: &str,
 ) -> Result<Option<Arc<EnterpriseProviderRegistry>>, CliError> {
@@ -44,7 +48,7 @@ fn load_enterprise_provider_registry(
     Ok(Some(Arc::new(registry)))
 }
 
-fn load_verifier_policy_registry(
+pub(crate) fn load_verifier_policy_registry(
     path: Option<&std::path::Path>,
     surface: &str,
 ) -> Result<Option<Arc<VerifierPolicyRegistry>>, CliError> {
@@ -109,7 +113,9 @@ fn configured_verifier_policy_registry_path(
     })
 }
 
-fn configured_verifier_challenge_db_path(config: &TrustServiceConfig) -> Result<&Path, CliError> {
+pub(crate) fn configured_verifier_challenge_db_path(
+    config: &TrustServiceConfig,
+) -> Result<&Path, CliError> {
     config.verifier_challenge_db_path.as_deref().ok_or_else(|| {
         CliError::cli_other_error(
             "remote verifier challenge flows require --verifier-challenge-db on the trust-control service"
@@ -140,7 +146,7 @@ fn configured_passport_issuance_registry_path(
     })
 }
 
-fn configured_passport_credential_issuer(
+pub(crate) fn configured_passport_credential_issuer(
     config: &TrustServiceConfig,
 ) -> Result<Oid4vciCredentialIssuerMetadata, CliError> {
     let advertise_url = config.advertise_url.as_deref().ok_or_else(|| {
@@ -181,7 +187,7 @@ fn configured_certification_discovery_path(config: &TrustServiceConfig) -> Resul
     })
 }
 
-fn configured_public_certification_metadata(
+pub(crate) fn configured_public_certification_metadata(
     config: &TrustServiceConfig,
 ) -> Result<CertificationPublicMetadata, CliError> {
     let advertise_url = config.advertise_url.as_deref().ok_or_else(|| {
@@ -223,7 +229,7 @@ fn public_generic_listing_boundary() -> GenericListingBoundary {
     GenericListingBoundary::default()
 }
 
-fn public_generic_registry_publisher(
+pub(crate) fn public_generic_registry_publisher(
     config: &TrustServiceConfig,
 ) -> Result<GenericRegistryPublisher, CliError> {
     let advertise_url = config.advertise_url.as_deref().ok_or_else(|| {
@@ -290,7 +296,7 @@ fn configured_generic_namespace_ownership(
     Ok(ownership)
 }
 
-fn build_signed_generic_namespace(
+pub(crate) fn build_signed_generic_namespace(
     config: &TrustServiceConfig,
 ) -> Result<SignedGenericNamespace, CliError> {
     let signer_keypair = load_behavioral_feed_signing_keypair(
@@ -356,7 +362,9 @@ fn generic_listing_status_from_provider(
     match status {
         chio_kernel::LiabilityProviderLifecycleState::Active => GenericListingStatus::Active,
         chio_kernel::LiabilityProviderLifecycleState::Suspended => GenericListingStatus::Suspended,
-        chio_kernel::LiabilityProviderLifecycleState::Superseded => GenericListingStatus::Superseded,
+        chio_kernel::LiabilityProviderLifecycleState::Superseded => {
+            GenericListingStatus::Superseded
+        }
         chio_kernel::LiabilityProviderLifecycleState::Retired => GenericListingStatus::Retired,
     }
 }
@@ -415,7 +423,8 @@ fn build_signed_generic_listing_from_public_issuer(
     signer_keypair: &Keypair,
 ) -> Result<SignedGenericListing, CliError> {
     let source_sha256 = sha256_hex(
-        &canonical_json_bytes(document).map_err(|error| CliError::cli_other_error(error.to_string()))?,
+        &canonical_json_bytes(document)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?,
     );
     let listing_id = generic_listing_id(
         &ownership.namespace,
@@ -466,7 +475,8 @@ fn build_signed_generic_listing_from_public_verifier(
     signer_keypair: &Keypair,
 ) -> Result<SignedGenericListing, CliError> {
     let source_sha256 = sha256_hex(
-        &canonical_json_bytes(document).map_err(|error| CliError::cli_other_error(error.to_string()))?,
+        &canonical_json_bytes(document)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?,
     );
     let listing_id = generic_listing_id(
         &ownership.namespace,
@@ -512,7 +522,8 @@ fn build_signed_generic_listing_from_liability_provider(
     signer_keypair: &Keypair,
 ) -> Result<SignedGenericListing, CliError> {
     let source_sha256 = sha256_hex(
-        &canonical_json_bytes(&row.provider).map_err(|error| CliError::cli_other_error(error.to_string()))?,
+        &canonical_json_bytes(&row.provider)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?,
     );
     let provider = &row.provider.body;
     let listing_id = generic_listing_id(
@@ -553,7 +564,7 @@ fn build_signed_generic_listing_from_liability_provider(
     })
 }
 
-fn build_public_generic_listing_report(
+pub(crate) fn build_public_generic_listing_report(
     config: &TrustServiceConfig,
     query: &GenericListingQuery,
 ) -> Result<GenericListingReport, CliError> {
@@ -691,7 +702,7 @@ fn build_public_generic_listing_report(
     })
 }
 
-fn load_enterprise_provider_registry_for_admin(
+pub(crate) fn load_enterprise_provider_registry_for_admin(
     config: &TrustServiceConfig,
 ) -> Result<(PathBuf, EnterpriseProviderRegistry), CliError> {
     let path = configured_enterprise_provider_registry_path(config)?.to_path_buf();
@@ -703,7 +714,7 @@ fn load_enterprise_provider_registry_for_admin(
     Ok((path, registry))
 }
 
-fn load_federation_policy_registry_for_admin(
+pub(crate) fn load_federation_policy_registry_for_admin(
     config: &TrustServiceConfig,
 ) -> Result<(PathBuf, FederationAdmissionPolicyRegistry), CliError> {
     let path = configured_federation_policy_registry_path(config)?.to_path_buf();
@@ -715,7 +726,7 @@ fn load_federation_policy_registry_for_admin(
     Ok((path, registry))
 }
 
-fn load_scim_lifecycle_registry_for_admin(
+pub(crate) fn load_scim_lifecycle_registry_for_admin(
     config: &TrustServiceConfig,
 ) -> Result<(PathBuf, ScimLifecycleRegistry), CliError> {
     let path = configured_scim_lifecycle_registry_path(config)?.to_path_buf();
@@ -723,7 +734,7 @@ fn load_scim_lifecycle_registry_for_admin(
     Ok((path, registry))
 }
 
-fn load_verifier_policy_registry_for_admin(
+pub(crate) fn load_verifier_policy_registry_for_admin(
     config: &TrustServiceConfig,
 ) -> Result<(PathBuf, VerifierPolicyRegistry), CliError> {
     let path = configured_verifier_policy_registry_path(config)?.to_path_buf();
@@ -735,7 +746,7 @@ fn load_verifier_policy_registry_for_admin(
     Ok((path, registry))
 }
 
-fn load_passport_issuance_registry_for_admin(
+pub(crate) fn load_passport_issuance_registry_for_admin(
     config: &TrustServiceConfig,
 ) -> Result<(PathBuf, PassportIssuanceOfferRegistry), CliError> {
     let path = configured_passport_issuance_registry_path(config)?.to_path_buf();
@@ -747,7 +758,7 @@ fn load_passport_issuance_registry_for_admin(
     Ok((path, registry))
 }
 
-fn load_passport_status_registry_for_admin(
+pub(crate) fn load_passport_status_registry_for_admin(
     config: &TrustServiceConfig,
 ) -> Result<(PathBuf, PassportStatusRegistry), CliError> {
     let path = configured_passport_status_registry_path(config)?.to_path_buf();
@@ -759,7 +770,7 @@ fn load_passport_status_registry_for_admin(
     Ok((path, registry))
 }
 
-fn load_certification_registry_for_admin(
+pub(crate) fn load_certification_registry_for_admin(
     config: &TrustServiceConfig,
 ) -> Result<(PathBuf, CertificationRegistry), CliError> {
     let path = configured_certification_registry_path(config)?.to_path_buf();
@@ -771,7 +782,7 @@ fn load_certification_registry_for_admin(
     Ok((path, registry))
 }
 
-fn load_certification_discovery_network_for_admin(
+pub(crate) fn load_certification_discovery_network_for_admin(
     config: &TrustServiceConfig,
 ) -> Result<(PathBuf, CertificationDiscoveryNetwork), CliError> {
     let path = configured_certification_discovery_path(config)?.to_path_buf();
@@ -779,7 +790,7 @@ fn load_certification_discovery_network_for_admin(
     Ok((path, network))
 }
 
-fn resolve_verifier_policy_for_challenge(
+pub(crate) fn resolve_verifier_policy_for_challenge(
     registry: Option<&VerifierPolicyRegistry>,
     challenge: &PassportPresentationChallenge,
     now: u64,
@@ -808,7 +819,7 @@ fn resolve_verifier_policy_for_challenge(
     ))
 }
 
-fn passport_lifecycle_reason(lifecycle: &PassportLifecycleResolution) -> String {
+pub(crate) fn passport_lifecycle_reason(lifecycle: &PassportLifecycleResolution) -> String {
     match lifecycle.state {
         PassportLifecycleState::Active => "passport lifecycle state is active".to_string(),
         PassportLifecycleState::Stale => lifecycle
@@ -831,7 +842,9 @@ fn passport_lifecycle_reason(lifecycle: &PassportLifecycleResolution) -> String 
     }
 }
 
-fn default_passport_status_distribution(config: &TrustServiceConfig) -> PassportStatusDistribution {
+pub(crate) fn default_passport_status_distribution(
+    config: &TrustServiceConfig,
+) -> PassportStatusDistribution {
     if config.passport_statuses_file.is_none() {
         return PassportStatusDistribution::default();
     }
@@ -847,7 +860,7 @@ fn default_passport_status_distribution(config: &TrustServiceConfig) -> Passport
         .unwrap_or_default()
 }
 
-fn resolve_passport_lifecycle_for_service(
+pub(crate) fn resolve_passport_lifecycle_for_service(
     config: &TrustServiceConfig,
     passport: &AgentPassport,
     at: u64,
@@ -861,7 +874,7 @@ fn resolve_passport_lifecycle_for_service(
     Ok(Some(lifecycle))
 }
 
-fn portable_passport_status_reference_for_service(
+pub(crate) fn portable_passport_status_reference_for_service(
     config: &TrustServiceConfig,
     passport: &AgentPassport,
     at: u64,
@@ -875,7 +888,7 @@ fn portable_passport_status_reference_for_service(
         .map(Some)
 }
 
-fn passport_presentation_transport_for_service(
+pub(crate) fn passport_presentation_transport_for_service(
     config: &TrustServiceConfig,
     challenge: &PassportPresentationChallenge,
 ) -> Result<Option<PassportPresentationTransport>, CliError> {
@@ -900,7 +913,7 @@ fn passport_presentation_transport_for_service(
     }))
 }
 
-fn consume_challenge_if_configured(
+pub(crate) fn consume_challenge_if_configured(
     config: &TrustServiceConfig,
     challenge: &PassportPresentationChallenge,
     now: u64,
@@ -924,7 +937,7 @@ fn generate_oid4vp_token(prefix: &str, seed: &str) -> String {
     format!("{prefix}-{}", &digest[..24])
 }
 
-fn oid4vp_same_device_url(request_uri: &str) -> String {
+pub(crate) fn oid4vp_same_device_url(request_uri: &str) -> String {
     format!(
         "{OID4VP_OPENID4VP_SCHEME}?request_uri={}",
         utf8_percent_encode(request_uri, NON_ALPHANUMERIC)
@@ -951,7 +964,7 @@ fn oid4vp_wallet_exchange_url(
     ))
 }
 
-fn oid4vp_cross_device_url(
+pub(crate) fn oid4vp_cross_device_url(
     config: &TrustServiceConfig,
     request_id: &str,
     request_uri: &str,
@@ -969,7 +982,7 @@ fn oid4vp_cross_device_url(
     ))
 }
 
-fn build_oid4vp_wallet_exchange_response(
+pub(crate) fn build_oid4vp_wallet_exchange_response(
     config: &TrustServiceConfig,
     request: &Oid4vpRequestObject,
     request_jwt: &str,
@@ -996,7 +1009,7 @@ fn build_oid4vp_wallet_exchange_response(
     })
 }
 
-fn authority_status_for_config(
+pub(crate) fn authority_status_for_config(
     config: &TrustServiceConfig,
 ) -> Result<TrustAuthorityStatus, CliError> {
     if let Some(path) = config.authority_db_path.as_deref() {
@@ -1053,13 +1066,13 @@ fn trusted_public_keys_from_status(
     Ok(trusted)
 }
 
-fn resolve_oid4vp_verifier_trusted_public_keys(
+pub(crate) fn resolve_oid4vp_verifier_trusted_public_keys(
     config: &TrustServiceConfig,
 ) -> Result<Vec<PublicKey>, CliError> {
     trusted_public_keys_from_status(&authority_status_for_config(config)?)
 }
 
-fn build_oid4vp_verifier_metadata(
+pub(crate) fn build_oid4vp_verifier_metadata(
     config: &TrustServiceConfig,
 ) -> Result<Oid4vpVerifierMetadata, CliError> {
     let advertise_url = config.advertise_url.as_deref().ok_or_else(|| {
@@ -1093,7 +1106,9 @@ fn build_oid4vp_verifier_metadata(
     Ok(metadata)
 }
 
-fn build_oid4vp_verifier_jwks(config: &TrustServiceConfig) -> Result<PortableJwkSet, CliError> {
+pub(crate) fn build_oid4vp_verifier_jwks(
+    config: &TrustServiceConfig,
+) -> Result<PortableJwkSet, CliError> {
     let advertise_url = config.advertise_url.as_deref().ok_or_else(|| {
         CliError::cli_other_error(
             "OID4VP verifier jwks requires --advertise-url on the trust-control service"
@@ -1105,7 +1120,7 @@ fn build_oid4vp_verifier_jwks(config: &TrustServiceConfig) -> Result<PortableJwk
         .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
-fn now_unix_secs() -> Result<u64, CliError> {
+pub(crate) fn now_unix_secs() -> Result<u64, CliError> {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|error| CliError::cli_other_error(format!("system clock error: {error}")))
@@ -1123,7 +1138,7 @@ fn public_discovery_guardrails() -> PublicDiscoveryImportGuardrails {
     PublicDiscoveryImportGuardrails::default()
 }
 
-fn build_public_issuer_discovery(
+pub(crate) fn build_public_issuer_discovery(
     config: &TrustServiceConfig,
 ) -> Result<SignedPublicIssuerDiscovery, CliError> {
     let signing_key = resolve_oid4vp_verifier_signing_key(config)?;
@@ -1162,7 +1177,7 @@ fn build_public_issuer_discovery(
     .map_err(CliError::from)
 }
 
-fn build_public_verifier_discovery(
+pub(crate) fn build_public_verifier_discovery(
     config: &TrustServiceConfig,
 ) -> Result<SignedPublicVerifierDiscovery, CliError> {
     let signing_key = resolve_oid4vp_verifier_signing_key(config)?;
@@ -1187,7 +1202,7 @@ fn build_public_verifier_discovery(
     .map_err(CliError::from)
 }
 
-fn build_public_discovery_transparency(
+pub(crate) fn build_public_discovery_transparency(
     config: &TrustServiceConfig,
 ) -> Result<SignedPublicDiscoveryTransparency, CliError> {
     let signing_key = resolve_oid4vp_verifier_signing_key(config)?;
@@ -1233,7 +1248,7 @@ fn build_public_discovery_transparency(
     .map_err(CliError::from)
 }
 
-fn build_oid4vp_request_for_service(
+pub(crate) fn build_oid4vp_request_for_service(
     config: &TrustServiceConfig,
     payload: &CreateOid4vpRequest,
     now: u64,
@@ -1352,7 +1367,9 @@ fn build_oid4vp_request_for_service(
     Ok(request)
 }
 
-fn resolve_oid4vp_verifier_signing_key(config: &TrustServiceConfig) -> Result<Keypair, CliError> {
+pub(crate) fn resolve_oid4vp_verifier_signing_key(
+    config: &TrustServiceConfig,
+) -> Result<Keypair, CliError> {
     if let Some(path) = config.authority_db_path.as_deref() {
         return Ok(SqliteCapabilityAuthority::open(path)?.local_keypair()?);
     }
@@ -1364,7 +1381,7 @@ fn resolve_oid4vp_verifier_signing_key(config: &TrustServiceConfig) -> Result<Ke
     load_or_create_authority_keypair(path)
 }
 
-fn resolve_portable_issuer_public_keys(
+pub(crate) fn resolve_portable_issuer_public_keys(
     config: &TrustServiceConfig,
     issuer: &str,
 ) -> Result<Vec<PublicKey>, CliError> {
@@ -1411,7 +1428,7 @@ fn resolve_portable_issuer_public_keys(
     Ok(public_keys)
 }
 
-fn resolve_oid4vp_passport_lifecycle(
+pub(crate) fn resolve_oid4vp_passport_lifecycle(
     config: &TrustServiceConfig,
     passport_id: &str,
     status_ref: Option<&chio_credentials::Oid4vciChioPassportStatusReference>,
@@ -1461,7 +1478,7 @@ fn resolve_oid4vp_passport_lifecycle(
     Ok(Some(lifecycle))
 }
 
-fn build_enterprise_admission_audit(
+pub(crate) fn build_enterprise_admission_audit(
     identity: &EnterpriseIdentityContext,
     subject_public_key: &str,
     provider: Option<&EnterpriseProviderRecord>,
@@ -1503,7 +1520,9 @@ fn build_enterprise_admission_audit(
     }
 }
 
-fn enterprise_origin_context(identity: &EnterpriseIdentityContext) -> chio_policy::OriginContext {
+pub(crate) fn enterprise_origin_context(
+    identity: &EnterpriseIdentityContext,
+) -> chio_policy::OriginContext {
     chio_policy::OriginContext {
         provider: Some(identity.provider_id.clone()),
         tenant_id: identity.tenant_id.clone(),
@@ -1520,7 +1539,7 @@ fn enterprise_origin_context(identity: &EnterpriseIdentityContext) -> chio_polic
     }
 }
 
-fn enterprise_admission_response(
+pub(crate) fn enterprise_admission_response(
     status: StatusCode,
     message: &str,
     audit: &EnterpriseAdmissionAudit,
@@ -1535,7 +1554,7 @@ fn enterprise_admission_response(
         .into_response()
 }
 
-fn scim_json_response<T: Serialize>(status: StatusCode, value: &T) -> Response {
+pub(crate) fn scim_json_response<T: Serialize>(status: StatusCode, value: &T) -> Response {
     match serde_json::to_vec(value) {
         Ok(body) => (
             status,
@@ -1550,15 +1569,15 @@ fn scim_json_response<T: Serialize>(status: StatusCode, value: &T) -> Response {
     }
 }
 
-fn scim_error_response(status: StatusCode, detail: &str) -> Response {
+pub(crate) fn scim_error_response(status: StatusCode, detail: &str) -> Response {
     scim_json_response(status, &build_scim_error(status.as_u16(), detail))
 }
 
-fn scim_user_location(user_id: &str) -> String {
+pub(crate) fn scim_user_location(user_id: &str) -> String {
     path_with_encoded_param(SCIM_USER_PATH, "user_id", user_id)
 }
 
-fn validated_scim_provider_for_request(
+pub(crate) fn validated_scim_provider_for_request(
     config: &TrustServiceConfig,
     user: &ScimUserResource,
 ) -> Result<EnterpriseProviderRecord, CliError> {
@@ -1584,7 +1603,7 @@ fn validated_scim_provider_for_request(
     Ok(provider)
 }
 
-fn resolve_scim_lifecycle_record_for_federated_issue(
+pub(crate) fn resolve_scim_lifecycle_record_for_federated_issue(
     config: &TrustServiceConfig,
     provider: &EnterpriseProviderRecord,
     identity: &EnterpriseIdentityContext,
@@ -1614,7 +1633,7 @@ fn resolve_scim_lifecycle_record_for_federated_issue(
     Ok(Some(record))
 }
 
-fn bind_scim_capability_to_identity(
+pub(crate) fn bind_scim_capability_to_identity(
     config: &TrustServiceConfig,
     provider_id: &str,
     subject_key: &str,
@@ -1634,7 +1653,7 @@ fn bind_scim_capability_to_identity(
     registry.save(path)
 }
 
-fn build_scim_deprovision_receipt(
+pub(crate) fn build_scim_deprovision_receipt(
     config: &TrustServiceConfig,
     record: &crate::scim_lifecycle::ScimLifecycleUserRecord,
     revoked_capability_ids: &[String],
@@ -1978,7 +1997,10 @@ mod config_and_public_tests {
         assert_eq!(signing_key.public_key(), follower_local_key.public_key());
 
         let issuer = build_public_issuer_discovery(&config).expect("build issuer discovery");
-        assert_eq!(issuer.body.signer_public_key, follower_local_key.public_key());
+        assert_eq!(
+            issuer.body.signer_public_key,
+            follower_local_key.public_key()
+        );
         verify_signed_public_issuer_discovery(&issuer).expect("verify issuer discovery");
     }
 }

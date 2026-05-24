@@ -1,4 +1,6 @@
-async fn handle_authority_status(
+use super::*;
+
+pub(crate) async fn handle_authority_status(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
@@ -11,7 +13,7 @@ async fn handle_authority_status(
     }
 }
 
-async fn handle_rotate_authority(
+pub(crate) async fn handle_rotate_authority(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
@@ -50,7 +52,7 @@ async fn handle_rotate_authority(
     }
 }
 
-async fn handle_issue_capability(
+pub(crate) async fn handle_issue_capability(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(payload): Json<IssueCapabilityRequest>,
@@ -100,7 +102,7 @@ async fn handle_issue_capability(
     }
 }
 
-async fn handle_scim_create_user(
+pub(crate) async fn handle_scim_create_user(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(payload): Json<ScimUserResource>,
@@ -139,7 +141,7 @@ async fn handle_scim_create_user(
     scim_json_response(StatusCode::CREATED, &record.scim_user)
 }
 
-async fn handle_scim_delete_user(
+pub(crate) async fn handle_scim_delete_user(
     State(state): State<TrustServiceState>,
     AxumPath(user_id): AxumPath<String>,
     headers: HeaderMap,
@@ -223,7 +225,7 @@ async fn handle_scim_delete_user(
     scim_json_response(StatusCode::OK, &updated.scim_user)
 }
 
-async fn handle_list_enterprise_providers(
+pub(crate) async fn handle_list_enterprise_providers(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
@@ -241,7 +243,7 @@ async fn handle_list_enterprise_providers(
     }
 }
 
-async fn handle_get_enterprise_provider(
+pub(crate) async fn handle_get_enterprise_provider(
     State(state): State<TrustServiceState>,
     AxumPath(provider_id): AxumPath<String>,
     headers: HeaderMap,
@@ -262,7 +264,7 @@ async fn handle_get_enterprise_provider(
     }
 }
 
-async fn handle_upsert_enterprise_provider(
+pub(crate) async fn handle_upsert_enterprise_provider(
     State(state): State<TrustServiceState>,
     AxumPath(provider_id): AxumPath<String>,
     headers: HeaderMap,
@@ -289,7 +291,7 @@ async fn handle_upsert_enterprise_provider(
     Json(saved).into_response()
 }
 
-async fn handle_delete_enterprise_provider(
+pub(crate) async fn handle_delete_enterprise_provider(
     State(state): State<TrustServiceState>,
     AxumPath(provider_id): AxumPath<String>,
     headers: HeaderMap,
@@ -312,7 +314,7 @@ async fn handle_delete_enterprise_provider(
     .into_response()
 }
 
-async fn handle_list_federation_policies(
+pub(crate) async fn handle_list_federation_policies(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
@@ -330,7 +332,7 @@ async fn handle_list_federation_policies(
     }
 }
 
-async fn handle_get_federation_policy(
+pub(crate) async fn handle_get_federation_policy(
     State(state): State<TrustServiceState>,
     AxumPath(policy_id): AxumPath<String>,
     headers: HeaderMap,
@@ -351,7 +353,7 @@ async fn handle_get_federation_policy(
     }
 }
 
-async fn handle_upsert_federation_policy(
+pub(crate) async fn handle_upsert_federation_policy(
     State(state): State<TrustServiceState>,
     AxumPath(policy_id): AxumPath<String>,
     headers: HeaderMap,
@@ -385,7 +387,7 @@ async fn handle_upsert_federation_policy(
     Json(saved).into_response()
 }
 
-async fn handle_delete_federation_policy(
+pub(crate) async fn handle_delete_federation_policy(
     State(state): State<TrustServiceState>,
     AxumPath(policy_id): AxumPath<String>,
     headers: HeaderMap,
@@ -404,7 +406,7 @@ async fn handle_delete_federation_policy(
     Json(FederationAdmissionPolicyDeleteResponse { policy_id, deleted }).into_response()
 }
 
-async fn handle_evaluate_federation_policy(
+pub(crate) async fn handle_evaluate_federation_policy(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<FederationAdmissionEvaluationRequest>,
@@ -427,7 +429,7 @@ async fn handle_evaluate_federation_policy(
     }
 }
 
-async fn handle_list_certifications(
+pub(crate) async fn handle_list_certifications(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
@@ -445,7 +447,7 @@ async fn handle_list_certifications(
     }
 }
 
-async fn handle_get_certification(
+pub(crate) async fn handle_get_certification(
     State(state): State<TrustServiceState>,
     AxumPath(artifact_id): AxumPath<String>,
     headers: HeaderMap,
@@ -466,7 +468,7 @@ async fn handle_get_certification(
     }
 }
 
-async fn handle_publish_certification(
+pub(crate) async fn handle_publish_certification(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(artifact): Json<SignedCertificationCheck>,
@@ -488,7 +490,7 @@ async fn handle_publish_certification(
     Json(entry).into_response()
 }
 
-async fn handle_resolve_certification(
+pub(crate) async fn handle_resolve_certification(
     State(state): State<TrustServiceState>,
     AxumPath(tool_server_id): AxumPath<String>,
     headers: HeaderMap,
@@ -503,7 +505,7 @@ async fn handle_resolve_certification(
     Json(registry.resolve(&tool_server_id)).into_response()
 }
 
-async fn handle_public_resolve_certification(
+pub(crate) async fn handle_public_resolve_certification(
     State(state): State<TrustServiceState>,
     AxumPath(tool_server_id): AxumPath<String>,
 ) -> Response {
@@ -514,14 +516,16 @@ async fn handle_public_resolve_certification(
     Json(registry.resolve(&tool_server_id)).into_response()
 }
 
-async fn handle_public_certification_metadata(State(state): State<TrustServiceState>) -> Response {
+pub(crate) async fn handle_public_certification_metadata(
+    State(state): State<TrustServiceState>,
+) -> Response {
     match configured_public_certification_metadata(&state.config) {
         Ok(metadata) => Json(metadata).into_response(),
         Err(error) => plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     }
 }
 
-async fn handle_public_search_certifications(
+pub(crate) async fn handle_public_search_certifications(
     State(state): State<TrustServiceState>,
     Query(query): Query<CertificationPublicSearchQuery>,
 ) -> Response {
@@ -536,7 +540,7 @@ async fn handle_public_search_certifications(
     Json(registry.search_public(&metadata.publisher, metadata.expires_at, &query)).into_response()
 }
 
-async fn handle_public_certification_transparency(
+pub(crate) async fn handle_public_certification_transparency(
     State(state): State<TrustServiceState>,
     Query(query): Query<CertificationTransparencyQuery>,
 ) -> Response {
@@ -551,14 +555,16 @@ async fn handle_public_certification_transparency(
     Json(registry.transparency(&metadata.publisher, &query)).into_response()
 }
 
-async fn handle_public_generic_namespace(State(state): State<TrustServiceState>) -> Response {
+pub(crate) async fn handle_public_generic_namespace(
+    State(state): State<TrustServiceState>,
+) -> Response {
     match build_signed_generic_namespace(&state.config) {
         Ok(namespace) => Json(namespace).into_response(),
         Err(error) => public_discovery_error_response(&error),
     }
 }
 
-async fn handle_public_generic_listings(
+pub(crate) async fn handle_public_generic_listings(
     State(state): State<TrustServiceState>,
     Query(query): Query<GenericListingQuery>,
 ) -> Response {
@@ -568,7 +574,7 @@ async fn handle_public_generic_listings(
     }
 }
 
-async fn handle_issue_generic_trust_activation(
+pub(crate) async fn handle_issue_generic_trust_activation(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<GenericTrustActivationIssueRequest>,
@@ -582,7 +588,7 @@ async fn handle_issue_generic_trust_activation(
     }
 }
 
-async fn handle_evaluate_generic_trust_activation(
+pub(crate) async fn handle_evaluate_generic_trust_activation(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<GenericTrustActivationEvaluationRequest>,
@@ -596,7 +602,7 @@ async fn handle_evaluate_generic_trust_activation(
     }
 }
 
-async fn handle_issue_generic_governance_charter(
+pub(crate) async fn handle_issue_generic_governance_charter(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<GenericGovernanceCharterIssueRequest>,
@@ -610,7 +616,7 @@ async fn handle_issue_generic_governance_charter(
     }
 }
 
-async fn handle_issue_generic_governance_case(
+pub(crate) async fn handle_issue_generic_governance_case(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<GenericGovernanceCaseIssueRequest>,
@@ -624,7 +630,7 @@ async fn handle_issue_generic_governance_case(
     }
 }
 
-async fn handle_evaluate_generic_governance_case(
+pub(crate) async fn handle_evaluate_generic_governance_case(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<GenericGovernanceCaseEvaluationRequest>,
@@ -638,7 +644,7 @@ async fn handle_evaluate_generic_governance_case(
     }
 }
 
-async fn handle_issue_open_market_fee_schedule(
+pub(crate) async fn handle_issue_open_market_fee_schedule(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<OpenMarketFeeScheduleIssueRequest>,
@@ -652,7 +658,7 @@ async fn handle_issue_open_market_fee_schedule(
     }
 }
 
-async fn handle_issue_open_market_penalty(
+pub(crate) async fn handle_issue_open_market_penalty(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<OpenMarketPenaltyIssueRequest>,
@@ -666,7 +672,7 @@ async fn handle_issue_open_market_penalty(
     }
 }
 
-async fn handle_evaluate_open_market_penalty(
+pub(crate) async fn handle_evaluate_open_market_penalty(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<OpenMarketPenaltyEvaluationRequest>,
@@ -680,14 +686,16 @@ async fn handle_evaluate_open_market_penalty(
     }
 }
 
-async fn handle_passport_issuer_metadata(State(state): State<TrustServiceState>) -> Response {
+pub(crate) async fn handle_passport_issuer_metadata(
+    State(state): State<TrustServiceState>,
+) -> Response {
     match configured_passport_credential_issuer(&state.config) {
         Ok(metadata) => Json(metadata).into_response(),
         Err(error) => plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     }
 }
 
-async fn handle_public_passport_issuer_discovery(
+pub(crate) async fn handle_public_passport_issuer_discovery(
     State(state): State<TrustServiceState>,
 ) -> Response {
     match build_public_issuer_discovery(&state.config) {
@@ -696,7 +704,7 @@ async fn handle_public_passport_issuer_discovery(
     }
 }
 
-async fn handle_public_passport_verifier_discovery(
+pub(crate) async fn handle_public_passport_verifier_discovery(
     State(state): State<TrustServiceState>,
 ) -> Response {
     match build_public_verifier_discovery(&state.config) {
@@ -705,7 +713,7 @@ async fn handle_public_passport_verifier_discovery(
     }
 }
 
-async fn handle_public_passport_discovery_transparency(
+pub(crate) async fn handle_public_passport_discovery_transparency(
     State(state): State<TrustServiceState>,
 ) -> Response {
     match build_public_discovery_transparency(&state.config) {
@@ -714,14 +722,18 @@ async fn handle_public_passport_discovery_transparency(
     }
 }
 
-async fn handle_oid4vp_verifier_metadata(State(state): State<TrustServiceState>) -> Response {
+pub(crate) async fn handle_oid4vp_verifier_metadata(
+    State(state): State<TrustServiceState>,
+) -> Response {
     match build_oid4vp_verifier_metadata(&state.config) {
         Ok(metadata) => Json(metadata).into_response(),
         Err(error) => plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     }
 }
 
-async fn handle_passport_issuer_jwks(State(state): State<TrustServiceState>) -> Response {
+pub(crate) async fn handle_passport_issuer_jwks(
+    State(state): State<TrustServiceState>,
+) -> Response {
     match build_oid4vp_verifier_jwks(&state.config) {
         Ok(jwks) => Json(jwks).into_response(),
         Err(error) => {
@@ -753,7 +765,9 @@ fn public_discovery_error_response(error: &CliError) -> Response {
     plain_http_error(status, &message)
 }
 
-async fn handle_passport_sd_jwt_type_metadata(State(state): State<TrustServiceState>) -> Response {
+pub(crate) async fn handle_passport_sd_jwt_type_metadata(
+    State(state): State<TrustServiceState>,
+) -> Response {
     let Some(advertise_url) = state.config.advertise_url.as_deref() else {
         return plain_http_error(
             StatusCode::CONFLICT,
@@ -772,7 +786,7 @@ async fn handle_passport_sd_jwt_type_metadata(State(state): State<TrustServiceSt
     }
 }
 
-async fn handle_passport_jwt_vc_json_type_metadata(
+pub(crate) async fn handle_passport_jwt_vc_json_type_metadata(
     State(state): State<TrustServiceState>,
 ) -> Response {
     let Some(advertise_url) = state.config.advertise_url.as_deref() else {
@@ -793,7 +807,7 @@ async fn handle_passport_jwt_vc_json_type_metadata(
     }
 }
 
-async fn handle_create_passport_issuance_offer(
+pub(crate) async fn handle_create_passport_issuance_offer(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(payload): Json<CreatePassportIssuanceOfferRequest>,
@@ -839,7 +853,7 @@ async fn handle_create_passport_issuance_offer(
     Json(record).into_response()
 }
 
-async fn handle_redeem_passport_issuance_token(
+pub(crate) async fn handle_redeem_passport_issuance_token(
     State(state): State<TrustServiceState>,
     Json(payload): Json<Oid4vciTokenRequest>,
 ) -> Response {
@@ -862,7 +876,7 @@ async fn handle_redeem_passport_issuance_token(
     Json(response).into_response()
 }
 
-async fn handle_redeem_passport_issuance_credential(
+pub(crate) async fn handle_redeem_passport_issuance_credential(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(payload): Json<Oid4vciCredentialRequest>,
@@ -915,7 +929,7 @@ async fn handle_redeem_passport_issuance_credential(
     Json(response).into_response()
 }
 
-async fn handle_publish_certification_network(
+pub(crate) async fn handle_publish_certification_network(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<CertificationNetworkPublishRequest>,
@@ -937,7 +951,7 @@ async fn handle_publish_certification_network(
     }
 }
 
-async fn handle_discover_certification(
+pub(crate) async fn handle_discover_certification(
     State(state): State<TrustServiceState>,
     AxumPath(tool_server_id): AxumPath<String>,
     headers: HeaderMap,
@@ -954,7 +968,7 @@ async fn handle_discover_certification(
     Json(response).into_response()
 }
 
-async fn handle_search_certification_marketplace(
+pub(crate) async fn handle_search_certification_marketplace(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Query(query): Query<CertificationMarketplaceSearchQuery>,
@@ -972,7 +986,7 @@ async fn handle_search_certification_marketplace(
     .into_response()
 }
 
-async fn handle_transparency_certification_marketplace(
+pub(crate) async fn handle_transparency_certification_marketplace(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Query(query): Query<CertificationMarketplaceTransparencyQuery>,
@@ -988,7 +1002,7 @@ async fn handle_transparency_certification_marketplace(
         .into_response()
 }
 
-async fn handle_consume_certification_marketplace(
+pub(crate) async fn handle_consume_certification_marketplace(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<CertificationConsumptionRequest>,
@@ -1006,7 +1020,7 @@ async fn handle_consume_certification_marketplace(
     .into_response()
 }
 
-async fn handle_revoke_certification(
+pub(crate) async fn handle_revoke_certification(
     State(state): State<TrustServiceState>,
     AxumPath(artifact_id): AxumPath<String>,
     headers: HeaderMap,
@@ -1032,7 +1046,7 @@ async fn handle_revoke_certification(
     Json(entry).into_response()
 }
 
-async fn handle_dispute_certification(
+pub(crate) async fn handle_dispute_certification(
     State(state): State<TrustServiceState>,
     AxumPath(artifact_id): AxumPath<String>,
     headers: HeaderMap,
@@ -1058,7 +1072,7 @@ async fn handle_dispute_certification(
     Json(entry).into_response()
 }
 
-async fn handle_list_passport_statuses(
+pub(crate) async fn handle_list_passport_statuses(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
@@ -1076,7 +1090,7 @@ async fn handle_list_passport_statuses(
     }
 }
 
-async fn handle_get_passport_status(
+pub(crate) async fn handle_get_passport_status(
     State(state): State<TrustServiceState>,
     AxumPath(passport_id): AxumPath<String>,
     headers: HeaderMap,
@@ -1097,7 +1111,7 @@ async fn handle_get_passport_status(
     }
 }
 
-async fn handle_publish_passport_status(
+pub(crate) async fn handle_publish_passport_status(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(mut request): Json<PublishPassportStatusRequest>,
@@ -1126,7 +1140,7 @@ async fn handle_publish_passport_status(
     Json(record).into_response()
 }
 
-async fn handle_resolve_passport_status(
+pub(crate) async fn handle_resolve_passport_status(
     State(state): State<TrustServiceState>,
     AxumPath(passport_id): AxumPath<String>,
     headers: HeaderMap,
@@ -1146,7 +1160,7 @@ async fn handle_resolve_passport_status(
     }
 }
 
-async fn handle_public_resolve_passport_status(
+pub(crate) async fn handle_public_resolve_passport_status(
     State(state): State<TrustServiceState>,
     AxumPath(passport_id): AxumPath<String>,
 ) -> Response {
@@ -1162,7 +1176,7 @@ async fn handle_public_resolve_passport_status(
     }
 }
 
-async fn handle_revoke_passport_status(
+pub(crate) async fn handle_revoke_passport_status(
     State(state): State<TrustServiceState>,
     AxumPath(passport_id): AxumPath<String>,
     headers: HeaderMap,
@@ -1189,7 +1203,7 @@ async fn handle_revoke_passport_status(
     Json(record).into_response()
 }
 
-async fn handle_list_verifier_policies(
+pub(crate) async fn handle_list_verifier_policies(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
@@ -1207,7 +1221,7 @@ async fn handle_list_verifier_policies(
     }
 }
 
-async fn handle_get_verifier_policy(
+pub(crate) async fn handle_get_verifier_policy(
     State(state): State<TrustServiceState>,
     AxumPath(policy_id): AxumPath<String>,
     headers: HeaderMap,
@@ -1228,7 +1242,7 @@ async fn handle_get_verifier_policy(
     }
 }
 
-async fn handle_upsert_verifier_policy(
+pub(crate) async fn handle_upsert_verifier_policy(
     State(state): State<TrustServiceState>,
     AxumPath(policy_id): AxumPath<String>,
     headers: HeaderMap,
@@ -1254,7 +1268,7 @@ async fn handle_upsert_verifier_policy(
     Json(document).into_response()
 }
 
-async fn handle_delete_verifier_policy(
+pub(crate) async fn handle_delete_verifier_policy(
     State(state): State<TrustServiceState>,
     AxumPath(policy_id): AxumPath<String>,
     headers: HeaderMap,
@@ -1273,7 +1287,7 @@ async fn handle_delete_verifier_policy(
     Json(VerifierPolicyDeleteResponse { policy_id, deleted }).into_response()
 }
 
-async fn handle_create_passport_challenge(
+pub(crate) async fn handle_create_passport_challenge(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(payload): Json<CreatePassportChallengeRequest>,
@@ -1439,7 +1453,7 @@ fn verify_passport_challenge_payload(
     Ok(verification)
 }
 
-async fn handle_verify_passport_challenge(
+pub(crate) async fn handle_verify_passport_challenge(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(payload): Json<VerifyPassportChallengeRequest>,
@@ -1463,7 +1477,7 @@ async fn handle_verify_passport_challenge(
     }
 }
 
-async fn handle_public_get_passport_challenge(
+pub(crate) async fn handle_public_get_passport_challenge(
     State(state): State<TrustServiceState>,
     AxumPath(challenge_id): AxumPath<String>,
 ) -> Response {
@@ -1484,7 +1498,7 @@ async fn handle_public_get_passport_challenge(
     }
 }
 
-async fn handle_public_verify_passport_challenge(
+pub(crate) async fn handle_public_verify_passport_challenge(
     State(state): State<TrustServiceState>,
     Json(payload): Json<VerifyPassportChallengeRequest>,
 ) -> Response {
@@ -1540,7 +1554,7 @@ async fn handle_public_verify_passport_challenge(
     }
 }
 
-async fn handle_create_oid4vp_request(
+pub(crate) async fn handle_create_oid4vp_request(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(payload): Json<CreateOid4vpRequest>,
@@ -1609,7 +1623,7 @@ async fn handle_create_oid4vp_request(
     .into_response()
 }
 
-async fn handle_public_get_wallet_exchange(
+pub(crate) async fn handle_public_get_wallet_exchange(
     State(state): State<TrustServiceState>,
     AxumPath(request_id): AxumPath<String>,
 ) -> Response {
@@ -1652,7 +1666,7 @@ async fn handle_public_get_wallet_exchange(
     }
 }
 
-async fn handle_public_get_oid4vp_request(
+pub(crate) async fn handle_public_get_oid4vp_request(
     State(state): State<TrustServiceState>,
     AxumPath(request_id): AxumPath<String>,
 ) -> Response {
@@ -1696,7 +1710,7 @@ async fn handle_public_get_oid4vp_request(
     response
 }
 
-async fn handle_public_launch_oid4vp_request(
+pub(crate) async fn handle_public_launch_oid4vp_request(
     State(state): State<TrustServiceState>,
     AxumPath(request_id): AxumPath<String>,
 ) -> Response {
@@ -1718,7 +1732,7 @@ async fn handle_public_launch_oid4vp_request(
     Redirect::temporary(&oid4vp_same_device_url(&request.request_uri)).into_response()
 }
 
-async fn handle_public_submit_oid4vp_response(
+pub(crate) async fn handle_public_submit_oid4vp_response(
     State(state): State<TrustServiceState>,
     Form(payload): Form<Oid4vpDirectPostForm>,
 ) -> Response {
@@ -1795,7 +1809,7 @@ async fn handle_public_submit_oid4vp_response(
     Json(verification).into_response()
 }
 
-async fn handle_federated_issue(
+pub(crate) async fn handle_federated_issue(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(payload): Json<FederatedIssueRequest>,
@@ -2237,7 +2251,7 @@ async fn handle_federated_issue(
     }
 }
 
-async fn handle_list_revocations(
+pub(crate) async fn handle_list_revocations(
     State(state): State<TrustServiceState>,
     Query(query): Query<RevocationQuery>,
     headers: HeaderMap,
@@ -2275,7 +2289,7 @@ async fn handle_list_revocations(
     .into_response()
 }
 
-async fn handle_revoke_capability(
+pub(crate) async fn handle_revoke_capability(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(payload): Json<RevokeCapabilityRequest>,
@@ -2315,7 +2329,7 @@ async fn handle_revoke_capability(
     }
 }
 
-async fn handle_list_tool_receipts(
+pub(crate) async fn handle_list_tool_receipts(
     State(state): State<TrustServiceState>,
     Query(query): Query<ToolReceiptQuery>,
     headers: HeaderMap,
@@ -2377,7 +2391,7 @@ async fn handle_list_tool_receipts(
     .into_response()
 }
 
-async fn handle_append_tool_receipt(
+pub(crate) async fn handle_append_tool_receipt(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(receipt): Json<ChioReceipt>,
@@ -2429,7 +2443,7 @@ async fn handle_append_tool_receipt(
     }
 }
 
-async fn handle_list_child_receipts(
+pub(crate) async fn handle_list_child_receipts(
     State(state): State<TrustServiceState>,
     Query(query): Query<ChildReceiptQuery>,
     headers: HeaderMap,
@@ -2491,7 +2505,7 @@ async fn handle_list_child_receipts(
     .into_response()
 }
 
-async fn handle_query_receipts(
+pub(crate) async fn handle_query_receipts(
     State(state): State<TrustServiceState>,
     Query(query): Query<ReceiptQueryHttpQuery>,
     headers: HeaderMap,

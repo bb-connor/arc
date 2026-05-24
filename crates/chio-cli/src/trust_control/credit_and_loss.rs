@@ -1,4 +1,6 @@
-fn build_credit_provider_risk_package_from_store(
+use super::*;
+
+pub(crate) fn build_credit_provider_risk_package_from_store(
     receipt_store: &SqliteReceiptStore,
     receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
@@ -147,7 +149,7 @@ fn build_credit_provider_risk_package_from_store(
     })
 }
 
-fn build_credit_scorecard_report(
+pub(crate) fn build_credit_scorecard_report(
     receipt_store: &SqliteReceiptStore,
     receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
@@ -166,7 +168,7 @@ fn build_credit_scorecard_report(
     )
 }
 
-fn build_credit_scorecard_report_with_context(
+pub(crate) fn build_credit_scorecard_report_with_context(
     receipt_store: &SqliteReceiptStore,
     receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
@@ -186,12 +188,11 @@ fn build_credit_scorecard_report_with_context(
         )
     })?;
 
-    let exposure =
-        build_exposure_ledger_report_with_context(
-            receipt_store,
-            &normalized_query,
-            read_context.clone(),
-        )?;
+    let exposure = build_exposure_ledger_report_with_context(
+        receipt_store,
+        &normalized_query,
+        read_context.clone(),
+    )?;
     if exposure.summary.matching_receipts == 0 {
         return Err(TrustHttpError::new(
             StatusCode::CONFLICT,
@@ -286,7 +287,7 @@ fn build_credit_scorecard_report_with_context(
     })
 }
 
-fn build_credit_facility_report_from_store(
+pub(crate) fn build_credit_facility_report_from_store(
     receipt_store: &SqliteReceiptStore,
     receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
@@ -409,7 +410,7 @@ fn build_credit_facility_report_from_store_with_context(
     })
 }
 
-fn build_credit_bond_report_from_store(
+pub(crate) fn build_credit_bond_report_from_store(
     receipt_store: &SqliteReceiptStore,
     receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
@@ -569,7 +570,7 @@ fn build_credit_bond_report_from_store(
     })
 }
 
-fn issue_signed_credit_bond_detailed(
+pub(crate) fn issue_signed_credit_bond_detailed(
     args: CreditIssuanceArgs<'_>,
 ) -> Result<SignedCreditBond, TrustHttpError> {
     let CreditIssuanceArgs {
@@ -657,7 +658,7 @@ fn build_credit_bond_artifact(
     })
 }
 
-fn build_credit_bonded_execution_simulation_report_from_store(
+pub(crate) fn build_credit_bonded_execution_simulation_report_from_store(
     receipt_store: &SqliteReceiptStore,
     request: &CreditBondedExecutionSimulationRequest,
 ) -> Result<CreditBondedExecutionSimulationReport, TrustHttpError> {
@@ -1098,13 +1099,13 @@ fn credit_bonded_execution_reason_key(code: CreditBondedExecutionFindingCode) ->
 }
 
 #[derive(Debug, Clone)]
-struct CreditLossLifecycleAccountingState {
-    currency: String,
-    delinquent_units: u64,
-    recovered_units: u64,
-    reserve_released_units: u64,
-    reserve_slashed_units: u64,
-    written_off_units: u64,
+pub(crate) struct CreditLossLifecycleAccountingState {
+    pub(crate) currency: String,
+    pub(crate) delinquent_units: u64,
+    pub(crate) recovered_units: u64,
+    pub(crate) reserve_released_units: u64,
+    pub(crate) reserve_slashed_units: u64,
+    pub(crate) written_off_units: u64,
 }
 
 impl CreditLossLifecycleAccountingState {
@@ -1172,7 +1173,7 @@ fn resolve_credit_loss_lifecycle_reserve_source(
         })
 }
 
-fn build_credit_loss_lifecycle_report_from_store(
+pub(crate) fn build_credit_loss_lifecycle_report_from_store(
     receipt_store: &SqliteReceiptStore,
     query: &CreditLossLifecycleQuery,
 ) -> Result<CreditLossLifecycleReport, TrustHttpError> {
@@ -1531,7 +1532,7 @@ fn build_credit_loss_lifecycle_report_from_store(
     })
 }
 
-fn issue_signed_credit_loss_lifecycle_detailed(
+pub(crate) fn issue_signed_credit_loss_lifecycle_detailed(
     receipt_db_path: &Path,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
@@ -1709,7 +1710,7 @@ fn issue_signed_credit_loss_lifecycle_detailed(
     Ok(signed)
 }
 
-fn issue_signed_credit_facility_detailed(
+pub(crate) fn issue_signed_credit_facility_detailed(
     args: CreditIssuanceArgs<'_>,
 ) -> Result<SignedCreditFacility, TrustHttpError> {
     let CreditIssuanceArgs {
@@ -1811,7 +1812,9 @@ fn credit_facility_minimum_runtime_assurance_tier(
     }
 }
 
-fn build_credit_facility_terms(scorecard: &CreditScorecardReport) -> Option<CreditFacilityTerms> {
+pub(crate) fn build_credit_facility_terms(
+    scorecard: &CreditScorecardReport,
+) -> Option<CreditFacilityTerms> {
     let position = match scorecard.positions.as_slice() {
         [position] => position,
         _ => return None,
@@ -1994,7 +1997,7 @@ fn credit_facility_ttl_seconds(report: &CreditFacilityReport) -> u64 {
         })
 }
 
-fn credit_facility_has_reason(
+pub(crate) fn credit_facility_has_reason(
     scorecard: &CreditScorecardReport,
     reason: CreditScorecardReasonCode,
 ) -> bool {
@@ -2004,7 +2007,7 @@ fn credit_facility_has_reason(
         .any(|anomaly| anomaly.code == reason)
 }
 
-fn credit_facility_evidence_for_reason(
+pub(crate) fn credit_facility_evidence_for_reason(
     scorecard: &CreditScorecardReport,
     reason: CreditScorecardReasonCode,
 ) -> Vec<CreditScorecardEvidenceReference> {
@@ -2027,7 +2030,7 @@ fn credit_facility_reputation_evidence(
         .unwrap_or_default()
 }
 
-fn credit_facility_receipt_refs_from_underwriting(
+pub(crate) fn credit_facility_receipt_refs_from_underwriting(
     underwriting_input: &UnderwritingPolicyInput,
 ) -> Vec<CreditScorecardEvidenceReference> {
     underwriting_input
@@ -2058,7 +2061,7 @@ fn credit_facility_receipt_refs_from_underwriting(
         .collect()
 }
 
-fn credit_backtest_utilization_bps(
+pub(crate) fn credit_backtest_utilization_bps(
     positions: &[ExposureLedgerCurrencyPosition],
     terms: Option<&CreditFacilityTerms>,
 ) -> Option<u32> {

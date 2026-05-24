@@ -1,3 +1,5 @@
+use super::*;
+
 fn resolve_admin_report_read_context(
     headers: &HeaderMap,
     config: &TrustServiceConfig,
@@ -12,19 +14,16 @@ fn resolve_admin_report_read_context(
     }
 }
 
-async fn handle_receipt_analytics(
+pub(crate) async fn handle_receipt_analytics(
     State(state): State<TrustServiceState>,
     Query(mut query): Query<ReceiptAnalyticsQuery>,
     headers: HeaderMap,
 ) -> Response {
-    query.read_context = match resolve_admin_report_read_context(
-        &headers,
-        &state.config,
-        "receipt analytics",
-    ) {
-        Ok(context) => Some(context),
-        Err(response) => return response,
-    };
+    query.read_context =
+        match resolve_admin_report_read_context(&headers, &state.config, "receipt analytics") {
+            Ok(context) => Some(context),
+            Err(response) => return response,
+        };
     let store = match open_receipt_store(&state.config) {
         Ok(store) => store,
         Err(response) => return response,
@@ -35,7 +34,7 @@ async fn handle_receipt_analytics(
     }
 }
 
-async fn handle_evidence_export(
+pub(crate) async fn handle_evidence_export(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<evidence_export::RemoteEvidenceExportRequest>,
@@ -89,7 +88,7 @@ async fn handle_evidence_export(
     .into_response()
 }
 
-async fn handle_evidence_import(
+pub(crate) async fn handle_evidence_import(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<evidence_export::RemoteEvidenceImportRequest>,
@@ -121,19 +120,17 @@ async fn handle_evidence_import(
     }
 }
 
-async fn handle_cost_attribution_report(
+pub(crate) async fn handle_cost_attribution_report(
     State(state): State<TrustServiceState>,
     Query(mut query): Query<CostAttributionQuery>,
     headers: HeaderMap,
 ) -> Response {
-    query.read_context = match resolve_admin_report_read_context(
-        &headers,
-        &state.config,
-        "cost attribution report",
-    ) {
-        Ok(context) => Some(context),
-        Err(response) => return response,
-    };
+    query.read_context =
+        match resolve_admin_report_read_context(&headers, &state.config, "cost attribution report")
+        {
+            Ok(context) => Some(context),
+            Err(response) => return response,
+        };
     let store = match open_receipt_store(&state.config) {
         Ok(store) => store,
         Err(response) => return response,
@@ -144,7 +141,7 @@ async fn handle_cost_attribution_report(
     }
 }
 
-async fn handle_shared_evidence_report(
+pub(crate) async fn handle_shared_evidence_report(
     State(state): State<TrustServiceState>,
     Query(mut query): Query<SharedEvidenceQuery>,
     headers: HeaderMap,
@@ -167,19 +164,16 @@ async fn handle_shared_evidence_report(
     }
 }
 
-async fn handle_operator_report(
+pub(crate) async fn handle_operator_report(
     State(state): State<TrustServiceState>,
     Query(mut query): Query<OperatorReportQuery>,
     headers: HeaderMap,
 ) -> Response {
-    query.read_context = match resolve_admin_report_read_context(
-        &headers,
-        &state.config,
-        "operator report",
-    ) {
-        Ok(context) => Some(context),
-        Err(response) => return response,
-    };
+    query.read_context =
+        match resolve_admin_report_read_context(&headers, &state.config, "operator report") {
+            Ok(context) => Some(context),
+            Err(response) => return response,
+        };
 
     let receipt_store = match open_receipt_store(&state.config) {
         Ok(store) => store,
@@ -196,7 +190,7 @@ async fn handle_operator_report(
     }
 }
 
-async fn handle_behavioral_feed_report(
+pub(crate) async fn handle_behavioral_feed_report(
     State(state): State<TrustServiceState>,
     Query(mut query): Query<BehavioralFeedQuery>,
     headers: HeaderMap,
@@ -232,16 +226,19 @@ async fn handle_behavioral_feed_report(
     }
 }
 
-async fn handle_exposure_ledger_report(
+pub(crate) async fn handle_exposure_ledger_report(
     State(state): State<TrustServiceState>,
     Query(query): Query<ExposureLedgerQuery>,
     headers: HeaderMap,
 ) -> Response {
-    let read_context =
-        match resolve_admin_report_read_context(&headers, &state.config, "exposure ledger report") {
-            Ok(context) => context,
-            Err(response) => return response,
-        };
+    let read_context = match resolve_admin_report_read_context(
+        &headers,
+        &state.config,
+        "exposure ledger report",
+    ) {
+        Ok(context) => context,
+        Err(response) => return response,
+    };
 
     let receipt_store = match open_receipt_store(&state.config) {
         Ok(store) => store,
@@ -266,7 +263,7 @@ async fn handle_exposure_ledger_report(
     }
 }
 
-async fn handle_credit_scorecard_report(
+pub(crate) async fn handle_credit_scorecard_report(
     State(state): State<TrustServiceState>,
     Query(query): Query<ExposureLedgerQuery>,
     headers: HeaderMap,
@@ -319,7 +316,7 @@ async fn handle_credit_scorecard_report(
     }
 }
 
-async fn handle_capital_book_report(
+pub(crate) async fn handle_capital_book_report(
     State(state): State<TrustServiceState>,
     Query(query): Query<CapitalBookQuery>,
     headers: HeaderMap,
@@ -353,7 +350,7 @@ async fn handle_capital_book_report(
     }
 }
 
-async fn handle_issue_capital_execution_instruction(
+pub(crate) async fn handle_issue_capital_execution_instruction(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<CapitalExecutionInstructionRequest>,
@@ -383,7 +380,7 @@ async fn handle_issue_capital_execution_instruction(
     }
 }
 
-async fn handle_issue_capital_allocation_decision(
+pub(crate) async fn handle_issue_capital_allocation_decision(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<CapitalAllocationDecisionRequest>,
@@ -415,7 +412,7 @@ async fn handle_issue_capital_allocation_decision(
     }
 }
 
-async fn handle_credit_facility_report(
+pub(crate) async fn handle_credit_facility_report(
     State(state): State<TrustServiceState>,
     Query(query): Query<ExposureLedgerQuery>,
     headers: HeaderMap,
@@ -465,7 +462,7 @@ async fn handle_credit_facility_report(
     }
 }
 
-async fn handle_issue_credit_facility(
+pub(crate) async fn handle_issue_credit_facility(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<CreditFacilityIssueRequest>,
@@ -499,7 +496,7 @@ async fn handle_issue_credit_facility(
     }
 }
 
-async fn handle_query_credit_facilities(
+pub(crate) async fn handle_query_credit_facilities(
     State(state): State<TrustServiceState>,
     Query(query): Query<CreditFacilityListQuery>,
     headers: HeaderMap,
@@ -521,7 +518,7 @@ async fn handle_query_credit_facilities(
     }
 }
 
-async fn handle_credit_bond_report(
+pub(crate) async fn handle_credit_bond_report(
     State(state): State<TrustServiceState>,
     Query(query): Query<ExposureLedgerQuery>,
     headers: HeaderMap,
@@ -571,7 +568,7 @@ async fn handle_credit_bond_report(
     }
 }
 
-async fn handle_issue_credit_bond(
+pub(crate) async fn handle_issue_credit_bond(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<CreditBondIssueRequest>,
@@ -605,7 +602,7 @@ async fn handle_issue_credit_bond(
     }
 }
 
-async fn handle_query_credit_bonds(
+pub(crate) async fn handle_query_credit_bonds(
     State(state): State<TrustServiceState>,
     Query(query): Query<CreditBondListQuery>,
     headers: HeaderMap,
@@ -627,7 +624,7 @@ async fn handle_query_credit_bonds(
     }
 }
 
-async fn handle_credit_bonded_execution_simulation_report(
+pub(crate) async fn handle_credit_bonded_execution_simulation_report(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<CreditBondedExecutionSimulationRequest>,
@@ -651,7 +648,7 @@ async fn handle_credit_bonded_execution_simulation_report(
     }
 }
 
-async fn handle_credit_loss_lifecycle_report(
+pub(crate) async fn handle_credit_loss_lifecycle_report(
     State(state): State<TrustServiceState>,
     Query(query): Query<CreditLossLifecycleQuery>,
     headers: HeaderMap,
@@ -673,7 +670,7 @@ async fn handle_credit_loss_lifecycle_report(
     }
 }
 
-async fn handle_issue_credit_loss_lifecycle(
+pub(crate) async fn handle_issue_credit_loss_lifecycle(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<CreditLossLifecycleIssueRequest>,
@@ -703,7 +700,7 @@ async fn handle_issue_credit_loss_lifecycle(
     }
 }
 
-async fn handle_query_credit_loss_lifecycle(
+pub(crate) async fn handle_query_credit_loss_lifecycle(
     State(state): State<TrustServiceState>,
     Query(query): Query<CreditLossLifecycleListQuery>,
     headers: HeaderMap,
@@ -725,7 +722,7 @@ async fn handle_query_credit_loss_lifecycle(
     }
 }
 
-async fn handle_credit_backtest_report(
+pub(crate) async fn handle_credit_backtest_report(
     State(state): State<TrustServiceState>,
     Query(query): Query<CreditBacktestQuery>,
     headers: HeaderMap,
@@ -775,7 +772,7 @@ async fn handle_credit_backtest_report(
     }
 }
 
-async fn handle_credit_provider_risk_package_report(
+pub(crate) async fn handle_credit_provider_risk_package_report(
     State(state): State<TrustServiceState>,
     Query(query): Query<CreditProviderRiskPackageQuery>,
     headers: HeaderMap,
@@ -830,7 +827,7 @@ async fn handle_credit_provider_risk_package_report(
     }
 }
 
-async fn handle_issue_liability_provider(
+pub(crate) async fn handle_issue_liability_provider(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<LiabilityProviderIssueRequest>,
@@ -857,12 +854,14 @@ async fn handle_issue_liability_provider(
         request.supersedes_provider_record_id.as_deref(),
     ) {
         Ok(provider) => Json::<SignedLiabilityProvider>(provider).into_response(),
-        Err(error @ CliError::Chio(_)) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(error @ CliError::Chio(_)) => {
+            plain_http_error(StatusCode::BAD_REQUEST, &error.to_string())
+        }
         Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
     }
 }
 
-async fn handle_query_liability_providers(
+pub(crate) async fn handle_query_liability_providers(
     State(state): State<TrustServiceState>,
     Query(query): Query<LiabilityProviderListQuery>,
     headers: HeaderMap,
@@ -881,7 +880,7 @@ async fn handle_query_liability_providers(
     }
 }
 
-async fn handle_resolve_liability_provider(
+pub(crate) async fn handle_resolve_liability_provider(
     State(state): State<TrustServiceState>,
     Query(query): Query<LiabilityProviderResolutionQuery>,
     headers: HeaderMap,
@@ -900,7 +899,7 @@ async fn handle_resolve_liability_provider(
     }
 }
 
-async fn handle_issue_liability_quote_request(
+pub(crate) async fn handle_issue_liability_quote_request(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<LiabilityQuoteRequestIssueRequest>,
@@ -931,7 +930,7 @@ async fn handle_issue_liability_quote_request(
     }
 }
 
-async fn handle_issue_liability_quote_response(
+pub(crate) async fn handle_issue_liability_quote_response(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<LiabilityQuoteResponseIssueRequest>,
@@ -962,7 +961,7 @@ async fn handle_issue_liability_quote_response(
     }
 }
 
-async fn handle_issue_liability_placement(
+pub(crate) async fn handle_issue_liability_placement(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<LiabilityPlacementIssueRequest>,
@@ -993,7 +992,7 @@ async fn handle_issue_liability_placement(
     }
 }
 
-async fn handle_issue_liability_pricing_authority(
+pub(crate) async fn handle_issue_liability_pricing_authority(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<LiabilityPricingAuthorityIssueRequest>,
@@ -1024,7 +1023,7 @@ async fn handle_issue_liability_pricing_authority(
     }
 }
 
-async fn handle_issue_liability_bound_coverage(
+pub(crate) async fn handle_issue_liability_bound_coverage(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<LiabilityBoundCoverageIssueRequest>,
@@ -1055,7 +1054,7 @@ async fn handle_issue_liability_bound_coverage(
     }
 }
 
-async fn handle_issue_liability_auto_bind(
+pub(crate) async fn handle_issue_liability_auto_bind(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<LiabilityAutoBindIssueRequest>,
@@ -1086,7 +1085,7 @@ async fn handle_issue_liability_auto_bind(
     }
 }
 
-async fn handle_query_liability_market_workflows(
+pub(crate) async fn handle_query_liability_market_workflows(
     State(state): State<TrustServiceState>,
     Query(query): Query<LiabilityMarketWorkflowQuery>,
     headers: HeaderMap,
@@ -1105,7 +1104,7 @@ async fn handle_query_liability_market_workflows(
     }
 }
 
-async fn handle_issue_liability_claim_package(
+pub(crate) async fn handle_issue_liability_claim_package(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<LiabilityClaimPackageIssueRequest>,
@@ -1136,7 +1135,7 @@ async fn handle_issue_liability_claim_package(
     }
 }
 
-async fn handle_issue_liability_claim_response(
+pub(crate) async fn handle_issue_liability_claim_response(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<LiabilityClaimResponseIssueRequest>,
@@ -1167,7 +1166,7 @@ async fn handle_issue_liability_claim_response(
     }
 }
 
-async fn handle_issue_liability_claim_dispute(
+pub(crate) async fn handle_issue_liability_claim_dispute(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<LiabilityClaimDisputeIssueRequest>,
@@ -1198,7 +1197,7 @@ async fn handle_issue_liability_claim_dispute(
     }
 }
 
-async fn handle_issue_liability_claim_adjudication(
+pub(crate) async fn handle_issue_liability_claim_adjudication(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<LiabilityClaimAdjudicationIssueRequest>,
@@ -1229,7 +1228,7 @@ async fn handle_issue_liability_claim_adjudication(
     }
 }
 
-async fn handle_issue_liability_claim_payout_instruction(
+pub(crate) async fn handle_issue_liability_claim_payout_instruction(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<LiabilityClaimPayoutInstructionIssueRequest>,
@@ -1260,7 +1259,7 @@ async fn handle_issue_liability_claim_payout_instruction(
     }
 }
 
-async fn handle_issue_liability_claim_payout_receipt(
+pub(crate) async fn handle_issue_liability_claim_payout_receipt(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<LiabilityClaimPayoutReceiptIssueRequest>,
@@ -1291,7 +1290,7 @@ async fn handle_issue_liability_claim_payout_receipt(
     }
 }
 
-async fn handle_issue_liability_claim_settlement_instruction(
+pub(crate) async fn handle_issue_liability_claim_settlement_instruction(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<LiabilityClaimSettlementInstructionIssueRequest>,
@@ -1322,7 +1321,7 @@ async fn handle_issue_liability_claim_settlement_instruction(
     }
 }
 
-async fn handle_issue_liability_claim_settlement_receipt(
+pub(crate) async fn handle_issue_liability_claim_settlement_receipt(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<LiabilityClaimSettlementReceiptIssueRequest>,
@@ -1353,7 +1352,7 @@ async fn handle_issue_liability_claim_settlement_receipt(
     }
 }
 
-async fn handle_query_liability_claim_workflows(
+pub(crate) async fn handle_query_liability_claim_workflows(
     State(state): State<TrustServiceState>,
     Query(query): Query<LiabilityClaimWorkflowQuery>,
     headers: HeaderMap,
@@ -1372,7 +1371,7 @@ async fn handle_query_liability_claim_workflows(
     }
 }
 
-async fn handle_runtime_attestation_appraisal_report(
+pub(crate) async fn handle_runtime_attestation_appraisal_report(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<RuntimeAttestationAppraisalRequest>,
@@ -1388,12 +1387,14 @@ async fn handle_runtime_attestation_appraisal_report(
         &request.runtime_attestation,
     ) {
         Ok(report) => Json::<SignedRuntimeAttestationAppraisalReport>(report).into_response(),
-        Err(error @ CliError::Chio(_)) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(error @ CliError::Chio(_)) => {
+            plain_http_error(StatusCode::BAD_REQUEST, &error.to_string())
+        }
         Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
     }
 }
 
-async fn handle_runtime_attestation_appraisal_result_export(
+pub(crate) async fn handle_runtime_attestation_appraisal_result_export(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<RuntimeAttestationAppraisalResultExportRequest>,
@@ -1409,12 +1410,14 @@ async fn handle_runtime_attestation_appraisal_result_export(
         &request,
     ) {
         Ok(result) => Json::<SignedRuntimeAttestationAppraisalResult>(result).into_response(),
-        Err(error @ CliError::Chio(_)) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(error @ CliError::Chio(_)) => {
+            plain_http_error(StatusCode::BAD_REQUEST, &error.to_string())
+        }
         Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
     }
 }
 
-async fn handle_runtime_attestation_appraisal_import(
+pub(crate) async fn handle_runtime_attestation_appraisal_import(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<RuntimeAttestationAppraisalImportRequest>,
@@ -1429,7 +1432,7 @@ async fn handle_runtime_attestation_appraisal_import(
     .into_response()
 }
 
-async fn handle_settlement_report(
+pub(crate) async fn handle_settlement_report(
     State(state): State<TrustServiceState>,
     Query(mut query): Query<OperatorReportQuery>,
     headers: HeaderMap,
@@ -1454,7 +1457,7 @@ async fn handle_settlement_report(
     }
 }
 
-async fn handle_record_settlement_reconciliation(
+pub(crate) async fn handle_record_settlement_reconciliation(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<SettlementReconciliationUpdateRequest>,
@@ -1487,7 +1490,7 @@ async fn handle_record_settlement_reconciliation(
     }
 }
 
-async fn handle_metered_billing_report(
+pub(crate) async fn handle_metered_billing_report(
     State(state): State<TrustServiceState>,
     Query(mut query): Query<OperatorReportQuery>,
     headers: HeaderMap,
@@ -1512,19 +1515,17 @@ async fn handle_metered_billing_report(
     }
 }
 
-async fn handle_economic_receipt_report(
+pub(crate) async fn handle_economic_receipt_report(
     State(state): State<TrustServiceState>,
     Query(mut query): Query<OperatorReportQuery>,
     headers: HeaderMap,
 ) -> Response {
-    query.read_context = match resolve_admin_report_read_context(
-        &headers,
-        &state.config,
-        "economic receipt report",
-    ) {
-        Ok(context) => Some(context),
-        Err(response) => return response,
-    };
+    query.read_context =
+        match resolve_admin_report_read_context(&headers, &state.config, "economic receipt report")
+        {
+            Ok(context) => Some(context),
+            Err(response) => return response,
+        };
 
     let receipt_store = match open_receipt_store(&state.config) {
         Ok(store) => store,
@@ -1537,7 +1538,7 @@ async fn handle_economic_receipt_report(
     }
 }
 
-async fn handle_economic_completion_flow_report(
+pub(crate) async fn handle_economic_completion_flow_report(
     State(state): State<TrustServiceState>,
     Query(query): Query<ExposureLedgerQuery>,
     headers: HeaderMap,
@@ -1562,7 +1563,7 @@ async fn handle_economic_completion_flow_report(
     }
 }
 
-async fn handle_authorization_context_report(
+pub(crate) async fn handle_authorization_context_report(
     State(state): State<TrustServiceState>,
     Query(mut query): Query<OperatorReportQuery>,
     headers: HeaderMap,
@@ -1587,7 +1588,7 @@ async fn handle_authorization_context_report(
     }
 }
 
-async fn handle_authorization_profile_metadata_report(
+pub(crate) async fn handle_authorization_profile_metadata_report(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
@@ -1610,7 +1611,7 @@ async fn handle_authorization_profile_metadata_report(
     .into_response()
 }
 
-async fn handle_authorization_review_pack_report(
+pub(crate) async fn handle_authorization_review_pack_report(
     State(state): State<TrustServiceState>,
     Query(mut query): Query<OperatorReportQuery>,
     headers: HeaderMap,
@@ -1635,7 +1636,7 @@ async fn handle_authorization_review_pack_report(
     }
 }
 
-async fn handle_underwriting_policy_input(
+pub(crate) async fn handle_underwriting_policy_input(
     State(state): State<TrustServiceState>,
     Query(query): Query<UnderwritingPolicyInputQuery>,
     headers: HeaderMap,
@@ -1685,17 +1686,19 @@ async fn handle_underwriting_policy_input(
     }
 }
 
-async fn handle_underwriting_decision_report(
+pub(crate) async fn handle_underwriting_decision_report(
     State(state): State<TrustServiceState>,
     Query(query): Query<UnderwritingPolicyInputQuery>,
     headers: HeaderMap,
 ) -> Response {
-    let read_context =
-        match resolve_admin_report_read_context(&headers, &state.config, "underwriting decision report")
-        {
-            Ok(context) => context,
-            Err(response) => return response,
-        };
+    let read_context = match resolve_admin_report_read_context(
+        &headers,
+        &state.config,
+        "underwriting decision report",
+    ) {
+        Ok(context) => context,
+        Err(response) => return response,
+    };
 
     let receipt_db_path = match state.config.receipt_db_path.as_deref() {
         Some(path) => path,
@@ -1736,7 +1739,7 @@ async fn handle_underwriting_decision_report(
     }
 }
 
-async fn handle_underwriting_simulation_report(
+pub(crate) async fn handle_underwriting_simulation_report(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<UnderwritingSimulationRequest>,
@@ -1789,7 +1792,7 @@ async fn handle_underwriting_simulation_report(
     }
 }
 
-async fn handle_query_underwriting_decisions(
+pub(crate) async fn handle_query_underwriting_decisions(
     State(state): State<TrustServiceState>,
     Query(query): Query<UnderwritingDecisionQuery>,
     headers: HeaderMap,
@@ -1809,7 +1812,7 @@ async fn handle_query_underwriting_decisions(
     }
 }
 
-async fn handle_issue_underwriting_decision(
+pub(crate) async fn handle_issue_underwriting_decision(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<UnderwritingDecisionIssueRequest>,
@@ -1843,7 +1846,7 @@ async fn handle_issue_underwriting_decision(
     }
 }
 
-async fn handle_create_underwriting_appeal(
+pub(crate) async fn handle_create_underwriting_appeal(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<UnderwritingAppealCreateRequest>,
@@ -1868,7 +1871,7 @@ async fn handle_create_underwriting_appeal(
     }
 }
 
-async fn handle_resolve_underwriting_appeal(
+pub(crate) async fn handle_resolve_underwriting_appeal(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<UnderwritingAppealResolveRequest>,
@@ -1893,7 +1896,7 @@ async fn handle_resolve_underwriting_appeal(
     }
 }
 
-async fn handle_record_metered_billing_reconciliation(
+pub(crate) async fn handle_record_metered_billing_reconciliation(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<MeteredBillingReconciliationUpdateRequest>,
@@ -1944,7 +1947,7 @@ async fn handle_record_metered_billing_reconciliation(
     }
 }
 
-async fn handle_local_reputation(
+pub(crate) async fn handle_local_reputation(
     State(state): State<TrustServiceState>,
     AxumPath(subject_key): AxumPath<String>,
     Query(query): Query<LocalReputationQuery>,
@@ -2007,7 +2010,7 @@ async fn handle_local_reputation(
     }
 }
 
-async fn handle_reputation_compare(
+pub(crate) async fn handle_reputation_compare(
     State(state): State<TrustServiceState>,
     AxumPath(subject_key): AxumPath<String>,
     headers: HeaderMap,
@@ -2102,7 +2105,7 @@ async fn handle_reputation_compare(
     }
 }
 
-async fn handle_issue_portable_reputation_summary(
+pub(crate) async fn handle_issue_portable_reputation_summary(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<PortableReputationSummaryIssueRequest>,
@@ -2116,7 +2119,7 @@ async fn handle_issue_portable_reputation_summary(
     }
 }
 
-async fn handle_issue_portable_negative_event(
+pub(crate) async fn handle_issue_portable_negative_event(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<PortableNegativeEventIssueRequest>,
@@ -2130,7 +2133,7 @@ async fn handle_issue_portable_negative_event(
     }
 }
 
-async fn handle_evaluate_portable_reputation(
+pub(crate) async fn handle_evaluate_portable_reputation(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(request): Json<PortableReputationEvaluationRequest>,
@@ -2144,7 +2147,7 @@ async fn handle_evaluate_portable_reputation(
     }
 }
 
-async fn handle_record_lineage_snapshot(
+pub(crate) async fn handle_record_lineage_snapshot(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(payload): Json<RecordCapabilitySnapshotRequest>,
@@ -2191,7 +2194,7 @@ async fn handle_record_lineage_snapshot(
 /// GET /v1/lineage/:capability_id
 ///
 /// Returns the CapabilitySnapshot for the given capability ID, or 404 if not found.
-async fn handle_get_lineage(
+pub(crate) async fn handle_get_lineage(
     State(state): State<TrustServiceState>,
     AxumPath(capability_id): AxumPath<String>,
     headers: HeaderMap,
@@ -2216,7 +2219,7 @@ async fn handle_get_lineage(
 /// GET /v1/lineage/:capability_id/chain
 ///
 /// Returns the full delegation chain for the given capability ID, root-first.
-async fn handle_get_delegation_chain(
+pub(crate) async fn handle_get_delegation_chain(
     State(state): State<TrustServiceState>,
     AxumPath(capability_id): AxumPath<String>,
     headers: HeaderMap,
@@ -2239,7 +2242,7 @@ async fn handle_get_delegation_chain(
 /// Convenience endpoint: returns receipts for a given agent subject key.
 /// Delegates to the same query_receipts call as GET /v1/receipts/query with
 /// agentSubject set, passing through limit and cursor from query params.
-async fn handle_agent_receipts(
+pub(crate) async fn handle_agent_receipts(
     State(state): State<TrustServiceState>,
     AxumPath(subject_key): AxumPath<String>,
     Query(query): Query<AgentReceiptsHttpQuery>,
@@ -2285,7 +2288,7 @@ async fn handle_agent_receipts(
     .into_response()
 }
 
-async fn handle_append_child_receipt(
+pub(crate) async fn handle_append_child_receipt(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(receipt): Json<ChildRequestReceipt>,
@@ -2338,7 +2341,7 @@ async fn handle_append_child_receipt(
     }
 }
 
-async fn handle_list_budgets(
+pub(crate) async fn handle_list_budgets(
     State(state): State<TrustServiceState>,
     Query(query): Query<BudgetQuery>,
     headers: HeaderMap,
@@ -2378,7 +2381,7 @@ async fn handle_list_budgets(
     .into_response()
 }
 
-async fn handle_try_increment_budget(
+pub(crate) async fn handle_try_increment_budget(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(payload): Json<TryIncrementBudgetRequest>,
@@ -2434,7 +2437,7 @@ async fn handle_try_increment_budget(
     )
 }
 
-async fn handle_try_charge_cost(
+pub(crate) async fn handle_try_charge_cost(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(payload): Json<TryChargeCostRequest>,
@@ -2556,7 +2559,7 @@ async fn handle_try_charge_cost(
     }
 }
 
-async fn handle_reverse_charge_cost(
+pub(crate) async fn handle_reverse_charge_cost(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(payload): Json<ReverseChargeCostRequest>,
@@ -2573,14 +2576,11 @@ async fn handle_reverse_charge_cost(
         Ok(store) => store,
         Err(response) => return response,
     };
-    let authority = match resolve_budget_hold_authority(
-        &state,
-        &mut store,
-        payload.hold_id.as_deref(),
-    ) {
-        Ok(authority) => authority,
-        Err(response) => return response,
-    };
+    let authority =
+        match resolve_budget_hold_authority(&state, &mut store, payload.hold_id.as_deref()) {
+            Ok(authority) => authority,
+            Err(response) => return response,
+        };
     if let Err(error) = store.reverse_charge_cost_with_ids_and_authority(
         &payload.capability_id,
         payload.grant_index,
@@ -2622,7 +2622,7 @@ async fn handle_reverse_charge_cost(
     .await
 }
 
-async fn handle_reduce_charge_cost(
+pub(crate) async fn handle_reduce_charge_cost(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
     Json(payload): Json<ReduceChargeCostRequest>,
@@ -2640,14 +2640,11 @@ async fn handle_reduce_charge_cost(
         Ok(store) => store,
         Err(response) => return response,
     };
-    let authority = match resolve_budget_hold_authority(
-        &state,
-        &mut store,
-        payload.hold_id.as_deref(),
-    ) {
-        Ok(authority) => authority,
-        Err(response) => return response,
-    };
+    let authority =
+        match resolve_budget_hold_authority(&state, &mut store, payload.hold_id.as_deref()) {
+            Ok(authority) => authority,
+            Err(response) => return response,
+        };
     let reconcile_result = if let (Some(exposure_units), Some(realized_spend_units)) =
         (payload.exposure_units, payload.realized_spend_units)
     {

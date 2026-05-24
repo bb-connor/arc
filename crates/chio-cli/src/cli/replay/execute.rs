@@ -11,6 +11,8 @@
 //    a [`TrafficFrameOutcome`] under `replay:<run_id>:<frame_id>`.
 // 5. Aggregate into a [`TrafficReplayReport`] for the diff renderer.
 
+use super::*;
+
 /// Per-frame outcome: replay-receipt id, recomputed verdict, and the
 /// captured verdict from the source frame, plus guard/reason attribution.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]

@@ -5,12 +5,14 @@
 // per-frame output. When `--against` is supplied, routes to the re-execution
 // path in `replay/execute.rs`.
 
+use super::*;
+
 /// Dispatch `chio replay traffic` against the supplied [`TrafficArgs`].
 ///
 /// Per-frame pipeline: NDJSON parse, schema-version gate, optional tenant-sig
 /// verify, M01 invocation validate. When `--against` is supplied, routes
 /// through [`run_traffic_replay`] instead.
-fn cmd_replay_traffic(args: &TrafficArgs) -> Result<(), CliError> {
+pub(crate) fn cmd_replay_traffic(args: &TrafficArgs) -> Result<(), CliError> {
     if let Some(against_str) = args.against.as_deref() {
         return cmd_replay_traffic_with_against(args, against_str);
     }
@@ -222,12 +224,12 @@ fn traffic_diff_exit_code(diff: &TrafficReplayDiffReport) -> i32 {
 }
 
 #[cfg(not(test))]
-fn finish_replay_failure(code: i32, _message: String) -> Result<(), CliError> {
+pub(crate) fn finish_replay_failure(code: i32, _message: String) -> Result<(), CliError> {
     std::process::exit(code);
 }
 
 #[cfg(test)]
-fn finish_replay_failure(_code: i32, message: String) -> Result<(), CliError> {
+pub(crate) fn finish_replay_failure(_code: i32, message: String) -> Result<(), CliError> {
     Err(CliError::replay_mismatch_error(message))
 }
 

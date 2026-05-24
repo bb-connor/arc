@@ -4,6 +4,11 @@
 // scaffold lives at `~/.config/chio/mcp/<server-id>.toml` by convention;
 // the renderer is pure so tests can compare bytes.
 
+use super::*;
+
+use super::scope::{infer_scopes, InferredCapability, InferredScope};
+use super::wrap::{split_wrapped_command, McpWrapArgs};
+
 /// Render the inferred capability scaffold to a TOML string. The output
 /// is deterministic: tools are sorted alphabetically, scopes are emitted
 /// in a fixed order, and every capability ships with `allow = false`.
@@ -88,7 +93,7 @@ pub(crate) fn load_manifest_allowlist(
 
 /// Print the inferred manifest scaffold to stdout. Used by
 /// `arc mcp wrap --print-scopes`.
-fn cmd_mcp_print_scopes(args: &McpWrapArgs) -> Result<(), CliError> {
+pub(crate) fn cmd_mcp_print_scopes(args: &McpWrapArgs) -> Result<(), CliError> {
     let tools = if let Some(fixture) = args.tools_fixture.as_ref() {
         load_tools_fixture(fixture)?
     } else {
