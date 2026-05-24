@@ -36,7 +36,8 @@ use chio_core_types::crypto::{
     SigningBackend,
 };
 use chio_core_types::receipt::{
-    ChioReceipt, ChioReceiptBody, Decision, ToolCallAction, TrustLevel,
+    chio_receipt_id, ChioReceipt, ChioReceiptBody, Decision, ToolCallAction, TrustLevel,
+    CHIO_RECEIPT_SIGNING_NONCE_METADATA_KEY,
 };
 use serde_json::Value;
 
@@ -110,7 +111,7 @@ fn fixture_action() -> ToolCallAction {
 }
 
 fn migration_body(kernel_key: PublicKey) -> ChioReceiptBody {
-    ChioReceiptBody {
+    let mut body = ChioReceiptBody {
         id: "rcpt-v318-fixture-001".to_string(),
         timestamp: 1_700_000_001,
         capability_id: "cap-v318-fixture".to_string(),
@@ -132,7 +133,20 @@ fn migration_body(kernel_key: PublicKey) -> ChioReceiptBody {
         trust_level: TrustLevel::Mediated,
         tenant_id: None,
         kernel_key,
-    }
+    };
+    // Mirror the canonical signing-nonce binding that ChioReceipt::sign_with_backend
+    // applies before signing: the pre-binding id is recorded as the signing nonce in
+    // metadata, then the content-addressed id is recomputed over the body that
+    // includes it. This keeps the expected body byte-identical to the signed fixture.
+    let nonce = body.id.clone();
+    let mut metadata = serde_json::Map::new();
+    metadata.insert(
+        CHIO_RECEIPT_SIGNING_NONCE_METADATA_KEY.to_string(),
+        Value::String(nonce),
+    );
+    body.metadata = Some(Value::Object(metadata));
+    body.id = chio_receipt_id(&body).unwrap();
+    body
 }
 
 fn load_v318_fixture() -> ChioReceipt {

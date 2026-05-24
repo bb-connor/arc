@@ -11,7 +11,7 @@
  * and a clear "wasm not built" notice instead of crashing the page.
  */
 
-import fixture from './fixtures/m04-allow-receipt.json';
+import fixture from './fixtures/allow-receipt.json';
 
 interface VerifyReceiptResult {
   ok: boolean;
