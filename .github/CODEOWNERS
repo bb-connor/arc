@@ -21,9 +21,7 @@ crates/chio-core-types/src/receipt*.rs       @bb-connor
 crates/chio-core-types/src/provenance*.rs    @bb-connor
 crates/chio-tower/src/middleware/**          @bb-connor
 crates/chio-tower/src/host_call.rs           @bb-connor
-crates/chio-tower/src/adapter.rs             @bb-connor
 crates/chio-wasm-guards/src/host.rs          @bb-connor
-crates/chio-wasm-guards/src/registry.rs      @bb-connor
 crates/chio-wasm-guards/src/hot_reload.rs    @bb-connor
 wit/chio-guard/world.wit                     @bb-connor
 wit/chio-guards-redact/world.wit             @bb-connor

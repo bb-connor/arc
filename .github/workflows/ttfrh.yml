@@ -28,7 +28,7 @@ jobs:
     name: ttfrh-bench (in-process p99 budget)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Cache cargo target
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: in-process-bench
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Run container TTFRH bench
         run: |
           set -euo pipefail
