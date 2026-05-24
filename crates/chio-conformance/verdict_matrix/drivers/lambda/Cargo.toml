@@ -19,6 +19,7 @@ path = "src/main.rs"
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+reqwest = { workspace = true, features = ["blocking", "json", "rustls"] }
 
 [lints.clippy]
 unwrap_used = "deny"

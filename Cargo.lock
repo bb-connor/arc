@@ -4342,6 +4342,7 @@ dependencies = [
 name = "chio-verdict-matrix-driver-lambda"
 version = "0.1.0"
 dependencies = [
+ "reqwest 0.13.2",
  "serde",
  "serde_json",
 ]
