@@ -12,6 +12,8 @@
 //! All invocations flow through the kernel guard pipeline, so every
 //! HTTP call produces a signed Chio receipt.
 
+#![forbid(unsafe_code)]
+
 use std::collections::BTreeMap;
 
 #[cfg(feature = "fuzz")]

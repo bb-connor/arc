@@ -10,6 +10,8 @@
 //!
 //! - [`bidding`] -- bid/ask/accept flow and the signed bidding artifacts.
 
+#![forbid(unsafe_code)]
+
 pub use chio_core_types::{canonical_json_bytes, capability, crypto, receipt};
 pub use chio_governance as governance;
 pub use chio_listing as listing;

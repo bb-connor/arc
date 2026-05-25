@@ -1,5 +1,7 @@
 //! Offline Chio buyer and auditor proof package loopback harness.
 
+#![forbid(unsafe_code)]
+
 use std::fs;
 use std::path::Path;
 

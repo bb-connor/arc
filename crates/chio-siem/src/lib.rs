@@ -14,6 +14,8 @@
 //! receipts using a seq-based cursor. It fans out to registered Exporter
 //! implementations with exponential backoff retry and a bounded DeadLetterQueue.
 
+#![forbid(unsafe_code)]
+
 pub mod alerting;
 pub mod dlq;
 pub mod event;

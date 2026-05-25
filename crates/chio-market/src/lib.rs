@@ -13,6 +13,8 @@
 //!
 //! - [`insurance_flow`] -- quote/bind and claim-settlement flow.
 
+#![forbid(unsafe_code)]
+
 pub use chio_appraisal as appraisal;
 pub use chio_core_types::{capability, crypto, receipt};
 pub use chio_credit as credit;

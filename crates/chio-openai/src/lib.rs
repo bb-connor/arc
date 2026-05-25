@@ -10,6 +10,8 @@
 //!
 //! Every function call produces a signed receipt. Guards fail closed by default.
 
+#![forbid(unsafe_code)]
+
 use std::collections::BTreeMap;
 
 use chio_core::capability::{

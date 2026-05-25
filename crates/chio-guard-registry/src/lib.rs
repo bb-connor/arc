@@ -4,6 +4,8 @@
 //! artifacts. Registry transport and artifact shape checks stay local, while
 //! Sigstore verification is delegated to `chio-attest-verify`.
 
+#![forbid(unsafe_code)]
+
 pub mod cache;
 #[cfg(feature = "marketplace")]
 pub mod marketplace;

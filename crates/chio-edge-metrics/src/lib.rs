@@ -13,6 +13,8 @@
 //! statics; each edge crate declares its own `static` instance and delegates
 //! to it.
 
+#![forbid(unsafe_code)]
+
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use chio_kernel::Verdict;

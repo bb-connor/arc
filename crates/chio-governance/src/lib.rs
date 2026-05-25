@@ -9,6 +9,8 @@
 //! [`verify_step_governance_boundary`]. It builds on the listing surface in
 //! `chio-listing`.
 
+#![forbid(unsafe_code)]
+
 pub use chio_core_types::{canonical_json_bytes, crypto, receipt};
 pub use chio_listing as listing;
 

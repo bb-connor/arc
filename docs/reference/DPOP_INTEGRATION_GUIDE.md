@@ -17,7 +17,7 @@ pub struct ToolGrant {
 
 ## Proof Format
 
-A DPoP proof is an Chio-native structure using Ed25519 and RFC 8785 canonical
+A DPoP proof is a Chio-native structure using Ed25519 and RFC 8785 canonical
 JSON. It is not a JWT.
 
 ### DpopProofBody

@@ -7,6 +7,7 @@
 //! - canonical Solana memo publication records
 //! - fail-closed multi-lane proof bundle verification
 
+#![forbid(unsafe_code)]
 #![cfg(feature = "web3")]
 
 mod automation;

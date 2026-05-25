@@ -49,6 +49,7 @@
 //!
 //! [ext-authz]: https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter
 
+#![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
 pub mod error;

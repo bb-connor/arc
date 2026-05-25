@@ -1,5 +1,7 @@
 //! Offline Chio buyer and auditor proof package verification.
 
+#![forbid(unsafe_code)]
+
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use chio_core_types::canonical::{canonical_json_bytes, canonical_json_string};

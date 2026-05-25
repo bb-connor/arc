@@ -33,6 +33,8 @@
 //! - `conversion`: message conversion and Chio metadata envelope builders.
 //! - `edge`: the [`ChioA2aEdge`] server and its compatibility wrapper.
 
+#![forbid(unsafe_code)]
+
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 

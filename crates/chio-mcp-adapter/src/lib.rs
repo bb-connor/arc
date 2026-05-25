@@ -17,6 +17,8 @@
 //! between the Chio kernel and the MCP server, providing the security
 //! boundary that MCP lacks.
 
+#![forbid(unsafe_code)]
+
 use std::sync::{Arc, Mutex};
 
 use chio_core::session::CreateElicitationOperation;

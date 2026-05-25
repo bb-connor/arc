@@ -14,6 +14,8 @@
 //! - [`marketplace_pricing`] -- per-invocation pricing with reputation-tier
 //!   discounts.
 
+#![forbid(unsafe_code)]
+
 pub use chio_core_types::{canonical, capability, crypto, error, receipt, Error};
 
 pub mod marketplace_pricing;

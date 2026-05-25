@@ -4,6 +4,7 @@
 //! need an HTTP transport dependency. The generic async adapter, retry,
 //! caching, and circuit-breaker infrastructure remains in `chio-guards`.
 
+#![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
 
 use std::future::Future;

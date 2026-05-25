@@ -5,6 +5,8 @@
 //! exposes only the runtime admission, trust-floor, orchestration, operations,
 //! and proof-regeneration APIs needed by Chio runtime callers.
 
+#![forbid(unsafe_code)]
+
 use serde::Serialize;
 use std::{fmt, path::Path};
 

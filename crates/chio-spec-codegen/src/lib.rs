@@ -56,6 +56,8 @@
 //!   malformed input.
 //! - No em dashes (U+2014); use `-` or parentheses.
 
+#![forbid(unsafe_code)]
+
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::fmt;

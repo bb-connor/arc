@@ -10,6 +10,7 @@
 //! OID4VCI-style issuance. That path remains derived from the native passport
 //! artifact rather than replacing it as the source of truth.
 
+#![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 use std::collections::{BTreeMap, BTreeSet};

@@ -12,6 +12,8 @@
 //! - [`discovery`] -- listing search, comparison, and admissibility
 //!   resolution.
 
+#![forbid(unsafe_code)]
+
 pub use chio_core_types::capability::MonetaryAmount;
 pub use chio_core_types::{canonical_json_bytes, crypto, receipt};
 

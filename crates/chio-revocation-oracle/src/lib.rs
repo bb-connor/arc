@@ -1,5 +1,7 @@
 //! Revocation oracle primitives for Chio.
 
+#![forbid(unsafe_code)]
+
 pub mod api;
 pub mod epoch;
 pub mod freshness;

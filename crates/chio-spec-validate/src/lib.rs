@@ -29,6 +29,8 @@
 //! network. This is verified by the `http_ref_in_schema_does_not_fetch_network`
 //! test.
 
+#![forbid(unsafe_code)]
+
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};

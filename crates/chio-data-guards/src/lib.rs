@@ -30,6 +30,7 @@
 //! configurations deny, and invalid user-supplied regex configuration
 //! rejects policy loading or constructs a deny-all guard.
 
+#![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
 
 pub mod config;

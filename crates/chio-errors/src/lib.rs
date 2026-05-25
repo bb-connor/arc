@@ -1,3 +1,11 @@
+//! Typed Chio error codes and diagnostics.
+//!
+//! Defines the canonical error `Code`/`Domain`/`Severity` taxonomy, the
+//! `ChioError` diagnostic type, lookups over the generated error-code table, and
+//! a JSON-RPC bridge for surfacing errors on the wire.
+
+#![forbid(unsafe_code)]
+
 pub mod _generated;
 mod code;
 mod diagnostic;

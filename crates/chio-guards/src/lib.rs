@@ -37,6 +37,7 @@
 //! kernel.add_guard(Box::new(pipeline));
 //! ```
 
+#![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
 
 pub mod action;

@@ -13,6 +13,8 @@
 //! - [`local_account`] -- in-memory account that signs IOU envelopes.
 //! - [`store_binding`] -- durable-store trait for persisting IOU envelopes.
 
+#![forbid(unsafe_code)]
+
 pub use chio_appraisal as appraisal;
 pub use chio_core_types::{capability, crypto, receipt};
 pub use chio_underwriting as underwriting;

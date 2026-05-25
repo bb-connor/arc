@@ -12,6 +12,8 @@
 //! implementations now live in dedicated crates. This crate preserves the
 //! historical `chio_core::*` surface by re-exporting those extracted crates.
 
+#![forbid(unsafe_code)]
+
 pub use chio_appraisal as appraisal;
 pub use chio_autonomy as autonomy;
 pub use chio_core_types::canonical;

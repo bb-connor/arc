@@ -1,3 +1,11 @@
+//! Oracle runtime for Chio cross-currency budget enforcement.
+//!
+//! Reads price feeds (Chainlink, Pyth) behind a pluggable backend, caches and
+//! monitors them, applies circuit-breaker thresholds, and converts amounts
+//! across currencies to back budget enforcement with signed conversion evidence.
+
+#![forbid(unsafe_code)]
+
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;

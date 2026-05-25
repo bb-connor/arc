@@ -22,6 +22,8 @@
 //! - [`encrypted_blob`] / [`memory_provenance_store`] / [`evidence_export`] --
 //!   encrypted payloads, memory provenance, and evidence export.
 
+#![forbid(unsafe_code)]
+
 pub mod approval_store;
 pub mod authority;
 pub mod batch_approval_store;

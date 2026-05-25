@@ -13,6 +13,8 @@
 //! - [`premium`] -- premium pricing, risk multipliers, and decline floors.
 //! - [`marketplace_limits`] -- reputation-tiered marketplace credit limits.
 
+#![forbid(unsafe_code)]
+
 pub use chio_appraisal as appraisal;
 pub use chio_core_types::{canonical, capability, crypto, receipt};
 
