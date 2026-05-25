@@ -7,9 +7,8 @@
 //! drivers we have available natively (the in-process Rust kernel and
 //! the WASM browser kernel via its native non-wasm test path), asserts
 //! tuple equality across drivers, and surfaces any divergence as a
-//! test failure. The CI workflow `.github/workflows/verdict-matrix.yml`
-//! flips the verdict-matrix gate to `required: true` once this test is
-//! green; PRs that diverge fail the matrix gate.
+//! test failure. The cross-language divergence gate is enforced by
+//! running this test in CI; PRs whose driver tuples diverge fail it.
 //!
 //! The Python, TS node-http, and Go drivers are not invoked in-process
 //! here (they run in their own gate jobs and report tuples via their
@@ -28,7 +27,6 @@
 //! to-end against the real corpus.
 
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use chio_core::capability::{
@@ -59,7 +57,6 @@ const EXPIRES_AT: u64 = 1_700_100_000;
 const REASON_NONE: &str = "urn:chio:error:none";
 const REASON_SCOPE_EXCEEDED: &str = "urn:chio:error:capability:scope-exceeded";
 const REASON_KERNEL_INTERNAL: &str = "urn:chio:error:kernel:internal-error";
-const WORKFLOW_PATH: &str = ".github/workflows/verdict-matrix.yml";
 
 fn verdict_matrix_root() -> PathBuf {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -68,21 +65,6 @@ fn verdict_matrix_root() -> PathBuf {
     } else {
         manifest_dir.join("verdict_matrix")
     }
-}
-
-fn repo_root() -> PathBuf {
-    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let mut candidate: Option<&Path> = Some(manifest_dir);
-    while let Some(dir) = candidate {
-        if dir.join(WORKFLOW_PATH).is_file() {
-            return dir.to_path_buf();
-        }
-        candidate = dir.parent();
-    }
-    panic!(
-        "failed to find repo root from CARGO_MANIFEST_DIR {}",
-        manifest_dir.display()
-    );
 }
 
 fn load_manifest_and_corpus() -> (VerdictMatrixManifest, Vec<VerdictScenario>) {
@@ -389,24 +371,6 @@ fn wasm_browser_report_covers_capability_subset_only() {
     }
 }
 
-#[test]
-fn workflow_advertises_required_on_divergence_gate() {
-    // The divergence gate requires the workflow to declare `required: true`
-    // so the cross-language oracle is enforced on PR merges. This check
-    // mirrors the YAML gate in the `verdict-matrix.yml` workflow so the
-    // assertion lives next to the test that it gates.
-    let workflow_path = repo_root().join(WORKFLOW_PATH);
-    let raw = match fs::read_to_string(&workflow_path) {
-        Ok(raw) => raw,
-        Err(error) => panic!(
-            "failed to read workflow {}: {error}",
-            workflow_path.display()
-        ),
-    };
-    assert!(
-        raw.contains("required: true"),
-        "verdict-matrix workflow at {} must advertise `required: true` for the \
-         cross-language gate",
-        workflow_path.display(),
-    );
-}
+// The cross-language divergence gate is enforced by running this test in CI;
+// it is no longer tied to a dedicated workflow file (the milestone-era
+// verdict-matrix.yml gate workflow was removed).

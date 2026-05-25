@@ -16,9 +16,8 @@
 //! still requires that the manifest's `drivers.required` list (which
 //! pins `rust-kernel`) produces tuples for every scenario.
 //!
-//! The CI workflow `.github/workflows/verdict-matrix.yml` flips its
-//! gate to `required: true` once this oracle ships; any divergence in
-//! the cross-language tuple set fails the PR check. See
+//! The cross-language divergence gate runs this oracle in CI; any
+//! divergence in the cross-language tuple set fails the PR check. See
 //! `docs/conformance/verdict-matrix.md` for the runbook.
 
 use std::collections::{BTreeMap, BTreeSet};

@@ -136,26 +136,17 @@ cargo test -p chio-conformance --test verdict_matrix_cross_language --quiet
 cd sdks/python/chio-sdk-python && python -m pytest tests/test_verdict_matrix.py -q
 cd ../../go/chio-go-http && go test -run VerdictMatrix ./...
 cd ../../..
-test -f .github/workflows/verdict-matrix.yml
 test -f docs/conformance/verdict-matrix.md
 python3 - <<'PY'
 from pathlib import Path
 
-workflow = Path(".github/workflows/verdict-matrix.yml").read_text()
 docs = Path("docs/conformance/verdict-matrix.md").read_text()
 cross_language = "verdict_matrix_" + "cross_language"
-workflow_command = (
-    "run: cargo test -p chio-conformance --test "
-    + cross_language
-    + " --quiet"
-)
 docs_command = (
     "cargo test -p chio-conformance --test "
     + cross_language
     + " --quiet"
 )
-if workflow_command not in workflow:
-    raise SystemExit("cross-language verdict-matrix workflow step is missing")
 if docs_command not in docs:
     raise SystemExit("cross-language verdict-matrix docs gate is missing")
 PY
