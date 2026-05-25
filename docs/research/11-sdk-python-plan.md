@@ -1,5 +1,8 @@
 # Python SDK Plan
 
+> Historical, pre-rename design note. Paths and names below (for example `packages/sdk/arc-py`) reflect the original ARC-era plan and are kept as a record; they are not current.
+> The Python SDK shipped as `chio-sdk` (module `chio`) at `sdks/python/chio-py`.
+
 ## Goal
 
 Build a Python SDK that is strong enough to replace the current Python conformance peer and later serve as the maintained Python client for the ARC edge.

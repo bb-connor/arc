@@ -1,5 +1,8 @@
 # Go SDK Plan
 
+> Historical, pre-rename design note. Paths and names below (for example `packages/sdk/arc-go`) reflect the original ARC-era plan and are kept as a record; they are not current.
+> The Go SDK shipped as `chio-go` at `sdks/go/chio-go`, with the wire client `chio-go-http` at `sdks/go/chio-go-http`.
+
 ## Goal
 
 Build a Go SDK that is installable and usable for remote-edge interaction without requiring CGO, while leaving room for a narrow optional native bridge later.

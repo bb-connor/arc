@@ -1,5 +1,8 @@
 # TypeScript SDK Plan
 
+> Historical, pre-rename design note. Paths and names below (for example `packages/sdk/arc-ts`) reflect the original ARC-era plan and are kept as a record; they are not current.
+> The TypeScript SDK shipped as `@chio-protocol/sdk` at `sdks/typescript/chio-ts`.
+
 ## Goal
 
 Build a TypeScript SDK that is good enough to replace the current JS conformance peer code and then grow into the maintained JS/TS client surface for the ARC edge.
