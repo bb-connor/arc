@@ -1,6 +1,7 @@
 # Chio C++ SDK Family Release Checklist
 
-The Chio C++ surface ships as four sibling packages under `packages/sdk/`:
+The Chio C++ surface ships as four sibling packages: the host SDKs under
+`sdks/cpp/` and the WASM guard guest under `sdks/guard/`:
 
 | SDK              | CMake target                       | Conan ref            | vcpkg name        |
 |------------------|------------------------------------|----------------------|-------------------|

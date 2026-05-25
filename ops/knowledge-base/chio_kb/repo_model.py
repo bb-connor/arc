@@ -17,7 +17,6 @@ SOURCE_ROOTS = (
     "docs",
     "spec",
     "examples",
-    "packages",
     "sdks",
     "integrations",
     "tests",
@@ -455,8 +454,6 @@ def crate_for_path(path: str) -> str:
 
 def package_for_path(path: str) -> str:
     parts = pathlib.PurePath(path).parts
-    if len(parts) >= 3 and parts[0] == "packages":
-        return "/".join(parts[:3])
     if len(parts) >= 2 and parts[0] == "sdks":
         return "/".join(parts[:2])
     return ""
@@ -473,8 +470,6 @@ def nearest_manifest_for_path(path: str) -> str:
         return f"tests/{parts[1]}/Cargo.toml"
     if len(parts) >= 2 and parts[0] in {"examples", "bench", "integrations", "formal"}:
         return f"{parts[0]}/{parts[1]}/Cargo.toml"
-    if len(parts) >= 3 and parts[0] == "packages":
-        return f"{parts[0]}/{parts[1]}/{parts[2]}/package.json"
     if len(parts) >= 2 and parts[0] == "sdks":
         return f"{parts[0]}/{parts[1]}"
     return ""
@@ -522,7 +517,7 @@ def validation_command_for_path(path: str) -> str:
         return "cargo test -p chio-conformance"
     if norm.startswith("docs/"):
         return "make kb-eval"
-    if norm.startswith("sdks/typescript/") or norm.startswith("packages/"):
+    if norm.startswith("sdks/typescript/"):
         return "npm test"
     if norm.startswith("sdks/python/"):
         return "pytest"

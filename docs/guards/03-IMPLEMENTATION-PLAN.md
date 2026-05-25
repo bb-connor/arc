@@ -73,10 +73,10 @@ crates/
 
 For non-Rust languages (TypeScript, Python, Go), the guest SDK will be
 language-specific packages that generate the same ABI exports. These live in
-`packages/sdk/`:
+`sdks/guard/`:
 
 ```
-packages/sdk/
+sdks/guard/
   chio-guard-ts/          # AssemblyScript / ts2wasm guard SDK
   chio-guard-py/          # componentize-py or Extism PDK for Python
   chio-guard-go/          # TinyGo guard SDK
