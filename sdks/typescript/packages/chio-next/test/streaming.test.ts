@@ -24,7 +24,7 @@ function authorizedAllow() {
   };
 }
 
-describe("@chio/next streaming and denial response", () => {
+describe("@chio-protocol/next streaming and denial response", () => {
   it("returns allowed streaming responses by reference", async () => {
     const stream = new ReadableStream();
     const response = new Response(stream);

@@ -43,7 +43,7 @@ function freshGlobals(): { restoreFetch: () => void } {
   };
 }
 
-describe('@chio/passkey demo e2e', () => {
+describe('@chio-protocol/passkey demo e2e', () => {
   let env: { restoreFetch: () => void };
   let state: RevocationState;
 

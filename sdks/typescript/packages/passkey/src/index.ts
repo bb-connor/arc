@@ -1,4 +1,4 @@
-// @chio/passkey
+// @chio-protocol/passkey
 //
 // Browser helper for the hardware-custody flow. The package presents a
 // passkey assertion to a server-side issuer (the only authority that holds

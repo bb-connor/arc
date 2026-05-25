@@ -75,7 +75,7 @@ function ensureNavigator(): void {
   }
 }
 
-describe('@chio/passkey revocation cascade', () => {
+describe('@chio-protocol/passkey revocation cascade', () => {
   let state: RevocationState;
   let originalFetch: typeof fetch;
   let clock: Clock;

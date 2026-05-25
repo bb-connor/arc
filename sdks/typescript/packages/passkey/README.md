@@ -1,4 +1,4 @@
-# @chio/passkey
+# @chio-protocol/passkey
 
 Browser helper for the Chio hardware-custody flow.
 

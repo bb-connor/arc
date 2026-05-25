@@ -2,7 +2,7 @@
 // stub receipt into the local sink. The evaluator is static by default;
 // swap it for a sidecar call without changing the route handler shape.
 
-import type { ChioRouteEvaluation } from "@chio/next";
+import type { ChioRouteEvaluation } from "@chio-protocol/next";
 import { getLocalReceiptSink } from "./local-sink.js";
 
 let sequence = 0;
