@@ -64,71 +64,80 @@ pub enum SanitizationAction {
 }
 
 fn default_patterns() -> Vec<SensitivePattern> {
-    let mut patterns = Vec::new();
+    // (regex, name, level, redaction) for each built-in PII/PHI detector.
+    let specs: [(&str, &str, SensitivityLevel, &str); 7] = [
+        (
+            r"\b\d{3}-\d{2}-\d{4}\b",
+            "SSN",
+            SensitivityLevel::High,
+            "[SSN REDACTED]",
+        ),
+        (
+            r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
+            "email",
+            SensitivityLevel::Medium,
+            "[EMAIL REDACTED]",
+        ),
+        (
+            r"\b(?:\(\d{3}\)\s*|\d{3}[-.])\d{3}[-.]?\d{4}\b",
+            "phone",
+            SensitivityLevel::Low,
+            "[PHONE REDACTED]",
+        ),
+        (
+            r"\b(?:\d{4}[-\s]?){3}\d{4}\b",
+            "credit-card",
+            SensitivityLevel::High,
+            "[CARD REDACTED]",
+        ),
+        (
+            r"\b(?:\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2})\b",
+            "date-of-birth",
+            SensitivityLevel::Low,
+            "[DATE REDACTED]",
+        ),
+        (
+            r"\bMRN[:\s#]*\d{6,12}\b",
+            "MRN",
+            SensitivityLevel::High,
+            "[MRN REDACTED]",
+        ),
+        (
+            r"\b[A-Z]\d{2}(?:\.\d{1,4})?\b",
+            "ICD-10",
+            SensitivityLevel::Medium,
+            "[ICD REDACTED]",
+        ),
+    ];
 
-    if let Ok(regex) = Regex::new(r"\b\d{3}-\d{2}-\d{4}\b") {
-        patterns.push(SensitivePattern {
-            name: "SSN".to_string(),
-            regex,
-            level: SensitivityLevel::High,
-            redaction: "[SSN REDACTED]".to_string(),
-        });
+    let mut patterns = Vec::with_capacity(specs.len());
+    for (pattern, name, level, redaction) in specs {
+        match compile_required_pattern(pattern) {
+            Ok(regex) => patterns.push(SensitivePattern {
+                name: name.to_string(),
+                regex,
+                level,
+                redaction: redaction.to_string(),
+            }),
+            Err(_) => {
+                // Fail closed: a built-in constant pattern failed to compile.
+                // Shipping the reduced set would let that PII/PHI category
+                // through, so redact every response instead (the simple-guard
+                // analogue of the OutputSanitizer fail-closed path). The
+                // catch-all is itself a constant, so its fallback is
+                // unreachable in practice.
+                if let Ok(catch_all) = compile_required_pattern(r"[\s\S]+") {
+                    return vec![SensitivePattern {
+                        name: "redaction_unavailable_fail_closed".to_string(),
+                        regex: catch_all,
+                        level: SensitivityLevel::High,
+                        redaction: "[REDACTED]".to_string(),
+                    }];
+                }
+                return patterns;
+            }
+        }
     }
-
-    if let Ok(regex) = Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b") {
-        patterns.push(SensitivePattern {
-            name: "email".to_string(),
-            regex,
-            level: SensitivityLevel::Medium,
-            redaction: "[EMAIL REDACTED]".to_string(),
-        });
-    }
-
-    if let Ok(regex) = Regex::new(r"\b(?:\(\d{3}\)\s*|\d{3}[-.])\d{3}[-.]?\d{4}\b") {
-        patterns.push(SensitivePattern {
-            name: "phone".to_string(),
-            regex,
-            level: SensitivityLevel::Low,
-            redaction: "[PHONE REDACTED]".to_string(),
-        });
-    }
-
-    if let Ok(regex) = Regex::new(r"\b(?:\d{4}[-\s]?){3}\d{4}\b") {
-        patterns.push(SensitivePattern {
-            name: "credit-card".to_string(),
-            regex,
-            level: SensitivityLevel::High,
-            redaction: "[CARD REDACTED]".to_string(),
-        });
-    }
-
-    if let Ok(regex) = Regex::new(r"\b(?:\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2})\b") {
-        patterns.push(SensitivePattern {
-            name: "date-of-birth".to_string(),
-            regex,
-            level: SensitivityLevel::Low,
-            redaction: "[DATE REDACTED]".to_string(),
-        });
-    }
-
-    if let Ok(regex) = Regex::new(r"\bMRN[:\s#]*\d{6,12}\b") {
-        patterns.push(SensitivePattern {
-            name: "MRN".to_string(),
-            regex,
-            level: SensitivityLevel::High,
-            redaction: "[MRN REDACTED]".to_string(),
-        });
-    }
-
-    if let Ok(regex) = Regex::new(r"\b[A-Z]\d{2}(?:\.\d{1,4})?\b") {
-        patterns.push(SensitivePattern {
-            name: "ICD-10".to_string(),
-            regex,
-            level: SensitivityLevel::Medium,
-            redaction: "[ICD REDACTED]".to_string(),
-        });
-    }
-
     patterns
 }
 
@@ -1425,6 +1434,14 @@ fn detect_service_account_object(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn default_patterns_compile_to_full_set() {
+        // Every built-in constant pattern must compile; a regression that
+        // breaks one must fail CI here rather than silently shrink the
+        // detector set at runtime.
+        assert_eq!(default_patterns().len(), 7);
+    }
 
     // ---- Legacy API tests ----
 

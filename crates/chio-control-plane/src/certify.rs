@@ -2486,7 +2486,7 @@ mod tests {
             peer_roles: vec![PeerRole::ClientToChioServer],
             deployment_modes: vec![DeploymentMode::WrappedStdio],
             required_capabilities: RequiredCapabilities::default(),
-            tags: vec!["wave1".to_string()],
+            tags: vec!["core".to_string()],
             expected: ResultStatus::Pass,
             timeout_ms: None,
             notes: None,

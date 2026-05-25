@@ -182,7 +182,7 @@ fn write_scenario(dir: &Path, id: &str) {
   "peerRoles": ["client_to_chio_server"],
   "deploymentModes": ["wrapped_stdio"],
   "requiredCapabilities": {{"server": [], "client": []}},
-  "tags": ["wave1"],
+  "tags": ["core"],
   "expected": "pass"
 }}"#
         ),

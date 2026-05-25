@@ -48,7 +48,7 @@ fn make_kernel(issuer: Keypair) -> ChioKernel {
         keypair: issuer,
         ca_public_keys: vec![],
         max_delegation_depth: 5,
-        policy_hash: "wave1-hot-path-test-policy".to_string(),
+        policy_hash: "hot-path-test-policy".to_string(),
         allow_sampling: false,
         allow_sampling_tool_use: false,
         allow_elicitation: false,

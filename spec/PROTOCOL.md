@@ -429,7 +429,7 @@ MUST document the omission alongside the surface helper. The
 The W1.1 chain-binding fixture asserts the pre-admit pass MUST; the W1.2
 sibling-sum admit MUST is asserted by the hosted-dispatch admit fixtures (e.g.
 `budget_split_cross_hop_rejects_amplification.rs`,
-`wave1_hot_path_enforcement.rs`). Both rejection paths surface
+`hot_path_enforcement.rs`). Both rejection paths surface
 `CapabilityError::AttenuationViolation` with the offending hashes
 formatted as hex. The check costs a single hash comparison on the
 happy path and runs after the basic signature, time, and crypto-floor
