@@ -1,4 +1,4 @@
-// Top-level glue for the `arc mcp wrap` subcommand.
+// Top-level glue for the `chio mcp wrap` subcommand.
 //
 // Per the workspace `include!()` pattern (mirrors `cli/replay.rs` +
 // `cli/replay/*.rs`), this file is `include!`-d from `src/main.rs` and in
@@ -13,7 +13,7 @@ use super::*;
 
 use chio_mcp_adapter::McpTransport as _;
 
-/// Dispatch entry-point for `arc mcp wrap`.
+/// Dispatch entry-point for `chio mcp wrap`.
 ///
 /// Wrapper-side of the native MCP adapter surface (`chio-mcp-adapter` and
 /// `chio-hosted-mcp`). It runs the verdict gate over `tools/call`,

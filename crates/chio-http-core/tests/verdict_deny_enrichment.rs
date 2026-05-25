@@ -1,4 +1,4 @@
-//! Phase 0.5 integration coverage for the `Verdict::Deny` enrichment.
+//! Integration coverage for the `Verdict::Deny` enrichment.
 //!
 //! These tests verify three properties end-to-end at the HTTP-layer boundary:
 //!

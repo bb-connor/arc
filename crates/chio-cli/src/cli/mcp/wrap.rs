@@ -1,4 +1,4 @@
-// `arc mcp wrap` -- stdio child orchestration with verdict gating per
+// `chio mcp wrap` -- stdio child orchestration with verdict gating per
 // `tools/call`.
 //
 // Flow:
@@ -39,7 +39,7 @@ pub(crate) enum WrapVerdict {
 }
 
 /// Verdict gate consumed by [`run_wrap_with_gate`]. The default gate
-/// applied by `arc mcp wrap` infers per-tool scopes from `tools/list`
+/// applied by `chio mcp wrap` infers per-tool scopes from `tools/list`
 /// and denies any tool that is not yet promoted in the user's manifest.
 pub(crate) trait VerdictGate {
     fn evaluate(&self, tool_name: &str, arguments: &serde_json::Value) -> WrapVerdict;
@@ -67,7 +67,7 @@ impl VerdictGate for ManifestVerdictGate {
     }
 }
 
-/// CLI argument bundle for `arc mcp wrap`.
+/// CLI argument bundle for `chio mcp wrap`.
 #[derive(clap::Args, Debug)]
 pub(crate) struct McpWrapArgs {
     /// Server ID to assign to the wrapped MCP server inside the inferred

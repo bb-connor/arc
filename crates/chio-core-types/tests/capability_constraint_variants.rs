@@ -1,4 +1,5 @@
-//! Serde and construction tests for Phase 2.2 `Constraint` variants.
+//! Serde and construction tests for `Constraint` variants (data-layer, communication,
+//! financial, model-routing, and memory-governance kinds).
 //!
 //! These exercise the data-layer, communication, financial,
 //! model-routing, and memory-governance variants added per
@@ -184,7 +185,7 @@ fn memory_write_deny_patterns_roundtrips() {
     assert_eq!(roundtrip(constraint.clone()), constraint);
 }
 
-/// Phase 2.3: `ModelMetadata` carries the calling model's identity and
+/// `ModelMetadata` carries the calling model's identity and
 /// safety tier on `ToolCallRequest`. It must round-trip through serde
 /// so wire edges (HTTP, A2A, MCP) can transport it verbatim.
 #[test]
@@ -235,7 +236,7 @@ fn model_metadata_accepts_legacy_payload_without_optional_fields() {
 }
 
 /// Existing variants must still decode from their on-wire form after
-/// adding the Phase 2.2 variants, proving additive compatibility.
+/// adding the new `Constraint` variants, proving additive compatibility.
 #[test]
 fn existing_path_prefix_still_deserializes() {
     let value = json!({

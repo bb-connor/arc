@@ -443,7 +443,7 @@ pub(crate) enum Commands {
 
     /// Bind a provider under a signed model card.
     ///
-    /// `arc bind <provider> --card <path>` loads the model card from
+    /// `chio bind <provider> --card <path>` loads the model card from
     /// `<path>` (canonical-JSON encoded per spec/schemas/model-card.v1.json),
     /// validates its structural shape, and prints the resolved
     /// `weights_hash` and `allowed_capability_set` so an operator can sanity
@@ -872,7 +872,7 @@ pub struct TrafficArgs {
 
 /// Settle subcommands. Currently exposes a single `status` surface;
 /// further verbs (e.g. `clear`, `replay`) can attach here without
-/// breaking the `arc settle status` contract.
+/// breaking the `chio settle status` contract.
 #[derive(Subcommand)]
 pub(crate) enum SettleCommands {
     /// Show pending IOU envelopes, settled receipts, and dead-lettered
@@ -891,7 +891,7 @@ pub(crate) enum SettleCommands {
     },
 }
 
-/// `arc lineage` subcommands. Surfaces three verbs that the underlying
+/// `chio lineage` subcommands. Surfaces three verbs that the underlying
 /// library and tests share.
 #[derive(Subcommand)]
 pub(crate) enum LineageCommands {
@@ -1144,7 +1144,7 @@ pub(crate) enum GuardCommands {
     },
 }
 
-/// Subcommands under `arc guard market`.
+/// Subcommands under `chio guard market`.
 #[derive(Subcommand)]
 pub(crate) enum GuardMarketCommands {
     /// List guards visible to the tenant under the tenant's reputation

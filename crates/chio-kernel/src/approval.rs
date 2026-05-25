@@ -6,7 +6,7 @@
 //! HTTP surface after a human responds. The design follows
 //! `docs/protocols/HUMAN-IN-THE-LOOP-PROTOCOL.md`.
 //!
-//! Scope note (deviation documented in the phase report): the existing
+//! Design note: the existing
 //! `crate::runtime::Verdict` is `Copy` and threaded through 5,000+ lines
 //! of kernel code. Rather than ripple a breaking change through every
 //! call site, this module exposes a richer [`HitlVerdict`] that carries

@@ -1828,7 +1828,7 @@ that operators later persist.
 `POST /v1/underwriting/decisions/issue` signs and persists that durable
 underwriting artifact. The signed decision envelope carries:
 
-- one immutable decision artifact over the phase-50 evaluation snapshot
+- one immutable decision artifact over the underwriting evaluation snapshot
 - one explicit lifecycle and review state at issuance time
 - one budget recommendation in the bounded vocabulary
   `preserve`/`reduce`/`hold`/`deny`

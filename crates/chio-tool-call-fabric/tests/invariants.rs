@@ -340,15 +340,14 @@ proptest! {
 
     /// (h) Schema subsumption against the canonical capability schema.
     ///
-    /// Soft-dep: the canonical `chio-tool-call-fabric.v1` schema is not yet
-    /// vendored into the workspace. Until it is, this
-    /// property runs as a structural self-check: every arbitrary
-    /// `ToolInvocation` must canonicalise to a JSON object with the four
-    /// load-bearing fields (`provider`, `tool_name`, `arguments`,
-    /// `provenance`), and the `provenance` sub-object must carry the five
-    /// load-bearing fields (`provider`, `request_id`, `api_version`,
-    /// `principal`, `received_at`). When the canonical schema lands the test
-    /// will be promoted to a real jsonschema validation behind the
+    /// Schema note: the canonical `chio-tool-call-fabric.v1` schema is not yet
+    /// vendored into the workspace. Until it is, this property runs as a
+    /// structural self-check: every arbitrary `ToolInvocation` must canonicalise
+    /// to a JSON object with the four load-bearing fields (`provider`,
+    /// `tool_name`, `arguments`, `provenance`), and the `provenance` sub-object
+    /// must carry the five load-bearing fields (`provider`, `request_id`,
+    /// `api_version`, `principal`, `received_at`). When the schema is vendored
+    /// the test can be promoted to real jsonschema validation behind the
     /// `schema-subsumption` cargo feature.
     #[test]
     fn invariant_h_schema_subsumption_self_check(inv in arb_tool_invocation()) {

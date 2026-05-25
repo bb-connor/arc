@@ -1,4 +1,4 @@
-//! Phase 19.1 -- HTTP handler for `POST /compliance/score`.
+//! HTTP handler for `POST /compliance/score`.
 //!
 //! The handler is substrate-agnostic: adapters feed in raw request
 //! bytes, the handler parses them into a [`ComplianceScoreRequest`],

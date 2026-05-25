@@ -209,7 +209,7 @@ fn frame_from_receipt(
         "receipt_id": receipt.receipt.id,
     });
     Frame::build(FrameInputs {
-        event_id: format!("01M08ARENA{index:016}"),
+        event_id: format!("01ARENA000{index:016}"),
         ts: scenario.virtual_clock_start.clone(),
         tee_id: "arena-p1".to_string(),
         upstream: Upstream {

@@ -16,10 +16,10 @@
 //! the success criterion in `spec/PROTOCOL.md`.
 //!
 //! As a side-effect, the harness writes a structured JSONL receipt log
-//! to a temp path captured by a `RECEIPT_LOG_PATH` env var so the
-//! companion T2 receipt-chain-proof test can walk it and assert that
-//! every allow receipt has `seen_epoch < revoke_epoch`. The two tests
-//! share their on-disk schema via `tests/common/mod.rs`.
+//! to a temp path. The companion receipt-chain-proof test builds its own
+//! self-contained log and asserts that every allow receipt has
+//! `seen_epoch < revoke_epoch`. The two tests share their on-disk schema
+//! via `tests/common/mod.rs`.
 
 #[path = "common/mod.rs"]
 mod common;
@@ -314,12 +314,8 @@ fn elapsed_us(started: Instant) -> u64 {
 fn three_tier_swarm_revoke_to_deny_under_500ms_median() {
     // Receipt log lives under target/ so test artifacts survive the
     // run for the T2 verifier to walk.
-    let log_path = std::env::temp_dir().join("chio-m04-p5-receipt-log.jsonl");
+    let log_path = std::env::temp_dir().join("chio-revocation-e2e-receipt-log.jsonl");
     let log = ReceiptLog::create(&log_path).expect("open receipt log");
-
-    // Stamp the env var so T2 (or a later debugger) can locate the
-    // log without hard-coding the path.
-    std::env::set_var("CHIO_M04_P5_RECEIPT_LOG", &log_path);
 
     log.write_header(TRIALS, MEDIAN_BUDGET_MS as u64);
 

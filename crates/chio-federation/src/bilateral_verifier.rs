@@ -4,9 +4,7 @@
 //!
 //! ## Partial-verifier scope
 //!
-//! This module previously self-described as a "full verifier" and
-//! implied full §7 conformance. The
-//! implementation does not yet cover the full predicate schema:
+//! The implementation does not yet cover the full predicate schema:
 //!
 //!   - `BilateralPredicate` is intentionally not the strict Chio
 //!     predicate: it is missing required fields the spec
@@ -16,8 +14,6 @@
 //!   - The error mapping conflates parseable-but-schema-malformed
 //!     Statement JSON with `dsse.malformed` rather than the spec's
 //!     `statement.malformed`.
-//!   - The receipt digest binding shape was wrong in an earlier
-//!     revision, now fixed in `bilateral_dsse::build_statement`.
 //!
 //! This verifier is labeled as a **partial local verifier**: it
 //! implements the structural / cryptographic core
@@ -2043,13 +2039,9 @@ mod tests {
         revocation_oracle: &'a dyn RevocationOracle,
         now_ms: u64,
     ) -> VerifierConfig<'a> {
-        // Strict-default helper: the helper now returns the strict default
-        // (`UnknownActionClassPolicy::Reject`) and pre-registers the
-        // tool exercised by `fixture` (`file_read`) as `Routine`. The
-        // happy-path test must pass under the production-shape policy
-        // rather than relying on the legacy `DefaultRoutine` fallback.
-        // Negative tests that exercise the strict-mode rejection or
-        // the receipt-backed class path mutate `action_classes` /
+        // The happy-path test uses UnknownActionClassPolicy::Reject (the production default)
+        // with `file_read` pre-registered as Routine. Negative tests that exercise
+        // strict-mode rejection or receipt-backed classes mutate `action_classes` /
         // `unknown_action_class_policy` explicitly.
         let mut action_classes = BTreeMap::new();
         action_classes.insert("file_read".to_string(), ActionClassKind::Routine);

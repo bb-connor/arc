@@ -245,7 +245,7 @@ fn no_allow_receipt_after_revoke_epoch() {
     // not depend on T1 having run beforehand. We use a per-pid temp
     // path so parallel `cargo test` invocations do not race.
     let log_path: PathBuf = std::env::temp_dir().join(format!(
-        "chio-m04-p5-receipt-chain-{}.jsonl",
+        "chio-revocation-chain-{}.jsonl",
         std::process::id()
     ));
     let log = ReceiptLog::create(&log_path).expect("open receipt log");

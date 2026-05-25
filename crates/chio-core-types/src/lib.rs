@@ -1,7 +1,7 @@
-//! Shared Chio substrate types extracted from `chio-core`.
-//!
-//! This crate holds the protocol-wide types that should remain stable while
-//! heavier domain crates split away from the compatibility facade.
+//! Core Chio protocol types: capabilities, receipts, crypto primitives, and
+//! canonical JSON. This crate is `no_std + alloc` compatible; heavier domain
+//! crates (`chio-core`, `chio-appraisal`, etc.) re-export these types with
+//! additional features layered on top.
 //!
 //! # no_std support
 //!

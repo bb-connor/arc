@@ -1,4 +1,4 @@
-// IDE config blob renderer for `arc mcp wrap --emit-config <target>`.
+// IDE config blob renderer for `chio mcp wrap --emit-config <target>`.
 //
 // Each IDE has its own schema; the rendered JSON is canonical (sorted
 // keys via `serde_json::to_string_pretty`) and the schema version is

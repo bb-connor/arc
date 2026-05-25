@@ -34,7 +34,7 @@ fn chio_cli_binary() -> PathBuf {
 
 #[test]
 fn preset_yaml_is_shipped_in_crate_source() {
-    // Ensures Phase 4.2's bundled YAML stays reachable from the crate
+    // Ensures the bundled YAML stays reachable from the crate
     // source tree; the Python SDK's default_policy.yaml must stay
     // byte-identical with this file.
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

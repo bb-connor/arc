@@ -1,4 +1,4 @@
-//! `arc lineage {query,diff,roots}` CLI surface.
+//! `chio lineage {query,diff,roots}` CLI surface.
 //!
 //! - `query` runs a forward or reverse query starting from a seed node id
 //!   on a fixture lineage JSON dump. The dump is the same format the

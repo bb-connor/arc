@@ -7,9 +7,8 @@
 //! [`BlockingToolEvaluator`] remains for compatibility surfaces that
 //! intentionally enter the synchronous bridge.
 //!
-//! This migration is a containment slice, not the final durable async
-//! architecture. The kernel still needs a later cancellation-safe finalization
-//! design for futures dropped after budget admission or tool dispatch.
+//! The synchronous bridge path is not cancellation-safe for futures dropped
+//! after budget admission or tool dispatch; that gap is a known open item.
 
 use crate::kernel::ChioKernel;
 use crate::{

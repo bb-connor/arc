@@ -1,6 +1,6 @@
 # chio-conformance
 
-Cross-language conformance harness for the Chio (formerly ARC) agent
+Cross-language conformance harness for the Chio agent
 protocol. The crate exposes a Rust library plus a small bin set that loads
 JSON scenario descriptors, drives peer implementations against the Chio
 HTTP edge, and renders a Markdown compatibility report.

@@ -71,7 +71,7 @@ std = [
 fips = ["dep:aws-lc-rs", "std"]
 pq = ["dep:fips204"]
 # Recursive-delegation primitive retained as a compatibility feature name.
-# The T1.1 wire primitive is now always available, including no-default
+# The recursive-delegation wire primitive is now always available, including no-default
 # builds; this feature is a no-op for downstream manifests that still enable it.
 delegation = []
 # Backward-compatibility alias for the legacy `delegation_v2` feature name.

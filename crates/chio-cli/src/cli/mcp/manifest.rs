@@ -1,4 +1,4 @@
-// Default-deny manifest scaffold renderer for `arc mcp wrap`.
+// Default-deny manifest scaffold renderer for `chio mcp wrap`.
 //
 // Emits a TOML scaffold that the user reviews before promoting. The
 // scaffold lives at `~/.config/chio/mcp/<server-id>.toml` by convention;
@@ -92,7 +92,7 @@ pub(crate) fn load_manifest_allowlist(
 }
 
 /// Print the inferred manifest scaffold to stdout. Used by
-/// `arc mcp wrap --print-scopes`.
+/// `chio mcp wrap --print-scopes`.
 pub(crate) fn cmd_mcp_print_scopes(args: &McpWrapArgs) -> Result<(), CliError> {
     let tools = if let Some(fixture) = args.tools_fixture.as_ref() {
         load_tools_fixture(fixture)?

@@ -34,11 +34,7 @@ fn runtime_entrypoints_remain_decomposed_and_reexported() {
         "chio-cli main must not inline the trust-control runtime shell",
     );
 
-    // The pre-refactor crate-extraction pattern (#[path = "../../chio-cli/..."]
-    // splice from chio-hosted-mcp/chio-control-plane) was replaced by direct
-    // re-exports once chio-mcp-remote became a first-class workspace member.
-    // The current invariant is that chio-cli no longer inlines remote_mcp;
-    // ownership lives in chio-mcp-remote.
+    // chio-cli must not inline the remote_mcp module; ownership lives in chio-mcp-remote.
     let hosted_lib = read_repo_file("crates/chio-hosted-mcp/src/lib.rs");
     assert!(
         hosted_lib.contains("pub use chio_mcp_remote::{serve_http, RemoteServeHttpConfig};"),

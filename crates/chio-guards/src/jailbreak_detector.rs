@@ -15,8 +15,8 @@
 //!    layer-1 + layer-2 feature flags.  The weights are configurable so
 //!    operators can tune sensitivity without recompiling.
 //!
-//! The LLM-as-judge layer is intentionally deferred to v2.  See the
-//! [`LlmJudgeStub`] type and the `ml_score` function for the extension point.
+//! The LLM-as-judge layer is intentionally deferred.  See the
+//! `ml_score` function for the extension point.
 //!
 //! All thresholds and weights live on [`DetectorConfig`] and [`LayerWeights`].
 //! There are no magic numbers on the hot path; defaults are defined in this
@@ -374,8 +374,7 @@ impl JailbreakDetector {
         // score we then blend into the final verdict. The Chio `Guard` trait is
         // synchronous today, so this requires either a host-function reactor
         // (see chio-wasm-guards) or an async trait adapter through
-        // `AsyncGuardAdapter`. The `LlmJudgeStub` type below documents the
-        // intended shape.
+        // `AsyncGuardAdapter`.
 
         // ---- Blend the three layers ----
         let weights = self.config.layer_weights;
@@ -405,15 +404,6 @@ impl Default for JailbreakDetector {
         Self::new()
     }
 }
-
-/// Placeholder type documenting the future LLM-judge extension point.
-///
-/// In v2 this will become an async trait that a caller can implement to
-/// plug a host-provided LLM into the detection pipeline as a fourth layer.
-/// Carrying the shape as a unit struct keeps the signature stable for the
-/// eventual wiring without forcing any dependency today.
-#[doc(hidden)]
-pub struct LlmJudgeStub;
 
 /// Logistic sigmoid.
 fn sigmoid(x: f32) -> f32 {

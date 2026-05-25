@@ -15,11 +15,10 @@
 //! Failure mode: an `Err` returned from [`redact_payload`] MUST cause
 //! the tee to refuse persistence and emit `tee.redact_failed`.
 //!
-//! The crate is callable directly from native Rust today; a future
-//! ticket lights up the `wasm32-wasip2` `wit_bindgen::generate!`
-//! adapter that re-exports [`redact_payload`] as the `chio:guards/redact`
-//! guest export. The native types here are designed to mirror the WIT
-//! records 1:1 so the wasm bridge is mechanical.
+//! The crate is callable directly from native Rust today. The native types
+//! mirror the WIT records 1:1 so a future `wasm32-wasip2` `wit_bindgen::generate!`
+//! adapter re-exporting [`redact_payload`] as the `chio:guards/redact` guest
+//! export will be mechanical to add.
 
 use std::sync::LazyLock;
 use std::time::Instant;

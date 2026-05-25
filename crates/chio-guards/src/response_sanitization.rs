@@ -1443,7 +1443,7 @@ mod tests {
         assert_eq!(default_patterns().len(), 7);
     }
 
-    // ---- Legacy API tests ----
+    // ---- Simple (backwards-compatible) API tests ----
 
     #[test]
     fn guard_name() {

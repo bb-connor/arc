@@ -1643,7 +1643,7 @@ mod tests {
         assert!(matches!(err, KernelError::RequestIncomplete(_)));
     }
 
-    // ---- OAuth refresh placeholder tests ----
+    // ---- AdapterError display tests ----
 
     #[test]
     fn adapter_error_display_includes_structured_details() {

@@ -144,9 +144,6 @@ pub enum PolicyError {
     #[error("failed to serialize policy identity: {0}")]
     Json(#[from] serde_json::Error),
 
-    // Reserved for callers that want to distinguish semantic policy failures
-    // from parse/load errors when validation is surfaced separately.
-    #[allow(dead_code)]
     #[error("invalid policy: {0}")]
     Invalid(String),
 }

@@ -1,4 +1,4 @@
-//! `arc guard market {list,info,install}` CLI subcommands.
+//! `chio guard market {list,info,install}` CLI subcommands.
 //!
 //! The marketplace surface reuses the `chio-guard-registry` pull path
 //! for fetching artifacts. Listing and info read from a local
@@ -8,7 +8,7 @@
 //!
 //! The catalog format is intentionally simple: a JSON array of
 //! [`MarketCatalogEntry`] under the path resolved by
-//! `arc guard market --catalog <PATH>`. The end-to-end demo test writes
+//! `chio guard market --catalog <PATH>`. The end-to-end demo test writes
 //! this catalog directly. A production deployment refreshes the catalog
 //! by walking the OCI registry and indexing manifests; that loop is
 //! deliberately out of scope.
@@ -40,13 +40,13 @@ use chio_underwriting::{
 use serde::{Deserialize, Serialize};
 
 /// Schema string emitted on the wire for the JSON output of
-/// `arc guard market list`.
+/// `chio guard market list`.
 pub const MARKET_LIST_REPORT_SCHEMA: &str = "chio.market.list-report.v1";
 
-/// Schema string emitted on the wire for `arc guard market info` JSON.
+/// Schema string emitted on the wire for `chio guard market info` JSON.
 pub const MARKET_INFO_REPORT_SCHEMA: &str = "chio.market.info-report.v1";
 
-/// Schema string emitted on the wire for `arc guard market install` JSON.
+/// Schema string emitted on the wire for `chio guard market install` JSON.
 pub const MARKET_INSTALL_REPORT_SCHEMA: &str = "chio.market.install-report.v1";
 
 /// One entry in the local marketplace catalog.
@@ -84,7 +84,7 @@ pub struct MarketTenantContext {
     pub currency: String,
 }
 
-/// Local installation record persisted by `arc guard market install`.
+/// Local installation record persisted by `chio guard market install`.
 ///
 /// The record binds a tenant bundle entry to a (reference, price,
 /// applied_tier) triple so the kernel-level pricing machinery can

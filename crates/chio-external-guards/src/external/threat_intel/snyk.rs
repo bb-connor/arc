@@ -148,12 +148,6 @@ struct SnykVuln {
     severity: Option<SnykSeverity>,
     #[serde(default, rename = "isUpgradable")]
     is_upgradable: Option<bool>,
-    #[serde(default)]
-    #[allow(dead_code)]
-    id: Option<String>,
-    #[serde(default)]
-    #[allow(dead_code)]
-    title: Option<String>,
 }
 
 /// Structured receipt evidence.

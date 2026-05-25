@@ -1,7 +1,7 @@
 //! Multi-tenant receipt isolation tests for
 //! `chio_store_sqlite::SqliteReceiptStore`.
 //!
-//! The scenario mirrors the roadmap acceptance criterion:
+//! The test scenario covers the following invariants:
 //!
 //!   Tenant A writes 5 receipts, tenant B writes 3, and an operator's
 //!   pre-migration session writes 2 legacy untagged rows. The store
