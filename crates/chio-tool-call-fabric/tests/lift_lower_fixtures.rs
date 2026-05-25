@@ -14,8 +14,8 @@
 //! House rules:
 //! - No em dashes (U+2014) anywhere in code, comments, or rendered output.
 //! - `unwrap_used` / `expect_used` are denied workspace-wide; we allow them
-//!   inside this test file because fixture authoring is a controlled
-//!   in-source builder pipeline, not production code.
+//!   inside this test file; the `#[allow]` is scoped to controlled fixture
+//!   builders, not workspace code.
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 

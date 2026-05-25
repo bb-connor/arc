@@ -3548,11 +3548,9 @@ mod attestation_and_telemetry_tests {
 
     #[test]
     fn interceptor_pending_capability_buffer_is_bounded() {
-        // Regression: previously the pending_capability_contexts buffer
-        // accepted unmatched contexts forever. Floods 100 toolCallId-less
-        // fs/read_text_file requests at a single session, then asserts
-        // the per-session pending buffer never exceeds the documented
-        // FIFO cap of 32 entries.
+        // Verifies the per-session pending_capability_contexts FIFO cap (32 entries):
+        // floods 100 toolCallId-less fs/read_text_file requests and asserts the
+        // buffer stays bounded.
         let requests = Arc::new(Mutex::new(Vec::new()));
         let checker = always_allow_sequenced_checker(Arc::clone(&requests), 100);
         let config = AcpProxyConfig::new("echo", "deadbeef")
@@ -3603,11 +3601,8 @@ mod attestation_and_telemetry_tests {
 
     #[test]
     fn interceptor_session_cancel_clears_pending_capability_contexts() {
-        // Regression: pending contexts that never bind to a session/update
-        // used to live for the lifetime of the proxy. A session/cancel
-        // now drains the per-session pending FIFO so captured
-        // authorization material does not leak across long-lived
-        // sessions.
+        // Verifies that session/cancel drains the per-session pending FIFO:
+        // authorization material must not leak across long-lived sessions.
         let requests = Arc::new(Mutex::new(Vec::new()));
         let checker = always_allow_sequenced_checker(Arc::clone(&requests), 4);
         let config = AcpProxyConfig::new("echo", "deadbeef")

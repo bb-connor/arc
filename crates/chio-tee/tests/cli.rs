@@ -90,7 +90,6 @@ fn help_exits_successfully_and_is_image_smoke_safe() {
         stdout.contains("Usage: chio-tee"),
         "stdout should include usage text: {stdout}"
     );
-    // The stub disclaimer must be gone.
     assert!(
         !stdout.contains("not yet implemented") && !stdout.contains("skeleton"),
         "help text must not advertise a stub: {stdout}"

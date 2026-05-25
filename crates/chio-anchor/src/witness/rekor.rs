@@ -897,7 +897,7 @@ pub fn build_rekor_publish_response_with_set(
 
 /// Sign the canonical SET envelope `{body, integratedTime, logID,
 /// logIndex}` with a P-256 signing key and return the base64-DER
-/// signature. Exposed for tests; production code never calls this.
+/// signature. Test-only; never called from production paths.
 pub fn sign_set_with_test_key(
     body_b64: &str,
     integrated_time: i64,

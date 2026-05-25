@@ -211,7 +211,7 @@ pub fn load_kernel_signing_backend_after_self_quote(
 
     // Verifier said yes: materialize the hybrid backend through the
     // shared boot helper so the resulting backend is bit-identical to
-    // the one the legacy path already wires through.
+    // the one the classical-only path already wires through.
     Ok(kernel_signing_backend(
         crypto_floor,
         classical_keypair,

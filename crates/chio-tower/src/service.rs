@@ -582,8 +582,7 @@ mod tests {
             }
         }
 
-        // Wrapper that lets `From<Bytes>` work for the replay path the
-        // production code never reaches in this test (the call must abort).
+        // Wrapper that satisfies `From<Bytes>` for the replay path; the call must abort before this conversion runs.
         struct AdaptedBody(StreamingBody);
         impl Body for AdaptedBody {
             type Data = Bytes;

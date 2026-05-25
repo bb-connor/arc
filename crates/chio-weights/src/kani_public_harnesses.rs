@@ -311,10 +311,7 @@ pub fn public_model_card_new_pins_schema_version() {
     };
     let card = fixture_card(issued_at, expires_at);
 
-    // (1) Schema version is pinned to the `CARD_VERSION_V1` constant. A future
-    // refactor that promoted `ModelCard::new` to accept a
-    // caller-supplied schema string would break this invariant; we
-    // catch the regression here.
+    // (1) Schema version MUST equal `CARD_VERSION_V1`; `ModelCard::new` MUST NOT accept a caller-supplied schema string.
     assert_eq!(card.card_version, CARD_VERSION_V1.to_string());
 
     // (2) `validate()` is idempotent and accepts a freshly

@@ -251,9 +251,8 @@ fn rolled_hybrid_bundle_round_trips_under_pq_required() {
     assert!(rolled.verify_signature().unwrap());
 
     // Floor enforcement: under pq_required, hybrid is the ONLY accepted
-    // algorithm. We re-implement the dispatch table here (no
-    // chio-policy / chio-kernel dep on chio-attest-verify) to keep the
-    // test self-contained.
+    // algorithm. No chio-policy / chio-kernel dep is permitted in
+    // chio-attest-verify; the dispatch table is re-implemented inline.
     assert!(matches!(
         rolled.signature.algorithm(),
         SigningAlgorithm::Hybrid

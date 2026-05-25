@@ -56,9 +56,7 @@ impl TrafficFrameOutcome {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct TrafficReplayReport {
     /// Run-id of the replay partition (mirrors `<run_id>` in receipt
-    /// ids). Empty string when the dispatcher ran in production-mode
-    /// for some reason; T2 always allocates a replay partition so this
-    /// is non-empty in practice.
+    /// ids). Empty string only when the partition was unexpectedly production-flagged; the replay dispatcher always allocates a `Replay` partition.
     pub run_id: String,
     /// `--against` argument verbatim.
     pub against_label: String,
@@ -151,8 +149,7 @@ pub fn run_traffic_replay(
     // 5. Build the ephemeral kernel.
     let kernel_kp = chio_core::crypto::Keypair::generate();
     let mut kernel = build_kernel(loaded_policy, &kernel_kp);
-    // Register a stub tool server so capability evaluation has a
-    // server-id target. This mirrors the pattern in cli::runtime::cmd_check.
+    // Register a stub tool server so capability evaluation has a server-id target.
     kernel.register_tool_server(Box::new(StubToolServer {
         id: REPLAY_STUB_SERVER_ID.to_string(),
     }));

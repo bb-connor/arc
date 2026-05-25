@@ -449,11 +449,8 @@ describe("receipt authority verification", () => {
   });
 
   it("verifies via the resolved default URL on otherwise-allowed tool use without sidecarUrl or verifyReceipt", async () => {
-    // Regression: previously `applyReceiptAuthority` denied every
-    // otherwise-allowed tool use when callers relied on the default
-    // sidecar (no explicit `sidecarUrl`, no `verifyReceipt`). The fix
-    // reuses `resolveSidecarUrl` so the verify call still happens and
-    // populates authority fields. Without the fix, this test denies.
+    // Guards: applyReceiptAuthority must not deny tool use when callers rely on
+    // the default sidecar URL (no explicit sidecarUrl / verifyReceipt).
     const fetchMock = async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url === "http://127.0.0.1:9090/chio/evaluate") {
@@ -555,11 +552,9 @@ describe("receipt authority verification", () => {
   });
 
   it("denies on edge runtime without an explicit verifyReceipt (no fetch fallback)", async () => {
-    // Regression: previously the edge runtime fell through to a
-    // `/chio/verify` fetch against the localhost sidecar, which is
-    // unreachable from Vercel/Workers and turns every otherwise-allowed
-    // tool use into a misleading transport error. The fix denies with a
-    // clear reason instead. We must keep this verification in-process for
+    // Guards: the edge runtime must not fall back to a localhost /chio/verify
+    // fetch (unreachable from Vercel/Workers); it denies with a clear reason instead.
+    // We must keep this verification in-process for
     // edge runtimes (or via an explicit verifier) because the
     // in-process @chio-protocol/edge `verify_receipt` binding needs a
     // binary envelope the JSON `/chio/evaluate` response does not carry.

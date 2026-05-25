@@ -120,8 +120,8 @@ pub use signed_artifact::{
     KNOWN_SIGNED_ARTIFACT_SCHEMAS,
 };
 
-/// Opaque agent identifier. In practice this is a hex-encoded Ed25519 public key
-/// or a SPIFFE URI, but the core treats it as an opaque string.
+/// Opaque agent identifier: hex-encoded Ed25519 public key or SPIFFE URI
+/// accepted; the core performs no structural validation.
 pub type AgentId = alloc::string::String;
 
 /// Opaque tool server identifier.

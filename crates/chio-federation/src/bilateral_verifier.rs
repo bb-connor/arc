@@ -1598,9 +1598,7 @@ pub fn verify_bilateral_cosign_invocation(
     // `crdt-commutative`. `verify_dsse_envelope` rejects
     // `totally-ordered` and `quorum-required` before this point with
     // `predicate.schema_invalid`, so this verifier does not expose
-    // unreachable `consistency.*` error codes. Strict ordered/quorum
-    // reconciliation belongs to the future CHIO predicate-profile
-    // implementation.
+    // unreachable `consistency.*` error codes.
     if pred.consistency_model != crate::bilateral_dsse::DEFAULT_CONSISTENCY_MODEL {
         return Err(VerifierError::PredicateSchemaInvalid(format!(
             "consistency_model {:?} is not supported by the signature-slice profile",

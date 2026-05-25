@@ -1,7 +1,7 @@
 //! SSRF negative-conformance tests for production reqwest dispatchers.
 //!
 //! These tests drive real external-guard and api-protect forwarding paths so
-//! raw reqwest bypasses fail the suite instead of only direct contract probes.
+//! so that raw reqwest-level bypasses also fail, not only direct contract probes.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::net::{SocketAddr, TcpListener};

@@ -203,10 +203,9 @@ mod replay {
         assert_eq!(report["first_divergence"]["kind"], "verdict_drift");
     }
 
-    /// Exit code 20: an Ed25519 signature does not verify against the
-    /// embedded `kernel_key`. The fixture flips a single content_hash
-    /// byte on a previously-signed receipt so the body the verifier
-    /// re-canonicalises no longer matches the signature.
+    /// Exit code 20: an Ed25519 signature does not verify against the embedded `kernel_key`.
+    /// The fixture has a single flipped byte in `content_hash`, so the re-canonicalized body
+    /// no longer matches the signature.
     #[test]
     fn bad_signature_exits_twenty() {
         let fixture = fixture_path("20-bad-signature");

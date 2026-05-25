@@ -30,8 +30,7 @@ use chio_core::Keypair;
 fn stale_admission_rejects_replay_of_receipt_id_against_different_content() {
     let kp = Keypair::generate();
 
-    // Batch A: previously verified, body_hash recorded by the
-    // verifier daemon at some earlier successful verify_inclusion.
+    // Batch A: simulates a batch whose body_hash has already been recorded in the verifier-owned cache.
     let witness_a = AnchorBatchWitness {
         kind: AnchorBatchWitnessKind::Rekor,
         witness_id: "rekor:uuid-replay-target".to_string(),

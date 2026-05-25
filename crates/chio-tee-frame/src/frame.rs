@@ -179,9 +179,7 @@ pub enum FrameError {
     Schema(#[from] SchemaError),
 }
 
-/// Builder-style payload for [`Frame::build`]. Groups the 13 frame fields
-/// to keep the constructor under the clippy `too_many_arguments` limit
-/// while preserving the named-field ergonomics of the wire-level type.
+/// Builder-style payload for [`Frame::build`]. Groups the 13 frame fields while preserving named-field ergonomics.
 #[derive(Debug, Clone)]
 pub struct FrameInputs {
     pub event_id: String,

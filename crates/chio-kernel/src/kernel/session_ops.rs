@@ -17,11 +17,8 @@ use super::*;
 const SESSION_ID_ENTROPY_BYTES: usize = 16;
 
 /// Mint a fresh URL-safe session identifier from the operating system's
-/// CSPRNG. Sequential identifiers were previously derived from a global
-/// counter, which let an external observer enumerate active tenants over the
-/// MCP HTTP transport. Using an unguessable random handle closes that
-/// information-disclosure path and removes the session-fixation/forgery
-/// surface that came with predictable IDs.
+/// CSPRNG. Random handles prevent external enumeration of active tenants and
+/// close the session-fixation surface that sequential ids carry.
 fn generate_random_session_id() -> SessionId {
     let mut bytes = [0u8; SESSION_ID_ENTROPY_BYTES];
     OsRng.fill_bytes(&mut bytes);

@@ -381,9 +381,7 @@ mod replay_validate_tests {
             verdict: chio_tee_frame::Verdict::Allow,
             deny_reason: None,
             would_have_blocked: false,
-            // A valid base64 placeholder matching the schema regex.
-            // Tests that exercise the verifier sign their own frames
-            // and overwrite this field with a real signature.
+            // Unsigned placeholder matching the schema regex; tests that verify signatures overwrite this field.
             tenant_sig: format!("ed25519:{}", "A".repeat(86)),
         }
     }
@@ -522,8 +520,7 @@ mod replay_validate_tests {
 
     #[test]
     fn validate_frame_skips_sig_when_pubkey_absent() {
-        // A frame with an unsigned (placeholder) tenant_sig still
-        // passes when the verifier is skipped.
+        // An unsigned placeholder tenant_sig is accepted when pubkey verification is skipped.
         let frame = good_frame_with_invocation(canonical_invocation());
         validate_frame(&frame, "chio-tee-frame.v1", None).unwrap();
     }

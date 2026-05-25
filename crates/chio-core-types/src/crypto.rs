@@ -569,9 +569,9 @@ impl PublicKey {
 
 /// Signature produced by a Chio [`SigningBackend`].
 ///
-/// Historically this type wrapped a 64-byte Ed25519 signature. It now carries
-/// an algorithm-tagged payload internally while preserving byte-identical
-/// serialization and construction helpers for the Ed25519 case.
+/// Algorithm-tagged signature type. Preserves byte-identical serialization
+/// and construction helpers for the Ed25519 case; non-Ed25519 paths use
+/// the same outer API.
 #[derive(Clone, Debug)]
 pub struct Signature {
     material: SignatureMaterial,

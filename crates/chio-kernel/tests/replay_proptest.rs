@@ -151,8 +151,8 @@ fn edge_case_payload() -> impl Strategy<Value = serde_json::Value> {
             "bytes": Vec::<u8>::new(),
             "magnitude": i32::MIN,
         })),
-        // Single-element byte vector with the high bit set (canonical-JSON
-        // numeric encoding has previously regressed on values >= 128).
+        // Single-element byte vector with the high bit set: canonical-JSON
+        // numeric encoding must handle bytes >= 128 correctly.
         Just(json!({
             "method": "h",
             "bytes": vec![0xFFu8],

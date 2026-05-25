@@ -1269,9 +1269,7 @@ mod tests {
 
     #[test]
     fn execution_ids_do_not_collide_within_a_single_second() {
-        // Regression: `begin()` previously formatted the id as `wf-<now>`
-        // with second resolution. Two `begin()` calls in the same second on
-        // the same authority would collide and produce shadowed receipts.
+        // Regression guard: `begin()` MUST use sub-second resolution so two calls in the same second produce distinct ids; second-resolution ids collide and produce shadowed receipts.
         let manifest = make_manifest();
         let grant = make_grant();
         let authority = WorkflowAuthority::new(Keypair::generate());

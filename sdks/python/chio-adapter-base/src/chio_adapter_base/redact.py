@@ -1071,9 +1071,9 @@ def bind_and_redact(
         # a fixed positional binding). The merge-conflict semantics
         # apply: redact the positional and the kwarg independently.
         # This is the VAR_POSITIONAL counterpart of the pure-forwarder
-        # overflow path (closes deferred ID 3229566280: ``def fn(path,
-        # *rest, **kw)`` called with ``("/tmp/x", "PROD_SECRET")`` and
-        # ``content=KW_SECRET`` must redact rest[0] independently).
+        # overflow path (``def fn(path, *rest, **kw)`` called with
+        # ``("/tmp/x", "PROD_SECRET")`` and ``content=KW_SECRET``
+        # must redact rest[0] independently).
         # Slots filled by a fixed positional binding already had
         # redaction applied at the fixed-positional path; extras stay
         # raw (preserving the "extras past the table stay raw"

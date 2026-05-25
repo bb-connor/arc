@@ -6636,10 +6636,7 @@ fn append_inflight_counter_does_not_underflow_on_concurrent_drain() {
                     Ordering::SeqCst,
                 );
             }
-            // Pre-fix race signature: late `fetch_add` ran after the worker
-            // drained N items, so `inflight` briefly exceeded the number of
-            // accepted commands. The slack tolerates the fact that a thread
-            // can hold an unincremented receipt between `fetch_add` (now
+            // The slack tolerates a thread holding an unincremented receipt between `fetch_add` (now
             // pre-send) and its corresponding decrement.
             if inflight > accepted.saturating_add(slack) {
                 sampler_leak_clone.store(true, Ordering::SeqCst);

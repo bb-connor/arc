@@ -254,7 +254,7 @@ async fn mpsc_signing_path_signs_n_receipts_with_valid_signatures() {
 // path. We deliberately re-use the same module wiring rather than adding
 // a public test-only API; the test stays inside the crate's tree by
 // virtue of being in `tests/`, where the compiled-binary can use only
-// public items. To keep the surface minimal we exercise the channel via
+// public items. The test exercises the channel via
 // the public `sign_receipt_via_channel`, blocking the queue with a
 // staged sender that holds reply receivers open.
 //

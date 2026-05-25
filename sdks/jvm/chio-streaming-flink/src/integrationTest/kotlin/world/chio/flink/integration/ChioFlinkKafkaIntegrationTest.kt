@@ -11,7 +11,7 @@
  * the receipt and DLQ topics back and asserts exactly one envelope on
  * each (== checks, not >=, so a duplicate-emit bug fails).
  *
- * Self-contained: Testcontainers manages Redpanda, so
+ * Testcontainers manages Redpanda, so
  *   ./gradlew :chio-streaming-flink:integrationTest
  * works without `docker compose up`. A running Docker daemon is required.
  *

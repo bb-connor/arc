@@ -1,11 +1,9 @@
 """Behavioural tests for :func:`chio_adapter_base.redact.bind_and_redact`.
 
-6-axis coverage matrix (FINAL-PLAN Section 4)
-=============================================
+6-axis coverage matrix
+======================
 
-Tests reference cells from the orthogonal axis combinatoric below. Each
-new v0.3 test header names the (axis, value) coordinates it exercises,
-plus the deferred-ID it closes (when applicable).
+Tests reference cells from the orthogonal axis combinatoric below.
 
 1. Signature shape:
    - SS1 fixed-positional
@@ -743,8 +741,6 @@ def test_pure_forwarder_redacts_both_positional_and_kwarg_for_same_slot() -> Non
     }
 
 
-# ---------------------------------------------------------------------------
-# v0.3 helper hardening regression tests (per FINAL-PLAN Section 2 PR-1)
 # ---------------------------------------------------------------------------
 
 

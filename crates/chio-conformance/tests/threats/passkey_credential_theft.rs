@@ -133,9 +133,7 @@ fn threat_passkey_credential_theft_distinct_credentials_are_independent() {
 }
 
 /// Tuples of (evidence path, optional needle). When `needle` is `Some`,
-/// the file must additionally contain that string; this guards against
-/// the file being kept as a no-op stub while the cited functionality
-/// has been gutted.
+/// the file must contain that string; this detects if the cited implementation has been removed.
 const EVIDENCE_FILES: &[(&str, Option<&str>)] = &[
     (
         "crates/chio-custody-hw/src/verifier.rs",

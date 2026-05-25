@@ -2,10 +2,9 @@
 //!
 //! ## Why this exists
 //!
-//! The kernel previously signed receipts inline on the evaluate critical path,
-//! holding the synchronous `build_and_sign_receipt` step inside the same call
-//! stack that was already running guard pipelines and store mutations. Under
-//! load that funnel pinned a worker thread per concurrent evaluate call.
+//! A dedicated signing task decouples receipt signing from the evaluate critical
+//! path, preventing the synchronous `build_and_sign_receipt` step from pinning a
+//! worker thread per concurrent evaluate call.
 //!
 //! A single signing task now owns a clone of the kernel signing keypair and
 //! pulls signing requests from a bounded [`tokio::sync::mpsc`] channel.

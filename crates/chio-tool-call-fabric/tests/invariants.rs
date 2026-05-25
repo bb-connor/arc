@@ -380,15 +380,11 @@ proptest! {
             );
         }
 
-        // When the canonical capability schema is vendored, this branch tightens
-        // the property into a real jsonschema validation. The feature gate
-        // keeps the default build green until the schema lands.
+        // Schema-subsumption gate: wires full jsonschema validation against
+        // `spec/schemas/chio-tool-call-fabric/v1.json` once that file exists.
+        // Currently a compile-only type-check assertion.
         #[cfg(feature = "schema-subsumption")]
         {
-            // Intentionally minimal stub: the actual schema path will be
-            // wired here once `spec/schemas/chio-tool-call-fabric/v1.json`
-            // exists. Until then enabling the feature is a compile-only
-            // assertion that the property still type-checks.
             let _ = bytes;
         }
     }

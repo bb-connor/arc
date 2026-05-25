@@ -42,7 +42,7 @@ pub const MAX_APPROVAL_TTL_SECS: u64 = 3600;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ApprovalRequest {
     /// Unique request identifier. Caller-stable so the approval store
-    /// can be keyed on this value. In production this is a UUIDv7.
+    /// can be keyed on this value. Callers should supply a UUIDv7.
     pub approval_id: String,
 
     /// The policy / grant identifier that triggered the approval.

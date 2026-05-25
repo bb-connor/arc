@@ -451,9 +451,8 @@ published = true
 
     #[test]
     fn shipped_lockfile_marks_placeholders_as_unpublished() {
-        // The shipped lockfile carries placeholder sha256 pins, so every
-        // entry MUST be flagged as unpublished until the release pipeline
-        // fills in real values.
+        // Every entry MUST be flagged `published = false` until the release pipeline
+        // replaces the placeholder sha256 pins with real values.
         let manifest_dir =
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR set during cargo test");
         let path = Path::new(&manifest_dir).join("peers.lock.toml");

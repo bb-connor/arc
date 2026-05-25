@@ -236,13 +236,11 @@ impl ChioKernel {
                     )));
                 }
                 Ok(Verdict::PendingApproval) => {
-                    // A legacy `Guard` should not return the
-                    // HITL marker. The fully integrated approval flow
-                    // runs via `ApprovalGuard::evaluate` rather than
-                    // the `Guard` trait so this branch is unreachable
-                    // in practice. Fail-closed just in case.
+                    // The `Guard` trait does not carry the HITL approval flow; that runs via
+                    // `ApprovalGuard::evaluate`. A `Guard` returning `PendingApproval` is an
+                    // unsupported state, so fail closed.
                     return Err(KernelError::GuardDenied(format!(
-                        "guard \"{}\" requested approval via legacy path",
+                        "guard \"{}\" returned an unsupported approval verdict",
                         guard.name()
                     )));
                 }

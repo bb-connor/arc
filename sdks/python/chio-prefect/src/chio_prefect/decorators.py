@@ -462,10 +462,7 @@ def _prefect_envelope(
        v0.2 wire shape; v0.4 will deprecate the synthetic key with a
        one-release migration window).
 
-    Note on shim length: this function is ~88 lines (not the "~20
-    lines" the FINAL-PLAN initially estimated). The functional core is
-    a single ``bind_and_redact`` call plus the envelope rebuild; the
-    bulk of the body is the synthetic-key spillover-detection loop
+    The bulk of the body is the synthetic-key spillover-detection loop
     (positional-only collision walk + per-name index lookup) and the
     wire-shape rebuild that re-routes kwargs into the envelope under
     either their original key or the synthetic spillover key. Both
@@ -483,15 +480,14 @@ def _prefect_envelope(
     # Arity-overflow fail-closed redaction. The bare ``bind_and_redact``
     # fallback table forwards positional values past the wrapper's last
     # named slot raw (``# Extras beyond the table entry stay positional
-    # and raw.``). Pre-v0.3 prefect's ``_task_parameters`` instead
-    # dropped overflow positionals entirely so an arity-invalid call
-    # such as ``write('/tmp', 'SECRET1', 'SECRET2')`` against
-    # ``def write(path, content)`` could never leak ``SECRET2`` on the
-    # wire. Re-establish that fail-closed contract here, but preserve
-    # the audit trail by REDACTING the overflow values under each
-    # protected canonical instead of dropping them. A future receipt
-    # consumer can see "a secret was attempted at position N" without
-    # the raw bytes ever crossing the wire.
+    # and raw.``). An arity-invalid call such as
+    # ``write('/tmp', 'SECRET1', 'SECRET2')`` against
+    # ``def write(path, content)`` must not leak ``SECRET2`` on the
+    # wire. Enforce that fail-closed contract here, but redact the
+    # overflow values under each protected canonical instead of dropping
+    # them (preserves the audit trail: a receipt consumer can see
+    # "a secret was attempted at position N" without the raw bytes
+    # crossing the wire).
     redacted_arg_list = list(redacted_args)
     if fn is not None and len(redacted_arg_list) > 0:
         try:

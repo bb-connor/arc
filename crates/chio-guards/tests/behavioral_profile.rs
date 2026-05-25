@@ -67,10 +67,9 @@ fn make_receipt(id: &str, capability_id: &str, timestamp: u64, decision: Decisio
 }
 
 /// Adapter that exposes an chio-store-sqlite `SqliteReceiptStore` as
-/// a `ReceiptFeedSource`. Agent identity is resolved by reading the
-/// capability-id prefix here to keep the test self-contained; a real
-/// deployment would join through the capability_lineage table via
-/// `ReceiptQuery::agent_subject`.
+/// a `ReceiptFeedSource`. Agent identity is resolved from the
+/// capability-id prefix rather than via `ReceiptQuery::agent_subject`
+/// (which requires the capability_lineage table).
 struct SqliteFeed {
     store: Mutex<SqliteReceiptStore>,
     agent_capabilities: Vec<(String, String)>,

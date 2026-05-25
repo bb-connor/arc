@@ -334,9 +334,9 @@ pub struct SignedHybridReceipt {
 /// - Algorithm agnostic at the trait boundary: the helper accepts any
 ///   [`SigningBackend`] (Ed25519, P-256, P-384, or hybrid). When the
 ///   backend is the classical-only `Ed25519Backend` the canonical buffer
-///   is still the exact bytes the legacy `sign_with_backend` path signs,
+///   is still the exact bytes the `sign_with_backend` path signs,
 ///   so callers may treat this entrypoint as the canonical-bytes-aware
-///   superset of the legacy path.
+///   superset of the `sign_with_backend` path.
 ///
 /// # Errors
 ///

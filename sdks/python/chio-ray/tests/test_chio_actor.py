@@ -246,10 +246,8 @@ class TestStandingGrantIntrospection:
 
         # After a call, the receipt is recorded on the trail.
         _ = ray.get(ray.remote(Agent).remote().search.remote("x"))
-        # The driver-side instance and the Ray-side fake instance
-        # are different processes in a real cluster; in the fake they
-        # are independent instances, so the trail lives on the
-        # per-handle instance. We also confirm the direct-call trail:
+        # In the fake, driver-side and Ray-side are independent instances
+        # so the receipt trail lives on the per-handle instance. We also confirm the direct-call trail:
         agent.search("y")
         assert len(agent.chio_receipts) == 1
         assert agent.chio_receipts[0].is_allowed
