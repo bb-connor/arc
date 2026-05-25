@@ -25,7 +25,7 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/backbay-labs/chio/tree/main/packages/sdk/chio-py"
+Documentation = "https://github.com/backbay-labs/chio/tree/main/sdks/python/chio-py"
 Repository = "https://github.com/backbay-labs/chio"
 Issues = "https://github.com/backbay-labs/chio/issues"
 

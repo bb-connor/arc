@@ -14,7 +14,7 @@ Run it with:
 CHIO_BASE_URL=http://127.0.0.1:8931 \
 CHIO_CONTROL_URL=http://127.0.0.1:8940 \
 CHIO_AUTH_TOKEN=demo-token \
-python packages/sdk/chio-py/examples/governed_hello.py
+python sdks/python/chio-py/examples/governed_hello.py
 ```
 
 The script initializes a session, discovers the default capability issued for

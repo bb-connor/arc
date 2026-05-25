@@ -317,7 +317,7 @@ Remote-edge SDK:
 ### Package layout
 
 ```text
-packages/sdk/chio-py/
+sdks/python/chio-py/
   src/chio/
     client/
     session/
@@ -503,8 +503,8 @@ Reason to do this second:
 
 Deliverables:
 
-- `packages/sdk/chio-py`
-- `packages/sdk/chio-py/chio-native`
+- `sdks/python/chio-py`
+- `sdks/python/chio-py/chio-native`
 - optional native invariants module
 - remote HTTP client for current conformance waves
 
@@ -575,7 +575,7 @@ Tasks:
 
 Tasks:
 
-- scaffold `packages/sdk/chio-py`
+- scaffold `sdks/python/chio-py`
 - add `httpx` transport and session handling
 - add `chio-native` with `abi3`
 - run current Python conformance waves through the package
@@ -608,7 +608,7 @@ Tasks:
 1. Add `crates/chio-binding-helpers` with only canonical JSON, hashing, signature, receipt, capability, and manifest helpers.
 2. Add `tests/bindings/vectors/` and generate the first canonical JSON, hash, and receipt verification fixtures from Rust.
 3. Scaffold `packages/sdk/chio-ts` and route the existing JS peer through it for remote HTTP coverage.
-4. After the TS package shape stabilizes, scaffold `packages/sdk/chio-py` plus a minimal PyO3 module.
+4. After the TS package shape stabilizes, scaffold `sdks/python/chio-py` plus a minimal PyO3 module.
 5. Start Go only after the TS and Python packages prove that the bindings-core boundary is small enough.
 
 ## Recommendation

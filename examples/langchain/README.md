@@ -19,7 +19,7 @@ From this directory:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e ../../packages/sdk/chio-py -e .
+pip install -e ../../sdks/python/chio-py -e .
 ```
 
 ## Run

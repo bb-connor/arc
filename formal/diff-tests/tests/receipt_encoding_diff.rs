@@ -18,7 +18,7 @@
 //!
 //!   - Rust:        `crates/chio-binding-helpers/tests/vector_fixtures.rs`
 //!     `receipt_fixture_cases_round_trip_through_public_api`
-//!   - Python:      `packages/sdk/chio-py/tests/test_vectors.py`
+//!   - Python:      `sdks/python/chio-py/tests/test_vectors.py`
 //!     compares `receipt_body_canonical_json(receipt)` against the
 //!     `receipt_body_canonical_json` field of every case.
 //!   - TypeScript:  `packages/sdk/chio-ts/test/vectors.test.ts`

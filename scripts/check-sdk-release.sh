@@ -233,20 +233,20 @@ EOF
 
     cd "${repo_root}"
 
-    rm -rf packages/sdk/chio-py/build packages/sdk/chio-py/dist
-    find packages/sdk/chio-py/src -maxdepth 1 -type d -name '*.egg-info' -prune -exec rm -rf {} +
-    find packages/sdk/chio-py -type d -name '__pycache__' -prune -exec rm -rf {} +
+    rm -rf sdks/python/chio-py/build sdks/python/chio-py/dist
+    find sdks/python/chio-py/src -maxdepth 1 -type d -name '*.egg-info' -prune -exec rm -rf {} +
+    find sdks/python/chio-py -type d -name '__pycache__' -prune -exec rm -rf {} +
 
     python3 - <<'PY'
 from pathlib import Path
 import tomllib
 
-pyproject = tomllib.loads(Path("packages/sdk/chio-py/pyproject.toml").read_text())
+pyproject = tomllib.loads(Path("sdks/python/chio-py/pyproject.toml").read_text())
 declared_version = pyproject["project"]["version"]
 declared_name = pyproject["project"]["name"]
 
 version_ns = {}
-exec(Path("packages/sdk/chio-py/src/chio/version.py").read_text(), version_ns)
+exec(Path("sdks/python/chio-py/src/chio/version.py").read_text(), version_ns)
 module_version = version_ns["__version__"]
 
 if declared_name != "chio-sdk":
@@ -261,7 +261,7 @@ PY
     python3 -m venv "${builder_venv}"
     . "${builder_venv}/bin/activate"
     python -m pip install --quiet --upgrade pip build twine
-    python -m build packages/sdk/chio-py --sdist --wheel --outdir "${dist_dir}"
+    python -m build sdks/python/chio-py --sdist --wheel --outdir "${dist_dir}"
     python -m twine check "${dist_dir}"/*
     python - "${dist_dir}" <<'PY'
 from pathlib import Path

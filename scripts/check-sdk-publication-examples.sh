@@ -143,12 +143,12 @@ node --experimental-strip-types "${repo_root}/packages/sdk/chio-ts/examples/gove
 python3 -m venv "${venv_dir}"
 . "${venv_dir}/bin/activate"
 python -m pip install --quiet --upgrade pip
-python -m pip install --quiet -e "${repo_root}/packages/sdk/chio-py"
+python -m pip install --quiet -e "${repo_root}/sdks/python/chio-py"
 
 CHIO_BASE_URL="${mcp_url}" \
 CHIO_CONTROL_URL="${control_url}" \
 CHIO_AUTH_TOKEN="${auth_token}" \
-python "${repo_root}/packages/sdk/chio-py/examples/governed_hello.py" \
+python "${repo_root}/sdks/python/chio-py/examples/governed_hello.py" \
   >"${work_dir}/py-example.json"
 
 deactivate

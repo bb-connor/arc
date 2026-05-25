@@ -52,7 +52,7 @@ service:
 CHIO_BASE_URL=http://127.0.0.1:8931 \
 CHIO_CONTROL_URL=http://127.0.0.1:8940 \
 CHIO_AUTH_TOKEN=demo-token \
-python packages/sdk/chio-py/examples/governed_hello.py
+python sdks/python/chio-py/examples/governed_hello.py
 ```
 
 For a repo-local end-to-end verification run that boots those services

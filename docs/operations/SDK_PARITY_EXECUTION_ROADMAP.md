@@ -39,7 +39,7 @@ At the start of this roadmap, the repo already has:
 The repo does not yet have:
 
 - a first-class `chio-ts` client/session API
-- a `packages/sdk/chio-py` package
+- a `sdks/python/chio-py` package
 - a `sdks/go/chio-go` package
 - a checked-in SDK feature matrix with release gates
 
@@ -77,7 +77,7 @@ Do not spend this 4 to 6 week window on:
 
 - `crates/chio-bindings-ffi`
 - `crates/chio-bindings-wasm`
-- `packages/sdk/chio-py/chio-native`
+- `sdks/python/chio-py/chio-native`
 - Go CGO bridge work
 - browser-first packaging work
 - moving full SDK runtime logic behind Rust FFI
@@ -171,8 +171,8 @@ Objective:
 
 Deliverables:
 
-- `packages/sdk/chio-py/pyproject.toml`
-- `packages/sdk/chio-py/src/chio/`
+- `sdks/python/chio-py/pyproject.toml`
+- `sdks/python/chio-py/src/chio/`
 - Python errors, models, invariants, transport, and session modules
 - vector tests for Python invariant helpers
 
@@ -186,7 +186,7 @@ Tasks:
 
 Acceptance bar:
 
-- `pip install -e packages/sdk/chio-py` works without a Rust toolchain
+- `pip install -e sdks/python/chio-py` works without a Rust toolchain
 - Python vector tests are green against the checked-in shared fixtures
 - the package can initialize a remote session and perform low-level request execution in tests
 - no PyO3 or maturin dependency is required for the package to function
@@ -211,7 +211,7 @@ Deliverables:
 
 Tasks:
 
-- move the current peer transport and callback logic into `packages/sdk/chio-py`
+- move the current peer transport and callback logic into `sdks/python/chio-py`
 - keep transcript/debug hooks available to the peer
 - route the existing Python peer through the package for all current scenarios
 - document the alpha surface and explicit non-goals

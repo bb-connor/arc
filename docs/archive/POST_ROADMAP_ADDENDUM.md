@@ -411,7 +411,7 @@ pre-merge gate, a post-merge release gate, or split by surface.
 > - `docs/SDK_PARITY_EXECUTION_ROADMAP.md`
 
 **Current repo baseline**:
-- [`packages/sdk/chio-py`](../../packages/sdk/chio-py) and
+- [`sdks/python/chio-py`](../../sdks/python/chio-py) and
   [`packages/sdk/chio-ts`](../../packages/sdk/chio-ts) already exist with package
   structure, tests, and release-check scripts such as
   [`scripts/check-chio-py-release.sh`](../../scripts/check-chio-py-release.sh) and
@@ -428,8 +428,8 @@ the enriched Rust contract is visible to users.
 
 **Files**:
 - `crates/chio-http-core/src/verdict.rs`
-- `packages/sdk/chio-py/src/chio/errors.py`
-- `packages/sdk/chio-py/tests/test_errors.py`
+- `sdks/python/chio-py/src/chio/errors.py`
+- `sdks/python/chio-py/tests/test_errors.py`
 - `packages/sdk/chio-ts/src/errors.ts`
 - `packages/sdk/chio-ts/src/types.ts`
 - `packages/sdk/chio-ts/test/errors.test.ts`
@@ -461,9 +461,9 @@ the enriched Rust contract is visible to users.
 and verifiable as release outputs.
 
 **Files**:
-- `packages/sdk/chio-py/pyproject.toml`
+- `sdks/python/chio-py/pyproject.toml`
 - `packages/sdk/chio-ts/package.json`
-- `packages/sdk/chio-py/RELEASING.md`
+- `sdks/python/chio-py/RELEASING.md`
 - `packages/sdk/chio-ts/README.md`
 - `scripts/check-chio-py-release.sh`
 - `scripts/check-chio-ts-release.sh`
