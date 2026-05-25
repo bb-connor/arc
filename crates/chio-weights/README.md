@@ -8,4 +8,4 @@ The crate also ships a cosign bundle helper. Every public method that returns
 `Ok(_)` carries a real trust guarantee; the surface fails closed otherwise.
 
 Use this crate to author, sign, and verify model cards, and to enforce
-weights-to-capability binding at kernel bind time (`arc bind --card`).
+weights-to-capability binding at kernel bind time (`chio bind --card`).

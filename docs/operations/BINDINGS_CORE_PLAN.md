@@ -1,3 +1,5 @@
+> **Status:** superseded - SDKs live under `sdks/` (e.g. `sdks/typescript/chio-ts`), not `packages/sdk/`; the `crates/chio-bindings-wasm` crate is planned, not yet created.
+
 # Chio Bindings Core Plan
 
 ## Goal

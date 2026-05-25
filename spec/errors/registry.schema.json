@@ -25,7 +25,7 @@
     },
     "domains": {
       "type": "array",
-      "minItems": 18,
+      "minItems": 19,
       "items": {
         "$ref": "#/$defs/domain"
       }
@@ -59,7 +59,8 @@
         "economy",
         "lineage",
         "custody",
-        "weights"
+        "weights",
+        "mobile"
       ]
     },
     "domain": {
@@ -108,7 +109,7 @@
       "properties": {
         "urn": {
           "type": "string",
-          "pattern": "^urn:chio:error:(capability|policy|guard|attest|replay|provider|manifest|kernel|transport|cli|delegation|adversarial|threat|arena|economy|lineage|custody|weights):[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+          "pattern": "^urn:chio:error:(capability|policy|guard|attest|replay|provider|manifest|kernel|transport|cli|delegation|adversarial|threat|arena|economy|lineage|custody|weights|mobile):[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
         },
         "domain": {
           "$ref": "#/$defs/domainName"

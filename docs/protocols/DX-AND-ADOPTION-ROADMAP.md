@@ -77,6 +77,7 @@ jobs:
   publish-typescript:
     steps:
       - checkout
+      - cd sdks/typescript
       - npm ci --workspaces
       - npm test --workspaces
       - npm publish --workspace packages/node-http --access public

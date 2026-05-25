@@ -73,11 +73,17 @@ jobs:
             fi
             dry_run="false"
           else
-            version="$(grep -m1 'version =' packages/sdk/chio-cpp/conanfile.py | sed -E 's/.*"([^"]+)".*/\1/')"
+            version="$(grep -m1 'version =' sdks/cpp/chio-cpp/conanfile.py | sed -E 's/.*"([^"]+)".*/\1/')"
             dry_run="${INPUT_DRY_RUN:-true}"
           fi
+          sdk_dir() {
+            case "$1" in
+              chio-guard-cpp) echo "sdks/guard/$1" ;;
+              *)              echo "sdks/cpp/$1"   ;;
+            esac
+          }
           for sdk in chio-cpp chio-cpp-kernel chio-guard-cpp chio-drogon; do
-            recipe_version="$(grep -m1 'version =' "packages/sdk/${sdk}/conanfile.py" | sed -E 's/.*"([^"]+)".*/\1/')"
+            recipe_version="$(grep -m1 'version =' "$(sdk_dir "${sdk}")/conanfile.py" | sed -E 's/.*"([^"]+)".*/\1/')"
             if [[ "$recipe_version" != "$version" ]]; then
               echo "::error::${sdk}/conanfile.py declares version ${recipe_version} but tag is v${version}" >&2
               exit 1

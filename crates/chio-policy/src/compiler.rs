@@ -163,10 +163,10 @@ fn compile_rule_guards(
             if fp.patterns.is_empty() {
                 builder.add(ForbiddenPathGuard::new());
             } else {
-                builder.add(ForbiddenPathGuard::with_patterns(
-                    fp.patterns.clone(),
-                    fp.exceptions.clone(),
-                ));
+                builder.add(
+                    ForbiddenPathGuard::with_patterns(fp.patterns.clone(), fp.exceptions.clone())
+                        .map_err(|error| CompileError::Invalid(error.to_string()))?,
+                );
             }
         }
     }

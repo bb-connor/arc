@@ -93,7 +93,7 @@ pub use behavioral_profile::{
 pub use behavioral_sequence::{BehavioralSequenceGuard, SequencePolicy};
 pub use data_flow::{DataFlowConfig, DataFlowGuard};
 pub use egress_allowlist::EgressAllowlistGuard;
-pub use forbidden_path::ForbiddenPathGuard;
+pub use forbidden_path::{ForbiddenPathConfigError, ForbiddenPathGuard};
 pub use internal_network::InternalNetworkGuard;
 pub use jailbreak::{
     JailbreakGuard, JailbreakGuardConfig,

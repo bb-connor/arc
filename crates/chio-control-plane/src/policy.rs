@@ -1035,10 +1035,10 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> Result<GuardPipeline,
                     .clone()
                     .unwrap_or_else(default_forbidden_path_patterns);
                 patterns.extend(fp.additional_patterns.clone());
-                pipeline.add(Box::new(ForbiddenPathGuard::with_patterns(
-                    patterns,
-                    fp.exceptions.clone(),
-                )));
+                pipeline.add(Box::new(
+                    ForbiddenPathGuard::with_patterns(patterns, fp.exceptions.clone())
+                        .map_err(|error| PolicyError::Invalid(error.to_string()))?,
+                ));
             }
         }
     }

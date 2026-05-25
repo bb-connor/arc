@@ -118,10 +118,10 @@ recorded as `SigningState::UnsignedSoftDepAbsent`.
 Operators bind a card to a provider through:
 
 ```
-arc bind <provider> --card <path-to-card.json>
+chio bind <provider> --card <path-to-card.json>
 ```
 
-The `arc bind` subcommand at
+The `chio bind` subcommand at
 `crates/chio-cli/src/commands/bind.rs` loads the card, runs the
 cosign bundle verify, attaches the card to the provider binding
 context, and prints the resolved

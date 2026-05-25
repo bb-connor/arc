@@ -1371,7 +1371,7 @@ def _graph_bucket(row: Mapping[str, Any]) -> str:
         return "doc"
     if kind == "crate":
         return "owner"
-    if kind in {"symbol", "file"} or path.startswith(("crates/", "integrations/", "packages/", "sdks/", "examples/")):
+    if kind in {"symbol", "file"} or path.startswith(("crates/", "integrations/", "sdks/", "examples/")):
         return "implementation"
     if kind in GLOBAL_HUB_KINDS or str(row.get("concept_scope") or "") == "scoped":
         return "concept"

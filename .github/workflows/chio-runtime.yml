@@ -8,6 +8,14 @@ name: Chio Runtime
 # Reported check context names changed: the GitHub branch ruleset must be
 # updated to require the new matrix legs (e.g. "Chio Runtime / runtime (spine)")
 # instead of the removed standalone workflow checks.
+#
+# Path-scoping trade-off (accepted): a single matrix workflow has one `on:`
+# block and cannot express per-matrix-entry path filters, so the union
+# `on.paths` below over-triggers - a change matching any one leg's paths runs
+# all five legs, some redundantly. The pheromone workflows stay separate to
+# avoid exactly this (see .github/workflows/README.md "Why not one matrix
+# workflow"); for the runtime family we accept the redundant legs in exchange
+# for a single maintained file. The extra legs are cheap and fail-fast.
 
 on:
   pull_request:

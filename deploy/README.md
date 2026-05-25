@@ -1,6 +1,6 @@
 # Chio sidecar deployment references
 
-Reference deployment manifests for running the Chio (Chio) kernel as a sidecar
+Reference deployment manifests for running the Chio kernel as a sidecar
 alongside an application container on managed multi-container platforms.
 
 All manifests assume the sidecar listens on `:9090` and exposes `GET /chio/health`.
