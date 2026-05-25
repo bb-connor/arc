@@ -139,7 +139,7 @@ fn ten_receipts_produce_ten_settlements_with_byte_identical_receipts() {
         statuses.push(settlement_observer::run_observer(
             Some(&hook_handle),
             receipt,
-            &[receipt.kernel_key.clone()],
+            std::slice::from_ref(&receipt.kernel_key),
         ));
     }
 
@@ -207,8 +207,11 @@ fn no_settlement_baseline_matches_with_settlement_canonical_bytes() {
 
     // Run the observer for the with-hook variant only.
     for receipt in &receipts_with_hook {
-        let _status =
-            settlement_observer::run_observer(Some(&hook), receipt, &[receipt.kernel_key.clone()]);
+        let _status = settlement_observer::run_observer(
+            Some(&hook),
+            receipt,
+            std::slice::from_ref(&receipt.kernel_key),
+        );
     }
 
     for (no_hook, with_hook) in receipts_no_hook.iter().zip(receipts_with_hook.iter()) {

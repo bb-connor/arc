@@ -1230,8 +1230,9 @@ fn receipt_fixture_allow_case_passes_with_trusted_signer() {
         .test_unwrap("allow case");
     let receipt: ChioReceipt =
         serde_json::from_value(case["receipt"].clone()).test_unwrap("parse receipt case");
-    let actual = verify_receipt_with_trusted_signers(&receipt, &[receipt.kernel_key.clone()])
-        .test_unwrap("verify receipt with trusted signer");
+    let actual =
+        verify_receipt_with_trusted_signers(&receipt, std::slice::from_ref(&receipt.kernel_key))
+            .test_unwrap("verify receipt with trusted signer");
 
     assert!(actual.signature_valid);
     assert!(actual.parameter_hash_valid);

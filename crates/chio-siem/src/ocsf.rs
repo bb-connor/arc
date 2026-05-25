@@ -529,6 +529,7 @@ fn trust_level_str(level: TrustLevel) -> &'static str {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use chio_core::crypto::Keypair;

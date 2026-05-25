@@ -281,7 +281,7 @@ mod tests {
                 guard: "G".to_string(),
             },
         );
-        assert!(build_observation(&receipt, &[receipt.kernel_key.clone()]).is_none());
+        assert!(build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)).is_none());
     }
 
     #[test]
@@ -292,13 +292,13 @@ mod tests {
             }),
             Decision::Allow,
         );
-        assert!(build_observation(&receipt, &[receipt.kernel_key.clone()]).is_none());
+        assert!(build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)).is_none());
     }
 
     #[test]
     fn build_observation_skips_when_metadata_missing_financial_section() {
         let receipt = sign_with(serde_json::json!({}), Decision::Allow);
-        assert!(build_observation(&receipt, &[receipt.kernel_key.clone()]).is_none());
+        assert!(build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)).is_none());
     }
 
     #[test]
@@ -310,7 +310,7 @@ mod tests {
             Decision::Allow,
         );
         receipt.tool_name = "tampered".to_string();
-        assert!(build_observation(&receipt, &[receipt.kernel_key.clone()]).is_none());
+        assert!(build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)).is_none());
     }
 
     #[test]
@@ -325,7 +325,7 @@ mod tests {
             Decision::Allow,
             action,
         );
-        assert!(build_observation(&receipt, &[receipt.kernel_key.clone()]).is_none());
+        assert!(build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)).is_none());
     }
 
     #[test]
@@ -336,7 +336,7 @@ mod tests {
             }),
             Decision::Allow,
         );
-        let observation = build_observation(&receipt, &[receipt.kernel_key.clone()])
+        let observation = build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key))
             .expect("priced receipt yields observation");
         assert_eq!(observation.receipt_id, receipt.id);
         assert_eq!(observation.finalized_at, 100);
@@ -369,7 +369,7 @@ mod tests {
             }),
             Decision::Allow,
         );
-        let status = run_observer(None, &receipt, &[receipt.kernel_key.clone()]);
+        let status = run_observer(None, &receipt, std::slice::from_ref(&receipt.kernel_key));
         assert!(matches!(status, SettlementObserverStatus::NotRegistered));
     }
 
@@ -382,7 +382,11 @@ mod tests {
             Decision::Allow,
         );
         let hook: Arc<dyn SettlementHook> = Arc::new(AcceptingHook);
-        let status = run_observer(Some(&hook), &receipt, &[receipt.kernel_key.clone()]);
+        let status = run_observer(
+            Some(&hook),
+            &receipt,
+            std::slice::from_ref(&receipt.kernel_key),
+        );
         match status {
             SettlementObserverStatus::Observed {
                 outcome: SettlementOutcome::Accepted { transcript_id, .. },
@@ -400,7 +404,11 @@ mod tests {
             Decision::Allow,
         );
         let hook: Arc<dyn SettlementHook> = Arc::new(FailingHook);
-        let status = run_observer(Some(&hook), &receipt, &[receipt.kernel_key.clone()]);
+        let status = run_observer(
+            Some(&hook),
+            &receipt,
+            std::slice::from_ref(&receipt.kernel_key),
+        );
         assert!(matches!(status, SettlementObserverStatus::Skipped { .. }));
     }
 
@@ -426,7 +434,7 @@ mod tests {
             }),
             Decision::Allow,
         );
-        let observation = build_observation(&receipt, &[receipt.kernel_key.clone()])
+        let observation = build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key))
             .expect("canonical FinancialReceiptMetadata shape yields observation");
         assert_eq!(observation.amount.units, 250);
         assert_eq!(observation.amount.currency, "USD");
@@ -443,7 +451,7 @@ mod tests {
             }),
             Decision::Allow,
         );
-        assert!(build_observation(&receipt, &[receipt.kernel_key.clone()]).is_none());
+        assert!(build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)).is_none());
     }
 
     #[test]
@@ -455,7 +463,11 @@ mod tests {
             Decision::Allow,
         );
         let hook: Arc<dyn SettlementHook> = Arc::new(FailingHook);
-        let status = run_observer(Some(&hook), &receipt, &[receipt.kernel_key.clone()]);
+        let status = run_observer(
+            Some(&hook),
+            &receipt,
+            std::slice::from_ref(&receipt.kernel_key),
+        );
         assert!(matches!(
             status,
             SettlementObserverStatus::HookFailed { .. }

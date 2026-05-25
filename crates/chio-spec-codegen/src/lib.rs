@@ -655,7 +655,7 @@ mod tests {
         let workspace_root = manifest_dir
             .parent()
             .and_then(Path::parent)
-            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "missing workspace"))?;
+            .ok_or_else(|| std::io::Error::other("missing workspace"))?;
         let schemas_dir = workspace_root.join("spec/schemas/chio-wire/v1");
 
         let rendered = render_chio_wire_v1(&schemas_dir)?;

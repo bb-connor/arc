@@ -2139,87 +2139,6 @@ pub(crate) fn trusted_kernel_keys_from_service_config(
     }
 }
 
-#[cfg(test)]
-mod underwriting_and_support_tests {
-    use super::*;
-    use std::fs;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    use chio_test_support::prelude::*;
-
-    fn unique_temp_path(prefix: &str, extension: &str) -> std::path::PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .test_unwrap()
-            .as_nanos();
-        std::env::temp_dir().join(format!("{prefix}-{nonce}.{extension}"))
-    }
-
-    #[test]
-    fn behavioral_feed_signer_uses_local_db_seed_after_replica_snapshot() {
-        let source_path = unique_temp_path("chio-behavioral-feed-source", "sqlite");
-        let follower_path = unique_temp_path("chio-behavioral-feed-follower", "sqlite");
-        let source = SqliteCapabilityAuthority::open(&source_path).test_unwrap();
-        let follower = SqliteCapabilityAuthority::open(&follower_path).test_unwrap();
-        let follower_local_key = follower.local_keypair().test_unwrap();
-
-        source.rotate().test_unwrap();
-        let snapshot = source.snapshot().test_unwrap();
-        assert!(follower.apply_snapshot(&snapshot).test_unwrap());
-        assert!(follower.current_keypair().is_err());
-
-        let signing_key =
-            load_behavioral_feed_signing_keypair(None, Some(&follower_path)).test_unwrap();
-        assert_eq!(signing_key.public_key(), follower_local_key.public_key());
-
-        let _ = fs::remove_file(source_path);
-        let _ = fs::remove_file(follower_path);
-    }
-
-    #[test]
-    fn underwriting_compliance_evidence_rejects_subject_mismatch() {
-        let activity = chio_kernel::ReceiptAnalyticsResponse {
-            summary: chio_kernel::ReceiptAnalyticsMetrics::from_raw(5, 4, 1, 0, 0, 10, 2),
-            by_agent: Vec::new(),
-            by_tool: Vec::new(),
-            by_time: Vec::new(),
-        };
-        let report = chio_kernel::ComplianceReport {
-            matching_receipts: 5,
-            evidence_ready_receipts: 5,
-            uncheckpointed_receipts: 0,
-            checkpoint_coverage_rate: Some(1.0),
-            lineage_covered_receipts: 5,
-            lineage_gap_receipts: 0,
-            lineage_coverage_rate: Some(1.0),
-            pending_settlement_receipts: 0,
-            failed_settlement_receipts: 0,
-            direct_evidence_export_supported: true,
-            child_receipt_scope: chio_kernel::EvidenceChildReceiptScope::OmittedNoJoinPath,
-            proofs_complete: true,
-            export_query: chio_kernel::EvidenceExportQuery {
-                agent_subject: Some("subject-other".to_string()),
-                ..chio_kernel::EvidenceExportQuery::default()
-            },
-            export_scope_note: None,
-        };
-        let selection = chio_kernel::BehavioralFeedReceiptSelection {
-            matching_receipts: 0,
-            receipts: Vec::new(),
-        };
-
-        let error = build_underwriting_compliance_evidence(
-            "subject-expected",
-            1_717_171_717,
-            &activity,
-            &report,
-            &selection,
-        )
-        .test_unwrap_err();
-        assert!(error.contains("compliance report subject mismatch"));
-    }
-}
-
 pub(crate) fn response_status_text(response: &Response) -> String {
     format!("request failed with status {}", response.status())
 }
@@ -2539,4 +2458,85 @@ pub(crate) fn list_limit(requested: Option<usize>) -> usize {
 
 pub(crate) fn plain_http_error(status: StatusCode, message: &str) -> Response {
     (status, Json(json!({ "error": message }))).into_response()
+}
+
+#[cfg(test)]
+mod underwriting_and_support_tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use chio_test_support::prelude::*;
+
+    fn unique_temp_path(prefix: &str, extension: &str) -> std::path::PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .test_unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("{prefix}-{nonce}.{extension}"))
+    }
+
+    #[test]
+    fn behavioral_feed_signer_uses_local_db_seed_after_replica_snapshot() {
+        let source_path = unique_temp_path("chio-behavioral-feed-source", "sqlite");
+        let follower_path = unique_temp_path("chio-behavioral-feed-follower", "sqlite");
+        let source = SqliteCapabilityAuthority::open(&source_path).test_unwrap();
+        let follower = SqliteCapabilityAuthority::open(&follower_path).test_unwrap();
+        let follower_local_key = follower.local_keypair().test_unwrap();
+
+        source.rotate().test_unwrap();
+        let snapshot = source.snapshot().test_unwrap();
+        assert!(follower.apply_snapshot(&snapshot).test_unwrap());
+        assert!(follower.current_keypair().is_err());
+
+        let signing_key =
+            load_behavioral_feed_signing_keypair(None, Some(&follower_path)).test_unwrap();
+        assert_eq!(signing_key.public_key(), follower_local_key.public_key());
+
+        let _ = fs::remove_file(source_path);
+        let _ = fs::remove_file(follower_path);
+    }
+
+    #[test]
+    fn underwriting_compliance_evidence_rejects_subject_mismatch() {
+        let activity = chio_kernel::ReceiptAnalyticsResponse {
+            summary: chio_kernel::ReceiptAnalyticsMetrics::from_raw(5, 4, 1, 0, 0, 10, 2),
+            by_agent: Vec::new(),
+            by_tool: Vec::new(),
+            by_time: Vec::new(),
+        };
+        let report = chio_kernel::ComplianceReport {
+            matching_receipts: 5,
+            evidence_ready_receipts: 5,
+            uncheckpointed_receipts: 0,
+            checkpoint_coverage_rate: Some(1.0),
+            lineage_covered_receipts: 5,
+            lineage_gap_receipts: 0,
+            lineage_coverage_rate: Some(1.0),
+            pending_settlement_receipts: 0,
+            failed_settlement_receipts: 0,
+            direct_evidence_export_supported: true,
+            child_receipt_scope: chio_kernel::EvidenceChildReceiptScope::OmittedNoJoinPath,
+            proofs_complete: true,
+            export_query: chio_kernel::EvidenceExportQuery {
+                agent_subject: Some("subject-other".to_string()),
+                ..chio_kernel::EvidenceExportQuery::default()
+            },
+            export_scope_note: None,
+        };
+        let selection = chio_kernel::BehavioralFeedReceiptSelection {
+            matching_receipts: 0,
+            receipts: Vec::new(),
+        };
+
+        let error = build_underwriting_compliance_evidence(
+            "subject-expected",
+            1_717_171_717,
+            &activity,
+            &report,
+            &selection,
+        )
+        .test_unwrap_err();
+        assert!(error.contains("compliance report subject mismatch"));
+    }
 }
