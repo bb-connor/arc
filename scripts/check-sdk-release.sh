@@ -133,7 +133,7 @@ case "${lang}" in
     ;;
 
   guard-cpp)
-    sdk_dir="${repo_root}/packages/sdk/chio-guard-cpp"
+    sdk_dir="${repo_root}/sdks/guard/chio-guard-cpp"
 
     "${sdk_dir}/scripts/check-native.sh"
     chio_cpp_packager_smoke "${sdk_dir}" "chio-guard-cpp"

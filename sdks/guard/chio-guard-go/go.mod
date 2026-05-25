@@ -1,4 +1,4 @@
-module github.com/backbay-labs/chio/packages/sdk/chio-guard-go
+module github.com/backbay-labs/chio/sdks/guard/chio-guard-go
 
 go 1.24
 

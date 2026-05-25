@@ -133,7 +133,7 @@ Rust, TypeScript, Python, and Go in lockstep:
 | Rust       | `chio-guard-sdk` 0.1 -> 0.2      | `host::log/get_config/get_time` keep signatures; new `host::fetch_blob` and `PolicyContext` resource. Macro re-exports unchanged. |
 | TypeScript | `@chio-protocol/guard-sdk`       | Regenerated via `jco transpile` against 0.2.0 WIT. `host.fetchBlob()` added; existing imports keep names. |
 | Python     | `chio_guard_sdk`                 | Regenerated via `componentize-py bindings`. New `host.fetch_blob()`; everything else stable. |
-| Go         | `packages/sdk/chio-guard-go`     | Regenerated via `wit-bindgen-go` (tinygo target). New `host.FetchBlob`; package path unchanged. |
+| Go         | `sdks/guard/chio-guard-go`     | Regenerated via `wit-bindgen-go` (tinygo target). New `host.FetchBlob`; package path unchanged. |
 
 If your guard does not need `fetch-blob` or the `bundle-handle` resource,
 the migration is exactly: bump the WIT pin, regenerate bindings, rebuild.

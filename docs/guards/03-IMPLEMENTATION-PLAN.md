@@ -380,7 +380,7 @@ def evaluate(req):
 ```go
 package main
 
-import "github.com/backbay-labs/chio/packages/sdk/chio-guard-go"
+import "github.com/backbay-labs/chio/sdks/guard/chio-guard-go"
 
 //export evaluate
 func evaluate(ptr, len int32) int32 {
@@ -596,9 +596,9 @@ let fuel_consumed = self.fuel_limit.saturating_sub(fuel_remaining);
 ### Phase 4: Non-Rust guest SDKs + WIT migration -- v2+
 
 - Define WIT interface, migrate from raw ABI
-- TypeScript/AssemblyScript guard SDK (`packages/sdk/chio-guard-ts`)
-- Python guard SDK (`packages/sdk/chio-guard-py`)
-- Go guard SDK (TinyGo, `packages/sdk/chio-guard-go`)
+- TypeScript/AssemblyScript guard SDK (`sdks/guard/chio-guard-ts`)
+- Python guard SDK (`sdks/guard/chio-guard-py`)
+- Go guard SDK (TinyGo, `sdks/guard/chio-guard-go`)
 - Cross-language conformance test suite
 
 

@@ -32,15 +32,15 @@ class PathGuard final : public chio::guard::Guard {
 Run the local non-WASI compile smoke:
 
 ```bash
-./packages/sdk/chio-guard-cpp/scripts/check-native.sh
+./sdks/guard/chio-guard-cpp/scripts/check-native.sh
 ```
 
 Or configure the package directly:
 
 ```bash
-cmake -S packages/sdk/chio-guard-cpp -B packages/sdk/chio-guard-cpp/build-native
-cmake --build packages/sdk/chio-guard-cpp/build-native
-ctest --test-dir packages/sdk/chio-guard-cpp/build-native --output-on-failure
+cmake -S sdks/guard/chio-guard-cpp -B sdks/guard/chio-guard-cpp/build-native
+cmake --build sdks/guard/chio-guard-cpp/build-native
+ctest --test-dir sdks/guard/chio-guard-cpp/build-native --output-on-failure
 ```
 
 ## WIT Bindings
@@ -50,13 +50,13 @@ Generate guest bindings when `wit-bindgen` is available. The default uses
 `guard.h`, `guard.c`, and `guard_component_type.o`.
 
 ```bash
-./packages/sdk/chio-guard-cpp/scripts/generate-types.sh
+./sdks/guard/chio-guard-cpp/scripts/generate-types.sh
 ```
 
 The output directory can be overridden:
 
 ```bash
-./packages/sdk/chio-guard-cpp/scripts/generate-types.sh \
+./sdks/guard/chio-guard-cpp/scripts/generate-types.sh \
   --out-dir /tmp/chio-guard-generated
 ```
 
@@ -65,7 +65,7 @@ The output directory can be overridden:
 Build the sample path guard with the WASI SDK when the toolchain is available:
 
 ```bash
-WASI_SDK_PATH=/opt/wasi-sdk ./packages/sdk/chio-guard-cpp/scripts/build-guard.sh
+WASI_SDK_PATH=/opt/wasi-sdk ./sdks/guard/chio-guard-cpp/scripts/build-guard.sh
 ```
 
 The script configures CMake with:

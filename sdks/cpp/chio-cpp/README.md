@@ -54,5 +54,5 @@ The Rust ABI is intentionally limited to JSON strings and byte buffers with
 explicit `chio_buffer_free` ownership. Session runtime, HTTP transport,
 callbacks, subscriptions, and tool orchestration stay in C++.
 
-Guard authoring lives in the separate `packages/sdk/chio-guard-cpp` package so
+Guard authoring lives in the separate `sdks/guard/chio-guard-cpp` package so
 WASM component tooling does not burden ordinary C++ client users.

@@ -10,8 +10,8 @@
 package main
 
 import (
-	"github.com/backbay-labs/chio/packages/sdk/chio-guard-go/internal/chio/guard/guard"
-	"github.com/backbay-labs/chio/packages/sdk/chio-guard-go/internal/chio/guard/types"
+	"github.com/backbay-labs/chio/sdks/guard/chio-guard-go/internal/chio/guard/guard"
+	"github.com/backbay-labs/chio/sdks/guard/chio-guard-go/internal/chio/guard/types"
 )
 
 // blockedTools is the set of tools that this guard denies.

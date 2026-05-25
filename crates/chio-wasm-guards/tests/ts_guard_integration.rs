@@ -18,7 +18,7 @@
 //! Build the TypeScript guard before running these tests:
 //!
 //! ```bash
-//! cd packages/sdk/chio-guard-ts && npm install && npm run build:example
+//! cd sdks/guard/chio-guard-ts && npm install && npm run build:example
 //! ```
 
 #![cfg(feature = "wasmtime-runtime")]
@@ -47,13 +47,13 @@ const TS_MAX_MEMORY: usize = 16 * 1024 * 1024;
 /// Load the TypeScript-compiled tool-gate guard WASM binary.
 fn load_ts_guard_wasm() -> Vec<u8> {
     let path = format!(
-        "{}/../../packages/sdk/chio-guard-ts/dist/tool-gate.wasm",
+        "{}/../../sdks/guard/chio-guard-ts/dist/tool-gate.wasm",
         env!("CARGO_MANIFEST_DIR"),
     );
     std::fs::read(&path).unwrap_or_else(|e| {
         panic!(
             "Missing .wasm at {path}: {e}. Build with: \
-             cd packages/sdk/chio-guard-ts && npm run build:example"
+             cd sdks/guard/chio-guard-ts && npm run build:example"
         )
     })
 }
