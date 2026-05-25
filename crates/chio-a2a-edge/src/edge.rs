@@ -439,17 +439,6 @@ impl ChioA2aEdge {
         }
     }
 
-    /// Back-compat alias for callers that already adopted the explicit kernel helper name.
-    pub fn handle_send_message_with_kernel(
-        &mut self,
-        skill_id: &str,
-        request: &SendMessageRequest,
-        kernel: &ChioKernel,
-        execution: &A2aKernelExecutionContext,
-    ) -> Result<TaskResponse, A2aEdgeError> {
-        self.handle_send_message(skill_id, request, kernel, execution)
-    }
-
     /// Handle a JSON-RPC A2A request through the Chio kernel.
     ///
     /// This is the receipt-bearing path for production deployments that have
@@ -507,16 +496,6 @@ impl ChioA2aEdge {
                 }
             }),
         }
-    }
-
-    /// Back-compat alias for callers that already adopted the explicit kernel helper name.
-    pub fn handle_jsonrpc_with_kernel(
-        &mut self,
-        message: Value,
-        kernel: &ChioKernel,
-        execution: &A2aKernelExecutionContext,
-    ) -> Value {
-        self.handle_jsonrpc(message, kernel, execution)
     }
 
     #[cfg(any(test, feature = "compatibility-surface"))]
@@ -858,21 +837,6 @@ impl ChioA2aEdgeCompatibility<'_> {
             .handle_send_message_passthrough(skill_id, request, server)
     }
 
-    /// Back-compat alias for older callers. Prefer
-    /// [`handle_send_message_compatibility`] to make the non-authoritative
-    /// passthrough surface explicit at the call site.
-    #[deprecated(
-        note = "use handle_send_message_compatibility to make the non-authoritative passthrough surface explicit"
-    )]
-    pub fn handle_send_message(
-        &mut self,
-        skill_id: &str,
-        request: &SendMessageRequest,
-        server: &dyn ToolServerConnection,
-    ) -> Result<TaskResponse, A2aEdgeError> {
-        self.handle_send_message_compatibility(skill_id, request, server)
-    }
-
     /// Handle a JSON-RPC A2A request through the direct passthrough path.
     ///
     /// This compatibility helper does not invoke the Chio kernel. Its result
@@ -886,13 +850,5 @@ impl ChioA2aEdgeCompatibility<'_> {
         self.edge.handle_jsonrpc_passthrough(message, server)
     }
 
-    /// Back-compat alias for older callers. Prefer
-    /// [`handle_jsonrpc_compatibility`] to make the non-authoritative
-    /// passthrough surface explicit at the call site.
-    #[deprecated(
-        note = "use handle_jsonrpc_compatibility to make the non-authoritative passthrough surface explicit"
-    )]
-    pub fn handle_jsonrpc(&mut self, message: Value, server: &dyn ToolServerConnection) -> Value {
-        self.handle_jsonrpc_compatibility(message, server)
-    }
 }
+

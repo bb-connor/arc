@@ -112,7 +112,7 @@ impl ClaimReceiptLogProjectionRow {
         }
     }
 
-    pub(crate) fn matches_projection_or_legacy_enrichment(&self, expected: &Self) -> bool {
+    pub(crate) fn matches_projection_or_enrichment(&self, expected: &Self) -> bool {
         self.receipt_id == expected.receipt_id
             && self.receipt_kind == expected.receipt_kind
             && self.source_seq == expected.source_seq
@@ -124,15 +124,12 @@ impl ClaimReceiptLogProjectionRow {
             && self.tool_server == expected.tool_server
             && self.tool_name == expected.tool_name
             && self.raw_json == expected.raw_json
-            && legacy_optional_enrichment_matches(&self.subject_key, &expected.subject_key)
-            && legacy_optional_enrichment_matches(&self.issuer_key, &expected.issuer_key)
+            && optional_enrichment_matches(&self.subject_key, &expected.subject_key)
+            && optional_enrichment_matches(&self.issuer_key, &expected.issuer_key)
     }
 }
 
-fn legacy_optional_enrichment_matches(
-    existing: &Option<String>,
-    expected: &Option<String>,
-) -> bool {
+fn optional_enrichment_matches(existing: &Option<String>, expected: &Option<String>) -> bool {
     existing == expected || (existing.is_none() && expected.is_some())
 }
 

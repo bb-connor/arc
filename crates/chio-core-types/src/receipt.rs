@@ -600,7 +600,7 @@ pub struct ChildRequestReceipt {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
     pub kernel_key: PublicKey,
-    /// Signing algorithm. Absent means Ed25519 for backward compatibility.
+    /// Signing algorithm. Absent means Ed25519 (the default).
     #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
     pub algorithm: Option<SigningAlgorithm>,
     pub signature: Signature,
@@ -1637,8 +1637,9 @@ pub struct GovernedTransactionReceiptMetadata {
     /// Optional autonomy tier and delegation-bond attachment bound through the governed intent hash.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub autonomy: Option<GovernedAutonomyReceiptMetadata>,
-    /// Optional versioned economic envelope that keeps budget, meter, rail,
-    /// and settlement truth separate from the legacy receipt fields.
+    /// Optional versioned economic envelope that consolidates budget, meter, rail,
+    /// and settlement truth in a single typed structure alongside the per-field
+    /// convenience accessors (max_amount, commerce, metered_billing).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub economic_authorization: Option<EconomicAuthorizationReceiptMetadata>,
 }
@@ -2800,7 +2801,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_ed25519_receipt_without_algorithm_field_still_verifies() {
+    fn ed25519_receipt_without_algorithm_field_verifies() {
         // Generate an Ed25519 receipt, then assert that parsing its JSON (which
         // has no `algorithm` key) produces a receipt whose `algorithm` is
         // `None` and whose signature still verifies.

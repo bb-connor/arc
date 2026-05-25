@@ -293,7 +293,7 @@ impl CliError {
                     serde_json::json!({
                         "domain": diagnostic.domain().as_str(),
                         "severity": diagnostic.severity().as_str(),
-                        "legacy_string_code": spec.map(|entry| entry.legacy_string_code),
+                        "string_code": spec.map(|entry| entry.string_code),
                         "stability": spec.map(|entry| entry.stability),
                     }),
                     diagnostic

@@ -423,11 +423,6 @@ pub enum UnknownActionClassPolicy {
     /// receipt-backed class to `Routine` (fail-open).
     #[default]
     Reject,
-    /// Legacy fallback. Falls back to [`ActionClassKind::Routine`]
-    /// when the table does not contain the tool. Integrators must
-    /// opt in explicitly; production deployments are expected to
-    /// migrate to `Reject`.
-    DefaultRoutine,
 }
 
 /// Verifier configuration: the trait objects + pinned epoch +
@@ -447,15 +442,10 @@ pub struct VerifierConfig<'a> {
     /// Fail-closed action-class invariant: controls how step 15 reacts
     /// to a `tool_name` that is not present in `action_classes`.
     ///
-    /// - [`UnknownActionClassPolicy::Reject`] (default): the verifier returns
-    ///   [`VerifierError::UnknownActionClass`] so a misspelled or
-    ///   missing registration cannot silently downgrade a
-    ///   receipt-backed class to `Routine`.
-    /// - [`UnknownActionClassPolicy::DefaultRoutine`]: the legacy
-    ///   behavior, retained as an explicit opt-in for integrators
-    ///   whose classification table is genuinely incomplete during
-    ///   bootstrap. Kernels that opt in MUST also pin a strictness
-    ///   schedule for production cutover.
+    /// The only supported value is [`UnknownActionClassPolicy::Reject`]
+    /// (default): the verifier returns [`VerifierError::UnknownActionClass`]
+    /// so a misspelled or missing registration cannot silently downgrade
+    /// a receipt-backed class to `Routine`.
     pub unknown_action_class_policy: UnknownActionClassPolicy,
 }
 
@@ -1135,7 +1125,6 @@ pub fn verify_chio_bilateral_invocation(
                     tool_name: pred.tool_name.clone(),
                 });
             }
-            UnknownActionClassPolicy::DefaultRoutine => ActionClassKind::Routine,
         },
     };
     let mut resolved_governance_receipt = match class {
@@ -1548,12 +1537,10 @@ pub fn verify_bilateral_cosign_invocation(
 
     // ---- Step 15: governance receipt for receipt-backed classes -------
     //
-    // Fail-closed action-class invariant: an unknown `tool_name` previously
-    // silently fell back to `Routine`, which is fail-OPEN for any
-    // receipt-backed class that was misspelled or omitted from the
-    // registry. The default policy now rejects unknown tools; legacy
-    // behavior is available as an explicit opt-in via
-    // `UnknownActionClassPolicy::DefaultRoutine`.
+    // Fail-closed action-class invariant: an unknown `tool_name` is
+    // rejected with `governance.unknown_action_class` so a misspelled
+    // or missing registration cannot silently downgrade a receipt-backed
+    // class to `Routine` (fail-open).
     let class = match config.action_classes.get(&pred.tool_name).copied() {
         Some(known) => known,
         None => match config.unknown_action_class_policy {
@@ -1562,7 +1549,6 @@ pub fn verify_bilateral_cosign_invocation(
                     tool_name: pred.tool_name.clone(),
                 });
             }
-            UnknownActionClassPolicy::DefaultRoutine => ActionClassKind::Routine,
         },
     };
     let resolved_governance_receipt = match class {
@@ -3464,47 +3450,5 @@ mod tests {
         let err = verify_bilateral_cosign_invocation(&envelope, &cfg).unwrap_err();
         assert_eq!(err.code(), "governance.receipt_required_missing");
         assert!(err.to_string().contains("sha256"));
-    }
-
-    #[test]
-    fn happy_path_under_legacy_default_routine_fallback() {
-        // The legacy policy (DefaultRoutine) is retained for explicit
-        // opt-in by integrators whose registry is incomplete during
-        // bootstrap. It must continue to pass when no governance
-        // receipt is required (Routine class). Named to make clear
-        // this is the legacy fallback path,
-        // distinct from the strict happy path
-        // (`happy_path_passes_partial_local_verifier`).
-        let kp_a = Keypair::generate();
-        let kp_b = Keypair::generate();
-        let receipt = sample_receipt(&kp_b);
-        let now_ms = 1_734_000_000_000;
-
-        let (envelope, store, lease_registry, governance_store, oracle, peers) =
-            fixture(&kp_a, &kp_b, &receipt, now_ms);
-        let mut cfg = config(
-            &peers,
-            &store,
-            &lease_registry,
-            &governance_store,
-            &oracle,
-            now_ms,
-        );
-        cfg.unknown_action_class_policy = UnknownActionClassPolicy::DefaultRoutine;
-        // Clear the helper's pre-registration so we genuinely
-        // exercise the fallback (not the explicit Routine entry).
-        cfg.action_classes.clear();
-
-        // Empty action_classes + DefaultRoutine = silently treats the
-        // tool as Routine, passing through to step 16+. The verifier
-        // must not raise `governance.unknown_action_class`.
-        let result = verify_bilateral_cosign_invocation(&envelope, &cfg);
-        if let Err(err) = result {
-            assert_ne!(
-                err.code(),
-                "governance.unknown_action_class",
-                "DefaultRoutine policy must NOT raise UnknownActionClass"
-            );
-        }
     }
 }

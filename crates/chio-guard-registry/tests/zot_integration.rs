@@ -4,12 +4,12 @@ use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 use chio_guard_registry::{
-    expected_identity_from_config, load_guard_with_policy, AttestError, AttestVerifier,
-    ExpectedIdentity, GuardArtifactConfig, GuardCache, GuardLoadEventResult, GuardLoadSource,
-    GuardNetworkState, GuardOciRef, GuardOfflineLoadError, GuardOfflineLoadRequest,
-    GuardPublishArtifact, GuardPublishArtifactInput, GuardPublishRef, GuardRegistryClient,
-    GuardRegistryConfig, GuardRegistryError, GuardSigstoreVerifier, GuardVerificationKind,
-    RegistryCredentials, Sha256Digest, VerifiedAttestation,
+    load_guard_with_policy, AttestError, AttestVerifier, ExpectedIdentity, GuardArtifactConfig,
+    GuardCache, GuardLoadEventResult, GuardLoadSource, GuardNetworkState, GuardOciRef,
+    GuardOfflineLoadError, GuardOfflineLoadRequest, GuardPublishArtifact,
+    GuardPublishArtifactInput, GuardPublishRef, GuardRegistryClient, GuardRegistryConfig,
+    GuardRegistryError, GuardSigstoreVerifier, GuardVerificationKind, RegistryCredentials,
+    Sha256Digest, VerifiedAttestation,
 };
 use oci_distribution::client::{Client, ClientConfig, ClientProtocol};
 use oci_distribution::secrets::RegistryAuth;
@@ -258,7 +258,7 @@ fn expected_identity() -> ExpectedIdentity
 where
     ExpectedIdentity: Sized,
 {
-    expected_identity_from_config(
+    ExpectedIdentity::doc_hidden_inline(
         "https://github\\.com/backbay-labs/chio/\\.github/workflows/release-binaries\\.yml@refs/tags/v.*",
         "https://token.actions.githubusercontent.com",
     )

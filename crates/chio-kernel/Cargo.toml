@@ -17,12 +17,7 @@ name = "chio_kernel"
 # `delegation` is part of the kernel's default feature set so the
 # recursive-delegation oracle consultation runs on every dispatch out of
 # the box.
-# Downstream consumers that need the legacy single-step path can opt
-# back via `default-features = false` plus an explicit `legacy-sync`
-# selection. See `docs/migrations/delegation-migration.md` for the full
-# upgrade contract.
-default = ["legacy-sync", "delegation"]
-legacy-sync = []
+default = ["delegation"]
 dhat-heap = []
 sustained-p99-nightly = []
 otel = ["dep:opentelemetry-semantic-conventions"]
@@ -154,11 +149,6 @@ required-features = ["sustained-p99-nightly"]
 [[test]]
 name = "replay_proptest"
 path = "tests/replay_proptest.rs"
-
-# Dual-track async/sync receipt byte-identity gate.
-[[test]]
-name = "dual_track_receipt_identity"
-path = "tests/dual_track_receipt_identity.rs"
 
 [[test]]
 name = "tokio_console_smoke"

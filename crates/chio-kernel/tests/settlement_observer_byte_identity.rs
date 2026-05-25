@@ -77,7 +77,7 @@ impl SettlementHook for RecordingHook {
 fn build_receipt(index: u64, kp: &Keypair) -> (ChioReceipt, String) {
     let metadata = serde_json::json!({
         "financial": {
-            "approved_max": {"units": 100 + index, "currency": "USD"}
+            "cost_charged": 100 + index, "currency": "USD"
         }
     });
     let action = ToolCallAction::from_parameters(serde_json::json!({"i": index}))

@@ -236,7 +236,7 @@ pub fn public_anchor_emergency_controls_allows_truth_table() {
 /// Result<(), AnchorOperationAdmissionError>` where the error type
 /// is a small enum carrying only the variant tag (no `String`
 /// payload). The runtime fail-closed branch wraps that into the
-/// existing `AnchorError::InvalidInput` for backwards-compat. The
+/// existing `AnchorError::InvalidInput` variant. The
 /// Kani harness then exercises `classify_operation_admission`
 /// directly and skips the format-string path entirely, letting the
 /// tightened harness migrate back to the PR lane.

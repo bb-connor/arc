@@ -12,7 +12,7 @@
 //! - The price is read from the receipt's
 //!   [`FinancialReceiptMetadata`]. If the metadata is absent or the
 //!   `cost_charged` is zero, the result is `Ok(None)`. This is the
-//!   manifest-price-zero / legacy-receipt fallback.
+//!   manifest-price-zero / no-financial-metadata path (trace, advisory).
 //! - When all preconditions hold, exactly one [`IouEnvelope`] is
 //!   produced. The envelope `iou_id` is derived deterministically
 //!   from `receipt_id` so re-evaluating the same receipt yields a
@@ -118,15 +118,15 @@ impl<B: SigningBackend> CreditEvaluatorHook for LocalCreditAccount<B> {
         }
 
         // Only mediated/prevent allow receipts are eligible. Trace or
-        // advisory observations may preserve a legacy-shaped decision slot,
-        // but they must never mint IOUs.
+        // advisory observations use a non-mediated decision slot and
+        // must never mint IOUs.
         if !receipt.is_allowed() {
             return Ok(None);
         }
 
         // Pricing context comes from the receipt's typed financial
-        // metadata. Receipts without financial metadata are legacy
-        // (no manifest price) and mint zero IOUs.
+        // metadata. Receipts without financial metadata (trace, advisory)
+        // carry no manifest price and mint zero IOUs.
         let Some(financial) = receipt.financial_metadata() else {
             return Ok(None);
         };

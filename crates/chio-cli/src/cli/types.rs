@@ -18,7 +18,7 @@ pub(crate) struct Cli {
     #[command(subcommand)]
     pub(crate) command: Commands,
 
-    /// Backward-compatible alias for `--format json`.
+    /// Short alias for `--format json`.
     #[arg(long, global = true, default_value_t = false)]
     json: bool,
 
@@ -2943,7 +2943,7 @@ pub(crate) enum ReceiptCommands {
     /// When `--input-file` points at a `BilateralCoSignArtifacts` JSON
     /// document (the federation signature-slice API emission with both a
     /// `dualSignedReceipt` and a `dsseEnvelope`), the renderer auto-detects
-    /// the bilateral shape and prints both the legacy DualSignedReceipt
+    /// the bilateral shape and prints both the non-section-6-conformant DualSignedReceipt
     /// section (NON-SECTION-6-CONFORMANT per B4) and the DSSE signature-slice
     /// section. It does not claim strict Chio DSSE section 6 predicate conformance.
     ///
@@ -2955,8 +2955,7 @@ pub(crate) enum ReceiptCommands {
     /// Ed25519 signature verification was NOT performed. The new flag
     /// emits an inspection trace (structural / schema checks only) and
     /// is honest about the absence of cryptographic verification. The
-    /// legacy spelling `--explain-bilateral` is retained as a
-    /// deprecated alias.
+    /// The `--explain-bilateral` alias is retained as a previous spelling.
     Explain {
         /// Receipt ID. Use a sentinel (e.g. `bilateral`) when reading a
         /// bilateral artifact via `--input-file`; the receipt_id is

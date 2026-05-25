@@ -446,7 +446,7 @@ mod tests {
     }
 
     #[test]
-    fn enterprise_origin_keeps_legacy_actor_role_matching_when_roles_are_absent() {
+    fn enterprise_origin_matches_actor_role_when_roles_list_is_empty() {
         let spec = enterprise_origin_spec(vec![origin_profile(
             "legacy-actor-role",
             OriginMatch {

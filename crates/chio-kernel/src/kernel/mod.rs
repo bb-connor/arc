@@ -1364,13 +1364,12 @@ pub struct ChioKernel {
     /// These are emitted through the federation cosigner protocol rather than
     /// by loading Org A private key material in the tool-host kernel.
     federation_dsse_envelopes: DashMap<String, chio_federation::DsseEnvelope>,
-    /// Request-keyed tenant scope for receipts. The thread-local tenant scope
-    /// is still available for legacy sync builders, but async evaluate futures
-    /// can resume on a different worker after dispatch.
+    /// Request-keyed tenant scope for receipts. Async evaluate futures
+    /// can resume on a different worker after dispatch, so the scope is
+    /// stored in this map rather than a thread-local.
     receipt_tenant_ids: Arc<DashMap<String, String>>,
     /// Request-keyed copy of the receipt-version admission snapshot.
-    /// Thread-local admission state is still kept for legacy sync builders,
-    /// but async evaluate futures may resume on a different Tokio worker
+    /// Async evaluate futures may resume on a different Tokio worker
     /// after dispatch. This map keeps the admitted version and peer state
     /// available until the evaluation future finishes.
     receipt_federation_admissions: Arc<DashMap<String, ReceiptFederationAdmission>>,

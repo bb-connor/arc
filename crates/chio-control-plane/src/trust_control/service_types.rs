@@ -95,7 +95,6 @@ pub(crate) const PUBLIC_PASSPORT_OID4VP_DIRECT_POST_PATH: &str =
     "/v1/public/passport/oid4vp/direct-post";
 pub(crate) const PUBLIC_DISCOVERY_TTL_SECS: u64 = 300;
 pub const FEDERATED_DELEGATION_POLICY_SCHEMA: &str = "chio.federated-delegation-policy.v1";
-const LEGACY_FEDERATED_DELEGATION_POLICY_SCHEMA: &str = "chio.federated-delegation-policy.v1";
 pub(crate) const REVOCATIONS_PATH: &str = "/v1/revocations";
 pub(crate) const TOOL_RECEIPTS_PATH: &str = "/v1/receipts/tools";
 pub(crate) const CHILD_RECEIPTS_PATH: &str = "/v1/receipts/children";
@@ -701,14 +700,10 @@ pub(crate) struct RecordCapabilitySnapshotRequest {
 pub fn verify_federated_delegation_policy(
     policy: &FederatedDelegationPolicyDocument,
 ) -> Result<(), CliError> {
-    if policy.body.schema != FEDERATED_DELEGATION_POLICY_SCHEMA
-        && policy.body.schema != LEGACY_FEDERATED_DELEGATION_POLICY_SCHEMA
-    {
+    if policy.body.schema != FEDERATED_DELEGATION_POLICY_SCHEMA {
         return Err(CliError::cli_other_error(format!(
-            "unsupported federated delegation policy schema: expected {} or {}, got {}",
-            FEDERATED_DELEGATION_POLICY_SCHEMA,
-            LEGACY_FEDERATED_DELEGATION_POLICY_SCHEMA,
-            policy.body.schema
+            "unsupported federated delegation policy schema: expected {}, got {}",
+            FEDERATED_DELEGATION_POLICY_SCHEMA, policy.body.schema
         )));
     }
     if policy.body.created_at > policy.body.expires_at {

@@ -1516,14 +1516,9 @@ paths:
 
     #[test]
     fn ttl_seconds_from_wire_accepts_seconds_and_nanoseconds() {
-        assert_eq!(ttl_seconds_from_wire(None, None, None), 3600);
-        assert_eq!(ttl_seconds_from_wire(Some(3600), None, None), 3600);
-        assert_eq!(ttl_seconds_from_wire(None, Some(500_000_000), None), 1);
-        assert_eq!(ttl_seconds_from_wire(None, None, Some(3600)), 3600);
-        assert_eq!(
-            ttl_seconds_from_wire(None, None, Some(3_600_000_000_000)),
-            3600
-        );
+        assert_eq!(ttl_seconds_from_wire(None, None), 3600);
+        assert_eq!(ttl_seconds_from_wire(Some(3600), None), 3600);
+        assert_eq!(ttl_seconds_from_wire(None, Some(500_000_000)), 1);
     }
 
     #[test]

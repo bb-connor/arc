@@ -69,7 +69,7 @@ fn validate_or_backfill_claim_receipt_log_entries(
                 row.receipt_id, row.receipt_kind
             )));
         };
-        if !existing.matches_projection_or_legacy_enrichment(row) {
+        if !existing.matches_projection_or_enrichment(row) {
             return Err(ReceiptStoreError::Conflict(format!(
                 "claim receipt log entry `{}` diverges from persisted {} source row",
                 row.receipt_id, row.receipt_kind

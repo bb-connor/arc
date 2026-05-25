@@ -179,7 +179,7 @@ mod cli_entrypoint_tests {
     }
 
     #[test]
-    fn legacy_json_flag_still_enables_json_output() {
+    fn json_shorthand_flag_enables_json_output() {
         let cli = parse_cli(["chio", "--json", "init", "demo"]).unwrap();
         assert!(cli.json_output());
     }
@@ -1731,7 +1731,7 @@ mod cli_entrypoint_tests {
 
 
     #[test]
-    fn chio_attest_buyer_dispatch_owns_legacy_replay_boundary() {
+    fn chio_attest_buyer_dispatch_uses_canonical_crate_names() {
         let buyer_dispatch = include_str!("cli/chio/dispatch/buyer.rs");
 
         assert!(buyer_dispatch.contains("chio_attest_buyer::"));

@@ -28,26 +28,19 @@ use crate::policy::load_policy;
 use crate::{load_or_create_authority_keypair, CliError};
 
 const EVIDENCE_EXPORT_MANIFEST_SCHEMA: &str = "chio.evidence_export_manifest.v1";
-const LEGACY_EVIDENCE_EXPORT_MANIFEST_SCHEMA: &str = "chio.evidence_export_manifest.v1";
 const FEDERATION_POLICY_SCHEMA: &str = "chio.federation-policy.v1";
-const LEGACY_FEDERATION_POLICY_SCHEMA: &str = "chio.federation-policy.v1";
 const FEDERATED_EVIDENCE_SHARE_SCHEMA: &str = "chio.federated-evidence-share.v1";
-const LEGACY_FEDERATED_EVIDENCE_SHARE_SCHEMA: &str = "chio.federated-evidence-share.v1";
 
 fn is_supported_evidence_export_manifest_schema(schema: &str) -> bool {
-    schema == EVIDENCE_EXPORT_MANIFEST_SCHEMA || schema == LEGACY_EVIDENCE_EXPORT_MANIFEST_SCHEMA
+    schema == EVIDENCE_EXPORT_MANIFEST_SCHEMA
 }
 
 fn is_supported_federation_policy_schema(schema: &str) -> bool {
-    schema == FEDERATION_POLICY_SCHEMA || schema == LEGACY_FEDERATION_POLICY_SCHEMA
+    schema == FEDERATION_POLICY_SCHEMA
 }
 
-fn federated_evidence_share_schema_for_manifest(schema: &str) -> &'static str {
-    if schema == LEGACY_EVIDENCE_EXPORT_MANIFEST_SCHEMA {
-        LEGACY_FEDERATED_EVIDENCE_SHARE_SCHEMA
-    } else {
-        FEDERATED_EVIDENCE_SHARE_SCHEMA
-    }
+fn federated_evidence_share_schema_for_manifest(_schema: &str) -> &'static str {
+    FEDERATED_EVIDENCE_SHARE_SCHEMA
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -582,8 +575,8 @@ pub(crate) fn render_missing_proofs_error(records: &[EvidenceUncheckpointedRecei
 pub(crate) fn verify_federation_policy(policy: &FederationPolicyDocument) -> Result<(), CliError> {
     if !is_supported_federation_policy_schema(&policy.body.schema) {
         return Err(CliError::attest_error(format!(
-            "unsupported federation policy schema: expected {} or {}, got {}",
-            FEDERATION_POLICY_SCHEMA, LEGACY_FEDERATION_POLICY_SCHEMA, policy.body.schema
+            "unsupported federation policy schema: expected {}, got {}",
+            FEDERATION_POLICY_SCHEMA, policy.body.schema
         )));
     }
     if policy.body.created_at > policy.body.expires_at {
@@ -1397,10 +1390,8 @@ pub(crate) fn validate_import_package_data(
 ) -> Result<(), CliError> {
     if !is_supported_evidence_export_manifest_schema(&package.manifest.schema) {
         return Err(CliError::attest_error(format!(
-            "unsupported evidence manifest schema: expected {} or {}, got {}",
-            EVIDENCE_EXPORT_MANIFEST_SCHEMA,
-            LEGACY_EVIDENCE_EXPORT_MANIFEST_SCHEMA,
-            package.manifest.schema
+            "unsupported evidence manifest schema: expected {}, got {}",
+            EVIDENCE_EXPORT_MANIFEST_SCHEMA, package.manifest.schema
         )));
     }
     if package.bundle.query != package.manifest.query {
@@ -1493,10 +1484,8 @@ fn load_verified_evidence_package(input: &Path) -> Result<EvidenceImportPackage,
     let manifest: EvidenceExportManifest = read_json_file(input, "manifest.json")?;
     if !is_supported_evidence_export_manifest_schema(&manifest.schema) {
         return Err(CliError::attest_error(format!(
-            "unsupported evidence manifest schema: expected {} or {}, got {}",
-            EVIDENCE_EXPORT_MANIFEST_SCHEMA,
-            LEGACY_EVIDENCE_EXPORT_MANIFEST_SCHEMA,
-            manifest.schema
+            "unsupported evidence manifest schema: expected {}, got {}",
+            EVIDENCE_EXPORT_MANIFEST_SCHEMA, manifest.schema
         )));
     }
 

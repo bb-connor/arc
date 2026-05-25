@@ -12,7 +12,7 @@
 //! 2. POSTs `body_hash` to the configured calendar URL,
 //! 3. parses the returned blob through the existing
 //!    `opentimestamps` crate (already a chio-anchor dependency for
-//!    the legacy super-root path),
+//!    the bitcoin super-root path),
 //! 4. preserves the returned OTS blob as advisory timestamp material.
 //!
 //! Important: a local OTS parse plus a Bitcoin attestation marker is

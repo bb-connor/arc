@@ -2976,7 +2976,7 @@ pub(crate) fn explain_dual_signed_receipt(
         "org_b_kernel_id": org_b,
         "org_a_signature": org_a_sig,
         "org_b_signature": org_b_sig,
-        "non_section6_disclaimer": "DualSignedReceipt signs canonical JSON of CoSigningBody, not the DSSE PAE preimage required by the treaty-bound bilateral invocation profile section 6. This artifact is retained for backward compatibility with pre-B4 federation transport callers and is explicitly not section-6 conformant. Verifiers seeking section-6 conformance must use the dsse_envelope section.",
+        "non_section6_disclaimer": "DualSignedReceipt signs canonical JSON of CoSigningBody, not the DSSE PAE preimage required by section 6. This section is NOT section-6 conformant. For section-6 conformance use the dsse_envelope section.",
     }))
 }
 
@@ -3371,7 +3371,7 @@ pub(crate) fn print_bilateral_human(report: &serde_json::Value, with_trace: bool
     println!("shape:  {}", report["shape"].as_str().unwrap_or("?"));
     println!();
 
-    println!("--- DualSignedReceipt (legacy, NON-SECTION-6-CONFORMANT) ---");
+    println!("--- DualSignedReceipt (NON-SECTION-6-CONFORMANT) ---");
     let dual = &report["dual_signed_receipt"];
     println!(
         "  receipt_id:       {}",
@@ -3804,8 +3804,8 @@ mod receipt_explain_tests {
     }
 
     #[test]
-    fn receipt_value_matches_legacy_and_v2_ids() {
-        let legacy = serde_json::json!({
+    fn receipt_value_matches_flat_and_nested_ids() {
+        let flat = serde_json::json!({
             "id": "receipt-legacy",
             "decision": {"type": "allow"}
         });
@@ -3815,9 +3815,9 @@ mod receipt_explain_tests {
             }
         });
 
-        assert!(receipt_value_matches_id(&legacy, "receipt-legacy"));
+        assert!(receipt_value_matches_id(&flat, "receipt-legacy"));
         assert!(receipt_value_matches_id(&nested, "nested-receipt"));
-        assert!(!receipt_value_matches_id(&legacy, "missing"));
+        assert!(!receipt_value_matches_id(&flat, "missing"));
     }
 
     #[test]

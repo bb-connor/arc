@@ -335,12 +335,11 @@ impl core::error::Error for CapabilityFloorVerifyError {
 /// Verification re-serializes the token (excluding the signature), computes
 /// the canonical form, and checks the signature against `issuer` using the
 /// algorithm declared by the `algorithm` field (defaulting to Ed25519 when
-/// absent, which preserves backward compatibility with tokens issued prior
-/// to the introduction of [`SigningAlgorithm`]).
+/// absent).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilityToken {
-    /// Versioned signed-artifact schema. Legacy v1 wire tokens that omit
-    /// this field default to `chio.capability.v1`.
+    /// Versioned signed-artifact schema. Wire schema identifier; tokens that
+    /// omit this field default to `chio.capability.v1`.
     #[serde(default = "default_capability_schema")]
     pub schema: String,
     /// Unique token ID (UUIDv7 recommended, used for revocation).
@@ -358,7 +357,7 @@ pub struct CapabilityToken {
     /// Ordered list of delegation links from the root CA to this token.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub delegation_chain: Vec<DelegationLink>,
-    /// Signing algorithm. Absent means Ed25519 for backward compatibility.
+    /// Signing algorithm. Absent means Ed25519 (the default).
     #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
     pub algorithm: Option<SigningAlgorithm>,
     /// Typed caveats. Empty tokens omit this on the wire.
@@ -803,22 +802,7 @@ impl CapabilityToken {
     pub fn verify_signature(&self) -> Result<bool> {
         self.validate_schema()?;
         let signing_body = self.signing_body();
-        if self
-            .issuer
-            .verify_canonical(&signing_body, &self.signature)?
-        {
-            return Ok(true);
-        }
-        if self.schema == CHIO_CAPABILITY_SCHEMA
-            && self.caveats.is_empty()
-            && self.scope_attenuations.as_ref().is_none_or(Vec::is_empty)
-            && self.attenuation_proof.is_none()
-            && self.budget_share_bps.is_none()
-        {
-            let legacy_body = self.body();
-            return self.issuer.verify_canonical(&legacy_body, &self.signature);
-        }
-        Ok(false)
+        self.issuer.verify_canonical(&signing_body, &self.signature)
     }
 
     /// Verify the token's signature and enforce the kernel-side
@@ -896,26 +880,9 @@ impl CapabilityToken {
         self.validate_schema()
             .map_err(CapabilityFloorVerifyError::Crypto)?;
         let signing_body = self.signing_body();
-        if self
-            .issuer
+        self.issuer
             .verify_canonical(&signing_body, &self.signature)
-            .map_err(CapabilityFloorVerifyError::Crypto)?
-        {
-            return Ok(true);
-        }
-        if self.schema == CHIO_CAPABILITY_SCHEMA
-            && self.caveats.is_empty()
-            && self.scope_attenuations.as_ref().is_none_or(Vec::is_empty)
-            && self.attenuation_proof.is_none()
-            && self.budget_share_bps.is_none()
-        {
-            let legacy_body = self.body();
-            return self
-                .issuer
-                .verify_canonical(&legacy_body, &self.signature)
-                .map_err(CapabilityFloorVerifyError::Crypto);
-        }
-        Ok(false)
+            .map_err(CapabilityFloorVerifyError::Crypto)
     }
 
     /// Check whether this token is expired at the given unix timestamp.
@@ -1925,8 +1892,6 @@ pub struct CallChainContinuationToken {
     pub nonce: Option<String>,
     pub issued_at: u64,
     pub expires_at: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub legacy_upstream_proof: Option<GovernedUpstreamCallChainProof>,
     pub signature: Signature,
 }
 
@@ -1978,16 +1943,11 @@ impl CallChainContinuationToken {
             nonce: body.nonce,
             issued_at: body.issued_at,
             expires_at: body.expires_at,
-            legacy_upstream_proof: None,
             signature,
         })
     }
 
     pub fn verify_signature(&self) -> Result<bool> {
-        if let Some(legacy_upstream_proof) = &self.legacy_upstream_proof {
-            let expected = Self::from_legacy_upstream_proof(legacy_upstream_proof)?;
-            return Ok(legacy_upstream_proof.verify_signature()? && expected == *self);
-        }
         let body = self.body();
         self.signer.verify_canonical(&body, &self.signature)
     }
@@ -2040,34 +2000,6 @@ impl CallChainContinuationToken {
     #[must_use]
     pub fn matches_subject(&self, subject: &PublicKey) -> bool {
         &self.subject == subject
-    }
-
-    pub fn from_legacy_upstream_proof(proof: &GovernedUpstreamCallChainProof) -> Result<Self> {
-        let proof_body = proof.body();
-        let canonical = canonical_json_bytes(&proof_body)?;
-        Ok(Self {
-            schema: CHIO_CALL_CHAIN_CONTINUATION_SCHEMA.to_string(),
-            token_id: format!("legacy:{}", sha256_hex(&canonical)),
-            signer: proof.signer.clone(),
-            subject: proof.subject.clone(),
-            chain_id: proof.chain_id.clone(),
-            parent_request_id: proof.parent_request_id.clone(),
-            parent_receipt_id: proof.parent_receipt_id.clone(),
-            parent_receipt_hash: None,
-            parent_session_anchor: None,
-            current_subject: proof.subject.to_hex(),
-            delegator_subject: proof.delegator_subject.clone(),
-            origin_subject: proof.origin_subject.clone(),
-            parent_capability_id: None,
-            delegation_link_hash: None,
-            governed_intent_hash: None,
-            audience: None,
-            nonce: None,
-            issued_at: proof.issued_at,
-            expires_at: proof.expires_at,
-            legacy_upstream_proof: Some(proof.clone()),
-            signature: proof.signature.clone(),
-        })
     }
 }
 
@@ -2358,16 +2290,9 @@ impl GovernedTransactionIntent {
         Ok(Some(serde_json::from_value(value.clone())?))
     }
 
-    /// Extract the stronger continuation token, falling back to the legacy upstream proof key.
+    /// Extract the explicit continuation token, if present.
     pub fn continuation_token(&self) -> Result<Option<CallChainContinuationToken>> {
-        if let Some(token) = self.explicit_continuation_token()? {
-            return Ok(Some(token));
-        }
-
-        self.upstream_call_chain_proof()?
-            .as_ref()
-            .map(CallChainContinuationToken::from_legacy_upstream_proof)
-            .transpose()
+        self.explicit_continuation_token()
     }
 }
 
@@ -2412,7 +2337,7 @@ pub struct GovernedApprovalToken {
     pub issued_at: u64,
     pub expires_at: u64,
     pub decision: GovernedApprovalDecision,
-    /// Signing algorithm. Absent means Ed25519 for backward compatibility.
+    /// Signing algorithm. Absent means Ed25519 (the default).
     ///
     /// Informational: verification dispatches off the algorithm encoded in
     /// [`GovernedApprovalToken::signature`] and [`GovernedApprovalToken::approver`].
@@ -2813,9 +2738,7 @@ pub struct ModelMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
     /// Provenance class describing how Chio learned this model identity.
-    ///
-    /// Defaults to `asserted` for backward compatibility with legacy
-    /// callers that only forwarded raw model identifiers.
+    /// Defaults to `asserted`.
     #[serde(
         default,
         skip_serializing_if = "is_default_model_metadata_provenance_class"
@@ -2862,10 +2785,10 @@ pub struct DelegationLink {
     /// Unix timestamp of the delegation.
     pub timestamp: u64,
     /// Delegation chain-binding: SHA-256 hash of the canonical scope authorized
-    /// at this hop. Required by `Chio delegation`; absent on legacy
-    /// v1 links. Verifiers gated behind the
-    /// `delegation_chain_binding` feature flag enforce that this
-    /// matches the parent_scope_hash carried by the next hop.
+    /// at this hop. Absent on older links; verifiers can enforce presence via
+    /// feature gate. Verifiers gated behind the `delegation_chain_binding`
+    /// feature flag enforce that this matches the parent_scope_hash carried by
+    /// the next hop.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scope_hash: Option<ScopeHash>,
     /// Ed25519 signature by the delegator over the canonical form of the
@@ -4418,88 +4341,6 @@ mod tests {
             Some(token.clone())
         );
         assert_eq!(intent.continuation_token().unwrap(), Some(token));
-    }
-
-    #[test]
-    fn continuation_token_falls_back_to_legacy_upstream_proof() {
-        let signer = Keypair::generate();
-        let subject = Keypair::generate();
-        let proof = GovernedUpstreamCallChainProof::sign(
-            GovernedUpstreamCallChainProofBody {
-                signer: signer.public_key(),
-                subject: subject.public_key(),
-                chain_id: "chain-legacy-1".to_string(),
-                parent_request_id: "req-parent-legacy-1".to_string(),
-                parent_receipt_id: Some("rc-parent-legacy-1".to_string()),
-                origin_subject: "origin-subject".to_string(),
-                delegator_subject: "delegator-subject".to_string(),
-                issued_at: 1000,
-                expires_at: 2000,
-            },
-            &signer,
-        )
-        .unwrap();
-        let intent = GovernedTransactionIntent {
-            id: "intent-legacy-1".to_string(),
-            server_id: "srv-pay".to_string(),
-            tool_name: "charge".to_string(),
-            purpose: "pay supplier".to_string(),
-            max_amount: None,
-            commerce: None,
-            metered_billing: None,
-            runtime_attestation: None,
-            call_chain: Some(GovernedCallChainContext {
-                chain_id: "chain-legacy-1".to_string(),
-                parent_request_id: "req-parent-legacy-1".to_string(),
-                parent_receipt_id: Some("rc-parent-legacy-1".to_string()),
-                origin_subject: "origin-subject".to_string(),
-                delegator_subject: "delegator-subject".to_string(),
-            }),
-            autonomy: None,
-            context: Some(serde_json::json!({
-                GOVERNED_CALL_CHAIN_UPSTREAM_PROOF_CONTEXT_KEY: proof
-            })),
-        };
-
-        let token = intent.continuation_token().unwrap().unwrap();
-
-        assert!(token.verify_signature().unwrap());
-        assert!(token.token_id.starts_with("legacy:"));
-        assert_eq!(intent.explicit_continuation_token().unwrap(), None);
-        assert_eq!(token.parent_request_id, "req-parent-legacy-1");
-        assert_eq!(
-            token.parent_receipt_id.as_deref(),
-            Some("rc-parent-legacy-1")
-        );
-    }
-
-    #[test]
-    fn continuation_token_rejects_unsigned_bindings_when_using_legacy_proof() {
-        let signer = Keypair::generate();
-        let subject = Keypair::generate();
-        let proof = GovernedUpstreamCallChainProof::sign(
-            GovernedUpstreamCallChainProofBody {
-                signer: signer.public_key(),
-                subject: subject.public_key(),
-                chain_id: "chain-legacy-2".to_string(),
-                parent_request_id: "req-parent-legacy-2".to_string(),
-                parent_receipt_id: Some("rc-parent-legacy-2".to_string()),
-                origin_subject: "origin-subject".to_string(),
-                delegator_subject: "delegator-subject".to_string(),
-                issued_at: 1000,
-                expires_at: 2000,
-            },
-            &signer,
-        )
-        .unwrap();
-        let mut token = CallChainContinuationToken::from_legacy_upstream_proof(&proof).unwrap();
-        token.audience = Some(CallChainContinuationAudience {
-            server_id: "srv-pay".to_string(),
-            tool_name: "charge".to_string(),
-        });
-        token.governed_intent_hash = Some("intent-hash".to_string());
-
-        assert!(!token.verify_signature().unwrap());
     }
 
     #[test]

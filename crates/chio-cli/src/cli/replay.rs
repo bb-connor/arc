@@ -70,7 +70,7 @@ pub(crate) fn cmd_replay(args: &ReplayArgs) -> Result<(), CliError> {
         return cmd_replay_traffic(traffic);
     }
 
-    // Legacy surface requires the positional `log` path.
+    // Positional log surface requires the positional `log` path.
     let Some(log) = args.log.as_ref() else {
         return Err(CliError::cli_other_error(
             "chio replay requires a positional <log> path or the `traffic` sub-subcommand"
@@ -82,14 +82,14 @@ pub(crate) fn cmd_replay(args: &ReplayArgs) -> Result<(), CliError> {
         return cmd_replay_bless(args, log);
     }
 
-    cmd_replay_legacy(args, log)
+    cmd_replay_log(args, log)
 }
 
-/// Legacy `chio replay <log>` arm. Builds a [`ReplayReport`], renders it
+/// Positional-log `chio replay <log>` arm. Builds a [`ReplayReport`], renders it
 /// (single-line JSON when `--json` is set, short human summary otherwise),
 /// and on divergence returns through [`finish_replay_failure`] so the binary
 /// exits with the canonical 0/10/20/30/40/50 code.
-fn cmd_replay_legacy(args: &ReplayArgs, log: &Path) -> Result<(), CliError> {
+fn cmd_replay_log(args: &ReplayArgs, log: &Path) -> Result<(), CliError> {
     if args.from_tee && args.tenant_pubkey.is_none() {
         return finish_replay_failure(
             EXIT_BAD_TENANT_SIG,
@@ -116,7 +116,7 @@ fn cmd_replay_legacy(args: &ReplayArgs, log: &Path) -> Result<(), CliError> {
         None => None,
     };
 
-    let report = run_legacy_replay(
+    let report = run_log_replay(
         log,
         args.expect_root.as_deref(),
         args.from_tee,
@@ -144,10 +144,10 @@ fn cmd_replay_legacy(args: &ReplayArgs, log: &Path) -> Result<(), CliError> {
     finish_replay_failure(report.exit_code, format!("chio replay: {detail}"))
 }
 
-/// Run the legacy receipt-log replay pipeline against `log` and produce a
+/// Run the receipt-log replay pipeline against `log` and produce a
 /// [`ReplayReport`]. The pipeline is fail-closed and stops at the first
 /// divergence; subsequent receipts are not folded into the synthetic root.
-fn run_legacy_replay(
+fn run_log_replay(
     log: &Path,
     expect_root: Option<&str>,
     from_tee: bool,
@@ -163,7 +163,7 @@ fn run_legacy_replay(
                 "chio replay --from-tee requires --tenant-pubkey".to_string(),
             ));
         };
-        return run_legacy_replay_from_tee(log, &log_path, expected_root, tenant_pubkey);
+        return run_log_replay_from_tee(log, &log_path, expected_root, tenant_pubkey);
     }
 
     let reader = ReceiptLogReader::open(log).map_err(|e| {
@@ -455,7 +455,7 @@ fn run_legacy_replay(
 /// under `--from-tee` is out of scope for this surface; only the four
 /// non-drift divergence shapes (parse / schema / redaction / signature)
 /// can fire here.
-fn run_legacy_replay_from_tee(
+fn run_log_replay_from_tee(
     log: &Path,
     log_path: &str,
     expected_root: Option<String>,

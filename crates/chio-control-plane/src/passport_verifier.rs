@@ -23,11 +23,8 @@ use serde::{Deserialize, Serialize};
 use crate::CliError;
 
 const VERIFIER_POLICY_REGISTRY_VERSION: &str = "chio.passport-verifier-policies.v1";
-const LEGACY_VERIFIER_POLICY_REGISTRY_VERSION: &str = "chio.passport-verifier-policies.v1";
 const PASSPORT_STATUS_REGISTRY_VERSION: &str = "chio.passport-status-registry.v1";
-const LEGACY_PASSPORT_STATUS_REGISTRY_VERSION: &str = "chio.passport-status-registry.v1";
 const PASSPORT_ISSUANCE_REGISTRY_VERSION: &str = "chio.passport-issuance-offers.v1";
-const LEGACY_PASSPORT_ISSUANCE_REGISTRY_VERSION: &str = "chio.passport-issuance-offers.v1";
 const CHALLENGE_STATUS_ISSUED: &str = "issued";
 const CHALLENGE_STATUS_CONSUMED: &str = "consumed";
 const CHALLENGE_STATUS_EXPIRED: &str = "expired";
@@ -73,9 +70,7 @@ impl VerifierPolicyRegistry {
         match fs::read(path) {
             Ok(bytes) => {
                 let mut registry: Self = serde_json::from_slice(&bytes)?;
-                if registry.version != VERIFIER_POLICY_REGISTRY_VERSION
-                    && registry.version != LEGACY_VERIFIER_POLICY_REGISTRY_VERSION
-                {
+                if registry.version != VERIFIER_POLICY_REGISTRY_VERSION {
                     return Err(CliError::policy_error(format!(
                         "unsupported verifier policy registry version: {}",
                         registry.version
@@ -227,9 +222,7 @@ impl PassportStatusRegistry {
         match fs::read(path) {
             Ok(bytes) => {
                 let mut registry: Self = serde_json::from_slice(&bytes)?;
-                if registry.version != PASSPORT_STATUS_REGISTRY_VERSION
-                    && registry.version != LEGACY_PASSPORT_STATUS_REGISTRY_VERSION
-                {
+                if registry.version != PASSPORT_STATUS_REGISTRY_VERSION {
                     return Err(CliError::policy_error(format!(
                         "unsupported passport status registry version: {}",
                         registry.version
@@ -430,9 +423,7 @@ impl PassportIssuanceOfferRegistry {
         match fs::read(path) {
             Ok(bytes) => {
                 let mut registry: Self = serde_json::from_slice(&bytes)?;
-                if registry.version != PASSPORT_ISSUANCE_REGISTRY_VERSION
-                    && registry.version != LEGACY_PASSPORT_ISSUANCE_REGISTRY_VERSION
-                {
+                if registry.version != PASSPORT_ISSUANCE_REGISTRY_VERSION {
                     return Err(CliError::policy_error(format!(
                         "unsupported passport issuance registry version: {}",
                         registry.version

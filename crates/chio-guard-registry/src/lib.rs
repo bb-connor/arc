@@ -47,7 +47,7 @@ pub use publish::{
 };
 pub use pull::{GuardPullRequest, GuardPullResponse, RESERVED_SIGSTORE_BUNDLE_JSON};
 pub use verify::{
-    expected_identity_from_config, verify_dual_mode, GuardLoadEvent, GuardLoadEventResult,
-    GuardLoadSource, GuardSigstoreVerifier, GuardVerificationKind, GuardVerificationReport,
-    GuardVerifiedSignature, CHIO_GUARD_VERIFY_EVENT,
+    verify_dual_mode, GuardLoadEvent, GuardLoadEventResult, GuardLoadSource, GuardSigstoreVerifier,
+    GuardVerificationKind, GuardVerificationReport, GuardVerifiedSignature,
+    CHIO_GUARD_VERIFY_EVENT,
 };

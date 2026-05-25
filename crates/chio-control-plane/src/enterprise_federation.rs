@@ -8,10 +8,7 @@ use crate::CliError;
 use crate::JwtProviderProfile;
 
 pub const ENTERPRISE_PROVIDER_REGISTRY_VERSION: &str = "chio.enterprise-providers.v1";
-pub const LEGACY_ENTERPRISE_PROVIDER_REGISTRY_VERSION: &str = "chio.enterprise-providers.v1";
 pub const CERTIFICATION_DISCOVERY_NETWORK_VERSION: &str = "chio.certify.discovery-network.v1";
-pub const LEGACY_CERTIFICATION_DISCOVERY_NETWORK_VERSION: &str =
-    "chio.certify.discovery-network.v1";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EnterpriseProviderKind {
@@ -333,9 +330,7 @@ impl EnterpriseProviderRegistry {
     }
 
     fn with_revalidated_records(mut self) -> Result<Self, CliError> {
-        if self.version != ENTERPRISE_PROVIDER_REGISTRY_VERSION
-            && self.version != LEGACY_ENTERPRISE_PROVIDER_REGISTRY_VERSION
-        {
+        if self.version != ENTERPRISE_PROVIDER_REGISTRY_VERSION {
             return Err(CliError::cli_other_error(format!(
                 "unsupported enterprise provider registry version `{}`",
                 self.version
@@ -417,9 +412,7 @@ impl CertificationDiscoveryNetwork {
     }
 
     fn with_revalidated_records(mut self) -> Result<Self, CliError> {
-        if self.version != CERTIFICATION_DISCOVERY_NETWORK_VERSION
-            && self.version != LEGACY_CERTIFICATION_DISCOVERY_NETWORK_VERSION
-        {
+        if self.version != CERTIFICATION_DISCOVERY_NETWORK_VERSION {
             return Err(CliError::cli_other_error(format!(
                 "unsupported certification discovery network version `{}`",
                 self.version

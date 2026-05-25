@@ -35,10 +35,6 @@ pub struct CorpusReceiptRow {
     pub tenant_id: Option<String>,
     #[serde(default)]
     pub recorded_at: Option<i64>,
-    /// Legacy hint retained for old corpora. It is never sufficient to mark
-    /// lineage verified; ingest requires `signed_lineage_statement`.
-    #[serde(default)]
-    pub has_signed_lineage_statement: bool,
     /// Signed receipt-lineage statement linking parent_receipt_id to
     /// receipt_id. This is the only field that can upgrade replay-corpus
     /// receipt lineage from observed to verified.
@@ -246,7 +242,6 @@ mod tests {
             tool_name: None,
             tenant_id: None,
             recorded_at: None,
-            has_signed_lineage_statement: true,
             signed_lineage_statement: None,
         }];
         let g = ingest_corpus(&rows);
@@ -294,7 +289,6 @@ mod tests {
             tool_name: None,
             tenant_id: None,
             recorded_at: None,
-            has_signed_lineage_statement: true,
             signed_lineage_statement: Some(statement),
         }];
         let g = ingest_corpus(&rows);
@@ -344,7 +338,6 @@ mod tests {
             tool_name: None,
             tenant_id: None,
             recorded_at: None,
-            has_signed_lineage_statement: true,
             signed_lineage_statement: Some(statement),
         }];
         let g = ingest_corpus(&rows);
@@ -367,7 +360,6 @@ mod tests {
             tool_name: Some("tool.run".into()),
             tenant_id: Some("t".into()),
             recorded_at: Some(1),
-            has_signed_lineage_statement: false,
             signed_lineage_statement: None,
         };
         let rows = vec![row.clone(), row.clone(), row];

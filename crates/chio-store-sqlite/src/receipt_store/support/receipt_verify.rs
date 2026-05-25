@@ -51,12 +51,6 @@ pub(crate) fn ensure_child_receipt_verified(
     ensure_child_receipt_verified_with_context(receipt, "child receipt", None)
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ActionParameterHashPolicy {
-    Strict,
-    AllowLegacySignedMismatch,
-}
-
 fn format_receipt_context(
     receipt_kind: &str,
     receipt_id: Option<&str>,
@@ -77,20 +71,6 @@ pub(crate) fn ensure_chio_receipt_verified_with_context(
     receipt_kind: &str,
     seq: Option<u64>,
 ) -> Result<(), ReceiptStoreError> {
-    ensure_chio_receipt_verified_with_context_and_action_hash_policy(
-        receipt,
-        receipt_kind,
-        seq,
-        ActionParameterHashPolicy::Strict,
-    )
-}
-
-fn ensure_chio_receipt_verified_with_context_and_action_hash_policy(
-    receipt: &ChioReceipt,
-    receipt_kind: &str,
-    seq: Option<u64>,
-    action_hash_policy: ActionParameterHashPolicy,
-) -> Result<(), ReceiptStoreError> {
     let context = format_receipt_context(receipt_kind, Some(receipt.id.as_str()), seq);
     let signature_valid = receipt.verify_signature().map_err(|error| {
         ReceiptStoreError::Conflict(format!("{context} verification failed: {error}"))
@@ -105,11 +85,6 @@ fn ensure_chio_receipt_verified_with_context_and_action_hash_policy(
         ReceiptStoreError::Conflict(format!("{context} verification failed: {error}"))
     })?;
     if !parameter_hash_valid {
-        if action_hash_policy == ActionParameterHashPolicy::AllowLegacySignedMismatch {
-            // Older signed receipts may carry pre-canonical parameter hashes.
-            // Keep them readable, but only after the receipt signature verifies.
-            return Ok(());
-        }
         return Err(ReceiptStoreError::Conflict(format!(
             "{context} has mismatched action parameter hash",
         )));
@@ -157,12 +132,7 @@ pub(crate) fn decode_verified_chio_receipt(
             format_receipt_context(receipt_kind, receipt_id.as_deref(), seq)
         ))
     })?;
-    ensure_chio_receipt_verified_with_context_and_action_hash_policy(
-        &receipt,
-        receipt_kind,
-        seq,
-        ActionParameterHashPolicy::AllowLegacySignedMismatch,
-    )?;
+    ensure_chio_receipt_verified_with_context(&receipt, receipt_kind, seq)?;
     Ok(receipt)
 }
 

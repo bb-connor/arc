@@ -93,7 +93,7 @@ const REPLAY_FIXTURE_DRIFT_GUARD_SENTINEL: &str = "drift-marker";
 
 /// Re-derive the verdict for a single receipt against the current build.
 ///
-/// The legacy receipt log does not carry enough context to reconstruct a live
+/// The positional receipt log does not carry enough context to reconstruct a live
 /// kernel evaluation, so this function refuses to mark ordinary receipts clean.
 /// Replay callers must use a richer replay surface for actual drift checks.
 ///

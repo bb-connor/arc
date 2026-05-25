@@ -250,7 +250,7 @@ mod tests {
         );
         assert!(
             !message.contains("cosign-github-oidc-test"),
-            "verifier must not surface the legacy cosign-github-oidc-test literal, got: {message}"
+            "verifier must not surface the cosign-github-oidc-test scheme literal, got: {message}"
         );
         Ok(())
     }
@@ -366,10 +366,10 @@ mod tests {
     }
 
     #[test]
-    fn verifier_rejects_legacy_cosign_github_oidc_test_scheme() -> Result<(), String> {
-        let memo = b"legacy literal rejection test memo\n";
+    fn verifier_rejects_cosign_github_oidc_test_scheme() -> Result<(), String> {
+        let memo = b"scheme rejection test memo\n";
         let memo_sha = sha256_hex(memo);
-        let signer = "https://example.invalid/legacy-signer";
+        let signer = "https://example.invalid/rejected-scheme-signer";
         let signature = memo_signature(&memo_sha, signer);
         let sig_body = format!(
             "signature_format: chio-memo-signature.v1\n\
@@ -380,15 +380,15 @@ mod tests {
              signature: {signature}\n",
         );
 
-        let memo_path = write_temp("legacy-memo.md", memo)?;
-        let sig_path = write_temp("legacy-memo.sig", sig_body.as_bytes())?;
+        let memo_path = write_temp("rejected-scheme-memo.md", memo)?;
+        let sig_path = write_temp("rejected-scheme-memo.sig", sig_body.as_bytes())?;
 
         let result = verify_memo_path(path_str(&memo_path)?, path_str(&sig_path)?);
         let _ = fs::remove_file(&memo_path);
         let _ = fs::remove_file(&sig_path);
 
         let err = result.err().ok_or_else(|| {
-            "legacy cosign-github-oidc-test literal must be rejected by the verifier".to_owned()
+            "cosign-github-oidc-test scheme must be rejected by the verifier".to_owned()
         })?;
         assert!(
             err.contains("scheme mismatch"),

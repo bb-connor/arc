@@ -510,7 +510,7 @@ impl SqliteReceiptStore {
             .map_err(ReceiptStoreError::ReadBoundary)?;
         let tenant_fragment = match (
             read_scope.tenant.as_deref(),
-            read_scope.include_legacy_null_tenant && !self.strict_tenant_isolation_enabled(),
+            read_scope.include_null_tenant && !self.strict_tenant_isolation_enabled(),
         ) {
             (None, _) => "(?12 IS NULL)",
             (Some(_), true) => "(r.tenant_id = ?12 OR r.tenant_id IS NULL)",

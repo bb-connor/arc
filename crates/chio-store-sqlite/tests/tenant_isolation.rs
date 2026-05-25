@@ -87,7 +87,9 @@ fn compat_query(tenant: String) -> ReceiptQuery {
     ReceiptQuery {
         limit: chio_kernel::MAX_QUERY_LIMIT,
         tenant_filter: Some(tenant.clone()),
-        read_context: Some(chio_kernel::ReceiptReadContext::local_operator_tenant_compat(tenant)),
+        read_context: Some(chio_kernel::ReceiptReadContext::local_operator_tenant(
+            tenant,
+        )),
         ..ReceiptQuery::default()
     }
 }

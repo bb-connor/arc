@@ -261,7 +261,7 @@ fn compile_policy_accepts_canonical_hushspec_fixture() {
     // Canonical fixture exercises forbidden_paths, path_allowlist, shell,
     // tool_access, secret_patterns, patch_integrity. With no commented
     // velocity/human_in_loop stanzas active, compilation must still be
-    // accepted (backward compatible).
+    // accepted (partial spec is valid).
     assert!(
         !compiled.guard_names.is_empty(),
         "canonical fixture should emit at least one guard"

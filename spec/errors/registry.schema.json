@@ -100,7 +100,7 @@
         "severity",
         "summary",
         "help",
-        "legacy_string_code",
+        "string_code",
         "since",
         "stability",
         "consumed_by"
@@ -130,7 +130,7 @@
           "type": "string",
           "minLength": 1
         },
-        "legacy_string_code": {
+        "string_code": {
           "type": "string",
           "pattern": "^CHIO-[A-Z0-9]+(?:-[A-Z0-9]+)*$"
         },

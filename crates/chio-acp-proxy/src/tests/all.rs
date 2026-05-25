@@ -399,7 +399,7 @@ mod tests {
         let raw = json!({
             "toolCallId": "tc-1",
             "title": "Read file",
-            "kind": "fs_read",
+            "kind": "read",
             "status": "running"
         });
         let update = parse_session_update(&raw);
@@ -651,7 +651,7 @@ mod tests {
                 "update": {
                     "toolCallId": "tc-99",
                     "title": "Build project",
-                    "kind": "terminal",
+                    "kind": "execute",
                     "status": "running"
                 }
             }
@@ -1481,7 +1481,7 @@ mod extended_tests {
                 "update": {
                     "toolCallId": "tc-200",
                     "title": "Compile",
-                    "kind": "terminal",
+                    "kind": "execute",
                     "status": "running"
                 }
             }
@@ -2074,7 +2074,7 @@ mod extended_tests {
         let event = ToolCallEvent {
             tool_call_id: "tc-ser".to_string(),
             title: Some("Serialize test".to_string()),
-            kind: Some("terminal".to_string()),
+            kind: Some("execute".to_string()),
             status: Some("running".to_string()),
             extra: Default::default(),
         };
@@ -2083,7 +2083,7 @@ mod extended_tests {
         if let Ok(val) = json_result {
             assert_eq!(val["toolCallId"], "tc-ser");
             assert_eq!(val["title"], "Serialize test");
-            assert_eq!(val["kind"], "terminal");
+            assert_eq!(val["kind"], "execute");
             assert_eq!(val["status"], "running");
         }
     }
@@ -2584,7 +2584,7 @@ mod attestation_and_telemetry_tests {
         AcpToolCallAuditEntry {
             tool_call_id: tool_call_id.to_string(),
             title: "Test tool".to_string(),
-            kind: Some("terminal".to_string()),
+            kind: Some("execute".to_string()),
             status: "completed".to_string(),
             session_id: session_id.to_string(),
             timestamp: now_secs().to_string(),
@@ -3007,7 +3007,7 @@ mod attestation_and_telemetry_tests {
                 "update": {
                     "toolCallId": "tool-required-signer",
                     "title": "Build project",
-                    "kind": "terminal",
+                    "kind": "execute",
                     "status": "running"
                 }
             }
@@ -3369,7 +3369,7 @@ mod attestation_and_telemetry_tests {
                 "update": {
                     "toolCallId": "tool-377",
                     "title": "Read file",
-                    "kind": "fs_read",
+                    "kind": "read",
                     "status": "running"
                 }
             }
@@ -3504,7 +3504,7 @@ mod attestation_and_telemetry_tests {
                 "update": {
                     "toolCallId": "tool-b",
                     "title": "Read file B",
-                    "kind": "fs_read",
+                    "kind": "read",
                     "status": "running"
                 }
             }
@@ -3770,7 +3770,7 @@ mod attestation_and_telemetry_tests {
                 "update": {
                     "toolCallId": "tool-clear",
                     "title": "Read file",
-                    "kind": "fs_read",
+                    "kind": "read",
                     "status": "running"
                 }
             }
@@ -3901,7 +3901,7 @@ mod attestation_and_telemetry_tests {
                 "update": {
                     "toolCallId": "tool-fs-read-link-1",
                     "title": "Read /home/user/project/src/lib.rs",
-                    "kind": "fs_read",
+                    "kind": "read",
                     "status": "running"
                 }
             }
@@ -4624,7 +4624,7 @@ mod attestation_and_telemetry_tests {
     }
 
     #[test]
-    fn compliance_certificate_serializes_snake_case_and_accepts_legacy_aliases() {
+    fn compliance_certificate_serializes_snake_case() {
         let signer = Keypair::generate();
         let now = now_secs();
         let receipts = vec![ComplianceReceiptEntry {
@@ -4665,30 +4665,6 @@ mod attestation_and_telemetry_tests {
         assert!(body.get("receipt_count").is_some());
         assert!(body.get("kernel_key").is_some());
         assert!(body.get("sessionId").is_none());
-
-        let legacy = serde_json::json!({
-            "body": {
-                "schema": cert.body.schema,
-                "sessionId": cert.body.session_id,
-                "issuedAt": cert.body.issued_at,
-                "receiptCount": cert.body.receipt_count,
-                "firstReceiptAt": cert.body.first_receipt_at,
-                "lastReceiptAt": cert.body.last_receipt_at,
-                "allSignaturesValid": cert.body.all_signatures_valid,
-                "chainContinuous": cert.body.chain_continuous,
-                "scopeCompliant": cert.body.scope_compliant,
-                "budgetCompliant": cert.body.budget_compliant,
-                "guardsCompliant": cert.body.guards_compliant,
-                "anomalies": cert.body.anomalies,
-                "kernelKey": cert.body.kernel_key,
-            },
-            "signerKey": cert.signer_key,
-            "signature": cert.signature,
-        });
-        let decoded: ComplianceCertificate =
-            serde_json::from_value(legacy).expect("legacy camelCase payload should deserialize");
-        assert_eq!(decoded.body.session_id, "session-snake");
-        assert_eq!(decoded.body.receipt_count, 1);
     }
 
     #[test]
@@ -5555,7 +5531,7 @@ mod attestation_and_telemetry_tests {
             json!({
                 "tool_call_id": "call-provenance",
                 "title": "Test tool",
-                "kind": "terminal",
+                "kind": "execute",
                 "status": "completed",
                 "authorization_parameter_hash": null,
             })
@@ -6058,7 +6034,7 @@ mod attestation_and_telemetry_tests {
                 "update": {
                     "toolCallId": "tool-1",
                     "title": "Build",
-                    "kind": "terminal",
+                    "kind": "execute",
                     "status": "running"
                 }
             }

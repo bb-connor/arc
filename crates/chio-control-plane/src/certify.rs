@@ -16,9 +16,7 @@ use crate::enterprise_federation::CertificationDiscoveryNetwork;
 use crate::{load_or_create_authority_keypair, CliError};
 
 const CERTIFICATION_SCHEMA: &str = "chio.certify.check.v1";
-const LEGACY_CERTIFICATION_SCHEMA: &str = "chio.certify.check.v1";
 const CERTIFICATION_REGISTRY_VERSION: &str = "chio.certify.registry.v1";
-const LEGACY_CERTIFICATION_REGISTRY_VERSION: &str = "chio.certify.registry.v1";
 const CRITERIA_PROFILE_ALL_PASS_V1: &str = "conformance-all-pass-v1";
 const EVIDENCE_PROFILE_CONFORMANCE_REPORT_BUNDLE_V1: &str = "conformance-report-bundle-v1";
 const CERTIFICATION_PUBLIC_METADATA_SCHEMA: &str = "chio.certify.discovery-metadata.v1";
@@ -29,11 +27,11 @@ const CERTIFICATION_PROVENANCE_MODE_ARTIFACT_SIGNER: &str = "artifact-signer-key
 const GENERATED_REPORT_MEDIA_TYPE_MARKDOWN: &str = "text/markdown";
 
 fn is_supported_certification_schema(schema: &str) -> bool {
-    schema == CERTIFICATION_SCHEMA || schema == LEGACY_CERTIFICATION_SCHEMA
+    schema == CERTIFICATION_SCHEMA
 }
 
 fn is_supported_certification_registry_version(version: &str) -> bool {
-    version == CERTIFICATION_REGISTRY_VERSION || version == LEGACY_CERTIFICATION_REGISTRY_VERSION
+    version == CERTIFICATION_REGISTRY_VERSION
 }
 
 fn is_supported_evidence_profile(profile: &str) -> bool {
@@ -685,8 +683,8 @@ pub(crate) fn validate_public_certification_metadata(
 fn validate_certification_artifact_body(body: &CertificationCheckBody) -> Result<(), CliError> {
     if !is_supported_certification_schema(&body.schema) {
         return Err(CliError::attest_error(format!(
-            "unsupported certification schema: expected {} or {}, got {}",
-            CERTIFICATION_SCHEMA, LEGACY_CERTIFICATION_SCHEMA, body.schema
+            "unsupported certification schema: expected {}, got {}",
+            CERTIFICATION_SCHEMA, body.schema
         )));
     }
     if body.criteria_profile != CRITERIA_PROFILE_ALL_PASS_V1 {

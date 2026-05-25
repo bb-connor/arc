@@ -238,15 +238,6 @@ impl ChioAcpEdge {
         }
     }
 
-    /// Back-compat alias for callers that already adopted the explicit capability-preview name.
-    pub fn evaluate_permission_with_capability(
-        &self,
-        request: &PermissionRequest,
-        execution: &AcpKernelExecutionContext,
-    ) -> PermissionDecision {
-        self.evaluate_permission(request, execution)
-    }
-
     /// Invoke a capability through the Chio kernel.
     ///
     /// The caller is responsible for registering the bound tool server with the
@@ -390,17 +381,6 @@ impl ChioAcpEdge {
                 metadata: Some(passthrough_metadata(Some(&error.to_string()))),
             }),
         }
-    }
-
-    /// Back-compat alias for callers that already adopted the explicit kernel helper name.
-    pub fn invoke_with_kernel(
-        &self,
-        capability_id: &str,
-        arguments: Value,
-        kernel: &ChioKernel,
-        execution: &AcpKernelExecutionContext,
-    ) -> Result<AcpInvocationResult, AcpEdgeError> {
-        self.invoke(capability_id, arguments, kernel, execution)
     }
 
     /// Handle a JSON-RPC ACP request through the Chio kernel.
@@ -594,16 +574,6 @@ impl ChioAcpEdge {
                 }
             }),
         }
-    }
-
-    /// Back-compat alias for callers that already adopted the explicit kernel helper name.
-    pub fn handle_jsonrpc_with_kernel(
-        &self,
-        message: Value,
-        kernel: &ChioKernel,
-        execution: &AcpKernelExecutionContext,
-    ) -> Value {
-        self.handle_jsonrpc(message, kernel, execution)
     }
 
     fn handle_jsonrpc_stream(

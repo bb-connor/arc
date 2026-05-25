@@ -5179,12 +5179,12 @@ mod cluster_and_reports_tests {
     }
 
     #[test]
-    fn budget_delta_import_preserves_record_only_legacy_deltas() {
-        let budget_db = unique_temp_path("cluster-legacy-budget-delta", "sqlite3");
+    fn budget_delta_import_handles_records_without_mutation_events() {
+        let budget_db = unique_temp_path("cluster-records-only-budget-delta", "sqlite3");
         let mut store = SqliteBudgetStore::open(&budget_db).test_unwrap();
         let response = BudgetDeltaResponse {
             records: vec![BudgetUsageView {
-                capability_id: "cap-legacy".to_string(),
+                capability_id: "cap-records-only".to_string(),
                 grant_index: 0,
                 invocation_count: 3,
                 total_cost_exposed: 55,
@@ -5200,13 +5200,16 @@ mod cluster_and_reports_tests {
         assert!(outcome.should_continue);
         assert_eq!(outcome.next_cursor.test_unwrap().seq, 42);
 
-        let usage = store.get_usage("cap-legacy", 0).test_unwrap().test_unwrap();
+        let usage = store
+            .get_usage("cap-records-only", 0)
+            .test_unwrap()
+            .test_unwrap();
         assert_eq!(usage.invocation_count, 3);
         assert_eq!(usage.seq, 42);
         assert_eq!(usage.total_cost_exposed, 55);
         assert_eq!(usage.total_cost_realized_spend, 21);
         assert!(store
-            .list_mutation_events(10, Some("cap-legacy"), Some(0))
+            .list_mutation_events(10, Some("cap-records-only"), Some(0))
             .test_unwrap()
             .is_empty());
     }

@@ -74,12 +74,9 @@ impl SettlementObserverStatus {
 /// invocations, or non-allow decisions). The kernel observer slot
 /// invokes a registered hook only when this returns `Some`.
 ///
-/// The receipt's financial metadata is canonically the
-/// `FinancialReceiptMetadata` shape (`cost_charged`, `currency`,
-/// `attempted_cost`) under `metadata.financial.*`. Older receipts and
-/// tests may still carry `approved_max`/`settlement_cap`/`amount.units`
-/// keys, so the lookup is canonical-first with a legacy fallback for
-/// external receipts that pre-date the kernel canonical shape.
+/// The receipt's financial metadata is the `FinancialReceiptMetadata`
+/// shape (`cost_charged`, `currency`, `attempted_cost`) under
+/// `metadata.financial.*`.
 #[must_use]
 fn build_observation_unchecked(receipt: &ChioReceipt) -> Option<SettlementObservation> {
     if !receipt.verify_signature().ok()? {
@@ -98,25 +95,10 @@ fn build_observation_unchecked(receipt: &ChioReceipt) -> Option<SettlementObserv
             .and_then(|value| value.as_object())
     })?;
 
-    // Canonical kernel shape: `FinancialReceiptMetadata`.
-    let canonical_amount = financial.get("cost_charged").and_then(|cc| {
+    // Financial metadata uses the `FinancialReceiptMetadata` shape.
+    let monetary = financial.get("cost_charged").and_then(|cc| {
         let units = cc.as_u64()?;
         let currency = financial.get("currency")?.as_str()?.to_string();
-        Some(chio_core::capability::MonetaryAmount { currency, units })
-    });
-
-    // Legacy/test fallback: nested `approved_max`/`settlement_cap`/
-    // `amount` objects that some older fixtures and external
-    // receipts emit. Kept so the unit tests in this module and any
-    // imported corpus continue to round-trip.
-    let monetary = canonical_amount.or_else(|| {
-        let amount = financial.get("approved_max").or_else(|| {
-            financial
-                .get("settlement_cap")
-                .or_else(|| financial.get("amount"))
-        })?;
-        let units = amount.get("units")?.as_u64()?;
-        let currency = amount.get("currency")?.as_str()?.to_string();
         Some(chio_core::capability::MonetaryAmount { currency, units })
     })?;
 
@@ -274,7 +256,7 @@ mod tests {
     fn build_observation_skips_non_allow_decisions() {
         let receipt = sign_with(
             serde_json::json!({
-                "financial": {"approved_max": {"units": 100, "currency": "USD"}}
+                "financial": {"cost_charged": 100, "currency": "USD"}
             }),
             Decision::Deny {
                 reason: "denied".to_string(),
@@ -288,7 +270,7 @@ mod tests {
     fn build_observation_skips_zero_priced_receipts() {
         let receipt = sign_with(
             serde_json::json!({
-                "financial": {"approved_max": {"units": 0, "currency": "USD"}}
+                "financial": {"cost_charged": 0, "currency": "USD"}
             }),
             Decision::Allow,
         );
@@ -305,7 +287,7 @@ mod tests {
     fn build_observation_skips_invalid_signature() {
         let mut receipt = sign_with(
             serde_json::json!({
-                "financial": {"approved_max": {"units": 250, "currency": "USD"}}
+                "financial": {"cost_charged": 250, "currency": "USD"}
             }),
             Decision::Allow,
         );
@@ -320,7 +302,7 @@ mod tests {
         action.parameters = serde_json::json!({"path": "/tmp/b"});
         let receipt = sign_with_action(
             serde_json::json!({
-                "financial": {"approved_max": {"units": 250, "currency": "USD"}}
+                "financial": {"cost_charged": 250, "currency": "USD"}
             }),
             Decision::Allow,
             action,
@@ -332,7 +314,7 @@ mod tests {
     fn build_observation_constructs_priced_frame() {
         let receipt = sign_with(
             serde_json::json!({
-                "financial": {"approved_max": {"units": 250, "currency": "USD"}}
+                "financial": {"cost_charged": 250, "currency": "USD"}
             }),
             Decision::Allow,
         );
@@ -354,7 +336,7 @@ mod tests {
     fn build_observation_rejects_untrusted_signer() {
         let receipt = sign_with(
             serde_json::json!({
-                "financial": {"approved_max": {"units": 250, "currency": "USD"}}
+                "financial": {"cost_charged": 250, "currency": "USD"}
             }),
             Decision::Allow,
         );
@@ -365,7 +347,7 @@ mod tests {
     fn run_observer_returns_not_registered_without_hook() {
         let receipt = sign_with(
             serde_json::json!({
-                "financial": {"approved_max": {"units": 250, "currency": "USD"}}
+                "financial": {"cost_charged": 250, "currency": "USD"}
             }),
             Decision::Allow,
         );
@@ -377,7 +359,7 @@ mod tests {
     fn run_observer_records_hook_outcome() {
         let receipt = sign_with(
             serde_json::json!({
-                "financial": {"approved_max": {"units": 250, "currency": "USD"}}
+                "financial": {"cost_charged": 250, "currency": "USD"}
             }),
             Decision::Allow,
         );
@@ -399,7 +381,7 @@ mod tests {
     fn run_observer_skips_zero_price_without_invoking_hook() {
         let receipt = sign_with(
             serde_json::json!({
-                "financial": {"approved_max": {"units": 0, "currency": "USD"}}
+                "financial": {"cost_charged": 0, "currency": "USD"}
             }),
             Decision::Allow,
         );
@@ -458,7 +440,7 @@ mod tests {
     fn run_observer_records_hook_failures_without_panicking() {
         let receipt = sign_with(
             serde_json::json!({
-                "financial": {"approved_max": {"units": 250, "currency": "USD"}}
+                "financial": {"cost_charged": 250, "currency": "USD"}
             }),
             Decision::Allow,
         );

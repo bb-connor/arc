@@ -139,8 +139,6 @@ pub(crate) struct SidecarMintRequest {
     #[serde(default)]
     scopes: Vec<String>,
     #[serde(default)]
-    ttl: Option<u64>,
-    #[serde(default)]
     ttl_seconds: Option<u64>,
     #[serde(default)]
     ttl_nanos: Option<u64>,
@@ -234,11 +232,7 @@ pub(crate) async fn sidecar_mint_handler(
     };
 
     let issued_at = chrono::Utc::now().timestamp() as u64;
-    let ttl_seconds = ttl_seconds_from_wire(
-        mint_request.ttl_seconds,
-        mint_request.ttl_nanos,
-        mint_request.ttl,
-    );
+    let ttl_seconds = ttl_seconds_from_wire(mint_request.ttl_seconds, mint_request.ttl_nanos);
     let expires_at = issued_at.saturating_add(ttl_seconds);
     let subject = derive_sidecar_subject_key(&mint_request.subject, &mint_request.job_uid);
     let capability_id = match derive_sidecar_capability_id(
@@ -481,8 +475,6 @@ pub(crate) struct SdkMintRequest {
     #[serde(default)]
     ttl_nanos: Option<u64>,
     #[serde(default)]
-    ttl: Option<u64>,
-    #[serde(default)]
     job_uid: Option<String>,
 }
 
@@ -522,43 +514,40 @@ pub(crate) async fn sidecar_capabilities_alias_handler(
         }
     };
 
-    let (subject, scope, job_uid, ttl_seconds_wire, ttl_nanos_wire, ttl_legacy_wire) =
-        match alias_request {
-            SidecarCapabilitiesAliasRequest::Sdk(sdk) => {
-                if sdk.subject.trim().is_empty() {
-                    return sidecar_bad_request("subject must not be empty").into_response();
-                }
-                let job_uid = sdk.job_uid.unwrap_or_default();
-                (
-                    sdk.subject,
-                    sdk.scope,
-                    job_uid,
-                    sdk.ttl_seconds,
-                    sdk.ttl_nanos,
-                    sdk.ttl,
-                )
+    let (subject, scope, job_uid, ttl_seconds_wire, ttl_nanos_wire) = match alias_request {
+        SidecarCapabilitiesAliasRequest::Sdk(sdk) => {
+            if sdk.subject.trim().is_empty() {
+                return sidecar_bad_request("subject must not be empty").into_response();
             }
-            SidecarCapabilitiesAliasRequest::Canonical(mint_request) => {
-                if mint_request.subject.trim().is_empty() {
-                    return sidecar_bad_request("subject must not be empty").into_response();
-                }
-                let scope = match build_sidecar_scope(&mint_request.scopes) {
-                    Ok(scope) => scope,
-                    Err(error) => return sidecar_bad_request(&error).into_response(),
-                };
-                (
-                    mint_request.subject,
-                    scope,
-                    mint_request.job_uid,
-                    mint_request.ttl_seconds,
-                    mint_request.ttl_nanos,
-                    mint_request.ttl,
-                )
+            let job_uid = sdk.job_uid.unwrap_or_default();
+            (
+                sdk.subject,
+                sdk.scope,
+                job_uid,
+                sdk.ttl_seconds,
+                sdk.ttl_nanos,
+            )
+        }
+        SidecarCapabilitiesAliasRequest::Canonical(mint_request) => {
+            if mint_request.subject.trim().is_empty() {
+                return sidecar_bad_request("subject must not be empty").into_response();
             }
-        };
+            let scope = match build_sidecar_scope(&mint_request.scopes) {
+                Ok(scope) => scope,
+                Err(error) => return sidecar_bad_request(&error).into_response(),
+            };
+            (
+                mint_request.subject,
+                scope,
+                mint_request.job_uid,
+                mint_request.ttl_seconds,
+                mint_request.ttl_nanos,
+            )
+        }
+    };
 
     let issued_at = chrono::Utc::now().timestamp() as u64;
-    let ttl_seconds = ttl_seconds_from_wire(ttl_seconds_wire, ttl_nanos_wire, ttl_legacy_wire);
+    let ttl_seconds = ttl_seconds_from_wire(ttl_seconds_wire, ttl_nanos_wire);
     let expires_at = issued_at.saturating_add(ttl_seconds);
     let subject_key = derive_sidecar_subject_key(&subject, &job_uid);
     let capability_id = match derive_sidecar_capability_id(&subject, &job_uid, ttl_seconds, &scope)
@@ -1147,7 +1136,6 @@ pub(crate) fn sidecar_control_forbidden_response(remote_auth_configured: bool) -
 pub(crate) fn ttl_seconds_from_wire(
     ttl_seconds_wire: Option<u64>,
     ttl_nanos_wire: Option<u64>,
-    ttl_legacy_wire: Option<u64>,
 ) -> u64 {
     const DEFAULT_TTL_SECONDS: u64 = 3600;
     const NANOS_PER_SECOND: u64 = 1_000_000_000;
@@ -1169,14 +1157,7 @@ pub(crate) fn ttl_seconds_from_wire(
         };
     }
 
-    match ttl_legacy_wire {
-        Some(0) | None => DEFAULT_TTL_SECONDS,
-        Some(ttl) if ttl < NANOS_PER_SECOND => ttl,
-        Some(ttl) => std::cmp::max(
-            1,
-            ttl.saturating_add(NANOS_PER_SECOND - 1) / NANOS_PER_SECOND,
-        ),
-    }
+    DEFAULT_TTL_SECONDS
 }
 
 pub(crate) fn derive_sidecar_subject_key(
