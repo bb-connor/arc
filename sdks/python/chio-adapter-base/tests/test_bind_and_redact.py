@@ -66,10 +66,6 @@ Cells documented as out-of-scope (covered by fail-closed semantics):
   that does not declare any field for the tool yields a no-op redact;
   exercised indirectly via ``test_unrelated_tool_passes_*``-shape
   prefect tests.
-
-Per-deferred-ID regression coverage. Each ID below maps to a test in
-this file via the ``Closes deferred ID`` docstring marker. The IDs
-trace to the v2 review tables (REVIEW-v2-interval-3 / -4).
 """
 
 from __future__ import annotations
@@ -745,7 +741,7 @@ def test_pure_forwarder_redacts_both_positional_and_kwarg_for_same_slot() -> Non
 
 
 def test_index_collision_does_not_corrupt_redaction_when_renamed_protected_first() -> None:  # noqa: E501
-    """Cell SS1 / AP3 / KP1 / DT1. Closes deferred ID 3229853017.
+    """Cell SS1 / AP3 / KP1 / DT1.
 
     Wrapper renames a protected slot AND swaps the canonical-name slot
     later: ``def write(body, path)`` for ``chio_file_write`` whose
@@ -771,7 +767,7 @@ def test_index_collision_does_not_corrupt_redaction_when_renamed_protected_first
 
 
 def test_index_collision_via_kwarg_call_routes_to_protected_canonical() -> None:
-    """Cell SS1 / AP1 / KP2 / DT1. Closes deferred ID 3229898769.
+    """Cell SS1 / AP1 / KP2 / DT1.
 
     Same wrapper shape as above (``def write(body, path)``) but called
     purely with kwargs. The wrapper-renamed ``body`` kwarg must redact
@@ -796,7 +792,7 @@ def test_index_collision_via_kwarg_call_routes_to_protected_canonical() -> None:
 
 
 def test_typeerror_fallback_arity_mismatch_keeps_alias_map() -> None:
-    """Cell SS1 / AP4 / KP1 / DT1. Closes deferred ID 3229853019.
+    """Cell SS1 / AP4 / KP1 / DT1.
 
     A wrapper with a renamed protected param hit by an arity mismatch
     (more positional args than the signature accepts) blows
@@ -826,11 +822,7 @@ def test_typeerror_fallback_arity_mismatch_keeps_alias_map() -> None:
 
 
 def test_alias_map_redacts_kwarg_under_canonical_no_fallback() -> None:
-    """Cell SS1 / AP3 / KP4 / DT1. Closes deferred ID 3229898779.
-
-    Also covers deferred IDs 3229550950, 3229550957 (same root: PR
-    #666 P1 alias-rename for default-tool slot + kwarg-fills-table-slot
-    fallback path).
+    """Cell SS1 / AP3 / KP4 / DT1.
 
     Same renamed-protected wrapper as above. The original test name
     referenced a TypeError fallback path, but ``bind_partial`` actually
@@ -861,7 +853,7 @@ def test_alias_map_redacts_kwarg_under_canonical_no_fallback() -> None:
 
 
 def test_kwonly_alias_in_typeerror_fallback() -> None:
-    """Cell SS2 / AP2 / KP4 / DT1. Closes deferred ID 3229898774.
+    """Cell SS2 / AP2 / KP4 / DT1.
 
     A wrapper with both a renamed positional protected slot AND a
     kwonly alias gets hit by a duplicate-keyword TypeError. The alias
@@ -889,7 +881,7 @@ def test_kwonly_alias_in_typeerror_fallback() -> None:
 
 
 def test_pure_var_positional_named_for_protected_field_uses_signature_path() -> None:  # noqa: E501
-    """Cell SS5 / AP2 / KP1 / DT2. Closes deferred ID 3229515818.
+    """Cell SS5 / AP2 / KP1 / DT2.
 
     ``def upload(*payload)`` against a custom policy declaring
     ``payload`` as the protected field. The earlier
@@ -918,7 +910,7 @@ def test_pure_var_positional_named_for_protected_field_uses_signature_path() -> 
 
 
 def test_pure_var_positional_named_for_protected_field_with_var_keyword() -> None:  # noqa: E501
-    """Cell SS7 / AP2 / KP1 / DT2. Closes deferred ID 3229428714.
+    """Cell SS7 / AP2 / KP1 / DT2.
 
     ``def upload(*payload, **opts)`` for the same custom-tool policy.
     Even with a sibling VAR_KEYWORD, the variadic-name match must
@@ -942,7 +934,7 @@ def test_pure_var_positional_named_for_protected_field_with_var_keyword() -> Non
 
 
 def test_pure_var_positional_named_for_protected_field_chio_default() -> None:
-    """Cell SS5 / AP2 / KP1 / DT1. Closes deferred ID 3229428721.
+    """Cell SS5 / AP2 / KP1 / DT1.
 
     Prefect-side surface: ``def write_file(*content)`` against
     chio_file_write's default policy. The variadic-name ``content``
@@ -963,7 +955,7 @@ def test_pure_var_positional_named_for_protected_field_chio_default() -> None:
 
 
 def test_custom_positional_table_replaces_default_locked_v0_3_semantic() -> None:  # noqa: E501
-    """Cell SS8 / AP3 / KP1 / OV2. Closes deferred ID 3229515813.
+    """Cell SS8 / AP3 / KP1 / OV2.
 
     The v0.3 contract LOCKS ``positional_table`` as REPLACES (current
     behavior) rather than EXTENDS. A caller-supplied table fully
@@ -1013,11 +1005,7 @@ def test_custom_positional_table_replaces_default_locked_v0_3_semantic() -> None
 
 
 def test_kwarg_filling_table_slot_does_not_leak_positional_when_renamed_wrapper() -> None:  # noqa: E501
-    """Cell SS1 / AP2 / KP4 / DT1. Closes deferred ID 3229883416.
-
-    Also covers deferred IDs 3229550950, 3229550957 (same root: PR
-    #666 P1 alias-rename for default-tool slot + kwarg-fills-table-slot
-    fallback path).
+    """Cell SS1 / AP2 / KP4 / DT1.
 
     Wrapper renames protected slot, kwarg supplies the wrapper's
     renamed name AND a positional secret arrives. Both buckets must
@@ -1085,7 +1073,7 @@ def test_typeerror_fallback_two_kwargs_same_canonical_both_redact() -> None:
 
 
 def test_pure_forwarder_kwarg_aliasing_does_not_break_existing_path() -> None:
-    """Cell SS7 / AP2 / KP3 / DT1. Closes deferred ID 3229883411.
+    """Cell SS7 / AP2 / KP3 / DT1.
 
     A pure-forwarder wrapper called with a non-table kwarg name must
     not invent an alias. ``proxy("PROD_SECRET", marker="ok")`` for
@@ -1110,7 +1098,7 @@ def test_pure_forwarder_kwarg_aliasing_does_not_break_existing_path() -> None:
 
 
 def test_pure_forwarder_with_kwarg_canonical_redirects_positional_to_protected() -> None:  # noqa: E501
-    """Cell SS7 / AP2 / KP2 / DT1. Closes deferred ID 3229890976.
+    """Cell SS7 / AP2 / KP2 / DT1.
 
     Pure-forwarder with a kwarg consuming the unprotected canonical
     slot (``path``); the positional value rolls onto the next free
@@ -1131,7 +1119,7 @@ def test_pure_forwarder_with_kwarg_canonical_redirects_positional_to_protected()
 
 
 def test_known_tool_with_canonical_kwarg_filling_unprotected_slot() -> None:
-    """Cell SS1 / AP2 / KP2 / DT1. Closes deferred ID 3229381473.
+    """Cell SS1 / AP2 / KP2 / DT1.
 
     ``def write(content, path)`` (canonical names, swapped order)
     called as ``write("PROD_SECRET", path="/tmp/x")``. The wrapper's
@@ -1152,7 +1140,7 @@ def test_known_tool_with_canonical_kwarg_filling_unprotected_slot() -> None:
 
 
 def test_var_positional_after_protected_kwarg_redacts_extras() -> None:
-    """Cell SS3 / AP4 / KP2 / DT1. Closes deferred ID 3229566280.
+    """Cell SS3 / AP4 / KP2 / DT1.
 
     ``def fn(path, *rest, **kw)`` with the kwarg consuming the
     canonical protected slot. The VAR_POSITIONAL extras must STILL
@@ -1184,7 +1172,7 @@ def test_var_positional_after_protected_kwarg_redacts_extras() -> None:
 
 
 def test_var_positional_after_protected_kwarg_redacts_extras_alt_shape() -> None:  # noqa: E501
-    """Cell SS3 / AP4 / KP1 / DT1. Closes deferred ID 3229515822.
+    """Cell SS3 / AP4 / KP1 / DT1.
 
     ``def fn(path, *rest, **kw)`` purely positional: rest[0] is the
     secret. The variadic redacts via table slot 1 (``content``).
@@ -1205,7 +1193,7 @@ def test_var_positional_after_protected_kwarg_redacts_extras_alt_shape() -> None
 
 
 def test_custom_policy_without_positional_table_redacts_kwargs() -> None:
-    """Cell SS6 / AP1 / KP2 / DT2. Closes deferred ID 3229550963.
+    """Cell SS6 / AP1 / KP2 / DT2.
 
     A custom policy for a tool not in any positional_table at all -
     kwargs-only redaction is the fail-closed contract. Positional args
@@ -1232,7 +1220,7 @@ def test_custom_policy_without_positional_table_redacts_kwargs() -> None:
 
 
 def test_custom_policy_without_positional_table_pure_forwarder_kwargs() -> None:
-    """Cell SS7 / AP1 / KP2 / DT2. Closes deferred ID 3229566266.
+    """Cell SS7 / AP1 / KP2 / DT2.
 
     Pure-forwarder, custom-policy tool, kwargs-only call: kwargs
     redact under the policy.
@@ -1259,7 +1247,7 @@ def test_custom_policy_without_positional_table_pure_forwarder_kwargs() -> None:
 
 
 def test_custom_policy_without_table_positional_passes_raw_documented_limitation() -> None:  # noqa: E501
-    """Cell SS7 / AP2 / KP1 / DT2. Closes deferred ID 3229566275.
+    """Cell SS7 / AP2 / KP1 / DT2.
 
     Pure-forwarder, custom-policy tool, positional-only call: no
     positional_table entry means no name to bind against; positional
@@ -1284,7 +1272,7 @@ def test_custom_policy_without_table_positional_passes_raw_documented_limitation
 
 
 def test_var_positional_named_after_protected_multi_chunk_emits_each() -> None:
-    """Cell SS3 / AP4 / KP2 / DT1. Closes deferred ID 3229428697.
+    """Cell SS3 / AP4 / KP2 / DT1.
 
     ``def write_file(*content, path)`` with multiple chunks. Every
     chunk must redact under the variadic name; none silently dropped.
@@ -1306,7 +1294,7 @@ def test_var_positional_named_after_protected_multi_chunk_emits_each() -> None:
 
 
 def test_pure_forwarder_kwarg_alias_not_invented_when_no_canonical_match() -> None:  # noqa: E501
-    """Cell SS7 / AP1 / KP3 / DT1. Closes deferred ID 3229428705.
+    """Cell SS7 / AP1 / KP3 / DT1.
 
     Pure-forwarder, single non-matching kwarg, chio-default policy:
     no alias inference; kwarg passes through unredacted.
@@ -1326,7 +1314,7 @@ def test_pure_forwarder_kwarg_alias_not_invented_when_no_canonical_match() -> No
 
 
 def test_pure_forwarder_positional_only_kwarg_redacts_under_canonical() -> None:
-    """Cell SS7 / AP2 / KP2 / DT1. Closes deferred ID 3229428710.
+    """Cell SS7 / AP2 / KP2 / DT1.
 
     Same pure-forwarder shape but with the kwarg supplying the
     canonical protected name directly. Both buckets redact.
@@ -1351,7 +1339,7 @@ def test_pure_forwarder_positional_only_kwarg_redacts_under_canonical() -> None:
 
 
 def test_temporal_extras_past_table_pass_through_raw_documented() -> None:
-    """Cell SS3 / AP4 / KP1 / DT1. Closes deferred ID 3229196956.
+    """Cell SS3 / AP4 / KP1 / DT1.
 
     chio-temporal motivation: ``chio_file_write(path, content,
     overwrite)`` style call where a third positional ``overwrite``
@@ -1377,7 +1365,7 @@ def test_temporal_extras_past_table_pass_through_raw_documented() -> None:
 
 
 def test_index_renamed_kwonly_with_typeerror_routes_via_alias() -> None:
-    """Cell SS2 / AP3 / KP4 / DT1. Closes deferred ID 3229515806.
+    """Cell SS2 / AP3 / KP4 / DT1.
 
     Wrapper with renamed positional protected slot AND a kwonly alias,
     triggered into the TypeError fallback by an arity overflow.
@@ -1413,7 +1401,7 @@ def test_index_renamed_kwonly_with_typeerror_routes_via_alias() -> None:
 
 
 def test_typeerror_fallback_unknown_tool_only_redacts_kwargs() -> None:
-    """Cell SS1 / AP4 / KP1 / DT2. Closes deferred ID 3229383817.
+    """Cell SS1 / AP4 / KP1 / DT2.
 
     Test integrity: the original
     ``test_bind_and_redact_fallback_unknown_tool_forwards_args_raw``
@@ -1441,7 +1429,7 @@ def test_typeerror_fallback_unknown_tool_only_redacts_kwargs() -> None:
 
 
 def test_signature_derived_table_overrides_default_in_typeerror_fallback() -> None:  # noqa: E501
-    """Cell SS1 / AP3 / KP4 / DT1. Closes deferred ID 3229551813.
+    """Cell SS1 / AP3 / KP4 / DT1.
 
     E1 regression: the dict-spread in the TypeError fallback must put
     signature-derived names AFTER the caller table so they take
@@ -1470,13 +1458,12 @@ def test_signature_derived_table_overrides_default_in_typeerror_fallback() -> No
 
 
 def test_var_keyword_only_preserves_documented_kwargs_only_redact() -> None:
-    """Cell SS6 / AP1 / KP2 / DT1. Closes deferred ID 3229135545.
+    """Cell SS6 / AP1 / KP2 / DT1.
 
     Pure VAR_KEYWORD wrapper; the positional-only same-named kwarg
     edge case is already covered by
     ``test_positional_only_with_same_named_kwarg_preserves_spillover``;
-    this asserts the simpler kwargs-only path for
-    completeness of the deferred-ID mapping.
+    this asserts the simpler kwargs-only path for completeness.
     """
 
     def fn(**kwargs: object) -> None:
@@ -1561,11 +1548,8 @@ def test_typeerror_fallback_protected_var_positional_multi_chunk() -> None:
     first one.
 
     Uses chunks of DISTINCT byte lengths so a regression that
-    overwrites earlier values (e.g. the fallback table dedup bug closed
-    by b75631cbb) cannot hide behind matching ``byte_count`` records.
-    The interval-1 version of this test used three 13-byte chunks
-    (``PROD_SECRET_A/B/C``) which masked the overwrite. Distinct
-    lengths make any future regression visible.
+    overwrites earlier values cannot hide behind matching
+    ``byte_count`` records.
     """
 
     def write_file(*content: str) -> None:
@@ -1683,13 +1667,10 @@ def test_typeerror_fallback_protected_var_positional_distinct_lengths_strict() -
     """Regression:
 
     ``def write_file(*content)`` invoked with ``args=("A","BB","CCC")``
-    plus an unsupported ``path`` kwarg. The reviewer flagged that
-    earlier code overwrote the per-position byte_count so the rebuilt
-    args reported the LAST value's length for every position
-    (``byte_count: 3`` for all three). Interval-2's de-dup fix
-    (b75631cbb) did close this; this test asserts the post-fix
-    invariant with DISTINCT byte lengths so any future regression that
-    re-introduces overwrite behaviour fails loudly. Complements
+    plus an unsupported ``path`` kwarg. Asserts each position reports
+    its OWN value's byte_count (not the last value's length for every
+    position), using DISTINCT byte lengths so an overwrite regression
+    fails loudly. Complements
     ``test_typeerror_fallback_protected_var_positional_multi_chunk``
     by varying the input arity and chunk-shape so the contract is
     pinned from multiple angles.

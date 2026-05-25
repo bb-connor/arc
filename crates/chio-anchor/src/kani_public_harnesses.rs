@@ -79,21 +79,6 @@
 //!       `WitnessPolicyError::StaleNotPreviouslyVerified`).
 //!     - The negative conformance regression tests under
 //!       `crates/chio-conformance/tests/`.
-//!
-//! Future hardening follow-up: extract a decision-algebra helper
-//! (e.g. `pub(crate) fn classify_witness_policy_outcome(state:
-//! &WitnessState, policy: &WitnessPolicy) -> WitnessPolicyClass`)
-//! used by both the runtime `evaluate_witness_policy` and the Kani
-//! harness, replacing `model_evaluate_witness_policy`. This is option
-//! (a) for future hardening; it was deferred from this release because the
-//! production function's `Stale` arm depends on `batch_body_hash`
-//! recomputation (canonical-JSON + SHA-256) and `WitnessPolicyError`
-//! constructors that carry hex-formatted body-hash strings. Decoupling
-//! those side-effects from the decision algebra requires touching the
-//! public error enum; doing so on the load-bearing conformance
-//! lane risks a regression.
-//!
-//! # Cross-references
 
 extern crate alloc;
 
@@ -229,17 +214,6 @@ pub fn public_anchor_emergency_controls_allows_truth_table() {
 ///   - The runtime negative tests under
 ///     `crates/chio-anchor/tests/` that exercise the
 ///     `format!()`-based error path.
-///
-/// Future hardening follow-up: extract a
-/// `pub(crate) fn classify_operation_admission(controls:
-/// AnchorEmergencyControls, operation: AnchorOperationKind) ->
-/// Result<(), AnchorOperationAdmissionError>` where the error type
-/// is a small enum carrying only the variant tag (no `String`
-/// payload). The runtime fail-closed branch wraps that into the
-/// existing `AnchorError::InvalidInput` variant. The
-/// Kani harness then exercises `classify_operation_admission`
-/// directly and skips the format-string path entirely, letting the
-/// tightened harness migrate back to the PR lane.
 #[kani::proof]
 #[kani::unwind(4)]
 pub fn public_ensure_anchor_operation_allowed_fail_closed() {

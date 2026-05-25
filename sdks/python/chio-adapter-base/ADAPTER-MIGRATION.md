@@ -38,8 +38,7 @@ batch (#664-#675) exposed:
    instead so each variadic value redacts under the canonical name.
 5. **VAR_POSITIONAL merge-conflicts for `def fn(path, *rest, **kw)`**
    now redact the extra positional value that collides with a
-   kwarg-supplied protected slot (closes deferred IDs 3229566280 and
-   3229515822). Extras that have no table slot or protected
+   kwarg-supplied protected slot. Extras that have no table slot or protected
    collision remain raw because the helper has no safe field name for
    them.
 
@@ -298,7 +297,7 @@ is the same across all of them:
    in 0.2.0): for `def fn(path, *rest, **kw)`, assert that when
    `kw` already supplies a protected slot (e.g. `body=`), the
    colliding variadic extra redacts under the canonical protected
-   slot (closes deferred IDs 3229566280 / 3229515822). Do not
+   slot. Do not
    assert that arbitrary extras beyond known slots are redacted.
 
 7. **Custom `positional_table` replace semantic** (new in

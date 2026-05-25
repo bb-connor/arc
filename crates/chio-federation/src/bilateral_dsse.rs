@@ -1,5 +1,3 @@
-//! ## Why this module exists
-//!
 //! ## Wire format
 //!
 //! ```text

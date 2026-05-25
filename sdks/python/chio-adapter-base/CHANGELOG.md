@@ -19,8 +19,7 @@ against a real adapter so future shape additions land once, in
 ### Added
 - 26 new regression tests (115 -> 141) plus a 6-axis coverage matrix
   comment block at the top of `tests/test_bind_and_redact.py` mapping
-  every cell to one or more named tests. Each new test docstring
-  cites the `Closes deferred ID <bot-comment-id>` it covers.
+  every cell to one or more named tests.
 - 5 hypothesis property tests in
   `tests/test_bind_and_redact_properties.py`, each running 200
   examples on CI: JSON-serialisability of the redacted output, the
@@ -81,8 +80,7 @@ against a real adapter so future shape additions land once, in
   shape wrappers now redact the extra positional value that collides
   with a kwarg-supplied protected slot. Extras without a table slot
   or protected collision remain raw because the helper has no safe
-  field name for them. This closes deferred IDs 3229566280 and
-  3229515822.
+  field name for them.
 
 ### Documentation
 - `positional_table` argument is now explicitly documented as

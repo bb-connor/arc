@@ -940,13 +940,9 @@ class TestArityOverflowFailClosed:
     positional values than the signature accepts triggers
     ``bind_partial`` TypeError. The bare ``bind_and_redact`` fallback
     table redacts only up to the wrapper's last named slot and forwards
-    the rest raw. Pre-v0.3 prefect's ``_task_parameters`` instead
-    dropped the overflow positionals so an arity-invalid call could
-    never silently leak. The interval-3 shim delegated to
-    ``bind_and_redact`` and lost that fail-closed behaviour. This
-    re-establishes it: overflow values are redacted under each
-    protected canonical so the receipt audit log records "a secret was
-    attempted at position N" without crossing the wire.
+    the rest raw. Fail-closed contract: overflow values are redacted
+    under each protected canonical so the receipt audit log records
+    "a secret was attempted at position N" without crossing the wire.
     """
 
     def test_arity_overflow_positional_redacted_via_table(self) -> None:
@@ -1047,14 +1043,13 @@ class TestArityOverflowFailClosed:
     def test_user_dict_with_omitted_key_still_redacted(self) -> None:
         """Regression:
 
-        The interval-5 stub-skip guard checked only
-        ``isinstance(value, dict) and value.get("omitted") is True`` so
-        a user-supplied dict that happened to carry an ``omitted: True``
-        flag plus real secrets slipped through the overflow loop
-        unredacted. Tighten the guard to match the exact stub
-        fingerprint (``omitted is True`` AND a numeric ``byte_count`` AND
-        no other keys); user dicts with extra keys must continue to be
-        redacted via the protected canonical.
+        The stub-skip guard must match the exact stub fingerprint
+        (``omitted is True`` AND a numeric ``byte_count`` AND no other
+        keys). A looser check (``isinstance(value, dict) and
+        value.get("omitted") is True``) lets a user-supplied dict that
+        carries an ``omitted: True`` flag plus real secrets slip through
+        the overflow loop unredacted; user dicts with extra keys must
+        continue to be redacted via the protected canonical.
         """
         from chio_prefect.decorators import _task_parameters
 

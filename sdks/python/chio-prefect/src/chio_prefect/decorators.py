@@ -637,11 +637,11 @@ def _task_parameters(
        already supplied positionally.
 
     The helper redaction logic itself lives in
-    ``chio_adapter_base.redact.bind_and_redact`` (v0.2.0+). All
-    pre-v0.3 prefect-local contracts (variadic-named-after-protected,
-    pure-forwarder kwarg precedence, alias-rename redaction, TypeError
-    fallback) are now expressed there; the prefect canary verifies the
-    helper API actually subsumes the bespoke shape.
+    ``chio_adapter_base.redact.bind_and_redact``. The prefect-local
+    contracts (variadic-named-after-protected, pure-forwarder kwarg
+    precedence, alias-rename redaction, TypeError fallback) are
+    expressed there; the prefect canary verifies the helper API
+    subsumes the bespoke shape.
     """
     return _prefect_envelope(args, kwargs, tool_name, policy, fn)
 

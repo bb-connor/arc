@@ -291,10 +291,9 @@ def build_alias_map(
     canonical stay self-aliased, preserving the "redact only named
     fields" custom-policy contract.
 
-    Closes deferred ID 3229853017 (``def write(body, path)`` previously
-    aliased ``body`` to ``path`` index-wise; correct routing is
-    ``body`` -> ``content`` since ``path`` is claimed at idx 1 by the
-    swap-aware Pass 1).
+    The ``def write(body, path)`` case routes ``body`` -> ``content``,
+    not ``path``: ``path`` is already claimed at idx 1 by the swap-aware
+    Pass 1.
     """
     sig_to_canonical: dict[str, str] = {}
     claimed_canonicals: set[str] = set()
