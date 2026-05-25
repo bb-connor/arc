@@ -302,7 +302,7 @@ The current launch package also consumes the same evidence set through
 | Release inputs come from source only and generated artifacts are not tracked | `scripts/check-release-inputs.sh`, root `.gitignore`, package-specific packaging manifests | `./scripts/check-release-inputs.sh` |
 | The main Rust workspace is format-clean, lint-clean, and test-clean | workspace crates plus integration/e2e suites | `./scripts/ci-workspace.sh` |
 | The dashboard is buildable and testable from a clean install | `crates/chio-cli/dashboard/package.json` and `dist/` output from a temp copy | `./scripts/check-dashboard-release.sh` |
-| The TypeScript SDK can be built, packed, and consumed as a package | `packages/sdk/chio-ts/package.json`, packed tarball, and consumer smoke install | `./scripts/check-chio-ts-release.sh` |
+| The TypeScript SDK can be built, packed, and consumed as a package | `sdks/typescript/chio-ts/package.json`, packed tarball, and consumer smoke install | `./scripts/check-chio-ts-release.sh` |
 | The Python SDK wheel and sdist are reproducible and install cleanly | `sdks/python/chio-py/pyproject.toml`, built wheel/sdist, and clean venv smoke installs | `./scripts/check-chio-py-release.sh` |
 | The Go SDK module qualifies as a module release and consumer dependency | `sdks/go/chio-go/go.mod`, `go install ./cmd/conformance-peer`, and consumer-module smoke build | `./scripts/check-chio-go-release.sh` |
 | The browser wasm bindings remain buildable and exercisable end to end in a headless browser, with emitted artifact-size and evaluate-latency outputs | `scripts/qualify-portable-browser.sh`, `crates/chio-kernel-browser/tests/wasm_bindings.rs`, and `crates/chio-kernel-browser/pkg/chio_kernel_browser_bg.wasm` | `./scripts/qualify-portable-browser.sh` |

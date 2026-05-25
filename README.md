@@ -93,7 +93,7 @@ Install and verification instructions live in
 
 | Language | Package | Package README |
 | --- | --- | --- |
-| TypeScript | `@chio-protocol/sdk` | [packages/sdk/chio-ts/README.md](packages/sdk/chio-ts/README.md) |
+| TypeScript | `@chio-protocol/sdk` | [sdks/typescript/chio-ts/README.md](sdks/typescript/chio-ts/README.md) |
 | Python | `chio-sdk` | [sdks/python/chio-py/README.md](sdks/python/chio-py/README.md) |
 | Go | `chio-go` | [sdks/go/chio-go/README.md](sdks/go/chio-go/README.md) |
 

@@ -53,7 +53,7 @@ service:
 CHIO_BASE_URL=http://127.0.0.1:8931 \
 CHIO_CONTROL_URL=http://127.0.0.1:8940 \
 CHIO_AUTH_TOKEN=demo-token \
-node --experimental-strip-types packages/sdk/chio-ts/examples/governed_hello.ts
+node --experimental-strip-types sdks/typescript/chio-ts/examples/governed_hello.ts
 ```
 
 For a repo-local end-to-end verification run that boots those services
@@ -72,6 +72,6 @@ automatically, use:
 ## Release Checks
 
 ```bash
-npm --prefix packages/sdk/chio-ts test
+npm --prefix sdks/typescript/chio-ts test
 ./scripts/check-chio-ts-release.sh
 ```

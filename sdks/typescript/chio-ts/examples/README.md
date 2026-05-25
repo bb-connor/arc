@@ -14,7 +14,7 @@ Run it with:
 CHIO_BASE_URL=http://127.0.0.1:8931 \
 CHIO_CONTROL_URL=http://127.0.0.1:8940 \
 CHIO_AUTH_TOKEN=demo-token \
-node --experimental-strip-types packages/sdk/chio-ts/examples/governed_hello.ts
+node --experimental-strip-types sdks/typescript/chio-ts/examples/governed_hello.ts
 ```
 
 The script initializes a session, discovers the default capability issued for

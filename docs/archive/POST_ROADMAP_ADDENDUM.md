@@ -412,7 +412,7 @@ pre-merge gate, a post-merge release gate, or split by surface.
 
 **Current repo baseline**:
 - [`sdks/python/chio-py`](../../sdks/python/chio-py) and
-  [`packages/sdk/chio-ts`](../../packages/sdk/chio-ts) already exist with package
+  [`sdks/typescript/chio-ts`](../../sdks/typescript/chio-ts) already exist with package
   structure, tests, and release-check scripts such as
   [`scripts/check-chio-py-release.sh`](../../scripts/check-chio-py-release.sh) and
   [`scripts/check-chio-ts-release.sh`](../../scripts/check-chio-ts-release.sh).
@@ -430,9 +430,9 @@ the enriched Rust contract is visible to users.
 - `crates/chio-http-core/src/verdict.rs`
 - `sdks/python/chio-py/src/chio/errors.py`
 - `sdks/python/chio-py/tests/test_errors.py`
-- `packages/sdk/chio-ts/src/errors.ts`
-- `packages/sdk/chio-ts/src/types.ts`
-- `packages/sdk/chio-ts/test/errors.test.ts`
+- `sdks/typescript/chio-ts/src/errors.ts`
+- `sdks/typescript/chio-ts/src/types.ts`
+- `sdks/typescript/chio-ts/test/errors.test.ts`
 
 **Acceptance**:
 - Python and TypeScript surface the same deny details contract that Rust emits
@@ -445,9 +445,9 @@ the enriched Rust contract is visible to users.
 `MockChioClient`.
 
 **Files**:
-- `packages/sdk/chio-ts/src/testing.ts`
-- `packages/sdk/chio-ts/package.json`
-- `packages/sdk/chio-ts/test/`
+- `sdks/typescript/chio-ts/src/testing.ts`
+- `sdks/typescript/chio-ts/package.json`
+- `sdks/typescript/chio-ts/test/`
 
 **Acceptance**:
 - JavaScript and TypeScript users can unit test without a live sidecar
@@ -462,9 +462,9 @@ and verifiable as release outputs.
 
 **Files**:
 - `sdks/python/chio-py/pyproject.toml`
-- `packages/sdk/chio-ts/package.json`
+- `sdks/typescript/chio-ts/package.json`
 - `sdks/python/chio-py/RELEASING.md`
-- `packages/sdk/chio-ts/README.md`
+- `sdks/typescript/chio-ts/README.md`
 - `scripts/check-chio-py-release.sh`
 - `scripts/check-chio-ts-release.sh`
 - `.github/workflows/publish-typescript.yml`

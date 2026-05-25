@@ -32,7 +32,7 @@ At the start of this roadmap, the repo already has:
 
 - `crates/chio-binding-helpers` with canonical JSON, hashing, signing, receipt, capability, and manifest helpers
 - checked-in shared vectors under `tests/bindings/vectors/`
-- `packages/sdk/chio-ts` invariant helpers plus a low-level transport/session layer
+- `sdks/typescript/chio-ts` invariant helpers plus a low-level transport/session layer
 - the JS conformance peer importing shared transport code from `chio-ts`
 - live MCP core, tasks, auth, notifications, and nested-callback JS and Python conformance green against the remote edge
 
@@ -136,11 +136,11 @@ Objective:
 
 Deliverables:
 
-- `packages/sdk/chio-ts/src/client/`
-- `packages/sdk/chio-ts/src/session/`
-- `packages/sdk/chio-ts/src/auth/`
-- `packages/sdk/chio-ts/src/tasks/`
-- `packages/sdk/chio-ts/src/nested/`
+- `sdks/typescript/chio-ts/src/client/`
+- `sdks/typescript/chio-ts/src/session/`
+- `sdks/typescript/chio-ts/src/auth/`
+- `sdks/typescript/chio-ts/src/tasks/`
+- `sdks/typescript/chio-ts/src/nested/`
 - public `Client` and `Session` API exported from the package root
 - updated README with alpha scope, examples, and unsupported surfaces
 
@@ -155,7 +155,7 @@ Acceptance bar:
 
 - `chio-ts` root exports more than invariants and transport
 - the JS peer uses package modules for all remote-edge behavior in current conformance areas
-- `npm --prefix packages/sdk/chio-ts test` is green
+- `npm --prefix sdks/typescript/chio-ts test` is green
 - MCP core, tasks, auth, notifications, and nested-callback live conformance is green with the JS peer backed by `chio-ts`
 - the README clearly marks the package as alpha and lists unsupported surfaces explicitly
 

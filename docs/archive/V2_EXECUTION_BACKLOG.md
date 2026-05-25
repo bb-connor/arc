@@ -83,7 +83,7 @@ Completed:
   - updated `examples/hello-tool` to publish a priced manifest and added a dedicated example test for that contract
   - added a pricing and budget-planning guide that explains how advertised manifest pricing informs capability monetary budgets before invocation, without overstating the current YAML policy surface
   - aligned TypeScript signed-manifest types with the shipped pricing metadata contract
-  - verified with `npm --prefix packages/sdk/chio-ts test` and full `cargo test --workspace`
+  - verified with `npm --prefix sdks/typescript/chio-ts test` and full `cargo test --workspace`
 
 | ID | Task | Why it matters | Effort | Depends on | Acceptance |
 | --- | --- | --- | --- | --- | --- |

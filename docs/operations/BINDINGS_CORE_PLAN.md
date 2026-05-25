@@ -261,7 +261,7 @@ This is distinct from the main conformance harness. It records SDK surface progr
 ### Package layout
 
 ```text
-packages/sdk/chio-ts/
+sdks/typescript/chio-ts/
   src/
     client/
     transport/
@@ -483,7 +483,7 @@ Reason to do this first:
 
 Deliverables:
 
-- `packages/sdk/chio-ts`
+- `sdks/typescript/chio-ts`
 - invariant helper layer with optional WASM backend
 - remote HTTP client for current conformance waves
 
@@ -566,7 +566,7 @@ Tasks:
 
 Tasks:
 
-- scaffold `packages/sdk/chio-ts`
+- scaffold `sdks/typescript/chio-ts`
 - move current JS peer transport logic into reusable library code
 - add optional WASM loading for invariant helpers
 - run current JS conformance waves through the package
@@ -607,7 +607,7 @@ Tasks:
 
 1. Add `crates/chio-binding-helpers` with only canonical JSON, hashing, signature, receipt, capability, and manifest helpers.
 2. Add `tests/bindings/vectors/` and generate the first canonical JSON, hash, and receipt verification fixtures from Rust.
-3. Scaffold `packages/sdk/chio-ts` and route the existing JS peer through it for remote HTTP coverage.
+3. Scaffold `sdks/typescript/chio-ts` and route the existing JS peer through it for remote HTTP coverage.
 4. After the TS package shape stabilizes, scaffold `sdks/python/chio-py` plus a minimal PyO3 module.
 5. Start Go only after the TS and Python packages prove that the bindings-core boundary is small enough.
 

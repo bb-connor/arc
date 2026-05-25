@@ -328,9 +328,9 @@ PY
     ;;
 
   ts)
-    source_dir="${repo_root}/packages/sdk/chio-ts"
+    source_dir="${repo_root}/sdks/typescript/chio-ts"
     repo_copy_dir="${work_dir}/repo"
-    sdk_dir="${repo_copy_dir}/packages/sdk/chio-ts"
+    sdk_dir="${repo_copy_dir}/sdks/typescript/chio-ts"
     consumer_dir="${work_dir}/consumer"
 
     if ! command -v npm >/dev/null 2>&1; then
@@ -338,7 +338,7 @@ PY
       exit 1
     fi
 
-    mkdir -p "${repo_copy_dir}/packages/sdk" "${repo_copy_dir}/tests"
+    mkdir -p "${repo_copy_dir}/sdks/typescript" "${repo_copy_dir}/tests"
     cp -R "${source_dir}" "${sdk_dir}"
     rm -rf "${sdk_dir}/node_modules" "${sdk_dir}/dist"
     cp -R "${repo_root}/tests/bindings" "${repo_copy_dir}/tests/bindings"

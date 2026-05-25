@@ -112,7 +112,7 @@ Splunk HEC and Elasticsearch bulk exporters with a bounded dead-letter queue shi
 
 ### TypeScript SDK (implemented in current v1)
 
-`@chio-protocol/sdk` v1.0.0 ships in `packages/sdk/chio-ts/`. It covers capability invariants, receipt verification, DPoP proof construction, a receipt query client, and Streamable HTTP session management.
+`@chio-protocol/sdk` v1.0.0 ships in `sdks/typescript/chio-ts/`. It covers capability invariants, receipt verification, DPoP proof construction, a receipt query client, and Streamable HTTP session management.
 
 ### Compliance documents (implemented in current v1)
 
