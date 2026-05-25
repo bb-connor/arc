@@ -276,6 +276,19 @@ mod tests {
     }
 
     #[test]
+    fn default_patterns_all_compile() {
+        // new() builds defaults via filter_map(...ok()), which would silently
+        // drop a malformed default. Guarantee none is malformed so the default
+        // guard never loses a forbidden pattern.
+        for pattern in default_forbidden_patterns() {
+            assert!(
+                Pattern::new(&pattern).is_ok(),
+                "default forbidden pattern failed to compile: {pattern}"
+            );
+        }
+    }
+
+    #[test]
     fn windows_paths_normalized() {
         let guard = ForbiddenPathGuard::new();
         assert!(guard.is_forbidden(r"C:\Users\alice\.ssh\id_rsa"));

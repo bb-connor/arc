@@ -20,7 +20,6 @@ chio-manifest = { path = "../chio-manifest" }
 
 [dev-dependencies]
 chio-test-support = { path = "../chio-test-support" }
-serde_json = { workspace = true }
 
 [lints]
 workspace = true

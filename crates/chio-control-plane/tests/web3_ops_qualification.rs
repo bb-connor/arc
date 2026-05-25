@@ -10,7 +10,8 @@ use chio_anchor::{
     AnchorLaneRuntimeStatusInput, AnchorOperationKind, AnchorRuntimeReport,
 };
 use chio_link::config::{
-    OracleBackendKind, PairConfig, PairRuntimeOverride, PriceOracleConfig, ARBITRUM_ONE_CHAIN_ID,
+    build_default_egress_contract, OracleBackendKind, PairConfig, PairRuntimeOverride,
+    PriceOracleConfig, ARBITRUM_ONE_CHAIN_ID,
 };
 use chio_link::control::ChioLinkControlState;
 use chio_link::{ChioLinkOracle, ExchangeRate, OracleBackend, OracleFuture, PriceOracleError};
@@ -104,8 +105,12 @@ fn write_json(path: &Path, value: &impl Serialize) {
 #[tokio::test]
 async fn web3_ops_qualification_emits_generated_runtime_reports_and_control_audits() {
     let generated_at = 1_764_620_000;
-    let base_rpc = "https://base-mainnet.example.invalid";
-    let mut config = PriceOracleConfig::base_mainnet_default(base_rpc);
+    // Use loopback addresses so config.validate() does not perform a live DNS
+    // lookup. The test uses StaticBackend for all rates so no real RPC occurs.
+    let mut config =
+        PriceOracleConfig::base_arbitrum_default("http://127.0.0.1:8545", "http://127.0.0.1:9545");
+    config.egress_contract = build_default_egress_contract(&config.pyth, &config.operator.chains);
+    config.egress_contract.deny_loopback = false;
     for chain in &mut config.operator.chains {
         chain.sequencer_uptime_feed = None;
     }

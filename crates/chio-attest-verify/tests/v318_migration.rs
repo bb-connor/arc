@@ -144,7 +144,7 @@ fn rebuild_v318_fixture() -> ChioReceipt {
 /// recovery procedure if a future encoding bump intentionally moves the
 /// byte oracle (the canonical vector corpus signs off on every bump).
 #[test]
-#[ignore]
+#[ignore = "fixture-bless helper; run with --ignored regenerate_fixture --features pq"]
 fn regenerate_fixture() {
     let receipt = rebuild_v318_fixture();
     let json = serde_json::to_string_pretty(&receipt).unwrap();

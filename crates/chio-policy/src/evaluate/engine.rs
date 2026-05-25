@@ -39,9 +39,11 @@ pub fn evaluate(spec: &HushSpec, action: &EvaluationAction) -> EvaluationResult 
         "computer_use" => evaluate_computer_use(spec, action, posture, origin_profile_id),
         "input_inject" => evaluate_input_injection(spec, action, posture, origin_profile_id),
         _ => EvaluationResult {
-            decision: Decision::Allow,
+            decision: Decision::Deny,
             matched_rule: None,
-            reason: Some("no reference evaluator rule for this action type".to_string()),
+            reason: Some(
+                "no reference evaluator rule for this action type; denying fail-closed".to_string(),
+            ),
             origin_profile: origin_profile_id,
             posture,
         },
@@ -125,9 +127,11 @@ pub fn evaluate_with_context(
             evaluate_input_injection(&effective_spec, action, posture, origin_profile_id)
         }
         _ => EvaluationResult {
-            decision: Decision::Allow,
+            decision: Decision::Deny,
             matched_rule: None,
-            reason: Some("no reference evaluator rule for this action type".to_string()),
+            reason: Some(
+                "no reference evaluator rule for this action type; denying fail-closed".to_string(),
+            ),
             origin_profile: origin_profile_id,
             posture,
         },

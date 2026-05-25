@@ -18,8 +18,8 @@
 //! spawns `chio replay <path> --json`, and asserts the process exit code
 //! and the `exit_code` field in the JSON report.
 //!
-//! Tests are `#[ignore]` because `cmd_replay` does not yet call the live
-//! pipeline. Remove `#[ignore]` once the dispatch wiring lands.
+//! All six tests are active - `cmd_replay` is wired (dispatch.rs) and the
+//! fixtures exist. Tests spawn the `chio` binary and assert exit codes.
 //!
 //! Fixtures are regenerated via:
 //! `cargo test -p chio-cli --test replay -- --ignored bless_fixtures`
@@ -31,7 +31,7 @@ use chio_core::receipt::{ChioReceipt, ChioReceiptBody, Decision, ToolCallAction,
 use chio_core::Keypair;
 use serde_json::{json, Value};
 
-// All six exit-code tests are `#[ignore]` pending dispatch wiring.
+// All six exit-code tests are active; cmd_replay is wired and fixtures exist.
 
 // --------------------------------------------------------------------
 // Path / fixture helpers

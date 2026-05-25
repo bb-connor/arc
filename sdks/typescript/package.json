@@ -19,7 +19,8 @@
     "packages/elysia",
     "packages/express",
     "packages/fastify",
-    "packages/node-http"
+    "packages/node-http",
+    "packages/create-chio-app"
   ],
   "engines": {
     "node": ">=20.0.0"

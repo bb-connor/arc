@@ -1483,6 +1483,10 @@ impl ChioKernel {
                     "approval token has already been consumed (replay detected)".to_string(),
                 ));
             }
+        } else {
+            return Err(KernelError::GovernedTransactionDenied(
+                "approval replay store not configured; denying as fail-closed".to_string(),
+            ));
         }
 
         Ok(())
