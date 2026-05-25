@@ -112,12 +112,6 @@ impl ChioKernel {
     /// `extra_metadata` parameters; both default to `None` on this path,
     /// matching the previous direct delegation from
     /// `evaluate_tool_call`.
-    ///
-    /// T2 renamed the long-form helper from
-    /// `evaluate_tool_call_sync_with_session_roots` to
-    /// `evaluate_tool_call_sync_inner` and marked it `#[doc(hidden)]`; this
-    /// shim continues to expose the crate-internal sync surface.
-    #[allow(dead_code)]
     pub(crate) fn evaluate_tool_call_sync(
         &self,
         request: &ToolCallRequest,

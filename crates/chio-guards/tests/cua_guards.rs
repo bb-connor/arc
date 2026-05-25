@@ -391,9 +391,9 @@ fn spider_sense_bundled_pattern_db_loads() {
         SpiderSenseGuard::from_json(&bundled_pattern_json()).expect("bundled DB must parse");
     assert!(
         guard.pattern_count() >= 9,
-        "expected 10-20 entries from clawdstrike DB"
+        "expected 10-20 entries from the bundled DB"
     );
-    assert_eq!(guard.dim(), 6, "clawdstrike DB uses 6-dim embeddings");
+    assert_eq!(guard.dim(), 6, "the bundled DB uses 6-dim embeddings");
 }
 
 #[test]

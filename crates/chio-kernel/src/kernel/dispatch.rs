@@ -364,17 +364,6 @@ impl ChioKernel {
         }
     }
 
-    /// Synchronous dispatch shim used by the legacy
-    /// `evaluate_tool_call_blocking` path while it still exists.
-    #[allow(dead_code)]
-    pub(crate) fn dispatch_tool_call_with_cost_blocking(
-        &self,
-        request: &ToolCallRequest,
-        has_monetary_grant: bool,
-    ) -> Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError> {
-        block_on_async_tool_dispatch(self.dispatch_tool_call_with_cost(request, has_monetary_grant))
-    }
-
     /// Build a denial response, including FinancialReceiptMetadata when the
     pub(crate) fn record_child_receipts(
         &self,

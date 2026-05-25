@@ -221,7 +221,7 @@ allow = ["MPL-2.0"]
 #
 # `multiple-versions = "deny"` is the gate: any NEW duplicated crate name fails
 # `cargo deny check bans` until it is either resolved or consciously waived
-# here. The `[[bans.skip]]` list below currently holds 99 blocks (90 distinct
+# here. The `[[bans.skip]]` list below currently holds 99 blocks (fewer distinct
 # crate names; `syn`, `bitflags`, and the windows family carry extra
 # version-scoped entries). That is not an aspirational cap - it is the real
 # count of transitive ecosystem splits that exist in `Cargo.lock` today and

@@ -277,7 +277,6 @@ impl SpiderSenseGuard {
                 // work, because the DB is typically small.  Break only
                 // when the scan has observed at least top_k entries; we
                 // still want the maximum across the full DB.
-                // (Equivalent to Clawdstrike's sort+truncate.)
             }
         }
         best
