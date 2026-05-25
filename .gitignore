@@ -62,7 +62,6 @@ examples/openai-compatible/node_modules/
 examples/langchain/*.egg-info/
 examples/langchain/.venv/
 sdks/python/**/.venv/
-packages/sdk/**/.venv/
 
 # Generated JVM and .NET build artifacts
 examples/**/.gradle/
@@ -93,10 +92,10 @@ formal/rust-verification/creusot-core/target/
 formal/rust-verification/creusot-core/verif/
 
 # Build outputs (flagged by scripts/check-release-inputs.sh)
-packages/sdk/chio-ts/dist/
-packages/sdk/chio-ts/node_modules/
-packages/sdk/chio-py/build/
-packages/sdk/chio-py/src/*.egg-info/
+sdks/typescript/chio-ts/dist/
+sdks/typescript/chio-ts/node_modules/
+sdks/python/chio-py/build/
+sdks/python/chio-py/src/*.egg-info/
 crates/chio-cli/dashboard/dist/
 crates/chio-cli/dashboard/node_modules/
 tests/conformance/results/generated/
