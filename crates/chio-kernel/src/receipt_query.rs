@@ -29,7 +29,6 @@ pub enum ReceiptReadContextSource {
     LocalOperator,
     AdminService,
     AuthenticatedTenant,
-    LegacyCompat,
 }
 
 /// Fully resolved receipt read context. Remote/control-plane callers must
@@ -78,15 +77,6 @@ impl ReceiptReadContext {
         Self {
             boundary: ReceiptReadBoundary::tenant_scoped(tenant),
             source: ReceiptReadContextSource::LocalOperator,
-            legacy_null_mode: true,
-        }
-    }
-
-    #[must_use]
-    pub fn legacy_compat_admin_all() -> Self {
-        Self {
-            boundary: ReceiptReadBoundary::AdminAll,
-            source: ReceiptReadContextSource::LegacyCompat,
             legacy_null_mode: true,
         }
     }

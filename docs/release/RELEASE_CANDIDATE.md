@@ -153,8 +153,8 @@ kernel/browser/mobile qualification lanes.
   trust-control health and registry surfaces
 - portable trust ships as `did:chio`, Chio-primary passport and verifier-policy
   schemas, challenge/response presentation, evidence export/import, and
-  parent-bound federated delegation continuation, with legacy pre-Chio schemas rejected
-  artifacts still accepted
+  parent-bound federated delegation continuation, with legacy pre-Chio
+  artifacts still accepted for verification
 - Chio now ships one qualified portable credential family over
   OID4VCI-compatible issuer metadata, with a native `AgentPassport` response,
   projected `application/dc+sd-jwt` and `jwt_vc_json` responses, portable
