@@ -49,7 +49,7 @@ The crate ships with the same fixture tree it exercises in CI. The Cargo
 
 The C++ and Go peers are built from sources outside the crate (the C++
 peer lives under `sdks/cpp/chio-cpp/`, the Go peer under
-`packages/sdk/chio-go/`) and are only available when the crate is consumed
+`sdks/go/chio-go/`) and are only available when the crate is consumed
 in-repo. External consumers should drive their own peer binaries via the
 `ConformanceRunOptions` API or the upcoming `chio conformance fetch-peers`
 subcommand.
@@ -61,7 +61,7 @@ subcommand.
 | Python  | bundled       | Reference peer at `tests/conformance/peers/python/`              |
 | Node.js | bundled       | Reference peer at `tests/conformance/peers/js/`                  |
 | C++     | in-repo only  | Built from `sdks/cpp/chio-cpp/` via `chio-cpp-kernel-ffi`    |
-| Go      | in-repo only  | Built from `packages/sdk/chio-go/`                               |
+| Go      | in-repo only  | Built from `sdks/go/chio-go/`                               |
 
 C++ P0 scenario coverage (`mcp_core` and `auth`) is gated by the
 `cpp_peer_p0` integration test in `crates/chio-conformance/tests/`.

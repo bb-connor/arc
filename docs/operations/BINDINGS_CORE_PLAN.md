@@ -375,7 +375,7 @@ PyO3 native module:
 ### Package layout
 
 ```text
-packages/sdk/chio-go/
+sdks/go/chio-go/
   client/
   session/
   auth/
@@ -524,7 +524,7 @@ Reason to do this third:
 
 Deliverables:
 
-- `packages/sdk/chio-go`
+- `sdks/go/chio-go`
 - pure Go remote-edge client
 - optional `internal/native` bridge using `chio-bindings-ffi`
 
@@ -584,7 +584,7 @@ Tasks:
 
 Tasks:
 
-- scaffold `packages/sdk/chio-go`
+- scaffold `sdks/go/chio-go`
 - add context-aware remote HTTP client
 - add optional CGO helpers
 - create first Go integration coverage

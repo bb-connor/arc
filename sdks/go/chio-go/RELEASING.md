@@ -1,6 +1,6 @@
 # Releasing `chio-go`
 
-`chio-go` is a Go module rooted at `packages/sdk/chio-go`.
+`chio-go` is a Go module rooted at `sdks/go/chio-go`.
 
 ## Release Gate
 
@@ -24,8 +24,8 @@ Because this module lives in a repository subdirectory, release tags must use
 the subdirectory-prefixed Go module format:
 
 ```sh
-git tag packages/sdk/chio-go/v0.1.0
-git push origin packages/sdk/chio-go/v0.1.0
+git tag sdks/go/chio-go/v0.1.0
+git push origin sdks/go/chio-go/v0.1.0
 ```
 
 ## Publication Notes

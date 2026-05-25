@@ -40,7 +40,7 @@ The repo does not yet have:
 
 - a first-class `chio-ts` client/session API
 - a `packages/sdk/chio-py` package
-- a `packages/sdk/chio-go` package
+- a `sdks/go/chio-go` package
 - a checked-in SDK feature matrix with release gates
 
 ## North Star
@@ -235,12 +235,12 @@ Objective:
 
 Deliverables:
 
-- `packages/sdk/chio-go/go.mod`
-- `packages/sdk/chio-go/client/`
-- `packages/sdk/chio-go/transport/`
-- `packages/sdk/chio-go/session/`
-- `packages/sdk/chio-go/auth/`
-- `packages/sdk/chio-go/invariants/`
+- `sdks/go/chio-go/go.mod`
+- `sdks/go/chio-go/client/`
+- `sdks/go/chio-go/transport/`
+- `sdks/go/chio-go/session/`
+- `sdks/go/chio-go/auth/`
+- `sdks/go/chio-go/invariants/`
 - first Go vector tests
 
 Tasks:

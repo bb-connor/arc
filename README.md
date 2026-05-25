@@ -95,7 +95,7 @@ Install and verification instructions live in
 | --- | --- | --- |
 | TypeScript | `@chio-protocol/sdk` | [packages/sdk/chio-ts/README.md](packages/sdk/chio-ts/README.md) |
 | Python | `chio-sdk` | [packages/sdk/chio-py/README.md](packages/sdk/chio-py/README.md) |
-| Go | `chio-go` | [packages/sdk/chio-go/README.md](packages/sdk/chio-go/README.md) |
+| Go | `chio-go` | [sdks/go/chio-go/README.md](sdks/go/chio-go/README.md) |
 
 The primary Python and TypeScript packages include runnable quickstarts and
 canonical example links back to the supported web-backend flow.

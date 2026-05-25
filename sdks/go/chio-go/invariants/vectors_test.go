@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/backbay-labs/chio/packages/sdk/chio-go/invariants"
+	"github.com/backbay-labs/chio/sdks/go/chio-go/invariants"
 )
 
 const vectorRoot = "../../../../tests/bindings/vectors"

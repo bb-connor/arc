@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"sync/atomic"
 
-	"github.com/backbay-labs/chio/packages/sdk/chio-go/transport"
+	"github.com/backbay-labs/chio/sdks/go/chio-go/transport"
 )
 
 type MessageHandler = transport.MessageHandler

@@ -397,7 +397,7 @@ fn run_peer(
             );
             let mut command = Command::new(&options.go_binary);
             command
-                .current_dir(options.repo_root.join("packages/sdk/chio-go"))
+                .current_dir(options.repo_root.join("sdks/go/chio-go"))
                 .arg("run")
                 .arg("./cmd/conformance-peer");
             command

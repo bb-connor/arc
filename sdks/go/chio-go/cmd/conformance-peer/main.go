@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/backbay-labs/chio/packages/sdk/chio-go/auth"
-	"github.com/backbay-labs/chio/packages/sdk/chio-go/client"
-	"github.com/backbay-labs/chio/packages/sdk/chio-go/nested"
-	"github.com/backbay-labs/chio/packages/sdk/chio-go/session"
-	"github.com/backbay-labs/chio/packages/sdk/chio-go/transport"
-	"github.com/backbay-labs/chio/packages/sdk/chio-go/version"
+	"github.com/backbay-labs/chio/sdks/go/chio-go/auth"
+	"github.com/backbay-labs/chio/sdks/go/chio-go/client"
+	"github.com/backbay-labs/chio/sdks/go/chio-go/nested"
+	"github.com/backbay-labs/chio/sdks/go/chio-go/session"
+	"github.com/backbay-labs/chio/sdks/go/chio-go/transport"
+	"github.com/backbay-labs/chio/sdks/go/chio-go/version"
 )
 
 type scenario struct {

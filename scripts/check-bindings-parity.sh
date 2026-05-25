@@ -22,4 +22,4 @@ NODE
 cargo test -p chio-binding-helpers --test vector_fixtures receipt_fixture
 npm --prefix packages/sdk/chio-ts test
 (cd packages/sdk/chio-py && python -m unittest discover -s tests)
-(cd packages/sdk/chio-go && CGO_ENABLED=0 go test ./...)
+(cd sdks/go/chio-go && CGO_ENABLED=0 go test ./...)

@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/backbay-labs/chio/packages/sdk/chio-go/nested"
-	"github.com/backbay-labs/chio/packages/sdk/chio-go/session"
+	"github.com/backbay-labs/chio/sdks/go/chio-go/nested"
+	"github.com/backbay-labs/chio/sdks/go/chio-go/session"
 )
 
 func TestRouterDispatchesAndEmitsTranscript(t *testing.T) {
