@@ -1,4 +1,4 @@
-// Phase 14.2 acceptance demo for chio-kernel-browser.
+// Acceptance demo for chio-kernel-browser.
 //
 // This file is intentionally dependency-free: it loads the wasm module
 // produced by `wasm-pack build --target web --release` and exercises
