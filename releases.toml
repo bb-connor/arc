@@ -120,7 +120,7 @@ m09_hitrust_i1_readiness_package:
   reclassified_from: issued_certificate
   certificate_id: ""
   package_path: compliance/hitrust/readiness-package/readiness-package.md
-  package_sha256: b2d2b03aafed87720fd9a3865dabfc9b89e9681de2fce8405aa051837d4706ef
+  package_sha256: 92d00cc1af96047c9116332f0f1467ce2a456fe9c31c64e9a667f6fa72a27cc6
   internal_record: retained outside release bundle
   scope: "Chio 0.1.0 baseline plus the healthcare design-partner deployment (readiness scope; not assessor scope)"
   external_assessor_engagement: deferred

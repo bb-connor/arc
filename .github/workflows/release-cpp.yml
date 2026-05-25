@@ -13,12 +13,10 @@ name: Release C++ SDKs
 #   - CHIO_VCPKG_REGISTRY_DEPLOY_KEY: SSH private key whose public half is
 #     a deploy key on backbay-labs/chio-vcpkg-registry with write access
 #
-# TODO: The previous publish step uploaded Conan packages to a private Nexus
-# instance (decommissioned). That private server reference has been removed.
-# Conan packages should now be published to GitHub Releases assets
-# under github.com/backbay-labs/chio (using GITHUB_TOKEN / a deploy PAT) or
-# to the public Conan Center if the packages become open. Wire up the new
-# publish step before cutting the next cpp/v* release.
+# Conan packages are published as assets on the cpp/v<X.Y.Z> GitHub Release
+# (the prior private Nexus remote was decommissioned). The publish-conan job
+# attaches the qualified Conan 2 cache archive; consumers restore it into a
+# local Conan home (the restore command is in the job's release notes).
 
 on:
   push:
@@ -44,8 +42,6 @@ env:
   CHIO_CPP_CBINDGEN_VERSION: "0.29.2"
   CHIO_CPP_CONAN_VERSION: "2.28.0"
   CHIO_CPP_VCPKG_REF: 7a9071743140154391b0e18b77d46cc66c5f3663
-  # TODO: Set CHIO_CONAN_PUBLISH_URL to the new publish endpoint once
-  # the GitHub Releases-based Conan distribution is wired up.
   CHIO_VCPKG_REGISTRY_REPO: backbay-labs/chio-vcpkg-registry
 
 jobs:
@@ -142,14 +138,36 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
-  # TODO: publish-conan - upload Conan packages to GitHub Releases under
-  # github.com/backbay-labs/chio (or Conan Center if the packages go public).
-  # The previous step published to a private Nexus instance (decommissioned).
-  # Implement a new publish job here that:
-  #   1. Downloads the conan-cache artifact from the qualify job.
-  #   2. Uploads the packed .tgz archives as GitHub Release assets via
-  #      `gh release upload cpp/v<VERSION> <archive>` with GITHUB_TOKEN.
-  # Wire this job before cutting the next cpp/v* release tag.
+  publish-conan:
+    name: Publish Conan packages
+    needs: qualify
+    if: needs.qualify.outputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Conan cache snapshot
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: conan-cache-${{ needs.qualify.outputs.version }}
+          path: ${{ runner.temp }}/conan-dist
+
+      - name: Publish the Conan cache to the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.qualify.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag="cpp/v${VERSION}"
+          asset="${RUNNER_TEMP}/conan-dist/chio-cpp-sdks-${VERSION}-conan2-cache.tar.gz"
+          mv "${RUNNER_TEMP}/conan-dist/conan-cache.tar.gz" "$asset"
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" \
+              --title "Chio C++ SDKs v${VERSION}" \
+              --notes "Conan 2 packages for chio-cpp, chio-cpp-kernel, chio-guard-cpp, and chio-drogon, built and qualified by this workflow. Download the archive and restore it into a local Conan home: tar -C \"\$HOME/.conan2\" -xzf chio-cpp-sdks-${VERSION}-conan2-cache.tar.gz"
+          fi
+          gh release upload "$tag" "$asset" --clobber
 
   publish-vcpkg:
     name: Sync vcpkg overlay

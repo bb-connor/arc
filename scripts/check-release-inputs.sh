@@ -29,7 +29,7 @@ if grep -qF "activation_evidence.m08_final_report" releases.toml; then
 fi
 
 m09_package_path="compliance/hitrust/readiness-package/readiness-package.md"
-m09_package_sha256="b2d2b03aafed87720fd9a3865dabfc9b89e9681de2fce8405aa051837d4706ef"
+m09_package_sha256="92d00cc1af96047c9116332f0f1467ce2a456fe9c31c64e9a667f6fa72a27cc6"
 m09_evidence_files=(
   "${m09_package_path}"
   "docs/external-attestation/hitrust-i1/index.md"
