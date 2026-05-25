@@ -365,7 +365,7 @@ app.Run();
 
 ## 5. C++ Drogon (chio-drogon)
 
-**Location:** `packages/sdk/chio-drogon/`
+**Location:** `sdks/cpp/chio-drogon/`
 
 C++17 middleware for Drogon applications. The package exports
 `ChioDrogon::chio_drogon` when CMake can find both `Drogon::Drogon` and the
@@ -380,7 +380,7 @@ target_link_libraries(app PRIVATE ChioDrogon::chio_drogon)
 ```
 
 For in-repo examples, [`examples/hello-drogon/`](../../examples/hello-drogon/)
-adds `packages/sdk/chio-drogon` as a subdirectory and skips clearly when
+adds `sdks/cpp/chio-drogon` as a subdirectory and skips clearly when
 Drogon is not installed locally.
 
 ### Minimal Example

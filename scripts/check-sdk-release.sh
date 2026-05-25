@@ -115,7 +115,7 @@ PY
 
 case "${lang}" in
   cpp)
-    sdk_dir="${repo_root}/packages/sdk/chio-cpp"
+    sdk_dir="${repo_root}/sdks/cpp/chio-cpp"
 
     "${repo_root}/scripts/check-chio-cpp.sh"
     chio_cpp_packager_smoke "${sdk_dir}" "chio-cpp"
@@ -124,7 +124,7 @@ case "${lang}" in
     ;;
 
   cpp-kernel)
-    sdk_dir="${repo_root}/packages/sdk/chio-cpp-kernel"
+    sdk_dir="${repo_root}/sdks/cpp/chio-cpp-kernel"
 
     "${sdk_dir}/scripts/check-with-ffi.sh"
     chio_cpp_packager_smoke "${sdk_dir}" "chio-cpp-kernel"
@@ -142,8 +142,8 @@ case "${lang}" in
     ;;
 
   drogon)
-    sdk_dir="${repo_root}/packages/sdk/chio-drogon"
-    chio_cpp_dir="${repo_root}/packages/sdk/chio-cpp"
+    sdk_dir="${repo_root}/sdks/cpp/chio-drogon"
+    chio_cpp_dir="${repo_root}/sdks/cpp/chio-cpp"
 
     "${repo_root}/scripts/check-chio-drogon.sh"
     chio_cpp_packager_smoke "${sdk_dir}" "chio-drogon" "${chio_cpp_dir}"

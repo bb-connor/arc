@@ -22,7 +22,7 @@ JSON, SHA-256, Ed25519 signing, and signed Chio artifact verification.
 ## Build
 
 ```bash
-cmake -S packages/sdk/chio-cpp -B target/chio-cpp \
+cmake -S sdks/cpp/chio-cpp -B target/chio-cpp \
   -DCHIO_CPP_BUILD_TESTS=ON \
   -DCHIO_CPP_BUILD_EXAMPLES=ON \
   -DCHIO_CPP_ENABLE_CURL=OFF

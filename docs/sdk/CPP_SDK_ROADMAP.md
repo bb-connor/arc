@@ -17,10 +17,10 @@ long-horizon C++ SDK completion effort.
 
 | Owner | Write scope |
 | --- | --- |
-| Coordinator | `Cargo.toml`, `.github/**`, `scripts/**`, SDK matrix, conformance runner, main `packages/sdk/chio-cpp/**`, this file |
+| Coordinator | `Cargo.toml`, `.github/**`, `scripts/**`, SDK matrix, conformance runner, main `sdks/cpp/chio-cpp/**`, this file |
 | Worker A | `crates/chio-bindings-ffi/**`, optional `tests/abi/**` |
 | Worker H | `packages/sdk/chio-guard-cpp/**` |
-| Worker I | `packages/sdk/chio-cpp-kernel/**`, `crates/chio-cpp-kernel-ffi/**` |
+| Worker I | `sdks/cpp/chio-cpp-kernel/**`, `crates/chio-cpp-kernel-ffi/**` |
 
 Agents must not edit outside their write scope. Shared-file changes are
 coordinator-only.
@@ -70,4 +70,4 @@ coordinator-only.
 - `cargo test -p chio-conformance --test auth_cpp_live -- --nocapture`
 - `cargo test -p chio-conformance --test notifications_cpp_live -- --nocapture`
 - `cargo test -p chio-conformance --test nested_callbacks_cpp_live -- --nocapture`
-- `./packages/sdk/chio-cpp-kernel/scripts/check-with-ffi.sh`
+- `./sdks/cpp/chio-cpp-kernel/scripts/check-with-ffi.sh`

@@ -7,7 +7,7 @@
 // expanding this one (its purpose is to be the immutable P0 gate).
 //
 // The C++ peer is the conformance-peer binary built from
-// `packages/sdk/chio-cpp` via CMake; that binary links against
+// `sdks/cpp/chio-cpp` via CMake; that binary links against
 // `crates/chio-cpp-kernel-ffi` (the C ABI surface for the Chio offline
 // kernel). Driving the binary therefore exercises the FFI end-to-end.
 //

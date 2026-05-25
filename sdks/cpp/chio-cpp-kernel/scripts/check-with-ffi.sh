@@ -38,7 +38,7 @@ if [[ ! -e "${ffi_lib}" ]]; then
   exit 1
 fi
 
-cmake -S packages/sdk/chio-cpp-kernel -B "${build_dir}" \
+cmake -S sdks/cpp/chio-cpp-kernel -B "${build_dir}" \
   -DCHIO_CPP_KERNEL_BUILD_TESTS=ON \
   -DCHIO_CPP_KERNEL_BUILD_EXAMPLES=ON \
   -DCHIO_CPP_KERNEL_ENABLE_FFI=ON \

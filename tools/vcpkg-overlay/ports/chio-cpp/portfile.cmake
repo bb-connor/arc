@@ -42,7 +42,7 @@ vcpkg_check_features(
 )
 
 vcpkg_cmake_configure(
-    SOURCE_PATH "${SOURCE_PATH}/packages/sdk/chio-cpp"
+    SOURCE_PATH "${SOURCE_PATH}/sdks/cpp/chio-cpp"
     OPTIONS
         ${FEATURE_OPTIONS}
         -DCHIO_CPP_BUILD_TESTS=OFF

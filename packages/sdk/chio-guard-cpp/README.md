@@ -2,7 +2,7 @@
 
 `chio-guard-cpp` is the separate C++17 guard authoring package for Chio WASM
 guard components. It tracks `wit/chio-guard/world.wit` and stays independent
-from `packages/sdk/chio-cpp` so client applications do not need WASI SDK or
+from `sdks/cpp/chio-cpp` so client applications do not need WASI SDK or
 component-model tools.
 
 The package has two layers:

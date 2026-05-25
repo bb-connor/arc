@@ -32,11 +32,11 @@ def test_file_info_classifies_crate_metadata() -> None:
 
 
 def test_file_info_classifies_package_metadata() -> None:
-    info = repo_model.file_info("packages/sdk/chio-cpp/src/client.cpp")
-    assert info.source_root == "packages"
-    assert info.package == "packages/sdk/chio-cpp"
+    info = repo_model.file_info("sdks/cpp/chio-cpp/src/client.cpp")
+    assert info.source_root == "sdks"
+    assert info.package == "sdks/cpp"
     assert info.language == "cpp"
-    assert info.validation_command == "npm test"
+    assert info.validation_command == ""
 
 
 def test_canonicality_and_generation() -> None:

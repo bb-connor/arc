@@ -38,7 +38,7 @@ else()
 endif()
 
 vcpkg_cmake_configure(
-    SOURCE_PATH "${SOURCE_PATH}/packages/sdk/chio-cpp-kernel"
+    SOURCE_PATH "${SOURCE_PATH}/sdks/cpp/chio-cpp-kernel"
     OPTIONS
         -DCHIO_CPP_KERNEL_BUILD_TESTS=OFF
         -DCHIO_CPP_KERNEL_BUILD_EXAMPLES=OFF

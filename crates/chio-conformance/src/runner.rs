@@ -463,7 +463,7 @@ fn ensure_cpp_peer_executable(repo_root: &Path) -> Result<PathBuf, RunnerError> 
         build_dir.join(&executable_name),
         build_dir.join(build_config).join(&executable_name),
     ];
-    let source_dir = repo_root.join("packages/sdk/chio-cpp");
+    let source_dir = repo_root.join("sdks/cpp/chio-cpp");
     let configure_status = Command::new("cmake")
         .current_dir(repo_root)
         .arg("-S")

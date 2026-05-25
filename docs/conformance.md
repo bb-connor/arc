@@ -345,7 +345,7 @@ The C++ peer is not bundled in the published crate. Either:
 - Run `chio conformance fetch-peers --language cpp` first to download
   the pre-built peer binary into `./.chio-peers/cpp/`, or
 - Build from source in the Chio monorepo (the C++ peer lives under
-  `packages/sdk/chio-cpp/`) and point at the resulting binary via
+  `sdks/cpp/chio-cpp/`) and point at the resulting binary via
   `ConformanceRunOptions`.
 
 ### A scenario is green locally but red in `external-consumer-smoke`

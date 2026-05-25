@@ -15,7 +15,7 @@ target_link_libraries(app PRIVATE ChioDrogon::chio_drogon)
 If Drogon is not installed, configuring this package directly skips the target by default:
 
 ```bash
-cmake -S packages/sdk/chio-drogon -B build/chio-drogon
+cmake -S sdks/cpp/chio-drogon -B build/chio-drogon
 ```
 
 Use `-DCHIO_DROGON_REQUIRE_DEPS=ON` when missing dependencies should fail configuration.

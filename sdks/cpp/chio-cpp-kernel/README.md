@@ -2,7 +2,7 @@
 
 `chio-cpp-kernel` is the separate C++17 package for offline, in-process
 kernel-style operations. It is intentionally independent from
-`packages/sdk/chio-cpp`, which owns hosted sessions, HTTP transport, auth,
+`sdks/cpp/chio-cpp`, which owns hosted sessions, HTTP transport, auth,
 callbacks, and tool orchestration.
 
 By default the package builds as a deterministic fail-closed facade so ordinary
@@ -36,7 +36,7 @@ metadata.
 ## Build
 
 ```bash
-cmake -S packages/sdk/chio-cpp-kernel -B target/chio-cpp-kernel
+cmake -S sdks/cpp/chio-cpp-kernel -B target/chio-cpp-kernel
 cmake --build target/chio-cpp-kernel
 ctest --test-dir target/chio-cpp-kernel --output-on-failure
 ```
@@ -47,7 +47,7 @@ Cargo for the default fail-closed build.
 To verify the Rust-backed path:
 
 ```bash
-./packages/sdk/chio-cpp-kernel/scripts/check-with-ffi.sh
+./sdks/cpp/chio-cpp-kernel/scripts/check-with-ffi.sh
 ```
 
 That script runs `cargo test -p chio-cpp-kernel-ffi`, builds the Rust library,

@@ -80,7 +80,7 @@ def check_fuzz_matrix_and_smoke_inventory() -> None:
 def check_chio_cpp_drogon_coverage() -> None:
     text = read(".github/workflows/chio-cpp.yml")
     markers = [
-        '"packages/sdk/chio-drogon/**"',
+        '"sdks/cpp/chio-drogon/**"',
         '"scripts/check-chio-drogon*.sh"',
         "./scripts/check-chio-drogon.sh",
         "./scripts/check-chio-drogon-release.sh",
