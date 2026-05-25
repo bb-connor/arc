@@ -1265,7 +1265,7 @@ methods. Calls outside granted scope are denied.
 **Files**: `sdks/k8s/controller/job_reconciler.go` (new)
 **Refs**: `docs/protocols/K8S-JOBS-INTEGRATION.md`
 
-**Acceptance**: A K8s Job with `chio.protocol/governed: "true"` label gets
+**Acceptance**: A K8s Job with `chio.world/governed: "true"` label gets
 a capability grant at creation and release on completion.
 
 ### 17.6 Cloud Run / ECS Sidecar Reference Patterns [SHIPPED 8a0b933]

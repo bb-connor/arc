@@ -1,7 +1,7 @@
 # chio-k8s-controller
 
 A Kubernetes controller that extends the Chio protocol to batch `Job` workloads. Jobs carrying the
-`chio.protocol/governed: "true"` label get a capability grant minted at
+`chio.world/governed: "true"` label get a capability grant minted at
 creation, per-pod receipts aggregated across the Job's lifecycle, and the
 grant released at completion or failure alongside a signed `JobReceipt`.
 
@@ -15,14 +15,14 @@ clients; it does not open raw watches via `client-go`. The single reconciler
 (`internal/reconciler.JobReconciler`) handles four lifecycle points:
 
 1. **New governed Job.** The controller adds the finalizer
-   `chio.protocol/capability-finalizer`, calls the sidecar's
+   `chio.world/capability-finalizer`, calls the sidecar's
    `POST /v1/capabilities/mint`, and persists the grant on the Job as
-   annotations (`chio.protocol/capability-id`,
-   `chio.protocol/capability-token`,
-   `chio.protocol/capability-expires-at`).
+   annotations (`chio.world/capability-id`,
+   `chio.world/capability-token`,
+   `chio.world/capability-expires-at`).
 2. **Running Job.** Pods owned by the Job are watched (`Owns(&corev1.Pod{})`).
    Each reconciliation caused by a Pod update re-enters the Job reconciler,
-   which harvests any `chio.protocol/receipt` annotations the sidecar posted
+   which harvests any `chio.world/receipt` annotations the sidecar posted
    onto the Pod.
 3. **Completed / failed Job.** The reconciler calls
    `POST /v1/capabilities/release`, aggregates the harvested pod receipts
@@ -48,9 +48,9 @@ forever.
 
 Every mutation is gated on the presence (or absence) of an annotation the
 reconciler itself sets. A capability is minted only when
-`chio.protocol/capability-id` is empty. Release is gated on
-`chio.protocol/released-at`. Receipt submission is gated on
-`chio.protocol/receipt-id`. Running `Reconcile` repeatedly on a stable Job
+`chio.world/capability-id` is empty. Release is gated on
+`chio.world/released-at`. Receipt submission is gated on
+`chio.world/receipt-id`. Running `Reconcile` repeatedly on a stable Job
 converges without additional sidecar calls.
 
 ## Configuration
@@ -101,9 +101,9 @@ metadata:
   name: chio-demo
   namespace: default
   labels:
-    chio.protocol/governed: "true"
+    chio.world/governed: "true"
   annotations:
-    chio.protocol/scopes: "tools:search,tools:fetch"
+    chio.world/scopes: "tools:search,tools:fetch"
 spec:
   template:
     spec:
@@ -121,7 +121,7 @@ kubectl get events --field-selector involvedObject.name=chio-demo
 ```
 
 On completion the events will show `ChioCapabilityMinted`,
-`ChioCapabilityReleased`, and `ChioReceiptSubmitted`. The `chio.protocol/receipt-id`
+`ChioCapabilityReleased`, and `ChioReceiptSubmitted`. The `chio.world/receipt-id`
 annotation carries the ID assigned by the Chio receipt store.
 
 ## Development

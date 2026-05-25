@@ -12,7 +12,7 @@ import "encoding/json"
 const (
 	// AnnotationCapabilityToken is the pod annotation carrying the Chio
 	// capability token bytes (canonical JSON).
-	AnnotationCapabilityToken = "chio.protocol/capability-token"
+	AnnotationCapabilityToken = "chio.world/capability-token"
 
 	// AnnotationLegacyRequiredScopes is a pod-supplied annotation that the
 	// webhook does not trust. Required scopes are read from webhook

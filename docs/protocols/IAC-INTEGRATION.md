@@ -574,7 +574,7 @@ directly to the existing K8s integration:
 
 ```yaml
 # ChioJobGrant for a Crossplane Composition
-apiVersion: chio.protocol/v1alpha1
+apiVersion: chio.world/v1alpha1
 kind: ChioJobGrant
 metadata:
   name: crossplane-database-grant
@@ -584,7 +584,7 @@ spec:
   jobSelector:
     matchLabels:
       crossplane.io/claim-name: agent-database
-      chio.protocol/governed: "true"
+      chio.world/governed: "true"
 
   capability:
     scopes:
@@ -654,8 +654,8 @@ func (v *ChioValidator) handleCrossplaneClaim(
 
     // Mutate: inject receipt ID as annotation
     claim.SetAnnotations(mergeMaps(claim.GetAnnotations(), map[string]string{
-        "chio.protocol/receipt-id": verdict.ReceiptID,
-        "chio.protocol/grant":     grant.Name,
+        "chio.world/receipt-id": verdict.ReceiptID,
+        "chio.world/grant":     grant.Name,
     }))
 
     return admission.Patched("Chio approved", claim)

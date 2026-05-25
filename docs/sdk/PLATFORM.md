@@ -117,7 +117,7 @@ pod deployment time and optionally injects the Chio sidecar container.
 ### Validating Webhook
 
 The validating webhook rejects pods that lack the required
-`chio.protocol/capability-token` annotation, unless the pod carries an
+`chio.world/capability-token` annotation, unless the pod carries an
 explicit `chio.world/exempt: "true"` exemption. Presented tokens are
 parsed as Chio capability tokens, verified cryptographically, checked for time
 validity, and matched against any required scopes before the pod is allowed.
@@ -138,7 +138,7 @@ and proxies HTTP traffic through the Chio kernel on port 9090.
 
 | Annotation | Required | Description |
 |------------|----------|-------------|
-| `chio.protocol/capability-token` | Yes (unless exempt) | Chio capability token for the workload, signed by a controller-trusted Chio issuer |
+| `chio.world/capability-token` | Yes (unless exempt) | Chio capability token for the workload, signed by a controller-trusted Chio issuer |
 | `chio.world/required-scopes` | No | Comma-separated required Chio scopes using the grammar below |
 | `chio.world/exempt` | No | Set to `"true"` to skip capability validation |
 | `chio.world/inject` | No | Set to `"true"` to trigger sidecar injection |
