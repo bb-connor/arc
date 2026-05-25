@@ -78,6 +78,28 @@ mod cli_env_tests {
     use std::ffi::OsString;
     use std::sync::{Mutex, MutexGuard, OnceLock};
 
+    /// Parse a `chio` argv into [`Cli`] on a thread with an 8 MiB stack.
+    ///
+    /// The release binary parses argv on the process main thread (8 MiB
+    /// stack); the libtest harness runs each test on a worker thread with a
+    /// ~2 MiB stack, which the monomorphised clap parser for the 24-variant
+    /// `Commands` enum overflows. Driving the parse through an 8 MiB worker
+    /// mirrors the production main-thread stack without changing the CLI
+    /// surface. Process env vars are shared across threads, so clap's `env`
+    /// fallbacks still observe the vars the caller set under `env_lock`.
+    fn parse_cli<I>(argv: I) -> clap::error::Result<Cli>
+    where
+        I: IntoIterator<Item = &'static str>,
+    {
+        let argv: Vec<&'static str> = argv.into_iter().collect();
+        std::thread::Builder::new()
+            .stack_size(8 * 1024 * 1024)
+            .spawn(move || Cli::try_parse_from(argv))
+            .unwrap_or_else(|error| panic!("spawn 8 MiB parse thread: {error}"))
+            .join()
+            .unwrap_or_else(|_| panic!("parse thread must not panic"))
+    }
+
     fn env_lock() -> MutexGuard<'static, ()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
         LOCK.get_or_init(|| Mutex::new(()))
@@ -105,7 +127,7 @@ mod cli_env_tests {
         std::env::remove_var("CHIO_MCP_AUTH_TOKEN");
         std::env::remove_var("CHIO_MCP_ADMIN_TOKEN");
 
-        let parsed = Cli::try_parse_from([
+        let parsed = parse_cli([
             "chio",
             "mcp",
             "serve-http",
@@ -144,7 +166,7 @@ mod cli_env_tests {
         let prior = std::env::var_os("CHIO_GUARD_REGISTRY_PASSWORD");
         std::env::set_var("CHIO_GUARD_REGISTRY_PASSWORD", "registry-password");
 
-        let parsed = Cli::try_parse_from([
+        let parsed = parse_cli([
             "chio",
             "guard",
             "publish",
@@ -176,7 +198,7 @@ mod cli_env_tests {
         let prior = std::env::var_os("CHIO_GUARD_REGISTRY_PASSWORD");
         std::env::set_var("CHIO_GUARD_REGISTRY_PASSWORD", "registry-password");
 
-        let parsed = Cli::try_parse_from([
+        let parsed = parse_cli([
             "chio",
             "guard",
             "pull",

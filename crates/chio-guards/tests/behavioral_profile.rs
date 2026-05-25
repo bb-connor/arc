@@ -162,6 +162,11 @@ fn ema_baseline_stabilizes_under_steady_calls() {
 fn in_memory_receipt_feed_persists_and_filters_by_agent_and_window() -> Result<(), KernelError> {
     let feed = InMemoryReceiptFeed::new();
     let receipt = make_receipt("r-feed-1", "cap-feed", 1_700_000_010, Decision::Allow);
+    // `ChioReceipt::sign` folds the caller-supplied `body.id` ("r-feed-1")
+    // into the signing nonce and overwrites `.id` with the content-addressed
+    // hash, so the feed round-trips that computed id rather than the label.
+    // Capture it before the receipt is moved into the feed.
+    let expected_id = receipt.id.clone();
 
     assert_eq!(feed.len()?, 0);
     assert!(feed.is_empty()?);
@@ -172,7 +177,7 @@ fn in_memory_receipt_feed_persists_and_filters_by_agent_and_window() -> Result<(
 
     let matching = feed.receipts_for_agent("agent-feed", 1_700_000_000, 1_700_000_020)?;
     assert_eq!(matching.len(), 1);
-    assert_eq!(matching[0].id, "r-feed-1");
+    assert_eq!(matching[0].id, expected_id);
 
     let wrong_agent = feed.receipts_for_agent("agent-other", 1_700_000_000, 1_700_000_020)?;
     assert!(wrong_agent.is_empty());

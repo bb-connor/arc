@@ -625,9 +625,33 @@ mod replay_parser_tests {
 
     use super::*;
 
+    /// Parse a `chio` argv into [`Cli`] on a thread with an 8 MiB stack.
+    ///
+    /// The release binary parses argv on the process main thread, whose
+    /// default stack is 8 MiB. The libtest harness, by contrast, runs each
+    /// `#[test]` on a worker thread whose default stack is only ~2 MiB, and
+    /// the monomorphised clap parser for the 24-variant `Commands` enum needs
+    /// more than that to build, overflowing the worker stack with a SIGABRT.
+    ///
+    /// Driving the parse through an explicit 8 MiB worker mirrors the
+    /// production main-thread stack exactly, so the test exercises the same
+    /// code path the binary does without changing the CLI surface.
+    fn parse_cli<I>(argv: I) -> clap::error::Result<Cli>
+    where
+        I: IntoIterator<Item = &'static str>,
+    {
+        let argv: Vec<&'static str> = argv.into_iter().collect();
+        std::thread::Builder::new()
+            .stack_size(8 * 1024 * 1024)
+            .spawn(move || Cli::try_parse_from(argv))
+            .expect("spawn 8 MiB parse thread")
+            .join()
+            .expect("parse thread must not panic")
+    }
+
     #[test]
     fn replay_parses_log_argument() {
-        let cli = Cli::try_parse_from(["chio", "replay", "./receipts/"]).unwrap();
+        let cli = parse_cli(["chio", "replay", "./receipts/"]).unwrap();
         match cli.command {
             Commands::Replay(args) => {
                 assert_eq!(args.log.as_deref(), Some(Path::new("./receipts/")));
@@ -644,7 +668,7 @@ mod replay_parser_tests {
 
     #[test]
     fn replay_parses_expect_root_flag() {
-        let cli = Cli::try_parse_from([
+        let cli = parse_cli([
             "chio",
             "replay",
             "./receipts/",
@@ -662,7 +686,7 @@ mod replay_parser_tests {
 
     #[test]
     fn replay_parses_from_tee_and_json_flags() {
-        let cli = Cli::try_parse_from(["chio", "replay", "capture.ndjson", "--from-tee", "--json"])
+        let cli = parse_cli(["chio", "replay", "capture.ndjson", "--from-tee", "--json"])
             .unwrap();
         match cli.command {
             Commands::Replay(args) => {
@@ -675,7 +699,7 @@ mod replay_parser_tests {
 
     #[test]
     fn replay_parses_bless_flag() {
-        let cli = Cli::try_parse_from(["chio", "replay", "./receipts/", "--bless"]).unwrap();
+        let cli = parse_cli(["chio", "replay", "./receipts/", "--bless"]).unwrap();
         match cli.command {
             Commands::Replay(args) => {
                 assert!(args.bless);
@@ -686,7 +710,7 @@ mod replay_parser_tests {
 
     #[test]
     fn replay_parses_bless_into_flag() {
-        let cli = Cli::try_parse_from([
+        let cli = parse_cli([
             "chio",
             "replay",
             "capture.ndjson",
@@ -710,7 +734,7 @@ mod replay_parser_tests {
     #[test]
     fn replay_parses_traffic_subcommand() {
         let cli =
-            Cli::try_parse_from(["chio", "replay", "traffic", "--from", "capture.ndjson"]).unwrap();
+            parse_cli(["chio", "replay", "traffic", "--from", "capture.ndjson"]).unwrap();
         match cli.command {
             Commands::Replay(args) => {
                 assert!(args.log.is_none(), "positional <log> absent under traffic");
@@ -730,7 +754,7 @@ mod replay_parser_tests {
 
     #[test]
     fn replay_parses_traffic_full_flag_set() {
-        let cli = Cli::try_parse_from([
+        let cli = parse_cli([
             "chio",
             "replay",
             "traffic",
@@ -764,7 +788,7 @@ mod replay_parser_tests {
 
     #[test]
     fn replay_parses_traffic_against_and_run_id_flags() {
-        let cli = Cli::try_parse_from([
+        let cli = parse_cli([
             "chio",
             "replay",
             "traffic",

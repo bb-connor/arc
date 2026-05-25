@@ -292,6 +292,10 @@ mod replay_verdict_tests {
                 guard: REPLAY_FIXTURE_DRIFT_GUARD_SENTINEL.to_string(),
             },
         );
+        // ChioReceipt::sign content-addresses body.id (the supplied label
+        // survives only as the signing nonce), so the drift error reports the
+        // real receipt id, not the label.
+        let expected_id = receipt.id.clone();
         let err = rederive_verdict(&receipt).unwrap_err();
         match err {
             VerdictError::Drift {
@@ -299,7 +303,7 @@ mod replay_verdict_tests {
                 stored,
                 current,
             } => {
-                assert_eq!(receipt_id, "rcpt-drift-marker-0001");
+                assert_eq!(receipt_id, expected_id);
                 assert_eq!(stored, "deny");
                 assert_eq!(current, "allow");
             }

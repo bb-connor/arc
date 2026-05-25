@@ -145,15 +145,42 @@ mod cli_entrypoint_tests {
 
     use super::*;
 
+    /// Parse a `chio` argv into [`Cli`] on a thread with an 8 MiB stack.
+    ///
+    /// The release binary parses argv on the process main thread, whose
+    /// default stack is 8 MiB. The libtest harness runs each `#[test]` on a
+    /// worker thread with a ~2 MiB default stack, and the monomorphised clap
+    /// parser for the 24-variant `Commands` enum needs more than that to
+    /// build, overflowing the worker stack with a SIGABRT. Driving the parse
+    /// through an explicit 8 MiB worker mirrors the production main-thread
+    /// stack so the tests exercise the same parser the binary does without
+    /// changing the CLI surface.
+    ///
+    /// Accepts any iterator of string-likes and collects to owned `Vec<String>`
+    /// so borrowed argv (slices, cloned vecs) can move across the thread.
+    fn parse_cli<I, S>(argv: I) -> clap::error::Result<Cli>
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let argv: Vec<String> = argv.into_iter().map(Into::into).collect();
+        std::thread::Builder::new()
+            .stack_size(8 * 1024 * 1024)
+            .spawn(move || Cli::try_parse_from(argv))
+            .expect("spawn 8 MiB parse thread")
+            .join()
+            .expect("parse thread must not panic")
+    }
+
     #[test]
     fn format_json_flag_enables_json_output() {
-        let cli = Cli::try_parse_from(["chio", "--format", "json", "init", "demo"]).unwrap();
+        let cli = parse_cli(["chio", "--format", "json", "init", "demo"]).unwrap();
         assert!(cli.json_output());
     }
 
     #[test]
     fn legacy_json_flag_still_enables_json_output() {
-        let cli = Cli::try_parse_from(["chio", "--json", "init", "demo"]).unwrap();
+        let cli = parse_cli(["chio", "--json", "init", "demo"]).unwrap();
         assert!(cli.json_output());
     }
 
@@ -225,7 +252,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn api_protect_subcommand_parses() {
-        let cli = Cli::try_parse_from([
+        let cli = parse_cli([
             "chio",
             "api",
             "protect",
@@ -255,7 +282,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn receipt_flush_subcommand_parses() {
-        let cli = Cli::try_parse_from([
+        let cli = parse_cli([
             "chio",
             "--receipt-db",
             "receipts.sqlite3",
@@ -279,7 +306,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn receipt_flush_rejects_zero_timeout() {
-        let result = Cli::try_parse_from([
+        let result = parse_cli([
             "chio",
             "--receipt-db",
             "receipts.sqlite3",
@@ -294,7 +321,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn receipt_checkpoint_create_subcommand_parses() {
-        let cli = Cli::try_parse_from([
+        let cli = parse_cli([
             "chio",
             "--receipt-db",
             "receipts.sqlite3",
@@ -328,7 +355,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn receipt_checkpoint_rejects_zero_max_batch() {
-        let create = Cli::try_parse_from([
+        let create = parse_cli([
             "chio",
             "--receipt-db",
             "receipts.sqlite3",
@@ -340,7 +367,7 @@ mod cli_entrypoint_tests {
             "--max-batch",
             "0",
         ]);
-        let status = Cli::try_parse_from([
+        let status = parse_cli([
             "chio",
             "--receipt-db",
             "receipts.sqlite3",
@@ -391,7 +418,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn mcp_wrap_subcommand_parses() {
-        let cli = Cli::try_parse_from([
+        let cli = parse_cli([
             "chio",
             "mcp",
             "wrap",
@@ -636,7 +663,7 @@ mod cli_entrypoint_tests {
         ];
 
         for args in commands {
-            Cli::try_parse_from(args.clone()).unwrap_or_else(|error| {
+            parse_cli(args.clone()).unwrap_or_else(|error| {
                 panic!("expected native Chio command to parse: {args:?}: {error}")
             });
         }
@@ -644,7 +671,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn chio_native_command_surfaces_preserve_required_arguments() {
-        let relay_enqueue = Cli::try_parse_from([
+        let relay_enqueue = parse_cli([
             "chio",
             "pheromone",
             "relay",
@@ -665,7 +692,7 @@ mod cli_entrypoint_tests {
             clap::error::ErrorKind::MissingRequiredArgument
         );
 
-        let buyer_verify = Cli::try_parse_from([
+        let buyer_verify = parse_cli([
             "chio",
             "attest",
             "buyer",
@@ -701,7 +728,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn hidden_chio_attest_verify_shortcut_is_rejected() {
-        let error = match Cli::try_parse_from([
+        let error = match parse_cli([
             "chio",
             "attest",
             "verify",
@@ -724,7 +751,7 @@ mod cli_entrypoint_tests {
 
 
     fn rendered_help(args: &[&str]) -> String {
-        let error = match Cli::try_parse_from(args) {
+        let error = match parse_cli(args.iter().copied()) {
             Ok(_) => panic!("help exits before parsing command values"),
             Err(error) => error,
         };
@@ -747,7 +774,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn chio_attest_buyer_packet_surface_parses() {
-        let cli = Cli::try_parse_from([
+        let cli = parse_cli([
             "chio",
             "attest",
             "buyer",
@@ -821,7 +848,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn chio_attest_buyer_verify_packet_surface_parses() {
-        let cli = Cli::try_parse_from([
+        let cli = parse_cli([
             "chio",
             "attest",
             "buyer",
@@ -872,7 +899,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn chio_attest_supply_chain_verify_surface_parses() {
-        let cli = Cli::try_parse_from([
+        let cli = parse_cli([
             "chio",
             "attest",
             "supply-chain",
@@ -919,7 +946,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn chio_attest_runtime_quote_verify_surface_parses() {
-        let cli = Cli::try_parse_from([
+        let cli = parse_cli([
             "chio",
             "attest",
             "runtime-quote",
@@ -1043,7 +1070,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn chio_native_federation_treaty_surface_parses() {
-        let cli = Cli::try_parse_from([
+        let cli = parse_cli([
             "chio",
             "federation",
             "treaty",
@@ -1094,7 +1121,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn chio_native_runtime_surface_parses() {
-        let cli = Cli::try_parse_from([
+        let cli = parse_cli([
             "chio",
             "runtime",
             "sign-trust-input",
@@ -1132,7 +1159,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn chio_native_pheromone_surface_parses() {
-        let cli = Cli::try_parse_from([
+        let cli = parse_cli([
             "chio",
             "pheromone",
             "query",
@@ -1178,7 +1205,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn chio_native_surfaces_remain_native_command_variants() {
-        let runtime = Cli::try_parse_from([
+        let runtime = parse_cli([
             "chio",
             "runtime",
             "sign-trust-input",
@@ -1193,7 +1220,7 @@ mod cli_entrypoint_tests {
         .command;
         assert!(matches!(runtime, Commands::Runtime { .. }));
 
-        let pheromone = Cli::try_parse_from([
+        let pheromone = parse_cli([
             "chio",
             "pheromone",
             "query",
@@ -1214,7 +1241,7 @@ mod cli_entrypoint_tests {
         .command;
         assert!(matches!(pheromone, Commands::Pheromone { .. }));
 
-        let federation = Cli::try_parse_from([
+        let federation = parse_cli([
             "chio",
             "federation",
             "treaty",
@@ -1232,7 +1259,7 @@ mod cli_entrypoint_tests {
         .command;
         assert!(matches!(federation, Commands::Federation { .. }));
 
-        let attest = Cli::try_parse_from([
+        let attest = parse_cli([
             "chio",
             "attest",
             "buyer",
