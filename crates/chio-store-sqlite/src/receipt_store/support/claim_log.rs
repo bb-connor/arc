@@ -1652,10 +1652,10 @@ pub(crate) fn ensure_tool_receipt_attribution_columns(
     //
     // Pre-multitenant receipts migrate to NULL, which the
     // tenant-scoped WHERE clause treats as a "public" fallback set (a
-    // tenant A query returns its own rows AND the NULL-tagged legacy
+    // tenant A query returns its own rows AND the NULL-tagged pre-multitenant
     // set), so historical data remains visible under query modes that
     // opt into backward compatibility. Operators that need strict
-    // isolation across the legacy set can enable
+    // isolation across the pre-multitenant set can enable
     // [`SqliteReceiptStore::with_strict_tenant_isolation`].
     //
     // Migration fails closed: if the column cannot be added we bail
@@ -1758,11 +1758,11 @@ pub(crate) fn backfill_tool_receipt_attribution_columns(
               ) IS NOT NULL;
 
         -- Multi-tenant receipt isolation: hydrate tenant_id
-        -- from the canonical receipt body. Legacy receipts (pre-multitenant)
+        -- from the canonical receipt body. Pre-multitenant receipts (NULL-tagged)
         -- that were stored before the field existed stay NULL, which
         -- means "public / visible to any tenant under the default
         -- compat query mode". Operators who want to purge those
-        -- legacy rows can enable strict tenant isolation on queries.
+        -- pre-multitenant rows can enable strict tenant isolation on queries.
         --
         -- The receipt body uses snake_case field names (no rename_all),
         -- so the JSON key is `tenant_id`, not `tenantId`.

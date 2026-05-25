@@ -1530,8 +1530,8 @@ pub fn verify_bilateral_cosign_invocation(
         (None, None) => {
             // Both sides explicitly omit scope-digest binding; the
             // lease is unscoped on both ends and step 14 accepts it
-            // on id+issuer+expiry alone. This is the legacy
-            // unscoped-lease path.
+            // on id+issuer+expiry alone. Unscoped leases are a valid
+            // current configuration permitted by the spec.
         }
     }
 

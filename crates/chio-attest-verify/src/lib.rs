@@ -74,7 +74,7 @@ pub struct ExpectedIdentity {
 }
 
 impl ExpectedIdentity {
-    /// Doc-hidden constructor retained for tests and legacy operator
+    /// Doc-hidden constructor retained for tests and direct operator
     /// configuration.
     ///
     /// The function is `#[doc(hidden)]` so it does not appear in public

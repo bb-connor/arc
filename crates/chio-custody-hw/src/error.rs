@@ -101,8 +101,8 @@ pub enum CustodyError {
 impl CustodyError {
     /// Stable `urn:chio:error:custody:*` code for this error variant.
     ///
-    /// Consumed by HTTP / JSON-RPC translation layers; the legacy string
-    /// codes still live in `spec/errors/registry.yaml` for transport.
+    /// Consumed by HTTP / JSON-RPC translation layers; the string codes are
+    /// defined in `spec/errors/registry.yaml`.
     #[must_use]
     pub fn urn(&self) -> &'static str {
         match self {

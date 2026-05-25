@@ -1,9 +1,7 @@
 """Acceptance test for the 10-line chio-code-agent quickstart.
 
-Implements the roadmap Phase 4.1 acceptance:
-
-    A 10-line Python script demonstrates safe file reads allowed and
-    `.env` writes denied.
+Verifies that a 10-line Python script demonstrates safe file reads
+allowed and `.env` writes denied.
 
 Also covers a few round-trip cases that exercise the real
 ``CodeAgent`` / ``FileTool`` surface against a ``MockChioClient``.

@@ -98,7 +98,7 @@ fn build_body(kernel_key: PublicKey) -> ChioReceiptBody {
 }
 
 #[test]
-fn shared_canonical_bytes_match_legacy_classical_path() {
+fn shared_canonical_bytes_match_classical_signing_path() {
     // Contract 2: the canonical buffer the hybrid-canonical helper
     // emits under a classical backend is byte-identical to the buffer
     // the legacy classical entrypoint signs. Deployments

@@ -194,14 +194,14 @@ impl Transport for GeminiTransport {
 ///
 /// Backed by the shared [`MockHttpTransport`]: scripted responses are dequeued
 /// in FIFO order and every call is recorded. When the script is exhausted the
-/// mock fails closed rather than returning an empty success. The legacy
+/// mock fails closed rather than returning an empty success. The manual
 /// `record`/`calls` helpers are retained so existing tests that only use the
 /// mock as an inert handle keep compiling.
 pub struct MockTransport {
     inner: Arc<MockHttpTransport>,
     /// Endpoint advertised by [`Transport::endpoint`]; defaults to `mock://gemini`.
     endpoint: String,
-    /// Calls recorded through the legacy [`MockTransport::record`] helper.
+    /// Calls recorded through the manual [`MockTransport::record`] helper.
     manual_calls: Mutex<Vec<(String, Vec<u8>)>>,
 }
 
@@ -237,7 +237,7 @@ impl MockTransport {
         self.inner.push_error(error);
     }
 
-    /// Record a placed call (legacy helper for tests that drive the mock by hand).
+    /// Record a placed call (manual helper for tests that drive the mock by hand).
     pub fn record(&self, endpoint: &str, body: &[u8]) {
         if let Ok(mut guard) = self.manual_calls.lock() {
             guard.push((endpoint.to_string(), body.to_vec()));
@@ -246,7 +246,7 @@ impl MockTransport {
 
     /// Snapshot every recorded call: those captured by the backing
     /// [`MockHttpTransport`] during real `send_*` calls followed by any added
-    /// through the legacy [`MockTransport::record`] helper.
+    /// through the manual [`MockTransport::record`] helper.
     pub fn calls(&self) -> Vec<(String, Vec<u8>)> {
         let mut calls: Vec<(String, Vec<u8>)> = self
             .inner

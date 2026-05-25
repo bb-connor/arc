@@ -1,4 +1,4 @@
-//! Phase 3.6 approval channels.
+//! Approval channels for HITL signaling.
 //!
 //! A channel is a delivery mechanism that gets an `ApprovalRequest` in
 //! front of a human. The kernel treats channels as fire-and-forget

@@ -126,7 +126,7 @@
         "deferred_to": {
           "type": "string",
           "minLength": 1,
-          "description": "Milestone, ticket, or trajectory carry-forward reference for pending threats that are intentionally deferred instead of counted as covered."
+          "description": "Version or ticket carry-forward reference for pending threats that are intentionally deferred instead of counted as covered."
         }
       }
     },

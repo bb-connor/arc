@@ -221,7 +221,7 @@ impl ChioAcpEdge {
         }
     }
 
-    /// Evaluate a permission request using the legacy config-only preview path.
+    /// Evaluate a permission request using the config-only passthrough preview path.
     ///
     /// This helper does not consult the Chio kernel and does not imply that a
     /// later invocation would produce a signed receipt.
@@ -811,7 +811,7 @@ impl ChioAcpEdge {
 
 #[cfg(any(test, feature = "compatibility-surface"))]
 impl ChioAcpEdgeCompatibility<'_> {
-    /// Evaluate a permission request using the legacy config-only preview path.
+    /// Evaluate a permission request using the config-only passthrough preview path.
     ///
     /// This compatibility helper does not consult the Chio kernel and does not
     /// imply that a later invocation would produce a signed receipt.

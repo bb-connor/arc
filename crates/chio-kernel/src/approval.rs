@@ -1,4 +1,4 @@
-//! Phase 3.4-3.6 human-in-the-loop (HITL) primitives.
+//! Human-in-the-loop (HITL) primitives.
 //!
 //! This module houses the approval-request data model, the persistent
 //! approval-store contract, the approval guard that decides when a call
@@ -563,10 +563,10 @@ impl ApprovalGuard {
             }
         }
 
-        // Sentinel for Phase 3.4-3.6: an attribute flag on the request
-        // (`force_approval`) forces a PendingApproval outcome so host
-        // integrations can drop into the HITL flow without teaching
-        // every constraint variant. Test harnesses use this path too.
+        // An attribute flag on the request (`force_approval`) forces a
+        // PendingApproval outcome so host integrations can enter the HITL
+        // flow without teaching every constraint variant.
+        // Test harnesses use this path too.
         if ctx.force_approval {
             always_hit = true;
             triggered.push("force_approval".to_string());
@@ -830,8 +830,8 @@ pub fn resume_with_decision(
 
 /// Thread-safe in-memory `ApprovalStore`. Useful for tests and for
 /// ephemeral deployments where operators explicitly accept data loss
-/// on restart (the opposite of Phase 3.5's durability contract; SQLite
-/// is the production path).
+/// on restart (ephemeral: data is lost on restart; use the SQLite-backed
+/// store for production durability).
 #[derive(Default)]
 pub struct InMemoryApprovalStore {
     pending: RwLock<HashMap<String, ApprovalRequest>>,

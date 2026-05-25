@@ -225,8 +225,8 @@ fn model_metadata_omits_absent_optional_fields() {
 }
 
 #[test]
-fn model_metadata_accepts_legacy_payload_without_optional_fields() {
-    // A legacy edge that only populates `model_id` must still decode.
+fn model_metadata_accepts_partial_payload_with_only_model_id() {
+    // An edge that only populates `model_id` must still decode.
     let value = json!({"model_id": "gpt-5"});
     let metadata: ModelMetadata = serde_json::from_value(value).expect("decodes");
     assert_eq!(metadata.model_id, "gpt-5");

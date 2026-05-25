@@ -504,7 +504,7 @@ impl SqliteReceiptStore {
 
         // Receipt read isolation: admin contexts can read all rows, tenant
         // contexts see exact tenant rows by default, and local compatibility
-        // mode may include legacy NULL-tenant rows.
+        // mode may include NULL-tenant (pre-multitenant) rows.
         let read_scope = query
             .effective_read_scope()
             .map_err(ReceiptStoreError::ReadBoundary)?;

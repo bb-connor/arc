@@ -1,4 +1,4 @@
-// Phase 2.4 plan-level evaluation tests.
+// Plan-level evaluation tests.
 //
 // Included by `src/kernel/tests.rs`. Inherits `super::*` plus the
 // helpers defined at the top of `tests/all.rs` (`make_config`,

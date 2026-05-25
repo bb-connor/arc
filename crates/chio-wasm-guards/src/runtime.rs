@@ -1056,8 +1056,8 @@ pub mod wasmtime_backend {
     impl WasmtimeBackend {
         /// Create a new Wasmtime backend with its own shared engine.
         ///
-        /// For backward compatibility; callers that want to share an engine
-        /// across multiple guards should use [`with_engine`] instead.
+        /// Convenience constructor that creates its own engine; callers sharing
+        /// an engine across guards should use [`with_engine`] instead.
         pub fn new() -> Result<Self, WasmGuardError> {
             let engine = create_shared_engine()?;
             Ok(Self {
@@ -1280,7 +1280,7 @@ pub mod wasmtime_backend {
                     }
                 }
             } else {
-                // No chio_alloc export -- use legacy offset-0 protocol
+                // No chio_alloc export -- use offset-0 placement (core-module ABI)
                 0
             };
 
@@ -1330,7 +1330,7 @@ pub mod wasmtime_backend {
                     let reason = if let Some(ref reason_fn) = deny_reason_fn {
                         read_structured_deny_reason(reason_fn, &memory, &mut store)
                     } else {
-                        // Fallback to legacy offset-64K NUL-terminated string
+                        // Fallback to core-module offset-64K NUL-terminated deny string (no chio_deny_reason export)
                         read_deny_reason(&memory, &store)
                     };
 
@@ -2153,16 +2153,16 @@ pub mod wasmtime_backend {
         }
 
         #[test]
-        fn chio_deny_reason_fallback_legacy() {
+        fn chio_deny_reason_fallback_core_module() {
             // WAT module WITHOUT chio_deny_reason export.
-            // Has a NUL-terminated string at offset 65536 ("legacy reason\0").
+            // Has a NUL-terminated string at offset 65536 (core-module deny-reason ABI: "core-module reason\0").
             let wat = r#"
                 (module
                     (import "chio" "log" (func $log (param i32 i32 i32)))
                     (import "chio" "get_config" (func $get_config (param i32 i32 i32 i32) (result i32)))
                     (import "chio" "get_time_unix_secs" (func $get_time (result i64)))
                     (memory (export "memory") 2)
-                    (data (i32.const 65536) "legacy reason\00")
+                    (data (i32.const 65536) "core-module reason\00")
                     (func (export "evaluate") (param $ptr i32) (param $len i32) (result i32)
                         ;; Return DENY (1)
                         (i32.const 1)
@@ -2179,8 +2179,8 @@ pub mod wasmtime_backend {
                 GuardVerdict::Deny { reason } => {
                     assert_eq!(
                         reason.as_deref(),
-                        Some("legacy reason"),
-                        "expected legacy deny reason from offset 64K"
+                        Some("core-module reason"),
+                        "expected core-module deny reason from offset 64K"
                     );
                 }
                 _ => panic!("expected Deny verdict, got: {result:?}"),

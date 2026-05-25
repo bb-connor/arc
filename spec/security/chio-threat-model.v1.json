@@ -623,7 +623,7 @@
           "control": "The issued capability must carry a trust-level marker so downgraded Android API 26-27 devices cannot claim StrongBox-backed custody."
         }
       ],
-      "residualRisk": "A fully compromised mobile OS can still interfere with UI and request timing; M07 only prevents export of the device-bound signing key from being treated as normal custody.",
+      "residualRisk": "A fully compromised mobile OS can still interfere with UI and request timing; this control only prevents export of the device-bound signing key from being treated as normal custody.",
       "coverage_state": "pending",
       "coveredBy": [
         "crates/chio-conformance/tests/threats/device_key_extraction.rs",

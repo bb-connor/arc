@@ -436,7 +436,7 @@ async def _invoke_task(
     return await asyncio.to_thread(fn, *args, **kwargs)
 
 
-def _legacy_envelope(
+def _prefect_envelope(
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
     tool_name: str,
@@ -632,7 +632,7 @@ def _task_parameters(
     """Canonicalise call arguments for the sidecar payload.
 
     Thin wrapper around ``chio_adapter_base.redact.bind_and_redact``
-    plus the prefect ``_legacy_envelope`` shim. The shim's two jobs:
+    plus the prefect ``_prefect_envelope`` shim. The shim's two jobs:
 
     1. Pack ``(args, kwargs)`` into prefect's
        ``{"args": [...], "kwargs": {...}}`` envelope.
@@ -647,7 +647,7 @@ def _task_parameters(
     fallback) are now expressed there; the prefect canary verifies the
     helper API actually subsumes the bespoke shape.
     """
-    return _legacy_envelope(args, kwargs, tool_name, policy, fn)
+    return _prefect_envelope(args, kwargs, tool_name, policy, fn)
 
 
 @overload

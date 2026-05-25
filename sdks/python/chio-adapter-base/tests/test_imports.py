@@ -97,7 +97,7 @@ def test_filters_submodule_surface() -> None:
 
 
 def test_conformance_submodule_exports_fixture() -> None:
-    """Phase 2 conformance namespace ships the :class:`ConformanceFixture`."""
+    """The conformance namespace ships the :class:`ConformanceFixture`."""
     from chio_adapter_base import conformance
 
     assert "ConformanceFixture" in conformance.__all__
