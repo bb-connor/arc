@@ -157,13 +157,10 @@ pub(crate) struct ReceiptExplainArgs<'a> {
     pub(crate) input_file: Option<&'a Path>,
     pub(crate) depth: usize,
     pub(crate) fanout_limit: usize,
-    /// Renamed from `explain_bilateral` because the previous output
-    /// labelled itself a "full-verifier trace" while the CLI does
-    /// not carry the org A / org B passport public keys and could not
-    /// perform real Ed25519 verification. The trace is now an
-    /// `inspect` output (structural / schema checks only). The legacy
-    /// CLI flag spelling is preserved as a `clap` alias on the parent
-    /// enum.
+    /// Inspect-only: the CLI does not carry the org A / org B passport
+    /// public keys and cannot perform real Ed25519 verification, so the
+    /// trace reports structural / schema checks only. The legacy CLI flag
+    /// spelling is preserved as a `clap` alias on the parent enum.
     pub(crate) inspect_bilateral: bool,
     pub(crate) tenant: Option<&'a str>,
     pub(crate) admin_all: bool,
@@ -3031,14 +3028,12 @@ pub(crate) fn explain_dsse_envelope(dsse: &serde_json::Value) -> Result<serde_js
     }))
 }
 
-/// Renamed from `explain_bilateral_seventeen_step_trace`. The previous
-/// name implied this was a section-7 full-verifier trace, but most steps
-/// were marked `bounded` because the CLI does not have the org A / org
-/// B passport public keys in scope and cannot perform real Ed25519
-/// verification. The function now produces an INSPECTION trace
-/// (structural / schema / fingerprint-presence checks only) and the
-/// emitted JSON labels itself accordingly. Real verification belongs
-/// in `chio_federation::bilateral_dsse::verify_dsse_envelope` against
+/// Produces an INSPECTION trace (structural / schema /
+/// fingerprint-presence checks only); the CLI does not have the org A /
+/// org B passport public keys in scope and cannot perform real Ed25519
+/// verification, and the emitted JSON labels itself accordingly. Real
+/// verification belongs in
+/// `chio_federation::bilateral_dsse::verify_dsse_envelope` against
 /// pinned passport keys.
 pub(crate) fn inspect_bilateral_envelope_trace(
     dual: &serde_json::Value,

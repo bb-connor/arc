@@ -101,7 +101,7 @@ fn build_body(kernel_key: PublicKey) -> ChioReceiptBody {
 fn shared_canonical_bytes_match_legacy_classical_path() {
     // Contract 2: the canonical buffer the hybrid-canonical helper
     // emits under a classical backend is byte-identical to the buffer
-    // the legacy classical entrypoint signs. Trajectory-1 deployments
+    // the legacy classical entrypoint signs. Deployments
     // see no byte drift when they switch to the canonical-bytes-aware
     // entrypoint.
     let kp = Keypair::from_seed(&fixture_classical_seed());
@@ -254,7 +254,7 @@ fn shared_bytes_round_trip_through_serde_after_signing() {
 
 #[test]
 fn hybrid_canonical_and_classical_paths_sign_identical_bytes_under_ed25519() {
-    // PR 682 contract: `sign_receipt_body_hybrid_canonical` must sign
+    // `sign_receipt_body_hybrid_canonical` must sign
     // the authoritative `ChioReceiptSigningBody` wrapper (id plus
     // `ChioReceiptIdInput`), not the bare `ChioReceiptBody`. Under a
     // classical-only Ed25519 backend this means the signed bytes -- and

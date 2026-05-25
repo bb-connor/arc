@@ -1,8 +1,5 @@
 use super::*;
 
-// Per-command-group handlers extracted from `run()`. Each file carries the arm
-// body verbatim behind a `dispatch_<command>(command, <locals>)` function so the
-// entrypoint below stays a thin parse-and-route skeleton.
 #[path = "dispatch/api_mcp.rs"]
 mod api_mcp;
 #[path = "dispatch/trust.rs"]

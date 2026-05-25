@@ -236,7 +236,7 @@ impl ChioKernel {
                     )));
                 }
                 Ok(Verdict::PendingApproval) => {
-                    // Phase 3.4: a legacy `Guard` should not return the
+                    // A legacy `Guard` should not return the
                     // HITL marker. The fully integrated approval flow
                     // runs via `ApprovalGuard::evaluate` rather than
                     // the `Guard` trait so this branch is unreachable

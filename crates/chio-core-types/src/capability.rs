@@ -2749,10 +2749,7 @@ pub enum Constraint {
     /// Extensibility: arbitrary key-value constraint.
     Custom(String, String),
 
-    // ---- Phase 2.2 additions -----------------------------------------
-    //
-    // The variants below were added per docs/protocols/ADR-TYPE-EVOLUTION.md
-    // section 3 to carry data-layer, communication, financial,
+    // The variants below carry data-layer, communication, financial,
     // model-routing, and memory-governance policy. They participate in
     // the existing tagged serde envelope
     // (`#[serde(tag = "type", content = "value", rename_all = "snake_case")]`).

@@ -1116,7 +1116,7 @@ pub(crate) enum GuardCommands {
         target_dir: PathBuf,
     },
 
-    /// Sign a .wasm guard binary and write a `.wasm.sig` sidecar (Phase 1.3).
+    /// Sign a .wasm guard binary and write a `.wasm.sig` sidecar.
     Sign {
         /// Path to the `.wasm` file to sign.
         wasm: PathBuf,
@@ -3329,8 +3329,8 @@ pub(crate) enum DidCommands {
 pub(crate) enum PassportCommands {
     /// Synthesize a trust-tier-enriched Agent Passport for a named agent.
     ///
-    /// Computes the agent's compliance score (Phase 19.1) and behavioral
-    /// anomaly (Phase 19.2), collapses them into a `TrustTier`, and emits
+    /// Computes the agent's compliance score and behavioral
+    /// anomaly, collapses them into a `TrustTier`, and emits
     /// a minimal passport JSON document with that tier populated.
     Generate {
         /// Agent identifier (DID or opaque subject) to stamp on the passport.

@@ -1,4 +1,4 @@
-// Phase 20.3 cross-kernel federation bilateral co-signing tests.
+// Cross-kernel federation bilateral co-signing tests.
 //
 // Included by `src/kernel/tests.rs`; shares helpers (`make_config`,
 // `make_keypair`, `make_scope`, `make_grant`, `make_capability`,

@@ -34,7 +34,7 @@ pub(crate) fn handle_agent_message(
             match response.verdict {
                 chio_kernel::Verdict::Allow => stats.allowed += 1,
                 chio_kernel::Verdict::Deny => stats.denied += 1,
-                // Phase 3.4: pending approval is a non-terminal
+                // Pending approval is a non-terminal
                 // outcome; from the CLI's accounting perspective we
                 // fold it into denied until the human responds.
                 chio_kernel::Verdict::PendingApproval => stats.denied += 1,
@@ -191,7 +191,7 @@ pub(crate) fn tool_response_messages(
         (chio_kernel::Verdict::Allow, _, None) => ToolCallResult::Ok {
             value: serde_json::Value::Null,
         },
-        // Phase 3.4: map PendingApproval to a policy-denied result so
+        // Map PendingApproval to a policy-denied result so
         // the existing session driver surfaces it to the caller; the
         // HTTP `/approvals` surface is the mechanism for resume.
         (chio_kernel::Verdict::PendingApproval, _, _) => ToolCallResult::Err {

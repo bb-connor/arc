@@ -6,7 +6,7 @@ pipelines without changing the inner `chio-wire/v1/receipt` body.
 
 ## `chio.eval-report.bundle.v1`
 
-`receipt-format.v1.json` defines the M02 eval-report bundle envelope.
+`receipt-format.v1.json` defines the eval-report bundle envelope.
 The bundle:
 
 - preserves each inner Chio receipt payload;

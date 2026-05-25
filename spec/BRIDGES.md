@@ -343,7 +343,7 @@ The edge handles `session/request_permission` JSON-RPC requests by:
    edge MUST return `deny`.
 2. If `requiresPermission` is `true` for the capability, the edge MUST
    return `deny` by default. Explicit permission grants require kernel
-   capability token validation (full integration deferred to Phase 324).
+   capability token validation (full integration deferred to a future release).
 3. If `requiresPermission` is `false`, the edge MUST return `allow`.
 
 ```mermaid

@@ -1,6 +1,4 @@
 // Dispatch handlers for the `chio api` and `chio mcp` command groups.
-//
-// Extracted verbatim from the top-level `run()` match arms.
 
 use super::*;
 

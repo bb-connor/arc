@@ -92,7 +92,7 @@ struct KernelFederationTreatyDsseMetadata {
 }
 
 // ---------------------------------------------------------------------------
-// Phase 1.5 multi-tenant receipt isolation.
+// Multi-tenant receipt isolation.
 //
 // The kernel must tag every receipt it signs with the tenant that the active
 // session belongs to. The natural place to derive that is the authenticated
@@ -671,7 +671,7 @@ pub enum KernelError {
     #[error("DPoP proof verification failed: {0}")]
     DpopVerificationFailed(String),
 
-    /// Phase 3.4: a human-in-the-loop approval token failed to satisfy
+    /// A human-in-the-loop approval token failed to satisfy
     /// the pending approval contract (bad binding, bad signature,
     /// expired, or replayed).
     #[error("approval rejected: {0}")]
@@ -1300,11 +1300,11 @@ pub struct ChioKernel {
     dpop_nonce_store: Option<dpop::DpopNonceStore>,
     /// Configuration for DPoP proof verification TTLs and clock skew.
     dpop_config: Option<dpop::DpopConfig>,
-    /// Phase 1.1 execution-nonce config (TTL, capacity, strict-mode flag).
+    /// Execution-nonce config (TTL, capacity, strict-mode flag).
     /// When `None`, no nonce is minted on allow and strict verification is
     /// disabled (legacy deployments keep working).
     execution_nonce_config: Option<crate::execution_nonce::ExecutionNonceConfig>,
-    /// Phase 1.1 replay-prevention store for execution nonces. Shared with
+    /// Replay-prevention store for execution nonces. Shared with
     /// any tool server that delegates verification to the kernel. Boxed
     /// trait object so SQLite-backed stores can be plugged in.
     execution_nonce_store: Option<Box<dyn crate::execution_nonce::ExecutionNonceStore>>,
@@ -1330,15 +1330,15 @@ pub struct ChioKernel {
     /// `emergency_stop`, cleared on `emergency_resume`. Stored behind
     /// ArcSwap so health probes can read the current reason without blocking.
     emergency_stop_reason: ArcSwap<Option<String>>,
-    /// Phase 18.2 memory-provenance chain. When installed, every
+    /// Memory-provenance chain. When installed, every
     /// governed `MemoryWrite` action appends an entry after the allow
     /// receipt is signed, and every `MemoryRead` attaches the latest
     /// entry (or an `Unverified` marker) to its receipt as
     /// `memory_provenance` evidence metadata. `None` keeps the kernel
     /// backward-compatible: memory-shaped tool calls behave exactly as
-    /// they did before Phase 18.2.
+    /// they do without a provenance chain installed.
     memory_provenance: Option<Arc<dyn crate::memory_provenance::MemoryProvenanceStore>>,
-    /// Phase 20.3 cross-kernel federation peer set. When a request
+    /// Cross-kernel federation peer set. When a request
     /// carries a `federated_origin_kernel_id` and that peer is pinned
     /// here (fresh), the kernel invokes `federation_cosigner` after
     /// locally signing the receipt to obtain the origin kernel's
@@ -1351,16 +1351,16 @@ pub struct ChioKernel {
     /// Serializes read-modify-write updates to `capability_trust_roots`.
     /// Snapshot reads remain lock-free through ArcSwap.
     capability_trust_roots_write_lock: Mutex<()>,
-    /// Phase 20.3 bilateral co-signer. Separate from the peer set so
+    /// Bilateral co-signer. Separate from the peer set so
     /// runtime can install it independently -- for instance, a deployment
     /// can declare peers while still using a mock cosigner in tests.
     federation_cosigner: Option<Arc<dyn chio_federation::BilateralCoSigningProtocol>>,
-    /// Phase 20.3 locally-signed dual receipts, indexed by ChioReceipt.id.
+    /// Locally-signed dual receipts, indexed by ChioReceipt.id.
     /// Populated only when the post-sign hook fires successfully. Kept
     /// in-memory; persistent storage plugs in via the federation-state
     /// APIs already in chio-federation.
     federation_dual_receipts: DashMap<String, chio_federation::DualSignedReceipt>,
-    /// Phase 20.4 DSSE signature-slice envelopes, indexed by ChioReceipt.id.
+    /// DSSE signature-slice envelopes, indexed by ChioReceipt.id.
     /// These are emitted through the federation cosigner protocol rather than
     /// by loading Org A private key material in the tool-host kernel.
     federation_dsse_envelopes: DashMap<String, chio_federation::DsseEnvelope>,
@@ -1374,7 +1374,7 @@ pub struct ChioKernel {
     /// after dispatch. This map keeps the admitted version and peer state
     /// available until the evaluation future finishes.
     receipt_federation_admissions: Arc<DashMap<String, ReceiptFederationAdmission>>,
-    /// Phase 20.3 operator-declared kernel identifier used as the
+    /// Operator-declared kernel identifier used as the
     /// `org_b_kernel_id` in bilateral co-signing. Defaults to the hex
     /// encoding of the kernel's signing public key, but operators can
     /// override it to a stable DNS name via `with_federation_peers`.
@@ -1643,7 +1643,7 @@ impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
 /// Plan evaluation surfaces the offending guard in the per-step verdict
 /// so callers can target a specific guard when replanning. Parsing the
 /// name out of the canonical string is sufficient here; the structured
-/// denial payload defined by Phase 0.5 is a tool-call response type and
+/// denial payload is a tool-call response type and
 /// is not shared with plan evaluation.
 fn extract_guard_name(message: &str) -> Option<String> {
     let start_marker = "guard \"";
@@ -1873,7 +1873,7 @@ pub(crate) struct ReceiptParams<'a> {
     /// `Mediated` (the safest baseline) when integration adapters do not
     /// override it.
     trust_level: chio_core::TrustLevel,
-    /// Phase 1.5 multi-tenant receipt isolation: explicit tenant tag for
+    /// Multi-tenant receipt isolation: explicit tenant tag for
     /// this receipt. `None` in virtually every call site -- the evaluate
     /// path plumbs the resolved tenant through
     /// [`scope_receipt_tenant_id`] so `build_and_sign_receipt` can pick it
@@ -1903,19 +1903,17 @@ pub(crate) fn current_unix_timestamp_ms() -> u64 {
 pub(crate) mod delegation;
 // Kernel construction and configuration surface. Holds the constructor,
 // session/store accessors, and the `set_*` / `with_*` / `register_*`
-// configuration setters split out of this file as a pure move.
+// configuration setters.
 #[path = "construction.rs"]
 mod construction;
 // Tool-call and plan evaluation path, including the long-form evaluation
-// cores, split out of this file as a pure move.
+// cores.
 #[path = "evaluation.rs"]
 mod evaluation;
-// Capability, budget, and governed-admission validation, split out of this
-// file as a pure move.
+// Capability, budget, and governed-admission validation.
 #[path = "validation.rs"]
 mod validation;
-// Guard evaluation, runtime admission, and tool dispatch, split out of this
-// file as a pure move.
+// Guard evaluation, runtime admission, and tool dispatch.
 #[path = "dispatch.rs"]
 mod dispatch;
 #[path = "evaluator.rs"]

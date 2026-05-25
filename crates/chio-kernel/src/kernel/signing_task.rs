@@ -38,7 +38,7 @@
 //! ## Channel capacity
 //!
 //! Default capacity is [`DEFAULT_SIGNING_CHANNEL_CAPACITY`] (256). The
-//! milestone names "fail-closed default" -- a bounded channel where
+//! This is a fail-closed default: a bounded channel where
 //! producers `.await` on `send` until capacity frees up, rather than an
 //! unbounded queue that lets memory grow without limit. Tests can pick a
 //! smaller capacity to exercise backpressure deterministically via
@@ -119,7 +119,7 @@ struct SigningTaskInner {
     /// JoinHandle for the spawned signing task. Wrapped in
     /// `Mutex<Option<_>>` so [`SigningTaskHandle::shutdown`] can take
     /// ownership exactly once even though the kernel handle is shared
-    /// (`Arc<ChioKernel>` after Phase 3). `None` after a successful
+    /// (`Arc<ChioKernel>`). `None` after a successful
     /// shutdown; subsequent shutdown calls are no-ops.
     join: Mutex<Option<JoinHandle<()>>>,
 }
@@ -180,7 +180,7 @@ impl SigningTaskHandle {
     /// `capacity` must be `>= 1`; a zero capacity collapses to 1 to
     /// preserve the `send().await` semantics callers rely on (a
     /// rendezvous channel still surfaces backpressure but blocks on
-    /// every send, which the milestone-doc default explicitly avoids).
+    /// every send, which the default bounded capacity avoids).
     pub(crate) fn with_capacity(keypair: Keypair, capacity: usize) -> Self {
         let capacity = capacity.max(1);
         Self {

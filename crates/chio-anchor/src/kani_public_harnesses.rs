@@ -220,8 +220,8 @@ pub fn public_anchor_emergency_controls_allows_truth_table() {
 /// length accounting, which inflates cbmc's symex into the millions
 /// of steps even at unwind=4 (~140s symex + minutes of SAT in local
 /// runs against a tight per-harness budget). PR-tier CI cannot
-/// afford that wall-clock; the manifest entry on PR #607 enrolls
-/// this harness in the **nightly** lane at a 3600s budget. PR-tier
+/// afford that wall-clock; the manifest enrolls this harness in the
+/// **nightly** lane at a 3600s budget. PR-tier
 /// regression coverage for the same property comes from:
 ///   - `public_anchor_emergency_controls_allows_truth_table` (the
 ///     truth-table harness above, which calls `controls.allows()`
@@ -230,7 +230,7 @@ pub fn public_anchor_emergency_controls_allows_truth_table() {
 ///     `crates/chio-anchor/tests/` that exercise the
 ///     `format!()`-based error path.
 ///
-/// Future hardening follow-up (option (a) per model-scope notes): extract a
+/// Future hardening follow-up: extract a
 /// `pub(crate) fn classify_operation_admission(controls:
 /// AnchorEmergencyControls, operation: AnchorOperationKind) ->
 /// Result<(), AnchorOperationAdmissionError>` where the error type

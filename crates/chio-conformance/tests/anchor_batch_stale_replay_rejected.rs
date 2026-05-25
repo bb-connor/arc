@@ -106,7 +106,7 @@ fn stale_admission_rejects_replay_of_receipt_id_against_different_content() {
         .expect("batch A admitted: body_hash present in verifier-owned cache");
 
     // Negative case: batch B (same receipt id, different content)
-    // must be rejected. Without the HIGH-1 fix this would slip
+    // must be rejected. If admission were keyed by receipt id this would slip
     // through because the receipt id matches.
     let err = runtime
         .block_on(verify_anchor_batch_with_witness_policy_async(

@@ -713,7 +713,7 @@ capabilities: {}
     #[test]
     fn frame_replay_outcome_serializes_namespace_under_replay_prefix() {
         // Stable wire-shape check: the JSON encoding carries the
-        // `replay_receipt_id` field with the milestone-pinned prefix.
+        // `replay_receipt_id` field with the `replay:` namespace prefix.
         let outcome = TrafficFrameOutcome {
             line: 1,
             frame_id: "frame-x".to_string(),

@@ -1,4 +1,4 @@
-//! Phase 1.1 HTTP-surface execution-nonce tests.
+//! HTTP-surface execution-nonce tests.
 //!
 //! `chio-http-core` is protocol-agnostic (no embedded HTTP server). The
 //! test exercises the wire shape that every HTTP adapter inherits:

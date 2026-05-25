@@ -10,11 +10,10 @@ This module hosts:
   arg-fields to redact.
 - :func:`bind_and_redact`: signature-aware wrapper that binds positional
   args to parameter names so redaction covers both ``f("path", "secret")``
-  and ``f(path="path", content="secret")`` call shapes. Sibling adapters
-  used to re-derive the bind-and-redact pattern via inline
-  ``_build_redacted_parameters`` / ``_redact_method_call`` /
-  ``_task_parameters`` helpers; this consolidates the security-critical
-  surface in one place.
+  and ``f(path="path", content="secret")`` call shapes. This is the one
+  canonical place for the security-critical bind-and-redact surface;
+  sibling adapters route their wrapper redaction through it rather than
+  reimplementing it inline.
 - :data:`DEFAULT_TOOL_POSITIONAL_NAMES`: positional-name table for
   chio-default tools. Used by :func:`bind_and_redact` when the wrapped
   callable cannot be introspected (C-extension callable, pure forwarding
@@ -332,9 +331,9 @@ def build_alias_map(
     # the secret. Fail-closed by cycling through the protected list so
     # every unmatched wrapper-name redacts to a protected canonical
     # (mirrors the kwonly Pass B ambiguous-fail-closed semantics in
-    # ``bind_and_redact`` and closes PR #679 P2 3231057188:
+    # ``bind_and_redact``). Example:
     # ``def write_file(label, body, path)`` greedily gave the only
-    # protected slot to ``label`` and left the secret in ``body`` raw).
+    # protected slot to ``label`` and left the secret in ``body`` raw.
     swap_unclaimed_wrappers: list[str] = []
     swap_unclaimed_canonicals: list[str] = []
     swap_ambiguous = False
@@ -378,7 +377,6 @@ def build_alias_map(
         # ambiguous (more unmatched wrappers than free canonicals),
         # fail-closed by cycling through the protected list so every
         # unmatched wrapper-name aliases to a protected canonical.
-        # (Closes PR #679 P2 3231057188 + deferred ID 3229853017.)
         if swap_ambiguous:
             sig_to_canonical[sig_name] = swap_cycle[
                 swap_cycle_idx % len(swap_cycle)
@@ -558,8 +556,6 @@ def bind_and_redact(
             #       runs and routes the secret to the unprotected ``path``
             #       slot. Use the variadic name itself as the slot when it
             #       is a protected canonical so the secret redacts.
-            #
-            # Closes PR #679 P2 3230753453 and 3230753454.
             kwonly_protected_slots: list[tuple[str, str]] = []
             kwonly_protected_set: set[str] = set()
             for p in sig.parameters.values():
@@ -676,11 +672,11 @@ def bind_and_redact(
             # Walk kwonly names too: any kwonly that did not get an
             # alias from the positional pass routes to the next unclaimed
             # protected canonical. Apply the same ambiguous-fail-closed
-            # semantics the non-fallback kwonly Pass B uses (Closes PR
-            # #679 P2 3231057181: ``def write_file(path, *, label, body)``
-            # called with extra positional + body kwarg leaked because
-            # the greedy build_alias_map run gave the only canonical to
-            # ``label`` while ``body`` stayed self-aliased).
+            # semantics the non-fallback kwonly Pass B uses. Example:
+            # ``def write_file(path, *, label, body)`` called with extra
+            # positional + body kwarg leaked because the greedy
+            # build_alias_map run gave the only canonical to ``label``
+            # while ``body`` stayed self-aliased.
             kwonly_names_fb = tuple(
                 p.name
                 for p in sig.parameters.values()
@@ -866,10 +862,7 @@ def bind_and_redact(
     # ``def writer(path, *rest, body)`` where ``*rest`` is just overflow),
     # the kwonly may still be the body alias and the kwonly aliasing
     # pass MUST run; otherwise a kwarg call like ``writer('/tmp/x',
-    # body='PROD_SECRET')`` forwards the secret raw. (Closes PR #679 P2
-    # 3230955382: ``def write_file(path, *rest, body)`` with kwarg body
-    # leaked because the broad ``has_var_positional`` guard skipped the
-    # aliasing pass entirely.)
+    # body='PROD_SECRET')`` forwards the secret raw.
     # Only a variadic parameter whose name is an actual PROTECTED
     # canonical suppresses kwonly aliasing. Earlier versions also fired
     # the guard when ``*name`` matched any table slot (protected or
@@ -877,8 +870,7 @@ def bind_and_redact(
     # ``def write_file(*path, body)`` -- ``path`` is in the chio
     # ``("path", "content")`` table but is NOT a protected field, so
     # the kwonly ``body`` should still alias to ``content`` and got
-    # forwarded raw instead. (Closes PR #679 P2 3231057186 +
-    # 3231057261.)
+    # forwarded raw instead.
     var_positional_is_protected_canonical = any(
         p.kind is inspect.Parameter.VAR_POSITIONAL
         and p.name in protected_fields_for_tool
@@ -920,10 +912,9 @@ def bind_and_redact(
         # the protected list) so the secret is redacted regardless of
         # which kwonly carries it. Mirrors the merge-conflict semantics
         # used elsewhere in this module: when ambiguous, redact more.
-        # (Closes PR #679 P2 3230955385: ``def fn(path, *, label,
-        # body)`` greedily gave the only protected slot to the
-        # first-declared kwonly ``label`` and left the secret in
-        # ``body`` raw.)
+        # Example: ``def fn(path, *, label, body)`` greedily gave the
+        # only protected slot to the first-declared kwonly ``label`` and
+        # left the secret in ``body`` raw.
         unclaimed_kwonlys: list[str] = [
             param.name
             for param in kwonly_params
@@ -971,8 +962,7 @@ def bind_and_redact(
 
     # Redact named (fixed) params first. Build the dict using canonical
     # names so the policy lookup matches the wire-level contract even
-    # when the wrapper renamed the param (closes PR #666 P1
-    # 3229550950).
+    # when the wrapper renamed the param.
     fixed_named: dict[str, Any] = {}
     # Track positional-arg collisions: two or more fixed params routed
     # to the same protected canonical (e.g. swap-detected ambiguous case
@@ -1129,9 +1119,7 @@ def bind_and_redact(
             ):
                 # Multiple fixed positionals share this canonical:
                 # redact each value independently so each stub
-                # reflects its own byte_count. Closes PR #679 P2
-                # 3231057188 byte-count regression for ambiguous
-                # swap-detected aliasing.
+                # reflects its own byte_count.
                 single_redacted = _redact_named(
                     {canonical_name: value},
                     tool_name=tool_name,
@@ -1171,8 +1159,7 @@ def bind_and_redact(
     # the merge-conflict semantics from ``_table_fallback_redact``:
     # redact each colliding kwarg's value INDEPENDENTLY under the
     # canonical so each kwarg's stub reflects its own byte_count.
-    # (Closes PR #679 P2 3230955385: ``def fn(path, *, label, body)``
-    # with both kwargs passed.)
+    # Example: ``def fn(path, *, label, body)`` with both kwargs passed.
     canonical_kw_counts: dict[str, int] = {}
     for kwarg_name in kwargs:
         canonical = sig_to_canonical.get(kwarg_name, kwarg_name)
@@ -1249,7 +1236,7 @@ def _table_fallback_redact(
       is what ``def proxy(*args, **kwargs)`` called as
       ``proxy("PROD_SECRET", path="/tmp/x")`` needs - the positional
       value is the ``content`` slot, not the already-consumed ``path``
-      slot (closes PR #666 P1 3229550957).
+      slot.
 
     ``kwarg_alias_map`` carries wrapper-name -> canonical-name routing
     derived from the failed bind's signature. When set, kwarg redaction
@@ -1281,7 +1268,6 @@ def _table_fallback_redact(
         # semantics from the variadic / overflow paths: redact each
         # bucket independently, keyed by the ORIGINAL wrapper name, so
         # both buckets round-trip with their own redaction record.
-        # (Closes Cursor Bugbot Medium on PR #679.)
         redacted_kwargs: dict[str, Any] = {}
         for k, v in kwargs.items():
             canonical = _to_canonical(k)
@@ -1334,8 +1320,7 @@ def _table_fallback_redact(
     # ``chio_file_write`` need the second positional ``POS_SECRET``
     # redacted under the canonical ``content`` slot, not forwarded raw.
     # Mirror the fixed-signature merge-conflict semantics: redact both
-    # the positional value and the kwarg value independently. (Closes PR
-    # #666 P1 3229853019.)
+    # the positional value and the kwarg value independently.
     overflow_pos_idx = 0
     overflow_slots = (
         [slot for slot in positional_names if slot in filled_by_kwarg]
@@ -1352,8 +1337,7 @@ def _table_fallback_redact(
     # drop one slot, and the rebuild would KeyError when looking up the
     # missing wrapper-name. Mirror the overflow path: route the
     # colliding slots through the sentinel/per-position redact pass so
-    # each value gets its own redacted record. (Closes PR #679 Cursor
-    # High 3231129174 + P2 3231134970.)
+    # each value gets its own redacted record.
     canonicals_claimed: set[str] = set()
     for idx, value in enumerate(args):
         if idx < len(slot_sequence):
@@ -1369,8 +1353,7 @@ def _table_fallback_redact(
             # value's redacted record. Detect the duplicate and re-use
             # the same positional-index sentinel approach as the
             # overflow path so each value redacts and rebuilds
-            # independently. (Closes Cursor Bugbot Medium 3230918235 on
-            # PR #679.)
+            # independently.
             #
             # Distinct slot names can also collide on the SAME canonical
             # when the alias map fans two wrappers onto one protected

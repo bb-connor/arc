@@ -1,8 +1,6 @@
 # Eval-Receipt Evidence Export Contract
 
 **Schema id:** `chio.eval-report.bundle.v1`
-**Milestone:** M02
-**Phase:** P2
 **Partner:** METR
 
 This contract defines how a `verdict_matrix` scenario run becomes an

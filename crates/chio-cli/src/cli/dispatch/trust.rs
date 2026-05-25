@@ -1,7 +1,6 @@
 // Dispatch handler for the `chio trust` command group.
 //
-// Extracted verbatim from the top-level `run()` match arm so the entrypoint
-// stays a thin parse-and-route skeleton. The trust-control surface threads the
+// The trust-control surface threads the
 // kernel store paths and control-plane endpoint through every subcommand.
 
 use super::*;

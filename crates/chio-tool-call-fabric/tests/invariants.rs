@@ -233,13 +233,13 @@ proptest! {
 
     /// (d) lift then lower preserves invocation identity.
     ///
-    /// Phase 1 has no provider adapters wired yet, so we model the lift/lower
-    /// pair at the fabric level: take the invocation to canonical-JSON bytes
-    /// (the on-the-wire shape adapters will produce), parse those bytes back
-    /// (the inverse adapters will consume), and assert byte-for-byte
-    /// stability of every field including the canonicalized arguments
-    /// payload. Phase 2-4 adapter conformance tests will tighten this to a
-    /// real `lift(lower(x)) == x` round-trip.
+    /// No provider adapters are wired yet, so the lift/lower pair is
+    /// modelled at the fabric level: take the invocation to canonical-JSON
+    /// bytes (the on-the-wire shape adapters will produce), parse those
+    /// bytes back (the inverse adapters will consume), and assert
+    /// byte-for-byte stability of every field including the canonicalized
+    /// arguments payload. Adapter conformance tests will later tighten this
+    /// to a real `lift(lower(x)) == x` round-trip.
     #[test]
     fn invariant_d_lift_lower_preserves_invocation_identity(
         inv in arb_tool_invocation(),
@@ -312,7 +312,7 @@ proptest! {
     /// We sample timestamps at whole-ms granularity (see
     /// `arb_system_time_ms`) and assert that the round-tripped stamp's
     /// `received_at` matches the input within ms tolerance. This pins the
-    /// wire-precision contract: M07 surfaces ms-precision timestamps; any
+    /// wire-precision contract: the wire surfaces ms-precision timestamps; any
     /// future drift to second-only precision will fail this property.
     #[test]
     fn invariant_g_received_at_round_trips_within_ms(stamp in arb_provenance_stamp()) {
@@ -338,10 +338,10 @@ proptest! {
         prop_assert!(delta <= 1, "received_at drifted {}ms (>1ms)", delta);
     }
 
-    /// (h) Schema subsumption against the M01 capability schema.
+    /// (h) Schema subsumption against the canonical capability schema.
     ///
-    /// Soft-dep: the canonical `chio-tool-call-fabric.v1` schema is part of
-    /// M01 and is not yet vendored into the workspace. Until it is, this
+    /// Soft-dep: the canonical `chio-tool-call-fabric.v1` schema is not yet
+    /// vendored into the workspace. Until it is, this
     /// property runs as a structural self-check: every arbitrary
     /// `ToolInvocation` must canonicalise to a JSON object with the four
     /// load-bearing fields (`provider`, `tool_name`, `arguments`,

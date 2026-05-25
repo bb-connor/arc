@@ -547,7 +547,7 @@ Chio's normative provenance model now distinguishes three evidence classes:
   `chio.session_anchor.v1`, `chio.receipt_lineage_statement.v1`, or
   `chio.call_chain_continuation.v1`
 
-The Phase 1 provenance substrate uses these versioned artifacts:
+The provenance substrate uses these versioned artifacts:
 
 - `chio.session_anchor.v1`: signed anchor binding `session_id`, `agent_id`,
   transport/auth context, proof-binding material, and auth epoch

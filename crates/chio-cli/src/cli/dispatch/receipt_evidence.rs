@@ -1,6 +1,4 @@
 // Dispatch handlers for the `chio receipt` and `chio evidence` command groups.
-//
-// Extracted verbatim from the top-level `run()` match arms.
 
 use super::*;
 

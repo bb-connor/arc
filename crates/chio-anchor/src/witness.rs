@@ -8,7 +8,7 @@
 //! and OpenTimestamps calendars. Tests substitute mock servers where
 //! load-bearing verification is available.
 //!
-//! # Soundness notes (PR #594 review fixes)
+//! # Soundness notes
 //!
 //! - The receipt's `body_hash` binds a stable [`BatchHashInput`] view
 //!   of the batch body that EXCLUDES `witness_state` and lane-assigned
@@ -647,7 +647,7 @@ mod tests {
         ));
     }
 
-    /// HIGH-1 regression: the body_hash bound by a receipt MUST be
+    /// Regression: the body_hash bound by a receipt MUST be
     /// identical between the Pending body and the same body once
     /// signed under WitnessState::Witnessed. If batch_body_hash
     /// reads witness_state, the two values diverge and the receipt
@@ -707,7 +707,7 @@ mod tests {
         assert_ne!(original_hash, different_lane);
     }
 
-    /// HIGH-2 regression: a self-asserted Witnessed state must NOT
+    /// Regression: a self-asserted Witnessed state must NOT
     /// satisfy require_public_witness=true on its own. The verifier
     /// path requires a real client.verify_inclusion call.
     #[tokio::test]
@@ -763,7 +763,7 @@ mod tests {
         assert!(matches!(err, WitnessPolicyError::VerifierRejected(_)));
     }
 
-    /// HIGH-2 regression for Stale: a stale state with no prior
+    /// Regression for Stale: a stale state with no prior
     /// verified record must be rejected when require_public_witness.
     #[tokio::test]
     async fn require_public_witness_rejects_stale_without_prior_verification() {
@@ -823,7 +823,7 @@ mod tests {
         .expect("previously verified stale receipt is admissible");
     }
 
-    /// HIGH-1 (round-2 review): a Stale receipt id that an attacker
+    /// Regression: a Stale receipt id that an attacker
     /// has previously observed must NOT admit a different batch's
     /// content. The previously-verified set is keyed by recomputed
     /// batch_body_hash, so a fresh-content batch with the same

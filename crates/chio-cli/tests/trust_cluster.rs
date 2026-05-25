@@ -671,7 +671,7 @@ fn wait_for_cluster_leader_convergence(
 /// The internal cluster status endpoint can transiently fail with HTTP errors during cluster
 /// state transitions (initial bring-up, leader failover, follower restart) even when the node's
 /// `/health` endpoint is already up. Single-shot callers that immediately panic on `None` are
-/// the source of intermittent flakes (see the `initial cluster status` failure on PR #528 CI).
+/// the source of intermittent flakes.
 /// This helper bounds the wait with a deadline and returns the first non-`None` snapshot.
 fn wait_for_internal_cluster_status(
     client: &Client,

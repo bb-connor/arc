@@ -12,10 +12,9 @@
 //!    over the canonical JSON of `{body, integratedTime, logID,
 //!    logIndex}` (Rekor SET spec).
 //!
-//! HIGH-3 in PR #594 review: previously the client only inspected the
-//! body hash and treated any well-formed JSON response as valid,
-//! letting a malicious mirror forge inclusion responses. The SET
-//! signature check fixes that.
+//! The SET signature check is load-bearing: inspecting only the body
+//! hash and treating any well-formed JSON response as valid would let a
+//! malicious mirror forge inclusion responses.
 //!
 //! In addition, when the response carries a
 //! `verification.inclusionProof`, [`verify_inclusion_proof`] rebuilds
@@ -151,12 +150,10 @@ struct RekorIntotoContent<'a> {
 ///                   "sig": <base64>}] }
 /// ```
 ///
-/// HIGH-2 (PR #594 round-2 review): the previous shape serialized
-/// `payload_type` (snake_case) instead of Rekor's canonical
-/// `payloadType` (camelCase). Real Rekor would either reject the
-/// envelope or canonicalize it to a shape that would no longer
-/// match the SET signature input. The `rename_all` annotation
-/// fixes the wire shape.
+/// The wire shape MUST serialize Rekor's canonical `payloadType`
+/// (camelCase), not `payload_type` (snake_case): real Rekor would
+/// either reject the envelope or canonicalize it to a shape that would
+/// no longer match the SET signature input.
 ///
 /// The intoto v0.0.2 schema requires a signature object with `publicKey`
 /// and `sig` (an empty `signatures` array is rejected), so the entry
@@ -750,7 +747,7 @@ impl AnchorWitnessClient for RekorClient {
         // SET signature against the pinned Rekor public key. This is
         // the substantive authentication of the inclusion response;
         // without it, a malicious mirror could forge any
-        // body+integratedTime triple. (HIGH-3 fix.)
+        // body+integratedTime triple.
         verify_set_signature(entry, &self.trusted_keys)?;
         // Merkle inclusion proof, when the lane returns one: rebuild
         // the RFC 6962 tree head from the entry leaf and audit path and
@@ -974,7 +971,7 @@ mod tests {
         assert_eq!(parsed.spec.content.hash.value, expected);
     }
 
-    /// HIGH-2 (PR #594 round-2 review): the DSSE envelope wire shape
+    /// The DSSE envelope wire shape
     /// MUST use Rekor's canonical camelCase keys (`payloadType`,
     /// `apiVersion`) and the in-toto payload type. Inspect the raw
     /// JSON bytes to catch any future serde drift.
@@ -1194,8 +1191,8 @@ mod tests {
             let leaves: Vec<&[u8]> = owned.iter().map(Vec::as_slice).collect();
             let tree = ReferenceMerkleTree::from_leaves(&leaves);
             let expected_root = tree.root();
-            for index in 0..leaf_count {
-                let leaf_hash = rfc6962_leaf_hash(leaves[index]);
+            for (index, &leaf) in leaves.iter().enumerate() {
+                let leaf_hash = rfc6962_leaf_hash(leaf);
                 let path = tree.audit_path(index);
                 let computed = rfc6962_root_from_inclusion_proof(
                     index as u64,

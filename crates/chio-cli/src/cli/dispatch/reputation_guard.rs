@@ -1,6 +1,4 @@
 // Dispatch handlers for the `chio reputation`, `chio guard`, and `chio conformance` command groups.
-//
-// Extracted verbatim from the top-level `run()` match arms.
 
 use super::*;
 

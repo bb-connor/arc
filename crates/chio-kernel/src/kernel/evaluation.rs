@@ -33,7 +33,7 @@ impl ChioKernel {
         capability: &CapabilityToken,
         agent_id: &str,
     ) -> Result<(), KernelError> {
-        // Phase 1.4 emergency kill switch: resource/prompt operations that go
+        // Emergency kill switch: resource/prompt operations that go
         // through this helper must also deny-fast so the kill switch applies
         // to every capability-backed surface, not just tool calls.
         if self.is_emergency_stopped() {
@@ -148,7 +148,7 @@ impl ChioKernel {
         )
     }
 
-    /// Phase 2.4 plan-level evaluation.
+    /// Plan-level evaluation.
     ///
     /// Takes an ordered list of planned tool calls under a single
     /// capability token and evaluates every step INDEPENDENTLY against
@@ -167,7 +167,7 @@ impl ChioKernel {
     ///
     /// Guards that require post-invocation output (response-shaping,
     /// streaming sanitizers, etc.) are inherently skipped because no
-    /// tool output exists; in Phase 2.4 every registered guard is
+    /// tool output exists; every registered guard is
     /// invoked against the synthesised pre-flight request, matching the
     /// set of guards that run in `evaluate_tool_call` before dispatch.
     ///
@@ -434,7 +434,7 @@ impl ChioKernel {
 
     /// Evaluate a tool call sync path with access to the owning session,
     /// so the kernel can tag the resulting receipt with the session's
-    /// tenant_id (Phase 1.5 multi-tenant receipt isolation).
+    /// tenant_id (multi-tenant receipt isolation).
     ///
     /// `session_id` is the session that authenticated the caller, used only
     /// to resolve the tenant from `auth_context().enterprise_identity`. The
@@ -473,7 +473,7 @@ impl ChioKernel {
         let now_unix_ms = current_unix_timestamp_ms();
         let now = now_unix_ms / 1000;
 
-        // Phase 1.4 emergency kill switch: every evaluate path checks the flag
+        // Emergency kill switch: every evaluate path checks the flag
         // before receipt negotiation, capability validation, guard evaluation,
         // or budget mutation so a stopped kernel cannot be coerced into doing
         // any work or peer lookup.
@@ -1104,7 +1104,7 @@ impl ChioKernel {
         request: &ToolCallRequest,
         client: &mut C,
     ) -> Result<ToolCallResponse, KernelError> {
-        // Phase 1.5: install the parent session's tenant_id so every
+        // Install the parent session's tenant_id so every
         // receipt signed while this nested-flow evaluation is in flight
         // carries the correct tenant tag.
         let tenant_id = self.resolve_tenant_id_for_session(Some(&parent_context.session_id));
@@ -1115,7 +1115,7 @@ impl ChioKernel {
         let now_unix_ms = current_unix_timestamp_ms();
         let now = now_unix_ms / 1000;
 
-        // Phase 1.4 emergency kill switch: the nested-flow path also
+        // Emergency kill switch: the nested-flow path also
         // deny-fast before receipt negotiation so sampling/elicitation-bearing
         // tool calls cannot slip past while the kernel is stopped.
         if self.is_emergency_stopped() {

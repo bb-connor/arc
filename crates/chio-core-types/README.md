@@ -1,7 +1,7 @@
 # chio-core-types
 
 `chio-core-types` holds the shared Chio substrate types (capability, receipt,
-manifest, and session boundaries) extracted from `chio-core`. These are the
+manifest, and session boundaries). These are the
 protocol-wide types that stay stable while heavier domain crates split away
 from the compatibility facade.
 

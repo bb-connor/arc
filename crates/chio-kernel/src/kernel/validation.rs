@@ -323,7 +323,7 @@ impl ChioKernel {
         Ok(())
     }
 
-    /// Phase 14.1 -- run the portable pure-compute verdict path provided by
+    /// Run the portable pure-compute verdict path provided by
     /// `chio-kernel-core`.
     ///
     /// This exposes the same synchronous checks the core kernel performs
@@ -1284,7 +1284,7 @@ impl ChioKernel {
                             }),
                     );
                 }
-                // Phase 2.2 data-layer, communication, financial,
+                // Data-layer, communication, financial,
                 // model-routing, and memory-governance constraints do
                 // not contribute to governed-transaction requirements.
                 // Their enforcement is wired into request_matching.rs

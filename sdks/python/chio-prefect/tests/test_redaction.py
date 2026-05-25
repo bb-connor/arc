@@ -934,7 +934,7 @@ class TestVarPositionalNamedAfterBodyField:
 
 
 class TestArityOverflowFailClosed:
-    """Regression for PR #679 P2 3231181763.
+    """Regression:
 
     A fixed-signature wrapper (no VAR_POSITIONAL) invoked with MORE
     positional values than the signature accepts triggers
@@ -1016,7 +1016,6 @@ class TestArityOverflowFailClosed:
         Re-redacting feeds the stub dict's ``repr()`` to ``redact_args``
         as the new "value", overwriting ``byte_count`` with the length
         of the stub repr (34) instead of the original secret length (7).
-        Closes PR #680 CursorM 3231239987 / P2 3231244182.
         """
         from chio_prefect.decorators import _task_parameters
 
@@ -1046,7 +1045,7 @@ class TestArityOverflowFailClosed:
         )
 
     def test_user_dict_with_omitted_key_still_redacted(self) -> None:
-        """Regression for PR #679 P2 3231314233.
+        """Regression:
 
         The interval-5 stub-skip guard checked only
         ``isinstance(value, dict) and value.get("omitted") is True`` so

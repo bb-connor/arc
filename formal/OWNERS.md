@@ -6,10 +6,10 @@ extraction, Kani harnesses, Rust formal-verification glue, and the nightly
 liveness lane). It lives next to the formal artifacts under `formal/` so
 ownership stays close to the code being proved.
 
-Under the current single-owner trajectory, both slots resolve to
+Under the current single-owner model, both slots resolve to
 `@bb-connor`. The literal `TBD-primary` and `TBD-backup` placeholders are
 preserved in the rows below so external contributors fill them in when
-they arrive (and so the M03 P1 gate-check grep for those tokens
+they arrive (and so the gate-check grep for those tokens
 continues to pass).
 
 ## Ownership

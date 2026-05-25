@@ -43,7 +43,7 @@ impl ChioKernel {
         f(&session)
     }
 
-    /// Phase 1.5: resolve the tenant_id for a given session by walking its
+    /// Resolve the tenant_id for a given session by walking its
     /// authenticated auth context into the enterprise identity's tenant
     /// claim. Returns `None` for single-tenant / anonymous sessions, for
     /// unknown session IDs, or when the caller did not supply one.
@@ -476,7 +476,7 @@ impl ChioKernel {
         )
     }
 
-    /// Phase 18.2: install a memory-provenance chain.
+    /// Install a memory-provenance chain.
     ///
     /// Once installed, every governed `MemoryWrite`-shaped tool call
     /// appends an entry to the chain after the allow receipt is
@@ -510,7 +510,7 @@ impl ChioKernel {
         self.memory_provenance.as_ref().map(Arc::clone)
     }
 
-    /// Phase 20.3: install a set of [`chio_federation::FederationPeer`]s
+    /// Install a set of [`chio_federation::FederationPeer`]s
     /// this kernel trusts for bilateral co-signing. Overwrites any
     /// previously declared set. Callers typically obtain these peers
     /// from [`chio_federation::KernelTrustExchange::accept_envelope`]
@@ -608,7 +608,7 @@ impl ChioKernel {
         Ok(chio_core::capability::CapabilityNegotiation::t1_default())
     }
 
-    /// Phase 20.3: install the bilateral cosigner responsible for
+    /// Install the bilateral cosigner responsible for
     /// contacting a peer kernel to obtain a co-signature. Production
     /// deployments plug in an mTLS-backed RPC client; tests can use
     /// [`chio_federation::InProcessCoSigner`].
@@ -619,7 +619,7 @@ impl ChioKernel {
         self.federation_cosigner = Some(cosigner);
     }
 
-    /// Phase 20.3: advertise this kernel's stable identifier as seen by
+    /// Advertise this kernel's stable identifier as seen by
     /// remote federation peers. When unset, the hex encoding of the
     /// signing public key is used. Setting this is recommended in
     /// production so receipts reference DNS names rather than raw keys.
@@ -628,7 +628,7 @@ impl ChioKernel {
             .store(Arc::new(Some(kernel_id.into())));
     }
 
-    /// Phase 20.3: resolve the active federation peer for
+    /// Resolve the active federation peer for
     /// `remote_kernel_id`, refusing stale pins fail-closed.
     pub fn federation_peer(
         &self,
@@ -644,12 +644,12 @@ impl ChioKernel {
         }
     }
 
-    /// Phase 20.3: snapshot the currently-pinned federation peer set.
+    /// Snapshot the currently-pinned federation peer set.
     pub fn federation_peers_snapshot(&self) -> Vec<chio_federation::FederationPeer> {
         self.federation_peers.load().values().cloned().collect()
     }
 
-    /// Phase 20.3: look up a dual-signed receipt by the underlying
+    /// Look up a dual-signed receipt by the underlying
     /// [`chio_core::receipt::ChioReceipt`] id. Returns `None` when the
     /// receipt did not cross a federation boundary or when the
     /// co-signing hook has not yet produced a dual-signed artifact
@@ -739,7 +739,7 @@ impl ChioKernel {
         }))
     }
 
-    /// Phase 20.3 post-sign hook. Invoked immediately after
+    /// Post-sign hook. Invoked immediately after
     /// [`Self::build_and_sign_receipt`] so the local (tool-host)
     /// signature has already landed in the `ChioReceipt`. When
     /// `federated_origin_kernel_id` is set and the admission-time peer
@@ -830,8 +830,8 @@ impl ChioKernel {
     ///
     /// The active capability set is NOT purged from the revocation store:
     /// the current `RevocationStore` trait has no bulk revoke API and
-    /// capability expiration plus the kill-switch flag together satisfy
-    /// Phase 1.4 acceptance. When a future revision adds `revoke_all`,
+    /// capability expiration plus the kill-switch flag together
+    /// cover this surface. When a future revision adds `revoke_all`,
     /// this method should call it; until then, capability revocation is
     /// delegated to natural expiration.
     pub fn emergency_stop(&self, reason: &str) -> Result<(), KernelError> {
@@ -910,7 +910,7 @@ impl ChioKernel {
         self.dpop_config = Some(config);
     }
 
-    /// Phase 1.1: install an execution-nonce config and replay store.
+    /// Install an execution-nonce config and replay store.
     ///
     /// Once installed, every `Verdict::Allow` carries a short-lived signed
     /// nonce on `ToolCallResponse::execution_nonce`. Tool servers re-present
@@ -946,7 +946,7 @@ impl ChioKernel {
             .is_some_and(|cfg| cfg.require_nonce)
     }
 
-    /// Phase 1.1: mint a signed execution nonce for an allow verdict.
+    /// Mint a signed execution nonce for an allow verdict.
     ///
     /// Returns `Ok(None)` when no config is installed (nonces disabled);
     /// returns `Ok(Some(nonce))` once configured. The nonce binding is
@@ -980,7 +980,7 @@ impl ChioKernel {
         Ok(Some(Box::new(signed)))
     }
 
-    /// Phase 1.1: verify a caller-presented execution nonce against the
+    /// Verify a caller-presented execution nonce against the
     /// expected binding, consuming it in the replay store on success.
     ///
     /// Returns `Ok(())` when the nonce is fresh, correctly bound, signed
@@ -1007,7 +1007,7 @@ impl ChioKernel {
         )
     }
 
-    /// Phase 1.1: strict-mode gate. Denies the call fail-closed when the
+    /// Strict-mode gate. Denies the call fail-closed when the
     /// kernel is configured to require nonces on every execution-bound
     /// tool call but the caller did not present one.
     ///

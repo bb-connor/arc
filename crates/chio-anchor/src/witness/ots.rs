@@ -21,11 +21,6 @@
 //! independently verified calendar commitment, this client can return
 //! advisory receipts from `publish`, but `verify_inclusion` fails
 //! closed for load-bearing public-witness policy.
-//!
-//! The `verify_*` helpers moved from
-//! `chio-anchor/src/bitcoin.rs` to take an `&AnchorBatch` rather
-//! than a free super-root digest. The legacy helpers remain so
-//! existing checkpoint super-root code keeps working.
 
 use std::time::Duration;
 
@@ -96,8 +91,7 @@ impl OtsClient {
 #[async_trait::async_trait]
 impl AnchorWitnessClient for OtsClient {
     async fn publish(&self, batch: &AnchorBatch) -> Result<WitnessReceipt, AnchorWitnessError> {
-        // P2 fix (PR #594 round-2 review, codex): hash the
-        // witness-state-excluded BatchHashInput view, not the full
+        // Hash the witness-state-excluded BatchHashInput view, not the full
         // body. Hashing the full body creates a circular reference
         // through `witness_state` (the receipt embeds the body_hash
         // and the body embeds the receipt). The Rekor lane already

@@ -189,7 +189,7 @@ pub struct ToolResult(pub Vec<u8>);
 /// format the upstream expects.
 ///
 /// The trait is intentionally minimal so it stays dyn-compatible and so the
-/// streaming state machine in `stream.rs` (Phase 1 task 3) can wrap any
+/// streaming state machine in `stream.rs` can wrap any
 /// implementer uniformly.
 #[async_trait]
 pub trait ProviderAdapter: Send + Sync {

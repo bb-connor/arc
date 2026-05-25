@@ -5,9 +5,6 @@ A Kubernetes controller that extends the Chio protocol to batch `Job` workloads.
 creation, per-pod receipts aggregated across the Job's lifecycle, and the
 grant released at completion or failure alongside a signed `JobReceipt`.
 
-This implements roadmap **Phase 17.5** (see
-`docs/ROADMAP.md:1248-1256`).
-
 ## Design
 
 The controller uses `sigs.k8s.io/controller-runtime` with cache-backed

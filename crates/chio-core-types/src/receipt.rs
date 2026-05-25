@@ -33,7 +33,7 @@ pub const CHIO_RECEIPT_SCHEMA: &str = "chio.receipt.v1";
 /// consumers (audit, regulatory, dashboards) can reason about the strength
 /// of mediation that produced each authorization.
 ///
-/// See `docs/protocols/STRUCTURAL-SECURITY-FIXES.md` and roadmap Phase 1.2.
+/// See `docs/protocols/STRUCTURAL-SECURITY-FIXES.md`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum TrustLevel {

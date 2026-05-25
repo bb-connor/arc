@@ -1,6 +1,6 @@
 # Apalache Negative Tests
 
-This directory holds **deliberately broken** variants of the M06 Apalache
+This directory holds **deliberately broken** variants of the Apalache
 specs. The point is to demonstrate that the corresponding production
 property is not tautologically satisfied: a real bug must produce a real
 counterexample.
