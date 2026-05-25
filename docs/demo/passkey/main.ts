@@ -1,5 +1,5 @@
 /*
- * Chio @chio/passkey demo.
+ * Chio @chio-protocol/passkey demo.
  *
  * Drives the full passkey-to-capability flow against an in-page issuer
  * test-double:
@@ -33,7 +33,7 @@ import {
   requestCapability,
   RequestCapabilityError,
   type PasskeyCapability,
-} from '@chio/passkey';
+} from '@chio-protocol/passkey';
 import { installIssuerTestDouble, simulateRevocation, simulateKernelCall, RevocationState } from './test-double.js';
 
 const AUDIENCE = 'urn:chio:audience:kernel';

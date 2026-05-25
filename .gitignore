@@ -3,7 +3,9 @@
 /target-shared/
 **/*.rs.bk
 # Nested cargo/qualification output dirs at any depth (not the workspace root /target/).
-crates/**/target/
+**/target/
+# Standalone shim crate: its lib Cargo.lock is regenerated on build, not tracked.
+sdks/rust/chio-guard-sdk-compat/Cargo.lock
 
 # Transient SQLite journal files must never be committed (only the .sqlite3
 # fixture itself is tracked, never its write-ahead log or shared-memory file).

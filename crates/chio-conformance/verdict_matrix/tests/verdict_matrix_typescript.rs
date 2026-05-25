@@ -2,7 +2,7 @@
 #![forbid(clippy::expect_used)]
 
 //! Cross-SDK verdict-matrix driver registration test for the TypeScript
-//! framework wrappers (`@chio/ai-sdk-middleware`, `@chio/next`).
+//! framework wrappers (`@chio-protocol/ai-sdk-middleware`, `@chio-protocol/next`).
 //!
 //! The wrappers do not embed kernel evaluation; they are wired transport
 //! clients that delegate to the `typescript-node-http` transport-client

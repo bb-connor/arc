@@ -135,7 +135,7 @@ class ChioGroupChatManager(GroupChatManager):
     ) -> None:
         if not isinstance(groupchat, ChioGroupChat):
             raise ChioAutogenConfigError(
-                "groupchat must be an ChioGroupChat instance"
+                "groupchat must be a ChioGroupChat instance"
             )
         super().__init__(groupchat=groupchat, **manager_kwargs)
         self._chio_client: ChioClientLike = chio_client

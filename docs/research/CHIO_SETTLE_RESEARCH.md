@@ -1018,7 +1018,7 @@ OFAC (Office of Foreign Assets Control) sanctions apply to on-chain transactions
 
 ### 14.5 Protocol Evolution
 
-14. **x402 compatibility surface**: Should Chio tool servers optionally support x402's HTTP 402 flow? This would let any x402 client pay for Chio tool access without understanding Chio's full capability model. The tool server would translate x402 payment into an Chio governed transaction.
+14. **x402 compatibility surface**: Should Chio tool servers optionally support x402's HTTP 402 flow? This would let any x402 client pay for Chio tool access without understanding Chio's full capability model. The tool server would translate x402 payment into a Chio governed transaction.
 
 15. **Superfluid streaming integration**: For long-running metered tool access (e.g., GPU compute), a Superfluid stream could provide continuous settlement without individual transactions per invocation. This maps to `ToolGrant` with `max_total_cost` backed by a stream rate.
 
@@ -1054,7 +1054,7 @@ The combined contract would be deployed once per chain and shared by both crates
 
 ### 15.2 arc-settle and arc-link
 
-**Price feeds for settlement**: arc-link provides the `PriceOracle` trait for cross-currency budget enforcement. arc-settle needs price data in one specific scenario: when the escrow amount (USDC) must be derived from an Chio `MonetaryAmount` denominated in a different currency (e.g., EUR -> USDC conversion). arc-settle should consume arc-link's price cache for this conversion rather than implementing its own oracle integration.
+**Price feeds for settlement**: arc-link provides the `PriceOracle` trait for cross-currency budget enforcement. arc-settle needs price data in one specific scenario: when the escrow amount (USDC) must be derived from a Chio `MonetaryAmount` denominated in a different currency (e.g., EUR -> USDC conversion). arc-settle should consume arc-link's price cache for this conversion rather than implementing its own oracle integration.
 
 **Cross-chain settlement via CCIP**: arc-link researches Chainlink CCIP for cross-chain delegation transport. The same CCIP infrastructure could support cross-chain settlement: an escrow on Base releases funds, and CCIP transfers the USDC to the beneficiary on Arbitrum. arc-link's CCIP integration would be the transport layer; arc-settle would be the settlement logic that triggers it.
 

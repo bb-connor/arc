@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// CapabilityToken is an Chio capability token minted by the sidecar.
+// CapabilityToken is a Chio capability token minted by the sidecar.
 //
 // The wire format matches the canonical Chio capability token JSON shape.
 // The controller additionally keeps the raw serialized token bytes so the

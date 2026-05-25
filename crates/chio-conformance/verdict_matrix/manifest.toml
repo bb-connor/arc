@@ -51,7 +51,7 @@ requires_sidecar_env = ["CHIO_VERDICT_MATRIX_SIDECAR_URL", "CHIO_SIDECAR_URL"]
 status = "transport-client"
 entrypoint = "drivers/typescript/ai_sdk_middleware.ts"
 underlying_driver = "typescript-node-http"
-package = "@chio/ai-sdk-middleware"
+package = "@chio-protocol/ai-sdk-middleware"
 matrix_role = "framework-wrapper"
 requires_sidecar_env = ["CHIO_VERDICT_MATRIX_SIDECAR_URL", "CHIO_SIDECAR_URL"]
 
@@ -59,7 +59,7 @@ requires_sidecar_env = ["CHIO_VERDICT_MATRIX_SIDECAR_URL", "CHIO_SIDECAR_URL"]
 status = "transport-client"
 entrypoint = "drivers/typescript/chio_next.ts"
 underlying_driver = "typescript-node-http"
-package = "@chio/next"
+package = "@chio-protocol/next"
 matrix_role = "framework-wrapper"
 requires_sidecar_env = ["CHIO_VERDICT_MATRIX_SIDECAR_URL", "CHIO_SIDECAR_URL"]
 

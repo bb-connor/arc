@@ -157,7 +157,7 @@ impl Verdict {
 /// match on this server id.
 pub const ENVOY_SERVER_ID: &str = "envoy";
 
-/// Translate an Envoy `CheckRequest` into an Chio [`ToolCallRequest`]. Returns
+/// Translate an Envoy `CheckRequest` into a Chio [`ToolCallRequest`]. Returns
 /// [`TranslateError`] when the request is malformed. The adapter treats a
 /// translation error as an internal fault and denies fail-closed.
 pub fn check_request_to_tool_call(check: &CheckRequest) -> Result<ToolCallRequest, TranslateError> {

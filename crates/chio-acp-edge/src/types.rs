@@ -1,6 +1,6 @@
 // ACP protocol wire types and the kernel execution context.
 
-/// An ACP capability advertisement derived from an Chio tool.
+/// An ACP capability advertisement derived from a Chio tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AcpCapability {

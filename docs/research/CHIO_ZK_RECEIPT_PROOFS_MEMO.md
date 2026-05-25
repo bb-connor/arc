@@ -42,7 +42,7 @@ privately holds:
 
 - one or more signed Chio receipts
 - any receipt-lineage statements or continuation tokens needed for the claim
-- Merkle inclusion proofs into an Chio checkpoint or receipt-log view
+- Merkle inclusion proofs into a Chio checkpoint or receipt-log view
 - consistency proofs that connect a later checkpoint root to an earlier one
 
 The ZK proof exposes only narrow public outputs such as:

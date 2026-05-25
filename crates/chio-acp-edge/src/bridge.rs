@@ -61,7 +61,7 @@ impl CapabilityBridge for AcpCapabilityBridge {
     }
 }
 
-/// Infer the ACP category for an Chio tool based on its name and properties.
+/// Infer the ACP category for a Chio tool based on its name and properties.
 fn infer_acp_category(tool: &ToolDefinition, default: AcpCategory) -> AcpCategory {
     let name_lower = tool.name.to_lowercase();
     if name_lower.contains("read_file")
@@ -86,7 +86,7 @@ fn infer_acp_category(tool: &ToolDefinition, default: AcpCategory) -> AcpCategor
     }
 }
 
-/// Evaluate bridge fidelity for an Chio tool to ACP mapping.
+/// Evaluate bridge fidelity for a Chio tool to ACP mapping.
 fn evaluate_bridge_fidelity(
     tool: &ToolDefinition,
     category: AcpCategory,

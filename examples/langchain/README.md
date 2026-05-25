@@ -1,6 +1,6 @@
 # LangChain Tool Example
 
-This example wraps an Chio-governed hosted-edge tool as a LangChain
+This example wraps a Chio-governed hosted-edge tool as a LangChain
 `StructuredTool` while the hosted session itself is managed by `chio-sdk`.
 
 ## What it does

@@ -1,4 +1,4 @@
-# Reference Cloud Run service for an Chio-sidecar-governed tool server.
+# Reference Cloud Run service for a Chio-sidecar-governed tool server.
 #
 # Placeholders:
 #   APP_IMAGE_PLACEHOLDER            -- replace with your application image

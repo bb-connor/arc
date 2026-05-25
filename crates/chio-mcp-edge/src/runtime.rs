@@ -86,7 +86,7 @@ impl Default for McpEdgeConfig {
     }
 }
 
-/// Bridge-only request for projecting an Chio tool invocation through MCP session semantics.
+/// Bridge-only request for projecting a Chio tool invocation through MCP session semantics.
 #[derive(Debug, Clone)]
 pub struct BridgeMcpToolCallRequest {
     pub request_id: String,

@@ -1,7 +1,7 @@
 //! Chio adapter for Envoy's [`ext_authz`][ext-authz] gRPC filter.
 //!
 //! This crate implements `envoy.service.auth.v3.Authorization/Check` as a thin
-//! shim that translates each Envoy `CheckRequest` into an Chio
+//! shim that translates each Envoy `CheckRequest` into a Chio
 //! [`translate::ToolCallRequest`], hands it to an [`EnvoyKernel`] implementation,
 //! and maps the returned [`translate::Verdict`] onto a compliant
 //! `CheckResponse`.

@@ -313,7 +313,7 @@ impl OpenApiMcpBridge {
 }
 
 /// Implements `ToolServerConnection` so the bridge can be registered
-/// with an Chio kernel for capability validation and receipt signing.
+/// with a Chio kernel for capability validation and receipt signing.
 pub struct BridgeToolServer<'a> {
     bridge: &'a OpenApiMcpBridge,
 }

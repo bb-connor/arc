@@ -77,7 +77,7 @@ State file + Receipt = complete provenance
 ### 2.2 Module-Level Capability Scoping
 
 Terraform modules are the natural capability boundary. Each module maps
-to an Chio scope:
+to a Chio scope:
 
 ```
 Modules                          Chio Scopes
@@ -393,7 +393,7 @@ class ChioDriftDetector:
             drift_resources = self._extract_drift(plan)
 
             for resource in drift_resources:
-                # Check if this change has an Chio receipt
+                # Check if this change has a Chio receipt
                 receipts = await self.chio.find_receipts(
                     meta={
                         "tf_resource_id": resource["id"],

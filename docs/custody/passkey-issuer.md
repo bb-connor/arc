@@ -27,7 +27,7 @@ and points at the tests that lock the contract.
         |
         v
    browser holds capability bytes only
-        |    @chio/passkey TS helper at sdks/typescript/packages/passkey/
+        |    @chio-protocol/passkey TS helper at sdks/typescript/packages/passkey/
         |    zero key material; one navigator.credentials.get + one fetch
         |
         v

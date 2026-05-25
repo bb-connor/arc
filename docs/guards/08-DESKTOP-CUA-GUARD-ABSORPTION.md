@@ -358,7 +358,7 @@ Key differences:
 
 ### 4.2 Absorption strategy
 
-Each upstream guard becomes an Chio guard that:
+Each upstream guard becomes a Chio guard that:
 
 1. Calls `extract_action(ctx.request.tool_name, ctx.request.arguments)` to get
    a `ToolAction`.

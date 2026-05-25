@@ -1,7 +1,7 @@
 // Command chio-controller is the entrypoint for the Chio K8s Job controller.
 //
 // The controller watches batch/v1 Job objects labeled
-// chio.world/governed=true, mints an Chio capability grant at creation,
+// chio.world/governed=true, mints a Chio capability grant at creation,
 // harvests per-pod receipts across the Job lifecycle, and releases the grant
 // while emitting a JobReceipt on Job completion or failure.
 package main

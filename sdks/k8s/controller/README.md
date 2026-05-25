@@ -91,7 +91,7 @@ The manifests under `config/` create the `chio-system` namespace, a
 
 ## End-to-end demo
 
-With the controller running and an Chio sidecar reachable at the configured
+With the controller running and a Chio sidecar reachable at the configured
 URL:
 
 ```yaml

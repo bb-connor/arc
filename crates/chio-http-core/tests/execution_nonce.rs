@@ -161,7 +161,7 @@ fn http_receipt(signer: &Keypair, id: &str) -> HttpReceipt {
 
 #[test]
 fn evaluate_response_serializes_execution_nonce_field() {
-    // Stand up an ChioReceipt + HttpReceipt so the body type-checks.
+    // Stand up a ChioReceipt + HttpReceipt so the body type-checks.
     let kp = Keypair::generate();
     let chio_body = ChioReceiptBody {
         id: "rcpt-1".to_string(),

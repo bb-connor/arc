@@ -73,7 +73,7 @@ impl CapabilityBridge for A2aCapabilityBridge {
     }
 }
 
-/// Evaluate how faithfully an Chio tool maps to A2A semantics.
+/// Evaluate how faithfully a Chio tool maps to A2A semantics.
 fn evaluate_bridge_fidelity(
     tool: &ToolDefinition,
     target_protocol: DiscoveryProtocol,

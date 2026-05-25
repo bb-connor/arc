@@ -252,7 +252,7 @@ introducing external telemetry. The receipts are the primary data source.
 
 Agent reputation materializes as a W3C Verifiable Credential: an Agent
 Passport. The passport is a portable, cryptographically signed attestation of
-an agent's behavioral track record, issued by an Chio-participating authority
+an agent's behavioral track record, issued by a Chio-participating authority
 and verifiable by any relying party.
 
 The current shipped surface already supports offline verification,

@@ -15,7 +15,7 @@ Public surface:
   handing control to the inner operator's ``execute()`` and pushes the
   receipt id into XCom on allow.
 * :func:`chio_task` -- TaskFlow API decorator that gates an ``@task``
-  on an Chio capability evaluation.
+  on a Chio capability evaluation.
 * :class:`ChioDAGListener` -- Airflow listener (``@hookimpl``) that
   records per-task receipt ids and publishes a DAG-run aggregation at
   terminal transitions.

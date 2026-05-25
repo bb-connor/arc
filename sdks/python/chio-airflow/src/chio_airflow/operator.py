@@ -52,7 +52,7 @@ XCOM_CAPABILITY_KEY = "chio_capability_id"
 
 
 class ChioOperator(BaseOperator):
-    """Wraps another operator with an Chio capability evaluation.
+    """Wraps another operator with a Chio capability evaluation.
 
     Parameters
     ----------

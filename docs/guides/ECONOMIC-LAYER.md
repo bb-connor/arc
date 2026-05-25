@@ -146,7 +146,7 @@ was committed to every lane that matters to the relying party.
 
 | Lane | Module | Purpose |
 |------|--------|---------|
-| EVM root registry | `crates/chio-anchor/src/evm.rs` | Direct publish of the Merkle root to an ChioRootRegistry contract (`prepare_root_publication`, `confirm_root_publication`). |
+| EVM root registry | `crates/chio-anchor/src/evm.rs` | Direct publish of the Merkle root to a ChioRootRegistry contract (`prepare_root_publication`, `confirm_root_publication`). |
 | Bitcoin via OTS | `crates/chio-anchor/src/bitcoin.rs` | Super-root aggregation timestamped via OpenTimestamps (`prepare_ots_submission`, `verify_ots_proof_for_submission`). |
 | Solana memo | `crates/chio-anchor/src/solana.rs` | Canonical memo publication (`prepare_solana_memo_publication`, `verify_solana_anchor`). |
 | Chainlink Functions | `crates/chio-anchor/src/functions.rs` | Off-chain attestation verification path with fallback assessment. |

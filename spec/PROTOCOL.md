@@ -1155,7 +1155,7 @@ The manifest defines:
 - operator-facing descriptions and metadata
 
 This manifest is the authoritative discovery contract for native tool servers
-and for mediated adapters that synthesize an Chio tool surface from another
+and for mediated adapters that synthesize a Chio tool surface from another
 protocol. `chio.manifest.v1` remains frozen in this release for compatibility.
 
 ### 7.1 OpenAPI-Derived Manifests

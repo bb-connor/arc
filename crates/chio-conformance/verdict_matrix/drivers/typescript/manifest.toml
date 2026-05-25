@@ -12,7 +12,7 @@ tuple_fields = ["verdict", "reason_code", "scope_set"]
 
 [[drivers]]
 id = "typescript-ai-sdk-middleware"
-package = "@chio/ai-sdk-middleware"
+package = "@chio-protocol/ai-sdk-middleware"
 entrypoint = "ai_sdk_middleware.ts"
 transport = "node-http-sidecar"
 status = "transport-client"
@@ -21,7 +21,7 @@ underlying_driver = "typescript-node-http"
 
 [[drivers]]
 id = "typescript-chio-next"
-package = "@chio/next"
+package = "@chio-protocol/next"
 entrypoint = "chio_next.ts"
 transport = "node-http-sidecar"
 status = "transport-client"

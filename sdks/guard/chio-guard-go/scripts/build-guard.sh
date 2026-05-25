@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build an Chio guard from Go source to a WASM Component Model binary.
+# Build a Chio guard from Go source to a WASM Component Model binary.
 #
 # Full pipeline: wit-bindgen-go -> TinyGo wasip2 -> wasi-virt -> component
 #

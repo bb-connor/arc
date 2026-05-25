@@ -49,7 +49,7 @@ export interface SignDpopProofParams {
 }
 
 /**
- * Sign a DPoP proof for an Chio tool invocation.
+ * Sign a DPoP proof for a Chio tool invocation.
  *
  * The proof body is serialized as RFC 8785 canonical JSON before signing,
  * ensuring compatibility with chio-kernel's verify_dpop_proof.

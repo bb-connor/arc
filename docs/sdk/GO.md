@@ -114,7 +114,7 @@ Control behavior when the sidecar is unreachable.
 | Value | Behavior |
 |-------|----------|
 | `"deny"` | Fail-closed (default). Return 502 error. |
-| `"allow"` | Fail-open. Forward request to inner handler without attaching an Chio receipt header. |
+| `"allow"` | Fail-open. Forward request to inner handler without attaching a Chio receipt header. |
 
 ```go
 chio.WithOnSidecarError("allow")  // fail-open

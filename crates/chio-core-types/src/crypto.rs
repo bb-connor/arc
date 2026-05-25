@@ -569,7 +569,7 @@ impl PublicKey {
 // Signature
 // ---------------------------------------------------------------------------
 
-/// Signature produced by an Chio [`SigningBackend`].
+/// Signature produced by a Chio [`SigningBackend`].
 ///
 /// Historically this type wrapped a 64-byte Ed25519 signature. It now carries
 /// an algorithm-tagged payload internally while preserving byte-identical

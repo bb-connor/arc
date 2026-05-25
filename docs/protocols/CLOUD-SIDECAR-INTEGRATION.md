@@ -457,7 +457,7 @@ deploy/
    "evaluate once at startup" use cases.
 
 2. **Service mesh interaction.** If the platform already runs a service
-   mesh sidecar (Envoy/Istio), adding an Chio sidecar is a third container.
+   mesh sidecar (Envoy/Istio), adding a Chio sidecar is a third container.
    Should Chio integrate as an Envoy external authorization filter instead?
 
 3. **Multi-region.** For global deployments (Cloud Run multi-region, ECS
