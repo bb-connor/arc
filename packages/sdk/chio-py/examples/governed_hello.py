@@ -39,7 +39,7 @@ def main() -> None:
 
     client = ChioClient.with_static_bearer(base_url, auth_token)
     session = client.initialize(
-        client_info={"name": "chio-sdk/examples/python", "version": "1.0.0"}
+        client_info={"name": "chio-sdk/examples/python", "version": "0.1.0"}
     )
 
     try:

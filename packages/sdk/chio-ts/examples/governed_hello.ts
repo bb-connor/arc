@@ -38,7 +38,7 @@ const client = ChioClient.withStaticBearer(baseUrl, authToken);
 const session = await client.initialize({
   clientInfo: {
     name: "@chio-protocol/sdk/examples/typescript",
-    version: "1.0.0",
+    version: "0.1.0",
   },
 });
 

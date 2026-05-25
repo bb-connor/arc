@@ -31,7 +31,7 @@ The release qualification scripts verify:
 
 ## Publication Notes
 
-- `chio-sdk` is the stable `1.0.0` Python publication target for Chio's hosted
+- `chio-sdk` is the `0.1.0` (pre-release) Python publication target for Chio's hosted
   MCP and receipt-query surface.
 - The package stays pure Python and does not require a Rust toolchain.
 - The API is intentionally narrow: remote MCP sessions, receipt queries,
