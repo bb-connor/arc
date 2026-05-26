@@ -236,7 +236,10 @@ aws-sdk-marketplacemetering = { version = "1", default-features = false, feature
     "rt-tokio",
 ] }
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# float_roundtrip keeps f64 parsing exact so signed credentials persisted to
+# JSON re-verify: canonical signing bytes are reproducible only if a reloaded
+# float yields the exact bits that were signed.
+serde_json = { version = "1", features = ["float_roundtrip"] }
 serde_yaml = "0.9"
 serde_yml = "0.0.12"
 tokio = { version = "1", features = ["full"] }

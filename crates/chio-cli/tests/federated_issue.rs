@@ -915,6 +915,7 @@ fn create_evidence_federation_policy(
             partner,
             "--capability",
             capability_id,
+            "--admin-all",
             "--expires-at",
             "1900000000",
         ])
