@@ -1,5 +1,63 @@
 # Chio-CLI Trust-Control Test-Suite Remediation
 
+## Resolution (completed)
+
+The chio-cli trust-control suite is fully green (all 44 test binaries). Several
+hypotheses below were corrected during the work: almost every failure was a
+test-only defect, not the deep trust-control, terms, or replication bugs feared.
+
+- Cluster A (rows) and F (residual): tests matched report rows by the
+  caller-supplied receipt id, but ChioReceipt::sign replaces body.id with a
+  content-addressed hash. Match on the real id.
+- Cluster B (terms): seed receipts were signed with throwaway random keys, so the
+  reputation integrity filter dropped them, collapsing credit scoring to
+  probationary and forcing terms=None. Sign with a trusted test key and seed it
+  into the service. The fail-closed filter is correct and unchanged.
+- Cluster C (reputation): same trusted-key seeding for local_reputation and the
+  evidence import roundtrip.
+- Cluster D (mcp_serve): the fixtures omitted allow_ephemeral_receipt_log, so the
+  fail-closed receipt-persistence gate denied every tool call (the "cancellation
+  race" was that gate, not a race). Enable the flag; make the serial test lock
+  poison-tolerant.
+- Cluster E: federated_issue exposed a real product bug (serde_json parsed some
+  17-digit floats to a neighboring ULP, breaking canonical-signature verification
+  on persisted credentials; fixed by enabling the serde_json float_roundtrip
+  feature) plus a stale read-boundary flag. trust_cluster, conformance_cli, init,
+  code_agent_preset, and receipt_explain_bilateral were test-only (content-id,
+  receipt-gate, read-boundary, or stale-string). The forward_compat
+  receipt_with_unknown_fields case was also the content-id pattern (it was
+  misfiled below as a golden).
+
+The one genuine product fix was serde_json float_roundtrip. Everything else in
+the plan was test-only.
+
+## Out-of-plan failures found by the workspace regression sweep
+
+Running the full workspace (to confirm the float fix regressed nothing) surfaced
+pre-existing failures in crates outside this plan. None were caused by the float
+fix (confirmed: all are string-id, structural, golden, or environmental, never a
+float-value mismatch). The two that were the same content-id pattern were fixed
+(chio-credit, chio-kernel-core). The rest are a separate remediation:
+
+- chio-e2e full_flow (2): untrusted_issuer is a stale denial-reason string (the
+  verdict is correctly Deny; the reason wording changed to "capability issuer is
+  not a trusted CA"). revocation_cascade is a setup gap: the test issuer is not
+  registered as a trusted CA, so a valid capability is denied before revocation.
+- chio-external-guards bedrock (1): stale test, not fail-open. The guard enforces
+  hostname DNS pinning at connect via its egress contract, not at construction;
+  the test expects construction-time rejection (the same enforce-at-connect
+  relocation handled earlier for chio-anchor/chio-link). The test should assert
+  the connect-time failure.
+- chio-pheromone-runtime runtime_receiver (5): structural (report admission
+  rejected); needs investigation, likely a trusted-key or admission-setup gap.
+- Blessed-vector goldens (2): capability/v1.json (a cross-language signature
+  vector) and rust_canonical_receipt_body_matches_blessed_vector_bytes. Stale;
+  need a deliberate, owner-aware re-bless. The vectors are consumed by the go, py,
+  and ts SDKs, so regenerating only to make Rust pass could mask cross-language
+  canonical divergence, which is what the vectors exist to catch.
+- Environmental: py_guard_integration (needs a built .wasm guard component) and
+  the SIEM datadog/ocsf/sumo exporters (post to external endpoints).
+
 ## Context (read first)
 
 A full `cargo test --workspace --no-fail-fast` sweep surfaced a large cohort of
