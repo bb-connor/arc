@@ -564,10 +564,19 @@ fn evidence_import_roundtrip_surfaces_imported_trust_without_rewriting_local_his
     let output_dir = unique_path("evidence-export-imported-trust-output", "");
     let federation_policy_path = unique_path("federation-policy-imported-trust", ".json");
     let signing_seed_path = unique_path("federation-policy-imported-trust-seed", ".txt");
+    let authority_seed_path = unique_path("evidence-import-authority-seed", ".txt");
 
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
     let subject_hex = subject.public_key().to_hex();
+
+    // The source receipts are signed with `issuer`; model the importer choosing
+    // to trust that partner's kernel key by seeding the same key as the local
+    // authority seed. This lets the imported share's scorecard surface its 2
+    // receipts without rewriting the importer's (empty) local history. The
+    // share's federation-policy signer is a different key and is deliberately
+    // NOT auto-trusted (that would be fail-open).
+    std::fs::write(&authority_seed_path, issuer.seed_hex()).expect("write authority seed");
 
     {
         let store =
@@ -677,6 +686,8 @@ fn evidence_import_roundtrip_surfaces_imported_trust_without_rewriting_local_his
             imported_receipt_db_path
                 .to_str()
                 .expect("imported receipt db path"),
+            "--authority-seed-file",
+            authority_seed_path.to_str().expect("authority seed path"),
             "reputation",
             "local",
             "--subject-public-key",
