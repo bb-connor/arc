@@ -2882,6 +2882,19 @@ mod tests {
     }
 
     #[test]
+    fn verifier_trust_bundle_requires_runtime_policy_issuers() {
+        let trust_bundle =
+            ChiodosVerifierTrustBundle::from_document(trust_bundle_document_from_fixture())
+                .expect("trust bundle parses");
+        assert!(!trust_bundle.runtime_policy_issuer_public_keys().is_empty());
+
+        let mut missing_issuers = trust_bundle_document_from_fixture();
+        missing_issuers.runtime_policy_issuer_public_keys.clear();
+        let error = ChiodosVerifierTrustBundle::from_document(missing_issuers).unwrap_err();
+        assert!(error.to_string().contains("runtime policy issuers"));
+    }
+
+    #[test]
     #[ignore = "v1-only collapse: v1 is now the strict schema, not a historical one"]
     fn historical_v1_trust_bundle_is_not_strict_verifier_input() {
         // Predates the Chio-owned pre-release v1-only collapse. Kept here as a
