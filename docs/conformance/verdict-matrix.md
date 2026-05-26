@@ -119,7 +119,7 @@ does not include a revocation store, execution nonce store, or guard pipeline.
 
 ## Local Gates
 
-Run the same gates used by the workflow:
+Run these gates locally:
 
 ```bash
 test -d crates/chio-conformance/verdict_matrix/scenarios/capability_subset

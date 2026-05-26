@@ -662,6 +662,39 @@ mod tests {
     }
 
     #[test]
+    fn evaluate_with_context_denies_fail_closed_on_unknown_condition_key() {
+        let spec = spec_with_rules(Rules {
+            egress: Some(EgressRule {
+                enabled: true,
+                allow: Vec::new(),
+                block: Vec::new(),
+                default: DefaultAction::Allow,
+            }),
+            ..Rules::default()
+        });
+        // `egres` is a typo of the `egress` rule block. An unrecognized key must
+        // not silently no-op; the evaluator denies rather than filtering with a
+        // misconfigured condition map.
+        let conditions = HashMap::from([("egres".to_string(), Condition::default())]);
+
+        let result = evaluate_with_context(
+            &spec,
+            &action("egress", "api.example.com"),
+            &RuntimeContext::default(),
+            &conditions,
+        );
+
+        assert_eq!(result.decision, Decision::Deny);
+        assert!(
+            result.reason.as_deref().is_some_and(|reason| reason
+                .contains("invalid policy condition keys")
+                && reason.contains("egres")),
+            "expected fail-closed reason naming the bad key, got: {:?}",
+            result.reason
+        );
+    }
+
+    #[test]
     fn generated_glob_compile_errors_fail_closed_for_allow_rules() {
         let spec = spec_with_rules(Rules {
             tool_access: Some(ToolAccessRule {

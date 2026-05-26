@@ -782,14 +782,30 @@ impl ChioKernel {
         };
 
         let local_kernel_id = self.federation_local_kernel_id();
-        let extensions = self
-            .treaty_dsse_extensions_from_receipt_metadata(receipt)?
-            .ok_or_else(|| {
-                KernelError::Internal(
+        let extensions = match self.treaty_dsse_extensions_from_receipt_metadata(receipt)? {
+            Some(extensions) => extensions,
+            None => {
+                // A federated request rejected before runtime treaty admission
+                // ran (capability verification, time bounds, revocation, subject
+                // binding) never produced the bilateral treaty material the
+                // dual-sign path binds, and dispatched no cross-org outcome to
+                // co-sign. Record such a deny single-signed, with no dual-signed
+                // or DSSE artifact, matching the pre-dispatch denial contract in
+                // federated_request_without_receipt_store_denies_before_dispatch_or_cosign.
+                // An allowed federated outcome always carries treaty material, so
+                // any non-deny receipt still fails closed here.
+                if matches!(
+                    receipt.decision,
+                    Some(chio_core::receipt::Decision::Deny { .. })
+                ) {
+                    return Ok(());
+                }
+                return Err(KernelError::Internal(
                     "federation runtime treaty material missing; refusing treaty-bound DSSE"
                         .to_string(),
-                )
-            })?;
+                ));
+            }
+        };
         let dual = chio_federation::co_sign_with_origin(
             origin_kernel_id,
             &peer.public_key,

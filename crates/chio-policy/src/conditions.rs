@@ -36,9 +36,11 @@ pub const CONDITIONABLE_RULE_BLOCKS: [&str; 14] = [
     "human_in_loop",
 ];
 
-/// Reject condition maps whose keys are not known rule-block names. Call at
-/// load time, before evaluate_with_context, so a misspelled key fails closed
-/// instead of silently no-oping the rule it was meant to gate.
+/// Reject condition maps whose keys are not known rule-block names. The
+/// reference evaluator calls this at the start of `evaluate_with_context`;
+/// callers that assemble condition maps elsewhere should also validate at load
+/// time, so a misspelled key fails closed instead of silently no-oping the rule
+/// it was meant to gate.
 ///
 /// # Errors
 ///

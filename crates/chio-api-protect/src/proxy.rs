@@ -872,7 +872,11 @@ paths:
         assert!(Arc::ptr_eq(&evaluator_store, state.approval_admin.store()));
     }
 
-    #[tokio::test]
+    // These proxy/sidecar handlers reach the kernel through Chio's sync
+    // tool-dispatch bridge, which requires a multi-thread runtime (the
+    // documented host requirement); a current-thread test runtime cannot
+    // drive the async tool server and the handler surfaces a 500 instead.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn proxy_handler_denies_without_capability_and_records_receipt() {
         let state = test_state(
             vec![RouteEntry {
@@ -928,7 +932,7 @@ paths:
         assert!(log.receipts[0].verify_signature().test_unwrap());
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn proxy_handler_forwards_allowed_requests_and_end_to_end_headers() {
         let Some(server) = MockUpstreamServer::spawn(
             201,
@@ -1011,7 +1015,7 @@ paths:
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn proxy_handler_strips_query_capability_before_forwarding_upstream() {
         let Some(server) =
             MockUpstreamServer::spawn(200, vec![("content-type", "application/json")], "{}")
@@ -1076,7 +1080,7 @@ paths:
         assert!(log.receipts.is_empty());
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn proxy_handler_surfaces_upstream_failures_after_allowing_request() {
         let state = test_state(
             vec![RouteEntry {
@@ -1111,7 +1115,7 @@ paths:
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn proxy_handler_denies_invalid_capability_tokens() {
         let state = test_state(
             vec![RouteEntry {
@@ -1147,7 +1151,7 @@ paths:
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn sidecar_evaluate_returns_200_with_deny_verdict() {
         let state = test_state(
             vec![RouteEntry {
@@ -1188,7 +1192,7 @@ paths:
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn sidecar_evaluate_validates_transport_capability_header() {
         let state = test_state(
             vec![RouteEntry {
@@ -2003,7 +2007,7 @@ paths:
         ));
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn proxy_handler_persists_receipts_when_receipt_db_configured() {
         let receipt_db = temp_receipt_db_path();
         let state = test_state_with_receipt_db(
@@ -2042,7 +2046,7 @@ paths:
         let _ = std::fs::remove_file(receipt_db);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn persisted_receipts_are_visible_across_proxy_and_sidecar_flows() {
         let receipt_db = temp_receipt_db_path();
         let proxy_state = test_state_with_receipt_db(

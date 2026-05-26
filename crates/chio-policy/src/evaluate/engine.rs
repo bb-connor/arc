@@ -75,6 +75,21 @@ pub fn evaluate_with_context(
         return denied;
     }
 
+    // Reject condition maps that reference unknown rule-block names before
+    // filtering, so a misspelled key fails closed instead of silently leaving
+    // its target rule active (which apply_conditions would otherwise no-op).
+    if let Err(reason) = validate_condition_keys(conditions) {
+        return EvaluationResult {
+            decision: Decision::Deny,
+            matched_rule: None,
+            reason: Some(format!(
+                "invalid policy condition keys; denying fail-closed: {reason}"
+            )),
+            origin_profile: None,
+            posture: None,
+        };
+    }
+
     let effective_spec = apply_conditions(spec, context, conditions);
 
     match action.action_type.as_str() {
