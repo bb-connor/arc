@@ -1109,6 +1109,10 @@ pub struct ReceiptQueryHttpQuery {
     #[serde(default)]
     pub outcome: Option<String>,
     #[serde(default)]
+    pub receipt_kind: Option<String>,
+    #[serde(default)]
+    pub boundary_class: Option<String>,
+    #[serde(default)]
     pub since: Option<u64>,
     #[serde(default)]
     pub until: Option<u64>,
@@ -1162,6 +1166,35 @@ pub struct ReceiptQueryResponse {
     pub total_count: u64,
     pub next_cursor: Option<u64>,
     pub receipts: Vec<Value>,
+}
+
+pub fn receipt_query_response_value(receipt: ChioReceipt) -> Result<Value, serde_json::Error> {
+    let view = receipt.semantic_view();
+    let mut value = serde_json::to_value(receipt)?;
+    if let Some(object) = value.as_object_mut() {
+        object.insert(
+            "receiptKind".to_string(),
+            Value::String(view.receipt_kind.as_str().to_string()),
+        );
+        object.insert(
+            "boundaryClass".to_string(),
+            Value::String(view.boundary_class.as_str().to_string()),
+        );
+        if let Some(decision_kind) = view.decision_kind {
+            object.insert("decisionKind".to_string(), Value::String(decision_kind));
+        }
+        if let Some(observation_outcome) = view.observation_outcome {
+            object.insert(
+                "observationOutcome".to_string(),
+                Value::String(observation_outcome.as_str().to_string()),
+            );
+        }
+        object.insert(
+            "result".to_string(),
+            Value::String(view.result.as_str().to_string()),
+        );
+    }
+    Ok(value)
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

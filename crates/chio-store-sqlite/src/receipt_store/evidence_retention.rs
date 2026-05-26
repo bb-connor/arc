@@ -580,6 +580,29 @@ impl SqliteReceiptStore {
                 )));
             }
         }
+        const VALID_RECEIPT_KINDS: &[&str] = &[
+            "mediated_decision",
+            "trace_observation",
+            "advisory_evaluation",
+        ];
+        if let Some(receipt_kind) = query.receipt_kind.as_deref() {
+            if !VALID_RECEIPT_KINDS.contains(&receipt_kind) {
+                return Err(ReceiptStoreError::InvalidOutcome(format!(
+                    "unknown receipt kind filter {:?}; valid values are: mediated_decision, trace_observation, advisory_evaluation",
+                    receipt_kind
+                )));
+            }
+        }
+        const VALID_BOUNDARY_CLASSES: &[&str] =
+            &["prevent", "detect_only", "advisory_only", "cannot_see"];
+        if let Some(boundary_class) = query.boundary_class.as_deref() {
+            if !VALID_BOUNDARY_CLASSES.contains(&boundary_class) {
+                return Err(ReceiptStoreError::InvalidOutcome(format!(
+                    "unknown boundary class filter {:?}; valid values are: prevent, detect_only, advisory_only, cannot_see",
+                    boundary_class
+                )));
+            }
+        }
 
         let limit = query.limit.clamp(1, MAX_QUERY_LIMIT);
 
@@ -618,6 +641,8 @@ impl SqliteReceiptStore {
         //   ?8  max_cost (json_extract cost_charged <=)
         //   ?9  agent_subject (receipt subject_key, falling back to capability_lineage)
         //   ?12 tenant_filter (tenant_id exact match or NULL fallback)
+        //   ?13 receipt_kind (legacy tool receipts are mediated_decision)
+        //   ?14 boundary_class (legacy tool receipts are prevent)
         // Data query also uses:
         //   ?10 cursor (seq >, exclusive)
         //   ?11 limit
@@ -639,6 +664,8 @@ impl SqliteReceiptStore {
               AND (?8 IS NULL OR CAST(json_extract(r.raw_json, '$.metadata.financial.cost_charged') AS INTEGER) <= ?8)
               AND (?9 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?9)
               AND {tenant_fragment}
+              AND (?13 IS NULL OR ?13 = 'mediated_decision')
+              AND (?14 IS NULL OR ?14 = 'prevent')
               AND (?10 IS NULL OR r.seq > ?10)
             ORDER BY r.seq ASC
             LIMIT ?11
@@ -662,6 +689,8 @@ impl SqliteReceiptStore {
               AND (?8 IS NULL OR CAST(json_extract(r.raw_json, '$.metadata.financial.cost_charged') AS INTEGER) <= ?8)
               AND (?9 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?9)
               AND {tenant_fragment}
+              AND (?13 IS NULL OR ?13 = 'mediated_decision')
+              AND (?14 IS NULL OR ?14 = 'prevent')
         "#
         );
 
@@ -675,6 +704,8 @@ impl SqliteReceiptStore {
         let max_cost = query.max_cost.map(|v| v as i64);
         let agent_sub = query.agent_subject.as_deref();
         let tenant = query.tenant_filter.as_deref();
+        let receipt_kind = query.receipt_kind.as_deref();
+        let boundary_class = query.boundary_class.as_deref();
         // Convert cursor to signed i64 for SQLite. SQLite AUTOINCREMENT seq
         // values are bounded by i64::MAX; a cursor above that can never be
         // exceeded. Convert with a checked cast: on overflow return an empty
@@ -710,6 +741,8 @@ impl SqliteReceiptStore {
                                 None::<i64>,
                                 0i64,
                                 tenant,
+                                receipt_kind,
+                                boundary_class,
                             ],
                             |row| row.get::<_, i64>(0),
                         )
@@ -740,6 +773,8 @@ impl SqliteReceiptStore {
                 cursor_i64,
                 limit as i64,
                 tenant,
+                receipt_kind,
+                boundary_class,
             ],
             |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
         )?;
@@ -772,6 +807,8 @@ impl SqliteReceiptStore {
                     None::<i64>,
                     0i64,
                     tenant,
+                    receipt_kind,
+                    boundary_class,
                 ],
                 |row| row.get::<_, i64>(0),
             )

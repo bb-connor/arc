@@ -35,6 +35,7 @@
 use chio_core::receipt::{ChioReceipt, Decision, GuardEvidence, TrustLevel};
 use serde_json::{json, Map, Value};
 
+use crate::event::SiemEvent;
 use crate::redaction::redact_for_operator_log;
 
 /// OCSF schema version targeted by this mapper.
@@ -179,6 +180,47 @@ pub fn receipt_to_ocsf(receipt: &ChioReceipt) -> Value {
     }
 
     Value::Object(event)
+}
+
+/// Convert a semantic SIEM event into OCSF.
+///
+/// Only `mediated_decision + prevent + authorized` is emitted as an OCSF
+/// Authorization Grant success. Trace/advisory observations are mapped to
+/// Other with Chio semantic fields under `unmapped`, so downstream systems do
+/// not treat them as authorization grants.
+#[must_use]
+pub fn siem_event_to_ocsf(event: &SiemEvent) -> Value {
+    let mut value = receipt_to_ocsf(&event.receipt);
+    let authoritative_allow = event.receipt_kind == "mediated_decision"
+        && event.boundary_class == "prevent"
+        && event.result == "authorized";
+
+    if let Some(object) = value.as_object_mut() {
+        if !authoritative_allow && event.result != "denied" {
+            object.insert("activity_id".into(), json!(99));
+            object.insert("activity_name".into(), json!("Other"));
+            object.insert("status_id".into(), json!(99));
+            object.insert("status".into(), json!("Other"));
+            object.insert("severity_id".into(), json!(1));
+            object.insert("severity".into(), json!("Informational"));
+            object.insert("type_uid".into(), json!(OCSF_CLASS_UID * 100 + 99));
+            object.insert(
+                "type_name".into(),
+                json!(format!("{OCSF_CLASS_NAME}: Other")),
+            );
+            if let Some(actor) = object.get_mut("actor").and_then(Value::as_object_mut) {
+                actor.insert("authorizations".into(), Value::Array(Vec::new()));
+            }
+        }
+        if let Some(unmapped) = object.get_mut("unmapped").and_then(Value::as_object_mut) {
+            if let Some(chio) = unmapped.get_mut("chio").and_then(Value::as_object_mut) {
+                chio.insert("receipt_kind".into(), json!(event.receipt_kind));
+                chio.insert("boundary_class".into(), json!(event.boundary_class));
+                chio.insert("result".into(), json!(event.result));
+            }
+        }
+    }
+    value
 }
 
 fn activity_for(decision: &Decision) -> (u32, &'static str) {
@@ -416,5 +458,19 @@ mod tests {
         assert_eq!(ev["status_id"], 1);
         assert_eq!(ev["severity_id"], 1);
         assert_eq!(ev["type_uid"], 300_201);
+    }
+
+    #[test]
+    fn advisory_allow_does_not_map_to_authorization_grant_success() {
+        let mut receipt = test_receipt("r-advisory", Decision::Allow);
+        receipt.trust_level = TrustLevel::Advisory;
+        let event = SiemEvent::from_receipt(receipt);
+        let ev = siem_event_to_ocsf(&event);
+
+        assert_eq!(event.receipt_kind, "advisory_evaluation");
+        assert_eq!(event.boundary_class, "advisory_only");
+        assert_eq!(ev["activity_id"], 99);
+        assert_eq!(ev["status_id"], 99);
+        assert_eq!(ev["unmapped"]["chio"]["result"], "advisory");
     }
 }

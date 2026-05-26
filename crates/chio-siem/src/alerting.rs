@@ -670,7 +670,7 @@ impl AlertingExporter {
             guard, event.receipt.tool_name, event.receipt.id
         );
 
-        let receipt_json = serde_json::to_value(&event.receipt).map_err(|e| {
+        let receipt_json = serde_json::to_value(event).map_err(|e| {
             ExportError::SerializationError(format!(
                 "failed to serialize receipt {}: {e}",
                 event.receipt.id

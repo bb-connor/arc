@@ -170,12 +170,17 @@ impl ReceiptSigner for KernelReceiptSigner {
             policy_hash: String::new(),
             evidence: Vec::new(),
             metadata: Some(serde_json::json!({
+                "receipt_semantics": {
+                    "receipt_kind": "trace_observation",
+                    "boundary_class": "detect_only",
+                    "observation_outcome": "observed"
+                },
                 "acp": {
                     "sessionId": entry.session_id,
                     "enforcementMode": entry.enforcement_mode,
                 }
             })),
-            trust_level: chio_core::TrustLevel::default(),
+            trust_level: chio_core::TrustLevel::Advisory,
             tenant_id: None,
             kernel_key: self.keypair.public_key(),
         };

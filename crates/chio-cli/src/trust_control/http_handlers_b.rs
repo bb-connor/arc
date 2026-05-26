@@ -2048,7 +2048,7 @@ async fn handle_agent_receipts(
     let receipts = match result
         .receipts
         .into_iter()
-        .map(|stored| serde_json::to_value(stored.receipt))
+        .map(|stored| receipt_query_response_value(stored.receipt))
         .collect::<Result<Vec<_>, _>>()
     {
         Ok(receipts) => receipts,

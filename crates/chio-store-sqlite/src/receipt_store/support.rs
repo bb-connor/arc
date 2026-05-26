@@ -4462,6 +4462,31 @@ impl ReceiptStore for SqliteReceiptStore {
         SqliteReceiptStore::contains_chio_receipt_v2_body_hash_internal(self, body_hash)
     }
 
+    fn supports_chio_receipt_v3(&self) -> bool {
+        true
+    }
+
+    fn append_chio_receipt_v3(
+        &self,
+        receipt: &chio_core::receipt::ChioReceiptV3,
+    ) -> Result<u64, ReceiptStoreError> {
+        SqliteReceiptStore::append_chio_receipt_v3_internal(self, receipt)
+    }
+
+    fn contains_chio_receipt_v3_body_hash(
+        &self,
+        body_hash: &str,
+    ) -> Result<bool, ReceiptStoreError> {
+        SqliteReceiptStore::contains_chio_receipt_v3_body_hash_internal(self, body_hash)
+    }
+
+    fn load_chio_receipt_v3_body_hash(
+        &self,
+        body_hash: &str,
+    ) -> Result<Option<chio_kernel::StoredReceiptV3>, ReceiptStoreError> {
+        SqliteReceiptStore::load_chio_receipt_v3_body_hash_internal(self, body_hash)
+    }
+
     fn append_chio_receipt_canonical(
         &self,
         _receipt: &ChioReceipt,

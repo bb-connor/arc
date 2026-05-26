@@ -317,12 +317,16 @@ pub use open_market::{
     OPEN_MARKET_FEE_SCHEDULE_ARTIFACT_SCHEMA, OPEN_MARKET_PENALTY_ARTIFACT_SCHEMA,
 };
 pub use receipt::{
-    signed_receipt_v2, ChildRequestReceipt, ChildRequestReceiptBody, ChioReceipt, ChioReceiptBody,
-    ChioReceiptV2, Decision, FinancialReceiptMetadata, GovernedApprovalReceiptMetadata,
-    GovernedCommerceReceiptMetadata, GovernedTransactionReceiptMetadata, GuardEvidence,
-    MeteredBillingReceiptMetadata, MeteredUsageEvidenceReceiptMetadata, ReceiptDagParent,
-    ReceiptHybridLogicalClock, ReceiptV2BodyHashInput, ReceiptV2ReplaySet, ToolCallAction,
-    TrustLevel,
+    downgrade_receipt_v3_to_v2, receipt_v3_body_hash, receipt_v3_extensions_hash,
+    signed_receipt_v2, ActorRef, BoundaryClass, ChildRequestReceipt, ChildRequestReceiptBody,
+    ChioReceipt, ChioReceiptBody, ChioReceiptV2, ChioReceiptV3, Decision, FinancialReceiptMetadata,
+    GovernedApprovalReceiptMetadata, GovernedCommerceReceiptMetadata,
+    GovernedTransactionReceiptMetadata, GuardEvidence, MeteredBillingReceiptMetadata,
+    MeteredUsageEvidenceReceiptMetadata, ObservationOutcome, ReceiptDagParent,
+    ReceiptDisplayResult, ReceiptExtension, ReceiptHybridLogicalClock, ReceiptKind,
+    ReceiptSemanticView, ReceiptV2BodyHashInput, ReceiptV2ReplaySet, ReceiptV3BodyHashInput,
+    RedactionMode, ToolCallAction, ToolOrigin, TrustLevel, CHIO_RECEIPT_V1_SCHEMA,
+    CHIO_RECEIPT_V2_SCHEMA, CHIO_RECEIPT_V3_SCHEMA,
 };
 pub use session::{
     ChioIdentityAssertion, CompleteOperation, CompletionArgument, CompletionReference,

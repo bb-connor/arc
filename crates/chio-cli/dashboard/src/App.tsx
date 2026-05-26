@@ -9,6 +9,8 @@ const INITIAL_FILTERS: Filters = {
   toolServer: '',
   toolName: '',
   outcome: '',
+  receiptKind: '',
+  boundaryClass: '',
   since: undefined,
   until: undefined,
 }

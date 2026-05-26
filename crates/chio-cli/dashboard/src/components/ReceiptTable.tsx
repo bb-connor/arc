@@ -8,7 +8,14 @@ import {
 import { format } from 'date-fns'
 import { fetchAgentCostSeries, fetchLineage, fetchReceipts } from '../api'
 import type { Filters, Receipt } from '../types'
-import { decisionKind, formatMinorUnits, receiptSubjectKey } from '../types'
+import {
+  formatMinorUnits,
+  receiptSubjectKey,
+  semanticBoundaryClass,
+  semanticLabel,
+  semanticReceiptKind,
+  semanticResult,
+} from '../types'
 import { OperatorSummary } from './OperatorSummary'
 import { PortableReputationPanel } from './PortableReputationPanel'
 import { RelayAlertDeliverySummary } from './RelayAlertDeliverySummary'
@@ -34,18 +41,20 @@ interface DetailPanelProps {
   onClose: () => void
 }
 
-function decisionBadgeClass(kind: string): string {
-  switch (kind) {
-    case 'allow': return 'badge badge-allow'
-    case 'deny': return 'badge badge-deny'
+function resultBadgeClass(result: string): string {
+  switch (result) {
+    case 'authorized': return 'badge badge-allow'
+    case 'denied': return 'badge badge-deny'
     case 'cancelled': return 'badge badge-cancelled'
+    case 'observed': return 'badge badge-observed'
+    case 'advisory': return 'badge badge-advisory'
     default: return 'badge badge-incomplete'
   }
 }
 
 function DetailPanel({ receipt, onClose }: DetailPanelProps) {
   const financial = receipt.metadata?.financial
-  const kind = decisionKind(receipt.decision)
+  const result = semanticResult(receipt)
   const [sparkData, setSparkData] = useState<{ time: string; cost: number }[]>([])
   const subjectKey = receiptSubjectKey(receipt)
 
@@ -102,10 +111,20 @@ function DetailPanel({ receipt, onClose }: DetailPanelProps) {
       </div>
 
       <div className="detail-section">
-        <div className="detail-section-title">Decision</div>
-        <span className={decisionBadgeClass(kind)}>
-          {kind.charAt(0).toUpperCase() + kind.slice(1)}
+        <div className="detail-section-title">Result</div>
+        <span className={resultBadgeClass(result)}>
+          {semanticLabel(result)}
         </span>
+      </div>
+
+      <div className="detail-section">
+        <div className="detail-section-title">Kind</div>
+        <span>{semanticLabel(semanticReceiptKind(receipt))}</span>
+      </div>
+
+      <div className="detail-section">
+        <div className="detail-section-title">Boundary</div>
+        <span>{semanticLabel(semanticBoundaryClass(receipt))}</span>
       </div>
 
       <div className="detail-section">
@@ -199,17 +218,37 @@ const columns = [
       cell: (info) => info.getValue(),
     },
   ),
-  columnHelper.accessor('decision', {
-    header: 'Outcome',
-    cell: (info) => {
-      const kind = decisionKind(info.getValue())
-      return (
-        <span className={decisionBadgeClass(kind)}>
-          {kind.charAt(0).toUpperCase() + kind.slice(1)}
-        </span>
-      )
+  columnHelper.accessor(
+    (row) => semanticReceiptKind(row),
+    {
+      id: 'receiptKind',
+      header: 'Kind',
+      cell: (info) => semanticLabel(info.getValue()),
     },
-  }),
+  ),
+  columnHelper.accessor(
+    (row) => semanticBoundaryClass(row),
+    {
+      id: 'boundaryClass',
+      header: 'Boundary',
+      cell: (info) => semanticLabel(info.getValue()),
+    },
+  ),
+  columnHelper.accessor(
+    (row) => semanticResult(row),
+    {
+      id: 'result',
+      header: 'Result',
+      cell: (info) => {
+        const result = info.getValue()
+        return (
+          <span className={resultBadgeClass(result)}>
+            {semanticLabel(result)}
+          </span>
+        )
+      },
+    },
+  ),
   columnHelper.accessor('capability_id', {
     header: 'Capability',
     cell: (info) => (

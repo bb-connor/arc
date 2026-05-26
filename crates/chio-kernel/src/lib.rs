@@ -395,7 +395,7 @@ pub use receipt_analytics::{
 pub use receipt_query::{ReceiptQuery, ReceiptQueryResult, MAX_QUERY_LIMIT};
 pub use receipt_store::{
     FederatedEvidenceShareImport, FederatedEvidenceShareSummary, ReceiptStore, ReceiptStoreError,
-    RetentionConfig, StoredChildReceipt, StoredToolReceipt,
+    RetentionConfig, StoredChildReceipt, StoredReceiptV3, StoredToolReceipt,
 };
 pub use revocation_runtime::{InMemoryRevocationStore, RevocationStore};
 pub use revocation_store::{RevocationRecord, RevocationStoreError};

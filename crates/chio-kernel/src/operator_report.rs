@@ -304,6 +304,8 @@ impl BehavioralFeedQuery {
             tool_server: self.tool_server.clone(),
             tool_name: self.tool_name.clone(),
             outcome: None,
+            receipt_kind: None,
+            boundary_class: None,
             since: self.since,
             until: self.until,
             min_cost: None,

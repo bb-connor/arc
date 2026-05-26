@@ -26,14 +26,24 @@ use crate::session::{
     OperationKind, OperationTerminalState, RequestId, SessionAnchorReference, SessionId,
 };
 
+/// Legacy receipt schema with authorization-shaped decisions only.
+pub const CHIO_RECEIPT_V1_SCHEMA: &str = "chio.receipt.v1";
+
 /// Signed receipt v2 schema with content-addressed identity.
 pub const CHIO_RECEIPT_V2_SCHEMA: &str = "chio.receipt.v2";
+
+/// Signed receipt v3 schema with explicit mediation and boundary semantics.
+pub const CHIO_RECEIPT_V3_SCHEMA: &str = "chio.receipt.v3";
 
 /// Multi-parent receipt-lineage statement schema.
 pub const CHIO_RECEIPT_LINEAGE_STATEMENT_V2_SCHEMA: &str = "chio.receipt_lineage_statement.v2";
 
 fn receipt_v2_schema() -> String {
     CHIO_RECEIPT_V2_SCHEMA.to_string()
+}
+
+fn receipt_v3_schema() -> String {
+    CHIO_RECEIPT_V3_SCHEMA.to_string()
 }
 
 /// Trust level of a receipt's authorization, recording HOW the Kernel
@@ -342,6 +352,53 @@ impl ChioReceipt {
     ) -> Option<FinancialBudgetAuthorityReceiptMetadata> {
         self.typed_metadata("budget_authority")
     }
+
+    /// Additive semantic view for legacy receipt readers.
+    ///
+    /// Legacy v1 receipts are authorization-shaped. The default mediated
+    /// trust level maps to `mediated_decision/prevent`; advisory legacy
+    /// receipts are deliberately labeled advisory so dashboards and SIEM
+    /// pipelines do not display them as authorized grants.
+    #[must_use]
+    pub fn semantic_view(&self) -> ReceiptSemanticView {
+        if let Some(view) = self.metadata_semantic_view() {
+            return view;
+        }
+        let (receipt_kind, boundary_class) = match self.trust_level {
+            TrustLevel::Advisory => (ReceiptKind::AdvisoryEvaluation, BoundaryClass::AdvisoryOnly),
+            TrustLevel::Mediated | TrustLevel::Verified => {
+                (ReceiptKind::MediatedDecision, BoundaryClass::Prevent)
+            }
+        };
+        ReceiptSemanticView {
+            receipt_kind,
+            boundary_class,
+            decision_kind: Some(decision_kind_name(&self.decision).to_string()),
+            observation_outcome: None,
+            result: display_result_for(receipt_kind, boundary_class, Some(&self.decision)),
+        }
+    }
+
+    fn metadata_semantic_view(&self) -> Option<ReceiptSemanticView> {
+        let metadata = self.metadata.as_ref()?;
+        let semantics = metadata.get("receipt_semantics").unwrap_or(metadata);
+        let receipt_kind = semantic_str(semantics, "receiptKind")
+            .or_else(|| semantic_str(semantics, "receipt_kind"))
+            .and_then(ReceiptKind::parse)?;
+        let boundary_class = semantic_str(semantics, "boundaryClass")
+            .or_else(|| semantic_str(semantics, "boundary_class"))
+            .and_then(BoundaryClass::parse)?;
+        let observation_outcome = semantic_str(semantics, "observationOutcome")
+            .or_else(|| semantic_str(semantics, "observation_outcome"))
+            .and_then(ObservationOutcome::parse);
+        Some(ReceiptSemanticView {
+            receipt_kind,
+            boundary_class,
+            decision_kind: Some(decision_kind_name(&self.decision).to_string()),
+            observation_outcome,
+            result: display_result_for(receipt_kind, boundary_class, Some(&self.decision)),
+        })
+    }
 }
 
 /// Hybrid logical clock carried by v2 receipts for cross-kernel ordering.
@@ -424,6 +481,298 @@ pub struct ChioReceiptV2 {
     pub receipt_id: String,
     pub body_hash: String,
     pub body: ReceiptV2BodyHashInput,
+    #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
+    pub algorithm: Option<SigningAlgorithm>,
+    pub signature: Signature,
+}
+
+/// Semantic class of a signed receipt.
+///
+/// `MediatedDecision` records an inline kernel decision. `TraceObservation`
+/// records externally reported or audit-only activity that Chio did not
+/// prevent. `AdvisoryEvaluation` records shadow policy evaluation whose
+/// result is not an authorization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReceiptKind {
+    MediatedDecision,
+    TraceObservation,
+    AdvisoryEvaluation,
+}
+
+impl ReceiptKind {
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::MediatedDecision => "mediated_decision",
+            Self::TraceObservation => "trace_observation",
+            Self::AdvisoryEvaluation => "advisory_evaluation",
+        }
+    }
+
+    #[must_use]
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "mediated_decision" => Some(Self::MediatedDecision),
+            "trace_observation" => Some(Self::TraceObservation),
+            "advisory_evaluation" => Some(Self::AdvisoryEvaluation),
+            _ => None,
+        }
+    }
+}
+
+/// Runtime enforcement boundary attached to a receipt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BoundaryClass {
+    Prevent,
+    DetectOnly,
+    AdvisoryOnly,
+    CannotSee,
+}
+
+impl BoundaryClass {
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Prevent => "prevent",
+            Self::DetectOnly => "detect_only",
+            Self::AdvisoryOnly => "advisory_only",
+            Self::CannotSee => "cannot_see",
+        }
+    }
+
+    #[must_use]
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "prevent" => Some(Self::Prevent),
+            "detect_only" => Some(Self::DetectOnly),
+            "advisory_only" => Some(Self::AdvisoryOnly),
+            "cannot_see" => Some(Self::CannotSee),
+            _ => None,
+        }
+    }
+}
+
+/// Non-authorization outcome for trace and advisory receipts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ObservationOutcome {
+    Observed,
+    Failed,
+    Redacted,
+    WouldAllow,
+    WouldDeny,
+    Unknown,
+}
+
+impl ObservationOutcome {
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Observed => "observed",
+            Self::Failed => "failed",
+            Self::Redacted => "redacted",
+            Self::WouldAllow => "would_allow",
+            Self::WouldDeny => "would_deny",
+            Self::Unknown => "unknown",
+        }
+    }
+
+    #[must_use]
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "observed" => Some(Self::Observed),
+            "failed" => Some(Self::Failed),
+            "redacted" => Some(Self::Redacted),
+            "would_allow" => Some(Self::WouldAllow),
+            "would_deny" => Some(Self::WouldDeny),
+            "unknown" => Some(Self::Unknown),
+            _ => None,
+        }
+    }
+}
+
+/// Where the tool execution happened relative to Chio.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolOrigin {
+    CallerExecuted,
+    KernelMediated,
+    ProviderReported,
+    ExternalAuditOnly,
+}
+
+impl ToolOrigin {
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::CallerExecuted => "caller_executed",
+            Self::KernelMediated => "kernel_mediated",
+            Self::ProviderReported => "provider_reported",
+            Self::ExternalAuditOnly => "external_audit_only",
+        }
+    }
+}
+
+/// Redaction posture for receipt payloads and exported evidence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RedactionMode {
+    None,
+    Summary,
+    Redacted,
+    HashOnly,
+}
+
+impl RedactionMode {
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Summary => "summary",
+            Self::Redacted => "redacted",
+            Self::HashOnly => "hash_only",
+        }
+    }
+}
+
+/// Actor identity captured on a receipt.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ActorRef {
+    pub actor_id: String,
+    pub actor_kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor_token_jti: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scope_constraints: Vec<String>,
+}
+
+/// Versioned extension payload bound into a v3 receipt by hash.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReceiptExtension {
+    pub namespace: String,
+    pub must_understand: bool,
+    pub payload: serde_json::Value,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ReceiptExtensionHashEntry<'a> {
+    namespace: &'a str,
+    must_understand: bool,
+    payload: &'a serde_json::Value,
+}
+
+/// UI/query label derived from receipt semantics, not just legacy decisions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReceiptDisplayResult {
+    Authorized,
+    Denied,
+    Cancelled,
+    Incomplete,
+    Observed,
+    Advisory,
+    Unknown,
+}
+
+impl ReceiptDisplayResult {
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Authorized => "authorized",
+            Self::Denied => "denied",
+            Self::Cancelled => "cancelled",
+            Self::Incomplete => "incomplete",
+            Self::Observed => "observed",
+            Self::Advisory => "advisory",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+/// Additive receipt view used by dashboards and exporters.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReceiptSemanticView {
+    pub receipt_kind: ReceiptKind,
+    pub boundary_class: BoundaryClass,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decision_kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observation_outcome: Option<ObservationOutcome>,
+    pub result: ReceiptDisplayResult,
+}
+
+/// The exact v3 receipt body fields that contribute to `body_hash`.
+///
+/// V3 separates authorization decisions from trace/advisory observations. A
+/// non-mediated receipt must not carry an `Allow`, `Deny`, `Cancelled`, or
+/// `Incomplete` decision, which prevents old allow-shaped consumers from
+/// mistaking observations for kernel-mediated authorization.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReceiptV3BodyHashInput {
+    #[serde(default = "receipt_v3_schema")]
+    pub schema: String,
+    pub timestamp: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capability_id: Option<String>,
+    pub tool_server: String,
+    pub tool_name: String,
+    pub action: ToolCallAction,
+    pub receipt_kind: ReceiptKind,
+    pub boundary_class: BoundaryClass,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decision: Option<Decision>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observation_outcome: Option<ObservationOutcome>,
+    pub content_hash: String,
+    pub policy_digest: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence: Vec<GuardEvidence>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Value>,
+    pub tool_origin: ToolOrigin,
+    pub redaction_mode: RedactionMode,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub actor_chain: Vec<ActorRef>,
+    #[serde(default, skip_serializing_if = "is_default_trust_level")]
+    pub trust_level: TrustLevel,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant_id: Option<String>,
+    pub chain_id: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub parent_receipt_ids: Vec<String>,
+    pub parent_set_hash: String,
+    pub dag_ordinal: u64,
+    pub hlc: ReceiptHybridLogicalClock,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub must_understand_extensions: Vec<String>,
+    pub extensions_hash: String,
+    pub kernel_key: PublicKey,
+}
+
+/// Typed v3 signing input. Verifiers reconstruct this shape exactly.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReceiptV3SigningBody {
+    pub body_hash: String,
+    pub body: ReceiptV3BodyHashInput,
+}
+
+/// Signed v3 receipt with semantic receipt kind and extension bundle.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChioReceiptV3 {
+    pub receipt_id: String,
+    pub body_hash: String,
+    pub body: ReceiptV3BodyHashInput,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub extensions: Vec<ReceiptExtension>,
     #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
     pub algorithm: Option<SigningAlgorithm>,
     pub signature: Signature,
@@ -573,6 +922,386 @@ impl ChioReceiptV2 {
     #[must_use]
     pub fn authoritative_receipt_id(&self) -> &str {
         &self.body_hash
+    }
+}
+
+impl ReceiptV3BodyHashInput {
+    pub fn validate(&self, extensions: &[ReceiptExtension]) -> Result<()> {
+        if self.schema != CHIO_RECEIPT_V3_SCHEMA {
+            return Err(Error::CanonicalJson(format!(
+                "unsupported receipt v3 schema: {}",
+                self.schema
+            )));
+        }
+        validate_receipt_v3_semantics(
+            self.receipt_kind,
+            self.boundary_class,
+            self.decision.as_ref(),
+            self.observation_outcome,
+        )?;
+        validate_lowercase_hex_256(&self.policy_digest, "policy_digest")?;
+
+        let normalized = canonical_parent_receipt_ids(self.parent_receipt_ids.clone());
+        if normalized != self.parent_receipt_ids {
+            return Err(Error::CanonicalJson(
+                "receipt v3 parent_receipt_ids must be sorted and deduplicated".to_string(),
+            ));
+        }
+        let expected_parent_set = parent_set_hash_for_normalized(&self.parent_receipt_ids)?;
+        if expected_parent_set != self.parent_set_hash {
+            return Err(Error::CanonicalJson(
+                "receipt v3 parent_set_hash mismatch".to_string(),
+            ));
+        }
+
+        let expected_extensions_hash = receipt_v3_extensions_hash(extensions)?;
+        if expected_extensions_hash != self.extensions_hash {
+            return Err(Error::CanonicalJson(
+                "receipt v3 extensions_hash mismatch".to_string(),
+            ));
+        }
+        validate_must_understand_extensions(&self.must_understand_extensions, extensions)?;
+
+        if self.receipt_kind == ReceiptKind::MediatedDecision && self.capability_id.is_none() {
+            return Err(Error::CanonicalJson(
+                "mediated receipt v3 requires capability_id".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn semantic_view(&self) -> ReceiptSemanticView {
+        ReceiptSemanticView {
+            receipt_kind: self.receipt_kind,
+            boundary_class: self.boundary_class,
+            decision_kind: self
+                .decision
+                .as_ref()
+                .map(decision_kind_name)
+                .map(String::from),
+            observation_outcome: self.observation_outcome,
+            result: display_result_for(
+                self.receipt_kind,
+                self.boundary_class,
+                self.decision.as_ref(),
+            ),
+        }
+    }
+}
+
+impl ChioReceiptV3 {
+    pub fn sign(
+        receipt_id: impl Into<String>,
+        body: ReceiptV3BodyHashInput,
+        extensions: Vec<ReceiptExtension>,
+        keypair: &Keypair,
+    ) -> Result<Self> {
+        body.validate(&extensions)?;
+        let body_hash = receipt_v3_body_hash(&body, &extensions)?;
+        let signing_body = ReceiptV3SigningBody {
+            body_hash: body_hash.clone(),
+            body: body.clone(),
+        };
+        let (signature, _bytes) = keypair.sign_canonical(&signing_body)?;
+        Ok(Self {
+            receipt_id: receipt_id.into(),
+            body_hash,
+            body,
+            extensions,
+            algorithm: None,
+            signature,
+        })
+    }
+
+    pub fn verify_signature(&self) -> Result<bool> {
+        if self.body.validate(&self.extensions).is_err() {
+            return Ok(false);
+        }
+        let expected_body_hash = receipt_v3_body_hash(&self.body, &self.extensions)?;
+        if expected_body_hash != self.body_hash {
+            return Ok(false);
+        }
+        let signing_body = ReceiptV3SigningBody {
+            body_hash: self.body_hash.clone(),
+            body: self.body.clone(),
+        };
+        self.body
+            .kernel_key
+            .verify_canonical(&signing_body, &self.signature)
+    }
+
+    #[must_use]
+    pub fn authoritative_receipt_id(&self) -> &str {
+        &self.body_hash
+    }
+
+    #[must_use]
+    pub fn semantic_kind(&self) -> ReceiptKind {
+        self.body.receipt_kind
+    }
+
+    #[must_use]
+    pub fn boundary_class(&self) -> BoundaryClass {
+        self.body.boundary_class
+    }
+
+    #[must_use]
+    pub fn decision_kind(&self) -> Option<&'static str> {
+        self.body.decision.as_ref().map(decision_kind_name)
+    }
+
+    #[must_use]
+    pub fn display_result(&self) -> ReceiptDisplayResult {
+        self.body.semantic_view().result
+    }
+
+    #[must_use]
+    pub fn semantic_view(&self) -> ReceiptSemanticView {
+        self.body.semantic_view()
+    }
+}
+
+/// Compute `extensions_hash := H(canonical_jcs(sorted ReceiptExtension bundle))`.
+pub fn receipt_v3_extensions_hash(extensions: &[ReceiptExtension]) -> Result<String> {
+    validate_extension_namespaces(extensions)?;
+    let mut sorted: Vec<&ReceiptExtension> = extensions.iter().collect();
+    sorted.sort_by(|left, right| left.namespace.cmp(&right.namespace));
+    let entries: Vec<ReceiptExtensionHashEntry<'_>> = sorted
+        .into_iter()
+        .map(|extension| ReceiptExtensionHashEntry {
+            namespace: extension.namespace.as_str(),
+            must_understand: extension.must_understand,
+            payload: &extension.payload,
+        })
+        .collect();
+    let canonical = canonical_json_bytes(&entries)?;
+    Ok(sha256_hex(&canonical))
+}
+
+/// Compute `body_hash := H(canonical_jcs(ReceiptV3BodyHashInput))`.
+pub fn receipt_v3_body_hash(
+    body: &ReceiptV3BodyHashInput,
+    extensions: &[ReceiptExtension],
+) -> Result<String> {
+    body.validate(extensions)?;
+    let canonical = canonical_json_bytes(body)?;
+    Ok(sha256_hex(&canonical))
+}
+
+/// Build a v2 receipt from a mediated v3 receipt when semantics are safe.
+///
+/// Trace and advisory receipts cannot be represented by v1/v2 without looking
+/// like authorization decisions, so they fail closed instead of downgrading.
+pub fn downgrade_receipt_v3_to_v2(
+    receipt: &ChioReceiptV3,
+    receipt_id: impl Into<String>,
+    keypair: &Keypair,
+) -> Result<ChioReceiptV2> {
+    if !receipt.verify_signature()? {
+        return Err(Error::SignatureVerificationFailed);
+    }
+    if receipt.body.receipt_kind != ReceiptKind::MediatedDecision {
+        return Err(Error::CanonicalJson(
+            "receipt v3 trace/advisory records cannot downgrade to v2".to_string(),
+        ));
+    }
+    let decision = receipt.body.decision.clone().ok_or_else(|| {
+        Error::CanonicalJson("mediated receipt v3 missing decision for v2 downgrade".to_string())
+    })?;
+    let capability_id = receipt.body.capability_id.clone().ok_or_else(|| {
+        Error::CanonicalJson(
+            "mediated receipt v3 missing capability_id for v2 downgrade".to_string(),
+        )
+    })?;
+    let body = ReceiptV2BodyHashInput {
+        schema: CHIO_RECEIPT_V2_SCHEMA.to_string(),
+        timestamp: receipt.body.timestamp,
+        capability_id,
+        tool_server: receipt.body.tool_server.clone(),
+        tool_name: receipt.body.tool_name.clone(),
+        action: receipt.body.action.clone(),
+        decision,
+        content_hash: receipt.body.content_hash.clone(),
+        policy_hash: receipt.body.policy_digest.clone(),
+        evidence: receipt.body.evidence.clone(),
+        metadata: receipt.body.metadata.clone(),
+        trust_level: receipt.body.trust_level,
+        tenant_id: receipt.body.tenant_id.clone(),
+        chain_id: receipt.body.chain_id.clone(),
+        parent_receipt_ids: receipt.body.parent_receipt_ids.clone(),
+        parent_set_hash: receipt.body.parent_set_hash.clone(),
+        dag_ordinal: receipt.body.dag_ordinal,
+        hlc: receipt.body.hlc.clone(),
+        kernel_key: receipt.body.kernel_key.clone(),
+    };
+    ChioReceiptV2::sign(receipt_id, body, keypair)
+}
+
+fn validate_receipt_v3_semantics(
+    receipt_kind: ReceiptKind,
+    boundary_class: BoundaryClass,
+    decision: Option<&Decision>,
+    observation_outcome: Option<ObservationOutcome>,
+) -> Result<()> {
+    match receipt_kind {
+        ReceiptKind::MediatedDecision => {
+            if decision.is_none() {
+                return Err(Error::CanonicalJson(
+                    "mediated receipt v3 requires a decision".to_string(),
+                ));
+            }
+            if observation_outcome.is_some() {
+                return Err(Error::CanonicalJson(
+                    "mediated receipt v3 must not carry observation_outcome".to_string(),
+                ));
+            }
+            if boundary_class == BoundaryClass::CannotSee {
+                return Err(Error::CanonicalJson(
+                    "mediated receipt v3 cannot use cannot_see boundary".to_string(),
+                ));
+            }
+        }
+        ReceiptKind::TraceObservation | ReceiptKind::AdvisoryEvaluation => {
+            if decision.is_some() {
+                return Err(Error::CanonicalJson(
+                    "trace/advisory receipt v3 must not carry authorization decision".to_string(),
+                ));
+            }
+            if observation_outcome.is_none() {
+                return Err(Error::CanonicalJson(
+                    "trace/advisory receipt v3 requires observation_outcome".to_string(),
+                ));
+            }
+            if receipt_kind == ReceiptKind::TraceObservation
+                && boundary_class == BoundaryClass::Prevent
+            {
+                return Err(Error::CanonicalJson(
+                    "trace receipt v3 cannot use prevent boundary".to_string(),
+                ));
+            }
+            if receipt_kind == ReceiptKind::AdvisoryEvaluation
+                && boundary_class != BoundaryClass::AdvisoryOnly
+            {
+                return Err(Error::CanonicalJson(
+                    "advisory receipt v3 requires advisory_only boundary".to_string(),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_lowercase_hex_256(value: &str, field: &str) -> Result<()> {
+    let valid = value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'));
+    if valid {
+        Ok(())
+    } else {
+        Err(Error::CanonicalJson(format!(
+            "receipt v3 {field} must be lowercase 32-byte hex"
+        )))
+    }
+}
+
+fn validate_extension_namespaces(extensions: &[ReceiptExtension]) -> Result<()> {
+    let mut seen = BTreeSet::new();
+    for extension in extensions {
+        let namespace = extension.namespace.as_str();
+        let valid = !namespace.is_empty()
+            && namespace.len() <= 128
+            && namespace
+                .bytes()
+                .all(|byte| matches!(byte, b'a'..=b'z' | b'0'..=b'9' | b'_' | b'.' | b'-'));
+        if !valid {
+            return Err(Error::CanonicalJson(format!(
+                "malformed receipt v3 extension namespace: {namespace}"
+            )));
+        }
+        if !seen.insert(namespace) {
+            return Err(Error::CanonicalJson(format!(
+                "duplicate receipt v3 extension namespace: {namespace}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_must_understand_extensions(
+    required: &[String],
+    extensions: &[ReceiptExtension],
+) -> Result<()> {
+    let normalized = canonical_parent_receipt_ids(required.to_vec());
+    if normalized != required {
+        return Err(Error::CanonicalJson(
+            "receipt v3 must_understand_extensions must be sorted and deduplicated".to_string(),
+        ));
+    }
+    for namespace in required {
+        let extension = extensions
+            .iter()
+            .find(|candidate| candidate.namespace == *namespace)
+            .ok_or_else(|| {
+                Error::CanonicalJson(format!(
+                    "receipt v3 missing must_understand extension: {namespace}"
+                ))
+            })?;
+        if !extension.must_understand {
+            return Err(Error::CanonicalJson(format!(
+                "receipt v3 extension listed as must_understand is not marked: {namespace}"
+            )));
+        }
+    }
+    for extension in extensions
+        .iter()
+        .filter(|extension| extension.must_understand)
+    {
+        if !required
+            .iter()
+            .any(|namespace| namespace == &extension.namespace)
+        {
+            return Err(Error::CanonicalJson(format!(
+                "receipt v3 must_understand extension not listed in signed body: {}",
+                extension.namespace
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn semantic_str<'a>(metadata: &'a serde_json::Value, key: &str) -> Option<&'a str> {
+    metadata.get(key).and_then(serde_json::Value::as_str)
+}
+
+fn decision_kind_name(decision: &Decision) -> &'static str {
+    match decision {
+        Decision::Allow => "allow",
+        Decision::Deny { .. } => "deny",
+        Decision::Cancelled { .. } => "cancelled",
+        Decision::Incomplete { .. } => "incomplete",
+    }
+}
+
+fn display_result_for(
+    receipt_kind: ReceiptKind,
+    boundary_class: BoundaryClass,
+    decision: Option<&Decision>,
+) -> ReceiptDisplayResult {
+    match receipt_kind {
+        ReceiptKind::MediatedDecision => match decision {
+            Some(Decision::Allow) if boundary_class == BoundaryClass::Prevent => {
+                ReceiptDisplayResult::Authorized
+            }
+            Some(Decision::Allow) => ReceiptDisplayResult::Observed,
+            Some(Decision::Deny { .. }) => ReceiptDisplayResult::Denied,
+            Some(Decision::Cancelled { .. }) => ReceiptDisplayResult::Cancelled,
+            Some(Decision::Incomplete { .. }) => ReceiptDisplayResult::Incomplete,
+            None => ReceiptDisplayResult::Unknown,
+        },
+        ReceiptKind::TraceObservation => ReceiptDisplayResult::Observed,
+        ReceiptKind::AdvisoryEvaluation => ReceiptDisplayResult::Advisory,
     }
 }
 
@@ -1756,6 +2485,78 @@ mod tests {
         ChioReceiptV2::sign(id, body, kp).unwrap()
     }
 
+    fn make_actor_ref() -> ActorRef {
+        ActorRef {
+            actor_id: "did:example:agent-1".to_string(),
+            actor_kind: "agent".to_string(),
+            actor_token_jti: Some("jti-001".to_string()),
+            scope_constraints: vec!["tool:file_read".to_string()],
+        }
+    }
+
+    fn make_receipt_extension() -> ReceiptExtension {
+        ReceiptExtension {
+            namespace: "security.audit".to_string(),
+            must_understand: true,
+            payload: serde_json::json!({
+                "reviewer": "kernel",
+                "level": "strict"
+            }),
+        }
+    }
+
+    fn make_receipt_v3_body(
+        kp: &Keypair,
+        receipt_kind: ReceiptKind,
+        boundary_class: BoundaryClass,
+        decision: Option<Decision>,
+        observation_outcome: Option<ObservationOutcome>,
+        extensions: &[ReceiptExtension],
+    ) -> ReceiptV3BodyHashInput {
+        ReceiptV3BodyHashInput {
+            schema: CHIO_RECEIPT_V3_SCHEMA.to_string(),
+            timestamp: 1710000000,
+            capability_id: Some("cap-001".to_string()),
+            tool_server: "srv-files".to_string(),
+            tool_name: "file_read".to_string(),
+            action: make_action(),
+            receipt_kind,
+            boundary_class,
+            decision,
+            observation_outcome,
+            content_hash: sha256_hex(br#"{"ok":true}"#),
+            policy_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+                .to_string(),
+            evidence: vec![GuardEvidence {
+                guard_name: "ForbiddenPathGuard".to_string(),
+                verdict: true,
+                details: None,
+            }],
+            metadata: None,
+            tool_origin: ToolOrigin::CallerExecuted,
+            redaction_mode: RedactionMode::Summary,
+            actor_chain: vec![make_actor_ref()],
+            trust_level: TrustLevel::Mediated,
+            tenant_id: None,
+            chain_id: "chain-1".to_string(),
+            parent_receipt_ids: Vec::new(),
+            parent_set_hash: parent_set_hash(&[]).unwrap(),
+            dag_ordinal: 0,
+            hlc: ReceiptHybridLogicalClock {
+                wall_seconds: 1710000000,
+                logical: 0,
+                kernel_id: "kernel-a".to_string(),
+            },
+            must_understand_extensions: extensions
+                .iter()
+                .filter(|extension| extension.must_understand)
+                .map(|extension| extension.namespace.clone())
+                .collect(),
+            extensions_hash: receipt_v3_extensions_hash(extensions).unwrap(),
+            kernel_key: kp.public_key(),
+        }
+    }
+
     fn make_economic_authorization_receipt_metadata() -> EconomicAuthorizationReceiptMetadata {
         EconomicAuthorizationReceiptMetadata {
             version: EconomicAuthorizationReceiptMetadataVersion::V1,
@@ -1915,6 +2716,117 @@ mod tests {
         let child = ChioReceiptV2::sign("rcpt_child", child_body, &kp).unwrap();
 
         assert!(verify_receipt_v2_dag(&child, &[parent]).is_err());
+    }
+
+    #[test]
+    fn receipt_v3_mediated_decision_signs_and_verifies() {
+        let kp = Keypair::generate();
+        let extensions = vec![make_receipt_extension()];
+        let body = make_receipt_v3_body(
+            &kp,
+            ReceiptKind::MediatedDecision,
+            BoundaryClass::Prevent,
+            Some(Decision::Allow),
+            None,
+            &extensions,
+        );
+        let receipt = ChioReceiptV3::sign("rcpt-v3-001", body, extensions, &kp).unwrap();
+
+        assert!(receipt.verify_signature().unwrap());
+        assert_eq!(receipt.semantic_kind(), ReceiptKind::MediatedDecision);
+        assert_eq!(receipt.decision_kind(), Some("allow"));
+        assert_eq!(receipt.display_result(), ReceiptDisplayResult::Authorized);
+    }
+
+    #[test]
+    fn receipt_v3_rejects_trace_or_advisory_with_decision() {
+        let kp = Keypair::generate();
+        let extensions = Vec::new();
+        let trace_body = make_receipt_v3_body(
+            &kp,
+            ReceiptKind::TraceObservation,
+            BoundaryClass::DetectOnly,
+            Some(Decision::Allow),
+            Some(ObservationOutcome::Observed),
+            &extensions,
+        );
+        assert!(ChioReceiptV3::sign("rcpt-trace", trace_body, extensions.clone(), &kp).is_err());
+
+        let advisory_body = make_receipt_v3_body(
+            &kp,
+            ReceiptKind::AdvisoryEvaluation,
+            BoundaryClass::AdvisoryOnly,
+            Some(Decision::Deny {
+                reason: "would block".to_string(),
+                guard: "AdvisoryGuard".to_string(),
+            }),
+            Some(ObservationOutcome::WouldDeny),
+            &extensions,
+        );
+        assert!(ChioReceiptV3::sign("rcpt-advisory", advisory_body, extensions, &kp).is_err());
+    }
+
+    #[test]
+    fn receipt_v3_never_downgrades_trace_or_advisory_to_allow_shaped_receipts() {
+        let kp = Keypair::generate();
+        let body = make_receipt_v3_body(
+            &kp,
+            ReceiptKind::TraceObservation,
+            BoundaryClass::DetectOnly,
+            None,
+            Some(ObservationOutcome::Observed),
+            &[],
+        );
+        let trace = ChioReceiptV3::sign("rcpt-trace", body, Vec::new(), &kp).unwrap();
+
+        assert!(downgrade_receipt_v3_to_v2(&trace, "rcpt-trace-v2", &kp,).is_err());
+        assert_eq!(trace.display_result(), ReceiptDisplayResult::Observed);
+    }
+
+    #[test]
+    fn receipt_v3_validates_policy_digest_and_extension_hash() {
+        let kp = Keypair::generate();
+        let extensions = vec![make_receipt_extension()];
+        let mut body = make_receipt_v3_body(
+            &kp,
+            ReceiptKind::MediatedDecision,
+            BoundaryClass::Prevent,
+            Some(Decision::Allow),
+            None,
+            &extensions,
+        );
+        body.policy_digest = body.policy_digest.to_ascii_uppercase();
+        assert!(ChioReceiptV3::sign("rcpt-bad-policy", body, extensions.clone(), &kp).is_err());
+
+        let body = make_receipt_v3_body(
+            &kp,
+            ReceiptKind::MediatedDecision,
+            BoundaryClass::Prevent,
+            Some(Decision::Allow),
+            None,
+            &extensions,
+        );
+        let receipt = ChioReceiptV3::sign("rcpt-v3-002", body, extensions, &kp).unwrap();
+        let mut tampered = receipt.clone();
+        tampered.extensions[0].payload = serde_json::json!({"reviewer": "changed"});
+        assert!(!tampered.verify_signature().unwrap());
+    }
+
+    #[test]
+    fn receipt_v3_rejects_missing_must_understand_extension() {
+        let kp = Keypair::generate();
+        let extensions = vec![make_receipt_extension()];
+        let mut body = make_receipt_v3_body(
+            &kp,
+            ReceiptKind::MediatedDecision,
+            BoundaryClass::Prevent,
+            Some(Decision::Allow),
+            None,
+            &extensions,
+        );
+        body.extensions_hash = receipt_v3_extensions_hash(&[]).unwrap();
+
+        assert!(ChioReceiptV3::sign("rcpt-missing-extension", body, Vec::new(), &kp).is_err());
     }
 
     #[test]

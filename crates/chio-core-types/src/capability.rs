@@ -34,6 +34,15 @@ pub const CHIO_CAPABILITY_V1_SCHEMA: &str = "chio.capability.v1";
 /// Capability-token v2 schema with typed caveats and attenuation witnesses.
 pub const CHIO_CAPABILITY_V2_SCHEMA: &str = "chio.capability.v2";
 
+/// Legacy receipt schema with authorization-shaped decisions only.
+pub const CHIO_RECEIPT_V1_SCHEMA: &str = "chio.receipt.v1";
+
+/// Receipt v2 schema with content-addressed identity.
+pub const CHIO_RECEIPT_V2_SCHEMA: &str = "chio.receipt.v2";
+
+/// Receipt v3 schema with explicit receipt-kind and boundary semantics.
+pub const CHIO_RECEIPT_V3_SCHEMA: &str = "chio.receipt.v3";
+
 /// Total ordering over the known capability-token schema versions.
 ///
 /// The W1.3 schema-ceiling check needs an ordering relation (token schema
@@ -85,6 +94,10 @@ fn capability_v1_schema() -> String {
     CHIO_CAPABILITY_V1_SCHEMA.to_string()
 }
 
+fn receipt_v1_schema() -> String {
+    CHIO_RECEIPT_V1_SCHEMA.to_string()
+}
+
 fn capabilities_schema() -> String {
     CHIO_CAPABILITIES_SCHEMA.to_string()
 }
@@ -105,6 +118,7 @@ fn is_none_or_empty_attenuation_proof(value: &Option<AttenuationProof>) -> bool 
 pub mod capability_features {
     pub const ACCEPTS_CAPABILITY_V2: &str = "accepts_capability_v2";
     pub const ACCEPTS_RECEIPT_V2: &str = "accepts_receipt_v2";
+    pub const ACCEPTS_RECEIPT_V3: &str = "accepts_receipt_v3";
     pub const ACCEPTS_ANCHOR_BATCH_V1: &str = "accepts_anchor_batch_v1";
     pub const ACCEPTS_HYBRID_SIGNATURES: &str = "accepts_hybrid_signatures";
     /// W1.1: opts the peer into the v2 delegation-chain binding rules.
@@ -129,6 +143,8 @@ pub struct CapabilityNegotiation {
     pub features: BTreeMap<String, bool>,
     #[serde(default = "capability_v1_schema")]
     pub max_capability_schema: String,
+    #[serde(default = "receipt_v1_schema")]
+    pub max_receipt_schema: String,
 }
 
 impl Default for CapabilityNegotiation {
@@ -145,6 +161,7 @@ impl CapabilityNegotiation {
             schema: CHIO_CAPABILITIES_SCHEMA.to_string(),
             features: BTreeMap::new(),
             max_capability_schema: CHIO_CAPABILITY_V1_SCHEMA.to_string(),
+            max_receipt_schema: CHIO_RECEIPT_V1_SCHEMA.to_string(),
         }
     }
 
@@ -174,7 +191,19 @@ impl CapabilityNegotiation {
             schema: CHIO_CAPABILITIES_SCHEMA.to_string(),
             features,
             max_capability_schema: CHIO_CAPABILITY_V2_SCHEMA.to_string(),
+            max_receipt_schema: CHIO_RECEIPT_V2_SCHEMA.to_string(),
         }
+    }
+
+    /// Receipt-v3 peer profile layered on top of the T1 defaults.
+    #[must_use]
+    pub fn receipt_v3_default() -> Self {
+        let mut negotiated = Self::t1_default();
+        negotiated
+            .features
+            .insert(capability_features::ACCEPTS_RECEIPT_V3.to_string(), true);
+        negotiated.max_receipt_schema = CHIO_RECEIPT_V3_SCHEMA.to_string();
+        negotiated
     }
 
     /// Return whether a named feature is explicitly advertised.
@@ -197,6 +226,15 @@ impl CapabilityNegotiation {
             return Err(Error::CanonicalJson(format!(
                 "unsupported max capability schema: {}",
                 self.max_capability_schema
+            )));
+        }
+        if !matches!(
+            self.max_receipt_schema.as_str(),
+            CHIO_RECEIPT_V1_SCHEMA | CHIO_RECEIPT_V2_SCHEMA | CHIO_RECEIPT_V3_SCHEMA
+        ) {
+            return Err(Error::CanonicalJson(format!(
+                "unsupported max receipt schema: {}",
+                self.max_receipt_schema
             )));
         }
         for feature in self.features.keys() {
@@ -237,11 +275,53 @@ impl CapabilityNegotiation {
         } else {
             CHIO_CAPABILITY_V1_SCHEMA
         };
+        let local_receipt_rank =
+            receipt_schema_rank(&self.max_receipt_schema).ok_or_else(|| {
+                Error::CanonicalJson(format!(
+                    "unsupported max receipt schema: {}",
+                    self.max_receipt_schema
+                ))
+            })?;
+        let remote_receipt_rank =
+            receipt_schema_rank(&remote.max_receipt_schema).ok_or_else(|| {
+                Error::CanonicalJson(format!(
+                    "unsupported max receipt schema: {}",
+                    remote.max_receipt_schema
+                ))
+            })?;
+        let candidate_receipt_rank = local_receipt_rank.min(remote_receipt_rank);
+        let max_receipt_schema = if candidate_receipt_rank >= 3
+            && features
+                .get(capability_features::ACCEPTS_RECEIPT_V3)
+                .copied()
+                .unwrap_or(false)
+        {
+            CHIO_RECEIPT_V3_SCHEMA
+        } else if candidate_receipt_rank >= 2
+            && features
+                .get(capability_features::ACCEPTS_RECEIPT_V2)
+                .copied()
+                .unwrap_or(false)
+        {
+            CHIO_RECEIPT_V2_SCHEMA
+        } else {
+            CHIO_RECEIPT_V1_SCHEMA
+        };
         Ok(Self {
             schema: CHIO_CAPABILITIES_SCHEMA.to_string(),
             features,
             max_capability_schema: max_capability_schema.to_string(),
+            max_receipt_schema: max_receipt_schema.to_string(),
         })
+    }
+}
+
+fn receipt_schema_rank(schema: &str) -> Option<u8> {
+    match schema {
+        CHIO_RECEIPT_V1_SCHEMA => Some(1),
+        CHIO_RECEIPT_V2_SCHEMA => Some(2),
+        CHIO_RECEIPT_V3_SCHEMA => Some(3),
+        _ => None,
     }
 }
 
@@ -3990,6 +4070,38 @@ mod tests {
                 .copied(),
             Some(false)
         );
+    }
+
+    #[test]
+    fn capability_negotiation_defaults_old_peers_to_receipt_v1() {
+        let legacy_json = serde_json::json!({
+            "schema": CHIO_CAPABILITIES_SCHEMA,
+            "features": {},
+            "maxCapabilitySchema": CHIO_CAPABILITY_V1_SCHEMA
+        });
+        let legacy: CapabilityNegotiation = serde_json::from_value(legacy_json).unwrap();
+
+        assert_eq!(legacy.max_receipt_schema, CHIO_RECEIPT_V1_SCHEMA);
+        let local = CapabilityNegotiation::receipt_v3_default();
+        let negotiated = local.negotiated_with(&legacy).unwrap();
+        assert_eq!(negotiated.max_receipt_schema, CHIO_RECEIPT_V1_SCHEMA);
+        assert!(!negotiated.supports(capability_features::ACCEPTS_RECEIPT_V3));
+    }
+
+    #[test]
+    fn capability_negotiation_intersects_receipt_schema_ceiling() {
+        let local = CapabilityNegotiation::receipt_v3_default();
+        let remote_v3 = CapabilityNegotiation::receipt_v3_default();
+        let negotiated_v3 = local.negotiated_with(&remote_v3).unwrap();
+        assert_eq!(negotiated_v3.max_receipt_schema, CHIO_RECEIPT_V3_SCHEMA);
+
+        let remote_v2 = CapabilityNegotiation::t1_default();
+        let negotiated_v2 = local.negotiated_with(&remote_v2).unwrap();
+        assert_eq!(negotiated_v2.max_receipt_schema, CHIO_RECEIPT_V2_SCHEMA);
+
+        let mut malformed = CapabilityNegotiation::receipt_v3_default();
+        malformed.max_receipt_schema = "chio.receipt.v99".to_string();
+        assert!(local.negotiated_with(&malformed).is_err());
     }
 
     #[test]

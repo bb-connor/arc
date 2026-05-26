@@ -42,7 +42,7 @@ pub use exporters::webhook::{
 };
 pub use manager::{ExporterManager, SiemConfig, SiemError};
 pub use ocsf::{
-    receipt_to_ocsf, OCSF_CATEGORY_NAME, OCSF_CATEGORY_UID, OCSF_CLASS_NAME, OCSF_CLASS_UID,
-    OCSF_PRODUCT_NAME, OCSF_PRODUCT_VENDOR, OCSF_SCHEMA_VERSION,
+    receipt_to_ocsf, siem_event_to_ocsf, OCSF_CATEGORY_NAME, OCSF_CATEGORY_UID, OCSF_CLASS_NAME,
+    OCSF_CLASS_UID, OCSF_PRODUCT_NAME, OCSF_PRODUCT_VENDOR, OCSF_SCHEMA_VERSION,
 };
 pub use ratelimit::{ExportRateLimiter, RateLimitConfig, RateLimitConfigError};

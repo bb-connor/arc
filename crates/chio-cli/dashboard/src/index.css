@@ -16,6 +16,10 @@
   --color-deny-bg: #fee2e2;
   --color-cancelled: #d97706;
   --color-cancelled-bg: #fef3c7;
+  --color-observed: #2563eb;
+  --color-observed-bg: #dbeafe;
+  --color-advisory: #7c3aed;
+  --color-advisory-bg: #ede9fe;
   --color-incomplete: #6b7280;
   --color-incomplete-bg: #f3f4f6;
   --sidebar-width: 280px;
@@ -397,6 +401,8 @@ html, body, #root {
 .badge-allow { color: var(--color-allow); background: var(--color-allow-bg); }
 .badge-deny { color: var(--color-deny); background: var(--color-deny-bg); }
 .badge-cancelled { color: var(--color-cancelled); background: var(--color-cancelled-bg); }
+.badge-observed { color: var(--color-observed); background: var(--color-observed-bg); }
+.badge-advisory { color: var(--color-advisory); background: var(--color-advisory-bg); }
 .badge-incomplete { color: var(--color-incomplete); background: var(--color-incomplete-bg); }
 
 /* Pagination */

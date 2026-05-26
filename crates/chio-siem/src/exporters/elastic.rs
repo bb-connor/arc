@@ -156,7 +156,7 @@ impl Exporter for ElasticsearchExporter {
 
             // Build NDJSON body: for each event, two lines:
             //   Line 1: action -- {"index": {"_index": "<index>", "_id": "<receipt.id>"}}
-            //   Line 2: document -- full receipt JSON
+            //   Line 2: document -- full SIEM event JSON
             // Every line (including the last) must end with '\n'.
             let mut body = String::new();
             for ev in events {
@@ -169,7 +169,7 @@ impl Exporter for ElasticsearchExporter {
                 body.push_str(&action.to_string());
                 body.push('\n');
 
-                let doc = serde_json::to_string(&ev.receipt).map_err(|e| {
+                let doc = serde_json::to_string(ev).map_err(|e| {
                     ExportError::SerializationError(format!(
                         "failed to serialize receipt {}: {e}",
                         ev.receipt.id

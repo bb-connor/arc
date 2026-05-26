@@ -11,6 +11,8 @@ const EMPTY_FILTERS: Filters = {
   toolServer: '',
   toolName: '',
   outcome: '',
+  receiptKind: '',
+  boundaryClass: '',
   since: undefined,
   until: undefined,
 }
@@ -104,6 +106,35 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
           <option value="deny">Deny</option>
           <option value="cancelled">Cancelled</option>
           <option value="incomplete">Incomplete</option>
+        </select>
+      </div>
+
+      <div className="filter-group">
+        <label htmlFor="filter-kind">Kind</label>
+        <select
+          id="filter-kind"
+          value={filters.receiptKind ?? ''}
+          onChange={(e) => set('receiptKind', e.target.value as Filters['receiptKind'])}
+        >
+          <option value="">All</option>
+          <option value="mediated_decision">Mediated Decision</option>
+          <option value="trace_observation">Trace Observation</option>
+          <option value="advisory_evaluation">Advisory Evaluation</option>
+        </select>
+      </div>
+
+      <div className="filter-group">
+        <label htmlFor="filter-boundary">Boundary</label>
+        <select
+          id="filter-boundary"
+          value={filters.boundaryClass ?? ''}
+          onChange={(e) => set('boundaryClass', e.target.value as Filters['boundaryClass'])}
+        >
+          <option value="">All</option>
+          <option value="prevent">Prevent</option>
+          <option value="detect_only">Detect Only</option>
+          <option value="advisory_only">Advisory Only</option>
+          <option value="cannot_see">Cannot See</option>
         </select>
       </div>
 

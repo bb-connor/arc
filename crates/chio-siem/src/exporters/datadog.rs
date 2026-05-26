@@ -196,12 +196,13 @@ impl DatadogExporter {
 
         for ev in events {
             let receipt = &ev.receipt;
-            let (allow, guard_label, reason) = match &receipt.decision {
+            let (legacy_allow, guard_label, reason) = match &receipt.decision {
                 Decision::Allow => (true, "allow", "chio.receipt".to_string()),
                 Decision::Deny { reason, guard } => (false, guard.as_str(), reason.clone()),
                 Decision::Cancelled { reason } => (false, "cancelled", reason.clone()),
                 Decision::Incomplete { reason } => (false, "incomplete", reason.clone()),
             };
+            let allow = legacy_allow && ev.result == "authorized";
             let reason = redact_for_operator_log(reason);
 
             let severity = derive_severity(receipt);
@@ -217,7 +218,15 @@ impl DatadogExporter {
                 "severity:{}",
                 sanitize_tag_value(severity.as_tag())
             ));
-            tags.push(format!("outcome:{}", if allow { "allow" } else { "deny" }));
+            tags.push(format!("outcome:{}", sanitize_tag_value(&ev.result)));
+            tags.push(format!(
+                "receipt_kind:{}",
+                sanitize_tag_value(&ev.receipt_kind)
+            ));
+            tags.push(format!(
+                "boundary_class:{}",
+                sanitize_tag_value(&ev.boundary_class)
+            ));
 
             for guard in &receipt.evidence {
                 tags.push(format!(
@@ -226,7 +235,7 @@ impl DatadogExporter {
                 ));
             }
 
-            let event_json = serde_json::to_value(receipt).map_err(|e| {
+            let event_json = serde_json::to_value(ev).map_err(|e| {
                 ExportError::SerializationError(format!(
                     "failed to serialize receipt {}: {e}",
                     receipt.id

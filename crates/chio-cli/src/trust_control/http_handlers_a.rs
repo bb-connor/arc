@@ -2487,6 +2487,8 @@ async fn handle_query_receipts(
         tool_server: query.tool_server.clone(),
         tool_name: query.tool_name.clone(),
         outcome: query.outcome.clone(),
+        receipt_kind: query.receipt_kind.clone(),
+        boundary_class: query.boundary_class.clone(),
         since: query.since,
         until: query.until,
         min_cost: query.min_cost,
@@ -2509,7 +2511,7 @@ async fn handle_query_receipts(
     let receipts = match result
         .receipts
         .into_iter()
-        .map(|stored| serde_json::to_value(stored.receipt))
+        .map(|stored| receipt_query_response_value(stored.receipt))
         .collect::<Result<Vec<_>, _>>()
     {
         Ok(receipts) => receipts,

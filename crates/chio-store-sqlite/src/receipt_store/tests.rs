@@ -12,16 +12,19 @@ use chio_core::capability::{
 use chio_core::crypto::Keypair;
 use chio_core::merkle::MerkleTree;
 use chio_core::receipt::{
-    ChildRequestReceipt, ChildRequestReceiptBody, ChioReceipt, ChioReceiptBody, Decision,
+    parent_set_hash, receipt_v3_extensions_hash, ActorRef, BoundaryClass, ChildRequestReceipt,
+    ChildRequestReceiptBody, ChioReceipt, ChioReceiptBody, ChioReceiptV3, Decision,
     EconomicAmountBoundsReceiptMetadata, EconomicAuthorizationMode,
     EconomicAuthorizationReceiptMetadata, EconomicAuthorizationReceiptMetadataVersion,
     EconomicBudgetReceiptMetadata, EconomicMerchantReceiptMetadata,
     EconomicMeteringReceiptMetadata, EconomicPayeeReceiptMetadata, EconomicPayerReceiptMetadata,
     EconomicPricingBasisReceiptMetadata, EconomicRailReceiptMetadata,
     EconomicSettlementReceiptMetadata, FinancialReceiptMetadata, GovernedApprovalReceiptMetadata,
-    GovernedTransactionReceiptMetadata, MeteredBillingReceiptMetadata, ReceiptAttributionMetadata,
-    ReceiptLineageEndpoints, ReceiptLineageRelationKind, ReceiptLineageStatement,
-    ReceiptLineageStatementBody, SettlementStatus, SignedExportEnvelope, ToolCallAction,
+    GovernedTransactionReceiptMetadata, MeteredBillingReceiptMetadata, ObservationOutcome,
+    ReceiptAttributionMetadata, ReceiptHybridLogicalClock, ReceiptKind, ReceiptLineageEndpoints,
+    ReceiptLineageRelationKind, ReceiptLineageStatement, ReceiptLineageStatementBody,
+    ReceiptV3BodyHashInput, RedactionMode, SettlementStatus, SignedExportEnvelope, ToolCallAction,
+    ToolOrigin,
 };
 use chio_core::session::{
     OperationKind, OperationTerminalState, RequestId, SessionAnchorReference, SessionId,
@@ -121,6 +124,58 @@ fn valid_tool_action(parameters: serde_json::Value) -> ToolCallAction {
     ToolCallAction::from_parameters(parameters).test_unwrap()
 }
 
+fn sample_receipt_v3(
+    receipt_id: &str,
+    receipt_kind: ReceiptKind,
+    boundary_class: BoundaryClass,
+    decision: Option<Decision>,
+    observation_outcome: Option<ObservationOutcome>,
+) -> ChioReceiptV3 {
+    let keypair = Keypair::generate();
+    let extensions = Vec::new();
+    let body = ReceiptV3BodyHashInput {
+        schema: chio_core::receipt::CHIO_RECEIPT_V3_SCHEMA.to_string(),
+        timestamp: 3,
+        capability_id: Some("cap-v3".to_string()),
+        tool_server: "shell".to_string(),
+        tool_name: "bash".to_string(),
+        action: valid_tool_action(serde_json::json!({"cmd": "true"})),
+        receipt_kind,
+        boundary_class,
+        decision,
+        observation_outcome,
+        content_hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+            .to_string(),
+        policy_digest: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+            .to_string(),
+        evidence: Vec::new(),
+        metadata: None,
+        tool_origin: ToolOrigin::CallerExecuted,
+        redaction_mode: RedactionMode::Summary,
+        actor_chain: vec![ActorRef {
+            actor_id: "did:example:agent".to_string(),
+            actor_kind: "agent".to_string(),
+            actor_token_jti: None,
+            scope_constraints: Vec::new(),
+        }],
+        trust_level: chio_core::TrustLevel::Mediated,
+        tenant_id: None,
+        chain_id: "chain-v3".to_string(),
+        parent_receipt_ids: Vec::new(),
+        parent_set_hash: parent_set_hash(&[]).test_unwrap(),
+        dag_ordinal: 0,
+        hlc: ReceiptHybridLogicalClock {
+            wall_seconds: 3,
+            logical: 0,
+            kernel_id: "kernel-v3".to_string(),
+        },
+        must_understand_extensions: Vec::new(),
+        extensions_hash: receipt_v3_extensions_hash(&extensions).test_unwrap(),
+        kernel_key: keypair.public_key(),
+    };
+    ChioReceiptV3::sign(receipt_id, body, extensions, &keypair).test_unwrap()
+}
+
 fn sample_child_receipt() -> ChildRequestReceipt {
     let keypair = Keypair::generate();
     ChildRequestReceipt::sign(
@@ -158,6 +213,82 @@ fn sqlite_receipt_store_persists_across_reopen() {
     let reopened = SqliteReceiptStore::open(&path).test_unwrap();
     assert_eq!(reopened.tool_receipt_count().test_unwrap(), 1);
     assert_eq!(reopened.child_receipt_count().test_unwrap(), 1);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn sqlite_receipt_store_persists_receipt_v3_semantic_columns() {
+    let path = unique_db_path("chio-receipts-v3");
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
+    let mediated = sample_receipt_v3(
+        "rcpt-v3-mediated",
+        ReceiptKind::MediatedDecision,
+        BoundaryClass::Prevent,
+        Some(Decision::Allow),
+        None,
+    );
+    let trace = sample_receipt_v3(
+        "rcpt-v3-trace",
+        ReceiptKind::TraceObservation,
+        BoundaryClass::DetectOnly,
+        None,
+        Some(ObservationOutcome::Observed),
+    );
+
+    let mediated_seq = store
+        .append_chio_receipt_v3_internal(&mediated)
+        .test_unwrap();
+    store.append_chio_receipt_v3_internal(&trace).test_unwrap();
+
+    assert!(store
+        .contains_chio_receipt_v3_body_hash_internal(&mediated.body_hash)
+        .test_unwrap());
+    let loaded = store
+        .load_chio_receipt_v3_body_hash_internal(&mediated.body_hash)
+        .test_unwrap()
+        .test_expect("load v3 receipt");
+    assert_eq!(loaded.seq, mediated_seq);
+    assert_eq!(loaded.receipt.body_hash, mediated.body_hash);
+    assert!(store.append_chio_receipt_v3_internal(&mediated).is_err());
+
+    let connection = store.connection().test_unwrap();
+    let (receipt_kind, decision_kind, boundary_class, observation_outcome): (
+        String,
+        Option<String>,
+        String,
+        Option<String>,
+    ) = connection
+        .query_row(
+            r#"
+            SELECT receipt_kind, decision_kind, boundary_class, observation_outcome
+            FROM chio_receipts_v3
+            WHERE seq = ?1
+            "#,
+            rusqlite::params![mediated_seq as i64],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .test_unwrap();
+    assert_eq!(receipt_kind, "mediated_decision");
+    assert_eq!(decision_kind.as_deref(), Some("allow"));
+    assert_eq!(boundary_class, "prevent");
+    assert!(observation_outcome.is_none());
+
+    let trace_columns: (String, Option<String>, String, Option<String>) = connection
+        .query_row(
+            r#"
+            SELECT receipt_kind, decision_kind, boundary_class, observation_outcome
+            FROM chio_receipts_v3
+            WHERE body_hash = ?1
+            "#,
+            rusqlite::params![trace.body_hash.as_str()],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .test_unwrap();
+    assert_eq!(trace_columns.0, "trace_observation");
+    assert!(trace_columns.1.is_none());
+    assert_eq!(trace_columns.2, "detect_only");
+    assert_eq!(trace_columns.3.as_deref(), Some("observed"));
 
     let _ = fs::remove_file(path);
 }

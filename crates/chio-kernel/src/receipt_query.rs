@@ -15,6 +15,12 @@ pub struct ReceiptQuery {
     /// Filter by decision outcome (maps to decision_kind column:
     /// "allow", "deny", "cancelled", "incomplete").
     pub outcome: Option<String>,
+    /// Filter by semantic receipt kind. Legacy v1/v2 tool receipts are
+    /// treated as "mediated_decision" for compatibility.
+    pub receipt_kind: Option<String>,
+    /// Filter by runtime boundary class. Legacy v1/v2 tool receipts are
+    /// treated as "prevent" for compatibility.
+    pub boundary_class: Option<String>,
     /// Include only receipts with timestamp >= since (Unix seconds, inclusive).
     pub since: Option<u64>,
     /// Include only receipts with timestamp <= until (Unix seconds, inclusive).

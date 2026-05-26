@@ -46,10 +46,10 @@ impl CefExporter {
 
     pub fn format_event(&self, event: &SiemEvent) -> Result<String, ExportError> {
         let receipt = &event.receipt;
-        let decision = decision_label(&receipt.decision);
-        let signature_id = signature_id(&receipt.decision);
-        let name = event_name(&receipt.decision);
-        let severity = severity(&receipt.decision);
+        let decision = event_action(event);
+        let signature_id = signature_id(event);
+        let name = event_name(event);
+        let severity = severity(event);
         let reason = reason_code(&receipt.decision);
         let tenant_id = receipt
             .tenant_id
@@ -95,6 +95,9 @@ impl CefExporter {
             ("cs6", redaction_status.to_string()),
             ("flexString1Label", "checkpoint_id".to_string()),
             ("flexString1", checkpoint_id.to_string()),
+            ("receipt_kind", event.receipt_kind.clone()),
+            ("boundary_class", event.boundary_class.clone()),
+            ("result", event.result.clone()),
         ]
         .into_iter()
         .map(|(key, value)| format!("{key}={}", escape_extension(&value)))
@@ -133,21 +136,39 @@ fn decision_label(decision: &Decision) -> &'static str {
     }
 }
 
-fn signature_id(decision: &Decision) -> &str {
-    match decision {
-        Decision::Allow => "chio.allow",
-        Decision::Deny { guard, .. } => guard.as_str(),
-        Decision::Cancelled { .. } => "chio.cancelled",
-        Decision::Incomplete { .. } => "chio.incomplete",
+fn event_action(event: &SiemEvent) -> &'static str {
+    match event.result.as_str() {
+        "authorized" => "allow",
+        "denied" => "deny",
+        "cancelled" => "cancelled",
+        "observed" => "observed",
+        "advisory" => "advisory",
+        _ => decision_label(&event.receipt.decision),
     }
 }
 
-fn event_name(decision: &Decision) -> &'static str {
-    match decision {
-        Decision::Allow => "Chio allow",
-        Decision::Deny { .. } => "Chio guard deny",
-        Decision::Cancelled { .. } => "Chio cancelled",
-        Decision::Incomplete { .. } => "Chio incomplete",
+fn signature_id(event: &SiemEvent) -> &str {
+    match event.result.as_str() {
+        "authorized" => "chio.authorized",
+        "observed" => "chio.observed",
+        "advisory" => "chio.advisory",
+        "denied" => match &event.receipt.decision {
+            Decision::Deny { guard, .. } => guard.as_str(),
+            _ => "chio.denied",
+        },
+        "cancelled" => "chio.cancelled",
+        _ => "chio.incomplete",
+    }
+}
+
+fn event_name(event: &SiemEvent) -> &'static str {
+    match event.result.as_str() {
+        "authorized" => "Chio authorized",
+        "denied" => "Chio guard deny",
+        "cancelled" => "Chio cancelled",
+        "observed" => "Chio observed",
+        "advisory" => "Chio advisory",
+        _ => "Chio incomplete",
     }
 }
 
@@ -160,12 +181,13 @@ fn reason_code(decision: &Decision) -> &str {
     }
 }
 
-fn severity(decision: &Decision) -> u8 {
-    match decision {
-        Decision::Allow => 2,
-        Decision::Deny { .. } => 8,
-        Decision::Cancelled { .. } => 4,
-        Decision::Incomplete { .. } => 5,
+fn severity(event: &SiemEvent) -> u8 {
+    match event.result.as_str() {
+        "authorized" => 2,
+        "denied" => 8,
+        "cancelled" => 4,
+        "observed" | "advisory" => 3,
+        _ => 5,
     }
 }
 

@@ -1,6 +1,16 @@
 // Mirror of API response shapes from the Chio receipt query and lineage endpoints.
 
 export type DecisionKind = 'allow' | 'deny' | 'cancelled' | 'incomplete'
+export type ReceiptKind = 'mediated_decision' | 'trace_observation' | 'advisory_evaluation'
+export type BoundaryClass = 'prevent' | 'detect_only' | 'advisory_only' | 'cannot_see'
+export type ReceiptResult =
+  | 'authorized'
+  | 'denied'
+  | 'cancelled'
+  | 'incomplete'
+  | 'observed'
+  | 'advisory'
+  | 'unknown'
 
 export interface FinancialMetadata {
   grant_index: number
@@ -46,6 +56,9 @@ export interface Receipt {
   action: ReceiptAction
   decision: ReceiptDecision
   metadata?: ReceiptMetadata
+  receiptKind?: ReceiptKind
+  boundaryClass?: BoundaryClass
+  result?: ReceiptResult
 }
 
 export interface ReceiptQueryResponse {
@@ -563,6 +576,8 @@ export interface Filters {
   toolServer?: string
   toolName?: string
   outcome?: DecisionKind | ''
+  receiptKind?: ReceiptKind | ''
+  boundaryClass?: BoundaryClass | ''
   since?: number
   until?: number
 }
@@ -589,6 +604,26 @@ export function decisionKind(decision: ReceiptDecision): DecisionKind {
   if (typeof decision === 'object' && 'deny' in decision) return 'deny'
   if (typeof decision === 'object' && 'cancelled' in decision) return 'cancelled'
   return 'incomplete'
+}
+
+export function semanticReceiptKind(receipt: Receipt): ReceiptKind {
+  return receipt.receiptKind ?? 'mediated_decision'
+}
+
+export function semanticBoundaryClass(receipt: Receipt): BoundaryClass {
+  return receipt.boundaryClass ?? 'prevent'
+}
+
+export function semanticResult(receipt: Receipt): ReceiptResult {
+  if (receipt.result) return receipt.result
+  const kind = decisionKind(receipt.decision)
+  if (kind === 'allow') return 'authorized'
+  if (kind === 'deny') return 'denied'
+  return kind
+}
+
+export function semanticLabel(value: string): string {
+  return value.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')
 }
 
 /**

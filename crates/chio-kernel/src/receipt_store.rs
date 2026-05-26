@@ -3,6 +3,7 @@ use chio_core::capability::CapabilityToken;
 use chio_core::credit::CreditBondRow;
 use chio_core::receipt::{ChildRequestReceipt, ChioReceipt};
 use chio_core_types::receipt::ChioReceiptV2;
+use chio_core_types::receipt::ChioReceiptV3;
 
 use crate::capability_lineage::CapabilitySnapshot;
 use crate::checkpoint::KernelCheckpoint;
@@ -125,6 +126,37 @@ pub trait ReceiptStore: Send + Sync {
         _body_hash: &str,
     ) -> Result<bool, ReceiptStoreError> {
         Ok(false)
+    }
+
+    /// Returns true when this store durably persists v3 receipts with
+    /// semantic receipt kind and boundary columns.
+    fn supports_chio_receipt_v3(&self) -> bool {
+        false
+    }
+
+    /// Persist a v3 receipt keyed on `body_hash`.
+    ///
+    /// Implementations that do not support v3 storage return `Ok(0)`.
+    /// Kernels must reject v3-required dispatches unless
+    /// [`ReceiptStore::supports_chio_receipt_v3`] is true.
+    fn append_chio_receipt_v3(&self, _receipt: &ChioReceiptV3) -> Result<u64, ReceiptStoreError> {
+        Ok(0)
+    }
+
+    /// Replay-detection probe for a v3 receipt body_hash.
+    fn contains_chio_receipt_v3_body_hash(
+        &self,
+        _body_hash: &str,
+    ) -> Result<bool, ReceiptStoreError> {
+        Ok(false)
+    }
+
+    /// Load a v3 receipt by authoritative `body_hash`.
+    fn load_chio_receipt_v3_body_hash(
+        &self,
+        _body_hash: &str,
+    ) -> Result<Option<StoredReceiptV3>, ReceiptStoreError> {
+        Ok(None)
     }
 
     fn receipts_canonical_bytes_range(
@@ -279,6 +311,12 @@ pub struct StoredToolReceipt {
 pub struct StoredChildReceipt {
     pub seq: u64,
     pub receipt: ChildRequestReceipt,
+}
+
+#[derive(Debug, Clone)]
+pub struct StoredReceiptV3 {
+    pub seq: u64,
+    pub receipt: ChioReceiptV3,
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq, Eq)]

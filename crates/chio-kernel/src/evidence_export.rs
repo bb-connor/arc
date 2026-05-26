@@ -247,6 +247,8 @@ impl EvidenceExportQuery {
             tool_server: None,
             tool_name: None,
             outcome: None,
+            receipt_kind: None,
+            boundary_class: None,
             since: self.since,
             until: self.until,
             min_cost: None,

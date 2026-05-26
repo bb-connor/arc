@@ -11,8 +11,9 @@ use chio_core::canonical::{canonical_json_bytes, CanonicalBytes};
 use chio_core::capability::{CapabilityToken, ChioScope};
 use chio_core::crypto::{sha256_hex, Signature};
 use chio_core::receipt::{
-    ChildRequestReceipt, ChioReceipt, Decision, FinancialReceiptMetadata,
-    GovernedTransactionReceiptMetadata, ReceiptAttributionMetadata, SettlementStatus,
+    ChildRequestReceipt, ChioReceipt, ChioReceiptV3, Decision, FinancialReceiptMetadata,
+    GovernedTransactionReceiptMetadata, ObservationOutcome, ReceiptAttributionMetadata,
+    SettlementStatus,
 };
 use chio_core::session::OperationTerminalState;
 use chio_kernel::checkpoint::{KernelCheckpoint, KernelCheckpointBody};
@@ -75,7 +76,7 @@ use chio_kernel::{
     SignedLiabilityClaimResponse, SignedLiabilityClaimSettlementInstruction,
     SignedLiabilityClaimSettlementReceipt, SignedLiabilityPlacement,
     SignedLiabilityPricingAuthority, SignedLiabilityProvider, SignedLiabilityQuoteRequest,
-    SignedLiabilityQuoteResponse, SignedUnderwritingDecision, StoredChildReceipt,
+    SignedLiabilityQuoteResponse, SignedUnderwritingDecision, StoredChildReceipt, StoredReceiptV3,
     StoredToolReceipt, UnderwritingAppealCreateRequest, UnderwritingAppealRecord,
     UnderwritingAppealResolution, UnderwritingAppealResolveRequest, UnderwritingAppealStatus,
     UnderwritingDecisionLifecycleState, UnderwritingDecisionListReport,
@@ -476,6 +477,118 @@ impl SqliteReceiptStore {
             )
             .optional()?;
         Ok(row.is_some())
+    }
+
+    /// Append a v3 receipt keyed on `body_hash` with semantic read columns.
+    pub fn append_chio_receipt_v3_internal(
+        &self,
+        receipt: &ChioReceiptV3,
+    ) -> Result<u64, ReceiptStoreError> {
+        if !receipt
+            .verify_signature()
+            .map_err(|e| ReceiptStoreError::Canonical(e.to_string()))?
+        {
+            return Err(ReceiptStoreError::Canonical(
+                "receipt v3 signature verification failed".into(),
+            ));
+        }
+        let raw_json = serde_json::to_string(receipt)?;
+        let extensions_json = serde_json::to_string(&receipt.extensions)?;
+        let timestamp = sqlite_i64(receipt.body.timestamp, "v3 receipt timestamp")?;
+        let dag_ordinal = sqlite_i64(receipt.body.dag_ordinal, "v3 receipt dag_ordinal")?;
+        let decision_kind = receipt.body.decision.as_ref().map(decision_kind);
+        let observation_outcome = receipt
+            .body
+            .observation_outcome
+            .map(ObservationOutcome::as_str);
+        let connection = self.connection()?;
+        let inserted_seq = connection
+            .query_row(
+                r#"
+                INSERT INTO chio_receipts_v3 (
+                    body_hash, receipt_id, timestamp, capability_id,
+                    tool_server, tool_name, receipt_kind, decision_kind,
+                    boundary_class, observation_outcome, policy_digest,
+                    content_hash, chain_id, dag_ordinal, tenant_id,
+                    raw_json, extensions_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(body_hash) DO NOTHING
+                RETURNING seq
+                "#,
+                params![
+                    receipt.body_hash.as_str(),
+                    receipt.receipt_id.as_str(),
+                    timestamp,
+                    receipt.body.capability_id.as_deref(),
+                    receipt.body.tool_server.as_str(),
+                    receipt.body.tool_name.as_str(),
+                    receipt.body.receipt_kind.as_str(),
+                    decision_kind,
+                    receipt.body.boundary_class.as_str(),
+                    observation_outcome,
+                    receipt.body.policy_digest.as_str(),
+                    receipt.body.content_hash.as_str(),
+                    receipt.body.chain_id.as_str(),
+                    dag_ordinal,
+                    receipt.body.tenant_id.as_deref(),
+                    raw_json,
+                    extensions_json,
+                ],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()?;
+        match inserted_seq {
+            Some(seq) => sqlite_u64(seq, "v3 receipt seq"),
+            None => Err(ReceiptStoreError::Conflict(format!(
+                "v3 receipt replay rejected: body_hash {} already exists",
+                receipt.body_hash
+            ))),
+        }
+    }
+
+    pub fn contains_chio_receipt_v3_body_hash_internal(
+        &self,
+        body_hash: &str,
+    ) -> Result<bool, ReceiptStoreError> {
+        let connection = self.connection()?;
+        let row: Option<i64> = connection
+            .query_row(
+                "SELECT 1 FROM chio_receipts_v3 WHERE body_hash = ?1",
+                params![body_hash],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()?;
+        Ok(row.is_some())
+    }
+
+    pub fn load_chio_receipt_v3_body_hash_internal(
+        &self,
+        body_hash: &str,
+    ) -> Result<Option<StoredReceiptV3>, ReceiptStoreError> {
+        let connection = self.connection()?;
+        let row = connection
+            .query_row(
+                "SELECT seq, raw_json FROM chio_receipts_v3 WHERE body_hash = ?1",
+                params![body_hash],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+            )
+            .optional()?;
+        let Some((seq, raw_json)) = row else {
+            return Ok(None);
+        };
+        let receipt: ChioReceiptV3 = serde_json::from_str(&raw_json)?;
+        if !receipt
+            .verify_signature()
+            .map_err(|e| ReceiptStoreError::Canonical(e.to_string()))?
+        {
+            return Err(ReceiptStoreError::Canonical(
+                "persisted receipt v3 signature verification failed".into(),
+            ));
+        }
+        Ok(Some(StoredReceiptV3 {
+            seq: sqlite_u64(seq, "v3 receipt seq")?,
+            receipt,
+        }))
     }
 }
 

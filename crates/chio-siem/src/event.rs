@@ -14,6 +14,13 @@ pub struct SiemEvent {
     pub receipt: ChioReceipt,
     /// Financial metadata extracted from `receipt.metadata["financial"]`, if present.
     pub financial: Option<FinancialReceiptMetadata>,
+    /// Semantic receipt kind. Legacy receipts default to mediated decisions
+    /// unless their trust level marks them advisory.
+    pub receipt_kind: String,
+    /// Runtime boundary class used by downstream authorization mapping.
+    pub boundary_class: String,
+    /// Human-facing result label. Only mediated/prevent/allow is authorized.
+    pub result: String,
 }
 
 impl SiemEvent {
@@ -29,6 +36,13 @@ impl SiemEvent {
             .and_then(|meta| meta.get("financial"))
             .and_then(|val| serde_json::from_value::<FinancialReceiptMetadata>(val.clone()).ok());
 
-        Self { receipt, financial }
+        let view = receipt.semantic_view();
+        Self {
+            receipt,
+            financial,
+            receipt_kind: view.receipt_kind.as_str().to_string(),
+            boundary_class: view.boundary_class.as_str().to_string(),
+            result: view.result.as_str().to_string(),
+        }
     }
 }

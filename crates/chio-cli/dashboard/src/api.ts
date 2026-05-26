@@ -83,6 +83,8 @@ export async function fetchReceipts(
     toolServer: filters.toolServer,
     toolName: filters.toolName,
     outcome: filters.outcome || undefined,
+    receiptKind: filters.receiptKind || undefined,
+    boundaryClass: filters.boundaryClass || undefined,
     since: filters.since,
     until: filters.until,
     cursor: cursor ?? undefined,

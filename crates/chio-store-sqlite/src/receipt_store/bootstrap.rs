@@ -535,6 +535,48 @@ impl SqliteReceiptStore {
             CREATE INDEX IF NOT EXISTS idx_chio_receipts_v2_capability
                 ON chio_receipts_v2(capability_id);
 
+            -- Receipt v3 stores explicit semantic columns so dashboards and
+            -- exporters can distinguish mediated authorization from trace or
+            -- advisory evidence without reparsing raw signed payloads.
+            CREATE TABLE IF NOT EXISTS chio_receipts_v3 (
+                seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                body_hash TEXT NOT NULL UNIQUE,
+                receipt_id TEXT NOT NULL,
+                timestamp INTEGER NOT NULL,
+                capability_id TEXT,
+                tool_server TEXT NOT NULL,
+                tool_name TEXT NOT NULL,
+                receipt_kind TEXT NOT NULL,
+                decision_kind TEXT,
+                boundary_class TEXT NOT NULL,
+                observation_outcome TEXT,
+                policy_digest TEXT NOT NULL,
+                content_hash TEXT NOT NULL,
+                chain_id TEXT NOT NULL,
+                dag_ordinal INTEGER NOT NULL,
+                tenant_id TEXT,
+                raw_json TEXT NOT NULL,
+                extensions_json TEXT NOT NULL,
+                CHECK (receipt_kind IN ('mediated_decision', 'trace_observation', 'advisory_evaluation')),
+                CHECK (boundary_class IN ('prevent', 'detect_only', 'advisory_only', 'cannot_see')),
+                CHECK (decision_kind IS NULL OR decision_kind IN ('allow', 'deny', 'cancelled', 'incomplete')),
+                CHECK (observation_outcome IS NULL OR observation_outcome IN ('observed', 'failed', 'redacted', 'would_allow', 'would_deny', 'unknown')),
+                CHECK (
+                    (receipt_kind = 'mediated_decision' AND decision_kind IS NOT NULL AND observation_outcome IS NULL)
+                    OR
+                    (receipt_kind <> 'mediated_decision' AND decision_kind IS NULL AND observation_outcome IS NOT NULL)
+                )
+            );
+            CREATE INDEX IF NOT EXISTS idx_chio_receipts_v3_receipt_id
+                ON chio_receipts_v3(receipt_id);
+            CREATE INDEX IF NOT EXISTS idx_chio_receipts_v3_semantic
+                ON chio_receipts_v3(receipt_kind, boundary_class);
+            CREATE INDEX IF NOT EXISTS idx_chio_receipts_v3_capability
+                ON chio_receipts_v3(capability_id)
+                WHERE capability_id IS NOT NULL;
+            CREATE INDEX IF NOT EXISTS idx_chio_receipts_v3_chain
+                ON chio_receipts_v3(chain_id, dag_ordinal);
+
             CREATE TABLE IF NOT EXISTS claim_receipt_log_entries (
                 entry_seq INTEGER PRIMARY KEY AUTOINCREMENT,
                 receipt_id TEXT NOT NULL UNIQUE,
