@@ -4,7 +4,7 @@ A formal-methods plus systems-security paper that conditions receipt admission o
 
 ## Venue
 
-USENIX Security 2027 is the primary target. The September 2026 cycle is the working deadline (full-length 13 page submission, anonymous review). NDSS 2027 (August 2026 deadline) is the backup if peer review schedule slips on the Lean side.
+USENIX Security 2027 is the primary target. Cycle 1, August 25, 2026 is the working deadline (full-length 13 page submission, anonymous review). NDSS 2027 (August 2026 deadline) is the backup if peer review schedule slips on the Lean side.
 
 The decision rests on which threat model the program committees will weight more. USENIX Security publishes systems-security papers with a working adversary; NDSS publishes network-and-distributed-systems papers with a working measurement story. The paper aims at the first reading because its load-bearing claim is about adversarial substrate state, not transport.
 
@@ -42,7 +42,7 @@ On balance: this paper is the better hook for the Bowman / Perez / Grosse / Kapl
 
 ## Synopsis
 
-Every signed receipt produced by an admission kernel embeds a signed claim about which sensors were installed, active, healthy, and degraded at decision time, with dropped-event and deadline-miss counts. The polity's admission predicate is conditioned on this attestation: a receipt whose attestation shows the constitution-required sensor set is healthy is admitted under the receipt-backed mode; a receipt whose attestation shows the required set is not healthy is admitted only under the partition-contingency mode, with explicit reconciliation obligations. Admission under a degraded substrate is structurally distinguishable from admission under a healthy substrate, and the structural distinction is decidable on the attestation field. The headline result is an existence-of-witnesses claim; the supporting results connect the structural distinction to the parent paper's five-mode ladder and to the destructive-admission floor. The retired assumption is the parent paper's "trust-store-honest-by-assumption" row: the substrate now attests its own sensor state, and the verifier's admission predicate evaluates that attestation rather than assuming honesty.
+Every signed receipt produced by an admission kernel embeds a signed claim about which sensors were installed, active, healthy, and degraded at decision time, with dropped-event and deadline-miss counts. The polity's admission predicate is conditioned on this attestation: a receipt whose attestation shows the constitution-required sensor set is healthy is admitted under the receipt-backed mode; a receipt whose attestation shows the required set is not healthy is admitted only under the partition-contingency mode, with explicit reconciliation obligations. Admission under a degraded substrate is structurally distinguishable from admission under a healthy substrate, and the structural distinction is decidable on the attestation field. The headline result is an existence-of-witnesses claim; the supporting results connect the structural distinction to the parent paper's five-mode ladder and to the destructive-admission floor. The parent paper's "trust-store-honest-by-assumption" row is made falsifiable: the substrate now attests its own sensor state, and the verifier's admission predicate evaluates that attestation rather than assuming honesty.
 
 ## Layout
 

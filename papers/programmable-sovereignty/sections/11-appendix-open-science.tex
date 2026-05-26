@@ -1,0 +1,62 @@
+\section{Open Science}
+\label{sec:open-science}
+
+The submission includes an anonymized supplementary package for
+artifact review. Its purpose is to make the formal claims auditable
+without requiring access to any private repository, service account, or
+live deployment.
+
+\subsection{Artifact package}
+\label{sec:open-science:package}
+
+The package contains three machine-readable artifacts. First,
+\path{lean-source.tar.gz} is a self-contained Lean~4 Lake project with
+the checked-in \path{lean-toolchain}, \path{lakefile.lean},
+\path{lake-manifest.json}, the \path{Chio.lean} root module, and the
+\path{Chio/} source tree needed to rebuild the parent-paper proofs.
+Second, \path{proof-manifest.toml} records the theorem names, source
+modules, paper sections, and axiom sets reported for the four
+load-bearing parent-paper theorems. Third,
+\path{theorem-inventory.json} carries the same inventory in JSON form
+for tool consumption.
+
+\subsection{Rebuilding the proofs}
+\label{sec:open-science:rebuild}
+
+With \texttt{elan} installed, a reviewer rebuilds the proof artifact
+with:
+
+\begin{verbatim}
+tar xzf lean-source.tar.gz
+cd chio-lean && lake build
+\end{verbatim}
+
+A cold cache takes approximately three to five minutes. The released
+snapshot builds without warnings, without \texttt{sorry}, and without
+project-local \texttt{axiom} declarations. The four parent-paper
+theorems are:
+\texttt{treaty\_admission\_iff\_predicate\_intersection},
+\texttt{treaty\_admission\_stable\_under\_ladder\_floor},
+\texttt{amendment\_admissible\_iff\_backward\_refinement}, and
+\texttt{amendment\_without\_refinement\_rejected}.
+
+\subsection{Axiom inspection}
+\label{sec:open-science:axioms}
+
+The supplementary README documents how to reproduce the
+\texttt{\#print axioms} output for each theorem. The recorded axiom
+sets contain only Lean kernel axioms: \texttt{propext} for the two
+treaty-stability theorems and no axioms for the two amendment
+refinement theorems. No project-specific axiom is introduced by the
+artifact.
+
+\subsection{Release plan}
+\label{sec:open-science:release}
+
+During double-blind review, the package is anonymized and submitted
+through the artifact channel. In the camera-ready version, the source
+repository and the Lean artifacts will be named publicly, with the same
+responsible caveats stated in the paper: the mechanization covers the
+bounded formal model and the named proof obligations, while runtime
+engineering assumptions, deployment policy choices, and economics-layer
+extensions remain outside the proved kernel.

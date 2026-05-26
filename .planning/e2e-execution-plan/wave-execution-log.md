@@ -218,3 +218,119 @@ All three are conditional on outcomes that do not exist yet:
 - Wave 8 conditional on co-author landings (Anthropic, Walch, FM partner). None have landed; outreach drafts ready but not sent.
 
 The orchestrator does NOT dispatch any of these. They wake on triggers the human controls.
+
+## Research-paper hardening swarm: Wave 0 inventory
+
+Timestamp: 2026-05-19.
+
+Trigger: continuation objective in `08-research-paper-swarm-goal-prompt.md`, covering the six-paper line on PR 684.
+
+Dispatched read-only:
+- Wave 0A New Reader Review across all six paper introductions, abstracts, contributions, and conclusions.
+- Wave 0B Paper-Line Cartographer across cross-paper positioning, duplicate claims, dependency structure, and publication sequence.
+- Wave 0C Build and Artifact Auditor across Makefiles, PDFs, supplementary packages, Lean manifests, theorem inventories, and status claims.
+
+Deliverable landed:
+- `.planning/e2e-execution-plan/09-research-paper-swarm-wave0-priority-queue.md`
+
+Gate result:
+- Wave 0 complete.
+- Highest priority queue: reversible-action is blocked by unmechanized Lean and deployment gaps; parent package needs mandatory appendices or narrowed readiness claims; parent and sensor Makefiles need build-pass failure semantics and tool preflight; sensor checklist is stale against current appendices; bilateral is sequence-sensitive; delegated needs legal review before publication submission.
+
+Next handoff:
+- Dispatch Wave 1 expert adversarial reviews against the Wave 0 queue.
+
+## Research-paper hardening swarm: Wave 1 adversarial expert review
+
+Timestamp: 2026-05-19.
+
+Dispatched read-only:
+- Computer Science Theorist.
+- Cryptography Expert.
+- Formal Methods and Lean Reviewer.
+- Systems Security Reviewer.
+- Distributed Systems Reviewer.
+- Legal and Governance Reviewer.
+- AI Safety Reviewer.
+- Venue and PC Fit Reviewer.
+
+Deliverable landed:
+- `.planning/e2e-execution-plan/10-research-paper-swarm-wave1-synthesis.md`
+
+Gate result:
+- Wave 1 complete.
+- Consensus: freeze or pivot reversible-action until Lean and runtime gates close; treat delegated-emergency-authority as legal-circulation, not submission-ready; repair bilateral schema and formal-claim calibration; repair agentic threat-model overclaims; repair parent and sensor claim calibration; repair USENIX appendix and build-harness packaging.
+
+Next handoff:
+- Dispatch Wave 2 repair agents with disjoint file scopes.
+
+## Research-paper hardening swarm: Wave 2 repair swarm
+
+Timestamp: 2026-05-19.
+
+Dispatched with disjoint write scopes:
+- USENIX packaging and build harness for parent and sensor packages.
+- Bilateral verifier and formal-claim calibration.
+- Agentic claim calibration.
+- Parent and sensor claim calibration.
+
+Deliverables landed:
+- `.planning/e2e-execution-plan/11-research-paper-swarm-wave2-repair-summary.md`
+- `papers/programmable-sovereignty/notes/wave2-repair-memo.md`
+- `papers/sensor-grounded-admission/research/wave2-repair-memo.md`
+- `papers/agentic-tool-safety/research/wave2-repair-memo.md`
+- `papers/bilateral-receipt-admission/research/wave2-repair-memo.md`
+
+Gate result:
+- Wave 2 repair complete for swarm-actionable items.
+- Parent and sensor package gates now fail closed when local TeX and Poppler tools are missing.
+- Bilateral active sections now consistently use the six-code taxonomy, including `trust-store-miss`.
+- Agentic active sections now state admission guarantees only under mediated-dispatch and independent-cosigner assumptions.
+- Lean build passed after integration.
+- Full PDF verification is blocked until `pdflatex`, `bibtex`, `pdfinfo`, and `pdftotext` are installed locally.
+
+Next handoff:
+- Dispatch Wave 3 fresh reviewers who did not write the fixes.
+
+## Research-paper hardening swarm: Wave 3 termination recheck and narrow repair
+
+Timestamp: 2026-05-19.
+
+Dispatched read-only:
+- Fresh New Reader.
+- Fresh Adversarial PC Reviewer.
+- Fresh Build and Artifact Auditor.
+
+Deliverable landed:
+- `.planning/e2e-execution-plan/12-research-paper-swarm-wave3-termination-recheck.md`
+
+Fresh-review result:
+- The priority queue was not empty after Wave 2.
+- Swarm-actionable items were narrow: parent abstract proof-scope drift, sensor retired-assumption and checklist drift, bilateral anonymization/status/formal-metadata drift, and a small agentic parent-dependence clarification.
+- Reversible-action remained kill or pivot.
+- Delegated-emergency-authority remained human-only defer.
+
+Narrow repair result:
+- Parent abstracts now bound Lean coverage to treaty and amendment claims over the bounded model, not the whole Rust implementation.
+- Sensor abstract, conclusion, and checklist now use strictly-strengthened and falsifiable assumption language, and the checklist no longer claims current submission-ready pass.
+- Bilateral author metadata is anonymized, BilateralAccept is inventoried in formal metadata, and the paper/status memos now describe an 8-10 page compact full-format target rather than a nonexistent USENIX short-paper track.
+- Agentic grammar text now carries its own local workshop contract if the parent paper remains unpublished.
+
+Verification:
+- `git diff --check` exited 0.
+- Targeted changed-file no-em-dash scan exited 1 with no matches.
+- Targeted stale-claim scans for the repaired Wave 3 issues exited 1 with no matches.
+- `formal/theorem-inventory.json` and `formal/proof-manifest.toml` parsed successfully.
+- `cd formal/lean4/Chio && lake build` exited 0.
+- Bilateral axiom query reported `[propext]` for `freestanding_accept_set_theorem` and its three corollaries.
+- Homebrew `texlive` and `poppler` installed successfully after the fresh build audit blocked on missing PDF tools.
+- Parent `make submit-check` exited 0: `paper-usenix.pdf` has 17 total pages and 13 body pages.
+- Parent `make submit-check-acmart` exited 0: `paper.pdf` has 13 total pages and 11 body pages.
+- Sensor `make submit-check` exited 0: `paper-usenix.pdf` has 16 total pages and 12 body pages.
+- Sensor `make submit-check-acmart` exited 0 after correcting the target to a generic draft compile gate: `paper.pdf` has 24 pages and passes log and BibTeX checks.
+- Agentic `latexmk` exited 0, log and BibTeX scans found no fatal or stale-reference markers, and `paper.pdf` has 14 pages.
+- Bilateral `latexmk` exited 0, log and BibTeX scans found no fatal or stale-reference markers, and `paper.pdf` has 11 pages.
+
+Termination:
+- No further broad swarm is justified.
+- Remaining gates are human or larger implementation gates.

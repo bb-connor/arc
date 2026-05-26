@@ -1,0 +1,53 @@
+\section{Ethical Considerations}
+\label{sec:ethical-considerations}
+
+This work studies a formal admission substrate for capability-bounded
+tool use and federated receipts. It does not report a user study,
+measurement of a live population, offensive security experiment, or
+deployment against production users.
+
+\subsection{Human subjects and data}
+\label{sec:ethical-considerations:subjects}
+
+No human-subjects research and no animal-subjects research were
+conducted. No IRB review or animal-care protocol was required. The
+evaluation uses synthetic or replayable receipt fixtures and formal
+models of admission, treaty intersection, capability attenuation, and
+amendment refinement. It does not collect, process, or retain live user
+data, personally identifying information, private messages, account
+contents, payment records, medical records, or location traces.
+
+\subsection{Deployment posture}
+\label{sec:ethical-considerations:deployment}
+
+The paper does not deploy an offensive tool, exploit a third-party
+system, bypass an access-control policy, or probe a live service. The
+construction is a verifier-side discipline for deciding when a receipt
+is admitted under a constitution. Its intended use is to reduce
+ambient authority and improve auditability in agent systems by making
+capability scope, guard decisions, and receipt admission explicit.
+
+\subsection{Dual-use risks}
+\label{sec:ethical-considerations:dual-use}
+
+The main dual-use risk is policy misuse by a verifier or capability
+authority. A verifier could encode an exclusionary or coercive
+constitution, or use the receipt log and admission predicates as a
+rigid administrative control rather than as a narrowly scoped safety
+mechanism. A second risk is admission-policy overclaiming: operators
+could present a mechanically checked bounded model as if it proved all
+runtime, cryptographic, economic, and governance properties of a live
+deployment. The paper limits this risk by separating proved theorem
+statements from implementation assumptions and by naming boundaries
+that remain outside the formal substrate.
+
+\subsection{Responsible release}
+\label{sec:ethical-considerations:release}
+
+The planned release is source code plus Lean artifacts, not a hosted
+authority service or a production governance system. Public artifacts
+will include responsible caveats: proof obligations cover the stated
+model only; deployment requires independent policy review; admission
+predicates should be minimized to legitimate security and audit needs;
+and receipt retention should follow data-minimization and access-control
+requirements appropriate to the deploying organization.

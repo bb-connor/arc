@@ -1,7 +1,7 @@
 # Sensor-Grounded Admission -- Submission Checklist
 
 Target: USENIX Security 2027 Cycle 1 (deadline 2026-08-25)
-Generated: 2026-05-18 by W4.a verification pass
+Generated: 2026-05-19 by Wave 2 USENIX harness repair
 
 ## Gates
 
@@ -11,13 +11,14 @@ Generated: 2026-05-18 by W4.a verification pass
 - [x] 4-pass pdflatex clean (pass 1, 2 (bibtex), 3, 4 each exit=0) -- VERIFIED
 - [x] `[check-log] OK` (no `!`, no undefined refs, no citation warnings) -- VERIFIED
 - [x] `[check-bibtex] OK` (no `Warning--`, no error markers in .blg) -- VERIFIED
-- [x] `[check-pages] paper-usenix.pdf: total=12, refs start page=11, body=10 (max=13)` -- VERIFIED
-- [x] VERDICT: PASS (paper-usenix is submission-ready) -- VERIFIED
+- [x] `[check-pages] paper-usenix.pdf: total=12, refs start page=11, body=10 (max=13)` -- VERIFIED 2026-05-18 before appendix-order repair
+- [ ] Rerun `make submit-check` after Wave 2 harness repair -- BLOCKED if local TeX and Poppler tools are absent
+- [ ] VERDICT: BLOCKED in this checkout until `make submit-check` reruns after Wave 2 source changes
 
 ### 2. Body page count
 
-- [x] Body = 10 pages, references begin page 11, total 12 -- VERIFIED via check-pages output
-- [x] USENIX Security body limit 13, references and appendices excluded -- VERIFIED in Makefile (MAX=13)
+- [x] Body = 10 pages, references begin page 11, total 12 -- VERIFIED via 2026-05-18 check-pages output
+- [x] USENIX Security body limit 13, references and appendices excluded -- VERIFIED in Makefile (MAX=13, appendix-aware page gate)
 
 ### 3. Anonymization
 
@@ -68,27 +69,26 @@ Generated: 2026-05-18 by W4.a verification pass
 - [x] No stray `\thispagestyle{empty}` first-page suppression -- VERIFIED (zero matches)
 - [x] `usenix2019_v3.sty` present in paper directory (build is self-contained) -- VERIFIED
 
-### 8. Open Science statement preparedness
+### 8. Open Science appendix
 
 - [x] `supplementary/README.md` provides material adaptable for the Open Science appendix (Files list, build instructions, axiom verification, theorem inventory) -- VERIFIED
-- [ ] Open Science appendix (~1 page) not yet written into paper sections -- NOT DONE, drafting work for the human
+- [x] `sections/11-appendix-open-science.tex` is drafted -- VERIFIED
+- [x] `paper-usenix.tex` places Open Science before the bibliography -- VERIFIED
 
-### 9. Ethics Considerations preparedness
+### 9. Ethics Considerations appendix
 
-- [ ] No `ETHICS.md`, `ethics-considerations.tex`, or equivalent draft in repo -- VERIFIED ABSENT
-- [ ] No Ethics Considerations section in body -- VERIFIED ABSENT
-- [ ] Ethics Considerations appendix (~1 page) must be drafted before submission. The paper is formal-substrate work without human subjects, but USENIX requires the appendix regardless. NOT DONE, drafting work for the human.
+- [x] `sections/12-appendix-ethics.tex` is drafted -- VERIFIED
+- [x] No human-subjects or animal-subjects research is claimed -- VERIFIED
+- [x] `paper-usenix.tex` places Ethics Considerations before the bibliography -- VERIFIED
 
 ## Open items for the human
 
-1. Draft Open Science appendix (~1 page). Material in `supplementary/README.md` covers Lean tarball, build commands, axiom verification, and theorem inventory.
-2. Draft Ethics Considerations appendix (~1 page). Not present in repo; needs writing. Formal-substrate paper without human subjects, but the appendix is mandatory.
-3. Confirm that citing the parent `chioProgrammableSovereignty2027` (author `{Chio Project}`) and referring to "the Chio substrate" in Section 1 and Section 8 is consistent with the human's reading of USENIX Security 2027 double-blind policy. The substrate identifier is a public artifact and the citation uses a project name rather than a personal name, but the human should make the final call.
-4. Register USENIX account and click Submit.
+1. Confirm that citing the parent `chioProgrammableSovereignty2027` (author `{Chio Project}`) and referring to "the Chio substrate" in Section 1 and Section 8 is consistent with the human's reading of USENIX Security 2027 double-blind policy. The substrate identifier is a public artifact and the citation uses a project name rather than a personal name, but the human should make the final call.
+2. Register USENIX account and upload through the submission portal.
 
 ## Verification log
 
-### make submit-check (tail)
+### make submit-check (tail, 2026-05-18 before Wave 2 appendix-order repair)
 
 ```
 Output written on paper-usenix.pdf (12 pages, 204861 bytes).
@@ -101,7 +101,7 @@ Transcript written on paper-usenix.log.
 [check-bibtex] OK
 [check-pages] paper-usenix.pdf: total=12, refs start page=11, body=10 (max=13)
 [check-pages] OK
-[submit-check] VERDICT: PASS (paper-usenix is submission-ready)
+[submit-check] Historical pre-repair pass; current rerun is blocked by missing TeX and Poppler tools
 ```
 
 ### Tarball verify

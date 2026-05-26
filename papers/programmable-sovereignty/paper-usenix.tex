@@ -48,7 +48,7 @@ Anonymous Institution
 \maketitle
 
 \begin{abstract}
-Agent systems already allocate authority, settle costs, and emit records that become accounting and dispute evidence, yet their governance reduces to prompts, API keys, dashboards, and after-the-fact logs. We give a substrate in which a polity is a triple $(T, C, K)$: a closed receipt-admission scope $T$, a Merkle-rooted citizenship roster $C$, and a constitution $K$ expressed as a finite list of predicates evaluated by a runtime kernel and discharged by machine-checked proofs over a bounded model. Admission, capability attenuation, treaty intersection, ladder-floor stability, and constitutional amendment become decidable operations on this triple, and each emits a canonically signed receipt only when $K$ and $T$ accept. We implement the construction in Rust with companion proofs in Lean~4, prove theorems for treaty predicate intersection, ladder-floor stability, and amendment refinement, and demonstrate the construction with a three-party buyer-vendor closure backed by replay fixtures. Treaty intersection composes with ladder-floor reduction without changing admission; amendment enactment is conditioned at the type level on a refinement witness and is unconstructable in the well-typed runtime path without one; the three-vendor demonstration replays both admitted and denied paths in the same canonical schema. The paper contributes the formal model, the substrate implementation, and an evaluation across dispatch admission, treaty intersection, selective disclosure, and replay-corpus stability.
+Agent systems already allocate authority, settle costs, and emit records that become accounting and dispute evidence, yet their governance reduces to prompts, API keys, dashboards, and after-the-fact logs. We give a substrate in which a polity is a triple $(T, C, K)$: a closed receipt-admission scope $T$, a Merkle-rooted citizenship roster $C$, and a constitution $K$ expressed as a finite list of predicates evaluated by a runtime kernel and mirrored by a bounded Lean model for the paper's treaty and amendment claims. Admission, capability attenuation, treaty intersection, ladder-floor stability, and constitutional amendment become decidable operations on this triple, and each emits a canonically signed receipt only when $K$ and $T$ accept. We implement the construction in Rust with companion Lean~4 proofs for treaty predicate intersection, ladder-floor stability, and amendment refinement over the bounded paper model, not for the whole Rust implementation, and demonstrate the construction with a three-party buyer-vendor closure backed by replay fixtures. Treaty intersection composes with ladder-floor reduction without changing admission; amendment enactment is conditioned at the type level on a refinement witness and is unconstructable in the well-typed runtime path without one; the three-vendor demonstration replays both admitted and denied paths in the same canonical schema. The paper contributes the formal model, the substrate implementation, and an evaluation across dispatch admission, treaty intersection, selective disclosure, and replay-corpus stability.
 \end{abstract}
 
 \input{sections/01-introduction}
@@ -61,6 +61,10 @@ Agent systems already allocate authority, settle costs, and emit records that be
 \input{sections/08-related-work}
 \input{sections/09-limitations}
 \input{sections/10-conclusion}
+
+\appendix
+\input{sections/11-appendix-open-science}
+\input{sections/12-appendix-ethics}
 
 \bibliographystyle{plain}
 \bibliography{bib}

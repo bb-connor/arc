@@ -799,6 +799,46 @@
       "claimClass": "bounded_model",
       "mapsTo": ["P3"],
       "notes": "Bounded amendment model showing enactment is rejected when the backward-refinement proof is absent."
+    },
+    {
+      "id": "proof.bilateral.freestanding_accept_set_theorem",
+      "leanName": "Chio.Treaty.BilateralAccept.freestanding_accept_set_theorem",
+      "file": "formal/lean4/Chio/Chio/Treaty/BilateralAccept.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "mapsTo": ["P3"],
+      "notes": "Paper-specific schema-alignment witness: the abstract bilateral accept relation equals issuer-key membership, kernel-key membership, and scope-predicate denotation under the model's abstraction boundary. It does not prove runtime signature soundness, canonicalization, lease freshness, or subject-digest correctness."
+    },
+    {
+      "id": "proof.bilateral.accept_monotone_in_issuer_store",
+      "leanName": "Chio.Treaty.BilateralAccept.accept_monotone_in_issuer_store",
+      "file": "formal/lean4/Chio/Chio/Treaty/BilateralAccept.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "mapsTo": ["P3"],
+      "notes": "Schema-alignment corollary showing issuer-key allowlist extension preserves accepted envelopes when kernel-key allowlists agree."
+    },
+    {
+      "id": "proof.bilateral.accept_conj_scope_decompose",
+      "leanName": "Chio.Treaty.BilateralAccept.accept_conj_scope_decompose",
+      "file": "formal/lean4/Chio/Chio/Treaty/BilateralAccept.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "mapsTo": ["P3"],
+      "notes": "Schema-alignment corollary decomposing accepted conjunction scopes into acceptance of each conjunct under the same trust store."
+    },
+    {
+      "id": "proof.bilateral.accept_requires_issuer_key",
+      "leanName": "Chio.Treaty.BilateralAccept.accept_requires_issuer_key",
+      "file": "formal/lean4/Chio/Chio/Treaty/BilateralAccept.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "mapsTo": ["P3"],
+      "notes": "Schema-alignment corollary showing absence of the issuer key from the verifier-owned issuer allowlist forces rejection in the abstract model."
     }
   ]
 }

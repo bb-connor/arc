@@ -1,7 +1,7 @@
 \section{Evaluation}
 \label{sec:evaluation}
 
-Each reported number is produced by a script in \codepath{bench/}; absent measurements are marked rather than estimated. The baseline machine is a MacBook Pro 18,4 (Apple M1 Max, 10 cores, 32~GB RAM) running Darwin 25.4.0.
+Each reported number is produced by a script in \codepath{bench/}; absent measurements are marked rather than estimated. The baseline machine is a MacBook Pro 18,4 (Apple M1 Max, 10 cores, 32~GB RAM) running Darwin 25.4.0. The evaluation is local or fixture-backed where stated: it measures executable admission, treaty, disclosure, and replay paths, and the three-vendor case study is a generator of signed positive and negative proof packages rather than a live cross-process federation among independently operated vendors.
 
 Scripts live at \codepath{papers/programmable-sovereignty/bench/} and write \TeX{} results under \codepath{bench/results/} alongside the raw log or CSV. Hand-written harnesses compile temporary Rust projects against the source tree referenced by \codepath{CHIO_SOURCE} (set to a workspace checkout, or absent for the repository root); the dispatch and replay scripts redirect \codepath{CARGO_TARGET_DIR} into a temporary directory so measurement does not mutate the source tree. The four exercised paths are dispatch admission, treaty intersection, selective-disclosure verification, and replay-corpus stability (Table~\ref{tab:evaluation}).
 

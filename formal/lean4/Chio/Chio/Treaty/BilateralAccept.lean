@@ -11,12 +11,14 @@
   treaty intersection). A short-paper reviewer can read this file
   and audit the structural claim end to end.
 
-  The load-bearing structural theorem is
+  The schema-alignment theorem is
   `freestanding_accept_set_theorem`: a bilateral envelope is
   accepted by a verifier iff three independent conjuncts hold (issuer
   key in trust store, kernel key in trust store, scope predicate
-  denotes on the receipt). The bi-conditional is the named claim that
-  no hidden side channel can sneak admission past these three gates.
+  denotes on the receipt). The bi-conditional records the abstraction
+  boundary used by the paper; runtime byte checks, signature validity,
+  lease freshness, and subject-digest equality remain outside this
+  model.
 -/
 
 import Chio.Treaty.PredicateLang

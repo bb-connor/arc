@@ -31,7 +31,7 @@ The cross-reference is one-directional. This paper cites the parent paper for th
 
 This is a **position paper that uses the parent paper's substrate as its structural backbone**. The novel contribution is not a new theorem; it is a reframing of agentic-AI safety as a structural problem at the admission layer rather than (only) a training-layer problem, accompanied by a typed grammar for what a substrate-level safety property looks like.
 
-The headline-claim survival case is that two safety layers compose: a training-time layer that shapes what the model wants to do, and an admission-time layer that shapes what the substrate is willing to execute. A scheming model that successfully evades the first layer still faces a type-checked rollback obligation at the second.
+The headline-claim survival case is bounded: two safety layers compose when every tool call is mediated through a correctly classified single-envelope path, with independent cosigners, an intact action-class registry, no bypass channel, and working rollback executors. A scheming model that successfully evades the training-time layer still faces a substrate-side admission predicate, but the paper no longer claims protection under registry compromise, host-side willing signatures, TOCTOU races, multi-agent collusion, admission-hook DoS, or faulty rollback code.
 
 ### Anthropic primary contact
 
@@ -47,9 +47,10 @@ Honest assessment: this paper is publishable at a top AI-safety workshop without
 
 - LaTeX shell, all nine sections drafted, bib placeholders inherited from the parent paper.
 - Word count is on target (roughly 3700-4200 words across sections).
-- Two open items before submission:
-  1. A worked example. A two-page appendix demonstrating the grammar on a real misaligned-agent scenario (e.g., the database-drop example or the alignment-faking-deployment example) would harden the paper considerably. Currently sketched in §5 but not concrete.
+- Three open items before submission:
+  1. Replace qualitative red-team sketch with a small empirical evaluation if time permits.
   2. The substrate citation. The parent paper is the structural backbone; whether it is cited as a pre-print or as an accepted publication determines the strength of the substrate-citation move. If the parent paper has not landed, this paper carries more of the structural weight and may benefit from the formal grammar being expanded by half a page.
+  3. Re-audit the action-class registry story against a concrete tool server so the threat-model boundary does not read as hand-waved operational work.
 
 Estimate: **2-3 weeks of polish from a competent author** to convert this draft into a submission-ready workshop paper, assuming the parent paper exists as a citable artifact. Less time if a co-author from Anthropic engages.
 

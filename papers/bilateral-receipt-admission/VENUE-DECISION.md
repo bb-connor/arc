@@ -7,7 +7,7 @@ Scope: this memo does not edit `paper.tex` or any section file; it prepares the 
 
 ## Recommendation
 
-Submit the short paper to **USENIX Security 2027 Cycle 2 (paper submission deadline 2027-01-26, 23:59 AoE)**, after the parent paper has cleared early-reject at USENIX Security 2027 Cycle 1 (early-reject notification roughly 2026-10-06 per the SEC26 calendar). Fall-back: ACSAC 2026 (deadline 2026-05-26) if the human wants a venue with a shorter calendar burn and is willing to accept tier-B venue prestige.
+Submit the compact full-format paper to **USENIX Security 2027 Cycle 2 (paper submission deadline 2027-01-26, 23:59 AoE)**, after the parent paper has cleared early-reject at USENIX Security 2027 Cycle 1 (early-reject notification roughly 2026-10-06 per the SEC26 calendar). Fall-back: ACSAC 2026 (deadline 2026-05-26) if the human wants a venue with a shorter calendar burn and is willing to accept tier-B venue prestige.
 
 ## Venue survey
 
@@ -20,7 +20,7 @@ Source: `https://www.usenix.org/conference/usenixsecurity27`, cross-checked agai
 - Per-author cap: 7 submissions per cycle.
 - Anonymity: double-blind, "must not reveal the identity of the authors," third-person self-references.
 - Simultaneous submission: tolerated with anonymized citation in the body and non-anonymous notification to `sec26chairs@usenix.org` (SEC27 PC chairs will publish their address when CFP is finalized; precedent rule applies).
-- Fit for a 6-8 page short paper: weak. Reviewers expect a full-length contribution at the 13-page envelope. A 7-8 page submission will look thin against the cycle's median submission.
+- Fit for the current 10-page compact draft: plausible. Reviewers expect a full-length contribution at the 13-page envelope; a 7-8 page submission would look thin against the cycle's median submission.
 
 ### 2. USENIX Security 2027 Cycle 2 (paper submission 2027-01-26)
 
@@ -28,7 +28,7 @@ Source: same. Cycle 2 deadline confirmed by sec-deadlines.github.io as 2027-01-2
 
 - Page limit and policies identical to Cycle 1.
 - Cycle 2 is the same venue, same PC pool (with cycle-2 additions), same proceedings.
-- Critical fact: USENIX prohibits resubmission of a Cycle 1 reject into Cycle 2 of the same year. But submitting a different paper (the short paper) into Cycle 2 after submitting the parent paper into Cycle 1 is allowed.
+- Critical fact: USENIX prohibits resubmission of a Cycle 1 reject into Cycle 2 of the same year. But submitting a different paper (the bilateral paper) into Cycle 2 after submitting the parent paper into Cycle 1 is allowed.
 
 ### 3. NDSS 2027 Fall (paper submission 2026-08-19)
 
@@ -105,7 +105,7 @@ SigstoreCon (CNCF, co-located with KubeCon Europe 2026, April 2026) is a one-day
 
 ## PC-overlap risk analysis
 
-The parent paper targets USENIX Security 2027 Cycle 1 (deadline 2026-08-25) per `wave1-venue-decision.md`. The decision to make about the short paper hinges on three combinations:
+The parent paper targets USENIX Security 2027 Cycle 1 (deadline 2026-08-25) per `wave1-venue-decision.md`. The decision to make about the bilateral paper hinges on three combinations:
 
 ### Combination A: Parent USENIX SEC27 Cycle 1, short USENIX SEC27 Cycle 1
 
@@ -113,7 +113,7 @@ Both papers in the same cycle of the same PC.
 
 - USENIX policy: explicitly allowed. The simultaneous-submission paragraph in `sec26_cfp_011226.pdf` covers this: "Citations to simultaneously submitted papers should be anonymized; non-anonymous versions of these citations must, however, be emailed to the program co-chairs at sec26chairs@usenix.org."
 - Anonymity risk: high. The same PC reads both papers. A reviewer who is assigned both will see the construction sharing (DSSE predicate, five rejection codes, three-vendor buyer-closure). The paper's anonymity rests on the construction itself being non-uniquely-identifying. The construction is, in fact, distinctive: bilateral DSSE with treaty-bound subject digest is not yet in the literature outside this project. A reviewer who reads both papers, even anonymized, can connect them via the shared primitive.
-- Bias risk: real. Reviewer fatigue, or a strong reaction to one paper, will color the other. A reviewer who finds the polity framing in the parent paper unconvincing may discount the short paper's claim that the primitive stands without the polity framing.
+- Bias risk: real. Reviewer fatigue, or a strong reaction to one paper, will color the other. A reviewer who finds the polity framing in the parent paper unconvincing may discount the bilateral paper's claim that the primitive stands without the polity framing.
 - Resource-pull risk: real. A PC discussion that decides "this is one contribution split across two papers" will reject the second.
 - Verdict: **risky**. Allowed by policy, but the concentration risk is large enough to recommend against.
 
@@ -121,10 +121,10 @@ Both papers in the same cycle of the same PC.
 
 Parent submitted 2026-08-25, short submitted 2027-01-26. Five-month gap.
 
-- Cycle 1 early-reject notification arrives roughly 2026-10-06 (six weeks after submission per the SEC26 calendar). By the time the short paper is submitted, Cycle 1's first-round triage outcome is known.
+- Cycle 1 early-reject notification arrives roughly 2026-10-06 (six weeks after submission per the SEC26 calendar). By the time the bilateral paper is submitted, Cycle 1's first-round triage outcome is known.
 - USENIX policy: allowed. Cycle 1 and Cycle 2 share a PC pool but Cycle 2 reviewers are assigned different papers; PC overlap is partial, not complete.
-- Anonymity risk: moderate. A reviewer who saw the parent paper in Cycle 1 and happens to be assigned the short paper in Cycle 2 can connect them. The probability that any individual reviewer overlaps is low (PC sizes are 150-200; random assignment is sparse). The probability across the full review committee is non-negligible but bounded.
-- Bias risk: lower than Combination A. The papers are not in active discussion at the same PC meeting. If the parent paper is accepted at Cycle 1, the short paper can cite it as a non-anonymized parent and the situation simplifies (the short paper becomes a "see also" of a published work). If the parent is rejected at Cycle 1 and resubmitted to Cycle 2 elsewhere, the short paper's Cycle 2 submission is independent.
+- Anonymity risk: moderate. A reviewer who saw the parent paper in Cycle 1 and happens to be assigned the bilateral paper in Cycle 2 can connect them. The probability that any individual reviewer overlaps is low (PC sizes are 150-200; random assignment is sparse). The probability across the full review committee is non-negligible but bounded.
+- Bias risk: lower than Combination A. The papers are not in active discussion at the same PC meeting. If the parent paper is accepted at Cycle 1, the bilateral paper can cite it as a non-anonymized parent and the situation simplifies. If the parent is rejected at Cycle 1 and resubmitted to Cycle 2 elsewhere, the bilateral paper's Cycle 2 submission is independent.
 - Resource-pull risk: low. The two papers are in different cycles, so PC discussion is not jointly framed.
 - Verdict: **safe**. This is the recommended configuration.
 
@@ -140,27 +140,27 @@ Different conference for the short paper:
 
 ## Final recommendation
 
-Submit the short paper to **USENIX Security 2027 Cycle 2 (paper registration 2027-01-19, paper submission 2027-01-26)**.
+Submit the compact full-format paper to **USENIX Security 2027 Cycle 2 (paper registration 2027-01-19, paper submission 2027-01-26)**.
 
 Reasoning:
 
-1. **Tier prestige matches the parent.** Both papers land in the same top-tier proceedings line, which is the right place for the cryptographic-primitive short paper's audience.
+1. **Tier prestige matches the parent.** Both papers land in the same top-tier proceedings line, which is the right place for the cryptographic-primitive paper's audience.
 2. **PC concentration risk is mitigated by the cycle gap.** Five months between Cycle 1 and Cycle 2 lets the parent paper either land or fail before the short paper enters review, removing joint-discussion bias.
-3. **Calendar slack.** The bilateral-receipt-admission paper has §4 (formal sketch) still to draft per the iter-3 comparator's salami-slice escape requirement. Targeting January 2027 gives 8 months to finish the freestanding accept-set theorem and complete a tight 6-8 page draft.
+3. **Calendar slack.** The bilateral-receipt-admission paper now has a drafted §4 and a freestanding accept-set Lean artifact. Targeting January 2027 leaves time to add USENIX appendices, rerun the PDF gate, and keep the 8-10 page draft tight.
 4. **Simultaneous-submission policy is the most permissive.** USENIX explicitly allows the configuration, with the requirement that the parent paper be cited (anonymized in body, non-anonymous to PC chairs).
-5. **Re-roll path preserved.** If the short paper misses Cycle 2, the SEC28 Cycle 1 deadline (~August 2027) is the next attempt at the same venue tier.
+5. **Re-roll path preserved.** If the bilateral paper misses Cycle 2, the SEC28 Cycle 1 deadline (~August 2027) is the next attempt at the same venue tier.
 
 ## What sleeps if this venue is picked
 
-- **No 2026 conference attendance from the short paper.** USENIX Sec 2027 papers are presented at the conference in August 2027 at the earliest. If the user wants something at a 2026 conference (which would help validate the construction publicly before the parent paper lands), ACSAC 2026 (Honolulu, December 2026) is the only viable 2026 academic venue still open.
+- **No 2026 conference attendance from the bilateral paper.** USENIX Sec 2027 papers are presented at the conference in August 2027 at the earliest. If the user wants something at a 2026 conference (which would help validate the construction publicly before the parent paper lands), ACSAC 2026 (Honolulu, December 2026) is the only viable 2026 academic venue still open.
 - **No NDSS reviewer pool.** The NDSS 2027 Fall PC includes a different reviewer set (more measurement-oriented, less applied-formal-methods). The short paper does not get that audience.
-- **No 6-page short paper format.** USENIX Sec accepts up to 13 pages but does not have an explicit short paper class. The paper will need to be at least 8-10 pages to look like a "real" submission rather than a thin one. The README's 6-8 page target is too tight for this venue; the draft should expand to 8-10.
+- **No 6-page short paper format.** USENIX Sec accepts up to 13 pages but does not have an explicit short paper class. The current 10-page draft fits the 8-10 page compact full-format target better than the old README's 6-8 page target.
 - **No early signal on the construction.** A pre-print to arXiv at submission time can substitute for early signal, but reviewers may treat the construction as known by the time the short paper enters review.
 
 ## Open questions for the user
 
-1. **Page count.** USENIX SEC27 has no short paper class. The README targets 6-8 pages. Is the user willing to expand the draft to 8-10 pages to fit the venue, or does the user prefer a venue with an explicit 6-page short class (SecDev 2027) at lower prestige?
-2. **Audience.** Does the user want the short paper read by the USENIX PC (broad systems-security audience) or the SecDev PC (secure-software-engineering audience)?
+1. **Page count.** Confirm the 8-10 page compact full-format target for USENIX, or choose a venue with an explicit 6-page short class (SecDev 2027) at lower prestige.
+2. **Audience.** Does the user want the bilateral paper read by the USENIX PC (broad systems-security audience) or the SecDev PC (secure-software-engineering audience)?
 3. **Two-paper concentration.** Is the user comfortable with the moderate concentration risk of two papers from the same author at the same venue across two cycles, or does the user prefer the cleaner "different venue" split (ACSAC 2026 in May, or CCS 2027 Cycle 1 in January)?
 4. **Walch / Anthropic co-author timing.** If a co-author is added before January 2027, the anonymity audit (W1.b of the parent paper) reopens and the venue calculation may shift.
 5. **Pre-print policy.** USENIX permits pre-prints. Does the user want to post the short paper to arXiv at submission time (January 2027) or wait until conditional acceptance?
@@ -183,7 +183,7 @@ Flip to **CCS 2027 Cycle 1 (deadline ~mid January 2027)** if:
 - The user wants a non-USENIX top-tier venue specifically to avoid PC overlap with the parent paper.
 - The user accepts the substantially-overlap risk being scrutinized harder at CCS than at USENIX Cycle 2.
 
-Do **not** target NDSS 2027 for the short paper. NDSS's substantial-overlap prohibition makes the two-paper plan a desk-reject candidate.
+Do **not** target NDSS 2027 for the bilateral paper. NDSS's substantial-overlap prohibition makes the two-paper plan a desk-reject candidate.
 
 ## Sources verified
 
