@@ -419,7 +419,6 @@ fn non_federated_request_leaves_no_dual_signed_artifact_behind() {
 
 #[test]
 fn federated_request_without_pinned_peer_fails_closed() {
-    let origin_kp = Keypair::generate();
     let origin_kernel_id = "kernel.org-a";
 
     let mut kernel = make_kernel(make_config());
@@ -428,12 +427,12 @@ fn federated_request_without_pinned_peer_fails_closed() {
         "srv-fed",
         vec!["file_read"],
     )));
-    // Cosigner is installed, but no peer is pinned -- must fail closed.
-    kernel.set_federation_cosigner(std::sync::Arc::new(InProcessCoSigner::new(
-        origin_kernel_id,
-        origin_kp.clone(),
-        kernel.config.keypair.public_key(),
-    )));
+    // Cosigner is installed, but no peer is pinned - the pre-dispatch
+    // negotiation gate must fail closed before any federation side effect.
+    let cosigner_calls = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.set_federation_cosigner(std::sync::Arc::new(CountingRejectingCosigner {
+        calls: std::sync::Arc::clone(&cosigner_calls),
+    }));
 
     let agent_kp = make_keypair();
     let cap = make_capability(
@@ -462,6 +461,11 @@ fn federated_request_without_pinned_peer_fails_closed() {
     assert!(
         reason.contains("not pinned") || reason.contains("stale") || reason.contains("downgrade"),
         "unexpected deny reason: {reason}"
+    );
+    assert_eq!(
+        cosigner_calls.load(Ordering::SeqCst),
+        0,
+        "cosigner must not run for a pre-dispatch negotiation denial"
     );
 }
 
