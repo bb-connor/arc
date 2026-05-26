@@ -277,8 +277,13 @@ impl SettlementChainConfig {
                     "invalid settlement RPC HttpEgressContract: {error}"
                 ))
             })?;
+        // Validate scheme/authority and reject IP-literal loopback/link-local
+        // hosts here. Hostname address-class is enforced at connect time by the
+        // contract's pinned ContractDnsResolver (see client_builder_with_contract),
+        // so this validation does not resolve DNS itself: a config-time lookup
+        // would be redundant, fail offline, and be open to TOCTOU drift.
         self.egress_contract
-            .enforce_url_with_dns(&self.rpc_url, 0)
+            .enforce_url(&self.rpc_url, 0)
             .map_err(|error| {
                 SettlementError::InvalidInput(format!(
                     "settlement RPC URL is not allowed by HttpEgressContract: {error}"

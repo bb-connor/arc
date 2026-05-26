@@ -384,7 +384,10 @@ mod tests {
         (keypair, evaluator)
     }
 
-    #[tokio::test]
+    // Chio's sync tool-dispatch bridge requires a multi-thread runtime (the
+    // documented host requirement); the default current-thread test runtime
+    // cannot drive the async tool server.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn service_allows_get() {
         let (_kp, evaluator) = make_service();
 
@@ -423,7 +426,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn service_denies_post_without_capability() {
         let (_kp, evaluator) = make_service();
 
@@ -464,7 +467,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn service_allows_post_with_capability() {
         let (kp, evaluator) = make_service();
 

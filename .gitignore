@@ -70,6 +70,12 @@ examples/**/bin/
 examples/**/obj/
 sdks/dotnet/**/bin/
 sdks/dotnet/**/obj/
+# verdict-matrix deployment-shape driver build outputs (dotnet / jvm / go)
+crates/chio-conformance/verdict_matrix/drivers/**/bin/
+crates/chio-conformance/verdict_matrix/drivers/**/obj/
+crates/chio-conformance/verdict_matrix/drivers/**/build/
+crates/chio-conformance/verdict_matrix/drivers/**/.gradle/
+crates/chio-conformance/verdict_matrix/drivers/k8s/k8s
 
 # Generated coverage artifacts
 /coverage/*
