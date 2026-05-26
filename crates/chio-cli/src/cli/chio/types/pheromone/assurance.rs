@@ -213,7 +213,7 @@ pub(crate) enum ChioPheromoneRelayAlertAssuranceRetentionCommands {
 
     /// Review local evidence for operator-managed external retention readiness.
     ExternalReview {
-        /// Directory containing archive packages or archive package report JSON files.
+        /// Directory containing signed archive package tarballs.
         #[arg(long, value_name = "DIR")]
         package_dir: PathBuf,
 
@@ -474,7 +474,7 @@ pub(crate) enum ChioPheromoneRelayAlertAssurancePhysicalDrillCommands {
 pub(crate) enum ChioPheromoneRelayAlertAssuranceArchiveRestoreDrillCommands {
     /// Review local archive package generations and readback evidence.
     Review {
-        /// Directory containing archive package report JSON files.
+        /// Directory containing signed archive package tarballs.
         #[arg(long, value_name = "DIR")]
         package_dir: PathBuf,
 

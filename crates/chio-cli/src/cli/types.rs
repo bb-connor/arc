@@ -1486,6 +1486,10 @@ enum TrustCommands {
         #[arg(long, env = "CHIO_TRUST_SERVICE_TOKEN", hide_env_values = true)]
         service_token: String,
 
+        /// Tenant-scoped read token in `tenant_id=token` form. Repeat for multiple tenants.
+        #[arg(long = "tenant-read-token", value_name = "TENANT=TOKEN")]
+        tenant_read_tokens: Vec<String>,
+
         /// Public base URL this trust-control node advertises to peers and clients.
         #[arg(long)]
         advertise_url: Option<String>,
@@ -2929,6 +2933,25 @@ enum ReceiptCommands {
         /// Cursor for pagination (seq value to start after).
         #[arg(long)]
         cursor: Option<u64>,
+        /// Restrict receipt reads to one tenant.
+        #[arg(long)]
+        tenant: Option<String>,
+        /// Read receipts across all tenants as an administrative operation.
+        #[arg(long, default_value_t = false, conflicts_with = "tenant")]
+        admin_all: bool,
+    },
+    /// Report local receipt writer health.
+    Health,
+    /// Flush pending receipt writes before returning.
+    Flush {
+        /// Maximum time to wait for pending writes.
+        #[arg(long, default_value_t = 5_000, value_parser = parse_positive_u64)]
+        timeout_ms: u64,
+    },
+    /// Inspect, create, or verify receipt checkpoints.
+    Checkpoint {
+        #[command(subcommand)]
+        command: ReceiptCheckpointCommands,
     },
     /// Explain why a receipt was allowed or denied.
     ///
@@ -2971,7 +2994,34 @@ enum ReceiptCommands {
         /// against pinned passport keys.
         #[arg(long, alias = "explain-bilateral", default_value_t = false)]
         inspect_bilateral: bool,
+        /// Restrict receipt reads to one tenant.
+        #[arg(long)]
+        tenant: Option<String>,
+        /// Read receipts across all tenants as an administrative operation.
+        #[arg(long, default_value_t = false, conflicts_with = "tenant")]
+        admin_all: bool,
     },
+}
+
+#[derive(Subcommand)]
+enum ReceiptCheckpointCommands {
+    /// Report checkpoint writer health.
+    Status {
+        /// Maximum number of uncheckpointed rows to include in one batch.
+        #[arg(long, default_value_t = 1_000, value_parser = parse_positive_u64)]
+        max_batch: u64,
+    },
+    /// Create the next receipt checkpoint.
+    Create {
+        /// Kernel signing seed file used to sign checkpoint receipts.
+        #[arg(long)]
+        kernel_seed_file: PathBuf,
+        /// Maximum number of uncheckpointed rows to include.
+        #[arg(long, default_value_t = 1_000, value_parser = parse_positive_u64)]
+        max_batch: u64,
+    },
+    /// Verify local receipt checkpoint coverage.
+    Verify,
 }
 
 #[derive(Subcommand)]
@@ -3888,6 +3938,10 @@ enum CertCommands {
         #[arg(long)]
         certificate: PathBuf,
 
+        /// File containing trusted kernel public keys.
+        #[arg(long)]
+        trusted_kernel_pubkey: PathBuf,
+
         /// Enable full-bundle verification (re-verify all receipt signatures).
         #[arg(long, default_value_t = false)]
         full: bool,
@@ -3903,4 +3957,14 @@ enum CertCommands {
         #[arg(long)]
         certificate: PathBuf,
     },
+}
+
+fn parse_positive_u64(value: &str) -> Result<u64, String> {
+    let parsed = value
+        .parse::<u64>()
+        .map_err(|error| format!("expected a positive integer: {error}"))?;
+    if parsed == 0 {
+        return Err("expected a positive integer greater than zero".to_string());
+    }
+    Ok(parsed)
 }

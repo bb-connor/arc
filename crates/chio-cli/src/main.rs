@@ -86,6 +86,16 @@ mod cli_entrypoint_tests {
 
     use super::*;
 
+    fn parse_cli_for_large_command(args: Vec<&'static str>) -> Result<Cli, clap::Error> {
+        std::thread::Builder::new()
+            .name("chio-cli-parse".to_string())
+            .stack_size(8 * 1024 * 1024)
+            .spawn(move || Cli::try_parse_from(args))
+            .expect("spawn CLI parser thread")
+            .join()
+            .expect("join CLI parser thread")
+    }
+
     #[test]
     fn format_json_flag_enables_json_output() {
         let cli = Cli::try_parse_from(["chio", "--format", "json", "init", "demo"]).unwrap();
@@ -196,7 +206,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn receipt_flush_subcommand_parses() {
-        let cli = Cli::try_parse_from([
+        let cli = parse_cli_for_large_command(vec![
             "chio",
             "--receipt-db",
             "receipts.sqlite3",
@@ -220,7 +230,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn receipt_flush_rejects_zero_timeout() {
-        let result = Cli::try_parse_from([
+        let result = parse_cli_for_large_command(vec![
             "chio",
             "--receipt-db",
             "receipts.sqlite3",
@@ -235,7 +245,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn receipt_checkpoint_create_subcommand_parses() {
-        let cli = Cli::try_parse_from([
+        let cli = parse_cli_for_large_command(vec![
             "chio",
             "--receipt-db",
             "receipts.sqlite3",
@@ -269,7 +279,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn receipt_checkpoint_rejects_zero_max_batch() {
-        let create = Cli::try_parse_from([
+        let create = parse_cli_for_large_command(vec![
             "chio",
             "--receipt-db",
             "receipts.sqlite3",
@@ -281,7 +291,7 @@ mod cli_entrypoint_tests {
             "--max-batch",
             "0",
         ]);
-        let status = Cli::try_parse_from([
+        let status = parse_cli_for_large_command(vec![
             "chio",
             "--receipt-db",
             "receipts.sqlite3",
