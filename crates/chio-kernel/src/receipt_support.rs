@@ -355,7 +355,7 @@ pub fn sign_receipt_body_hybrid_canonical(
     use chio_core::crypto::{
         canonical_json_shared_bytes, sign_shared_canonical_with_backend, PublicKey,
     };
-    use chio_core::receipt::{chio_receipt_id, ChioReceiptSigningBody};
+    use chio_core::receipt::{bind_receipt_signing_nonce, chio_receipt_id, ChioReceiptSigningBody};
 
     // Fail-closed kernel-key match BEFORE any cryptographic work. Mirrors
     // `chio_kernel_core::sign_receipt` so the byte-identity contract holds
@@ -380,6 +380,7 @@ pub fn sign_receipt_body_hybrid_canonical(
             "receipt body failed semantic validation: {error}"
         ))
     })?;
+    bind_receipt_signing_nonce(&mut body);
     body.id = chio_receipt_id(&body).map_err(|error| {
         KernelError::ReceiptSigningFailed(format!(
             "canonical JSON encoding of receipt id input failed: {error}"

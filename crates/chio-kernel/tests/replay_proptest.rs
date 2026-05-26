@@ -393,14 +393,14 @@ proptest! {
         prop_assert!(receipt_b.verify_signature().expect("verify b"));
         prop_assert!(receipt_c.verify_signature().expect("verify c"));
 
-        // Canonical body bytes must round-trip independent of which receipt
-        // we project from: the body is the input to signing and must remain
-        // a fixed point.
+        // Canonical body bytes must round-trip independent of which signed
+        // receipt we project from. Signing intentionally binds the caller's
+        // placeholder id into nonce metadata before deriving the final
+        // content-addressed id, so the signed body is not byte-identical to
+        // the unsigned input body.
         let body_bytes_a = canonical_body_bytes(&receipt_a.body());
         let body_bytes_b = canonical_body_bytes(&receipt_b.body());
-        let body_bytes_direct = canonical_body_bytes(&body);
         prop_assert_eq!(&body_bytes_a, &body_bytes_b);
-        prop_assert_eq!(&body_bytes_a, &body_bytes_direct);
 
         // The action's parameter hash must verify against its own canonical
         // bytes. This guards against a regression where signing accepted a

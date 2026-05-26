@@ -26,8 +26,7 @@ use std::sync::{Arc, Mutex};
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::Keypair;
 use chio_core::receipt::{
-    chio_receipt_id, ChioReceipt, ChioReceiptBody, Decision, GuardEvidence, ToolCallAction,
-    TrustLevel,
+    ChioReceipt, ChioReceiptBody, Decision, GuardEvidence, ToolCallAction, TrustLevel,
 };
 use chio_kernel::settlement_observer::{
     self, SettlementObserverStatus, SETTLEMENT_OBSERVER_STATUS_SCHEMA,
@@ -82,7 +81,7 @@ fn build_receipt(index: u64, kp: &Keypair) -> (ChioReceipt, String) {
     });
     let action = ToolCallAction::from_parameters(serde_json::json!({"i": index}))
         .expect("test action constructs");
-    let mut body = ChioReceiptBody {
+    let body = ChioReceiptBody {
         id: format!("rcpt-{index:03}"),
         timestamp: 1_000 + index,
         capability_id: format!("cap-{index}"),
@@ -108,12 +107,8 @@ fn build_receipt(index: u64, kp: &Keypair) -> (ChioReceipt, String) {
         tenant_id: None,
         kernel_key: kp.public_key(),
     };
-    // Pre-compute the content-addressed id so the caller knows ahead of
-    // time what id the signed receipt will carry. `ChioReceipt::sign`
-    // rewrites `body.id` to this same canonical hash before signing.
-    body.id = chio_receipt_id(&body).expect("canonical receipt id computes");
-    let canonical_id = body.id.clone();
     let receipt = ChioReceipt::sign(body, kp).expect("test receipt signs");
+    let canonical_id = receipt.id.clone();
     (receipt, canonical_id)
 }
 

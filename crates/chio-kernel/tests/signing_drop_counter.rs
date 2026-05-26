@@ -11,9 +11,7 @@ use std::task::{Context, Poll, Wake, Waker};
 use std::time::Duration;
 
 use chio_core::crypto::{sha256_hex, Keypair};
-use chio_core::receipt::{
-    chio_receipt_id, ChioReceipt, ChioReceiptBody, Decision, ToolCallAction, TrustLevel,
-};
+use chio_core::receipt::{ChioReceipt, ChioReceiptBody, Decision, ToolCallAction, TrustLevel};
 use chio_kernel::KernelError;
 use serde_json::json;
 
@@ -57,12 +55,7 @@ fn make_body(n: usize, kernel_key: &Keypair) -> Result<ChioReceiptBody, String> 
     .map_err(|error| format!("payload canonicalisation failed: {error}"))?;
     let content_hash = sha256_hex(action.parameter_hash.as_bytes());
     let policy_hash = sha256_hex(format!("policy:{nonce}").as_bytes());
-    // Pre-compute the content-addressed id so the test fixture matches the
-    // canonical id `sign_one_with_backend` rewrites into the signed
-    // receipt. Without this the test would compare the user-supplied label
-    // (e.g. `rcpt-block-counter-0001`) against the post-signing canonical
-    // hash and fail.
-    let mut body = ChioReceiptBody {
+    Ok(ChioReceiptBody {
         id: format!("rcpt-{nonce}"),
         timestamp: 1_700_200_000 + (n as u64),
         capability_id: format!("cap-{nonce}"),
@@ -83,10 +76,7 @@ fn make_body(n: usize, kernel_key: &Keypair) -> Result<ChioReceiptBody, String> 
         trust_level: TrustLevel::default(),
         tenant_id: None,
         kernel_key: kernel_key.public_key(),
-    };
-    body.id =
-        chio_receipt_id(&body).map_err(|error| format!("canonical receipt id failed: {error}"))?;
-    Ok(body)
+    })
 }
 
 fn rendered_signing_queue_block_total() -> Result<u64, String> {
@@ -108,18 +98,18 @@ async fn full_signing_queue_increments_block_counter_without_dropping() -> Resul
     let handle = signing_task::SigningTaskHandle::with_capacity(keypair.clone(), 1);
 
     let queued_body = make_body(1, &keypair)?;
-    // `make_body` pre-computes the content-addressed id so the body's id
-    // already matches what the signing task will emit. Capture both ids
-    // for the post-sign assertions below so the test does not need to
-    // hardcode the SHA-256 hash of the fixture.
-    let queued_expected_id = queued_body.id.clone();
+    let queued_expected_id = ChioReceipt::sign(queued_body.clone(), &keypair)
+        .map_err(|error| format!("sync signing failed: {error}"))?
+        .id;
     let queued = handle
         .try_sign(queued_body)
         .map_err(|_| "first request should queue before spawned task runs".to_string())?;
     let before = rendered_signing_queue_block_total()?;
 
     let blocked_body = make_body(2, &keypair)?;
-    let blocked_expected_id = blocked_body.id.clone();
+    let blocked_expected_id = ChioReceipt::sign(blocked_body.clone(), &keypair)
+        .map_err(|error| format!("sync signing failed: {error}"))?
+        .id;
     let mut blocked = Box::pin(handle.sign(blocked_body));
     let waker = noop_waker();
     let mut context = Context::from_waker(&waker);

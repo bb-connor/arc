@@ -13,7 +13,8 @@
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::{Keypair, PublicKey, SigningAlgorithm};
 use chio_core::receipt::{
-    chio_receipt_id, ChioReceiptBody, ChioReceiptSigningBody, Decision, ToolCallAction, TrustLevel,
+    bind_receipt_signing_nonce, chio_receipt_id, ChioReceiptBody, ChioReceiptSigningBody, Decision,
+    ToolCallAction, TrustLevel,
 };
 use chio_kernel::{
     kernel_signing_backend, sign_receipt_body_with_backend, KernelCryptoFloor,
@@ -25,6 +26,7 @@ use chio_kernel::{
 /// bytes, not the bare `ChioReceiptBody` bytes.
 fn canonical_signing_wrapper_bytes(body: &ChioReceiptBody) -> Vec<u8> {
     let mut body = body.clone();
+    bind_receipt_signing_nonce(&mut body);
     body.id = chio_receipt_id(&body).unwrap();
     let signing_body = ChioReceiptSigningBody::from(&body);
     canonical_json_bytes(&signing_body).unwrap()
