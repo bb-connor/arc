@@ -47,7 +47,7 @@
       "summary": "One bounded hosted/auth profile is published and compatibility paths are explicitly demoted.",
       "witnesses": [
         "docs/release/OPERATIONS_RUNBOOK.md",
-        "docs/DPOP_INTEGRATION_GUIDE.md"
+        "docs/reference/DPOP_INTEGRATION_GUIDE.md"
       ]
     },
     {
