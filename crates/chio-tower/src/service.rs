@@ -132,7 +132,12 @@ where
                 Ok(r) => r,
                 Err(e) => {
                     if evaluator.is_fail_open() {
-                        // Fail-open: pass through to inner service.
+                        // Fail-open: pass through to inner service. Record the
+                        // skipped enforcement so the bypass is auditable.
+                        tracing::warn!(
+                            error = %e,
+                            "Chio evaluation failed; fail-open enabled, forwarding request WITHOUT enforcement"
+                        );
                         return inner.call(req).await.map_err(Into::into);
                     }
                     tracing::error!("Chio evaluation failed: {e}");

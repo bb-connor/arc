@@ -42,6 +42,10 @@ private const val REASON_NONE: String = "urn:chio:error:none"
 private const val REASON_KERNEL_INTERNAL: String = "urn:chio:error:kernel:internal-error"
 private const val EVALUATE_PATH: String = "/chio/evaluate"
 
+// Synthetic request timestamp (unix seconds). The verdict-matrix corpus is
+// time-invariant, so a fixed value keeps relayed requests deterministic.
+private const val REQUEST_TIMESTAMP_SECS: Long = 1_700_000_000L
+
 private val MAPPER: ObjectMapper = ObjectMapper().registerKotlinModule()
 
 data class VerdictTuple(
@@ -148,6 +152,7 @@ fun scenarioToHttpRequest(scenarioId: String, script: Map<String, Any?>): Object
             MAPPER.nullNode()
         }
     val root = MAPPER.createObjectNode()
+    root.put("request_id", "req-$scenarioId")
     root.put("method", method)
     root.put("path", "/" + tool.replace(".", "/"))
     root.set<ObjectNode>("query", MAPPER.createObjectNode())
@@ -171,7 +176,8 @@ fun scenarioToHttpRequest(scenarioId: String, script: Map<String, Any?>): Object
     root.put("capability_id", "cap-$scenarioId")
     root.put("tool_server", MATRIX_SERVER_ID)
     root.put("tool_name", tool)
-    root.set<JsonNode>("tool_arguments", arguments)
+    root.set<JsonNode>("arguments", arguments)
+    root.put("timestamp", REQUEST_TIMESTAMP_SECS)
     return root
 }
 
@@ -302,6 +308,22 @@ fun runDriver(scenarioRoot: Path, sidecarUrl: String?): DriverReport {
                     diagnostic =
                         "set $SIDECAR_ENV (or $SIDECAR_FALLBACK_ENV) to a live Chio sidecar; " +
                             "the JVM SDK does not embed kernel evaluation",
+                )
+            continue
+        }
+        val category = scenario["category"]?.toString() ?: ""
+        if (category == "capability" || category == "revocation") {
+            outcomes +=
+                ScenarioOutcome(
+                    scenarioId = id,
+                    status = "unsupported",
+                    expected = expected,
+                    actual = null,
+                    diagnostic =
+                        "JVM deployment-shape relay has no signed CapabilityToken builder; " +
+                            "sidecar evaluation of $category scenarios requires a signed " +
+                            "CapabilityToken (issuer + signature + time-valid) per " +
+                            "chio-http-core authority validate_capability_token",
                 )
             continue
         }

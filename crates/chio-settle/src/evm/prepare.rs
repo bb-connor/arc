@@ -127,6 +127,18 @@ pub async fn prepare_web3_escrow_dispatch(
             SettlementError::InvalidDispatch("capital instruction amount is required".to_string())
         })?;
     let amount_minor_units = scale_chio_amount_to_token_minor_units(&settlement_amount, config)?;
+    // The operator key hash binds an Ed25519 key; reject other algorithms here
+    // rather than letting PublicKey::as_bytes panic on a P256/P384/Hybrid key
+    // that arrived via a deserialized (untrusted) identity binding.
+    if !matches!(
+        binding.certificate.chio_public_key.algorithm(),
+        chio_core::crypto::SigningAlgorithm::Ed25519
+    ) {
+        return Err(SettlementError::InvalidBinding(format!(
+            "settlement identity binding requires an Ed25519 chio_public_key, got {:?}",
+            binding.certificate.chio_public_key.algorithm()
+        )));
+    }
     let operator_key_hash = keccak256(binding.certificate.chio_public_key.as_bytes());
     let terms = IChioEscrow::EscrowTerms {
         capabilityId: hash_string_id(&request.capability_id),

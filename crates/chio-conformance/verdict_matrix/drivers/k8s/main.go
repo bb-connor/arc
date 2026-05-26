@@ -48,6 +48,8 @@ const (
 	evaluatePath       = "/chio/evaluate"
 )
 
+const requestTimestampSecs = 1700000000
+
 type verdictTuple struct {
 	Verdict    string   `json:"verdict"`
 	ReasonCode string   `json:"reason_code"`
@@ -212,9 +214,10 @@ func scenarioToHTTPRequest(s scenario) map[string]interface{} {
 	}
 	bodyLength := 0
 	req := map[string]interface{}{
-		"method": method,
-		"path":   "/" + strings.ReplaceAll(tool, ".", "/"),
-		"query":  map[string]interface{}{},
+		"request_id": "req-" + s.ID,
+		"method":     method,
+		"path":       "/" + strings.ReplaceAll(tool, ".", "/"),
+		"query":      map[string]interface{}{},
 		"headers": map[string]interface{}{
 			"content-type": "application/json",
 		},
@@ -224,11 +227,12 @@ func scenarioToHTTPRequest(s scenario) map[string]interface{} {
 			"verified":    true,
 			"agent_id":    "agent:" + s.ID,
 		},
-		"route_pattern":  matrixServerID + ":" + tool,
-		"capability_id":  "cap-" + s.ID,
-		"tool_server":    matrixServerID,
-		"tool_name":      tool,
-		"tool_arguments": arguments,
+		"route_pattern": matrixServerID + ":" + tool,
+		"capability_id": "cap-" + s.ID,
+		"tool_server":   matrixServerID,
+		"tool_name":     tool,
+		"arguments":     arguments,
+		"timestamp":     requestTimestampSecs,
 	}
 	if method != "GET" && method != "HEAD" {
 		bodyLength = len([]byte(s.Script.InputJSON))
@@ -398,6 +402,21 @@ func runDriver(root, sidecarURL string) (*report, error) {
 			})
 			continue
 		}
+		if s.Category == "capability" || s.Category == "revocation" {
+			outcomes = append(outcomes, outcome{
+				ScenarioID: s.ID,
+				Status:     "unsupported",
+				Expected:   normalize(s.Expected),
+				Actual:     nil,
+				Diagnostic: fmt.Sprintf(
+					"k8s deployment-shape relay has no signed CapabilityToken builder; "+
+						"sidecar evaluation of %s scenarios requires a signed CapabilityToken "+
+						"(issuer + signature + time-valid) per chio-http-core authority validate_capability_token",
+					s.Category),
+			})
+			continue
+		}
+
 		outcomes = append(outcomes, evaluateScenario(client, sidecar, s))
 	}
 	r := &report{

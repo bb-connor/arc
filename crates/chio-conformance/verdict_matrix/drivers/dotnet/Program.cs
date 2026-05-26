@@ -64,6 +64,9 @@ public static class Driver
     private const string ReasonNone = "urn:chio:error:none";
     private const string ReasonKernelInternal = "urn:chio:error:kernel:internal-error";
     private const string EvaluatePath = "/chio/evaluate";
+    // Synthetic request timestamp (unix seconds). The verdict-matrix corpus is
+    // time-invariant, so a fixed value keeps relayed requests deterministic.
+    private const long RequestTimestampSecs = 1_700_000_000;
 
     public static string ResolveScenarioRoot(string[] args)
     {
@@ -169,6 +172,7 @@ public static class Driver
         using (var writer = new Utf8JsonWriter(buffer))
         {
             writer.WriteStartObject();
+            writer.WriteString("request_id", $"req-{scenarioId}");
             writer.WriteString("method", method);
             writer.WriteString("path", "/" + tool.Replace(".", "/"));
             writer.WriteStartObject("query");
@@ -193,8 +197,9 @@ public static class Driver
             writer.WriteString("capability_id", $"cap-{scenarioId}");
             writer.WriteString("tool_server", MatrixServerId);
             writer.WriteString("tool_name", tool);
-            writer.WritePropertyName("tool_arguments");
+            writer.WritePropertyName("arguments");
             WriteRawJsonOrNull(writer, inputJson);
+            writer.WriteNumber("timestamp", RequestTimestampSecs);
             writer.WriteEndObject();
         }
         return Encoding.UTF8.GetString(buffer.ToArray());
@@ -371,6 +376,18 @@ public static class Driver
                     outcomes.Add(new ScenarioOutcome(id, "unsupported", expected, null,
                         $"set {SidecarEnv} (or {SidecarFallbackEnv}) to a live Chio sidecar; "
                         + "the dotnet SDK does not embed kernel evaluation"));
+                    continue;
+                }
+
+                var category = scenario.TryGetProperty("category", out var catEl)
+                    ? catEl.GetString() ?? string.Empty
+                    : string.Empty;
+                if (category is "capability" or "revocation")
+                {
+                    outcomes.Add(new ScenarioOutcome(id, "unsupported", expected, null,
+                        "dotnet deployment-shape relay has no signed CapabilityToken builder; "
+                        + $"sidecar evaluation of `{category}` scenarios requires issuer + signature + "
+                        + "time-valid fields per chio-http-core::authority::validate_capability_token"));
                     continue;
                 }
 
