@@ -177,9 +177,12 @@ fn write_preset_to_temp() -> tempfile::NamedTempFile {
 #[test]
 fn preset_denies_dotenv_write_via_chio_check() {
     let preset = write_preset_to_temp();
+    let receipt_db = tempfile::NamedTempFile::new().expect("receipt-db tempfile");
     let output = Command::new(chio_cli_binary())
         .args(["--format", "json", "check", "--policy"])
         .arg(preset.path())
+        .arg("--receipt-db")
+        .arg(receipt_db.path())
         .args([
             "--server",
             "fs",
@@ -214,9 +217,12 @@ fn preset_denies_dotenv_write_via_chio_check() {
 #[test]
 fn preset_allows_safe_file_read_via_chio_check() {
     let preset = write_preset_to_temp();
+    let receipt_db = tempfile::NamedTempFile::new().expect("receipt-db tempfile");
     let output = Command::new(chio_cli_binary())
         .args(["--format", "json", "check", "--policy"])
         .arg(preset.path())
+        .arg("--receipt-db")
+        .arg(receipt_db.path())
         .args([
             "--server",
             "fs",

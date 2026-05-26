@@ -126,8 +126,9 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_inspection_trace() {
         .as_str()
         .expect("dual section must carry non-section-6 disclaimer string");
     assert!(
-        disclaimer.contains("not section-6 conformant")
-            || disclaimer.contains("NOT-SECTION-6-CONFORMANT"),
+        disclaimer
+            .to_lowercase()
+            .contains("not section-6 conformant"),
         "disclaimer must call out non-section-6 status: got {disclaimer}"
     );
 
