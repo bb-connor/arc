@@ -546,7 +546,12 @@ fn validate_rpc_egress_contract(
                 "invalid anchor EVM RPC HttpEgressContract: {error}"
             ))
         })?;
-    contract.enforce_url_with_dns(rpc_url, 0).map_err(|error| {
+    // Validate scheme/authority and reject IP-literal loopback/link-local hosts
+    // here. Hostname address-class is enforced at connect time by the contract's
+    // pinned ContractDnsResolver (see client_builder_with_contract), so this does
+    // not resolve DNS itself: a config-time lookup would be redundant, fail
+    // offline, and be open to TOCTOU drift.
+    contract.enforce_url(rpc_url, 0).map_err(|error| {
         AnchorError::Rpc(format!(
             "anchor EVM RPC URL is not allowed by HttpEgressContract: {error}"
         ))

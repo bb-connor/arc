@@ -306,7 +306,7 @@ class VerifyReceiptResponse(BaseModel):
             and self.receipt_kind == "mediated_decision"
             and self.boundary_class == "prevent"
             and self.trust_level == "mediated"
-            and self.result in {"allow", "authorized", "Authorized"}
+            and self.result == "allow"
         )
 
 
