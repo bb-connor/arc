@@ -15,7 +15,7 @@
 //! - `device_integrity.device_recognition_verdict` must contain
 //!   [`MEETS_DEVICE_INTEGRITY`].
 
-use jsonwebtoken::jwk::{AlgorithmParameters, Jwk, JwkSet, KeyAlgorithm};
+use jsonwebtoken::jwk::{AlgorithmParameters, EllipticCurve, Jwk, JwkSet, KeyAlgorithm};
 use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 
@@ -160,35 +160,27 @@ fn claim_nonce(claims: &PlayIntegrityClaims) -> Result<&str, AttestationError> {
 }
 
 fn jwk_algorithm(jwk: &Jwk) -> Result<Algorithm, AttestationError> {
-    if matches!(jwk.algorithm, AlgorithmParameters::OctetKey(_)) {
-        return Err(AttestationError::PlayIntegrityInvalidToken(
-            "Play Integrity JWKS must not contain symmetric keys".to_string(),
-        ));
-    }
     let algorithm = jwk.common.key_algorithm.ok_or_else(|| {
         AttestationError::PlayIntegrityInvalidToken("JWKS key has no alg".to_string())
     })?;
-    match algorithm {
-        KeyAlgorithm::HS256 | KeyAlgorithm::HS384 | KeyAlgorithm::HS512 => {
+    match (&jwk.algorithm, algorithm) {
+        (AlgorithmParameters::EllipticCurve(params), KeyAlgorithm::ES256)
+            if params.curve == EllipticCurve::P256 =>
+        {
+            Ok(Algorithm::ES256)
+        }
+        (AlgorithmParameters::OctetKey(_), _) => Err(AttestationError::PlayIntegrityInvalidToken(
+            "Play Integrity JWKS must not contain symmetric keys".to_string(),
+        )),
+        (_, KeyAlgorithm::HS256 | KeyAlgorithm::HS384 | KeyAlgorithm::HS512) => {
             Err(AttestationError::PlayIntegrityInvalidToken(format!(
                 "unsupported symmetric JWKS signing alg {:?}",
                 algorithm
             )))
         }
-        KeyAlgorithm::ES256 => Ok(Algorithm::ES256),
-        KeyAlgorithm::ES384 => Ok(Algorithm::ES384),
-        KeyAlgorithm::RS256 => Ok(Algorithm::RS256),
-        KeyAlgorithm::RS384 => Ok(Algorithm::RS384),
-        KeyAlgorithm::RS512 => Ok(Algorithm::RS512),
-        KeyAlgorithm::PS256 => Ok(Algorithm::PS256),
-        KeyAlgorithm::PS384 => Ok(Algorithm::PS384),
-        KeyAlgorithm::PS512 => Ok(Algorithm::PS512),
-        KeyAlgorithm::EdDSA => Ok(Algorithm::EdDSA),
-        KeyAlgorithm::RSA1_5 | KeyAlgorithm::RSA_OAEP | KeyAlgorithm::RSA_OAEP_256 => {
-            Err(AttestationError::PlayIntegrityInvalidToken(format!(
-                "unsupported JWKS signing alg {:?}",
-                algorithm
-            )))
-        }
+        _ => Err(AttestationError::PlayIntegrityInvalidToken(format!(
+            "unsupported Play Integrity JWKS signing alg {:?}",
+            algorithm
+        ))),
     }
 }

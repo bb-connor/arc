@@ -143,7 +143,7 @@ fn signed_token_with_exp(
         app_verdict,
         device_verdicts,
         exp,
-        Algorithm::RS256,
+        Algorithm::ES256,
     )
 }
 
@@ -177,7 +177,7 @@ fn signed_token_with_alg(
 }
 
 fn signed_token_with_issuer(issuer: &str) -> Result<String, Box<dyn Error>> {
-    let mut header = Header::new(Algorithm::RS256);
+    let mut header = Header::new(Algorithm::ES256);
     header.kid = Some(GOOGLE_PLAY_INTEGRITY_ROOT_KID.to_string());
     let claims = TestClaims {
         nonce: NONCE.to_string(),
@@ -346,6 +346,40 @@ fn play_integrity_verifier_rejects_symmetric_jwks_fail_closed() -> Result<(), Bo
     Ok(())
 }
 
+#[test]
+fn play_integrity_verifier_rejects_rsa_jwks_fail_closed() -> Result<(), Box<dyn Error>> {
+    let kid = "attacker-rsa";
+    let token = token_with_header("RS256", kid)?;
+    let jwks = serde_json::json!({
+        "keys": [
+            {
+                "kty": "RSA",
+                "alg": "RS256",
+                "kid": kid,
+                "use": "sig",
+                "n": "qH9NQke6D70kWv0tfAPaUlFRsbUnfgTrquzXdjZ7iLXWZOTt1JtFyh-ZaVfFf607HBCY93DREy5TuQlIIuRmlkNL6ccCEc-qDTFWFuYAdb-yW72rI-4yK6Nan42vZNcWk5nby7rfOEFrUZjzUXuqCMy-HoaDliWnRtT-TJmQKbUDL94R-VZ2Vy94Oe6BuJ4ZtYFCOaQM2qIEXRqZV8hQNhXvpuz_i6sF8TJ7H7hCtlqT9wJ5bQGmEvvXr_kyjyetTwPoDl0D0--1PdJb7V7moZ16_8yEptGFc9es9dlXxk-9EFXu-fvpx7LTjBKWr9zNmF1G0UrH7rzPsCTaLOfeNw",
+                "e": "AQAB"
+            }
+        ]
+    })
+    .to_string();
+
+    let error = verify_play_integrity(PlayIntegrityVerificationInput {
+        token: &token,
+        expected_nonce: NONCE,
+        expected_package_name: PACKAGE,
+        expected_audience: AUDIENCE,
+        jwks_json: &jwks,
+    })
+    .err()
+    .ok_or("expected RSA JWKS rejection")?;
+    assert!(matches!(
+        error,
+        AttestationError::PlayIntegrityInvalidToken(_)
+    ));
+    Ok(())
+}
+
 fn signed_symmetric_token(secret: &[u8], kid: &str) -> Result<String, Box<dyn Error>> {
     signed_symmetric_token_with_alg(secret, kid, Algorithm::HS256)
 }
@@ -371,6 +405,29 @@ fn signed_symmetric_token_with_alg(
         exp: Some(future_exp()?),
     };
     encode(&header, &claims, &EncodingKey::from_secret(secret)).map_err(Into::into)
+}
+
+fn token_with_header(algorithm: &str, kid: &str) -> Result<String, Box<dyn Error>> {
+    let header = serde_json::json!({
+        "alg": algorithm,
+        "kid": kid
+    });
+    let claims = TestClaims {
+        nonce: NONCE.to_string(),
+        app_integrity: TestAppIntegrity {
+            app_recognition_verdict: PLAY_RECOGNIZED.to_string(),
+            package_name: PACKAGE.to_string(),
+        },
+        device_integrity: TestDeviceIntegrity {
+            device_recognition_verdict: vec![MEETS_DEVICE_INTEGRITY.to_string()],
+        },
+        aud: AUDIENCE.to_string(),
+        iss: GOOGLE_PLAY_INTEGRITY_ISSUER.to_string(),
+        exp: Some(future_exp()?),
+    };
+    let header = Base64UrlUnpadded::encode_string(serde_json::to_string(&header)?.as_bytes());
+    let claims = Base64UrlUnpadded::encode_string(serde_json::to_string(&claims)?.as_bytes());
+    Ok(format!("{header}.{claims}.signature"))
 }
 
 fn future_exp() -> Result<u64, Box<dyn Error>> {
