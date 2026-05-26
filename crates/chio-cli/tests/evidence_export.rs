@@ -291,10 +291,22 @@ capabilities:
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
         let seq1 = store
-            .append_chio_receipt_returning_seq(&receipt_with_ts("rcpt-1", "cap-evidence", 100))
+            .append_chio_receipt_returning_seq(&receipt_with_keypair(
+                "rcpt-1",
+                "cap-evidence",
+                100,
+                None,
+                &issuer,
+            ))
             .expect("append receipt");
         let seq2 = store
-            .append_chio_receipt_returning_seq(&receipt_with_ts("rcpt-2", "cap-evidence", 101))
+            .append_chio_receipt_returning_seq(&receipt_with_keypair(
+                "rcpt-2",
+                "cap-evidence",
+                101,
+                None,
+                &issuer,
+            ))
             .expect("append receipt");
         store
             .append_child_receipt(&child_receipt_with_ts("child-1", 100))
@@ -453,10 +465,22 @@ fn evidence_export_with_signed_federation_policy_roundtrips() {
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
         let seq1 = store
-            .append_chio_receipt_returning_seq(&receipt_with_ts("rcpt-1", "cap-federated", 100))
+            .append_chio_receipt_returning_seq(&receipt_with_keypair(
+                "rcpt-1",
+                "cap-federated",
+                100,
+                None,
+                &issuer,
+            ))
             .expect("append receipt");
         let seq2 = store
-            .append_chio_receipt_returning_seq(&receipt_with_ts("rcpt-2", "cap-federated", 101))
+            .append_chio_receipt_returning_seq(&receipt_with_keypair(
+                "rcpt-2",
+                "cap-federated",
+                101,
+                None,
+                &issuer,
+            ))
             .expect("append receipt");
         let canonical = store
             .receipts_canonical_bytes_range(seq1, seq2)
@@ -553,17 +577,21 @@ fn evidence_import_roundtrip_surfaces_imported_trust_without_rewriting_local_his
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
         let seq1 = store
-            .append_chio_receipt_returning_seq(&receipt_with_ts(
+            .append_chio_receipt_returning_seq(&receipt_with_keypair(
                 "rcpt-imported-1",
                 "cap-federated-reputation",
                 100,
+                None,
+                &issuer,
             ))
             .expect("append first receipt");
         let seq2 = store
-            .append_chio_receipt_returning_seq(&receipt_with_ts(
+            .append_chio_receipt_returning_seq(&receipt_with_keypair(
                 "rcpt-imported-2",
                 "cap-federated-reputation",
                 101,
+                None,
+                &issuer,
             ))
             .expect("append second receipt");
         let canonical = store
@@ -760,17 +788,21 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
         let seq1 = store
-            .append_chio_receipt_returning_seq(&receipt_with_ts(
+            .append_chio_receipt_returning_seq(&receipt_with_keypair(
                 "rcpt-1",
                 "cap-remote-federated",
                 100,
+                None,
+                &issuer,
             ))
             .expect("append receipt");
         let seq2 = store
-            .append_chio_receipt_returning_seq(&receipt_with_ts(
+            .append_chio_receipt_returning_seq(&receipt_with_keypair(
                 "rcpt-2",
                 "cap-remote-federated",
                 101,
+                None,
+                &issuer,
             ))
             .expect("append receipt");
         let canonical = store
@@ -877,17 +909,21 @@ fn evidence_verify_detects_tampered_receipt_even_if_manifest_hash_is_updated() {
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
         let seq1 = store
-            .append_chio_receipt_returning_seq(&receipt_with_ts(
+            .append_chio_receipt_returning_seq(&receipt_with_keypair(
                 "rcpt-1",
                 "cap-evidence-verify",
                 100,
+                None,
+                &issuer,
             ))
             .expect("append receipt");
         let seq2 = store
-            .append_chio_receipt_returning_seq(&receipt_with_ts(
+            .append_chio_receipt_returning_seq(&receipt_with_keypair(
                 "rcpt-2",
                 "cap-evidence-verify",
                 101,
+                None,
+                &issuer,
             ))
             .expect("append receipt");
         let canonical = store
@@ -948,8 +984,13 @@ fn evidence_verify_detects_tampered_receipt_even_if_manifest_hash_is_updated() {
         !verify.status.success(),
         "verify should fail on tampered receipt"
     );
+    // The signed manifest commits to a semantic summary derived from each
+    // receipt's signature and action-hash validity, so tampering the receipt
+    // body trips the semantic-summary check before the raw signature pass even
+    // when the manifest file hash is refreshed to match the altered bytes.
     assert!(
-        String::from_utf8_lossy(&verify.stderr).contains("signature verification failed"),
+        String::from_utf8_lossy(&verify.stderr)
+            .contains("semantic summary does not match exported data"),
         "stdout={}\nstderr={}",
         String::from_utf8_lossy(&verify.stdout),
         String::from_utf8_lossy(&verify.stderr)

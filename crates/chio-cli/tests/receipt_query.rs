@@ -702,7 +702,38 @@ fn make_financial_receipt(
     root_budget_holder: &str,
     delegation_depth: u32,
 ) -> ChioReceipt {
-    let keypair = Keypair::generate();
+    make_financial_receipt_signed_by(
+        &Keypair::generate(),
+        id,
+        capability_id,
+        subject_key,
+        issuer_key,
+        tool_server,
+        tool_name,
+        decision,
+        timestamp,
+        cost_charged,
+        attempted_cost,
+        root_budget_holder,
+        delegation_depth,
+    )
+}
+
+fn make_financial_receipt_signed_by(
+    signing_key: &Keypair,
+    id: &str,
+    capability_id: &str,
+    subject_key: Option<&str>,
+    issuer_key: &str,
+    tool_server: &str,
+    tool_name: &str,
+    decision: Decision,
+    timestamp: u64,
+    cost_charged: u64,
+    attempted_cost: Option<u64>,
+    root_budget_holder: &str,
+    delegation_depth: u32,
+) -> ChioReceipt {
     let budget_authority = FinancialBudgetAuthorityReceiptMetadata {
         guarantee_level: "ha_quorum_commit".to_string(),
         authority_profile: "authoritative_hold_event".to_string(),
@@ -781,9 +812,9 @@ fn make_financial_receipt(
             metadata: Some(metadata),
             trust_level: chio_core::TrustLevel::default(),
             tenant_id: None,
-            kernel_key: keypair.public_key(),
+            kernel_key: signing_key.public_key(),
         },
-        &keypair,
+        signing_key,
     )
     .unwrap()
 }
@@ -963,7 +994,8 @@ fn make_financial_receipt_with_settlement_status(
     .unwrap()
 }
 
-fn make_governed_financial_receipt(
+fn make_governed_financial_receipt_signed_by(
+    signing_key: &Keypair,
     id: &str,
     capability_id: &str,
     subject_key: &str,
@@ -974,7 +1006,6 @@ fn make_governed_financial_receipt(
     cost_charged: u64,
     root_budget_holder: &str,
 ) -> ChioReceipt {
-    let keypair = Keypair::generate();
     let metadata = serde_json::json!({
         "attribution": ReceiptAttributionMetadata {
             subject_key: subject_key.to_string(),
@@ -1043,9 +1074,9 @@ fn make_governed_financial_receipt(
             metadata: Some(metadata),
             trust_level: chio_core::TrustLevel::default(),
             tenant_id: None,
-            kernel_key: keypair.public_key(),
+            kernel_key: signing_key.public_key(),
         },
-        &keypair,
+        signing_key,
     )
     .unwrap()
 }
@@ -3153,7 +3184,8 @@ fn test_operator_report_endpoint() {
             .expect("record child lineage");
 
         let seq = store
-            .append_chio_receipt_returning_seq(&make_financial_receipt(
+            .append_chio_receipt_returning_seq(&make_financial_receipt_signed_by(
+                &checkpoint_kp,
                 "rc-op-1",
                 "cap-op-child",
                 Some(&leaf_hex),
@@ -5254,7 +5286,8 @@ fn test_shared_evidence_reporting_surfaces() {
             .expect("record remote lineage bridge");
 
         let seq = store
-            .append_chio_receipt_returning_seq(&make_financial_receipt(
+            .append_chio_receipt_returning_seq(&make_financial_receipt_signed_by(
+                &checkpoint_kp,
                 "rc-local-1",
                 "cap-local-child",
                 Some(&local_leaf_hex),
@@ -5502,7 +5535,8 @@ fn test_behavioral_feed_export_surfaces() {
             .expect("record child lineage");
 
         let seq = store
-            .append_chio_receipt_returning_seq(&make_governed_financial_receipt(
+            .append_chio_receipt_returning_seq(&make_governed_financial_receipt_signed_by(
+                &checkpoint_kp,
                 "rc-risk-1",
                 "cap-risk-child",
                 &leaf_hex,

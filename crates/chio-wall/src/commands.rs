@@ -391,7 +391,7 @@ fn create_chio_wall_receipt_db(
             .into_iter()
             .map(|(_, bytes)| bytes)
             .collect::<Vec<_>>(),
-        &issuer,
+        &kernel,
     )?;
     store.store_checkpoint(&checkpoint)?;
     Ok(())
