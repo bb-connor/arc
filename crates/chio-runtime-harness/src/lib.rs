@@ -123,25 +123,25 @@ mod tests {
         let mut scenario = read_json(source)?;
         let arguments = [
             serde_json::json!({
+                "workflowId": "wf-chiodos-refund-001",
                 "caseRef": "refund-250",
                 "tool": "read_refund_case",
-                "workflowId": "wf-chio-refund-001"
             }),
             serde_json::json!({
+                "workflowId": "wf-chiodos-refund-001",
                 "caseRef": "refund-250",
                 "tool": "verify_customer",
-                "workflowId": "wf-chio-refund-001"
             }),
             serde_json::json!({
+                "workflowId": "wf-chiodos-refund-001",
                 "caseRef": "refund-250",
                 "tool": "stage_refund",
-                "workflowId": "wf-chio-refund-001"
             }),
         ];
         let tool_arg_sha256s = [
-            "3f31b68cde492ccb216e04bb62d975141dbed7b3c4f96a73d21398eaa88fb5cc",
-            "5e9312cae8fac5f26d60c004f5e371a48d649b1c5fb234803727f478d18a0ccd",
-            "47e6e096b5d5888a3f90d057de3bce595d8ea5dd8624ccde387bb739d5a6464b",
+            "935b1378da1b3a29790a7176986bc1b9358b0a23e7ca8a94156bab0e0da64ed2",
+            "86269a4364b65b0b29ab6559e8b1dc4fa4f2c6e93b1bc96abf6208a0afdf8b5b",
+            "b3381903fd6423aa4316775de66d10c173144264bacd0fd09f172e165841ebaf",
         ];
         let host_kernel_ids = [
             "did:chio:vendor-a",
