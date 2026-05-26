@@ -807,8 +807,9 @@ def test_typeerror_fallback_arity_mismatch_keeps_alias_map() -> None:
     A wrapper with a renamed protected param hit by an arity mismatch
     (more positional args than the signature accepts) blows
     ``bind_partial`` up. The fallback must preserve the wrapper's
-    canonical alias map so the positional secret is still redacted via
-    the table the helper derives from the signature.
+    canonical alias map so every positional value that may carry a body
+    secret is still redacted via the table the helper derives from the
+    signature.
     """
 
     def write_file(path: str, body: str) -> None:
@@ -827,8 +828,9 @@ def test_typeerror_fallback_arity_mismatch_keeps_alias_map() -> None:
     # the wrapper-named slot at args[1].
     assert args[0] == "/tmp/x"
     assert args[1] == {"omitted": True, "byte_count": len(b"PROD_SECRET")}
-    # The third positional has no slot in the signature; surfaces raw.
-    assert args[2] == "trailing"
+    # The third positional has no slot in the signature. Redact it under
+    # the protected canonical instead of leaking it into receipt payloads.
+    assert args[2] == {"omitted": True, "byte_count": len(b"trailing")}
 
 
 def test_alias_map_redacts_kwarg_under_canonical_no_fallback() -> None:
