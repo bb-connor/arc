@@ -63,7 +63,7 @@ subcommand.
 | C++     | in-repo only  | Built from `sdks/cpp/chio-cpp/` via `chio-cpp-kernel-ffi`    |
 | Go      | in-repo only  | Built from `sdks/go/chio-go/`                               |
 
-C++ P0 scenario coverage (`mcp_core` and `auth`) is gated by the
+C++ P0 scenario coverage (`mcp_core` and `auth`) is covered by the
 `cpp_peer_p0` integration test in `crates/chio-conformance/tests/`.
 
 ## Feature flags

@@ -1,10 +1,10 @@
 //! Cross-language verdict-matrix diff oracle.
 //!
-//! Aggregates per-driver verdict reports across the five primary kernel
-//! surfaces (Rust kernel, Python SDK, TypeScript node-http SDK, WASM
-//! browser kernel, Go HTTP SDK) and asserts the (verdict, reason_code,
-//! scope_set) tuple equality contract on every scenario where two or
-//! more drivers produce a non-unsupported tuple.
+//! Aggregates per-driver verdict reports across the verdict-matrix drivers
+//! declared in manifest.toml (the in-process Rust and WASM-browser kernels
+//! plus the language-SDK and deployment-shape drivers) and asserts the
+//! (verdict, reason_code, scope_set) tuple equality contract on every
+//! scenario where two or more drivers produce a non-unsupported tuple.
 //!
 //! The diff oracle is fail-closed: any divergence between drivers, or
 //! between a driver and the expected tuple, surfaces a

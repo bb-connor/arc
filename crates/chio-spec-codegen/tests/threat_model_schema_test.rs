@@ -7,8 +7,10 @@
 //! `mitigations`, `residualRisk`, optional `coveredBy`,
 //! `covered_by_tests`, `deferred_to`, and `coverage_state`). The
 //! optional `coverage_state` field carries the enum `{covered, partial,
-//! pending}`. The threat-model-coverage CI gate fails on `partial` and
-//! fails on `pending` unless `deferred_to` is populated.
+//! pending, weak_coverage}`. The threat-model-coverage CI gate accepts
+//! `partial` only with a `deferred_to` reference, an in-tree test body,
+//! and a companion evidence file; accepts `pending` only with a
+//! `deferred_to` reference; and never accepts `weak_coverage`.
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 

@@ -7,19 +7,16 @@
 //! drivers we have available natively (the in-process Rust kernel and
 //! the WASM browser kernel via its native non-wasm test path), asserts
 //! tuple equality across drivers, and surfaces any divergence as a
-//! test failure. The cross-language divergence gate is enforced by
-//! running this test in CI; PRs whose driver tuples diverge fail it.
+//! test failure. It runs as part of the chio-conformance test suite, so
+//! a divergence between the natively available drivers fails the suite.
 //!
-//! The Python, TS node-http, and Go drivers are not invoked in-process
-//! here (they run in their own gate jobs and report tuples via their
-//! per-driver entry points). Their absence from this test does not
-//! weaken the cross-language equality claim because:
-//!
-//! - The Python and Go drivers run their local semantic evaluators in
-//!   their package-level tests and assert 48 passed, 0 failed, 0
-//!   unsupported.
-//! - The TS node-http driver remains a transport-client sidecar lane
-//!   and is enforced by its own gate.
+//! The Python, TS, and Go drivers are not invoked in-process here; each
+//! carries its own package-level tests over the same scenario corpus and
+//! reports tuples through its per-driver entry point. Their absence from
+//! this test does not weaken the cross-language equality claim: every
+//! driver evaluates the shared corpus, and `verify_manifest_corpus_hash`
+//! binds the manifest to that corpus so no driver can silently diverge on
+//! its inputs.
 //!
 //! The diff oracle in `cross_language.rs` is exercised directly by the
 //! unit tests under `cross_language::tests`; this file is the

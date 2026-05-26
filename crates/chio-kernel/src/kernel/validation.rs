@@ -1284,13 +1284,23 @@ impl ChioKernel {
                             }),
                     );
                 }
-                // Data-layer, communication, financial,
-                // model-routing, and memory-governance constraints do
-                // not contribute to governed-transaction requirements.
-                // Their enforcement is wired into request_matching.rs
-                // (argument-level checks) and downstream data/content
-                // guards (SQL parsing, result shaping, HITL replay).
-                Constraint::TableAllowlist(_)
+                // The argument/path matchers and the data-layer,
+                // communication, financial, model-routing, and
+                // memory-governance constraints do not contribute
+                // governed-transaction requirements. Their enforcement is
+                // wired into request_matching.rs (argument-level checks)
+                // and downstream data/content guards (SQL parsing, result
+                // shaping, HITL replay). This arm is exhaustive with no
+                // `_` catch-all: a new Constraint variant must choose
+                // explicitly here rather than be silently dropped from
+                // governance requirements.
+                Constraint::PathPrefix(_)
+                | Constraint::DomainExact(_)
+                | Constraint::DomainGlob(_)
+                | Constraint::RegexMatch(_)
+                | Constraint::MaxLength(_)
+                | Constraint::Custom(_, _)
+                | Constraint::TableAllowlist(_)
                 | Constraint::ColumnDenylist(_)
                 | Constraint::MaxRowsReturned(_)
                 | Constraint::OperationClass(_)
@@ -1302,7 +1312,6 @@ impl ChioKernel {
                 | Constraint::ModelConstraint { .. }
                 | Constraint::MemoryStoreAllowlist(_)
                 | Constraint::MemoryWriteDenyPatterns(_) => {}
-                _ => {}
             }
         }
 

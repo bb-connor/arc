@@ -48,6 +48,9 @@ const REASON_NONE: &str = "urn:chio:error:none";
 const REASON_KERNEL_INTERNAL: &str = "urn:chio:error:kernel:internal-error";
 const EVALUATE_PATH: &str = "/chio/evaluate";
 const DEFAULT_TIMEOUT_SECS: u64 = 5;
+/// Synthetic request timestamp (unix seconds). The verdict-matrix corpus
+/// is time-invariant, so a fixed value keeps relayed requests deterministic.
+const REQUEST_TIMESTAMP_SECS: u64 = 1_700_000_000;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct VerdictTuple {
@@ -195,6 +198,16 @@ pub fn run_driver(scenario_root: &Path, sidecar_url: Option<&str>) -> Result<Dri
         Some(base_url) => {
             let client = build_client()?;
             for scenario in scenarios {
+                if let Some(reason) = sidecar_unsupported_reason(&scenario) {
+                    outcomes.push(ScenarioOutcome {
+                        scenario_id: scenario.id,
+                        status: "unsupported".to_string(),
+                        expected: scenario.expected.normalized(),
+                        actual: None,
+                        diagnostic: Some(reason),
+                    });
+                    continue;
+                }
                 outcomes.push(evaluate_scenario(&client, &base_url, &scenario));
             }
         }
@@ -311,6 +324,7 @@ pub fn scenario_to_http_request(scenario: &Scenario) -> Value {
         }
     }
     let mut request = serde_json::json!({
+        "request_id": format!("req-{}", scenario.id),
         "method": method,
         "path": path,
         "query": {},
@@ -326,7 +340,8 @@ pub fn scenario_to_http_request(scenario: &Scenario) -> Value {
         "capability_id": format!("cap-{}", scenario.id),
         "tool_server": MATRIX_SERVER_ID,
         "tool_name": tool,
-        "tool_arguments": arguments,
+        "arguments": arguments,
+        "timestamp": REQUEST_TIMESTAMP_SECS,
     });
     if let (Some(object), Some(hash)) = (request.as_object_mut(), body_hash) {
         object.insert("body_hash".to_string(), Value::String(hash));
@@ -340,6 +355,26 @@ fn capability_token_for(scenario: &Scenario) -> String {
         "scopes": scenario.script.capability_scopes,
     })
     .to_string()
+}
+
+/// Scenario classes this sidecar relay cannot faithfully evaluate over
+/// plain HTTP, mirroring the TypeScript node-http driver's
+/// `unsupportedSignedCapability` gate. The `capability` and `revocation`
+/// tuples turn on signed `CapabilityToken` validation (issuer, signature,
+/// and time-validity per `chio-http-core::authority::validate_capability_token`);
+/// this relay has no signed-token builder, so an unsigned token would force
+/// a deny on validation rather than surface the intended verdict. Report
+/// `unsupported` instead of a misleading pass/fail.
+fn sidecar_unsupported_reason(scenario: &Scenario) -> Option<String> {
+    match scenario.category.as_str() {
+        "capability" | "revocation" => Some(format!(
+            "lambda deployment-shape relay has no signed CapabilityToken builder; \
+             sidecar evaluation of `{}` scenarios requires issuer + signature + \
+             time-valid fields per chio-http-core::authority::validate_capability_token",
+            scenario.category
+        )),
+        _ => None,
+    }
 }
 
 fn method_for_tool(tool: &str) -> &'static str {
@@ -478,9 +513,10 @@ mod tests {
 
     #[test]
     fn run_driver_records_fail_when_sidecar_is_set_but_unreachable() {
-        // A sidecar URL that resolves to a closed port must surface as a
-        // `fail` outcome, never a silent skip: a set-but-broken sidecar
-        // cannot masquerade as a pass.
+        // capability/revocation scenarios self-gate to `unsupported` before
+        // any sidecar call (the relay has no signed-token builder). The
+        // remaining scenarios are attempted, and a set-but-unreachable
+        // sidecar must surface them as `fail`, never a silent pass.
         let root = match resolve_scenario_root() {
             Ok(root) => root,
             Err(err) => panic!("could not resolve scenario root: {err}"),
@@ -491,14 +527,55 @@ mod tests {
             Err(err) => panic!("run_driver failed: {err}"),
         };
         assert!(report.total > 0, "expected scenarios to load");
-        assert_eq!(report.unsupported, 0);
         assert_eq!(report.passed, 0);
-        assert_eq!(report.failed, report.total);
-        let first = match report.outcomes.first() {
-            Some(outcome) => outcome,
-            None => panic!("expected at least one outcome"),
+        assert!(
+            report.unsupported > 0,
+            "capability/revocation classes should gate to unsupported"
+        );
+        assert!(
+            report.failed > 0,
+            "attempted scenarios must fail against an unreachable sidecar, not skip"
+        );
+        assert_eq!(report.unsupported + report.failed, report.total);
+    }
+
+    #[test]
+    fn scenario_to_http_request_matches_chio_http_request_contract() {
+        let request = scenario_to_http_request(&scenario("shape-check"));
+        let object = match request.as_object() {
+            Some(object) => object,
+            None => panic!("request must serialize to a JSON object"),
         };
-        assert_eq!(first.status, "fail");
+        // request_id and timestamp are required (non-defaulted) fields on
+        // ChioHttpRequest; tool inputs go under `arguments`, not `tool_arguments`.
+        assert!(object.contains_key("request_id"), "request_id is required");
+        assert!(object.contains_key("timestamp"), "timestamp is required");
+        assert!(
+            object.contains_key("arguments"),
+            "tool inputs go under `arguments`"
+        );
+        assert!(
+            !object.contains_key("tool_arguments"),
+            "`tool_arguments` is not a ChioHttpRequest field"
+        );
+    }
+
+    #[test]
+    fn capability_and_revocation_scenarios_gate_to_unsupported() {
+        let mut capability = scenario("cap-1");
+        capability.category = "capability".to_string();
+        assert!(sidecar_unsupported_reason(&capability).is_some());
+
+        let mut revocation = scenario("revoke-1");
+        revocation.category = "revocation".to_string();
+        assert!(sidecar_unsupported_reason(&revocation).is_some());
+
+        let mut replay = scenario("replay-1");
+        replay.category = "replay".to_string();
+        assert!(
+            sidecar_unsupported_reason(&replay).is_none(),
+            "replay scenarios are attempted, not gated"
+        );
     }
 
     #[test]
