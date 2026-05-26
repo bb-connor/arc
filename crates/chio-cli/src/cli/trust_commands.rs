@@ -3952,7 +3952,7 @@ mod receipt_operator_tests {
                 tenant_id: None,
                 kernel_key: keypair.public_key(),
             },
-            &keypair,
+            keypair,
         )
     }
 

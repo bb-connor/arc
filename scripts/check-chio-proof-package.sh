@@ -15,24 +15,26 @@ case "${1:-}" in
     shift
     ;;
   *)
-    echo "usage: check-chiodos-proof-package.sh [--schema-only|--negative-only]" >&2
+    echo "usage: check-chio-proof-package.sh [--schema-only|--negative-only]" >&2
     exit 2
     ;;
 esac
 if [[ $# -ne 0 ]]; then
-  echo "usage: check-chiodos-proof-package.sh [--schema-only|--negative-only]" >&2
+  echo "usage: check-chio-proof-package.sh [--schema-only|--negative-only]" >&2
   exit 2
 fi
 
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
 
-PROOF_FIXTURE="$ROOT/examples/chiodos-3vendor/fixtures/selective-disclosure-proof.json"
-PACKAGE_FIXTURE="$ROOT/examples/chiodos-3vendor/fixtures/buyer-auditor-proof-package.json"
-TRUST_BUNDLE_FIXTURE="$ROOT/examples/chiodos-3vendor/fixtures/verifier-trust-bundle.json"
-CONTEXT_FIXTURE="$ROOT/examples/chiodos-3vendor/fixtures/verification-context.json"
-REPORT_FIXTURE="$ROOT/examples/chiodos-3vendor/fixtures/verifier-report.json"
-NEGATIVE_CASES_FIXTURE="$ROOT/examples/chiodos-3vendor/fixtures/negative-cases.json"
-SCHEMA_DIR="$ROOT/spec/schemas/chiodos/v1"
+PROOF_FIXTURE="$ROOT/examples/chio-3vendor/fixtures/selective-disclosure-proof.json"
+PACKAGE_FIXTURE="$ROOT/examples/chio-3vendor/fixtures/buyer-auditor-proof-package.json"
+TRUST_BUNDLE_FIXTURE="$ROOT/examples/chio-3vendor/fixtures/verifier-trust-bundle.json"
+CONTEXT_FIXTURE="$ROOT/examples/chio-3vendor/fixtures/verification-context.json"
+REPORT_FIXTURE="$ROOT/examples/chio-3vendor/fixtures/verifier-report.json"
+NEGATIVE_CASES_FIXTURE="$ROOT/examples/chio-3vendor/fixtures/negative-cases.json"
+SCHEMA_DIR="$ROOT/spec/schemas"
+ATTEST_SCHEMA_DIR="$SCHEMA_DIR/chio-attest/v1"
+FEDERATION_SCHEMA_DIR="$SCHEMA_DIR/chio-federation/v1"
 SCHEMA_REGISTRY="$ROOT/spec/schemas/registry.json"
 
 python3 - "$PROOF_FIXTURE" "$PACKAGE_FIXTURE" "$TRUST_BUNDLE_FIXTURE" "$CONTEXT_FIXTURE" "$REPORT_FIXTURE" "$NEGATIVE_CASES_FIXTURE" "$SCHEMA_DIR" "$SCHEMA_REGISTRY" <<'PY'
@@ -57,40 +59,40 @@ with open(negative_cases_fixture, "r", encoding="utf-8") as handle:
 with open(schema_registry, "r", encoding="utf-8") as handle:
     registry = json.load(handle)
 
-if proof.get("schema") != "chio.selective-disclosure-proof.v1":
-    raise SystemExit("Chiodos BBS fixture does not use the real proof schema")
+if proof.get("schema") != "chio.attest.selective-disclosure-proof.v1":
+    raise SystemExit("Chio BBS fixture does not use the real proof schema")
 if str(proof.get("schema", "")).endswith(".stub"):
-    raise SystemExit("Chiodos BBS fixture must not use the legacy stub schema")
+    raise SystemExit("Chio BBS fixture must not use the legacy stub schema")
 if proof.get("projection_version") != "chio.bbs-projection.workflow.v1":
-    raise SystemExit("Chiodos BBS fixture must exercise the workflow projection")
+    raise SystemExit("Chio BBS fixture must exercise the workflow projection")
 if proof.get("ciphersuite") != "BBS_BLS12381G1_XMD:SHA-256_SSWU_RO_":
-    raise SystemExit("Chiodos BBS fixture must declare the SHA-256 BBS ciphersuite")
+    raise SystemExit("Chio BBS fixture must declare the SHA-256 BBS ciphersuite")
 if len(proof.get("disclosed", [])) != len(proof.get("disclosed_indices", [])):
-    raise SystemExit("Chiodos BBS fixture disclosed messages and indices disagree")
+    raise SystemExit("Chio BBS fixture disclosed messages and indices disagree")
 if len(set(proof.get("disclosed_indices", []))) != len(proof.get("disclosed_indices", [])):
-    raise SystemExit("Chiodos BBS fixture disclosed indices must be unique")
-if package.get("schema") != "chio.chiodos.proof-package.v1":
-    raise SystemExit("Chiodos proof package uses the wrong schema")
-if trust_bundle.get("schema") != "chio.chiodos.verifier-trust-bundle.v1":
-    raise SystemExit("Chiodos verifier trust bundle uses the wrong schema")
-if context.get("schema") != "chio.chiodos.verification-context.v1":
-    raise SystemExit("Chiodos verification context uses the wrong schema")
-if report.get("schema") != "chio.chiodos.verifier-report.v1":
-    raise SystemExit("Chiodos verifier report uses the wrong schema")
+    raise SystemExit("Chio BBS fixture disclosed indices must be unique")
+if package.get("schema") != "chio.attest.proof-package.v1":
+    raise SystemExit("Chio proof package uses the wrong schema")
+if trust_bundle.get("schema") != "chio.federation.verifier-trust-bundle.v1":
+    raise SystemExit("Chio verifier trust bundle uses the wrong schema")
+if context.get("schema") != "chio.federation.verification-context.v1":
+    raise SystemExit("Chio verification context uses the wrong schema")
+if report.get("schema") != "chio.attest.verifier-report.v1":
+    raise SystemExit("Chio verifier report uses the wrong schema")
 if not report.get("accepted"):
-    raise SystemExit("Chiodos verifier report is not accepted")
+    raise SystemExit("Chio verifier report is not accepted")
 for field in ("packageSha256", "trustBundleSha256", "contextSha256", "revocationEpochHeight"):
     if field not in report:
-        raise SystemExit(f"Chiodos verifier report is missing {field}")
+        raise SystemExit(f"Chio verifier report is missing {field}")
 if not all(check.get("code") for check in report.get("checks", [])):
-    raise SystemExit("Chiodos verifier report checks must carry stable codes")
+    raise SystemExit("Chio verifier report checks must carry stable codes")
 
 claims = package.get("claims", {})
 if not claims.get("bbsRevealSet"):
-    raise SystemExit("Chiodos package must claim real BBS reveal-set support")
+    raise SystemExit("Chio package must claim real BBS reveal-set support")
 for unsupported in ("hiddenRangePredicates", "vcDataIntegrityBbs", "zkvm"):
     if claims.get(unsupported):
-        raise SystemExit(f"Chiodos package must not claim {unsupported}")
+        raise SystemExit(f"Chio package must not claim {unsupported}")
 if package.get("selectiveDisclosureProof") != proof:
     raise SystemExit("Standalone BBS proof fixture differs from package proof")
 
@@ -109,7 +111,7 @@ if set(policy.get("requiredDisclosedFields", [])) - disclosed_fields:
 
 issuers = trust_bundle.get("trustedBbsIssuers", [])
 if len(issuers) != 1:
-    raise SystemExit("Chiodos trust bundle must contain one fixture BBS issuer")
+    raise SystemExit("Chio trust bundle must contain one fixture BBS issuer")
 issuer = issuers[0]
 if issuer.get("issuerFingerprint") != proof.get("issuer_fingerprint"):
     raise SystemExit("Trust bundle issuer fingerprint does not match proof issuer")
@@ -118,7 +120,7 @@ if issuer.get("publicKeyHex") != proof.get("issuer_public_key_hex"):
 
 revocation = trust_bundle.get("revocation", {})
 body = revocation.get("body", {})
-if body.get("schema") != "chio.chiodos.revocation-checkpoint.v1":
+if body.get("schema") != "chio.federation.revocation-checkpoint.v1":
     raise SystemExit("Trust bundle must carry a signed revocation checkpoint")
 if body.get("expiresAtUnixMs", 0) <= body.get("issuedAtUnixMs", 0):
     raise SystemExit("Revocation checkpoint must have a live interval")
@@ -126,8 +128,8 @@ if "signerKey" not in revocation or "signature" not in revocation:
     raise SystemExit("Revocation checkpoint must be signed")
 
 workflow_intersection = package.get("workflowIntersection", {})
-if workflow_intersection.get("schema") != "chio.chiodos-workflow-intersection.v1":
-    raise SystemExit("Chiodos package must carry workflow intersection v1")
+if workflow_intersection.get("schema") != "chio.attest.workflow-intersection.v1":
+    raise SystemExit("Chio package must carry workflow intersection v1")
 if workflow_intersection.get("workflowId") != package.get("workflowId"):
     raise SystemExit("Workflow intersection workflow id must match package")
 if workflow_intersection.get("workflowGrantId") != package.get("workflowReceipt", {}).get("capability_id"):
@@ -151,28 +153,28 @@ for required_class in ("workflow.grant_issue", "workflow.aggregate_publish"):
 if len(trust_bundle.get("workflowIntersections", [])) != 1:
     raise SystemExit("Trust bundle must trust one workflow intersection hash")
 if len(package.get("bilateralEnvelopes", [])) != 3:
-    raise SystemExit("Chiodos package must contain three bilateral envelopes")
+    raise SystemExit("Chio package must contain three bilateral envelopes")
 for idx, envelope in enumerate(package.get("bilateralEnvelopes", [])):
     payload = envelope.get("payload")
     if not isinstance(payload, str):
-        raise SystemExit(f"Chiodos envelope {idx} has no payload")
+        raise SystemExit(f"Chio envelope {idx} has no payload")
     statement = json.loads(base64.b64decode(payload).decode("utf-8"))
     if statement.get("predicateType") != "chio.bilateral-cosign-invocation.v1":
-        raise SystemExit(f"Chiodos envelope {idx} is not strict Chiodos")
+        raise SystemExit(f"Chio envelope {idx} is not strict Chio")
     predicate = statement.get("predicate", {})
     if "tool_args_hash" not in predicate:
-        raise SystemExit(f"Chiodos envelope {idx} is missing tool_args_hash")
+        raise SystemExit(f"Chio envelope {idx} is missing tool_args_hash")
     if "receipt_canonical_json" in predicate:
-        raise SystemExit(f"Chiodos envelope {idx} carries signature-slice receipt helper")
+        raise SystemExit(f"Chio envelope {idx} carries signature-slice receipt helper")
 if len(package.get("capabilityLeases", [])) != 3:
-    raise SystemExit("Chiodos package must contain three capability leases")
+    raise SystemExit("Chio package must contain three capability leases")
 if len(package.get("leaseScopeBindings", [])) != 3:
-    raise SystemExit("Chiodos package must contain three lease scope bindings")
+    raise SystemExit("Chio package must contain three lease scope bindings")
 for binding in package.get("leaseScopeBindings", []):
-    if binding.get("schema") != "chio.chiodos-lease-scope-binding.v1":
-        raise SystemExit("Chiodos lease scope binding uses the wrong schema")
+    if binding.get("schema") != "chio.federation.lease-scope-binding.v1":
+        raise SystemExit("Chio lease scope binding uses the wrong schema")
 if len(package.get("governanceReceipts", [])) != 1:
-    raise SystemExit("Chiodos package must contain one destructive governance receipt")
+    raise SystemExit("Chio package must contain one destructive governance receipt")
 
 lease_authorities = trust_bundle.get("leaseAuthorities", [])
 if len(lease_authorities) != 1:
@@ -200,44 +202,43 @@ if governance_authority.get("authorizingKernel") != "did:chio:buyer-governance":
 if governance_authority.get("publicKey") != package["governanceReceipts"][0].get("signerKey"):
     raise SystemExit("Fixture governance authority key does not match signed receipt")
 
-if negative_cases.get("schema") != "chio.chiodos.negative-fixture-corpus.v1":
-    raise SystemExit("Chiodos negative corpus uses the wrong schema")
+if negative_cases.get("schema") != "chio.attest.buyer-proof-negative-fixture-corpus.v1":
+    raise SystemExit("Chio negative corpus uses the wrong schema")
 if len(negative_cases.get("cases", [])) < 14:
-    raise SystemExit("Chiodos negative corpus must cover verifier trust, context, and package mutations")
+    raise SystemExit("Chio negative corpus must cover verifier trust, context, and package mutations")
 
 expected_schemas = {
-    "capability-lease.schema.json": "chio.capability-lease.v1",
-    "governance-receipt.schema.json": "chio.governance-receipt.v1",
-    "lease-scope-binding.schema.json": "chio.chiodos-lease-scope-binding.v1",
-    "proof-package.schema.json": "chio.chiodos.proof-package.v1",
-    "verifier-trust-bundle.schema.json": "chio.chiodos.verifier-trust-bundle.v1",
-    "workflow-intersection.schema.json": "chio.chiodos-workflow-intersection.v1",
-    "trusted-issuer-registry.schema.json": "chio.chiodos.trusted-issuer-registry.v1",
-    "selective-disclosure-proof.schema.json": "chio.selective-disclosure-proof.v1",
-    "verifier-report.schema.json": "chio.chiodos.verifier-report.v1",
-    "revocation-checkpoint.schema.json": "chio.chiodos.revocation-checkpoint.v1",
-    "verification-context.schema.json": "chio.chiodos.verification-context.v1",
-    "negative-fixture-corpus.schema.json": "chio.chiodos.negative-fixture-corpus.v1",
-    "authority-profile.schema.json": "chio.chiodos.authority-profile.v1",
-    "issuance-request.schema.json": "chio.chiodos.issuance-request.v1",
-    "issuance-bundle.schema.json": "chio.chiodos.issuance-bundle.v1",
-    "revocation-publication-request.schema.json": "chio.chiodos.revocation-publication-request.v1",
-    "peer-pins.schema.json": "chio.chiodos.peer-pins.v1",
+    "chio-federation/v1/capability-lease.schema.json": "chio.capability-lease.v1",
+    "chio-federation/v1/governance-receipt.schema.json": "chio.governance-receipt.v1",
+    "chio-federation/v1/lease-scope-binding.schema.json": "chio.federation.lease-scope-binding.v1",
+    "chio-attest/v1/proof-package.schema.json": "chio.attest.proof-package.v1",
+    "chio-federation/v1/verifier-trust-bundle.schema.json": "chio.federation.verifier-trust-bundle.v1",
+    "chio-attest/v1/workflow-intersection.schema.json": "chio.attest.workflow-intersection.v1",
+    "chio-attest/v1/selective-disclosure-proof.schema.json": "chio.attest.selective-disclosure-proof.v1",
+    "chio-attest/v1/verifier-report.schema.json": "chio.attest.verifier-report.v1",
+    "chio-federation/v1/revocation-checkpoint.schema.json": "chio.federation.revocation-checkpoint.v1",
+    "chio-federation/v1/verification-context.schema.json": "chio.federation.verification-context.v1",
+    "chio-attest/v1/buyer-proof-negative-fixture-corpus.schema.json": "chio.attest.buyer-proof-negative-fixture-corpus.v1",
+    "chio-federation/v1/authority-profile.schema.json": "chio.federation.authority-profile.v1",
+    "chio-federation/v1/issuance-request.schema.json": "chio.federation.issuance-request.v1",
+    "chio-federation/v1/issuance-bundle.schema.json": "chio.federation.issuance-bundle.v1",
+    "chio-federation/v1/revocation-publication-request.schema.json": "chio.federation.revocation-publication-request.v1",
+    "chio-federation/v1/peer-pins.schema.json": "chio.federation.peer-pins.v1",
 }
 registered = {entry.get("schema"): entry.get("schemaFile") for entry in registry.get("artifacts", [])}
 schema_root = pathlib.Path(schema_dir)
-for filename, schema_id in expected_schemas.items():
-    schema_path = schema_root / filename
+for relative_schema_path, schema_id in expected_schemas.items():
+    schema_path = schema_root / relative_schema_path
     if not schema_path.is_file():
-        raise SystemExit(f"missing Chiodos schema file {filename}")
+        raise SystemExit(f"missing Chio schema file {relative_schema_path}")
     with schema_path.open("r", encoding="utf-8") as handle:
         schema = json.load(handle)
     if "$id" not in schema or schema.get("type") != "object":
-        raise SystemExit(f"Chiodos schema {filename} is not frozen as an object schema")
-    if registered.get(schema_id) != f"spec/schemas/chiodos/v1/{filename}":
-        raise SystemExit(f"Chiodos schema {schema_id} is missing from registry")
+        raise SystemExit(f"Chio schema {relative_schema_path} is not frozen as an object schema")
+    if registered.get(schema_id) != f"spec/schemas/{relative_schema_path}":
+        raise SystemExit(f"Chio schema {schema_id} is missing from registry")
 
-print("OK Chiodos proof package metadata")
+print("OK Chio proof package metadata")
 PY
 
 validate_schema() {
@@ -246,12 +247,12 @@ validate_schema() {
   cargo run -p chio-spec-validate -- "$schema" "$document" >/dev/null
 }
 
-validate_schema "$SCHEMA_DIR/selective-disclosure-proof.schema.json" "$PROOF_FIXTURE"
-validate_schema "$SCHEMA_DIR/proof-package.schema.json" "$PACKAGE_FIXTURE"
-validate_schema "$SCHEMA_DIR/verifier-trust-bundle.schema.json" "$TRUST_BUNDLE_FIXTURE"
-validate_schema "$SCHEMA_DIR/verification-context.schema.json" "$CONTEXT_FIXTURE"
-validate_schema "$SCHEMA_DIR/verifier-report.schema.json" "$REPORT_FIXTURE"
-validate_schema "$SCHEMA_DIR/negative-fixture-corpus.schema.json" "$NEGATIVE_CASES_FIXTURE"
+validate_schema "$ATTEST_SCHEMA_DIR/selective-disclosure-proof.schema.json" "$PROOF_FIXTURE"
+validate_schema "$ATTEST_SCHEMA_DIR/proof-package.schema.json" "$PACKAGE_FIXTURE"
+validate_schema "$FEDERATION_SCHEMA_DIR/verifier-trust-bundle.schema.json" "$TRUST_BUNDLE_FIXTURE"
+validate_schema "$FEDERATION_SCHEMA_DIR/verification-context.schema.json" "$CONTEXT_FIXTURE"
+validate_schema "$ATTEST_SCHEMA_DIR/verifier-report.schema.json" "$REPORT_FIXTURE"
+validate_schema "$ATTEST_SCHEMA_DIR/buyer-proof-negative-fixture-corpus.schema.json" "$NEGATIVE_CASES_FIXTURE"
 
 if [[ "$MODE" == "schema-only" ]]; then
   exit 0
@@ -259,18 +260,18 @@ fi
 
 if [[ "$MODE" == "all" ]]; then
   cargo test -p chio-selective-disclosure --features bbs --test bbs_selective_disclosure
-  cargo test -p chio-conformance --features chiodos-bbs --test chiodos_selective_disclosure
-  cargo test -p chio-chiodos
-  cargo test -p chio-cli chiodos
-  cargo test -p chiodos-three-vendor-example
+  cargo test -p chio-conformance --features chio-bbs --test chio_selective_disclosure
+  cargo test -p chio-attest-buyer
+  cargo test -p chio-cli chio
+  cargo test -p chio-three-vendor-example
 fi
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
 if [[ "$MODE" == "all" ]]; then
-  bash "$ROOT/scripts/check-chiodos-authority-issuance.sh"
-  cargo run -p chio-cli -- chiodos verify \
+  bash "$ROOT/scripts/check-chio-authority-issuance.sh"
+  cargo run -p chio-cli -- attest buyer verify-proof \
       --package "$PACKAGE_FIXTURE" \
       --trust-bundle "$TRUST_BUNDLE_FIXTURE" \
       --context "$CONTEXT_FIXTURE" \
@@ -343,16 +344,16 @@ for case in corpus["cases"]:
 (out / "negative-index.tsv").write_text("\n".join(index_lines) + "\n", encoding="utf-8")
 PY
 
-cargo run -p chiodos-three-vendor-example --bin generate-chiodos-proof-package -- \
+cargo run -p chio-three-vendor-example --bin generate-chio-proof-package -- \
     --signed-negative-dir "$tmpdir"
 
 while IFS=$'\t' read -r case_id expected_code requires_signed package_path trust_bundle_path context_path report_path; do
-    if cargo run -p chio-cli -- chiodos verify \
+    if cargo run -p chio-cli -- attest buyer verify-proof \
         --package "$package_path" \
         --trust-bundle "$trust_bundle_path" \
         --context "$context_path" \
         --report "$report_path"; then
-        echo "Chiodos CLI accepted negative case ${case_id}" >&2
+        echo "Chio CLI accepted negative case ${case_id}" >&2
         exit 1
     fi
     python3 - "$case_id" "$expected_code" "$requires_signed" "$report_path" <<'PY'

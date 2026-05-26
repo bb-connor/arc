@@ -91,7 +91,18 @@ pub(crate) fn cmd_chio_federation_treaty_admit(
     .map_err(|error| CliError::cli_other_error(format!("Chio treaty admission: {error}")))?;
     let json = chio_federation::cross_boundary_admission_report_json(&admission)
         .map_err(|error| CliError::cli_other_error(format!("Chio treaty admission: {error}")))?;
-    write_json_string(report, &format!("{json}\n"))
+    write_json_string(report, &format!("{json}\n"))?;
+    if admission.accepted {
+        Ok(())
+    } else {
+        Err(CliError::policy_error(format!(
+            "Chio treaty admission rejected request: {}",
+            admission
+                .failure_code
+                .as_deref()
+                .unwrap_or("unknown_treaty_admission_failure")
+        )))
+    }
 }
 
 pub(crate) fn cmd_chio_federation_treaty_verify_packet(
@@ -164,7 +175,18 @@ pub(crate) fn cmd_chio_attest_buyer_verify_packet(
         .map_err(|error| {
             CliError::cli_other_error(format!("Chio buyer attestation verification: {error}"))
         })?;
-    write_json_string(report, &format!("{json}\n"))
+    write_json_string(report, &format!("{json}\n"))?;
+    if verification.accepted {
+        Ok(())
+    } else {
+        Err(CliError::cli_other_error(format!(
+            "Chio buyer packet verification rejected packet: {}",
+            verification
+                .failure_code
+                .as_deref()
+                .unwrap_or("unknown_buyer_packet_rejection")
+        )))
+    }
 }
 
 pub(crate) const BUYER_REVIEW_ARTIFACT_FILES: &[(&str, &str)] = &[

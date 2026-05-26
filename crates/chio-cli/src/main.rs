@@ -113,6 +113,207 @@ mod cli_entrypoint_tests {
         );
     }
 
+    const TEST_NOW: u64 = 1_800_000_010_000;
+
+    struct TestBuyerPacketInputs {
+        packet: chio_attest_buyer::BuyerAttestationPacket,
+        lineage: chio_attest_buyer::ReceiptLineageStatement,
+        continuation: chio_attest_buyer::CrossKernelContinuation,
+        admission: chio_attest_buyer::CrossBoundaryAdmissionReport,
+        bilateral: chio_attest_buyer::BilateralInvocation,
+    }
+
+    fn write_test_json(
+        path: &std::path::Path,
+        value: &impl serde::Serialize,
+    ) -> Result<(), Box<dyn Error>> {
+        std::fs::write(path, serde_json::to_vec_pretty(value)?)?;
+        Ok(())
+    }
+
+    fn canonical_sha256(value: &impl serde::Serialize) -> Result<String, Box<dyn Error>> {
+        Ok(chio_core_types::crypto::sha256_hex(
+            &chio_core_types::crypto::canonical_json_bytes(value)?,
+        ))
+    }
+
+    fn test_treaty_action_class(
+        mode: &str,
+        destructive: bool,
+        consistency_model: &str,
+        evidence_required: Vec<&str>,
+    ) -> chio_federation::GovernanceLadderActionClass {
+        chio_federation::GovernanceLadderActionClass {
+            action_class_id: "workflow.destructive.vendor_call".to_string(),
+            mode: mode.to_string(),
+            destructive,
+            consistency_model: consistency_model.to_string(),
+            co_sign: "bilateral_required".to_string(),
+            evidence_required: evidence_required
+                .into_iter()
+                .map(std::string::ToString::to_string)
+                .collect(),
+            aliases: Vec::new(),
+        }
+    }
+
+    fn test_treaty_manifest(
+        kernel_id: &str,
+        action: chio_federation::GovernanceLadderActionClass,
+    ) -> chio_federation::GovernanceLadderManifest {
+        chio_federation::GovernanceLadderManifest {
+            schema: chio_federation::CHIO_FEDERATION_GOVERNANCE_LADDER_MANIFEST_SCHEMA
+                .to_string(),
+            manifest_id: format!("ladder-{kernel_id}"),
+            kernel_id: kernel_id.to_string(),
+            issuer: format!("did:chio:{kernel_id}"),
+            key_id: "ladder-key-1".to_string(),
+            issued_at_unix_ms: 1_800_000_000_000,
+            expires_at_unix_ms: 1_800_003_600_000,
+            destructive_floor: "receipt_backed".to_string(),
+            default_unknown_mode: "deny".to_string(),
+            action_classes: vec![action],
+        }
+    }
+
+    fn test_treaty_scope() -> chio_federation::TreatyScope {
+        let buyer_key = chio_core_types::crypto::Keypair::generate();
+        let vendor_key = chio_core_types::crypto::Keypair::generate();
+        chio_federation::TreatyScope {
+            schema: chio_federation::CHIO_FEDERATION_TREATY_SCOPE_SCHEMA.to_string(),
+            treaty_id: "treaty-buyer-vendor".to_string(),
+            participant_kernel_ids: vec!["kernel.buyer".to_string(), "kernel.vendor-b".to_string()],
+            participant_public_keys: vec![buyer_key.public_key(), vendor_key.public_key()],
+            ladder_manifest_sha256s: vec!["a".repeat(64), "b".repeat(64)],
+            allowed_action_classes: vec!["workflow.destructive.vendor_call".to_string()],
+            issued_at_unix_ms: 1_800_000_000_000,
+            expires_at_unix_ms: 1_800_003_600_000,
+            revocation_epoch_sha256: "c".repeat(64),
+            trust_bundle_sha256: "b".repeat(64),
+        }
+    }
+
+    fn test_buyer_packet_inputs() -> Result<TestBuyerPacketInputs, Box<dyn Error>> {
+        let continuation = chio_attest_buyer::CrossKernelContinuation {
+            schema: chio_attest_buyer::CHIO_FEDERATION_CROSS_KERNEL_CONTINUATION_SCHEMA.to_string(),
+            continuation_id: "continuation:buyer:001".to_string(),
+            source_kernel_id: "did:chio:buyer".to_string(),
+            target_kernel_id: "did:chio:seller".to_string(),
+            parent_receipt_sha256: "11".repeat(32),
+            parent_session_anchor_sha256: "22".repeat(32),
+            capability_id: "capability:buyer:001".to_string(),
+            action_class_id: "chio.tool.invoke".to_string(),
+            audience_tool: "seller.lookup".to_string(),
+            nonce: "nonce-buyer-001".to_string(),
+            issued_at_unix_ms: 1_766_000_000_000,
+            expires_at_unix_ms: 1_766_000_060_000,
+        };
+        let continuation_sha256 = canonical_sha256(&continuation)?;
+        let mut lineage = chio_attest_buyer::ReceiptLineageStatement {
+            schema: chio_attest_buyer::CHIO_FEDERATION_RECEIPT_LINEAGE_STATEMENT_SCHEMA.to_string(),
+            statement_id: "lineage:buyer:001".to_string(),
+            parent_receipt_sha256: continuation.parent_receipt_sha256.clone(),
+            child_receipt_sha256: "33".repeat(32),
+            continuation_sha256: continuation_sha256.clone(),
+            bilateral_invocation_sha256: "00".repeat(32),
+            evidence_class: "verified".to_string(),
+            source_kernel_id: continuation.source_kernel_id.clone(),
+            target_kernel_id: continuation.target_kernel_id.clone(),
+        };
+        let mut bilateral = chio_attest_buyer::BilateralInvocation {
+            schema: chio_attest_buyer::CHIO_FEDERATION_BILATERAL_INVOCATION_SCHEMA.to_string(),
+            invocation_id: "bilateral:buyer:001".to_string(),
+            treaty_id: "treaty:buyer-seller:001".to_string(),
+            ladder_intersection_sha256: "44".repeat(32),
+            continuation_sha256: continuation_sha256.clone(),
+            lineage_statement_sha256: "00".repeat(32),
+            action_class_id: continuation.action_class_id.clone(),
+            consistency_model: "totally_ordered".to_string(),
+            capability_id: continuation.capability_id.clone(),
+            request_sha256: "55".repeat(32),
+            outcome_sha256: "66".repeat(32),
+            local_receipt_sha256: lineage.parent_receipt_sha256.clone(),
+            remote_receipt_sha256: lineage.child_receipt_sha256.clone(),
+            signer_kernel_ids: vec![
+                continuation.source_kernel_id.clone(),
+                continuation.target_kernel_id.clone(),
+            ],
+        };
+        let bilateral_sha256 =
+            chio_attest_buyer::bilateral_invocation_binding_sha256(&bilateral)?;
+        lineage.bilateral_invocation_sha256 = bilateral_sha256.clone();
+        let lineage_sha256 = chio_attest_buyer::receipt_lineage_statement_sha256(&lineage)?;
+        bilateral.lineage_statement_sha256 = lineage_sha256.clone();
+        let admission = chio_attest_buyer::CrossBoundaryAdmissionReport {
+            schema: "chio.federation.cross-boundary-admission-report.v1".to_string(),
+            treaty_id: bilateral.treaty_id.clone(),
+            action_class_id: continuation.action_class_id.clone(),
+            accepted: true,
+            failure_code: None,
+            mode: "receipt_backed".to_string(),
+            consistency_model: bilateral.consistency_model.clone(),
+            co_sign: "bilateral_required".to_string(),
+            required_evidence: vec![
+                "receipt_lineage".to_string(),
+                "bilateral_invocation".to_string(),
+            ],
+            present_evidence: vec![
+                "receipt_lineage".to_string(),
+                "bilateral_invocation".to_string(),
+            ],
+            verified_evidence: vec![
+                chio_attest_buyer::CrossBoundaryEvidenceRef {
+                    evidence_class: "receipt_lineage".to_string(),
+                    artifact_sha256: lineage_sha256.clone(),
+                    verified: true,
+                },
+                chio_attest_buyer::CrossBoundaryEvidenceRef {
+                    evidence_class: "bilateral_invocation".to_string(),
+                    artifact_sha256: bilateral_sha256.clone(),
+                    verified: true,
+                },
+            ],
+            treaty_scope_sha256: "77".repeat(32),
+            ladder_intersection_sha256: bilateral.ladder_intersection_sha256.clone(),
+            expected_ladder_intersection_sha256: None,
+            checks: vec!["accepted".to_string()],
+        };
+        let packet = chio_attest_buyer::BuyerAttestationPacket {
+            schema: "chio.attest.buyer-attestation-packet.v1".to_string(),
+            packet_id: "buyer-packet:001".to_string(),
+            buyer_id: continuation.source_kernel_id.clone(),
+            capability_id: continuation.capability_id.clone(),
+            treaty_scope_sha256: admission.treaty_scope_sha256.clone(),
+            ladder_intersection_sha256: admission.ladder_intersection_sha256.clone(),
+            cross_boundary_admission_report_sha256: canonical_sha256(&admission)?,
+            continuation_sha256: canonical_sha256(&continuation)?,
+            receipt_lineage_statement_sha256: lineage_sha256,
+            bilateral_invocation_sha256: bilateral_sha256,
+            bilateral_dsse_sha256: "88".repeat(32),
+            workflow_receipt_sha256: "99".repeat(32),
+            proof_package_sha256: "aa".repeat(32),
+            verifier_report_sha256: "bb".repeat(32),
+            budget_refs: Vec::new(),
+            settlement_claimed: false,
+        };
+        Ok(TestBuyerPacketInputs {
+            packet,
+            lineage,
+            continuation,
+            admission,
+            bilateral,
+        })
+    }
+
+    fn parse_receipt_cli<const N: usize>(args: [&'static str; N]) -> Result<Cli, clap::Error> {
+        std::thread::Builder::new()
+            .stack_size(8 * 1024 * 1024)
+            .spawn(move || Cli::try_parse_from(args))
+            .expect("spawn receipt CLI parser")
+            .join()
+            .expect("receipt CLI parser thread")
+    }
+
     #[test]
     fn public_chio_command_type_boundaries_are_native() {
         let sources = [
@@ -196,7 +397,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn receipt_flush_subcommand_parses() {
-        let cli = Cli::try_parse_from([
+        let cli = parse_receipt_cli([
             "chio",
             "--receipt-db",
             "receipts.sqlite3",
@@ -220,7 +421,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn receipt_flush_rejects_zero_timeout() {
-        let result = Cli::try_parse_from([
+        let result = parse_receipt_cli([
             "chio",
             "--receipt-db",
             "receipts.sqlite3",
@@ -235,7 +436,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn receipt_checkpoint_create_subcommand_parses() {
-        let cli = Cli::try_parse_from([
+        let cli = parse_receipt_cli([
             "chio",
             "--receipt-db",
             "receipts.sqlite3",
@@ -252,13 +453,10 @@ mod cli_entrypoint_tests {
         match cli.command {
             Commands::Receipt {
                 command:
-                    ReceiptCommands::Checkpoint {
-                        command:
-                            ReceiptCheckpointCommands::Create {
-                                kernel_seed_file,
-                                max_batch,
-                            },
-                    },
+                    ReceiptCommands::Checkpoint(ReceiptCheckpointCommands::Create {
+                        kernel_seed_file,
+                        max_batch,
+                    }),
             } => {
                 assert_eq!(kernel_seed_file, PathBuf::from("kernel.seed"));
                 assert_eq!(max_batch, 250);
@@ -269,7 +467,7 @@ mod cli_entrypoint_tests {
 
     #[test]
     fn receipt_checkpoint_rejects_zero_max_batch() {
-        let create = Cli::try_parse_from([
+        let create = parse_receipt_cli([
             "chio",
             "--receipt-db",
             "receipts.sqlite3",
@@ -281,7 +479,7 @@ mod cli_entrypoint_tests {
             "--max-batch",
             "0",
         ]);
-        let status = Cli::try_parse_from([
+        let status = parse_receipt_cli([
             "chio",
             "--receipt-db",
             "receipts.sqlite3",
@@ -1202,6 +1400,111 @@ mod cli_entrypoint_tests {
         assert!(treaty_dispatch.contains("cmd_chio_federation_treaty_admit("));
         assert!(treaty_dispatch.contains("cmd_chio_federation_treaty_verify_packet("));
         assert!(!treaty_dispatch.contains("cmd_chio_treaty_"));
+    }
+
+    #[test]
+    fn chio_federation_treaty_admit_fails_cli_on_rejection(
+    ) -> Result<(), Box<dyn Error>> {
+        let tempdir = tempfile::tempdir()?;
+        let buyer = test_treaty_manifest(
+            "kernel.buyer",
+            test_treaty_action_class(
+                "receipt_backed",
+                true,
+                "totally_ordered",
+                vec![
+                    "governance_receipt",
+                    "bilateral_invocation",
+                    "receipt_lineage",
+                ],
+            ),
+        );
+        let vendor = test_treaty_manifest(
+            "kernel.vendor-b",
+            test_treaty_action_class(
+                "receipt_backed",
+                true,
+                "totally_ordered",
+                vec!["governance_receipt", "bilateral_invocation"],
+            ),
+        );
+        let mut treaty = test_treaty_scope();
+        treaty.ladder_manifest_sha256s = vec![
+            chio_federation::governance_ladder_manifest_sha256(&buyer)?,
+            chio_federation::governance_ladder_manifest_sha256(&vendor)?,
+        ];
+        let intersection =
+            chio_federation::compute_ladder_intersection(&treaty, &[buyer, vendor], TEST_NOW)?;
+        let expected_intersection_sha256 =
+            chio_federation::ladder_intersection_sha256(&intersection)?;
+        let treaty_path = tempdir.path().join("treaty-scope.json");
+        let intersection_path = tempdir.path().join("ladder-intersection.json");
+        let report_path = tempdir.path().join("admission-report.json");
+        write_test_json(&treaty_path, &treaty)?;
+        write_test_json(&intersection_path, &intersection)?;
+
+        let error = cmd_chio_federation_treaty_admit(
+            &treaty_path,
+            &intersection_path,
+            &expected_intersection_sha256,
+            "workflow.destructive.vendor_call",
+            &["governance_receipt=".to_string() + &"d".repeat(64)],
+            TEST_NOW,
+            &report_path,
+        )
+        .expect_err("rejected treaty admission must fail the CLI command");
+
+        assert!(
+            error.to_string().contains("rejected"),
+            "unexpected error: {error}"
+        );
+        let report: serde_json::Value = serde_json::from_slice(&std::fs::read(report_path)?)?;
+        assert_eq!(report["accepted"], false);
+        assert_eq!(
+            report["failureCode"],
+            "chio_federation_treaty_missing_required_evidence"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn chio_attest_buyer_verify_packet_fails_cli_on_rejection(
+    ) -> Result<(), Box<dyn Error>> {
+        let tempdir = tempfile::tempdir()?;
+        let inputs = test_buyer_packet_inputs()?;
+        let packet_path = tempdir.path().join("packet.json");
+        let lineage_path = tempdir.path().join("lineage.json");
+        let continuation_path = tempdir.path().join("continuation.json");
+        let admission_path = tempdir.path().join("admission.json");
+        let bilateral_path = tempdir.path().join("bilateral.json");
+        let report_path = tempdir.path().join("verification.json");
+        write_test_json(&packet_path, &inputs.packet)?;
+        write_test_json(&lineage_path, &inputs.lineage)?;
+        write_test_json(&continuation_path, &inputs.continuation)?;
+        write_test_json(&admission_path, &inputs.admission)?;
+        write_test_json(&bilateral_path, &inputs.bilateral)?;
+
+        let error = cmd_chio_attest_buyer_verify_packet(
+            &packet_path,
+            &lineage_path,
+            &continuation_path,
+            &admission_path,
+            &bilateral_path,
+            &report_path,
+        )
+        .expect_err("rejected buyer packet verification must fail the CLI command");
+
+        assert!(
+            error.to_string().contains("rejected"),
+            "unexpected error: {error}"
+        );
+        let report: serde_json::Value = serde_json::from_slice(&std::fs::read(report_path)?)?;
+        assert_eq!(report["accepted"], false);
+        assert_eq!(
+            report["failureCode"],
+            "chio_attest_buyer_packet_dsse_unresolved"
+        );
+        Ok(())
     }
 
     #[test]
