@@ -353,9 +353,22 @@ impl ChioKernel {
         session_filesystem_roots: Option<&'a [String]>,
     ) -> chio_kernel_core::EvaluationVerdict {
         let trusted = self.trusted_issuer_keys();
-        let peer_profile = self
-            .capability_negotiation_for_remote(None, clock.now_unix_secs())
-            .unwrap_or_else(|_| chio_core::capability::CapabilityNegotiation::t1_default());
+        let peer_profile = match self.capability_negotiation_for_remote(None, clock.now_unix_secs())
+        {
+            Ok(profile) => profile,
+            // Fail closed: a negotiation error denies rather than falling back
+            // to the permissive default profile.
+            Err(reason) => {
+                return chio_kernel_core::EvaluationVerdict {
+                    verdict: chio_kernel_core::Verdict::Deny,
+                    reason: Some(format!(
+                        "capability negotiation failed; denying fail-closed: {reason}"
+                    )),
+                    matched_grant_index: None,
+                    verified: None,
+                };
+            }
+        };
         let trust_resolver = self.capability_trust_root_resolver_snapshot();
         let mut budgets = match self.budget_registry.lock() {
             Ok(guard) => guard,

@@ -202,7 +202,9 @@ impl chio_kernel::Guard for PathAllowlistGuard {
             ToolAction::FileAccess(path) => self.is_file_access_allowed(path),
             ToolAction::FileWrite(path, _) => self.is_file_write_allowed(path),
             ToolAction::Patch(path, _) => self.is_patch_allowed(path),
-            _ => unreachable!("non-filesystem actions should return early"),
+            // Fail closed: any path-bearing action this allowlist cannot
+            // classify is denied, never silently allowed.
+            _ => false,
         };
 
         if allowed {

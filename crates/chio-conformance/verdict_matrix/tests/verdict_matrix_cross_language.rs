@@ -190,7 +190,7 @@ fn collect_wasm_browser_report(scenarios: &[VerdictScenario]) -> DriverReport {
                 scenario.id, error.message
             ),
         };
-        let tuple = match core.verdict.as_str() {
+        let tuple = match core.capability_verdict.as_str() {
             "allow" => VerdictTuple {
                 verdict: Verdict::Allow,
                 reason_code: REASON_NONE.to_string(),
@@ -206,12 +206,13 @@ fn collect_wasm_browser_report(scenarios: &[VerdictScenario]) -> DriverReport {
                 }
                 .normalized()
             }
-            other => panic!(
-                "wasm browser kernel returned unknown verdict `{other}` on {}",
-                scenario.id
-            ),
+            _ => VerdictTuple {
+                verdict: Verdict::Error,
+                reason_code: REASON_KERNEL_INTERNAL.to_string(),
+                scope_set: scope_set_for_failure.clone(),
+            }
+            .normalized(),
         };
-        let _ = REASON_KERNEL_INTERNAL; // silence unused-const warning under no-std builds
         tuples.insert(scenario.id.clone(), tuple);
     }
     DriverReport {
