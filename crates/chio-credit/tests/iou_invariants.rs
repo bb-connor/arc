@@ -207,7 +207,7 @@ proptest! {
             let envelope = outcome.expect("priced allow receipt mints exactly one IOU");
             prop_assert_eq!(envelope.body.amount_units, scenario.cost_charged);
             prop_assert_eq!(&envelope.body.currency, &scenario.currency);
-            prop_assert_eq!(&envelope.body.receipt_id, &scenario.receipt_id);
+            prop_assert_eq!(&envelope.body.receipt_id, &receipt.id);
             prop_assert_eq!(envelope.body.receipt_timestamp, scenario.timestamp);
             prop_assert_eq!(envelope.body.tenant_id.clone(), scenario.tenant_id.clone());
             prop_assert!(envelope.verify_signature().unwrap());
