@@ -1170,6 +1170,83 @@ fn manifest_vector_fixture_matches_checked_in_json() {
     assert_fixture_matches(&manifest_fixture_path(), &manifest_vector_fixture());
 }
 
+// Re-sign the checked-in capability corpus in place after a capability
+// signing-schema change (the signed body carries the schema string, which
+// renamed from `arc.capability.v1` to `chio.capability.v1`, so every stored
+// signature over the old schema no longer verifies). Only capabilities whose
+// own signature is meant to verify are re-signed; the intentionally tampered
+// cases keep their invalid signatures (a corrupted signature stays invalid
+// under the renamed schema). Run with `--ignored`, then refreeze the manifest
+// with `cargo xtask freeze-vectors`.
+#[test]
+#[ignore = "regenerator: re-sign capability vectors after a signing-schema change; run with --ignored"]
+fn rebless_capability_vector_signatures() {
+    use std::collections::HashMap;
+    let path = capability_fixture_path();
+    let raw = fs::read_to_string(&path).test_unwrap("read capability fixture");
+    let fixture: Value = serde_json::from_str(&raw).test_unwrap("parse capability fixture");
+
+    let mut by_pub: HashMap<String, Keypair> = HashMap::new();
+    for seed_field in [
+        "issuer_seed_hex",
+        "subject_seed_hex",
+        "delegatee_seed_hex",
+        "alt_seed_1_hex",
+        "alt_seed_2_hex",
+        "alt_seed_3_hex",
+        "alt_seed_4_hex",
+    ] {
+        if let Some(hex) = fixture[seed_field].as_str() {
+            let keypair = Keypair::from_seed_hex(hex).test_unwrap("seed hex");
+            by_pub.insert(keypair.public_key().to_hex(), keypair);
+        }
+    }
+
+    let mut replacements: Vec<(String, String)> = Vec::new();
+    for case in fixture["cases"].as_array().test_unwrap("cases array") {
+        if !case["expected"]["signature_valid"]
+            .as_bool()
+            .unwrap_or(false)
+        {
+            continue;
+        }
+        let issuer_hex = case["capability"]["issuer"].as_str().test_unwrap("issuer");
+        let keypair = by_pub
+            .get(issuer_hex)
+            .unwrap_or_else(|| panic!("no seed keypair for issuer {issuer_hex}"));
+        let token: CapabilityToken =
+            serde_json::from_value(case["capability"].clone()).test_unwrap("parse capability");
+        let resigned = CapabilityToken::sign(token.body(), keypair).test_unwrap("re-sign");
+        let resigned_value = serde_json::to_value(&resigned).test_unwrap("serialize resigned");
+        let old_sig = case["capability"]["signature"]
+            .as_str()
+            .test_unwrap("old signature")
+            .to_string();
+        let new_sig = resigned_value["signature"]
+            .as_str()
+            .test_unwrap("new signature")
+            .to_string();
+        if old_sig != new_sig {
+            replacements.push((old_sig, new_sig));
+        }
+    }
+
+    let mut text = raw;
+    for (old, new) in &replacements {
+        assert_eq!(
+            text.matches(old.as_str()).count(),
+            1,
+            "stored signature {old} is not unique; cannot re-bless in place"
+        );
+        text = text.replace(old.as_str(), new.as_str());
+    }
+    fs::write(&path, text).test_unwrap("write capability fixture");
+    eprintln!(
+        "re-signed {} capability vector signatures",
+        replacements.len()
+    );
+}
+
 #[test]
 fn canonical_fixture_cases_round_trip_through_public_api() {
     let fixture = canonical_vector_fixture();
