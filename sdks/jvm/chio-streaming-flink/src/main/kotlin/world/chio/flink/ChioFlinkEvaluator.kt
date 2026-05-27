@@ -152,6 +152,21 @@ internal class ChioFlinkEvaluator<IN>(
         val receiptAuthorized = receipt.isAllowed() && c.verifyReceipt(receipt)
         if (!receiptAuthorized) {
             metrics?.denyTotal?.inc()
+            // Fail closed. An allow receipt that fails verification is unsafe to
+            // emit, but the DLQ path is reserved for denials. Mirror the
+            // denied/sidecar synthesis above and turn the unverified allow into
+            // a synthetic deny before routing it to the DLQ.
+            if (!receipt.isDenied()) {
+                receipt =
+                    SyntheticDenyReceipt.synthesize(
+                        capabilityId = config.capabilityId,
+                        toolServer = config.toolServer,
+                        toolName = toolName,
+                        parameters = parameters,
+                        reason = "receipt failed verification; failing closed",
+                        guard = "chio-streaming-verify",
+                    )
+            }
             val originalBytes = BodyCoercion.canonicalBodyBytes(element)
             val dlqRecord =
                 d.buildRecord(

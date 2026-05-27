@@ -181,7 +181,7 @@ class ChioClient
         // --------------------------------------------------------------
 
         /** POST /v1/receipts/verify. Mirrors verify_receipt. */
-        fun verifyReceipt(receipt: ChioReceipt): Boolean {
+        override fun verifyReceipt(receipt: ChioReceipt): Boolean {
             val node = postJson(SidecarPaths.VERIFY_RECEIPT, receipt)
             return node.has("ok") &&
                 node.has("authorized") &&
