@@ -1553,7 +1553,7 @@ fn main() {
                     control_token: control_token.as_deref(),
                 },
             ),
-            ReceiptCommands::Checkpoint { command } => match command {
+            ReceiptCommands::Checkpoint(command) => match command {
                 ReceiptCheckpointCommands::Status { max_batch } => cmd_receipt_checkpoint_status(
                     max_batch,
                     QueryBackend {
