@@ -1,8 +1,8 @@
 package world.chio.flink
 
-import world.chio.sdk.errors.ChioValidationError
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import world.chio.sdk.errors.ChioValidationError
 import kotlin.test.assertEquals
 
 class ScopeResolverTest {

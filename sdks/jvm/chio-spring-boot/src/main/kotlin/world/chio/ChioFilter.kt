@@ -11,7 +11,6 @@
 package world.chio
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import world.chio.sdk.Hashing.sha256Hex
 import jakarta.servlet.Filter
 import jakarta.servlet.FilterChain
 import jakarta.servlet.FilterConfig
@@ -19,6 +18,7 @@ import jakarta.servlet.ServletRequest
 import jakarta.servlet.ServletResponse
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import world.chio.sdk.Hashing.sha256Hex
 import java.util.UUID
 
 private fun capabilityIdFromToken(rawToken: String?): String? {

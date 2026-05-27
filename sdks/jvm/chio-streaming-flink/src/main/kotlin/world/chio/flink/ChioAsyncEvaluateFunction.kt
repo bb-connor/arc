@@ -10,10 +10,10 @@
  */
 package world.chio.flink
 
-import world.chio.sdk.errors.ChioError
 import org.apache.flink.api.common.functions.OpenContext
 import org.apache.flink.streaming.api.functions.async.ResultFuture
 import org.apache.flink.streaming.api.functions.async.RichAsyncFunction
+import world.chio.sdk.errors.ChioError
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadFactory

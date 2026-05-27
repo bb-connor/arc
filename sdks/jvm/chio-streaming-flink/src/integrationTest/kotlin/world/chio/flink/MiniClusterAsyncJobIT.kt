@@ -4,8 +4,6 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
-import world.chio.sdk.ChioClient
-import world.chio.sdk.DlqRouter
 import org.apache.flink.api.common.RuntimeExecutionMode
 import org.apache.flink.api.common.typeinfo.TypeHint
 import org.apache.flink.api.common.typeinfo.TypeInformation
@@ -17,6 +15,8 @@ import org.apache.flink.util.CloseableIterator
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import world.chio.sdk.ChioClient
+import world.chio.sdk.DlqRouter
 import java.net.InetSocketAddress
 import java.time.Duration
 import java.util.concurrent.TimeUnit

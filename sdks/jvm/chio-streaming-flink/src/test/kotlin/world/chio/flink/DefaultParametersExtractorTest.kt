@@ -1,8 +1,8 @@
 package world.chio.flink
 
+import org.junit.jupiter.api.Test
 import world.chio.sdk.CanonicalJson
 import world.chio.sdk.Hashing
-import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 

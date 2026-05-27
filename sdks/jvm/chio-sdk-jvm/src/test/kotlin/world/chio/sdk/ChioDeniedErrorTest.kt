@@ -1,8 +1,8 @@
 package world.chio.sdk
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import world.chio.sdk.errors.ChioDeniedError
 import org.junit.jupiter.api.Test
+import world.chio.sdk.errors.ChioDeniedError
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue

@@ -1,8 +1,8 @@
 package world.chio.flink
 
-import world.chio.sdk.CanonicalJson
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import world.chio.sdk.CanonicalJson
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import kotlin.test.assertEquals

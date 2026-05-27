@@ -2,9 +2,9 @@ package world.chio.sdk
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
-import world.chio.sdk.errors.ChioValidationError
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import world.chio.sdk.errors.ChioValidationError
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue

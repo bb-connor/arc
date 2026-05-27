@@ -1,5 +1,8 @@
 package world.chio.flink
 
+import org.junit.jupiter.api.Tag
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import world.chio.flink.support.FakeChioClient
 import world.chio.flink.support.FakeRuntimeContext
 import world.chio.sdk.ChioClientLike
@@ -7,9 +10,6 @@ import world.chio.sdk.DlqRouter
 import world.chio.sdk.SyntheticDenyReceipt
 import world.chio.sdk.errors.ChioConnectionError
 import world.chio.sdk.errors.ChioError
-import org.junit.jupiter.api.Tag
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -82,10 +82,11 @@ class ChioFlinkEvaluatorTest {
 
     @Test
     fun unverifiedAllowReceiptGoesToDlq() {
-        val client = FakeChioClient(
-            behaviour = FakeChioClient.Behaviour.Allow,
-            verifyResult = false,
-        )
+        val client =
+            FakeChioClient(
+                behaviour = FakeChioClient.Behaviour.Allow,
+                verifyResult = false,
+            )
         val evaluator =
             ChioFlinkEvaluator(
                 configFor(client, receiptTopic = "chio-receipts"),

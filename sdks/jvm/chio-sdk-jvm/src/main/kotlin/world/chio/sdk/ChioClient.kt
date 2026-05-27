@@ -119,7 +119,7 @@ class ChioClient
                     emptyMap()
                 } else {
                     mapOf("X-Chio-Capability" to capabilityToken)
-            }
+                }
             val node = postJson(SidecarPaths.EVALUATE_HTTP, request, extraHeaders = headers)
             val result = parser.treeToValue(node, EvaluateResponse::class.java)
             if (result.verdict.isAllowed() || result.receipt.verdict.isAllowed()) {

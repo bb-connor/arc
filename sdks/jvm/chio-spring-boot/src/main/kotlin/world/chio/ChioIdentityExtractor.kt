@@ -6,8 +6,8 @@
  */
 package world.chio
 
-import world.chio.sdk.Hashing.sha256Hex
 import jakarta.servlet.http.HttpServletRequest
+import world.chio.sdk.Hashing.sha256Hex
 
 /** Function type for extracting caller identity from a request. */
 typealias IdentityExtractorFn = (HttpServletRequest) -> CallerIdentity

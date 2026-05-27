@@ -5,6 +5,9 @@
  */
 package world.chio.flink
 
+import org.apache.flink.api.common.functions.RuntimeContext
+import org.apache.flink.metrics.Counter
+import org.apache.flink.metrics.Gauge
 import world.chio.sdk.ChioClientLike
 import world.chio.sdk.ChioReceipt
 import world.chio.sdk.DlqRouter
@@ -13,9 +16,6 @@ import world.chio.sdk.SyntheticDenyReceipt
 import world.chio.sdk.errors.ChioDeniedError
 import world.chio.sdk.errors.ChioError
 import world.chio.sdk.errors.ChioStreamingError
-import org.apache.flink.api.common.functions.RuntimeContext
-import org.apache.flink.metrics.Counter
-import org.apache.flink.metrics.Gauge
 import java.util.UUID
 
 internal class ChioFlinkEvaluator<IN>(

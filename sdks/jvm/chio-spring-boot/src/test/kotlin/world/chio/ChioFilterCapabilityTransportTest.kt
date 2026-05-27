@@ -116,7 +116,7 @@ class ChioFilterCapabilityTransportTest {
             MockHttpServletRequest().apply {
                 method = "GET"
                 requestURI = "/echo"
-        }
+            }
         val response = MockHttpServletResponse()
         val chainCalled = AtomicBoolean(false)
         val chain = FilterChain { _, _ -> chainCalled.set(true) }

@@ -1,7 +1,7 @@
 package world.chio.flink
 
-import world.chio.sdk.errors.ChioValidationError
 import org.junit.jupiter.api.Test
+import world.chio.sdk.errors.ChioValidationError
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
