@@ -2520,6 +2520,105 @@ mod tests {
         assert_eq!(err, BilateralCoSigningError::ReceiptMismatch);
     }
 
+    fn sample_policy_evaluation_summary() -> PolicyEvaluationSummary {
+        PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: Some("allow".to_string()),
+        }
+    }
+
+    #[test]
+    fn policy_evaluation_summary_accepts_matching_allow_verdicts() {
+        validate_policy_evaluation_summary(&sample_policy_evaluation_summary())
+            .expect("matching allow verdicts should validate");
+    }
+
+    #[test]
+    fn policy_evaluation_summary_rejects_mismatched_server_verdicts() {
+        let mut summary = sample_policy_evaluation_summary();
+        summary.server_b_verdict.verdict = "deny".to_string();
+
+        let err = validate_policy_evaluation_summary(&summary)
+            .expect_err("mismatched server verdicts must fail closed");
+
+        match err {
+            BilateralCoSigningError::CanonicalJson(message) => {
+                assert_eq!(message, "predicate.schema_invalid: server_a=allow server_b=deny");
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn policy_evaluation_summary_rejects_unsupported_verdict_string() {
+        let mut summary = sample_policy_evaluation_summary();
+        summary.server_a_verdict.verdict = "permit".to_string();
+        summary.server_b_verdict.verdict = "permit".to_string();
+        summary.joint_disposition = Some("permit".to_string());
+
+        let err = validate_policy_evaluation_summary(&summary)
+            .expect_err("unsupported verdict strings must fail closed");
+
+        match err {
+            BilateralCoSigningError::CanonicalJson(message) => {
+                assert_eq!(
+                    message,
+                    "predicate.schema_invalid: unsupported verdict \"permit\"; expected allow or deny"
+                );
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn policy_evaluation_summary_rejects_empty_policy_id() {
+        let mut summary = sample_policy_evaluation_summary();
+        summary.server_a_verdict.policy_id.clear();
+
+        let err = validate_policy_evaluation_summary(&summary)
+            .expect_err("empty policy_id must fail closed");
+
+        match err {
+            BilateralCoSigningError::CanonicalJson(message) => {
+                assert_eq!(
+                    message,
+                    "predicate.schema_invalid: server_a_verdict.policy_id must be non-empty"
+                );
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn policy_evaluation_summary_rejects_joint_disposition_mismatch() {
+        let mut summary = sample_policy_evaluation_summary();
+        summary.joint_disposition = Some("deny".to_string());
+
+        let err = validate_policy_evaluation_summary(&summary)
+            .expect_err("joint_disposition must agree with server verdicts");
+
+        match err {
+            BilateralCoSigningError::CanonicalJson(message) => {
+                assert_eq!(
+                    message,
+                    "predicate.schema_invalid: joint_disposition=deny disagrees with server_a/b verdict=allow"
+                );
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
     fn resign_payload(
         envelope: &mut DsseEnvelope,
         kp_a: &Keypair,
