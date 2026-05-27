@@ -642,6 +642,8 @@ pub fn verify_treaty_bound_chio_bilateral_invocation(
         )
     })?;
     validate_policy_evaluation_summary(summary).map_err(map_bilateral_error)?;
+    crate::bilateral_dsse::require_policy_evaluation_allow_admission(summary)
+        .map_err(map_bilateral_error)?;
 
     let signer_a_id = &review.expected_treaty_binding.signer_kernel_ids[0];
     let signer_b_id = &review.expected_treaty_binding.signer_kernel_ids[1];

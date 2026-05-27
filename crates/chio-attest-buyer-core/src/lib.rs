@@ -1440,13 +1440,19 @@ fn verify_package_inner(
         unknown_action_class_policy: UnknownActionClassPolicy::Reject,
     };
     for envelope in &package.bilateral_envelopes {
-        verify_chio_bilateral_invocation(
+        let verified = verify_chio_bilateral_invocation(
             envelope,
             &ChioBilateralVerifierConfig {
                 base: &verifier_config,
             },
         )
         .map_err(|error| ChiodosPackageError::Federation(error.to_string()))?;
+        if verified.joint_verdict != "allow" {
+            return Err(ChiodosPackageError::Federation(format!(
+                "bilateral envelope policy verdict {:?} is not allow",
+                verified.joint_verdict
+            )));
+        }
     }
     add_check(
         checks,

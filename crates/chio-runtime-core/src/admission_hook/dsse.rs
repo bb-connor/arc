@@ -34,6 +34,13 @@ pub(super) fn verify_treaty_dsse_evidence(
             detail: "bilateral DSSE policy evaluation summary is invalid".to_string(),
         }
     })?;
+    chio_federation::require_policy_evaluation_allow_admission(policy_summary).map_err(|_| {
+        ChioRuntimeError::Rejected {
+            code: "chio_treaty_policy_denied",
+            detail: "bilateral DSSE policy evaluation must be allow for treaty dispatch"
+                .to_string(),
+        }
+    })?;
     let Some(treaty) = statement.predicate.treaty_binding_ref.as_ref() else {
         return rejected(
             "chio_treaty_unverified_required_evidence",
