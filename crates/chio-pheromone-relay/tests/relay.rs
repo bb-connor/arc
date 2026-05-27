@@ -7,6 +7,8 @@ mod common;
 mod alerts;
 #[path = "relay/archive.rs"]
 mod archive;
+#[path = "relay/external_retention.rs"]
+mod external_retention;
 #[path = "relay/delivery.rs"]
 mod delivery;
 #[path = "relay/directory.rs"]
