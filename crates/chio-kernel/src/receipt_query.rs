@@ -237,6 +237,57 @@ mod tests {
     }
 
     #[test]
+    fn admin_context_rejects_empty_tenant_filter() {
+        let query = ReceiptQuery {
+            tenant_filter: Some("  ".to_string()),
+            read_context: Some(ReceiptReadContext::admin_service()),
+            ..ReceiptQuery::default()
+        };
+
+        let err = query
+            .effective_read_scope()
+            .expect_err("empty tenant filter must fail closed");
+
+        assert_eq!(
+            err,
+            "receipt query tenant filter requires a non-empty tenant"
+        );
+    }
+
+    #[test]
+    fn tenant_scoped_context_rejects_empty_boundary_tenant() {
+        let query = ReceiptQuery {
+            read_context: Some(ReceiptReadContext::authenticated_tenant("  ")),
+            ..ReceiptQuery::default()
+        };
+
+        let err = query
+            .effective_read_scope()
+            .expect_err("empty tenant boundary must fail closed");
+
+        assert_eq!(
+            err,
+            "tenant-scoped receipt query requires a non-empty tenant"
+        );
+    }
+
+    #[test]
+    fn local_operator_admin_all_includes_legacy_null_without_tenant_filter() {
+        let query = ReceiptQuery {
+            read_context: Some(ReceiptReadContext::local_operator_admin_all()),
+            ..ReceiptQuery::default()
+        };
+
+        let scope = query
+            .effective_read_scope()
+            .expect("local operator admin scope");
+
+        assert!(scope.tenant.is_none());
+        assert!(scope.include_legacy_null_tenant);
+        assert!(scope.is_admin_all);
+    }
+
+    #[test]
     fn admin_context_tenant_filter_narrows_effective_scope() {
         let query = ReceiptQuery {
             tenant_filter: Some("tenant-a".to_string()),
