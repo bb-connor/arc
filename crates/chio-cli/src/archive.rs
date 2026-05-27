@@ -641,6 +641,94 @@ mod tests {
         assert!(err.to_string().contains("too many members"));
     }
 
+    #[test]
+    fn safe_archive_helper_rejects_casefold_duplicate_members() {
+        let temp = tempfile::tempdir().unwrap();
+        let archive = temp.path().join("bundle.tar.gz");
+        let file = fs::File::create(&archive).unwrap();
+        let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::default());
+        let mut builder = tar::Builder::new(encoder);
+        append_regular_file(&mut builder, "Report.json", b"upper", "test archive").unwrap();
+        append_regular_file(&mut builder, "report.json", b"lower", "test archive").unwrap();
+        let encoder = builder.into_inner().unwrap();
+        encoder.finish().unwrap();
+
+        let err = read_tar_gz_file(&archive, "test archive", TEST_LIMITS).unwrap_err();
+
+        assert!(err.to_string().contains("casefold collision"));
+    }
+
+    #[test]
+    fn safe_archive_helper_rejects_symlink_members() {
+        let temp = tempfile::tempdir().unwrap();
+        let archive = temp.path().join("bundle.tar.gz");
+        let file = fs::File::create(&archive).unwrap();
+        let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::default());
+        let mut builder = tar::Builder::new(encoder);
+        let mut header = tar::Header::new_ustar();
+        header.set_entry_type(tar::EntryType::Symlink);
+        header.set_size(0);
+        header.set_mode(0o777);
+        header.set_link_name("outside").unwrap();
+        header.set_cksum();
+        builder
+            .append_data(&mut header, "link", std::io::empty())
+            .unwrap();
+        let encoder = builder.into_inner().unwrap();
+        encoder.finish().unwrap();
+
+        let err = read_tar_gz_file(&archive, "test archive", TEST_LIMITS).unwrap_err();
+
+        assert!(err.to_string().contains("non-regular member"));
+    }
+
+    #[test]
+    fn safe_archive_helper_rejects_excessive_decompression_ratio() {
+        let temp = tempfile::tempdir().unwrap();
+        let archive = temp.path().join("bundle.tar.gz");
+        let zeros = vec![0_u8; 64 * 1024];
+        let entries = [SafeArchiveWriteEntry {
+            path: "zeros.bin",
+            bytes: &zeros,
+        }];
+        let limits = SafeArchiveLimits {
+            max_decompression_ratio: 8,
+            max_member_bytes: 128 * 1024,
+            max_total_bytes: 128 * 1024,
+            ..TEST_LIMITS
+        };
+        write_tar_gz_file(&archive, "test archive", &entries, limits).unwrap();
+
+        let err = read_tar_gz_file(&archive, "test archive", limits).unwrap_err();
+
+        assert!(err.to_string().contains("decompression ratio"));
+    }
+
+    #[test]
+    fn safe_archive_helper_cleans_up_fresh_dir_after_member_error() {
+        let temp = tempfile::tempdir().unwrap();
+        let out_dir = temp.path().join("extract");
+        let entries = [
+            SafeArchiveEntry {
+                path: "ok.txt".to_string(),
+                bytes: b"ok".to_vec(),
+                mode: 0o600,
+            },
+            SafeArchiveEntry {
+                path: "../escape.txt".to_string(),
+                bytes: b"escape".to_vec(),
+                mode: 0o600,
+            },
+        ];
+
+        let err = write_entries_to_fresh_dir(&out_dir, "test archive", &entries).unwrap_err();
+
+        assert!(err.to_string().contains("unsafe"));
+        assert!(!out_dir.exists());
+        let remaining_entries = fs::read_dir(temp.path()).unwrap().count();
+        assert_eq!(remaining_entries, 0);
+    }
+
     #[cfg(unix)]
     #[test]
     fn safe_archive_helper_rejects_symlink_target_on_refresh() {
