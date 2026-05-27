@@ -317,9 +317,9 @@ pub use open_market::{
     OPEN_MARKET_FEE_SCHEDULE_ARTIFACT_SCHEMA, OPEN_MARKET_PENALTY_ARTIFACT_SCHEMA,
 };
 pub use receipt::{
-    chio_receipt_id, ActorRef, BoundaryClass, ChildRequestReceipt, ChildRequestReceiptBody,
-    ChioReceipt, ChioReceiptBody, ChioReceiptIdInput, Decision, FinancialReceiptMetadata,
-    GovernedApprovalReceiptMetadata, GovernedCommerceReceiptMetadata,
+    bind_receipt_signing_nonce, chio_receipt_id, ActorRef, BoundaryClass, ChildRequestReceipt,
+    ChildRequestReceiptBody, ChioReceipt, ChioReceiptBody, ChioReceiptIdInput, Decision,
+    FinancialReceiptMetadata, GovernedApprovalReceiptMetadata, GovernedCommerceReceiptMetadata,
     GovernedTransactionReceiptMetadata, GuardEvidence, MeteredBillingReceiptMetadata,
     MeteredUsageEvidenceReceiptMetadata, ObservationOutcome, ReceiptDagParent,
     ReceiptHybridLogicalClock, ReceiptKind, ReceiptSemanticFields, RedactionMode, ToolCallAction,

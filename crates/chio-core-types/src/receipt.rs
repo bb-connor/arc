@@ -509,7 +509,15 @@ pub struct ChioReceiptSigningBody {
 pub const CHIO_RECEIPT_SIGNING_NONCE_METADATA_KEY: &str = "chio_receipt_signing_nonce";
 const CHIO_RECEIPT_ORIGINAL_METADATA_KEY: &str = "original_metadata";
 
-fn bind_receipt_signing_nonce(body: &mut ChioReceiptBody) {
+/// Bind the caller-provided receipt id into metadata before computing the
+/// content-addressed receipt id for signing.
+///
+/// Production callers often build a receipt body with a unique placeholder
+/// id, then replace it with `chio_receipt_id(body)` before signing. The
+/// placeholder is not part of [`ChioReceiptIdInput`], so this helper preserves
+/// it as signing metadata to prevent repeated identical invocations from
+/// collapsing onto the same content-addressed id.
+pub fn bind_receipt_signing_nonce(body: &mut ChioReceiptBody) {
     let nonce = body.id.trim();
     if nonce.is_empty() {
         return;
