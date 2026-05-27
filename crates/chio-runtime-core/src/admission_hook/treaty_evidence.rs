@@ -429,6 +429,7 @@ fn static_treaty_failure_code(code: Option<&str>) -> &'static str {
         Some("chio_treaty_unverified_required_evidence") => {
             "chio_treaty_unverified_required_evidence"
         }
+        Some("chio_treaty_policy_denied") => "chio_treaty_policy_denied",
         _ => "chio_treaty_unverified_required_evidence",
     }
 }
