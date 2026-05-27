@@ -1,7 +1,9 @@
 use chio_attest_buyer::{
-    buyer_attestation_packet_from_json, verify_buyer_attestation_review_package,
+    buyer_attestation_packet_from_json, buyer_attestation_review_report_json,
+    verify_buyer_attestation_review_package,
     verify_buyer_attestation_review_package_with_proof_replay_json, BuyerAttestationError,
-    BuyerAttestationReviewPackage,
+    BuyerAttestationReviewCheck, BuyerAttestationReviewPackage, BuyerAttestationReviewReport,
+    CHIO_ATTEST_BUYER_ATTESTATION_REVIEW_REPORT_SCHEMA,
 };
 
 #[test]
@@ -49,6 +51,41 @@ fn buyer_error_boundary_is_chio_owned() {
         Err(error) => error,
     };
     assert_eq!(error.code(), "runtime_admission_json");
+}
+
+#[test]
+fn chio_buyer_review_report_json_normalizes_retired_chiodos_codes(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let retired_review_code = ["chio", "dos", "_buyer_review.missing_artifact"].concat();
+    let report = BuyerAttestationReviewReport {
+        schema: CHIO_ATTEST_BUYER_ATTESTATION_REVIEW_REPORT_SCHEMA.to_string(),
+        package_id: "buyer-review:packet:retired-code".to_string(),
+        packet_id: "packet:retired-code".to_string(),
+        accepted: false,
+        failure_code: Some(retired_review_code.clone()),
+        checks: vec![BuyerAttestationReviewCheck {
+            code: retired_review_code,
+            passed: false,
+            severity: "error".to_string(),
+            artifact_role: "packet".to_string(),
+            expected_sha256: None,
+            observed_sha256: None,
+            message: "missing artifact".to_string(),
+        }],
+    };
+
+    let json = buyer_attestation_review_report_json(&report)?;
+    let value: serde_json::Value = serde_json::from_str(&json)?;
+
+    assert_eq!(
+        value["failureCode"].as_str(),
+        Some("chio_attest_buyer.review.missing_artifact")
+    );
+    assert_eq!(
+        value["checks"][0]["code"].as_str(),
+        Some("chio_attest_buyer.review.missing_artifact")
+    );
+    Ok(())
 }
 
 #[test]

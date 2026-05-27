@@ -1549,6 +1549,62 @@ mod tests {
     }
 
     #[test]
+    fn operator_report_evidence_export_requires_read_context() {
+        let query = OperatorReportQuery::default();
+
+        let err = query
+            .to_evidence_export_query()
+            .expect_err("operator report export without read context must fail closed");
+
+        assert_eq!(
+            err,
+            "operator report evidence export requires an explicit read context"
+        );
+    }
+
+    #[test]
+    fn operator_report_evidence_export_maps_admin_all_context() {
+        let query = OperatorReportQuery {
+            capability_id: Some("cap-1".to_string()),
+            since: Some(10),
+            until: Some(20),
+            read_context: Some(ReceiptReadContext::admin_service()),
+            ..OperatorReportQuery::default()
+        };
+
+        let export = query
+            .to_evidence_export_query()
+            .expect("admin read context should map to evidence export");
+
+        assert_eq!(export.tenant, None);
+        assert_eq!(
+            export.read_boundary,
+            Some(ReceiptReadBoundary::AdminAll)
+        );
+        assert_eq!(export.capability_id.as_deref(), Some("cap-1"));
+        assert_eq!(export.since, Some(10));
+        assert_eq!(export.until, Some(20));
+    }
+
+    #[test]
+    fn operator_report_evidence_export_maps_tenant_scoped_context() {
+        let query = OperatorReportQuery {
+            read_context: Some(ReceiptReadContext::authenticated_tenant("tenant-a")),
+            ..OperatorReportQuery::default()
+        };
+
+        let export = query
+            .to_evidence_export_query()
+            .expect("tenant read context should map to evidence export");
+
+        assert_eq!(export.tenant.as_deref(), Some("tenant-a"));
+        assert_eq!(
+            export.read_boundary,
+            Some(ReceiptReadBoundary::tenant_scoped("tenant-a"))
+        );
+    }
+
+    #[test]
     fn operator_report_query_direct_export_support_requires_no_tool_filters() {
         let unrestricted = OperatorReportQuery::default();
         assert!(unrestricted.direct_evidence_export_supported());
