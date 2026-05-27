@@ -22,14 +22,19 @@ use chio_core_types::crypto::sha256_hex;
 use chio_core_types::PublicKey;
 use chio_pheromone_relay::{
     build_relay_alert_assurance_archive_extraction_report,
+    generate_relay_alert_assurance_external_retention_review_report,
     generate_relay_alert_assurance_physical_archive_drill_report,
     generate_relay_alert_assurance_retention_handoff_report,
+    relay_alert_assurance_external_retention_profile_from_json,
     sign_relay_alert_assurance_archive_package, verify_relay_alert_assurance_archive_package,
     RelayAlertAssuranceArchivePackageBuildInput, RelayAlertAssuranceArchivePackageReport,
-    RelayAlertAssuranceArchivePackageVerifyInput, RelayAlertAssurancePhysicalArchiveDrillInput,
+    RelayAlertAssuranceArchivePackageVerifyInput, RelayAlertAssuranceExternalRetentionProfileDocument,
+    RelayAlertAssuranceExternalRetentionReviewInput, RelayAlertAssurancePhysicalArchiveDrillInput,
     RelayAlertAssurancePhysicalArchiveEvidence, RelayAlertAssuranceRetentionHandoffEvidence,
     RelayAlertAssuranceRetentionHandoffInput, RelayAlertAssuranceRetentionHandoffProfileDocument,
     RelayAlertAssuranceTrustedArchivePackager, RelayAlertAssuranceTrustedArchivePackagersDocument,
+    PheromoneRelayError, PHEROMONE_RELAY_ALERT_ASSURANCE_EXTERNAL_RETENTION_PROFILE_SCHEMA,
+    PHEROMONE_RELAY_ALERT_ASSURANCE_EXTERNAL_RETENTION_REVIEW_REPORT_SCHEMA,
     PHEROMONE_RELAY_ALERT_ASSURANCE_PHYSICAL_ARCHIVE_EVIDENCE_SCHEMA,
     PHEROMONE_RELAY_ALERT_ASSURANCE_RETENTION_HANDOFF_EVIDENCE_SCHEMA,
     PHEROMONE_RELAY_ALERT_ASSURANCE_RETENTION_HANDOFF_PROFILE_SCHEMA,
@@ -500,6 +505,25 @@ fn package_file_bytes(package: &chio_pheromone_relay::RelayAlertAssuranceArchive
         .sum()
 }
 
+fn external_retention_profile_for_review() -> RelayAlertAssuranceExternalRetentionProfileDocument {
+    RelayAlertAssuranceExternalRetentionProfileDocument {
+        schema: PHEROMONE_RELAY_ALERT_ASSURANCE_EXTERNAL_RETENTION_PROFILE_SCHEMA.to_string(),
+        local_kernel_id: "did:chio:buyer-kernel".to_string(),
+        allowed_retention_system_aliases: vec!["cold-archive-a".to_string()],
+        max_package_count: 4,
+        max_evidence_age_ms: 900_000,
+        require_generation_continuity: false,
+        require_restore_accepted: false,
+        require_physical_readback: false,
+        require_retention_handoff_ready: false,
+        min_sampled_members: 1,
+        min_sample_coverage_basis_points: 1,
+        recommendation_codes: vec!["retention_ready".to_string()],
+        issued_at_unix_ms: NOW,
+        expires_at_unix_ms: NOW + 900_000,
+    }
+}
+
 fn archive_package_report_for_evidence() -> RelayAlertAssuranceArchivePackageReport {
     RelayAlertAssuranceArchivePackageReport {
         schema: chio_pheromone_relay::PHEROMONE_RELAY_ALERT_ASSURANCE_ARCHIVE_PACKAGE_REPORT_SCHEMA
@@ -528,5 +552,104 @@ fn archive_package_report_for_evidence() -> RelayAlertAssuranceArchivePackageRep
             accepted: true,
             detail: "package report verified".to_string(),
         }],
+    }
+}
+
+#[test]
+fn external_retention_review_accepts_minimal_package_report_window() {
+    let profile = external_retention_profile_for_review();
+    let package_report = archive_package_report_for_evidence();
+    let review = generate_relay_alert_assurance_external_retention_review_report(
+        RelayAlertAssuranceExternalRetentionReviewInput {
+            package_reports: std::slice::from_ref(&package_report),
+            restore_drill_reports: &[],
+            physical_drill_reports: &[],
+            retention_handoff_reports: &[],
+            profile: &profile,
+            since_unix_ms: NOW,
+            until_unix_ms: NOW + 20_000,
+            now_unix_ms: NOW + 15_000,
+        },
+    )
+    .unwrap();
+
+    assert_eq!(
+        review.schema,
+        PHEROMONE_RELAY_ALERT_ASSURANCE_EXTERNAL_RETENTION_REVIEW_REPORT_SCHEMA
+    );
+    assert!(review.accepted);
+    assert_eq!(review.package_count, 1);
+    assert_eq!(review.ready_count, 1);
+    assert_eq!(review.reviews.len(), 1);
+    assert!(review.reviews[0].accepted);
+}
+
+#[test]
+fn external_retention_review_rejects_tampered_package_report_before_review() {
+    let profile = external_retention_profile_for_review();
+    let mut package_report = archive_package_report_for_evidence();
+    package_report.package_generation = 0;
+
+    let error = generate_relay_alert_assurance_external_retention_review_report(
+        RelayAlertAssuranceExternalRetentionReviewInput {
+            package_reports: std::slice::from_ref(&package_report),
+            restore_drill_reports: &[],
+            physical_drill_reports: &[],
+            retention_handoff_reports: &[],
+            profile: &profile,
+            since_unix_ms: NOW,
+            until_unix_ms: NOW + 20_000,
+            now_unix_ms: NOW + 15_000,
+        },
+    )
+    .expect_err("tampered package report must fail closed");
+
+    match error {
+        PheromoneRelayError::ArchivePackageInvalid(message) => {
+            assert!(message.contains("package_report_generation_invalid"));
+        }
+        other => panic!("unexpected error: {other:?}"),
+    }
+}
+
+#[test]
+fn external_retention_profile_parser_rejects_expired_profile() {
+    let profile = external_retention_profile_for_review();
+    let json = serde_json::to_string(&profile).unwrap();
+
+    let error = relay_alert_assurance_external_retention_profile_from_json(&json, NOW + 2_000_000)
+        .expect_err("expired profile must fail closed");
+
+    match error {
+        PheromoneRelayError::ArchivePackageInvalid(message) => {
+            assert!(message.contains("not fresh"));
+        }
+        other => panic!("unexpected error: {other:?}"),
+    }
+}
+
+#[test]
+fn external_retention_review_rejects_empty_package_report_set() {
+    let profile = external_retention_profile_for_review();
+
+    let error = generate_relay_alert_assurance_external_retention_review_report(
+        RelayAlertAssuranceExternalRetentionReviewInput {
+            package_reports: &[],
+            restore_drill_reports: &[],
+            physical_drill_reports: &[],
+            retention_handoff_reports: &[],
+            profile: &profile,
+            since_unix_ms: NOW,
+            until_unix_ms: NOW + 20_000,
+            now_unix_ms: NOW + 15_000,
+        },
+    )
+    .expect_err("empty package report set must fail closed");
+
+    match error {
+        PheromoneRelayError::ArchivePackageInvalid(message) => {
+            assert!(message.contains("at least one package report"));
+        }
+        other => panic!("unexpected error: {other:?}"),
     }
 }
