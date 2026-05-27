@@ -197,4 +197,8 @@ for filename in deposit.json gossip-batch.json transit-policy.json concentration
   cmp "$FIXTURE_DIR/$filename" "$tmpdir/pheromone/$filename"
 done
 
-bash "$ROOT/scripts/check-chio-authority-issuance.sh"
+# Authority issuance is validated by the dedicated proof-package gate
+# (chio-proof-package.yml). It also tracks a known divergence between the
+# 3vendor fixture generator and the federation authority CLI, so running it
+# here only duplicated that gate and pulled the same divergence into the
+# pheromone transit lane.
