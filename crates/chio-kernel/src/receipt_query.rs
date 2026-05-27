@@ -252,6 +252,47 @@ mod tests {
         assert!(!scope.include_legacy_null_tenant);
         assert!(scope.is_admin_all);
     }
+
+    #[test]
+    fn admin_context_rejects_empty_tenant_filter() {
+        let query = ReceiptQuery {
+            tenant_filter: Some("   ".to_string()),
+            read_context: Some(ReceiptReadContext::admin_service()),
+            ..ReceiptQuery::default()
+        };
+
+        let err = query
+            .effective_read_scope()
+            .expect_err("whitespace tenant filter must not authorize reads");
+
+        assert_eq!(
+            err,
+            "receipt query tenant filter requires a non-empty tenant"
+        );
+    }
+
+    #[test]
+    fn tenant_scoped_context_rejects_empty_tenant() {
+        let query = ReceiptQuery {
+            read_context: Some(ReceiptReadContext {
+                boundary: super::ReceiptReadBoundary::TenantScoped {
+                    tenant: "  ".to_string(),
+                },
+                source: super::ReceiptReadContextSource::AuthenticatedTenant,
+                legacy_null_mode: false,
+            }),
+            ..ReceiptQuery::default()
+        };
+
+        let err = query
+            .effective_read_scope()
+            .expect_err("empty tenant scope must fail closed");
+
+        assert_eq!(
+            err,
+            "tenant-scoped receipt query requires a non-empty tenant"
+        );
+    }
 }
 
 /// Result of a receipt query, including pagination state.

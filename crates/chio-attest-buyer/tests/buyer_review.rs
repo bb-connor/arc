@@ -40,6 +40,21 @@ fn buyer_public_review_messages_use_chio_boundary_wording() {
 }
 
 #[test]
+fn buyer_code_normalizer_maps_retired_namespace_prefixes() {
+    let lib = include_str!("../src/lib.rs");
+    for retired_parts in [
+        ["chio", "dos", "_buyer."],
+        ["chio", "dos", "_buyer_packet."],
+        ["chio", "dos", "_buyer_review."],
+    ] {
+        assert!(
+            lib.contains(&format!("{:?}", retired_parts)),
+            "buyer attestation code normalizer must build retired prefix from {retired_parts:?}"
+        );
+    }
+}
+
+#[test]
 fn buyer_error_boundary_is_chio_owned() {
     let error_type = std::any::type_name::<BuyerAttestationError>();
     assert_eq!(error_type, "chio_attest_buyer::BuyerAttestationError");
