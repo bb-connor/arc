@@ -324,7 +324,7 @@ case "$MODE" in
     ;;
   "full")
     cargo test -p chio-runtime-core runtime_ops
-    cargo test -p chio-cli --bin chio_native_runtime_surface_parses
+    cargo test -p chio-cli --bin chio chio_native_runtime_surface_parses
     run_schema_flow
     run_tick_flow
     run_status_flow
