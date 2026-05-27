@@ -53,7 +53,12 @@ schema_dir, registry_path, fixture_dir = map(pathlib.Path, sys.argv[1:])
 registry = json.loads(registry_path.read_text(encoding="utf-8"))
 registered = {entry.get("schema"): entry.get("schemaFile") for entry in registry.get("artifacts", [])}
 legacy_re = re.compile(
-    r"chio-relay|chio-pheromone-relay|CHIO_PHEROMONE_RELAY_RUNBOOK\.md"
+    # Retired pre-Chio surface (the project went arc -> chiodos -> chio). Active
+    # fixtures must not reference the chiodos-era relay service or runbook. The
+    # current chio-pheromone-relay service and CHIO_PHEROMONE_RELAY_RUNBOOK.md
+    # runbook are valid and must not be flagged (the prior chio-* pattern flagged
+    # current identifiers, so this gate never passed once it ran).
+    r"chiodos-relay|chiodos-pheromone-relay|CHIODOS_PHEROMONE_RELAY_RUNBOOK\.md"
 )
 for path in sorted(fixture_dir.rglob("*.json")):
     text = path.read_text(encoding="utf-8")
