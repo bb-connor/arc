@@ -1486,6 +1486,10 @@ enum TrustCommands {
         #[arg(long, env = "CHIO_TRUST_SERVICE_TOKEN", hide_env_values = true)]
         service_token: String,
 
+        /// Tenant-scoped read token as `tenant_id=token`. Repeat for multiple tenants.
+        #[arg(long = "tenant-read-token", value_name = "TENANT=TOKEN")]
+        tenant_read_tokens: Vec<String>,
+
         /// Public base URL this trust-control node advertises to peers and clients.
         #[arg(long)]
         advertise_url: Option<String>,
@@ -2929,7 +2933,26 @@ enum ReceiptCommands {
         /// Cursor for pagination (seq value to start after).
         #[arg(long)]
         cursor: Option<u64>,
+
+        /// Restrict receipt reads to a tenant id.
+        #[arg(long)]
+        tenant: Option<String>,
+
+        /// Admin override to list receipts across tenants.
+        #[arg(long, default_value_t = false)]
+        admin_all: bool,
     },
+    /// Inspect local receipt-store health.
+    Health,
+    /// Flush pending receipt writes and checkpoint local storage.
+    Flush {
+        /// Maximum time to wait for the flush, in milliseconds.
+        #[arg(long, value_parser = parse_positive_u64, default_value_t = 5_000)]
+        timeout_ms: u64,
+    },
+    /// Manage receipt-store checkpoints.
+    #[command(subcommand)]
+    Checkpoint(ReceiptCheckpointCommands),
     /// Explain why a receipt was allowed or denied.
     ///
     /// When `--input-file` points at a `BilateralCoSignArtifacts` JSON
@@ -2971,7 +2994,47 @@ enum ReceiptCommands {
         /// against pinned passport keys.
         #[arg(long, alias = "explain-bilateral", default_value_t = false)]
         inspect_bilateral: bool,
+
+        /// Restrict receipt reads to a tenant id.
+        #[arg(long)]
+        tenant: Option<String>,
+
+        /// Admin override to explain receipts across tenants.
+        #[arg(long, default_value_t = false)]
+        admin_all: bool,
     },
+}
+
+fn parse_positive_u64(value: &str) -> Result<u64, String> {
+    let parsed = value
+        .parse::<u64>()
+        .map_err(|error| format!("expected positive integer: {error}"))?;
+    if parsed == 0 {
+        Err("expected positive integer greater than zero".to_string())
+    } else {
+        Ok(parsed)
+    }
+}
+
+#[derive(Subcommand)]
+enum ReceiptCheckpointCommands {
+    /// Show checkpoint coverage and pending receipt count.
+    Status {
+        /// Maximum receipts to inspect in one checkpoint batch.
+        #[arg(long, value_parser = parse_positive_u64, default_value_t = 1_000)]
+        max_batch: u64,
+    },
+    /// Create a signed checkpoint for pending receipts.
+    Create {
+        /// Kernel seed file used to sign the checkpoint.
+        #[arg(long)]
+        kernel_seed_file: PathBuf,
+        /// Maximum receipts to include in this checkpoint.
+        #[arg(long, value_parser = parse_positive_u64, default_value_t = 1_000)]
+        max_batch: u64,
+    },
+    /// Verify existing receipt checkpoints.
+    Verify,
 }
 
 #[derive(Subcommand)]
@@ -3887,6 +3950,10 @@ enum CertCommands {
         /// Path to the certificate JSON file.
         #[arg(long)]
         certificate: PathBuf,
+
+        /// Trusted kernel public-key file used for receipt signature verification.
+        #[arg(long)]
+        trusted_kernel_pubkey: PathBuf,
 
         /// Enable full-bundle verification (re-verify all receipt signatures).
         #[arg(long, default_value_t = false)]
