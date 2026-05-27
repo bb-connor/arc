@@ -27,7 +27,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chio_core::crypto::{sha256_hex, Keypair};
-use chio_core::receipt::{chio_receipt_id, ChioReceiptBody, Decision, ToolCallAction, TrustLevel};
+use chio_core::receipt::{ChioReceipt, ChioReceiptBody, Decision, ToolCallAction, TrustLevel};
 use chio_kernel::{
     ChioKernel, KernelConfig, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
@@ -78,14 +78,7 @@ fn make_body(n: usize, kernel_key: &Keypair) -> ChioReceiptBody {
     .expect("payload canonicalises");
     let content_hash = sha256_hex(action.parameter_hash.as_bytes());
     let policy_hash = sha256_hex(format!("policy:{nonce}").as_bytes());
-    // The signing path (sync `ChioReceipt::sign` and the mpsc-backed
-    // `sign_one_with_backend`) computes the authoritative content-addressed
-    // id via `chio_receipt_id(&body)` before signing the
-    // `ChioReceiptSigningBody` wrapper. Pre-compute that id on the input
-    // body so the test fixture matches what the signing pipeline will emit,
-    // letting downstream assertions compare receipt ids without needing to
-    // know the canonical hash up front.
-    let mut body = ChioReceiptBody {
+    ChioReceiptBody {
         id: format!("rcpt-{nonce}"),
         timestamp: 1_700_000_000 + (n as u64),
         capability_id: format!("cap-{nonce}"),
@@ -106,9 +99,7 @@ fn make_body(n: usize, kernel_key: &Keypair) -> ChioReceiptBody {
         trust_level: TrustLevel::default(),
         tenant_id: None,
         kernel_key: kernel_key.public_key(),
-    };
-    body.id = chio_receipt_id(&body).expect("canonical receipt id computes");
-    body
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -135,7 +126,9 @@ async fn mpsc_signing_path_signs_n_receipts_with_valid_signatures() {
     for i in 0..N {
         let kernel = Arc::clone(&kernel);
         let body = make_body(i, &keypair);
-        let expected_id = body.id.clone();
+        let expected_id = ChioReceipt::sign(body.clone(), &keypair)
+            .expect("sync signing should succeed")
+            .id;
         let expected_timestamp = body.timestamp;
         handles.push(tokio::spawn(async move {
             let receipt = kernel

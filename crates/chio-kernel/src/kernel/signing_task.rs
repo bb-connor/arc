@@ -490,7 +490,7 @@ fn sign_one_with_backend(
     body: ChioReceiptBody,
     backend: &dyn SigningBackend,
 ) -> Result<ChioReceipt, KernelError> {
-    use chio_core::receipt::{chio_receipt_id, ChioReceiptSigningBody};
+    use chio_core::receipt::{bind_receipt_signing_nonce, chio_receipt_id, ChioReceiptSigningBody};
 
     let backend_key = backend.public_key();
     if body.kernel_key.algorithm() != backend_key.algorithm() || body.kernel_key != backend_key {
@@ -514,6 +514,7 @@ fn sign_one_with_backend(
             "receipt body failed semantic validation: {error}"
         ))
     })?;
+    bind_receipt_signing_nonce(&mut body);
     body.id = chio_receipt_id(&body).map_err(|error| {
         KernelError::ReceiptSigningFailed(format!(
             "canonical JSON encoding of receipt id input failed: {error}"
