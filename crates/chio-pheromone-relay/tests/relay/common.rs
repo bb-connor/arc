@@ -1160,7 +1160,7 @@ pub(super) fn external_retention_negative_code(case_id: &str) -> String {
         .to_string();
     }
 
-    let mut profile = external_retention_profile();
+    let profile = external_retention_profile();
     let mut package_report = external_retention_package_report(1, None);
     let report_hash = external_retention_package_report_sha256(&package_report);
     let mut restore_drill_reports =
