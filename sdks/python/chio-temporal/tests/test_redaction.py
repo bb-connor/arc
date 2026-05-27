@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Callable
 
 from chio_adapter_base.redact import RedactionPolicy
 from chio_sdk.models import (
@@ -95,14 +95,17 @@ def _patched_activity_info(info: activity.Info):
         activity.info = original  # type: ignore[assignment]
 
 
-def _make_input(*args: Any) -> Any:
+def _make_input(*args: Any, fn: Callable[..., Any] | None = None) -> Any:
     from temporalio.worker import ExecuteActivityInput
 
-    async def _fn() -> None:  # pragma: no cover -- not invoked
-        pass
+    if fn is None:
+        async def _fn() -> None:  # pragma: no cover -- not invoked
+            pass
+
+        fn = _fn
 
     return ExecuteActivityInput(
-        fn=_fn,
+        fn=fn,
         args=list(args),
         executor=None,
         headers={},
@@ -322,6 +325,57 @@ class TestDefaultPolicyRedacts:
                 },
             },
             True,
+        ]
+
+    async def test_chio_file_write_swapped_positional_args_are_redacted(self) -> None:
+        """Regression: ``def chio_file_write(content, path)`` must not leak secrets.
+
+        Positional binding previously used blind index-to-table zip, so a
+        wrapper that names the protected field first forwarded the secret
+        under the unprotected ``path`` slot in receipt logs.
+        """
+
+        def chio_file_write(content: str, path: str) -> None:
+            del content, path
+
+        async with allow_all() as chio:
+            token = await _mint_token(
+                chio,
+                subject="agent:alice",
+                scope=_scope_for_tools("chio_file_write"),
+            )
+            grant = WorkflowGrant(
+                workflow_id="wf-1",
+                token=token,
+                tool_server="srv",
+            )
+            interceptor = ChioActivityInterceptor(chio_client=chio)
+            interceptor.register_workflow_grant(grant)
+
+            inbound = _ChioInboundInterceptor(_NextInterceptor(), interceptor)
+            info = _default_info(activity_type="chio_file_write")
+            with _patched_activity_info(info):
+                await inbound.execute_activity(
+                    _make_input(
+                        "PROD_SECRET=abc123",
+                        "/tmp/x",
+                        fn=chio_file_write,
+                    )
+                )
+
+        import json
+
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
+        forwarded = evaluate_calls[0].parameters
+        assert "PROD_SECRET" not in json.dumps(forwarded)
+        assert forwarded["args"] == [
+            {
+                "path": "/tmp/x",
+                "content": {
+                    "omitted": True,
+                    "byte_count": len(b"PROD_SECRET=abc123"),
+                },
+            }
         ]
 
     async def test_chio_file_edit_positional_args_are_redacted(self) -> None:
