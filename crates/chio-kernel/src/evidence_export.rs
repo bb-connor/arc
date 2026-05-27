@@ -576,6 +576,50 @@ mod tests {
     }
 
     #[test]
+    fn evidence_export_requires_explicit_read_boundary() {
+        let err = EvidenceExportQuery::default()
+            .validate_read_boundary()
+            .expect_err("export without read boundary must fail closed");
+
+        assert!(matches!(err, EvidenceExportError::ReadBoundary(message) if message.contains(
+            "explicit receipt read boundary"
+        )));
+    }
+
+    #[test]
+    fn tenant_scoped_evidence_export_rejects_empty_tenant_boundary() {
+        let err = EvidenceExportQuery {
+            read_boundary: Some(ReceiptReadBoundary::TenantScoped {
+                tenant: "   ".to_string(),
+            }),
+            ..EvidenceExportQuery::default()
+        }
+        .validate_read_boundary()
+        .expect_err("empty tenant boundary must fail closed");
+
+        assert!(matches!(err, EvidenceExportError::ReadBoundary(message) if message.contains(
+            "non-empty tenant"
+        )));
+    }
+
+    #[test]
+    fn tenant_scoped_evidence_export_rejects_mismatched_query_tenant() {
+        let err = EvidenceExportQuery {
+            tenant: Some("tenant-b".to_string()),
+            read_boundary: Some(ReceiptReadBoundary::TenantScoped {
+                tenant: "tenant-a".to_string(),
+            }),
+            ..EvidenceExportQuery::default()
+        }
+        .validate_read_boundary()
+        .expect_err("query tenant must not widen authenticated tenant scope");
+
+        assert!(matches!(err, EvidenceExportError::ReadBoundary(message) if message.contains(
+            "does not match query tenant"
+        )));
+    }
+
+    #[test]
     fn evidence_export_marks_unanchored_publication_as_transparency_preview() {
         let keypair = Keypair::generate();
         let first = build_checkpoint(1, 1, 2, &[b"one".to_vec(), b"two".to_vec()], &keypair)

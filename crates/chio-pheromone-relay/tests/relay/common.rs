@@ -16,8 +16,10 @@ pub(super) use chio_pheromone_relay::{
     deliver_due_batches, evaluate_relay_alert_acknowledgement, evaluate_relay_alert_delivery,
     evaluate_relay_alert_handoff, evaluate_relay_alerts,
     generate_relay_alert_assurance_archive_report, generate_relay_alert_assurance_closeout_report,
+    generate_relay_alert_assurance_external_retention_review_report,
     generate_relay_alert_assurance_package, generate_relay_alert_assurance_recovery_drill_report,
     generate_relay_alert_assurance_replay_report, generate_relay_alert_assurance_retention_report,
+    relay_alert_assurance_external_retention_profile_from_json,
     generate_relay_alert_delivery_drift_report, generate_relay_alert_handoff_drift_report,
     generate_relay_alert_route_review_packet, generate_relay_trend_report,
     normalize_relay_alert_delivery_evidence, promote_peer_directory_candidate,
@@ -28,9 +30,14 @@ pub(super) use chio_pheromone_relay::{
     verify_relay_alert_assurance_export_bundle, CatchupRequest, CatchupResponse, PeerDirectory,
     PeerDirectoryBundleSigningInput, PeerDirectoryBundleTrust, PeerDirectoryDocument,
     PeerDirectoryEntry, PeerDirectoryStateDocument, PheromoneRelayClient, PheromoneRelayConfig,
-    PheromoneRelayError, PheromoneRelayService, RelayAlertAcknowledgementInput,
+    PheromoneRelayError, PheromoneRelayService,     RelayAlertAcknowledgementInput, RelayAlertCheck,
     RelayAlertAssuranceArchiveBundleCandidate, RelayAlertAssuranceArchiveInput,
-    RelayAlertAssuranceArchiveProfileDocument, RelayAlertAssuranceCloseoutInput,
+    RelayAlertAssuranceArchivePackageReport, RelayAlertAssuranceArchiveProfileDocument,
+    RelayAlertAssuranceArchiveRestoreDrillReport,
+    RelayAlertAssuranceArchiveRestorePackageReview, RelayAlertAssuranceCloseoutInput,
+    RelayAlertAssuranceExternalRetentionProfileDocument,
+    RelayAlertAssuranceExternalRetentionReviewInput,
+    RelayAlertAssurancePhysicalArchiveDrillReport, RelayAlertAssuranceRetentionHandoffReport,
     RelayAlertAssuranceCloseoutProfileDocument, RelayAlertAssuranceExportBuildInput,
     RelayAlertAssuranceInput, RelayAlertAssuranceRecoveryDrillInput,
     RelayAlertAssuranceReplayInput, RelayAlertAssuranceRetentionInput,
@@ -51,8 +58,13 @@ pub(super) use chio_pheromone_relay::{
     SqlitePheromoneRelayStore, TrustedPeerDirectoryIssuer, PHEROMONE_BATCH_RELAY_PATH,
     PHEROMONE_CATCHUP_RELAY_PATH, PHEROMONE_CATCHUP_REQUEST_SCHEMA,
     PHEROMONE_PEER_DIRECTORY_SCHEMA, PHEROMONE_RELAY_ALERT_ACKNOWLEDGEMENT_REPORT_SCHEMA,
+    PHEROMONE_RELAY_ALERT_ASSURANCE_ARCHIVE_PACKAGE_REPORT_SCHEMA,
     PHEROMONE_RELAY_ALERT_ASSURANCE_ARCHIVE_PROFILE_SCHEMA,
     PHEROMONE_RELAY_ALERT_ASSURANCE_ARCHIVE_REPORT_SCHEMA,
+    PHEROMONE_RELAY_ALERT_ASSURANCE_ARCHIVE_RESTORE_DRILL_REPORT_SCHEMA,
+    PHEROMONE_RELAY_ALERT_ASSURANCE_EXTERNAL_RETENTION_PROFILE_SCHEMA,
+    PHEROMONE_RELAY_ALERT_ASSURANCE_PHYSICAL_ARCHIVE_DRILL_REPORT_SCHEMA,
+    PHEROMONE_RELAY_ALERT_ASSURANCE_RETENTION_HANDOFF_REPORT_SCHEMA,
     PHEROMONE_RELAY_ALERT_ASSURANCE_CLOSEOUT_PROFILE_SCHEMA,
     PHEROMONE_RELAY_ALERT_ASSURANCE_CLOSEOUT_REPORT_SCHEMA,
     PHEROMONE_RELAY_ALERT_ASSURANCE_EXPORT_MANIFEST_SCHEMA,
@@ -928,4 +940,357 @@ pub(super) fn accepted_report() -> PheromoneReceiveReport {
             deposit_nonce: Some("nonce-live-relay-001".to_string()),
         }],
     }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ExternalRetentionNegativeCorpus {
+    pub(super) cases: Vec<ExternalRetentionNegativeCase>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ExternalRetentionNegativeCase {
+    pub(super) case_id: String,
+    pub(super) expected_code: String,
+}
+
+const EXTERNAL_RETENTION_KERNEL_ID: &str = "did:chio:buyer-kernel";
+const EXTERNAL_RETENTION_PACKAGE_ID: &str = "relay-archive-package-1";
+const EXTERNAL_RETENTION_SINCE_UNIX_MS: u64 = NOW - 10_000;
+const EXTERNAL_RETENTION_UNTIL_UNIX_MS: u64 = NOW + 10_000;
+
+fn external_retention_profile() -> RelayAlertAssuranceExternalRetentionProfileDocument {
+    RelayAlertAssuranceExternalRetentionProfileDocument {
+        schema: PHEROMONE_RELAY_ALERT_ASSURANCE_EXTERNAL_RETENTION_PROFILE_SCHEMA.to_string(),
+        local_kernel_id: EXTERNAL_RETENTION_KERNEL_ID.to_string(),
+        allowed_retention_system_aliases: vec![
+            "retention-vault".to_string(),
+            "retention-vault-b".to_string(),
+        ],
+        max_package_count: 8,
+        max_evidence_age_ms: 120_000,
+        require_generation_continuity: true,
+        require_restore_accepted: true,
+        require_physical_readback: true,
+        require_retention_handoff_ready: true,
+        min_sampled_members: 1,
+        min_sample_coverage_basis_points: 1_000,
+        recommendation_codes: vec!["operator_external_retention_review".to_string()],
+        issued_at_unix_ms: NOW - 1_000,
+        expires_at_unix_ms: NOW + 600_000,
+    }
+}
+
+fn external_retention_package_report(
+    generation: u64,
+    previous_package_manifest_sha256: Option<String>,
+) -> RelayAlertAssuranceArchivePackageReport {
+    RelayAlertAssuranceArchivePackageReport {
+        schema: PHEROMONE_RELAY_ALERT_ASSURANCE_ARCHIVE_PACKAGE_REPORT_SCHEMA.to_string(),
+        accepted: true,
+        code: "accepted".to_string(),
+        local_kernel_id: EXTERNAL_RETENTION_KERNEL_ID.to_string(),
+        generated_at_unix_ms: NOW,
+        package_id: EXTERNAL_RETENTION_PACKAGE_ID.to_string(),
+        package_generation: generation,
+        previous_package_manifest_sha256,
+        package_manifest_sha256: format!("{:064x}", generation),
+        source_archive_report_sha256: "b".repeat(64),
+        source_closeout_report_sha256: "c".repeat(64),
+        package_member_count: 4,
+        package_total_byte_count: 128,
+        bundle_count: 1,
+        trusted_packager_verified: true,
+        nested_exporter_verified: true,
+        source_reports_matched: true,
+        closeout_ready_verified: true,
+        total_byte_count_matched: true,
+        extractable: true,
+        checks: vec![RelayAlertCheck {
+            code: "accepted".to_string(),
+            accepted: true,
+            detail: "package report verified".to_string(),
+        }],
+    }
+}
+
+fn external_retention_package_report_sha256(
+    report: &RelayAlertAssuranceArchivePackageReport,
+) -> String {
+    sha256_hex(&canonical_json_bytes(report).unwrap())
+}
+
+fn external_retention_restore_drill(
+    report: &RelayAlertAssuranceArchivePackageReport,
+    accepted: bool,
+) -> RelayAlertAssuranceArchiveRestoreDrillReport {
+    let package_code = if accepted {
+        "accepted".to_string()
+    } else {
+        "package_report_rejected".to_string()
+    };
+    RelayAlertAssuranceArchiveRestoreDrillReport {
+        schema: PHEROMONE_RELAY_ALERT_ASSURANCE_ARCHIVE_RESTORE_DRILL_REPORT_SCHEMA.to_string(),
+        accepted,
+        code: if accepted {
+            "accepted".to_string()
+        } else {
+            "restore_blocked".to_string()
+        },
+        local_kernel_id: EXTERNAL_RETENTION_KERNEL_ID.to_string(),
+        generated_at_unix_ms: NOW,
+        package_count: 1,
+        verified_generation_count: if accepted { 1 } else { 0 },
+        latest_package_generation: report.package_generation,
+        quarantine_count: if accepted { 0 } else { 1 },
+        blocked_count: if accepted { 0 } else { 1 },
+        packages: vec![RelayAlertAssuranceArchiveRestorePackageReview {
+            package_id: report.package_id.clone(),
+            package_generation: report.package_generation,
+            package_manifest_sha256: report.package_manifest_sha256.clone(),
+            previous_package_manifest_sha256: report.previous_package_manifest_sha256.clone(),
+            accepted,
+            code: package_code,
+        }],
+        checks: vec![RelayAlertCheck {
+            code: if accepted {
+                "accepted".to_string()
+            } else {
+                "restore_blocked".to_string()
+            },
+            accepted,
+            detail: "restore drill review".to_string(),
+        }],
+    }
+}
+
+fn external_retention_physical_drill(
+    report_hash: &str,
+    sampled_member_count: u64,
+) -> RelayAlertAssurancePhysicalArchiveDrillReport {
+    RelayAlertAssurancePhysicalArchiveDrillReport {
+        schema: PHEROMONE_RELAY_ALERT_ASSURANCE_PHYSICAL_ARCHIVE_DRILL_REPORT_SCHEMA.to_string(),
+        accepted: true,
+        code: "accepted".to_string(),
+        local_kernel_id: EXTERNAL_RETENTION_KERNEL_ID.to_string(),
+        generated_at_unix_ms: NOW,
+        evidence_id: "physical-readback-001".to_string(),
+        package_id: EXTERNAL_RETENTION_PACKAGE_ID.to_string(),
+        package_report_sha256: report_hash.to_string(),
+        sampled_member_count,
+        checks: vec![RelayAlertCheck {
+            code: "accepted".to_string(),
+            accepted: true,
+            detail: "physical readback".to_string(),
+        }],
+    }
+}
+
+fn external_retention_handoff(
+    report_hash: &str,
+    target_system_alias: &str,
+) -> RelayAlertAssuranceRetentionHandoffReport {
+    RelayAlertAssuranceRetentionHandoffReport {
+        schema: PHEROMONE_RELAY_ALERT_ASSURANCE_RETENTION_HANDOFF_REPORT_SCHEMA.to_string(),
+        accepted: true,
+        code: "accepted".to_string(),
+        local_kernel_id: EXTERNAL_RETENTION_KERNEL_ID.to_string(),
+        generated_at_unix_ms: NOW,
+        evidence_id: "handoff-001".to_string(),
+        package_id: EXTERNAL_RETENTION_PACKAGE_ID.to_string(),
+        package_report_sha256: report_hash.to_string(),
+        target_system_alias: target_system_alias.to_string(),
+        ready_for_operator_handoff: true,
+        checks: vec![RelayAlertCheck {
+            code: "accepted".to_string(),
+            accepted: true,
+            detail: "retention handoff".to_string(),
+        }],
+    }
+}
+
+fn external_retention_review_code(
+    profile: &RelayAlertAssuranceExternalRetentionProfileDocument,
+    package_reports: &[RelayAlertAssuranceArchivePackageReport],
+    restore_drill_reports: &[RelayAlertAssuranceArchiveRestoreDrillReport],
+    physical_drill_reports: &[RelayAlertAssurancePhysicalArchiveDrillReport],
+    retention_handoff_reports: &[RelayAlertAssuranceRetentionHandoffReport],
+) -> String {
+    generate_relay_alert_assurance_external_retention_review_report(
+        RelayAlertAssuranceExternalRetentionReviewInput {
+            package_reports,
+            restore_drill_reports,
+            physical_drill_reports,
+            retention_handoff_reports,
+            profile,
+            since_unix_ms: EXTERNAL_RETENTION_SINCE_UNIX_MS,
+            until_unix_ms: EXTERNAL_RETENTION_UNTIL_UNIX_MS,
+            now_unix_ms: NOW,
+        },
+    )
+    .map(|report| report.code)
+    .unwrap_or_else(|error| error.code().to_string())
+}
+
+pub(super) fn external_retention_negative_code(case_id: &str) -> String {
+    if case_id == "stale_profile" {
+        let stale_profile = serde_json::json!({
+            "schema": PHEROMONE_RELAY_ALERT_ASSURANCE_EXTERNAL_RETENTION_PROFILE_SCHEMA,
+            "localKernelId": EXTERNAL_RETENTION_KERNEL_ID,
+            "allowedRetentionSystemAliases": ["retention-vault"],
+            "maxPackageCount": 8,
+            "maxEvidenceAgeMs": 120000,
+            "requireGenerationContinuity": true,
+            "requireRestoreAccepted": true,
+            "requirePhysicalReadback": true,
+            "requireRetentionHandoffReady": true,
+            "minSampledMembers": 1,
+            "minSampleCoverageBasisPoints": 1000,
+            "recommendationCodes": ["operator_external_retention_review"],
+            "issuedAtUnixMs": NOW - 1_000_000,
+            "expiresAtUnixMs": NOW - 500_000,
+        });
+        return relay_alert_assurance_external_retention_profile_from_json(
+            &stale_profile.to_string(),
+            NOW,
+        )
+        .unwrap_err()
+        .code()
+        .to_string();
+    }
+
+    let mut profile = external_retention_profile();
+    let mut package_report = external_retention_package_report(1, None);
+    let report_hash = external_retention_package_report_sha256(&package_report);
+    let mut restore_drill_reports =
+        vec![external_retention_restore_drill(&package_report, true)];
+    let mut physical_drill_reports = vec![external_retention_physical_drill(&report_hash, 1)];
+    let mut retention_handoff_reports =
+        vec![external_retention_handoff(&report_hash, "retention-vault")];
+    let mut package_reports = vec![package_report.clone()];
+
+    match case_id {
+        "untrusted_packager" => package_report.trusted_packager_verified = false,
+        "untrusted_exporter" => package_report.nested_exporter_verified = false,
+        "source_report_mismatch" => package_report.source_reports_matched = false,
+        "stale_evidence" => package_report.generated_at_unix_ms = NOW - 200_000,
+        "local_kernel_mismatch" => package_report.local_kernel_id = "did:chio:other-kernel".to_string(),
+        "generation_gap" => {
+            let first = external_retention_package_report(1, None);
+            let second = external_retention_package_report(
+                3,
+                Some("0000000000000000000000000000000000000000000000000000000000000002".to_string()),
+            );
+            let first_hash = external_retention_package_report_sha256(&first);
+            let second_hash = external_retention_package_report_sha256(&second);
+            package_reports = vec![first, second];
+            restore_drill_reports = vec![
+                external_retention_restore_drill(&package_reports[0], true),
+                external_retention_restore_drill(&package_reports[1], true),
+            ];
+            physical_drill_reports = vec![
+                external_retention_physical_drill(&first_hash, 1),
+                external_retention_physical_drill(&second_hash, 1),
+            ];
+            retention_handoff_reports = vec![
+                external_retention_handoff(&first_hash, "retention-vault"),
+                external_retention_handoff(&second_hash, "retention-vault"),
+            ];
+            return external_retention_review_code(
+                &profile,
+                &package_reports,
+                &restore_drill_reports,
+                &physical_drill_reports,
+                &retention_handoff_reports,
+            );
+        }
+        "previous_manifest_mismatch" => {
+            package_reports = vec![
+                external_retention_package_report(1, None),
+                external_retention_package_report(
+                    2,
+                    Some("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_string()),
+                ),
+            ];
+            let second_hash = external_retention_package_report_sha256(&package_reports[1]);
+            restore_drill_reports = vec![
+                external_retention_restore_drill(&package_reports[0], true),
+                external_retention_restore_drill(&package_reports[1], true),
+            ];
+            physical_drill_reports = vec![
+                external_retention_physical_drill(
+                    &external_retention_package_report_sha256(&package_reports[0]),
+                    1,
+                ),
+                external_retention_physical_drill(&second_hash, 1),
+            ];
+            retention_handoff_reports = vec![
+                external_retention_handoff(
+                    &external_retention_package_report_sha256(&package_reports[0]),
+                    "retention-vault",
+                ),
+                external_retention_handoff(&second_hash, "retention-vault"),
+            ];
+            return external_retention_review_code(
+                &profile,
+                &package_reports,
+                &restore_drill_reports,
+                &physical_drill_reports,
+                &retention_handoff_reports,
+            );
+        }
+        "missing_restore_drill" => restore_drill_reports.clear(),
+        "rejected_restore_drill" => {
+            restore_drill_reports = vec![external_retention_restore_drill(&package_report, false)]
+        }
+        "missing_physical_readback" => physical_drill_reports.clear(),
+        "insufficient_sample" => {
+            physical_drill_reports = vec![external_retention_physical_drill(&report_hash, 0)]
+        }
+        "missing_retention_handoff" => retention_handoff_reports.clear(),
+        "unknown_retention_alias" => {
+            retention_handoff_reports =
+                vec![external_retention_handoff(&report_hash, "unknown-vault")]
+        }
+        "alias_drift" => {
+            let first = external_retention_package_report(1, None);
+            let second = external_retention_package_report(
+                2,
+                Some(first.package_manifest_sha256.clone()),
+            );
+            let first_hash = external_retention_package_report_sha256(&first);
+            let second_hash = external_retention_package_report_sha256(&second);
+            package_reports = vec![first, second];
+            restore_drill_reports = vec![
+                external_retention_restore_drill(&package_reports[0], true),
+                external_retention_restore_drill(&package_reports[1], true),
+            ];
+            physical_drill_reports = vec![
+                external_retention_physical_drill(&first_hash, 1),
+                external_retention_physical_drill(&second_hash, 1),
+            ];
+            retention_handoff_reports = vec![
+                external_retention_handoff(&first_hash, "retention-vault"),
+                external_retention_handoff(&second_hash, "retention-vault-b"),
+            ];
+            return external_retention_review_code(
+                &profile,
+                &package_reports,
+                &restore_drill_reports,
+                &physical_drill_reports,
+                &retention_handoff_reports,
+            );
+        }
+        other => panic!("unsupported external retention negative case {other}"),
+    }
+
+    package_reports = vec![package_report];
+    external_retention_review_code(
+        &profile,
+        &package_reports,
+        &restore_drill_reports,
+        &physical_drill_reports,
+        &retention_handoff_reports,
+    )
 }

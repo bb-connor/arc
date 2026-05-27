@@ -1,11 +1,14 @@
+use std::fs;
+
 use super::common::{
-    archive_profile_for_export, closeout_profile_for_export,
+    archive_profile_for_export, closeout_profile_for_export, external_retention_negative_code,
     generate_relay_alert_assurance_archive_report, generate_relay_alert_assurance_closeout_report,
     generate_relay_alert_assurance_recovery_drill_report,
     generate_relay_alert_assurance_replay_report, generate_relay_alert_assurance_retention_report,
     generated_assurance_chain, key, relay_alert_assurance_export_bundle,
     retention_profile_for_export, sign_relay_alert_assurance_export_bundle, trusted_exporters,
-    verify_relay_alert_assurance_export_bundle, RelayAlertAssuranceArchiveBundleCandidate,
+    verify_relay_alert_assurance_export_bundle, ExternalRetentionNegativeCorpus,
+    RelayAlertAssuranceArchiveBundleCandidate,
     RelayAlertAssuranceArchiveInput, RelayAlertAssuranceCloseoutInput,
     RelayAlertAssuranceExportBuildInput, RelayAlertAssuranceRecoveryDrillInput,
     RelayAlertAssuranceReplayInput, RelayAlertAssuranceRetentionInput, NOW,
@@ -472,6 +475,70 @@ fn relay_alert_assurance_archive_drill_evidence_binds_package_report_identity() 
     )
     .unwrap_err();
     assert!(err.to_string().contains("package id mismatch"));
+}
+
+#[test]
+fn relay_alert_assurance_external_retention_review_negative_corpus_cases_are_executable() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../examples/chio-3vendor/fixtures/pheromone/relay/alert-assurance/",
+        "relay-alert-assurance-external-retention-negative-cases.json"
+    );
+    let corpus: ExternalRetentionNegativeCorpus =
+        serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
+    let mut seen = std::collections::BTreeSet::new();
+    for case in &corpus.cases {
+        assert!(
+            seen.insert(case.case_id.as_str()),
+            "duplicate case {}",
+            case.case_id
+        );
+        if case.case_id == "wrong_expected_code" {
+            let observed = external_retention_negative_code("untrusted_packager");
+            assert_ne!(observed, "negative_corpus_mismatch");
+            assert_eq!(case.expected_code, "negative_corpus_mismatch");
+            continue;
+        }
+        let observed = external_retention_negative_code(&case.case_id);
+        assert_eq!(
+            observed, case.expected_code,
+            "negative case {} expected {} but observed {}",
+            case.case_id, case.expected_code, observed
+        );
+    }
+    for required in [
+        "untrusted_packager",
+        "untrusted_exporter",
+        "source_report_mismatch",
+        "stale_profile",
+        "stale_evidence",
+        "local_kernel_mismatch",
+        "generation_gap",
+        "previous_manifest_mismatch",
+        "missing_restore_drill",
+        "rejected_restore_drill",
+        "missing_physical_readback",
+        "insufficient_sample",
+        "missing_retention_handoff",
+        "unknown_retention_alias",
+        "alias_drift",
+        "wrong_expected_code",
+    ] {
+        assert!(seen.contains(required), "missing negative case {required}");
+    }
+}
+
+#[test]
+fn relay_alert_assurance_archive_extraction_review_rejects_incomplete_member_extraction() {
+    let report = archive_package_report_for_evidence();
+    let extraction = build_relay_alert_assurance_archive_extraction_report(
+        &report,
+        report.package_member_count as u64 - 1,
+        NOW + 130_000,
+    )
+    .unwrap();
+    assert!(!extraction.accepted);
+    assert_eq!(extraction.code, "extraction_incomplete");
 }
 
 fn trusted_archive_packagers(

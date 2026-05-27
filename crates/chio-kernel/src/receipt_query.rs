@@ -252,6 +252,20 @@ mod tests {
         assert!(!scope.include_legacy_null_tenant);
         assert!(scope.is_admin_all);
     }
+
+    #[test]
+    fn tenant_scoped_read_context_rejects_empty_tenant() {
+        let query = ReceiptQuery {
+            read_context: Some(ReceiptReadContext::authenticated_tenant("   ")),
+            ..ReceiptQuery::default()
+        };
+
+        let err = query
+            .effective_read_scope()
+            .expect_err("empty tenant scope must fail closed");
+
+        assert_eq!(err, "tenant-scoped receipt query requires a non-empty tenant");
+    }
 }
 
 /// Result of a receipt query, including pagination state.
