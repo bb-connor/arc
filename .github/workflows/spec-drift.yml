@@ -34,6 +34,9 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
       - name: Assert Chio-owned schemas stay v1-only before release
         run: bash scripts/check-chio-owned-v1-only.sh
 
