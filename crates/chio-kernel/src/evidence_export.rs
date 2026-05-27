@@ -547,6 +547,26 @@ mod tests {
     }
 
     #[test]
+    fn evidence_export_query_rejects_admin_all_with_blank_tenant_filter() {
+        let error = EvidenceExportQuery {
+            tenant: Some("   ".to_string()),
+            read_boundary: Some(ReceiptReadBoundary::AdminAll),
+            ..EvidenceExportQuery::default()
+        }
+        .validate_read_boundary()
+        .expect_err("blank tenant filter must fail closed under admin-all boundary");
+        assert!(error.to_string().contains("non-empty tenant"));
+    }
+
+    #[test]
+    fn evidence_export_query_rejects_tenant_scoped_boundary_with_blank_tenant() {
+        let error = EvidenceExportQuery::tenant_scoped("   ")
+            .validate_read_boundary()
+            .expect_err("blank tenant-scoped boundary must fail closed");
+        assert!(error.to_string().contains("non-empty tenant"));
+    }
+
+    #[test]
     fn admin_all_evidence_export_uses_remote_safe_read_context() {
         let receipt_query = EvidenceExportQuery {
             tenant: Some("tenant-a".to_string()),

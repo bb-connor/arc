@@ -519,3 +519,120 @@ pub fn verify_receipt_lineage_bundle(
     }
     Ok(true)
 }
+
+#[cfg(test)]
+mod tests {
+    use chio_core_types::crypto::Keypair;
+    use chio_core_types::receipt::{
+        ActorRef, BoundaryClass, ChioReceipt, ChioReceiptBody, Decision, ReceiptKind,
+        RedactionMode, ToolCallAction, ToolOrigin, TrustLevel,
+    };
+
+    use super::{proof_package_contains_signed_receipt, receipt_wire_value_matches_parsed_receipt};
+
+    fn fixture_receipt() -> ChioReceipt {
+        let signer = Keypair::from_seed(&[9; 32]);
+        ChioReceipt::sign(
+            ChioReceiptBody {
+                id: "rcpt-wire-normalize".to_string(),
+                timestamp: 1_800_000_010,
+                capability_id: "cap-wire".to_string(),
+                tool_server: "server".to_string(),
+                tool_name: "tool".to_string(),
+                action: ToolCallAction::from_parameters(serde_json::json!({"x": 1}))
+                    .expect("fixture action"),
+                decision: Some(Decision::Allow),
+                receipt_kind: ReceiptKind::MediatedDecision,
+                boundary_class: BoundaryClass::Prevent,
+                observation_outcome: None,
+                tool_origin: ToolOrigin::CallerExecuted,
+                redaction_mode: RedactionMode::None,
+                actor_chain: vec![ActorRef {
+                    actor_id: "agent:test".to_string(),
+                    actor_kind: Some("agent".to_string()),
+                }],
+                content_hash: "a".repeat(64),
+                policy_hash: "policy".to_string(),
+                evidence: Vec::new(),
+                metadata: None,
+                trust_level: TrustLevel::default(),
+                tenant_id: None,
+                kernel_key: signer.public_key(),
+            },
+            &signer,
+        )
+        .expect("fixture receipt")
+    }
+
+    #[test]
+    fn receipt_wire_normalization_accepts_redundant_default_fields() {
+        let receipt = fixture_receipt();
+        let mut wire_value =
+            serde_json::to_value(&receipt).expect("serialize receipt for wire comparison");
+        let wire_object = wire_value
+            .as_object_mut()
+            .expect("receipt wire value must be an object");
+        wire_object.insert("algorithm".to_string(), serde_json::json!("ed25519"));
+        wire_object.insert("evidence".to_string(), serde_json::json!([]));
+        wire_object.insert("tenant_id".to_string(), serde_json::Value::Null);
+
+        assert!(
+            receipt_wire_value_matches_parsed_receipt(&wire_value, &receipt)
+                .expect("wire comparison"),
+            "default wire fields must normalize to the parsed signed receipt"
+        );
+    }
+
+    #[test]
+    fn receipt_wire_normalization_rejects_spoofed_null_metadata() {
+        let receipt = fixture_receipt();
+        let mut wire_value =
+            serde_json::to_value(&receipt).expect("serialize receipt for wire comparison");
+        wire_value["metadata"] = serde_json::Value::Null;
+
+        assert!(
+            !receipt_wire_value_matches_parsed_receipt(&wire_value, &receipt)
+                .expect("wire comparison"),
+            "wire metadata must match the signed receipt metadata"
+        );
+    }
+
+    #[test]
+    fn receipt_wire_normalization_rejects_non_default_evidence_array() {
+        let receipt = fixture_receipt();
+        let mut wire_value =
+            serde_json::to_value(&receipt).expect("serialize receipt for wire comparison");
+        wire_value["evidence"] = serde_json::json!([{
+            "guard_id": "shadow-guard",
+            "result": "allow"
+        }]);
+
+        assert!(
+            !receipt_wire_value_matches_parsed_receipt(&wire_value, &receipt)
+                .expect("wire comparison"),
+            "non-empty wire evidence must not match an empty parsed evidence vector"
+        );
+    }
+
+    #[test]
+    fn proof_package_signed_receipt_lookup_matches_wire_with_default_fields() {
+        let receipt = fixture_receipt();
+        let mut wire_value =
+            serde_json::to_value(&receipt).expect("serialize receipt for proof package");
+        let wire_object = wire_value
+            .as_object_mut()
+            .expect("receipt wire value must be an object");
+        wire_object.insert("algorithm".to_string(), serde_json::json!("ed25519"));
+        wire_object.insert("evidence".to_string(), serde_json::json!([]));
+        let receipt_sha256 = crate::hash::canonical_sha256(&wire_value).expect("wire hash");
+        let proof_package = serde_json::json!({
+            "toolReceipts": [wire_value]
+        });
+
+        assert!(
+            proof_package_contains_signed_receipt(&proof_package, &receipt_sha256)
+                .expect("proof package lookup"),
+            "proof package must accept signed receipts whose wire form carries redundant defaults"
+        );
+    }
+}
