@@ -208,10 +208,9 @@ fn validate_scenarios(args: Vec<String>) -> Result<(), XtaskError> {
         let schema_path = match resolve_schema_path(uri, &schema_index, &schemas_root) {
             Some(path) => path,
             None => {
-                // Unrecognized `$schema` URIs were previously SKIPped, which
-                // meant a typo could silently bypass validation. Treat them
-                // as a hard failure: a scenario that opted into schema
-                // validation must point at a real schema.
+                // Fail closed on an unrecognized `$schema` URI: a scenario
+                // that opted into schema validation must point at a real
+                // schema, so a typo cannot silently bypass validation.
                 println!(
                     "FAIL {}: unrecognized $schema URI: {}",
                     display_path(scenario),
@@ -605,9 +604,8 @@ fn codegen_rust(check_only: bool) -> Result<(), XtaskError> {
     if check_only {
         // Render BOTH the consolidated chio_wire_v1.rs and the placeholder
         // mod.rs into a temporary staging directory and compare every file
-        // byte-for-byte with the on-disk copy. The previous implementation
-        // only checked chio_wire_v1.rs, so a stale or missing mod.rs slipped
-        // past the spec-drift CI lane.
+        // byte-for-byte with the on-disk copy, so a stale or missing mod.rs
+        // cannot slip past the spec-drift CI lane.
         let staging = TempDir::new("chio-codegen-rust-check").map_err(|err| {
             XtaskError::Io("<temp staging dir for codegen rust --check>".into(), err)
         })?;
@@ -1648,8 +1646,7 @@ fn extract_top_level_python_classes(body: &str) -> Vec<String> {
         if name.is_empty() {
             continue;
         }
-        // Skip private classes (datamodel-codegen does not emit any, but be
-        // defensive against future changes).
+        // Skip private (leading-underscore) classes.
         if name.starts_with('_') {
             continue;
         }

@@ -3,10 +3,9 @@
 Wraps Apache Airflow's operator and TaskFlow surfaces so every task
 run flows through the Chio sidecar for capability-scoped authorisation,
 denied tasks fail with an :class:`airflow.exceptions.AirflowException`
-whose ``__cause__`` is a :class:`PermissionError` (per the roadmap
-17.3 acceptance criterion), and receipt ids are pushed into XCom on
-the current task instance so downstream tasks and audit consumers can
-build a DAG-level receipt timeline.
+whose ``__cause__`` is a :class:`PermissionError`, and receipt ids are
+pushed into XCom on the current task instance so downstream tasks and
+audit consumers can build a DAG-level receipt timeline.
 
 Public surface:
 

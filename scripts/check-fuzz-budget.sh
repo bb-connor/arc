@@ -1,24 +1,11 @@
 #!/usr/bin/env bash
-# check-fuzz-budget.sh - Advisory budget report for GitHub Actions fuzz minutes.
+# check-fuzz-budget.sh - Budget report for GitHub Actions fuzz minutes.
 #
-# Public repositories get unlimited GitHub-hosted standard-runner minutes, so
-# there is no billing cap to enforce. This script still sums the fuzz and
-# mutation lanes' wall time over the last 30 days and reports it for
-# visibility (so a runaway lane is noticed before it hogs the shared runner
-# pool), but it no longer hard-halts by default: cap_mode defaults to "warn".
-# A private fork that wants a hard cap can set GH_FUZZ_BUDGET_CAP_MODE=fail.
-#
-# This script queries the workflow-run history for the cflite_pr.yml,
-# cflite_batch.yml, fuzz.yml, mutants.yml, and mutants-fuzz-cocoverage.yml
-# workflows, sums their observed run wall time across the last 30 days, and
-# converts to minutes. The 1,800-minute default is now a reporting threshold,
-# not a gate.
-#
-# Cleanup C6: fuzz.yml was previously omitted from the WORKFLOWS array,
-# which meant the native cargo-fuzz scheduled matrix could burn its full
-# nightly 13 * 30 = 390 billed-min without contributing to the cap. The
-# entry below restores the gate's intended coverage of every fuzz lane on
-# the 1,800-min budget.
+# Sums the observed run wall time of the cflite_pr.yml, cflite_batch.yml,
+# fuzz.yml, mutants.yml, and mutants-fuzz-cocoverage.yml workflows across the
+# last 30 days and converts to minutes. cap_mode defaults to "warn", so
+# exceeding the cap reports but does not halt; set GH_FUZZ_BUDGET_CAP_MODE=fail
+# to hard-halt at the cap.
 #
 # Usage:
 #   scripts/check-fuzz-budget.sh                      # default repo: backbay-labs/chio
@@ -64,8 +51,6 @@ esac
 total_seconds=0
 
 rate_limit_mode="${GH_FUZZ_BUDGET_RATE_LIMIT_MODE:-fail}"
-# Public repos have no billing cap, so the budget is advisory by default. Set
-# GH_FUZZ_BUDGET_CAP_MODE=fail to restore a hard halt (e.g. on a private fork).
 cap_mode="${GH_FUZZ_BUDGET_CAP_MODE:-warn}"
 
 for wf in "${WORKFLOWS[@]}"; do

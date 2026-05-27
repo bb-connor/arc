@@ -193,7 +193,7 @@ fn run_invocation_with(
     };
     // Strict-default regression coverage: positive helpers must run under
     // the strict fail-closed default `Reject` so they actually prove
-    // the new default. Tests that don't pass a custom class for `TOOL`
+    // that default. Tests that don't pass a custom class for `TOOL`
     // get a `Routine` registration here so the assertion still proves
     // the *non-step-15* code path; tests that exercise step 15 (the
     // `step_15_*` cases) pass their own `ReceiptBacked` mapping which

@@ -9,11 +9,10 @@
 # Why these are suppressed rather than bumped: patched releases exist within the
 # current semver ranges, but the example packages depend on unpublished local
 # @chio-protocol/* workspace packages, so npm cannot regenerate their lockfiles
-# in isolation (it fails resolving the workspace deps). The bump is deferred to a
-# dedicated polyglot dependency-refresh pass that can run the full workspace
-# install. These entries are intentionally narrow (by advisory id) so a new,
-# unrelated advisory still blocks. Revisit and remove once the lockfiles are
-# refreshed.
+# in isolation (it fails resolving the workspace deps). These entries are
+# intentionally narrow (by advisory id) so a new, unrelated advisory still
+# blocks. Revisit and remove once the lockfiles can be refreshed against the
+# full workspace install.
 
 [[IgnoredVulns]]
 id = "GHSA-58qx-3vcg-4xpx"

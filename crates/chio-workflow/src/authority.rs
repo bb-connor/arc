@@ -1314,13 +1314,11 @@ mod tests {
 
     #[test]
     fn rapid_begin_calls_produce_distinct_ids_for_same_agent() {
-        // Regression: with the previous fix, the id mixed in `execution_count`
-        // (only incremented in `finalize()`) plus the agent id. Two back-to-
-        // back `begin()` calls for the same agent within one second, with no
-        // intervening `finalize()`, would still collide because both `now`
-        // and `execution_count` were unchanged. The atomic per-call counter
-        // ensures every `begin()` produces a fresh id regardless of finalize
-        // ordering.
+        // Two back-to-back `begin()` calls for the same agent within one
+        // second, with no intervening `finalize()`, must not collide: `now`
+        // and `execution_count` (incremented only in `finalize()`) are both
+        // unchanged across the pair. The atomic per-call counter ensures
+        // every `begin()` produces a fresh id regardless of finalize ordering.
         let manifest = make_manifest();
         let grant = make_grant();
         let authority = WorkflowAuthority::new(Keypair::generate());

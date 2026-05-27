@@ -1,15 +1,9 @@
 name: Chio Proof Package
 
 on:
-  # The proof-package gate re-issues a federation authority bundle and compares
-  # it against the committed examples/chio-3vendor proof package, verifier trust
-  # bundle, and verification context. The 3vendor fixture generator and the
-  # `federation authority` CLI currently diverge on the governance-receipt
-  # stepSha256 and the assembled trust bundle; verifier-trust-bundle.json is
-  # also consumed by chio-pheromone-runtime's receiver tests, which need the
-  # generator's bytes, so the two consumers cannot share one re-blessed file.
-  # Reconciling the two issuance implementations is a tracked product-level fix.
-  # Until then this gate runs nightly and on demand rather than blocking PRs.
+  # Re-issues a federation authority bundle and compares it against the
+  # committed examples/chio-3vendor proof package, verifier trust bundle, and
+  # verification context.
   schedule:
     - cron: "17 7 * * *"
   workflow_dispatch:

@@ -2948,14 +2948,11 @@ pub(crate) enum ReceiptCommands {
     /// section. It does not claim strict Chio DSSE section 6 predicate conformance.
     ///
     /// Pass `--inspect-bilateral` to additionally emit a structural
-    /// **inspection trace** of the envelope. The previous flag spelling
-    /// (`--explain-bilateral`) labelled the output a "full-verifier
-    /// trace" and a number of steps were marked `bounded` because the
-    /// CLI does not carry the org A / org B passport public keys;
-    /// Ed25519 signature verification was NOT performed. The new flag
-    /// emits an inspection trace (structural / schema checks only) and
-    /// is honest about the absence of cryptographic verification. The
-    /// The `--explain-bilateral` alias is retained as a previous spelling.
+    /// **inspection trace** of the envelope (structural / schema checks
+    /// only). Ed25519 signature verification is NOT performed: the CLI
+    /// does not carry the org A / org B passport public keys, so the
+    /// trace makes no cryptographic-verification claim.
+    /// `--explain-bilateral` is retained as an alias.
     Explain {
         /// Receipt ID. Use a sentinel (e.g. `bilateral`) when reading a
         /// bilateral artifact via `--input-file`; the receipt_id is

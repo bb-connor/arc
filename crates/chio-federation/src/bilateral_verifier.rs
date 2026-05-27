@@ -141,11 +141,10 @@ pub enum VerifierError {
     LadderManifestStale(String),
     /// Fail-closed action-class invariant: `governance.unknown_action_class`.
     /// The predicate's `tool_name` is not registered in the verifier's
-    /// `action_classes` table. The pre-fix verifier silently fell back
-    /// to `Routine` (no governance receipt required) when the table
-    /// did not contain the tool, which is fail-OPEN for receipt-backed
-    /// classes that were misspelled or omitted from the registry. The
-    /// strict mode requires explicit registration.
+    /// `action_classes` table. Strict mode requires explicit registration:
+    /// falling back to `Routine` (no governance receipt required) for an
+    /// unregistered tool is fail-OPEN for receipt-backed classes that were
+    /// misspelled or omitted from the registry.
     #[error("governance.unknown_action_class: {tool_name:?}")]
     UnknownActionClass { tool_name: String },
 }
@@ -1276,13 +1275,11 @@ pub fn verify_bilateral_cosign_invocation(
         )));
     }
     // Single-subject invariant: the bilateral envelope profile
-    // binds exactly ONE subject (the receipt body). The pre-fix
-    // verifier only rejected the empty-list case, so a multi-subject
-    // envelope was accepted and `subject[0]` alone was bound. A
-    // signer could insert an arbitrary second subject digest and
-    // verifiers that walked the full subject list (the in-toto
-    // convention for subject membership) would resolve a different
-    // receipt than the producer signed. Mirror the
+    // binds exactly ONE subject (the receipt body). Rejecting only the
+    // empty-list case is fail-OPEN: a signer could insert an arbitrary
+    // second subject digest and verifiers that walked the full subject
+    // list (the in-toto convention for subject membership) would resolve
+    // a different receipt than the producer signed. Mirror the
     // `bilateral_dsse::verify_dsse_envelope` check at this layer so
     // the §7 verifier path also fails closed.
     if statement.subject.len() != 1 {
@@ -3084,12 +3081,11 @@ mod tests {
 
     #[test]
     fn step_15_unknown_action_class_rejected_under_strict_policy() {
-        // Fail-closed action-class invariant: the pre-fix verifier silently
-        // fell back to `Routine` for any tool name not present in
-        // `action_classes`, fail-OPEN for receipt-backed classes
-        // misspelled or omitted from the registry. The strict default
-        // (Reject) returns the typed `governance.unknown_action_class`
-        // diagnostic.
+        // Fail-closed action-class invariant: a tool name not present in
+        // `action_classes` must not fall back to `Routine` (fail-OPEN for
+        // receipt-backed classes misspelled or omitted from the registry).
+        // The strict default (Reject) returns the typed
+        // `governance.unknown_action_class` diagnostic.
         let kp_a = Keypair::generate();
         let kp_b = Keypair::generate();
         let receipt = sample_receipt(&kp_b);

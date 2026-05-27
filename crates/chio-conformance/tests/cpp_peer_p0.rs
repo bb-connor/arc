@@ -45,9 +45,7 @@ const AUTH_P0_SCENARIOS: &[&str] = &[
     "auth-token-exchange-initialize",
 ];
 
-// Areas explicitly deferred from the P0 gate. Listed here so a future
-// reader can grep and confirm the deferral is still the intent before
-// expanding the gate.
+// Areas explicitly outside the P0 gate and not exercised by the C++ peer.
 const DEFERRED_AREAS: &[&str] = &[
     "chio-extensions",
     "tasks",

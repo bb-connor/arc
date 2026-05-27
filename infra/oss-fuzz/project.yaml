@@ -3,7 +3,7 @@ language: rust
 primary_contact: "connor@backbay.io"
 auto_ccs:
   - "connor@backbay.io"
-  # TODO: add backup contact before opening the upstream OSS-Fuzz PR.
+  # TODO: add a backup contact.
 main_repo: "https://github.com/backbay-labs/chio"
 sanitizers:
   # OSS-Fuzz Rust integration only supports `address` for Rust

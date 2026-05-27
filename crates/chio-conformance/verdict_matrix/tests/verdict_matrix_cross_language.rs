@@ -369,6 +369,4 @@ fn wasm_browser_report_covers_capability_subset_only() {
     }
 }
 
-// The cross-language divergence gate is enforced by running this test in CI;
-// it is no longer tied to a dedicated workflow file (the milestone-era
-// verdict-matrix.yml gate workflow was removed).
+// The cross-language divergence gate is enforced by running this test in CI.

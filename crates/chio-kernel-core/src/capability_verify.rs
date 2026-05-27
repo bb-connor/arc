@@ -270,7 +270,7 @@ where
 }
 
 /// Chain-binding entry point. Verify a capability token while also
-/// enforcing the chain-binding rule that closes the P0 soundness gap.
+/// enforcing the chain-binding rule required for delegation soundness.
 ///
 /// In addition to the checks in [`verify_capability_with_floor`], this
 /// entry point checks tokens that carry an `attenuation_proof`

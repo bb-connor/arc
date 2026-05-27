@@ -615,8 +615,8 @@ class TestForwardingTablePassthroughHelper:
     def test_pure_var_positional_signature_redacts_via_tool_table(
         self,
     ) -> None:
-        # Regression: pure *args wrappers previously bypassed the
-        # forwarding-table helper and leaked the body field.
+        # Pure *args wrappers must route through the forwarding-table
+        # helper so the body field is redacted, not leaked.
         from typing import Any
 
         from chio_prefect.decorators import _task_parameters
@@ -859,7 +859,7 @@ class TestPositionalOnlyVarKeywordSpillover:
 
 
 class TestVarPositionalNamedAfterBodyField:
-    """Regression for #672 comment 3228939863.
+    """Variadic parameter named after a protected body field.
 
     ``def write_file(*content, path)`` puts the positional secret in the
     VAR_POSITIONAL bucket whose declared name is ``content`` (one of the
@@ -981,9 +981,9 @@ class TestArityOverflowFailClosed:
     def test_arity_overflow_with_var_positional_passes_through(
         self,
     ) -> None:
-        # Sanity check: a VAR_POSITIONAL wrapper is NOT treated as
-        # arity-overflow because all extras land in *args by design.
-        # Existing pass-through semantics are preserved.
+        # A VAR_POSITIONAL wrapper is NOT treated as arity-overflow
+        # because all extras land in *args by design. Existing
+        # pass-through semantics are preserved.
         from typing import Any
 
         from chio_prefect.decorators import _task_parameters

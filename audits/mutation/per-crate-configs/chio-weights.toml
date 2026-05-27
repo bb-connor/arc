@@ -19,7 +19,7 @@
 #     (`kernel_capability_checker_rejects_untrusted_and_tampered_tokens`
 #     asserts `verdict.reason.contains("signature") || ...("untrusted")`,
 #     but the runtime now returns `"trusted CA"` wording). That failure
-#     is on `main` at SHA 708c7bb33 and is out of scope for the A1
+#     is on `main` at SHA 708c7bb33 and is out of scope for this
 #     mutation baseline. Without this scope override, every mutant on
 #     chio-weights would register as caught regardless of whether the
 #     mutation actually changed chio-weights behavior, producing a

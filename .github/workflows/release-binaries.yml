@@ -162,16 +162,13 @@ jobs:
       - name: Build (cross)
         # cross v0.2.5 does NOT recognise `auditable` as a build
         # subcommand; in upstream `src/cargo.rs` unknown subcommands map
-        # to `Subcommand::Other`, whose `needs_docker()` returns false,
-        # so the previous `cross auditable build` invocation silently
-        # fell back to the host. The host lacks the cross-compile
-        # linker + sysroot, so every aarch64-linux release build failed.
-        #
-        # The correct pattern is to drive the cross-rs container image
-        # directly: install `cargo-auditable` inside the container and
-        # then run `cargo auditable build` there. The image is pinned by
-        # digest so the release lane never signs bytes built inside a
-        # moved tag.
+        # to `Subcommand::Other`, whose `needs_docker()` returns false, so
+        # `cross auditable build` would silently fall back to the host,
+        # which lacks the cross-compile linker + sysroot. Instead, drive the
+        # cross-rs container image directly: install `cargo-auditable` inside
+        # the container and run `cargo auditable build` there. The image is
+        # pinned by digest so the release lane never signs bytes built inside
+        # a moved tag.
         if: matrix.cross == true
         shell: bash
         env:
@@ -988,7 +985,7 @@ jobs:
           # Replace the `cycle_end_tag = ""` line with the resolved tag.
           # The pattern is anchored to the empty-string form so a re-run
           # against an already-flipped file is a no-op even if the
-          # `should_flip` guard above misses (defense in depth).
+          # `should_flip` guard above misses.
           python3 - <<'PY'
           import os
           import pathlib

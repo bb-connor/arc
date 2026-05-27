@@ -321,10 +321,8 @@ mod tests {
         let bytes = canonicalize(&frame).expect("canonicalize");
         let s = std::str::from_utf8(&bytes).expect("utf8");
         // RFC 8785 sorts object keys; "deny_reason" is absent for an
-        // `Allow` frame because of `skip_serializing_if`. The first key
-        // must be `event_id` since "e" < "i" < "p" < "r" < "s" < "t" < "u" < "v" < "w" but
-        // also < "schema_version". Let's just assert the schema version
-        // appears later than event_id.
+        // `Allow` frame because of `skip_serializing_if`. "event_id" sorts
+        // before "schema_version".
         let pos_event = s.find("\"event_id\"").expect("event_id present");
         let pos_schema = s
             .find("\"schema_version\"")

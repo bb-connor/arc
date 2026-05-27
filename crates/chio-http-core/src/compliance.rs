@@ -193,8 +193,6 @@ mod tests {
             config: None,
         })
         .unwrap();
-        // We build a dummy kernel via ChioKernel::new with the
-        // simplest possible config.
         let keypair = chio_core_types::crypto::Keypair::generate();
         let kernel = Arc::new(ChioKernel::new(chio_kernel::KernelConfig {
             keypair,

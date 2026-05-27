@@ -484,10 +484,9 @@ pub fn promote_to_fixtures(
 /// Auto-promote failing scenarios to the chio-adversarial-suite
 /// per-class corpus.
 ///
-/// When the suite scaffold has not landed yet (signalled by the absence
-/// of `crates/chio-adversarial-suite/cases/`), the writer falls back to
-/// `target/arena/promote-pending/`. The returned summary records which
-/// target was chosen.
+/// When `crates/chio-adversarial-suite/cases/` is absent, the writer
+/// falls back to `target/arena/promote-pending/`. The returned summary
+/// records which target was chosen.
 pub fn promote_to_adversarial_suite(
     scenario: &Scenario,
     run: &ArenaRun,

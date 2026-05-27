@@ -183,8 +183,8 @@ fn utf8_char_len(b: u8) -> usize {
     } else if b & 0xF8 == 0xF0 {
         4
     } else {
-        // Continuation byte or invalid header; caller ensures this is only hit
-        // inside a valid &str so we never reach here in practice.
+        // Continuation byte or invalid header; unreachable for a leading byte
+        // of a valid &str.
         1
     }
 }

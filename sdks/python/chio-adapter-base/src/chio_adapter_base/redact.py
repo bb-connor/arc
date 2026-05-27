@@ -255,7 +255,7 @@ def _redact_named(
     tool_name: str,
     policy: RedactionPolicy,
 ) -> dict[str, Any]:
-    """Apply ``policy`` to a name-keyed mapping; thin wrapper for clarity."""
+    """Apply ``policy`` to a name-keyed mapping."""
     return redact_args(tool_name, parameters, policy=policy)
 
 
@@ -510,7 +510,7 @@ def bind_and_redact(
     # caller-supplied / chio-default ``positional_table`` may not list
     # the custom tool. Derive a positional-name table from the
     # signature itself so the merge-conflict fallback covers
-    # custom-tool fixed signatures too. (See bot comment 3229135384.)
+    # custom-tool fixed signatures too.
     bound: inspect.BoundArguments | None = None
     fallback_table: Mapping[str, tuple[str, ...]] = table
     fallback_kwarg_alias: Mapping[str, str] | None = None
@@ -807,9 +807,9 @@ def bind_and_redact(
     # Build alias map by ROUTING to protected canonical names, not by
     # same-index table-slot lookup.
     #
-    # Earlier versions aliased a non-canonical wrapper-name at index N
-    # to ``table_slots_for_tool[N]`` regardless of whether that slot was
-    # itself protected. That breaks ``def write(body, path)`` for
+    # Aliasing a non-canonical wrapper-name at index N to
+    # ``table_slots_for_tool[N]`` regardless of whether that slot is
+    # itself protected breaks ``def write(body, path)`` for
     # chio_file_write whose table is ``("path", "content")``: ``body``
     # would be aliased to ``path`` (idx 0), but ``path`` is NOT a
     # protected field; the redactor would never look it up and
@@ -863,13 +863,12 @@ def bind_and_redact(
     # pass MUST run; otherwise a kwarg call like ``writer('/tmp/x',
     # body='PROD_SECRET')`` forwards the secret raw.
     # Only a variadic parameter whose name is an actual PROTECTED
-    # canonical suppresses kwonly aliasing. Earlier versions also fired
-    # the guard when ``*name`` matched any table slot (protected or
-    # not), which over-broadly skipped aliasing for shapes like
-    # ``def write_file(*path, body)`` -- ``path`` is in the chio
-    # ``("path", "content")`` table but is NOT a protected field, so
-    # the kwonly ``body`` should still alias to ``content`` and got
-    # forwarded raw instead.
+    # canonical suppresses kwonly aliasing. Firing the guard whenever
+    # ``*name`` matches any table slot (protected or not) over-broadly
+    # skips aliasing for shapes like ``def write_file(*path, body)``:
+    # ``path`` is in the chio ``("path", "content")`` table but is NOT a
+    # protected field, so the kwonly ``body`` must still alias to
+    # ``content`` rather than forward raw.
     var_positional_is_protected_canonical = any(
         p.kind is inspect.Parameter.VAR_POSITIONAL
         and p.name in protected_fields_for_tool
@@ -991,8 +990,7 @@ def bind_and_redact(
     # in the policy table for this tool, treat every value in the
     # tuple as that protected slot and redact each independently.
     # This covers wrappers like ``def write_file(*content, path)``
-    # where ``*content`` is itself the protected field name. (See
-    # bot comments 3229375712 and 3229301707/3229301713.)
+    # where ``*content`` is itself the protected field name.
     redacted_var_positional_by_name: tuple[Any, ...] | None = None
     if (
         var_positional_param is not None
@@ -1175,7 +1173,7 @@ def bind_and_redact(
         # ``redacted_fixed`` check below would substitute the
         # positional-only value into the kwarg position and the
         # caller's original spillover value would be silently
-        # dropped. (See bot comments 3229301699 / 3229411436.)
+        # dropped.
         if name in spillover_keys and name in redacted_spillover:
             rebuilt_kwargs[name] = redacted_spillover[name]
             continue

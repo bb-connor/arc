@@ -196,9 +196,3 @@ cargo run -p chio-three-vendor-example --bin generate-chio-three-vendor-fixtures
 for filename in deposit.json gossip-batch.json transit-policy.json concentration.json negative-cases.json; do
   cmp "$FIXTURE_DIR/$filename" "$tmpdir/pheromone/$filename"
 done
-
-# Authority issuance is validated by the dedicated proof-package gate
-# (chio-proof-package.yml). It also tracks a known divergence between the
-# 3vendor fixture generator and the federation authority CLI, so running it
-# here only duplicated that gate and pulled the same divergence into the
-# pheromone transit lane.

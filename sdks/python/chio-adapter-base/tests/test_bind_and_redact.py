@@ -403,14 +403,13 @@ def test_pure_var_positional_treated_as_forwarder() -> None:
 def test_fixed_signature_redacts_both_positional_and_kwarg_for_protected_slot() -> None:
     """Custom-tool merge conflict: redact both positional + kwarg without a custom table.
 
-    Regression for bot comment 3229135384: a fixed-signature custom
-    tool (``def my_tool(path, body)``) called with a duplicate
-    protected name (``my_tool("p", "SECRET", body="KW")``) caused
-    ``bind_partial`` to raise. The fallback used the chio-default
-    positional table, which has no entry for ``my_tool``, so the
-    positional ``body`` value was returned raw. The fix derives the
-    fallback positional names from the signature itself when the
-    caller has not supplied a ``positional_table=`` for the tool.
+    A fixed-signature custom tool (``def my_tool(path, body)``) called
+    with a duplicate protected name (``my_tool("p", "SECRET", body="KW")``)
+    makes ``bind_partial`` raise. The chio-default positional table has
+    no entry for ``my_tool``, so without a signature-derived fallback the
+    positional ``body`` value is returned raw. The fallback positional
+    names are derived from the signature itself when the caller has not
+    supplied a ``positional_table=`` for the tool.
     """
 
     def my_tool(path: str, body: str) -> None:
@@ -433,13 +432,11 @@ def test_fixed_signature_redacts_both_positional_and_kwarg_for_protected_slot() 
 def test_var_positional_named_after_protected_chio_default() -> None:
     """``def fn(*content, path)`` for chio_file_write: each ``*content`` value redacts.
 
-    Regression for bot comments 3229375712 and 3229301707: the
-    wrapper's varargs parameter is itself the protected field name
-    (``content``). Previously, the rebuild loop ignored the declared
-    ``*content`` name and bound extras only via the positional
-    table. Because ``path`` already filled the table's ``path`` slot
-    via kwargs, the first content chunk was treated as ``path`` and
-    returned raw.
+    The wrapper's varargs parameter is itself the protected field name
+    (``content``). If the rebuild loop ignored the declared ``*content``
+    name and bound extras only via the positional table, then because
+    ``path`` already filled the table's ``path`` slot via kwargs, the
+    first content chunk would be treated as ``path`` and returned raw.
     """
 
     def write_file(*content: object, path: str) -> None:
@@ -485,13 +482,12 @@ def test_var_positional_named_after_protected_custom_tool() -> None:
 def test_positional_only_with_same_named_kwarg_preserves_spillover() -> None:
     """``def write(path, /, **kw)`` called as ``write("/etc", path="/tmp/x")``.
 
-    Regression for bot comments 3229301699 and 3229411436:
     Python permits both a positional-only ``path`` and a
     same-named entry in ``**kw``. ``bind_partial`` keeps the
-    kwarg in the VAR_KEYWORD spillover, but the rebuild loop
-    previously matched ``redacted_fixed`` first and replaced the
-    spillover value with the positional value. Each redacted
-    independently; the original wire shape preserves both.
+    kwarg in the VAR_KEYWORD spillover; the rebuild loop must not
+    match ``redacted_fixed`` first and replace the spillover value
+    with the positional value. Each redacts independently; the
+    original wire shape preserves both.
     """
 
     def write(path: str, /, **kw: object) -> None:
@@ -536,8 +532,8 @@ def test_known_tool_with_renamed_param_redacts_correctly() -> None:
     ``def write_file(path, body)`` against ``chio_file_write`` whose
     canonical slots are ``("path", "content")``), the rebuild must
     route the value through the table-derived canonical name so the
-    policy lookup matches. Previously the wrapper's ``body`` name was
-    used directly and ``content``-keyed policy missed it, leaking the
+    policy lookup matches. If the wrapper's ``body`` name were used
+    directly, the ``content``-keyed policy would miss it and leak the
     raw secret in ``parameters["args"][1]``.
     """
 
@@ -589,8 +585,8 @@ def test_pure_forwarder_skips_table_slot_filled_by_kwarg() -> None:
     (``def proxy(*args, **kwargs)``) registered as ``chio_file_write``
     called as ``proxy("PROD_SECRET", path="/tmp/x")``. The kwarg already
     fills slot 0 (``path``), so the lone positional value is logically
-    the ``content`` slot. Previously the fallback always mapped
-    positional[0] -> table slot 0, returning the raw secret under
+    the ``content`` slot. A fallback that always mapped
+    positional[0] -> table slot 0 would return the raw secret under
     ``args[0]``.
     """
 
@@ -659,9 +655,9 @@ def test_keyword_only_alias_for_protected_field_redacts_via_canonical() -> None:
     """A TaskFlow wrapper with a keyword-only
     alias for the protected body must still redact via the canonical
     slot name. ``def write_file(path, *, body)`` registered as
-    ``chio_file_write`` (table ``("path", "content")``) was previously
-    omitted from the alias map because the kwonly param is not in the
-    fixed-positional collection.
+    ``chio_file_write`` (table ``("path", "content")``) must not be
+    omitted from the alias map merely because the kwonly param is not in
+    the fixed-positional collection.
     """
 
     def write_file(path: str, *, body: str) -> None:
@@ -699,9 +695,9 @@ def test_pure_forwarder_redacts_both_positional_and_kwarg_for_same_slot() -> Non
     """A pure-forwarding wrapper that receives
     the protected slot both positionally and as a kwarg must redact both
     independently. ``proxy("/tmp/x", "POS_SECRET", content="KW_SECRET")``
-    for ``chio_file_write`` previously dropped the positional
-    ``POS_SECRET`` to raw because the ``content`` slot had been removed
-    from the free-slot sequence by the kwarg.
+    for ``chio_file_write`` must not drop the positional ``POS_SECRET``
+    to raw when the kwarg has already removed the ``content`` slot from
+    the free-slot sequence.
     """
 
     def proxy(*args: object, **kwargs: object) -> None:
@@ -1049,9 +1045,9 @@ def test_typeerror_fallback_two_kwargs_same_canonical_both_redact() -> None:
     def write(body: str, path: str) -> None:
         del body, path
 
-    # ``content=`` is not a parameter of ``write``; bind_partial will
-    # raise TypeError, dropping the helper into the alias-map fallback
-    # path where C1 previously dropped one of the two kwargs.
+    # ``content=`` is not a parameter of ``write``; bind_partial raises
+    # TypeError, dropping the helper into the alias-map fallback path
+    # where C1 must not drop either of the two kwargs.
     args, kwargs = bind_and_redact(
         write,
         (),
@@ -1516,9 +1512,9 @@ def test_typeerror_fallback_protected_var_positional_with_unknown_kwarg() -> Non
     A wrapper whose VAR_POSITIONAL is itself the protected canonical
     (``def write_file(*content)``), invoked with an unsupported kwarg
     so bind_partial raises, must still redact the positional values
-    under the variadic name. Previously the TypeError fallback dropped
-    the variadic-name slot list and the chio-default
-    ``("path", "content")`` table routed the secret to the unprotected
+    under the variadic name. The TypeError fallback must not drop the
+    variadic-name slot list; otherwise the chio-default
+    ``("path", "content")`` table routes the secret to the unprotected
     ``path`` slot.
     """
 
@@ -1601,15 +1597,14 @@ def test_signature_path_kwonly_body_with_unrelated_var_positional() -> None:
     """Regression:
 
     ``def write_file(path, *rest, body)`` invoked with the protected
-    body as a kwarg. The kwonly aliasing pass was previously SKIPPED
-    whenever the signature contained any VAR_POSITIONAL (broad
-    ``has_var_positional`` guard). The guard is intended to defer to
-    the variadic when the variadic ITSELF names a protected canonical
-    (e.g. ``def writer(*content, path)``); when the VAR_POSITIONAL is
-    unrelated (``*rest``), the kwonly may still alias the protected
-    body. The broad guard let ``body='PROD_SECRET'`` forward raw.
-    Distinct byte length so a future regression cannot hide behind a
-    coincidentally-matching ``byte_count``.
+    body as a kwarg. The kwonly aliasing pass must not be skipped merely
+    because the signature contains any VAR_POSITIONAL. The guard defers
+    to the variadic only when the variadic ITSELF names a protected
+    canonical (e.g. ``def writer(*content, path)``); when the
+    VAR_POSITIONAL is unrelated (``*rest``), the kwonly may still alias
+    the protected body. A broad guard would let ``body='PROD_SECRET'``
+    forward raw. Distinct byte length so a regression cannot hide behind
+    a coincidentally-matching ``byte_count``.
     """
 
     def write_file(path: str, *rest: object, body: str) -> None:
@@ -1632,15 +1627,15 @@ def test_signature_path_ambiguous_kwonly_aliases_redact_all() -> None:
     """Regression:
 
     ``def write_file(path, *, label, body)`` invoked with both kwonly
-    kwargs supplied. Pass-B previously walked the kwonly params in
-    declaration order and greedily assigned the only unclaimed
-    protected canonical (``content``) to the first-declared kwonly
-    (``label``), leaving ``body`` unaliased so ``body='PROD_SECRET'``
-    forwarded raw. The fix routes EVERY unclaimed kwonly to a
-    protected canonical (cycling) when there are more kwonlys than
-    free canonicals, mirroring the merge-conflict semantics used by
-    other paths. Both kwargs must redact; each stub must report ITS
-    OWN byte_count (not a shared one) so a regression can't hide.
+    kwargs supplied. Pass-B must not walk the kwonly params in
+    declaration order and greedily assign the only unclaimed protected
+    canonical (``content``) to the first-declared kwonly (``label``),
+    leaving ``body`` unaliased so ``body='PROD_SECRET'`` forwards raw.
+    EVERY unclaimed kwonly routes to a protected canonical (cycling)
+    when there are more kwonlys than free canonicals, mirroring the
+    merge-conflict semantics used by other paths. Both kwargs must
+    redact; each stub must report ITS OWN byte_count (not a shared one)
+    so a regression can't hide.
     """
 
     def write_file(path: str, *, label: str, body: str) -> None:
@@ -1854,18 +1849,16 @@ def test_typeerror_fallback_colliding_positional_aliases_redact_independently() 
     ``path='/tmp'`` as a kwarg triggers ``bind_partial`` TypeError
     (``path`` duplicated across positional + kwarg). The TypeError
     fallback builds an ambiguous-fail-closed alias map sending BOTH
-    ``label`` and ``body`` to canonical ``content``. Earlier versions
-    keyed the canonical-redact view by canonical name, so the second
-    slot silently overwrote the first in the dict view, and the
-    rebuild ``KeyError``-crashed when looking up the missing wrapper-
-    name.
+    ``label`` and ``body`` to canonical ``content``. Keying the
+    canonical-redact view by canonical name would let the second slot
+    silently overwrite the first in the dict view and crash the rebuild
+    with a ``KeyError`` on the missing wrapper-name.
 
-    The fix mirrors the overflow path: detect that two wrapper slot
-    names collide on the same canonical and route the second slot
-    through a per-position sentinel so each value redacts and rebuilds
-    independently. Both stubs must report DISTINCT byte_counts
-    (4 != 11) so a future regression that re-uses one slot's record
-    for both positions cannot hide.
+    Mirroring the overflow path: when two wrapper slot names collide on
+    the same canonical, the second slot routes through a per-position
+    sentinel so each value redacts and rebuilds independently. Both
+    stubs must report DISTINCT byte_counts (4 != 11) so a regression
+    that re-uses one slot's record for both positions cannot hide.
     """
 
     def write_file(label: str, body: str, path: str) -> None:

@@ -384,8 +384,7 @@ pub fn sign_receipt_body_hybrid_canonical(
     })?;
     // Bind the signing nonce BEFORE computing the id, exactly as the
     // classical path does, so the content-addressed id (and therefore the
-    // signed bytes) cover the nonce. Omitting this step is what previously
-    // made the hybrid receipt envelope drift from the classical one.
+    // signed bytes) cover the nonce.
     bind_receipt_signing_nonce(&mut body);
     body.id = chio_receipt_id(&body).map_err(|error| {
         KernelError::ReceiptSigningFailed(format!(

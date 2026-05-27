@@ -261,8 +261,8 @@ where
 
 /// Register raw-ABI core-module imports (used by modules that predate the Component Model ABI).
 ///
-/// Component guards use [`register_component_host_functions`]. This path remains
-/// for core-module guards and is implemented without the old linker shortcut.
+/// Component guards use [`register_component_host_functions`]; this path is
+/// for core-module guards.
 pub fn register_host_functions(
     linker: &mut CoreLinker<WasmHostState>,
 ) -> Result<(), WasmGuardError> {

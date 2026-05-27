@@ -8,10 +8,7 @@
 //! `seen_epoch >= revoke_epoch`. Deny receipts are required to carry
 //! `seen_epoch >= revoke_epoch`.
 //!
-//! The test runs the swarm fixture in-process (so the gate command
-//! `cargo test -p chio-revocation-oracle --test receipt_chain_proof
-//! --features delegation` is self-contained); it does not depend
-//! on the T1 test having run first. The fixture writes to a
+//! The test runs the swarm fixture in-process and writes to a
 //! per-test-run temp file so two parallel `cargo test` invocations
 //! cannot race on a shared path.
 
@@ -241,9 +238,8 @@ fn spawn_consult_loop(
 
 #[test]
 fn no_allow_receipt_after_revoke_epoch() {
-    // Run a small fixture so the test is fully self-contained: it does
-    // not depend on T1 having run beforehand. We use a per-pid temp
-    // path so parallel `cargo test` invocations do not race.
+    // A per-pid temp path keeps parallel `cargo test` invocations from
+    // racing on a shared log file.
     let log_path: PathBuf = std::env::temp_dir().join(format!(
         "chio-revocation-chain-{}.jsonl",
         std::process::id()
@@ -281,7 +277,7 @@ fn no_allow_receipt_after_revoke_epoch() {
 
     // The summary order matches the run order, so split the receipt
     // stream by trial via the revoke_epoch monotonicity gate. The
-    // T1/T2 fixtures both share the same view-per-trial design, so
+    // writer and reader share the same view-per-trial design, so
     // every consult's seen_epoch is either 0 (pre-revoke) or the
     // current trial's revoke_epoch (post-revoke).
     let mut allow_count = 0_usize;

@@ -6,7 +6,7 @@
 //! still be fetched via `GET /approvals/pending`, matching the
 //! fail-closed rule in the HITL protocol.
 //!
-//! Two channels ship in this phase:
+//! Two channels:
 //!
 //! 1. `WebhookChannel` -- blocking HTTP POST to a configured URL.
 //!    Production integrations wire this into their own dashboard or

@@ -67,8 +67,7 @@ fn kernel_denies_memory_write_to_disallowed_store() {
 }
 
 /// `AudienceAllowlist` should not affect tool calls whose arguments do
-/// not carry a recipient-style key, demonstrating the additive and
-/// non-regressing nature of the new variant.
+/// not carry a recipient-style key.
 #[test]
 fn kernel_allows_action_when_unaffected_by_new_constraint() {
     let mut kernel = make_kernel(make_config());

@@ -150,10 +150,9 @@ impl JailbreakGuard {
             return Verdict::Allow;
         }
 
-        // Canonicalize once to compute the fingerprint used by dedup.  The
-        // detector recomputes canonicalization internally; the duplication is
-        // deliberate so the detector stays self-contained and testable in
-        // isolation.  Canonicalization is O(n) in the (bounded) input size.
+        // Canonicalize once to compute the fingerprint used by dedup. The
+        // detector recomputes canonicalization internally (it does not depend
+        // on this call). Canonicalization is O(n) in the (bounded) input size.
         let (clipped, _truncated) =
             truncate_at_char_boundary(input, self.config.detector.max_scan_bytes);
         let canonical = canonicalize(clipped);

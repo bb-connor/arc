@@ -1,4 +1,4 @@
-# OSS-Fuzz builder image for Chio (formerly ARC).
+# OSS-Fuzz builder image for Chio.
 #
 # Companion docs in docs/fuzzing/continuous.md (OSS-Fuzz integration section).
 

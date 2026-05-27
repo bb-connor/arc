@@ -10,10 +10,9 @@
 //   * The browser holds ZERO key material. The only crypto primitive
 //     touched here is navigator.credentials.get, which is platform-side
 //     and never returns a private key to the page.
-//   * No envelope is signed in the browser. The reviewer-visible verdict
-//     at docs/trust-boundary-browser-signing.md (status: rejected,
-//     2026-04-27) explicitly forbids this. The verdict is satisfied by
-//     issuing audience-pinned capabilities server-side. This package is
+//   * No envelope is signed in the browser (see
+//     docs/trust-boundary-browser-signing.md). The contract is satisfied
+//     by issuing audience-pinned capabilities server-side. This package is
 //     the thin call site for that flow.
 //   * The capability returned to the caller is parsed via
 //     parseCapabilityToken (peer dep @chio-protocol/browser, with a local

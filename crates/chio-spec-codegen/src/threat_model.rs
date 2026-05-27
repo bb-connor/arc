@@ -302,9 +302,9 @@ mod tests {
 
     #[test]
     fn render_stub_strips_doc_comment_escape_in_name() {
-        // P1 hardening: a threat-model entry with a newline (or `*/`) in
-        // its `name` must NOT be able to break out of the generated doc
-        // comment and inject top-level Rust into the stub.
+        // A threat-model entry with a newline (or `*/`) in its `name` must
+        // NOT be able to break out of the generated doc comment and inject
+        // top-level Rust into the stub.
         let evil = ThreatEntry {
             id: "evil_threat".to_string(),
             name: "evil\n#[panic_handler] fn p(_: &core::panic::PanicInfo) -> ! { loop {} } //"

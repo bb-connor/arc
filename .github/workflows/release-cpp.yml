@@ -5,9 +5,7 @@ name: Release C++ SDKs
 # (backbay-labs/chio-vcpkg-registry).
 #
 # Tag format: cpp/v<X.Y.Z> publishes all four SDKs. The four SDK versions
-# stay coupled while the C ABI invariant boundary is pre-1.0; once any SDK
-# diverges, switch to slug-specific tags (cpp/<slug>-v<X.Y.Z>) following the
-# release-npm.yml precedent.
+# stay coupled while the C ABI invariant boundary is pre-1.0.
 #
 # Required GitHub Actions secrets (configured at repo level):
 #   - CHIO_VCPKG_REGISTRY_DEPLOY_KEY: SSH private key whose public half is
@@ -294,10 +292,8 @@ jobs:
               # vcpkg expects each (version, port-version) tuple to appear
               # at most once. Re-tagging the same release (e.g. after a
               # publish-conan retry) can leave duplicate rows from earlier
-              # runs; the previous `next(...)` form found only the first
-              # match and left any additional duplicates untouched, so the
-              # file could remain invalid after this step. Strip every
-              # matching tuple before re-inserting the canonical entry.
+              # runs, so strip every matching tuple before re-inserting the
+              # canonical entry.
               data["versions"] = [
                   v
                   for v in data["versions"]

@@ -3116,8 +3116,8 @@ impl RemoteCapabilityAuthority {
     ///
     /// `AuthorityKeyCache::from_status` rejects any status without a current
     /// key, so a primed cache always carries one. If that invariant is ever
-    /// violated we must NOT abort the process (the previous code panicked) and
-    /// must NOT return a key an attacker could control. We return a freshly
+    /// violated we must NOT abort the process and must NOT return a key an
+    /// attacker could control. We return a freshly
     /// generated ephemeral public key whose private half is discarded
     /// immediately: it can never validate a real capability, so callers that
     /// fold this value into a trust set gain no usable issuer. The effect is a

@@ -1,9 +1,8 @@
 name: browser-kernel-twiggy
 
 on:
-  # Wasm bundle-size measurement runs nightly and on manual dispatch. It is not
-  # a per-PR gate: it has no path scope, and the size signal is most useful
-  # tracked over time on main rather than as a blocking check on every PR.
+  # Wasm bundle-size measurement. Nightly and manual dispatch only; not a
+  # per-PR gate and has no path scope.
   schedule:
     - cron: "37 6 * * *"
   workflow_dispatch:

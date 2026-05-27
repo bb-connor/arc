@@ -2109,7 +2109,7 @@ mod extended_tests {
     }
 
     // ================================================================
-    // 9. Additional edge cases for completeness
+    // 9. Method parsing and parameter-handling edge cases
     // ================================================================
 
     #[test]

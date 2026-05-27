@@ -474,8 +474,8 @@ impl ChioAcpEdge {
 
     /// Handle a JSON-RPC ACP request through the direct passthrough path.
     ///
-    /// This compatibility helper keeps the old config-preview and direct tool
-    /// invocation behavior, but marks both as non-authoritative.
+    /// This compatibility helper exposes config-preview and direct tool
+    /// invocation, but marks both as non-authoritative.
     #[cfg(any(test, feature = "compatibility-surface"))]
     fn handle_jsonrpc_passthrough(
         &self,
@@ -836,8 +836,8 @@ impl ChioAcpEdgeCompatibility<'_> {
 
     /// Handle a JSON-RPC ACP request through the direct passthrough path.
     ///
-    /// This compatibility helper keeps the old config-preview and direct tool
-    /// invocation behavior, but marks both as non-authoritative.
+    /// This compatibility helper exposes config-preview and direct tool
+    /// invocation, but marks both as non-authoritative.
     pub fn handle_jsonrpc(&self, message: Value, server: &dyn ToolServerConnection) -> Value {
         self.edge.handle_jsonrpc_passthrough(message, server)
     }

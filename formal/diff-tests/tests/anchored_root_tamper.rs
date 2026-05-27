@@ -1,6 +1,6 @@
 #![cfg(not(target_arch = "wasm32"))]
 
-//! Anchored-root tamper regression for M04 Phase 6.
+//! Anchored-root tamper regression.
 //!
 //! The canary replay fixture is used to build the same
 //! `(receipt_id, leaf_hash, inclusion_proof, root)` tuple shape as the

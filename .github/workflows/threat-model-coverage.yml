@@ -18,12 +18,11 @@
 #      caught mutant. Rows whose evidence is missing or zero-kills
 #      get a `WEAK: <id>` downgrade hint. Bootstrap placeholders
 #      (`needs_real_run: true`) are reported as informational and
-#      do not fail the build, so the per-row gate can be wired in
-#      ahead of backfilling real evidence.
+#      do not fail the build.
 #
-# Pending vectors auto-promoted by the fuzz-seed promoter
-# (D14) live in the corpus, not the threat list, and are excluded
-# from this gate by construction.
+# Pending vectors auto-promoted by the fuzz-seed promoter live in
+# the corpus, not the threat list, and are excluded from this gate
+# by construction.
 #
 # Required status check name: threat-model-coverage / coverage-gate
 

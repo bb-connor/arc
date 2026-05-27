@@ -388,9 +388,8 @@ fn lift_lower_fixtures_round_trip_canonical_json() {
     }
 }
 
-/// Sanity check on directory layout: the on-disk corpus carries exactly
-/// three fixtures per provider, all `.json`, so a future stray file (e.g.,
-/// a tenth fixture or a back-up) trips CI.
+/// The on-disk corpus carries exactly three fixtures per provider, all
+/// `.json`, so a stray file (e.g. a tenth fixture or a back-up) trips CI.
 #[test]
 fn lift_lower_fixture_directories_have_three_json_files_each() {
     for provider_dir in ["openai", "anthropic", "bedrock"] {

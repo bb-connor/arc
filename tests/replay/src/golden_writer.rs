@@ -396,8 +396,7 @@ mod tests {
         fs::read_to_string(path).expect("read of just-committed goldens must succeed")
     }
 
-    // The previous revision of this module hand-rolled a BTreeMap
-    // canonicaliser; the writer now delegates to the workspace-wide
+    // The writer delegates canonicalization to the workspace-wide
     // `chio_core_types::canonical::canonicalize` (RFC 8785 / JCS) via
     // `crate::golden_format::canonical_json_bytes`. The tests below
     // assert the byte-level invariants the writer relies on (sorted

@@ -6536,12 +6536,12 @@ fn liability_claim_lifecycle_persists_package_through_payout_receipt() {
 /// phantom increments when the commit actor drains a request between
 /// `try_send` returning Ok and the caller's `fetch_add`.
 ///
-/// Before the fix, `inflight.fetch_add(1)` ran AFTER `try_send`, so the
-/// worker could dequeue, commit, and run `atomic_saturating_sub` before the
-/// appender thread observed the send result. The increment then leaked past
-/// the drain, leaving `health.writer.inflight` stuck at a positive value
-/// after a flush, OR saturating the worker's subtraction to 0 mid-flight and
-/// underreporting concurrent writes.
+/// The hazard: if `inflight.fetch_add(1)` runs AFTER `try_send`, the worker
+/// can dequeue, commit, and run `atomic_saturating_sub` before the appender
+/// thread observes the send result. The increment then leaks past the drain,
+/// leaving `health.writer.inflight` stuck at a positive value after a flush,
+/// OR saturating the worker's subtraction to 0 mid-flight and underreporting
+/// concurrent writes.
 ///
 /// This stress test runs many concurrent appenders within a bounded time
 /// budget, polls `inflight` from a sampler thread, then drains via
@@ -6549,13 +6549,12 @@ fn liability_claim_lifecycle_persists_package_through_payout_receipt() {
 ///   - `inflight == 0` after flush (no phantom leaked increment),
 ///   - `accepted_total == committed_total` (no lost commits),
 ///   - sampler never observed `inflight > accepted_total + thread_count`
-///     slack (catches the pre-fix leak-past-drain signature).
+///     slack (catches the leak-past-drain signature).
 ///
-/// The race window on the buggy code is genuinely narrow because the worker
-/// runs a SQL commit between dequeue and decrement (milliseconds), while the
-/// caller's `fetch_add` follows `try_send` in nanoseconds. The test acts as
-/// a regression guard pinning the post-fix accounting invariant rather than
-/// a deterministic reproducer.
+/// The race window is narrow because the worker runs a SQL commit between
+/// dequeue and decrement (milliseconds), while the caller's `fetch_add`
+/// follows `try_send` in nanoseconds. The test acts as a regression guard
+/// pinning the accounting invariant rather than a deterministic reproducer.
 #[test]
 fn append_inflight_counter_does_not_underflow_on_concurrent_drain() {
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};

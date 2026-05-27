@@ -515,12 +515,10 @@ impl chio_kernel::Guard for VectorDbGuard {
         // `allow_all`. This is by design: a domain-scoped guard returns
         // Allow for traffic outside its concern, and the deny-by-default
         // contract is enforced by the composing authority layer, not here.
-        // The old `!allow_all && !looks_like_vector` gate
-        // inverted the bypass intent: enabling `allow_all` forced every
-        // tool call (including non-vector ones) through `extract_call`,
-        // which then denied any call lacking vector-specific fields.
-        // Split the condition so `allow_all` only governs whether vector
-        // policy is enforced on vector-shaped requests.
+        // `allow_all` only governs whether vector policy is enforced on
+        // vector-shaped requests; it must not force non-vector calls
+        // through `extract_call`, which would deny any call lacking
+        // vector-specific fields.
         if !self.config.looks_like_vector(&database, tool) {
             return Ok(Verdict::Allow);
         }

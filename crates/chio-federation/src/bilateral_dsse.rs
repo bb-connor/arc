@@ -1062,13 +1062,11 @@ pub fn verify_dsse_envelope(
     validate_signature_slice_predicate(&statement.predicate)?;
 
     // Single-subject invariant: the bilateral envelope profile
-    // binds exactly ONE subject (the receipt body). The pre-fix
-    // verifier only rejected the empty-list case, so a multi-subject
-    // envelope was accepted and only `subject[0]` was bound. A
-    // signer could insert an arbitrary second subject digest and
-    // verifiers that walked the full subject list (which is the
-    // spec-conformant behavior for in-toto subject membership) would
-    // resolve a different receipt than the producer signed.
+    // binds exactly ONE subject (the receipt body). Rejecting only the
+    // empty-list case is fail-OPEN: a signer could insert an arbitrary
+    // second subject digest and verifiers that walked the full subject
+    // list (the spec-conformant behavior for in-toto subject membership)
+    // would resolve a different receipt than the producer signed.
     if statement.subject.len() != 1 {
         return Err(BilateralCoSigningError::CanonicalJson(format!(
             "statement.malformed: bilateral envelope must carry exactly 1 subject, got {}",

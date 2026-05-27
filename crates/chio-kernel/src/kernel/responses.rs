@@ -1616,7 +1616,7 @@ impl ChioKernel {
         _request: &crate::runtime::ToolCallRequest,
         receipt: &ChioReceipt,
     ) -> Result<(), KernelError> {
-        // PR 682 v1 receipt shape: persist the v1 deny receipt locally and
+        // Persist the v1 deny receipt locally and
         // deliberately stop before the federation co-signature hook. The
         // runtime-admission deny path does not co-sign because the deny
         // decision is locally authoritative and may have been triggered

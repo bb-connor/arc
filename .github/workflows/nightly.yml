@@ -19,9 +19,7 @@ env:
   PROPTEST_CASES: "4096"
   # Pinned cargo-kani version; must agree with CHIO_KANI_VERSION in ci.yml.
   CHIO_KANI_VERSION: 0.67.0
-  # Formal-verification toolchain pins for the qualification job. These used
-  # to live in ci.yml's `check` job; they moved here when the proof report and
-  # portable/SDK qualification lanes were taken off the per-PR critical path.
+  # Formal-verification toolchain pins for the qualification job.
   CHIO_ELAN_VERSION: v4.2.1
   CHIO_ELAN_TARBALL_SHA256: 4e717523217af592fa2d7b9c479410a31816c065d66ccbf0c2149337cfec0f5c
   CHIO_AENEAS_RELEASE_TAG: build-2026.04.22.215158-38d10a22642d75d051e14006cc6e45055381f10e
@@ -158,10 +156,8 @@ jobs:
           done
 
   # Formal proof report plus portable (browser/mobile) and polyglot SDK
-  # qualification. These ran in ci.yml's `check` job on every PR; they moved
-  # here to keep the PR gate fast. The toolchain install (Lean 4, Aeneas /
-  # Charon, Creusot, wasm-pack, cargo-ndk, chromium) is the slow part, which is
-  # exactly why this is nightly rather than per-PR.
+  # qualification. The toolchain install (Lean 4, Aeneas / Charon, Creusot,
+  # wasm-pack, cargo-ndk, chromium) dominates the runtime.
   formal-qualification:
     name: formal-qualification (proof report + portable + SDK parity)
     # owner: @bb-connor
@@ -321,8 +317,7 @@ jobs:
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }}"
         run: ./scripts/check-sdk-parity.sh
 
-  # Workspace coverage. Advisory (continue-on-error) and slow; it ran in
-  # ci.yml on every PR and moved here to keep the PR gate fast.
+  # Workspace coverage. Advisory (continue-on-error) and slow.
   coverage:
     name: Coverage
     runs-on: ubuntu-latest

@@ -3,9 +3,8 @@
 //!
 //! The types defined here are deliberately self-contained. The adapter does
 //! not pull in `chio-kernel` or `chio-http-core`; instead it exposes a small
-//! protocol-agnostic request / verdict pair that real wiring can map onto the
-//! richer Chio substrate types downstream. This keeps the crate compilable
-//! and testable without the heavier substrate.
+//! protocol-agnostic request / verdict pair that callers map onto the richer
+//! Chio substrate types downstream.
 
 use std::collections::BTreeMap;
 

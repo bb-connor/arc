@@ -233,7 +233,6 @@ impl ApprovalToken {
             )));
         }
 
-        // Signature.
         let ok = self.governed_token.verify_signature().map_err(|e| {
             KernelError::ApprovalRejected(format!(
                 "approval token signature verification failed: {e}"

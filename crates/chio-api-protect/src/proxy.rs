@@ -2116,7 +2116,7 @@ paths:
     }
 
     // -------------------------------------------------------------
-    // Phase A / B: SDK-shape body tests for the new routes.
+    // SDK-shape body tests for the proxy routes.
     // -------------------------------------------------------------
 
     fn loopback_post(uri: &str, body: serde_json::Value) -> Request<Body> {
@@ -2308,7 +2308,7 @@ paths:
     async fn sidecar_verify_receipt_round_trips_a_signed_chio_receipt() {
         let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
 
-        // First, mint a tool-call receipt via the new evaluate alias so
+        // First, mint a tool-call receipt via the evaluate alias so
         // we get a sidecar-signed `ChioReceipt` to round-trip.
         let mint_body = serde_json::json!({
             "subject": Keypair::generate().public_key().to_hex(),

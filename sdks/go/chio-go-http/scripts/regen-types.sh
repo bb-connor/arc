@@ -500,8 +500,8 @@ PY
 # `-generate types,skip-prune` keeps every schema even when no operation
 # references it (we have no operations - all schemas are model-only). The
 # `skip-fmt` member is intentionally omitted so oapi-codegen runs gofmt on
-# its output; we run gofmt again after prepending our header below for
-# safety.
+# its output; gofmt runs again after the header is prepended below, since
+# that edit lands after oapi-codegen has formatted the file.
 #
 # `compatibility.always-prefix-enum-values: true` forces oapi-codegen to
 # emit fully-qualified enum constants (`<TypeName><Value>`) rather than

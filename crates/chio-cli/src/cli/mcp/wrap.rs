@@ -13,11 +13,8 @@
 //      denials are surfaced as JSON-RPC errors with a deterministic
 //      `urn:chio:` reason code.
 //
-// We model the verdict gate as a trait so the e2e test can swap in a
-// pure-Rust gate without spinning up the kernel; the production gate
-// delegates to `verdict_for_provider_invocation` once the kernel surface
-// stabilizes for the stdio wrap path. The trait surface is identical
-// either way.
+// The verdict gate is a trait so the e2e test can inject a pure-Rust gate
+// without spinning up the kernel.
 
 use super::*;
 

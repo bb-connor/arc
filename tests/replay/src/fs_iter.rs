@@ -261,10 +261,9 @@ fn sort_key(path: &Path) -> Result<Vec<u8>, FsIterError> {
 
 /// Convert a single [`Component`]'s [`OsStr`] into its byte-form key.
 ///
-/// Mirrors the platform split used by the previous implementation but
-/// operates per-component so the caller can interleave a fixed-byte
-/// separator. `parent` is only used for diagnostic context in the
-/// non-Unix `NonUtf8Path` error.
+/// Uses the platform-specific `OsStr` byte split, operating per-component
+/// so the caller can interleave a fixed-byte separator. `parent` is only
+/// used for diagnostic context in the non-Unix `NonUtf8Path` error.
 #[cfg(unix)]
 fn component_bytes(raw: &std::ffi::OsStr, _parent: &Path) -> Result<Vec<u8>, FsIterError> {
     use std::os::unix::ffi::OsStrExt;

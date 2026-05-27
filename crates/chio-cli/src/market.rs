@@ -702,8 +702,8 @@ mod tests {
     #[test]
     fn install_record_path_distinguishes_punctuation_variants() {
         // References differing only by punctuation must NOT collide
-        // on the install-record path. The previous `_`-replacement
-        // scheme was lossy; the digest-keyed scheme is collision-free.
+        // on the install-record path: the digest-keyed scheme is
+        // collision-free where a `_`-replacement scheme would be lossy.
         let dir = tempdir().expect("tmpdir");
         let bundle = dir.path().join("bundle");
         let a = install_record_path(&bundle, "tenant", "guard-foo");

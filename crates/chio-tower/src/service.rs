@@ -147,7 +147,6 @@ where
                 }
             };
 
-            // Check verdict.
             if prepared.verdict.is_denied() {
                 let status = denied_status(&prepared.verdict);
                 let receipt = evaluator
@@ -294,9 +293,8 @@ where
     }
 
     // Pull frames one at a time and abort as soon as the running buffer would
-    // exceed `max_body_bytes`. The previous implementation called
-    // `body.collect()` which buffered every byte of the request before
-    // checking the size, so an attacker could exhaust host memory with a
+    // exceed `max_body_bytes`. Buffering the whole body first (e.g.
+    // `body.collect()`) would let an attacker exhaust host memory with a
     // single oversized POST whose declared size hint hid the true length.
     // Streaming the frames bounds peak buffer use to `max_body_bytes` plus
     // the size of one in-flight frame.

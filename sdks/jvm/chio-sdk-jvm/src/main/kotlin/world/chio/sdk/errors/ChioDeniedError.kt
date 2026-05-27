@@ -2,9 +2,7 @@
  * Structured Chio deny error. Mirrors chio_sdk.errors.ChioDeniedError.
  *
  * Preserves all 11 optional fields plus fromWire/toWire helpers that
- * accept and emit the same payload shape Python emits. The multi-line
- * toString() pretty-print is deferred; a single-line message is
- * acceptable for v1.
+ * accept and emit the same payload shape Python emits.
  */
 package world.chio.sdk.errors
 

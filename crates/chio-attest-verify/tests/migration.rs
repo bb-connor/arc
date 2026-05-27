@@ -346,9 +346,9 @@ fn stage3_pq_required_accepts_rolled_hybrid_and_rejects_v318_bundle() {
 
 #[test]
 fn end_to_end_migration_walks_three_stages() {
-    // Compose the per-stage assertions into the single E2E walk the
-    // ticket title pins: allow_classical -> allow_hybrid -> pq_required
-    // with the PQ key roll between stages 2 and 3.
+    // Compose the per-stage assertions into a single E2E walk:
+    // allow_classical -> allow_hybrid -> pq_required, with the PQ key
+    // roll between stages 2 and 3.
     //
     // This test is the operator-facing narrative oracle: if any
     // individual stage assertion drifts, this walk fails first with a

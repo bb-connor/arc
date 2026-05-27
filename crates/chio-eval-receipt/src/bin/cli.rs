@@ -257,10 +257,10 @@ mod tests {
 
     #[test]
     fn verifier_rejects_duplicate_scheme_field() -> Result<(), String> {
-        // Defence-in-depth: a sig file with two `scheme:` lines (one
-        // synthetic-test-sample, one sigstore-cosign) must not slip through
-        // because the verifier happens to match the first occurrence. Reject
-        // duplicates outright so any downstream parser disagreement fail-closes.
+        // A sig file with two `scheme:` lines (one synthetic-test-sample, one
+        // sigstore-cosign) must not slip through because the verifier happens
+        // to match the first occurrence. Reject duplicates outright so any
+        // downstream parser disagreement fail-closes.
         let memo = b"duplicate-scheme rejection test memo\n";
         let memo_sha = sha256_hex(memo);
         let signer = "https://example.invalid/dup-scheme-signer";

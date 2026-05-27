@@ -127,13 +127,10 @@ HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
   CMD ["/usr/bin/curl", "-fsS", "http://localhost:9090/chio/health"]
 
 ENTRYPOINT ["/usr/local/bin/chio-sidecar"]
-# `serve-sidecar` is not a real subcommand in the chio CLI tree; a
-# container built from the old default exited immediately with CLI
-# usage errors before ever opening /chio/health. There is no single
-# zero-argument default that makes sense because every chio subcommand
-# needs operator input (policy path, wrapped server command, etc.).
-# Default to --help so `docker run <image>` prints usage instead of
-# crashing; operators override this at deploy time with the real
-# subcommand, e.g. `chio mcp serve-http --policy /etc/chio/policy.yaml
-# --server-id my-tool -- npx @modelcontextprotocol/server-filesystem /data`.
+# No zero-argument default is meaningful: every chio subcommand needs
+# operator input (policy path, wrapped server command, etc.). Default to
+# --help so `docker run <image>` prints usage; operators override this at
+# deploy time with the real subcommand, e.g. `chio mcp serve-http --policy
+# /etc/chio/policy.yaml --server-id my-tool -- npx
+# @modelcontextprotocol/server-filesystem /data`.
 CMD ["--help"]

@@ -5,26 +5,19 @@
 all-features = true
 no-default-features = false
 
-# NOTE: [output] feedback-level = "error" is not accepted in cargo-deny ^0.16;
-# the [output] block was dropped to keep the config parseable.
-
-# NOTE: cargo-deny PR #611 removed `unmaintained` and `notice` from
-# [advisories] (severity is now implicit). Both keys were dropped here
-# to keep the config parseable.
+# cargo-deny ^0.16 rejects `[output] feedback-level` and the `unmaintained` /
+# `notice` keys under `[advisories]` (severity is now implicit); none are set
+# here.
 [advisories]
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
 yanked = "deny"
-# Active advisory ignores: 9 entries. Each is individually dated and justified
-# below (see the per-entry `last-checked` notes). There is no hard cap; the
-# working target is to keep this list small, and every entry must be one of:
-# an unmaintained build-time/test-only transitive, an ecosystem migration that
+# Each ignore below is individually dated and justified (see the per-entry
+# `last-checked` notes). Keep this list small: every entry must be one of an
+# unmaintained build-time/test-only transitive, an ecosystem migration that
 # needs a coordinated upstream bump, or one RSA advisory with no upstream fix.
-# A prior AWS SDK cleanup removed the legacy rustls 0.21 path, so rustls-webpki
-# advisories are no longer ignored. Prune the corresponding entries here when
-# the tracked migrations (serde_yml, rustls-pemfile) land.
-# Last full refresh: 2026-05-05. Each ignore below is either closed by a
-# lockfile bump or re-justified with a dated status.
+# rustls-webpki advisories are not ignored.
+# Last full refresh: 2026-05-05.
 ignore = [
     # --- unmaintained / unsound clusters: each requires a dep migration. ---
     # last-checked = 2026-05-02; bincode 1.3.3 unmaintained (RUSTSEC-2025-0141). Pulled by uniffi 0.28.x build deps;
@@ -59,10 +52,9 @@ ignore = [
     "RUSTSEC-2024-0370",
 ]
 
-# NOTE: cargo-deny 0.16 enforces an explicit allow-list only; unlisted licenses
-# are denied by default. The `unlicensed`, `copyleft`, `allow-osi-fsf-free`, and
-# `default` keys from prior config were removed because cargo-deny 0.16
-# enforces an explicit allow-list only.
+# cargo-deny 0.16 enforces an explicit allow-list only: unlisted licenses are
+# denied by default, and the `unlicensed`, `copyleft`, `allow-osi-fsf-free`,
+# and `default` keys are not accepted.
 [licenses]
 confidence-threshold = 0.93
 # Workspace-wide allow-list. Strictly permissive: no GPL / AGPL / LGPL /
@@ -73,10 +65,6 @@ confidence-threshold = 0.93
 # family (which is the only legitimate consumer in the graph today) is
 # pinned via per-crate `[[licenses.exceptions]]` entries below; new MPL
 # transitives must add a similar pinned exception.
-# The prior `Unicode-DFS-2016` entry was removed because the Unicode
-# consortium relicensed under `Unicode-3.0` (already allowed) and no
-# remaining crate in the lockfile ships the older identifier (cargo-deny
-# was emitting a `license-not-encountered` warning for it).
 allow = [
     "MIT",
     "Apache-2.0",
@@ -221,20 +209,17 @@ allow = ["MPL-2.0"]
 #
 # `multiple-versions = "deny"` is the gate: any NEW duplicated crate name fails
 # `cargo deny check bans` until it is either resolved or consciously waived
-# here. The `[[bans.skip]]` list below currently holds 99 blocks (fewer distinct
-# crate names; `syn`, `bitflags`, and the windows family carry extra
-# version-scoped entries). That is not an aspirational cap - it is the real
-# count of transitive ecosystem splits that exist in `Cargo.lock` today and
-# cannot be flattened without forcing an upstream major bump on wasmtime,
-# tonic, the rand/getrandom family, the RustCrypto stack, or alloy.
+# here. The `[[bans.skip]]` entries below are transitive ecosystem splits that
+# exist in `Cargo.lock` and cannot be flattened without forcing an upstream
+# major bump on wasmtime, tonic, the rand/getrandom family, the RustCrypto
+# stack, or alloy.
 #
 # Every entry has been verified against `cargo tree -d --workspace
 # --all-features --target all` to be a genuine current duplicate (the
 # cross-target view matters: the windows_*, jni, hermit-abi, r-efi, and redox
 # crates only duplicate on their own platforms and do not appear in a
 # host-only tree). When an upstream convergence lands, re-run that command and
-# delete the entries that no longer appear. The goal is to shrink this list
-# over time, not to bless it.
+# delete the entries that no longer appear.
 [bans]
 multiple-versions = "deny"
 # cargo-deny treats local path dependencies without an explicit version as

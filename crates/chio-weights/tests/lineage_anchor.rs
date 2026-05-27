@@ -111,7 +111,7 @@ fn anchor_carries_signed_state_when_signer_present() {
     // Signer hint is present but no signature payload was supplied, so
     // the anchor records `UnsignedSignerStubbed`. Constructing
     // `SigningState::Signed { signature_hex: "" }` here would expose the
-    // P0 forgery vector documented on the lineage `SigningState` enum:
+    // forgery vector documented on the lineage `SigningState` enum:
     // verifiers matching `Signed { .. }` alone would treat an unsigned
     // anchor as authenticated.
     match anchor.signing {

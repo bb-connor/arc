@@ -259,10 +259,9 @@ async fn pipeline_all_allow_means_overall_allow() {
     assert_eq!(resp.verdict, Verdict::Allow);
 }
 
-// Regression: `chio check --tool filesystem --params '{"path": "/etc/shadow"}'`
-// previously returned ALLOW because "filesystem" was not recognized as a file
-// tool, so the action fell through to McpTool and the ForbiddenPathGuard
-// did not fire.
+// `filesystem` must be recognized as a file tool so the ForbiddenPathGuard
+// fires; otherwise the action falls through to McpTool and a read of
+// `/etc/shadow` is allowed.
 #[tokio::test]
 async fn filesystem_tool_blocks_etc_shadow() {
     let (mut kernel, _kp) = make_kernel();

@@ -61,8 +61,7 @@ pub enum UnknownSseFieldPolicy {
 
 /// Parser configuration shared by every SSE-forwarding adapter.
 ///
-/// The two boolean knobs cover the provider-specific behaviors that previously
-/// forced adapters to keep private copies of the parser:
+/// The two boolean knobs cover the provider-specific SSE behaviors:
 ///
 /// - `done_sentinel`: when set, a `data` payload equal to this string yields a
 ///   frame with `done = true` and `data = None` instead of being parsed as JSON.

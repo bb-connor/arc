@@ -10,14 +10,14 @@ name: CI
 #     - "cargo-deny (supply-chain bans/advisories/licenses)" # cargo-deny job
 #
 # PR-tier CI is intentionally fast and Linux-only: format, clippy, build, the
-# workspace test lane, and the cheap structural gates. The heavy lanes that
-# used to live in the `check` job (Lean 4 / Aeneas / Creusot proof report,
-# portable browser and mobile qualification, the polyglot SDK-parity lane)
-# now run nightly in nightly.yml. Formal model checking is path-scoped in
-# apalache-safety.yml; the Kani lanes run nightly (kani-public-nightly).
-# Coverage runs nightly; the JVM SDK build is path-scoped in jvm.yml. macOS
-# coverage stays in release-binaries.yml for tag releases, where macOS
-# artifact behavior is actually exercised.
+# workspace test lane, and the cheap structural gates. Heavier lanes live
+# elsewhere: the Lean 4 / Aeneas / Creusot proof report, portable browser and
+# mobile qualification, the polyglot SDK-parity lane, and workspace coverage
+# run nightly in nightly.yml; formal model checking is path-scoped in
+# apalache-safety.yml; the Kani lanes run nightly (kani-public-nightly); the
+# JVM SDK build is path-scoped in jvm.yml; macOS coverage stays in
+# release-binaries.yml for tag releases, where macOS artifact behavior is
+# actually exercised.
 
 on:
   push:

@@ -407,29 +407,28 @@ impl LocalReceiptArtifact {
     }
 }
 
-/// Bridge a sync caller to the now-async tool-server dispatch path.
+/// Bridge a sync caller to the async tool-server dispatch path.
 ///
 /// Calling `futures::executor::block_on` from inside a current-thread
 /// Tokio runtime parks the very thread that the runtime needs to drive
 /// its reactor / timer wheel, and any tool-server future that awaits
-/// Tokio I/O (the production case once `chio-mcp-remote` and
-/// `chio-mcp-adapter` are wired in) deadlocks silently. Tokio refuses
+/// Tokio I/O deadlocks silently. Tokio refuses
 /// to nest `block_on` calls precisely because of this, but
 /// `futures::executor::block_on` is a different executor that does not
 /// see the surrounding runtime, so the deadlock manifests as a hung
 /// tool call rather than a typed error.
 ///
-/// We now explicitly distinguish three cases:
+/// Three cases are distinguished:
 ///   1. Multi-thread runtime active: use `block_in_place` so Tokio can
 ///      move the blocking work off the runtime threads. This is the
-///      production-supported path.
+///      supported path.
 ///   2. Current-thread runtime active: refuse fail-closed with
 ///      [`KernelError::SyncBridgeIncompatibleWithCurrentThreadRuntime`].
 ///      Sync callers are expected to move the host to a multi-thread runtime
 ///      or call an async-native kernel entrypoint instead of this bridge.
 ///   3. No runtime active: drive the future with a non-tokio executor.
 ///      No surrounding runtime exists to deadlock; tool-server impls
-///      that need Tokio I/O will simply fail when they try to spawn
+///      that need Tokio I/O fail when they try to spawn
 ///      tasks, which is the correct, observable failure mode.
 fn block_on_async_tool_dispatch<F, T>(future: F) -> Result<T, KernelError>
 where

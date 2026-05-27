@@ -27,8 +27,8 @@
 //! ```
 //!
 //! The non-ignored test in this file (`matrix_loads_and_has_at_least_two_entries`)
-//! is a fast sanity check that always runs; it asserts the matrix file
-//! parses and contains at least the v0.1.0 + v2.0 rows.
+//! always runs; it asserts the matrix file parses and contains at least
+//! the v0.1.0 + v2.0 rows.
 
 use std::path::Path;
 

@@ -132,7 +132,6 @@ pub(crate) async fn proxy_handler(
         return response;
     }
 
-    // Evaluate.
     let result =
         match state
             .evaluator

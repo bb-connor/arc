@@ -488,7 +488,7 @@ fn certificate_validity(cert: &Certificate) -> Result<(SystemTime, SystemTime), 
 /// is acceptable, and a certificate at the exact `notAfter` second is
 /// also still inside its window.
 ///
-/// Extracted from the `verify_bytes` flow so the comparison can be
+/// A standalone helper so the validity-window comparison can be
 /// unit-tested independently of the trust-root chain validation that
 /// gates the surrounding code path.
 fn is_within_validity_window(

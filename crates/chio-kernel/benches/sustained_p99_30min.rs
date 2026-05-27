@@ -1,8 +1,8 @@
 //! Sustained p99 lane.
 //!
 //! This bench target is intentionally executable through Cargo's bench test
-//! harness. Local and ticket gates use the default one-second duration. The
-//! nightly workflow sets `CHIO_SUSTAINED_P99_SECONDS=1800`.
+//! harness. The default duration is one second; the nightly workflow sets
+//! `CHIO_SUSTAINED_P99_SECONDS=1800`.
 
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};

@@ -6,7 +6,7 @@
 # Walks `crates/chio-adversarial-suite/cases/<class>/<id>.json` and
 # asserts that every non-pending vector cites at least one threat ID
 # that exists in `spec/security/chio-threat-model.v1.json`. Vectors
-# with `pending: true` are auto-promoted from libFuzzer crashes (D14)
+# with `pending: true` are auto-promoted from libFuzzer crashes
 # and are excepted from the citation gate until human triage strips
 # the flag.
 #

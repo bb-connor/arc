@@ -1,4 +1,4 @@
-# Healthcare design-partner SIEM and PagerDuty overrides for M01.P1.
+# Healthcare design-partner SIEM and PagerDuty overrides.
 deployment_id: healthcare-design-partner
 pagerduty:
   service_name: chio-healthcare-pilot-prod

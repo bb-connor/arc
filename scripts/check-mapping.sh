@@ -139,8 +139,7 @@ done
 
 unmapped_kani=()
 # bash 3.2 / `set -u` rejects expansion of empty arrays via `${arr[@]}`.
-# Guard the loop so an empty harness list does not crash the script
-# (which previously surfaced as "unbound variable: kani_harnesses[@]").
+# Guard the loop so an empty harness list does not crash the script.
 if [[ "${#kani_harnesses[@]}" -gt 0 ]]; then
   for name in "${kani_harnesses[@]}"; do
     # Skip empty entries that can arise if the file has no harnesses.

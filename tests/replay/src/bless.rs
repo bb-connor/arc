@@ -943,9 +943,8 @@ mod tests {
 
     #[test]
     fn clause_6_ci_one_refuses() {
-        // The original gate failed open on `CI=1` (a common CI marker
-        // outside the literal `true` convention). The fix treats any
-        // non-falsey value as "running under CI".
+        // `CI=1` is a common CI marker outside the literal `true`
+        // convention; any non-falsey value counts as "running under CI".
         let env = StubEnv::happy().with("CI", "1");
         let git = StubGit::happy();
         let err = evaluate_gate(&env, &git, true, fixture(), fixed_now())

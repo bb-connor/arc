@@ -3,8 +3,8 @@
 //! Implements the minimal `LanguageServer` lifecycle (`initialize`,
 //! `initialized`, `shutdown`) plus the text-document open / change /
 //! close handlers that drive the document cache. Diagnostics,
-//! completion, hover, and go-to-definition are wired in by sibling
-//! P4 tickets.
+//! completion, hover, and go-to-definition are implemented in the
+//! sibling modules.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;

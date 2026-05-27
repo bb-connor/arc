@@ -10,8 +10,7 @@
 //! can be linked into any Envoy-fronted service without pulling in the rest
 //! of the Chio substrate. The [`EnvoyKernel`] trait exists precisely so real
 //! deployments can plug `chio-kernel` (or `chio-http-core`'s `HttpAuthority`)
-//! into this service without this crate depending on them. A doc example is
-//! sketched below.
+//! into this service without this crate depending on them.
 //!
 //! # Example wiring
 //!

@@ -1,8 +1,7 @@
 /**
  * Typed blocking HTTP client for the Chio sidecar.
  *
- * Mirrors chio_sdk.client.ChioClient. Blocking only in v1; the async
- * pair lands when the Flink async operator is rewired through the SDK.
+ * Mirrors chio_sdk.client.ChioClient.
  */
 package world.chio.sdk
 

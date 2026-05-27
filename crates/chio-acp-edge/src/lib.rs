@@ -72,8 +72,8 @@ pub use metrics::{
 
 // ---------- source fragments (include! pattern) ----------
 //
-// Each fragment merges into this crate-root module scope, so item paths and
-// visibility are byte-for-byte identical to the previous single-file layout.
+// Each fragment merges into this crate-root module scope; item paths and
+// visibility resolve as if the fragments were inlined here.
 
 include!("sync_bridge.rs");
 include!("error.rs");

@@ -31,8 +31,8 @@
 # to `pending` with a `deferred_to` reference), `pending` without
 # `deferred_to` exits non-zero with a clear hint, and `partial`
 # without both a `deferred_to` reference and an in-tree test body
-# also exits non-zero. Auto-promoted pending corpus seeds (D14)
-# are excluded from coverage by construction since they live in
+# also exits non-zero. Auto-promoted pending corpus seeds are
+# excluded from coverage by construction since they live in
 # the corpus, not the threat list.
 #
 # This script handles the file-existence check only. The companion

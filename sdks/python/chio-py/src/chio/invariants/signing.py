@@ -118,18 +118,14 @@ def verify_chio_signature(
         message_text = signed_bytes
 
     if signature.startswith("p256:"):
-        # TODO(chio-sdk-py-fips): wire ECDSA P-256/sha256 through
-        # cryptography.hazmat.primitives.asymmetric.ec once the package
-        # depends on `cryptography`. Verification is rejected fail-closed
-        # for now so unsupported receipts cannot be silently accepted.
+        # ECDSA P-256 verification is not wired; reject fail-closed so
+        # unsupported receipts cannot be silently accepted.
         raise ChioInvariantError(
             "invalid_signature",
             "ECDSA P-256 signatures are not yet supported by this SDK build",
         )
     if signature.startswith("p384:"):
-        # TODO(chio-sdk-py-fips): wire ECDSA P-384/sha384 through
-        # cryptography.hazmat.primitives.asymmetric.ec once the package
-        # depends on `cryptography`.
+        # ECDSA P-384 verification is not wired; reject fail-closed.
         raise ChioInvariantError(
             "invalid_signature",
             "ECDSA P-384 signatures are not yet supported by this SDK build",

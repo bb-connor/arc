@@ -43,9 +43,8 @@ use common::{ReceiptLog, ReceiptRecord};
 /// chain; revoking it must propagate to both children.
 const PLANNER_CAP_ID: &str = "cap-planner-root";
 
-/// Number of acceptance trials. The budget is 500ms median
-/// across 100 trials; we use the same N so the test exercises the
-/// gate the success criteria specify.
+/// Number of acceptance trials. Matches the success criterion's sample
+/// size: 500ms median across 100 trials.
 const TRIALS: usize = 100;
 
 /// Hard timeout per trial. If a child fails to observe the deny
@@ -150,8 +149,8 @@ fn run_trial(trial_idx: u64, log: &ReceiptLog) -> Result<TrialOutcome, String> {
         "tester-cap",
     );
 
-    // Briefly let the children record allow receipts so T2 has a
-    // pre-revoke prefix to walk. Sub-millisecond suffices.
+    // Briefly let the children record allow receipts so the proof test
+    // has a pre-revoke prefix to walk. Sub-millisecond suffices.
     thread::sleep(Duration::from_micros(200));
 
     // -- Revoke step ----------------------------------------------------
@@ -312,8 +311,7 @@ fn elapsed_us(started: Instant) -> u64 {
 
 #[test]
 fn three_tier_swarm_revoke_to_deny_under_500ms_median() {
-    // Receipt log lives under target/ so test artifacts survive the
-    // run for the T2 verifier to walk.
+    // Receipt log lives in the temp dir so the sibling proof test can walk it.
     let log_path = std::env::temp_dir().join("chio-revocation-e2e-receipt-log.jsonl");
     let log = ReceiptLog::create(&log_path).expect("open receipt log");
 

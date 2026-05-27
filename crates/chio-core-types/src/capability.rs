@@ -2941,11 +2941,12 @@ pub fn validate_delegation_chain(chain: &[DelegationLink], max_depth: Option<u32
 
 /// Validate a delegation chain under the chain-binding rule.
 ///
-/// Closes the parent-scope-inflation soundness gap: an issuer with true authority
-/// `scope_X` could previously mint a attenuated token claiming
-/// `parent_scope = scope_BIGGER` and supply an internally-consistent
-/// `attenuation_proof` because nothing tied `parent_scope_hash` to the
-/// issuer's actual upstream parent capability. This verifier requires:
+/// Defends against parent-scope inflation: an issuer with true authority
+/// `scope_X` must not be able to mint an attenuated token claiming
+/// `parent_scope = scope_BIGGER` with an internally-consistent
+/// `attenuation_proof`, which is possible whenever nothing ties
+/// `parent_scope_hash` to the issuer's actual upstream parent capability.
+/// This verifier requires:
 ///
 /// 1. Every link in the chain populates `scope_hash` (chains lacking
 ///    chain-binding are rejected fail-closed).

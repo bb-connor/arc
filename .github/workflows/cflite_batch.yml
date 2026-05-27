@@ -47,11 +47,9 @@ jobs:
           GH_FUZZ_BUDGET_CAP_MODE: warn
         run: |
           set -euo pipefail
-          # Cap is advisory: the cflite_batch cron itself contributes to
-          # the trailing 30-day window, so a hard halt becomes
-          # self-perpetuating once breached and pins the workflow red.
-          # The script still emits used/cap/remaining for visibility.
-          # Matches the `mutants-nightly` knob added in PR #519.
+          # Cap is advisory (CAP_MODE=warn): this cron's own runs count
+          # toward the trailing 30-day window, so a hard halt would not
+          # clear on its own. The script emits used/cap/remaining.
           scripts/check-fuzz-budget.sh "${{ github.repository }}"
 
   rotate:

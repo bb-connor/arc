@@ -8,7 +8,7 @@
 //! The adversarial corpus lives under
 //! `crates/chio-adversarial-suite/cases/<class>/<id>.json` and is
 //! exposed as `bundled_cases()` from the suite crate. Cases with
-//! `pending: true` are auto-promoted from libFuzzer crashes (D14) and
+//! `pending: true` are auto-promoted from libFuzzer crashes and
 //! are excluded from the threat-coverage assertions until a human
 //! triages them.
 

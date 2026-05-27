@@ -20,10 +20,8 @@
 //! # Forbidden constructs
 //!
 //! This crate sits on a trust boundary: it forbids `unwrap`, `expect`, and
-//! unsafe blocks at the lint level. The reviewer checklist for any PR
-//! touching this crate also requires a
-//! `rg -n 'todo!\(|unimplemented!\(|panic!\('` sweep across `src/` and
-//! `tests/`.
+//! unsafe blocks at the lint level, and contains no `todo!`,
+//! `unimplemented!`, or `panic!` constructs.
 
 #![forbid(unsafe_code)]
 #![forbid(clippy::unwrap_used)]

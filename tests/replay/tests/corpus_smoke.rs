@@ -150,9 +150,9 @@ fn all_50_fixtures_load_and_run() {
 
         let summary = run_scenario(&manifest, manifest_path, &scenario_dir);
 
-        // Writer-output sanity checks. These are not byte-equivalence
-        // (the golden_byte_equivalence test covers that) but they catch
-        // any silent regression in the staging / commit dance that would
+        // Writer-output checks. These are not byte-equivalence (the
+        // golden_byte_equivalence test covers that) but they catch any
+        // silent regression in the staging / commit dance that would
         // otherwise let the gate run with empty or malformed goldens.
         assert!(
             summary.receipt_count >= 1,

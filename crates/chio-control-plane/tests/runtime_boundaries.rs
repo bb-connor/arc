@@ -19,7 +19,7 @@ fn line_count(relative: &str) -> usize {
 
 #[test]
 fn runtime_entrypoints_remain_decomposed_and_reexported() {
-    // Remote MCP now lives in chio-mcp-remote; chio-hosted-mcp is a compatibility shell.
+    // Remote MCP lives in chio-mcp-remote; chio-hosted-mcp is a compatibility shell.
     let main = read_repo_file("crates/chio-cli/src/main.rs");
     assert!(
         main.contains("pub use chio_mcp_remote as remote_mcp;"),

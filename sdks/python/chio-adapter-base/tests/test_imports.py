@@ -1,9 +1,9 @@
 """Smoke test: the documented public API surface imports cleanly.
 
-This is the long-running acceptance test: it pins every name in the
-public ``__all__`` to a real callable / class so an accidental rename
-or missing re-export shows up immediately. Per-primitive behaviour
-tests live in ``test_security.py``, ``test_receipts.py``, etc.
+Pins every name in the public ``__all__`` to a real callable / class so
+an accidental rename or missing re-export shows up immediately.
+Per-primitive behaviour tests live in ``test_security.py``,
+``test_receipts.py``, etc.
 """
 
 from __future__ import annotations

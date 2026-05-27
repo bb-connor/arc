@@ -6,8 +6,8 @@
 //! inherent methods, this crate provides small extension traits that perform
 //! the same fail-the-test-on-error behaviour through explicit `panic!` calls.
 //!
-//! Two families of helpers exist because the workspace historically grew two
-//! call conventions that are intentionally kept distinct:
+//! Two families of helpers exist for two call conventions that are
+//! intentionally kept distinct:
 //!
 //! - The default family (re-exported from [`prelude`]) takes no context
 //!   argument: `value.test_unwrap()`. An optional `test_expect(context)` is

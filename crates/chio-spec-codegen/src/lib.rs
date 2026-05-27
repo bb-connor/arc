@@ -31,8 +31,8 @@
 //! ```
 //!
 //! The single-file emission keeps downstream consumers pointing at one
-//! well-known file. The file can be split into per-group modules once the
-//! `no_std + alloc` story for the generated types is settled.
+//! well-known file; per-group module splitting waits on the `no_std + alloc`
+//! story for the generated types.
 //!
 //! # Header policy
 //!

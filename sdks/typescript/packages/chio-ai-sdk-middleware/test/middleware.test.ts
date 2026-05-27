@@ -414,12 +414,10 @@ describe("receipt authority verification", () => {
   });
 
   it("accepts the sidecar's result: \"allow\" response shape from /chio/verify", async () => {
-    // Regression: the Rust `/chio/verify` route returns
-    // `result: "allow"` (see `VerifyReceiptResponse::from_http_receipt`
-    // in `crates/chio-http-core/src/evaluation.rs`). Before the fix the
-    // middleware only accepted `"authorized"` / `"Authorized"` here, so
-    // every real sidecar verification was rejected even when every
-    // authority field was true.
+    // The Rust `/chio/verify` route returns `result: "allow"` (see
+    // `VerifyReceiptResponse::from_http_receipt` in
+    // `crates/chio-http-core/src/evaluation.rs`); the middleware must
+    // accept that shape and authorize when every authority field is true.
     let modelCalls = 0;
     const fetchMock = async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
@@ -707,14 +705,13 @@ describe("receipt verdict lifting", () => {
   it("lifts nested receipt.verdict.verdict into decision when sidecar response uses the Verdict-tagged shape", async () => {
     // The Rust `Verdict` enum is `#[serde(tag = "verdict")]`, so the
     // real `HttpReceipt.verdict` is `{verdict:"allow"}` rather than a
-    // plain string. Before the fix the middleware only looked for a
-    // string `record.decision` or `receipt.decision.verdict`, so
-    // `evaluation.decision` stayed undefined and every otherwise-
-    // authorized tool use was denied because `isAuthorizedEvaluation`
-    // requires `decision === "allow"`. This test deliberately omits
-    // the legacy `record.decision` shim and the legacy
-    // `receipt.decision` field so it exercises the nested
-    // `receipt.verdict.verdict` lifting path.
+    // plain string. The middleware must lift this nested shape: if it
+    // only reads a string `record.decision` or `receipt.decision.verdict`,
+    // `evaluation.decision` stays undefined and every otherwise-authorized
+    // tool use is denied because `isAuthorizedEvaluation` requires
+    // `decision === "allow"`. This test deliberately omits the
+    // `record.decision` shim and the `receipt.decision` field so it
+    // exercises the nested `receipt.verdict.verdict` lifting path.
     let modelCalls = 0;
     const fetchMock = async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();

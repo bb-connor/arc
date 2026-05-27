@@ -121,8 +121,7 @@ pub fn tier_from_deltas(deltas: &[ScoreDelta]) -> ReputationTier {
 
 /// Count the number of distinct `feed_id` values in `deltas`.
 ///
-/// O(n^2) in the worst case but bounded by the small shipped feed
-/// catalog (currently arena-survival and cross-provider-equality), so
+/// O(n^2) in the worst case but bounded by the small feed catalog, so
 /// a linear scan over a `Vec` is preferable to allocating a hash set
 /// for the typical 1-3 element input.
 fn distinct_feed_count(deltas: &[ScoreDelta]) -> usize {
@@ -157,8 +156,7 @@ pub fn satisfies_floor(tier: ReputationTier, required: ReputationTier) -> bool {
     tier >= required
 }
 
-/// Sentinel constant used to remind readers that
-/// `MAX_FEED_DELTA` is the saturation cap on the composed score.
+/// Saturation cap on the composed score; equal to `MAX_FEED_DELTA`.
 pub const MAX_COMPOSED_SCORE: f64 = MAX_FEED_DELTA;
 
 #[cfg(test)]

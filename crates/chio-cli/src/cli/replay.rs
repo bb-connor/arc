@@ -44,9 +44,8 @@ mod bless;
 
 // Re-export every submodule's crate-internal surface so cross-file
 // references (and the `cmd_replay`/`load_trusted_kernel_pubkey` symbols
-// re-exported from `main.rs`) resolve exactly as they did under the prior
-// flat `include!` scope. The submodules carry no colliding public item
-// names, so the globs are unambiguous.
+// re-exported from `main.rs`) resolve at this module scope. The submodules
+// carry no colliding public item names, so the globs are unambiguous.
 pub(crate) use self::bless::*;
 pub(crate) use self::bless_fixture_layout::*;
 pub(crate) use self::bless_strip::*;

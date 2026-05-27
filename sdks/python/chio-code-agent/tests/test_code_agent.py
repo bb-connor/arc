@@ -52,7 +52,7 @@ def _project_tree(tmp_path: Path) -> Path:
 async def test_quickstart_safe_reads_allowed_env_writes_denied(
     tmp_path: Path,
 ) -> None:
-    """The roadmap's 10-line demo: safe reads allowed, .env writes denied."""
+    """The 10-line demo: safe reads allowed, .env writes denied."""
     project = _project_tree(tmp_path)
     # --- 10-line quickstart (what the README shows verbatim) ---
     client = MockChioClient(policy=_allow_all_policy)
@@ -66,7 +66,7 @@ async def test_quickstart_safe_reads_allowed_env_writes_denied(
     assert "forbidden_path" in (excinfo.value.reason or "")
     # --- end 10-line quickstart ---
 
-    # Belt-and-braces: the sidecar was asked about the read, never the write.
+    # The sidecar was asked about the read, never the write.
     methods = [c.method for c in client.calls]
     assert methods.count("evaluate_tool_call") == 1
 
