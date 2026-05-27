@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
-# check-fuzz-budget.sh - Self-imposed cap on GitHub Actions fuzz minutes.
+# check-fuzz-budget.sh - Advisory budget report for GitHub Actions fuzz minutes.
 #
-# The public-repo free tier on GitHub Actions allows 2,000 runner-minutes
-# per month. The continuous-fuzzing-path decision holds ClusterFuzzLite at
-# 1,800 runner-minutes per rolling 30-day window, leaving 200-minute headroom
-# for everything else on the free tier.
+# Public repositories get unlimited GitHub-hosted standard-runner minutes, so
+# there is no billing cap to enforce. This script still sums the fuzz and
+# mutation lanes' wall time over the last 30 days and reports it for
+# visibility (so a runaway lane is noticed before it hogs the shared runner
+# pool), but it no longer hard-halts by default: cap_mode defaults to "warn".
+# A private fork that wants a hard cap can set GH_FUZZ_BUDGET_CAP_MODE=fail.
 #
 # This script queries the workflow-run history for the cflite_pr.yml,
-# cflite_batch.yml, fuzz.yml, mutants.yml, and mutants-fuzz-cocoverage.yml workflows, sums their
-# observed run wall time across the last 30 days, converts to minutes, and
-# exits non-zero when the sum crosses 1,800. The orchestrator runs this on a
-# scheduled cadence and as a step in cflite_batch.yml plus fuzz.yml so the
-# cap acts as a hard halt rather than a soft warning.
+# cflite_batch.yml, fuzz.yml, mutants.yml, and mutants-fuzz-cocoverage.yml
+# workflows, sums their observed run wall time across the last 30 days, and
+# converts to minutes. The 1,800-minute default is now a reporting threshold,
+# not a gate.
 #
 # Cleanup C6: fuzz.yml was previously omitted from the WORKFLOWS array,
 # which meant the native cargo-fuzz scheduled matrix could burn its full
@@ -63,7 +64,9 @@ esac
 total_seconds=0
 
 rate_limit_mode="${GH_FUZZ_BUDGET_RATE_LIMIT_MODE:-fail}"
-cap_mode="${GH_FUZZ_BUDGET_CAP_MODE:-fail}"
+# Public repos have no billing cap, so the budget is advisory by default. Set
+# GH_FUZZ_BUDGET_CAP_MODE=fail to restore a hard halt (e.g. on a private fork).
+cap_mode="${GH_FUZZ_BUDGET_CAP_MODE:-warn}"
 
 for wf in "${WORKFLOWS[@]}"; do
     runs_path="repos/${REPO}/actions/workflows/${wf}/runs"
