@@ -202,7 +202,9 @@ impl ReceiptQuery {
 
 #[cfg(test)]
 mod tests {
-    use super::{ReceiptQuery, ReceiptReadContext};
+    use super::{
+        ReceiptQuery, ReceiptReadBoundary, ReceiptReadContext, ReceiptReadContextSource,
+    };
 
     #[test]
     fn tenant_filter_without_read_context_is_not_authority() {
@@ -250,6 +252,57 @@ mod tests {
 
         assert_eq!(scope.tenant.as_deref(), Some("tenant-a"));
         assert!(!scope.include_legacy_null_tenant);
+        assert!(scope.is_admin_all);
+    }
+
+    #[test]
+    fn admin_context_rejects_empty_tenant_filter() {
+        let query = ReceiptQuery {
+            tenant_filter: Some("  ".to_string()),
+            read_context: Some(ReceiptReadContext::admin_service()),
+            ..ReceiptQuery::default()
+        };
+
+        let err = query
+            .effective_read_scope()
+            .expect_err("whitespace tenant filter must fail closed");
+
+        assert_eq!(err, "receipt query tenant filter requires a non-empty tenant");
+    }
+
+    #[test]
+    fn tenant_scoped_context_rejects_empty_boundary_tenant() {
+        let query = ReceiptQuery {
+            read_context: Some(ReceiptReadContext {
+                boundary: ReceiptReadBoundary::TenantScoped {
+                    tenant: "   ".to_string(),
+                },
+                source: ReceiptReadContextSource::AuthenticatedTenant,
+                legacy_null_mode: false,
+            }),
+            ..ReceiptQuery::default()
+        };
+
+        let err = query
+            .effective_read_scope()
+            .expect_err("empty tenant in read context must fail closed");
+
+        assert_eq!(err, "tenant-scoped receipt query requires a non-empty tenant");
+    }
+
+    #[test]
+    fn local_operator_admin_all_includes_legacy_null_tenant_without_filter() {
+        let query = ReceiptQuery {
+            read_context: Some(ReceiptReadContext::local_operator_admin_all()),
+            ..ReceiptQuery::default()
+        };
+
+        let scope = query
+            .effective_read_scope()
+            .expect("local operator admin context should resolve");
+
+        assert!(scope.tenant.is_none());
+        assert!(scope.include_legacy_null_tenant);
         assert!(scope.is_admin_all);
     }
 }
