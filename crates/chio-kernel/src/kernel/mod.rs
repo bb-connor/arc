@@ -2410,14 +2410,6 @@ impl ChioKernel {
         };
 
         let local_kernel_id = self.federation_local_kernel_id();
-        let extensions = self
-            .treaty_dsse_extensions_from_receipt_metadata(receipt)?
-            .ok_or_else(|| {
-                KernelError::Internal(
-                    "federation runtime treaty material missing; refusing treaty-bound DSSE"
-                        .to_string(),
-                )
-            })?;
         let dual = chio_federation::co_sign_with_origin(
             origin_kernel_id,
             &peer.public_key,
@@ -2428,18 +2420,37 @@ impl ChioKernel {
         )
         .map_err(|e| KernelError::Internal(format!("bilateral co-sign failed: {e}")))?;
         let timestamp_unix_ms = current_unix_timestamp().saturating_mul(1000);
-        let dsse_envelope = chio_federation::sign_chio_bilateral_dsse_envelope_with_cosigner(
-            receipt,
-            &peer.public_key,
-            &self.config.keypair,
-            origin_kernel_id,
-            &local_kernel_id,
-            &request.tool_name,
-            timestamp_unix_ms,
-            extensions,
-            cosigner.as_ref(),
-        )
-        .map_err(|e| KernelError::Internal(format!("bilateral DSSE co-sign failed: {e}")))?;
+        // Treaty-bound runtime admissions embed `federation_treaty_dsse` in receipt
+        // metadata. Legacy Phase 20.3 federation callers (no runtime hook) still
+        // dual-sign and emit a default-extensions DSSE envelope.
+        let dsse_envelope =
+            if let Some(extensions) = self.treaty_dsse_extensions_from_receipt_metadata(receipt)?
+            {
+                chio_federation::sign_chio_bilateral_dsse_envelope_with_cosigner(
+                    receipt,
+                    &peer.public_key,
+                    &self.config.keypair,
+                    origin_kernel_id,
+                    &local_kernel_id,
+                    &request.tool_name,
+                    timestamp_unix_ms,
+                    extensions,
+                    cosigner.as_ref(),
+                )
+            } else {
+                chio_federation::sign_dsse_envelope_with_cosigner(
+                    receipt,
+                    &peer.public_key,
+                    &self.config.keypair,
+                    origin_kernel_id,
+                    &local_kernel_id,
+                    &request.tool_name,
+                    timestamp_unix_ms,
+                    chio_federation::BilateralPredicateExtensions::default(),
+                    cosigner.as_ref(),
+                )
+            }
+            .map_err(|e| KernelError::Internal(format!("bilateral DSSE co-sign failed: {e}")))?;
 
         self.federation_dual_receipts
             .insert(receipt.id.clone(), dual);
