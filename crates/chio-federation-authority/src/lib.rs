@@ -1282,12 +1282,12 @@ mod tests {
                 ChioTrustedActionClass {
                     action_class_id: WORKFLOW_GRANT_ISSUE_ACTION_CLASS_ID.to_string(),
                     tool_name: WORKFLOW_GRANT_ISSUE_ACTION_CLASS_ID.to_string(),
-                    kind: chio_attest_buyer_core::ChioActionClassKind::Routine,
+                    kind: chio_attest_buyer_core::ChiodosActionClassKind::Routine,
                 },
                 ChioTrustedActionClass {
                     action_class_id: WORKFLOW_AGGREGATE_PUBLISH_ACTION_CLASS_ID.to_string(),
                     tool_name: WORKFLOW_AGGREGATE_PUBLISH_ACTION_CLASS_ID.to_string(),
-                    kind: chio_attest_buyer_core::ChioActionClassKind::Routine,
+                    kind: chio_attest_buyer_core::ChiodosActionClassKind::Routine,
                 },
             ],
         };
@@ -1429,12 +1429,12 @@ mod tests {
                 ChioTrustedActionClass {
                     action_class_id: WORKFLOW_GRANT_ISSUE_ACTION_CLASS_ID.to_string(),
                     tool_name: WORKFLOW_GRANT_ISSUE_ACTION_CLASS_ID.to_string(),
-                    kind: chio_attest_buyer_core::ChioActionClassKind::Routine,
+                    kind: chio_attest_buyer_core::ChiodosActionClassKind::Routine,
                 },
                 ChioTrustedActionClass {
                     action_class_id: WORKFLOW_AGGREGATE_PUBLISH_ACTION_CLASS_ID.to_string(),
                     tool_name: WORKFLOW_AGGREGATE_PUBLISH_ACTION_CLASS_ID.to_string(),
-                    kind: chio_attest_buyer_core::ChioActionClassKind::Routine,
+                    kind: chio_attest_buyer_core::ChiodosActionClassKind::Routine,
                 },
             ],
         };
