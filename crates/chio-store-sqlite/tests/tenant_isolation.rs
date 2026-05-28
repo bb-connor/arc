@@ -20,7 +20,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::crypto::Keypair;
 use chio_core::receipt::{ChioReceipt, ChioReceiptBody, Decision, ToolCallAction};
-use chio_kernel::receipt_query::ReceiptQuery;
+use chio_kernel::receipt_analytics::ReceiptAnalyticsQuery;
+use chio_kernel::receipt_query::{ReceiptQuery, ReceiptReadContext};
 use chio_store_sqlite::SqliteReceiptStore;
 
 trait TestResultOk<T, E> {
@@ -128,6 +129,57 @@ fn tenant_filter_without_read_context_fails_closed() {
     assert!(
         err.to_string()
             .contains("receipt query requires an explicit read context"),
+        "unexpected error: {err}"
+    );
+
+    cleanup(&path);
+}
+
+#[test]
+fn tenant_scoped_read_context_rejects_admin_only_list_surfaces() {
+    let path = unique_db_path("tenant-isolation-admin-list");
+    let store = SqliteReceiptStore::open(&path).test_expect("open store");
+    let tenant_context = ReceiptReadContext::authenticated_tenant("tenant-A");
+
+    let list_err = store
+        .list_tool_receipts_with_context(&tenant_context, 10, None, None, None, None)
+        .expect_err("tenant-scoped context must not authorize admin list reads");
+    assert!(
+        list_err
+            .to_string()
+            .contains("tool receipt admin list requires explicit admin receipt read context"),
+        "unexpected error: {list_err}"
+    );
+
+    let child_list_err = store
+        .list_child_receipts_with_context(&tenant_context, 10, None, None, None, None, None)
+        .expect_err("tenant-scoped context must not authorize child receipt admin lists");
+    assert!(
+        child_list_err
+            .to_string()
+            .contains("child receipt admin list requires explicit admin receipt read context"),
+        "unexpected error: {child_list_err}"
+    );
+
+    cleanup(&path);
+}
+
+#[test]
+fn tenant_scoped_read_context_rejects_admin_only_analytics_reports() {
+    let path = unique_db_path("tenant-isolation-admin-analytics");
+    let store = SqliteReceiptStore::open(&path).test_expect("open store");
+
+    let err = store
+        .query_receipt_analytics(&ReceiptAnalyticsQuery {
+            read_context: Some(ReceiptReadContext::authenticated_tenant("tenant-A")),
+            ..ReceiptAnalyticsQuery::default()
+        })
+        .expect_err("tenant-scoped context must not authorize analytics reports");
+
+    assert!(
+        err.to_string().contains(
+            "receipt analytics report requires admin receipt read authority until tenant-scoped report filtering is implemented"
+        ),
         "unexpected error: {err}"
     );
 
