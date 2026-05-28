@@ -123,7 +123,8 @@ pub fn verify_receipt_json(input: &str) -> Result<ReceiptVerification> {
 mod tests {
     use super::{verify_receipt, ReceiptDecisionKind};
     use chio_core::{
-        sha256_hex, ChioReceipt, ChioReceiptBody, Decision, GuardEvidence, Keypair, ToolCallAction,
+        sha256_hex, BoundaryClass, ChioReceipt, ChioReceiptBody, Decision, GuardEvidence, Keypair,
+        ObservationOutcome, ReceiptKind, ToolCallAction, TrustLevel,
     };
 
     fn sample_receipt() -> crate::Result<ChioReceipt> {
@@ -203,6 +204,79 @@ mod tests {
         assert!(!verification.receipt_id_valid);
         assert!(!verification.signature_valid);
         assert!(!verification.ok);
+        Ok(())
+    }
+
+    fn observation_receipt(
+        id: &str,
+        receipt_kind: ReceiptKind,
+        boundary_class: BoundaryClass,
+        outcome: ObservationOutcome,
+        trust_level: TrustLevel,
+    ) -> crate::Result<ChioReceipt> {
+        let keypair = Keypair::from_seed(&[9u8; 32]);
+        let action = ToolCallAction::from_parameters(serde_json::json!({
+            "path": "/workspace/docs/roadmap.md",
+            "mode": "read"
+        }))?;
+        let body = ChioReceiptBody {
+            id: id.to_string(),
+            timestamp: 1710000200,
+            capability_id: "cap-bindings-obs".to_string(),
+            tool_server: "srv-files".to_string(),
+            tool_name: "file_read".to_string(),
+            action,
+            decision: None,
+            receipt_kind,
+            boundary_class,
+            observation_outcome: Some(outcome),
+            tool_origin: chio_core::ToolOrigin::CallerExecuted,
+            redaction_mode: chio_core::RedactionMode::None,
+            actor_chain: Vec::new(),
+            content_hash: sha256_hex(br#"{"ok":true}"#),
+            policy_hash: "policy-bindings-obs".to_string(),
+            evidence: Vec::new(),
+            metadata: None,
+            trust_level,
+            tenant_id: None,
+            kernel_key: keypair.public_key(),
+        };
+        Ok(ChioReceipt::sign(body, &keypair)?)
+    }
+
+    #[test]
+    fn verify_trace_observation_receipt_reports_observed_result() -> crate::Result<()> {
+        let receipt = observation_receipt(
+            "rcpt-bindings-trace",
+            ReceiptKind::TraceObservation,
+            BoundaryClass::DetectOnly,
+            ObservationOutcome::Observed,
+            TrustLevel::Verified,
+        )?;
+        let verification = verify_receipt(&receipt)?;
+        assert_eq!(verification.receipt_kind, "trace_observation");
+        assert_eq!(verification.boundary_class, "detect_only");
+        assert_eq!(verification.decision, ReceiptDecisionKind::None);
+        assert_eq!(verification.result, "Observed");
+        assert_eq!(verification.trust_level, "verified");
+        Ok(())
+    }
+
+    #[test]
+    fn verify_advisory_evaluation_receipt_reports_advisory_result() -> crate::Result<()> {
+        let receipt = observation_receipt(
+            "rcpt-bindings-advisory",
+            ReceiptKind::AdvisoryEvaluation,
+            BoundaryClass::AdvisoryOnly,
+            ObservationOutcome::Evaluated,
+            TrustLevel::Advisory,
+        )?;
+        let verification = verify_receipt(&receipt)?;
+        assert_eq!(verification.receipt_kind, "advisory_evaluation");
+        assert_eq!(verification.boundary_class, "advisory_only");
+        assert_eq!(verification.decision, ReceiptDecisionKind::None);
+        assert_eq!(verification.result, "Advisory");
+        assert_eq!(verification.trust_level, "advisory");
         Ok(())
     }
 }
