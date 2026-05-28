@@ -2520,6 +2520,69 @@ mod tests {
         assert_eq!(err, BilateralCoSigningError::ReceiptMismatch);
     }
 
+    fn allow_policy_summary() -> PolicyEvaluationSummary {
+        PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: Some("allow".to_string()),
+        }
+    }
+
+    #[test]
+    fn validate_policy_evaluation_summary_accepts_matching_allow_verdicts() {
+        validate_policy_evaluation_summary(&allow_policy_summary())
+            .expect("matching allow verdicts should validate");
+    }
+
+    #[test]
+    fn validate_policy_evaluation_summary_rejects_server_verdict_mismatch() {
+        let mut summary = allow_policy_summary();
+        summary.server_b_verdict.verdict = "deny".to_string();
+
+        let err = validate_policy_evaluation_summary(&summary).unwrap_err();
+
+        let BilateralCoSigningError::CanonicalJson(message) = err else {
+            panic!("expected canonical json error");
+        };
+        assert!(message.contains("server_a=allow server_b=deny"));
+    }
+
+    #[test]
+    fn validate_policy_evaluation_summary_rejects_joint_disposition_mismatch() {
+        let mut summary = allow_policy_summary();
+        summary.joint_disposition = Some("deny".to_string());
+
+        let err = validate_policy_evaluation_summary(&summary).unwrap_err();
+
+        let BilateralCoSigningError::CanonicalJson(message) = err else {
+            panic!("expected canonical json error");
+        };
+        assert!(message.contains("joint_disposition=deny"));
+    }
+
+    #[test]
+    fn validate_policy_evaluation_summary_rejects_empty_policy_id() {
+        let mut summary = allow_policy_summary();
+        summary.server_a_verdict.policy_id.clear();
+
+        let err = validate_policy_evaluation_summary(&summary).unwrap_err();
+
+        let BilateralCoSigningError::CanonicalJson(message) = err else {
+            panic!("expected canonical json error");
+        };
+        assert!(message.contains("server_a_verdict.policy_id must be non-empty"));
+    }
+
     fn resign_payload(
         envelope: &mut DsseEnvelope,
         kp_a: &Keypair,

@@ -1354,6 +1354,32 @@ mod tests {
     }
 
     #[test]
+    fn profile_rejects_duplicate_runtime_policy_issuer_keys() {
+        let mut profile = profile();
+        let duplicate = profile.runtime_policy_issuer_public_keys[0].clone();
+        profile
+            .runtime_policy_issuer_public_keys
+            .push(duplicate);
+
+        let error = profile.validate().unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("duplicate runtime policy issuer public key"));
+    }
+
+    #[test]
+    fn profile_rejects_runtime_policy_issuer_colliding_with_lease_authority() {
+        let mut profile = profile();
+        profile.runtime_policy_issuer_public_keys =
+            vec![profile.lease_authorities[0].public_key.clone()];
+
+        let error = profile.validate().unwrap_err();
+        assert!(error.to_string().contains(
+            "runtime policy issuer key must be distinct from lease, governance, and revocation authority keys"
+        ));
+    }
+
+    #[test]
     fn checkpoint_rejects_non_monotonic_epoch() {
         let request = RevocationPublicationRequest {
             schema: REVOCATION_PUBLICATION_REQUEST_SCHEMA.to_string(),
