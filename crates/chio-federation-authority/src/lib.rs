@@ -1194,6 +1194,50 @@ mod tests {
     }
 
     #[test]
+    fn authority_profile_rejects_missing_runtime_policy_issuers() {
+        let mut document = profile();
+        document.runtime_policy_issuer_public_keys.clear();
+
+        let err = document
+            .validate()
+            .expect_err("profile without runtime policy issuers must fail closed");
+
+        assert!(err
+            .to_string()
+            .contains("runtime policy issuers"));
+    }
+
+    #[test]
+    fn authority_profile_rejects_duplicate_runtime_policy_issuer_keys() {
+        let mut document = profile();
+        let duplicate = document.runtime_policy_issuer_public_keys[0].clone();
+        document
+            .runtime_policy_issuer_public_keys
+            .push(duplicate);
+
+        let err = document
+            .validate()
+            .expect_err("duplicate runtime policy issuer keys must fail closed");
+
+        assert!(err.to_string().contains("duplicate runtime policy issuer"));
+    }
+
+    #[test]
+    fn authority_profile_rejects_runtime_policy_issuer_colliding_with_lease_authority() {
+        let mut document = profile();
+        document.runtime_policy_issuer_public_keys =
+            vec![document.lease_authorities[0].public_key.clone()];
+
+        let err = document.validate().expect_err(
+            "runtime policy issuer keys must stay distinct from lease authority keys",
+        );
+
+        assert!(err
+            .to_string()
+            .contains("distinct from lease, governance, and revocation"));
+    }
+
+    #[test]
     fn issuer_outputs_verifier_compatible_lease_and_governance_artifacts() {
         let bundle =
             issue_authority_bundle(&profile(), &request(), &signing_keys()).expect("issue bundle");
@@ -1282,12 +1326,12 @@ mod tests {
                 ChioTrustedActionClass {
                     action_class_id: WORKFLOW_GRANT_ISSUE_ACTION_CLASS_ID.to_string(),
                     tool_name: WORKFLOW_GRANT_ISSUE_ACTION_CLASS_ID.to_string(),
-                    kind: chio_attest_buyer_core::ChioActionClassKind::Routine,
+                    kind: chio_attest_buyer_core::ChiodosActionClassKind::Routine,
                 },
                 ChioTrustedActionClass {
                     action_class_id: WORKFLOW_AGGREGATE_PUBLISH_ACTION_CLASS_ID.to_string(),
                     tool_name: WORKFLOW_AGGREGATE_PUBLISH_ACTION_CLASS_ID.to_string(),
-                    kind: chio_attest_buyer_core::ChioActionClassKind::Routine,
+                    kind: chio_attest_buyer_core::ChiodosActionClassKind::Routine,
                 },
             ],
         };
@@ -1403,12 +1447,12 @@ mod tests {
                 ChioTrustedActionClass {
                     action_class_id: WORKFLOW_GRANT_ISSUE_ACTION_CLASS_ID.to_string(),
                     tool_name: WORKFLOW_GRANT_ISSUE_ACTION_CLASS_ID.to_string(),
-                    kind: chio_attest_buyer_core::ChioActionClassKind::Routine,
+                    kind: chio_attest_buyer_core::ChiodosActionClassKind::Routine,
                 },
                 ChioTrustedActionClass {
                     action_class_id: WORKFLOW_AGGREGATE_PUBLISH_ACTION_CLASS_ID.to_string(),
                     tool_name: WORKFLOW_AGGREGATE_PUBLISH_ACTION_CLASS_ID.to_string(),
-                    kind: chio_attest_buyer_core::ChioActionClassKind::Routine,
+                    kind: chio_attest_buyer_core::ChiodosActionClassKind::Routine,
                 },
             ],
         };
