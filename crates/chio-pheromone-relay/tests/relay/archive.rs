@@ -24,7 +24,8 @@ use chio_pheromone_relay::{
     build_relay_alert_assurance_archive_extraction_report,
     generate_relay_alert_assurance_physical_archive_drill_report,
     generate_relay_alert_assurance_retention_handoff_report,
-    sign_relay_alert_assurance_archive_package, verify_relay_alert_assurance_archive_package,
+    sign_relay_alert_assurance_archive_package, validate_relay_alert_assurance_archive_package_report,
+    verify_relay_alert_assurance_archive_package,
     RelayAlertAssuranceArchivePackageBuildInput, RelayAlertAssuranceArchivePackageReport,
     RelayAlertAssuranceArchivePackageVerifyInput, RelayAlertAssurancePhysicalArchiveDrillInput,
     RelayAlertAssurancePhysicalArchiveEvidence, RelayAlertAssuranceRetentionHandoffEvidence,
@@ -386,6 +387,17 @@ fn relay_alert_assurance_archive_package_binds_source_reports_and_members() {
     )
     .unwrap_err();
     assert!(err.to_string().contains("outside verified bundle"));
+}
+
+#[test]
+fn relay_alert_assurance_archive_package_report_rejects_missing_previous_hash() {
+    let mut report = archive_package_report_for_evidence();
+    report.package_generation = 2;
+    report.previous_package_manifest_sha256 = None;
+
+    let err = validate_relay_alert_assurance_archive_package_report(&report).unwrap_err();
+
+    assert!(err.to_string().contains("package_report_previous_hash_missing"));
 }
 
 #[test]
