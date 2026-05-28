@@ -1287,9 +1287,11 @@ pub fn generate_relay_alert_assurance_external_retention_review_report(
 
     for report in package_reports {
         if let Some(failure) = archive_package_report_integrity_failure(report) {
-            return Err(PheromoneRelayError::ArchivePackageInvalid(format!(
-                "external retention package report rejected: {failure}"
-            )));
+            if failure != "package_report_verification_incomplete" {
+                return Err(PheromoneRelayError::ArchivePackageInvalid(format!(
+                    "external retention package report rejected: {failure}"
+                )));
+            }
         }
         let package_report_sha256 = canonical_sha256(report)?;
         let mut accepted = true;

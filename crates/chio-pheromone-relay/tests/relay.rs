@@ -11,6 +11,8 @@ mod archive;
 mod delivery;
 #[path = "relay/directory.rs"]
 mod directory;
+#[path = "relay/external_retention.rs"]
+mod external_retention;
 #[path = "relay/observability.rs"]
 mod observability;
 #[path = "relay/service.rs"]
