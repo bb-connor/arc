@@ -2520,6 +2520,76 @@ mod tests {
         assert_eq!(err, BilateralCoSigningError::ReceiptMismatch);
     }
 
+    fn allow_policy_summary() -> PolicyEvaluationSummary {
+        PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: Some("allow".to_string()),
+        }
+    }
+
+    #[test]
+    fn validate_policy_summary_accepts_matching_verdicts() {
+        validate_policy_evaluation_summary(&allow_policy_summary())
+            .expect("matching allow verdicts must validate");
+    }
+
+    #[test]
+    fn validate_policy_summary_rejects_server_verdict_mismatch() {
+        let mut summary = allow_policy_summary();
+        summary.server_b_verdict.verdict = "deny".to_string();
+
+        let err = validate_policy_evaluation_summary(&summary)
+            .expect_err("server_a/server_b verdict mismatch must fail closed");
+
+        assert!(err.to_string().contains("predicate.schema_invalid: server_a="));
+    }
+
+    #[test]
+    fn validate_policy_summary_rejects_empty_policy_id() {
+        let mut summary = allow_policy_summary();
+        summary.server_a_verdict.policy_id.clear();
+
+        let err = validate_policy_evaluation_summary(&summary)
+            .expect_err("empty policy_id must fail closed");
+
+        assert!(err.to_string().contains("policy_id must be non-empty"));
+    }
+
+    #[test]
+    fn validate_policy_summary_rejects_unsupported_verdict() {
+        let mut summary = allow_policy_summary();
+        summary.server_a_verdict.verdict = "maybe".to_string();
+        summary.server_b_verdict.verdict = "maybe".to_string();
+        summary.joint_disposition = Some("maybe".to_string());
+
+        let err = validate_policy_evaluation_summary(&summary)
+            .expect_err("unsupported verdict must fail closed");
+
+        assert!(err.to_string().contains("unsupported verdict"));
+    }
+
+    #[test]
+    fn validate_policy_summary_rejects_joint_disposition_mismatch() {
+        let mut summary = allow_policy_summary();
+        summary.joint_disposition = Some("deny".to_string());
+
+        let err = validate_policy_evaluation_summary(&summary)
+            .expect_err("joint_disposition must agree with server verdicts");
+
+        assert!(err.to_string().contains("joint_disposition=deny disagrees"));
+    }
+
     fn resign_payload(
         envelope: &mut DsseEnvelope,
         kp_a: &Keypair,
