@@ -123,7 +123,6 @@ target.write_text(json.dumps(profile, indent=2) + "\n", encoding="utf-8")
 PY
 
 cargo run -p chio-cli --bin chio -- pheromone relay alert assurance export \
-  --bundle-id relay-alert-assurance-export-package \
   --package "$ASSURANCE_DIR/relay-alert-assurance-package.json" \
   --alert-report "$ASSURANCE_DIR/relay-alert-report.json" \
   --trend-report "$ASSURANCE_DIR/relay-trend-report.json" \
@@ -131,7 +130,7 @@ cargo run -p chio-cli --bin chio -- pheromone relay alert assurance export \
   --normalization-report "$ASSURANCE_DIR/relay-alert-normalization-report.json" \
   --delivery-report "$ASSURANCE_DIR/relay-alert-delivery-report.json" \
   --acknowledgement-report "$ASSURANCE_DIR/relay-alert-acknowledgement-report.json" \
-  --drift-report "$ASSURANCE_DIR/relay-alert-delivery-drift-report-v2.json" \
+  --drift-report "$ASSURANCE_DIR/relay-alert-delivery-drift-report.json" \
   --review-packet "$ASSURANCE_DIR/relay-alert-route-review-packet.json" \
   --retention-profile "$ASSURANCE_DIR/relay-alert-assurance-retention-profile.json" \
   --signing-key "$ASSURANCE_DIR/relay-alert-assurance-export-signing-key.json" \
@@ -238,7 +237,9 @@ if archive.get("accepted") is not True:
     raise SystemExit("archive report must be accepted")
 if closeout.get("accepted") is not True:
     raise SystemExit("package closeout report must be accepted")
-if package_verify.get("accepted") is not True or package_verify.get("nestedExporterVerified") is not True:
+# A verified report omits the boolean (skip_serializing_if = "is_true"); only a
+# present-and-false value signals a nested-exporter verification failure.
+if package_verify.get("accepted") is not True or package_verify.get("nestedExporterVerified", True) is not True:
     raise SystemExit("package verify report must verify nested exporters")
 if extraction.get("accepted") is not True:
     raise SystemExit("archive extraction report must be accepted")
