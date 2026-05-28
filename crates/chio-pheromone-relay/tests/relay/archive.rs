@@ -5,7 +5,8 @@ use super::common::{
     generate_relay_alert_assurance_replay_report, generate_relay_alert_assurance_retention_report,
     generated_assurance_chain, key, relay_alert_assurance_export_bundle,
     retention_profile_for_export, sign_relay_alert_assurance_export_bundle, trusted_exporters,
-    verify_relay_alert_assurance_export_bundle, RelayAlertAssuranceArchiveBundleCandidate,
+    verify_relay_alert_assurance_export_bundle,
+    RelayAlertAssuranceArchiveBundleCandidate,
     RelayAlertAssuranceArchiveInput, RelayAlertAssuranceCloseoutInput,
     RelayAlertAssuranceExportBuildInput, RelayAlertAssuranceRecoveryDrillInput,
     RelayAlertAssuranceReplayInput, RelayAlertAssuranceRetentionInput, NOW,
@@ -20,19 +21,42 @@ use super::common::{
 use chio_core_types::canonical::canonical_json_bytes;
 use chio_core_types::crypto::sha256_hex;
 use chio_core_types::PublicKey;
+use std::{collections::BTreeSet, fs};
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ArchiveRestoreNegativeCase {
+    case_id: String,
+    expected_code: String,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ArchiveRestoreNegativeCorpus {
+    cases: Vec<ArchiveRestoreNegativeCase>,
+}
 use chio_pheromone_relay::{
     build_relay_alert_assurance_archive_extraction_report,
+    generate_relay_alert_assurance_archive_restore_drill_report,
     generate_relay_alert_assurance_physical_archive_drill_report,
     generate_relay_alert_assurance_retention_handoff_report,
     sign_relay_alert_assurance_archive_package, verify_relay_alert_assurance_archive_package,
     RelayAlertAssuranceArchivePackageBuildInput, RelayAlertAssuranceArchivePackageReport,
-    RelayAlertAssuranceArchivePackageVerifyInput, RelayAlertAssurancePhysicalArchiveDrillInput,
-    RelayAlertAssurancePhysicalArchiveEvidence, RelayAlertAssuranceRetentionHandoffEvidence,
-    RelayAlertAssuranceRetentionHandoffInput, RelayAlertAssuranceRetentionHandoffProfileDocument,
-    RelayAlertAssuranceTrustedArchivePackager, RelayAlertAssuranceTrustedArchivePackagersDocument,
+    RelayAlertAssuranceArchivePackageVerifyInput, RelayAlertAssuranceArchiveRestoreDrillInput,
+    RelayAlertAssuranceArchiveRestoreProfileDocument,
+    RelayAlertAssurancePhysicalArchiveDrillInput, RelayAlertAssurancePhysicalArchiveEvidence,
+    RelayAlertAssuranceRetentionHandoffEvidence, RelayAlertAssuranceRetentionHandoffInput,
+    RelayAlertAssuranceRetentionHandoffProfileDocument,
+    RelayAlertAssuranceRetentionHandoffReport, RelayAlertAssuranceTrustedArchivePackager,
+    RelayAlertAssuranceTrustedArchivePackagersDocument, RelayAlertCheck,
+    PHEROMONE_RELAY_ALERT_ASSURANCE_ARCHIVE_PACKAGE_REPORT_SCHEMA,
+    PHEROMONE_RELAY_ALERT_ASSURANCE_ARCHIVE_RESTORE_DRILL_REPORT_SCHEMA,
+    PHEROMONE_RELAY_ALERT_ASSURANCE_ARCHIVE_RESTORE_PROFILE_SCHEMA,
+    PHEROMONE_RELAY_ALERT_ASSURANCE_PHYSICAL_ARCHIVE_DRILL_REPORT_SCHEMA,
     PHEROMONE_RELAY_ALERT_ASSURANCE_PHYSICAL_ARCHIVE_EVIDENCE_SCHEMA,
     PHEROMONE_RELAY_ALERT_ASSURANCE_RETENTION_HANDOFF_EVIDENCE_SCHEMA,
     PHEROMONE_RELAY_ALERT_ASSURANCE_RETENTION_HANDOFF_PROFILE_SCHEMA,
+    PHEROMONE_RELAY_ALERT_ASSURANCE_RETENTION_HANDOFF_REPORT_SCHEMA,
     PHEROMONE_RELAY_ALERT_ASSURANCE_TRUSTED_ARCHIVE_PACKAGERS_SCHEMA,
 };
 
@@ -527,6 +551,261 @@ fn archive_package_report_for_evidence() -> RelayAlertAssuranceArchivePackageRep
             code: "accepted".to_string(),
             accepted: true,
             detail: "package report verified".to_string(),
+        }],
+    }
+}
+
+#[test]
+fn relay_alert_assurance_archive_restore_drill_accepts_continuous_generation() {
+    let profile = restore_profile_for_drill();
+    let gen1 = valid_restore_package_report(
+        "relay-alert-archive-package-001",
+        1,
+        "1111111111111111111111111111111111111111111111111111111111111111",
+        None,
+    );
+    let gen1_manifest = gen1.package_manifest_sha256.clone();
+    let gen2 = valid_restore_package_report(
+        "relay-alert-archive-package-002",
+        2,
+        "2222222222222222222222222222222222222222222222222222222222222222",
+        Some(gen1_manifest),
+    );
+    let physical = [
+        matching_physical_drill(&gen1),
+        matching_physical_drill(&gen2),
+    ];
+    let handoff = [
+        matching_retention_handoff(&gen1),
+        matching_retention_handoff(&gen2),
+    ];
+    let report = generate_relay_alert_assurance_archive_restore_drill_report(
+        RelayAlertAssuranceArchiveRestoreDrillInput {
+            package_reports: &[gen1, gen2],
+            physical_drill_reports: &physical,
+            retention_handoff_reports: &handoff,
+            restore_profile: &profile,
+            now_unix_ms: NOW + 100_000,
+        },
+    )
+    .unwrap();
+
+    assert_eq!(
+        report.schema,
+        PHEROMONE_RELAY_ALERT_ASSURANCE_ARCHIVE_RESTORE_DRILL_REPORT_SCHEMA
+    );
+    assert!(report.accepted);
+    assert_eq!(report.code, "accepted");
+    assert_eq!(report.package_count, 2);
+    assert_eq!(report.latest_package_generation, 2);
+}
+
+#[test]
+fn relay_alert_assurance_archive_restore_negative_corpus_cases_are_executable() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../examples/chio-3vendor/fixtures/pheromone/relay/alert-assurance/",
+        "relay-alert-assurance-archive-restore-negative-cases.json"
+    );
+    let corpus: ArchiveRestoreNegativeCorpus =
+        serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
+    let mut seen = BTreeSet::new();
+    for case in &corpus.cases {
+        assert!(seen.insert(case.case_id.as_str()), "duplicate case {}", case.case_id);
+        if case.case_id == "wrong_expected_code" {
+            let observed = restore_drill_code("generation_gap");
+            assert_eq!(observed, "restore_blocked");
+            assert_eq!(case.expected_code, "negative_corpus_mismatch");
+            continue;
+        }
+        let observed = restore_drill_code(&case.case_id);
+        assert_eq!(
+            observed, case.expected_code,
+            "negative case {} expected {} but observed {}",
+            case.case_id, case.expected_code, observed
+        );
+    }
+    for required in [
+        "generation_gap",
+        "duplicate_generation",
+        "previous_hash_mismatch",
+        "missing_readback",
+        "retention_handoff_not_ready",
+        "wrong_expected_code",
+    ] {
+        assert!(seen.contains(required), "missing negative case {required}");
+    }
+}
+
+fn restore_drill_code(case_id: &str) -> String {
+    let profile = restore_profile_for_drill();
+    let gen1_manifest = "1111111111111111111111111111111111111111111111111111111111111111";
+    let gen1 = valid_restore_package_report(
+        "relay-alert-archive-package-001",
+        1,
+        gen1_manifest,
+        None,
+    );
+    let gen1_physical = matching_physical_drill(&gen1);
+    let gen1_handoff = matching_retention_handoff(&gen1);
+
+    let (package_reports, physical, handoff) = match case_id {
+        "generation_gap" => {
+            let gen3 = valid_restore_package_report(
+                "relay-alert-archive-package-003",
+                3,
+                "3333333333333333333333333333333333333333333333333333333333333333",
+                Some("2222222222222222222222222222222222222222222222222222222222222222".to_string()),
+            );
+            let gen3_physical = matching_physical_drill(&gen3);
+            let gen3_handoff = matching_retention_handoff(&gen3);
+            (
+                vec![gen1, gen3],
+                vec![gen1_physical, gen3_physical],
+                vec![gen1_handoff, gen3_handoff],
+            )
+        }
+        "duplicate_generation" => {
+            let duplicate = valid_restore_package_report(
+                "relay-alert-archive-package-001b",
+                1,
+                "4444444444444444444444444444444444444444444444444444444444444444",
+                None,
+            );
+            let duplicate_physical = matching_physical_drill(&duplicate);
+            let duplicate_handoff = matching_retention_handoff(&duplicate);
+            (
+                vec![gen1, duplicate],
+                vec![gen1_physical, duplicate_physical],
+                vec![gen1_handoff, duplicate_handoff],
+            )
+        }
+        "previous_hash_mismatch" => {
+            let gen2 = valid_restore_package_report(
+                "relay-alert-archive-package-002",
+                2,
+                "2222222222222222222222222222222222222222222222222222222222222222",
+                Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string()),
+            );
+            let gen2_physical = matching_physical_drill(&gen2);
+            let gen2_handoff = matching_retention_handoff(&gen2);
+            (
+                vec![gen1, gen2],
+                vec![gen1_physical, gen2_physical],
+                vec![gen1_handoff, gen2_handoff],
+            )
+        }
+        "missing_readback" => (vec![gen1], Vec::new(), vec![gen1_handoff]),
+        "retention_handoff_not_ready" => {
+            (vec![gen1], vec![gen1_physical], Vec::new())
+        }
+        other => panic!("unsupported archive restore negative case {other}"),
+    };
+
+    generate_relay_alert_assurance_archive_restore_drill_report(
+        RelayAlertAssuranceArchiveRestoreDrillInput {
+            package_reports: &package_reports,
+            physical_drill_reports: &physical,
+            retention_handoff_reports: &handoff,
+            restore_profile: &profile,
+            now_unix_ms: NOW + 100_000,
+        },
+    )
+    .expect("restore drill negative corpus cases should produce a report")
+    .code
+}
+
+fn restore_profile_for_drill() -> RelayAlertAssuranceArchiveRestoreProfileDocument {
+    RelayAlertAssuranceArchiveRestoreProfileDocument {
+        schema: PHEROMONE_RELAY_ALERT_ASSURANCE_ARCHIVE_RESTORE_PROFILE_SCHEMA.to_string(),
+        local_kernel_id: "did:chio:buyer-kernel".to_string(),
+        profile_id: "relay-archive-restore-profile".to_string(),
+        max_package_count: 8,
+        require_generation_continuity: true,
+        require_physical_readback: true,
+        require_retention_handoff_ready: true,
+        issued_at_unix_ms: NOW,
+        expires_at_unix_ms: NOW + 900_000,
+    }
+}
+
+fn valid_restore_package_report(
+    package_id: &str,
+    generation: u64,
+    manifest_sha256: &str,
+    previous_manifest_sha256: Option<String>,
+) -> RelayAlertAssuranceArchivePackageReport {
+    RelayAlertAssuranceArchivePackageReport {
+        schema: PHEROMONE_RELAY_ALERT_ASSURANCE_ARCHIVE_PACKAGE_REPORT_SCHEMA.to_string(),
+        accepted: true,
+        code: "accepted".to_string(),
+        local_kernel_id: "did:chio:buyer-kernel".to_string(),
+        generated_at_unix_ms: NOW + 10_000,
+        package_id: package_id.to_string(),
+        package_generation: generation,
+        previous_package_manifest_sha256: previous_manifest_sha256,
+        package_manifest_sha256: manifest_sha256.to_string(),
+        source_archive_report_sha256: "b".repeat(64),
+        source_closeout_report_sha256: "c".repeat(64),
+        package_member_count: 1,
+        package_total_byte_count: 128,
+        bundle_count: 1,
+        trusted_packager_verified: true,
+        nested_exporter_verified: true,
+        source_reports_matched: true,
+        closeout_ready_verified: true,
+        total_byte_count_matched: true,
+        extractable: true,
+        checks: vec![RelayAlertCheck {
+            code: "accepted".to_string(),
+            accepted: true,
+            detail: "package report verified".to_string(),
+        }],
+    }
+}
+
+fn matching_physical_drill(
+    report: &RelayAlertAssuranceArchivePackageReport,
+) -> chio_pheromone_relay::RelayAlertAssurancePhysicalArchiveDrillReport {
+    let report_sha256 = sha256_hex(&canonical_json_bytes(report).unwrap());
+    chio_pheromone_relay::RelayAlertAssurancePhysicalArchiveDrillReport {
+        schema: PHEROMONE_RELAY_ALERT_ASSURANCE_PHYSICAL_ARCHIVE_DRILL_REPORT_SCHEMA.to_string(),
+        accepted: true,
+        code: "accepted".to_string(),
+        local_kernel_id: report.local_kernel_id.clone(),
+        generated_at_unix_ms: NOW + 20_000,
+        evidence_id: format!("physical-readback-{}", report.package_id),
+        package_id: report.package_id.clone(),
+        package_report_sha256: report_sha256,
+        sampled_member_count: 1,
+        checks: vec![RelayAlertCheck {
+            code: "local_readback_evidence".to_string(),
+            accepted: true,
+            detail: "operator-provided local readback evidence is hash-bound to package report"
+                .to_string(),
+        }],
+    }
+}
+
+fn matching_retention_handoff(
+    report: &RelayAlertAssuranceArchivePackageReport,
+) -> RelayAlertAssuranceRetentionHandoffReport {
+    let report_sha256 = sha256_hex(&canonical_json_bytes(report).unwrap());
+    RelayAlertAssuranceRetentionHandoffReport {
+        schema: PHEROMONE_RELAY_ALERT_ASSURANCE_RETENTION_HANDOFF_REPORT_SCHEMA.to_string(),
+        accepted: true,
+        code: "accepted".to_string(),
+        local_kernel_id: report.local_kernel_id.clone(),
+        generated_at_unix_ms: NOW + 20_000,
+        evidence_id: format!("handoff-{}", report.package_id),
+        package_id: report.package_id.clone(),
+        package_report_sha256: report_sha256,
+        target_system_alias: "external-retention-1".to_string(),
+        ready_for_operator_handoff: true,
+        checks: vec![RelayAlertCheck {
+            code: "accepted".to_string(),
+            accepted: true,
+            detail: "retention handoff evidence is hash-bound to package report".to_string(),
         }],
     }
 }
