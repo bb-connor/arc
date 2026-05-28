@@ -1549,6 +1549,55 @@ mod tests {
     }
 
     #[test]
+    fn operator_report_evidence_export_requires_explicit_read_context() {
+        let err = OperatorReportQuery::default()
+            .to_evidence_export_query()
+            .expect_err("operator report export must fail closed without read context");
+
+        assert_eq!(
+            err,
+            "operator report evidence export requires an explicit read context"
+        );
+    }
+
+    #[test]
+    fn operator_report_evidence_export_maps_admin_read_context() {
+        let export = OperatorReportQuery {
+            read_context: Some(ReceiptReadContext::admin_service()),
+            ..OperatorReportQuery::default()
+        }
+        .to_evidence_export_query()
+        .expect("admin read context should authorize export");
+
+        assert!(export.tenant.is_none());
+        assert_eq!(export.read_boundary, Some(ReceiptReadBoundary::AdminAll));
+        export
+            .validate_read_boundary()
+            .expect("admin export boundary should validate");
+    }
+
+    #[test]
+    fn operator_report_evidence_export_maps_tenant_scoped_read_context() {
+        let export = OperatorReportQuery {
+            read_context: Some(ReceiptReadContext::authenticated_tenant("tenant-a")),
+            ..OperatorReportQuery::default()
+        }
+        .to_evidence_export_query()
+        .expect("tenant read context should authorize export");
+
+        assert_eq!(export.tenant.as_deref(), Some("tenant-a"));
+        assert_eq!(
+            export.read_boundary,
+            Some(ReceiptReadBoundary::TenantScoped {
+                tenant: "tenant-a".to_string()
+            })
+        );
+        export
+            .validate_read_boundary()
+            .expect("tenant-scoped export boundary should validate");
+    }
+
+    #[test]
     fn operator_report_query_direct_export_support_requires_no_tool_filters() {
         let unrestricted = OperatorReportQuery::default();
         assert!(unrestricted.direct_evidence_export_supported());
