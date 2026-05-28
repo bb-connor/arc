@@ -1796,6 +1796,78 @@ mod tests {
         );
     }
 
+    fn sample_policy_summary(
+        server_a_verdict: &str,
+        server_b_verdict: &str,
+        joint_disposition: Option<&str>,
+    ) -> PolicyEvaluationSummary {
+        PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: server_a_verdict.to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: server_b_verdict.to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: joint_disposition.map(str::to_string),
+        }
+    }
+
+    fn assert_policy_summary_error(summary: &PolicyEvaluationSummary, expected_substring: &str) {
+        let error = validate_policy_evaluation_summary(summary)
+            .expect_err("policy summary validation must fail closed");
+        let message = match error {
+            BilateralCoSigningError::CanonicalJson(message) => message,
+            other => panic!("unexpected bilateral error: {other:?}"),
+        };
+        assert!(
+            message.contains(expected_substring),
+            "expected error containing {expected_substring:?}, got {message:?}"
+        );
+    }
+
+    #[test]
+    fn policy_evaluation_summary_rejects_disagreeing_server_verdicts() {
+        assert_policy_summary_error(
+            &sample_policy_summary("allow", "deny", None),
+            "server_a=allow server_b=deny",
+        );
+    }
+
+    #[test]
+    fn policy_evaluation_summary_rejects_unsupported_verdict_values() {
+        assert_policy_summary_error(
+            &sample_policy_summary("permit", "permit", None),
+            "unsupported verdict",
+        );
+    }
+
+    #[test]
+    fn policy_evaluation_summary_rejects_empty_policy_id() {
+        let mut summary = sample_policy_summary("allow", "allow", None);
+        summary.server_a_verdict.policy_id.clear();
+        assert_policy_summary_error(&summary, "server_a_verdict.policy_id must be non-empty");
+    }
+
+    #[test]
+    fn policy_evaluation_summary_rejects_joint_disposition_mismatch() {
+        assert_policy_summary_error(
+            &sample_policy_summary("allow", "allow", Some("deny")),
+            "joint_disposition=deny disagrees",
+        );
+    }
+
+    #[test]
+    fn policy_evaluation_summary_accepts_matching_allow_verdicts() {
+        validate_policy_evaluation_summary(&sample_policy_summary("allow", "allow", Some("allow")))
+            .expect("matching allow verdicts should validate");
+    }
+
     #[test]
     fn happy_path_signs_and_verifies() {
         let kp_a = Keypair::generate();
