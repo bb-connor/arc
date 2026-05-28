@@ -547,6 +547,71 @@ mod tests {
     }
 
     #[test]
+    fn evidence_export_without_read_boundary_fails_closed() {
+        let err = EvidenceExportQuery::default()
+            .validate_read_boundary()
+            .expect_err("export without read boundary must fail closed");
+
+        assert!(
+            err.to_string()
+                .contains("evidence export requires an explicit receipt read boundary"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn admin_all_evidence_export_rejects_empty_tenant_filter() {
+        let err = EvidenceExportQuery {
+            tenant: Some("   ".to_string()),
+            read_boundary: Some(ReceiptReadBoundary::AdminAll),
+            ..EvidenceExportQuery::default()
+        }
+        .validate_read_boundary()
+        .expect_err("empty tenant filter must not authorize export");
+
+        assert!(
+            err.to_string().contains(
+                "admin-all evidence export tenant filter requires a non-empty tenant"
+            ),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn tenant_scoped_evidence_export_rejects_empty_boundary_tenant() {
+        let err = EvidenceExportQuery {
+            read_boundary: Some(ReceiptReadBoundary::tenant_scoped("   ")),
+            ..EvidenceExportQuery::default()
+        }
+        .validate_read_boundary()
+        .expect_err("empty tenant boundary must fail closed");
+
+        assert!(
+            err.to_string()
+                .contains("tenant-scoped evidence export requires a non-empty tenant"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn tenant_scoped_evidence_export_rejects_mismatched_query_tenant() {
+        let err = EvidenceExportQuery {
+            tenant: Some("tenant-b".to_string()),
+            read_boundary: Some(ReceiptReadBoundary::tenant_scoped("tenant-a")),
+            ..EvidenceExportQuery::default()
+        }
+        .validate_read_boundary()
+        .expect_err("query tenant must not widen authenticated export scope");
+
+        assert!(
+            err.to_string().contains(
+                "tenant-scoped evidence export tenant does not match query tenant"
+            ),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
     fn admin_all_evidence_export_uses_remote_safe_read_context() {
         let receipt_query = EvidenceExportQuery {
             tenant: Some("tenant-a".to_string()),

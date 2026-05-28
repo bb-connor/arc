@@ -252,6 +252,75 @@ mod tests {
         assert!(!scope.include_legacy_null_tenant);
         assert!(scope.is_admin_all);
     }
+
+    #[test]
+    fn admin_context_rejects_empty_tenant_filter() {
+        let query = ReceiptQuery {
+            tenant_filter: Some("   ".to_string()),
+            read_context: Some(ReceiptReadContext::admin_service()),
+            ..ReceiptQuery::default()
+        };
+
+        let err = query
+            .effective_read_scope()
+            .expect_err("whitespace-only tenant filter must not authorize reads");
+
+        assert_eq!(
+            err,
+            "receipt query tenant filter requires a non-empty tenant"
+        );
+    }
+
+    #[test]
+    fn tenant_scoped_context_rejects_empty_tenant_boundary() {
+        let query = ReceiptQuery {
+            read_context: Some(ReceiptReadContext::authenticated_tenant("   ")),
+            ..ReceiptQuery::default()
+        };
+
+        let err = query
+            .effective_read_scope()
+            .expect_err("empty tenant boundary must fail closed");
+
+        assert_eq!(
+            err,
+            "tenant-scoped receipt query requires a non-empty tenant"
+        );
+    }
+
+    #[test]
+    fn authenticated_tenant_scope_hides_legacy_null_rows_by_default() {
+        let query = ReceiptQuery {
+            tenant_filter: Some("tenant-a".to_string()),
+            read_context: Some(ReceiptReadContext::authenticated_tenant("tenant-a")),
+            ..ReceiptQuery::default()
+        };
+
+        let scope = query
+            .effective_read_scope()
+            .expect("matching tenant filter should authorize tenant scope");
+
+        assert_eq!(scope.tenant.as_deref(), Some("tenant-a"));
+        assert!(!scope.include_legacy_null_tenant);
+        assert!(!scope.is_admin_all);
+    }
+
+    #[test]
+    fn local_operator_tenant_compat_enables_legacy_null_rows() {
+        let query = ReceiptQuery {
+            tenant_filter: Some("tenant-a".to_string()),
+            read_context: Some(ReceiptReadContext::local_operator_tenant_compat("tenant-a")),
+            ..ReceiptQuery::default()
+        };
+
+        let scope = query
+            .effective_read_scope()
+            .expect("local compat context should authorize tenant scope");
+
+        assert_eq!(scope.tenant.as_deref(), Some("tenant-a"));
+        assert!(scope.include_legacy_null_tenant);
+        assert!(!scope.is_admin_all);
+    }
 }
 
 /// Result of a receipt query, including pagination state.
