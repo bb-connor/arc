@@ -202,7 +202,9 @@ impl ReceiptQuery {
 
 #[cfg(test)]
 mod tests {
-    use super::{ReceiptQuery, ReceiptReadContext};
+    use super::{
+        ReceiptQuery, ReceiptReadBoundary, ReceiptReadContext, ReceiptReadContextSource,
+    };
 
     #[test]
     fn tenant_filter_without_read_context_is_not_authority() {
@@ -249,6 +251,73 @@ mod tests {
             .expect("admin tenant filter should narrow the query");
 
         assert_eq!(scope.tenant.as_deref(), Some("tenant-a"));
+        assert!(!scope.include_legacy_null_tenant);
+        assert!(scope.is_admin_all);
+    }
+
+    #[test]
+    fn receipt_query_rejects_empty_tenant_in_scoped_boundary() {
+        let query = ReceiptQuery {
+            read_context: Some(ReceiptReadContext {
+                boundary: ReceiptReadBoundary::TenantScoped {
+                    tenant: "   ".to_string(),
+                },
+                source: ReceiptReadContextSource::AuthenticatedTenant,
+                legacy_null_mode: false,
+            }),
+            ..ReceiptQuery::default()
+        };
+
+        let err = query
+            .effective_read_scope()
+            .expect_err("empty tenant scope must fail closed");
+
+        assert_eq!(err, "tenant-scoped receipt query requires a non-empty tenant");
+    }
+
+    #[test]
+    fn receipt_query_rejects_empty_tenant_filter_under_admin_all() {
+        let query = ReceiptQuery {
+            tenant_filter: Some("   ".to_string()),
+            read_context: Some(ReceiptReadContext::admin_service()),
+            ..ReceiptQuery::default()
+        };
+
+        let err = query
+            .effective_read_scope()
+            .expect_err("empty tenant filter must fail closed");
+
+        assert_eq!(err, "receipt query tenant filter requires a non-empty tenant");
+    }
+
+    #[test]
+    fn local_operator_tenant_compat_includes_legacy_null_rows() {
+        let query = ReceiptQuery {
+            read_context: Some(ReceiptReadContext::local_operator_tenant_compat("tenant-a")),
+            ..ReceiptQuery::default()
+        };
+
+        let scope = query
+            .effective_read_scope()
+            .expect("local operator tenant compat should resolve");
+
+        assert_eq!(scope.tenant.as_deref(), Some("tenant-a"));
+        assert!(scope.include_legacy_null_tenant);
+        assert!(!scope.is_admin_all);
+    }
+
+    #[test]
+    fn admin_service_without_tenant_filter_excludes_legacy_null_rows() {
+        let query = ReceiptQuery {
+            read_context: Some(ReceiptReadContext::admin_service()),
+            ..ReceiptQuery::default()
+        };
+
+        let scope = query
+            .effective_read_scope()
+            .expect("admin service context should resolve");
+
+        assert!(scope.tenant.is_none());
         assert!(!scope.include_legacy_null_tenant);
         assert!(scope.is_admin_all);
     }
