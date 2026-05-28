@@ -250,6 +250,12 @@ version = "<0.4.31"
 name = "windows-sys"
 
 [[bans.skip]]
+# `mio` resolves to 0.8 (pulled by `notify` 6.x for filesystem watching) and
+# 1.x (pulled by tokio). Cannot be flattened without bumping `notify` to 7.x;
+# revisit when `notify` moves onto mio 1.x.
+name = "mio"
+
+[[bans.skip]]
 # `windows-targets` duplicates as a direct consequence of the windows-sys
 # 0.52 vs 0.59 split above. The eight `windows_<arch>_<abi>` platform
 # sub-crates (gnu/gnullvm/msvc across aarch64/i686/x86_64, plus
