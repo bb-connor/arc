@@ -506,6 +506,19 @@ mod tests {
         std::env::temp_dir().join(format!("{prefix}-{nonce}.seed"))
     }
 
+    // Mirror production (cli/runtime.rs): pair build_kernel with a receipt
+    // store so the kernel's fail-closed receipt-persistence check passes.
+    fn build_kernel_with_receipt_store(
+        loaded_policy: policy::LoadedPolicy,
+        kernel_kp: &Keypair,
+    ) -> ChioKernel {
+        let mut kernel = build_kernel(loaded_policy, kernel_kp);
+        let receipt_db_path = unique_db_path("chio-cli-session-receipts");
+        configure_receipt_store(&mut kernel, Some(&receipt_db_path), None, None)
+            .expect("configure receipt store for session test");
+        kernel
+    }
+
     fn first_default_capability(
         kernel: &ChioKernel,
         policy: &policy::ChioPolicy,
@@ -789,7 +802,7 @@ capabilities:
 "#;
         let policy = policy::parse_policy(yaml).unwrap();
         let kp = Keypair::generate();
-        let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+        let mut kernel = build_kernel_with_receipt_store(load_test_policy_runtime(&policy), &kp);
         kernel.register_tool_server(Box::new(StubToolServer {
             id: "*".to_string(),
         }));
@@ -958,7 +971,7 @@ capabilities:
 "#;
         let policy = policy::parse_policy(yaml).unwrap();
         let kp = Keypair::generate();
-        let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+        let mut kernel = build_kernel_with_receipt_store(load_test_policy_runtime(&policy), &kp);
         kernel.register_tool_server(Box::new(StubToolServer {
             id: "srv-b".to_string(),
         }));
@@ -1067,7 +1080,7 @@ capabilities:
         let default_capabilities = loaded_policy.default_capabilities.clone();
 
         let kp = Keypair::generate();
-        let mut kernel = build_kernel(loaded_policy, &kp);
+        let mut kernel = build_kernel_with_receipt_store(loaded_policy, &kp);
         kernel.register_tool_server(Box::new(StubToolServer {
             id: "*".to_string(),
         }));
@@ -1257,7 +1270,7 @@ guards:
         let default_capabilities = loaded_policy.default_capabilities.clone();
 
         let kp = Keypair::generate();
-        let mut kernel = build_kernel(loaded_policy, &kp);
+        let mut kernel = build_kernel_with_receipt_store(loaded_policy, &kp);
         kernel.register_tool_server(Box::new(StubToolServer {
             id: "*".to_string(),
         }));
@@ -1337,7 +1350,7 @@ capabilities:
 "#;
         let policy = policy::parse_policy(yaml).unwrap();
         let kp = Keypair::generate();
-        let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+        let mut kernel = build_kernel_with_receipt_store(load_test_policy_runtime(&policy), &kp);
         kernel.register_tool_server(Box::new(StubStreamingToolServer {
             id: "*".to_string(),
             incomplete: false,
@@ -1393,7 +1406,7 @@ capabilities:
 "#;
         let policy = policy::parse_policy(yaml).unwrap();
         let kp = Keypair::generate();
-        let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+        let mut kernel = build_kernel_with_receipt_store(load_test_policy_runtime(&policy), &kp);
         kernel.register_tool_server(Box::new(StubStreamingToolServer {
             id: "*".to_string(),
             incomplete: true,
@@ -1572,7 +1585,7 @@ guards:
         let default_capabilities = policy::build_runtime_default_capabilities(&policy).unwrap();
 
         let kp = Keypair::generate();
-        let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+        let mut kernel = build_kernel_with_receipt_store(load_test_policy_runtime(&policy), &kp);
         kernel.register_tool_server(Box::new(StubSqlResultToolServer {
             id: "*".to_string(),
         }));
