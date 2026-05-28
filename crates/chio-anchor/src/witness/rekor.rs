@@ -93,6 +93,9 @@ impl RekorClient {
                 "max_witness_age_seconds must be non-negative".to_string(),
             ));
         }
+        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: Sigstore Rekor witness lane;
+        // threading an HttpEgressContract through RekorClient::new is a
+        // dedicated refactor, not yet wired here.
         let http = reqwest::Client::builder()
             .timeout(Duration::from_secs(15))
             .https_only(false)
@@ -653,6 +656,7 @@ impl AnchorWitnessClient for RekorClient {
             .http
             .post(self.entries_url())
             .json(&request)
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with builder above.
             .send()
             .await
             .map_err(|error| AnchorWitnessError::Network(error.to_string()))?;
@@ -714,6 +718,7 @@ impl AnchorWitnessClient for RekorClient {
         let response = self
             .http
             .get(self.entry_by_uuid_url(&receipt.external_uuid))
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with builder above.
             .send()
             .await
             .map_err(|error| AnchorWitnessError::Network(error.to_string()))?;

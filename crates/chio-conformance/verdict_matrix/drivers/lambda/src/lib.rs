@@ -232,6 +232,9 @@ pub fn run_driver(scenario_root: &Path, sidecar_url: Option<&str>) -> Result<Dri
 }
 
 fn build_client() -> Result<reqwest::blocking::Client, String> {
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: verdict-matrix conformance
+    // driver targets an operator-supplied sidecar URL via env var, outside
+    // production substrate egress policy.
     reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECS))
         .build()
@@ -251,6 +254,7 @@ fn evaluate_scenario(
         .header("content-type", "application/json")
         .header("x-chio-capability", capability_token_for(scenario))
         .json(&request_body)
+        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with builder above.
         .send()
     {
         Ok(response) => response,
