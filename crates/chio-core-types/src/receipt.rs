@@ -2079,6 +2079,33 @@ mod tests {
     }
 
     #[test]
+    fn signable_receipt_rejects_cannot_see_boundary() {
+        let kp = Keypair::generate();
+        let mut body = make_receipt_body(&kp);
+        body.boundary_class = BoundaryClass::CannotSee;
+
+        let err = body
+            .validate_signable_semantics()
+            .expect_err("cannot_see is planning metadata only");
+
+        assert!(err.to_string().contains("cannot_see"));
+    }
+
+    #[test]
+    fn mediated_receipt_rejects_mismatched_trust_level() {
+        let kp = Keypair::generate();
+        let mut body = make_receipt_body(&kp);
+        body.trust_level = TrustLevel::Verified;
+
+        let err = body
+            .validate_signable_semantics()
+            .expect_err("mediated receipts require mediated trust_level");
+
+        assert!(err.to_string().contains("mediated_decision"));
+        assert!(err.to_string().contains("trust_level"));
+    }
+
+    #[test]
     fn signed_export_envelope_roundtrip() {
         #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
         struct ExampleExport {

@@ -1561,6 +1561,61 @@ mod tests {
     }
 
     #[test]
+    fn operator_report_evidence_export_requires_read_context() {
+        let query = OperatorReportQuery::default();
+
+        let err = query
+            .to_evidence_export_query()
+            .expect_err("export without read context must fail closed");
+
+        assert_eq!(
+            err,
+            "operator report evidence export requires an explicit read context"
+        );
+    }
+
+    #[test]
+    fn operator_report_evidence_export_maps_admin_read_context() {
+        let query = OperatorReportQuery {
+            capability_id: Some("cap-1".to_string()),
+            since: Some(100),
+            read_context: Some(ReceiptReadContext::local_operator_admin_all()),
+            ..OperatorReportQuery::default()
+        };
+
+        let export = query
+            .to_evidence_export_query()
+            .expect("admin read context should authorize export mapping");
+
+        assert_eq!(export.read_boundary, Some(ReceiptReadBoundary::AdminAll));
+        assert!(export.tenant.is_none());
+        assert_eq!(export.capability_id.as_deref(), Some("cap-1"));
+        assert_eq!(export.since, Some(100));
+    }
+
+    #[test]
+    fn operator_report_evidence_export_maps_tenant_read_context() {
+        let query = OperatorReportQuery {
+            agent_subject: Some("subject-1".to_string()),
+            read_context: Some(ReceiptReadContext::authenticated_tenant("tenant-a")),
+            ..OperatorReportQuery::default()
+        };
+
+        let export = query
+            .to_evidence_export_query()
+            .expect("tenant read context should authorize export mapping");
+
+        assert_eq!(export.tenant.as_deref(), Some("tenant-a"));
+        assert_eq!(
+            export.read_boundary,
+            Some(ReceiptReadBoundary::TenantScoped {
+                tenant: "tenant-a".to_string(),
+            })
+        );
+        assert_eq!(export.agent_subject.as_deref(), Some("subject-1"));
+    }
+
+    #[test]
     fn operator_report_query_clamps_metered_limit() {
         let query = OperatorReportQuery {
             metered_limit: Some(5_000),

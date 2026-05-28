@@ -1,10 +1,10 @@
 use chio_core_types::crypto::Keypair;
 use chio_federation::{
     compute_ladder_intersection, evaluate_cross_boundary_admission,
-    governance_ladder_manifest_sha256, ladder_intersection_sha256, CrossBoundaryAdmissionInput,
-    CrossBoundaryEvidenceRef, GovernanceLadderActionClass, GovernanceLadderManifest, TreatyScope,
-    CHIO_FEDERATION_GOVERNANCE_LADDER_MANIFEST_SCHEMA, CHIO_FEDERATION_LADDER_INTERSECTION_SCHEMA,
-    CHIO_FEDERATION_TREATY_SCOPE_SCHEMA,
+    governance_ladder_manifest_sha256, ladder_intersection_sha256, validate_treaty_scope,
+    CrossBoundaryAdmissionInput, CrossBoundaryEvidenceRef, GovernanceLadderActionClass,
+    GovernanceLadderManifest, TreatyScope, CHIO_FEDERATION_GOVERNANCE_LADDER_MANIFEST_SCHEMA,
+    CHIO_FEDERATION_LADDER_INTERSECTION_SCHEMA, CHIO_FEDERATION_TREATY_SCOPE_SCHEMA,
 };
 
 #[test]
@@ -64,6 +64,50 @@ fn chio_treaty_manifest_rejects_alias_shadowing_later_canonical_action(
     };
 
     assert_eq!(error.code(), "chio_federation_ladder_alias_conflict");
+    Ok(())
+}
+
+#[test]
+fn validate_treaty_scope_rejects_single_participant() -> Result<(), Box<dyn std::error::Error>> {
+    let manifest_a = treaty_manifest("kernel.buyer", treaty_action("receipt_backed", false));
+    let manifest_b = treaty_manifest("kernel.vendor", treaty_action("receipt_backed", false));
+    let mut scope = treaty_scope(&manifest_a, &manifest_b)?;
+    scope.participant_kernel_ids.pop();
+    scope.ladder_manifest_sha256s.pop();
+    scope.participant_public_keys.pop();
+
+    let error = validate_treaty_scope(&scope).expect_err("treaty scope needs two participants");
+
+    assert_eq!(
+        error.code(),
+        "chio_federation_treaty_missing_participant"
+    );
+    Ok(())
+}
+
+#[test]
+fn validate_treaty_scope_rejects_empty_validity_window() -> Result<(), Box<dyn std::error::Error>> {
+    let manifest_a = treaty_manifest("kernel.buyer", treaty_action("receipt_backed", false));
+    let manifest_b = treaty_manifest("kernel.vendor", treaty_action("receipt_backed", false));
+    let mut scope = treaty_scope(&manifest_a, &manifest_b)?;
+    scope.expires_at_unix_ms = scope.issued_at_unix_ms;
+
+    let error = validate_treaty_scope(&scope).expect_err("empty validity window must fail closed");
+
+    assert_eq!(error.code(), "chio_federation_treaty_stale");
+    Ok(())
+}
+
+#[test]
+fn validate_treaty_scope_rejects_duplicate_participant() -> Result<(), Box<dyn std::error::Error>> {
+    let manifest_a = treaty_manifest("kernel.buyer", treaty_action("receipt_backed", false));
+    let manifest_b = treaty_manifest("kernel.vendor", treaty_action("receipt_backed", false));
+    let mut scope = treaty_scope(&manifest_a, &manifest_b)?;
+    scope.participant_kernel_ids[1] = scope.participant_kernel_ids[0].clone();
+
+    let error = validate_treaty_scope(&scope).expect_err("duplicate participant must fail closed");
+
+    assert_eq!(error.code(), "treaty_scope_duplicate_participant");
     Ok(())
 }
 
