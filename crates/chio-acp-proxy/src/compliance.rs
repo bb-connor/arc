@@ -669,3 +669,30 @@ fn verification_failure_summary(
     }
     format!("verification failed: {}", reasons.join(", "))
 }
+
+#[cfg(test)]
+mod summary_tests {
+    use super::verification_failure_summary;
+
+    #[test]
+    fn signer_mismatch_summary_omits_redundant_body_consistency_reason() {
+        let summary = verification_failure_summary(true, true, true, false, 0);
+
+        assert_eq!(
+            summary,
+            "verification failed: certificate signer does not match body kernel key"
+        );
+        assert!(!summary.contains("body consistency check failed"));
+    }
+
+    #[test]
+    fn body_and_signer_failures_surface_distinct_reasons() {
+        let summary = verification_failure_summary(false, false, false, false, 2);
+
+        assert!(summary.contains("certificate signature invalid"));
+        assert!(summary.contains("certificate signer is not trusted"));
+        assert!(summary.contains("certificate signer does not match body kernel key"));
+        assert!(summary.contains("body consistency check failed"));
+        assert!(summary.contains("2 receipt authority check(s) failed"));
+    }
+}
