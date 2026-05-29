@@ -13,7 +13,7 @@ set -euo pipefail
 # Move into the standalone fuzz workspace. cargo-fuzz emits binaries under
 # the workspace's target/ tree, namespaced by host triple; OSS-Fuzz builders
 # run on x86_64-unknown-linux-gnu.
-cd "$SRC/arc/fuzz"
+cd "$SRC/chio/fuzz"
 
 TARGETS=(
     attest_verify
@@ -46,7 +46,7 @@ TARGETS=(
 for target in "${TARGETS[@]}"; do
     cargo +nightly fuzz build "$target" --release --sanitizer "$SANITIZER"
     # Binaries land under the fuzz workspace's own `target/` tree:
-    # `$SRC/arc/fuzz` is a standalone Cargo workspace with its own
+    # `$SRC/chio/fuzz` is a standalone Cargo workspace with its own
     # `[workspace]` stanza, not the parent project's target dir.
     cp "target/x86_64-unknown-linux-gnu/release/$target" "$OUT/"
 

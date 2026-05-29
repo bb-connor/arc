@@ -216,7 +216,7 @@ files live under `infra/oss-fuzz/` and are mirrored into the upstream
 - `infra/oss-fuzz/Dockerfile` is based on
   `gcr.io/oss-fuzz-base/base-builder-rust`, installs the rustls/openssl
   build deps plus `zip` for seed-corpus packing, and clones the repo at
-  `/src/chio` (the path stays `arc` until the GitHub repo rename lands).
+  `/src/chio`.
 - `infra/oss-fuzz/build.sh` enumerates all sixteen fuzz targets
   (`attest_verify`, `jwt_vc_verify`, `oid4vp_presentation`,
   `did_resolve`, `anchor_bundle_verify`, `mcp_envelope_decode`,

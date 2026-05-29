@@ -27,7 +27,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@chio-protocol/node-http": "^0.1.0"
+    "@chio-protocol/node-http": "file:../node-http"
   },
   "peerDependencies": {
     "elysia": ">=1.0.0"

@@ -33,7 +33,7 @@ ENV OPENSSL_LIB_DIR=/opt/openssl-3/lib64
 ENV PKG_CONFIG_PATH=/opt/openssl-3/lib64/pkgconfig
 
 RUN git clone --depth 1 https://github.com/backbay-labs/chio /src/chio
-WORKDIR $SRC/arc
+WORKDIR $SRC/chio
 
 COPY build.sh $SRC/build.sh
 RUN chmod +x $SRC/build.sh

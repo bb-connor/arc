@@ -247,9 +247,9 @@ jobs:
             echo "Bootstrapping local file dependency $dep_dir"
             pushd "$dep_dir" >/dev/null
             if [[ -f package-lock.json ]]; then
-              npm ci
+              npm ci --workspaces=false
             else
-              npm install
+              npm install --workspaces=false
             fi
             if node -e 'const pkg = require("./package.json"); process.exit(pkg.scripts?.build ? 0 : 1)'; then
               npm run build
@@ -257,9 +257,9 @@ jobs:
             popd >/dev/null
           done
           if [[ -f package-lock.json ]]; then
-            npm ci
+            npm ci --workspaces=false
           else
-            npm install
+            npm install --workspaces=false
           fi
 
       - name: Build

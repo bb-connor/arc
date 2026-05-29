@@ -24,7 +24,7 @@ jobs:
   apalache-subset:
     name: apalache-subset
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 

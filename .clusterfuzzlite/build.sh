@@ -19,7 +19,7 @@ set -euo pipefail
 # Move into the standalone fuzz workspace. cargo-fuzz emits binaries under
 # the workspace's target/ tree, namespaced by host triple; CFLite builders
 # run on x86_64-unknown-linux-gnu.
-cd "$SRC/arc/fuzz"
+cd "$SRC/chio/fuzz"
 
 TARGETS=(
     attest_verify

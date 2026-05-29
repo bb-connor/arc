@@ -38,10 +38,10 @@ ENV OPENSSL_LIB_DIR=/opt/openssl-3/lib64
 ENV PKG_CONFIG_PATH=/opt/openssl-3/lib64/pkgconfig
 
 # ClusterFuzzLite mounts the repo into $SRC at runtime; the
-# `COPY . $SRC/arc` line below is a no-op in that flow but keeps
+# `COPY . $SRC/chio` line below is a no-op in that flow but keeps
 # the image self-contained for local `docker build` smoke tests.
-COPY . $SRC/arc
-WORKDIR $SRC/arc
+COPY . $SRC/chio
+WORKDIR $SRC/chio
 
 COPY .clusterfuzzlite/build.sh $SRC/build.sh
 RUN chmod +x $SRC/build.sh

@@ -510,6 +510,16 @@ impl CapabilityToken {
         }
     }
 
+    fn permits_legacy_body_signature(&self) -> bool {
+        // Legacy body signatures predate the schema-aware caveat and
+        // attenuation envelope, so only plain v1 tokens can fall back.
+        self.schema == CHIO_CAPABILITY_SCHEMA
+            && self.caveats.is_empty()
+            && self.scope_attenuations.as_ref().is_none_or(Vec::is_empty)
+            && self.attenuation_proof.is_none()
+            && self.budget_share_bps.is_none()
+    }
+
     /// Reject unknown schema IDs and budget amplification.
     pub fn validate_schema(&self) -> Result<()> {
         if self.schema != CHIO_CAPABILITY_SCHEMA {
@@ -802,7 +812,17 @@ impl CapabilityToken {
     pub fn verify_signature(&self) -> Result<bool> {
         self.validate_schema()?;
         let signing_body = self.signing_body();
-        self.issuer.verify_canonical(&signing_body, &self.signature)
+        if self
+            .issuer
+            .verify_canonical(&signing_body, &self.signature)?
+        {
+            return Ok(true);
+        }
+        if self.permits_legacy_body_signature() {
+            let legacy_body = self.body();
+            return self.issuer.verify_canonical(&legacy_body, &self.signature);
+        }
+        Ok(false)
     }
 
     /// Verify the token's signature and enforce the kernel-side
@@ -880,9 +900,21 @@ impl CapabilityToken {
         self.validate_schema()
             .map_err(CapabilityFloorVerifyError::Crypto)?;
         let signing_body = self.signing_body();
-        self.issuer
+        if self
+            .issuer
             .verify_canonical(&signing_body, &self.signature)
-            .map_err(CapabilityFloorVerifyError::Crypto)
+            .map_err(CapabilityFloorVerifyError::Crypto)?
+        {
+            return Ok(true);
+        }
+        if self.permits_legacy_body_signature() {
+            let legacy_body = self.body();
+            return self
+                .issuer
+                .verify_canonical(&legacy_body, &self.signature)
+                .map_err(CapabilityFloorVerifyError::Crypto);
+        }
+        Ok(false)
     }
 
     /// Check whether this token is expired at the given unix timestamp.
@@ -3363,6 +3395,48 @@ mod tests {
         };
         let token = CapabilityToken::sign(body, &kp).unwrap();
         assert!(token.verify_signature().unwrap());
+    }
+
+    #[test]
+    fn legacy_body_signed_capability_token_still_verifies() -> Result<()> {
+        let kp = Keypair::generate();
+        let body = CapabilityTokenBody {
+            id: "cap-legacy-body".to_string(),
+            issuer: kp.public_key(),
+            subject: Keypair::generate().public_key(),
+            scope: make_scope(vec![make_grant(
+                "srv-a",
+                "file_read",
+                vec![Operation::Invoke],
+            )]),
+            issued_at: 1000,
+            expires_at: 2000,
+            delegation_chain: vec![],
+        };
+        let (signature, _bytes) = kp.sign_canonical(&body)?;
+        let token = CapabilityToken {
+            schema: CHIO_CAPABILITY_SCHEMA.to_string(),
+            id: body.id,
+            issuer: body.issuer,
+            subject: body.subject,
+            scope: body.scope,
+            issued_at: body.issued_at,
+            expires_at: body.expires_at,
+            delegation_chain: body.delegation_chain,
+            algorithm: None,
+            caveats: Vec::new(),
+            scope_attenuations: None,
+            attenuation_proof: None,
+            budget_share_bps: None,
+            signature,
+        };
+
+        assert!(token.verify_signature()?);
+        assert!(matches!(
+            token.verify_signature_with_floor(CapabilityCryptoFloor::AllowClassical),
+            Ok(true)
+        ));
+        Ok(())
     }
 
     #[test]
