@@ -252,6 +252,56 @@ mod tests {
         assert!(!scope.include_legacy_null_tenant);
         assert!(scope.is_admin_all);
     }
+
+    #[test]
+    fn tenant_scoped_context_rejects_empty_tenant() {
+        let query = ReceiptQuery {
+            read_context: Some(ReceiptReadContext::authenticated_tenant("   ")),
+            ..ReceiptQuery::default()
+        };
+
+        let err = query
+            .effective_read_scope()
+            .expect_err("empty tenant in boundary must fail");
+
+        assert_eq!(
+            err,
+            "tenant-scoped receipt query requires a non-empty tenant"
+        );
+    }
+
+    #[test]
+    fn authenticated_tenant_context_resolves_effective_scope() {
+        let query = ReceiptQuery {
+            tenant_filter: Some("tenant-a".to_string()),
+            read_context: Some(ReceiptReadContext::authenticated_tenant("tenant-a")),
+            ..ReceiptQuery::default()
+        };
+
+        let scope = query
+            .effective_read_scope()
+            .expect("matching tenant filter should resolve");
+
+        assert_eq!(scope.tenant.as_deref(), Some("tenant-a"));
+        assert!(!scope.is_admin_all);
+        assert!(!scope.include_legacy_null_tenant);
+    }
+
+    #[test]
+    fn local_operator_admin_all_includes_legacy_null_tenant_rows() {
+        let query = ReceiptQuery {
+            read_context: Some(ReceiptReadContext::local_operator_admin_all()),
+            ..ReceiptQuery::default()
+        };
+
+        let scope = query
+            .effective_read_scope()
+            .expect("local operator admin scope should resolve");
+
+        assert!(scope.is_admin_all);
+        assert!(scope.include_legacy_null_tenant);
+        assert!(scope.tenant.is_none());
+    }
 }
 
 /// Result of a receipt query, including pagination state.

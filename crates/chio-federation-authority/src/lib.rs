@@ -1472,4 +1472,46 @@ mod tests {
             .to_string()
             .contains(WORKFLOW_GRANT_ISSUE_ACTION_CLASS_ID));
     }
+
+    #[test]
+    fn authority_profile_rejects_missing_runtime_policy_issuer() {
+        let mut document = profile();
+        document.runtime_policy_issuer_public_keys.clear();
+
+        let err = document.validate().expect_err("runtime policy issuers are required");
+
+        assert!(err
+            .to_string()
+            .contains("runtime policy issuers"));
+    }
+
+    #[test]
+    fn authority_profile_rejects_duplicate_runtime_policy_issuer_key() {
+        let mut document = profile();
+        let duplicate = document.runtime_policy_issuer_public_keys[0];
+        document
+            .runtime_policy_issuer_public_keys
+            .push(duplicate);
+
+        let err = document
+            .validate()
+            .expect_err("duplicate runtime policy issuer keys must fail");
+
+        assert!(err.to_string().contains("duplicate runtime policy issuer public key"));
+    }
+
+    #[test]
+    fn authority_profile_rejects_runtime_policy_issuer_overlapping_lease_authority() {
+        let mut document = profile();
+        document.runtime_policy_issuer_public_keys =
+            vec![document.lease_authorities[0].public_key];
+
+        let err = document.validate().expect_err(
+            "runtime policy issuer keys must stay distinct from lease authority keys",
+        );
+
+        assert!(err.to_string().contains(
+            "runtime policy issuer key must be distinct from lease, governance, and revocation authority keys"
+        ));
+    }
 }

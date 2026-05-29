@@ -1784,6 +1784,63 @@ mod tests {
         }
     }
 
+    fn policy_summary(
+        server_a_verdict: &str,
+        server_b_verdict: &str,
+        joint_disposition: Option<&str>,
+    ) -> PolicyEvaluationSummary {
+        PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: server_a_verdict.to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: server_b_verdict.to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: joint_disposition.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn validate_policy_evaluation_summary_rejects_server_verdict_mismatch() {
+        let err = validate_policy_evaluation_summary(&policy_summary("allow", "deny", None))
+            .expect_err("server verdict disagreement must fail closed");
+
+        assert!(err
+            .to_string()
+            .contains("predicate.schema_invalid: server_a=allow server_b=deny"));
+    }
+
+    #[test]
+    fn validate_policy_evaluation_summary_rejects_joint_disposition_mismatch() {
+        let err = validate_policy_evaluation_summary(&policy_summary(
+            "allow",
+            "allow",
+            Some("deny"),
+        ))
+        .expect_err("joint disposition must match server verdicts");
+
+        assert!(err
+            .to_string()
+            .contains("predicate.schema_invalid: joint_disposition=deny disagrees"));
+    }
+
+    #[test]
+    fn validate_policy_evaluation_summary_rejects_unsupported_verdict_tokens() {
+        let err =
+            validate_policy_evaluation_summary(&policy_summary("observe", "observe", None))
+                .expect_err("unsupported verdict tokens must fail closed");
+
+        assert!(err
+            .to_string()
+            .contains("unsupported verdict \"observe\""));
+    }
+
     #[test]
     fn pae_matches_dsse_v1_format_known_vector() {
         // Sanity: the leading bytes are literally "DSSEv1 ".
