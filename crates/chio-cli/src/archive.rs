@@ -612,6 +612,74 @@ mod tests {
     }
 
     #[test]
+    fn safe_archive_helper_rejects_casefold_collision_on_read() {
+        let temp = tempfile::tempdir().unwrap();
+        let archive = temp.path().join("bundle.tar.gz");
+        let file = fs::File::create(&archive).unwrap();
+        let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::default());
+        let mut builder = tar::Builder::new(encoder);
+        for path in ["Alpha.txt", "alpha.txt"] {
+            append_regular_file(&mut builder, path, b"payload", "test archive").unwrap();
+        }
+        let encoder = builder.into_inner().unwrap();
+        encoder.finish().unwrap();
+
+        let err = read_tar_gz_file(&archive, "test archive", TEST_LIMITS).unwrap_err();
+
+        assert!(err.to_string().contains("casefold collision"));
+    }
+
+    #[test]
+    fn safe_archive_helper_rejects_casefold_collision_on_write() {
+        let temp = tempfile::tempdir().unwrap();
+        let archive = temp.path().join("bundle.tar.gz");
+        let err = write_tar_gz_file(
+            &archive,
+            "test archive",
+            &[
+                SafeArchiveWriteEntry {
+                    path: "Alpha.txt",
+                    bytes: b"one",
+                },
+                SafeArchiveWriteEntry {
+                    path: "alpha.txt",
+                    bytes: b"two",
+                },
+            ],
+            TEST_LIMITS,
+        )
+        .unwrap_err();
+
+        assert!(err.to_string().contains("casefold collision"));
+        assert!(!archive.exists());
+    }
+
+    #[test]
+    fn safe_archive_helper_rejects_decompression_ratio_bomb() {
+        let temp = tempfile::tempdir().unwrap();
+        let archive = temp.path().join("bundle.tar.gz");
+        let payload = vec![b'x'; 16_384];
+        write_tar_gz_file(
+            &archive,
+            "test archive",
+            &[SafeArchiveWriteEntry {
+                path: "payload.bin",
+                bytes: &payload,
+            }],
+            TEST_LIMITS,
+        )
+        .unwrap();
+        let limits = SafeArchiveLimits {
+            max_decompression_ratio: 2,
+            ..TEST_LIMITS
+        };
+
+        let err = read_tar_gz_file(&archive, "test archive", limits).unwrap_err();
+
+        assert!(err.to_string().contains("decompression ratio"));
+    }
+
+    #[test]
     fn safe_archive_helper_counts_directory_members() {
         let temp = tempfile::tempdir().unwrap();
         let archive = temp.path().join("bundle.tar.gz");

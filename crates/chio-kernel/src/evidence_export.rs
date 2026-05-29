@@ -547,6 +547,54 @@ mod tests {
     }
 
     #[test]
+    fn evidence_export_query_rejects_missing_read_boundary() {
+        let error = EvidenceExportQuery::default()
+            .validate_read_boundary()
+            .expect_err("export without read boundary must fail closed");
+        assert!(error.to_string().contains("explicit receipt read boundary"));
+    }
+
+    #[test]
+    fn evidence_export_query_rejects_empty_tenant_scoped_boundary() {
+        let error = EvidenceExportQuery {
+            read_boundary: Some(ReceiptReadBoundary::TenantScoped {
+                tenant: "   ".to_string(),
+            }),
+            ..EvidenceExportQuery::default()
+        }
+        .validate_read_boundary()
+        .expect_err("blank tenant boundary must fail closed");
+        assert!(error.to_string().contains("non-empty tenant"));
+    }
+
+    #[test]
+    fn evidence_export_query_rejects_tenant_mismatch() {
+        let error = EvidenceExportQuery {
+            tenant: Some("tenant-a".to_string()),
+            read_boundary: Some(ReceiptReadBoundary::TenantScoped {
+                tenant: "tenant-b".to_string(),
+            }),
+            ..EvidenceExportQuery::default()
+        }
+        .validate_read_boundary()
+        .expect_err("mismatched tenant filters must fail closed");
+        assert!(error.to_string().contains("does not match query tenant"));
+    }
+
+    #[test]
+    fn normalized_for_read_boundary_sets_query_tenant_from_boundary() {
+        let normalized = EvidenceExportQuery {
+            tenant: None,
+            read_boundary: Some(ReceiptReadBoundary::TenantScoped {
+                tenant: "tenant-a".to_string(),
+            }),
+            ..EvidenceExportQuery::default()
+        }
+        .normalized_for_read_boundary();
+        assert_eq!(normalized.tenant.as_deref(), Some("tenant-a"));
+    }
+
+    #[test]
     fn admin_all_evidence_export_uses_remote_safe_read_context() {
         let receipt_query = EvidenceExportQuery {
             tenant: Some("tenant-a".to_string()),
