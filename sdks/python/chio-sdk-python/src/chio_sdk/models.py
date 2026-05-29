@@ -47,6 +47,7 @@ from chio_sdk._generated import (
     ChioReceiptRecord as ChioReceipt,
     TrustControlTier as RuntimeAssuranceTier,
 )
+from chio_sdk._generated.receipt.record_schema import Decision1, Decision2
 
 # The following types have no confirmed generated equivalent and are preserved
 # from models_supplemental. See the UNRESOLVED REPORT at the bottom of this file.
@@ -70,6 +71,174 @@ from chio_sdk.models_supplemental import (
 #     from chio_sdk.models import generated
 #     token = generated.capability.token_schema.ChioCapabilitytoken(...)
 generated = _generated
+
+
+def _decision_allow(cls: type[Decision]) -> Decision:
+    return cls(root=Decision1(verdict="allow"))
+
+
+def _decision_deny(
+    cls: type[Decision],
+    reason: str,
+    guard: str,
+) -> Decision:
+    return cls(root=Decision2(verdict="deny", reason=reason, guard=guard))
+
+
+def _decision_verdict(self: Decision) -> str:
+    return self.root.verdict
+
+
+def _decision_reason(self: Decision) -> str | None:
+    return getattr(self.root, "reason", None)
+
+
+def _decision_guard(self: Decision) -> str | None:
+    return getattr(self.root, "guard", None)
+
+
+def _operation_set(operations: list[Operation]) -> set[str]:
+    return {getattr(operation, "value", str(operation)) for operation in operations}
+
+
+def _constraint_key(constraint: Constraint) -> str:
+    return constraint.model_dump_json(exclude_none=True)
+
+
+def _money_within(child: MonetaryAmount | None, parent: MonetaryAmount | None) -> bool:
+    if parent is None:
+        return True
+    if child is None:
+        return False
+    return child.currency == parent.currency and child.units <= parent.units
+
+
+def _optional_cap_within(child: int | None, parent: int | None) -> bool:
+    if parent is None:
+        return True
+    return child is not None and child <= parent
+
+
+def _tool_grant_is_subset_of(self: ToolGrant, parent: ToolGrant) -> bool:
+    if parent.server_id != "*" and self.server_id != parent.server_id:
+        return False
+    if parent.tool_name != "*" and self.tool_name != parent.tool_name:
+        return False
+    if not _operation_set(self.operations).issubset(_operation_set(parent.operations)):
+        return False
+    parent_constraints = {
+        _constraint_key(constraint) for constraint in parent.constraints or []
+    }
+    child_constraints = {
+        _constraint_key(constraint) for constraint in self.constraints or []
+    }
+    if not parent_constraints.issubset(child_constraints):
+        return False
+    if not _optional_cap_within(self.max_invocations, parent.max_invocations):
+        return False
+    if not _money_within(self.max_cost_per_invocation, parent.max_cost_per_invocation):
+        return False
+    if not _money_within(self.max_total_cost, parent.max_total_cost):
+        return False
+    if parent.dpop_required and not self.dpop_required:
+        return False
+    return True
+
+
+def _resource_grant_is_subset_of(self: ResourceGrant, parent: ResourceGrant) -> bool:
+    if parent.uri_pattern != "*" and self.uri_pattern != parent.uri_pattern:
+        return False
+    return _operation_set(self.operations).issubset(_operation_set(parent.operations))
+
+
+def _prompt_grant_is_subset_of(self: PromptGrant, parent: PromptGrant) -> bool:
+    child = self.model_dump(exclude_none=True)
+    parent_dump = parent.model_dump(exclude_none=True)
+    return all(child.get(key) == value for key, value in parent_dump.items())
+
+
+def _scope_is_subset_of(self: ChioScope, parent: ChioScope) -> bool:
+    parent_tool_grants = parent.grants or []
+    for grant in self.grants or []:
+        if not any(
+            grant.is_subset_of(parent_grant) for parent_grant in parent_tool_grants
+        ):
+            return False
+    parent_resource_grants = parent.resource_grants or []
+    for grant in self.resource_grants or []:
+        if not any(
+            grant.is_subset_of(parent_grant)
+            for parent_grant in parent_resource_grants
+        ):
+            return False
+    parent_prompt_grants = parent.prompt_grants or []
+    for grant in self.prompt_grants or []:
+        if not any(
+            grant.is_subset_of(parent_grant)
+            for parent_grant in parent_prompt_grants
+        ):
+            return False
+    return True
+
+
+def _token_is_valid_at(self: CapabilityToken, timestamp: int) -> bool:
+    return self.issued_at <= timestamp < self.expires_at
+
+
+def _token_is_expired_at(self: CapabilityToken, timestamp: int) -> bool:
+    return timestamp >= self.expires_at
+
+
+def _token_body(self: CapabilityToken) -> CapabilityTokenBody:
+    return CapabilityTokenBody(
+        id=self.id,
+        issuer=self.issuer,
+        subject=self.subject,
+        scope=self.scope,
+        issued_at=self.issued_at,
+        expires_at=self.expires_at,
+        delegation_chain=self.delegation_chain,
+    )
+
+
+def _receipt_is_allowed(self: ChioReceipt) -> bool:
+    return self.decision.is_allowed
+
+
+def _receipt_is_denied(self: ChioReceipt) -> bool:
+    return self.decision.is_denied
+
+
+Decision.allow = classmethod(_decision_allow)  # type: ignore[attr-defined]
+Decision.deny = classmethod(_decision_deny)  # type: ignore[attr-defined]
+Decision.verdict = property(_decision_verdict)  # type: ignore[attr-defined]
+Decision.reason = property(_decision_reason)  # type: ignore[attr-defined]
+Decision.guard = property(_decision_guard)  # type: ignore[attr-defined]
+Decision.is_allowed = property(  # type: ignore[attr-defined]
+    lambda self: self.root.verdict == "allow"
+)
+Decision.is_denied = property(  # type: ignore[attr-defined]
+    lambda self: self.root.verdict == "deny"
+)
+ChioReceipt.is_allowed = property(_receipt_is_allowed)  # type: ignore[attr-defined]
+ChioReceipt.is_denied = property(_receipt_is_denied)  # type: ignore[attr-defined]
+ToolGrant.is_subset_of = _tool_grant_is_subset_of  # type: ignore[attr-defined]
+ResourceGrant.is_subset_of = _resource_grant_is_subset_of  # type: ignore[attr-defined]
+PromptGrant.is_subset_of = _prompt_grant_is_subset_of  # type: ignore[attr-defined]
+ChioScope.is_subset_of = _scope_is_subset_of  # type: ignore[attr-defined]
+CapabilityToken.is_valid_at = _token_is_valid_at  # type: ignore[attr-defined]
+CapabilityToken.is_expired_at = _token_is_expired_at  # type: ignore[attr-defined]
+CapabilityToken.body = _token_body  # type: ignore[attr-defined]
+for _operation_name in (
+    "invoke",
+    "read_result",
+    "read",
+    "subscribe",
+    "get",
+    "delegate",
+):
+    if hasattr(Operation, _operation_name):
+        setattr(Operation, _operation_name.upper(), getattr(Operation, _operation_name))
 
 __all__ = [
     # Schema pin (re-exported from `_generated`)

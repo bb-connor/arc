@@ -813,8 +813,7 @@ def test_typeerror_fallback_arity_mismatch_keeps_alias_map() -> None:
     # the wrapper-named slot at args[1].
     assert args[0] == "/tmp/x"
     assert args[1] == {"omitted": True, "byte_count": len(b"PROD_SECRET")}
-    # The third positional has no slot in the signature; surfaces raw.
-    assert args[2] == "trailing"
+    assert args[2] == {"omitted": True, "byte_count": len(b"trailing")}
 
 
 def test_alias_map_redacts_kwarg_under_canonical_no_fallback() -> None:

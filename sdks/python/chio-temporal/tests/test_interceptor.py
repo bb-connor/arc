@@ -14,8 +14,8 @@ from typing import Any
 
 import pytest
 from chio_sdk.models import (
-    ChioScope,
     CapabilityToken,
+    ChioScope,
     Operation,
     ToolGrant,
 )
@@ -37,6 +37,8 @@ from chio_temporal.interceptor import (
     _ChioInboundInterceptor,
 )
 
+INVOKE_OPERATION = getattr(Operation, "INVOKE", Operation.invoke)
+
 # ---------------------------------------------------------------------------
 # Test doubles / helpers
 # ---------------------------------------------------------------------------
@@ -47,7 +49,7 @@ def _scope_for_tools(*tool_names: str, server_id: str = "srv") -> ChioScope:
         ToolGrant(
             server_id=server_id,
             tool_name=name,
-            operations=[Operation.INVOKE],
+            operations=[INVOKE_OPERATION],
         )
         for name in tool_names
     ]
