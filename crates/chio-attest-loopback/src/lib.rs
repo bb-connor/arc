@@ -1357,34 +1357,37 @@ mod tests {
     }
 
     #[test]
-    fn authority_issuance_request_hashes_signed_receipt_body_for_governance() {
-        let package = fresh_proof_package().expect("fresh package builds");
-        let request = authority_issuance_request().expect("authority request builds");
+    fn authority_issuance_request_hashes_signed_receipt_body_for_governance(
+    ) -> Result<(), ChioPackageError> {
+        let package = fresh_proof_package()?;
+        let request = authority_issuance_request()?;
         let destructive_step = request
             .steps
             .iter()
             .find(|step| step.destructive)
-            .expect("destructive step exists");
+            .ok_or_else(|| ChioPackageError::Inconsistent("destructive step missing".into()))?;
         let governance_receipt = package
             .governance_receipts
             .first()
-            .expect("governance receipt exists");
+            .ok_or_else(|| ChioPackageError::Inconsistent("governance receipt missing".into()))?;
 
         assert_eq!(
             destructive_step.step_sha256.as_deref(),
             Some(governance_receipt.body.step_sha256.as_str())
         );
+        Ok(())
     }
 
     #[test]
-    fn authority_profile_pins_fixture_runtime_policy_signer() {
+    fn authority_profile_pins_fixture_runtime_policy_signer() -> Result<(), ChioPackageError> {
         let fixture_runtime_policy_key = Keypair::from_seed(&[42; 32]);
-        let profile = authority_profile_document().expect("authority profile builds");
+        let profile = authority_profile_document()?;
 
         assert_eq!(
             profile.runtime_policy_issuer_public_keys,
             vec![fixture_runtime_policy_key.public_key()]
         );
+        Ok(())
     }
 
     #[test]
