@@ -1808,6 +1808,44 @@ mod tests {
         );
     }
 
+    fn sample_allow_policy_summary() -> PolicyEvaluationSummary {
+        PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: Some("allow".to_string()),
+        }
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_accepts_unanimous_allow() {
+        require_policy_evaluation_allow_admission(&sample_allow_policy_summary())
+            .expect("unanimous allow summary should admit");
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_rejects_deny() {
+        let mut summary = sample_allow_policy_summary();
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+
+        let err = require_policy_evaluation_allow_admission(&summary)
+            .expect_err("deny summaries must not admit");
+
+        assert!(matches!(err, BilateralCoSigningError::CanonicalJson(message)
+            if message.contains("requires allow verdict for admission")));
+    }
+
     #[test]
     fn happy_path_signs_and_verifies() {
         let kp_a = Keypair::generate();
