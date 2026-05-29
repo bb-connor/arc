@@ -1561,6 +1561,66 @@ mod tests {
     }
 
     #[test]
+    fn operator_report_evidence_export_requires_explicit_read_context() {
+        let err = OperatorReportQuery::default()
+            .to_evidence_export_query()
+            .expect_err("operator report export must not proceed without read context");
+
+        assert_eq!(
+            err,
+            "operator report evidence export requires an explicit read context"
+        );
+    }
+
+    #[test]
+    fn operator_report_evidence_export_maps_admin_read_context() {
+        let export = OperatorReportQuery {
+            capability_id: Some("cap-1".to_string()),
+            agent_subject: Some("subject-1".to_string()),
+            since: Some(10),
+            until: Some(20),
+            read_context: Some(ReceiptReadContext::admin_service()),
+            ..OperatorReportQuery::default()
+        }
+        .to_evidence_export_query()
+        .expect("admin read context should produce an evidence export query");
+
+        assert_eq!(export.capability_id.as_deref(), Some("cap-1"));
+        assert_eq!(export.agent_subject.as_deref(), Some("subject-1"));
+        assert_eq!(export.since, Some(10));
+        assert_eq!(export.until, Some(20));
+        assert!(export.tenant.is_none());
+        assert_eq!(
+            export.read_boundary,
+            Some(ReceiptReadBoundary::AdminAll)
+        );
+        export
+            .validate_read_boundary()
+            .expect("admin export query should pass read boundary validation");
+    }
+
+    #[test]
+    fn operator_report_evidence_export_maps_tenant_scoped_read_context() {
+        let export = OperatorReportQuery {
+            read_context: Some(ReceiptReadContext::authenticated_tenant("tenant-a")),
+            ..OperatorReportQuery::default()
+        }
+        .to_evidence_export_query()
+        .expect("tenant read context should produce an evidence export query");
+
+        assert_eq!(export.tenant.as_deref(), Some("tenant-a"));
+        assert_eq!(
+            export.read_boundary,
+            Some(ReceiptReadBoundary::TenantScoped {
+                tenant: "tenant-a".to_string(),
+            })
+        );
+        export
+            .validate_read_boundary()
+            .expect("tenant-scoped export query should pass read boundary validation");
+    }
+
+    #[test]
     fn operator_report_query_clamps_metered_limit() {
         let query = OperatorReportQuery {
             metered_limit: Some(5_000),
