@@ -4619,6 +4619,58 @@ mod attestation_and_telemetry_tests {
     }
 
     #[test]
+    fn compliance_verification_summary_omits_redundant_body_failure_on_signer_mismatch() {
+        let body_signer = Keypair::generate();
+        let cert_signer = Keypair::generate();
+        let now = now_secs();
+        let body = ComplianceCertificateBody {
+            schema: COMPLIANCE_CERTIFICATE_SCHEMA.to_string(),
+            session_id: "session-signer-mismatch".to_string(),
+            issued_at: now,
+            receipt_count: 1,
+            first_receipt_at: now,
+            last_receipt_at: now,
+            all_signatures_valid: true,
+            chain_continuous: true,
+            scope_compliant: true,
+            budget_compliant: true,
+            guards_compliant: true,
+            anomalies: Vec::new(),
+            kernel_key: body_signer.public_key(),
+        };
+        let body_bytes = chio_core::canonical::canonical_json_bytes(&body)
+            .expect("certificate body should serialize");
+        let certificate = ComplianceCertificate {
+            body,
+            signer_key: cert_signer.public_key(),
+            signature: cert_signer.sign(&body_bytes),
+        };
+        let config = ComplianceConfig {
+            trusted_kernel_keys: std::collections::BTreeSet::from([
+                cert_signer.public_key().to_hex(),
+            ]),
+            ..ComplianceConfig::default()
+        };
+
+        let result = verify_compliance_certificate(
+            &certificate,
+            VerificationMode::Lightweight,
+            None,
+            &config,
+        );
+
+        assert!(!result.passed);
+        assert!(result.summary.contains(
+            "certificate signer does not match body kernel key"
+        ));
+        assert!(
+            !result.summary.contains("body consistency check failed"),
+            "signer mismatch alone must not also report a generic body failure: {}",
+            result.summary
+        );
+    }
+
+    #[test]
     fn compliance_certificate_serializes_snake_case() {
         let signer = Keypair::generate();
         let now = now_secs();
