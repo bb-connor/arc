@@ -1262,6 +1262,16 @@ pub fn verify_package_report(
     }
 }
 
+fn require_bilateral_allow_admission(joint_verdict: &str) -> Result<(), ChioPackageError> {
+    if joint_verdict != "allow" {
+        return Err(ChioPackageError::Federation(format!(
+            "bilateral envelope policy verdict {:?} is not allow",
+            joint_verdict
+        )));
+    }
+    Ok(())
+}
+
 fn verify_package_inner(
     package: &ChioProofPackage,
     trust_bundle: &ChioVerifierTrustBundle,
@@ -1424,12 +1434,7 @@ fn verify_package_inner(
             },
         )
         .map_err(|error| ChioPackageError::Federation(error.to_string()))?;
-        if verified.joint_verdict != "allow" {
-            return Err(ChioPackageError::Federation(format!(
-                "bilateral envelope policy verdict {:?} is not allow",
-                verified.joint_verdict
-            )));
-        }
+        require_bilateral_allow_admission(&verified.joint_verdict)?;
     }
     add_check(
         checks,
@@ -2966,5 +2971,18 @@ mod tests {
             .checks
             .iter()
             .any(|check| check.code == "trust.bbs_issuer"));
+    }
+
+    #[test]
+    fn bilateral_allow_admission_rejects_deny_joint_verdict() {
+        let error = require_bilateral_allow_admission("deny").expect_err("deny must not admit");
+        assert!(error
+            .to_string()
+            .contains("bilateral envelope policy verdict \"deny\" is not allow"));
+    }
+
+    #[test]
+    fn bilateral_allow_admission_accepts_allow_joint_verdict() {
+        require_bilateral_allow_admission("allow").expect("allow admits");
     }
 }

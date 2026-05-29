@@ -1866,6 +1866,37 @@ mod tests {
         }
     }
 
+    fn unanimous_deny_extensions(now_ms: u64) -> BilateralPredicateExtensions {
+        BilateralPredicateExtensions {
+            capability_lease_ref: Some(CapabilityLeaseRef {
+                lease_id: "lease-c2-happy".to_string(),
+                issuer: "did:chio:org-a".to_string(),
+                expires_at_unix_ms: now_ms + 60_000,
+                scope_digest: None,
+            }),
+            policy_evaluation_summary: Some(PolicyEvaluationSummary {
+                server_a_verdict: PolicyVerdict {
+                    verdict: "deny".to_string(),
+                    policy_id: "policy.org-a".to_string(),
+                    policy_version: "v1".to_string(),
+                    rationale_code: None,
+                },
+                server_b_verdict: PolicyVerdict {
+                    verdict: "deny".to_string(),
+                    policy_id: "policy.org-b".to_string(),
+                    policy_version: "v1".to_string(),
+                    rationale_code: None,
+                },
+                joint_disposition: Some("deny".to_string()),
+            }),
+            governance_receipt_ref: None,
+            consistency_anchor: None,
+            consistency_model: None,
+            cross_org_visibility: None,
+            treaty_binding_ref: None,
+        }
+    }
+
     fn treaty_bound_extensions(
         receipt: &ChioReceipt,
         now_ms: u64,
@@ -2134,6 +2165,44 @@ mod tests {
         let verified = verify_bilateral_cosign_invocation(&envelope, &config).unwrap();
         assert_eq!(verified.joint_verdict, "allow");
         assert_eq!(verified.resolved_receipt.id, receipt.id);
+    }
+
+    #[test]
+    fn chio_invocation_attests_unanimous_deny_joint_verdict() {
+        let kp_a = Keypair::generate();
+        let kp_b = Keypair::generate();
+        let receipt = sample_receipt(&kp_b);
+        let now_ms = 1_734_000_000_000;
+
+        let (_ignored, receipt_store, lease_registry, governance_store, oracle, mut peers) =
+            fixture(&kp_a, &kp_b, &receipt, now_ms);
+        let envelope = sign_chio_bilateral_dsse_envelope(
+            &receipt,
+            &kp_a,
+            &kp_b,
+            "did:chio:org-a",
+            "did:chio:org-b",
+            "file_read",
+            now_ms,
+            unanimous_deny_extensions(now_ms),
+        )
+        .unwrap();
+        insert_fresh_ladder_peers(&mut peers, &kp_a, &kp_b, now_ms);
+        let base = config(
+            &peers,
+            &receipt_store,
+            &lease_registry,
+            &governance_store,
+            &oracle,
+            now_ms,
+        );
+
+        let verified = verify_chio_bilateral_invocation(
+            &envelope,
+            &ChioBilateralVerifierConfig { base: &base },
+        )
+        .expect("cryptographic bilateral verification may attest deny for audit");
+        assert_eq!(verified.joint_verdict, "deny");
     }
 
     #[test]
