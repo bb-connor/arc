@@ -2887,6 +2887,7 @@ dependencies = [
  "chio-siem",
  "chio-store-sqlite",
  "chio-tee-frame",
+ "chio-test-support",
  "chio-tool-call-fabric",
  "chio-underwriting",
  "chio-wasm-guards",

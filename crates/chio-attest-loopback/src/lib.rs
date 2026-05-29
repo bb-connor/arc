@@ -75,7 +75,7 @@ const BBS_KEY_INFO: &[u8] = b"chio";
 const BUYER_SEED: [u8; 32] = [11; 32];
 const GOVERNANCE_SEED: [u8; 32] = [12; 32];
 const REVOCATION_SEED: [u8; 32] = [13; 32];
-const RUNTIME_POLICY_SEED: [u8; 32] = [14; 32];
+const RUNTIME_POLICY_SEED: [u8; 32] = [42; 32];
 const VENDOR_A_SEED: [u8; 32] = [21; 32];
 const VENDOR_B_SEED: [u8; 32] = [22; 32];
 const VENDOR_C_SEED: [u8; 32] = [23; 32];
@@ -437,10 +437,13 @@ pub fn authority_issuance_request() -> Result<ChioIssuanceRequest, ChioPackageEr
         let vendor_key = Keypair::from_seed(&vendor.seed);
         let body = receipt_body(vendor, &vendor_key)?;
         let tool_args_hash = body.action.parameter_hash.clone();
-        let step_sha256 = vendor
-            .destructive
-            .then(|| canonical_sha256(&body))
-            .transpose()?;
+        let step_sha256 = if vendor.destructive {
+            let receipt = ChioReceipt::sign(body, &vendor_key)
+                .map_err(|error| ChioPackageError::Inconsistent(error.to_string()))?;
+            Some(canonical_sha256(&receipt.body())?)
+        } else {
+            None
+        };
         steps.push(issuance_step_request(
             vendor,
             index,
@@ -1351,6 +1354,37 @@ mod tests {
             .checks
             .iter()
             .any(|check| check.code == "workflow.intersection"));
+    }
+
+    #[test]
+    fn authority_issuance_request_hashes_signed_receipt_body_for_governance() {
+        let package = fresh_proof_package().expect("fresh package builds");
+        let request = authority_issuance_request().expect("authority request builds");
+        let destructive_step = request
+            .steps
+            .iter()
+            .find(|step| step.destructive)
+            .expect("destructive step exists");
+        let governance_receipt = package
+            .governance_receipts
+            .first()
+            .expect("governance receipt exists");
+
+        assert_eq!(
+            destructive_step.step_sha256.as_deref(),
+            Some(governance_receipt.body.step_sha256.as_str())
+        );
+    }
+
+    #[test]
+    fn authority_profile_pins_fixture_runtime_policy_signer() {
+        let fixture_runtime_policy_key = Keypair::from_seed(&[42; 32]);
+        let profile = authority_profile_document().expect("authority profile builds");
+
+        assert_eq!(
+            profile.runtime_policy_issuer_public_keys,
+            vec![fixture_runtime_policy_key.public_key()]
+        );
     }
 
     #[test]
