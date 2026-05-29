@@ -546,6 +546,78 @@ mod tests {
         .expect("admin-all evidence export may narrow to a tenant filter");
     }
 
+    fn read_boundary_message(error: EvidenceExportError) -> String {
+        match error {
+            EvidenceExportError::ReadBoundary(message) => message,
+            other => panic!("expected ReadBoundary, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn evidence_export_requires_explicit_read_boundary() {
+        let message = read_boundary_message(
+            EvidenceExportQuery::default()
+                .validate_read_boundary()
+                .expect_err("missing boundary must fail closed"),
+        );
+        assert_eq!(
+            message,
+            "evidence export requires an explicit receipt read boundary"
+        );
+    }
+
+    #[test]
+    fn tenant_scoped_evidence_export_rejects_empty_tenant_boundary() {
+        let message = read_boundary_message(
+            EvidenceExportQuery {
+                read_boundary: Some(ReceiptReadBoundary::TenantScoped {
+                    tenant: "   ".to_string(),
+                }),
+                ..EvidenceExportQuery::default()
+            }
+            .validate_read_boundary()
+            .expect_err("whitespace tenant boundary must fail closed"),
+        );
+        assert_eq!(
+            message,
+            "tenant-scoped evidence export requires a non-empty tenant"
+        );
+    }
+
+    #[test]
+    fn tenant_scoped_evidence_export_rejects_query_tenant_mismatch() {
+        let message = read_boundary_message(
+            EvidenceExportQuery {
+                tenant: Some("tenant-b".to_string()),
+                read_boundary: Some(ReceiptReadBoundary::tenant_scoped("tenant-a")),
+                ..EvidenceExportQuery::default()
+            }
+            .validate_read_boundary()
+            .expect_err("query tenant must match authenticated boundary"),
+        );
+        assert_eq!(
+            message,
+            "tenant-scoped evidence export tenant does not match query tenant"
+        );
+    }
+
+    #[test]
+    fn admin_all_evidence_export_rejects_empty_tenant_filter() {
+        let message = read_boundary_message(
+            EvidenceExportQuery {
+                tenant: Some("   ".to_string()),
+                read_boundary: Some(ReceiptReadBoundary::AdminAll),
+                ..EvidenceExportQuery::default()
+            }
+            .validate_read_boundary()
+            .expect_err("admin tenant filter must be non-empty when present"),
+        );
+        assert_eq!(
+            message,
+            "admin-all evidence export tenant filter requires a non-empty tenant"
+        );
+    }
+
     #[test]
     fn admin_all_evidence_export_uses_remote_safe_read_context() {
         let receipt_query = EvidenceExportQuery {
