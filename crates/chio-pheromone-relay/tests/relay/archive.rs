@@ -22,14 +22,17 @@ use chio_core_types::crypto::sha256_hex;
 use chio_core_types::PublicKey;
 use chio_pheromone_relay::{
     build_relay_alert_assurance_archive_extraction_report,
+    generate_relay_alert_assurance_external_retention_review_report,
     generate_relay_alert_assurance_physical_archive_drill_report,
     generate_relay_alert_assurance_retention_handoff_report,
     sign_relay_alert_assurance_archive_package, verify_relay_alert_assurance_archive_package,
     RelayAlertAssuranceArchivePackageBuildInput, RelayAlertAssuranceArchivePackageReport,
-    RelayAlertAssuranceArchivePackageVerifyInput, RelayAlertAssurancePhysicalArchiveDrillInput,
+    RelayAlertAssuranceArchivePackageVerifyInput, RelayAlertAssuranceExternalRetentionProfileDocument,
+    RelayAlertAssuranceExternalRetentionReviewInput, RelayAlertAssurancePhysicalArchiveDrillInput,
     RelayAlertAssurancePhysicalArchiveEvidence, RelayAlertAssuranceRetentionHandoffEvidence,
     RelayAlertAssuranceRetentionHandoffInput, RelayAlertAssuranceRetentionHandoffProfileDocument,
     RelayAlertAssuranceTrustedArchivePackager, RelayAlertAssuranceTrustedArchivePackagersDocument,
+    PHEROMONE_RELAY_ALERT_ASSURANCE_EXTERNAL_RETENTION_PROFILE_SCHEMA,
     PHEROMONE_RELAY_ALERT_ASSURANCE_PHYSICAL_ARCHIVE_EVIDENCE_SCHEMA,
     PHEROMONE_RELAY_ALERT_ASSURANCE_RETENTION_HANDOFF_EVIDENCE_SCHEMA,
     PHEROMONE_RELAY_ALERT_ASSURANCE_RETENTION_HANDOFF_PROFILE_SCHEMA,
@@ -472,6 +475,51 @@ fn relay_alert_assurance_archive_drill_evidence_binds_package_report_identity() 
     )
     .unwrap_err();
     assert!(err.to_string().contains("package id mismatch"));
+}
+
+#[test]
+fn relay_alert_assurance_external_retention_review_rejects_tampered_package_report() {
+    let profile = external_retention_profile_for_review();
+    let mut report = archive_package_report_for_evidence();
+    report.package_generation = 0;
+
+    let err = generate_relay_alert_assurance_external_retention_review_report(
+        RelayAlertAssuranceExternalRetentionReviewInput {
+            package_reports: std::slice::from_ref(&report),
+            restore_drill_reports: &[],
+            physical_drill_reports: &[],
+            retention_handoff_reports: &[],
+            profile: &profile,
+            since_unix_ms: NOW,
+            until_unix_ms: NOW + 60_000,
+            now_unix_ms: NOW + 10_000,
+        },
+    )
+    .unwrap_err();
+
+    assert!(err
+        .to_string()
+        .contains("external retention package report rejected"));
+    assert!(err.to_string().contains("package_report_generation_invalid"));
+}
+
+fn external_retention_profile_for_review() -> RelayAlertAssuranceExternalRetentionProfileDocument {
+    RelayAlertAssuranceExternalRetentionProfileDocument {
+        schema: PHEROMONE_RELAY_ALERT_ASSURANCE_EXTERNAL_RETENTION_PROFILE_SCHEMA.to_string(),
+        local_kernel_id: "did:chio:buyer-kernel".to_string(),
+        allowed_retention_system_aliases: vec!["external-retention-1".to_string()],
+        max_package_count: 4,
+        max_evidence_age_ms: 900_000,
+        require_generation_continuity: false,
+        require_restore_accepted: false,
+        require_physical_readback: false,
+        require_retention_handoff_ready: false,
+        min_sampled_members: 1,
+        min_sample_coverage_basis_points: 1,
+        recommendation_codes: vec!["review_operator".to_string()],
+        issued_at_unix_ms: NOW,
+        expires_at_unix_ms: NOW + 900_000,
+    }
 }
 
 fn trusted_archive_packagers(
