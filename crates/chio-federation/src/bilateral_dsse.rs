@@ -2532,6 +2532,40 @@ mod tests {
         assert_eq!(err, BilateralCoSigningError::ReceiptMismatch);
     }
 
+    fn sample_policy_evaluation_summary(verdict: &str) -> PolicyEvaluationSummary {
+        PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: verdict.to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: verdict.to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: Some(verdict.to_string()),
+        }
+    }
+
+    #[test]
+    fn admission_requires_allow_verdict_for_policy_summary() {
+        let summary = sample_policy_evaluation_summary("deny");
+        let error = require_policy_evaluation_allow_admission(&summary)
+            .expect_err("deny summaries must not satisfy admission");
+
+        assert!(error.to_string().contains("requires allow verdict for admission"));
+    }
+
+    #[test]
+    fn admission_accepts_unanimous_allow_policy_summary() {
+        let summary = sample_policy_evaluation_summary("allow");
+        require_policy_evaluation_allow_admission(&summary)
+            .expect("unanimous allow summaries satisfy admission");
+    }
+
     fn resign_payload(
         envelope: &mut DsseEnvelope,
         kp_a: &Keypair,
