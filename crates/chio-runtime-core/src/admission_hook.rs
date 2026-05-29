@@ -248,7 +248,7 @@ where
     fn release_reserved(&self, metadata: &serde_json::Value) -> Result<(), KernelError> {
         let Some(runtime) = metadata
             .get("chio_runtime")
-            .or_else(|| metadata.get("chio_runtime"))
+            .or_else(|| metadata.get("chiodos_runtime"))
             .and_then(serde_json::Value::as_object)
         else {
             return Ok(());
