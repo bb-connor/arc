@@ -15,7 +15,6 @@ use chio_wasm_guards::blocklist::{E_GUARD_DIGEST_BLOCKLISTED, GuardDigestBlockli
 use chio_wasm_guards::manifest::GuardManifest;
 use chio_wasm_guards::runtime::wasmtime_backend::WasmtimeBackend;
 use flate2::Compression;
-use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use serde::Deserialize;
 
@@ -830,12 +829,23 @@ fn registry_credentials(username: Option<&str>, password: Option<&str>) -> Regis
     }
 }
 
-pub(crate) fn cmd_guard_install(archive_path: &Path, target_dir: &Path) -> Result<(), CliError> {
-    let file = fs::File::open(archive_path)
-        .map_err(|e| guard_io_error(format!("failed to open {}: {e}", archive_path.display())))?;
-    let dec = GzDecoder::new(file);
-    let mut archive = tar::Archive::new(dec);
+const GUARD_ARCHIVE_MAX_COMPRESSED_BYTES: u64 = 64 * 1024 * 1024;
+const GUARD_ARCHIVE_MAX_MEMBER_BYTES: u64 = 32 * 1024 * 1024;
+const GUARD_ARCHIVE_MAX_TOTAL_BYTES: u64 = 64 * 1024 * 1024;
+const GUARD_ARCHIVE_MAX_MEMBER_COUNT: usize = 16;
+const GUARD_ARCHIVE_MAX_DECOMPRESSION_RATIO: u64 = 200;
 
+fn guard_archive_limits() -> crate::archive::SafeArchiveLimits {
+    crate::archive::SafeArchiveLimits {
+        max_compressed_bytes: GUARD_ARCHIVE_MAX_COMPRESSED_BYTES,
+        max_member_bytes: GUARD_ARCHIVE_MAX_MEMBER_BYTES,
+        max_total_bytes: GUARD_ARCHIVE_MAX_TOTAL_BYTES,
+        max_member_count: GUARD_ARCHIVE_MAX_MEMBER_COUNT,
+        max_decompression_ratio: GUARD_ARCHIVE_MAX_DECOMPRESSION_RATIO,
+    }
+}
+
+pub(crate) fn cmd_guard_install(archive_path: &Path, target_dir: &Path) -> Result<(), CliError> {
     // Extract to a temporary directory first, then determine guard name from manifest.
     // Use std::env::temp_dir with a unique suffix derived from the archive filename
     // to avoid requiring tempfile as a regular dependency.
@@ -856,24 +866,13 @@ pub(crate) fn cmd_guard_install(archive_path: &Path, target_dir: &Path) -> Resul
             ))
         })?;
     }
-    fs::create_dir_all(&tmp_path).map_err(|e| {
-        guard_io_error(format!(
-            "failed to create temp directory {}: {e}",
-            tmp_path.display()
-        ))
-    })?;
 
-    // Collect entries into the temp directory
-    for entry_result in archive
-        .entries()
-        .map_err(|e| guard_io_error(format!("failed to read archive entries: {e}")))?
-    {
-        let mut entry = entry_result
-            .map_err(|e| guard_io_error(format!("failed to read archive entry: {e}")))?;
-        entry
-            .unpack_in(&tmp_path)
-            .map_err(|e| guard_io_error(format!("failed to extract archive entry: {e}")))?;
-    }
+    let entries = crate::archive::read_tar_gz_file(
+        archive_path,
+        "guard archive",
+        guard_archive_limits(),
+    )?;
+    crate::archive::write_entries_to_fresh_dir(&tmp_path, "guard archive", &entries)?;
 
     // Read the manifest from the temp directory to determine the guard name
     let tmp_manifest_path = tmp_path.join("guard-manifest.yaml");
@@ -1505,6 +1504,36 @@ wasm_sha256: "deadbeef"
     }
 
     #[test]
+    #[cfg(unix)]
+    #[test]
+    fn test_install_rejects_symlink_member() {
+        let temp = tempfile::tempdir().unwrap();
+        let archive = temp.path().join("evil.arcguard");
+        let file = fs::File::create(&archive).unwrap();
+        let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::default());
+        let mut builder = tar::Builder::new(encoder);
+        let mut header = tar::Header::new_gnu();
+        header.set_entry_type(tar::EntryType::Symlink);
+        header.set_size(0);
+        header.set_mode(0o777);
+        header.set_link_name("../escape").unwrap();
+        header.set_cksum();
+        builder
+            .append_data(&mut header, "guard-manifest.yaml", std::io::empty())
+            .unwrap();
+        builder.finish().unwrap();
+        let encoder = builder.into_inner().unwrap();
+        encoder.finish().unwrap();
+
+        let install_dir = tempfile::tempdir().unwrap();
+        let err = must_cli_err(
+            cmd_guard_install(&archive, install_dir.path()),
+            "install symlink archive",
+        );
+        let msg = err.to_string();
+        assert!(msg.contains("non-regular"), "{msg}");
+    }
+
     fn test_install_fails_with_missing_archive() {
         let install_dir = tempfile::tempdir().unwrap();
         let bogus_path = install_dir.path().join("nonexistent.arcguard");

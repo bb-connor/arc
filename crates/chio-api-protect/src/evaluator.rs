@@ -352,7 +352,14 @@ mod tests {
     }
 
     fn signed_capability_token_json(issuer: &Keypair, id: &str) -> String {
-        signed_capability_token_json_with_scope(issuer, id, ChioScope::default())
+        signed_capability_token_json_with_scope(
+            issuer,
+            id,
+            ChioScope {
+                grants: vec![chio_http_core::http_authority_tool_grant()],
+                ..ChioScope::default()
+            },
+        )
     }
 
     fn signed_capability_token_json_with_scope(
@@ -399,6 +406,49 @@ mod tests {
         let headers = HashMap::new();
         let caller = extract_caller(&headers);
         assert_eq!(caller.subject, "anonymous");
+    }
+
+    #[test]
+    fn evaluate_deny_by_default_rejects_unscoped_capability() {
+        let keypair = Keypair::generate();
+        let routes = vec![RouteEntry {
+            pattern: "/pets".to_string(),
+            method: HttpMethod::Post,
+            operation_id: Some("createPet".to_string()),
+            policy: PolicyDecision::DenyByDefault,
+        }];
+        let evaluator = RequestEvaluator::new(routes, keypair.clone(), "test-policy".to_string());
+        let capability = signed_capability_token_json_with_scope(
+            &keypair,
+            "cap-math-only",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "math".to_string(),
+                    tool_name: "double".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+
+        let result = evaluator
+            .evaluate(
+                HttpMethod::Post,
+                "/pets",
+                &HashMap::new(),
+                &HashMap::from([("x-chio-capability".to_string(), capability)]),
+                Some("abc".to_string()),
+                3,
+            )
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
     }
 
     #[test]
