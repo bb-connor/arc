@@ -2532,6 +2532,55 @@ mod tests {
         assert_eq!(err, BilateralCoSigningError::ReceiptMismatch);
     }
 
+    fn sample_policy_evaluation_summary(verdict: &str) -> PolicyEvaluationSummary {
+        PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: verdict.to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: verdict.to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: Some(verdict.to_string()),
+        }
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_accepts_unanimous_allow() {
+        let summary = sample_policy_evaluation_summary("allow");
+        require_policy_evaluation_allow_admission(&summary).expect("unanimous allow admits");
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_rejects_deny() {
+        let summary = sample_policy_evaluation_summary("deny");
+        let err = require_policy_evaluation_allow_admission(&summary)
+            .expect_err("deny verdict must fail admission");
+        assert!(
+            err.to_string()
+                .contains("requires allow verdict for admission"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_rejects_verdict_disagreement() {
+        let mut summary = sample_policy_evaluation_summary("allow");
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+        let err = require_policy_evaluation_allow_admission(&summary)
+            .expect_err("verdict disagreement must fail admission");
+        assert!(
+            err.to_string().contains("server_a=allow server_b=deny"),
+            "unexpected error: {err}"
+        );
+    }
+
     fn resign_payload(
         envelope: &mut DsseEnvelope,
         kp_a: &Keypair,
