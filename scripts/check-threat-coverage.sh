@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Threat-model coverage CI gate.
 #
-# Owner: @bb-connor.
+# Owner: chio-maintainers.
 #
 # Reads spec/security/chio-threat-model.v1.json and asserts that
 # every threat ID either:

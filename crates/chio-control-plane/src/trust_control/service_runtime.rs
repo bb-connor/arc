@@ -3983,9 +3983,9 @@ fn into_budget_store_error(error: CliError) -> BudgetStoreError {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
 mod service_runtime_tests {
     use super::*;
+    use chio_test_support::prelude::*;
     use std::collections::BTreeMap;
     use std::io::{Read, Write};
     use std::net::{TcpListener, TcpStream};
@@ -4008,19 +4008,20 @@ mod service_runtime_tests {
 
     impl StaticResponseServer {
         fn spawn(status: u16, body: &str, content_type: &str, expected_requests: usize) -> Self {
-            let listener = TcpListener::bind("127.0.0.1:0").expect("bind static response server");
-            let addr = listener.local_addr().expect("server local addr");
+            let listener =
+                TcpListener::bind("127.0.0.1:0").test_expect("bind static response server");
+            let addr = listener.local_addr().test_expect("server local addr");
             let body = body.to_string();
             let content_type = content_type.to_string();
             let captured = Arc::new(Mutex::new(Vec::new()));
             let captured_requests = Arc::clone(&captured);
             let join = thread::spawn(move || {
                 for _ in 0..expected_requests {
-                    let (mut stream, _) = listener.accept().expect("accept request");
+                    let (mut stream, _) = listener.accept().test_expect("accept request");
                     let request = read_http_request(&mut stream);
                     captured_requests
                         .lock()
-                        .expect("capture request")
+                        .test_expect("capture request")
                         .push(request);
                     write!(
                         stream,
@@ -4028,8 +4029,8 @@ mod service_runtime_tests {
                         body.len(),
                         body
                     )
-                    .expect("write response");
-                    stream.flush().expect("flush response");
+                    .test_expect("write response");
+                    stream.flush().test_expect("flush response");
                 }
             });
             Self {
@@ -4040,14 +4041,17 @@ mod service_runtime_tests {
         }
 
         fn requests(&self) -> Vec<CapturedRequest> {
-            self.captured.lock().expect("captured requests").clone()
+            self.captured
+                .lock()
+                .test_expect("captured requests")
+                .clone()
         }
     }
 
     impl Drop for StaticResponseServer {
         fn drop(&mut self) {
             if let Some(join) = self.join.take() {
-                join.join().expect("join response server");
+                join.join().test_expect("join response server");
             }
         }
     }
@@ -4058,7 +4062,7 @@ mod service_runtime_tests {
         let mut headers_end = None;
         let mut content_length = 0usize;
         loop {
-            let read = stream.read(&mut chunk).expect("read HTTP request");
+            let read = stream.read(&mut chunk).test_expect("read HTTP request");
             if read == 0 {
                 break;
             }
@@ -4077,18 +4081,18 @@ mod service_runtime_tests {
             }
         }
 
-        let headers_end = headers_end.expect("HTTP request headers terminator");
+        let headers_end = headers_end.test_expect("HTTP request headers terminator");
         let header_text = String::from_utf8_lossy(&buffer[..headers_end]);
         let mut lines = header_text.split("\r\n").filter(|line| !line.is_empty());
-        let request_line = lines.next().expect("request line");
+        let request_line = lines.next().test_expect("request line");
         let mut request_line_parts = request_line.split_whitespace();
         let method = request_line_parts
             .next()
-            .expect("request method")
+            .test_expect("request method")
             .to_string();
         let target = request_line_parts
             .next()
-            .expect("request target")
+            .test_expect("request target")
             .to_string();
         let headers = lines
             .filter_map(|line| {
@@ -4151,7 +4155,7 @@ mod service_runtime_tests {
         let content_type = request
             .headers
             .get("content-type")
-            .expect("content-type header");
+            .test_expect("content-type header");
         assert!(content_type.starts_with("application/json"));
         for fragment in body_fragments {
             assert!(
@@ -4172,7 +4176,7 @@ mod service_runtime_tests {
         assert!(error.to_string().contains("control URL must not be empty"));
 
         let client = build_client(" http://one/ , http://two// ,,", "secret")
-            .expect("build client with normalized endpoints");
+            .test_expect("build client with normalized endpoints");
         assert_eq!(
             client.endpoints.as_ref(),
             &vec!["http://one".to_string(), "http://two".to_string()]
@@ -4225,7 +4229,7 @@ mod service_runtime_tests {
             StaticResponseServer::spawn(503, "{\"error\":\"retry\"}", "application/json", 1);
         let success = StaticResponseServer::spawn(200, "{\"ok\":true}", "application/json", 1);
         let client = build_client(&format!("{},{}", retry.url, success.url), "secret")
-            .expect("build failover client");
+            .test_expect("build failover client");
 
         let response: Value = client
             .request_json(
@@ -4238,7 +4242,7 @@ mod service_runtime_tests {
                 },
                 "/status",
             )
-            .expect("retry to healthy endpoint");
+            .test_expect("retry to healthy endpoint");
 
         assert_eq!(response["ok"], Value::Bool(true));
         assert_eq!(client.endpoint_order(), vec![1, 0]);
@@ -4247,11 +4251,11 @@ mod service_runtime_tests {
     #[test]
     fn request_text_without_service_auth_reads_text_response() {
         let server = StaticResponseServer::spawn(200, "ready", "text/plain", 1);
-        let client = build_client(&server.url, "secret").expect("build text client");
+        let client = build_client(&server.url, "secret").test_expect("build text client");
 
         let body = client
             .request_text_without_service_auth(|agent, url| agent.get(url).call(), "/health")
-            .expect("read text response");
+            .test_expect("read text response");
 
         assert_eq!(body, "ready");
     }
@@ -4259,7 +4263,7 @@ mod service_runtime_tests {
     #[test]
     fn trust_control_get_wrappers_encode_queries_and_service_auth() {
         let server = StaticResponseServer::spawn(200, "{}", "application/json", 26);
-        let client = build_client(&server.url, "secret").expect("build client");
+        let client = build_client(&server.url, "secret").test_expect("build client");
 
         let _ = client.list_revocations(&RevocationQuery {
             capability_id: Some("cap-1".to_string()),
@@ -4729,7 +4733,7 @@ mod service_runtime_tests {
     #[test]
     fn trust_control_post_wrappers_send_json_bodies_and_encoded_paths() {
         let server = StaticResponseServer::spawn(200, "{}", "application/json", 7);
-        let client = build_client(&server.url, "secret").expect("build client");
+        let client = build_client(&server.url, "secret").test_expect("build client");
 
         let _ = client.issue_credit_facility(&CreditFacilityIssueRequest {
             query: ExposureLedgerQuery {
@@ -4885,7 +4889,7 @@ mod service_runtime_tests {
     #[test]
     fn budget_wrappers_use_split_budget_routes() {
         let server = StaticResponseServer::spawn(200, "{}", "application/json", 3);
-        let client = build_client(&server.url, "secret").expect("build client");
+        let client = build_client(&server.url, "secret").test_expect("build client");
 
         let _ = client.try_charge_cost("cap-budget", 2, Some(9), 120, Some(150), Some(900));
         let _ = client.reverse_charge_cost("cap-budget", 2, 120);
@@ -4921,7 +4925,7 @@ mod service_runtime_tests {
     #[test]
     fn budget_wrappers_include_budget_event_identity_when_provided() {
         let server = StaticResponseServer::spawn(200, "{}", "application/json", 3);
-        let client = build_client(&server.url, "secret").expect("build client");
+        let client = build_client(&server.url, "secret").test_expect("build client");
 
         let _ = client.try_charge_cost_with_ids(
             "cap-budget",
@@ -4988,7 +4992,7 @@ mod service_runtime_tests {
             "updatedAt": 1234,
             "seq": 9
         }))
-        .expect("parse split budget usage view");
+        .test_expect("parse split budget usage view");
 
         assert_eq!(usage.capability_id, "cap-budget");
         assert_eq!(usage.grant_index, 3);
@@ -4998,7 +5002,7 @@ mod service_runtime_tests {
         assert_eq!(usage.updated_at, 1234);
         assert_eq!(usage.seq, Some(9));
 
-        let encoded = serde_json::to_value(&usage).expect("serialize budget usage view");
+        let encoded = serde_json::to_value(&usage).test_expect("serialize budget usage view");
         assert_eq!(encoded["totalExposureCharged"], 75);
         assert_eq!(encoded["totalRealizedSpend"], 60);
         assert!(encoded.get("totalCostCharged").is_none());
@@ -5039,8 +5043,8 @@ mod service_runtime_tests {
         })
         .to_string();
         let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
-        let store =
-            build_remote_budget_store(&server.url, "secret").expect("build remote budget store");
+        let store = build_remote_budget_store(&server.url, "secret")
+            .test_expect("build remote budget store");
 
         let decision = store
             .authorize_budget_hold(BudgetAuthorizeHoldRequest {
@@ -5054,7 +5058,7 @@ mod service_runtime_tests {
                 event_id: Some("hold-budget:authorize".to_string()),
                 authority: None,
             })
-            .expect("authorize remote budget hold");
+            .test_expect("authorize remote budget hold");
 
         let BudgetAuthorizeHoldDecision::Authorized(authorized) = decision else {
             panic!("expected remote authorize to succeed");
@@ -5062,7 +5066,7 @@ mod service_runtime_tests {
         let authority = authorized
             .metadata
             .authority
-            .expect("budget authority metadata");
+            .test_expect("budget authority metadata");
         assert_eq!(authority.authority_id, "http://leader-a");
         assert_eq!(authority.lease_id, "http://leader-a#term-7");
         assert_eq!(authority.lease_epoch, 7);
@@ -5078,8 +5082,8 @@ mod service_runtime_tests {
 
         let usage = store
             .get_usage("cap-budget", 2)
-            .expect("get cached usage")
-            .expect("cached usage record");
+            .test_expect("get cached usage")
+            .test_expect("cached usage record");
         assert_eq!(usage.seq, 41);
         assert_eq!(usage.invocation_count, 5);
         assert_eq!(usage.total_cost_exposed, 120);
@@ -5100,10 +5104,10 @@ mod service_runtime_tests {
             applies_to_future_sessions_only: false,
             trusted_public_keys: vec![trusted_only.clone()],
         })
-        .expect("cache from valid status");
+        .test_expect("cache from valid status");
 
         assert_eq!(
-            cache.current.as_ref().expect("current key").to_hex(),
+            cache.current.as_ref().test_expect("current key").to_hex(),
             current
         );
         assert_eq!(cache.trusted.len(), 2);
@@ -5157,9 +5161,9 @@ mod service_runtime_tests {
         let trusted = vec![previous.clone(), current];
 
         ensure_signed_by_trusted_authority("trust activation", &previous, &trusted)
-            .expect("previous authority key should remain trusted");
+            .test_expect("previous authority key should remain trusted");
         let error = ensure_signed_by_trusted_authority("trust activation", &outsider, &trusted)
-            .expect_err("outsider signer should fail closed");
+            .test_expect_err("outsider signer should fail closed");
         assert!(error
             .to_string()
             .contains("does not match a trusted trust-control authority signer"));

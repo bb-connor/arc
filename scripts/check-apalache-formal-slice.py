@@ -140,6 +140,16 @@ def check_safety_workflow_paths() -> None:
         '- ".github/workflows/apalache-temporal.yml"' in text,
         "apalache-safety paths must keep .github/workflows/apalache-temporal.yml",
     )
+    require(
+        "formal/tla/MCRevocationPropagation.cfg|formal/tla/RevocationPropagation.tla"
+        in text,
+        "apalache-safety must keep RevocationPropagation safety coverage",
+    )
+    require(
+        "formal/tla/MCDelegationDepthBound.cfg|formal/tla/DelegationDepthBound.tla"
+        in text,
+        "apalache-safety must keep DelegationDepthBound safety coverage",
+    )
 
 
 def main() -> int:

@@ -1,8 +1,10 @@
 //! EVM settlement rail: call preparation, finalization, signing, and decoding.
 
 use std::str::FromStr;
-use std::thread;
 use std::time::Duration;
+
+#[cfg(test)]
+use std::thread;
 
 use alloy_primitives::{keccak256, Address, FixedBytes, B256, U256};
 use alloy_sol_types::{sol, SolCall};

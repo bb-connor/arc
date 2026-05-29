@@ -619,7 +619,7 @@ pub async fn confirm_transaction(
     for _ in 0..100 {
         let result = rpc_call(config, "eth_getTransactionReceipt", json!([tx_hash])).await?;
         if result.is_null() {
-            thread::sleep(Duration::from_millis(100));
+            tokio::time::sleep(Duration::from_millis(100)).await;
             continue;
         }
         let block_hash = result

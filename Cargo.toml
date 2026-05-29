@@ -120,6 +120,8 @@ members = [
     # Products
     "crates/chio-api-protect",
     "crates/chio-cli",
+    "crates/chio-mercury",
+    "crates/chio-mercury-core",
     "crates/chio-wall",
     "crates/chio-wall-core",
     #

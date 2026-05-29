@@ -39,5 +39,8 @@ tracing = { workspace = true }
 # free of fuzz instrumentation.
 arbitrary = { version = "1", features = ["derive"], optional = true }
 
+[dev-dependencies]
+chio-test-support = { path = "../chio-test-support" }
+
 [lints]
 workspace = true

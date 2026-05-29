@@ -42,6 +42,7 @@
   },
   "scripts": {
     "build": "tsc && node ./scripts/fix-dist-imports.mjs",
+    "lint": "tsc --noEmit",
     "prepack": "npm run build",
     "test": "node --experimental-strip-types --test ./test/*.test.ts"
   },

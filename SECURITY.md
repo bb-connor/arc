@@ -13,7 +13,7 @@ model and trust-boundary analysis, see [spec/SECURITY.md](spec/SECURITY.md).
 Please report security vulnerabilities privately. Do not open a public issue,
 pull request, or discussion for a suspected vulnerability.
 
-Email **[connor@backbay.io](mailto:connor@backbay.io)** with the details. If you
+Email **[security@backbay.io](mailto:security@backbay.io)** with the details. If you
 would like to encrypt your report, say so in an initial message and we will
 arrange a secure channel.
 
@@ -67,4 +67,4 @@ faith:
 Activity conducted consistent with this policy is considered authorized, and we
 will work with you to understand and resolve the issue quickly. If in doubt about
 whether a specific test is acceptable, contact us first at
-[connor@backbay.io](mailto:connor@backbay.io).
+[security@backbay.io](mailto:security@backbay.io).

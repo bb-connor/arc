@@ -237,14 +237,24 @@ paths:
         } else {
             Arc::new(InMemoryApprovalStore::new())
         };
-        let (receipt_store, receipts, revoked_capability_ids) = if let Some(path) = receipt_db {
-            let store = SqliteReceiptStore::open(path).test_unwrap();
-            let receipts = store.load_receipts().test_unwrap();
-            let revoked_capability_ids = store.load_revoked_capability_ids().test_unwrap();
-            (Some(Mutex::new(store)), receipts, revoked_capability_ids)
-        } else {
-            (None, Vec::new(), HashSet::new())
-        };
+        let (receipt_store, receipts, tool_receipts, revoked_capability_ids) =
+            if let Some(path) = receipt_db {
+                let store = SqliteReceiptStore::open(path).test_unwrap();
+                let receipts = store.load_receipts().test_unwrap();
+                let tool_receipts = store.load_tool_receipts().test_unwrap();
+                let revoked_capability_ids = store.load_revoked_capability_ids().test_unwrap();
+                (
+                    Some(Mutex::new(store)),
+                    receipts,
+                    tool_receipts,
+                    revoked_capability_ids,
+                )
+            } else {
+                (None, Vec::new(), Vec::new(), HashSet::new())
+            };
+        let signer_public_key = keypair.public_key();
+        let trusted_capability_issuers = vec![signer_public_key.clone()];
+        let trusted_receipt_signers = vec![signer_public_key];
         let evaluator = RequestEvaluator::new_with_approval_store(
             routes,
             keypair.clone(),
@@ -263,8 +273,13 @@ paths:
             egress_contract,
             approval_admin: ApprovalAdmin::new(approval_store),
             receipt_log: Mutex::new(ReceiptLog { receipts }),
+            tool_receipt_log: Mutex::new(ToolReceiptLog {
+                receipts: tool_receipts,
+            }),
             receipt_store,
             revoked_capability_ids: Mutex::new(revoked_capability_ids),
+            trusted_capability_issuers,
+            trusted_receipt_signers,
             sidecar_control_token: None,
         })
     }
@@ -2284,6 +2299,30 @@ paths:
     }
 
     #[tokio::test]
+    async fn sidecar_validate_capability_rejects_untrusted_issuer() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let untrusted_issuer = Keypair::generate();
+        let token_json = signed_capability_token_json(&untrusted_issuer, "cap-untrusted");
+        let validate_body: serde_json::Value = serde_json::from_str(&token_json).test_unwrap();
+
+        let validate_response = build_app(Arc::clone(&state))
+            .oneshot(loopback_post("/v1/capabilities/validate", validate_body))
+            .await
+            .test_unwrap();
+        assert_eq!(validate_response.status(), StatusCode::OK);
+
+        let bytes = to_bytes(validate_response.into_body(), 1024 * 1024)
+            .await
+            .test_unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).test_unwrap();
+        assert_eq!(json["valid"], false);
+        assert!(json["reason"]
+            .as_str()
+            .test_unwrap()
+            .contains("issuer is not trusted"));
+    }
+
+    #[tokio::test]
     async fn sidecar_attenuate_capability_returns_not_implemented() {
         let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
         let body = serde_json::json!({
@@ -2369,9 +2408,205 @@ paths:
                 .test_unwrap(),
         )
         .test_unwrap();
-        assert_eq!(verify_json["valid"], true);
-        assert_eq!(verify_json["decision"], "none");
-        assert_eq!(verify_json["receipt_id"], receipt.id);
+        assert_eq!(verify_json["valid"], false);
+        let verification: VerifyReceiptResponse = serde_json::from_value(verify_json).test_unwrap();
+        assert!(verification.signature_valid);
+        assert!(verification.signer_trusted);
+        assert!(!verification.authorized);
+        assert!(!verification.ok);
+        assert_eq!(verification.receipt_kind, "advisory_evaluation");
+        assert_eq!(verification.boundary_class, "advisory_only");
+        assert_eq!(verification.trust_level, "advisory");
+        assert_eq!(verification.result, "none");
+    }
+
+    #[tokio::test]
+    async fn sidecar_verify_receipt_rejects_untrusted_signer() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let attacker = Keypair::generate();
+        let parameters = serde_json::json!({"path": "/etc/hostname"});
+        let parameter_hash = chio_core_types::canonical_json_bytes(&parameters)
+            .map(|canonical| chio_core_types::sha256_hex(&canonical))
+            .test_unwrap();
+        let receipt = ChioReceipt::sign(
+            ChioReceiptBody {
+                id: uuid::Uuid::now_v7().to_string(),
+                timestamp: chrono::Utc::now().timestamp() as u64,
+                capability_id: "cap-attacker".to_string(),
+                tool_server: "fs".to_string(),
+                tool_name: "read".to_string(),
+                action: ToolCallAction {
+                    parameters,
+                    parameter_hash,
+                },
+                decision: Some(Decision::Allow),
+                receipt_kind: ReceiptKind::MediatedDecision,
+                boundary_class: BoundaryClass::Prevent,
+                observation_outcome: None,
+                tool_origin: ToolOrigin::CallerExecuted,
+                redaction_mode: RedactionMode::None,
+                actor_chain: Vec::new(),
+                content_hash: chio_core_types::sha256_hex(b"forged-request-body"),
+                policy_hash: manual_receipt_policy_hash("forged_sidecar_receipt_test"),
+                evidence: Vec::new(),
+                metadata: None,
+                trust_level: TrustLevel::Mediated,
+                tenant_id: None,
+                kernel_key: attacker.public_key(),
+            },
+            &attacker,
+        )
+        .test_unwrap();
+        assert!(receipt.verify_signature().test_unwrap());
+
+        let verify_body = serde_json::to_value(&receipt).test_unwrap();
+        let verify_response = build_app(Arc::clone(&state))
+            .oneshot(loopback_post("/v1/receipts/verify", verify_body))
+            .await
+            .test_unwrap();
+        assert_eq!(verify_response.status(), StatusCode::OK);
+        let verify_json: serde_json::Value = serde_json::from_slice(
+            &to_bytes(verify_response.into_body(), 1024 * 1024)
+                .await
+                .test_unwrap(),
+        )
+        .test_unwrap();
+        assert_eq!(verify_json["valid"], false);
+        assert!(verify_json["reason"]
+            .as_str()
+            .test_unwrap()
+            .contains("signer is not trusted"));
+
+        let verification: VerifyReceiptResponse = serde_json::from_value(verify_json).test_unwrap();
+        assert!(verification.signature_valid);
+        assert!(!verification.signer_trusted);
+        assert!(!verification.authorized);
+        assert!(!verification.ok);
+    }
+
+    #[tokio::test]
+    async fn sidecar_verify_receipt_rejects_capability_issuer_as_receipt_signer() {
+        let attacker = Keypair::generate();
+        let mut state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        Arc::get_mut(&mut state)
+            .test_expect("state is not shared yet")
+            .trusted_capability_issuers
+            .push(attacker.public_key());
+
+        let parameters = serde_json::json!({"path": "/etc/hostname"});
+        let action = ToolCallAction::from_parameters(parameters).test_unwrap();
+        let receipt = ChioReceipt::sign(
+            ChioReceiptBody {
+                id: uuid::Uuid::now_v7().to_string(),
+                timestamp: chrono::Utc::now().timestamp() as u64,
+                capability_id: "cap-attacker".to_string(),
+                tool_server: "fs".to_string(),
+                tool_name: "read".to_string(),
+                action,
+                decision: Some(Decision::Allow),
+                receipt_kind: ReceiptKind::MediatedDecision,
+                boundary_class: BoundaryClass::Prevent,
+                observation_outcome: None,
+                tool_origin: ToolOrigin::CallerExecuted,
+                redaction_mode: RedactionMode::None,
+                actor_chain: Vec::new(),
+                content_hash: chio_core_types::sha256_hex(b"forged-request-body"),
+                policy_hash: manual_receipt_policy_hash("forged_capability_issuer_receipt_test"),
+                evidence: Vec::new(),
+                metadata: None,
+                trust_level: TrustLevel::Mediated,
+                tenant_id: None,
+                kernel_key: attacker.public_key(),
+            },
+            &attacker,
+        )
+        .test_unwrap();
+
+        let verify_body = serde_json::to_value(&receipt).test_unwrap();
+        let verify_response = build_app(Arc::clone(&state))
+            .oneshot(loopback_post("/v1/receipts/verify", verify_body))
+            .await
+            .test_unwrap();
+        assert_eq!(verify_response.status(), StatusCode::OK);
+        let verify_json: serde_json::Value = serde_json::from_slice(
+            &to_bytes(verify_response.into_body(), 1024 * 1024)
+                .await
+                .test_unwrap(),
+        )
+        .test_unwrap();
+        assert_eq!(verify_json["valid"], false);
+        assert!(verify_json["reason"]
+            .as_str()
+            .test_unwrap()
+            .contains("signer is not trusted"));
+
+        let verification: VerifyReceiptResponse = serde_json::from_value(verify_json).test_unwrap();
+        assert!(verification.signature_valid);
+        assert!(!verification.signer_trusted);
+        assert!(!verification.authorized);
+        assert!(!verification.ok);
+    }
+
+    #[tokio::test]
+    async fn sidecar_verify_receipt_rejects_action_parameter_hash_mismatch() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let parameters = serde_json::json!({"path": "/etc/hostname"});
+        let receipt = ChioReceipt::sign(
+            ChioReceiptBody {
+                id: uuid::Uuid::now_v7().to_string(),
+                timestamp: chrono::Utc::now().timestamp() as u64,
+                capability_id: "cap-sidecar".to_string(),
+                tool_server: "fs".to_string(),
+                tool_name: "read".to_string(),
+                action: ToolCallAction {
+                    parameters,
+                    parameter_hash: "0".repeat(64),
+                },
+                decision: Some(Decision::Allow),
+                receipt_kind: ReceiptKind::MediatedDecision,
+                boundary_class: BoundaryClass::Prevent,
+                observation_outcome: None,
+                tool_origin: ToolOrigin::CallerExecuted,
+                redaction_mode: RedactionMode::None,
+                actor_chain: Vec::new(),
+                content_hash: chio_core_types::sha256_hex(b"trusted-request-body"),
+                policy_hash: manual_receipt_policy_hash("bad_action_hash_receipt_test"),
+                evidence: Vec::new(),
+                metadata: None,
+                trust_level: TrustLevel::Mediated,
+                tenant_id: None,
+                kernel_key: state.signer_keypair.public_key(),
+            },
+            &state.signer_keypair,
+        )
+        .test_unwrap();
+        assert!(receipt.verify_signature().test_unwrap());
+
+        let verify_body = serde_json::to_value(&receipt).test_unwrap();
+        let verify_response = build_app(Arc::clone(&state))
+            .oneshot(loopback_post("/v1/receipts/verify", verify_body))
+            .await
+            .test_unwrap();
+        assert_eq!(verify_response.status(), StatusCode::OK);
+        let verify_json: serde_json::Value = serde_json::from_slice(
+            &to_bytes(verify_response.into_body(), 1024 * 1024)
+                .await
+                .test_unwrap(),
+        )
+        .test_unwrap();
+        assert_eq!(verify_json["valid"], false);
+        assert!(verify_json["reason"]
+            .as_str()
+            .test_unwrap()
+            .contains("parameter_hash"));
+
+        let verification: VerifyReceiptResponse = serde_json::from_value(verify_json).test_unwrap();
+        assert!(verification.signature_valid);
+        assert!(verification.signer_trusted);
+        assert!(verification.receipt_id_valid);
+        assert!(!verification.parameter_hash_valid);
+        assert!(!verification.authorized);
+        assert!(!verification.ok);
     }
 
     #[tokio::test]
@@ -2501,6 +2736,20 @@ paths:
             .and_then(|v| v.as_str());
         assert_eq!(alias_outcome, Some("capability_revoked"));
         assert!(receipt.verify_signature().test_unwrap());
+
+        let log = state.tool_receipt_log.lock().await;
+        assert_eq!(log.receipts.len(), 1);
+        assert_eq!(log.receipts[0].id, receipt.id);
+        drop(log);
+
+        let reloaded = test_state_with_receipt_db(
+            Vec::new(),
+            "http://127.0.0.1:1".to_string(),
+            Some(&receipt_db),
+        );
+        let persisted = reloaded.tool_receipt_log.lock().await;
+        assert_eq!(persisted.receipts.len(), 1);
+        assert_eq!(persisted.receipts[0].id, receipt.id);
 
         let _ = std::fs::remove_file(receipt_db);
     }

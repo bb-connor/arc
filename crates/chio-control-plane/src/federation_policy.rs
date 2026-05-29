@@ -260,7 +260,6 @@ fn leading_zero_bits(hex_digest: &str) -> u32 {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod federation_policy_error_tests {
     use super::*;
     use chio_core::crypto::Keypair;
@@ -268,6 +267,7 @@ mod federation_policy_error_tests {
         FederatedOpenAdmissionPolicyArtifact, FederationArtifactKind, FederationArtifactReference,
         CHIO_FEDERATION_OPEN_ADMISSION_POLICY_SCHEMA,
     };
+    use chio_test_support::prelude::*;
 
     fn assert_cli_other_error(error: CliError, expected_message: &str) {
         match error {
@@ -322,7 +322,7 @@ mod federation_policy_error_tests {
             note: None,
         };
         let keypair = Keypair::generate();
-        let policy = SignedFederatedOpenAdmissionPolicy::sign(artifact, &keypair).unwrap();
+        let policy = SignedFederatedOpenAdmissionPolicy::sign(artifact, &keypair).test_unwrap();
         FederationAdmissionPolicyRecord {
             schema: FEDERATION_ADMISSION_POLICY_RECORD_SCHEMA.to_string(),
             published_at: 1_700_000_100,
@@ -338,7 +338,7 @@ mod federation_policy_error_tests {
         let mut record = signed_record();
         record.schema = "unsupported".to_string();
 
-        let error = verify_federation_admission_policy_record(&record).unwrap_err();
+        let error = verify_federation_admission_policy_record(&record).test_unwrap_err();
 
         assert_cli_other_error(error, "unsupported federation admission policy schema");
     }
@@ -348,7 +348,7 @@ mod federation_policy_error_tests {
         let mut record = signed_record();
         record.minimum_reputation_score = Some(1.1);
 
-        let error = verify_federation_admission_policy_record(&record).unwrap_err();
+        let error = verify_federation_admission_policy_record(&record).test_unwrap_err();
 
         assert_cli_other_error(error, "minimum_reputation_score");
     }
@@ -358,7 +358,7 @@ mod federation_policy_error_tests {
         let mut record = signed_record();
         record.anti_sybil.proof_of_work_bits = Some(25);
 
-        let error = verify_federation_admission_policy_record(&record).unwrap_err();
+        let error = verify_federation_admission_policy_record(&record).test_unwrap_err();
 
         assert_cli_other_error(error, "anti_sybil.proof_of_work_bits");
     }

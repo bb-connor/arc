@@ -32,5 +32,8 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
+[dev-dependencies]
+chio-test-support = { path = "../chio-test-support" }
+
 [lints]
 workspace = true

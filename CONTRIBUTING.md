@@ -114,4 +114,4 @@ project.
 Participation in this project is governed by the
 [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). By participating, you
 are expected to uphold it. Report unacceptable behavior to
-[connor@backbay.io](mailto:connor@backbay.io).
+[security@backbay.io](mailto:security@backbay.io).

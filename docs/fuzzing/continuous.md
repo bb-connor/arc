@@ -177,7 +177,7 @@ The CFLite builder image lives under `.clusterfuzzlite/`:
   `.github/workflows/cflite_pr.yml` and `.github/workflows/cflite_batch.yml`
   per ClusterFuzzLite's published schema (it is not a `project.yaml` field).
 
-Storage backend: `backbay-labs/arc-fuzz-corpus` (sibling private repo). The
+Storage backend: `backbay-labs/chio-fuzz-corpus` (sibling private repo). The
 repo is created out-of-band before the first `cflite_batch.yml` run; until
 it exists, ClusterFuzzLite falls back to per-run artifact storage and the
 rotation still passes its crash-search criterion. Keeping corpus storage in
@@ -191,13 +191,11 @@ secret is unavailable.
 
 - Target submission window: during OSS-Fuzz onboarding.
 - Status: pending.
-- Infrastructure scaffolding lands under `infra/oss-fuzz/` in the OSS-Fuzz integration follow-up
+- Infrastructure scaffolding lands under `infra/oss-fuzz/` in the OSS-Fuzz integration package
   (`project.yaml`, `Dockerfile`, `build.sh`).
 - Acceptance lag: typically 2-6 weeks. ClusterFuzzLite carries coverage
   through the lag.
-- Backup contact slot: tracked in the OSS-Fuzz onboarding follow-up issue (current
-  primary contact: `connor@backbay.io`; backup TBD before the
-  application opens).
+- Contacts: primary `security@backbay.io`, backup `fuzzing@backbay.io`.
 - On acceptance: repoint the bug-tracker integration in
   `.clusterfuzzlite/project.yaml` (`report_to_oss_fuzz: true`); keep
   ClusterFuzzLite running as the documented fallback.
@@ -209,17 +207,16 @@ secret is unavailable.
 
 Chio is in the OSS-Fuzz application pipeline. Integration
 files live under `infra/oss-fuzz/` and are mirrored into the upstream
-`google/oss-fuzz` repo as a follow-up PR after the in-tree files merge:
+`google/oss-fuzz` repo as a dedicated upstream PR:
 
 - `infra/oss-fuzz/project.yaml` declares `language: rust`, the primary
-  contact (`connor@backbay.io`), `auto_ccs`, the `address` plus
-  `undefined` sanitizer pair, the `x86_64` architecture, and the
-  `libfuzzer` engine. The backup-contact slot is held open with a
-  `TODO` comment and is tracked in a follow-up issue.
+  contact (`security@backbay.io`), backup contact (`fuzzing@backbay.io`),
+  the `address` plus `undefined` sanitizer pair, the `x86_64` architecture,
+  and the `libfuzzer` engine.
 - `infra/oss-fuzz/Dockerfile` is based on
   `gcr.io/oss-fuzz-base/base-builder-rust`, installs the rustls/openssl
   build deps plus `zip` for seed-corpus packing, and clones the repo at
-  `/src/arc` (the path stays `arc` until the GitHub repo rename lands).
+  `/src/chio` (the path stays `arc` until the GitHub repo rename lands).
 - `infra/oss-fuzz/build.sh` enumerates all sixteen fuzz targets
   (`attest_verify`, `jwt_vc_verify`, `oid4vp_presentation`,
   `did_resolve`, `anchor_bundle_verify`, `mcp_envelope_decode`,

@@ -43,6 +43,7 @@ zeroize = { version = "1.8", features = ["derive"] }
 signal-hook = "0.3"
 
 [dev-dependencies]
+chio-test-support = { path = "../chio-test-support" }
 proptest = { workspace = true }
 tempfile = { workspace = true }
 

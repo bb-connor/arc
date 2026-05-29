@@ -62,22 +62,19 @@ from-source CMake options.
 
 ## Private registry endpoints
 
-### Conan: private remote
+### Conan: GitHub Release archive
 
-Remote URL: TODO (replace with the canonical Conan remote; the C++ SDK
-artifacts are distributed via GitHub Releases at
-`https://github.com/backbay-labs/chio/releases` until the remote is finalized).
-
-Add the remote and authenticate as the publisher service account (token lives
-in the secrets manager at `chio-registry/chio-publisher`, property `token`):
+Tag-driven publishes in `.github/workflows/release-cpp.yml` build the Conan 2
+packages, snapshot the qualified local Conan cache, and attach that cache as a
+GitHub Release asset at `https://github.com/backbay-labs/chio/releases`.
+Consumers can restore the archive into a Conan home with:
 
 ```bash
-conan remote add chio-private <CONAN_REMOTE_URL>  # TODO: set canonical remote
-conan remote login chio-private chio-publisher --password-stdin <<< "${CHIO_NEXUS_PUBLISHER_TOKEN}"
+tar -C "$HOME/.conan2" -xzf chio-cpp-sdks-0.1.0-conan2-cache.tar.gz
 ```
 
-Tag-driven publishes are wired through `.github/workflows/release-cpp.yml` and
-do not require operator action. Manual publishes (e.g. one-off republish):
+If a private Conan remote is provisioned separately, operators can upload the
+same locally qualified package refs manually:
 
 ```bash
 conan upload chio-cpp/0.1.0 -r=chio-private --confirm

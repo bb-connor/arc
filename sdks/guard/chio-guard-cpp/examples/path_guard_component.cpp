@@ -89,4 +89,3 @@ extern "C" void exports_chio_guard_evaluate(
   set_verdict(ret, guard.evaluate(native_request));
   exports_chio_guard_types_guard_request_free(request);
 }
-

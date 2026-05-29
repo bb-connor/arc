@@ -1746,15 +1746,15 @@ pub(crate) fn build_scim_deprovision_receipt(
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
 mod config_and_public_tests {
     use super::*;
     use chio_credentials::verify_signed_public_issuer_discovery;
+    use chio_test_support::prelude::*;
     use std::path::PathBuf;
 
     fn base_config() -> TrustServiceConfig {
         TrustServiceConfig {
-            listen: "127.0.0.1:0".parse().expect("parse listen addr"),
+            listen: "127.0.0.1:0".parse().test_expect("parse listen addr"),
             service_token: "token".to_string(),
             tenant_read_tokens: BTreeMap::new(),
             receipt_db_path: None,
@@ -1784,7 +1784,7 @@ mod config_and_public_tests {
     fn unique_temp_path(prefix: &str, extension: &str) -> PathBuf {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .expect("system time after unix epoch")
+            .test_expect("system time after unix epoch")
             .as_nanos();
         std::env::temp_dir().join(format!("{prefix}-{nonce}.{extension}"))
     }
@@ -1792,7 +1792,7 @@ mod config_and_public_tests {
     #[test]
     fn configured_public_certification_metadata_validates_advertise_url_and_builds_paths() {
         let missing_error = configured_public_certification_metadata(&base_config())
-            .expect_err("missing advertise URL should fail");
+            .test_expect_err("missing advertise URL should fail");
         assert!(missing_error
             .to_string()
             .contains("requires --advertise-url"));
@@ -1800,7 +1800,7 @@ mod config_and_public_tests {
         let mut blank_config = base_config();
         blank_config.advertise_url = Some("/".to_string());
         let blank_error = configured_public_certification_metadata(&blank_config)
-            .expect_err("blank advertise URL should fail");
+            .test_expect_err("blank advertise URL should fail");
         assert!(blank_error.to_string().contains("non-empty advertise_url"));
 
         let mut config = base_config();
@@ -1808,7 +1808,7 @@ mod config_and_public_tests {
         config.certification_public_metadata_ttl_seconds = 120;
 
         let metadata = configured_public_certification_metadata(&config)
-            .expect("build certification metadata");
+            .test_expect("build certification metadata");
 
         assert_eq!(metadata.publisher.publisher_id, "https://trust.example.com");
         assert_eq!(metadata.publisher.registry_url, "https://trust.example.com");
@@ -1829,8 +1829,8 @@ mod config_and_public_tests {
 
     #[test]
     fn public_generic_registry_publisher_requires_and_normalizes_advertise_url() {
-        let missing_error =
-            public_generic_registry_publisher(&base_config()).expect_err("missing advertise URL");
+        let missing_error = public_generic_registry_publisher(&base_config())
+            .test_expect_err("missing advertise URL");
         assert!(missing_error
             .to_string()
             .contains("require --advertise-url"));
@@ -1838,13 +1838,13 @@ mod config_and_public_tests {
         let mut blank_config = base_config();
         blank_config.advertise_url = Some("///".to_string());
         let blank_error = public_generic_registry_publisher(&blank_config)
-            .expect_err("blank normalized advertise URL");
+            .test_expect_err("blank normalized advertise URL");
         assert!(blank_error.to_string().contains("non-empty advertise_url"));
 
         let mut config = base_config();
         config.advertise_url = Some("https://trust.example.com/".to_string());
-        let publisher =
-            public_generic_registry_publisher(&config).expect("build generic registry publisher");
+        let publisher = public_generic_registry_publisher(&config)
+            .test_expect("build generic registry publisher");
 
         assert_eq!(publisher.role, GenericRegistryPublisherRole::Origin);
         assert_eq!(publisher.operator_id, "https://trust.example.com");
@@ -1863,7 +1863,7 @@ mod config_and_public_tests {
             applies_to_future_sessions_only: false,
             trusted_public_keys: Vec::new(),
         })
-        .expect_err("unconfigured authority should fail");
+        .test_expect_err("unconfigured authority should fail");
         assert!(not_configured
             .to_string()
             .contains("requires a configured authority"));
@@ -1878,7 +1878,7 @@ mod config_and_public_tests {
             applies_to_future_sessions_only: true,
             trusted_public_keys: vec![current.clone()],
         })
-        .expect("current key should be trusted once");
+        .test_expect("current key should be trusted once");
         assert_eq!(trusted.len(), 1);
         assert_eq!(trusted[0].to_hex(), current);
 
@@ -1891,7 +1891,7 @@ mod config_and_public_tests {
             applies_to_future_sessions_only: true,
             trusted_public_keys: Vec::new(),
         })
-        .expect_err("empty trust material should fail");
+        .test_expect_err("empty trust material should fail");
         assert!(missing_material
             .to_string()
             .contains("did not publish any signing keys"));
@@ -1913,14 +1913,14 @@ mod config_and_public_tests {
         config.advertise_url = Some("https://trust.example.com".to_string());
 
         let wallet_exchange =
-            oid4vp_wallet_exchange_url(&config, "request/alpha").expect("wallet exchange URL");
+            oid4vp_wallet_exchange_url(&config, "request/alpha").test_expect("wallet exchange URL");
         assert_eq!(
             wallet_exchange,
             "https://trust.example.com/v1/public/passport/wallet-exchanges/request%2Falpha"
         );
 
         let cross_device = oid4vp_cross_device_url(&config, "request/alpha", request_uri)
-            .expect("cross-device URL");
+            .test_expect("cross-device URL");
         assert!(cross_device.starts_with(
             "https://trust.example.com/v1/public/passport/oid4vp/launch/request%2Falpha?request_uri="
         ));
@@ -1931,13 +1931,14 @@ mod config_and_public_tests {
     fn verifier_metadata_and_jwks_can_be_built_from_seed_authority() {
         let seed_path = unique_temp_path("chio-trust-control-authority", "seed");
         let authority_keypair =
-            load_or_create_authority_keypair(&seed_path).expect("create authority seed file");
+            load_or_create_authority_keypair(&seed_path).test_expect("create authority seed file");
 
         let mut config = base_config();
         config.advertise_url = Some("https://trust.example.com".to_string());
         config.authority_seed_path = Some(seed_path);
 
-        let status = authority_status_for_config(&config).expect("authority status from seed file");
+        let status =
+            authority_status_for_config(&config).test_expect("authority status from seed file");
         assert!(status.configured);
         assert_eq!(status.backend.as_deref(), Some("seed_file"));
         let authority_public_key = authority_keypair.public_key().to_hex();
@@ -1948,7 +1949,7 @@ mod config_and_public_tests {
         assert_eq!(status.trusted_public_keys.len(), 1);
 
         let metadata =
-            build_oid4vp_verifier_metadata(&config).expect("build OID4VP verifier metadata");
+            build_oid4vp_verifier_metadata(&config).test_expect("build OID4VP verifier metadata");
         assert_eq!(metadata.verifier_id, "https://trust.example.com");
         assert_eq!(metadata.client_id, "https://trust.example.com");
         assert_eq!(
@@ -1962,13 +1963,13 @@ mod config_and_public_tests {
         assert_eq!(metadata.trusted_key_count, 1);
         assert!(metadata.authority_generation.is_none());
 
-        let jwks = build_oid4vp_verifier_jwks(&config).expect("build verifier JWKS");
+        let jwks = build_oid4vp_verifier_jwks(&config).test_expect("build verifier JWKS");
         assert_eq!(jwks.keys.len(), 1);
         assert_eq!(jwks.keys[0].alg, "EdDSA");
         assert_eq!(jwks.keys[0].use_, "sig");
 
         let discovery_version =
-            public_discovery_version(&config).expect("derive public discovery version");
+            public_discovery_version(&config).test_expect("derive public discovery version");
         assert_eq!(discovery_version, 1);
     }
 
@@ -1976,16 +1977,17 @@ mod config_and_public_tests {
     fn public_discovery_uses_local_db_signer_after_replica_snapshot() {
         let source_path = unique_temp_path("chio-trust-control-authority-source", "sqlite");
         let follower_path = unique_temp_path("chio-trust-control-authority-follower", "sqlite");
-        let source = SqliteCapabilityAuthority::open(&source_path).expect("open source authority");
+        let source =
+            SqliteCapabilityAuthority::open(&source_path).test_expect("open source authority");
         let follower =
-            SqliteCapabilityAuthority::open(&follower_path).expect("open follower authority");
-        let follower_local_key = follower.local_keypair().expect("read follower seed");
+            SqliteCapabilityAuthority::open(&follower_path).test_expect("open follower authority");
+        let follower_local_key = follower.local_keypair().test_expect("read follower seed");
 
-        source.rotate().expect("rotate source authority");
-        let snapshot = source.snapshot().expect("snapshot source authority");
+        source.rotate().test_expect("rotate source authority");
+        let snapshot = source.snapshot().test_expect("snapshot source authority");
         assert!(follower
             .apply_snapshot(&snapshot)
-            .expect("apply source snapshot"));
+            .test_expect("apply source snapshot"));
         assert!(follower.current_keypair().is_err());
 
         let mut config = base_config();
@@ -1993,14 +1995,14 @@ mod config_and_public_tests {
         config.authority_db_path = Some(follower_path.clone());
 
         let signing_key =
-            resolve_oid4vp_verifier_signing_key(&config).expect("resolve follower signer");
+            resolve_oid4vp_verifier_signing_key(&config).test_expect("resolve follower signer");
         assert_eq!(signing_key.public_key(), follower_local_key.public_key());
 
-        let issuer = build_public_issuer_discovery(&config).expect("build issuer discovery");
+        let issuer = build_public_issuer_discovery(&config).test_expect("build issuer discovery");
         assert_eq!(
             issuer.body.signer_public_key,
             follower_local_key.public_key()
         );
-        verify_signed_public_issuer_discovery(&issuer).expect("verify issuer discovery");
+        verify_signed_public_issuer_discovery(&issuer).test_expect("verify issuer discovery");
     }
 }

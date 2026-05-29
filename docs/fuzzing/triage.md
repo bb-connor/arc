@@ -44,7 +44,7 @@ The crash demonstrates one of:
 - Supply-chain attestation forge (an `attest_verify` input that
   passes verification with the wrong subject or wrong predicate).
 
-Critical crashes route to the on-call human (`@bb-connor`) and block the
+Critical crashes route to the on-call human (`Chio maintainers`) and block the
 next release cut until fixed or explicitly deferred with a
 CVE-style writeup.
 
@@ -168,7 +168,7 @@ fuzz run started).
   upstream and counted against the program's overall SLO health.
 
 Critical and High issues that miss their fix-or-defer SLO escalate
-to the on-call (`@bb-connor`) and surface in the next weekly
+to the on-call (`Chio maintainers`) and surface in the next weekly
 fuzz-program review. Medium and Low misses surface in the
 quarterly cleanup pass.
 
@@ -224,7 +224,7 @@ Two guards enforce the policy:
   `check-regression-tests` job in `.github/workflows/ci.yml` and fails
   the build when a committed `regression_<sha>.rs` file is removed
   without a paired issue link that names the deleted file.
-- `CODEOWNERS` requires `@bb-connor` review on any
+- `CODEOWNERS` requires `Chio maintainers` review on any
   diff that touches `tests/regression_*.rs` or
   `crates/*/tests/regression_*.rs`.
 
@@ -235,7 +235,7 @@ non-meaningful, or the target was deleted), the deleting PR must:
 1. Link the original `fuzz-crash` issue in the PR body.
 2. Explain why the test is no longer protective (one paragraph in
    the PR body).
-3. Get explicit `@bb-connor` approval on the deletion line.
+3. Get explicit `Chio maintainers` approval on the deletion line.
 
 The CI guard refuses the merge until those conditions are met.
 

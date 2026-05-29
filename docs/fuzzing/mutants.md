@@ -224,7 +224,7 @@ audit trail; pick the one that matches the situation.
 a PR that clears `cycle_end_tag` in `releases.toml`, includes
 `mutants-gate-override` in the PR title, and merges. The lane returns to
 advisory for one cycle. CODEOWNERS routes any edit on `releases.toml` to
-`@bb-connor` (principal-engineer review), so the override cannot land
+`Chio maintainers` (principal-engineer review), so the override cannot land
 without explicit sign-off. Use this path when the project needs to
 re-enter advisory mode for an entire release cycle (e.g. a large
 refactor temporarily depresses the catch ratio while tests are

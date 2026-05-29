@@ -256,10 +256,10 @@ impl std::fmt::Debug for CaptureWriter {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use crate::frame::{validate_signed, Otel, Provenance, Upstream, UpstreamSystem, Verdict};
+    use chio_test_support::prelude::*;
 
     fn sample_inputs() -> FrameInputs {
         FrameInputs {
@@ -321,15 +321,15 @@ mod tests {
     #[test]
     fn signed_frame_verifies_under_public_key() {
         let keypair = Keypair::from_seed(&[3u8; 32]);
-        let frame = sign_frame(sample_inputs(), &keypair).unwrap();
+        let frame = sign_frame(sample_inputs(), &keypair).test_unwrap();
         let pubkey = *keypair.public_key().as_bytes();
-        validate_signed(&frame, &pubkey).expect("signed frame must verify");
+        validate_signed(&frame, &pubkey).test_expect("signed frame must verify");
     }
 
     #[test]
     fn signed_frame_rejects_wrong_key() {
         let keypair = Keypair::from_seed(&[4u8; 32]);
-        let frame = sign_frame(sample_inputs(), &keypair).unwrap();
+        let frame = sign_frame(sample_inputs(), &keypair).test_unwrap();
         let wrong = Keypair::from_seed(&[5u8; 32]);
         let wrong_pub = *wrong.public_key().as_bytes();
         assert!(validate_signed(&frame, &wrong_pub).is_err());
@@ -337,18 +337,18 @@ mod tests {
 
     #[test]
     fn writer_appends_one_frame_per_line() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().test_unwrap();
         let keypair = Keypair::from_seed(&[6u8; 32]);
-        let writer = CaptureWriter::open(dir.path(), "run-test").unwrap();
-        let frame = sign_frame(sample_inputs(), &keypair).unwrap();
-        writer.append(&frame).unwrap();
-        writer.append(&frame).unwrap();
+        let writer = CaptureWriter::open(dir.path(), "run-test").test_unwrap();
+        let frame = sign_frame(sample_inputs(), &keypair).test_unwrap();
+        writer.append(&frame).test_unwrap();
+        writer.append(&frame).test_unwrap();
 
-        let body = std::fs::read_to_string(writer.path()).unwrap();
+        let body = std::fs::read_to_string(writer.path()).test_unwrap();
         let lines: Vec<&str> = body.lines().collect();
         assert_eq!(lines.len(), 2);
         for line in lines {
-            let parsed: Frame = serde_json::from_str(line).unwrap();
+            let parsed: Frame = serde_json::from_str(line).test_unwrap();
             assert_eq!(parsed.tee_id, "tee-capture-test");
         }
     }

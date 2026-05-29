@@ -529,13 +529,13 @@ fn trust_level_str(level: TrustLevel) -> &'static str {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use chio_core::crypto::Keypair;
     use chio_core::receipt::{
         ChioReceipt, ChioReceiptBody, Decision, ReceiptSemanticFields, ToolCallAction, TrustLevel,
     };
+    use chio_test_support::prelude::*;
 
     fn test_receipt(id: &str, decision: Decision) -> ChioReceipt {
         test_receipt_with_semantics(id, decision, None, TrustLevel::Mediated)
@@ -583,7 +583,7 @@ mod tests {
             kernel_key: kp.public_key(),
         };
         #[allow(clippy::unwrap_used)]
-        ChioReceipt::sign(body, &kp).unwrap()
+        ChioReceipt::sign(body, &kp).test_unwrap()
     }
 
     #[test]

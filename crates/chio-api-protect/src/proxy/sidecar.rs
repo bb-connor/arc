@@ -672,6 +672,19 @@ pub(crate) async fn sidecar_validate_capability_handler(
             .into_response();
     }
 
+    if !state.trusted_capability_issuers.contains(&token.issuer) {
+        return (
+            StatusCode::OK,
+            axum::Json(SidecarValidateCapabilityResponse {
+                valid: false,
+                reason: Some("capability issuer is not trusted".to_string()),
+                expires_at,
+                capability_id,
+            }),
+        )
+            .into_response();
+    }
+
     let signature_valid = token.verify_signature().unwrap_or(false);
     if !signature_valid {
         return (
@@ -788,6 +801,8 @@ pub(crate) struct SidecarVerifyReceiptRequest {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct SidecarVerifyReceiptResponse {
+    #[serde(flatten)]
+    report: VerifyReceiptResponse,
     valid: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     reason: Option<String>,
@@ -798,8 +813,86 @@ pub(crate) struct SidecarVerifyReceiptResponse {
     receipt_id: String,
 }
 
+fn sidecar_chio_receipt_report(
+    receipt: &ChioReceipt,
+    signer_trusted: bool,
+) -> VerifyReceiptResponse {
+    let signature_valid = receipt.verify_signature().unwrap_or(false);
+    let receipt_id_valid = chio_core_types::chio_receipt_id(&receipt.body())
+        .map(|expected_id| expected_id == receipt.id)
+        .unwrap_or(false);
+    let parameter_hash_valid = receipt.action.verify_hash().unwrap_or(false);
+    let content_hash_valid = is_lower_hex_64(&receipt.content_hash);
+    let policy_hash_valid = is_lower_hex_64(&receipt.policy_hash);
+    let semantic_valid = receipt.receipt_kind == ReceiptKind::MediatedDecision
+        && receipt.boundary_class == BoundaryClass::Prevent
+        && receipt.observation_outcome.is_none()
+        && receipt.trust_level == TrustLevel::Mediated;
+    let ok = signature_valid
+        && signer_trusted
+        && receipt_id_valid
+        && parameter_hash_valid
+        && content_hash_valid
+        && policy_hash_valid
+        && semantic_valid;
+    let authorized = ok && receipt.is_allowed();
+
+    VerifyReceiptResponse {
+        signature_valid,
+        signer_trusted,
+        receipt_id_valid,
+        parameter_hash_valid,
+        receipt_kind: receipt.receipt_kind.as_str().to_string(),
+        boundary_class: receipt.boundary_class.as_str().to_string(),
+        trust_level: receipt.trust_level.as_str().to_string(),
+        result: decision_label(&receipt.decision),
+        authorized,
+        signer_key_hex: receipt.kernel_key.to_hex(),
+        ok,
+    }
+}
+
+fn sidecar_verify_receipt_response(
+    receipt: &ChioReceipt,
+    report: VerifyReceiptResponse,
+    valid: bool,
+    reason: Option<String>,
+) -> SidecarVerifyReceiptResponse {
+    SidecarVerifyReceiptResponse {
+        valid,
+        reason,
+        decision: Some(report.result.clone()),
+        signed_at: Some(receipt.timestamp),
+        receipt_id: receipt.id.clone(),
+        report,
+    }
+}
+
+fn sidecar_receipt_report_reason(report: &VerifyReceiptResponse) -> Option<String> {
+    if !report.receipt_id_valid {
+        return Some("receipt id does not match body".to_string());
+    }
+    if !report.parameter_hash_valid {
+        return Some("receipt action parameter_hash does not match parameters".to_string());
+    }
+    if report.receipt_kind != ReceiptKind::MediatedDecision.as_str()
+        || report.boundary_class != BoundaryClass::Prevent.as_str()
+        || report.trust_level != TrustLevel::Mediated.as_str()
+    {
+        return Some("receipt semantics are not authoritative".to_string());
+    }
+    None
+}
+
+fn is_lower_hex_64(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 pub(crate) async fn sidecar_verify_receipt_handler(
-    State(_state): State<Arc<ProxyState>>,
+    State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
 ) -> Response {
     let (_parts, body) = request.into_parts();
@@ -821,21 +914,33 @@ pub(crate) async fn sidecar_verify_receipt_handler(
     };
 
     let receipt = verify_request.receipt;
-    let receipt_id = receipt.id.clone();
-    let signed_at = Some(receipt.timestamp);
     let decision_label = decision_label(&receipt.decision);
-
-    let signature_valid = receipt.verify_signature().unwrap_or(false);
-    if !signature_valid {
+    let signer_trusted = state.trusted_receipt_signers.contains(&receipt.kernel_key);
+    let mut report = sidecar_chio_receipt_report(&receipt, signer_trusted);
+    if !report.signature_valid {
         return (
             StatusCode::OK,
-            axum::Json(SidecarVerifyReceiptResponse {
-                valid: false,
-                reason: Some("receipt signature did not verify".to_string()),
-                decision: Some(decision_label.clone()),
-                signed_at,
-                receipt_id,
-            }),
+            axum::Json(sidecar_verify_receipt_response(
+                &receipt,
+                report,
+                false,
+                Some("receipt signature did not verify".to_string()),
+            )),
+        )
+            .into_response();
+    }
+
+    if !report.signer_trusted {
+        report.ok = false;
+        report.authorized = false;
+        return (
+            StatusCode::OK,
+            axum::Json(sidecar_verify_receipt_response(
+                &receipt,
+                report,
+                false,
+                Some("receipt signer is not trusted".to_string()),
+            )),
         )
             .into_response();
     }
@@ -843,17 +948,18 @@ pub(crate) async fn sidecar_verify_receipt_handler(
     if let Some(expected_decision) = verify_request.expected_decision.as_deref() {
         let expected = expected_decision.trim();
         if !expected.is_empty() && expected != decision_label {
+            report.ok = false;
+            report.authorized = false;
             return (
                 StatusCode::OK,
-                axum::Json(SidecarVerifyReceiptResponse {
-                    valid: false,
-                    reason: Some(format!(
+                axum::Json(sidecar_verify_receipt_response(
+                    &receipt,
+                    report,
+                    false,
+                    Some(format!(
                         "decision {decision_label} does not match expected {expected}"
                     )),
-                    decision: Some(decision_label),
-                    signed_at,
-                    receipt_id,
-                }),
+                )),
             )
                 .into_response();
         }
@@ -862,31 +968,32 @@ pub(crate) async fn sidecar_verify_receipt_handler(
     if let Some(expected_capability_id) = verify_request.expected_capability_id.as_deref() {
         let expected = expected_capability_id.trim();
         if !expected.is_empty() && expected != receipt.capability_id {
+            report.ok = false;
+            report.authorized = false;
             return (
                 StatusCode::OK,
-                axum::Json(SidecarVerifyReceiptResponse {
-                    valid: false,
-                    reason: Some(
-                        "receipt capability_id does not match expected_capability_id".to_string(),
-                    ),
-                    decision: Some(decision_label),
-                    signed_at,
-                    receipt_id,
-                }),
+                axum::Json(sidecar_verify_receipt_response(
+                    &receipt,
+                    report,
+                    false,
+                    Some("receipt capability_id does not match expected_capability_id".to_string()),
+                )),
             )
                 .into_response();
         }
     }
 
+    let valid = report.ok;
+    let reason = if valid {
+        None
+    } else {
+        sidecar_receipt_report_reason(&report)
+    };
     (
         StatusCode::OK,
-        axum::Json(SidecarVerifyReceiptResponse {
-            valid: true,
-            reason: None,
-            decision: Some(decision_label),
-            signed_at,
-            receipt_id,
-        }),
+        axum::Json(sidecar_verify_receipt_response(
+            &receipt, report, valid, reason,
+        )),
     )
         .into_response()
 }
@@ -1036,6 +1143,11 @@ pub(crate) async fn sidecar_evaluate_tool_call_handler(
             return internal_json_error_response("chio_receipt_sign_failed", &error.to_string());
         }
     };
+
+    if let Err(error) = record_tool_receipt(&state, &receipt).await {
+        warn!("failed to persist tool-call evaluation receipt: {error}");
+        return internal_json_error_response("chio_receipt_persistence_failed", &error.to_string());
+    }
 
     (StatusCode::OK, axum::Json(receipt)).into_response()
 }

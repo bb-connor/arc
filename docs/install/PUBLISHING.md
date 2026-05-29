@@ -62,6 +62,7 @@ Published under the listed distribution name:
 | Slug | Distribution | Directory |
 |---|---|---|
 | `chio-sdk-python` | `chio-sdk-python` | `sdks/python/chio-sdk-python` |
+| `chio-adapter-base` | `chio-adapter-base` | `sdks/python/chio-adapter-base` |
 | `chio-asgi` | `chio-asgi` | `sdks/python/chio-asgi` |
 | `chio-django` | `chio-django` | `sdks/python/chio-django` |
 | `chio-fastapi` | `chio-fastapi` | `sdks/python/chio-fastapi` |
@@ -79,12 +80,14 @@ Published under the listed distribution name:
 | `chio-observability` | `chio-observability` | `sdks/python/chio-observability` |
 | `chio-langgraph` | `chio-langgraph` | `sdks/python/chio-langgraph` |
 | `chio-code-agent` | `chio-code-agent` | `sdks/python/chio-code-agent` |
+| `chio-hermes` | `chio-hermes` | `sdks/python/chio-hermes` |
 | `chio-lambda-python` | `chio-lambda-python` | `sdks/lambda/chio-lambda-python` |
 
 ### TypeScript (npm)
 
 | Slug | Distribution | Directory |
 |---|---|---|
+| `chio-ts` | `@chio-protocol/sdk` | `sdks/typescript/chio-ts` |
 | `node-http` | `@chio-protocol/node-http` | `sdks/typescript/packages/node-http` |
 | `express` | `@chio-protocol/express` | `sdks/typescript/packages/express` |
 | `fastify` | `@chio-protocol/fastify` | `sdks/typescript/packages/fastify` |
@@ -127,7 +130,7 @@ npm provenance requires the workflow to run with
 for the npm package to opt in to Trusted Publishing:
 
 1. Log in to https://www.npmjs.com as an org admin of `@chio-protocol`.
-2. For each package (`node-http`, `express`, `fastify`, `elysia`,
+2. For each package (`chio-ts`, `node-http`, `express`, `fastify`, `elysia`,
    `ai-sdk`), go to **Settings** -> **Trusted Publishers** -> **Add**
    and register:
    - GitHub org: `backbay-industries`

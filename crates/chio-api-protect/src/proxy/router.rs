@@ -467,6 +467,20 @@ pub(crate) async fn record_receipt(
     Ok(())
 }
 
+pub(crate) async fn record_tool_receipt(
+    state: &Arc<ProxyState>,
+    receipt: &ChioReceipt,
+) -> Result<(), ProtectError> {
+    if let Some(store) = &state.receipt_store {
+        let mut store = store.lock().await;
+        store.append_tool_receipt(receipt)?;
+    }
+
+    let mut log = state.tool_receipt_log.lock().await;
+    log.receipts.push(receipt.clone());
+    Ok(())
+}
+
 pub(crate) async fn finalize_and_record_receipt(
     state: &Arc<ProxyState>,
     decision_receipt: &HttpReceipt,

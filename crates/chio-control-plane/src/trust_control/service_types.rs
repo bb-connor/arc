@@ -2388,8 +2388,9 @@ where
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod cluster_lease_rpc_tests {
+    use chio_test_support::prelude::*;
+
     use super::{LeaseHeartbeatRequest, LeaseTerminateRequest, LeaseTerminationReason};
 
     #[test]
@@ -2401,14 +2402,14 @@ mod cluster_lease_rpc_tests {
             observed_at: 1_700_000_000_000,
             proposed_expires_at: Some(1_700_000_030_000),
         };
-        let value = serde_json::to_value(&request).unwrap();
+        let value = serde_json::to_value(&request).test_unwrap();
         assert_eq!(value["leaseId"], "lease-7");
         assert_eq!(value["leaseEpoch"], 3);
         assert_eq!(value["leaderUrl"], "https://node-a.example/v1");
         assert_eq!(value["observedAt"], 1_700_000_000_000u64);
         assert_eq!(value["proposedExpiresAt"], 1_700_000_030_000u64);
 
-        let decoded: LeaseHeartbeatRequest = serde_json::from_value(value).unwrap();
+        let decoded: LeaseHeartbeatRequest = serde_json::from_value(value).test_unwrap();
         assert_eq!(decoded.lease_id, request.lease_id);
         assert_eq!(decoded.lease_epoch, request.lease_epoch);
         assert_eq!(decoded.proposed_expires_at, request.proposed_expires_at);
@@ -2418,9 +2419,9 @@ mod cluster_lease_rpc_tests {
     fn lease_heartbeat_request_optional_expiry_is_omitted_when_absent() {
         let json =
             r#"{"leaseId":"lease-1","leaseEpoch":0,"leaderUrl":"https://n/1","observedAt":1}"#;
-        let decoded: LeaseHeartbeatRequest = serde_json::from_str(json).unwrap();
+        let decoded: LeaseHeartbeatRequest = serde_json::from_str(json).test_unwrap();
         assert!(decoded.proposed_expires_at.is_none());
-        let reserialized = serde_json::to_value(&decoded).unwrap();
+        let reserialized = serde_json::to_value(&decoded).test_unwrap();
         assert!(reserialized.get("proposedExpiresAt").is_none());
     }
 
@@ -2447,11 +2448,11 @@ mod cluster_lease_rpc_tests {
             observed_at: 1_700_000_100_000,
             successor_leader_url: Some("https://node-c.example/v1".to_string()),
         };
-        let value = serde_json::to_value(&request).unwrap();
+        let value = serde_json::to_value(&request).test_unwrap();
         assert_eq!(value["reason"], "leader_handoff");
         assert_eq!(value["successorLeaderUrl"], "https://node-c.example/v1");
 
-        let decoded: LeaseTerminateRequest = serde_json::from_value(value).unwrap();
+        let decoded: LeaseTerminateRequest = serde_json::from_value(value).test_unwrap();
         assert_eq!(decoded.reason, LeaseTerminationReason::LeaderHandoff);
         assert_eq!(decoded.successor_leader_url, request.successor_leader_url);
     }
@@ -2467,9 +2468,9 @@ mod cluster_lease_rpc_tests {
             ),
             (LeaseTerminationReason::TermAdvanced, "term_advanced"),
         ] {
-            assert_eq!(serde_json::to_value(reason).unwrap(), wire);
+            assert_eq!(serde_json::to_value(reason).test_unwrap(), wire);
             let decoded: LeaseTerminationReason =
-                serde_json::from_value(serde_json::json!(wire)).unwrap();
+                serde_json::from_value(serde_json::json!(wire)).test_unwrap();
             assert_eq!(decoded, reason);
         }
     }

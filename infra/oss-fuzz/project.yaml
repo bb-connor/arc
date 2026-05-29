@@ -1,9 +1,9 @@
 homepage: "https://github.com/backbay-labs/chio"
 language: rust
-primary_contact: "connor@backbay.io"
+primary_contact: "security@backbay.io"
 auto_ccs:
-  - "connor@backbay.io"
-  # TODO: add a backup contact.
+  - "security@backbay.io"
+  - "fuzzing@backbay.io"
 main_repo: "https://github.com/backbay-labs/chio"
 sanitizers:
   # OSS-Fuzz Rust integration only supports `address` for Rust

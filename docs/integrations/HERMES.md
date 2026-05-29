@@ -1,6 +1,6 @@
 # Hermes Integration
 
-Chio (formerly ARC) is a first-class tool surface for the
+Chio is a first-class tool surface for the
 [Hermes Agent](https://github.com/NousResearch/hermes-agent) the same
 way it is for Claude Code, Cursor, Codex, and OpenClaw. Two integration
 paths are supported. Path A wires Chio into Hermes as an MCP server

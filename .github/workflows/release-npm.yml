@@ -7,8 +7,8 @@ name: Release npm
 # Tag formats:
 #   ts/v<X.Y.Z>                 -> publishes every TypeScript package
 #   ts/<slug>-v<X.Y.Z>          -> publishes only that package
-#                                  (e.g. ts/express-v1.2.0 publishes
-#                                  @chio-protocol/express)
+#                                  (e.g. ts/chio-ts-v1.2.0 publishes
+#                                  @chio-protocol/sdk)
 #
 # workflow_dispatch always builds and lints only; package publishing is
 # restricted to tag pushes. No stored NPM_TOKEN is required;
@@ -64,9 +64,10 @@ jobs:
           # `conformance` workspace is marked `"private": true` and is
           # intentionally excluded.
           #
-          # node-http must always be built first because the other
-          # packages depend on it via `file:../node-http`.
+          # chio-ts is the core SDK package. node-http stays ahead of
+          # packages that depend on it via `file:../node-http`.
           all_packages=(
+            "sdks/typescript/chio-ts"
             "sdks/typescript/packages/node-http"
             "sdks/typescript/packages/express"
             "sdks/typescript/packages/fastify"

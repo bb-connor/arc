@@ -12,7 +12,16 @@ def parse_capability_json(input_text: str) -> dict[str, Any]:
 
 
 def _capability_body(capability: dict[str, Any]) -> dict[str, Any]:
-    return {key: value for key, value in capability.items() if key != "signature"}
+    omitted = {
+        "algorithm",
+        "attenuation_proof",
+        "budget_share_bps",
+        "caveats",
+        "schema",
+        "scope_attenuations",
+        "signature",
+    }
+    return {key: value for key, value in capability.items() if key not in omitted}
 
 
 def _delegation_link_body(link: dict[str, Any]) -> dict[str, Any]:
@@ -21,6 +30,33 @@ def _delegation_link_body(link: dict[str, Any]) -> dict[str, Any]:
 
 def capability_body_canonical_json(capability: dict[str, Any]) -> str:
     return canonicalize_json(_capability_body(capability))
+
+
+def _non_empty_list(value: Any) -> bool:
+    return isinstance(value, list) and len(value) > 0
+
+
+def capability_signing_body(capability: dict[str, Any]) -> dict[str, Any]:
+    body = _capability_body(capability)
+    signing_body = {
+        "schema": capability.get("schema", "chio.capability.v1"),
+        **body,
+    }
+    if not _non_empty_list(signing_body.get("delegation_chain")):
+        signing_body.pop("delegation_chain", None)
+    if _non_empty_list(capability.get("caveats")):
+        signing_body["caveats"] = capability["caveats"]
+    if _non_empty_list(capability.get("scope_attenuations")):
+        signing_body["scope_attenuations"] = capability["scope_attenuations"]
+    if capability.get("attenuation_proof") is not None:
+        signing_body["attenuation_proof"] = capability["attenuation_proof"]
+    if capability.get("budget_share_bps") is not None:
+        signing_body["budget_share_bps"] = capability["budget_share_bps"]
+    return signing_body
+
+
+def capability_signing_body_canonical_json(capability: dict[str, Any]) -> str:
+    return canonicalize_json(capability_signing_body(capability))
 
 
 def _verify_delegation_chain(
@@ -58,7 +94,7 @@ def verify_capability(
         time_status = "valid"
     return {
         "signature_valid": verify_utf8_message_ed25519(
-            capability_body_canonical_json(capability),
+            capability_signing_body_canonical_json(capability),
             capability["issuer"],
             capability["signature"],
         ),

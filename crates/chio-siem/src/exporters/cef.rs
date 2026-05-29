@@ -229,13 +229,13 @@ fn escape_extension(value: &str) -> String {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use chio_core::crypto::Keypair;
     use chio_core::receipt::{
         ChioReceipt, ChioReceiptBody, Decision, ReceiptSemanticFields, ToolCallAction, TrustLevel,
     };
+    use chio_test_support::prelude::*;
 
     #[test]
     fn escapes_header_separator() {
@@ -256,7 +256,7 @@ mod tests {
         ));
         let cef = CefExporter::default()
             .format_event(&event)
-            .expect("format trace CEF");
+            .test_expect("format trace CEF");
 
         assert!(cef.contains("receiptKind=trace_observation"));
         assert!(cef.contains("boundaryClass=detect_only"));
@@ -279,7 +279,7 @@ mod tests {
         let event = SiemEvent::from_receipt(receipt);
         let cef = CefExporter::default()
             .format_event(&event)
-            .expect("format CEF");
+            .test_expect("format CEF");
 
         assert!(cef.contains("cs5=single-tenant"));
         assert!(!cef.contains("metadata-tenant"));
@@ -294,7 +294,7 @@ mod tests {
         let action = ToolCallAction::from_parameters(serde_json::json!({
             "path": "/etc/passwd"
         }))
-        .expect("hash test receipt parameters");
+        .test_expect("hash test receipt parameters");
         let decision = if semantics.receipt_kind == chio_core::ReceiptKind::MediatedDecision {
             Some(decision)
         } else {
@@ -325,6 +325,6 @@ mod tests {
             },
             &kp,
         )
-        .expect("sign test receipt")
+        .test_expect("sign test receipt")
     }
 }

@@ -30,6 +30,7 @@ default = []
 delegation = []
 
 [dev-dependencies]
+chio-test-support = { path = "../chio-test-support" }
 criterion = { workspace = true }
 proptest = { workspace = true }
 chio-federation = { path = "../chio-federation" }

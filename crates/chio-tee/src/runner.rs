@@ -513,9 +513,9 @@ fn sanitize_identifier(input: &str) -> String {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use chio_test_support::prelude::*;
 
     use chio_core::canonical::canonical_json_string;
     use chio_core::capability::{CapabilityToken, CapabilityTokenBody, ChioScope};
@@ -535,7 +535,7 @@ mod tests {
             expires_at: u64::MAX,
             delegation_chain: Vec::new(),
         };
-        CapabilityToken::sign(body, kp).expect("sign capability")
+        CapabilityToken::sign(body, kp).test_expect("sign capability")
     }
 
     fn request(kp: &Keypair, id: &str, params: serde_json::Value) -> AgentMessage {
@@ -554,7 +554,7 @@ mod tests {
         params: serde_json::Value,
         decision: Decision,
     ) -> ChioReceipt {
-        let canonical = canonical_json_string(&params).expect("canonical params");
+        let canonical = canonical_json_string(&params).test_expect("canonical params");
         let parameter_hash = sha256_hex(canonical.as_bytes());
         let action = ToolCallAction {
             parameters: params,
@@ -582,7 +582,7 @@ mod tests {
             tenant_id: None,
             kernel_key: kp.public_key(),
         };
-        ChioReceipt::sign(body, kp).expect("sign receipt")
+        ChioReceipt::sign(body, kp).test_expect("sign receipt")
     }
 
     fn config() -> RunnerConfig {
@@ -595,7 +595,7 @@ mod tests {
 
     #[test]
     fn verdict_only_capture_writes_allow_frame() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().test_unwrap();
         let runner = ShadowRunner::with_in_memory_store(
             config(),
             Mode::VerdictOnly,
@@ -603,18 +603,18 @@ mod tests {
             dir.path(),
             "run-vo",
         )
-        .unwrap();
+        .test_unwrap();
         let kp = keypair();
         let params = serde_json::json!({"to": "alice@example.com"});
         let req = request(&kp, "r1", params.clone());
         let rcpt = receipt(&kp, "r1", params, Decision::Allow);
 
-        runner.before_kernel(&req).expect("before ok");
-        runner.after_kernel(&req, &rcpt).expect("after ok");
+        runner.before_kernel(&req).test_expect("before ok");
+        runner.after_kernel(&req, &rcpt).test_expect("after ok");
 
-        let body = std::fs::read_to_string(runner.capture_path()).unwrap();
+        let body = std::fs::read_to_string(runner.capture_path()).test_unwrap();
         let frame: crate::frame::Frame =
-            serde_json::from_str(body.lines().next().unwrap()).unwrap();
+            serde_json::from_str(body.lines().next().test_unwrap()).test_unwrap();
         assert!(matches!(frame.verdict, Verdict::Allow));
         assert!(!frame.would_have_blocked);
         // The redactor stripped the email out of the persisted invocation
@@ -624,7 +624,7 @@ mod tests {
 
     #[test]
     fn shadow_mode_sets_would_have_blocked_on_deny() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().test_unwrap();
         let runner = ShadowRunner::with_in_memory_store(
             config(),
             Mode::Shadow,
@@ -632,7 +632,7 @@ mod tests {
             dir.path(),
             "run-shadow",
         )
-        .unwrap();
+        .test_unwrap();
         let kp = keypair();
         let params = serde_json::json!({"cmd": "rm -rf /"});
         let req = request(&kp, "r2", params.clone());
@@ -649,11 +649,11 @@ mod tests {
         // Shadow mode records divergence but never blocks.
         runner
             .after_kernel(&req, &rcpt)
-            .expect("shadow never blocks");
+            .test_expect("shadow never blocks");
 
-        let body = std::fs::read_to_string(runner.capture_path()).unwrap();
+        let body = std::fs::read_to_string(runner.capture_path()).test_unwrap();
         let frame: crate::frame::Frame =
-            serde_json::from_str(body.lines().next().unwrap()).unwrap();
+            serde_json::from_str(body.lines().next().test_unwrap()).test_unwrap();
         assert!(matches!(frame.verdict, Verdict::Deny));
         assert!(frame.would_have_blocked);
         assert_eq!(frame.deny_reason.as_deref(), Some("guard:fs.write"));
@@ -661,7 +661,7 @@ mod tests {
 
     #[test]
     fn enforce_mode_rejects_blocking_verdict() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().test_unwrap();
         let runner = ShadowRunner::with_in_memory_store(
             config(),
             Mode::Enforce,
@@ -669,7 +669,7 @@ mod tests {
             dir.path(),
             "run-enforce",
         )
-        .unwrap();
+        .test_unwrap();
         let kp = keypair();
         let params = serde_json::json!({"cmd": "exfiltrate"});
         let req = request(&kp, "r3", params.clone());
@@ -686,13 +686,13 @@ mod tests {
         let err = runner.after_kernel(&req, &rcpt).unwrap_err();
         assert!(err.to_string().contains("enforce"));
         // The frame is still persisted for audit despite the rejection.
-        let body = std::fs::read_to_string(runner.capture_path()).unwrap();
+        let body = std::fs::read_to_string(runner.capture_path()).test_unwrap();
         assert_eq!(body.lines().count(), 1);
     }
 
     #[test]
     fn enforce_mode_allows_clean_verdict() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().test_unwrap();
         let runner = ShadowRunner::with_in_memory_store(
             config(),
             Mode::Enforce,
@@ -700,19 +700,19 @@ mod tests {
             dir.path(),
             "run-enforce-ok",
         )
-        .unwrap();
+        .test_unwrap();
         let kp = keypair();
         let params = serde_json::json!({"to": "ops@example.com"});
         let req = request(&kp, "r4", params.clone());
         let rcpt = receipt(&kp, "r4", params, Decision::Allow);
         runner
             .after_kernel(&req, &rcpt)
-            .expect("clean allow passes enforce");
+            .test_expect("clean allow passes enforce");
     }
 
     #[test]
     fn frames_verify_under_tenant_public_key() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir().test_unwrap();
         let runner = ShadowRunner::with_in_memory_store(
             config(),
             Mode::Shadow,
@@ -720,18 +720,18 @@ mod tests {
             dir.path(),
             "run-verify",
         )
-        .unwrap();
+        .test_unwrap();
         let kp = keypair();
         let params = serde_json::json!({"q": "select 1"});
         let req = request(&kp, "r5", params.clone());
         let rcpt = receipt(&kp, "r5", params, Decision::Allow);
-        runner.after_kernel(&req, &rcpt).expect("capture ok");
+        runner.after_kernel(&req, &rcpt).test_expect("capture ok");
 
         let pubkey = runner.tenant_public_key();
-        let body = std::fs::read_to_string(runner.capture_path()).unwrap();
+        let body = std::fs::read_to_string(runner.capture_path()).test_unwrap();
         for line in body.lines().filter(|l| !l.trim().is_empty()) {
-            let frame: crate::frame::Frame = serde_json::from_str(line).unwrap();
-            crate::frame::validate_signed(&frame, &pubkey).expect("frame verifies");
+            let frame: crate::frame::Frame = serde_json::from_str(line).test_unwrap();
+            crate::frame::validate_signed(&frame, &pubkey).test_expect("frame verifies");
         }
     }
 

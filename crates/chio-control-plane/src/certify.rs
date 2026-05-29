@@ -2465,9 +2465,9 @@ fn certification_resolution_label(state: CertificationResolutionState) -> &'stat
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use chio_test_support::prelude::*;
 
     use chio_conformance::{
         DeploymentMode, PeerRole, RequiredCapabilities, ScenarioCategory, Transport,
@@ -2560,13 +2560,13 @@ mod tests {
             vec![scenario("initialize")],
             vec![result("initialize", ResultStatus::Pass)],
         )
-        .expect("build body");
+        .test_expect("build body");
         let keypair = Keypair::generate();
-        let artifact = sign_artifact(body, &keypair).expect("sign artifact");
+        let artifact = sign_artifact(body, &keypair).test_expect("sign artifact");
 
         assert!(artifact
             .signer_public_key
             .verify_canonical(&artifact.body, &artifact.signature)
-            .expect("verify canonical"));
+            .test_expect("verify canonical"));
     }
 }

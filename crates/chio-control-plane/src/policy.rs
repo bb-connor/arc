@@ -1823,9 +1823,9 @@ fn hash_bytes(bytes: &[u8]) -> String {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use chio_test_support::prelude::*;
     use std::net::IpAddr;
     use std::path::PathBuf;
 
@@ -1944,7 +1944,7 @@ guards:
 
     #[test]
     fn parse_example_policy() {
-        let policy = parse_policy(EXAMPLE_POLICY).unwrap();
+        let policy = parse_policy(EXAMPLE_POLICY).test_unwrap();
         assert_eq!(policy.kernel.max_capability_ttl, 3600);
         assert_eq!(policy.kernel.delegation_depth_limit, 5);
         assert!(!policy.kernel.allow_sampling);
@@ -1970,21 +1970,21 @@ kernel:
   checkpoint_batch_size: 32
 "#;
 
-        let policy = parse_policy(yaml).unwrap();
+        let policy = parse_policy(yaml).test_unwrap();
         assert!(policy.kernel.require_web3_evidence);
         assert_eq!(policy.kernel.checkpoint_batch_size, 32);
     }
 
     #[test]
     fn build_pipeline_from_policy() {
-        let policy = parse_policy(EXAMPLE_POLICY).unwrap();
-        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
+        let policy = parse_policy(EXAMPLE_POLICY).test_unwrap();
+        let pipeline = build_guard_pipeline(&policy.guards).test_unwrap();
         assert_eq!(pipeline.len(), 5);
     }
 
     #[test]
     fn parse_full_guard_policy() {
-        let policy = parse_policy(FULL_GUARD_POLICY).unwrap();
+        let policy = parse_policy(FULL_GUARD_POLICY).test_unwrap();
         assert!(policy.guards.forbidden_path.is_some());
         assert!(policy.guards.path_allowlist.is_some());
         assert!(policy.guards.shell_command.is_some());
@@ -1997,8 +1997,8 @@ kernel:
 
     #[test]
     fn build_pipeline_from_full_guard_policy() {
-        let policy = parse_policy(FULL_GUARD_POLICY).unwrap();
-        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
+        let policy = parse_policy(FULL_GUARD_POLICY).test_unwrap();
+        let pipeline = build_guard_pipeline(&policy.guards).test_unwrap();
         assert_eq!(pipeline.len(), 8);
     }
 
@@ -2013,7 +2013,7 @@ guards:
       - "["
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
         let error = match build_guard_pipeline(&policy.guards) {
             Ok(_) => panic!("invalid egress patterns should fail"),
@@ -2038,7 +2038,7 @@ guards:
       - "["
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
         let error = match build_guard_pipeline(&policy.guards) {
             Ok(_) => panic!("invalid patch integrity patterns should fail"),
@@ -2054,8 +2054,8 @@ guards:
 
     #[test]
     fn build_post_invocation_pipeline_from_secret_patterns() {
-        let policy = parse_policy(FULL_GUARD_POLICY).unwrap();
-        let pipeline = build_post_invocation_pipeline(&policy.guards).unwrap();
+        let policy = parse_policy(FULL_GUARD_POLICY).test_unwrap();
+        let pipeline = build_post_invocation_pipeline(&policy.guards).test_unwrap();
         assert_eq!(pipeline.len(), 1);
     }
 
@@ -2076,10 +2076,10 @@ guards:
       - "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
-        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
-        let post_invocation = build_post_invocation_pipeline(&policy.guards).unwrap();
+        let pipeline = build_guard_pipeline(&policy.guards).test_unwrap();
+        let post_invocation = build_post_invocation_pipeline(&policy.guards).test_unwrap();
         assert_eq!(pipeline.len(), 3);
         assert_eq!(post_invocation.len(), 1);
     }
@@ -2096,9 +2096,9 @@ guards:
         - "classified"
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
-        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
+        let pipeline = build_guard_pipeline(&policy.guards).test_unwrap();
         assert_eq!(pipeline.len(), 1);
     }
 
@@ -2121,9 +2121,9 @@ guards:
       tool_patterns: ["fetch_url"]
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
-        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
+        let pipeline = build_guard_pipeline(&policy.guards).test_unwrap();
         assert_eq!(pipeline.len(), 2);
     }
 
@@ -2133,7 +2133,7 @@ guards:
             "threat_intel.safe_browsing.base_url",
             SAFE_BROWSING_DEFAULT_BASE_URL,
         )
-        .expect("default safe browsing base URL should pass external guard validation");
+        .test_expect("default safe browsing base URL should pass external guard validation");
 
         let policy = parse_policy(
             r#"
@@ -2144,9 +2144,9 @@ guards:
       api_key: "sb-key"
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
-        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
+        let pipeline = build_guard_pipeline(&policy.guards).test_unwrap();
         assert_eq!(pipeline.len(), 1);
     }
 
@@ -2166,7 +2166,7 @@ guards:
       api_key: ""
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
         let error = match build_guard_pipeline(&policy.guards) {
             Ok(_) => panic!("invalid external guard config should fail"),
@@ -2197,7 +2197,7 @@ guards:
       base_url: "http://safebrowsing.googleapis.com/v4"
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
         let error = match build_guard_pipeline(&policy.guards) {
             Ok(_) => panic!("insecure external guard config should fail"),
@@ -2230,10 +2230,10 @@ guards:
       base_url: "http://localhost:9000/v4"
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
         build_guard_pipeline(&policy.guards)
-            .expect("localhost-only http endpoints should remain allowed for local testing");
+            .test_expect("localhost-only http endpoints should remain allowed for local testing");
     }
 
     #[test]
@@ -2253,11 +2253,11 @@ guards:
       base_url: "https://192.168.1.10/v4"
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
         let error = build_guard_pipeline(&policy.guards)
             .err()
-            .expect("private-network external guard URLs should fail closed");
+            .test_expect("private-network external guard URLs should fail closed");
         assert!(
             error
                 .to_string()
@@ -2273,7 +2273,7 @@ guards:
             "https://guard.example.test/moderate",
             |_host, _port| Ok(vec![IpAddr::V4(std::net::Ipv4Addr::new(10, 0, 0, 8))]),
         )
-        .expect_err("private DNS answers should fail closed");
+        .test_expect_err("private DNS answers should fail closed");
 
         assert!(
             error.to_string().contains("resolved to disallowed address"),
@@ -2287,7 +2287,7 @@ guards:
             "cloud_guardrails.azure_content_safety.endpoint",
             "https://224.0.0.1/moderate",
         )
-        .expect_err("IPv4 multicast should fail closed");
+        .test_expect_err("IPv4 multicast should fail closed");
         assert!(
             error
                 .to_string()
@@ -2304,7 +2304,7 @@ guards:
         ] {
             let error =
                 validate_https_url("cloud_guardrails.azure_content_safety.endpoint", endpoint)
-                    .expect_err("IPv4-mapped IPv6 private endpoint should fail closed");
+                    .test_expect_err("IPv4-mapped IPv6 private endpoint should fail closed");
             assert!(
                 error
                     .to_string()
@@ -2326,11 +2326,11 @@ guards:
       api_key: "azure-key"
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
         let error = build_guard_pipeline(&policy.guards)
             .err()
-            .expect(".localhost endpoints should fail closed");
+            .test_expect(".localhost endpoints should fail closed");
         assert!(
             error
                 .to_string()
@@ -2352,9 +2352,9 @@ guards:
       - "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
-        let pipeline = build_post_invocation_pipeline(&policy.guards).unwrap();
+        let pipeline = build_post_invocation_pipeline(&policy.guards).test_unwrap();
         let context = chio_guards::post_invocation::PostInvocationContext::synthetic("sql");
         let outcome = pipeline.evaluate_with_context_and_evidence(
             &context,
@@ -2384,11 +2384,11 @@ guards:
         let policy = parse_policy(&format!(
             "guards:\n  query_result:\n    redact_pii_patterns:\n{patterns}"
         ))
-        .unwrap();
+        .test_unwrap();
 
         let error = build_post_invocation_pipeline(&policy.guards)
             .err()
-            .expect("excessive PII pattern count should fail closed");
+            .test_expect("excessive PII pattern count should fail closed");
         assert!(
             error.to_string().contains("allows at most 64 patterns"),
             "unexpected error: {error}"
@@ -2397,10 +2397,10 @@ guards:
 
     #[test]
     fn build_scope_from_policy() {
-        let policy = parse_policy(EXAMPLE_POLICY).unwrap();
+        let policy = parse_policy(EXAMPLE_POLICY).test_unwrap();
         let capabilities =
             build_default_capabilities(&policy.capabilities, policy.kernel.max_capability_ttl)
-                .unwrap();
+                .test_unwrap();
         assert_eq!(capabilities.len(), 1);
         assert_eq!(capabilities[0].scope.grants.len(), 1);
         assert_eq!(capabilities[0].scope.grants[0].server_id, "*");
@@ -2425,10 +2425,10 @@ capabilities:
         ttl: 120
 "#;
 
-        let policy = parse_policy(yaml).unwrap();
+        let policy = parse_policy(yaml).test_unwrap();
         let capabilities =
             build_default_capabilities(&policy.capabilities, policy.kernel.max_capability_ttl)
-                .unwrap();
+                .test_unwrap();
 
         assert_eq!(capabilities.len(), 1);
         assert!(capabilities[0].scope.grants.is_empty());
@@ -2468,9 +2468,9 @@ guards:
       - list_directory
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
-        let capabilities = build_runtime_default_capabilities(&policy).unwrap();
+        let capabilities = build_runtime_default_capabilities(&policy).test_unwrap();
         assert_eq!(capabilities.len(), 1);
         assert_eq!(capabilities[0].ttl, 3600);
         assert_eq!(capabilities[0].scope.grants.len(), 2);
@@ -2496,9 +2496,9 @@ guards:
       - write_*
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
-        let capabilities = build_runtime_default_capabilities(&policy).unwrap();
+        let capabilities = build_runtime_default_capabilities(&policy).test_unwrap();
         assert_eq!(capabilities.len(), 1);
         assert_eq!(
             capabilities[0].scope.grants[0].constraints,
@@ -2530,9 +2530,9 @@ guards:
       - git_push
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
-        let error = build_runtime_default_capabilities(&policy).expect_err(
+        let error = build_runtime_default_capabilities(&policy).test_expect_err(
             "scoped confirmation cannot be represented by a synthesized wildcard grant",
         );
         assert!(error.to_string().contains(
@@ -2557,9 +2557,9 @@ guards:
       - "*"
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
-        let capabilities = build_runtime_default_capabilities(&policy).unwrap();
+        let capabilities = build_runtime_default_capabilities(&policy).test_unwrap();
         assert_eq!(capabilities.len(), 1);
         assert_eq!(capabilities[0].scope.grants.len(), 1);
         assert_eq!(capabilities[0].scope.grants[0].tool_name, "*");
@@ -2588,10 +2588,10 @@ guards:
       - git_push
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
         let error = build_runtime_default_capabilities(&policy)
-            .expect_err("scoped confirmation cannot narrow an explicit wildcard allow grant");
+            .test_expect_err("scoped confirmation cannot narrow an explicit wildcard allow grant");
         assert!(error.to_string().contains(
             "guards.tool_access.require_confirmation cannot narrow wildcard allow pattern '*'"
         ));
@@ -2613,10 +2613,11 @@ guards:
       - db_a
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
-        let error = build_runtime_default_capabilities(&policy)
-            .expect_err("scoped confirmation cannot narrow a question-mark wildcard allow grant");
+        let error = build_runtime_default_capabilities(&policy).test_expect_err(
+            "scoped confirmation cannot narrow a question-mark wildcard allow grant",
+        );
         assert!(error.to_string().contains(
             "guards.tool_access.require_confirmation cannot narrow wildcard allow pattern 'db_?'"
         ));
@@ -2638,9 +2639,9 @@ guards:
       - git_*
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
-        let capabilities = build_runtime_default_capabilities(&policy).unwrap();
+        let capabilities = build_runtime_default_capabilities(&policy).test_unwrap();
         assert_eq!(capabilities.len(), 1);
         assert_eq!(capabilities[0].scope.grants.len(), 1);
         assert_eq!(capabilities[0].scope.grants[0].tool_name, "git_*");
@@ -2652,20 +2653,20 @@ guards:
 
     #[test]
     fn wildcard_overlap_conservatively_rejects_ambiguous_leading_globs() {
-        assert!(!tool_patterns_overlap("read_file", "*_write").unwrap());
-        assert!(!tool_patterns_overlap("*_write", "git_push").unwrap());
+        assert!(!tool_patterns_overlap("read_file", "*_write").test_unwrap());
+        assert!(!tool_patterns_overlap("*_write", "git_push").test_unwrap());
         // Leading unbounded globs are intentionally treated as overlapping so
         // capability synthesis fails closed instead of under-confirming.
-        assert!(tool_patterns_overlap("*_read", "*_write").unwrap());
-        assert!(!tool_patterns_overlap("bb*", "?a").unwrap());
-        assert!(tool_patterns_overlap("read_*", "*_read").unwrap());
+        assert!(tool_patterns_overlap("*_read", "*_write").test_unwrap());
+        assert!(!tool_patterns_overlap("bb*", "?a").test_unwrap());
+        assert!(tool_patterns_overlap("read_*", "*_read").test_unwrap());
     }
 
     #[test]
     fn wildcard_overlap_rejects_oversized_patterns_before_recursing() {
         let oversized = "*".repeat(MAX_TOOL_ACCESS_GLOB_PATTERN_BYTES + 1);
         let error = tool_patterns_overlap(&oversized, "read_file")
-            .expect_err("oversized overlap pattern should fail policy loading");
+            .test_expect_err("oversized overlap pattern should fail policy loading");
         assert!(error.to_string().contains("glob pattern exceeds"));
     }
 
@@ -2673,7 +2674,7 @@ guards:
     fn wildcard_overlap_rejects_excessive_recursive_state_budget() {
         let pattern = "a".repeat(200);
         let error = tool_patterns_overlap(&pattern, &pattern)
-            .expect_err("large overlap state space should fail policy loading");
+            .test_expect_err("large overlap state space should fail policy loading");
         assert!(error.to_string().contains("recursive states"));
     }
 
@@ -2693,10 +2694,10 @@ guards:
       - "*_write"
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
         let error = build_runtime_default_capabilities(&policy)
-            .expect_err("leading wildcard confirmation overlap is unrepresentable");
+            .test_expect_err("leading wildcard confirmation overlap is unrepresentable");
 
         assert!(error
             .to_string()
@@ -2721,9 +2722,9 @@ capabilities:
         ttl: 60
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
-        let capabilities = build_runtime_default_capabilities(&policy).unwrap();
+        let capabilities = build_runtime_default_capabilities(&policy).test_unwrap();
         assert_eq!(capabilities.len(), 1);
         assert_eq!(capabilities[0].ttl, 60);
         assert_eq!(capabilities[0].scope.grants.len(), 1);
@@ -2732,13 +2733,13 @@ capabilities:
 
     #[test]
     fn empty_policy_defaults() {
-        let policy = parse_policy("{}").unwrap();
+        let policy = parse_policy("{}").test_unwrap();
         assert_eq!(policy.kernel.max_capability_ttl, 3600);
         assert_eq!(policy.kernel.delegation_depth_limit, 5);
         assert!(!policy.kernel.allow_sampling);
         assert!(!policy.kernel.allow_sampling_tool_use);
         assert!(!policy.kernel.allow_elicitation);
-        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
+        let pipeline = build_guard_pipeline(&policy.guards).test_unwrap();
         assert_eq!(pipeline.len(), 0);
     }
 
@@ -2751,7 +2752,7 @@ kernel:
   allow_elicitation: true
 "#;
 
-        let policy = parse_policy(yaml).unwrap();
+        let policy = parse_policy(yaml).test_unwrap();
         assert!(policy.kernel.allow_sampling);
         assert!(policy.kernel.allow_sampling_tool_use);
         assert!(policy.kernel.allow_elicitation);
@@ -2772,8 +2773,8 @@ guards:
   internal_network:
     enabled: false
 "#;
-        let policy = parse_policy(yaml).unwrap();
-        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
+        let policy = parse_policy(yaml).test_unwrap();
+        let pipeline = build_guard_pipeline(&policy.guards).test_unwrap();
         assert_eq!(pipeline.len(), 0);
     }
 
@@ -2786,8 +2787,8 @@ guards:
     enabled: true
 "#,
         )
-        .unwrap();
-        let without_egress_pipeline = build_guard_pipeline(&without_egress.guards).unwrap();
+        .test_unwrap();
+        let without_egress_pipeline = build_guard_pipeline(&without_egress.guards).test_unwrap();
         assert_eq!(without_egress_pipeline.len(), 1);
 
         let with_egress = parse_policy(
@@ -2799,8 +2800,8 @@ guards:
       - "*.openai.com"
 "#,
         )
-        .unwrap();
-        let with_egress_pipeline = build_guard_pipeline(&with_egress.guards).unwrap();
+        .test_unwrap();
+        let with_egress_pipeline = build_guard_pipeline(&with_egress.guards).test_unwrap();
         assert_eq!(with_egress_pipeline.len(), 1);
 
         let with_internal_network = parse_policy(
@@ -2813,9 +2814,9 @@ guards:
     dns_rebinding_detection: false
 "#,
         )
-        .unwrap();
+        .test_unwrap();
         let with_internal_network_pipeline =
-            build_guard_pipeline(&with_internal_network.guards).unwrap();
+            build_guard_pipeline(&with_internal_network.guards).test_unwrap();
         assert_eq!(with_internal_network_pipeline.len(), 1);
     }
 
@@ -2832,8 +2833,8 @@ guards:
     write:
       - "**"
 "#;
-        let policy = parse_policy(yaml).unwrap();
-        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
+        let policy = parse_policy(yaml).test_unwrap();
+        let pipeline = build_guard_pipeline(&policy.guards).test_unwrap();
         assert_eq!(pipeline.len(), 1);
 
         let kp = chio_core::crypto::Keypair::generate();
@@ -2849,7 +2850,7 @@ guards:
             expires_at: u64::MAX,
             delegation_chain: vec![],
         };
-        let cap = chio_core::capability::CapabilityToken::sign(cap_body, &kp).unwrap();
+        let cap = chio_core::capability::CapabilityToken::sign(cap_body, &kp).test_unwrap();
         let request = chio_kernel::ToolCallRequest {
             request_id: "req-test".to_string(),
             capability: cap,
@@ -2887,10 +2888,10 @@ capabilities:
         tool: "read_file"
         ttl: 600
 "#;
-        let policy = parse_policy(yaml).unwrap();
+        let policy = parse_policy(yaml).test_unwrap();
         let capabilities =
             build_default_capabilities(&policy.capabilities, policy.kernel.max_capability_ttl)
-                .unwrap();
+                .test_unwrap();
         assert_eq!(capabilities.len(), 1);
         assert_eq!(capabilities[0].scope.grants.len(), 1);
         assert_eq!(capabilities[0].scope.grants[0].server_id, "my-server");
@@ -2914,10 +2915,10 @@ capabilities:
         tool: "write_file"
         ttl: 60
 "#;
-        let policy = parse_policy(yaml).unwrap();
+        let policy = parse_policy(yaml).test_unwrap();
         let capabilities =
             build_default_capabilities(&policy.capabilities, policy.kernel.max_capability_ttl)
-                .unwrap();
+                .test_unwrap();
 
         assert_eq!(capabilities.len(), 2);
         assert_eq!(capabilities[0].ttl, 60);
@@ -2938,10 +2939,10 @@ capabilities:
         tool: "read_file"
         ttl: 300
 "#;
-        let policy = parse_policy(yaml).unwrap();
+        let policy = parse_policy(yaml).test_unwrap();
         let err =
             build_default_capabilities(&policy.capabilities, policy.kernel.max_capability_ttl)
-                .unwrap_err();
+                .test_unwrap_err();
         assert!(err
             .to_string()
             .contains("exceeds kernel max_capability_ttl"));
@@ -2958,10 +2959,10 @@ capabilities:
         operations: [invoke, teleport]
         ttl: 60
 "#;
-        let policy = parse_policy(yaml).unwrap();
+        let policy = parse_policy(yaml).test_unwrap();
         let err =
             build_default_capabilities(&policy.capabilities, policy.kernel.max_capability_ttl)
-                .unwrap_err();
+                .test_unwrap_err();
         assert!(err.to_string().contains("unsupported capability operation"));
     }
 
@@ -2982,7 +2983,7 @@ capabilities:
         ttl: 300
 "#,
         )
-        .unwrap();
+        .test_unwrap();
         let policy_b = parse_policy(
             r#"
 
@@ -2995,23 +2996,23 @@ capabilities:
       - { server: "*", tool: "read_file", ttl: 300 }
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
         let caps_a =
             build_default_capabilities(&policy_a.capabilities, policy_a.kernel.max_capability_ttl)
-                .unwrap();
+                .test_unwrap();
         let caps_b =
             build_default_capabilities(&policy_b.capabilities, policy_b.kernel.max_capability_ttl)
-                .unwrap();
+                .test_unwrap();
 
-        let hash_a = runtime_hash_for_chio_yaml(&policy_a, &caps_a).unwrap();
-        let hash_b = runtime_hash_for_chio_yaml(&policy_b, &caps_b).unwrap();
+        let hash_a = runtime_hash_for_chio_yaml(&policy_a, &caps_a).test_unwrap();
+        let hash_b = runtime_hash_for_chio_yaml(&policy_b, &caps_b).test_unwrap();
         assert_eq!(hash_a, hash_b);
     }
 
     #[test]
     fn load_hushspec_policy_materializes_runtime_state() {
-        let loaded = load_policy(&fixture_path("hushspec-tool-allow.yaml")).unwrap();
+        let loaded = load_policy(&fixture_path("hushspec-tool-allow.yaml")).test_unwrap();
 
         assert_eq!(loaded.format, PolicyFormat::HushSpec);
         assert_eq!(loaded.guard_pipeline.len(), 1);
@@ -3035,14 +3036,14 @@ capabilities:
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .test_unwrap()
                 .as_millis()
         ));
-        std::fs::create_dir_all(&policy_dir).unwrap();
+        std::fs::create_dir_all(&policy_dir).test_unwrap();
         let pattern_db = policy_dir.join("pattern-db.json");
         let policy_path = policy_dir.join("policy.yaml");
 
-        std::fs::write(&pattern_db, sample_threat_intel_pattern_db("first")).unwrap();
+        std::fs::write(&pattern_db, sample_threat_intel_pattern_db("first")).test_unwrap();
         std::fs::write(
             &policy_path,
             r#"
@@ -3060,11 +3061,11 @@ extensions:
       pattern_db: "pattern-db.json"
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
-        let first = load_policy(&policy_path).unwrap();
-        std::fs::write(&pattern_db, sample_threat_intel_pattern_db("second")).unwrap();
-        let second = load_policy(&policy_path).unwrap();
+        let first = load_policy(&policy_path).test_unwrap();
+        std::fs::write(&pattern_db, sample_threat_intel_pattern_db("second")).test_unwrap();
+        let second = load_policy(&policy_path).test_unwrap();
 
         assert_ne!(first.identity.source_hash, second.identity.source_hash);
         assert_ne!(first.identity.runtime_hash, second.identity.runtime_hash);
@@ -3074,7 +3075,7 @@ extensions:
 
     #[test]
     fn load_hushspec_block_all_issues_no_default_capabilities() {
-        let loaded = load_policy(&fixture_path("hushspec-block-all.yaml")).unwrap();
+        let loaded = load_policy(&fixture_path("hushspec-block-all.yaml")).test_unwrap();
         assert_eq!(loaded.format, PolicyFormat::HushSpec);
         assert!(loaded.default_capabilities.is_empty());
         assert_eq!(loaded.guard_pipeline.len(), 1);
@@ -3082,7 +3083,7 @@ extensions:
 
     #[test]
     fn load_hushspec_resolves_extends_before_compiling() {
-        let loaded = load_policy(&fixture_path("hushspec-extended.yaml")).unwrap();
+        let loaded = load_policy(&fixture_path("hushspec-extended.yaml")).test_unwrap();
 
         assert_eq!(loaded.format, PolicyFormat::HushSpec);
         assert_eq!(loaded.guard_pipeline.len(), 2);
@@ -3096,11 +3097,11 @@ extensions:
 
     #[test]
     fn load_hushspec_materializes_reputation_issuance_policy() {
-        let loaded = load_policy(&fixture_path("hushspec-reputation.yaml")).unwrap();
+        let loaded = load_policy(&fixture_path("hushspec-reputation.yaml")).test_unwrap();
 
         let issuance_policy = loaded
             .issuance_policy
-            .expect("reputation issuance policy should materialize");
+            .test_expect("reputation issuance policy should materialize");
         assert_eq!(issuance_policy.probationary_receipt_count, 1000);
         assert_eq!(issuance_policy.probationary_min_days, 30);
         assert_eq!(issuance_policy.probationary_score_ceiling, 0.60);
@@ -3117,7 +3118,7 @@ extensions:
             issuance_policy
                 .tiers
                 .last()
-                .expect("elevated tier")
+                .test_expect("elevated tier")
                 .max_scope
                 .operations,
             vec![
@@ -3133,12 +3134,13 @@ extensions:
 
     #[test]
     fn chio_yaml_guard_surface_matches_hushspec_fixture() {
-        let chio_policy = parse_policy(FULL_GUARD_POLICY).unwrap();
-        let chio_pipeline = build_guard_pipeline(&chio_policy.guards).unwrap();
-        let chio_post_invocation = build_post_invocation_pipeline(&chio_policy.guards).unwrap();
-        let chio_capabilities = build_runtime_default_capabilities(&chio_policy).unwrap();
+        let chio_policy = parse_policy(FULL_GUARD_POLICY).test_unwrap();
+        let chio_pipeline = build_guard_pipeline(&chio_policy.guards).test_unwrap();
+        let chio_post_invocation =
+            build_post_invocation_pipeline(&chio_policy.guards).test_unwrap();
+        let chio_capabilities = build_runtime_default_capabilities(&chio_policy).test_unwrap();
 
-        let hushspec = load_policy(&fixture_path("hushspec-guard-heavy.yaml")).unwrap();
+        let hushspec = load_policy(&fixture_path("hushspec-guard-heavy.yaml")).test_unwrap();
 
         assert_eq!(chio_pipeline.len(), hushspec.guard_pipeline.len());
         assert_eq!(
@@ -3151,8 +3153,8 @@ extensions:
             hushspec.default_capabilities[0].ttl
         );
         assert_eq!(
-            serde_json::to_value(&chio_capabilities[0].scope.grants).unwrap(),
-            serde_json::to_value(&hushspec.default_capabilities[0].scope.grants).unwrap()
+            serde_json::to_value(&chio_capabilities[0].scope.grants).test_unwrap(),
+            serde_json::to_value(&hushspec.default_capabilities[0].scope.grants).test_unwrap()
         );
     }
 
@@ -3207,11 +3209,11 @@ extensions:
           attestationType: sgx
 "#,
         )
-        .unwrap();
+        .test_unwrap();
 
         let runtime_assurance_policy = materialize_runtime_assurance_policy(&spec)
-            .unwrap()
-            .expect("runtime assurance policy should materialize");
+            .test_unwrap()
+            .test_expect("runtime assurance policy should materialize");
         assert_eq!(runtime_assurance_policy.tiers.len(), 2);
         assert_eq!(runtime_assurance_policy.tiers[0].name, "baseline");
         assert_eq!(
@@ -3227,7 +3229,7 @@ extensions:
         );
         let trust_policy = runtime_assurance_policy
             .attestation_trust_policy
-            .expect("trusted verifier policy should materialize");
+            .test_expect("trusted verifier policy should materialize");
         assert_eq!(trust_policy.rules.len(), 1);
         assert_eq!(trust_policy.rules[0].name, "azure_contoso");
         assert_eq!(

@@ -11,4 +11,3 @@ cmake -S "${package_root}" -B "${build_dir}" \
   -DCHIO_GUARD_CPP_BUILD_WASI_COMPONENT=OFF
 cmake --build "${build_dir}" --target chio_guard_cpp_path_guard_smoke
 ctest --test-dir "${build_dir}" --output-on-failure
-

@@ -1,13 +1,9 @@
-//! Integration test entry point for chio-spec-codegen threat-model
-//! stubs.
+//! Integration test entry point for populated chio-spec-codegen threat-model
+//! regressions.
 //!
-//! Each `mod` declaration below names a threat ID whose test body has
-//! been populated. The stub files `tests/threats/<id>.rs` for threat
-//! IDs that are not yet covered remain on disk with `unimplemented!()`
-//! bodies but are intentionally NOT pulled into this integration test,
-//! so they neither compile nor run until a follow-up fills the body in.
-//! The threat-model-coverage CI gate inspects the on-disk file set for
-//! `unimplemented!` markers to decide which threat IDs still need tests.
+//! Each `mod` declaration below names a threat ID with a populated test body.
+//! The threat-model coverage gate validates that the generated inventory and
+//! the compiled regression set stay aligned.
 //!
 //! Covered threat IDs cited in the threat-model success criteria and
 //! the advisory reclassification:

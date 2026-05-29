@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# ClusterFuzzLite build entry point for Chio (formerly ARC).
+# ClusterFuzzLite build entry point for Chio.
 #
 # Builds the chio-fuzz targets listed below and copies each resulting
 # binary into $OUT/<target>, plus a per-target seed corpus zip when one

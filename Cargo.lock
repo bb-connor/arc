@@ -2525,6 +2525,7 @@ dependencies = [
  "chio-manifest",
  "chio-mcp-edge",
  "chio-metrics-spec",
+ "chio-test-support",
  "futures",
  "serde",
  "serde_json",
@@ -2546,6 +2547,7 @@ dependencies = [
  "chio-manifest",
  "chio-mcp-edge",
  "chio-metrics-spec",
+ "chio-test-support",
  "futures",
  "serde",
  "serde_json",
@@ -3817,6 +3819,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-mercury"
+version = "0.1.0"
+dependencies = [
+ "chio-control-plane",
+ "chio-core-types",
+ "chio-kernel",
+ "chio-mercury-core",
+ "chio-store-sqlite",
+ "chrono",
+ "clap 4.6.0",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "chio-mercury-core"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-kernel",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "chio-metering"
 version = "0.1.0"
 dependencies = [
@@ -4014,6 +4042,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chio-core-types",
+ "chio-test-support",
  "chio-tool-call-fabric",
  "reqwest 0.13.2",
  "serde_json",
@@ -4051,6 +4080,7 @@ dependencies = [
  "chio-core-types",
  "chio-tee",
  "chio-tee-frame",
+ "chio-test-support",
  "hex",
  "serde",
  "serde_json",
@@ -4097,6 +4127,7 @@ dependencies = [
  "chio-core-types",
  "chio-federation",
  "chio-kernel-core",
+ "chio-test-support",
  "criterion",
  "proptest",
  "rs_merkle",
@@ -4201,6 +4232,7 @@ dependencies = [
  "chio-egress-contract",
  "chio-kernel",
  "chio-log-redact",
+ "chio-test-support",
  "reqwest 0.13.2",
  "rusqlite",
  "serde",
@@ -4267,6 +4299,7 @@ dependencies = [
  "chio-data-guards-redactors-default",
  "chio-store-sqlite",
  "chio-tee-frame",
+ "chio-test-support",
  "chrono",
  "proptest",
  "serde",

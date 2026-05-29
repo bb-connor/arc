@@ -1,7 +1,7 @@
 # Chio Conformance Suite (Standalone Consumer Guide)
 
 This document is the canonical entry point for an external implementer
-who wants to run the Chio (formerly ARC) cross-language conformance
+who wants to run the Chio cross-language conformance
 suite against their own peer implementation, without checking out the
 Chio monorepo.
 
@@ -300,7 +300,7 @@ The runtime resolver mirrors the kernel cache-dir strategy so
 
 ## Unpublished peer entries
 
-The lockfile carries `published = false` placeholders for peers whose
+The lockfile carries `published = false` entries for peers whose
 release artifacts have not been cut yet (cleanup C5 issue D). The
 `fetch-peers` subcommand SKIPS those entries with a clear message
 rather than failing the run with a sha256 mismatch:
@@ -312,7 +312,7 @@ skipping unpublished peer `python / aarch64-apple-darwin`: lockfile entry has `p
 ```
 
 Once the release pipeline cuts a real artifact, the lockfile
-updater replaces the placeholder sha256 and flips `published = true`;
+updater writes the final sha256 and flips `published = true`;
 no consumer-facing change is required.
 
 ## Troubleshooting

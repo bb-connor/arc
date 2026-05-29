@@ -237,9 +237,9 @@ impl EpochRootVerifier for Ed25519RootVerifier {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use chio_test_support::prelude::*;
 
     const SEED_A: &str = "0101010101010101010101010101010101010101010101010101010101010101";
     const SEED_B: &str = "0202020202020202020202020202020202020202020202020202020202020202";
@@ -255,32 +255,32 @@ mod tests {
 
     #[test]
     fn sign_verify_round_trip() {
-        let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).unwrap();
+        let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).test_unwrap();
         let verifier = signer.verifier();
         let root = epoch_root(7);
-        let signature = signer.sign_epoch_root(&root).unwrap();
+        let signature = signer.sign_epoch_root(&root).test_unwrap();
         assert_eq!(signature.algorithm, ALGORITHM_ED25519);
         assert_eq!(signature.signer_id, "oracle-a");
         assert_eq!(signature.signature_bytes.len(), ED25519_SIGNATURE_LEN);
-        verifier.verify_epoch_root(&root, &signature).unwrap();
+        verifier.verify_epoch_root(&root, &signature).test_unwrap();
     }
 
     #[test]
     fn signatures_are_deterministic_for_a_fixed_seed() {
-        let signer_one = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).unwrap();
-        let signer_two = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).unwrap();
+        let signer_one = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).test_unwrap();
+        let signer_two = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).test_unwrap();
         let root = epoch_root(3);
-        let sig_one = signer_one.sign_epoch_root(&root).unwrap();
-        let sig_two = signer_two.sign_epoch_root(&root).unwrap();
+        let sig_one = signer_one.sign_epoch_root(&root).test_unwrap();
+        let sig_two = signer_two.sign_epoch_root(&root).test_unwrap();
         assert_eq!(sig_one.signature_bytes, sig_two.signature_bytes);
     }
 
     #[test]
     fn tampered_root_fails() {
-        let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).unwrap();
+        let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).test_unwrap();
         let verifier = signer.verifier();
         let root = epoch_root(7);
-        let signature = signer.sign_epoch_root(&root).unwrap();
+        let signature = signer.sign_epoch_root(&root).test_unwrap();
 
         let mut tampered = root.clone();
         tampered.root_hash[0] ^= 0x01;
@@ -299,10 +299,10 @@ mod tests {
 
     #[test]
     fn tampered_signature_bytes_fail() {
-        let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).unwrap();
+        let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).test_unwrap();
         let verifier = signer.verifier();
         let root = epoch_root(7);
-        let mut signature = signer.sign_epoch_root(&root).unwrap();
+        let mut signature = signer.sign_epoch_root(&root).test_unwrap();
         signature.signature_bytes[0] ^= 0x01;
         assert_eq!(
             verifier.verify_epoch_root(&root, &signature),
@@ -312,10 +312,10 @@ mod tests {
 
     #[test]
     fn wrong_key_is_rejected() {
-        let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).unwrap();
-        let other = Ed25519RootSigner::from_signing_key("oracle-a", SEED_B).unwrap();
+        let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).test_unwrap();
+        let other = Ed25519RootSigner::from_signing_key("oracle-a", SEED_B).test_unwrap();
         let root = epoch_root(7);
-        let signature = signer.sign_epoch_root(&root).unwrap();
+        let signature = signer.sign_epoch_root(&root).test_unwrap();
         // Same signer_id, different key: must fail-closed.
         assert_eq!(
             other.verifier().verify_epoch_root(&root, &signature),
@@ -325,9 +325,9 @@ mod tests {
 
     #[test]
     fn wrong_signer_id_is_rejected() {
-        let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).unwrap();
+        let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).test_unwrap();
         let root = epoch_root(7);
-        let signature = signer.sign_epoch_root(&root).unwrap();
+        let signature = signer.sign_epoch_root(&root).test_unwrap();
         let verifier = Ed25519RootVerifier::new("oracle-b", signer.public_key());
         assert_eq!(
             verifier.verify_epoch_root(&root, &signature),
@@ -337,10 +337,10 @@ mod tests {
 
     #[test]
     fn wrong_algorithm_tag_is_rejected() {
-        let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).unwrap();
+        let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).test_unwrap();
         let verifier = signer.verifier();
         let root = epoch_root(7);
-        let mut signature = signer.sign_epoch_root(&root).unwrap();
+        let mut signature = signer.sign_epoch_root(&root).test_unwrap();
         signature.algorithm = "digest-stub-sha256".to_string();
         assert_eq!(
             verifier.verify_epoch_root(&root, &signature),
@@ -350,10 +350,10 @@ mod tests {
 
     #[test]
     fn short_signature_bytes_fail_closed() {
-        let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).unwrap();
+        let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).test_unwrap();
         let verifier = signer.verifier();
         let root = epoch_root(7);
-        let mut signature = signer.sign_epoch_root(&root).unwrap();
+        let mut signature = signer.sign_epoch_root(&root).test_unwrap();
         signature.signature_bytes.truncate(32);
         assert_eq!(
             verifier.verify_epoch_root(&root, &signature),
@@ -377,13 +377,13 @@ mod tests {
 
     #[test]
     fn verifier_from_public_key_hex_round_trip() {
-        let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).unwrap();
+        let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).test_unwrap();
         let public_key_hex = signer.public_key().to_hex();
         let verifier =
-            Ed25519RootVerifier::from_public_key_hex("oracle-a", &public_key_hex).unwrap();
+            Ed25519RootVerifier::from_public_key_hex("oracle-a", &public_key_hex).test_unwrap();
         let root = epoch_root(9);
-        let signature = signer.sign_epoch_root(&root).unwrap();
-        verifier.verify_epoch_root(&root, &signature).unwrap();
+        let signature = signer.sign_epoch_root(&root).test_unwrap();
+        verifier.verify_epoch_root(&root, &signature).test_unwrap();
     }
 
     #[test]
@@ -397,9 +397,9 @@ mod tests {
     #[test]
     fn signing_message_is_domain_separated() {
         let root = epoch_root(1);
-        let message = signing_message(&root).unwrap();
+        let message = signing_message(&root).test_unwrap();
         assert!(message.starts_with(DOMAIN_SEPARATION_CONTEXT));
-        let canonical = canonical_json_bytes(&root).unwrap();
+        let canonical = canonical_json_bytes(&root).test_unwrap();
         assert_eq!(
             &message[DOMAIN_SEPARATION_CONTEXT.len()..],
             canonical.as_slice()

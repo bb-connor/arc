@@ -361,13 +361,13 @@ fn sanitize_tag_value(value: &str) -> String {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use chio_core::crypto::Keypair;
     use chio_core::receipt::{
         ChioReceipt, ChioReceiptBody, Decision, ReceiptSemanticFields, ToolCallAction, TrustLevel,
     };
+    use chio_test_support::prelude::*;
 
     #[test]
     fn new_rejects_empty_api_key() {
@@ -408,7 +408,7 @@ mod tests {
     fn trace_observation_allow_is_tagged_as_trace_not_allow() {
         let exporter =
             DatadogExporter::new_with_base_url_for_tests(DatadogConfig::default(), "http://local")
-                .expect("construct test exporter");
+                .test_expect("construct test exporter");
         let event = SiemEvent::from_receipt(test_receipt_with_semantics(
             Decision::Allow,
             ReceiptSemanticFields::trace_detect_only(),
@@ -416,8 +416,8 @@ mod tests {
         ));
         let payload = exporter
             .build_payload(&[event])
-            .expect("build datadog payload");
-        let tags = payload[0]["ddtags"].as_str().expect("ddtags string");
+            .test_expect("build datadog payload");
+        let tags = payload[0]["ddtags"].as_str().test_expect("ddtags string");
 
         assert!(tags.contains("receipt_kind:trace_observation"));
         assert!(tags.contains("boundary_class:detect_only"));
@@ -438,7 +438,7 @@ mod tests {
         let action = ToolCallAction::from_parameters(serde_json::json!({
             "path": "/etc/passwd"
         }))
-        .expect("hash test receipt parameters");
+        .test_expect("hash test receipt parameters");
         let decision = if semantics.receipt_kind == chio_core::ReceiptKind::MediatedDecision {
             Some(decision)
         } else {
@@ -469,6 +469,6 @@ mod tests {
             },
             &kp,
         )
-        .expect("sign test receipt")
+        .test_expect("sign test receipt")
     }
 }

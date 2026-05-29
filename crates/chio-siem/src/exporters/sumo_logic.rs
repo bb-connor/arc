@@ -312,9 +312,9 @@ fn decision_reason(event: &SiemEvent) -> String {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use chio_test_support::prelude::*;
 
     #[test]
     fn new_rejects_empty_url() {
@@ -356,11 +356,11 @@ mod tests {
             )),
             ..SumoLogicConfig::default()
         })
-        .expect("construct sumo exporter");
+        .test_expect("construct sumo exporter");
         let keypair = chio_core::crypto::Keypair::generate();
         let action =
             chio_core::receipt::ToolCallAction::from_parameters(serde_json::json!({"path":"/tmp"}))
-                .expect("hash parameters");
+                .test_expect("hash parameters");
         let semantics = chio_core::ReceiptSemanticFields::trace_detect_only();
         let receipt = chio_core::receipt::ChioReceipt::sign(
             chio_core::receipt::ChioReceiptBody {
@@ -387,10 +387,10 @@ mod tests {
             },
             &keypair,
         )
-        .expect("sign receipt");
+        .test_expect("sign receipt");
         let formatted = exporter
             .format_event(&SiemEvent::from_receipt(receipt))
-            .expect("format event");
+            .test_expect("format event");
 
         assert!(formatted.contains("receipt_kind=trace_observation"));
         assert!(formatted.contains("authorized=false"));

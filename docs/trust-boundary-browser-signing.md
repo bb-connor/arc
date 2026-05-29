@@ -1,7 +1,7 @@
 # Trust-boundary review: browser-side delegated subkey signing
 
 Status: rejected
-Approver: @bb-connor
+Approver: Chio maintainers
 Date: 2026-04-27
 
 ## 1. Scope of delegated subkeys

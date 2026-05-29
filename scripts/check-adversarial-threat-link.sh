@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Adversarial-vector to threat-model citation gate.
 #
-# Owner: @bb-connor.
+# Owner: chio-maintainers.
 #
 # Walks `crates/chio-adversarial-suite/cases/<class>/<id>.json` and
 # asserts that every non-pending vector cites at least one threat ID

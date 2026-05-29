@@ -625,9 +625,9 @@ impl ProviderHttpTransport for MockHttpTransport {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use chio_test_support::prelude::*;
     use wiremock::matchers::{body_string, header, header_exists, method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -643,7 +643,7 @@ mod tests {
     #[test]
     fn auth_scheme_from_env_reads_value() {
         std::env::set_var("CHIO_TEST_PRESENT_KEY", "secret-token");
-        let scheme = AuthScheme::bearer_from_env("CHIO_TEST_PRESENT_KEY").unwrap();
+        let scheme = AuthScheme::bearer_from_env("CHIO_TEST_PRESENT_KEY").test_unwrap();
         assert_eq!(scheme, AuthScheme::Bearer("secret-token".to_string()));
         std::env::remove_var("CHIO_TEST_PRESENT_KEY");
     }
@@ -672,7 +672,7 @@ mod tests {
     #[test]
     fn ndjson_parser_reads_lines_and_skips_blanks() {
         let raw = b"{\"a\":1}\n\n{\"done\":true}\n";
-        let values = parse_ndjson_lines(raw, "Ollama").unwrap();
+        let values = parse_ndjson_lines(raw, "Ollama").test_unwrap();
         assert_eq!(values.len(), 2);
         assert_eq!(values[1].get("done"), Some(&Value::Bool(true)));
     }
@@ -692,7 +692,7 @@ mod tests {
         let response = mock
             .post_json("/v1/chat", b"{\"model\":\"x\"}")
             .await
-            .unwrap();
+            .test_unwrap();
         assert_eq!(response.status, 200);
         assert_eq!(response.body, b"{\"ok\":true}");
         let calls = mock.calls();
@@ -729,11 +729,11 @@ mod tests {
         let config = HttpTransportConfig::new(server.uri())
             .with_auth(AuthScheme::Bearer("sk-test".to_string()))
             .with_header("x-extra", "yes");
-        let transport = HttpTransport::new(config).unwrap();
+        let transport = HttpTransport::new(config).test_unwrap();
         let response = transport
             .post_json("/v1/responses", b"{\"model\":\"gpt\"}")
             .await
-            .unwrap();
+            .test_unwrap();
         assert_eq!(response.status, 200);
         assert_eq!(response.body, b"{\"output\":[]}");
         assert_eq!(response.content_type.as_deref(), Some("application/json"));
@@ -756,8 +756,11 @@ mod tests {
                 value: "anthropic-secret".to_string(),
             })
             .with_header("anthropic-version", "2023-06-01");
-        let transport = HttpTransport::new(config).unwrap();
-        let response = transport.post_json("/v1/messages", b"{}").await.unwrap();
+        let transport = HttpTransport::new(config).test_unwrap();
+        let response = transport
+            .post_json("/v1/messages", b"{}")
+            .await
+            .test_unwrap();
         assert_eq!(response.status, 200);
     }
 
@@ -775,11 +778,11 @@ mod tests {
             name: "key".to_string(),
             value: "gemini-secret".to_string(),
         });
-        let transport = HttpTransport::new(config).unwrap();
+        let transport = HttpTransport::new(config).test_unwrap();
         let response = transport
             .post_json("/v1beta/models/gemini:generateContent", b"{}")
             .await
-            .unwrap();
+            .test_unwrap();
         assert_eq!(response.status, 200);
     }
 
@@ -798,8 +801,11 @@ mod tests {
             .mount(&server)
             .await;
 
-        let transport = HttpTransport::new(HttpTransportConfig::new(server.uri())).unwrap();
-        let body = transport.post_sse("/v1/responses", b"{}").await.unwrap();
+        let transport = HttpTransport::new(HttpTransportConfig::new(server.uri())).test_unwrap();
+        let body = transport
+            .post_sse("/v1/responses", b"{}")
+            .await
+            .test_unwrap();
         assert_eq!(String::from_utf8_lossy(&body), sse);
     }
 
@@ -817,9 +823,12 @@ mod tests {
             .mount(&server)
             .await;
 
-        let transport = HttpTransport::new(HttpTransportConfig::new(server.uri())).unwrap();
-        let body = transport.post_ndjson("/api/chat", b"{}").await.unwrap();
-        let values = parse_ndjson_lines(&body, "Ollama").unwrap();
+        let transport = HttpTransport::new(HttpTransportConfig::new(server.uri())).test_unwrap();
+        let body = transport
+            .post_ndjson("/api/chat", b"{}")
+            .await
+            .test_unwrap();
+        let values = parse_ndjson_lines(&body, "Ollama").test_unwrap();
         assert_eq!(values.len(), 2);
     }
 
@@ -832,7 +841,7 @@ mod tests {
             .mount(&server)
             .await;
 
-        let transport = HttpTransport::new(HttpTransportConfig::new(server.uri())).unwrap();
+        let transport = HttpTransport::new(HttpTransportConfig::new(server.uri())).test_unwrap();
         let error = transport
             .post_json("/v1/responses", b"{}")
             .await
@@ -857,7 +866,7 @@ mod tests {
         // Port 0 with an unroutable host: the connect attempt fails fast.
         let config =
             HttpTransportConfig::new("http://127.0.0.1:1").with_timeout(Duration::from_millis(250));
-        let transport = HttpTransport::new(config).unwrap();
+        let transport = HttpTransport::new(config).test_unwrap();
         let error = transport
             .post_json("/v1/chat", b"{}")
             .await

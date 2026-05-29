@@ -55,4 +55,3 @@ int main() {
   std::cout << "chio-guard-cpp native smoke passed\n";
   return 0;
 }
-

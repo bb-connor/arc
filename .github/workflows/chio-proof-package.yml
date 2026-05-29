@@ -4,6 +4,25 @@ on:
   # Re-issues a federation authority bundle and compares it against the
   # committed examples/chio-3vendor proof package, verifier trust bundle, and
   # verification context.
+  pull_request:
+    paths:
+      - "crates/chio-attest-*/**"
+      - "crates/chio-federation*/**"
+      - "examples/chio-3vendor/**"
+      - "scripts/check-chio-proof-package.sh"
+      - "spec/schemas/chio-attest/**"
+      - "spec/schemas/chio-federation/**"
+      - ".github/workflows/chio-proof-package.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "crates/chio-attest-*/**"
+      - "crates/chio-federation*/**"
+      - "examples/chio-3vendor/**"
+      - "scripts/check-chio-proof-package.sh"
+      - "spec/schemas/chio-attest/**"
+      - "spec/schemas/chio-federation/**"
+      - ".github/workflows/chio-proof-package.yml"
   schedule:
     - cron: "17 7 * * *"
   workflow_dispatch:

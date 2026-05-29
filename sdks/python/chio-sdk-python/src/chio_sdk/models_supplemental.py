@@ -291,6 +291,23 @@ class VerifyReceiptResponse(BaseModel):
     signer_key_hex: str
     ok: bool
 
+    @staticmethod
+    def _receipt_allows(receipt: Any) -> bool:
+        is_allowed = getattr(receipt, "is_allowed", None)
+        if isinstance(is_allowed, bool):
+            return is_allowed
+
+        verdict = getattr(receipt, "verdict", None)
+        verdict_allowed = getattr(verdict, "is_allowed", None)
+        if isinstance(verdict_allowed, bool):
+            return verdict_allowed
+        if getattr(verdict, "verdict", None) == "allow":
+            return True
+
+        decision = getattr(receipt, "decision", None)
+        decision_root = getattr(decision, "root", decision)
+        return getattr(decision_root, "verdict", None) == "allow"
+
     def authorizes(self, receipt: Any) -> bool:
         if not (
             self.ok
@@ -302,7 +319,7 @@ class VerifyReceiptResponse(BaseModel):
         ):
             return False
         return (
-            receipt.is_allowed
+            self._receipt_allows(receipt)
             and self.receipt_kind == "mediated_decision"
             and self.boundary_class == "prevent"
             and self.trust_level == "mediated"

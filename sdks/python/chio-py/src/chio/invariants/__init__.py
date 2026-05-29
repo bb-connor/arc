@@ -1,5 +1,6 @@
 from .capability import (
     capability_body_canonical_json,
+    capability_signing_body_canonical_json,
     parse_capability_json,
     verify_capability,
     verify_capability_json,
@@ -33,6 +34,7 @@ from .signing import (
 
 __all__ = [
     "capability_body_canonical_json",
+    "capability_signing_body_canonical_json",
     "canonicalize_json",
     "canonicalize_json_string",
     "is_valid_public_key_hex",

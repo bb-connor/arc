@@ -1,15 +1,12 @@
 //! Threat-model codegen pipeline.
 //!
 //! Reads `spec/security/chio-threat-model.v1.json`, validates it against
-//! `spec/security/chio-threat-model.schema.json`, and emits one stub
-//! Rust test file per threat ID into the configured output directory
-//! (typically `crates/chio-conformance/tests/threats/`). Each emitted
-//! file is a minimal compiling test that calls `unimplemented!()` until
-//! a real test body is filled in.
+//! `spec/security/chio-threat-model.schema.json`, and emits one Rust test
+//! inventory file per threat ID into the configured output directory
+//! (typically `crates/chio-conformance/tests/threats/`).
 //!
-//! The threat-model-coverage CI gate inspects the output tree and fails
-//! the build if any threat ID lacks a populated test body. The gate
-//! treats `unimplemented!()` as not-yet-covered.
+//! The threat-model coverage CI gate inspects the output tree and fails the
+//! build if any threat ID lacks a populated regression body.
 
 use std::fs;
 use std::path::{Path, PathBuf};

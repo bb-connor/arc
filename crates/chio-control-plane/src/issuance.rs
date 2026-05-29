@@ -698,9 +698,9 @@ fn unix_now() -> u64 {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use chio_test_support::prelude::*;
     use std::fs;
 
     use chio_core::capability::{CapabilityToken, MonetaryAmount, Operation, ToolGrant};
@@ -718,7 +718,7 @@ mod tests {
     fn unique_path(prefix: &str, extension: &str) -> PathBuf {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .expect("time before unix epoch")
+            .test_expect("time before unix epoch")
             .as_nanos();
         std::env::temp_dir().join(format!("{prefix}-{nonce}{extension}"))
     }
@@ -944,7 +944,7 @@ mod tests {
                 action: ToolCallAction::from_parameters(serde_json::json!({
                     "path": "/workspace/safe/data.txt"
                 }))
-                .expect("action"),
+                .test_expect("action"),
                 decision: Some(Decision::Allow),
                 receipt_kind: Default::default(),
                 boundary_class: Default::default(),
@@ -969,7 +969,7 @@ mod tests {
             },
             kernel_kp,
         )
-        .expect("sign receipt")
+        .test_expect("sign receipt")
     }
 
     fn make_subject_capability(
@@ -1007,7 +1007,7 @@ mod tests {
             expires_at: issued_at + 3_600,
             delegation_chain: Vec::new(),
         };
-        CapabilityToken::sign(body, issuer_kp).expect("sign capability")
+        CapabilityToken::sign(body, issuer_kp).test_expect("sign capability")
     }
 
     #[test]
@@ -1046,13 +1046,13 @@ mod tests {
 
         let capability = authority
             .issue_capability(&subject_kp.public_key(), scope, 30)
-            .expect("probationary read capability should issue");
+            .test_expect("probationary read capability should issue");
 
-        let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        let store = SqliteReceiptStore::open(&receipt_db_path).test_expect("open receipt store");
         let stored = store
             .get_lineage(&capability.id)
-            .expect("lineage query")
-            .expect("snapshot present");
+            .test_expect("lineage query")
+            .test_expect("snapshot present");
         assert_eq!(stored.subject_key, subject_kp.public_key().to_hex());
 
         let _ = fs::remove_file(receipt_db_path);
@@ -1088,7 +1088,7 @@ mod tests {
 
         let error = authority
             .issue_capability(&subject_kp.public_key(), scope, 300)
-            .expect_err("broad probationary issuance should be denied");
+            .test_expect_err("broad probationary issuance should be denied");
         assert!(
             matches!(error, KernelError::CapabilityIssuanceDenied(_)),
             "expected denial, got {error:?}"
@@ -1100,7 +1100,7 @@ mod tests {
     #[test]
     fn strong_local_history_allows_trusted_invoke_scope() {
         let receipt_db_path = unique_path("issuance-policy-history", ".sqlite3");
-        let receipt_store = SqliteReceiptStore::open(&receipt_db_path).expect("receipt store");
+        let receipt_store = SqliteReceiptStore::open(&receipt_db_path).test_expect("receipt store");
         let subject_kp = Keypair::generate();
         let issuer_kp = Keypair::generate();
         // The history receipts must be signed by a kernel key the issuing
@@ -1122,7 +1122,7 @@ mod tests {
         );
         receipt_store
             .record_capability_snapshot(&subject_capability, None)
-            .expect("record subject capability");
+            .test_expect("record subject capability");
         for day in 0..12 {
             let receipt = make_receipt(
                 &format!("rcpt-{day}"),
@@ -1134,7 +1134,7 @@ mod tests {
             );
             receipt_store
                 .append_chio_receipt(&receipt)
-                .expect("append receipt");
+                .test_expect("append receipt");
         }
         drop(receipt_store);
 
@@ -1168,7 +1168,7 @@ mod tests {
 
         let capability = authority
             .issue_capability(&subject_kp.public_key(), requested_scope, 300)
-            .expect("trusted issuance should succeed");
+            .test_expect("trusted issuance should succeed");
         assert_eq!(capability.subject, subject_kp.public_key());
 
         let _ = fs::remove_file(receipt_db_path);
@@ -1209,7 +1209,7 @@ mod tests {
 
         let error = authority
             .issue_capability(&subject_kp.public_key(), requested_scope, 120)
-            .expect_err("baseline runtime tier should not allow the higher monetary ceiling");
+            .test_expect_err("baseline runtime tier should not allow the higher monetary ceiling");
         assert!(
             matches!(error, KernelError::CapabilityIssuanceDenied(_)),
             "expected runtime-assurance issuance denial, got {error:?}"
@@ -1256,7 +1256,7 @@ mod tests {
                 120,
                 Some(test_azure_runtime_attestation()),
             )
-            .expect_err("raw attestation must not unlock attested scope without local trust");
+            .test_expect_err("raw attestation must not unlock attested scope without local trust");
 
         assert!(
             error
@@ -1274,8 +1274,8 @@ mod tests {
             Some(&policy),
             unix_now(),
         )
-        .expect("trusted attestation should verify")
-        .expect("verified record should be returned when runtime policy is present");
+        .test_expect("trusted attestation should verify")
+        .test_expect("verified record should be returned when runtime policy is present");
 
         assert!(verified.is_locally_accepted());
         assert_eq!(verified.effective_tier(), RuntimeAssuranceTier::Verified);
@@ -1287,7 +1287,7 @@ mod tests {
         assert_eq!(
             verified
                 .workload_identity()
-                .expect("trusted attestation should bind a workload identity")
+                .test_expect("trusted attestation should bind a workload identity")
                 .trust_domain,
             "chio"
         );
@@ -1297,8 +1297,8 @@ mod tests {
     fn issuance_verification_returns_verified_record_without_runtime_policy() {
         let evidence = test_azure_runtime_attestation();
         let verified = verify_runtime_attestation_for_issuance(Some(&evidence), None, unix_now())
-            .expect("attestation should pass local binding validation")
-            .expect("verified record should still be returned without runtime policy");
+            .test_expect("attestation should pass local binding validation")
+            .test_expect("verified record should still be returned without runtime policy");
 
         assert!(!verified.policy_outcome.trust_policy_configured);
         assert!(!verified.is_locally_accepted());
@@ -1368,7 +1368,7 @@ mod tests {
                 120,
                 Some(runtime_attestation),
             )
-            .expect_err("conflicting workload identity should fail closed");
+            .test_expect_err("conflicting workload identity should fail closed");
         assert!(
             matches!(error, KernelError::CapabilityIssuanceDenied(_)),
             "expected issuance denial, got {error:?}"
@@ -1419,7 +1419,7 @@ mod tests {
                 120,
                 Some(test_azure_runtime_attestation()),
             )
-            .expect("trusted attestation should unlock verified tier");
+            .test_expect("trusted attestation should unlock verified tier");
 
         assert!(
             capability.scope.grants[0]
@@ -1473,7 +1473,7 @@ mod tests {
                 120,
                 Some(untrusted),
             )
-            .expect_err("untrusted verifier should fail closed");
+            .test_expect_err("untrusted verifier should fail closed");
         assert!(
             error.to_string().contains("trust policy"),
             "expected trust policy denial, got {error}"
@@ -1520,7 +1520,7 @@ mod tests {
                 120,
                 Some(test_google_runtime_attestation()),
             )
-            .expect("trusted google appraisal should unlock verified tier");
+            .test_expect("trusted google appraisal should unlock verified tier");
 
         assert!(
             capability.scope.grants[0]

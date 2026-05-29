@@ -31,7 +31,7 @@ when an individual is officially representing the project in public spaces.
 ## Enforcement
 
 Concerns about behavior that violates this Code of Conduct may be reported
-privately to the project maintainers at connor@backbay.io. All reports will be
+privately to the project maintainers at security@backbay.io. All reports will be
 reviewed and investigated promptly and fairly. Maintainers are obligated to
 respect the privacy and security of anyone who reports an incident, and will
 apply the Contributor Covenant enforcement guidelines when determining the

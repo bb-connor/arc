@@ -1,6 +1,6 @@
 # GitHub Actions Billing Runbook
 
-**Owner:** @bb-connor
+**Owner:** Chio maintainers
 **Last updated:** 2026-05-02
 
 ## Purpose

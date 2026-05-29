@@ -491,10 +491,10 @@ fn file_size(path: &Path) -> Result<u64, WriterError> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use chio_tee_frame::{FrameInputs, Otel, Provenance, Upstream, UpstreamSystem};
+    use chio_test_support::prelude::*;
     use serde_json::json;
 
     fn frame(event_id: &str, invocation: Value, verdict: Verdict) -> Frame {
@@ -526,12 +526,12 @@ mod tests {
             would_have_blocked: !matches!(verdict, Verdict::Allow),
             tenant_sig: format!("ed25519:{}", "A".repeat(86)),
         })
-        .unwrap()
+        .test_unwrap()
     }
 
     #[test]
     fn writes_fixture_shape_and_strips_capture_only_fields() {
-        let tmp = tempfile::TempDir::new().unwrap();
+        let tmp = tempfile::TempDir::new().test_unwrap();
         let dir = tmp
             .path()
             .join("openai_responses_shadow")
@@ -549,7 +549,7 @@ mod tests {
             ),
         ];
 
-        let summary = write_fixture(&dir, frames).unwrap();
+        let summary = write_fixture(&dir, frames).test_unwrap();
 
         assert_eq!(summary.frames_in, 2);
         assert_eq!(summary.frames_after_dedupe, 1);
@@ -560,7 +560,7 @@ mod tests {
         assert!(dir.join(CHECKPOINT_FILENAME).is_file());
         assert!(dir.join(ROOT_FILENAME).is_file());
 
-        let receipts = fs::read_to_string(dir.join(RECEIPTS_FILENAME)).unwrap();
+        let receipts = fs::read_to_string(dir.join(RECEIPTS_FILENAME)).test_unwrap();
         assert!(receipts.ends_with('\n'));
         assert!(!receipts.contains("tenant_sig"));
         assert!(!receipts.contains("request_blob"));
@@ -569,25 +569,25 @@ mod tests {
         assert!(receipts.contains("[REDACTED-EMAIL]"));
         assert!(receipts.contains("\"verdict\":\"deny\""));
 
-        let checkpoint = fs::read_to_string(dir.join(CHECKPOINT_FILENAME)).unwrap();
+        let checkpoint = fs::read_to_string(dir.join(CHECKPOINT_FILENAME)).test_unwrap();
         assert!(checkpoint.starts_with("{\"family\""));
         assert!(checkpoint.contains("\"scenario\":\"openai_responses_shadow/tool_call_with_pii\""));
     }
 
     #[test]
     fn refuses_existing_non_fixture_directory_shape() {
-        let tmp = tempfile::TempDir::new().unwrap();
+        let tmp = tempfile::TempDir::new().test_unwrap();
         let dir = tmp.path().join("family").join("name");
-        fs::create_dir_all(&dir).unwrap();
-        fs::write(dir.join("extra.txt"), b"no").unwrap();
+        fs::create_dir_all(&dir).test_unwrap();
+        fs::write(dir.join("extra.txt"), b"no").test_unwrap();
 
-        let err = validate_scenario_dir(&dir).unwrap_err();
+        let err = validate_scenario_dir(&dir).test_unwrap_err();
         assert!(matches!(err, WriterError::ExtraEntry(_)));
     }
 
     #[test]
     fn root_matches_receipts_without_final_lf_plus_checkpoint() {
-        let tmp = tempfile::TempDir::new().unwrap();
+        let tmp = tempfile::TempDir::new().test_unwrap();
         let dir = tmp.path().join("family").join("name");
         let summary = write_fixture(
             &dir,
@@ -597,10 +597,10 @@ mod tests {
                 Verdict::Allow,
             )],
         )
-        .unwrap();
+        .test_unwrap();
 
-        let receipts = fs::read(dir.join(RECEIPTS_FILENAME)).unwrap();
-        let checkpoint = fs::read(dir.join(CHECKPOINT_FILENAME)).unwrap();
+        let receipts = fs::read(dir.join(RECEIPTS_FILENAME)).test_unwrap();
+        let checkpoint = fs::read(dir.join(CHECKPOINT_FILENAME)).test_unwrap();
         let receipts_without_lf = &receipts[..receipts.len() - 1];
         let root = root_bytes(receipts_without_lf, &checkpoint);
         assert_eq!(hex::encode(root), summary.root_hex);

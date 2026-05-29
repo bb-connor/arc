@@ -6,7 +6,7 @@ name: CI
 #   required (reported check context names):
 #     - "Build, lint, test"                                  # check job
 #     - "MSRV build and test"                                # msrv job
-#     - "cargo-vet (supply-chain audit)"                     # cargo-vet job
+#     - "cargo-vet (locked supply-chain audit)"              # cargo-vet job
 #     - "cargo-deny (supply-chain bans/advisories/licenses)" # cargo-deny job
 #
 # PR-tier CI is intentionally fast and Linux-only: format, clippy, build, the
@@ -145,8 +145,8 @@ jobs:
           cargo test -p chio-wasm-guards --lib
 
   cargo-vet:
-    name: cargo-vet (supply-chain audit)
-    # owner: @bb-connor
+    name: cargo-vet (locked supply-chain audit)
+    # owner: chio-maintainers
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -162,7 +162,7 @@ jobs:
 
   cargo-deny:
     name: cargo-deny (supply-chain bans/advisories/licenses)
-    # owner: @bb-connor
+    # owner: chio-maintainers
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -198,7 +198,7 @@ jobs:
   # commit-message range.
   check-regression-tests:
     name: check-regression-tests
-    # owner: @bb-connor
+    # owner: chio-maintainers
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5

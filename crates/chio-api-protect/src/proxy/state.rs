@@ -52,6 +52,11 @@ pub(crate) struct ReceiptLog {
     pub(crate) receipts: Vec<HttpReceipt>,
 }
 
+/// Stored Chio receipts for tool-call sidecar aliases.
+pub(crate) struct ToolReceiptLog {
+    pub(crate) receipts: Vec<ChioReceipt>,
+}
+
 pub(crate) struct SqliteReceiptStore {
     connection: Connection,
 }
@@ -64,6 +69,10 @@ impl SqliteReceiptStore {
             .execute_batch(
                 "
                 CREATE TABLE IF NOT EXISTS http_receipts (
+                    id TEXT PRIMARY KEY,
+                    receipt_json TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS tool_receipts (
                     id TEXT PRIMARY KEY,
                     receipt_json TEXT NOT NULL
                 );
@@ -96,12 +105,47 @@ impl SqliteReceiptStore {
         Ok(receipts)
     }
 
+    pub(crate) fn load_tool_receipts(&self) -> Result<Vec<ChioReceipt>, ProtectError> {
+        let mut statement = self
+            .connection
+            .prepare("SELECT receipt_json FROM tool_receipts ORDER BY rowid ASC")
+            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+        let rows = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+
+        let mut receipts = Vec::new();
+        for row in rows {
+            let receipt_json =
+                row.map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+            let receipt: ChioReceipt = serde_json::from_str(&receipt_json)
+                .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+            receipts.push(receipt);
+        }
+        Ok(receipts)
+    }
+
     pub(crate) fn append(&mut self, receipt: &HttpReceipt) -> Result<(), ProtectError> {
         let receipt_json = serde_json::to_string(receipt)
             .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
         self.connection
             .execute(
                 "INSERT OR REPLACE INTO http_receipts (id, receipt_json) VALUES (?1, ?2)",
+                params![receipt.id, receipt_json],
+            )
+            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+        Ok(())
+    }
+
+    pub(crate) fn append_tool_receipt(
+        &mut self,
+        receipt: &ChioReceipt,
+    ) -> Result<(), ProtectError> {
+        let receipt_json = serde_json::to_string(receipt)
+            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+        self.connection
+            .execute(
+                "INSERT OR REPLACE INTO tool_receipts (id, receipt_json) VALUES (?1, ?2)",
                 params![receipt.id, receipt_json],
             )
             .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
@@ -146,8 +190,11 @@ pub(crate) struct ProxyState {
     pub(crate) egress_contract: HttpEgressContract,
     pub(crate) approval_admin: ApprovalAdmin,
     pub(crate) receipt_log: Mutex<ReceiptLog>,
+    pub(crate) tool_receipt_log: Mutex<ToolReceiptLog>,
     pub(crate) receipt_store: Option<Mutex<SqliteReceiptStore>>,
     pub(crate) revoked_capability_ids: Mutex<HashSet<String>>,
+    pub(crate) trusted_capability_issuers: Vec<PublicKey>,
+    pub(crate) trusted_receipt_signers: Vec<PublicKey>,
     pub(crate) sidecar_control_token: Option<String>,
 }
 
@@ -241,6 +288,13 @@ impl ProtectProxy {
             Arc::new(InMemoryApprovalStore::new())
         };
 
+        let mut trusted_capability_issuers = self.config.trusted_capability_issuers.clone();
+        let signer_public_key = keypair.public_key();
+        if !trusted_capability_issuers.contains(&signer_public_key) {
+            trusted_capability_issuers.push(signer_public_key.clone());
+        }
+        let trusted_receipt_signers = vec![signer_public_key];
+
         let evaluator = RequestEvaluator::new_with_approval_store_and_trusted_capability_issuers(
             routes,
             keypair.clone(),
@@ -249,19 +303,26 @@ impl ProtectProxy {
             self.config.trusted_capability_issuers.clone(),
         );
 
-        let (receipt_log, receipt_store, revoked_capability_ids) =
+        let (receipt_log, tool_receipt_log, receipt_store, revoked_capability_ids) =
             if let Some(path) = &self.config.receipt_db {
                 let store = SqliteReceiptStore::open(path)?;
                 let receipts = store.load_receipts()?;
+                let tool_receipts = store.load_tool_receipts()?;
                 let revoked_capability_ids = store.load_revoked_capability_ids()?;
                 (
                     ReceiptLog { receipts },
+                    ToolReceiptLog {
+                        receipts: tool_receipts,
+                    },
                     Some(Mutex::new(store)),
                     revoked_capability_ids,
                 )
             } else {
                 (
                     ReceiptLog {
+                        receipts: Vec::new(),
+                    },
+                    ToolReceiptLog {
                         receipts: Vec::new(),
                     },
                     None,
@@ -279,8 +340,11 @@ impl ProtectProxy {
             egress_contract,
             approval_admin: ApprovalAdmin::new(approval_store),
             receipt_log: Mutex::new(receipt_log),
+            tool_receipt_log: Mutex::new(tool_receipt_log),
             receipt_store,
             revoked_capability_ids: Mutex::new(revoked_capability_ids),
+            trusted_capability_issuers,
+            trusted_receipt_signers,
             sidecar_control_token: self.config.sidecar_control_token.clone(),
         });
 

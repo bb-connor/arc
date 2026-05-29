@@ -10,10 +10,12 @@ export interface DelegationLink {
   delegatee: string;
   attenuations?: unknown[];
   timestamp: number;
+  scope_hash?: string;
   signature: string;
 }
 
 export interface CapabilityToken {
+  schema?: string;
   id: string;
   issuer: string;
   subject: string;
@@ -21,6 +23,11 @@ export interface CapabilityToken {
   issued_at: number;
   expires_at: number;
   delegation_chain?: DelegationLink[];
+  algorithm?: unknown;
+  caveats?: unknown[];
+  scope_attenuations?: unknown[];
+  attenuation_proof?: unknown;
+  budget_share_bps?: number;
   signature: string;
 }
 
@@ -34,6 +41,10 @@ export interface CapabilityVerification {
 function delegationLinkBody(link: DelegationLink): Omit<DelegationLink, "signature"> {
   const { signature: _signature, ...body } = link;
   return body;
+}
+
+function isNonEmptyArray(value: unknown): value is unknown[] {
+  return Array.isArray(value) && value.length > 0;
 }
 
 function verifyDelegationChain(chain: DelegationLink[], maxDelegationDepth?: number): boolean {
@@ -66,12 +77,51 @@ export function parseCapabilityJson(input: string): CapabilityToken {
 }
 
 export function capabilityBody(capability: CapabilityToken): Omit<CapabilityToken, "signature"> {
-  const { signature: _signature, ...body } = capability;
+  const {
+    algorithm: _algorithm,
+    attenuation_proof: _attenuationProof,
+    budget_share_bps: _budgetShareBps,
+    caveats: _caveats,
+    schema: _schema,
+    scope_attenuations: _scopeAttenuations,
+    signature: _signature,
+    ...body
+  } = capability;
   return body;
 }
 
 export function capabilityBodyCanonicalJson(capability: CapabilityToken): string {
   return canonicalizeJson(capabilityBody(capability));
+}
+
+export function capabilitySigningBody(capability: CapabilityToken): Record<string, unknown> {
+  const body = capabilityBody(capability);
+  const signingBody: Record<string, unknown> = {
+    schema: capability.schema ?? "chio.capability.v1",
+    ...body,
+  };
+
+  if (!isNonEmptyArray(signingBody.delegation_chain)) {
+    delete signingBody.delegation_chain;
+  }
+  if (isNonEmptyArray(capability.caveats)) {
+    signingBody.caveats = capability.caveats;
+  }
+  if (isNonEmptyArray(capability.scope_attenuations)) {
+    signingBody.scope_attenuations = capability.scope_attenuations;
+  }
+  if (capability.attenuation_proof !== undefined && capability.attenuation_proof !== null) {
+    signingBody.attenuation_proof = capability.attenuation_proof;
+  }
+  if (capability.budget_share_bps !== undefined && capability.budget_share_bps !== null) {
+    signingBody.budget_share_bps = capability.budget_share_bps;
+  }
+
+  return signingBody;
+}
+
+export function capabilitySigningBodyCanonicalJson(capability: CapabilityToken): string {
+  return canonicalizeJson(capabilitySigningBody(capability));
 }
 
 export function verifyCapability(
@@ -90,7 +140,7 @@ export function verifyCapability(
 
   return {
     signature_valid: verifyEd25519Signature(
-      capabilityBodyCanonicalJson(capability),
+      capabilitySigningBodyCanonicalJson(capability),
       capability.issuer,
       capability.signature,
     ),

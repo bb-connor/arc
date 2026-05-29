@@ -1,6 +1,6 @@
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
+    use chio_test_support::prelude::*;
     use super::*;
     use std::sync::{Mutex, MutexGuard};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -344,7 +344,7 @@ mod tests {
     fn unix_now() -> u64 {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .expect("system time should be after unix epoch")
+            .test_expect("system time should be after unix epoch")
             .as_secs()
     }
 
@@ -399,7 +399,7 @@ mod tests {
             },
             issuer,
         )
-        .expect("capability should sign")
+        .test_expect("capability should sign")
     }
 
     fn assert_receipt_write_prometheus_sample_at_least(outcome: &str, minimum: u64) {
@@ -408,9 +408,9 @@ mod tests {
         let sample = body
             .lines()
             .find_map(|line| line.strip_prefix(&prefix))
-            .expect("Prometheus sample should exist")
+            .test_expect("Prometheus sample should exist")
             .parse::<u64>()
-            .expect("Prometheus sample should be an integer");
+            .test_expect("Prometheus sample should be an integer");
         assert!(
             sample >= minimum,
             "Prometheus sample for {outcome} must include the pending projection counter"
@@ -421,21 +421,21 @@ mod tests {
 
     #[test]
     fn agent_card_has_correct_name() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
+        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let card = edge.agent_card();
         assert_eq!(card.name, "Chio A2A Edge");
     }
 
     #[test]
     fn agent_card_has_correct_version() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
+        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let card = edge.agent_card();
         assert_eq!(card.version, "0.1.0");
     }
 
     #[test]
     fn agent_card_includes_all_skills() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
+        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let card = edge.agent_card();
         assert_eq!(card.skills.len(), 2);
         assert!(card.skills.iter().any(|s| s.id == "echo"));
@@ -444,7 +444,7 @@ mod tests {
 
     #[test]
     fn agent_card_has_interface() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
+        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let card = edge.agent_card();
         assert_eq!(card.supported_interfaces.len(), 1);
         assert_eq!(card.supported_interfaces[0].protocol_binding, "JSONRPC");
@@ -453,9 +453,9 @@ mod tests {
 
     #[test]
     fn agent_card_json_serializes() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
-        let json_str = edge.agent_card_json().unwrap();
-        let parsed: Value = serde_json::from_str(&json_str).unwrap();
+        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let json_str = edge.agent_card_json().test_unwrap();
+        let parsed: Value = serde_json::from_str(&json_str).test_unwrap();
         assert_eq!(parsed["name"], "Chio A2A Edge");
     }
 
@@ -468,7 +468,7 @@ mod tests {
             endpoint_url: "https://myagent.com".to_string(),
             protocol_binding: "HTTP+JSON".to_string(),
         };
-        let edge = ChioA2aEdge::new(config, vec![test_manifest()]).unwrap();
+        let edge = ChioA2aEdge::new(config, vec![test_manifest()]).test_unwrap();
         let card = edge.agent_card();
         assert_eq!(card.name, "My Agent");
         assert_eq!(card.description, "Custom agent");
@@ -481,15 +481,15 @@ mod tests {
 
     #[test]
     fn read_only_tool_has_lossless_fidelity() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
-        let skill = edge.skill("echo").unwrap();
+        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let skill = edge.skill("echo").test_unwrap();
         assert_eq!(skill.bridge_fidelity, BridgeFidelity::Lossless);
     }
 
     #[test]
     fn side_effect_tool_has_adapted_fidelity_with_permission_caveat() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
-        let skill = edge.skill("write").unwrap();
+        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let skill = edge.skill("write").test_unwrap();
         let BridgeFidelity::Adapted { caveats } = &skill.bridge_fidelity else {
             panic!("expected adapted fidelity");
         };
@@ -500,7 +500,7 @@ mod tests {
 
     #[test]
     fn approval_required_tool_is_not_auto_published() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![approval_manifest()]).unwrap();
+        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![approval_manifest()]).test_unwrap();
         assert!(edge.skill("approve").is_none());
         assert_eq!(
             edge.bridge_fidelity("approve"),
@@ -513,8 +513,8 @@ mod tests {
     #[test]
     fn cancellation_tool_is_adapted_with_truthful_caveats() {
         let edge =
-            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![cancellation_manifest()]).unwrap();
-        let skill = edge.skill("cancel_me").unwrap();
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![cancellation_manifest()]).test_unwrap();
+        let skill = edge.skill("cancel_me").test_unwrap();
         let BridgeFidelity::Adapted { caveats } = &skill.bridge_fidelity else {
             panic!("expected adapted fidelity");
         };
@@ -526,7 +526,7 @@ mod tests {
 
     #[test]
     fn hidden_tool_is_not_auto_published() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![hidden_manifest()]).unwrap();
+        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![hidden_manifest()]).test_unwrap();
         assert!(edge.skill("hidden").is_none());
         assert_eq!(
             edge.bridge_fidelity("hidden"),
@@ -538,8 +538,8 @@ mod tests {
 
     #[test]
     fn streaming_tool_is_adapted_with_truthful_caveats() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).unwrap();
-        let skill = edge.skill("stream").unwrap();
+        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
+        let skill = edge.skill("stream").test_unwrap();
         let BridgeFidelity::Adapted { caveats } = &skill.bridge_fidelity else {
             panic!("expected adapted fidelity");
         };
@@ -551,14 +551,14 @@ mod tests {
 
     #[test]
     fn skill_ids_returns_all() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
+        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let ids = edge.skill_ids();
         assert_eq!(ids.len(), 2);
     }
 
     #[test]
     fn skill_returns_none_for_unknown() {
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
+        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         assert!(edge.skill("nonexistent").is_none());
     }
 
@@ -566,13 +566,13 @@ mod tests {
 
     #[test]
     fn send_message_completes_successfully() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let server = test_server();
         let request = text_message("hello");
         let response = edge
             .compatibility()
             .handle_send_message_compatibility("echo", &request, &server)
-            .unwrap();
+            .test_unwrap();
         assert_eq!(response.status, TaskStatus::Completed);
         assert!(response.message.is_some());
         assert_eq!(
@@ -586,24 +586,24 @@ mod tests {
 
     #[test]
     fn send_message_returns_task_id() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let server = test_server();
         let request = text_message("test");
         let r1 = edge
             .compatibility()
             .handle_send_message_compatibility("echo", &request, &server)
-            .unwrap();
+            .test_unwrap();
         let r2 = edge
             .compatibility()
             .handle_send_message_compatibility("echo", &request, &server)
-            .unwrap();
+            .test_unwrap();
         assert_ne!(r1.id, r2.id);
         assert!(r1.id.starts_with("a2a-task-"));
     }
 
     #[test]
     fn send_message_unknown_skill_errors() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let server = test_server();
         let request = text_message("test");
         let err = edge
@@ -636,12 +636,12 @@ mod tests {
             required_permissions: None,
             public_key: "aabb".to_string(),
         };
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![manifest]).unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![manifest]).test_unwrap();
         let request = text_message("test");
         let response = edge
             .compatibility()
             .handle_send_message_compatibility("fail_tool", &request, &server)
-            .unwrap();
+            .test_unwrap();
         assert_eq!(response.status, TaskStatus::Failed);
         assert!(response.status_message.is_some());
         assert_eq!(
@@ -655,7 +655,7 @@ mod tests {
 
     #[test]
     fn send_message_with_kernel_emits_signed_receipt_metadata() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -673,11 +673,11 @@ mod tests {
 
         let response = edge
             .handle_send_message("echo", &text_message("hello"), &kernel, &execution)
-            .unwrap();
+            .test_unwrap();
         assert_eq!(response.status, TaskStatus::Completed);
         let metadata = response
             .metadata
-            .expect("kernel path should attach metadata");
+            .test_expect("kernel path should attach metadata");
         assert!(metadata["chio"]["receiptId"].as_str().is_some());
         assert_eq!(
             metadata["chio"]["authorityPath"].as_str(),
@@ -711,7 +711,7 @@ mod tests {
 
     #[test]
     fn send_message_with_kernel_denial_still_returns_receipt_metadata() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -729,9 +729,9 @@ mod tests {
 
         let response = edge
             .handle_send_message("write", &text_message("blocked"), &kernel, &execution)
-            .unwrap();
+            .test_unwrap();
         assert_eq!(response.status, TaskStatus::Failed);
-        let metadata = response.metadata.expect("deny path should attach metadata");
+        let metadata = response.metadata.test_expect("deny path should attach metadata");
         assert_eq!(
             metadata["chio"]["authorityPath"].as_str(),
             Some("cross_protocol_orchestrator")
@@ -750,7 +750,7 @@ mod tests {
 
         let subject = Keypair::generate();
         let request = text_message("blocked pending approval");
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let before_pending = receipt_write_total(RECEIPT_WRITE_OUTCOME_PENDING_APPROVAL);
         let before_error = receipt_write_total(RECEIPT_WRITE_OUTCOME_ERROR);
 
@@ -769,10 +769,10 @@ mod tests {
                 },
                 "approval required",
             )
-            .unwrap();
+            .test_unwrap();
         let metadata = response
             .metadata
-            .expect("pending approval should attach metadata");
+            .test_expect("pending approval should attach metadata");
 
         assert_eq!(response.status, TaskStatus::Failed);
         assert_eq!(
@@ -799,7 +799,7 @@ mod tests {
     #[test]
     fn send_message_kernel_error_records_receipt_write_error_outcome() {
         let _metrics_guard = metrics_test_guard();
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let mut config = test_kernel_config();
         config.require_web3_evidence = true;
         let kernel_issuer = config.keypair.clone();
@@ -833,7 +833,7 @@ mod tests {
     #[test]
     fn pre_kernel_bridge_error_does_not_record_receipt_write_error_outcome() {
         let _metrics_guard = metrics_test_guard();
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -857,7 +857,7 @@ mod tests {
         let mut request = text_message("boom");
         request.metadata = Some(json!({
             "chio": {
-                "capabilityRef": serde_json::to_value(capability_ref).unwrap()
+                "capabilityRef": serde_json::to_value(capability_ref).test_unwrap()
             }
         }));
         let before_error = receipt_write_total(RECEIPT_WRITE_OUTCOME_ERROR);
@@ -895,7 +895,7 @@ mod tests {
             required_permissions: None,
             public_key: "aabb".to_string(),
         };
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![manifest]).unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![manifest]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -913,11 +913,11 @@ mod tests {
 
         let response = edge
             .handle_send_message("fail_tool", &text_message("boom"), &kernel, &execution)
-            .unwrap();
+            .test_unwrap();
         assert_eq!(response.status, TaskStatus::Failed);
         let metadata = response
             .metadata
-            .expect("kernel failure should attach metadata");
+            .test_expect("kernel failure should attach metadata");
         assert_eq!(
             metadata["chio"]["authorityPath"].as_str(),
             Some("cross_protocol_orchestrator")
@@ -1017,7 +1017,7 @@ mod tests {
                 m
             }],
         )
-        .unwrap();
+        .test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1055,7 +1055,7 @@ mod tests {
 
     #[test]
     fn jsonrpc_send_message_with_skill_id() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1096,7 +1096,7 @@ mod tests {
 
     #[test]
     fn jsonrpc_missing_skill_id_with_multiple_skills_errors() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1130,7 +1130,7 @@ mod tests {
 
     #[test]
     fn jsonrpc_unknown_method_returns_error() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1167,7 +1167,7 @@ mod tests {
                 m
             }],
         )
-        .unwrap();
+        .test_unwrap();
         let server = test_server();
         let response = edge.compatibility().handle_jsonrpc_compatibility(
             // This explicit compatibility wrapper remains available for bounded
@@ -1209,7 +1209,7 @@ mod tests {
 
     #[test]
     fn jsonrpc_send_with_streaming_tool_collates_output_into_final_message() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1246,7 +1246,7 @@ mod tests {
         );
         let parts = response["result"]["message"]["parts"]
             .as_array()
-            .expect("stream response should contain parts");
+            .test_expect("stream response should contain parts");
         assert_eq!(parts.len(), 2);
         assert_eq!(parts[0]["text"], "chunk-1");
         assert_eq!(parts[1]["text"], "chunk-2");
@@ -1254,7 +1254,7 @@ mod tests {
 
     #[test]
     fn jsonrpc_stream_creates_deferred_task_and_task_get_resolves_result() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1291,7 +1291,7 @@ mod tests {
         );
         let task_id = response["result"]["id"]
             .as_str()
-            .expect("message/stream should return task id")
+            .test_expect("message/stream should return task id")
             .to_string();
         assert_eq!(
             response["result"]["metadata"]["chio"]["receiptPending"].as_bool(),
@@ -1319,13 +1319,13 @@ mod tests {
         );
         let parts = resolved["result"]["message"]["parts"]
             .as_array()
-            .expect("resolved task should contain parts");
+            .test_expect("resolved task should contain parts");
         assert_eq!(parts.len(), 2);
     }
 
     #[test]
     fn jsonrpc_task_get_removes_completed_deferred_task() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1355,7 +1355,7 @@ mod tests {
             &kernel,
             &execution,
         );
-        let task_id = created["result"]["id"].as_str().unwrap().to_string();
+        let task_id = created["result"]["id"].as_str().test_unwrap().to_string();
 
         let resolved = edge.handle_jsonrpc(
             json!({
@@ -1374,7 +1374,7 @@ mod tests {
 
     #[test]
     fn jsonrpc_stream_rejects_deferred_task_map_over_cap() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
@@ -1425,13 +1425,13 @@ mod tests {
 
         assert!(rejected["error"]["message"]
             .as_str()
-            .unwrap()
+            .test_unwrap()
             .contains("too many deferred tasks"));
     }
 
     #[test]
     fn jsonrpc_task_cancel_marks_stream_task_cancelled() {
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
@@ -1460,7 +1460,7 @@ mod tests {
             &kernel,
             &execution,
         );
-        let task_id = response["result"]["id"].as_str().unwrap().to_string();
+        let task_id = response["result"]["id"].as_str().test_unwrap().to_string();
 
         let cancelled = edge.handle_jsonrpc(
             json!({
@@ -1484,7 +1484,7 @@ mod tests {
     #[test]
     fn authoritative_send_uses_protocol_aware_target_binding() {
         let mut edge =
-            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![mcp_target_manifest()]).unwrap();
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![mcp_target_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1515,9 +1515,9 @@ mod tests {
                 &kernel,
                 &execution,
             )
-            .unwrap();
+            .test_unwrap();
 
-        let metadata = response.metadata.unwrap();
+        let metadata = response.metadata.test_unwrap();
         assert_eq!(
             metadata["chio"]["bridge"]["targetProtocol"].as_str(),
             Some("mcp")
@@ -1539,7 +1539,7 @@ mod tests {
     #[test]
     fn authoritative_send_supports_openai_target_binding() {
         let mut edge =
-            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![openai_target_manifest()]).unwrap();
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![openai_target_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ChioKernel::new(config);
@@ -1570,9 +1570,9 @@ mod tests {
                 &kernel,
                 &execution,
             )
-            .unwrap();
+            .test_unwrap();
 
-        let metadata = response.metadata.unwrap();
+        let metadata = response.metadata.test_unwrap();
         assert_eq!(
             metadata["chio"]["bridge"]["targetProtocol"].as_str(),
             Some("open_ai")
@@ -1621,7 +1621,7 @@ mod tests {
     fn duplicate_skills_across_manifests_receive_qualified_ids() {
         let m1 = test_manifest();
         let m2 = test_manifest(); // Same tool names
-        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![m1, m2]).unwrap();
+        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![m1, m2]).test_unwrap();
         assert_eq!(edge.skill_ids().len(), 4);
         assert!(edge.skill("test-srv::echo").is_some());
         assert!(edge.skill("test-srv::echo#2").is_some());
@@ -1639,7 +1639,7 @@ mod tests {
     fn ambiguous_unqualified_skill_id_returns_guidance() {
         let m1 = test_manifest();
         let m2 = test_manifest(); // Same tool names
-        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![m1, m2]).unwrap();
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![m1, m2]).test_unwrap();
         let server = test_server();
         let error = edge
             .compatibility()
@@ -1667,20 +1667,20 @@ mod tests {
 
     #[test]
     fn task_status_serializes_correctly() {
-        let json = serde_json::to_value(TaskStatus::Completed).unwrap();
+        let json = serde_json::to_value(TaskStatus::Completed).test_unwrap();
         assert_eq!(json, "completed");
-        let json = serde_json::to_value(TaskStatus::Failed).unwrap();
+        let json = serde_json::to_value(TaskStatus::Failed).test_unwrap();
         assert_eq!(json, "failed");
     }
 
     #[test]
     fn bridge_fidelity_serializes_correctly() {
-        let json = serde_json::to_value(BridgeFidelity::Lossless).unwrap();
+        let json = serde_json::to_value(BridgeFidelity::Lossless).test_unwrap();
         assert_eq!(json, json!({"kind": "lossless"}));
         let json = serde_json::to_value(BridgeFidelity::Adapted {
             caveats: vec!["stream collated".to_string()],
         })
-        .unwrap();
+        .test_unwrap();
         assert_eq!(
             json,
             json!({"kind": "adapted", "caveats": ["stream collated"]})
@@ -1688,7 +1688,7 @@ mod tests {
         let json = serde_json::to_value(BridgeFidelity::Unsupported {
             reason: "needs cancellation".to_string(),
         })
-        .unwrap();
+        .test_unwrap();
         assert_eq!(
             json,
             json!({"kind": "unsupported", "reason": "needs cancellation"})
