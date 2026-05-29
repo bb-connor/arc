@@ -251,14 +251,10 @@ mod cli_entrypoint_tests {
 
         match cli.command {
             Commands::Receipt {
-                command:
-                    ReceiptCommands::Checkpoint {
-                        command:
-                            ReceiptCheckpointCommands::Create {
-                                kernel_seed_file,
-                                max_batch,
-                            },
-                    },
+                command: ReceiptCommands::Checkpoint(ReceiptCheckpointCommands::Create {
+                    kernel_seed_file,
+                    max_batch,
+                }),
             } => {
                 assert_eq!(kernel_seed_file, PathBuf::from("kernel.seed"));
                 assert_eq!(max_batch, 250);
