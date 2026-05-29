@@ -1903,6 +1903,38 @@ mod tests {
     }
 
     #[test]
+    fn strict_chio_cosigner_signs_and_verifies_treaty_envelope() {
+        use crate::bilateral::InProcessCoSigner;
+
+        let kp_a = Keypair::generate();
+        let kp_b = Keypair::generate();
+        let receipt = sample_receipt(&kp_b);
+        let cosigner = InProcessCoSigner::new("kernel.org-a", kp_a.clone(), kp_b.public_key());
+
+        let envelope = sign_chio_bilateral_dsse_envelope_with_cosigner(
+            &receipt,
+            &kp_a.public_key(),
+            &kp_b,
+            "kernel.org-a",
+            "kernel.org-b",
+            "file_read",
+            1_734_000_000_000,
+            strict_treaty_extensions(&receipt),
+            &cosigner,
+        )
+        .expect("strict Chio treaty DSSE co-signs");
+
+        let statement =
+            verify_chio_bilateral_dsse_envelope(&envelope, &kp_a.public_key(), &kp_b.public_key())
+                .expect("strict Chio treaty DSSE co-sign verifies");
+        let treaty = statement
+            .predicate
+            .treaty_binding_ref
+            .expect("strict treaty DSSE must carry treaty binding");
+        assert_eq!(treaty.treaty_id, "treaty-buyer-vendor");
+    }
+
+    #[test]
     fn strict_chio_signer_accepts_treaty_binding_without_governance_ref() {
         let kp_a = Keypair::generate();
         let kp_b = Keypair::generate();
