@@ -2166,6 +2166,59 @@ mod underwriting_and_support_tests {
         std::env::temp_dir().join(format!("{prefix}-{nonce}.{extension}"))
     }
 
+    fn base_trust_service_config() -> crate::trust_control::TrustServiceConfig {
+        use std::collections::BTreeMap;
+        use std::time::Duration;
+
+        crate::trust_control::TrustServiceConfig {
+            listen: "127.0.0.1:0".parse().test_unwrap(),
+            service_token: "token".to_string(),
+            tenant_read_tokens: BTreeMap::new(),
+            receipt_db_path: None,
+            revocation_db_path: None,
+            authority_seed_path: None,
+            authority_db_path: None,
+            budget_db_path: None,
+            enterprise_providers_file: None,
+            federation_policies_file: None,
+            scim_lifecycle_file: None,
+            verifier_policies_file: None,
+            verifier_challenge_db_path: None,
+            passport_statuses_file: None,
+            passport_issuance_offers_file: None,
+            certification_registry_file: None,
+            certification_discovery_file: None,
+            issuance_policy: None,
+            runtime_assurance_policy: None,
+            advertise_url: None,
+            allow_local_peer_urls: false,
+            certification_public_metadata_ttl_seconds: 900,
+            peer_urls: Vec::new(),
+            cluster_sync_interval: Duration::from_millis(200),
+        }
+    }
+
+    #[test]
+    fn trusted_kernel_keys_absent_when_no_authority_material_configured() {
+        let keys =
+            trusted_kernel_keys_from_service_config(&base_trust_service_config()).test_unwrap();
+
+        assert!(keys.is_none());
+    }
+
+    #[test]
+    fn trusted_kernel_keys_rejects_conflicting_authority_sources() {
+        let seed = unique_temp_path("chio-authority-seed", "seed");
+        let db = unique_temp_path("chio-authority-db", "sqlite");
+        let mut config = base_trust_service_config();
+        config.authority_seed_path = Some(seed);
+        config.authority_db_path = Some(db);
+
+        let error = trusted_kernel_keys_from_service_config(&config).test_unwrap_err();
+
+        assert!(error.to_string().contains("not both"));
+    }
+
     #[test]
     fn behavioral_feed_signer_uses_local_db_seed_after_replica_snapshot() {
         let source_path = unique_temp_path("chio-behavioral-feed-source", "sqlite");
