@@ -1780,6 +1780,32 @@ def test_typeerror_fallback_kwonly_only_preserves_default_prefix() -> None:
     }
 
 
+def test_empty_positional_table_does_not_invent_overflow_slot() -> None:
+    """No positional map means extra args stay raw.
+
+    Keyword redaction still applies by name, but the fallback must not
+    synthesize a protected positional slot when no positional mapping exists.
+    """
+
+    def proxy(**kwargs: object) -> None:
+        del kwargs
+
+    policy = RedactionPolicy(body_fields={"chio_file_write": ("content",)})
+    args, kwargs = bind_and_redact(
+        proxy,
+        ("PROD_SECRET_NO_POSITIONAL_SLOT",),
+        {"content": "KW_SECRET"},
+        tool_name="chio_file_write",
+        policy=policy,
+        positional_table={"chio_file_write": ()},
+    )
+    assert args == ["PROD_SECRET_NO_POSITIONAL_SLOT"]
+    assert kwargs["content"] == {
+        "omitted": True,
+        "byte_count": len(b"KW_SECRET"),
+    }
+
+
 def test_typeerror_fallback_unprotected_var_positional_keeps_table_prefix() -> None:
     """Regression:
 

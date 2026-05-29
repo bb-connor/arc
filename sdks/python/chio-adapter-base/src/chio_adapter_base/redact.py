@@ -636,6 +636,7 @@ def bind_and_redact(
                 not has_var_positional
                 and allow_ambiguous_cycling
                 and protected_fields_for_tool_pre
+                and extended_positional_names
                 and len(bind_args) > len(extended_positional_names)
             ):
                 base_alias = build_alias_map(
