@@ -101,8 +101,58 @@ def _operation_set(operations: list[Operation]) -> set[str]:
     return {getattr(operation, "value", str(operation)) for operation in operations}
 
 
+def _operation_missing(cls: type[Operation], value: object) -> Operation | None:
+    legacy_names = {
+        "Invoke": "invoke",
+        "ReadResult": "read_result",
+        "Read": "read",
+        "Subscribe": "subscribe",
+        "Get": "get",
+        "Delegate": "delegate",
+    }
+    if isinstance(value, str):
+        member_name = legacy_names.get(value, value)
+        if hasattr(cls, member_name):
+            return getattr(cls, member_name)
+    return None
+
+
 def _constraint_key(constraint: Constraint) -> str:
     return constraint.model_dump_json(exclude_none=True)
+
+
+def _constraint_path_prefix(cls: type[Constraint], prefix: str) -> Constraint:
+    return cls(type="path_prefix", value=prefix)
+
+
+def _constraint_domain_exact(cls: type[Constraint], domain: str) -> Constraint:
+    return cls(type="domain_exact", value=domain)
+
+
+def _constraint_max_length(cls: type[Constraint], length: int) -> Constraint:
+    return cls(type="max_length", value=length)
+
+
+def _attenuation_remove_tool(
+    cls: type[Attenuation],
+    server_id: str,
+    tool_name: str,
+) -> Attenuation:
+    return cls(type="remove_tool", server_id=server_id, tool_name=tool_name)
+
+
+def _attenuation_add_constraint(
+    cls: type[Attenuation],
+    server_id: str,
+    tool_name: str,
+    constraint: Constraint,
+) -> Attenuation:
+    return cls(
+        type="add_constraint",
+        server_id=server_id,
+        tool_name=tool_name,
+        constraint=constraint,
+    )
 
 
 def _money_within(child: MonetaryAmount | None, parent: MonetaryAmount | None) -> bool:
@@ -117,6 +167,14 @@ def _optional_cap_within(child: int | None, parent: int | None) -> bool:
     if parent is None:
         return True
     return child is not None and child <= parent
+
+
+def _pattern_allows(child: str, parent: str) -> bool:
+    if parent == "*":
+        return True
+    if parent.endswith("*"):
+        return child.startswith(parent[:-1])
+    return child == parent
 
 
 def _tool_grant_is_subset_of(self: ToolGrant, parent: ToolGrant) -> bool:
@@ -146,15 +204,15 @@ def _tool_grant_is_subset_of(self: ToolGrant, parent: ToolGrant) -> bool:
 
 
 def _resource_grant_is_subset_of(self: ResourceGrant, parent: ResourceGrant) -> bool:
-    if parent.uri_pattern != "*" and self.uri_pattern != parent.uri_pattern:
+    if not _pattern_allows(self.uri_pattern, parent.uri_pattern):
         return False
     return _operation_set(self.operations).issubset(_operation_set(parent.operations))
 
 
 def _prompt_grant_is_subset_of(self: PromptGrant, parent: PromptGrant) -> bool:
-    child = self.model_dump(exclude_none=True)
-    parent_dump = parent.model_dump(exclude_none=True)
-    return all(child.get(key) == value for key, value in parent_dump.items())
+    if not _pattern_allows(self.prompt_name, parent.prompt_name):
+        return False
+    return _operation_set(self.operations).issubset(_operation_set(parent.operations))
 
 
 def _scope_is_subset_of(self: ChioScope, parent: ChioScope) -> bool:
@@ -197,16 +255,16 @@ def _token_body(self: CapabilityToken) -> CapabilityTokenBody:
         scope=self.scope,
         issued_at=self.issued_at,
         expires_at=self.expires_at,
-        delegation_chain=self.delegation_chain,
+        delegation_chain=self.delegation_chain or [],
     )
 
 
 def _receipt_is_allowed(self: ChioReceipt) -> bool:
-    return self.decision.is_allowed
+    return bool(self.decision and self.decision.is_allowed)
 
 
 def _receipt_is_denied(self: ChioReceipt) -> bool:
-    return self.decision.is_denied
+    return bool(self.decision and self.decision.is_denied)
 
 
 Decision.allow = classmethod(_decision_allow)  # type: ignore[attr-defined]
@@ -229,6 +287,22 @@ ChioScope.is_subset_of = _scope_is_subset_of  # type: ignore[attr-defined]
 CapabilityToken.is_valid_at = _token_is_valid_at  # type: ignore[attr-defined]
 CapabilityToken.is_expired_at = _token_is_expired_at  # type: ignore[attr-defined]
 CapabilityToken.body = _token_body  # type: ignore[attr-defined]
+Operation._missing_ = classmethod(_operation_missing)  # type: ignore[attr-defined]
+Constraint.path_prefix = classmethod(  # type: ignore[attr-defined]
+    _constraint_path_prefix
+)
+Constraint.domain_exact = classmethod(  # type: ignore[attr-defined]
+    _constraint_domain_exact
+)
+Constraint.max_length = classmethod(  # type: ignore[attr-defined]
+    _constraint_max_length
+)
+Attenuation.remove_tool = classmethod(  # type: ignore[attr-defined]
+    _attenuation_remove_tool
+)
+Attenuation.add_constraint = classmethod(  # type: ignore[attr-defined]
+    _attenuation_add_constraint
+)
 for _operation_name in (
     "invoke",
     "read_result",

@@ -52,6 +52,10 @@ DENIED_ERROR_TYPE = "ChioCapabilityDenied"
 ActivityGrantOverride = Callable[[activity.Info], "WorkflowGrant | None"]
 
 
+def _is_sha256_hex(value: str) -> bool:
+    return len(value) == 64 and all(char in "0123456789abcdef" for char in value)
+
+
 @dataclass
 class _WorkflowRunState:
     """Per-(workflow_id, run_id) state; isolates concurrent runs on one worker."""
@@ -387,13 +391,12 @@ def _temporal_dict_lift(
     policy: RedactionPolicy,
 ) -> list[Any] | None:
     """Lift redacted positional values into Temporal's dict wire shape."""
-    protected_fields = policy.body_fields.get(tool_name) or ()
     sig_names = _fixed_positional_param_names(fn)
     if sig_names:
         alias_map = build_alias_map(
             sig_names,
             table_slots,
-            protected_fields,
+            policy.body_fields.get(tool_name) or (),
             allow_ambiguous_cycling=tool_name in DEFAULT_TOOL_POSITIONAL_NAMES,
         )
         canonical_dict: dict[str, Any] = {}
@@ -505,13 +508,28 @@ def _deny_receipt_from_error(
         ensure_ascii=True,
     ).encode("utf-8")
     parameter_hash = hashlib.sha256(canonical_parameters).hexdigest()
-    receipt_id_source = exc.receipt_id or (
+    fallback_receipt_id = (
         f"chio-temporal-deny-{info.workflow_id}-{info.activity_id}-{int(time.time())}"
     )
-    receipt_id = hashlib.sha256(receipt_id_source.encode("utf-8")).hexdigest()
+    receipt_id_source = exc.receipt_id or fallback_receipt_id
+    if exc.receipt_id and _is_sha256_hex(exc.receipt_id):
+        receipt_id = exc.receipt_id
+    else:
+        receipt_id = hashlib.sha256(receipt_id_source.encode("utf-8")).hexdigest()
     synthetic_hash = hashlib.sha256(
         f"synthetic-deny-receipt:{receipt_id_source}".encode()
     ).hexdigest()
+    metadata = {
+        "synthetic": True,
+        "reason_code": exc.reason_code,
+        "requested_action": exc.requested_action,
+        "required_scope": exc.required_scope,
+        "granted_scope": exc.granted_scope,
+        "hint": exc.hint,
+        "docs_url": exc.docs_url,
+    }
+    if exc.receipt_id:
+        metadata["sidecar_receipt_id"] = exc.receipt_id
     return ChioReceipt(
         id=receipt_id,
         timestamp=int(time.time()),
@@ -520,31 +538,23 @@ def _deny_receipt_from_error(
         tool_name=exc.tool_name or info.activity_type,
         action=ToolCallAction(
             parameters=dict(parameters),
-                parameter_hash=parameter_hash,
-            ),
-            decision=Decision.deny(
-                reason=exc.reason or exc.message or "Chio capability denied",
-                guard=exc.guard or "ChioDeniedError",
-            ),
-            receipt_kind="mediated_decision",
-            boundary_class="prevent",
-            observation_outcome=None,
-            tool_origin="caller_executed",
-            redaction_mode="none",
-            actor_chain=[],
-            content_hash=synthetic_hash,
-            policy_hash=synthetic_hash,
-            evidence=[],
-            trust_level="mediated",
-            metadata={
-                "synthetic": True,
-                "reason_code": exc.reason_code,
-            "requested_action": exc.requested_action,
-            "required_scope": exc.required_scope,
-            "granted_scope": exc.granted_scope,
-            "hint": exc.hint,
-            "docs_url": exc.docs_url,
-        },
+            parameter_hash=parameter_hash,
+        ),
+        decision=Decision.deny(
+            reason=exc.reason or exc.message or "Chio capability denied",
+            guard=exc.guard or "ChioDeniedError",
+        ),
+        receipt_kind="mediated_decision",
+        boundary_class="prevent",
+        observation_outcome=None,
+        tool_origin="caller_executed",
+        redaction_mode="none",
+        actor_chain=[],
+        content_hash=synthetic_hash,
+        policy_hash=synthetic_hash,
+        evidence=[],
+        trust_level="mediated",
+        metadata=metadata,
         kernel_key="0" * 64,
         signature="0" * 128,
     )
