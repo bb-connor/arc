@@ -1818,12 +1818,9 @@ mod tests {
 
     #[test]
     fn validate_policy_evaluation_summary_rejects_joint_disposition_mismatch() {
-        let err = validate_policy_evaluation_summary(&policy_summary(
-            "allow",
-            "allow",
-            Some("deny"),
-        ))
-        .expect_err("joint disposition must match server verdicts");
+        let err =
+            validate_policy_evaluation_summary(&policy_summary("allow", "allow", Some("deny")))
+                .expect_err("joint disposition must match server verdicts");
 
         assert!(err
             .to_string()
@@ -1832,13 +1829,10 @@ mod tests {
 
     #[test]
     fn validate_policy_evaluation_summary_rejects_unsupported_verdict_tokens() {
-        let err =
-            validate_policy_evaluation_summary(&policy_summary("observe", "observe", None))
-                .expect_err("unsupported verdict tokens must fail closed");
+        let err = validate_policy_evaluation_summary(&policy_summary("observe", "observe", None))
+            .expect_err("unsupported verdict tokens must fail closed");
 
-        assert!(err
-            .to_string()
-            .contains("unsupported verdict \"observe\""));
+        assert!(err.to_string().contains("unsupported verdict \"observe\""));
     }
 
     #[test]
