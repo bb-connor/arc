@@ -579,6 +579,79 @@ mod tests {
     };
 
     #[test]
+    fn safe_archive_helper_rejects_decompression_ratio_bomb() {
+        let temp = tempfile::tempdir().unwrap();
+        let archive = temp.path().join("bomb.tar.gz");
+        let zeros = vec![0_u8; 16 * 1024];
+        let entries = [SafeArchiveWriteEntry {
+            path: "zeros.bin",
+            bytes: &zeros,
+        }];
+        write_tar_gz_file(&archive, "test archive", &entries, TEST_LIMITS).unwrap();
+        let limits = SafeArchiveLimits {
+            max_decompression_ratio: 2,
+            ..TEST_LIMITS
+        };
+
+        let err = read_tar_gz_file(&archive, "test archive", limits).unwrap_err();
+
+        assert!(err.to_string().contains("decompression ratio"));
+    }
+
+    #[test]
+    fn safe_archive_helper_rejects_duplicate_member_paths() {
+        let temp = tempfile::tempdir().unwrap();
+        let archive = temp.path().join("dup.tar.gz");
+        let file = fs::File::create(&archive).unwrap();
+        let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::default());
+        let mut builder = tar::Builder::new(encoder);
+        append_regular_file(&mut builder, "same.txt", b"one", "test archive").unwrap();
+        append_regular_file(&mut builder, "same.txt", b"two", "test archive").unwrap();
+        let encoder = builder.into_inner().unwrap();
+        encoder.finish().unwrap();
+
+        let err = read_tar_gz_file(&archive, "test archive", TEST_LIMITS).unwrap_err();
+
+        assert!(err.to_string().contains("duplicate"));
+    }
+
+    #[test]
+    fn safe_archive_helper_rejects_casefold_collisions() {
+        let temp = tempfile::tempdir().unwrap();
+        let archive = temp.path().join("case.tar.gz");
+        let file = fs::File::create(&archive).unwrap();
+        let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::default());
+        let mut builder = tar::Builder::new(encoder);
+        append_regular_file(&mut builder, "File.txt", b"one", "test archive").unwrap();
+        append_regular_file(&mut builder, "file.txt", b"two", "test archive").unwrap();
+        let encoder = builder.into_inner().unwrap();
+        encoder.finish().unwrap();
+
+        let err = read_tar_gz_file(&archive, "test archive", TEST_LIMITS).unwrap_err();
+
+        assert!(err.to_string().contains("casefold"));
+    }
+
+    #[test]
+    fn safe_archive_helper_rejects_oversized_compressed_archive() {
+        let temp = tempfile::tempdir().unwrap();
+        let archive = temp.path().join("big.tar.gz");
+        let entries = [SafeArchiveWriteEntry {
+            path: "payload.bin",
+            bytes: &[0_u8; 32 * 1024],
+        }];
+        write_tar_gz_file(&archive, "test archive", &entries, TEST_LIMITS).unwrap();
+        let limits = SafeArchiveLimits {
+            max_compressed_bytes: 128,
+            ..TEST_LIMITS
+        };
+
+        let err = read_tar_gz_file(&archive, "test archive", limits).unwrap_err();
+
+        assert!(err.to_string().contains("compressed byte limit"));
+    }
+
+    #[test]
     fn safe_archive_helper_rejects_traversal_path() {
         let err = safe_archive_member_path("../escape", "test archive").unwrap_err();
         assert!(err.to_string().contains("unsafe"));
