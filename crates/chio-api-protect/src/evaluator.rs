@@ -418,6 +418,61 @@ mod tests {
     }
 
     #[test]
+    fn evaluate_chio_request_denies_spoofed_tool_identity_on_http_route() {
+        let keypair = Keypair::generate();
+        let routes = vec![RouteEntry {
+            pattern: "/pets".to_string(),
+            method: HttpMethod::Post,
+            operation_id: Some("createPet".to_string()),
+            policy: PolicyDecision::DenyByDefault,
+        }];
+        let evaluator = RequestEvaluator::new(routes, keypair.clone(), "test-policy".to_string());
+        let capability = signed_capability_token_json_with_scope(
+            &keypair,
+            "cap-math-only",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "math".to_string(),
+                    tool_name: "double".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+
+        let mut request = ChioHttpRequest::new(
+            "req-sidecar-spoofed-tool".to_string(),
+            HttpMethod::Post,
+            "/pets".to_string(),
+            "/pets".to_string(),
+            CallerIdentity::anonymous(),
+        );
+        request.tool_server = Some("math".to_string());
+        request.tool_name = Some("double".to_string());
+        request.arguments = Some(serde_json::json!({ "value": 1 }));
+        request.body_hash = Some("pet-body".to_string());
+        request.body_length = 8;
+
+        let result = evaluator
+            .evaluate_chio_request(request, Some(&capability))
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert!(result.receipt.evidence[0]
+            .details
+            .as_deref()
+            .is_some_and(|details| {
+                details.contains("capability does not authorize tool authorize_http_request")
+            }));
+    }
+
+    #[test]
     fn evaluate_chio_request_denies_capability_for_different_tool_identity() {
         let keypair = Keypair::generate();
         let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
