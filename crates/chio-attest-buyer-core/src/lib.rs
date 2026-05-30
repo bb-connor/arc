@@ -2456,6 +2456,7 @@ mod tests {
     use super::*;
     use chio_core_types::crypto::Keypair;
     use chio_core_types::receipt::SignedExportEnvelope;
+    use chio_workflow::receipt::WorkflowReceipt;
 
     fn trust_bundle_document_from_fixture() -> ChioVerifierTrustBundleDocument {
         serde_json::from_str(include_str!(
@@ -2500,6 +2501,135 @@ mod tests {
     fn resign_governance_receipt(receipt: &mut SignedGovernanceReceipt) {
         *receipt = SignedExportEnvelope::sign(receipt.body.clone(), &Keypair::from_seed(&[12; 32]))
             .expect("governance receipt re-signs");
+    }
+
+    fn resign_bilateral_envelope(
+        envelope: &mut DsseEnvelope,
+        buyer_key: &Keypair,
+        vendor_key: &Keypair,
+        statement_bytes: &[u8],
+    ) {
+        use base64::engine::general_purpose::STANDARD;
+        use base64::Engine;
+        use chio_core_types::crypto::{Ed25519Backend, SigningBackend};
+        use chio_federation::{pae, PAYLOAD_TYPE_IN_TOTO};
+
+        envelope.payload = STANDARD.encode(statement_bytes);
+        let pae_bytes = pae(PAYLOAD_TYPE_IN_TOTO, statement_bytes);
+        let sig_a = Ed25519Backend::new(buyer_key.clone())
+            .sign_bytes(&pae_bytes)
+            .expect("buyer bilateral signature");
+        let sig_b = Ed25519Backend::new(vendor_key.clone())
+            .sign_bytes(&pae_bytes)
+            .expect("vendor bilateral signature");
+        envelope.signatures[0].sig = STANDARD.encode(sig_a.to_bytes());
+        envelope.signatures[1].sig = STANDARD.encode(sig_b.to_bytes());
+    }
+
+    fn bilateral_envelope_with_denied_policy(envelope: &DsseEnvelope) -> DsseEnvelope {
+        let mut envelope = envelope.clone();
+        let (mut statement, _) = envelope
+            .decode_statement()
+            .expect("bilateral envelope decodes");
+        let summary = statement
+            .predicate
+            .policy_evaluation_summary
+            .as_mut()
+            .expect("bilateral envelope carries policy evaluation summary");
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+        let statement_bytes = statement
+            .canonical_bytes()
+            .expect("bilateral statement canonicalizes");
+        resign_bilateral_envelope(
+            &mut envelope,
+            &Keypair::from_seed(&[11; 32]),
+            &Keypair::from_seed(&[21; 32]),
+            &statement_bytes,
+        );
+        envelope
+    }
+
+    fn resign_workflow_receipt(package: &mut ChioProofPackage) -> Result<(), ChioPackageError> {
+        const VENDOR_SEEDS: [[u8; 32]; 3] = [[21; 32], [22; 32], [23; 32]];
+        const VENDOR_IDS: [&str; 3] = ["vendor-a", "vendor-b", "vendor-c"];
+
+        let buyer_key = Keypair::from_seed(&[11; 32]);
+        let mut workflow = WorkflowReceipt::sign(package.workflow_receipt.body(), &buyer_key)
+            .map_err(|error| ChioPackageError::Workflow(error.to_string()))?;
+        for (vendor_id, seed) in VENDOR_IDS.iter().zip(VENDOR_SEEDS) {
+            workflow
+                .add_vendor_signature(*vendor_id, &Keypair::from_seed(&seed))
+                .map_err(|error| ChioPackageError::Workflow(error.to_string()))?;
+        }
+        package.workflow_receipt = workflow;
+        package.workflow_intersection.aggregate_workflow_receipt_sha256 =
+            canonical_sha256(&package.workflow_receipt.body())?;
+        Ok(())
+    }
+
+    fn trust_bundle_for_package(
+        package: &ChioProofPackage,
+    ) -> Result<ChioVerifierTrustBundle, ChioPackageError> {
+        let mut document = trust_bundle_document_from_fixture();
+        let intersection_hash = canonical_sha256(&package.workflow_intersection)?;
+        for intersection in &mut document.workflow_intersections {
+            if intersection.intersection_id == package.workflow_intersection.intersection_id {
+                intersection.sha256 = intersection_hash.clone();
+            }
+        }
+        ChioVerifierTrustBundle::from_document(document)
+    }
+
+    fn refresh_step_parent_hashes(package: &mut ChioProofPackage) -> Result<(), ChioPackageError> {
+        let mut previous_step_sha256: Option<String> = None;
+        for step in &mut package.workflow_receipt.steps {
+            step.parent_receipt_sha256 = previous_step_sha256.clone();
+            previous_step_sha256 = Some(canonical_sha256(step)?);
+        }
+        Ok(())
+    }
+
+    fn package_with_denied_bilateral_envelope(
+        package: &ChioProofPackage,
+    ) -> Result<ChioProofPackage, ChioPackageError> {
+        let mut package = package.clone();
+        let denied_envelope =
+            bilateral_envelope_with_denied_policy(&package.bilateral_envelopes[0]);
+        package.bilateral_envelopes[0] = denied_envelope.clone();
+        package.workflow_receipt.steps[0].bilateral_dsse_sha256 =
+            Some(canonical_sha256(&denied_envelope)?);
+        refresh_step_parent_hashes(&mut package)?;
+        resign_workflow_receipt(&mut package)?;
+        Ok(package)
+    }
+
+    #[test]
+    fn denied_bilateral_envelope_policy_verdict_rejects_proof_package() {
+        let package = proof_package_from_json(include_str!(
+            "../../../examples/chio-3vendor/fixtures/buyer-auditor-proof-package.json"
+        ))
+        .expect("package fixture parses");
+        let context = verification_context_from_fixture();
+        let package = package_with_denied_bilateral_envelope(&package)
+            .expect("denied bilateral envelope package mutates");
+        let trust_bundle =
+            trust_bundle_for_package(&package).expect("trust bundle matches mutated package");
+
+        let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
+        let error_text = error.to_string();
+        assert!(
+            error_text.contains("policy verdict") && error_text.contains("not allow"),
+            "expected federation deny for non-allow bilateral verdict: {error_text}"
+        );
+
+        let report = verify_package_report(&package, &trust_bundle, &context);
+        assert!(!report.accepted);
+        assert_eq!(
+            report.failure.as_ref().expect("failure").code,
+            "federation"
+        );
     }
 
     #[test]

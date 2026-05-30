@@ -1556,4 +1556,98 @@ mod tests {
             Some("capability does not authorize tool increment on server math")
         );
     }
+
+    #[test]
+    fn deny_by_default_rejects_partial_proxy_server_without_tool() {
+        let query = HashMap::new();
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json_with_scope(
+            &issuer,
+            "cap-math-only",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "math".to_string(),
+                    tool_name: "double".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-partial-server".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/pets".to_string(),
+                path: "/pets",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("abc".to_string()),
+                body_length: 3,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: Some("math"),
+                requested_tool_name: None,
+                requested_arguments: None,
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+    }
+
+    #[test]
+    fn deny_by_default_rejects_partial_proxy_tool_without_server() {
+        let query = HashMap::new();
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json_with_scope(
+            &issuer,
+            "cap-math-only",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "math".to_string(),
+                    tool_name: "double".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-partial-tool".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/pets".to_string(),
+                path: "/pets",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("abc".to_string()),
+                body_length: 3,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: None,
+                requested_tool_name: Some("double"),
+                requested_arguments: None,
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+    }
 }
