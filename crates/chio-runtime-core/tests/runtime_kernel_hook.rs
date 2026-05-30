@@ -576,6 +576,152 @@ fn kernel_hook_denies_federated_runtime_request_without_treaty_context(
 }
 
 #[test]
+fn kernel_hook_denies_bundle_hash_mismatch() -> Result<(), Box<dyn std::error::Error>> {
+    let store = InMemoryRuntimeAdmissionStore::new();
+    let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
+    let mut bundle = bundle();
+    bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
+    bundle.binding.origin_kernel_id = None;
+    let bundle_hash = runtime_admission_bundle_sha256(&bundle)?;
+    store.insert_bundle(bundle)?;
+
+    let cap = capability("cap-live-1")?;
+    let mut request = ToolCallRequest {
+        request_id: "req-live-destructive".to_string(),
+        capability: cap.clone(),
+        tool_name: "close_account".to_string(),
+        server_id: "vendor-ledger".to_string(),
+        agent_id: cap.subject.to_hex(),
+        arguments: args,
+        dpop_proof: None,
+        governed_intent: None,
+        approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    };
+    request.governed_intent = Some(GovernedTransactionIntent {
+        id: "intent-live-1".to_string(),
+        server_id: "vendor-ledger".to_string(),
+        tool_name: "close_account".to_string(),
+        purpose: "close governed vendor account".to_string(),
+        max_amount: None,
+        commerce: None,
+        metered_billing: None,
+        runtime_attestation: None,
+        call_chain: None,
+        autonomy: None,
+        context: Some(serde_json::json!({
+            "chioAdmission": {
+                "admissionId": "adm-live-1",
+                "bundleSha256": "f".repeat(64)
+            }
+        })),
+    });
+
+    let hook = allowing_policy_hook(store)?;
+    let decision = hook.evaluate(&RuntimeAdmissionContext {
+        request: &request,
+        now_unix_secs: 1_800_000_001,
+        now_unix_ms: 1_800_000_001_000,
+        matched_grant_index: Some(0),
+        local_kernel_id: "kernel.vendor-b".to_string(),
+    })?;
+
+    assert!(!decision.allowed, "{decision:#?}");
+    let metadata = decision
+        .metadata
+        .ok_or_else(|| io::Error::other("runtime metadata missing"))?;
+    assert_eq!(metadata["chio_runtime"]["admission_id"], "adm-live-1");
+    assert_eq!(
+        metadata["chio_runtime"]["failure_code"],
+        "admission_bundle_hash_mismatch"
+    );
+    assert_ne!(bundle_hash, "f".repeat(64));
+    Ok(())
+}
+
+#[test]
+fn kernel_hook_denies_retired_treaty_context_without_canonical_key(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let store = InMemoryRuntimeAdmissionStore::new();
+    let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
+    let mut bundle = bundle();
+    bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
+    let bundle_hash = runtime_admission_bundle_sha256(&bundle)?;
+    store.insert_bundle(bundle)?;
+
+    let cap = capability("cap-live-1")?;
+    let mut treaty_context = serde_json::Map::new();
+    treaty_context.insert(
+        retired_context_key("Treaty"),
+        serde_json::json!({
+            "treatyScopeId": "treaty-buyer-vendor",
+            "treatyScopeSha256": "5".repeat(64),
+            "ladderIntersectionId": "treaty-buyer-vendor:1800000010000",
+            "ladderIntersectionSha256": "6".repeat(64),
+            "actionClassId": "workflow.destructive.vendor_call"
+        }),
+    );
+    let mut admission_context = serde_json::Map::new();
+    admission_context.insert(
+        "chioAdmission".to_string(),
+        serde_json::json!({
+            "admissionId": "adm-live-1",
+            "bundleSha256": bundle_hash
+        }),
+    );
+    for (key, value) in treaty_context {
+        admission_context.insert(key, value);
+    }
+
+    let mut request = ToolCallRequest {
+        request_id: "req-retired-treaty".to_string(),
+        capability: cap.clone(),
+        tool_name: "close_account".to_string(),
+        server_id: "vendor-ledger".to_string(),
+        agent_id: cap.subject.to_hex(),
+        arguments: args,
+        dpop_proof: None,
+        governed_intent: None,
+        approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: Some("kernel.buyer".to_string()),
+    };
+    request.governed_intent = Some(GovernedTransactionIntent {
+        id: "intent-retired-treaty".to_string(),
+        server_id: "vendor-ledger".to_string(),
+        tool_name: "close_account".to_string(),
+        purpose: "mixed-version treaty context must not bypass treaty enforcement".to_string(),
+        max_amount: None,
+        commerce: None,
+        metered_billing: None,
+        runtime_attestation: None,
+        call_chain: None,
+        autonomy: None,
+        context: Some(serde_json::Value::Object(admission_context)),
+    });
+
+    let hook = allowing_policy_hook(store)?;
+    let decision = hook.evaluate(&RuntimeAdmissionContext {
+        request: &request,
+        now_unix_secs: 1_800_000_001,
+        now_unix_ms: 1_800_000_001_000,
+        matched_grant_index: Some(0),
+        local_kernel_id: "kernel.vendor-b".to_string(),
+    })?;
+
+    assert!(!decision.allowed, "{decision:#?}");
+    let metadata = decision
+        .metadata
+        .ok_or_else(|| io::Error::other("runtime metadata missing"))?;
+    assert_eq!(
+        metadata["chio_runtime"]["failure_code"],
+        "chio_treaty_missing_scope"
+    );
+    Ok(())
+}
+
+#[test]
 fn kernel_hook_denies_cross_boundary_request_when_treaty_store_evidence_missing(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;

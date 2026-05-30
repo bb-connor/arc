@@ -2326,6 +2326,98 @@ paths:
     }
 
     #[tokio::test]
+    async fn sidecar_validate_capability_rejects_expected_scope_not_subset() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let mint_body = serde_json::json!({
+            "subject": Keypair::generate().public_key().to_hex(),
+            "scope": {
+                "grants": [{
+                    "server_id": "math",
+                    "tool_name": "double",
+                    "operations": ["invoke"],
+                    "constraints": []
+                }],
+                "resource_grants": [],
+                "prompt_grants": []
+            },
+            "ttl_seconds": 600,
+        });
+        let mint_response = build_app(Arc::clone(&state))
+            .oneshot(loopback_post("/v1/capabilities", mint_body))
+            .await
+            .test_unwrap();
+        let token: CapabilityToken = serde_json::from_slice(
+            &to_bytes(mint_response.into_body(), 1024 * 1024)
+                .await
+                .test_unwrap(),
+        )
+        .test_unwrap();
+
+        let mut validate_body = serde_json::to_value(&token).test_unwrap();
+        validate_body["expected_scope"] = serde_json::json!({
+            "grants": [{
+                "server_id": "math",
+                "tool_name": "increment",
+                "operations": ["invoke"],
+                "constraints": []
+            }],
+            "resource_grants": [],
+            "prompt_grants": []
+        });
+        let validate_response = build_app(Arc::clone(&state))
+            .oneshot(loopback_post("/v1/capabilities/validate", validate_body))
+            .await
+            .test_unwrap();
+        let bytes = to_bytes(validate_response.into_body(), 1024 * 1024)
+            .await
+            .test_unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).test_unwrap();
+        assert_eq!(json["valid"], false);
+        assert!(json["reason"]
+            .as_str()
+            .test_unwrap()
+            .contains("not a subset"));
+    }
+
+    #[tokio::test]
+    async fn sidecar_validate_capability_rejects_expected_subject_mismatch() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let subject = Keypair::generate();
+        let mint_body = serde_json::json!({
+            "subject": subject.public_key().to_hex(),
+            "scope": { "grants": [], "resource_grants": [], "prompt_grants": [] },
+            "ttl_seconds": 600,
+        });
+        let mint_response = build_app(Arc::clone(&state))
+            .oneshot(loopback_post("/v1/capabilities", mint_body))
+            .await
+            .test_unwrap();
+        let token: CapabilityToken = serde_json::from_slice(
+            &to_bytes(mint_response.into_body(), 1024 * 1024)
+                .await
+                .test_unwrap(),
+        )
+        .test_unwrap();
+
+        let mut validate_body = serde_json::to_value(&token).test_unwrap();
+        validate_body["expected_subject"] =
+            serde_json::json!(Keypair::generate().public_key().to_hex());
+        let validate_response = build_app(Arc::clone(&state))
+            .oneshot(loopback_post("/v1/capabilities/validate", validate_body))
+            .await
+            .test_unwrap();
+        let bytes = to_bytes(validate_response.into_body(), 1024 * 1024)
+            .await
+            .test_unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).test_unwrap();
+        assert_eq!(json["valid"], false);
+        assert!(json["reason"]
+            .as_str()
+            .test_unwrap()
+            .contains("expected_subject"));
+    }
+
+    #[tokio::test]
     async fn sidecar_attenuate_capability_returns_not_implemented() {
         let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
         let body = serde_json::json!({

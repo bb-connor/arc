@@ -18,17 +18,17 @@ use chio_runtime_core::{
     compute_ladder_intersection, evaluate_runtime_admission, runtime_admission_bundle_sha256,
     runtime_peer_weights_sha256, sign_runtime_admission_report, tool_args_sha256,
     verify_signed_runtime_admission_report, BilateralInvocation, ChioRuntimeAdmissionHook,
-    CrossKernelContinuation, InMemoryRuntimeAdmissionStore, ReceiptLineageBundle,
+    ChioRuntimeError, CrossKernelContinuation, InMemoryRuntimeAdmissionStore, ReceiptLineageBundle,
     ReceiptLineageStatement, RuntimeAdmissionBundle, RuntimeAdmissionInput,
-    RuntimeAdmissionProfile, RuntimePeerWeight, RuntimePeerWeights, RuntimePheromoneAdvisory,
-    RuntimePheromonePolicy, RuntimePheromonePolicyRule, RuntimeRequestBinding,
-    RuntimeTrustedVerifierKey, RuntimeVerifierTrustBundleV4, SignedRuntimePheromoneQueryReport,
-    SqliteRuntimeOrchestrationStore, TreatyScope, CHIO_BILATERAL_INVOCATION_SCHEMA,
-    CHIO_CROSS_KERNEL_CONTINUATION_SCHEMA, CHIO_RECEIPT_LINEAGE_BUNDLE_SCHEMA,
-    CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA, CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA,
-    CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA, CHIO_RUNTIME_FAILURE_CODES,
-    CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA, CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA,
-    CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA,
+    RuntimeAdmissionProfile, RuntimeAdmissionStore, RuntimePeerWeight, RuntimePeerWeights,
+    RuntimePheromoneAdvisory, RuntimePheromonePolicy, RuntimePheromonePolicyRule,
+    RuntimeRequestBinding, RuntimeTrustedVerifierKey, RuntimeTrustFloorEntry,
+    RuntimeVerifierTrustBundleV4, SignedRuntimePheromoneQueryReport, SqliteRuntimeOrchestrationStore,
+    TreatyScope, CHIO_BILATERAL_INVOCATION_SCHEMA, CHIO_CROSS_KERNEL_CONTINUATION_SCHEMA,
+    CHIO_RECEIPT_LINEAGE_BUNDLE_SCHEMA, CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA,
+    CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA, CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA,
+    CHIO_RUNTIME_FAILURE_CODES, CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA,
+    CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA, CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA,
 };
 use std::io;
 
@@ -927,6 +927,159 @@ fn treaty_runtime_hook_releases_continuation_after_runtime_denial(
         local_kernel_id: "kernel.vendor-b".to_string(),
     })?;
     assert!(allowed.allowed, "{allowed:#?}");
+    Ok(())
+}
+
+#[derive(Debug, Default)]
+struct TrustFloorFailingInMemoryStore {
+    inner: InMemoryRuntimeAdmissionStore,
+}
+
+impl TrustFloorFailingInMemoryStore {
+    fn insert_bundle(&self, bundle: RuntimeAdmissionBundle) -> Result<(), ChioRuntimeError> {
+        self.inner.insert_bundle(bundle)
+    }
+
+    fn insert_treaty_runtime_fixture(
+        &self,
+        fixture: &TreatyRuntimeFixture,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.inner.insert_treaty_runtime_artifact(
+            "treaty_scope",
+            &fixture.treaty_scope.treaty_id,
+            &fixture.treaty_scope,
+        )?;
+        self.inner.insert_treaty_runtime_artifact(
+            "ladder_intersection",
+            &fixture.ladder_intersection.intersection_id,
+            &fixture.ladder_intersection,
+        )?;
+        self.inner.insert_treaty_runtime_artifact(
+            "cross_kernel_continuation",
+            &fixture.continuation.continuation_id,
+            &fixture.continuation,
+        )?;
+        self.inner.insert_treaty_runtime_artifact(
+            "receipt_lineage_bundle",
+            &fixture.lineage_bundle.bundle_id,
+            &fixture.lineage_bundle,
+        )?;
+        self.inner.insert_treaty_runtime_artifact(
+            "bilateral_invocation",
+            &fixture.bilateral_invocation.invocation_id,
+            &fixture.bilateral_invocation,
+        )?;
+        self.inner.insert_treaty_runtime_artifact(
+            "bilateral_dsse_envelope",
+            &fixture.bilateral_dsse_id,
+            &fixture.bilateral_dsse,
+        )?;
+        Ok(())
+    }
+}
+
+impl RuntimeAdmissionStore for TrustFloorFailingInMemoryStore {
+    fn bundle(
+        &self,
+        admission_id: &str,
+    ) -> Result<Option<RuntimeAdmissionBundle>, ChioRuntimeError> {
+        self.inner.bundle(admission_id)
+    }
+
+    fn treaty_runtime_artifact(
+        &self,
+        evidence_kind: &str,
+        evidence_id: &str,
+    ) -> Result<Option<chio_runtime_core::TreatyRuntimeArtifactRecord>, ChioRuntimeError> {
+        self.inner.treaty_runtime_artifact(evidence_kind, evidence_id)
+    }
+
+    fn consume_destructive_lease(
+        &self,
+        lease_id: &str,
+        admission_id: &str,
+    ) -> Result<(), ChioRuntimeError> {
+        self.inner.consume_destructive_lease(lease_id, admission_id)
+    }
+
+    fn release_destructive_lease(
+        &self,
+        lease_id: &str,
+        admission_id: &str,
+    ) -> Result<(), ChioRuntimeError> {
+        self.inner.release_destructive_lease(lease_id, admission_id)
+    }
+
+    fn consume_treaty_continuation(
+        &self,
+        continuation_id: &str,
+        admission_id: &str,
+    ) -> Result<(), ChioRuntimeError> {
+        self.inner
+            .consume_treaty_continuation(continuation_id, admission_id)
+    }
+
+    fn release_treaty_continuation(
+        &self,
+        continuation_id: &str,
+        admission_id: &str,
+    ) -> Result<(), ChioRuntimeError> {
+        self.inner
+            .release_treaty_continuation(continuation_id, admission_id)
+    }
+
+    fn runtime_trust_floor(
+        &self,
+        verifier_id: &str,
+        key_id: &str,
+    ) -> Result<Option<RuntimeTrustFloorEntry>, ChioRuntimeError> {
+        RuntimeAdmissionStore::runtime_trust_floor(&self.inner, verifier_id, key_id)
+    }
+
+    fn record_runtime_trust_floor(
+        &self,
+        entry: RuntimeTrustFloorEntry,
+    ) -> Result<(), ChioRuntimeError> {
+        RuntimeAdmissionStore::record_runtime_trust_floor(&self.inner, entry)
+    }
+
+    fn validate_and_record_runtime_trust_floor(
+        &self,
+        _entry: RuntimeTrustFloorEntry,
+        _previous_hash_sha256: Option<&str>,
+    ) -> Result<(), ChioRuntimeError> {
+        Err(ChioRuntimeError::Store(
+            "injected trust-floor persistence failure".to_string(),
+        ))
+    }
+}
+
+#[test]
+fn treaty_runtime_hook_releases_continuation_after_internal_evaluate_error(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let store = TrustFloorFailingInMemoryStore::default();
+    let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
+    let mut admission_bundle = bundle();
+    admission_bundle.binding.tool_args_sha256 = tool_args_sha256(&args)?;
+    let bundle_hash = runtime_admission_bundle_sha256(&admission_bundle)?;
+    store.insert_bundle(admission_bundle)?;
+    let fixture = treaty_runtime_fixture()?;
+    store.insert_treaty_runtime_fixture(&fixture)?;
+    let request = treaty_runtime_request(args, bundle_hash, treaty_runtime_context(&fixture))?;
+    let hook = allowing_policy_hook(store)?;
+    let context = RuntimeAdmissionContext {
+        request: &request,
+        now_unix_secs: 1_800_000_001,
+        now_unix_ms: 1_800_000_001_000,
+        matched_grant_index: Some(0),
+        local_kernel_id: "kernel.vendor-b".to_string(),
+    };
+
+    let failed = hook.evaluate(&context);
+    assert!(failed.is_err(), "expected internal evaluate failure, got {failed:#?}");
+
+    let retry = hook.evaluate(&context)?;
+    assert!(retry.allowed, "{retry:#?}");
     Ok(())
 }
 

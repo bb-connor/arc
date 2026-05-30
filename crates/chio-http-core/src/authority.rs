@@ -1556,4 +1556,90 @@ mod tests {
             Some("capability does not authorize tool increment on server math")
         );
     }
+
+    #[test]
+    fn partial_tool_identity_denies_without_both_fields() {
+        let query = HashMap::new();
+        for (server, tool) in [
+            (Some("math"), None),
+            (None, Some("increment")),
+        ] {
+            let result = authority()
+                .evaluate(HttpAuthorityInput {
+                    request_id: "req-partial-tool".to_string(),
+                    method: HttpMethod::Post,
+                    route_pattern: "/chio/tools/math/increment".to_string(),
+                    path: "/chio/tools/math/increment",
+                    query: &query,
+                    caller: caller(),
+                    body_hash: Some("toolhash".to_string()),
+                    body_length: 8,
+                    session_id: None,
+                    capability_id_hint: None,
+                    presented_capability: None,
+                    requested_tool_server: server,
+                    requested_tool_name: tool,
+                    requested_arguments: Some(&Value::Null),
+                    model_metadata: None,
+                    policy: HttpAuthorityPolicy::SessionAllow,
+                })
+                .test_unwrap();
+
+            assert!(result.verdict.is_denied(), "server={server:?} tool={tool:?}");
+            assert_eq!(
+                result.receipt.evidence[0].details.as_deref(),
+                Some("tool-call evaluation requires both tool_server and tool_name")
+            );
+        }
+    }
+
+    #[test]
+    fn partial_tool_identity_denies_even_with_valid_capability() {
+        let query = HashMap::new();
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json_with_scope(
+            &issuer,
+            "cap-partial-tool",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "math".to_string(),
+                    tool_name: "increment".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-partial-tool-cap".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/chio/tools/math/increment".to_string(),
+                path: "/chio/tools/math/increment",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("toolhash".to_string()),
+                body_length: 8,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: Some("math"),
+                requested_tool_name: None,
+                requested_arguments: Some(&Value::Null),
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("tool-call evaluation requires both tool_server and tool_name")
+        );
+    }
 }
