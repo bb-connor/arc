@@ -44,6 +44,38 @@ pub fn http_authority_tool_grant() -> ToolGrant {
     }
 }
 
+#[must_use]
+fn is_chio_tool_invocation_path(path: &str) -> bool {
+    path.starts_with("/chio/tools/")
+}
+
+fn http_authority_capability_binding(
+    input: &HttpAuthorityInput<'_>,
+    caller_identity_hash: &str,
+) -> (Option<String>, Option<String>, Option<Value>) {
+    let arguments = serde_json::to_value(HttpKernelAuthorizationRequest {
+        request_id: input.request_id.clone(),
+        method: input.method,
+        route_pattern: input.route_pattern.clone(),
+        path: input.path.to_string(),
+        content_hash: input.body_hash.clone().unwrap_or_default(),
+        caller_identity_hash: caller_identity_hash.to_string(),
+        session_id: input.session_id.clone(),
+        policy: input.policy,
+        capability: HttpKernelCapabilityState {
+            id: None,
+            invalid_reason: None,
+        },
+    })
+    .unwrap_or(Value::Null);
+
+    (
+        Some(HTTP_AUTHORITY_SERVER_ID.to_string()),
+        Some(HTTP_AUTHORITY_TOOL_NAME.to_string()),
+        Some(arguments),
+    )
+}
+
 fn deny_by_default_capability_binding(
     input: &HttpAuthorityInput<'_>,
     caller_identity_hash: &str,
@@ -57,32 +89,13 @@ fn deny_by_default_capability_binding(
     }
 
     match (input.requested_tool_server, input.requested_tool_name) {
-        (Some(server_id), Some(tool_name)) => (
+        (Some(server_id), Some(tool_name)) if is_chio_tool_invocation_path(input.path) => (
             Some(server_id.to_string()),
             Some(tool_name.to_string()),
             input.requested_arguments.cloned(),
         ),
-        (None, None) => {
-            let arguments = serde_json::to_value(HttpKernelAuthorizationRequest {
-                request_id: input.request_id.clone(),
-                method: input.method,
-                route_pattern: input.route_pattern.clone(),
-                path: input.path.to_string(),
-                content_hash: input.body_hash.clone().unwrap_or_default(),
-                caller_identity_hash: caller_identity_hash.to_string(),
-                session_id: input.session_id.clone(),
-                policy: input.policy,
-                capability: HttpKernelCapabilityState {
-                    id: None,
-                    invalid_reason: None,
-                },
-            })
-            .unwrap_or(Value::Null);
-            (
-                Some(HTTP_AUTHORITY_SERVER_ID.to_string()),
-                Some(HTTP_AUTHORITY_TOOL_NAME.to_string()),
-                Some(arguments),
-            )
+        (None, None) | (Some(_), Some(_)) => {
+            http_authority_capability_binding(input, caller_identity_hash)
         }
         _ => (
             input.requested_tool_server.map(str::to_owned),
@@ -1491,6 +1504,59 @@ mod tests {
                 requested_tool_server: None,
                 requested_tool_name: None,
                 requested_arguments: None,
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert!(result.receipt.evidence[0]
+            .details
+            .as_deref()
+            .is_some_and(|details| {
+                details.contains("capability does not authorize tool authorize_http_request")
+            }));
+    }
+
+    #[test]
+    fn deny_by_default_proxy_path_ignores_spoofed_tool_identity() {
+        let query = HashMap::new();
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json_with_scope(
+            &issuer,
+            "cap-math-only",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "math".to_string(),
+                    tool_name: "double".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-proxy-spoofed-tool".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/pets".to_string(),
+                path: "/pets",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("abc".to_string()),
+                body_length: 3,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: Some("math"),
+                requested_tool_name: Some("double"),
+                requested_arguments: Some(&serde_json::json!({ "value": 1 })),
                 model_metadata: None,
                 policy: HttpAuthorityPolicy::DenyByDefault,
             })
