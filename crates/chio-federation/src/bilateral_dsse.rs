@@ -2514,6 +2514,49 @@ mod tests {
         }
     }
 
+    fn sample_policy_summary(verdict: &str) -> PolicyEvaluationSummary {
+        PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: verdict.to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: verdict.to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: Some(verdict.to_string()),
+        }
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_accepts_unanimous_allow() {
+        require_policy_evaluation_allow_admission(&sample_policy_summary("allow"))
+            .expect("unanimous allow admits");
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_rejects_unanimous_deny() {
+        let error = require_policy_evaluation_allow_admission(&sample_policy_summary("deny"))
+            .expect_err("unanimous deny must not admit");
+        assert!(error
+            .to_string()
+            .contains("requires allow verdict for admission"));
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_rejects_verdict_disagreement() {
+        let mut summary = sample_policy_summary("allow");
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+        let error = require_policy_evaluation_allow_admission(&summary)
+            .expect_err("disagreeing kernels must not admit");
+        assert!(error.to_string().contains("server_a=allow server_b=deny"));
+    }
+
     #[test]
     fn signer_rejects_tool_name_that_does_not_match_receipt() {
         let kp_a = Keypair::generate();

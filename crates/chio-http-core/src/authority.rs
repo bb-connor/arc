@@ -1096,6 +1096,67 @@ mod tests {
     }
 
     #[test]
+    fn http_authority_tool_grant_matches_sidecar_constants() {
+        let grant = http_authority_tool_grant();
+        assert_eq!(grant.server_id, HTTP_AUTHORITY_SERVER_ID);
+        assert_eq!(grant.tool_name, HTTP_AUTHORITY_TOOL_NAME);
+        assert!(grant.operations.contains(&Operation::Invoke));
+    }
+
+    #[test]
+    fn deny_by_default_partial_tool_binding_skips_proxy_injection() {
+        let query = HashMap::new();
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json_with_scope(
+            &issuer,
+            "cap-math-only",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "math".to_string(),
+                    tool_name: "double".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-partial-tool-binding".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/chio/tools/math/increment".to_string(),
+                path: "/chio/tools/math/increment",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("toolhash".to_string()),
+                body_length: 8,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: Some("math"),
+                requested_tool_name: None,
+                requested_arguments: None,
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.evidence[0]
+            .details
+            .as_deref()
+            .is_some_and(|details| {
+                details.contains("requires both tool_server and tool_name")
+                    && !details.contains(HTTP_AUTHORITY_TOOL_NAME)
+            }));
+    }
+
+    #[test]
     fn safe_policy_allows_without_capability() {
         let query = HashMap::new();
         let result = authority()

@@ -2137,6 +2137,55 @@ mod tests {
     }
 
     #[test]
+    fn strict_chio_verifier_reports_deny_joint_verdict_after_crypto_verification() {
+        let kp_a = Keypair::generate();
+        let kp_b = Keypair::generate();
+        let receipt = sample_receipt(&kp_b);
+        let now_ms = 1_734_000_000_000;
+
+        let (_slice_envelope, receipt_store, lease_registry, governance_store, oracle, mut peers) =
+            fixture(&kp_a, &kp_b, &receipt, now_ms);
+        insert_fresh_ladder_peers(&mut peers, &kp_a, &kp_b, now_ms);
+        let mut envelope = sign_chio_bilateral_dsse_envelope(
+            &receipt,
+            &kp_a,
+            &kp_b,
+            "did:chio:org-a",
+            "did:chio:org-b",
+            "file_read",
+            now_ms,
+            happy_path_extensions(now_ms),
+        )
+        .unwrap();
+        let (mut statement, _) = envelope.decode_statement().unwrap();
+        let deny_summary = statement
+            .predicate
+            .policy_evaluation_summary
+            .as_mut()
+            .unwrap();
+        deny_summary.server_a_verdict.verdict = "deny".to_string();
+        deny_summary.server_b_verdict.verdict = "deny".to_string();
+        deny_summary.joint_disposition = Some("deny".to_string());
+        let statement_bytes = statement.canonical_bytes().unwrap();
+        resign_envelope(&mut envelope, &kp_a, &kp_b, &statement_bytes);
+
+        let base = config(
+            &peers,
+            &receipt_store,
+            &lease_registry,
+            &governance_store,
+            &oracle,
+            now_ms,
+        );
+        let verified = verify_chio_bilateral_invocation(
+            &envelope,
+            &ChioBilateralVerifierConfig { base: &base },
+        )
+        .expect("cryptographically valid unanimous deny still verifies");
+        assert_eq!(verified.joint_verdict, "deny");
+    }
+
+    #[test]
     fn strict_chio_verifier_requires_fresh_ladder_refs() {
         let kp_a = Keypair::generate();
         let kp_b = Keypair::generate();
