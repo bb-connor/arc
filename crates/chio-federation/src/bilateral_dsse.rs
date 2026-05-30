@@ -1796,6 +1796,59 @@ mod tests {
         }
     }
 
+    fn sample_policy_evaluation_summary() -> PolicyEvaluationSummary {
+        PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: Some("allow".to_string()),
+        }
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_accepts_unanimous_allow() {
+        require_policy_evaluation_allow_admission(&sample_policy_evaluation_summary()).unwrap();
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_rejects_unanimous_deny() {
+        let mut summary = sample_policy_evaluation_summary();
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+        let error = require_policy_evaluation_allow_admission(&summary).unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("requires allow verdict for admission"));
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_rejects_verdict_disagreement() {
+        let mut summary = sample_policy_evaluation_summary();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        let error = require_policy_evaluation_allow_admission(&summary).unwrap_err();
+        assert!(error.to_string().contains("server_a=allow server_b=deny"));
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_rejects_empty_policy_id() {
+        let mut summary = sample_policy_evaluation_summary();
+        summary.server_a_verdict.policy_id.clear();
+        let error = require_policy_evaluation_allow_admission(&summary).unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("server_a_verdict.policy_id must be non-empty"));
+    }
+
     #[test]
     fn pae_matches_dsse_v1_format_known_vector() {
         // Sanity: the leading bytes are literally "DSSEv1 ".
