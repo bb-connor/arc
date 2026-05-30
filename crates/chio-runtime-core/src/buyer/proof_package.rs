@@ -519,3 +519,84 @@ pub fn verify_receipt_lineage_bundle(
     }
     Ok(true)
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+    use chio_core_types::crypto::Keypair;
+    use chio_core_types::receipt::{
+        BoundaryClass, ChioReceipt, ChioReceiptBody, Decision, ReceiptKind, RedactionMode,
+        ToolCallAction, ToolOrigin, TrustLevel,
+    };
+
+    fn minimal_signed_receipt_wire(kp: &Keypair) -> serde_json::Value {
+        let receipt = ChioReceipt::sign(
+            ChioReceiptBody {
+                id: "rcpt-wire-defaults".to_string(),
+                timestamp: 1_800_000_010,
+                capability_id: "cap-wire-defaults".to_string(),
+                tool_server: "vendor-ledger".to_string(),
+                tool_name: "close_account".to_string(),
+                action: ToolCallAction::from_parameters(serde_json::json!({
+                    "record": "vendor-ledger-7"
+                }))
+                .expect("action"),
+                decision: Some(Decision::Allow),
+                receipt_kind: ReceiptKind::MediatedDecision,
+                boundary_class: BoundaryClass::Prevent,
+                observation_outcome: None,
+                tool_origin: ToolOrigin::CallerExecuted,
+                redaction_mode: RedactionMode::None,
+                actor_chain: Vec::new(),
+                content_hash: "c".repeat(64),
+                policy_hash: "policy-live".to_string(),
+                evidence: Vec::new(),
+                metadata: None,
+                trust_level: TrustLevel::default(),
+                tenant_id: None,
+                kernel_key: kp.public_key(),
+            },
+            kp,
+        )
+        .expect("sign receipt");
+        let mut wire = serde_json::to_value(&receipt).expect("receipt json");
+        let object = wire
+            .as_object_mut()
+            .expect("receipt wire value must be an object");
+        // Wire emitters sometimes restate serde defaults that typed parsing omits.
+        object.insert("algorithm".to_string(), serde_json::json!("ed25519"));
+        object.insert("evidence".to_string(), serde_json::json!([]));
+        object.insert("tenant_id".to_string(), serde_json::Value::Null);
+        wire
+    }
+
+    #[test]
+    fn proof_package_accepts_receipt_with_redundant_default_wire_fields() {
+        let kp = Keypair::from_seed(&[9; 32]);
+        let wire = minimal_signed_receipt_wire(&kp);
+        let sha256 = canonical_sha256(&wire).expect("receipt hash");
+        let proof_package = serde_json::json!({ "toolReceipts": [wire] });
+
+        assert!(
+            proof_package_contains_signed_receipt(&proof_package, &sha256)
+                .expect("compare signed receipt")
+        );
+    }
+
+    #[test]
+    fn proof_package_rejects_receipt_with_unbound_wire_field() {
+        let kp = Keypair::from_seed(&[10; 32]);
+        let mut wire = minimal_signed_receipt_wire(&kp);
+        wire.as_object_mut()
+            .expect("receipt wire value must be an object")
+            .insert("unsignedShadow".to_string(), serde_json::json!("not-signed"));
+        let sha256 = canonical_sha256(&wire).expect("receipt hash");
+        let proof_package = serde_json::json!({ "toolReceipts": [wire] });
+
+        assert_ne!(
+            proof_package_contains_signed_receipt(&proof_package, &sha256),
+            Ok(true)
+        );
+    }
+}
