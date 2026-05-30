@@ -2237,6 +2237,53 @@ mod tests {
     }
 
     #[test]
+    fn require_policy_evaluation_allow_admission_accepts_unanimous_allow() {
+        let summary = PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: Some("allow".to_string()),
+        };
+
+        require_policy_evaluation_allow_admission(&summary)
+            .expect("unanimous allow verdict admits");
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_rejects_unanimous_deny() {
+        let summary = PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: "deny".to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: "deny".to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: Some("deny".to_string()),
+        };
+
+        let err = require_policy_evaluation_allow_admission(&summary)
+            .expect_err("unanimous deny must not admit");
+        assert!(err
+            .to_string()
+            .contains("requires allow verdict for admission"));
+    }
+
+    #[test]
     fn round_trip_preserves_pae_bytes() {
         let kp_a = Keypair::generate();
         let kp_b = Keypair::generate();

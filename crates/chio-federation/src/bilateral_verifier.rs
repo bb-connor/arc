@@ -2137,6 +2137,74 @@ mod tests {
     }
 
     #[test]
+    fn chio_bilateral_invocation_reports_unanimous_deny_joint_verdict() {
+        let kp_a = Keypair::generate();
+        let kp_b = Keypair::generate();
+        let receipt = sample_receipt(&kp_b);
+        let now_ms = 1_734_000_000_000;
+
+        let mut extensions = happy_path_extensions(now_ms);
+        let summary = extensions
+            .policy_evaluation_summary
+            .as_mut()
+            .expect("happy path carries policy summary");
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+
+        let envelope = sign_chio_bilateral_dsse_envelope(
+            &receipt,
+            &kp_a,
+            &kp_b,
+            "did:chio:org-a",
+            "did:chio:org-b",
+            "file_read",
+            now_ms,
+            extensions,
+        )
+        .expect("deny bilateral envelope signs");
+
+        let (_fixture_envelope, receipt_store, lease_registry, governance_store, oracle, mut peers) =
+            fixture(&kp_a, &kp_b, &receipt, now_ms);
+        let _ = _fixture_envelope;
+        peers.insert(PinnedPeer {
+            kernel_id: "did:chio:org-a".to_string(),
+            public_key: kp_a.public_key(),
+            ladder_manifest_ref: Some(crate::trust_establishment::LadderManifestRef {
+                manifest_id: "ladder:org-a:v1".to_string(),
+                sha256: "a".repeat(64),
+                issued_at_unix_ms: now_ms - 60_000,
+                expires_at_unix_ms: now_ms + 60_000,
+            }),
+        });
+        peers.insert(PinnedPeer {
+            kernel_id: "did:chio:org-b".to_string(),
+            public_key: kp_b.public_key(),
+            ladder_manifest_ref: Some(crate::trust_establishment::LadderManifestRef {
+                manifest_id: "ladder:org-b:v1".to_string(),
+                sha256: "b".repeat(64),
+                issued_at_unix_ms: now_ms - 60_000,
+                expires_at_unix_ms: now_ms + 60_000,
+            }),
+        });
+        let base = config(
+            &peers,
+            &receipt_store,
+            &lease_registry,
+            &governance_store,
+            &oracle,
+            now_ms,
+        );
+
+        let verified = verify_chio_bilateral_invocation(
+            &envelope,
+            &ChioBilateralVerifierConfig { base: &base },
+        )
+        .expect("cryptographic bilateral verification succeeds for unanimous deny");
+        assert_eq!(verified.joint_verdict, "deny");
+    }
+
+    #[test]
     fn strict_chio_verifier_requires_fresh_ladder_refs() {
         let kp_a = Keypair::generate();
         let kp_b = Keypair::generate();
