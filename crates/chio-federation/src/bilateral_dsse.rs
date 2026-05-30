@@ -1716,6 +1716,56 @@ mod tests {
         ChioReceipt, ChioReceiptBody, Decision, ToolCallAction, TrustLevel,
     };
 
+    #[test]
+    fn require_policy_evaluation_allow_admission_accepts_unanimous_allow() {
+        let summary = PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: Some("allow".to_string()),
+        };
+
+        require_policy_evaluation_allow_admission(&summary)
+            .expect("unanimous allow summary should admit");
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_rejects_unanimous_deny() {
+        let summary = PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: "deny".to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: "deny".to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: Some("deny".to_string()),
+        };
+
+        let err = require_policy_evaluation_allow_admission(&summary)
+            .expect_err("deny summaries must not admit");
+
+        assert!(matches!(
+            err,
+            BilateralCoSigningError::CanonicalJson(message)
+                if message == "policy_evaluation_summary requires allow verdict for admission"
+        ));
+    }
+
     fn sample_receipt(kp: &Keypair) -> ChioReceipt {
         let body = ChioReceiptBody {
             id: "rcpt-bilateral-b4-sample".to_string(),

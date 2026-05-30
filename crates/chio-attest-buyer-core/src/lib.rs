@@ -11,7 +11,8 @@ use chio_federation::{
     verify_chio_bilateral_invocation, ActionClassKind, ChioBilateralVerifierConfig, DsseEnvelope,
     InMemoryGovernanceReceiptStore, InMemoryLeaseRegistry, InMemoryReceiptStore, Keyid,
     LadderManifestRef, PeerPinSet, PinnedEpoch, PinnedPeer, ResolvedGovernanceReceipt,
-    ResolvedLease, RevocationOracle, UnknownActionClassPolicy, VerifierConfig,
+    ResolvedLease, RevocationOracle, UnknownActionClassPolicy, VerifiedBilateralCoSignInvocation,
+    VerifierConfig,
 };
 use chio_governance::{
     verify_capability_lease, verify_destructive_authorization, verify_step_governance_boundary,
@@ -1424,12 +1425,7 @@ fn verify_package_inner(
             },
         )
         .map_err(|error| ChioPackageError::Federation(error.to_string()))?;
-        if verified.joint_verdict != "allow" {
-            return Err(ChioPackageError::Federation(format!(
-                "bilateral envelope policy verdict {:?} is not allow",
-                verified.joint_verdict
-            )));
-        }
+        ensure_bilateral_allow_admission_verdict(&verified)?;
     }
     add_check(
         checks,
@@ -1892,6 +1888,21 @@ fn verify_workflow_intersection(
                 binding.tool_name
             )));
         }
+    }
+    Ok(())
+}
+
+fn ensure_bilateral_allow_admission_verdict(
+    verified: &VerifiedBilateralCoSignInvocation,
+) -> Result<(), ChioPackageError> {
+    reject_non_allow_bilateral_joint_verdict(&verified.joint_verdict)
+}
+
+fn reject_non_allow_bilateral_joint_verdict(joint_verdict: &str) -> Result<(), ChioPackageError> {
+    if joint_verdict != "allow" {
+        return Err(ChioPackageError::Federation(format!(
+            "bilateral envelope policy verdict {joint_verdict:?} is not allow"
+        )));
     }
     Ok(())
 }
@@ -2941,6 +2952,22 @@ mod tests {
         let context = verification_context_from_fixture();
         let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
         assert!(error.to_string().contains("issuer public key"));
+    }
+
+    #[test]
+    fn bilateral_allow_admission_verdict_rejects_deny_joint_verdict() {
+        let error = reject_non_allow_bilateral_joint_verdict("deny").unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.contains("bilateral envelope policy verdict"),
+            "unexpected error: {message}"
+        );
+        assert!(message.contains("deny"), "unexpected error: {message}");
+    }
+
+    #[test]
+    fn bilateral_allow_admission_verdict_accepts_allow_joint_verdict() {
+        reject_non_allow_bilateral_joint_verdict("allow").expect("allow verdict should admit");
     }
 
     #[test]
