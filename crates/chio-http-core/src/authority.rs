@@ -1556,4 +1556,41 @@ mod tests {
             Some("capability does not authorize tool increment on server math")
         );
     }
+
+    #[test]
+    fn deny_by_default_partial_tool_request_does_not_synthesize_proxy_binding() {
+        let query = HashMap::new();
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json(&issuer, "cap-http-only");
+
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-partial-tool".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/pets".to_string(),
+                path: "/pets",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("abc".to_string()),
+                body_length: 3,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: Some("math"),
+                requested_tool_name: None,
+                requested_arguments: None,
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.evidence[0]
+            .details
+            .as_deref()
+            .is_some_and(|details| {
+                details.contains("requires both tool_server and tool_name")
+                    && !details.contains("authorize_http_request")
+            }));
+    }
 }

@@ -243,6 +243,41 @@ mod tests {
         assert!(!scope.include_null_tenant);
         assert!(scope.is_admin_all);
     }
+
+    #[test]
+    fn admin_context_rejects_empty_tenant_filter() {
+        let query = ReceiptQuery {
+            tenant_filter: Some("  ".to_string()),
+            read_context: Some(ReceiptReadContext::admin_service()),
+            ..ReceiptQuery::default()
+        };
+
+        let err = query
+            .effective_read_scope()
+            .expect_err("blank tenant filter must not narrow admin reads");
+
+        assert_eq!(
+            err,
+            "receipt query tenant filter requires a non-empty tenant"
+        );
+    }
+
+    #[test]
+    fn tenant_scoped_context_rejects_empty_tenant() {
+        let query = ReceiptQuery {
+            read_context: Some(ReceiptReadContext::authenticated_tenant("  ")),
+            ..ReceiptQuery::default()
+        };
+
+        let err = query
+            .effective_read_scope()
+            .expect_err("blank authenticated tenant must fail closed");
+
+        assert_eq!(
+            err,
+            "tenant-scoped receipt query requires a non-empty tenant"
+        );
+    }
 }
 
 /// Result of a receipt query, including pagination state.
