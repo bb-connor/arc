@@ -1507,6 +1507,48 @@ mod tests {
     }
 
     #[test]
+    fn deny_by_default_partial_tool_invocation_does_not_bind_http_authority() {
+        let query = HashMap::new();
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json(&issuer, "cap-partial-tool");
+
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-partial-tool".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/pets".to_string(),
+                path: "/pets",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("abc".to_string()),
+                body_length: 3,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: Some("math"),
+                requested_tool_name: None,
+                requested_arguments: None,
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("tool-call evaluation requires both tool_server and tool_name")
+        );
+    }
+
+    #[test]
+    fn http_authority_tool_grant_matches_sidecar_constants() {
+        let grant = http_authority_tool_grant();
+        assert_eq!(grant.server_id, HTTP_AUTHORITY_SERVER_ID);
+        assert_eq!(grant.tool_name, HTTP_AUTHORITY_TOOL_NAME);
+        assert_eq!(grant.operations, vec![Operation::Invoke]);
+    }
+
+    #[test]
     fn deny_by_default_requires_matching_tool_grant() {
         let query = HashMap::new();
         let (authority, issuer) = authority_with_issuer();

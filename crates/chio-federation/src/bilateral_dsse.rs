@@ -2532,6 +2532,62 @@ mod tests {
         assert_eq!(err, BilateralCoSigningError::ReceiptMismatch);
     }
 
+    fn allow_policy_summary() -> PolicyEvaluationSummary {
+        PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: Some("allow".to_string()),
+        }
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_accepts_unanimous_allow() {
+        require_policy_evaluation_allow_admission(&allow_policy_summary())
+            .expect("unanimous allow summary should admit");
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_rejects_deny() {
+        let mut summary = allow_policy_summary();
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+
+        let err = require_policy_evaluation_allow_admission(&summary)
+            .expect_err("deny summaries must not admit");
+
+        assert!(matches!(
+            err,
+            BilateralCoSigningError::CanonicalJson(message)
+                if message.contains("requires allow verdict for admission")
+        ));
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_rejects_verdict_disagreement() {
+        let mut summary = allow_policy_summary();
+        summary.server_b_verdict.verdict = "deny".to_string();
+
+        let err = require_policy_evaluation_allow_admission(&summary)
+            .expect_err("disagreeing server verdicts must fail validation first");
+
+        assert!(matches!(
+            err,
+            BilateralCoSigningError::CanonicalJson(message)
+                if message.contains("server_a=allow server_b=deny")
+        ));
+    }
+
     fn resign_payload(
         envelope: &mut DsseEnvelope,
         kp_a: &Keypair,
