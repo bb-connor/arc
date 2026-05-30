@@ -1780,6 +1780,34 @@ def test_typeerror_fallback_kwonly_only_preserves_default_prefix() -> None:
     }
 
 
+def test_fixed_signature_overflow_redacts_without_var_positional() -> None:
+    """Regression: extra positionals on a fixed ``path, body`` wrapper must redact.
+
+    Without ``*args``, overflow past the declared positional slots should still
+    map to the protected body field instead of leaking raw secrets.
+    """
+
+    def write_file(path: str, body: str) -> None:
+        del path, body
+
+    args, kwargs = bind_and_redact(
+        write_file,
+        ("/tmp/x", "PROD_SECRET_BODY", "PROD_SECRET_OVERFLOW"),
+        {},
+        tool_name="chio_file_write",
+    )
+    assert args[0] == "/tmp/x"
+    assert args[1] == {
+        "omitted": True,
+        "byte_count": len(b"PROD_SECRET_BODY"),
+    }
+    assert args[2] == {
+        "omitted": True,
+        "byte_count": len(b"PROD_SECRET_OVERFLOW"),
+    }
+    assert kwargs == {}
+
+
 def test_empty_positional_table_does_not_invent_overflow_slot() -> None:
     """No positional map means extra args stay raw.
 
