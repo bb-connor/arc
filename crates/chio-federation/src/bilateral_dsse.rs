@@ -2549,4 +2549,38 @@ mod tests {
         envelope.signatures[0].sig = BASE64_STANDARD.encode(sig_a.to_bytes());
         envelope.signatures[1].sig = BASE64_STANDARD.encode(sig_b.to_bytes());
     }
+
+    fn sample_policy_evaluation_summary(verdict: &str) -> PolicyEvaluationSummary {
+        PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: verdict.to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: verdict.to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: Some(verdict.to_string()),
+        }
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_accepts_unanimous_allow() {
+        require_policy_evaluation_allow_admission(&sample_policy_evaluation_summary("allow"))
+            .expect("unanimous allow summary admits");
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_rejects_unanimous_deny() {
+        let err = require_policy_evaluation_allow_admission(&sample_policy_evaluation_summary(
+            "deny",
+        ))
+        .expect_err("admission paths must reject unanimous deny");
+
+        assert!(err.to_string().contains("requires allow verdict for admission"));
+    }
 }
