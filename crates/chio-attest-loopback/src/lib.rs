@@ -1316,6 +1316,14 @@ mod tests {
         }
     }
 
+    fn refresh_workflow_parent_chain(package: &mut ChioProofPackage) {
+        let mut parent = None;
+        for step in &mut package.workflow_receipt.steps {
+            step.parent_receipt_sha256 = parent.clone();
+            parent = Some(canonical_sha256(step).expect("step hashes"));
+        }
+    }
+
     #[test]
     fn fresh_proof_package_binds_disclosure_subject_to_workflow() {
         let package = fresh_proof_package().expect("fresh package builds");
@@ -1604,5 +1612,61 @@ mod tests {
 
         let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
         assert!(error.to_string().contains("consistency anchor"));
+    }
+
+    #[test]
+    fn unanimous_deny_bilateral_envelope_fails_package_verification() {
+        let mut package = fresh_proof_package().expect("fresh package builds");
+        let vendor = &VENDORS[0];
+        let buyer_key = Keypair::from_seed(&BUYER_SEED);
+        let vendor_key = Keypair::from_seed(&vendor.seed);
+        let receipt = package.tool_receipts[0].clone();
+        let lease = package.capability_leases[0].body.clone();
+        let mut summary = policy_summary(vendor);
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+        let envelope = sign_chio_bilateral_dsse_envelope(
+            &receipt,
+            &buyer_key,
+            &vendor_key,
+            BUYER_KERNEL_ID,
+            vendor.kernel_id,
+            vendor.tool_name,
+            GENERATED_AT_UNIX_MS,
+            BilateralPredicateExtensions {
+                capability_lease_ref: Some(CapabilityLeaseRef {
+                    lease_id: lease.lease_id,
+                    issuer: lease.issuer,
+                    expires_at_unix_ms: lease.expires_at_unix_ms,
+                    scope_digest: Some(HashRecord {
+                        alg: "sha256".to_string(),
+                        value: lease.scope_digest,
+                    }),
+                }),
+                policy_evaluation_summary: Some(summary),
+                governance_receipt_ref: None,
+                consistency_anchor: Some(format!("chio:consistency:{WORKFLOW_ID}:0")),
+                consistency_model: None,
+                cross_org_visibility: None,
+                treaty_binding_ref: None,
+            },
+        )
+        .expect("deny envelope signs");
+        let envelope_sha256 = canonical_sha256(&envelope).expect("envelope hashes");
+        package.bilateral_envelopes[0] = envelope;
+        package.workflow_receipt.steps[0].bilateral_dsse_sha256 = Some(envelope_sha256);
+        refresh_workflow_parent_chain(&mut package);
+        resign_workflow_receipt(&mut package).expect("workflow resigns");
+
+        let context = verification_context();
+        let trust_bundle = rebuild_verifier_material(&mut package, &context);
+        let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.contains("bilateral envelope policy verdict"),
+            "unexpected error: {message}"
+        );
+        assert!(message.contains("deny"), "unexpected error: {message}");
     }
 }

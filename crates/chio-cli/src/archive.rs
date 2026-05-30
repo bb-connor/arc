@@ -612,6 +612,33 @@ mod tests {
     }
 
     #[test]
+    fn safe_archive_helper_rejects_decompression_ratio_bomb() {
+        let temp = tempfile::tempdir().unwrap();
+        let archive = temp.path().join("ratio-bomb.tar.gz");
+        let file = fs::File::create(&archive).unwrap();
+        let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::best());
+        let mut builder = tar::Builder::new(encoder);
+        let payload = vec![0_u8; 64 * 1024];
+        let mut header = tar::Header::new_gnu();
+        header.set_size(payload.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        builder
+            .append_data(&mut header, "zeros.bin", payload.as_slice())
+            .unwrap();
+        let encoder = builder.into_inner().unwrap();
+        encoder.finish().unwrap();
+        let limits = SafeArchiveLimits {
+            max_decompression_ratio: 10,
+            ..TEST_LIMITS
+        };
+
+        let err = read_tar_gz_file(&archive, "test archive", limits).unwrap_err();
+
+        assert!(err.to_string().contains("decompression ratio"));
+    }
+
+    #[test]
     fn safe_archive_helper_counts_directory_members() {
         let temp = tempfile::tempdir().unwrap();
         let archive = temp.path().join("bundle.tar.gz");

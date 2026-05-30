@@ -2515,6 +2515,35 @@ mod tests {
     }
 
     #[test]
+    fn admission_requires_unanimous_allow_verdict() {
+        let summary = PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "buyer-policy".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "vendor-policy".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: Some("allow".to_string()),
+        };
+        require_policy_evaluation_allow_admission(&summary).expect("allow admits");
+
+        let mut deny = summary;
+        deny.server_a_verdict.verdict = "deny".to_string();
+        deny.server_b_verdict.verdict = "deny".to_string();
+        deny.joint_disposition = Some("deny".to_string());
+        let err = require_policy_evaluation_allow_admission(&deny).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("requires allow verdict for admission"));
+    }
+
+    #[test]
     fn signer_rejects_tool_name_that_does_not_match_receipt() {
         let kp_a = Keypair::generate();
         let kp_b = Keypair::generate();
