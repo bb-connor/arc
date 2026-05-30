@@ -1262,6 +1262,15 @@ pub fn verify_package_report(
     }
 }
 
+fn ensure_bilateral_joint_verdict_allow(joint_verdict: &str) -> Result<(), ChioPackageError> {
+    if joint_verdict != "allow" {
+        return Err(ChioPackageError::Federation(format!(
+            "bilateral envelope policy verdict {joint_verdict:?} is not allow"
+        )));
+    }
+    Ok(())
+}
+
 fn verify_package_inner(
     package: &ChioProofPackage,
     trust_bundle: &ChioVerifierTrustBundle,
@@ -1424,12 +1433,7 @@ fn verify_package_inner(
             },
         )
         .map_err(|error| ChioPackageError::Federation(error.to_string()))?;
-        if verified.joint_verdict != "allow" {
-            return Err(ChioPackageError::Federation(format!(
-                "bilateral envelope policy verdict {:?} is not allow",
-                verified.joint_verdict
-            )));
-        }
+        ensure_bilateral_joint_verdict_allow(&verified.joint_verdict)?;
     }
     add_check(
         checks,
@@ -2941,6 +2945,146 @@ mod tests {
         let context = verification_context_from_fixture();
         let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
         assert!(error.to_string().contains("issuer public key"));
+    }
+
+    #[test]
+    fn deny_joint_verdict_fails_closed_after_bilateral_verification() {
+        use chio_core_types::crypto::{Ed25519Backend, SigningBackend};
+        use chio_federation::{pae, DsseSignature, PAYLOAD_TYPE_IN_TOTO};
+
+        const BUYER_SEED: [u8; 32] = [11; 32];
+        const VENDOR_A_SEED: [u8; 32] = [21; 32];
+
+        let package = proof_package_from_json(include_str!(
+            "../../../examples/chio-3vendor/fixtures/buyer-auditor-proof-package.json"
+        ))
+        .expect("package fixture parses");
+        let trust_bundle = trust_bundle_from_fixture().expect("trust bundle parses");
+
+        let buyer_key = Keypair::from_seed(&BUYER_SEED);
+        let vendor_a_key = Keypair::from_seed(&VENDOR_A_SEED);
+
+        let mut envelope = package.bilateral_envelopes[0].clone();
+        let (mut statement, _) = envelope
+            .decode_statement()
+            .expect("first bilateral envelope decodes");
+        let summary = statement
+            .predicate
+            .policy_evaluation_summary
+            .as_mut()
+            .expect("fixture carries policy evaluation summary");
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+
+        let statement_bytes = statement.canonical_bytes().expect("statement canonicalizes");
+        envelope.payload = {
+            use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+            use base64::Engine;
+            BASE64_STANDARD.encode(&statement_bytes)
+        };
+        let pae_bytes = pae(PAYLOAD_TYPE_IN_TOTO, &statement_bytes);
+        let sig_a = Ed25519Backend::new(buyer_key.clone())
+            .sign_bytes(&pae_bytes)
+            .expect("buyer signs deny envelope");
+        let sig_b = Ed25519Backend::new(vendor_a_key.clone())
+            .sign_bytes(&pae_bytes)
+            .expect("vendor-a signs deny envelope");
+        let buyer_keyid = chio_federation::Keyid::from_public_key(&buyer_key.public_key());
+        let vendor_keyid = chio_federation::Keyid::from_public_key(&vendor_a_key.public_key());
+        envelope.signatures = vec![
+            DsseSignature {
+                keyid: buyer_keyid.as_str().to_string(),
+                sig: {
+                    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+                    use base64::Engine;
+                    BASE64_STANDARD.encode(sig_a.to_bytes())
+                },
+            },
+            DsseSignature {
+                keyid: vendor_keyid.as_str().to_string(),
+                sig: {
+                    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+                    use base64::Engine;
+                    BASE64_STANDARD.encode(sig_b.to_bytes())
+                },
+            },
+        ];
+
+        let mut receipt_store = InMemoryReceiptStore::new();
+        for receipt in &package.tool_receipts {
+            receipt_store.insert(receipt.clone());
+        }
+        let mut lease_registry = InMemoryLeaseRegistry::new();
+        for lease in &package.capability_leases {
+            let scope_digest = package
+                .lease_scope_bindings
+                .iter()
+                .find(|binding| binding.lease_id == lease.body.lease_id)
+                .map(|binding| binding.scope_digest())
+                .transpose()
+                .expect("scope digest parses")
+                .expect("fixture lease has scope binding");
+            lease_registry.insert(ResolvedLease {
+                lease_id: lease.body.lease_id.clone(),
+                issuer: lease.body.issuer.clone(),
+                expires_at_unix_ms: lease.body.expires_at_unix_ms,
+                scope_digest_hex: Some(scope_digest),
+            });
+        }
+        let mut governance_store = InMemoryGovernanceReceiptStore::new();
+        for receipt in &package.governance_receipts {
+            governance_store.insert(ResolvedGovernanceReceipt {
+                receipt_id: receipt.body.receipt_id.clone(),
+                kernel_id: receipt.body.authorizing_kernel.clone(),
+                canonical_json: canonical_string(receipt).expect("governance receipt serializes"),
+            });
+        }
+        let mut peer_pin_set = PeerPinSet::new();
+        for peer in trust_bundle.peers.values() {
+            peer_pin_set.insert(PinnedPeer {
+                kernel_id: peer.kernel_id.clone(),
+                public_key: peer.public_key.clone(),
+                ladder_manifest_ref: Some(peer.ladder_manifest_ref.clone()),
+            });
+        }
+        let revocation_oracle = OfflineRevocationOracle {
+            revoked_key_fingerprints: trust_bundle.revoked_key_fingerprints.clone(),
+        };
+        let verifier_config = VerifierConfig {
+            peer_pin_set: &peer_pin_set,
+            receipt_store: &receipt_store,
+            lease_registry: &lease_registry,
+            governance_receipt_store: &governance_store,
+            revocation_oracle: &revocation_oracle,
+            pinned_epoch: trust_bundle.pinned_epoch(),
+            action_classes: trust_bundle.action_class_map(),
+            unknown_action_class_policy: UnknownActionClassPolicy::Reject,
+        };
+        let verified = verify_chio_bilateral_invocation(
+            &envelope,
+            &ChioBilateralVerifierConfig {
+                base: &verifier_config,
+            },
+        )
+        .expect("cryptographically valid deny bilateral envelope verifies");
+        assert_eq!(verified.joint_verdict, "deny");
+
+        let error = super::ensure_bilateral_joint_verdict_allow(&verified.joint_verdict).unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.contains("is not allow"),
+            "buyer gate must reject deny verdict: {message}"
+        );
+        assert!(
+            message.contains("deny"),
+            "error should name the rejected verdict: {message}"
+        );
+    }
+
+    #[test]
+    fn ensure_bilateral_joint_verdict_allow_accepts_allow() {
+        super::ensure_bilateral_joint_verdict_allow("allow").expect("allow passes");
     }
 
     #[test]
