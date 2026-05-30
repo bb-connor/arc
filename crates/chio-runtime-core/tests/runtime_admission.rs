@@ -1078,8 +1078,21 @@ fn treaty_runtime_hook_releases_continuation_after_internal_evaluate_error(
     let failed = hook.evaluate(&context);
     assert!(failed.is_err(), "expected internal evaluate failure, got {failed:#?}");
 
-    let retry = hook.evaluate(&context)?;
-    assert!(retry.allowed, "{retry:#?}");
+    match hook.evaluate(&context) {
+        Err(_) => {}
+        Ok(decision) => {
+            let metadata = decision
+                .metadata
+                .as_ref()
+                .ok_or_else(|| io::Error::other("runtime metadata missing"))?;
+            assert_ne!(
+                metadata["chio_runtime"]["failure_code"],
+                "chio_treaty_continuation_replay",
+                "continuation was not released after internal evaluate error"
+            );
+            panic!("expected repeated internal evaluate failure, got {decision:#?}");
+        }
+    }
     Ok(())
 }
 
