@@ -140,7 +140,7 @@ impl RequestEvaluator {
         let ChioHttpRequest {
             request_id,
             method,
-            route_pattern,
+            route_pattern: _client_route_pattern,
             path,
             query,
             headers,
@@ -155,19 +155,7 @@ impl RequestEvaluator {
             model_metadata,
             ..
         } = request;
-        let (matched_route_pattern, matched_policy, matched_route) =
-            self.match_route_with_status(method, &path);
-        let synthetic_tool_context = is_synthetic_sidecar_tool_context(
-            &route_pattern,
-            &path,
-            tool_server.as_deref(),
-            tool_name.as_deref(),
-        );
-        let route_pattern = if matched_route || !synthetic_tool_context {
-            matched_route_pattern
-        } else {
-            route_pattern
-        };
+        let (route_pattern, matched_policy, _) = self.match_route_with_status(method, &path);
         let raw_capability =
             presented_capability.or_else(|| extract_presented_capability(&headers, &query));
         let arguments = arguments.unwrap_or(Value::Null);
@@ -278,19 +266,6 @@ impl From<HttpAuthorityError> for crate::error::ProtectError {
             HttpAuthorityError::ReceiptSign(message) => Self::ReceiptSign(message),
         }
     }
-}
-
-fn is_synthetic_sidecar_tool_context(
-    route_pattern: &str,
-    path: &str,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-) -> bool {
-    let (Some(server_id), Some(tool_name)) = (tool_server, tool_name) else {
-        return false;
-    };
-    route_pattern == format!("{server_id}:{tool_name}")
-        && path == format!("/{}", tool_name.replace('.', "/"))
 }
 
 /// Match OpenAPI-style path templates such as `/pets/{petId}`.
@@ -508,7 +483,7 @@ mod tests {
     }
 
     #[test]
-    fn evaluate_chio_request_allows_sidecar_tool_context_outside_tools_namespace() {
+    fn evaluate_chio_request_allows_reserved_tools_path_context() {
         let keypair = Keypair::generate();
         let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
         let capability = signed_capability_token_json_with_scope(
@@ -532,8 +507,8 @@ mod tests {
         let mut request = ChioHttpRequest::new(
             "req-sidecar-matrix-tool".to_string(),
             HttpMethod::Post,
-            "matrix:files.read".to_string(),
-            "/files/read".to_string(),
+            "/chio/tools/matrix/files.read".to_string(),
+            "/chio/tools/matrix/files.read".to_string(),
             CallerIdentity::anonymous(),
         );
         request.tool_server = Some("matrix".to_string());
@@ -559,11 +534,11 @@ mod tests {
         let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
         let capability = signed_capability_token_json_with_scope(
             &keypair,
-            "cap-matrix-read",
+            "cap-matrix-admin-delete",
             ChioScope {
                 grants: vec![ToolGrant {
                     server_id: "matrix".to_string(),
-                    tool_name: "files.read".to_string(),
+                    tool_name: "admin.delete".to_string(),
                     operations: vec![Operation::Invoke],
                     constraints: Vec::new(),
                     max_invocations: None,
@@ -578,12 +553,12 @@ mod tests {
         let mut request = ChioHttpRequest::new(
             "req-unmatched-spoofed-synthetic-pattern".to_string(),
             HttpMethod::Post,
-            "matrix:files.read".to_string(),
+            "matrix:admin.delete".to_string(),
             "/admin/delete".to_string(),
             CallerIdentity::anonymous(),
         );
         request.tool_server = Some("matrix".to_string());
-        request.tool_name = Some("files.read".to_string());
+        request.tool_name = Some("admin.delete".to_string());
         request.arguments = Some(serde_json::json!({ "path": "/tmp/a" }));
         request.body_hash = Some("tool-body".to_string());
         request.body_length = 8;

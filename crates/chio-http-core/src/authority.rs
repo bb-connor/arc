@@ -15,7 +15,6 @@ use chio_kernel::{
     DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
-use percent_encoding::percent_decode_str;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use thiserror::Error;
@@ -30,6 +29,8 @@ pub const HTTP_AUTHORITY_SERVER_ID: &str = "chio_http_authority";
 /// Tool name for HTTP-sidecar capability grants.
 pub const HTTP_AUTHORITY_TOOL_NAME: &str = "authorize_http_request";
 const HTTP_AUTHORITY_TTL_SECS: u64 = 60;
+const INVALID_CHIO_TOOLS_PATH_SERVER_ID: &str = "chio_invalid_tools_path";
+const INVALID_CHIO_TOOLS_PATH_TOOL_NAME: &str = "invalid_percent_encoded_identity";
 
 #[must_use]
 pub fn http_authority_tool_grant() -> ToolGrant {
@@ -45,35 +46,66 @@ pub fn http_authority_tool_grant() -> ToolGrant {
     }
 }
 
-#[must_use]
-fn chio_tools_path_identity(path: &str) -> Option<(String, String)> {
-    let rest = path.strip_prefix("/chio/tools/")?;
-    let (server_id, tool_name) = rest.split_once('/')?;
+enum ChioToolsPathIdentity {
+    NotToolsPath,
+    Malformed,
+    Identity {
+        server_id: String,
+        tool_name: String,
+    },
+}
+
+fn chio_tools_path_identity(path: &str) -> ChioToolsPathIdentity {
+    let Some(rest) = path.strip_prefix("/chio/tools/") else {
+        return ChioToolsPathIdentity::NotToolsPath;
+    };
+    let Some((server_id, tool_name)) = rest.split_once('/') else {
+        return ChioToolsPathIdentity::Malformed;
+    };
     if server_id.is_empty() || tool_name.is_empty() || tool_name.contains('/') {
-        return None;
+        return ChioToolsPathIdentity::Malformed;
     }
-    let server_id = decode_path_identity_segment(server_id)?;
-    let tool_name = decode_path_identity_segment(tool_name)?;
-    Some((server_id, tool_name))
+    let Some(server_id) = decode_path_identity_segment(server_id) else {
+        return ChioToolsPathIdentity::Malformed;
+    };
+    let Some(tool_name) = decode_path_identity_segment(tool_name) else {
+        return ChioToolsPathIdentity::Malformed;
+    };
+    ChioToolsPathIdentity::Identity {
+        server_id,
+        tool_name,
+    }
 }
 
 fn decode_path_identity_segment(segment: &str) -> Option<String> {
-    let decoded = percent_decode_str(segment).decode_utf8().ok()?;
+    let mut decoded = Vec::with_capacity(segment.len());
+    let bytes = segment.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' {
+            let high = hex_value(*bytes.get(index + 1)?)?;
+            let low = hex_value(*bytes.get(index + 2)?)?;
+            decoded.push((high << 4) | low);
+            index += 3;
+        } else {
+            decoded.push(bytes[index]);
+            index += 1;
+        }
+    }
+    let decoded = String::from_utf8(decoded).ok()?;
     if decoded.is_empty() {
         return None;
     }
-    Some(decoded.into_owned())
+    Some(decoded)
 }
 
-#[must_use]
-fn is_synthetic_sidecar_tool_context(input: &HttpAuthorityInput<'_>) -> bool {
-    let (Some(server_id), Some(tool_name)) =
-        (input.requested_tool_server, input.requested_tool_name)
-    else {
-        return false;
-    };
-    input.route_pattern == format!("{server_id}:{tool_name}")
-        && input.path == format!("/{}", tool_name.replace('.', "/"))
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
 }
 
 fn http_authority_capability_binding(
@@ -115,29 +147,23 @@ fn deny_by_default_capability_binding(
         );
     }
 
-    match (
-        chio_tools_path_identity(input.path),
-        input.requested_tool_server,
-        input.requested_tool_name,
-    ) {
-        (Some((server_id, tool_name)), _, _) => (
+    match chio_tools_path_identity(input.path) {
+        ChioToolsPathIdentity::Identity {
+            server_id,
+            tool_name,
+        } => (
             Some(server_id),
             Some(tool_name),
             input.requested_arguments.cloned(),
         ),
-        (None, Some(server_id), Some(tool_name)) if is_synthetic_sidecar_tool_context(input) => (
-            Some(server_id.to_string()),
-            Some(tool_name.to_string()),
+        ChioToolsPathIdentity::Malformed => (
+            Some(INVALID_CHIO_TOOLS_PATH_SERVER_ID.to_string()),
+            Some(INVALID_CHIO_TOOLS_PATH_TOOL_NAME.to_string()),
             input.requested_arguments.cloned(),
         ),
-        (None, None, None) | (None, Some(_), Some(_)) => {
+        ChioToolsPathIdentity::NotToolsPath => {
             http_authority_capability_binding(input, caller_identity_hash)
         }
-        (None, _, _) => (
-            input.requested_tool_server.map(str::to_owned),
-            input.requested_tool_name.map(str::to_owned),
-            input.requested_arguments.cloned(),
-        ),
     }
 }
 
@@ -1609,7 +1635,7 @@ mod tests {
     }
 
     #[test]
-    fn deny_by_default_sidecar_tool_context_honors_requested_tool_identity() {
+    fn deny_by_default_tools_path_honors_path_identity() {
         let query = HashMap::new();
         let (authority, issuer) = authority_with_issuer();
         let capability = signed_capability_token_json_with_scope(
@@ -1634,8 +1660,8 @@ mod tests {
             .evaluate(HttpAuthorityInput {
                 request_id: "req-sidecar-tool-context".to_string(),
                 method: HttpMethod::Post,
-                route_pattern: "matrix:files.read".to_string(),
-                path: "/files/read",
+                route_pattern: "/chio/tools/matrix/files.read".to_string(),
+                path: "/chio/tools/matrix/files.read",
                 query: &query,
                 caller: caller(),
                 body_hash: Some("abc".to_string()),
@@ -1664,11 +1690,11 @@ mod tests {
         let (authority, issuer) = authority_with_issuer();
         let capability = signed_capability_token_json_with_scope(
             &issuer,
-            "cap-matrix-read",
+            "cap-matrix-admin-delete",
             ChioScope {
                 grants: vec![ToolGrant {
                     server_id: "matrix".to_string(),
-                    tool_name: "files.read".to_string(),
+                    tool_name: "admin.delete".to_string(),
                     operations: vec![Operation::Invoke],
                     constraints: Vec::new(),
                     max_invocations: None,
@@ -1684,7 +1710,7 @@ mod tests {
             .evaluate(HttpAuthorityInput {
                 request_id: "req-unmatched-spoofed-synthetic-pattern".to_string(),
                 method: HttpMethod::Post,
-                route_pattern: "matrix:files.read".to_string(),
+                route_pattern: "matrix:admin.delete".to_string(),
                 path: "/admin/delete",
                 query: &query,
                 caller: caller(),
@@ -1694,7 +1720,7 @@ mod tests {
                 capability_id_hint: None,
                 presented_capability: Some(&capability),
                 requested_tool_server: Some("matrix"),
-                requested_tool_name: Some("files.read"),
+                requested_tool_name: Some("admin.delete"),
                 requested_arguments: Some(&serde_json::json!({ "path": "/tmp/a" })),
                 model_metadata: None,
                 policy: HttpAuthorityPolicy::DenyByDefault,
@@ -1810,6 +1836,44 @@ mod tests {
             result.receipt.capability_id.as_deref(),
             Some("cap-acp-terminal-create")
         );
+    }
+
+    #[test]
+    fn deny_by_default_tools_path_rejects_malformed_percent_encoding() {
+        let query = HashMap::new();
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json_with_scope(
+            &issuer,
+            "cap-http-authority",
+            ChioScope {
+                grants: vec![http_authority_tool_grant()],
+                ..ChioScope::default()
+            },
+        );
+
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-tools-path-malformed-tool".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/chio/tools/acp/terminal%ZZcreate".to_string(),
+                path: "/chio/tools/acp/terminal%ZZcreate",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("abc".to_string()),
+                body_length: 3,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: Some("acp"),
+                requested_tool_name: Some("terminal/create"),
+                requested_arguments: Some(&serde_json::json!({ "command": "ls" })),
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
     }
 
     #[test]
