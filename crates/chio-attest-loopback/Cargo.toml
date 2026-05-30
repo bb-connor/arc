@@ -19,6 +19,7 @@ chio-federation = { path = "../chio-federation" }
 chio-governance = { path = "../chio-governance" }
 chio-selective-disclosure = { path = "../chio-selective-disclosure", features = ["bbs"] }
 chio-workflow = { path = "../chio-workflow" }
+base64 = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

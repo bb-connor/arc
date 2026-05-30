@@ -2532,6 +2532,44 @@ mod tests {
         assert_eq!(err, BilateralCoSigningError::ReceiptMismatch);
     }
 
+    fn sample_policy_summary(verdict: &str) -> PolicyEvaluationSummary {
+        PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: verdict.to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: verdict.to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: Some(verdict.to_string()),
+        }
+    }
+
+    #[test]
+    fn admission_gate_requires_unanimous_allow_verdict() {
+        let allow = sample_policy_summary("allow");
+        require_policy_evaluation_allow_admission(&allow).expect("unanimous allow admits");
+
+        let deny = sample_policy_summary("deny");
+        let error = require_policy_evaluation_allow_admission(&deny)
+            .expect_err("unanimous deny must not admit");
+        assert!(error
+            .to_string()
+            .contains("requires allow verdict for admission"));
+
+        let mut disagree = allow.clone();
+        disagree.server_b_verdict.verdict = "deny".to_string();
+        disagree.joint_disposition = Some("deny".to_string());
+        let error = require_policy_evaluation_allow_admission(&disagree)
+            .expect_err("disagreeing kernels must not admit");
+        assert!(error.to_string().contains("server_a=allow server_b=deny"));
+    }
+
     fn resign_payload(
         envelope: &mut DsseEnvelope,
         kp_a: &Keypair,

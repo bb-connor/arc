@@ -1605,4 +1605,75 @@ mod tests {
         let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
         assert!(error.to_string().contains("consistency anchor"));
     }
+
+    fn resign_bilateral_envelope_with_unanimous_deny(
+        envelope: &mut DsseEnvelope,
+        buyer_key: &Keypair,
+        vendor_key: &Keypair,
+    ) {
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+        use base64::Engine;
+        use chio_core_types::crypto::{Ed25519Backend, SigningBackend};
+        use chio_federation::bilateral_dsse::{pae, PAYLOAD_TYPE_IN_TOTO};
+
+        let (mut statement, _) = envelope
+            .decode_statement()
+            .expect("bilateral envelope statement decodes");
+        let summary = statement
+            .predicate
+            .policy_evaluation_summary
+            .as_mut()
+            .expect("strict bilateral predicate carries policy summary");
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+        let statement_bytes = statement
+            .canonical_bytes()
+            .expect("bilateral statement canonicalizes");
+        envelope.payload = BASE64_STANDARD.encode(&statement_bytes);
+        let pae_bytes = pae(PAYLOAD_TYPE_IN_TOTO, &statement_bytes);
+        let buyer_sig = Ed25519Backend::new(buyer_key.clone())
+            .sign_bytes(&pae_bytes)
+            .expect("buyer bilateral signature");
+        let vendor_sig = Ed25519Backend::new(vendor_key.clone())
+            .sign_bytes(&pae_bytes)
+            .expect("vendor bilateral signature");
+        envelope.signatures[0].sig = BASE64_STANDARD.encode(buyer_sig.to_bytes());
+        envelope.signatures[1].sig = BASE64_STANDARD.encode(vendor_sig.to_bytes());
+    }
+
+    #[test]
+    fn unanimous_deny_bilateral_envelope_fails_buyer_package_verification() {
+        let mut package = fresh_proof_package().expect("fresh package builds");
+        let buyer_key = Keypair::from_seed(&BUYER_SEED);
+        let vendor_key = Keypair::from_seed(&VENDOR_A_SEED);
+        resign_bilateral_envelope_with_unanimous_deny(
+            &mut package.bilateral_envelopes[0],
+            &buyer_key,
+            &vendor_key,
+        );
+        let envelope_sha256 = canonical_sha256(&package.bilateral_envelopes[0])
+            .expect("mutated bilateral envelope hashes");
+        let mut artifacts = runtime_artifacts_from_package(&package).expect("runtime artifacts");
+        artifacts[0].workflow_step.bilateral_dsse_sha256 = Some(envelope_sha256);
+        refresh_runtime_parent_chain(&mut artifacts);
+        for (step, artifact) in package
+            .workflow_receipt
+            .steps
+            .iter_mut()
+            .zip(artifacts.iter())
+        {
+            *step = artifact.workflow_step.clone();
+        }
+        resign_workflow_receipt(&mut package).expect("workflow resigns after DSSE mutation");
+        let context = verification_context();
+        let trust_bundle = rebuild_verifier_material(&mut package, &context);
+
+        let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.contains("bilateral envelope policy verdict") && message.contains("not allow"),
+            "deny bilateral envelope must fail buyer admission gate: {message}"
+        );
+    }
 }
