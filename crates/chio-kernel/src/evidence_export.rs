@@ -547,6 +547,66 @@ mod tests {
     }
 
     #[test]
+    fn evidence_export_query_rejects_missing_read_boundary() {
+        let err = EvidenceExportQuery::default()
+            .validate_read_boundary()
+            .expect_err("export without read boundary must fail closed");
+
+        assert!(matches!(
+            err,
+            EvidenceExportError::ReadBoundary(message)
+                if message.contains("requires an explicit receipt read boundary")
+        ));
+    }
+
+    #[test]
+    fn evidence_export_query_rejects_empty_admin_tenant_filter() {
+        let err = EvidenceExportQuery {
+            tenant: Some("   ".to_string()),
+            read_boundary: Some(ReceiptReadBoundary::AdminAll),
+            ..EvidenceExportQuery::default()
+        }
+        .validate_read_boundary()
+        .expect_err("blank admin tenant filter must fail closed");
+
+        assert!(matches!(
+            err,
+            EvidenceExportError::ReadBoundary(message)
+                if message.contains("non-empty tenant")
+        ));
+    }
+
+    #[test]
+    fn evidence_export_query_rejects_empty_tenant_scoped_boundary() {
+        let err = EvidenceExportQuery::tenant_scoped("   ")
+            .validate_read_boundary()
+            .expect_err("blank tenant-scoped boundary must fail closed");
+
+        assert!(matches!(
+            err,
+            EvidenceExportError::ReadBoundary(message)
+                if message.contains("non-empty tenant")
+        ));
+    }
+
+    #[test]
+    fn evidence_export_query_rejects_tenant_filter_mismatch() {
+        let err = EvidenceExportQuery {
+            tenant: Some("tenant-b".to_string()),
+            read_boundary: Some(ReceiptReadBoundary::tenant_scoped("tenant-a")),
+            ..EvidenceExportQuery::default()
+        }
+        .validate_read_boundary()
+        .expect_err("query tenant must not disagree with scoped boundary");
+
+        assert!(matches!(
+            err,
+            EvidenceExportError::ReadBoundary(message)
+                if message.contains("does not match query tenant")
+        ));
+    }
+
+    #[test]
     fn admin_all_evidence_export_uses_remote_safe_read_context() {
         let receipt_query = EvidenceExportQuery {
             tenant: Some("tenant-a".to_string()),

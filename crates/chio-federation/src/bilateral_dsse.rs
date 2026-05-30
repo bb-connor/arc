@@ -1796,6 +1796,40 @@ mod tests {
         }
     }
 
+    fn sample_policy_evaluation_summary(verdict: &str) -> PolicyEvaluationSummary {
+        PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: verdict.to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: verdict.to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: Some(verdict.to_string()),
+        }
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_rejects_deny_verdict() {
+        let summary = sample_policy_evaluation_summary("deny");
+        let err = require_policy_evaluation_allow_admission(&summary).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("requires allow verdict for admission"));
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_accepts_allow_verdict() {
+        let summary = sample_policy_evaluation_summary("allow");
+        require_policy_evaluation_allow_admission(&summary)
+            .expect("unanimous allow summary should admit");
+    }
+
     #[test]
     fn pae_matches_dsse_v1_format_known_vector() {
         // Sanity: the leading bytes are literally "DSSEv1 ".

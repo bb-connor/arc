@@ -1507,6 +1507,89 @@ mod tests {
     }
 
     #[test]
+    fn sign_transport_deny_receipt_emits_final_scope_receipt() {
+        let authority = authority();
+        let receipt = authority
+            .sign_transport_deny_receipt(TransportDenyInput {
+                request_id: "req-transport-deny",
+                route_pattern: "/upload",
+                method: HttpMethod::Post,
+                caller_identity_hash: "caller-hash",
+                content_hash: None,
+                verdict: Verdict::deny(
+                    "request body exceeds transport limit",
+                    "transport.body_size",
+                ),
+            })
+            .test_unwrap();
+
+        assert!(receipt.is_denied());
+        assert_eq!(receipt.response_status, 403);
+        assert_eq!(
+            http_status_scope(receipt.metadata.as_ref()),
+            Some(CHIO_HTTP_STATUS_SCOPE_FINAL)
+        );
+        assert!(receipt.verify_signature().test_unwrap());
+        assert!(
+            metadata_string(receipt.metadata.as_ref(), CHIO_KERNEL_RECEIPT_ID_KEY).is_none(),
+            "transport denies must not invent kernel receipt ids"
+        );
+    }
+
+    #[test]
+    fn sign_transport_deny_receipt_rejects_non_deny_verdict() {
+        let authority = authority();
+        let err = authority
+            .sign_transport_deny_receipt(TransportDenyInput {
+                request_id: "req-transport-allow",
+                route_pattern: "/upload",
+                method: HttpMethod::Post,
+                caller_identity_hash: "caller-hash",
+                content_hash: None,
+                verdict: Verdict::Allow,
+            })
+            .expect_err("transport signer must reject allow verdicts");
+
+        assert!(matches!(err, HttpAuthorityError::Kernel(message) if message.contains("Deny verdict")));
+    }
+
+    #[test]
+    fn deny_by_default_partial_tool_binding_does_not_synthesize_http_authority() {
+        let query = HashMap::new();
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json(&issuer, "cap-partial-tool");
+
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-partial-tool".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/pets".to_string(),
+                path: "/pets",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("abc".to_string()),
+                body_length: 3,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: Some("math"),
+                requested_tool_name: None,
+                requested_arguments: None,
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.evidence[0]
+            .details
+            .as_deref()
+            .is_some_and(|details| {
+                details.contains("requires both tool_server and tool_name")
+            }));
+    }
+
+    #[test]
     fn deny_by_default_requires_matching_tool_grant() {
         let query = HashMap::new();
         let (authority, issuer) = authority_with_issuer();
