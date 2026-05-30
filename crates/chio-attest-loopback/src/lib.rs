@@ -1357,6 +1357,59 @@ mod tests {
     }
 
     #[test]
+    fn fresh_package_rejects_unanimous_deny_bilateral_envelope() {
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+        use base64::Engine;
+        use chio_core_types::crypto::{Ed25519Backend, SigningBackend};
+        use chio_federation::{pae, PAYLOAD_TYPE_IN_TOTO};
+
+        let mut package = fresh_proof_package().expect("fresh package builds");
+        let buyer_key = Keypair::from_seed(&BUYER_SEED);
+        let vendor_a_key = Keypair::from_seed(&VENDOR_A_SEED);
+        let mut envelope = package.bilateral_envelopes[0].clone();
+        let (mut statement, _) = envelope.decode_statement().expect("envelope decodes");
+        let summary = statement
+            .predicate
+            .policy_evaluation_summary
+            .as_mut()
+            .expect("fresh package carries policy evaluation summary");
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+        let statement_bytes = statement.canonical_bytes().expect("statement canonicalizes");
+        envelope.payload = BASE64_STANDARD.encode(&statement_bytes);
+        let pae_bytes = pae(PAYLOAD_TYPE_IN_TOTO, &statement_bytes);
+        envelope.signatures[0].sig = BASE64_STANDARD.encode(
+            Ed25519Backend::new(buyer_key.clone())
+                .sign_bytes(&pae_bytes)
+                .expect("buyer cosigns")
+                .to_bytes(),
+        );
+        envelope.signatures[1].sig = BASE64_STANDARD.encode(
+            Ed25519Backend::new(vendor_a_key.clone())
+                .sign_bytes(&pae_bytes)
+                .expect("vendor-a cosigns")
+                .to_bytes(),
+        );
+        package.bilateral_envelopes[0] = envelope;
+        package.workflow_receipt.steps[0].bilateral_dsse_sha256 =
+            Some(canonical_sha256(&package.bilateral_envelopes[0]).expect("envelope hashes"));
+        let mut parent_step_sha256 = None;
+        for step in &mut package.workflow_receipt.steps {
+            step.parent_receipt_sha256 = parent_step_sha256.clone();
+            parent_step_sha256 = Some(canonical_sha256(step).expect("step hashes"));
+        }
+        resign_workflow_receipt(&mut package).expect("workflow resigns");
+        let context = verification_context();
+        let trust_bundle = rebuild_verifier_material(&mut package, &context);
+        let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
+        assert!(
+            error.to_string().contains("not allow"),
+            "buyer verifier must reject deny bilateral envelopes: {error}"
+        );
+    }
+
+    #[test]
     fn authority_issuance_request_hashes_signed_receipt_body_for_governance(
     ) -> Result<(), ChioPackageError> {
         let package = fresh_proof_package()?;
