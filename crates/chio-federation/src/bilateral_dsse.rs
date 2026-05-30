@@ -2549,4 +2549,60 @@ mod tests {
         envelope.signatures[0].sig = BASE64_STANDARD.encode(sig_a.to_bytes());
         envelope.signatures[1].sig = BASE64_STANDARD.encode(sig_b.to_bytes());
     }
+
+    fn sample_policy_summary(verdict: &str) -> PolicyEvaluationSummary {
+        PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: verdict.to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: verdict.to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: Some(verdict.to_string()),
+        }
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_accepts_unanimous_allow() {
+        require_policy_evaluation_allow_admission(&sample_policy_summary("allow"))
+            .expect("unanimous allow should admit");
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_rejects_deny() {
+        let error = require_policy_evaluation_allow_admission(&sample_policy_summary("deny"))
+            .expect_err("deny verdict must not admit");
+
+        assert!(error
+            .to_string()
+            .contains("requires allow verdict for admission"));
+    }
+
+    #[test]
+    fn validate_policy_evaluation_summary_rejects_verdict_disagreement() {
+        let summary = PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: "deny".to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: None,
+        };
+
+        let error = validate_policy_evaluation_summary(&summary).expect_err("mixed verdicts");
+        assert!(error.to_string().contains("server_a=allow server_b=deny"));
+    }
 }
