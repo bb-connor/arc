@@ -2532,6 +2532,50 @@ mod tests {
         assert_eq!(err, BilateralCoSigningError::ReceiptMismatch);
     }
 
+    fn sample_policy_evaluation_summary(verdict: &str) -> PolicyEvaluationSummary {
+        let policy_verdict = PolicyVerdict {
+            verdict: verdict.to_string(),
+            policy_id: "policy-a".to_string(),
+            policy_version: "v1".to_string(),
+            rationale_code: None,
+        };
+        PolicyEvaluationSummary {
+            server_a_verdict: policy_verdict.clone(),
+            server_b_verdict: policy_verdict,
+            joint_disposition: Some(verdict.to_string()),
+        }
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_accepts_unanimous_allow() {
+        let summary = sample_policy_evaluation_summary("allow");
+        require_policy_evaluation_allow_admission(&summary).expect("allow summary admits");
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_rejects_deny_verdict() {
+        let summary = sample_policy_evaluation_summary("deny");
+        let err = require_policy_evaluation_allow_admission(&summary)
+            .expect_err("deny summary must not admit");
+        assert!(
+            err.to_string()
+                .contains("requires allow verdict for admission"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn require_policy_evaluation_allow_admission_propagates_schema_validation() {
+        let mut summary = sample_policy_evaluation_summary("allow");
+        summary.server_b_verdict.verdict = "deny".to_string();
+        let err = require_policy_evaluation_allow_admission(&summary)
+            .expect_err("disagreeing verdicts fail schema validation first");
+        assert!(
+            err.to_string().contains("server_a=allow server_b=deny"),
+            "{err}"
+        );
+    }
+
     fn resign_payload(
         envelope: &mut DsseEnvelope,
         kp_a: &Keypair,
