@@ -2532,6 +2532,62 @@ mod tests {
         assert_eq!(err, BilateralCoSigningError::ReceiptMismatch);
     }
 
+    fn policy_evaluation_summary_with_verdict(verdict: &str) -> PolicyEvaluationSummary {
+        let verdict_body = PolicyVerdict {
+            verdict: verdict.to_string(),
+            policy_id: "policy".to_string(),
+            policy_version: "v1".to_string(),
+            rationale_code: None,
+        };
+        PolicyEvaluationSummary {
+            server_a_verdict: verdict_body.clone(),
+            server_b_verdict: verdict_body,
+            joint_disposition: Some(verdict.to_string()),
+        }
+    }
+
+    #[test]
+    fn admission_accepts_unanimous_allow_summary() {
+        require_policy_evaluation_allow_admission(&policy_evaluation_summary_with_verdict("allow"))
+            .expect("unanimous allow should satisfy admission");
+    }
+
+    #[test]
+    fn admission_rejects_deny_summary_even_when_servers_agree() {
+        let err = require_policy_evaluation_allow_admission(
+            &policy_evaluation_summary_with_verdict("deny"),
+        )
+        .expect_err("deny summaries must not pass admission gate");
+        assert_eq!(
+            err,
+            BilateralCoSigningError::CanonicalJson(
+                "policy_evaluation_summary requires allow verdict for admission".to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn admission_rejects_mismatched_server_verdicts_before_allow_check() {
+        let summary = PolicyEvaluationSummary {
+            server_a_verdict: PolicyVerdict {
+                verdict: "allow".to_string(),
+                policy_id: "policy-a".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            server_b_verdict: PolicyVerdict {
+                verdict: "deny".to_string(),
+                policy_id: "policy-b".to_string(),
+                policy_version: "v1".to_string(),
+                rationale_code: None,
+            },
+            joint_disposition: None,
+        };
+        let err = require_policy_evaluation_allow_admission(&summary)
+            .expect_err("mismatched verdicts must fail closed");
+        assert!(err.to_string().contains("server_a=allow server_b=deny"));
+    }
+
     fn resign_payload(
         envelope: &mut DsseEnvelope,
         kp_a: &Keypair,
