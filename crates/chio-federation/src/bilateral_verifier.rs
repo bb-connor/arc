@@ -2137,6 +2137,60 @@ mod tests {
     }
 
     #[test]
+    fn unanimous_deny_policy_verifies_cryptographically_but_joint_verdict_is_deny() {
+        let kp_a = Keypair::generate();
+        let kp_b = Keypair::generate();
+        let receipt = sample_receipt(&kp_b);
+        let now_ms = 1_734_000_000_000;
+
+        let mut ext = happy_path_extensions(now_ms);
+        let summary = ext.policy_evaluation_summary.as_mut().unwrap();
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+        let envelope = sign_chio_bilateral_dsse_envelope(
+            &receipt,
+            &kp_a,
+            &kp_b,
+            "did:chio:org-a",
+            "did:chio:org-b",
+            "file_read",
+            now_ms,
+            ext,
+        )
+        .unwrap();
+
+        let mut receipt_store = InMemoryReceiptStore::new();
+        receipt_store.insert(receipt.clone());
+        let mut lease_registry = InMemoryLeaseRegistry::new();
+        lease_registry.insert(ResolvedLease {
+            lease_id: "lease-c2-happy".to_string(),
+            issuer: "did:chio:org-a".to_string(),
+            expires_at_unix_ms: now_ms + 60_000,
+            scope_digest_hex: None,
+        });
+        let governance_store = InMemoryGovernanceReceiptStore::new();
+        let oracle = DemoAllowAllRevocationOracle;
+        let mut peers = PeerPinSet::new();
+        insert_fresh_ladder_peers(&mut peers, &kp_a, &kp_b, now_ms);
+        let config = config(
+            &peers,
+            &receipt_store,
+            &lease_registry,
+            &governance_store,
+            &oracle,
+            now_ms,
+        );
+
+        let verified = verify_chio_bilateral_invocation(
+            &envelope,
+            &ChioBilateralVerifierConfig { base: &config },
+        )
+        .expect("cryptographic bilateral verification may attest unanimous deny");
+        assert_eq!(verified.joint_verdict, "deny");
+    }
+
+    #[test]
     fn strict_chio_verifier_requires_fresh_ladder_refs() {
         let kp_a = Keypair::generate();
         let kp_b = Keypair::generate();
