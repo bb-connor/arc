@@ -15,6 +15,7 @@ use chio_kernel::{
     DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
+use percent_encoding::percent_decode_str;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use thiserror::Error;
@@ -45,13 +46,23 @@ pub fn http_authority_tool_grant() -> ToolGrant {
 }
 
 #[must_use]
-fn chio_tools_path_identity(path: &str) -> Option<(&str, &str)> {
+fn chio_tools_path_identity(path: &str) -> Option<(String, String)> {
     let rest = path.strip_prefix("/chio/tools/")?;
     let (server_id, tool_name) = rest.split_once('/')?;
     if server_id.is_empty() || tool_name.is_empty() || tool_name.contains('/') {
         return None;
     }
+    let server_id = decode_path_identity_segment(server_id)?;
+    let tool_name = decode_path_identity_segment(tool_name)?;
     Some((server_id, tool_name))
+}
+
+fn decode_path_identity_segment(segment: &str) -> Option<String> {
+    let decoded = percent_decode_str(segment).decode_utf8().ok()?;
+    if decoded.is_empty() {
+        return None;
+    }
+    Some(decoded.into_owned())
 }
 
 #[must_use]
@@ -110,8 +121,8 @@ fn deny_by_default_capability_binding(
         input.requested_tool_name,
     ) {
         (Some((server_id, tool_name)), _, _) => (
-            Some(server_id.to_string()),
-            Some(tool_name.to_string()),
+            Some(server_id),
+            Some(tool_name),
             input.requested_arguments.cloned(),
         ),
         (None, Some(server_id), Some(tool_name)) if is_synthetic_sidecar_tool_context(input) => (
@@ -1748,6 +1759,56 @@ mod tests {
         assert_eq!(
             result.receipt.evidence[0].details.as_deref(),
             Some("capability does not authorize tool charge on server billing")
+        );
+    }
+
+    #[test]
+    fn deny_by_default_tools_path_decodes_percent_encoded_identity() {
+        let query = HashMap::new();
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json_with_scope(
+            &issuer,
+            "cap-acp-terminal-create",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "acp".to_string(),
+                    tool_name: "terminal/create".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-tools-path-encoded-tool".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/chio/tools/acp/terminal%2Fcreate".to_string(),
+                path: "/chio/tools/acp/terminal%2Fcreate",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("abc".to_string()),
+                body_length: 3,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: Some("acp"),
+                requested_tool_name: Some("terminal/create"),
+                requested_arguments: Some(&serde_json::json!({ "command": "ls" })),
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .test_unwrap();
+
+        assert!(result.verdict.is_allowed());
+        assert_eq!(
+            result.receipt.capability_id.as_deref(),
+            Some("cap-acp-terminal-create")
         );
     }
 

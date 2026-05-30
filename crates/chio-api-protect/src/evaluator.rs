@@ -157,7 +157,13 @@ impl RequestEvaluator {
         } = request;
         let (matched_route_pattern, matched_policy, matched_route) =
             self.match_route_with_status(method, &path);
-        let route_pattern = if matched_route {
+        let synthetic_tool_context = is_synthetic_sidecar_tool_context(
+            &route_pattern,
+            &path,
+            tool_server.as_deref(),
+            tool_name.as_deref(),
+        );
+        let route_pattern = if matched_route || !synthetic_tool_context {
             matched_route_pattern
         } else {
             route_pattern
@@ -272,6 +278,19 @@ impl From<HttpAuthorityError> for crate::error::ProtectError {
             HttpAuthorityError::ReceiptSign(message) => Self::ReceiptSign(message),
         }
     }
+}
+
+fn is_synthetic_sidecar_tool_context(
+    route_pattern: &str,
+    path: &str,
+    tool_server: Option<&str>,
+    tool_name: Option<&str>,
+) -> bool {
+    let (Some(server_id), Some(tool_name)) = (tool_server, tool_name) else {
+        return false;
+    };
+    route_pattern == format!("{server_id}:{tool_name}")
+        && path == format!("/{}", tool_name.replace('.', "/"))
 }
 
 /// Match OpenAPI-style path templates such as `/pets/{petId}`.
@@ -574,6 +593,7 @@ mod tests {
             .test_unwrap();
 
         assert!(result.verdict.is_denied());
+        assert_eq!(result.receipt.route_pattern, "/admin/delete");
         assert!(result.receipt.capability_id.is_none());
         assert!(result.receipt.evidence[0]
             .details

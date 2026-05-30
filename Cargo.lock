@@ -3530,6 +3530,7 @@ dependencies = [
  "chrono",
  "ed25519-dalek",
  "hex",
+ "percent-encoding",
  "rand_core 0.6.4",
  "reqwest 0.13.2",
  "serde",
