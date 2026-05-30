@@ -140,6 +140,7 @@ impl RequestEvaluator {
         let ChioHttpRequest {
             request_id,
             method,
+            route_pattern,
             path,
             query,
             headers,
@@ -154,7 +155,13 @@ impl RequestEvaluator {
             model_metadata,
             ..
         } = request;
-        let (route_pattern, matched_policy) = self.match_route(method, &path);
+        let (matched_route_pattern, matched_policy, matched_route) =
+            self.match_route_with_status(method, &path);
+        let route_pattern = if matched_route {
+            matched_route_pattern
+        } else {
+            route_pattern
+        };
         let raw_capability =
             presented_capability.or_else(|| extract_presented_capability(&headers, &query));
         let arguments = arguments.unwrap_or(Value::Null);
@@ -182,10 +189,19 @@ impl RequestEvaluator {
     /// Match a request path against the route table.
     /// Returns (matched_pattern, policy). Falls back to a catch-all.
     fn match_route(&self, method: HttpMethod, path: &str) -> (String, PolicyDecision) {
+        let (pattern, policy, _) = self.match_route_with_status(method, path);
+        (pattern, policy)
+    }
+
+    fn match_route_with_status(
+        &self,
+        method: HttpMethod,
+        path: &str,
+    ) -> (String, PolicyDecision, bool) {
         // Try exact pattern match first, then prefix match.
         for route in &self.routes {
             if route.method == method && path_matches_pattern(path, &route.pattern) {
-                return (route.pattern.clone(), route.policy);
+                return (route.pattern.clone(), route.policy, true);
             }
         }
 
@@ -196,7 +212,7 @@ impl RequestEvaluator {
         } else {
             PolicyDecision::DenyByDefault
         };
-        (pattern, policy)
+        (pattern, policy, false)
     }
 }
 
@@ -470,6 +486,52 @@ mod tests {
             .is_some_and(|details| {
                 details.contains("capability does not authorize tool authorize_http_request")
             }));
+    }
+
+    #[test]
+    fn evaluate_chio_request_allows_sidecar_tool_context_outside_tools_namespace() {
+        let keypair = Keypair::generate();
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let capability = signed_capability_token_json_with_scope(
+            &keypair,
+            "cap-matrix-read",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "matrix".to_string(),
+                    tool_name: "files.read".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+
+        let mut request = ChioHttpRequest::new(
+            "req-sidecar-matrix-tool".to_string(),
+            HttpMethod::Post,
+            "matrix:files.read".to_string(),
+            "/files/read".to_string(),
+            CallerIdentity::anonymous(),
+        );
+        request.tool_server = Some("matrix".to_string());
+        request.tool_name = Some("files.read".to_string());
+        request.arguments = Some(serde_json::json!({ "path": "/tmp/a" }));
+        request.body_hash = Some("tool-body".to_string());
+        request.body_length = 8;
+
+        let result = evaluator
+            .evaluate_chio_request(request, Some(&capability))
+            .test_unwrap();
+
+        assert!(result.verdict.is_allowed());
+        assert_eq!(
+            result.receipt.capability_id.as_deref(),
+            Some("cap-matrix-read")
+        );
     }
 
     #[test]

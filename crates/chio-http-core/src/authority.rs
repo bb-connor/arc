@@ -45,8 +45,8 @@ pub fn http_authority_tool_grant() -> ToolGrant {
 }
 
 #[must_use]
-fn is_chio_tool_invocation_path(path: &str) -> bool {
-    path.starts_with("/chio/tools/")
+fn is_chio_tool_invocation_context(input: &HttpAuthorityInput<'_>) -> bool {
+    input.path.starts_with("/chio/tools/") || !input.route_pattern.starts_with('/')
 }
 
 fn http_authority_capability_binding(
@@ -89,7 +89,7 @@ fn deny_by_default_capability_binding(
     }
 
     match (input.requested_tool_server, input.requested_tool_name) {
-        (Some(server_id), Some(tool_name)) if is_chio_tool_invocation_path(input.path) => (
+        (Some(server_id), Some(tool_name)) if is_chio_tool_invocation_context(input) => (
             Some(server_id.to_string()),
             Some(tool_name.to_string()),
             input.requested_arguments.cloned(),
@@ -1570,6 +1570,56 @@ mod tests {
             .is_some_and(|details| {
                 details.contains("capability does not authorize tool authorize_http_request")
             }));
+    }
+
+    #[test]
+    fn deny_by_default_sidecar_tool_context_honors_requested_tool_identity() {
+        let query = HashMap::new();
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json_with_scope(
+            &issuer,
+            "cap-matrix-read",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "matrix".to_string(),
+                    tool_name: "files.read".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-sidecar-tool-context".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "matrix:files.read".to_string(),
+                path: "/files/read",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("abc".to_string()),
+                body_length: 3,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: Some("matrix"),
+                requested_tool_name: Some("files.read"),
+                requested_arguments: Some(&serde_json::json!({ "path": "/tmp/a" })),
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .test_unwrap();
+
+        assert!(result.verdict.is_allowed());
+        assert_eq!(
+            result.receipt.capability_id.as_deref(),
+            Some("cap-matrix-read")
+        );
     }
 
     #[test]
