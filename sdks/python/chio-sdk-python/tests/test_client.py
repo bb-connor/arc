@@ -339,6 +339,43 @@ class TestEvaluateToolCall:
                 )
             assert exc_info.value.code == "INVALID_RECEIPT"
 
+    @respx.mock
+    async def test_evaluate_accepts_advisory_receipt_integrity(self) -> None:
+        advisory = _make_receipt_dict()
+        advisory["trust_level"] = "advisory"
+        advisory["receipt_kind"] = "advisory_evaluation"
+        advisory["boundary_class"] = "advisory_only"
+        advisory["decision"] = None
+        respx.post(f"{BASE}/v1/evaluate").mock(
+            return_value=httpx.Response(200, json=advisory)
+        )
+        respx.post(f"{BASE}/v1/receipts/verify").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "signature_valid": True,
+                    "signer_trusted": True,
+                    "receipt_id_valid": True,
+                    "parameter_hash_valid": True,
+                    "receipt_kind": "advisory_evaluation",
+                    "boundary_class": "advisory_only",
+                    "trust_level": "advisory",
+                    "result": "allow",
+                    "authorized": False,
+                    "signer_key_hex": "5" * 64,
+                    "ok": False,
+                },
+            )
+        )
+        async with ChioClient(BASE) as client:
+            receipt = await client.evaluate_tool_call(
+                capability_id="cap-1",
+                tool_server="srv",
+                tool_name="read",
+                parameters={"path": "/tmp"},
+            )
+            assert receipt.trust_level == "advisory"
+
 
 class TestEvaluateHttpRequest:
     @respx.mock

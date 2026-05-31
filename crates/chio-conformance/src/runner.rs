@@ -144,6 +144,16 @@ fn redact_conformance_secret(token: &str) -> String {
     }
 }
 
+/// Pass conformance tokens through child env vars so shared CI runners do not
+/// expose secrets via `/proc/<pid>/cmdline`.
+fn apply_conformance_auth_env(command: &mut Command, options: &ConformanceRunOptions) {
+    command
+        .env("CHIO_AUTH_TOKEN", &options.auth_token)
+        .env("CHIO_ADMIN_TOKEN", &options.admin_token)
+        .env("CHIO_CONFORMANCE_AUTH_TOKEN", &options.auth_token)
+        .env("CHIO_CONFORMANCE_ADMIN_TOKEN", &options.admin_token);
+}
+
 pub fn default_run_options() -> ConformanceRunOptions {
     let repo_root = default_repo_root();
     ConformanceRunOptions {
@@ -348,13 +358,11 @@ fn spawn_remote_edge(
         listen
     );
 
+    apply_conformance_auth_env(&mut command, options);
+
     match options.auth_mode {
         ConformanceAuthMode::StaticBearer => {
-            command.arg("--auth-token").arg(&options.auth_token);
-            command_description.push_str(&format!(
-                " --auth-token {}",
-                redact_conformance_secret(&options.auth_token)
-            ));
+            command_description.push_str(" (auth via CHIO_AUTH_TOKEN env)");
         }
         ConformanceAuthMode::LocalOAuth => {
             command
@@ -365,16 +373,13 @@ fn spawn_remote_edge(
                 .arg("--auth-jwt-audience")
                 .arg(format!("{public_base_url}/mcp"))
                 .arg("--auth-scope")
-                .arg(&options.auth_scope)
-                .arg("--admin-token")
-                .arg(&options.admin_token);
+                .arg(&options.auth_scope);
             command_description.push_str(&format!(
-                " --public-base-url {} --auth-server-seed-file {} --auth-jwt-audience {}/mcp --auth-scope {} --admin-token {}",
+                " --public-base-url {} --auth-server-seed-file {} --auth-jwt-audience {}/mcp --auth-scope {} (admin via CHIO_ADMIN_TOKEN env)",
                 public_base_url,
                 auth_server_seed_path.display(),
                 public_base_url,
-                options.auth_scope,
-                redact_conformance_secret(&options.admin_token)
+                options.auth_scope
             ));
         }
     }
@@ -457,6 +462,8 @@ fn run_peer(
         }
     };
 
+    apply_conformance_auth_env(&mut command, options);
+
     let status = command
         .arg("--base-url")
         .arg(base_url)
@@ -465,10 +472,6 @@ fn run_peer(
             ConformanceAuthMode::StaticBearer => "static-bearer",
             ConformanceAuthMode::LocalOAuth => "oauth-local",
         })
-        .arg("--auth-token")
-        .arg(&options.auth_token)
-        .arg("--admin-token")
-        .arg(&options.admin_token)
         .arg("--auth-scope")
         .arg(&options.auth_scope)
         .arg("--scenarios-dir")
