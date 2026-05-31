@@ -587,10 +587,7 @@ def bind_and_redact(
                     kwonly_protected_set.add(p.name)
 
             var_positional_protected_slot: str | None = None
-            has_var_positional = False
             for p in sig.parameters.values():
-                if p.kind is inspect.Parameter.VAR_POSITIONAL:
-                    has_var_positional = True
                 if (
                     p.kind is inspect.Parameter.VAR_POSITIONAL
                     and p.name in protected_fields_for_tool_pre
@@ -633,7 +630,7 @@ def bind_and_redact(
                 ) * pad_count
 
             if (
-                not has_var_positional
+                var_positional_protected_slot is None
                 and allow_ambiguous_cycling
                 and protected_fields_for_tool_pre
                 and extended_positional_names
@@ -1113,14 +1110,26 @@ def bind_and_redact(
             and slot in protected_fields_for_tool
         ]
         overflow_iter = iter(overflow_protected_slots)
+        protected_overflow_cycle = list(protected_fields_for_tool)
+        protected_overflow_idx = 0
+        may_cycle_unmatched_var_positional = (
+            allow_ambiguous_cycling
+            and bool(protected_overflow_cycle)
+            and fixed_positional_cardinality < len(table_slots)
+        )
         for idx, value in enumerate(bind_args):
             if idx < fixed_positional_cardinality:
                 continue
             slot_name = next(free_slot_iter, None)
             if slot_name is None:
                 slot_name = next(overflow_iter, None)
-                if slot_name is None:
-                    break
+            if slot_name is None and may_cycle_unmatched_var_positional:
+                slot_name = protected_overflow_cycle[
+                    protected_overflow_idx % len(protected_overflow_cycle)
+                ]
+                protected_overflow_idx += 1
+            if slot_name is None:
+                break
             redacted_extra = _redact_named(
                 {slot_name: value},
                 tool_name=tool_name,
