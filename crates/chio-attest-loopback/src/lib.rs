@@ -1316,6 +1316,17 @@ mod tests {
         }
     }
 
+    fn refresh_workflow_step_parent_chain(
+        package: &mut ChioProofPackage,
+    ) -> Result<(), ChioPackageError> {
+        let mut previous: Option<String> = None;
+        for step in &mut package.workflow_receipt.steps {
+            step.parent_receipt_sha256 = previous;
+            previous = Some(canonical_sha256(step)?);
+        }
+        Ok(())
+    }
+
     #[test]
     fn fresh_proof_package_binds_disclosure_subject_to_workflow() {
         let package = fresh_proof_package().expect("fresh package builds");
@@ -1604,5 +1615,76 @@ mod tests {
 
         let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
         assert!(error.to_string().contains("consistency anchor"));
+    }
+
+    fn resign_bilateral_envelope(
+        envelope: &mut DsseEnvelope,
+        buyer_key: &Keypair,
+        vendor_key: &Keypair,
+        statement_bytes: &[u8],
+    ) {
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+        use base64::Engine;
+        use chio_core_types::crypto::{Ed25519Backend, SigningBackend};
+        use chio_federation::bilateral_dsse::{pae, PAYLOAD_TYPE_IN_TOTO};
+
+        envelope.payload = BASE64_STANDARD.encode(statement_bytes);
+        let pae_bytes = pae(PAYLOAD_TYPE_IN_TOTO, statement_bytes);
+        let sig_a = Ed25519Backend::new(buyer_key.clone())
+            .sign_bytes(&pae_bytes)
+            .expect("buyer cosigns deny-envelope statement");
+        let sig_b = Ed25519Backend::new(vendor_key.clone())
+            .sign_bytes(&pae_bytes)
+            .expect("vendor cosigns deny-envelope statement");
+        envelope.signatures[0].sig = BASE64_STANDARD.encode(sig_a.to_bytes());
+        envelope.signatures[1].sig = BASE64_STANDARD.encode(sig_b.to_bytes());
+    }
+
+    #[test]
+    fn bilateral_policy_deny_verdict_fails_package_verification() -> Result<(), ChioPackageError> {
+        let mut package = fresh_proof_package()?;
+        let buyer_key = runtime_buyer_keypair();
+        let vendor_key = runtime_vendor_keypair(0)?;
+
+        let (mut statement, _) = package.bilateral_envelopes[0]
+            .decode_statement()
+            .map_err(|error| ChioPackageError::Federation(error.to_string()))?;
+        let summary = statement
+            .predicate
+            .policy_evaluation_summary
+            .as_mut()
+            .ok_or_else(|| {
+                ChioPackageError::Inconsistent(
+                    "fixture bilateral envelope missing policy summary".to_string(),
+                )
+            })?;
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+        let statement_bytes = statement
+            .canonical_bytes()
+            .map_err(|error| ChioPackageError::Federation(error.to_string()))?;
+        resign_bilateral_envelope(
+            &mut package.bilateral_envelopes[0],
+            &buyer_key,
+            &vendor_key,
+            &statement_bytes,
+        );
+        let envelope_sha256 = canonical_sha256(&package.bilateral_envelopes[0])?;
+        package.workflow_receipt.steps[0].bilateral_dsse_sha256 =
+            Some(envelope_sha256);
+        refresh_workflow_step_parent_chain(&mut package)?;
+        resign_workflow_receipt(&mut package)?;
+
+        let context = verification_context();
+        let trust_bundle = rebuild_verifier_material(&mut package, &context);
+        let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.contains("bilateral envelope policy verdict"),
+            "expected admission failure for deny verdict, got: {message}"
+        );
+        assert!(message.contains("deny"), "expected deny verdict in error: {message}");
+        Ok(())
     }
 }

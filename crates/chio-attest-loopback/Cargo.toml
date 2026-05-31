@@ -12,6 +12,7 @@ publish = false
 name = "chio_attest_loopback"
 
 [dependencies]
+base64 = { workspace = true }
 chio-attest-buyer-core = { path = "../chio-attest-buyer-core" }
 chio-federation-authority = { path = "../chio-federation-authority" }
 chio-core-types = { path = "../chio-core-types" }
