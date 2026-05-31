@@ -778,6 +778,36 @@ mod tests {
     }
 
     #[test]
+    fn evaluate_post_allowed_with_query_capability() {
+        let keypair = Keypair::generate();
+        let routes = vec![RouteEntry {
+            pattern: "/pets".to_string(),
+            method: HttpMethod::Post,
+            operation_id: Some("createPet".to_string()),
+            policy: PolicyDecision::DenyByDefault,
+        }];
+        let evaluator = RequestEvaluator::new(routes, keypair.clone(), "test-policy".to_string());
+        let mut query = HashMap::new();
+        query.insert(
+            "chio_capability".to_string(),
+            signed_capability_token_json(&keypair, "cap-query"),
+        );
+
+        let result = evaluator
+            .evaluate(
+                HttpMethod::Post,
+                "/pets",
+                &query,
+                &HashMap::new(),
+                None,
+                0,
+            )
+            .test_unwrap();
+        assert!(result.verdict.is_allowed());
+        assert_eq!(result.receipt.capability_id.as_deref(), Some("cap-query"));
+    }
+
+    #[test]
     fn finalize_receipt_rebinds_status_and_links_decision_receipt() {
         let keypair = Keypair::generate();
         let routes = vec![RouteEntry {
