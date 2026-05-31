@@ -1357,6 +1357,73 @@ mod tests {
     }
 
     #[test]
+    fn unanimous_deny_bilateral_envelope_fails_buyer_verification() -> Result<(), ChioPackageError>
+    {
+        use chio_federation::{sign_chio_bilateral_dsse_envelope, BilateralPredicateExtensions};
+
+        let mut package = fresh_proof_package()?;
+        let context = verification_context();
+        let (statement, _) = package.bilateral_envelopes[0]
+            .decode_statement()
+            .map_err(|error| ChioPackageError::Federation(error.to_string()))?;
+        let pred = statement.predicate;
+        let mut deny_summary = pred
+            .policy_evaluation_summary
+            .clone()
+            .ok_or_else(|| ChioPackageError::Federation("policy summary missing".to_string()))?;
+        deny_summary.server_a_verdict.verdict = "deny".to_string();
+        deny_summary.server_b_verdict.verdict = "deny".to_string();
+        deny_summary.joint_disposition = Some("deny".to_string());
+        let extensions = BilateralPredicateExtensions {
+            capability_lease_ref: pred.capability_lease_ref.clone(),
+            policy_evaluation_summary: Some(deny_summary),
+            governance_receipt_ref: pred.governance_receipt_ref.clone(),
+            consistency_anchor: pred.consistency_anchor.clone(),
+            consistency_model: Some(pred.consistency_model.clone()),
+            cross_org_visibility: Some(pred.cross_org_visibility.clone()),
+            treaty_binding_ref: pred.treaty_binding_ref.clone(),
+        };
+        let buyer_key = runtime_buyer_keypair();
+        let vendor_key = runtime_vendor_keypair(0)?;
+        let deny_envelope = sign_chio_bilateral_dsse_envelope(
+            &package.tool_receipts[0],
+            &buyer_key,
+            &vendor_key,
+            BUYER_KERNEL_ID,
+            VENDORS[0].kernel_id,
+            VENDORS[0].tool_name,
+            pred.timestamp_unix_ms,
+            extensions,
+        )
+        .map_err(|error| ChioPackageError::Federation(error.to_string()))?;
+        package.bilateral_envelopes[0] = deny_envelope;
+        package.workflow_receipt.steps[0].bilateral_dsse_sha256 =
+            Some(canonical_sha256(&package.bilateral_envelopes[0])?);
+        let mut parent_step_sha256 = None;
+        for step in &mut package.workflow_receipt.steps {
+            step.parent_receipt_sha256 = parent_step_sha256.clone();
+            parent_step_sha256 = Some(canonical_sha256(step)?);
+        }
+        resign_workflow_receipt(&mut package)?;
+        let trust_bundle_document = refresh_verifier_material_for_package(&mut package, &context)?;
+        let trust_bundle =
+            ChioVerifierTrustBundle::from_document(trust_bundle_document).map_err(|error| {
+                ChioPackageError::TrustedIssuer(format!("trust bundle: {error}"))
+            })?;
+        let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.contains("bilateral envelope policy verdict"),
+            "expected federation admission failure, got: {message}"
+        );
+        assert!(
+            message.contains("is not allow"),
+            "expected deny verdict rejection, got: {message}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn authority_issuance_request_hashes_signed_receipt_body_for_governance(
     ) -> Result<(), ChioPackageError> {
         let package = fresh_proof_package()?;
