@@ -1806,6 +1806,35 @@ def test_empty_positional_table_does_not_invent_overflow_slot() -> None:
     }
 
 
+def test_fixed_arity_extra_positional_redacts_without_varargs() -> None:
+    """Fixed-arity wrappers must redact overflow positionals without inventing slots.
+
+    When a callable has no ``*args`` bucket but receives more positionals than
+    its signature names, overflow values must still redact under the last
+    protected slot instead of leaking raw secrets.
+    """
+
+    def write_file(path: str, content: str) -> None:
+        del path, content
+
+    args, kwargs = bind_and_redact(
+        write_file,
+        ("/tmp/x", "PROD_SECRET_OVERFLOW", "EXTRA_OVERFLOW"),
+        {},
+        tool_name="chio_file_write",
+    )
+    assert args[0] == "/tmp/x"
+    assert args[1] == {
+        "omitted": True,
+        "byte_count": len(b"PROD_SECRET_OVERFLOW"),
+    }
+    assert args[2] == {
+        "omitted": True,
+        "byte_count": len(b"EXTRA_OVERFLOW"),
+    }
+    assert kwargs == {}
+
+
 def test_typeerror_fallback_unprotected_var_positional_keeps_table_prefix() -> None:
     """Regression:
 

@@ -1262,6 +1262,16 @@ pub fn verify_package_report(
     }
 }
 
+fn reject_non_allow_bilateral_joint_verdict(joint_verdict: &str) -> Result<(), ChioPackageError> {
+    if joint_verdict != "allow" {
+        return Err(ChioPackageError::Federation(format!(
+            "bilateral envelope policy verdict {:?} is not allow",
+            joint_verdict
+        )));
+    }
+    Ok(())
+}
+
 fn verify_package_inner(
     package: &ChioProofPackage,
     trust_bundle: &ChioVerifierTrustBundle,
@@ -1424,12 +1434,7 @@ fn verify_package_inner(
             },
         )
         .map_err(|error| ChioPackageError::Federation(error.to_string()))?;
-        if verified.joint_verdict != "allow" {
-            return Err(ChioPackageError::Federation(format!(
-                "bilateral envelope policy verdict {:?} is not allow",
-                verified.joint_verdict
-            )));
-        }
+        reject_non_allow_bilateral_joint_verdict(&verified.joint_verdict)?;
     }
     add_check(
         checks,
@@ -2500,6 +2505,19 @@ mod tests {
     fn resign_governance_receipt(receipt: &mut SignedGovernanceReceipt) {
         *receipt = SignedExportEnvelope::sign(receipt.body.clone(), &Keypair::from_seed(&[12; 32]))
             .expect("governance receipt re-signs");
+    }
+
+    #[test]
+    fn reject_non_allow_bilateral_joint_verdict_rejects_deny() {
+        let error = reject_non_allow_bilateral_joint_verdict("deny").unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("bilateral envelope policy verdict \"deny\" is not allow"));
+    }
+
+    #[test]
+    fn reject_non_allow_bilateral_joint_verdict_accepts_allow() {
+        reject_non_allow_bilateral_joint_verdict("allow").expect("allow verdict passes");
     }
 
     #[test]

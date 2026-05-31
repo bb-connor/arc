@@ -3051,6 +3051,67 @@ mod tests {
     }
 
     #[test]
+    fn unanimous_deny_bilateral_invocation_reports_joint_verdict_deny() {
+        let kp_a = Keypair::generate();
+        let kp_b = Keypair::generate();
+        let receipt = sample_receipt(&kp_b);
+        let now_ms = 1_734_000_000_000;
+
+        let mut ext = happy_path_extensions(now_ms);
+        if let Some(summary) = ext.policy_evaluation_summary.as_mut() {
+            summary.server_a_verdict.verdict = "deny".to_string();
+            summary.server_b_verdict.verdict = "deny".to_string();
+            summary.joint_disposition = Some("deny".to_string());
+        }
+        let envelope = sign_dsse_envelope_full(
+            &receipt,
+            &kp_a,
+            &kp_b,
+            "did:chio:org-a",
+            "did:chio:org-b",
+            "file_read",
+            now_ms,
+            ext,
+        )
+        .unwrap();
+
+        let mut peer_pin_set = PeerPinSet::new();
+        peer_pin_set.insert(PinnedPeer {
+            kernel_id: "did:chio:org-a".to_string(),
+            public_key: kp_a.public_key(),
+            ladder_manifest_ref: None,
+        });
+        peer_pin_set.insert(PinnedPeer {
+            kernel_id: "did:chio:org-b".to_string(),
+            public_key: kp_b.public_key(),
+            ladder_manifest_ref: None,
+        });
+        let mut receipt_store = InMemoryReceiptStore::new();
+        receipt_store.insert(receipt.clone());
+        let mut lease_registry = InMemoryLeaseRegistry::new();
+        lease_registry.insert(ResolvedLease {
+            lease_id: "lease-c2-happy".to_string(),
+            issuer: "did:chio:org-a".to_string(),
+            expires_at_unix_ms: now_ms + 60_000,
+            scope_digest_hex: None,
+        });
+        let governance_store = InMemoryGovernanceReceiptStore::new();
+        let oracle = DemoAllowAllRevocationOracle;
+
+        let config = config(
+            &peer_pin_set,
+            &receipt_store,
+            &lease_registry,
+            &governance_store,
+            &oracle,
+            now_ms,
+        );
+
+        let verified = verify_bilateral_cosign_invocation(&envelope, &config).unwrap();
+        assert_eq!(verified.joint_verdict, "deny");
+    }
+
+    #[test]
     fn step_15_receipt_backed_class_requires_governance_receipt() {
         let kp_a = Keypair::generate();
         let kp_b = Keypair::generate();
