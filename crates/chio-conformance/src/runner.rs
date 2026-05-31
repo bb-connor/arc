@@ -135,15 +135,6 @@ fn conformance_token_from_env(var: &str, role: &str) -> String {
     format!("dev-only-conformance-{role}-{nonce}")
 }
 
-/// Avoid echoing operator-provided CI tokens into `RunnerError` command strings.
-fn redact_conformance_secret(token: &str) -> String {
-    if token.starts_with("dev-only-conformance-") {
-        token.to_string()
-    } else {
-        "[redacted]".to_string()
-    }
-}
-
 /// Pass conformance tokens through child env vars so shared CI runners do not
 /// expose secrets via `/proc/<pid>/cmdline`.
 fn apply_conformance_auth_env(command: &mut Command, options: &ConformanceRunOptions) {

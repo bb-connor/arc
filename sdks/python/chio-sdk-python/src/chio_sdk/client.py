@@ -437,6 +437,13 @@ class ChioClient:
                     "integrity checks",
                     code="INVALID_RECEIPT",
                 )
+            outcome = getattr(
+                receipt.observation_outcome, "value", receipt.observation_outcome
+            )
+            if outcome == "dropped":
+                raise ChioDeniedError(
+                    "Chio sidecar advisory evaluation refused the tool call"
+                )
             return receipt
         if not await self.verify_receipt(receipt):
             raise ChioError(
