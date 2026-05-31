@@ -1780,6 +1780,36 @@ def test_typeerror_fallback_kwonly_only_preserves_default_prefix() -> None:
     }
 
 
+def test_fixed_arity_extra_positional_redacts_overflow_without_var_positional() -> None:
+    """Regression (#794): fixed-arity wrappers must redact extra positionals.
+
+    Without ``*args``, overflow values must not forward raw secrets when the
+    tool is a chio-default name with ambiguous-fail-closed cycling enabled.
+    """
+
+    def write_wrapper(path: str, content: str) -> None:
+        del path, content
+
+    policy = RedactionPolicy(body_fields={"chio_file_write": ("content",)})
+    args, kwargs = bind_and_redact(
+        write_wrapper,
+        ("/tmp/x", "KW_SECRET", "EXTRA_OVERFLOW_SECRET"),
+        {},
+        tool_name="chio_file_write",
+        policy=policy,
+    )
+    assert kwargs == {}
+    assert args[0] == "/tmp/x"
+    assert args[1] == {
+        "omitted": True,
+        "byte_count": len(b"KW_SECRET"),
+    }
+    assert args[2] == {
+        "omitted": True,
+        "byte_count": len(b"EXTRA_OVERFLOW_SECRET"),
+    }
+
+
 def test_empty_positional_table_does_not_invent_overflow_slot() -> None:
     """No positional map means extra args stay raw.
 

@@ -579,6 +579,44 @@ mod tests {
     }
 
     #[test]
+    fn evaluate_chio_request_denies_malformed_reserved_tools_path() {
+        let keypair = Keypair::generate();
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let capability = signed_capability_token_json_with_scope(
+            &keypair,
+            "cap-http-authority",
+            ChioScope {
+                grants: vec![chio_http_core::http_authority_tool_grant()],
+                ..ChioScope::default()
+            },
+        );
+
+        let mut request = ChioHttpRequest::new(
+            "req-malformed-tools-path".to_string(),
+            HttpMethod::Post,
+            "/chio/tools/acp/terminal%ZZcreate".to_string(),
+            "/chio/tools/acp/terminal%ZZcreate".to_string(),
+            CallerIdentity::anonymous(),
+        );
+        request.tool_server = Some("acp".to_string());
+        request.tool_name = Some("terminal/create".to_string());
+        request.arguments = Some(serde_json::json!({ "command": "ls" }));
+        request.body_hash = Some("tool-body".to_string());
+        request.body_length = 8;
+
+        let result = evaluator
+            .evaluate_chio_request(request, Some(&capability))
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("malformed /chio/tools path identity")
+        );
+    }
+
+    #[test]
     fn evaluate_chio_request_denies_capability_for_different_tool_identity() {
         let keypair = Keypair::generate();
         let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());

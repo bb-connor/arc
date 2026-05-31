@@ -2967,4 +2967,131 @@ mod tests {
             .iter()
             .any(|check| check.code == "trust.bbs_issuer"));
     }
+
+    fn resign_fixture_workflow_receipt(
+        package: &mut ChioProofPackage,
+    ) -> Result<(), ChioPackageError> {
+        const BUYER_SEED: [u8; 32] = [11; 32];
+        const VENDOR_SEEDS: [[u8; 32]; 3] = [[21; 32], [22; 32], [23; 32]];
+        const VENDOR_IDS: [&str; 3] = ["vendor-a", "vendor-b", "vendor-c"];
+
+        let buyer_key = Keypair::from_seed(&BUYER_SEED);
+        let mut workflow = WorkflowReceipt::sign(package.workflow_receipt.body(), &buyer_key)
+            .map_err(|error| ChioPackageError::Workflow(error.to_string()))?;
+        for (vendor_id, seed) in VENDOR_IDS.iter().zip(VENDOR_SEEDS.iter()) {
+            let vendor_key = Keypair::from_seed(seed);
+            workflow
+                .add_vendor_signature(*vendor_id, &vendor_key)
+                .map_err(|error| ChioPackageError::Workflow(error.to_string()))?;
+        }
+        package.workflow_receipt = workflow;
+        Ok(())
+    }
+
+    fn refresh_fixture_disclosure_proof(
+        package: &mut ChioProofPackage,
+        context: &ChioVerificationContext,
+    ) -> Result<(), ChioPackageError> {
+        use chio_selective_disclosure::{
+            derive_selective_disclosure_proof, generate_bbs_keypair, project_workflow_receipt_body,
+            sign_projection, DisclosureSet,
+        };
+
+        const BBS_KEY_MATERIAL: &[u8] = b"chio-conformance-bbs-key-material-0001";
+        const BBS_KEY_INFO: &[u8] = b"chio";
+
+        let projection = project_workflow_receipt_body(&package.workflow_receipt.body())
+            .map_err(|error| ChioPackageError::SelectiveDisclosure(error.to_string()))?;
+        let bbs_keypair = generate_bbs_keypair(BBS_KEY_MATERIAL, BBS_KEY_INFO)
+            .map_err(|error| ChioPackageError::SelectiveDisclosure(error.to_string()))?;
+        let signed = sign_projection(&projection, &bbs_keypair)
+            .map_err(|error| ChioPackageError::SelectiveDisclosure(error.to_string()))?;
+        package.selective_disclosure_proof = derive_selective_disclosure_proof(
+            &signed,
+            &projection,
+            &bbs_keypair,
+            &DisclosureSet(vec![4, 8, 9, 10]),
+            &context.expected_bbs_proof_nonce()?,
+        )
+        .map_err(|error| ChioPackageError::SelectiveDisclosure(error.to_string()))?;
+        Ok(())
+    }
+
+    #[test]
+    fn package_rejects_bilateral_envelope_with_non_allow_joint_verdict() {
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+        use base64::Engine;
+        use chio_core_types::crypto::{Ed25519Backend, SigningBackend};
+        use chio_federation::bilateral_dsse::{pae, PAYLOAD_TYPE_IN_TOTO};
+
+        const BUYER_SEED: [u8; 32] = [11; 32];
+        const VENDOR_A_SEED: [u8; 32] = [21; 32];
+
+        let mut package = proof_package_from_json(include_str!(
+            "../../../examples/chio-3vendor/fixtures/buyer-auditor-proof-package.json"
+        ))
+        .expect("package fixture parses");
+        let context = verification_context_from_fixture();
+
+        let buyer_key = Keypair::from_seed(&BUYER_SEED);
+        let vendor_a_key = Keypair::from_seed(&VENDOR_A_SEED);
+        let mut envelope = package.bilateral_envelopes[0].clone();
+        let (mut statement, _) = envelope.decode_statement().expect("statement decodes");
+        let summary = statement
+            .predicate
+            .policy_evaluation_summary
+            .as_mut()
+            .expect("policy summary present");
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+        let statement_bytes = statement.canonical_bytes().expect("canonical bytes");
+        envelope.payload = BASE64_STANDARD.encode(&statement_bytes);
+        let pae_bytes = pae(PAYLOAD_TYPE_IN_TOTO, &statement_bytes);
+        let sig_a = Ed25519Backend::new(buyer_key.clone())
+            .sign_bytes(&pae_bytes)
+            .expect("buyer signature");
+        let sig_b = Ed25519Backend::new(vendor_a_key.clone())
+            .sign_bytes(&pae_bytes)
+            .expect("vendor signature");
+        envelope.signatures[0].sig = BASE64_STANDARD.encode(sig_a.to_bytes());
+        envelope.signatures[1].sig = BASE64_STANDARD.encode(sig_b.to_bytes());
+        package.bilateral_envelopes[0] = envelope;
+
+        package.workflow_receipt.steps[0].bilateral_dsse_sha256 =
+            Some(canonical_sha256(&package.bilateral_envelopes[0]).expect("envelope hash"));
+        for index in 1..package.workflow_receipt.steps.len() {
+            let parent_hash = canonical_sha256(&package.workflow_receipt.steps[index - 1])
+                .expect("parent step hash");
+            package.workflow_receipt.steps[index].parent_receipt_sha256 = Some(parent_hash);
+        }
+        resign_fixture_workflow_receipt(&mut package).expect("workflow resigns");
+        package
+            .workflow_intersection
+            .aggregate_workflow_receipt_sha256 =
+            canonical_sha256(&package.workflow_receipt.body()).expect("aggregate hash");
+        refresh_fixture_disclosure_proof(&mut package, &context).expect("disclosure proof");
+
+        let mut trust_document = trust_bundle_document_from_fixture();
+        let intersection_hash =
+            canonical_sha256(&package.workflow_intersection).expect("intersection hash");
+        for entry in trust_document.workflow_intersections.iter_mut() {
+            if entry.intersection_id == package.workflow_intersection.intersection_id {
+                entry.sha256 = intersection_hash.clone();
+            }
+        }
+        let trust_bundle =
+            ChioVerifierTrustBundle::from_document(trust_document).expect("trust bundle parses");
+
+        let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.contains("bilateral envelope policy verdict"),
+            "expected federation gate message, got: {message}"
+        );
+        assert!(
+            message.contains("is not allow"),
+            "expected non-allow verdict rejection, got: {message}"
+        );
+    }
 }
