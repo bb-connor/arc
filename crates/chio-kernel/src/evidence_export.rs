@@ -576,6 +576,67 @@ mod tests {
     }
 
     #[test]
+    fn evidence_export_query_rejects_missing_read_boundary() {
+        let err = EvidenceExportQuery::default()
+            .validate_read_boundary()
+            .expect_err("export without read boundary must fail closed");
+
+        assert!(matches!(err, EvidenceExportError::ReadBoundary(message) if message
+            == "evidence export requires an explicit receipt read boundary"));
+    }
+
+    #[test]
+    fn evidence_export_query_rejects_empty_admin_tenant_filter() {
+        let err = EvidenceExportQuery {
+            tenant: Some("   ".to_string()),
+            read_boundary: Some(ReceiptReadBoundary::AdminAll),
+            ..EvidenceExportQuery::default()
+        }
+        .validate_read_boundary()
+        .expect_err("whitespace tenant filter must fail closed");
+
+        assert!(matches!(
+            err,
+            EvidenceExportError::ReadBoundary(message)
+                if message
+                    == "admin-all evidence export tenant filter requires a non-empty tenant"
+        ));
+    }
+
+    #[test]
+    fn evidence_export_query_rejects_empty_tenant_scoped_boundary() {
+        let err = EvidenceExportQuery::tenant_scoped("   ")
+            .validate_read_boundary()
+            .expect_err("whitespace tenant scope must fail closed");
+
+        assert!(matches!(
+            err,
+            EvidenceExportError::ReadBoundary(message)
+                if message == "tenant-scoped evidence export requires a non-empty tenant"
+        ));
+    }
+
+    #[test]
+    fn evidence_export_query_rejects_tenant_boundary_mismatch() {
+        let err = EvidenceExportQuery {
+            tenant: Some("tenant-b".to_string()),
+            read_boundary: Some(ReceiptReadBoundary::TenantScoped {
+                tenant: "tenant-a".to_string(),
+            }),
+            ..EvidenceExportQuery::default()
+        }
+        .validate_read_boundary()
+        .expect_err("mismatched tenant authority must fail closed");
+
+        assert!(matches!(
+            err,
+            EvidenceExportError::ReadBoundary(message)
+                if message
+                    == "tenant-scoped evidence export tenant does not match query tenant"
+        ));
+    }
+
+    #[test]
     fn evidence_export_marks_unanchored_publication_as_transparency_preview() {
         let keypair = Keypair::generate();
         let first = build_checkpoint(1, 1, 2, &[b"one".to_vec(), b"two".to_vec()], &keypair)
