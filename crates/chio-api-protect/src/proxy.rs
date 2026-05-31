@@ -2461,12 +2461,20 @@ paths:
             .await
             .test_unwrap();
         assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+        assert_eq!(
+            response
+                .headers()
+                .get(CHIO_ROUTE_STATUS_HEADER)
+                .and_then(|value| value.to_str().ok()),
+            Some("not-implemented")
+        );
 
         let bytes = to_bytes(response.into_body(), 1024 * 1024)
             .await
             .test_unwrap();
         let json: serde_json::Value = serde_json::from_slice(&bytes).test_unwrap();
         assert_eq!(json["error"], "chio_attenuate_not_implemented");
+        assert_eq!(json["chio_route_status"], "not-implemented");
     }
 
     #[tokio::test]
@@ -2502,6 +2510,13 @@ paths:
             .await
             .test_unwrap();
         assert_eq!(evaluate_response.status(), StatusCode::OK);
+        assert_eq!(
+            evaluate_response
+                .headers()
+                .get(CHIO_TRUST_LEVEL_HEADER)
+                .and_then(|value| value.to_str().ok()),
+            Some("advisory")
+        );
         let receipt_bytes = to_bytes(evaluate_response.into_body(), 1024 * 1024)
             .await
             .test_unwrap();
@@ -2838,6 +2853,13 @@ paths:
             .await
             .test_unwrap();
         assert_eq!(evaluate_response.status(), StatusCode::OK);
+        assert_eq!(
+            evaluate_response
+                .headers()
+                .get(CHIO_TRUST_LEVEL_HEADER)
+                .and_then(|value| value.to_str().ok()),
+            Some("advisory")
+        );
         let receipt: ChioReceipt = serde_json::from_slice(
             &to_bytes(evaluate_response.into_body(), 1024 * 1024)
                 .await
@@ -2896,6 +2918,13 @@ paths:
             .await
             .test_unwrap();
         assert_eq!(evaluate_response.status(), StatusCode::OK);
+        assert_eq!(
+            evaluate_response
+                .headers()
+                .get(CHIO_TRUST_LEVEL_HEADER)
+                .and_then(|value| value.to_str().ok()),
+            Some("advisory")
+        );
         let receipt: ChioReceipt = serde_json::from_slice(
             &to_bytes(evaluate_response.into_body(), 1024 * 1024)
                 .await

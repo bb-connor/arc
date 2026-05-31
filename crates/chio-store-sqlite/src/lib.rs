@@ -78,7 +78,7 @@ pub use batch_approval_store::SqliteBatchApprovalStore;
 pub use budget_store::SqliteBudgetStore;
 pub use encrypted_blob::{
     decrypt_blob, encrypt_blob, BlobHandle, BlobStoreError, DecryptError, EncryptedBlob,
-    SqliteEncryptedBlobStore, TenantId, TenantKey,
+    EncryptError, SqliteEncryptedBlobStore, TenantId, TenantKey,
 };
 pub use execution_nonce_store::{SqliteExecutionNonceStore, SqliteExecutionNonceStoreError};
 pub use iou_store::{SqliteIouEnvelopeStore, IOU_ENVELOPE_MIGRATION};

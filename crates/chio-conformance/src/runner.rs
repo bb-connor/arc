@@ -116,6 +116,25 @@ pub fn default_repo_root() -> PathBuf {
     conformance_fixture_root_from_manifest_dir(Path::new(env!("CARGO_MANIFEST_DIR")))
 }
 
+/// Read a conformance harness token from `var`, or return a local-only default.
+///
+/// When the env var is unset, the fallback uses the `dev-only-conformance-*`
+/// prefix plus a short random suffix. Set `CHIO_CONFORMANCE_AUTH_TOKEN` and
+/// `CHIO_CONFORMANCE_ADMIN_TOKEN` for CI or shared environments.
+fn conformance_token_from_env(var: &str, role: &str) -> String {
+    if let Ok(value) = env::var(var) {
+        let trimmed = value.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    format!("dev-only-conformance-{role}-{nonce}")
+}
+
 pub fn default_run_options() -> ConformanceRunOptions {
     let repo_root = default_repo_root();
     ConformanceRunOptions {
@@ -126,8 +145,8 @@ pub fn default_run_options() -> ConformanceRunOptions {
         upstream_server_script: repo_root
             .join("tests/conformance/fixtures/mcp_core/mock_mcp_server.py"),
         auth_mode: ConformanceAuthMode::StaticBearer,
-        auth_token: "conformance-token".to_string(),
-        admin_token: "conformance-admin-token".to_string(),
+        auth_token: conformance_token_from_env("CHIO_CONFORMANCE_AUTH_TOKEN", "auth"),
+        admin_token: conformance_token_from_env("CHIO_CONFORMANCE_ADMIN_TOKEN", "admin"),
         auth_scope: "mcp:invoke".to_string(),
         listen: None,
         peers: vec![PeerTarget::Js, PeerTarget::Python],

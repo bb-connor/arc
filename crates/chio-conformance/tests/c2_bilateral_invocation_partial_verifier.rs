@@ -34,13 +34,13 @@ use chio_core::receipt::{ChioReceipt, ChioReceiptBody, Decision, ToolCallAction,
 use chio_federation::{
     execute_local_bilateral_invocation_fixture, receipt_subject_name, ActionClassKind,
     BilateralCoSigningProtocol, BilateralInvocationError, BilateralPredicateExtensions,
-    CapabilityLeaseRef, DemoAllowAllRevocationOracle, DenyListRevocationOracle, DsseEnvelope,
-    GovernanceReceiptRef, GovernanceReceiptStore, HashRecord, InMemoryGovernanceReceiptStore,
-    InMemoryLeaseRegistry, InMemoryReceiptStore, InProcessCoSigner, Keyid,
-    LocalBilateralInvocationFixtureRequest, PeerPinSet, PinnedEpoch, PinnedPeer,
-    PolicyEvaluationSummary, PolicyVerdict, ReceiptStore, ResolvedGovernanceReceipt, ResolvedLease,
-    RevocationOracle, VerifierConfig,
+    CapabilityLeaseRef, DenyListRevocationOracle, DsseEnvelope, GovernanceReceiptRef,
+    GovernanceReceiptStore, HashRecord, InMemoryGovernanceReceiptStore, InMemoryLeaseRegistry,
+    InMemoryReceiptStore, InProcessCoSigner, Keyid, LocalBilateralInvocationFixtureRequest,
+    PeerPinSet, PinnedEpoch, PinnedPeer, PolicyEvaluationSummary, PolicyVerdict, ReceiptStore,
+    ResolvedGovernanceReceipt, ResolvedLease, RevocationOracle, VerifierConfig,
 };
+use chio_federation::demo::DemoAllowAllRevocationOracle;
 use sha2::Digest;
 
 const ORG_A: &str = "did:chio:org-a";

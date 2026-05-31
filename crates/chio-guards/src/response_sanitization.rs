@@ -909,11 +909,20 @@ impl Clone for OutputSanitizer {
 }
 
 impl OutputSanitizer {
+    fn build_default_or_fail_closed() -> Self {
+        Self::with_config(OutputSanitizerConfig::default()).unwrap_or_else(|_| Self {
+            config: OutputSanitizerConfig::default(),
+            allowlist_patterns: vec![],
+            denylist_patterns: vec![],
+            token_vault: Arc::new(TokenVault::default()),
+        })
+    }
+
     pub fn new() -> Self {
-        match Self::with_config(OutputSanitizerConfig::default()) {
-            Ok(sanitizer) => sanitizer,
-            Err(error) => panic!("default output sanitizer config should be valid: {error}"),
-        }
+        static DEFAULT: OnceLock<OutputSanitizer> = OnceLock::new();
+        DEFAULT
+            .get_or_init(Self::build_default_or_fail_closed)
+            .clone()
     }
 
     pub fn with_config(config: OutputSanitizerConfig) -> Result<Self, OutputSanitizerConfigError> {

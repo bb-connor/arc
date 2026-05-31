@@ -14,6 +14,8 @@ pub use chio_open_market as open_market;
 pub mod bilateral;
 pub mod bilateral_dsse;
 pub mod bilateral_verifier;
+#[cfg(any(test, feature = "demo"))]
+pub mod demo;
 pub mod metrics;
 pub mod pheromone_gossip;
 pub mod revocation_gossip;
@@ -67,7 +69,7 @@ pub use bilateral_dsse::{
 pub use bilateral_verifier::{
     verify_bilateral_cosign_invocation, verify_chio_bilateral_invocation,
     verify_treaty_bound_chio_bilateral_invocation, ActionClassKind, CapabilityLeaseRegistry,
-    ChioBilateralVerifierConfig, DemoAllowAllRevocationOracle, DenyListRevocationOracle,
+    ChioBilateralVerifierConfig, DenyListRevocationOracle,
     GovernanceReceiptStore, InMemoryGovernanceReceiptStore, InMemoryLeaseRegistry,
     InMemoryReceiptStore, PeerPinSet, PinnedEpoch, PinnedPeer, ReceiptStore,
     ResolvedGovernanceReceipt, ResolvedLease, RevocationOracle, TreatyBoundBilateralDsseReview,
@@ -100,6 +102,8 @@ pub use treaty::{
     CHIO_FEDERATION_GOVERNANCE_LADDER_MANIFEST_SCHEMA, CHIO_FEDERATION_LADDER_INTERSECTION_SCHEMA,
     CHIO_FEDERATION_TREATY_SCOPE_SCHEMA,
 };
+#[cfg(any(test, feature = "demo"))]
+pub use demo::DemoAllowAllRevocationOracle;
 pub use trust_establishment::{
     ConformanceEvidence, ConformanceTier, FederationPeer, FederationPeerStore, HandshakeChallenge,
     InMemoryPeerStore, KernelTrustExchange, KernelTrustExchangeConfig, LadderManifestRef,

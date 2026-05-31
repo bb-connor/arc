@@ -15,11 +15,12 @@ use chio_core::receipt::{ChioReceipt, ChioReceiptBody, Decision, ToolCallAction,
 use chio_federation::{
     sign_dsse_envelope, sign_dsse_envelope_with_cosigner, verify_bilateral_cosign_invocation,
     verify_dsse_envelope, ActionClassKind, BilateralPredicateExtensions, CapabilityLeaseRef,
-    DemoAllowAllRevocationOracle, GovernanceReceiptStore, InMemoryGovernanceReceiptStore,
-    InMemoryLeaseRegistry, InMemoryReceiptStore, InProcessCoSigner, PeerPinSet, PinnedEpoch,
-    PinnedPeer, PolicyEvaluationSummary, PolicyVerdict, ReceiptStore, ResolvedLease,
-    RevocationOracle, UnknownActionClassPolicy, VerifierConfig,
+    GovernanceReceiptStore, InMemoryGovernanceReceiptStore, InMemoryLeaseRegistry,
+    InMemoryReceiptStore, InProcessCoSigner, PeerPinSet, PinnedEpoch, PinnedPeer,
+    PolicyEvaluationSummary, PolicyVerdict, ReceiptStore, ResolvedLease, RevocationOracle,
+    UnknownActionClassPolicy, VerifierConfig,
 };
+use chio_federation::demo::DemoAllowAllRevocationOracle;
 
 const ORG_A: &str = "did:chio:org-a";
 const ORG_B: &str = "did:chio:org-b";
