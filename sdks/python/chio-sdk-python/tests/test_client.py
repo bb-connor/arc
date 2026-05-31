@@ -8,6 +8,7 @@ import httpx
 import pytest
 import respx
 
+from chio_sdk._generated.receipt import TrustLevel
 from chio_sdk.client import ChioClient, _canonical_json, _sha256_hex
 from chio_sdk.errors import (
     ChioConnectionError,
@@ -374,7 +375,7 @@ class TestEvaluateToolCall:
                 tool_name="read",
                 parameters={"path": "/tmp"},
             )
-            assert receipt.trust_level == "advisory"
+            assert receipt.trust_level == TrustLevel.advisory
 
     @respx.mock
     async def test_evaluate_rejects_advisory_dropped(self) -> None:
