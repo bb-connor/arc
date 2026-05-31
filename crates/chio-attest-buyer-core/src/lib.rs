@@ -1262,6 +1262,15 @@ pub fn verify_package_report(
     }
 }
 
+fn ensure_bilateral_joint_verdict_allows(joint_verdict: &str) -> Result<(), ChioPackageError> {
+    if joint_verdict != "allow" {
+        return Err(ChioPackageError::Federation(format!(
+            "bilateral envelope policy verdict {joint_verdict:?} is not allow"
+        )));
+    }
+    Ok(())
+}
+
 fn verify_package_inner(
     package: &ChioProofPackage,
     trust_bundle: &ChioVerifierTrustBundle,
@@ -1424,12 +1433,7 @@ fn verify_package_inner(
             },
         )
         .map_err(|error| ChioPackageError::Federation(error.to_string()))?;
-        if verified.joint_verdict != "allow" {
-            return Err(ChioPackageError::Federation(format!(
-                "bilateral envelope policy verdict {:?} is not allow",
-                verified.joint_verdict
-            )));
-        }
+        ensure_bilateral_joint_verdict_allows(&verified.joint_verdict)?;
     }
     add_check(
         checks,
@@ -2941,6 +2945,25 @@ mod tests {
         let context = verification_context_from_fixture();
         let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
         assert!(error.to_string().contains("issuer public key"));
+    }
+
+    #[test]
+    fn ensure_bilateral_joint_verdict_allows_accepts_allow() {
+        ensure_bilateral_joint_verdict_allows("allow").expect("allow verdict admits package");
+    }
+
+    #[test]
+    fn ensure_bilateral_joint_verdict_allows_rejects_unanimous_deny() {
+        let error = ensure_bilateral_joint_verdict_allows("deny")
+            .expect_err("buyer package verification must reject non-allow bilateral verdicts");
+
+        let message = error.to_string();
+        assert!(
+            message.contains("bilateral envelope policy verdict"),
+            "unexpected error: {message}"
+        );
+        assert!(message.contains("deny"), "unexpected error: {message}");
+        assert!(message.contains("not allow"), "unexpected error: {message}");
     }
 
     #[test]
