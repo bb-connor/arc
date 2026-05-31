@@ -1560,6 +1560,34 @@ mod tests {
     }
 
     #[test]
+    fn operator_report_evidence_export_requires_explicit_read_context() {
+        let err = OperatorReportQuery::default()
+            .to_evidence_export_query()
+            .expect_err("operator evidence export must not infer read authority");
+
+        assert_eq!(
+            err,
+            "operator report evidence export requires an explicit read context"
+        );
+    }
+
+    #[test]
+    fn operator_report_evidence_export_maps_tenant_scoped_read_context() {
+        let export_query = OperatorReportQuery {
+            read_context: Some(ReceiptReadContext::authenticated_tenant("tenant-a")),
+            ..OperatorReportQuery::default()
+        }
+        .to_evidence_export_query()
+        .expect("tenant-scoped read context should translate");
+
+        assert_eq!(export_query.tenant.as_deref(), Some("tenant-a"));
+        assert_eq!(
+            export_query.read_boundary,
+            Some(ReceiptReadBoundary::tenant_scoped("tenant-a"))
+        );
+    }
+
+    #[test]
     fn operator_report_query_clamps_metered_limit() {
         let query = OperatorReportQuery {
             metered_limit: Some(5_000),
