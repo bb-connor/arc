@@ -1717,7 +1717,7 @@ mod tests {
     }
 
     #[test]
-    fn deny_by_default_reserved_tools_proxy_path_requires_http_authority_grant() {
+    fn deny_by_default_reserved_tools_proxy_path_binds_path_identity_without_tool_fields() {
         let query = HashMap::new();
         let (authority, issuer) = authority_with_issuer();
         let capability = signed_capability_token_json_with_scope(
@@ -1759,27 +1759,24 @@ mod tests {
             })
             .test_unwrap();
 
-        assert!(result.verdict.is_denied());
-        assert!(result.receipt.capability_id.is_none());
-        assert!(result.receipt.evidence[0]
-            .details
-            .as_deref()
-            .is_some_and(|details| {
-                details.contains("capability does not authorize tool authorize_http_request")
-            }));
+        assert!(result.verdict.is_allowed());
+        assert_eq!(
+            result.receipt.capability_id.as_deref(),
+            Some("cap-billing-charge")
+        );
     }
 
     #[test]
-    fn deny_by_default_reserved_tools_arguments_only_requires_http_authority_grant() {
+    fn deny_by_default_reserved_tools_proxy_path_rejects_mismatched_capability() {
         let query = HashMap::new();
         let (authority, issuer) = authority_with_issuer();
         let capability = signed_capability_token_json_with_scope(
             &issuer,
-            "cap-billing-charge",
+            "cap-math-only",
             ChioScope {
                 grants: vec![ToolGrant {
-                    server_id: "billing".to_string(),
-                    tool_name: "charge".to_string(),
+                    server_id: "math".to_string(),
+                    tool_name: "double".to_string(),
                     operations: vec![Operation::Invoke],
                     constraints: Vec::new(),
                     max_invocations: None,
@@ -1814,12 +1811,10 @@ mod tests {
 
         assert!(result.verdict.is_denied());
         assert!(result.receipt.capability_id.is_none());
-        assert!(result.receipt.evidence[0]
-            .details
-            .as_deref()
-            .is_some_and(|details| {
-                details.contains("capability does not authorize tool authorize_http_request")
-            }));
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("capability does not authorize tool charge on server billing")
+        );
     }
 
     #[test]
