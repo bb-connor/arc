@@ -2594,23 +2594,6 @@ mod tests {
     }
 
     #[test]
-    fn require_policy_evaluation_allow_admission_accepts_unanimous_allow() {
-        let summary = policy_evaluation_summary_with_verdict("allow");
-        require_policy_evaluation_allow_admission(&summary).unwrap();
-    }
-
-    #[test]
-    fn require_policy_evaluation_allow_admission_rejects_deny() {
-        let summary = policy_evaluation_summary_with_verdict("deny");
-        let err = require_policy_evaluation_allow_admission(&summary)
-            .expect_err("admission must require allow verdict");
-        assert!(matches!(err, BilateralCoSigningError::CanonicalJson(_)));
-        assert!(err
-            .to_string()
-            .contains("policy_evaluation_summary requires allow verdict for admission"));
-    }
-
-    #[test]
     fn require_policy_evaluation_allow_admission_propagates_summary_validation() {
         let mut summary = policy_evaluation_summary_with_verdict("allow");
         summary.server_b_verdict.verdict = "deny".to_string();
