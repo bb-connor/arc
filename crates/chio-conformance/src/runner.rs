@@ -137,12 +137,22 @@ fn conformance_token_from_env(var: &str, role: &str) -> String {
 
 /// Pass conformance tokens through child env vars so shared CI runners do not
 /// expose secrets via `/proc/<pid>/cmdline`.
-fn apply_conformance_auth_env(command: &mut Command, options: &ConformanceRunOptions) {
+fn apply_conformance_auth_env(
+    command: &mut Command,
+    options: &ConformanceRunOptions,
+    auth_mode: ConformanceAuthMode,
+) {
     command
-        .env("CHIO_AUTH_TOKEN", &options.auth_token)
-        .env("CHIO_ADMIN_TOKEN", &options.admin_token)
         .env("CHIO_CONFORMANCE_AUTH_TOKEN", &options.auth_token)
         .env("CHIO_CONFORMANCE_ADMIN_TOKEN", &options.admin_token);
+    match auth_mode {
+        ConformanceAuthMode::StaticBearer => {
+            command.env("CHIO_AUTH_TOKEN", &options.auth_token);
+        }
+        ConformanceAuthMode::LocalOAuth => {
+            command.env("CHIO_ADMIN_TOKEN", &options.admin_token);
+        }
+    }
 }
 
 pub fn default_run_options() -> ConformanceRunOptions {
@@ -349,7 +359,7 @@ fn spawn_remote_edge(
         listen
     );
 
-    apply_conformance_auth_env(&mut command, options);
+    apply_conformance_auth_env(&mut command, options, options.auth_mode);
 
     match options.auth_mode {
         ConformanceAuthMode::StaticBearer => {
@@ -453,7 +463,7 @@ fn run_peer(
         }
     };
 
-    apply_conformance_auth_env(&mut command, options);
+    apply_conformance_auth_env(&mut command, options, options.auth_mode);
 
     let status = command
         .arg("--base-url")

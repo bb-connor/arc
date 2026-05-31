@@ -899,12 +899,7 @@ impl Default for OutputSanitizer {
 
 impl Clone for OutputSanitizer {
     fn clone(&self) -> Self {
-        Self {
-            config: self.config.clone(),
-            allowlist_patterns: self.allowlist_patterns.clone(),
-            denylist_patterns: self.denylist_patterns.clone(),
-            token_vault: self.token_vault.clone(),
-        }
+        self.clone_with_fresh_vault()
     }
 }
 
@@ -918,11 +913,20 @@ impl OutputSanitizer {
         })
     }
 
+    fn clone_with_fresh_vault(&self) -> Self {
+        Self {
+            config: self.config.clone(),
+            allowlist_patterns: self.allowlist_patterns.clone(),
+            denylist_patterns: self.denylist_patterns.clone(),
+            token_vault: Arc::new(TokenVault::new()),
+        }
+    }
+
     pub fn new() -> Self {
         static DEFAULT: OnceLock<OutputSanitizer> = OnceLock::new();
         DEFAULT
             .get_or_init(Self::build_default_or_fail_closed)
-            .clone()
+            .clone_with_fresh_vault()
     }
 
     pub fn with_config(config: OutputSanitizerConfig) -> Result<Self, OutputSanitizerConfigError> {
