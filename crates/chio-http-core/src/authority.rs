@@ -125,10 +125,6 @@ fn request_field_capability_binding(input: &HttpAuthorityInput<'_>) -> Capabilit
     }
 }
 
-fn has_sidecar_tool_identity(input: &HttpAuthorityInput<'_>) -> bool {
-    input.requested_tool_server.is_some() && input.requested_tool_name.is_some()
-}
-
 fn http_authority_capability_binding(
     input: &HttpAuthorityInput<'_>,
     caller_identity_hash: &str,
@@ -158,35 +154,39 @@ fn http_authority_capability_binding(
     }
 }
 
+fn reserved_tools_path_binding(
+    input: &HttpAuthorityInput<'_>,
+    identity: ChioToolsPathIdentity,
+) -> CapabilityBinding {
+    match identity {
+        ChioToolsPathIdentity::Identity {
+            server_id,
+            tool_name,
+        } => CapabilityBinding {
+            requested_tool_server: Some(server_id),
+            requested_tool_name: Some(tool_name),
+            requested_arguments: input.requested_arguments.cloned(),
+            invalid_reason: None,
+            policy: HttpAuthorityPolicy::DenyByDefault,
+        },
+        ChioToolsPathIdentity::Malformed => CapabilityBinding {
+            requested_tool_server: None,
+            requested_tool_name: None,
+            requested_arguments: input.requested_arguments.cloned(),
+            invalid_reason: Some(MALFORMED_CHIO_TOOLS_PATH_REASON.to_string()),
+            policy: HttpAuthorityPolicy::DenyByDefault,
+        },
+        ChioToolsPathIdentity::NotToolsPath => request_field_capability_binding(input),
+    }
+}
+
 fn capability_binding(
     input: &HttpAuthorityInput<'_>,
     caller_identity_hash: &str,
 ) -> CapabilityBinding {
-    if has_sidecar_tool_identity(input) {
-        match chio_tools_path_identity(input.path) {
-            ChioToolsPathIdentity::Identity {
-                server_id,
-                tool_name,
-            } => {
-                return CapabilityBinding {
-                    requested_tool_server: Some(server_id),
-                    requested_tool_name: Some(tool_name),
-                    requested_arguments: input.requested_arguments.cloned(),
-                    invalid_reason: None,
-                    policy: HttpAuthorityPolicy::DenyByDefault,
-                };
-            }
-            ChioToolsPathIdentity::Malformed => {
-                return CapabilityBinding {
-                    requested_tool_server: None,
-                    requested_tool_name: None,
-                    requested_arguments: input.requested_arguments.cloned(),
-                    invalid_reason: Some(MALFORMED_CHIO_TOOLS_PATH_REASON.to_string()),
-                    policy: HttpAuthorityPolicy::DenyByDefault,
-                };
-            }
-            ChioToolsPathIdentity::NotToolsPath => {}
-        }
+    let tools_path_identity = chio_tools_path_identity(input.path);
+    if !matches!(tools_path_identity, ChioToolsPathIdentity::NotToolsPath) {
+        return reserved_tools_path_binding(input, tools_path_identity);
     }
 
     if input.policy != HttpAuthorityPolicy::DenyByDefault {
@@ -1715,6 +1715,107 @@ mod tests {
         assert!(result.verdict.is_allowed());
         assert_eq!(
             result.receipt.capability_id.as_deref(),
+            Some("cap-matrix-read")
+        );
+    }
+
+    #[test]
+    fn session_allow_reserved_tools_path_requires_tool_grant_without_sidecar_fields() {
+        let query = HashMap::new();
+        let (authority, issuer) = authority_with_issuer();
+
+        let denied_without_capability = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-tools-get-no-cap".to_string(),
+                method: HttpMethod::Get,
+                route_pattern: "/chio/tools/matrix/files.read".to_string(),
+                path: "/chio/tools/matrix/files.read",
+                query: &query,
+                caller: caller(),
+                body_hash: None,
+                body_length: 0,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: None,
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::SessionAllow,
+            })
+            .test_unwrap();
+        assert!(denied_without_capability.verdict.is_denied());
+
+        let http_only_capability = signed_capability_token_json_with_scope(
+            &issuer,
+            "cap-http-only",
+            ChioScope {
+                grants: vec![http_authority_tool_grant()],
+                ..ChioScope::default()
+            },
+        );
+        let denied_with_http_grant = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-tools-get-http-grant".to_string(),
+                method: HttpMethod::Get,
+                route_pattern: "/chio/tools/matrix/files.read".to_string(),
+                path: "/chio/tools/matrix/files.read",
+                query: &query,
+                caller: caller(),
+                body_hash: None,
+                body_length: 0,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&http_only_capability),
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::SessionAllow,
+            })
+            .test_unwrap();
+        assert!(denied_with_http_grant.verdict.is_denied());
+
+        let tool_capability = signed_capability_token_json_with_scope(
+            &issuer,
+            "cap-matrix-read",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "matrix".to_string(),
+                    tool_name: "files.read".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+        let allowed = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-tools-get-tool-grant".to_string(),
+                method: HttpMethod::Get,
+                route_pattern: "/chio/tools/matrix/files.read".to_string(),
+                path: "/chio/tools/matrix/files.read",
+                query: &query,
+                caller: caller(),
+                body_hash: None,
+                body_length: 0,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&tool_capability),
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::SessionAllow,
+            })
+            .test_unwrap();
+        assert!(allowed.verdict.is_allowed());
+        assert_eq!(
+            allowed.receipt.capability_id.as_deref(),
             Some("cap-matrix-read")
         );
     }
