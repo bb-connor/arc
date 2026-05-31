@@ -2114,6 +2114,69 @@ mod tests {
     }
 
     #[test]
+    fn strict_chio_verifier_surfaces_unanimous_deny_joint_verdict() {
+        let kp_a = Keypair::generate();
+        let kp_b = Keypair::generate();
+        let receipt = sample_receipt(&kp_b);
+        let now_ms = 1_734_000_000_000;
+        let governance_json = r#"{"governance":"receipt"}"#.to_string();
+        let governance_digest = sha256_hex(governance_json.as_bytes());
+        let (
+            _slice_envelope,
+            receipt_store,
+            lease_registry,
+            mut governance_store,
+            oracle,
+            mut peers,
+        ) = fixture(&kp_a, &kp_b, &receipt, now_ms);
+        governance_store.insert(ResolvedGovernanceReceipt {
+            receipt_id: "gov-1".to_string(),
+            kernel_id: "did:chio:governance".to_string(),
+            canonical_json: governance_json,
+        });
+        insert_fresh_ladder_peers(&mut peers, &kp_a, &kp_b, now_ms);
+        let mut envelope = sign_chio_bilateral_dsse_envelope(
+            &receipt,
+            &kp_a,
+            &kp_b,
+            "did:chio:org-a",
+            "did:chio:org-b",
+            "file_read",
+            now_ms,
+            treaty_bound_extensions(&receipt, now_ms, governance_digest),
+        )
+        .unwrap();
+        let (mut statement, _) = envelope.decode_statement().unwrap();
+        let summary = statement
+            .predicate
+            .policy_evaluation_summary
+            .as_mut()
+            .unwrap();
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+        let statement_bytes = statement.canonical_bytes().unwrap();
+        resign_envelope(&mut envelope, &kp_a, &kp_b, &statement_bytes);
+        let mut base = config(
+            &peers,
+            &receipt_store,
+            &lease_registry,
+            &governance_store,
+            &oracle,
+            now_ms,
+        );
+        base.action_classes
+            .insert("file_read".to_string(), ActionClassKind::ReceiptBacked);
+
+        let verified = verify_chio_bilateral_invocation(
+            &envelope,
+            &ChioBilateralVerifierConfig { base: &base },
+        )
+        .unwrap();
+        assert_eq!(verified.joint_verdict, "deny");
+    }
+
+    #[test]
     fn happy_path_passes_partial_local_verifier() {
         let kp_a = Keypair::generate();
         let kp_b = Keypair::generate();
