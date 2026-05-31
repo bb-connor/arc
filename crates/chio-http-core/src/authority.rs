@@ -2207,6 +2207,67 @@ mod tests {
     }
 
     #[test]
+    fn deny_by_default_tools_path_ignores_partial_synthetic_tool_identity() {
+        let query = HashMap::new();
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json_with_scope(
+            &issuer,
+            "cap-matrix-read",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "matrix".to_string(),
+                    tool_name: "files.read".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-partial-sidecar-tool-identity".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/chio/tools/matrix/files.read".to_string(),
+                path: "/chio/tools/matrix/files.read",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("abc".to_string()),
+                body_length: 3,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: Some("matrix"),
+                requested_tool_name: None,
+                requested_arguments: Some(&serde_json::json!({ "path": "/tmp/a" })),
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert!(result.receipt.evidence[0]
+            .details
+            .as_deref()
+            .is_some_and(|details| {
+                details.contains("capability does not authorize tool authorize_http_request")
+            }));
+    }
+
+    #[test]
+    fn decode_path_identity_segment_accepts_uppercase_percent_encoding() {
+        assert_eq!(
+            decode_path_identity_segment("terminal%2Fcreate"),
+            Some("terminal/create".to_string())
+        );
+    }
+
+    #[test]
     fn chio_tools_path_identity_parses_reserved_prefix() {
         let ChioToolsPathIdentity::Identity {
             server_id,
