@@ -115,13 +115,25 @@ fn hex_value(byte: u8) -> Option<u8> {
     }
 }
 
-fn request_field_capability_binding(input: &HttpAuthorityInput<'_>) -> CapabilityBinding {
+fn request_field_capability_binding(
+    input: &HttpAuthorityInput<'_>,
+    policy: HttpAuthorityPolicy,
+) -> CapabilityBinding {
     CapabilityBinding {
         requested_tool_server: input.requested_tool_server.map(str::to_owned),
         requested_tool_name: input.requested_tool_name.map(str::to_owned),
         requested_arguments: input.requested_arguments.cloned(),
         invalid_reason: None,
-        policy: input.policy,
+        policy,
+    }
+}
+
+fn effective_authority_policy(path: &str, policy: HttpAuthorityPolicy) -> HttpAuthorityPolicy {
+    match chio_tools_path_identity(path) {
+        ChioToolsPathIdentity::NotToolsPath => policy,
+        ChioToolsPathIdentity::Identity { .. } | ChioToolsPathIdentity::Malformed => {
+            HttpAuthorityPolicy::DenyByDefault
+        }
     }
 }
 
@@ -132,6 +144,7 @@ fn has_sidecar_tool_identity(input: &HttpAuthorityInput<'_>) -> bool {
 fn http_authority_capability_binding(
     input: &HttpAuthorityInput<'_>,
     caller_identity_hash: &str,
+    policy: HttpAuthorityPolicy,
 ) -> CapabilityBinding {
     let arguments = serde_json::to_value(HttpKernelAuthorizationRequest {
         request_id: input.request_id.clone(),
@@ -141,7 +154,7 @@ fn http_authority_capability_binding(
         content_hash: input.body_hash.clone().unwrap_or_default(),
         caller_identity_hash: caller_identity_hash.to_string(),
         session_id: input.session_id.clone(),
-        policy: input.policy,
+        policy,
         capability: HttpKernelCapabilityState {
             id: None,
             invalid_reason: None,
@@ -154,7 +167,7 @@ fn http_authority_capability_binding(
         requested_tool_name: Some(HTTP_AUTHORITY_TOOL_NAME.to_string()),
         requested_arguments: Some(arguments),
         invalid_reason: None,
-        policy: input.policy,
+        policy,
     }
 }
 
@@ -189,11 +202,28 @@ fn capability_binding(
         }
     }
 
-    if input.policy != HttpAuthorityPolicy::DenyByDefault {
-        return request_field_capability_binding(input);
+    let policy = effective_authority_policy(input.path, input.policy);
+
+    if !has_sidecar_tool_identity(input)
+        && matches!(
+            chio_tools_path_identity(input.path),
+            ChioToolsPathIdentity::Malformed
+        )
+    {
+        return CapabilityBinding {
+            requested_tool_server: None,
+            requested_tool_name: None,
+            requested_arguments: input.requested_arguments.cloned(),
+            invalid_reason: Some(MALFORMED_CHIO_TOOLS_PATH_REASON.to_string()),
+            policy: HttpAuthorityPolicy::DenyByDefault,
+        };
     }
 
-    http_authority_capability_binding(input, caller_identity_hash)
+    if policy != HttpAuthorityPolicy::DenyByDefault {
+        return request_field_capability_binding(input, policy);
+    }
+
+    http_authority_capability_binding(input, caller_identity_hash, policy)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1905,6 +1935,70 @@ mod tests {
         assert_eq!(
             result.receipt.evidence[0].details.as_deref(),
             Some("side-effect route requires a valid capability token")
+        );
+    }
+
+    #[test]
+    fn reserved_tools_path_safe_policy_without_tool_fields_requires_authorization() {
+        let query = HashMap::new();
+        let result = authority()
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-safe-tools-path-no-tool-fields".to_string(),
+                method: HttpMethod::Get,
+                route_pattern: "/chio/tools/billing/read".to_string(),
+                path: "/chio/tools/billing/read",
+                query: &query,
+                caller: caller(),
+                body_hash: None,
+                body_length: 0,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: None,
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::SessionAllow,
+            })
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert!(result.receipt.evidence[0]
+            .details
+            .as_deref()
+            .is_some_and(|details| details.contains("side-effect route requires")));
+    }
+
+    #[test]
+    fn reserved_tools_path_malformed_without_tool_fields_is_denied() {
+        let query = HashMap::new();
+        let result = authority()
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-safe-tools-path-malformed-no-tool-fields".to_string(),
+                method: HttpMethod::Get,
+                route_pattern: "/chio/tools/acp/terminal%ZZcreate".to_string(),
+                path: "/chio/tools/acp/terminal%ZZcreate",
+                query: &query,
+                caller: caller(),
+                body_hash: None,
+                body_length: 0,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: None,
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::SessionAllow,
+            })
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some(MALFORMED_CHIO_TOOLS_PATH_REASON)
         );
     }
 
