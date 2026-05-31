@@ -2259,4 +2259,22 @@ mod tests {
             ChioToolsPathIdentity::NotToolsPath
         ));
     }
+
+    #[test]
+    fn chio_tools_path_identity_rejects_invalid_percent_hex() {
+        assert!(decode_path_identity_segment("terminal%GG").is_none());
+        assert!(matches!(
+            chio_tools_path_identity("/chio/tools/acp/terminal%GG"),
+            ChioToolsPathIdentity::Malformed
+        ));
+    }
+
+    #[test]
+    fn chio_tools_path_identity_rejects_invalid_utf8_percent_encoding() {
+        assert!(decode_path_identity_segment("%ED%A0%80").is_none());
+        assert!(matches!(
+            chio_tools_path_identity("/chio/tools/acp/%ED%A0%80"),
+            ChioToolsPathIdentity::Malformed
+        ));
+    }
 }

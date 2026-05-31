@@ -713,6 +713,51 @@ mod tests {
     }
 
     #[test]
+    fn evaluate_denies_reserved_tools_path_without_http_authority_grant() {
+        let keypair = Keypair::generate();
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let capability = signed_capability_token_json_with_scope(
+            &keypair,
+            "cap-matrix-read",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "matrix".to_string(),
+                    tool_name: "files.read".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+        let mut headers = HashMap::new();
+        headers.insert("X-Chio-Capability".to_string(), capability);
+
+        let result = evaluator
+            .evaluate(
+                HttpMethod::Post,
+                "/chio/tools/matrix/files.read",
+                &HashMap::new(),
+                &headers,
+                Some("tool-body".to_string()),
+                8,
+            )
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert!(result.receipt.evidence[0]
+            .details
+            .as_deref()
+            .is_some_and(|details| {
+                details.contains("capability does not authorize tool authorize_http_request")
+            }));
+    }
+
+    #[test]
     fn evaluate_post_denied_without_capability() {
         let keypair = Keypair::generate();
         let routes = vec![RouteEntry {
