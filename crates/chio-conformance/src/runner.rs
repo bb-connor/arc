@@ -135,6 +135,15 @@ fn conformance_token_from_env(var: &str, role: &str) -> String {
     format!("dev-only-conformance-{role}-{nonce}")
 }
 
+/// Avoid echoing operator-provided CI tokens into `RunnerError` command strings.
+fn redact_conformance_secret(token: &str) -> String {
+    if token.starts_with("dev-only-conformance-") {
+        token.to_string()
+    } else {
+        "[redacted]".to_string()
+    }
+}
+
 pub fn default_run_options() -> ConformanceRunOptions {
     let repo_root = default_repo_root();
     ConformanceRunOptions {
@@ -342,7 +351,10 @@ fn spawn_remote_edge(
     match options.auth_mode {
         ConformanceAuthMode::StaticBearer => {
             command.arg("--auth-token").arg(&options.auth_token);
-            command_description.push_str(&format!(" --auth-token {}", options.auth_token));
+            command_description.push_str(&format!(
+                " --auth-token {}",
+                redact_conformance_secret(&options.auth_token)
+            ));
         }
         ConformanceAuthMode::LocalOAuth => {
             command
@@ -362,7 +374,7 @@ fn spawn_remote_edge(
                 auth_server_seed_path.display(),
                 public_base_url,
                 options.auth_scope,
-                options.admin_token
+                redact_conformance_secret(&options.admin_token)
             ));
         }
     }

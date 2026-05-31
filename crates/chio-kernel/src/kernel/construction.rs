@@ -352,7 +352,10 @@ impl ChioKernel {
         self.signing_task.shutdown().await;
     }
 
-    pub fn set_receipt_store(&mut self, receipt_store: Box<dyn ReceiptStore>) -> Result<(), KernelError> {
+    pub fn set_receipt_store(
+        &mut self,
+        receipt_store: Box<dyn ReceiptStore>,
+    ) -> Result<(), KernelError> {
         self.set_receipt_store_handle(Arc::from(receipt_store))
     }
 

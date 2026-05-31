@@ -1788,12 +1788,12 @@ fn is_sha256_hex(value: &str) -> bool {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::demo::DemoAllowAllRevocationOracle;
     use crate::bilateral_dsse::{
         pae, receipt_subject_name, sign_chio_bilateral_dsse_envelope, sign_dsse_envelope_full,
         BilateralPredicateExtensions, CapabilityLeaseRef, GovernanceReceiptRef, HashRecord,
         PolicyEvaluationSummary, PolicyVerdict, PAYLOAD_TYPE_IN_TOTO,
     };
+    use crate::demo::DemoAllowAllRevocationOracle;
     use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
     use base64::Engine as _;
     use chio_core_types::crypto::{sha256_hex, Ed25519Backend, Keypair, SigningBackend};

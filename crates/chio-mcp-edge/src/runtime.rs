@@ -1052,10 +1052,10 @@ impl ChioMcpEdge {
             Err(error) => return error,
         };
 
-        let session_id = match self.kernel.open_session(
-            self.agent_id.clone(),
-            self.capabilities.clone(),
-        ) {
+        let session_id = match self
+            .kernel
+            .open_session(self.agent_id.clone(), self.capabilities.clone())
+        {
             Ok(session_id) => session_id,
             Err(error) => {
                 return jsonrpc_error(

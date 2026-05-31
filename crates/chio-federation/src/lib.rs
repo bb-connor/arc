@@ -69,12 +69,14 @@ pub use bilateral_dsse::{
 pub use bilateral_verifier::{
     verify_bilateral_cosign_invocation, verify_chio_bilateral_invocation,
     verify_treaty_bound_chio_bilateral_invocation, ActionClassKind, CapabilityLeaseRegistry,
-    ChioBilateralVerifierConfig, DenyListRevocationOracle,
-    GovernanceReceiptStore, InMemoryGovernanceReceiptStore, InMemoryLeaseRegistry,
-    InMemoryReceiptStore, PeerPinSet, PinnedEpoch, PinnedPeer, ReceiptStore,
-    ResolvedGovernanceReceipt, ResolvedLease, RevocationOracle, TreatyBoundBilateralDsseReview,
-    UnknownActionClassPolicy, VerifiedBilateralCoSignInvocation, VerifierConfig, VerifierError,
+    ChioBilateralVerifierConfig, DenyListRevocationOracle, GovernanceReceiptStore,
+    InMemoryGovernanceReceiptStore, InMemoryLeaseRegistry, InMemoryReceiptStore, PeerPinSet,
+    PinnedEpoch, PinnedPeer, ReceiptStore, ResolvedGovernanceReceipt, ResolvedLease,
+    RevocationOracle, TreatyBoundBilateralDsseReview, UnknownActionClassPolicy,
+    VerifiedBilateralCoSignInvocation, VerifierConfig, VerifierError,
 };
+#[cfg(any(test, feature = "demo"))]
+pub use demo::DemoAllowAllRevocationOracle;
 pub use revocation_gossip::{
     respond_to_catchup, RevocationCatchupHistory, RevocationCatchupRequest,
     RevocationCatchupResponse, RevocationGossipBatch, RevocationGossipError,
@@ -102,8 +104,6 @@ pub use treaty::{
     CHIO_FEDERATION_GOVERNANCE_LADDER_MANIFEST_SCHEMA, CHIO_FEDERATION_LADDER_INTERSECTION_SCHEMA,
     CHIO_FEDERATION_TREATY_SCOPE_SCHEMA,
 };
-#[cfg(any(test, feature = "demo"))]
-pub use demo::DemoAllowAllRevocationOracle;
 pub use trust_establishment::{
     ConformanceEvidence, ConformanceTier, FederationPeer, FederationPeerStore, HandshakeChallenge,
     InMemoryPeerStore, KernelTrustExchange, KernelTrustExchangeConfig, LadderManifestRef,

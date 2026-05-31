@@ -31,6 +31,7 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use chio_core::crypto::{sha256_hex, Keypair};
 use chio_core::receipt::{ChioReceipt, ChioReceiptBody, Decision, ToolCallAction, TrustLevel};
+use chio_federation::demo::DemoAllowAllRevocationOracle;
 use chio_federation::{
     execute_local_bilateral_invocation_fixture, receipt_subject_name, ActionClassKind,
     BilateralCoSigningProtocol, BilateralInvocationError, BilateralPredicateExtensions,
@@ -40,7 +41,6 @@ use chio_federation::{
     PeerPinSet, PinnedEpoch, PinnedPeer, PolicyEvaluationSummary, PolicyVerdict, ReceiptStore,
     ResolvedGovernanceReceipt, ResolvedLease, RevocationOracle, VerifierConfig,
 };
-use chio_federation::demo::DemoAllowAllRevocationOracle;
 use sha2::Digest;
 
 const ORG_A: &str = "did:chio:org-a";
