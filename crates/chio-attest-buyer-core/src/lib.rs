@@ -1114,6 +1114,16 @@ fn is_lower_hex(value: &str) -> bool {
         .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+fn require_bilateral_joint_allow_verdict(joint_verdict: &str) -> Result<(), ChioPackageError> {
+    if joint_verdict != "allow" {
+        return Err(ChioPackageError::Federation(format!(
+            "bilateral envelope policy verdict {:?} is not allow",
+            joint_verdict
+        )));
+    }
+    Ok(())
+}
+
 fn canonical_sha256<T: Serialize>(value: &T) -> Result<String, ChioPackageError> {
     let bytes = canonical_json_bytes(value)
         .map_err(|error| ChioPackageError::Canonical(error.to_string()))?;
@@ -1424,12 +1434,7 @@ fn verify_package_inner(
             },
         )
         .map_err(|error| ChioPackageError::Federation(error.to_string()))?;
-        if verified.joint_verdict != "allow" {
-            return Err(ChioPackageError::Federation(format!(
-                "bilateral envelope policy verdict {:?} is not allow",
-                verified.joint_verdict
-            )));
-        }
+        require_bilateral_joint_allow_verdict(&verified.joint_verdict)?;
     }
     add_check(
         checks,
@@ -2966,5 +2971,22 @@ mod tests {
             .checks
             .iter()
             .any(|check| check.code == "trust.bbs_issuer"));
+    }
+
+    #[test]
+    fn require_bilateral_joint_allow_verdict_rejects_deny() {
+        let error = require_bilateral_joint_allow_verdict("deny").unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("bilateral envelope policy verdict"),
+            "unexpected error: {error}"
+        );
+        assert!(error.to_string().contains("deny"));
+    }
+
+    #[test]
+    fn require_bilateral_joint_allow_verdict_accepts_allow() {
+        require_bilateral_joint_allow_verdict("allow").expect("allow verdict passes admission");
     }
 }

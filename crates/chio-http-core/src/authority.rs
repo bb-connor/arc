@@ -2259,4 +2259,17 @@ mod tests {
             ChioToolsPathIdentity::NotToolsPath
         ));
     }
+
+    #[test]
+    fn decode_path_identity_segment_rejects_empty_segment() {
+        assert!(decode_path_identity_segment("").is_none());
+    }
+
+    #[test]
+    fn decode_path_identity_segment_decodes_percent_encoded_slash() {
+        assert_eq!(
+            decode_path_identity_segment("terminal%2Fcreate").as_deref(),
+            Some("terminal/create")
+        );
+    }
 }
