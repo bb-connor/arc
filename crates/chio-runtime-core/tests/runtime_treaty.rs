@@ -2,9 +2,9 @@ mod support;
 
 use chio_runtime_core::{
     compute_ladder_intersection, evaluate_cross_boundary_admission,
-    validate_cross_boundary_admission_report, validate_governance_ladder_manifest,
-    validate_ladder_intersection, CrossBoundaryAdmissionInput, CrossBoundaryAdmissionReport,
-    CrossBoundaryEvidenceRef,
+    governance_ladder_manifest_sha256, validate_cross_boundary_admission_report,
+    validate_governance_ladder_manifest, validate_ladder_intersection,
+    CrossBoundaryAdmissionInput, CrossBoundaryAdmissionReport, CrossBoundaryEvidenceRef,
 };
 use std::io;
 use support::treaty::{treaty_action_class, treaty_manifest, treaty_scope};
@@ -60,6 +60,43 @@ fn treaty_ladder_intersection_rejects_destructive_observation(
         Err(error) => error,
     };
     assert_eq!(err.code(), "chio_ladder_destructive_below_floor");
+    Ok(())
+}
+
+#[test]
+fn treaty_manifest_rejects_alias_shadowing_later_canonical_action(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut alias_action = treaty_action_class("observation", false, "totally_ordered", vec![]);
+    alias_action.action_class_id = "workflow.alias.source".to_string();
+    alias_action.aliases = vec!["workflow.destructive.vendor_call".to_string()];
+    let canonical_action = treaty_action_class(
+        "receipt_backed",
+        true,
+        "totally_ordered",
+        vec!["bilateral_dsse", "receipt_lineage"],
+    );
+    let mut manifest = treaty_manifest("kernel.buyer", alias_action);
+    manifest.action_classes.push(canonical_action);
+
+    let error = match validate_governance_ladder_manifest(&manifest) {
+        Ok(()) => {
+            return Err(Box::new(io::Error::other(
+                "ladder aliases must not shadow later canonical action classes",
+            )));
+        }
+        Err(error) => error,
+    };
+    assert_eq!(error.code(), "chio_ladder_alias_conflict");
+
+    let hash_error = match governance_ladder_manifest_sha256(&manifest) {
+        Ok(_) => {
+            return Err(Box::new(io::Error::other(
+                "ladder manifest hash must reject alias shadowing",
+            )));
+        }
+        Err(error) => error,
+    };
+    assert_eq!(hash_error.code(), "chio_ladder_alias_conflict");
     Ok(())
 }
 

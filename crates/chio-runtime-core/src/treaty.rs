@@ -40,6 +40,7 @@ pub fn cross_boundary_admission_report_json(
 pub fn governance_ladder_manifest_sha256(
     manifest: &GovernanceLadderManifest,
 ) -> Result<String, ChioRuntimeError> {
+    validate_governance_ladder_manifest(manifest)?;
     canonical_sha256(manifest)
 }
 pub fn treaty_scope_sha256(scope: &TreatyScope) -> Result<String, ChioRuntimeError> {
@@ -136,6 +137,12 @@ pub fn validate_governance_ladder_manifest(
     }
     for action in &manifest.action_classes {
         validate_non_empty(&action.action_class_id, "governance_ladder_action_empty_id")?;
+        if aliases.contains(action.action_class_id.as_str()) {
+            return rejected(
+                "chio_ladder_alias_conflict",
+                "governance ladder action class conflicts with a prior alias",
+            );
+        }
         if !action_ids.insert(action.action_class_id.as_str()) {
             return rejected(
                 "chio_ladder_duplicate_action_class",
