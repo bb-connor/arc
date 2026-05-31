@@ -625,6 +625,138 @@ mod tests {
     }
 
     #[test]
+    fn evaluate_chio_request_denies_malformed_chio_tools_path_with_sidecar_identity() {
+        let keypair = Keypair::generate();
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let capability = signed_capability_token_json_with_scope(
+            &keypair,
+            "cap-http-authority",
+            ChioScope {
+                grants: vec![chio_http_core::http_authority_tool_grant()],
+                ..ChioScope::default()
+            },
+        );
+
+        let mut request = ChioHttpRequest::new(
+            "req-malformed-tools-path".to_string(),
+            HttpMethod::Post,
+            "/chio/tools/acp/terminal%ZZcreate".to_string(),
+            "/chio/tools/acp/terminal%ZZcreate".to_string(),
+            CallerIdentity::anonymous(),
+        );
+        request.tool_server = Some("acp".to_string());
+        request.tool_name = Some("terminal/create".to_string());
+        request.arguments = Some(serde_json::json!({ "command": "ls" }));
+        request.body_hash = Some("tool-body".to_string());
+        request.body_length = 8;
+
+        let result = evaluator
+            .evaluate_chio_request(request, Some(&capability))
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("malformed /chio/tools path identity")
+        );
+    }
+
+    #[test]
+    fn evaluate_chio_request_denies_malformed_chio_tools_path_before_wildcard_grant() {
+        let keypair = Keypair::generate();
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let capability = signed_capability_token_json_with_scope(
+            &keypair,
+            "cap-wildcard",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "*".to_string(),
+                    tool_name: "*".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+
+        let mut request = ChioHttpRequest::new(
+            "req-malformed-tools-path-wildcard".to_string(),
+            HttpMethod::Post,
+            "/chio/tools/acp/terminal%2".to_string(),
+            "/chio/tools/acp/terminal%2".to_string(),
+            CallerIdentity::anonymous(),
+        );
+        request.tool_server = Some("acp".to_string());
+        request.tool_name = Some("terminal/create".to_string());
+        request.arguments = Some(serde_json::json!({ "command": "ls" }));
+        request.body_hash = Some("tool-body".to_string());
+        request.body_length = 8;
+
+        let result = evaluator
+            .evaluate_chio_request(request, Some(&capability))
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("malformed /chio/tools path identity")
+        );
+    }
+
+    #[test]
+    fn evaluate_chio_request_denies_nested_chio_tools_path_segments_with_sidecar_identity() {
+        let keypair = Keypair::generate();
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let capability = signed_capability_token_json_with_scope(
+            &keypair,
+            "cap-matrix-read",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "matrix".to_string(),
+                    tool_name: "files.read".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+
+        let mut request = ChioHttpRequest::new(
+            "req-nested-tools-path".to_string(),
+            HttpMethod::Post,
+            "/chio/tools/matrix/files/read".to_string(),
+            "/chio/tools/matrix/files/read".to_string(),
+            CallerIdentity::anonymous(),
+        );
+        request.tool_server = Some("matrix".to_string());
+        request.tool_name = Some("files.read".to_string());
+        request.arguments = Some(serde_json::json!({ "path": "/tmp/a" }));
+        request.body_hash = Some("tool-body".to_string());
+        request.body_length = 8;
+
+        let result = evaluator
+            .evaluate_chio_request(request, Some(&capability))
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("malformed /chio/tools path identity")
+        );
+    }
+
+    #[test]
     fn evaluate_chio_request_allows_model_constrained_capability_when_metadata_matches() {
         let keypair = Keypair::generate();
         let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
