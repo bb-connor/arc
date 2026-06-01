@@ -43,6 +43,8 @@ pub const CHIO_FFI_ERROR_UNSUPPORTED_SCHEMA: i32 = 20;
 pub const CHIO_FFI_ERROR_MANIFEST_VERIFICATION_FAILED: i32 = 21;
 pub const CHIO_FFI_ERROR_DUPLICATE_SERVER_TOOL: i32 = 22;
 pub const CHIO_FFI_ERROR_INVALID_TOOL_NAME: i32 = 23;
+pub const CHIO_FFI_ERROR_INVALID_INPUT_SCHEMA: i32 = 24;
+pub const CHIO_FFI_ERROR_INVALID_OUTPUT_SCHEMA: i32 = 25;
 pub const CHIO_FFI_ERROR_INTERNAL: i32 = 255;
 
 #[repr(C)]
@@ -136,6 +138,8 @@ fn ffi_error_code_from_helper_code(code: ErrorCode) -> i32 {
         ErrorCode::EmptyManifest => CHIO_FFI_ERROR_EMPTY_MANIFEST,
         ErrorCode::DuplicateToolName => CHIO_FFI_ERROR_DUPLICATE_TOOL_NAME,
         ErrorCode::InvalidToolName => CHIO_FFI_ERROR_INVALID_TOOL_NAME,
+        ErrorCode::InvalidInputSchema => CHIO_FFI_ERROR_INVALID_INPUT_SCHEMA,
+        ErrorCode::InvalidOutputSchema => CHIO_FFI_ERROR_INVALID_OUTPUT_SCHEMA,
         ErrorCode::DuplicateServerTool => CHIO_FFI_ERROR_DUPLICATE_SERVER_TOOL,
         ErrorCode::UnsupportedSchema => CHIO_FFI_ERROR_UNSUPPORTED_SCHEMA,
         ErrorCode::ManifestVerificationFailed => CHIO_FFI_ERROR_MANIFEST_VERIFICATION_FAILED,
@@ -386,6 +390,7 @@ mod tests {
         chio_buffer_free, chio_canonicalize_json, chio_ffi_abi_version, chio_ffi_build_info,
         chio_sha256_hex_bytes, chio_sha256_hex_utf8, chio_sign_utf8_message_ed25519,
         chio_verify_utf8_message_ed25519, ffi_error_code_from_helper_code, ChioFfiBuffer,
+        CHIO_FFI_ERROR_INVALID_INPUT_SCHEMA, CHIO_FFI_ERROR_INVALID_OUTPUT_SCHEMA,
         CHIO_FFI_ERROR_INVALID_TOOL_NAME, CHIO_FFI_STATUS_ERROR, CHIO_FFI_STATUS_NULL_ARGUMENT,
         CHIO_FFI_STATUS_OK,
     };
@@ -528,6 +533,18 @@ mod tests {
         assert_eq!(
             ffi_error_code_from_helper_code(chio_binding_helpers::ErrorCode::InvalidToolName),
             CHIO_FFI_ERROR_INVALID_TOOL_NAME
+        );
+    }
+
+    #[test]
+    fn invalid_manifest_schema_errors_map_to_stable_ffi_error_codes() {
+        assert_eq!(
+            ffi_error_code_from_helper_code(chio_binding_helpers::ErrorCode::InvalidInputSchema),
+            CHIO_FFI_ERROR_INVALID_INPUT_SCHEMA
+        );
+        assert_eq!(
+            ffi_error_code_from_helper_code(chio_binding_helpers::ErrorCode::InvalidOutputSchema),
+            CHIO_FFI_ERROR_INVALID_OUTPUT_SCHEMA
         );
     }
 
