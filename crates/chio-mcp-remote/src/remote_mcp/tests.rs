@@ -8,6 +8,7 @@ mod tests {
     use rsa::pss::BlindedSigningKey as RsaPssSigningKey;
     use rsa::rand_core::OsRng;
     use rsa::signature::{RandomizedSigner as _, SignatureEncoding as _};
+    use rusqlite::params;
     use serde_json::json;
     use std::io::Read as _;
     use std::net::ToSocketAddrs as _;
@@ -624,6 +625,57 @@ mod tests {
         assert_eq!(
             loaded.invalid_session_ids,
             vec!["session-terminal".to_string()]
+        );
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn load_terminal_session_records_skips_mismatched_payload_session_id() {
+        let path = std::env::temp_dir().join(format!(
+            "chio-remote-terminal-mismatch-{}-{}.sqlite3",
+            std::process::id(),
+            session_now_millis()
+        ));
+        let terminal_record = RemoteSessionDiagnosticRecord {
+            session_id: "session-payload".to_string(),
+            auth_context: SessionAuthContext::streamable_http_static_bearer(
+                "agent-terminal",
+                "token-fingerprint",
+                None,
+            ),
+            capabilities: Vec::new(),
+            lifecycle: RemoteSessionLifecycleSnapshot {
+                state: RemoteSessionState::Deleted,
+                created_at: 10,
+                last_seen_at: 11,
+                idle_expires_at: 12,
+                drain_deadline_at: None,
+            },
+            protocol_version: Some("2025-06-18".to_string()),
+            ownership: RemoteSessionOwnershipSnapshot::default(),
+            terminal_at: 13,
+        };
+        let conn = open_session_state_db(&path).expect("open session state db");
+        conn.execute(
+            &format!(
+                "INSERT INTO {table} (session_id, terminal_at, record_json)
+                 VALUES (?1, ?2, ?3)",
+                table = SESSION_TOMBSTONE_TABLE,
+            ),
+            params![
+                "session-row",
+                terminal_record.terminal_at as i64,
+                serde_json::to_string(&terminal_record).expect("serialize terminal record")
+            ],
+        )
+        .expect("insert mismatched terminal row");
+        drop(conn);
+
+        let records = load_terminal_session_records(&path).expect("load terminal session records");
+        assert!(
+            records.is_empty(),
+            "terminal tombstone payloads must match their row session_id"
         );
 
         let _ = std::fs::remove_file(path);
