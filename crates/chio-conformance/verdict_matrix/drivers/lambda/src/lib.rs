@@ -663,4 +663,20 @@ mod tests {
         // GET requests carry no body hash.
         assert!(request.get("body_hash").is_none());
     }
+
+    #[test]
+    fn http_request_percent_encodes_tool_path_identity_segments() {
+        let mut scenario = scenario("capability-subset-001-slash");
+        scenario.script.tool = "terminal/create".to_string();
+        let request = scenario_to_http_request(&scenario);
+        assert_eq!(
+            request.get("path").and_then(Value::as_str),
+            Some("/chio/tools/verdict-matrix/terminal%2Fcreate")
+        );
+        assert_eq!(request.get("route_pattern"), request.get("path"));
+        assert_eq!(
+            request.get("tool_name").and_then(Value::as_str),
+            Some("terminal/create")
+        );
+    }
 }

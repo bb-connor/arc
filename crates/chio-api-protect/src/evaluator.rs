@@ -529,6 +529,51 @@ mod tests {
     }
 
     #[test]
+    fn evaluate_chio_request_denies_partial_tool_identity_on_tools_path() {
+        let keypair = Keypair::generate();
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let capability = signed_capability_token_json_with_scope(
+            &keypair,
+            "cap-billing-read",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "billing".to_string(),
+                    tool_name: "read".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+
+        let mut request = ChioHttpRequest::new(
+            "req-partial-tool-identity".to_string(),
+            HttpMethod::Get,
+            "/chio/tools/billing/read".to_string(),
+            "/chio/tools/billing/read".to_string(),
+            CallerIdentity::anonymous(),
+        );
+        request.tool_server = Some("billing".to_string());
+        request.tool_name = None;
+        request.arguments = Some(Value::Null);
+
+        let result = evaluator
+            .evaluate_chio_request(request, Some(&capability))
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("tool-call evaluation requires both tool_server and tool_name")
+        );
+    }
+
+    #[test]
     fn evaluate_chio_request_denies_unmatched_http_path_with_spoofed_synthetic_pattern() {
         let keypair = Keypair::generate();
         let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
