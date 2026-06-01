@@ -108,6 +108,16 @@ impl GeminiAdapter {
         &self.transport
     }
 
+    pub(crate) fn ensure_supported_api_version(&self) -> Result<(), ProviderError> {
+        if self.config.api_version != GEMINI_API_VERSION {
+            return Err(ProviderError::Malformed(format!(
+                "Gemini adapter supports only API version {GEMINI_API_VERSION}; configured {}",
+                self.config.api_version
+            )));
+        }
+        Ok(())
+    }
+
     /// Proxy a non-streaming Gemini `generateContent` request and lift the
     /// response.
     ///
@@ -123,6 +133,7 @@ impl GeminiAdapter {
         model: &str,
         request_body: &[u8],
     ) -> Result<Vec<ToolInvocation>, ProviderError> {
+        self.ensure_supported_api_version()?;
         let response = self
             .transport
             .send_generate_content(model, request_body)
@@ -145,6 +156,7 @@ impl GeminiAdapter {
     where
         F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
     {
+        self.ensure_supported_api_version()?;
         let body = self
             .transport
             .send_generate_content_stream(model, request_body)
@@ -155,6 +167,7 @@ impl GeminiAdapter {
     /// Lift every Gemini `functionCall` part in a non-streaming
     /// `generateContent` response payload.
     pub fn lift_batch(&self, raw: ProviderRequest) -> Result<Vec<ToolInvocation>, ProviderError> {
+        self.ensure_supported_api_version()?;
         let calls = response::function_calls(raw)?;
         if calls.is_empty() {
             return Err(ProviderError::Malformed(
@@ -171,6 +184,7 @@ impl GeminiAdapter {
         &self,
         call: &FunctionCallPart,
     ) -> Result<ToolInvocation, ProviderError> {
+        self.ensure_supported_api_version()?;
         validate_function_call(call)?;
         let arguments = canonical_json_bytes(&call.args).map_err(|error| {
             ProviderError::BadToolArgs(format!(
@@ -202,6 +216,7 @@ impl GeminiAdapter {
         verdict: VerdictResult,
         result: ToolResult,
     ) -> Result<FunctionResponsePart, ProviderError> {
+        self.ensure_supported_api_version()?;
         let function_name = non_empty_str(function_name, "functionResponse.name")?;
         match verdict {
             VerdictResult::Allow { redactions, .. } => {
@@ -343,6 +358,54 @@ mod tests {
         )
     }
 
+    fn config_with_api_version(api_version: &str) -> GeminiAdapterConfig {
+        let mut cfg = config();
+        cfg.api_version = api_version.to_string();
+        cfg
+    }
+
+    fn function_call_payload() -> Value {
+        json!({
+            "candidates": [{
+                "content": {
+                    "parts": [
+                        {"functionCall": {"name": "get_weather", "args": {"city": "Paris"}}}
+                    ]
+                }
+            }]
+        })
+    }
+
+    fn function_call_stream() -> Vec<u8> {
+        let payload = function_call_payload();
+        let mut sse = Vec::new();
+        sse.extend_from_slice(b"data: ");
+        sse.extend_from_slice(&serde_json::to_vec(&payload).unwrap());
+        sse.extend_from_slice(b"\n\n");
+        sse
+    }
+
+    fn raw_payload(value: Value) -> ProviderRequest {
+        ProviderRequest(serde_json::to_vec(&value).unwrap())
+    }
+
+    fn allow_verdict() -> VerdictResult {
+        VerdictResult::Allow {
+            redactions: vec![],
+            receipt_id: chio_tool_call_fabric::ReceiptId("rcpt_pin".into()),
+        }
+    }
+
+    fn assert_api_version_drift(error: ProviderError) {
+        match error {
+            ProviderError::Malformed(message) => {
+                assert!(message.contains("Gemini adapter supports only API version v1beta"));
+                assert!(message.contains("configured v1alpha"));
+            }
+            other => panic!("expected Malformed API version drift, got {other:?}"),
+        }
+    }
+
     #[test]
     fn config_pins_api_version() {
         let cfg = config();
@@ -357,6 +420,104 @@ mod tests {
         let adapter = GeminiAdapter::new(cfg, Arc::new(transport));
         assert_eq!(adapter.provider(), ProviderId::Gemini);
         assert_eq!(adapter.api_version(), "v1beta");
+    }
+
+    #[tokio::test]
+    async fn generate_content_rejects_api_version_drift_before_transport_call() {
+        let mock = Arc::new(transport::MockTransport::new());
+        mock.push_generate_content_response(serde_json::to_vec(&function_call_payload()).unwrap());
+        let adapter = GeminiAdapter::new(config_with_api_version("v1alpha"), mock.clone());
+
+        let err = adapter
+            .generate_content("gemini-1.5-pro", b"{\"contents\":[]}")
+            .await
+            .expect_err("drifted Gemini API version must fail before transport");
+
+        assert_api_version_drift(err);
+        assert!(mock.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn generate_content_stream_rejects_api_version_drift_before_transport_call() {
+        let mock = Arc::new(transport::MockTransport::new());
+        mock.push_generate_content_response(function_call_stream());
+        let adapter = GeminiAdapter::new(config_with_api_version("v1alpha"), mock.clone());
+
+        let err = adapter
+            .generate_content_stream("gemini-1.5-pro", b"{\"contents\":[]}", |_invocation| {
+                Ok(allow_verdict())
+            })
+            .await
+            .expect_err("drifted Gemini API version must fail before stream transport");
+
+        assert_api_version_drift(err);
+        assert!(mock.calls().is_empty());
+    }
+
+    #[test]
+    fn lift_batch_rejects_api_version_drift_before_provenance_stamp() {
+        let adapter = GeminiAdapter::new(
+            config_with_api_version("v1alpha"),
+            Arc::new(transport::MockTransport::new()),
+        );
+
+        let err = adapter
+            .lift_batch(raw_payload(function_call_payload()))
+            .expect_err("drifted Gemini API version must fail before provenance stamping");
+
+        assert_api_version_drift(err);
+    }
+
+    #[test]
+    fn gate_sse_stream_rejects_api_version_drift_before_evaluator() {
+        let adapter = GeminiAdapter::new(
+            config_with_api_version("v1alpha"),
+            Arc::new(transport::MockTransport::new()),
+        );
+        let evaluated = std::cell::Cell::new(false);
+
+        let err = adapter
+            .gate_sse_stream(&function_call_stream(), |_invocation| {
+                evaluated.set(true);
+                Ok(allow_verdict())
+            })
+            .expect_err("drifted Gemini API version must fail before stream evaluation");
+
+        assert_api_version_drift(err);
+        assert!(!evaluated.get());
+    }
+
+    #[test]
+    fn invocation_from_function_call_rejects_api_version_drift_before_provenance_stamp() {
+        let adapter = GeminiAdapter::new(
+            config_with_api_version("v1alpha"),
+            Arc::new(transport::MockTransport::new()),
+        );
+        let call = FunctionCallPart::new("get_weather", json!({"city": "Paris"}));
+
+        let err = adapter
+            .invocation_from_function_call(&call)
+            .expect_err("drifted Gemini API version must fail before provenance stamping");
+
+        assert_api_version_drift(err);
+    }
+
+    #[test]
+    fn lower_function_response_rejects_api_version_drift() {
+        let adapter = GeminiAdapter::new(
+            config_with_api_version("v1alpha"),
+            Arc::new(transport::MockTransport::new()),
+        );
+
+        let err = adapter
+            .lower_function_response(
+                "get_weather",
+                allow_verdict(),
+                ToolResult(b"{\"temp\":18}".to_vec()),
+            )
+            .expect_err("drifted Gemini API version must fail before lowering");
+
+        assert_api_version_drift(err);
     }
 
     #[test]

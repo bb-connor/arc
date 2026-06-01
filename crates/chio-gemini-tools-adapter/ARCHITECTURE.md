@@ -10,9 +10,10 @@
 
 ## Pain points
 
-- `lib.rs` currently mixes adapter orchestration, Gemini response-envelope parsing, native `functionCall` extraction, validation, and function-response lowering. That keeps the public adapter surface and the provider response trust boundary in one large file.
-- The README taxonomy documents Gemini safety blocks as `ProviderError::ContentPolicy`, but the batch lift path does not classify a `promptFeedback.blockReason` response before the no-tool-call path reports it as malformed.
-- Existing branch-local hardening already made malformed wrapper fields fail closed and split lower-response helpers, so the next slice should not be another small helper extraction.
+- `GeminiAdapterConfig::new` pins `api_version` to `GEMINI_API_VERSION`, but the public serializable config can be loaded from disk or mutated with a stale API version before it reaches `GeminiAdapter::new`.
+- Runtime paths currently trust `config.api_version` when stamping provenance and exposing provider metadata, even though the transport path always posts to the pinned `v1beta` endpoint.
+- A drifted config can therefore send an upstream request before the mismatch is detected, gate streamed output with stale provenance, or lower a tool result under a local contract that no longer matches the transport pin.
+- `response.rs` now owns Gemini response-envelope classification and `functionCall` extraction; that trust boundary should stay internal and should not be weakened by moving parsing back into `lib.rs`.
 
 ## Constraints
 
@@ -30,4 +31,4 @@
 
 ## Planned improvement
 
-Move Gemini response-envelope classification and `functionCall` extraction into an internal response module, and classify `promptFeedback.blockReason` safety blocks as `ProviderError::ContentPolicy` before the adapter reaches the generic malformed/no-tool path. This is architectural because it creates a distinct native-response trust boundary, aligns implementation with the documented error taxonomy, and keeps public adapter APIs stable.
+Add an adapter-local API-pin guard that fails closed unless `config.api_version == GEMINI_API_VERSION`, then invoke it before outbound transport, direct batch lift, direct stream gating, provenance stamping, and tool-result lowering. This is architectural because it tightens the adapter's runtime contract across every trust-boundary entrypoint while preserving the public construction API and the internal response module boundary.
