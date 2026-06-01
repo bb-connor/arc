@@ -226,6 +226,18 @@ pub fn load_fixture(path: impl AsRef<Path>) -> Result<ProviderCaptureFixture, Re
             "fixture_id changed within one NDJSON file",
         ));
     }
+    validate_fixture_id_matches_filename(&path, &fixture_id)?;
+
+    let provider = first.provider.clone();
+    if records
+        .iter()
+        .any(|record| record.provider.as_str() != provider.as_str())
+    {
+        return Err(invalid_fixture(
+            &path,
+            "provider changed within one NDJSON file",
+        ));
+    }
 
     Ok(ProviderCaptureFixture {
         fixture_id,
@@ -1308,6 +1320,19 @@ fn validate_record(path: &Path, record: &CaptureRecord) -> Result<(), ReplayErro
     Ok(())
 }
 
+fn validate_fixture_id_matches_filename(path: &Path, fixture_id: &str) -> Result<(), ReplayError> {
+    let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) else {
+        return Err(invalid_fixture(
+            path,
+            "fixture filename was not valid UTF-8",
+        ));
+    };
+    if fixture_id != stem {
+        return Err(invalid_fixture(path, "fixture_id did not match filename"));
+    }
+    Ok(())
+}
+
 fn validate_record_identifier(path: &Path, value: &str, field: &str) -> Result<(), ReplayError> {
     if value.trim().is_empty() {
         return Err(invalid_fixture(path, format!("{field} was empty")));
@@ -1711,6 +1736,74 @@ mod tests {
             error
                 .to_string()
                 .contains("fixture_id had surrounding whitespace"),
+            "unexpected error: {error}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn load_fixture_rejects_fixture_id_that_does_not_match_filename(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let path = std::env::temp_dir().join(format!(
+            "chio-provider-conformance-id-drift-{}.ndjson",
+            std::process::id()
+        ));
+        fs::write(
+            &path,
+            format!(
+                r#"{{"schema":"{CAPTURE_SCHEMA}","fixture_id":"different_fixture","direction":"upstream_request","provider":"openai","payload":{{}}}}"#
+            ),
+        )?;
+
+        let error = match load_fixture(&path) {
+            Ok(_) => {
+                let _ = fs::remove_file(&path);
+                panic!("fixture_id must be bound to the filename stem");
+            }
+            Err(error) => error,
+        };
+
+        fs::remove_file(&path)?;
+        assert!(
+            error
+                .to_string()
+                .contains("fixture_id did not match filename"),
+            "unexpected error: {error}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn load_fixture_rejects_provider_drift_within_file() -> Result<(), Box<dyn std::error::Error>> {
+        let root = std::env::temp_dir().join(format!(
+            "chio-provider-conformance-provider-drift-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root)?;
+        let path = root.join("provider_drift.ndjson");
+        fs::write(
+            &path,
+            format!(
+                r#"{{"schema":"{CAPTURE_SCHEMA}","fixture_id":"provider_drift","direction":"upstream_request","provider":"openai","payload":{{}}}}
+{{"schema":"{CAPTURE_SCHEMA}","fixture_id":"provider_drift","direction":"upstream_response","provider":"anthropic","payload":{{}}}}
+"#
+            ),
+        )?;
+
+        let error = match load_fixture(&path) {
+            Ok(_) => {
+                let _ = fs::remove_dir_all(&root);
+                panic!("provider drift must fail closed");
+            }
+            Err(error) => error,
+        };
+
+        fs::remove_dir_all(&root)?;
+        assert!(
+            error
+                .to_string()
+                .contains("provider changed within one NDJSON file"),
             "unexpected error: {error}"
         );
         Ok(())
