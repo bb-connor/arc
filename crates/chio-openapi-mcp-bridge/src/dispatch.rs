@@ -1,3 +1,5 @@
+use std::collections::{BTreeMap, BTreeSet};
+
 use chio_egress_contract::HttpEgressContract;
 use chio_openapi::{ChioExtensions, OpenApiSpec, Parameter, ParameterLocation};
 use serde_json::{json, Value};
@@ -25,8 +27,8 @@ impl RouteDispatch {
 
 pub(crate) fn build_route_dispatches(
     spec: &OpenApiSpec,
-) -> std::collections::BTreeMap<String, RouteDispatch> {
-    let mut routes = std::collections::BTreeMap::new();
+) -> Result<BTreeMap<String, RouteDispatch>, BridgeError> {
+    let mut routes = BTreeMap::new();
 
     for (path, path_item) in &spec.paths {
         for (method_str, operation) in &path_item.operations {
@@ -36,6 +38,7 @@ pub(crate) fn build_route_dispatches(
             }
 
             let params = merge_parameters(&path_item.common_parameters, &operation.parameters);
+            validate_path_template_parameters(path, &params)?;
             let query_parameters = params
                 .iter()
                 .filter(|param| param.location == ParameterLocation::Query)
@@ -59,7 +62,7 @@ pub(crate) fn build_route_dispatches(
         }
     }
 
-    routes
+    Ok(routes)
 }
 
 fn merge_parameters(path_params: &[Parameter], op_params: &[Parameter]) -> Vec<Parameter> {
@@ -77,6 +80,52 @@ fn merge_parameters(path_params: &[Parameter], op_params: &[Parameter]) -> Vec<P
     }
 
     merged
+}
+
+fn validate_path_template_parameters(path: &str, params: &[Parameter]) -> Result<(), BridgeError> {
+    let declared_path_parameters: BTreeSet<&str> = params
+        .iter()
+        .filter(|param| param.location == ParameterLocation::Path)
+        .map(|param| param.name.as_str())
+        .collect();
+    for name in route_path_parameter_names(path)? {
+        if !declared_path_parameters.contains(name.as_str()) {
+            return Err(BridgeError::UpstreamError(format!(
+                "OpenAPI bridge route path `{path}` contains undeclared path parameter `{name}`"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn route_path_parameter_names(template: &str) -> Result<Vec<String>, BridgeError> {
+    let mut names = Vec::new();
+    let mut rest = template;
+
+    while let Some(open) = rest.find('{') {
+        let after_open = &rest[open + 1..];
+        let close = after_open.find('}').ok_or_else(|| {
+            BridgeError::UpstreamError(format!(
+                "OpenAPI bridge route path `{template}` has an unterminated path parameter"
+            ))
+        })?;
+        let name = &after_open[..close];
+        if name.is_empty() {
+            return Err(BridgeError::UpstreamError(format!(
+                "OpenAPI bridge route path `{template}` has an empty path parameter"
+            )));
+        }
+        names.push(name.to_string());
+        rest = &after_open[close + 1..];
+    }
+
+    if rest.contains('}') {
+        return Err(BridgeError::UpstreamError(format!(
+            "OpenAPI bridge route path `{template}` has an unmatched path parameter terminator"
+        )));
+    }
+
+    Ok(names)
 }
 
 pub(crate) fn enforce_dispatch_contract<'a>(

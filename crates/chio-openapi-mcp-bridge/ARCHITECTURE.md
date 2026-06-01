@@ -12,7 +12,11 @@
 
 - `src/lib.rs` is carrying route binding, URL construction, egress enforcement, response shaping, and test fixtures in one file.
 - Manifest tool generation and route dispatch planning are parallel paths, so drift between advertised input schema and live dispatch behavior is easy to miss.
-- Query parameters are promoted into generated tool input schemas by `chio-openapi`, but the bridge currently builds upstream URLs from path parameters only.
+- Query parameter dispatch now follows the generated tool schema, but path
+  template placeholders are still discovered by the dispatcher independently of
+  declared OpenAPI path parameters. A malformed spec can therefore publish a
+  tool whose input schema omits a required path argument, then fail only at live
+  dispatch time.
 
 ## Constraints
 
@@ -30,4 +34,8 @@
 
 ## Planned Improvement
 
-Introduce an internal dispatch plan that keeps the public route binding separate from bridge-only query parameter metadata. Live invocation will expand path parameters, append declared query parameters to the upstream URL with deterministic percent encoding, and keep undeclared arguments out of the URL.
+Validate dispatch plans at ingest time by checking that every `{name}`
+placeholder in a route path is declared as an OpenAPI `in: path` parameter after
+path-level and operation-level parameter merge. The bridge should reject
+malformed specs before manifest publication instead of advertising an input
+schema that cannot satisfy live URL construction.

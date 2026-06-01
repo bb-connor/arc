@@ -156,7 +156,7 @@ impl OpenApiMcpBridge {
             ));
         }
 
-        let route_dispatches = build_route_dispatches(spec);
+        let route_dispatches = build_route_dispatches(spec)?;
 
         let manifest = ToolManifest {
             schema: "chio.manifest.v1".to_string(),
@@ -853,6 +853,29 @@ mod tests {
         let error = bridge.invoke_tool("getPet", json!({})).unwrap_err();
 
         assert!(format!("{error}").contains("missing path parameter `petId`"));
+    }
+
+    #[test]
+    fn bridge_rejects_undeclared_path_template_parameter() {
+        let spec = r#"{
+            "openapi": "3.0.3",
+            "info": { "title": "Bad Paths", "version": "1.0.0" },
+            "paths": {
+                "/pets/{petId}": {
+                    "get": {
+                        "operationId": "getPet",
+                        "responses": { "200": { "description": "OK" } }
+                    }
+                }
+            }
+        }"#;
+
+        let error = match OpenApiMcpBridge::from_spec(spec, petstore_config()) {
+            Ok(_) => panic!("undeclared path template parameter must reject at ingest"),
+            Err(error) => error,
+        };
+
+        assert!(format!("{error}").contains("undeclared path parameter `petId`"));
     }
 
     #[test]
