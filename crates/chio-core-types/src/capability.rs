@@ -22,6 +22,7 @@ use crate::runtime_attestation::{
     derive_runtime_attestation_trust_material, AttestationVerifierFamily,
     RuntimeAttestationTrustMaterial,
 };
+use crate::schema_binding::ensure_schema_matches;
 use crate::session::SessionAnchorReference;
 use crate::signer_binding::{
     ensure_backend_matches_embedded_key, ensure_keypair_matches_embedded_key,
@@ -525,12 +526,7 @@ impl CapabilityToken {
 
     /// Reject unknown schema IDs and budget amplification.
     pub fn validate_schema(&self) -> Result<()> {
-        if self.schema != CHIO_CAPABILITY_SCHEMA {
-            return Err(Error::CanonicalJson(format!(
-                "unsupported capability token schema: {}",
-                self.schema
-            )));
-        }
+        ensure_schema_matches(&self.schema, CHIO_CAPABILITY_SCHEMA, "capability token")?;
         let needs_attenuation_proof = self.requires_chain_binding();
         if needs_attenuation_proof && self.attenuation_proof.is_none() {
             return Err(Error::AttenuationViolation {
@@ -1966,6 +1962,11 @@ impl CallChainContinuationToken {
     }
 
     pub fn sign(body: CallChainContinuationTokenBody, keypair: &Keypair) -> Result<Self> {
+        ensure_schema_matches(
+            &body.schema,
+            CHIO_CALL_CHAIN_CONTINUATION_SCHEMA,
+            "call-chain continuation token",
+        )?;
         ensure_keypair_matches_embedded_key(&body.signer, keypair, "continuation token", "signer")?;
         let (signature, _bytes) = keypair.sign_canonical(&body)?;
         Ok(Self {
@@ -1993,6 +1994,11 @@ impl CallChainContinuationToken {
     }
 
     pub fn verify_signature(&self) -> Result<bool> {
+        ensure_schema_matches(
+            &self.schema,
+            CHIO_CALL_CHAIN_CONTINUATION_SCHEMA,
+            "call-chain continuation token",
+        )?;
         let body = self.body();
         self.signer.verify_canonical(&body, &self.signature)
     }

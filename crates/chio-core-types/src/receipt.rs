@@ -21,6 +21,7 @@ use crate::crypto::{
 use crate::error::{Error, Result};
 use crate::oracle::OracleConversionEvidence;
 use crate::runtime_attestation::AttestationVerifierFamily;
+use crate::schema_binding::ensure_schema_matches;
 use crate::session::{
     OperationKind, OperationTerminalState, RequestId, SessionAnchorReference, SessionId,
 };
@@ -1069,6 +1070,11 @@ pub struct ReceiptLineageStatement {
 
 impl ReceiptLineageStatement {
     pub fn sign(body: ReceiptLineageStatementBody, keypair: &Keypair) -> Result<Self> {
+        ensure_schema_matches(
+            &body.schema,
+            CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA,
+            "receipt lineage statement",
+        )?;
         ensure_keypair_matches_embedded_key(
             &body.kernel_key,
             keypair,
@@ -1114,6 +1120,11 @@ impl ReceiptLineageStatement {
     }
 
     pub fn verify_signature(&self) -> Result<bool> {
+        ensure_schema_matches(
+            &self.schema,
+            CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA,
+            "receipt lineage statement",
+        )?;
         let body = self.body();
         self.kernel_key.verify_canonical(&body, &self.signature)
     }

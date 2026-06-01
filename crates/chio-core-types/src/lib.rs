@@ -32,6 +32,7 @@ pub mod plan;
 pub mod pq;
 pub mod receipt;
 pub mod runtime_attestation;
+mod schema_binding;
 pub mod session;
 pub mod signed_artifact;
 mod signer_binding;

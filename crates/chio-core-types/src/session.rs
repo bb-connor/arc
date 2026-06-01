@@ -18,6 +18,7 @@ use url::Url;
 use crate::capability::{ModelMetadata, ProvenanceEvidenceClass};
 use crate::crypto::{canonical_json_bytes, sha256_hex, Keypair, PublicKey, Signature};
 use crate::error::Result;
+use crate::schema_binding::ensure_schema_matches;
 use crate::signer_binding::ensure_keypair_matches_embedded_key;
 use crate::{AgentId, CapabilityToken, ServerId};
 
@@ -648,6 +649,7 @@ pub struct SessionAnchor {
 
 impl SessionAnchor {
     pub fn sign(body: SessionAnchorBody, keypair: &Keypair) -> Result<Self> {
+        ensure_schema_matches(&body.schema, CHIO_SESSION_ANCHOR_SCHEMA, "session anchor")?;
         ensure_keypair_matches_embedded_key(
             &body.kernel_key,
             keypair,
@@ -689,6 +691,7 @@ impl SessionAnchor {
     }
 
     pub fn verify_signature(&self) -> Result<bool> {
+        ensure_schema_matches(&self.schema, CHIO_SESSION_ANCHOR_SCHEMA, "session anchor")?;
         let body = self.body();
         self.kernel_key.verify_canonical(&body, &self.signature)
     }
