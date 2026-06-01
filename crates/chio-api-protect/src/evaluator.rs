@@ -108,7 +108,7 @@ impl RequestEvaluator {
         body_length: u64,
     ) -> Result<EvaluationResult, crate::error::ProtectError> {
         let request_id = uuid::Uuid::now_v7().to_string();
-        let caller = extract_caller(headers);
+        let caller = caller_identity_from_headers(headers);
         let (route_pattern, matched_policy) = self.match_route(method, path);
         let result = self.authority.evaluate(HttpAuthorityInput {
             request_id,
@@ -289,14 +289,14 @@ fn path_segment_matches_pattern(path_segment: &str, pattern_segment: &str) -> bo
 }
 
 /// Extract caller identity from HTTP headers.
-fn extract_caller(headers: &HashMap<String, String>) -> CallerIdentity {
+pub(crate) fn caller_identity_from_headers(headers: &HashMap<String, String>) -> CallerIdentity {
     // Authorization headers become stable hashed caller identities.
     if let Some(auth) = headers
         .get("authorization")
         .or_else(|| headers.get("Authorization"))
     {
         if let Some(token) = auth.strip_prefix("Bearer ") {
-            if !token.trim().is_empty() && token.trim() == token {
+            if credential_value_is_well_formed(token) {
                 let token_hash = chio_core_types::sha256_hex(token.as_bytes());
                 return CallerIdentity {
                     subject: format!("bearer:{}", &token_hash[..16]),
@@ -312,6 +312,9 @@ fn extract_caller(headers: &HashMap<String, String>) -> CallerIdentity {
     // API keys follow the same non-secret identity derivation.
     for key_header in &["x-api-key", "X-Api-Key", "X-API-Key"] {
         if let Some(key_value) = headers.get(*key_header) {
+            if !credential_value_is_well_formed(key_value) {
+                continue;
+            }
             let key_hash = chio_core_types::sha256_hex(key_value.as_bytes());
             return CallerIdentity {
                 subject: format!("apikey:{}", &key_hash[..16]),
@@ -327,6 +330,10 @@ fn extract_caller(headers: &HashMap<String, String>) -> CallerIdentity {
     }
 
     CallerIdentity::anonymous()
+}
+
+fn credential_value_is_well_formed(value: &str) -> bool {
+    !value.trim().is_empty() && value.trim() == value
 }
 
 #[cfg(test)]
@@ -388,7 +395,7 @@ mod tests {
     fn extract_bearer_caller() {
         let mut headers = HashMap::new();
         headers.insert("Authorization".to_string(), "Bearer mytoken123".to_string());
-        let caller = extract_caller(&headers);
+        let caller = caller_identity_from_headers(&headers);
         assert!(caller.subject.starts_with("bearer:"));
         assert!(matches!(caller.auth_method, AuthMethod::Bearer { .. }));
     }
@@ -398,7 +405,7 @@ mod tests {
         let mut headers = HashMap::new();
         headers.insert("authorization".to_string(), "Bearer ".to_string());
 
-        let caller = extract_caller(&headers);
+        let caller = caller_identity_from_headers(&headers);
 
         assert!(matches!(caller.auth_method, AuthMethod::Anonymous));
         assert_eq!(caller.subject, "anonymous");
@@ -407,7 +414,7 @@ mod tests {
     #[test]
     fn extract_anonymous_caller() {
         let headers = HashMap::new();
-        let caller = extract_caller(&headers);
+        let caller = caller_identity_from_headers(&headers);
         assert_eq!(caller.subject, "anonymous");
     }
 
@@ -873,7 +880,7 @@ mod tests {
     fn extract_api_key_caller() {
         let mut headers = HashMap::new();
         headers.insert("X-API-Key".to_string(), "my-api-key-value".to_string());
-        let caller = extract_caller(&headers);
+        let caller = caller_identity_from_headers(&headers);
         assert!(caller.subject.starts_with("apikey:"));
         assert!(matches!(caller.auth_method, AuthMethod::ApiKey { .. }));
     }

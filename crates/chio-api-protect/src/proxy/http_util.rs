@@ -93,39 +93,7 @@ pub(crate) fn extract_presented_capability_from_maps<'a>(
 }
 
 pub(crate) fn extract_caller_identity(headers: &HashMap<String, String>) -> CallerIdentity {
-    if let Some(auth) = headers
-        .get("authorization")
-        .or_else(|| headers.get("Authorization"))
-    {
-        if let Some(token) = auth.strip_prefix("Bearer ") {
-            let token_hash = chio_core_types::sha256_hex(token.as_bytes());
-            return CallerIdentity {
-                subject: format!("bearer:{}", &token_hash[..16]),
-                auth_method: AuthMethod::Bearer { token_hash },
-                verified: false,
-                tenant: None,
-                agent_id: None,
-            };
-        }
-    }
-
-    for key_header in &["x-api-key", "X-Api-Key", "X-API-Key"] {
-        if let Some(key_value) = headers.get(*key_header) {
-            let key_hash = chio_core_types::sha256_hex(key_value.as_bytes());
-            return CallerIdentity {
-                subject: format!("apikey:{}", &key_hash[..16]),
-                auth_method: AuthMethod::ApiKey {
-                    key_name: key_header.to_string(),
-                    key_hash,
-                },
-                verified: false,
-                tenant: None,
-                agent_id: None,
-            };
-        }
-    }
-
-    CallerIdentity::anonymous()
+    crate::evaluator::caller_identity_from_headers(headers)
 }
 
 pub(crate) fn presented_capability_id(raw_capability: Option<&str>) -> Option<String> {
