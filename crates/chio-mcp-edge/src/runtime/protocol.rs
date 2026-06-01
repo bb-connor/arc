@@ -17,6 +17,11 @@ pub(super) struct JsonRpcEnvelope {
     pub params: Value,
 }
 
+#[derive(Debug, Clone)]
+pub(super) struct RequestedTask {
+    pub(super) ttl: Option<u64>,
+}
+
 pub(super) fn parse_jsonrpc_envelope(message: &Value) -> Result<JsonRpcEnvelope, Value> {
     if message.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
         return Err(jsonrpc_error(
@@ -272,16 +277,46 @@ pub(super) fn parse_requested_task(
     id: &Value,
     params: &Value,
 ) -> Result<Option<RequestedTask>, Value> {
-    let Some(task) = params.get("task").cloned() else {
+    let Some(task) = params.get("task") else {
         return Ok(None);
     };
-    serde_json::from_value(task).map(Some).map_err(|_| {
-        jsonrpc_error(
+    let Some(task) = task.as_object() else {
+        return Err(jsonrpc_error(
             id.clone(),
             JSONRPC_INVALID_PARAMS,
             "task must be an object with an optional numeric ttl",
-        )
-    })
+        ));
+    };
+
+    let ttl = match task.get("ttl") {
+        None | Some(Value::Null) => None,
+        Some(Value::Number(number)) => {
+            let Some(ttl) = number.as_u64() else {
+                return Err(jsonrpc_error(
+                    id.clone(),
+                    JSONRPC_INVALID_PARAMS,
+                    "task ttl must be a non-negative integer",
+                ));
+            };
+            if ttl > MAX_MCP_TASK_TTL_MILLIS {
+                return Err(jsonrpc_error(
+                    id.clone(),
+                    JSONRPC_INVALID_PARAMS,
+                    "task ttl exceeds maximum",
+                ));
+            }
+            Some(ttl)
+        }
+        Some(_) => {
+            return Err(jsonrpc_error(
+                id.clone(),
+                JSONRPC_INVALID_PARAMS,
+                "task ttl must be a non-negative integer",
+            ))
+        }
+    };
+
+    Ok(Some(RequestedTask { ttl }))
 }
 
 pub(super) fn parse_task_id(id: &Value, params: &Value) -> Result<String, Value> {

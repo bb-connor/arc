@@ -2427,6 +2427,53 @@ fn task_with_zero_ttl_expires_before_get() {
 }
 
 #[test]
+fn task_creation_rejects_ttl_above_edge_retention_ceiling() {
+    let mut edge = make_streaming_edge(10);
+    edge.set_session_auth_context(SessionAuthContext::streamable_http_static_bearer(
+        "agent",
+        "fingerprint",
+        None,
+    ));
+    let _ = edge.handle_jsonrpc(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {}
+    }));
+    let _ = edge.handle_jsonrpc(json!({
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized",
+        "params": {}
+    }));
+
+    let rejected = edge
+        .handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+                "name": "stream_file",
+                "arguments": {},
+                "task": { "ttl": u64::MAX }
+            }
+        }))
+        .unwrap();
+
+    assert_eq!(rejected["error"]["code"], JSONRPC_INVALID_PARAMS);
+    assert_eq!(rejected["error"]["message"], "task ttl exceeds maximum");
+
+    let listed = edge
+        .handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tasks/list",
+            "params": {}
+        }))
+        .unwrap();
+    assert_eq!(listed["result"]["tasks"], json!([]));
+}
+
+#[test]
 fn task_creation_rejects_deferred_task_map_over_cap() {
     let mut edge = make_streaming_edge(10);
     edge.set_session_auth_context(SessionAuthContext::streamable_http_static_bearer(

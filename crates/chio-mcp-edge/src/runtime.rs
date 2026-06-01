@@ -56,6 +56,7 @@ const MAX_BACKGROUND_TASKS_PER_TICK: usize = 8;
 const RELATED_TASK_META_KEY: &str = "io.modelcontextprotocol/related-task";
 const MAX_DEFERRED_MCP_TASKS: usize = 1024;
 const DEFAULT_MCP_TASK_TTL_MILLIS: u64 = 5 * 60 * 1000;
+const MAX_MCP_TASK_TTL_MILLIS: u64 = 60 * 60 * 1000;
 
 #[derive(Debug, Clone)]
 pub struct McpEdgeConfig {
