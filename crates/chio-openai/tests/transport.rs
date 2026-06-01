@@ -252,6 +252,61 @@ async fn upstream_5xx_fails_closed_as_upstream_5xx() {
 }
 
 #[tokio::test]
+async fn responses_http_status_is_classified_before_lift() {
+    let mock = Arc::new(MockHttpTransport::new("mock://openai"));
+    mock.push_response(HttpResponse::new(
+        429,
+        json!({
+            "error": {
+                "type": "rate_limit_exceeded",
+                "message": "Rate limit reached",
+                "code": "rate_limit_exceeded",
+                "param": null
+            }
+        })
+        .to_string()
+        .into_bytes(),
+        Some("application/json".to_string()),
+    ));
+
+    let transport = OpenAiTransport::with_transport(mock, "org_mock");
+    let error = transport
+        .send_responses(b"{}")
+        .await
+        .expect_err("a 429 response must be classified before lift");
+    assert!(matches!(error, ProviderError::RateLimited { .. }));
+}
+
+#[tokio::test]
+async fn chat_http_status_is_classified_before_parsing() {
+    let mock = Arc::new(MockHttpTransport::new("mock://openai"));
+    mock.push_response(HttpResponse::new(
+        500,
+        json!({
+            "error": {
+                "type": "server_error",
+                "message": "Internal server error",
+                "code": "server_error",
+                "param": null
+            }
+        })
+        .to_string()
+        .into_bytes(),
+        Some("application/json".to_string()),
+    ));
+
+    let transport = OpenAiTransport::with_transport(mock, "org_mock");
+    let error = transport
+        .send_chat_completions(b"{}")
+        .await
+        .expect_err("a 500 response must be classified before chat parsing");
+    assert!(matches!(
+        error,
+        ProviderError::Upstream5xx { status: 500, .. }
+    ));
+}
+
+#[tokio::test]
 async fn malformed_upstream_body_fails_closed() {
     let mock = Arc::new(MockHttpTransport::new("mock://openai"));
     mock.push_json_response(b"not json".to_vec());
