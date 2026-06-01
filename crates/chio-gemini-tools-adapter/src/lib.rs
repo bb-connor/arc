@@ -16,6 +16,8 @@ pub mod native;
 pub mod streaming;
 pub mod transport;
 
+mod response;
+
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -153,7 +155,7 @@ impl GeminiAdapter {
     /// Lift every Gemini `functionCall` part in a non-streaming
     /// `generateContent` response payload.
     pub fn lift_batch(&self, raw: ProviderRequest) -> Result<Vec<ToolInvocation>, ProviderError> {
-        let calls = function_calls(raw)?;
+        let calls = response::function_calls(raw)?;
         if calls.is_empty() {
             return Err(ProviderError::Malformed(
                 "Gemini generateContent payload did not contain functionCall parts".to_string(),
@@ -231,71 +233,6 @@ pub enum GeminiAdapterError {
     /// A provider-layer failure surfaced while proxying a request.
     #[error(transparent)]
     Provider(#[from] ProviderError),
-}
-
-fn function_calls(raw: ProviderRequest) -> Result<Vec<FunctionCallPart>, ProviderError> {
-    let value: Value = serde_json::from_slice(&raw.0).map_err(|error| {
-        ProviderError::Malformed(format!(
-            "Gemini generateContent payload was not JSON: {error}"
-        ))
-    })?;
-    let body = response_body(value)?;
-    extract_function_calls(&body)
-}
-
-fn response_body(value: Value) -> Result<Value, ProviderError> {
-    for field in ["body", "response", "payload"] {
-        if let Some(nested) = value.get(field) {
-            return nested_response_body(nested).ok_or_else(|| {
-                ProviderError::Malformed(format!(
-                    "Gemini generateContent envelope field `{field}` was not a JSON object or string body"
-                ))
-            });
-        }
-    }
-    Ok(value)
-}
-
-fn nested_response_body(value: &Value) -> Option<Value> {
-    match value {
-        Value::Object(_) => Some(value.clone()),
-        Value::String(body) => serde_json::from_str(body).ok(),
-        _ => None,
-    }
-}
-
-fn extract_function_calls(body: &Value) -> Result<Vec<FunctionCallPart>, ProviderError> {
-    if let Some(call) = body.get("functionCall") {
-        let parsed: FunctionCallPart = serde_json::from_value(call.clone()).map_err(|error| {
-            ProviderError::Malformed(format!("Gemini functionCall part was malformed: {error}"))
-        })?;
-        return Ok(vec![parsed]);
-    }
-    let candidates = body.get("candidates").and_then(Value::as_array);
-    let mut calls = Vec::new();
-    if let Some(candidates) = candidates {
-        for candidate in candidates {
-            let Some(parts) = candidate
-                .get("content")
-                .and_then(|c| c.get("parts"))
-                .and_then(Value::as_array)
-            else {
-                continue;
-            };
-            for part in parts {
-                if let Some(call) = part.get("functionCall") {
-                    let parsed: FunctionCallPart =
-                        serde_json::from_value(call.clone()).map_err(|error| {
-                            ProviderError::Malformed(format!(
-                                "Gemini functionCall part was malformed: {error}"
-                            ))
-                        })?;
-                    calls.push(parsed);
-                }
-            }
-        }
-    }
-    Ok(calls)
 }
 
 fn validate_function_call(call: &FunctionCallPart) -> Result<(), ProviderError> {
@@ -460,6 +397,25 @@ mod tests {
         let err = adapter.lift_batch(raw).unwrap_err();
 
         assert!(err.to_string().contains("envelope field `body`"));
+    }
+
+    #[test]
+    fn lift_batch_maps_prompt_feedback_safety_block_to_content_policy() {
+        let cfg = config();
+        let adapter = GeminiAdapter::new(cfg, Arc::new(transport::MockTransport::new()));
+        let payload = json!({
+            "promptFeedback": {
+                "blockReason": "SAFETY",
+                "safetyRatings": []
+            }
+        });
+        let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
+        let err = adapter
+            .lift_batch(raw)
+            .expect_err("Gemini safety block must fail closed as content policy");
+
+        assert!(matches!(err, ProviderError::ContentPolicy(_)));
+        assert!(err.to_string().contains("SAFETY"));
     }
 
     #[test]
