@@ -1357,6 +1357,76 @@ mod tests {
     }
 
     #[test]
+    fn verify_package_rejects_bilateral_envelope_with_deny_joint_verdict() {
+        let mut package = fresh_proof_package().expect("fresh package builds");
+        let vendor = &VENDORS[0];
+        let buyer_key = Keypair::from_seed(&BUYER_SEED);
+        let vendor_key = Keypair::from_seed(&vendor.seed);
+        let receipt = package.tool_receipts[0].clone();
+        let lease = &package.capability_leases[0];
+
+        let mut summary = policy_summary(vendor);
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+
+        let extensions = BilateralPredicateExtensions {
+            capability_lease_ref: Some(CapabilityLeaseRef {
+                lease_id: lease.body.lease_id.clone(),
+                issuer: lease.body.issuer.clone(),
+                expires_at_unix_ms: lease.body.expires_at_unix_ms,
+                scope_digest: Some(HashRecord {
+                    alg: "sha256".to_string(),
+                    value: lease.body.scope_digest.clone(),
+                }),
+            }),
+            policy_evaluation_summary: Some(summary),
+            governance_receipt_ref: None,
+            consistency_anchor: Some(format!("chio:consistency:{WORKFLOW_ID}:0")),
+            consistency_model: None,
+            cross_org_visibility: None,
+            treaty_binding_ref: None,
+        };
+        let deny_envelope = sign_chio_bilateral_dsse_envelope(
+            &receipt,
+            &buyer_key,
+            &vendor_key,
+            BUYER_KERNEL_ID,
+            vendor.kernel_id,
+            vendor.tool_name,
+            GENERATED_AT_UNIX_MS,
+            extensions,
+        )
+        .expect("deny bilateral envelope signs");
+
+        package.bilateral_envelopes[0] = deny_envelope;
+        let envelope_sha256 =
+            canonical_sha256(&package.bilateral_envelopes[0]).expect("envelope hashes");
+        package.workflow_receipt.steps[0].bilateral_dsse_sha256 = Some(envelope_sha256);
+        let mut parent_step_sha256 = None;
+        for step in &mut package.workflow_receipt.steps {
+            step.parent_receipt_sha256 = parent_step_sha256;
+            parent_step_sha256 = Some(canonical_sha256(step).expect("step hashes"));
+        }
+        resign_workflow_receipt(&mut package).expect("workflow resigns");
+
+        let context = verification_context();
+        let trust_bundle = rebuild_verifier_material(&mut package, &context);
+        let error = verify_package(&package, &trust_bundle, &context)
+            .expect_err("deny joint verdict must fail package verification");
+
+        let message = error.to_string();
+        assert!(
+            message.contains("bilateral envelope policy verdict"),
+            "expected federation admission failure, got: {message}"
+        );
+        assert!(
+            message.contains("not allow"),
+            "expected non-allow verdict rejection, got: {message}"
+        );
+    }
+
+    #[test]
     fn authority_issuance_request_hashes_signed_receipt_body_for_governance(
     ) -> Result<(), ChioPackageError> {
         let package = fresh_proof_package()?;
