@@ -42,15 +42,7 @@ pub(super) fn load_active_session_records(
     path: &FsPath,
 ) -> Result<LoadedActiveSessionRecords, CliError> {
     let conn = open_session_state_db(path)?;
-    let mut terminal_stmt = conn.prepare(&format!(
-        "SELECT session_id FROM {table}",
-        table = SESSION_TOMBSTONE_TABLE,
-    ))?;
-    let terminal_rows = terminal_stmt.query_map([], |row| row.get::<_, String>(0))?;
-    let mut terminal_session_ids = HashSet::new();
-    for row in terminal_rows {
-        terminal_session_ids.insert(row?);
-    }
+    let terminal_session_ids = load_terminal_session_ids(&conn)?;
 
     let mut stmt = conn.prepare(&format!(
         "SELECT session_id, record_json FROM {table}",
@@ -112,29 +104,57 @@ pub(super) fn load_terminal_session_records(
     while let Some(row) = rows.next()? {
         let session_id: String = row.get(0)?;
         let record_json: String = row.get(1)?;
-        let record: RemoteSessionDiagnosticRecord = match serde_json::from_str(&record_json) {
-            Ok(record) => record,
-            Err(error) => {
-                warn!(
-                    session_id = %session_id,
-                    error = %error,
-                    "dropping malformed terminal MCP session tombstone"
-                );
-                continue;
-            }
-        };
-        if record.session_id != session_id {
-            warn!(
-                session_id = %session_id,
-                record_session_id = %record.session_id,
-                "dropping terminal MCP session tombstone whose primary key does not match the stored session payload"
-            );
-            continue;
+        if let Some(record) = parse_terminal_session_record(&session_id, &record_json) {
+            records.insert(session_id, Arc::new(record));
         }
-        records.insert(session_id, Arc::new(record));
     }
 
     Ok(records)
+}
+
+fn load_terminal_session_ids(conn: &Connection) -> Result<HashSet<String>, CliError> {
+    let mut stmt = conn.prepare(&format!(
+        "SELECT session_id, record_json FROM {table}",
+        table = SESSION_TOMBSTONE_TABLE,
+    ))?;
+    let mut rows = stmt.query([])?;
+    let mut terminal_session_ids = HashSet::new();
+
+    while let Some(row) = rows.next()? {
+        let session_id: String = row.get(0)?;
+        let record_json: String = row.get(1)?;
+        if parse_terminal_session_record(&session_id, &record_json).is_some() {
+            terminal_session_ids.insert(session_id);
+        }
+    }
+
+    Ok(terminal_session_ids)
+}
+
+fn parse_terminal_session_record(
+    session_id: &str,
+    record_json: &str,
+) -> Option<RemoteSessionDiagnosticRecord> {
+    let record: RemoteSessionDiagnosticRecord = match serde_json::from_str(record_json) {
+        Ok(record) => record,
+        Err(error) => {
+            warn!(
+                session_id = %session_id,
+                error = %error,
+                "dropping malformed terminal MCP session tombstone"
+            );
+            return None;
+        }
+    };
+    if record.session_id != session_id {
+        warn!(
+            session_id = %session_id,
+            record_session_id = %record.session_id,
+            "dropping terminal MCP session tombstone whose primary key does not match the stored session payload"
+        );
+        return None;
+    }
+    Some(record)
 }
 
 pub(super) fn stored_capabilities_are_current(capabilities: &[CapabilityToken]) -> bool {

@@ -631,6 +631,61 @@ mod tests {
     }
 
     #[test]
+    fn load_active_session_records_keeps_active_row_when_matching_tombstone_is_malformed() {
+        let path = std::env::temp_dir().join(format!(
+            "chio-remote-malformed-tombstone-active-{}-{}.sqlite3",
+            std::process::id(),
+            session_now_millis()
+        ));
+        let auth_context = SessionAuthContext::streamable_http_static_bearer(
+            "agent-resumable",
+            "token-fingerprint",
+            None,
+        );
+        let lifecycle = RemoteSessionLifecycleSnapshot {
+            state: RemoteSessionState::Ready,
+            created_at: 10,
+            last_seen_at: 11,
+            idle_expires_at: 12,
+            drain_deadline_at: None,
+        };
+        let active_record = RemoteSessionResumeRecord {
+            session_id: "session-resumable".to_string(),
+            agent_id: "agent-resumable".to_string(),
+            auth_context,
+            auth_mode_fingerprint: Some("auth-contract-v1".to_string()),
+            policy_fingerprint: Some("policy-contract-v1".to_string()),
+            hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
+            lifecycle,
+            protocol_version: Some("2025-06-18".to_string()),
+            peer_capabilities: PeerCapabilities::default(),
+            initialize_params: json!({}),
+            issued_capabilities: Vec::new(),
+            resume_integrity_tag: None,
+        };
+        persist_active_session_record(&path, &active_record).expect("persist active session row");
+
+        let conn = open_session_state_db(&path).expect("open session state db");
+        conn.execute(
+            &format!(
+                "INSERT INTO {table} (session_id, terminal_at, record_json)
+                 VALUES (?1, ?2, ?3)",
+                table = SESSION_TOMBSTONE_TABLE,
+            ),
+            params!["session-resumable", 13_i64, "{not json"],
+        )
+        .expect("insert malformed terminal row");
+        drop(conn);
+
+        let loaded = load_active_session_records(&path).expect("load active session records");
+        assert_eq!(loaded.records.len(), 1);
+        assert_eq!(loaded.records[0].session_id, "session-resumable");
+        assert!(loaded.invalid_session_ids.is_empty());
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn load_terminal_session_records_skips_mismatched_payload_session_id() {
         let path = std::env::temp_dir().join(format!(
             "chio-remote-terminal-mismatch-{}-{}.sqlite3",
