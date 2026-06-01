@@ -829,6 +829,22 @@ impl ChioKernel {
         })
     }
 
+    pub(crate) fn reverse_pre_execution_budget_mutation(
+        &self,
+        cap: &CapabilityToken,
+        matched_grant_index: usize,
+        charge_result: Option<&BudgetChargeResult>,
+    ) -> Result<Option<BudgetReverseHoldDecision>, KernelError> {
+        if let Some(charge) = charge_result {
+            return self.reverse_budget_charge(&cap.id, charge).map(Some);
+        }
+
+        self.with_budget_store(|store| {
+            Ok(store.reverse_charge_cost(&cap.id, matched_grant_index, 0)?)
+        })?;
+        Ok(None)
+    }
+
     fn reconcile_budget_charge(
         &self,
         capability_id: &str,

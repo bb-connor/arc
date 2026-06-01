@@ -5718,6 +5718,85 @@ fn make_sibling_sum_monetary_fixture(prefix: &str) -> SiblingSumMonetaryFixture 
     }
 }
 
+struct SiblingSumInvocationFixture {
+    kernel: ChioKernel,
+    child_a: CapabilityToken,
+    child_b: CapabilityToken,
+    child_a_kp: Keypair,
+    child_b_kp: Keypair,
+    path: PathBuf,
+}
+
+fn make_invocation_limited_grant(server: &str, tool: &str, max_invocations: u32) -> ToolGrant {
+    let mut grant = make_grant(server, tool);
+    grant.max_invocations = Some(max_invocations);
+    grant
+}
+
+fn make_sibling_sum_invocation_fixture(prefix: &str) -> SiblingSumInvocationFixture {
+    let path = unique_receipt_db_path(prefix);
+    let seed_store = SqliteReceiptStore::open(&path).unwrap();
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.register_tool_server(Box::new(EchoServer::new("limited-srv", vec!["compute"])));
+
+    let parent_kp = make_keypair();
+    let child_a_kp = make_keypair();
+    let child_b_kp = make_keypair();
+    let mut parent_grant = make_invocation_limited_grant("limited-srv", "compute", 1);
+    parent_grant.operations.push(Operation::Delegate);
+    let parent_scope = make_scope(vec![parent_grant]);
+    let child_scope = make_scope(vec![make_invocation_limited_grant(
+        "limited-srv",
+        "compute",
+        1,
+    )]);
+    let parent = make_capability(&kernel, &parent_kp, parent_scope.clone(), 300);
+    seed_store
+        .record_capability_snapshot(&parent, None)
+        .unwrap();
+    drop(seed_store);
+    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
+    kernel
+        .register_budget_parent(parent.id.clone(), 5_000)
+        .unwrap();
+    kernel.set_capability_trust_root(
+        kernel.config.keypair.public_key(),
+        scope_hash(&parent_scope).unwrap(),
+    );
+
+    let child_a_id = format!("cap-{prefix}-child-a");
+    let child_a = make_v2_delegated_child(V2DelegatedChildInput {
+        kernel: &kernel,
+        parent: &parent,
+        parent_kp: &parent_kp,
+        child_kp: &child_a_kp,
+        parent_scope: &parent_scope,
+        child_scope: child_scope.clone(),
+        id: &child_a_id,
+        share_bps: 4_000,
+    });
+    let child_b_id = format!("cap-{prefix}-child-b");
+    let child_b = make_v2_delegated_child(V2DelegatedChildInput {
+        kernel: &kernel,
+        parent: &parent,
+        parent_kp: &parent_kp,
+        child_kp: &child_b_kp,
+        parent_scope: &parent_scope,
+        child_scope,
+        id: &child_b_id,
+        share_bps: 4_000,
+    });
+
+    SiblingSumInvocationFixture {
+        kernel,
+        child_a,
+        child_b,
+        child_a_kp,
+        child_b_kp,
+        path,
+    }
+}
+
 fn spawn_payment_test_server(
     status_code: u16,
     body: serde_json::Value,
@@ -9069,6 +9148,67 @@ fn sibling_sum_denial_reverses_pre_execution_monetary_charge() {
         .unwrap();
     assert_eq!(usage.invocation_count, 0);
     assert_eq!(usage.committed_cost_units().unwrap(), 0);
+
+    let _ = std::fs::remove_file(fixture.path);
+}
+
+#[test]
+fn sibling_sum_denial_reverses_pre_execution_invocation_increment() {
+    let fixture = make_sibling_sum_invocation_fixture("sibling-sum-invocation-rollback");
+    let kernel = fixture.kernel;
+
+    let allow_response = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: "req-sibling-sum-invocation-rollback-a".to_string(),
+            capability: fixture.child_a.clone(),
+            tool_name: "compute".to_string(),
+            server_id: "limited-srv".to_string(),
+            agent_id: fixture.child_a_kp.public_key().to_hex(),
+            arguments: serde_json::json!({}),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        })
+        .unwrap();
+    assert_eq!(
+        allow_response.verdict, Verdict::Allow,
+        "unexpected deny reason: {:?}",
+        allow_response.reason
+    );
+
+    let deny_response = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: "req-sibling-sum-invocation-rollback-b".to_string(),
+            capability: fixture.child_b.clone(),
+            tool_name: "compute".to_string(),
+            server_id: "limited-srv".to_string(),
+            agent_id: fixture.child_b_kp.public_key().to_hex(),
+            arguments: serde_json::json!({}),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        })
+        .unwrap();
+    assert_eq!(deny_response.verdict, Verdict::Deny);
+    assert!(deny_response.reason.as_deref().is_some_and(|reason| {
+        reason.contains("sibling-sum") || reason.contains("sibling sum")
+    }));
+
+    let usage = kernel.budget_store.get_usage(&fixture.child_b.id, 0).unwrap();
+    assert_eq!(usage.as_ref().map_or(0, |usage| usage.invocation_count), 0);
+    assert_eq!(
+        usage
+            .as_ref()
+            .map(BudgetUsageRecord::committed_cost_units)
+            .transpose()
+            .unwrap()
+            .unwrap_or(0),
+        0
+    );
 
     let _ = std::fs::remove_file(fixture.path);
 }

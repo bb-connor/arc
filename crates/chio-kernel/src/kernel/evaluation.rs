@@ -717,8 +717,12 @@ impl ChioKernel {
             Err(error) => {
                 let msg = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "governed transaction denied");
-                if let Some(ref charge) = charge_result {
-                    let reverse = self.reverse_budget_charge(&cap.id, charge)?;
+                let reverse = self.reverse_pre_execution_budget_mutation(
+                    cap,
+                    matched_grant_index,
+                    charge_result.as_ref(),
+                )?;
+                if let (Some(charge), Some(reverse)) = (charge_result.as_ref(), reverse.as_ref()) {
                     return self.build_pre_execution_monetary_deny_response_with_metadata(
                         request,
                         &msg,
@@ -730,7 +734,7 @@ impl ChioKernel {
                             extra_metadata.clone(),
                             self.budget_execution_receipt_metadata(
                                 charge,
-                                Some(("reversed", &reverse)),
+                                Some(("reversed", reverse)),
                             ),
                         ),
                     );
@@ -770,8 +774,12 @@ impl ChioKernel {
         ) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "guard denied");
-            if let Some(ref charge) = charge_result {
-                let reverse = self.reverse_budget_charge(&cap.id, charge)?;
+            let reverse = self.reverse_pre_execution_budget_mutation(
+                cap,
+                matched_grant_index,
+                charge_result.as_ref(),
+            )?;
+            if let (Some(charge), Some(reverse)) = (charge_result.as_ref(), reverse.as_ref()) {
                 return self.build_pre_execution_monetary_deny_response_with_metadata(
                     request,
                     &msg,
@@ -781,10 +789,7 @@ impl ChioKernel {
                     cap,
                     self.merge_budget_receipt_metadata(
                         extra_metadata.clone(),
-                        self.budget_execution_receipt_metadata(
-                            charge,
-                            Some(("reversed", &reverse)),
-                        ),
+                        self.budget_execution_receipt_metadata(charge, Some(("reversed", reverse))),
                     ),
                 );
             }
@@ -806,8 +811,12 @@ impl ChioKernel {
                 .reason
                 .unwrap_or_else(|| "runtime admission denied".to_string());
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "runtime admission denied");
-            if let Some(ref charge) = charge_result {
-                let reverse = self.reverse_budget_charge(&cap.id, charge)?;
+            let reverse = self.reverse_pre_execution_budget_mutation(
+                cap,
+                matched_grant_index,
+                charge_result.as_ref(),
+            )?;
+            if let (Some(charge), Some(reverse)) = (charge_result.as_ref(), reverse.as_ref()) {
                 return self
                     .build_runtime_admission_pre_execution_monetary_deny_response_with_metadata(
                         request,
@@ -820,7 +829,7 @@ impl ChioKernel {
                             extra_metadata,
                             self.budget_execution_receipt_metadata(
                                 charge,
-                                Some(("reversed", &reverse)),
+                                Some(("reversed", reverse)),
                             ),
                         ),
                     );
@@ -838,8 +847,12 @@ impl ChioKernel {
             let msg = format!("sibling-sum budget admission failed: {reason}");
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
             self.release_runtime_admission_reservations(extra_metadata.as_ref())?;
-            if let Some(ref charge) = charge_result {
-                let reverse = self.reverse_budget_charge(&cap.id, charge)?;
+            let reverse = self.reverse_pre_execution_budget_mutation(
+                cap,
+                matched_grant_index,
+                charge_result.as_ref(),
+            )?;
+            if let (Some(charge), Some(reverse)) = (charge_result.as_ref(), reverse.as_ref()) {
                 return self.build_pre_execution_monetary_deny_response_with_metadata(
                     request,
                     &msg,
@@ -849,10 +862,7 @@ impl ChioKernel {
                     cap,
                     self.merge_budget_receipt_metadata(
                         extra_metadata.clone(),
-                        self.budget_execution_receipt_metadata(
-                            charge,
-                            Some(("reversed", &reverse)),
-                        ),
+                        self.budget_execution_receipt_metadata(charge, Some(("reversed", reverse))),
                     ),
                 );
             }
@@ -873,8 +883,12 @@ impl ChioKernel {
                 let msg = format!("payment authorization failed: {error}");
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "payment denied");
                 self.release_runtime_admission_reservations(extra_metadata.as_ref())?;
-                if let Some(ref charge) = charge_result {
-                    let reverse = self.reverse_budget_charge(&cap.id, charge)?;
+                let reverse = self.reverse_pre_execution_budget_mutation(
+                    cap,
+                    matched_grant_index,
+                    charge_result.as_ref(),
+                )?;
+                if let (Some(charge), Some(reverse)) = (charge_result.as_ref(), reverse.as_ref()) {
                     return self.build_pre_execution_monetary_deny_response_with_metadata(
                         request,
                         &msg,
@@ -886,7 +900,7 @@ impl ChioKernel {
                             extra_metadata.clone(),
                             self.budget_execution_receipt_metadata(
                                 charge,
-                                Some(("reversed", &reverse)),
+                                Some(("reversed", reverse)),
                             ),
                         ),
                     );
@@ -1269,8 +1283,12 @@ impl ChioKernel {
             Err(error) => {
                 let msg = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "governed transaction denied");
-                if let Some(ref charge) = charge_result {
-                    let reverse = self.reverse_budget_charge(&cap.id, charge)?;
+                let reverse = self.reverse_pre_execution_budget_mutation(
+                    cap,
+                    matched_grant_index,
+                    charge_result.as_ref(),
+                )?;
+                if let (Some(charge), Some(reverse)) = (charge_result.as_ref(), reverse.as_ref()) {
                     return self.build_pre_execution_monetary_deny_response_with_metadata(
                         request,
                         &msg,
@@ -1280,7 +1298,7 @@ impl ChioKernel {
                         cap,
                         Some(self.budget_execution_receipt_metadata(
                             charge,
-                            Some(("reversed", &reverse)),
+                            Some(("reversed", reverse)),
                         )),
                     );
                 }
@@ -1316,8 +1334,12 @@ impl ChioKernel {
         ) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "guard denied");
-            if let Some(ref charge) = charge_result {
-                let reverse = self.reverse_budget_charge(&cap.id, charge)?;
+            let reverse = self.reverse_pre_execution_budget_mutation(
+                cap,
+                matched_grant_index,
+                charge_result.as_ref(),
+            )?;
+            if let (Some(charge), Some(reverse)) = (charge_result.as_ref(), reverse.as_ref()) {
                 return self.build_pre_execution_monetary_deny_response_with_metadata(
                     request,
                     &msg,
@@ -1326,10 +1348,7 @@ impl ChioKernel {
                     reverse.committed_cost_units_after,
                     cap,
                     Some(
-                        self.budget_execution_receipt_metadata(
-                            charge,
-                            Some(("reversed", &reverse)),
-                        ),
+                        self.budget_execution_receipt_metadata(charge, Some(("reversed", reverse))),
                     ),
                 );
             }
@@ -1344,8 +1363,12 @@ impl ChioKernel {
                 .reason
                 .unwrap_or_else(|| "runtime admission denied".to_string());
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "runtime admission denied (nested flow)");
-            if let Some(ref charge) = charge_result {
-                let reverse = self.reverse_budget_charge(&cap.id, charge)?;
+            let reverse = self.reverse_pre_execution_budget_mutation(
+                cap,
+                matched_grant_index,
+                charge_result.as_ref(),
+            )?;
+            if let (Some(charge), Some(reverse)) = (charge_result.as_ref(), reverse.as_ref()) {
                 return self
                     .build_runtime_admission_pre_execution_monetary_deny_response_with_metadata(
                         request,
@@ -1358,7 +1381,7 @@ impl ChioKernel {
                             runtime_admission.metadata,
                             self.budget_execution_receipt_metadata(
                                 charge,
-                                Some(("reversed", &reverse)),
+                                Some(("reversed", reverse)),
                             ),
                         ),
                     );
@@ -1376,8 +1399,12 @@ impl ChioKernel {
             let msg = format!("sibling-sum budget admission failed: {reason}");
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
             self.release_runtime_admission_reservations(runtime_admission_metadata.as_ref())?;
-            if let Some(ref charge) = charge_result {
-                let reverse = self.reverse_budget_charge(&cap.id, charge)?;
+            let reverse = self.reverse_pre_execution_budget_mutation(
+                cap,
+                matched_grant_index,
+                charge_result.as_ref(),
+            )?;
+            if let (Some(charge), Some(reverse)) = (charge_result.as_ref(), reverse.as_ref()) {
                 return self.build_pre_execution_monetary_deny_response_with_metadata(
                     request,
                     &msg,
@@ -1387,10 +1414,7 @@ impl ChioKernel {
                     cap,
                     self.merge_budget_receipt_metadata(
                         runtime_admission_metadata.clone(),
-                        self.budget_execution_receipt_metadata(
-                            charge,
-                            Some(("reversed", &reverse)),
-                        ),
+                        self.budget_execution_receipt_metadata(charge, Some(("reversed", reverse))),
                     ),
                 );
             }
@@ -1411,8 +1435,12 @@ impl ChioKernel {
                 let msg = format!("payment authorization failed: {error}");
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "payment denied");
                 self.release_runtime_admission_reservations(runtime_admission_metadata.as_ref())?;
-                if let Some(ref charge) = charge_result {
-                    let reverse = self.reverse_budget_charge(&cap.id, charge)?;
+                let reverse = self.reverse_pre_execution_budget_mutation(
+                    cap,
+                    matched_grant_index,
+                    charge_result.as_ref(),
+                )?;
+                if let (Some(charge), Some(reverse)) = (charge_result.as_ref(), reverse.as_ref()) {
                     return self.build_pre_execution_monetary_deny_response_with_metadata(
                         request,
                         &msg,
@@ -1424,7 +1452,7 @@ impl ChioKernel {
                             runtime_admission_metadata.clone(),
                             self.budget_execution_receipt_metadata(
                                 charge,
-                                Some(("reversed", &reverse)),
+                                Some(("reversed", reverse)),
                             ),
                         ),
                     );
