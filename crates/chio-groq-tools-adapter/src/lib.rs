@@ -24,6 +24,8 @@ pub mod native;
 pub mod streaming;
 pub mod transport;
 
+mod response;
+
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -177,7 +179,7 @@ impl GroqAdapter {
     /// Lift every Groq `tool_calls` part in a non-streaming
     /// `chat/completions` response payload.
     pub fn lift_batch(&self, raw: ProviderRequest) -> Result<Vec<ToolInvocation>, ProviderError> {
-        let calls = function_calls(raw)?;
+        let calls = response::function_calls(raw)?;
         if calls.is_empty() {
             return Err(ProviderError::Malformed(
                 "Groq chat/completions payload did not contain tool_calls".to_string(),
@@ -256,107 +258,6 @@ pub enum GroqAdapterError {
     /// types.
     #[error(transparent)]
     Provider(#[from] ProviderError),
-}
-
-fn function_calls(raw: ProviderRequest) -> Result<Vec<FunctionCallPart>, ProviderError> {
-    let value: Value = serde_json::from_slice(&raw.0).map_err(|error| {
-        ProviderError::Malformed(format!(
-            "Groq chat/completions payload was not JSON: {error}"
-        ))
-    })?;
-    let body = response_body(value)?;
-    extract_function_calls(&body)
-}
-
-fn response_body(value: Value) -> Result<Value, ProviderError> {
-    for field in ["body", "response", "payload"] {
-        if let Some(nested) = value.get(field) {
-            return nested_response_body(nested).ok_or_else(|| {
-                ProviderError::Malformed(format!(
-                    "Groq chat/completions envelope field `{field}` was not a JSON object or string body"
-                ))
-            });
-        }
-    }
-    Ok(value)
-}
-
-fn nested_response_body(value: &Value) -> Option<Value> {
-    match value {
-        Value::Object(_) => Some(value.clone()),
-        Value::String(body) => serde_json::from_str(body).ok(),
-        _ => None,
-    }
-}
-
-fn extract_function_calls(body: &Value) -> Result<Vec<FunctionCallPart>, ProviderError> {
-    // Groq is OpenAI-compatible: tool calls live at
-    // `choices[].message.tool_calls[]` with shape
-    // `{ id, type: "function", function: { name, arguments } }` where
-    // `arguments` is a JSON-encoded string.
-    let mut calls = Vec::new();
-    if let Some(choices) = body.get("choices").and_then(Value::as_array) {
-        for choice in choices {
-            let tool_calls = choice
-                .get("message")
-                .and_then(|m| m.get("tool_calls"))
-                .and_then(Value::as_array);
-            if let Some(tool_calls) = tool_calls {
-                for entry in tool_calls {
-                    if let Some(part) = openai_tool_call_to_function_call(entry, "Groq")? {
-                        calls.push(part);
-                    }
-                }
-            }
-        }
-    }
-    Ok(calls)
-}
-
-/// Decode an OpenAI-compatible `tool_calls[]` entry of shape
-/// `{ id, type: "function", function: { name, arguments } }` into a
-/// [`FunctionCallPart`]. The `arguments` slot is a JSON-encoded string per
-/// the OpenAI wire contract; we eagerly parse it so downstream gating sees a
-/// proper JSON object. Used by both Groq and Mistral via separate copies of
-/// this helper (Mistral lives in its own crate).
-pub(crate) fn openai_tool_call_to_function_call(
-    entry: &Value,
-    provider_label: &str,
-) -> Result<Option<FunctionCallPart>, ProviderError> {
-    let kind = entry
-        .get("type")
-        .and_then(Value::as_str)
-        .unwrap_or("function");
-    if kind != "function" {
-        // Non-function tool kinds (future surfaces) are skipped silently.
-        return Ok(None);
-    }
-    let function = match entry.get("function") {
-        Some(f) => f,
-        None => return Ok(None),
-    };
-    let name = function
-        .get("name")
-        .and_then(Value::as_str)
-        .ok_or_else(|| {
-            ProviderError::Malformed(format!(
-                "{provider_label} tool_calls[].function.name was missing or non-string"
-            ))
-        })?
-        .to_string();
-    let args_value = match function.get("arguments") {
-        Some(Value::String(s)) => serde_json::from_str::<Value>(s).map_err(|error| {
-            ProviderError::Malformed(format!(
-                "{provider_label} tool_calls[].function.arguments was not valid JSON: {error}"
-            ))
-        })?,
-        Some(other) => other.clone(),
-        None => Value::Object(serde_json::Map::new()),
-    };
-    Ok(Some(FunctionCallPart {
-        name,
-        args: args_value,
-    }))
 }
 
 fn validate_function_call(call: &FunctionCallPart) -> Result<(), ProviderError> {
@@ -587,6 +488,25 @@ mod tests {
         let err = adapter.lift_batch(raw).unwrap_err();
 
         assert!(err.to_string().contains("envelope field `body`"));
+    }
+
+    #[test]
+    fn lift_batch_maps_safety_block_to_content_policy() {
+        let cfg = config();
+        let adapter = GroqAdapter::new(cfg, Arc::new(transport::MockTransport::new()));
+        let payload = json!({
+            "stop_reason": "refusal",
+            "promptFeedback": {
+                "blockReason": "SAFETY"
+            }
+        });
+        let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
+        let err = adapter
+            .lift_batch(raw)
+            .expect_err("Groq safety block must fail closed as content policy");
+
+        assert!(matches!(err, ProviderError::ContentPolicy(_)));
+        assert!(err.to_string().contains("SAFETY"));
     }
 
     #[test]

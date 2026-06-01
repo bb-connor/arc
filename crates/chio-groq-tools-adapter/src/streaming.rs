@@ -12,7 +12,7 @@ use chio_provider_adapter_core::{
 use chio_tool_call_fabric::{ProviderError, ToolInvocation, VerdictResult};
 use serde_json::Value;
 
-use crate::{native::FunctionCallPart, openai_tool_call_to_function_call, GroqAdapter};
+use crate::{native::FunctionCallPart, response::openai_tool_call_to_function_call, GroqAdapter};
 
 pub type GatedSseStream = GatedStream;
 

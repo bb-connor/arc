@@ -1,0 +1,33 @@
+# chio-groq-tools-adapter architecture note
+
+## Boundaries
+
+- `lib.rs` owns the public adapter handle, configuration, provider identity, lift/lower entrypoints, and the `Provider` implementation.
+- `transport.rs` owns the shared HTTP transport wiring for Groq's OpenAI-compatible `chat/completions` endpoint, including Bearer auth, pinned endpoint constants, and the `2025-04` API-version header.
+- `native.rs` owns the adapter's normalized Groq content shapes: decoded function calls and gated function responses.
+- `streaming.rs` owns buffered SSE mediation for OpenAI-compatible `chat.completion.chunk` frames and gates streamed `tool_calls` before release.
+- `loaded_weights.rs` owns the explicit "unavailable" implementation for providers that cannot expose runtime model bytes.
+
+## Pain Points
+
+- `lib.rs` still mixes adapter orchestration, OpenAI-compatible response-envelope parsing, `tool_calls` extraction, validation, and lower-response helpers.
+- The README taxonomy documents safety blocks as `ProviderError::ContentPolicy`, but the batch lift path does not classify a safety-block response before reporting a generic malformed/no-tool-call response.
+- `openai_tool_call_to_function_call` is shared by batch and streaming paths but lives beside the public adapter surface, making the native response trust boundary harder to audit.
+
+## Constraints
+
+- Preserve public API compatibility for `GroqAdapter`, `GroqAdapterConfig`, transport constructors, `FunctionCallPart`, and `FunctionResponsePart`.
+- Preserve canonical JSON byte stability for decoded `function.arguments`.
+- Preserve fail-closed behavior for malformed upstream payloads, invalid arguments, transport failures, bad lower-response bytes, and streaming verdict failures.
+- Preserve the pinned upstream API version `2025-04`.
+- Do not touch fixture corpus or generated artifacts in this slice.
+
+## Dependents
+
+- `crates/chio-provider-conformance` depends on Groq fixture behavior and API-version pins.
+- `examples/cross-provider-policy` depends on the captured Groq fixture path for cross-provider verdict equality, not on private parsing helpers.
+- `streaming.rs` depends on the OpenAI-compatible `tool_calls` decoder; moving it requires updating only the internal module import.
+
+## Planned Improvement
+
+Move Groq response-envelope classification and OpenAI-compatible `tool_calls` decoding into an internal response module, then classify safety-block/refusal envelopes as `ProviderError::ContentPolicy` before reaching the generic malformed/no-tool path. This is architectural because it creates a single native-response trust boundary shared by batch and streaming paths, aligns code with the documented error taxonomy, and keeps public APIs stable.
