@@ -1177,6 +1177,39 @@ mod tests {
     }
 
     #[test]
+    fn jsonrpc_single_skill_rejects_empty_target_skill_id_before_lookup() {
+        let edge = ChioA2aEdge::new(
+            A2aEdgeConfig::default(),
+            vec![{
+                let mut manifest = test_manifest();
+                manifest.tools.truncate(1);
+                manifest
+            }],
+        )
+        .test_unwrap();
+
+        let error = match edge.parse_jsonrpc_send_message_params(
+            json!({
+                "message": {
+                    "role": "user",
+                    "parts": [{"type": "text", "text": "hi"}]
+                },
+                "metadata": {
+                    "chio": {"targetSkillId": "   "}
+                }
+            }),
+            "SendMessage",
+        ) {
+            Ok(_) => panic!("expected empty targetSkillId to fail before lookup"),
+            Err(error) => error,
+        };
+        let A2aEdgeError::InvalidRequest(message) = error else {
+            panic!("expected invalid request error");
+        };
+        assert_eq!(message, "metadata.chio.targetSkillId must not be empty");
+    }
+
+    #[test]
     fn jsonrpc_send_message_single_skill() {
         let mut edge = ChioA2aEdge::new(
             A2aEdgeConfig::default(),
@@ -1624,6 +1657,40 @@ mod tests {
 
         assert_eq!(resolved["result"]["status"].as_str(), Some("completed"));
         assert!(!edge.tasks.contains_key(&task_id));
+    }
+
+    #[test]
+    fn jsonrpc_task_get_rejects_empty_task_id_before_lookup() {
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let kernel_issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = A2aKernelExecutionContext {
+            capability: capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 32,
+                "method": "task/get",
+                "params": { "taskId": "" }
+            }),
+            &kernel,
+            &execution,
+        );
+
+        assert_eq!(response["error"]["code"], -32602);
+        assert_eq!(
+            response["error"]["message"],
+            "task/get params.taskId must not be empty"
+        );
     }
 
     #[test]
