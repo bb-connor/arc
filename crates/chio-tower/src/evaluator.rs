@@ -118,12 +118,21 @@ impl ChioEvaluator {
         &self,
         input: EvaluationInput<'_>,
     ) -> Result<PreparedEvaluation, ChioTowerError> {
+        let presented_capability = extract_presented_capability(input.headers, input.query);
+        self.prepare_with_presented_capability(input, presented_capability)
+    }
+
+    pub(crate) fn prepare_with_presented_capability(
+        &self,
+        input: EvaluationInput<'_>,
+        presented_capability: Option<&str>,
+    ) -> Result<PreparedEvaluation, ChioTowerError> {
         let EvaluationInput {
             method,
             path,
             query,
             caller,
-            headers,
+            headers: _headers,
             body_hash,
             body_length,
         } = input;
@@ -141,7 +150,7 @@ impl ChioEvaluator {
                 body_length,
                 session_id: None,
                 capability_id_hint: None,
-                presented_capability: extract_presented_capability(headers, query),
+                presented_capability,
                 requested_tool_server: None,
                 requested_tool_name: None,
                 requested_arguments: None,
