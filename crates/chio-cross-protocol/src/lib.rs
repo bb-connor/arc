@@ -1279,17 +1279,16 @@ fn build_route_candidate(
     registry: &TargetProtocolRegistry<'_>,
     availability: &BTreeMap<DiscoveryProtocol, RouteAvailabilityStatus>,
 ) -> RouteCandidateEvidence {
-    let registry_availability = if registry.supports_target_protocol(target_protocol) {
-        RouteAvailabilityStatus::available()
+    let availability = if registry.supports_target_protocol(target_protocol) {
+        availability
+            .get(&target_protocol)
+            .cloned()
+            .unwrap_or_else(RouteAvailabilityStatus::available)
     } else {
         RouteAvailabilityStatus::unavailable(format!(
             "target protocol `{target_protocol}` is not registered"
         ))
     };
-    let availability = availability
-        .get(&target_protocol)
-        .cloned()
-        .unwrap_or(registry_availability);
 
     RouteCandidateEvidence {
         route_id: format!("{}-route", target_protocol.as_str()),
@@ -2268,6 +2267,35 @@ mod tests {
             Some(
                 "governed intent disallowed projected protocols and no native route was available"
             )
+        );
+    }
+
+    #[test]
+    fn plan_authoritative_route_denies_unregistered_target_even_when_marked_available() {
+        let registry = TargetProtocolRegistry::new(DiscoveryProtocol::Native);
+        let mut availability = BTreeMap::new();
+        availability.insert(DiscoveryProtocol::Mcp, RouteAvailabilityStatus::available());
+
+        let planning = plan_authoritative_route(
+            "req-route-unregistered-available",
+            DiscoveryProtocol::A2a,
+            DiscoveryProtocol::Mcp,
+            None,
+            &registry,
+            &availability,
+        )
+        .unwrap();
+
+        assert_eq!(planning.selected_target_protocol, None);
+        assert_eq!(planning.evidence.decision, RouteSelectionDecision::Deny);
+        assert_eq!(planning.evidence.selected_target_protocol, None);
+        assert_eq!(planning.evidence.candidates.len(), 1);
+        assert!(!planning.evidence.candidates[0].available);
+        assert_eq!(
+            planning.evidence.candidates[0]
+                .availability_reason
+                .as_deref(),
+            Some("target protocol `mcp` is not registered")
         );
     }
 
