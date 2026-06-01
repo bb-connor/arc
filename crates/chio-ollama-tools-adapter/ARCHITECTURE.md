@@ -10,9 +10,9 @@
 
 ## Pain Points
 
-- `lib.rs` still mixes adapter orchestration, native response-envelope parsing, `tool_calls` extraction, validation, and lower-response helpers.
-- The README taxonomy documents model refusals as `ProviderError::ContentPolicy`, but the batch lift path reaches the generic no-tool-call malformed branch for `policy: refusal`.
-- Streaming NDJSON parses tool-call entries separately from the batch path, so the native response boundary is duplicated across modules.
+- `OllamaAdapterConfig.api_version` is public and serializable, so persisted or hand-built configs can drift away from the crate pin even though the transport, README, and fixtures define a single supported API snapshot.
+- `api_version()` and provenance stamps currently trust the mutable config field directly, which can make a stale local config look like an accepted upstream contract.
+- Outbound calls, captured batch lifting, streamed gating, direct tool-call lifting, and lower-response helpers share the same trust boundary but do not currently enforce the pin before doing work.
 
 ## Constraints
 
@@ -27,8 +27,8 @@
 - `crates/chio-provider-conformance` depends on Ollama fixture behavior and API-version pins.
 - `tests/localhost_replay.rs` depends on the recorded Ollama fixture and the shared mock transport path.
 - Cross-provider equality checks depend on the captured Ollama fixture path for canonical invocation bytes.
-- `streaming.rs` depends on the same tool-call entry decoder as batch response parsing.
+- `streaming.rs` and direct native lifting depend on the same config pin as outbound transport because both stamp provider provenance.
 
 ## Planned Improvement
 
-Move Ollama response-envelope classification and `tool_calls` decoding into an internal response module, then classify `policy: refusal` envelopes as `ProviderError::ContentPolicy` before reaching generic malformed/no-tool handling or forwarding stream frames. This is architectural because it creates a single native-response trust boundary shared by batch and streaming paths, aligns code with the documented error taxonomy, and keeps public APIs stable.
+Add an adapter-local API-version guard that accepts only `OLLAMA_API_VERSION` before any outbound transport, captured lift, streaming evaluation, direct provenance stamp, or lower-response operation. This is architectural because it turns the upstream contract pin from documentation and fixture metadata into an enforced boundary across every public mediation path while keeping the public config shape stable.

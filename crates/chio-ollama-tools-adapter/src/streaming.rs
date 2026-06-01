@@ -33,6 +33,7 @@ impl OllamaAdapter {
     where
         F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
     {
+        self.ensure_supported_api_version()?;
         let text = std::str::from_utf8(raw).map_err(|error| {
             ProviderError::Malformed(format!("Ollama NDJSON stream was not UTF-8: {error}"))
         })?;
