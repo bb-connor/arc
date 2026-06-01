@@ -7,7 +7,9 @@ the structural gate in `scripts/check-rust-public-surface.py`.
 
 `workspace.metadata.chio.rust_public_entrypoints` names repo-public Rust
 crates that are supported entrypoints even while the workspace remains
-pre-release and most crates set `publish = false`. The adjacent
+pre-release and most crates set `publish = false`. Individual crates may also
+declare `package.metadata.chio.public_entrypoint = true`; that local marker is
+only an assertion that the crate must appear in the root list. The adjacent
 `rust_registry_public_crates` list names crates that are allowed to publish to
 the Rust registry.
 
@@ -20,18 +22,21 @@ about it.
 ## Pain Points
 
 The current gate verifies sorted unique lists, known crate names, README
-presence, and registry-public `publish` settings. That catches accidental
-publication drift, but it still allows a crate to be listed as public with no
-Cargo package description or with no checked lib/bin implementation target.
+presence, package descriptions, implementation targets, and registry-public
+`publish` settings. That catches accidental publication drift, but the root
+list can still lag behind crate-local metadata and protocol docs.
 
-That makes the metadata weaker than the public contract it represents. A
-README-only synthetic crate can pass the public-entrypoint gate even though it
-is not a usable Rust entrypoint.
+`chio-api-protect` is the backing library for the documented `chio api protect`
+runtime entrypoint. The crate has a README and implementation target, but it is
+not listed in `rust_public_entrypoints`. Without a package-local assertion,
+that mismatch is review-only and can silently persist.
 
 ## Security And API Constraints
 
 - Public entrypoint metadata must remain explicit and sorted so review diffs
   show intentional public-surface changes.
+- Package-local `public_entrypoint` markers must be booleans and must not
+  create an alternate source of truth; they only force root-list parity.
 - Registry-public crates must continue to opt out of `publish = false`; every
   other workspace member must remain private to crates.io by default.
 - The gate must stay pure and local. It should inspect Cargo manifests and
@@ -51,6 +56,7 @@ to manifest metadata if the gate exposes an existing omission.
 
 ## Planned Improvement
 
-Strengthen the public Rust surface gate so every listed public entrypoint and
-registry-public crate must declare a non-empty package description and at least
-one checked lib or bin target with an existing source file.
+Strengthen the public Rust surface gate so
+`package.metadata.chio.public_entrypoint = true` fails unless the package also
+appears in `workspace.metadata.chio.rust_public_entrypoints`, then register
+`chio-api-protect` as a root public entrypoint with explicit README metadata.

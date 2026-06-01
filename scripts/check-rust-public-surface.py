@@ -139,6 +139,24 @@ def require_implementation_target(
         )
 
 
+def package_chio_metadata(
+    display_path: Path,
+    package: dict[str, object],
+    errors: list[str],
+) -> dict[str, object]:
+    metadata = package.get("metadata", {})
+    if not isinstance(metadata, dict):
+        errors.append(f"{display_path} declares non-table package.metadata.")
+        return {}
+
+    chio_metadata = metadata.get("chio", {})
+    if not isinstance(chio_metadata, dict):
+        errors.append(f"{display_path} declares non-table package.metadata.chio.")
+        return {}
+
+    return chio_metadata
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -173,6 +191,21 @@ def main() -> int:
         crate_name = package["name"]
         seen_names.add(crate_name)
         display_path = manifest_path.relative_to(root)
+        chio_metadata = package_chio_metadata(display_path, package, errors)
+        local_public_entrypoint = chio_metadata.get("public_entrypoint", False)
+        if not isinstance(local_public_entrypoint, bool):
+            errors.append(
+                f"{display_path} declares non-boolean "
+                "package.metadata.chio.public_entrypoint."
+            )
+            local_public_entrypoint = False
+
+        if local_public_entrypoint and crate_name not in entrypoint_names:
+            errors.append(
+                f"{display_path} declares package.metadata.chio.public_entrypoint "
+                "= true but is missing from "
+                "workspace.metadata.chio.rust_public_entrypoints."
+            )
 
         if crate_name in registry_names:
             if package.get("publish") is False:

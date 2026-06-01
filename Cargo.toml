@@ -177,6 +177,7 @@ repository = "https://github.com/backbay-labs/chio"
 
 [workspace.metadata.chio]
 rust_public_entrypoints = [
+    "chio-api-protect",
     "chio-cli",
     "chio-control-plane",
     "chio-core",

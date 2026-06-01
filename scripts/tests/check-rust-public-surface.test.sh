@@ -121,4 +121,16 @@ assert_rc "$(run_checker "$missing_target/Cargo.toml" "$work/missing-target.out"
 grep -F "crates/chio-core/Cargo.toml is a public entrypoint but does not declare an existing lib or bin target." \
   "$work/missing-target.err" >/dev/null
 
+local_public_marker="$work/local-public-marker"
+write_workspace "$local_public_marker" '    "chio-cli",'
+cat >> "$local_public_marker/crates/chio-core/Cargo.toml" <<'EOF'
+
+[package.metadata.chio]
+public_entrypoint = true
+EOF
+assert_rc "$(run_checker "$local_public_marker/Cargo.toml" "$work/local-public-marker.out" "$work/local-public-marker.err")" 1 \
+  "package-local public entrypoint marker missing from root list fails"
+grep -F "crates/chio-core/Cargo.toml declares package.metadata.chio.public_entrypoint = true but is missing from workspace.metadata.chio.rust_public_entrypoints." \
+  "$work/local-public-marker.err" >/dev/null
+
 echo "check-rust-public-surface.test.sh: all assertions passed"
