@@ -412,6 +412,12 @@ impl MessageInterceptor {
         match self
             .terminal_guard
             .check_command(&term_params.command, &term_params.args)
+            .and_then(|()| {
+                term_params
+                    .cwd
+                    .as_deref()
+                    .map_or(Ok(()), |cwd| self.fs_guard.check_cwd(cwd))
+            })
         {
             Ok(()) => {
                 if let Some(ref context) = capability_context {

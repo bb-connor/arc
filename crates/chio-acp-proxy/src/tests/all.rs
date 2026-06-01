@@ -680,6 +680,58 @@ mod tests {
     }
 
     #[test]
+    fn interceptor_blocks_terminal_create_with_out_of_scope_cwd() {
+        let interceptor = MessageInterceptor::new(test_config());
+        let msg = json!({
+            "jsonrpc": "2.0",
+            "id": 6,
+            "method": "terminal/create",
+            "params": {
+                "sessionId": "s1",
+                "command": "cargo",
+                "args": ["test"],
+                "cwd": "/etc"
+            }
+        });
+        let result = interceptor
+            .intercept(Direction::AgentToClient, &msg)
+            .unwrap();
+        match result {
+            InterceptResult::Block(v) => {
+                assert!(v.get("error").is_some());
+                assert!(v["error"]["message"]
+                    .as_str()
+                    .unwrap_or("")
+                    .contains("cwd"));
+            }
+            other => panic!("expected Block for out-of-scope cwd, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn interceptor_allows_terminal_create_with_in_scope_cwd() {
+        let interceptor = MessageInterceptor::new(test_config());
+        let msg = json!({
+            "jsonrpc": "2.0",
+            "id": 7,
+            "method": "terminal/create",
+            "params": {
+                "sessionId": "s1",
+                "command": "cargo",
+                "args": ["test"],
+                "cwd": "/home/user/project"
+            }
+        });
+        let result = interceptor
+            .intercept(Direction::AgentToClient, &msg)
+            .unwrap();
+        match result {
+            InterceptResult::Forward(_) => {}
+            other => panic!("expected Forward for in-scope cwd, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn interceptor_generates_receipt_for_tool_call() {
         let interceptor = MessageInterceptor::new(test_config());
         let msg = json!({
