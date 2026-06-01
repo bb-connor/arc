@@ -2253,6 +2253,15 @@ mod tests {
     }
 
     #[test]
+    fn chio_tools_path_identity_rejects_invalid_percent_hex() {
+        assert!(decode_path_identity_segment("file%GG").is_none());
+        assert!(matches!(
+            chio_tools_path_identity("/chio/tools/matrix/file%GG"),
+            ChioToolsPathIdentity::Malformed
+        ));
+    }
+
+    #[test]
     fn chio_tools_path_identity_non_tools_path_is_not_tools_path() {
         assert!(matches!(
             chio_tools_path_identity("/pets/42"),
