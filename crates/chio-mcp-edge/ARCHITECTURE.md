@@ -10,10 +10,10 @@
 
 ## Pain Points
 
-- `runtime/protocol.rs` still mixes JSON-RPC wire shaping with Chio-manifest to MCP-tool discovery projection.
-- `ChioMcpEdge::new` builds exposed tool bindings inline, so duplicate-name checks and projection rules sit in the runtime constructor rather than a focused discovery boundary.
-- MCP `tools/list` schemas are protocol-facing JSON Schema objects, but the edge currently forwards arbitrary manifest `input_schema` and `output_schema` values without checking shape.
-- This makes malformed manifest metadata visible to MCP clients even though ready-state methods and session traffic otherwise fail closed.
+- `runtime/discovery.rs` owns Chio-manifest to MCP-tool projection, but it only validates projection-local schema object shape and duplicate exposed tool names.
+- `ChioMcpEdge::new` can still accept manifests that fail the canonical `chio_manifest::validate_manifest` envelope checks, including unsupported schema versions, invalid embedded public keys, empty tool lists, invalid tool names, and duplicate server-tool allowlist entries.
+- This leaves discovery with two trust boundaries: manifest envelope validation in signer/loader paths, and partial projection validation at the MCP edge.
+- MCP clients should never see tools derived from a manifest envelope the workspace manifest validator would reject.
 
 ## Constraints
 
@@ -33,4 +33,4 @@
 
 ## Planned Improvement
 
-Move Chio-manifest to MCP-tool discovery projection into an internal discovery module, then validate that exposed `inputSchema` and `outputSchema` values are JSON objects before the edge starts. This is architectural because it creates one auditable discovery trust boundary, keeps the runtime constructor focused on state assembly, and prevents malformed signed manifest metadata from becoming MCP client-facing tool schema.
+Validate every `ToolManifest` with `chio_manifest::validate_manifest` before discovery projection or exposed-name indexing, while keeping cross-manifest duplicate exposed-name checks in `runtime/discovery.rs`. This is architectural because it makes manifest validation the single canonical envelope gate and leaves the MCP discovery module responsible only for outward projection and cross-manifest exposure rules.

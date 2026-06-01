@@ -694,7 +694,7 @@ fn sample_manifest() -> ToolManifest {
         ],
         server_tools: Vec::new(),
         required_permissions: None,
-        public_key: "abcd".into(),
+        public_key: Keypair::from_seed(&[7u8; 32]).public_key().to_hex(),
     }
 }
 
@@ -727,8 +727,34 @@ fn streaming_manifest() -> ToolManifest {
         ],
         server_tools: Vec::new(),
         required_permissions: None,
-        public_key: "stream-abcd".into(),
+        public_key: Keypair::from_seed(&[8u8; 32]).public_key().to_hex(),
     }
+}
+
+#[test]
+fn edge_rejects_manifest_with_unsupported_schema_version() {
+    let (kernel, _) = make_kernel();
+    let agent = Keypair::generate();
+    let mut manifest = sample_manifest();
+    manifest.schema = "chio.manifest.v0".into();
+    manifest.public_key = Keypair::from_seed(&[11u8; 32]).public_key().to_hex();
+
+    let err = match ChioMcpEdge::new(
+        McpEdgeConfig::default(),
+        kernel,
+        agent.public_key().to_hex(),
+        vec![],
+        vec![manifest],
+    ) {
+        Ok(_) => panic!("MCP edge discovery must reject unsupported manifest schema versions"),
+        Err(err) => err,
+    };
+
+    assert!(matches!(
+        err,
+        AdapterError::ManifestError(chio_manifest::ManifestError::UnsupportedSchema(schema))
+            if schema == "chio.manifest.v0"
+    ));
 }
 
 #[test]
@@ -749,8 +775,11 @@ fn edge_rejects_non_object_manifest_input_schema() {
         Err(err) => err,
     };
 
-    assert!(matches!(err, AdapterError::ParseError(_)));
-    assert!(err.to_string().contains("inputSchema"));
+    assert!(matches!(
+        err,
+        AdapterError::ManifestError(chio_manifest::ManifestError::InvalidInputSchema(tool_name))
+            if tool_name == "read_file"
+    ));
 }
 
 #[test]
@@ -771,8 +800,11 @@ fn edge_rejects_non_object_manifest_output_schema() {
         Err(err) => err,
     };
 
-    assert!(matches!(err, AdapterError::ParseError(_)));
-    assert!(err.to_string().contains("outputSchema"));
+    assert!(matches!(
+        err,
+        AdapterError::ManifestError(chio_manifest::ManifestError::InvalidOutputSchema(tool_name))
+            if tool_name == "echo_json"
+    ));
 }
 
 fn make_edge(page_size: usize) -> ChioMcpEdge {
@@ -1462,7 +1494,7 @@ fn make_url_required_edge() -> ChioMcpEdge {
             }],
             server_tools: Vec::new(),
             required_permissions: None,
-            public_key: "url-abcd".into(),
+            public_key: Keypair::from_seed(&[9u8; 32]).public_key().to_hex(),
         }],
     )
     .unwrap()

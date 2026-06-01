@@ -41,6 +41,8 @@ pub(super) fn build_exposed_tool_bindings(
     let mut tools = Vec::new();
 
     for manifest in manifests {
+        chio_manifest::validate_manifest(&manifest)?;
+
         for tool in manifest.tools {
             if tool_index.contains_key(&tool.name) {
                 return Err(AdapterError::ManifestError(
