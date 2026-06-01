@@ -64,3 +64,31 @@ Move task-observation extraction into a small internal registry boundary that va
 ### Planned Material Improvement
 
 Add a small internal normalization step for skill input modes that strips MIME parameters before alias classification. Prove the boundary through both manifest projection and send-path tests so discovery and invocation stay aligned.
+
+## Stream Registry Persistence Slice
+
+### Current Boundary
+
+- `transport.rs` parses A2A SSE events, unwraps JSON-RPC stream results when needed, validates every stream response, and returns a `ToolServerStreamResult`.
+- `invoke.rs` records task observations from completed stream chunks after the stream has already been parsed and accepted.
+- `task_registry.rs` owns durable follow-up authority. It must reject malformed observations and preserve existing task bindings.
+
+### Pain Point
+
+The stream path currently treats any registry persistence failure as a fatal invocation error even after the SSE parser has accepted the stream chunks. A stale or conflicting local registry entry can therefore convert an otherwise valid streaming response into `ToolServerError`, even though the safe fallback is to return the already-authorized stream and leave future follow-up authority denied by the unchanged registry.
+
+### Security And API Constraints
+
+- Preserve public API compatibility and keep the registry internals private.
+- Keep malformed stream chunks fail-closed. Stream data must still pass the same A2A stream-response validation before registry persistence is considered.
+- Do not overwrite conflicting task bindings. Future follow-up operations must remain denied unless the registry has a valid binding for the requested tool, server, interface, binding, tenant, and partner.
+- Do not expose secrets in registry persistence warnings.
+
+### Affected Dependents
+
+- `chio-kernel` should continue to receive stream output for valid A2A streaming calls instead of a late local persistence error.
+- Follow-up operations in this crate continue to depend on `A2aTaskRegistry::validate_follow_up`; no downstream schema or public API change is planned.
+
+### Planned Material Improvement
+
+Introduce a stream-specific recording boundary that first re-validates accepted chunks as A2A stream responses, then treats registry persistence failures as non-fatal for the current stream while preserving the registry unchanged. This keeps current stream delivery aligned with parser validation and keeps future follow-up authority fail-closed.

@@ -175,6 +175,25 @@ impl A2aAdapter {
         registry.record_from_value(response, &context)
     }
 
+    fn record_stream_task_activity(
+        &self,
+        tool_name: &str,
+        response: &Value,
+        source: &str,
+    ) -> Result<(), AdapterError> {
+        validate_stream_response(response.clone())?;
+        if let Err(error) = self.record_task_activity(tool_name, response, source) {
+            tracing::warn!(
+                target: "chio_a2a_adapter",
+                tool_name,
+                source,
+                error = %error,
+                "skipping A2A stream task registry persistence"
+            );
+        }
+        Ok(())
+    }
+
     fn resolve_request_auth(
         &self,
         skill: &A2aAgentSkill,
@@ -1346,7 +1365,7 @@ impl ToolServerConnection for A2aAdapter {
                     ToolServerStreamResult::Complete(stream)
                     | ToolServerStreamResult::Incomplete { stream, .. } => {
                         for chunk in &stream.chunks {
-                            self.record_task_activity(tool_name, &chunk.data, "stream_event")
+                            self.record_stream_task_activity(tool_name, &chunk.data, "stream_event")
                                 .map_err(|error| KernelError::ToolServerError(error.to_string()))?;
                         }
                     }
@@ -1374,7 +1393,11 @@ impl ToolServerConnection for A2aAdapter {
                     ToolServerStreamResult::Complete(stream)
                     | ToolServerStreamResult::Incomplete { stream, .. } => {
                         for chunk in &stream.chunks {
-                            self.record_task_activity(tool_name, &chunk.data, "subscribe_event")
+                            self.record_stream_task_activity(
+                                tool_name,
+                                &chunk.data,
+                                "subscribe_event",
+                            )
                                 .map_err(|error| KernelError::ToolServerError(error.to_string()))?;
                         }
                     }
