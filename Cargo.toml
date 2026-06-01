@@ -189,6 +189,9 @@ rust_public_entrypoints = [
     "chio-mcp-remote",
     "chio-policy",
 ]
+rust_registry_public_crates = [
+    "chio-conformance",
+]
 
 [workspace.metadata.cargo-vet]
 

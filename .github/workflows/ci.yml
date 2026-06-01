@@ -73,6 +73,7 @@ jobs:
         run: |
           ./scripts/check-release-inputs.sh
           ./scripts/check-workspace-layering.sh
+          python3 ./scripts/check-rust-public-surface.py
           bash ./scripts/check-sre-metrics-registry.sh
           bash ./scripts/check-log-redaction.sh
           bash ./scripts/check-http-egress-contract.sh
