@@ -227,6 +227,12 @@ pub enum ManifestError {
     #[error("invalid tool name: {0}")]
     InvalidToolName(String),
 
+    #[error("tool input schema is not a JSON object: {0}")]
+    InvalidInputSchema(String),
+
+    #[error("tool output schema is not a JSON object: {0}")]
+    InvalidOutputSchema(String),
+
     #[error("duplicate server tool allowlist entry: {0}")]
     DuplicateServerTool(String),
 
@@ -255,6 +261,16 @@ pub fn validate_manifest(manifest: &ToolManifest) -> Result<(), ManifestError> {
         }
         if !seen.insert(&tool.name) {
             return Err(ManifestError::DuplicateToolName(tool.name.clone()));
+        }
+        if !tool.input_schema.is_object() {
+            return Err(ManifestError::InvalidInputSchema(tool.name.clone()));
+        }
+        if tool
+            .output_schema
+            .as_ref()
+            .is_some_and(|schema| !schema.is_object())
+        {
+            return Err(ManifestError::InvalidOutputSchema(tool.name.clone()));
         }
     }
 
@@ -408,6 +424,28 @@ mod tests {
         assert!(matches!(
             validate_manifest(&m),
             Err(ManifestError::VerificationFailed)
+        ));
+    }
+
+    #[test]
+    fn validate_rejects_non_object_input_schema() {
+        let mut m = sample_manifest();
+        m.tools[0].input_schema = serde_json::json!(["not", "an", "object"]);
+
+        assert!(matches!(
+            validate_manifest(&m),
+            Err(ManifestError::InvalidInputSchema(tool)) if tool == "greet"
+        ));
+    }
+
+    #[test]
+    fn validate_rejects_non_object_output_schema() {
+        let mut m = sample_manifest();
+        m.tools[0].output_schema = Some(serde_json::json!("not an object"));
+
+        assert!(matches!(
+            validate_manifest(&m),
+            Err(ManifestError::InvalidOutputSchema(tool)) if tool == "greet"
         ));
     }
 

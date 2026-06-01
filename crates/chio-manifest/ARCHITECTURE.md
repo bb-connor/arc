@@ -11,18 +11,21 @@ or billing enforcement.
 
 ## Current Pain Point
 
-The manifest has both discovery metadata and trust metadata. Existing branch
-work ties `sign_manifest` and `verify_manifest` to the embedded `public_key`,
-but plain `validate_manifest` still accepts an unparsable `public_key`. That
-leaves adapters that call validation before exposing generated manifests with a
-weaker pre-signature boundary than the signed-manifest path.
+The manifest has both discovery metadata and trust metadata. Validation already
+checks the schema identifier, duplicate tools, duplicate server-tool entries,
+and embedded public-key parsing before signing or verification. The remaining
+gap is that `input_schema` and `output_schema` are still arbitrary JSON values
+at the manifest boundary. Some adapter edges reject non-object schemas before
+projection, but any caller that relies only on `validate_manifest` can still
+expose a malformed tool contract as a signed manifest.
 
 ## Security And API Constraints
 
 - `chio.manifest.v1` must stay frozen and backward-compatible for valid
   manifests.
-- Unknown schema values, malformed signer material, duplicate tool names, and
-  malformed server-tool allowlists must fail closed.
+- Unknown schema values, malformed signer material, duplicate tool names,
+  malformed server-tool allowlists, and non-object per-tool schemas must fail
+  closed.
 - Validation must use Chio's algorithm-aware `PublicKey` decoder so Ed25519 and
   supported FIPS encodings stay compatible.
 - Adapter fixture updates, if needed, should only replace fake keys with
@@ -31,12 +34,12 @@ weaker pre-signature boundary than the signed-manifest path.
 ## Affected Dependents
 
 Potential dependents are adapter tests and examples that synthesize manifests
-with placeholder public-key strings before calling `validate_manifest`. If this
-slice exposes those fixtures, the required transitive change is to use real
-deterministic public keys while preserving the tested adapter behavior.
+with non-object schema placeholders before calling `validate_manifest`. If this
+slice exposes those fixtures, the required transitive change is to use object
+schema placeholders while preserving the tested adapter behavior.
 
 ## Planned Improvement
 
-Move embedded public-key parsing into `validate_manifest`, so manifest
-validation rejects impossible trust metadata before admission, signing, or
-adapter exposure.
+Move per-tool JSON schema object checks into `validate_manifest`, so manifest
+validation rejects impossible discovery metadata before signing, verification,
+or adapter exposure.

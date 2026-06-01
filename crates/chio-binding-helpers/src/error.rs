@@ -23,6 +23,8 @@ pub enum ErrorCode {
     EmptyManifest,
     DuplicateToolName,
     InvalidToolName,
+    InvalidInputSchema,
+    InvalidOutputSchema,
     DuplicateServerTool,
     UnsupportedSchema,
     ManifestVerificationFailed,
@@ -51,6 +53,12 @@ impl Error {
                 chio_manifest::ManifestError::EmptyManifest => ErrorCode::EmptyManifest,
                 chio_manifest::ManifestError::DuplicateToolName(_) => ErrorCode::DuplicateToolName,
                 chio_manifest::ManifestError::InvalidToolName(_) => ErrorCode::InvalidToolName,
+                chio_manifest::ManifestError::InvalidInputSchema(_) => {
+                    ErrorCode::InvalidInputSchema
+                }
+                chio_manifest::ManifestError::InvalidOutputSchema(_) => {
+                    ErrorCode::InvalidOutputSchema
+                }
                 chio_manifest::ManifestError::DuplicateServerTool(_) => {
                     ErrorCode::DuplicateServerTool
                 }
@@ -111,5 +119,18 @@ mod tests {
             " echo ".to_string(),
         ));
         assert_eq!(error.code(), ErrorCode::InvalidToolName);
+    }
+
+    #[test]
+    fn codes_map_invalid_schema_manifest_errors() {
+        let input = Error::from(chio_manifest::ManifestError::InvalidInputSchema(
+            "echo".to_string(),
+        ));
+        assert_eq!(input.code(), ErrorCode::InvalidInputSchema);
+
+        let output = Error::from(chio_manifest::ManifestError::InvalidOutputSchema(
+            "echo".to_string(),
+        ));
+        assert_eq!(output.code(), ErrorCode::InvalidOutputSchema);
     }
 }
