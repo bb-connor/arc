@@ -2253,6 +2253,31 @@ mod tests {
     }
 
     #[test]
+    fn decode_path_identity_segment_accepts_uppercase_hex_digits() {
+        assert_eq!(
+            decode_path_identity_segment("terminal%2Fcreate").as_deref(),
+            Some("terminal/create")
+        );
+        assert_eq!(
+            decode_path_identity_segment("tool%2Bname").as_deref(),
+            Some("tool+name")
+        );
+    }
+
+    #[test]
+    fn chio_tools_path_identity_decodes_uppercase_percent_encoding() {
+        let ChioToolsPathIdentity::Identity {
+            server_id,
+            tool_name,
+        } = chio_tools_path_identity("/chio/tools/acp/terminal%2Fcreate")
+        else {
+            panic!("expected identity");
+        };
+        assert_eq!(server_id, "acp");
+        assert_eq!(tool_name, "terminal/create");
+    }
+
+    #[test]
     fn chio_tools_path_identity_non_tools_path_is_not_tools_path() {
         assert!(matches!(
             chio_tools_path_identity("/pets/42"),
