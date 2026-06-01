@@ -10,22 +10,24 @@ signing, capability validation, budget mutation, or persistent kernel state.
 
 ## Current Pain Point
 
-The shell-command guard has two detection layers: regexes over the raw command
-line and structured token analysis for command wrappers, root deletion, and
-forbidden path access. The structured layer understands wrappers such as
-`sudo`, `env`, and `command`, but it does not descend into shell interpreter
-command strings such as `sh -c` or `bash -lc`. That leaves the regex layer as
-the only protection for nested shell commands, which is weaker for quoted or
-token-split destructive patterns.
+The shell-command guard now recursively checks shell interpreter command strings
+for destructive root deletion, but forbidden-path extraction still stops at the
+outer command line. Some sensitive-path substrings are caught accidentally when
+they remain visible inside the outer `sh -c` argument, but bare relative targets
+such as `sh -c "cat .env"` are collapsed into one token and the delegated
+`ForbiddenPathGuard` never sees `.env` as a path. That creates a weaker path
+boundary for `sh -c`, `bash -lc`, and wrapper-mediated shell execution than for
+top-level commands.
 
 ## Security And API Constraints
 
 - Guard evaluation must remain fail-closed for malformed guard configuration.
 - Public guard constructors and re-exports should remain compatible.
-- Benign shell data such as `echo rm -rf /` must not become a denial merely
-  because a nested shell string contains those words.
 - Wrapper handling must preserve existing `sudo`, `env`, `command`, quoted
-  separator, and forbidden-path behavior.
+  separator, root-deletion, and forbidden-path behavior.
+- Nested shell analysis must share the existing maximum recursion depth.
+- Path extraction must remain best-effort and fail closed through the existing
+  guard verdict path rather than adding kernel-side state.
 
 ## Affected Dependents
 
@@ -35,7 +37,7 @@ kernel and CLI policy paths. No dependent API change is planned.
 
 ## Planned Improvement
 
-Extend the structured shell-command analysis to recurse into shell interpreter
-`-c` command strings. The nested analysis should detect the same destructive
-root-deletion forms that are already blocked at top level while preserving the
-current distinction between executable shell syntax and inert command text.
+Extend structured path extraction to recurse into shell interpreter `-c` command
+strings. The nested analysis should pass the same candidate paths to
+`ForbiddenPathGuard` that top-level shell commands already expose, including
+redirection targets and flag-embedded paths.

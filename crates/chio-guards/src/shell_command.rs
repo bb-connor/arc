@@ -132,17 +132,33 @@ impl ShellCommandGuard {
         }
 
         let mut out: Vec<String> = Vec::new();
-
-        for segment in tokens.split(|token| is_shell_separator(token)) {
-            push_segment_path_candidates(&mut out, segment);
-        }
-
-        // Windows drive-rooted paths.
-        for p in extract_windows_paths_best_effort(commandline) {
-            push_path_candidate(&mut out, &p);
-        }
-
+        push_candidate_paths_with_depth(&mut out, commandline, tokens, 0);
         out
+    }
+}
+
+fn push_candidate_paths_with_depth(
+    out: &mut Vec<String>,
+    commandline: &str,
+    tokens: &[String],
+    depth: usize,
+) {
+    for segment in tokens.split(|token| is_shell_separator(token)) {
+        let expanded_segment = expand_env_split_string_options(segment);
+        for expanded_shell_segment in expanded_segment.split(|token| is_shell_separator(token)) {
+            push_segment_path_candidates(out, expanded_shell_segment);
+            if depth < MAX_SHELL_COMMAND_NESTING {
+                if let Some(command_string) = shell_command_string(expanded_shell_segment) {
+                    let nested = shlex_split_best_effort(command_string);
+                    push_candidate_paths_with_depth(out, command_string, &nested, depth + 1);
+                }
+            }
+        }
+    }
+
+    // Windows drive-rooted paths.
+    for p in extract_windows_paths_best_effort(commandline) {
+        push_path_candidate(out, &p);
     }
 }
 
@@ -895,6 +911,18 @@ mod tests {
         assert!(guard.is_forbidden("echo ok | cat ~/.ssh/id_rsa"));
         assert!(guard.is_forbidden("echo ok\ncat ~/.ssh/id_rsa"));
         assert!(guard.is_forbidden("echo ok; tool --config=/home/user/.aws/credentials"));
+    }
+
+    #[test]
+    fn blocks_forbidden_paths_inside_shell_command_strings() {
+        let guard = ShellCommandGuard::new();
+        assert!(guard.is_forbidden("sh -c \"cat .env\""));
+        assert!(guard.is_forbidden("sh -c \"cat ~/.ssh/id_rsa\""));
+        assert!(guard.is_forbidden("bash -lc \"echo ok; cat ~/.aws/credentials\""));
+        assert!(guard.is_forbidden(
+            "sudo --user nobody sh -c \"tool --config=/home/user/.aws/credentials\""
+        ));
+        assert!(guard.is_forbidden("zsh -c \"echo hi > ~/.ssh/id_rsa\""));
     }
 
     #[test]
