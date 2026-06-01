@@ -2552,6 +2552,141 @@ fn guard_denies_request() {
 }
 
 #[test]
+fn unlimited_grant_guard_denial_does_not_reverse_budget_store() {
+    struct NoopUnlimitedBudgetStore {
+        inner: InMemoryBudgetStore,
+        reverse_calls: std::sync::atomic::AtomicUsize,
+    }
+
+    impl NoopUnlimitedBudgetStore {
+        fn new() -> Self {
+            Self {
+                inner: InMemoryBudgetStore::new(),
+                reverse_calls: std::sync::atomic::AtomicUsize::new(0),
+            }
+        }
+    }
+
+    impl BudgetStore for NoopUnlimitedBudgetStore {
+        fn try_increment(
+            &self,
+            capability_id: &str,
+            grant_index: usize,
+            max_invocations: Option<u32>,
+        ) -> Result<bool, BudgetStoreError> {
+            if max_invocations.is_none() {
+                return Ok(true);
+            }
+            self.inner
+                .try_increment(capability_id, grant_index, max_invocations)
+        }
+
+        fn try_charge_cost(
+            &self,
+            capability_id: &str,
+            grant_index: usize,
+            max_invocations: Option<u32>,
+            cost_units: u64,
+            max_cost_per_invocation: Option<u64>,
+            max_total_cost_units: Option<u64>,
+        ) -> Result<bool, BudgetStoreError> {
+            self.inner.try_charge_cost(
+                capability_id,
+                grant_index,
+                max_invocations,
+                cost_units,
+                max_cost_per_invocation,
+                max_total_cost_units,
+            )
+        }
+
+        fn reverse_charge_cost(
+            &self,
+            capability_id: &str,
+            grant_index: usize,
+            cost_units: u64,
+        ) -> Result<(), BudgetStoreError> {
+            self.reverse_calls.fetch_add(1, Ordering::SeqCst);
+            self.inner
+                .reverse_charge_cost(capability_id, grant_index, cost_units)
+        }
+
+        fn reduce_charge_cost(
+            &self,
+            capability_id: &str,
+            grant_index: usize,
+            cost_units: u64,
+        ) -> Result<(), BudgetStoreError> {
+            self.inner
+                .reduce_charge_cost(capability_id, grant_index, cost_units)
+        }
+
+        fn settle_charge_cost(
+            &self,
+            capability_id: &str,
+            grant_index: usize,
+            exposed_cost_units: u64,
+            realized_cost_units: u64,
+        ) -> Result<(), BudgetStoreError> {
+            self.inner.settle_charge_cost(
+                capability_id,
+                grant_index,
+                exposed_cost_units,
+                realized_cost_units,
+            )
+        }
+
+        fn list_usages(
+            &self,
+            limit: usize,
+            capability_id: Option<&str>,
+        ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
+            self.inner.list_usages(limit, capability_id)
+        }
+
+        fn get_usage(
+            &self,
+            capability_id: &str,
+            grant_index: usize,
+        ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
+            self.inner.get_usage(capability_id, grant_index)
+        }
+    }
+
+    let mut kernel = make_kernel(make_config());
+    let budget_store = std::sync::Arc::new(NoopUnlimitedBudgetStore::new());
+    kernel.set_budget_store_handle(budget_store.clone());
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["dangerous"])));
+
+    struct DenyAll;
+    impl Guard for DenyAll {
+        fn name(&self) -> &str {
+            "deny-all"
+        }
+        fn evaluate(&self, _ctx: &GuardContext) -> Result<Verdict, KernelError> {
+            Ok(Verdict::Deny)
+        }
+    }
+    kernel.add_guard(Box::new(DenyAll));
+
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-a", "dangerous")]),
+        300,
+    );
+    let request = make_request("req-unlimited-deny", &cap, "dangerous", "srv-a");
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    assert_eq!(response.verdict, Verdict::Deny);
+    let reason = response.reason.as_deref().unwrap_or("");
+    assert!(reason.contains("deny-all"), "reason was: {reason}");
+    assert_eq!(budget_store.reverse_calls.load(Ordering::SeqCst), 0);
+    assert!(budget_store.get_usage(&cap.id, 0).unwrap().is_none());
+}
+
+#[test]
 fn guard_error_treated_as_deny() {
     let mut kernel = make_kernel(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["tool"])));
