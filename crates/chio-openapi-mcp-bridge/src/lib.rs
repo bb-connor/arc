@@ -363,6 +363,12 @@ impl ToolServerConnection for OwnedBridgeToolServer {
 mod tests {
     use super::*;
 
+    fn valid_test_public_key() -> String {
+        chio_core::Keypair::from_seed(&[17u8; 32])
+            .public_key()
+            .to_hex()
+    }
+
     const PETSTORE_SPEC: &str = r#"{
         "openapi": "3.0.3",
         "info": {
@@ -454,7 +460,7 @@ mod tests {
             server_id: "petstore-bridge".to_string(),
             server_name: "Petstore Bridge".to_string(),
             server_version: "1.0.0".to_string(),
-            public_key: "aabbccdd".to_string(),
+            public_key: valid_test_public_key(),
             base_url: "https://api.example.com".to_string(),
             egress_contract: None,
         }

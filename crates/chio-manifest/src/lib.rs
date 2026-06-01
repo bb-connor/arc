@@ -243,6 +243,7 @@ pub fn validate_manifest(manifest: &ToolManifest) -> Result<(), ManifestError> {
     if manifest.schema != TOOL_MANIFEST_SCHEMA {
         return Err(ManifestError::UnsupportedSchema(manifest.schema.clone()));
     }
+    let _ = embedded_public_key(manifest)?;
     if manifest.tools.is_empty() {
         return Err(ManifestError::EmptyManifest);
     }
@@ -307,13 +308,16 @@ fn ensure_embedded_public_key_matches(
     manifest: &ToolManifest,
     signer_key: &PublicKey,
 ) -> Result<(), ManifestError> {
-    let embedded_key =
-        PublicKey::from_hex(&manifest.public_key).map_err(|_| ManifestError::VerificationFailed)?;
+    let embedded_key = embedded_public_key(manifest)?;
     if embedded_key == *signer_key {
         Ok(())
     } else {
         Err(ManifestError::VerificationFailed)
     }
+}
+
+fn embedded_public_key(manifest: &ToolManifest) -> Result<PublicKey, ManifestError> {
+    PublicKey::from_hex(&manifest.public_key).map_err(|_| ManifestError::VerificationFailed)
 }
 
 #[cfg(test)]
@@ -354,7 +358,7 @@ mod tests {
             }],
             server_tools: Vec::new(),
             required_permissions: None,
-            public_key: "deadbeef".into(),
+            public_key: Keypair::from_seed(&[7u8; 32]).public_key().to_hex(),
         }
     }
 
@@ -393,6 +397,17 @@ mod tests {
         assert!(matches!(
             validate_manifest(&m),
             Err(ManifestError::InvalidToolName(_))
+        ));
+    }
+
+    #[test]
+    fn validate_rejects_unparseable_embedded_public_key() {
+        let mut m = sample_manifest();
+        m.public_key = "not-a-public-key".into();
+
+        assert!(matches!(
+            validate_manifest(&m),
+            Err(ManifestError::VerificationFailed)
         ));
     }
 

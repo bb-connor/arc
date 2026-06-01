@@ -572,6 +572,10 @@ mod tests {
         response: Value,
     }
 
+    fn valid_test_public_key() -> String {
+        Keypair::from_seed(&[23u8; 32]).public_key().to_hex()
+    }
+
     #[async_trait::async_trait]
     impl ToolServerConnection for MockToolServer {
         fn server_id(&self) -> &str {
@@ -655,7 +659,7 @@ mod tests {
             ],
             server_tools: Vec::new(),
             required_permissions: None,
-            public_key: "aabbccdd".to_string(),
+            public_key: valid_test_public_key(),
         }
     }
 
@@ -664,7 +668,7 @@ mod tests {
             server_id: "openai-test".to_string(),
             server_name: "OpenAI Test".to_string(),
             server_version: "1.0.0".to_string(),
-            public_key: "aabbccdd".to_string(),
+            public_key: valid_test_public_key(),
         }
     }
 
@@ -771,7 +775,7 @@ mod tests {
             tools: vec![],
             server_tools: Vec::new(),
             required_permissions: None,
-            public_key: "aabb".to_string(),
+            public_key: valid_test_public_key(),
         };
         let err = ChioOpenAiAdapter::new(test_config(), vec![empty_manifest]).unwrap_err();
         assert!(matches!(err, OpenAiAdapterError::InvalidRequest(_)));
@@ -1029,7 +1033,7 @@ mod tests {
             }],
             server_tools: Vec::new(),
             required_permissions: None,
-            public_key: "aabb".to_string(),
+            public_key: valid_test_public_key(),
         };
         let adapter = ChioOpenAiAdapter::new(test_config(), vec![manifest]).unwrap();
         let mut kernel = ChioKernel::new(test_kernel_config());

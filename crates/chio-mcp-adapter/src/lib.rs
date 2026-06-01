@@ -545,6 +545,12 @@ mod tests {
 
     use chio_test_support::prelude::*;
 
+    fn valid_test_public_key() -> String {
+        chio_core::Keypair::from_seed(&[13u8; 32])
+            .public_key()
+            .to_hex()
+    }
+
     #[derive(Clone)]
     enum MockCallBehavior {
         Success(McpToolResult),
@@ -720,7 +726,7 @@ mod tests {
             server_id: "mcp-test".into(),
             server_name: "Test".into(),
             server_version: "0.1.0".into(),
-            public_key: "aabbccdd".into(),
+            public_key: valid_test_public_key(),
         }
     }
 
@@ -797,7 +803,7 @@ mod tests {
             server_id: "mcp-fs".into(),
             server_name: "Filesystem MCP".into(),
             server_version: "1.0.0".into(),
-            public_key: "aabbccdd".into(),
+            public_key: valid_test_public_key(),
         };
 
         let adapter = McpAdapter::new(config, Box::new(transport));
@@ -978,11 +984,12 @@ mod tests {
 
     #[test]
     fn manifest_carries_server_metadata() {
+        let public_key = valid_test_public_key();
         let config = McpAdapterConfig {
             server_id: "my-server".into(),
             server_name: "My Server".into(),
             server_version: "2.0.0".into(),
-            public_key: "deadbeef".into(),
+            public_key: public_key.clone(),
         };
         let transport = MockTransport::simple(
             vec![text_tool_info("t")],
@@ -995,7 +1002,7 @@ mod tests {
         assert_eq!(manifest.server_id, "my-server");
         assert_eq!(manifest.name, "My Server");
         assert_eq!(manifest.version, "2.0.0");
-        assert_eq!(manifest.public_key, "deadbeef");
+        assert_eq!(manifest.public_key, public_key);
     }
 
     // ---- Invocation tests ----
@@ -1228,7 +1235,7 @@ mod tests {
             server_id: "mcp-auth".into(),
             server_name: "Auth".into(),
             server_version: "0.1.0".into(),
-            public_key: "aabbccdd".into(),
+            public_key: valid_test_public_key(),
         };
 
         let adapted = AdaptedMcpServer::new(McpAdapter::new(config, Box::new(transport)))
