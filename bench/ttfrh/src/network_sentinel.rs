@@ -104,11 +104,49 @@ impl Allowlist {
 fn strip_toml_comments(manifest: &str) -> String {
     let mut stripped = String::with_capacity(manifest.len());
     for line in manifest.lines() {
-        let content = line.split_once('#').map_or(line, |(before, _)| before);
+        let content = match toml_comment_start(line) {
+            Some(index) => &line[..index],
+            None => line,
+        };
         stripped.push_str(content);
         stripped.push('\n');
     }
     stripped
+}
+
+fn toml_comment_start(line: &str) -> Option<usize> {
+    let mut in_basic_string = false;
+    let mut in_literal_string = false;
+    let mut escaped = false;
+
+    for (index, ch) in line.char_indices() {
+        if in_basic_string {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            match ch {
+                '\\' => escaped = true,
+                '"' => in_basic_string = false,
+                _ => {}
+            }
+            continue;
+        }
+        if in_literal_string {
+            if ch == '\'' {
+                in_literal_string = false;
+            }
+            continue;
+        }
+        match ch {
+            '"' => in_basic_string = true,
+            '\'' => in_literal_string = true,
+            '#' => return Some(index),
+            _ => {}
+        }
+    }
+
+    None
 }
 
 /// Result of running the sentinel against a captured hostname stream.
@@ -311,6 +349,28 @@ hosts = []
 "#;
         let allowlist = Allowlist::embedded();
         assert!(!allowlist.matches_manifest(manifest));
+    }
+
+    #[test]
+    fn manifest_match_preserves_hash_inside_quoted_hosts() {
+        let manifest = r#"
+global_hosts = ["127.0.0.1", "localhost", "::1", "server#1.example.com"] # comment
+
+[templates.next-ai-sdk-receipts]
+hosts = []
+
+[templates.fastapi-langchain]
+hosts = []
+
+[templates.cloudflare-worker]
+hosts = []
+"#;
+        let mut allowlist = Allowlist::embedded();
+        allowlist
+            .global_hosts
+            .insert("server#1.example.com".to_string());
+
+        assert!(allowlist.matches_manifest(manifest));
     }
 
     #[test]
