@@ -159,26 +159,22 @@ impl ChioAcpEdge {
         })
     }
 
-    fn dpop_proof_matches_permission_preview(
+    fn dpop_proof_matches_kernel_permission_preview(
+        kernel: &ChioKernel,
         proof: &dpop::DpopProof,
         capability: &CapabilityToken,
         binding: &CapabilityBinding,
         arguments: &Value,
     ) -> bool {
-        let Ok(args_bytes) = canonical_json_bytes(arguments) else {
-            return false;
-        };
-        let action_hash = sha256_hex(&args_bytes);
-        let config = dpop::DpopConfig::default();
-        dpop::verify_dpop_proof_stateless(
-            proof,
-            capability,
-            &binding.server_id,
-            &binding.tool_name,
-            &action_hash,
-            &config,
-        )
-        .is_ok()
+        kernel
+            .verify_dpop_for_permission_preview(
+                proof,
+                capability,
+                &binding.server_id,
+                &binding.tool_name,
+                arguments,
+            )
+            .is_ok()
     }
 
     /// List all capabilities.
@@ -211,12 +207,34 @@ impl ChioAcpEdge {
     /// Evaluate a permission request against an explicit capability token.
     ///
     /// This is a truthful permission preview for deployments that already have
-    /// authenticated capability context but are not yet dispatching the tool
-    /// call itself.
+    /// authenticated capability context but are not yet dispatching the tool call
+    /// itself. DPoP-required grants need kernel policy context and fail closed
+    /// here; use [`evaluate_permission_with_kernel`](Self::evaluate_permission_with_kernel)
+    /// for kernel-backed previews.
     pub fn evaluate_permission(
         &self,
         request: &PermissionRequest,
         execution: &AcpKernelExecutionContext,
+    ) -> PermissionDecision {
+        self.evaluate_permission_with_dpop_policy(request, execution, None)
+    }
+
+    /// Evaluate a permission request against the same kernel DPoP policy that
+    /// authoritative invocation will use.
+    pub fn evaluate_permission_with_kernel(
+        &self,
+        request: &PermissionRequest,
+        kernel: &ChioKernel,
+        execution: &AcpKernelExecutionContext,
+    ) -> PermissionDecision {
+        self.evaluate_permission_with_dpop_policy(request, execution, Some(kernel))
+    }
+
+    fn evaluate_permission_with_dpop_policy(
+        &self,
+        request: &PermissionRequest,
+        execution: &AcpKernelExecutionContext,
+        kernel: Option<&ChioKernel>,
     ) -> PermissionDecision {
         let Some(binding) = self.capability_bindings.get(&request.capability_id) else {
             return PermissionDecision::Deny;
@@ -261,7 +279,11 @@ impl ChioAcpEdge {
             let Some(proof) = execution.dpop_proof.as_ref() else {
                 return PermissionDecision::Deny;
             };
-            if !Self::dpop_proof_matches_permission_preview(
+            let Some(kernel) = kernel else {
+                return PermissionDecision::Deny;
+            };
+            if !Self::dpop_proof_matches_kernel_permission_preview(
+                kernel,
                 proof,
                 &execution.capability,
                 binding,
@@ -469,7 +491,7 @@ impl ChioAcpEdge {
                     Ok(request) => request,
                     Err(error) => return Self::jsonrpc_error_response(id, error),
                 };
-                let decision = self.evaluate_permission(&request, execution);
+                let decision = self.evaluate_permission_with_kernel(&request, kernel, execution);
                 json!({
                     "jsonrpc": "2.0",
                     "id": id,

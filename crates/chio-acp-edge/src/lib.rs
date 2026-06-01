@@ -38,11 +38,9 @@ use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use chio_core::canonical::canonical_json_bytes;
 use chio_core::capability::{
     CapabilityToken, GovernedApprovalToken, GovernedTransactionIntent, ModelMetadata,
 };
-use chio_core::crypto::sha256_hex;
 #[cfg(test)]
 use chio_core::session::OperationTerminalState;
 use chio_cross_protocol::{

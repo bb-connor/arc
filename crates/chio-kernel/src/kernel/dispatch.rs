@@ -206,6 +206,46 @@ impl ChioKernel {
         )
     }
 
+    /// Verify a DPoP proof for non-mutating permission preview.
+    ///
+    /// This mirrors invocation DPoP policy and checks that the nonce store and
+    /// config are installed, but deliberately avoids inserting the nonce so a
+    /// later authoritative invocation can still spend it.
+    pub fn verify_dpop_for_permission_preview(
+        &self,
+        proof: &dpop::DpopProof,
+        cap: &CapabilityToken,
+        expected_tool_server: &str,
+        expected_tool_name: &str,
+        arguments: &serde_json::Value,
+    ) -> Result<(), KernelError> {
+        if self.dpop_nonce_store.is_none() {
+            return Err(KernelError::DpopVerificationFailed(
+                "kernel DPoP nonce store not configured".to_string(),
+            ));
+        }
+
+        let config = self.dpop_config.as_ref().ok_or_else(|| {
+            KernelError::DpopVerificationFailed("kernel DPoP config not configured".to_string())
+        })?;
+
+        let args_bytes = canonical_json_bytes(arguments).map_err(|e| {
+            KernelError::DpopVerificationFailed(format!(
+                "failed to serialize arguments for action hash: {e}"
+            ))
+        })?;
+        let action_hash = sha256_hex(&args_bytes);
+
+        dpop::verify_dpop_proof_stateless(
+            proof,
+            cap,
+            expected_tool_server,
+            expected_tool_name,
+            &action_hash,
+            config,
+        )
+    }
+
     /// Run all registered guards. Fail-closed: any error from a guard is
     /// treated as a deny.
     pub(crate) fn run_guards(
