@@ -1605,4 +1605,74 @@ mod tests {
         let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
         assert!(error.to_string().contains("consistency anchor"));
     }
+
+    #[test]
+    fn verify_package_rejects_joint_deny_bilateral_policy_verdict() {
+        use chio_federation::{sign_chio_bilateral_dsse_envelope, BilateralPredicateExtensions};
+
+        let mut package = fresh_proof_package().expect("fresh package builds");
+        let (statement, _) = package.bilateral_envelopes[0]
+            .decode_statement()
+            .expect("first bilateral envelope decodes");
+        let predicate = statement.predicate;
+        let mut extensions = BilateralPredicateExtensions {
+            capability_lease_ref: predicate.capability_lease_ref.clone(),
+            policy_evaluation_summary: predicate.policy_evaluation_summary.clone(),
+            governance_receipt_ref: predicate.governance_receipt_ref.clone(),
+            consistency_anchor: predicate.consistency_anchor.clone(),
+            consistency_model: Some(predicate.consistency_model.clone()),
+            cross_org_visibility: Some(predicate.cross_org_visibility.clone()),
+            treaty_binding_ref: predicate.treaty_binding_ref.clone(),
+        };
+        let summary = extensions
+            .policy_evaluation_summary
+            .as_mut()
+            .expect("bilateral envelope carries policy evaluation summary");
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+
+        let buyer_key = Keypair::from_seed(&BUYER_SEED);
+        let vendor_key = Keypair::from_seed(&VENDOR_A_SEED);
+        let receipt = package.tool_receipts[0].clone();
+        package.bilateral_envelopes[0] = sign_chio_bilateral_dsse_envelope(
+            &receipt,
+            &buyer_key,
+            &vendor_key,
+            &predicate.tool_server_a.kernel_id,
+            &predicate.tool_server_b.kernel_id,
+            &predicate.tool_name,
+            predicate.timestamp_unix_ms,
+            extensions,
+        )
+        .expect("deny bilateral envelope re-signs");
+        package.workflow_receipt.steps[0].bilateral_dsse_sha256 =
+            Some(canonical_sha256(&package.bilateral_envelopes[0]).expect("envelope hashes"));
+        let mut workflow_body = package.workflow_receipt.body();
+        let mut previous_step_sha256: Option<String> = None;
+        for step in &mut workflow_body.steps {
+            step.parent_receipt_sha256 = previous_step_sha256.clone();
+            previous_step_sha256 =
+                Some(canonical_sha256(step).expect("workflow step canonical hash"));
+        }
+        package.workflow_receipt = WorkflowReceipt::sign(workflow_body, &buyer_key)
+            .expect("workflow receipt re-signs after bilateral swap");
+        for vendor in &VENDORS {
+            let key = Keypair::from_seed(&vendor.seed);
+            package
+                .workflow_receipt
+                .add_vendor_signature(vendor.vendor_id, &key)
+                .expect("vendor cosignature re-applies");
+        }
+        let context = verification_context();
+        let trust_bundle = rebuild_verifier_material(&mut package, &context);
+
+        let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.contains("bilateral envelope policy verdict"),
+            "expected joint deny gate, got: {message}"
+        );
+        assert!(message.contains("deny"), "expected deny verdict in error: {message}");
+    }
 }
