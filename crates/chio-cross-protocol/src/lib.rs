@@ -908,16 +908,12 @@ impl<'a> CrossProtocolOrchestrator<'a> {
         bridge: &B,
         request: CrossProtocolExecutionRequest,
     ) -> Result<OrchestratedToolCall, BridgeError> {
+        validate_execution_request_boundary(&request)?;
         let source_protocol = bridge.source_protocol();
         let provided_ref = bridge.extract_capability_ref(&request.source_envelope)?;
         let capability_ref = match provided_ref {
             Some(cap_ref) => {
-                if cap_ref.chio_capability_id != request.capability.id {
-                    return Err(BridgeError::CapabilityRefMismatch {
-                        expected: request.capability.id.clone(),
-                        actual: cap_ref.chio_capability_id,
-                    });
-                }
+                validate_provided_capability_ref(&cap_ref, &request.capability)?;
                 cap_ref
             }
             None => CrossProtocolCapabilityRef::from_capability(
@@ -1223,6 +1219,48 @@ fn build_route_evidence(
         terminal_protocol: last_hop.protocol,
         multi_hop: route_hops.len() > 1,
     })
+}
+
+fn validate_execution_request_boundary(
+    request: &CrossProtocolExecutionRequest,
+) -> Result<(), BridgeError> {
+    validate_non_empty_request_field("origin_request_id", &request.origin_request_id)?;
+    validate_non_empty_request_field("kernel_request_id", &request.kernel_request_id)?;
+    validate_non_empty_request_field("target_server_id", &request.target_server_id)?;
+    validate_non_empty_request_field("target_tool_name", &request.target_tool_name)?;
+    validate_non_empty_request_field("agent_id", &request.agent_id)?;
+    Ok(())
+}
+
+fn validate_non_empty_request_field(field_name: &str, value: &str) -> Result<(), BridgeError> {
+    if value.trim().is_empty() {
+        return Err(BridgeError::InvalidRequest(format!(
+            "{field_name} must be a non-empty string"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_provided_capability_ref(
+    cap_ref: &CrossProtocolCapabilityRef,
+    capability: &CapabilityToken,
+) -> Result<(), BridgeError> {
+    if cap_ref.chio_capability_id != capability.id {
+        return Err(BridgeError::CapabilityRefMismatch {
+            expected: capability.id.clone(),
+            actual: cap_ref.chio_capability_id.clone(),
+        });
+    }
+
+    let expected_hash = parent_capability_hash(capability)?;
+    if cap_ref.parent_capability_hash != expected_hash {
+        return Err(BridgeError::InvalidRequest(
+            "capabilityRef parentCapabilityHash does not match active capability lineage"
+                .to_string(),
+        ));
+    }
+
+    Ok(())
 }
 
 #[derive(Debug, Default)]
@@ -1792,6 +1830,89 @@ mod tests {
         let err = target_protocol_for_tool(&tool).unwrap_err();
 
         assert!(err.contains("x-chio-target-protocol must be a string"));
+    }
+
+    #[test]
+    fn orchestrator_rejects_empty_origin_request_id_before_signed_lineage() {
+        let (issuer, kernel) = test_kernel();
+        let subject = Keypair::generate();
+        let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+
+        let err = orchestrator
+            .execute(
+                &MockBridge,
+                CrossProtocolExecutionRequest {
+                    origin_request_id: " ".to_string(),
+                    kernel_request_id: "a2a-empty-origin-kernel-1".to_string(),
+                    target_protocol: DiscoveryProtocol::Native,
+                    target_server_id: "test-srv".to_string(),
+                    target_tool_name: "echo".to_string(),
+                    agent_id: subject.public_key().to_hex(),
+                    arguments: json!({"message":"hello"}),
+                    capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+                    source_envelope: json!({
+                        "message": {"role":"user"},
+                        "metadata": { "chio": { "targetSkillId": "echo" } }
+                    }),
+                    dpop_proof: None,
+                    governed_intent: None,
+                    approval_token: None,
+                    model_metadata: None,
+                },
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            err.to_string(),
+            "invalid request envelope: origin_request_id must be a non-empty string"
+        );
+    }
+
+    #[test]
+    fn orchestrator_rejects_forged_capability_ref_parent_hash() {
+        let (issuer, kernel) = test_kernel();
+        let subject = Keypair::generate();
+        let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+        let capability = capability_for_tool(&issuer, &subject, "test-srv", "echo");
+
+        let err = orchestrator
+            .execute(
+                &MockBridge,
+                CrossProtocolExecutionRequest {
+                    origin_request_id: "a2a-forged-cap-ref".to_string(),
+                    kernel_request_id: "a2a-forged-cap-ref-kernel-1".to_string(),
+                    target_protocol: DiscoveryProtocol::Native,
+                    target_server_id: "test-srv".to_string(),
+                    target_tool_name: "echo".to_string(),
+                    agent_id: subject.public_key().to_hex(),
+                    arguments: json!({"message":"hello"}),
+                    capability,
+                    source_envelope: json!({
+                        "message": {"role":"user"},
+                        "metadata": {
+                            "chio": {
+                                "targetSkillId": "echo",
+                                "capabilityRef": {
+                                    "chioCapabilityId": "cap-test-srv-echo",
+                                    "originProtocol": "a2a",
+                                    "protocolContext": {"targetSkillId": "echo"},
+                                    "parentCapabilityHash": "forged-parent-hash"
+                                }
+                            }
+                        }
+                    }),
+                    dpop_proof: None,
+                    governed_intent: None,
+                    approval_token: None,
+                    model_metadata: None,
+                },
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            err.to_string(),
+            "invalid request envelope: capabilityRef parentCapabilityHash does not match active capability lineage"
+        );
     }
 
     #[test]
