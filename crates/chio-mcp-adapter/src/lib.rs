@@ -556,12 +556,47 @@ fn parse_url_elicitation_required_error(
     })
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct McpToolSafetyHints {
+    read_only: Option<bool>,
+    destructive: Option<bool>,
+    malformed: bool,
+}
+
+impl McpToolSafetyHints {
+    fn from_annotations(annotations: Option<&serde_json::Value>) -> Self {
+        let Some(annotations) = annotations else {
+            return Self::default();
+        };
+
+        let (read_only, read_only_malformed) = read_bool_hint(annotations, "readOnlyHint");
+        let (destructive, destructive_malformed) = read_bool_hint(annotations, "destructiveHint");
+
+        Self {
+            read_only,
+            destructive,
+            malformed: read_only_malformed || destructive_malformed,
+        }
+    }
+
+    fn has_side_effects(self) -> bool {
+        if self.malformed || self.destructive == Some(true) {
+            return true;
+        }
+        !matches!(self.read_only, Some(true))
+    }
+}
+
+fn read_bool_hint(annotations: &serde_json::Value, key: &str) -> (Option<bool>, bool) {
+    match annotations.get(key) {
+        None | Some(serde_json::Value::Null) => (None, false),
+        Some(serde_json::Value::Bool(value)) => (Some(*value), false),
+        Some(_) => (None, true),
+    }
+}
+
 fn infer_has_side_effects(annotations: Option<&serde_json::Value>) -> bool {
-    annotations
-        .and_then(|value| value.get("readOnlyHint"))
-        .and_then(serde_json::Value::as_bool)
-        .map(|read_only| !read_only)
-        .unwrap_or(true)
+    McpToolSafetyHints::from_annotations(annotations).has_side_effects()
 }
 
 #[cfg(test)]
@@ -903,6 +938,34 @@ mod tests {
         assert!(
             manifest.tools[2].has_side_effects,
             "missing annotations defaults to side effects (fail-closed)"
+        );
+    }
+
+    #[test]
+    fn manifest_conflicting_readonly_and_destructive_annotations_fail_closed() {
+        let tool_conflicting = McpToolInfo {
+            name: "conflicting".into(),
+            title: None,
+            description: Some("Conflicting safety hints".into()),
+            input_schema: serde_json::json!({"type": "object"}),
+            output_schema: None,
+            annotations: Some(serde_json::json!({
+                "readOnlyHint": true,
+                "destructiveHint": true,
+            })),
+            execution: None,
+        };
+        let transport = MockTransport::simple(
+            vec![tool_conflicting],
+            MockCallBehavior::Success(success_result("ok")),
+        );
+        let adapter = McpAdapter::new(default_config(), Box::new(transport));
+
+        let manifest = adapter.generate_manifest().test_unwrap();
+
+        assert!(
+            manifest.tools[0].has_side_effects,
+            "destructiveHint=true must override readOnlyHint=true"
         );
     }
 
@@ -1791,6 +1854,24 @@ mod tests {
     #[test]
     fn infer_side_effects_readonly_non_bool_defaults_true() {
         let ann = serde_json::json!({"readOnlyHint": "yes"});
+        assert!(infer_has_side_effects(Some(&ann)));
+    }
+
+    #[test]
+    fn infer_side_effects_destructive_true_overrides_readonly_true() {
+        let ann = serde_json::json!({
+            "readOnlyHint": true,
+            "destructiveHint": true,
+        });
+        assert!(infer_has_side_effects(Some(&ann)));
+    }
+
+    #[test]
+    fn infer_side_effects_malformed_destructive_hint_fails_closed() {
+        let ann = serde_json::json!({
+            "readOnlyHint": true,
+            "destructiveHint": "no",
+        });
         assert!(infer_has_side_effects(Some(&ann)));
     }
 
