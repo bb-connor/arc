@@ -11,12 +11,13 @@ mutation, capability verification, or persistent runtime state.
 ## Current Pain Point
 
 Policy compilation has two different security surfaces: emitted guard pipelines
-and the compiled `ChioScope`. Approval rules from `human_in_loop` and
-`tool_access.require_confirmation` are enforced through scope constraints rather
-than a standalone guard. That makes default-allow scope compilation
-security-sensitive: a wildcard grant must carry representable approval
-constraints, but must not be materialized when other policy semantics cannot be
-represented on that grant.
+and the compiled `ChioScope`. Guard pipelines can express allow, block, warning,
+runtime, workload, and size rules. Capability scopes are positive grants with
+constraints, and have no negative grant form. That makes `tool_access` deny-list
+semantics security-sensitive: compiling an allow-list grant while ignoring a
+block list can issue a capability that is broader than the policy intent if the
+allow and block patterns overlap and a caller consumes `default_scope` outside
+the full guard pipeline.
 
 ## Security And API Constraints
 
@@ -24,9 +25,9 @@ represented on that grant.
 - Public parser, validator, compiler, and evaluator APIs should remain
   compatible.
 - Default scope compilation must not silently widen access when workload
-  identity, runtime assurance, argument-size, or deny-list semantics are
-  present. It may emit a constrained wildcard only when approval semantics are
-  exactly representable on a wildcard grant.
+  identity, deny-list, or other unrepresentable semantics are present. It may
+  emit constrained grants only for semantics that `ChioScope` can enforce
+  directly.
 - Existing guard ordering, fail-closed regex validation, and policy evaluator
   decisions must remain stable unless a test proves the current behavior drops
   policy intent.
@@ -40,9 +41,7 @@ planned.
 
 ## Planned Improvement
 
-Make default-allow scope compilation account for both top-level
-human-in-the-loop approval requirements and `tool_access.require_confirmation`
-before emitting a wildcard grant. Representable approval requirements should
-produce a constrained wildcard grant; unrepresentable security semantics should
-keep the guard pipeline but produce an empty default scope rather than issuing
-an unconstrained wildcard capability.
+Make block-by-default scope compilation fail closed when `tool_access.block`
+overlaps the grants that would otherwise be emitted. The guard pipeline should
+still enforce the complete policy, but `default_scope` should emit no grants
+when a deny-list would be required to make those grants faithful.

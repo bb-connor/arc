@@ -668,6 +668,10 @@ fn compile_scope(policy: &HushSpec) -> Result<ChioScope, CompileError> {
         return Ok(ChioScope::default());
     }
 
+    if tool_access_block_overlaps_allow(ta)? {
+        return Ok(ChioScope::default());
+    }
+
     if ta.require_workload_identity.is_some() || ta.prefer_workload_identity.is_some() {
         return Ok(ChioScope::default());
     }
@@ -874,6 +878,15 @@ fn confirmation_overlap(
 ) -> Result<bool, CompileError> {
     for pattern in confirmation_patterns {
         if tool_patterns_overlap(tool_pattern, pattern)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn tool_access_block_overlaps_allow(rule: &ToolAccessRule) -> Result<bool, CompileError> {
+    for allow_pattern in &rule.allow {
+        if confirmation_overlap(allow_pattern, &rule.block)? {
             return Ok(true);
         }
     }

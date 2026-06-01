@@ -85,6 +85,49 @@ rules:
 }
 
 #[test]
+fn default_block_with_overlapping_allow_and_block_list_fails_closed_to_empty_scope() {
+    let compiled = compile(
+        r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    allow: ["payments.*"]
+    block: ["payments.refund"]
+    default: block
+"#,
+    );
+
+    assert!(
+        compiled.default_scope.grants.is_empty(),
+        "block-list semantics cannot be represented by positive-only default scope grants"
+    );
+}
+
+#[test]
+fn default_block_with_disjoint_allow_and_block_list_preserves_allow_scope() {
+    let compiled = compile(
+        r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    allow: ["read_file", "build"]
+    block: ["deploy_production"]
+    default: block
+"#,
+    );
+
+    let grants: Vec<&str> = compiled
+        .default_scope
+        .grants
+        .iter()
+        .map(|grant| grant.tool_name.as_str())
+        .collect();
+    assert_eq!(grants, vec!["read_file", "build"]);
+}
+
+#[test]
 fn default_allow_with_human_in_loop_approval_emits_constrained_wildcard_scope() {
     let compiled = compile(
         r#"
