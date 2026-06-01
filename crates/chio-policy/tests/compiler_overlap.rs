@@ -83,3 +83,24 @@ rules:
         "default-allow plus security constraints must not widen to wildcard scope"
     );
 }
+
+#[test]
+fn default_allow_with_human_in_loop_approval_fails_closed_to_empty_scope() {
+    let compiled = compile(
+        r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    default: allow
+  human_in_loop:
+    enabled: true
+    approve_above: 15000
+"#,
+    );
+
+    assert!(
+        compiled.default_scope.grants.is_empty(),
+        "default-allow plus human-in-loop approval must not emit an unconstrained wildcard scope"
+    );
+}

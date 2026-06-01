@@ -651,8 +651,10 @@ fn compile_scope(policy: &HushSpec) -> Result<ChioScope, CompileError> {
         return Ok(permissive_scope());
     }
 
+    let human_in_loop = rules.human_in_loop.as_ref();
+
     if ta.default == DefaultAction::Allow {
-        if tool_access_can_safely_widen_to_wildcard(ta) {
+        if tool_access_can_safely_widen_to_wildcard(ta, human_in_loop) {
             return Ok(permissive_scope());
         }
         return Ok(ChioScope::default());
@@ -668,7 +670,6 @@ fn compile_scope(policy: &HushSpec) -> Result<ChioScope, CompileError> {
     }
 
     // Each allowed tool pattern becomes a grant on a wildcard server
-    let human_in_loop = rules.human_in_loop.as_ref();
     let mut grants = Vec::with_capacity(ta.allow.len());
     for tool_pattern in &ta.allow {
         grants.push(ToolGrant {
@@ -725,7 +726,10 @@ fn compile_output_sanitizer_config(rule: &SecretPatternsRule) -> OutputSanitizer
     config
 }
 
-fn tool_access_can_safely_widen_to_wildcard(rule: &ToolAccessRule) -> bool {
+fn tool_access_can_safely_widen_to_wildcard(
+    rule: &ToolAccessRule,
+    human_in_loop: Option<&HumanInLoopRule>,
+) -> bool {
     rule.allow.is_empty()
         && rule.block.is_empty()
         && rule.require_confirmation.is_empty()
@@ -734,6 +738,13 @@ fn tool_access_can_safely_widen_to_wildcard(rule: &ToolAccessRule) -> bool {
         && rule.prefer_runtime_assurance_tier.is_none()
         && rule.require_workload_identity.is_none()
         && rule.prefer_workload_identity.is_none()
+        && !human_in_loop_requires_scope_constraints(human_in_loop)
+}
+
+fn human_in_loop_requires_scope_constraints(human_in_loop: Option<&HumanInLoopRule>) -> bool {
+    human_in_loop.is_some_and(|rule| {
+        rule.enabled && (!rule.require_confirmation.is_empty() || rule.approve_above.is_some())
+    })
 }
 
 fn compile_tool_constraints(
