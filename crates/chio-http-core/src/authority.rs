@@ -2259,4 +2259,21 @@ mod tests {
             ChioToolsPathIdentity::NotToolsPath
         ));
     }
+
+    #[test]
+    fn decode_path_identity_segment_decodes_valid_percent_encoding() {
+        assert_eq!(
+            decode_path_identity_segment("files%20read").as_deref(),
+            Some("files read")
+        );
+        let ChioToolsPathIdentity::Identity {
+            server_id,
+            tool_name,
+        } = chio_tools_path_identity("/chio/tools/acp/files%20read")
+        else {
+            panic!("expected decoded tools path identity");
+        };
+        assert_eq!(server_id, "acp");
+        assert_eq!(tool_name, "files read");
+    }
 }
