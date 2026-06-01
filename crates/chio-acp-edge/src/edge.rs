@@ -10,13 +10,6 @@ struct DeferredAcpTask {
     expires_at_ms: u64,
 }
 
-#[derive(Debug)]
-struct AcpJsonRpcEnvelope {
-    id: Value,
-    method: String,
-    params: Value,
-}
-
 /// The ACP edge server.
 ///
 /// Maps Chio tools to ACP capabilities and routes invocations through
@@ -138,77 +131,6 @@ impl ChioAcpEdge {
             .get(capability_id)
             .cloned()
             .ok_or_else(|| AcpEdgeError::ToolNotFound(capability_id.to_string()))
-    }
-
-    fn jsonrpc_protocol_error_response(id: Value, code: i64, message: &str) -> Value {
-        json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "error": {
-                "code": code,
-                "message": message,
-            }
-        })
-    }
-
-    fn parse_jsonrpc_envelope(message: &Value) -> Result<AcpJsonRpcEnvelope, Value> {
-        if message.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
-            return Err(Self::jsonrpc_protocol_error_response(
-                Value::Null,
-                -32600,
-                "invalid jsonrpc envelope",
-            ));
-        }
-
-        let id = message.get("id").cloned().unwrap_or(Value::Null);
-        if !id.is_string() && !id.is_number() && !id.is_null() {
-            return Err(Self::jsonrpc_protocol_error_response(
-                Value::Null,
-                -32600,
-                "request id must be string, number, or null",
-            ));
-        }
-
-        let Some(method) = message.get("method").and_then(Value::as_str) else {
-            return Err(Self::jsonrpc_protocol_error_response(
-                id,
-                -32600,
-                "request missing method",
-            ));
-        };
-        let params = message.get("params").cloned().unwrap_or_else(|| json!({}));
-
-        Ok(AcpJsonRpcEnvelope {
-            id,
-            method: method.to_string(),
-            params,
-        })
-    }
-
-    fn jsonrpc_permission_request(params: &Value) -> PermissionRequest {
-        PermissionRequest {
-            capability_id: Self::jsonrpc_capability_id(params),
-            arguments: Self::jsonrpc_arguments(params),
-        }
-    }
-
-    fn jsonrpc_invocation_params(params: &Value) -> (String, Value) {
-        (
-            Self::jsonrpc_capability_id(params),
-            Self::jsonrpc_arguments(params),
-        )
-    }
-
-    fn jsonrpc_capability_id(params: &Value) -> String {
-        params
-            .get("capabilityId")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .to_string()
-    }
-
-    fn jsonrpc_arguments(params: &Value) -> Value {
-        params.get("arguments").cloned().unwrap_or_else(|| json!({}))
     }
 
     fn build_execution_request(
@@ -543,7 +465,10 @@ impl ChioAcpEdge {
                 })
             }
             "session/request_permission" => {
-                let request = Self::jsonrpc_permission_request(&params);
+                let request = match Self::jsonrpc_permission_request(&params) {
+                    Ok(request) => request,
+                    Err(error) => return Self::jsonrpc_error_response(id, error),
+                };
                 let decision = self.evaluate_permission(&request, execution);
                 json!({
                     "jsonrpc": "2.0",
@@ -556,7 +481,11 @@ impl ChioAcpEdge {
                 })
             }
             "tool/invoke" => {
-                let (capability_id, arguments) = Self::jsonrpc_invocation_params(&params);
+                let (capability_id, arguments) =
+                    match Self::jsonrpc_invocation_params(&params, "tool/invoke") {
+                        Ok(parsed) => parsed,
+                        Err(error) => return Self::jsonrpc_error_response(id, error),
+                    };
                 match self.invoke(&capability_id, arguments, kernel, execution) {
                     Ok(result) => json!({
                         "jsonrpc": "2.0",
@@ -617,7 +546,10 @@ impl ChioAcpEdge {
                 })
             }
             "session/request_permission" => {
-                let request = Self::jsonrpc_permission_request(&params);
+                let request = match Self::jsonrpc_permission_request(&params) {
+                    Ok(request) => request,
+                    Err(error) => return Self::jsonrpc_error_response(id, error),
+                };
                 let decision = self.evaluate_permission_passthrough(&request);
                 json!({
                     "jsonrpc": "2.0",
@@ -630,7 +562,11 @@ impl ChioAcpEdge {
                 })
             }
             "tool/invoke" => {
-                let (capability_id, arguments) = Self::jsonrpc_invocation_params(&params);
+                let (capability_id, arguments) =
+                    match Self::jsonrpc_invocation_params(&params, "tool/invoke") {
+                        Ok(parsed) => parsed,
+                        Err(error) => return Self::jsonrpc_error_response(id, error),
+                    };
                 match self.invoke_passthrough(&capability_id, arguments, server) {
                     Ok(result) => json!({
                         "jsonrpc": "2.0",
@@ -683,7 +619,11 @@ impl ChioAcpEdge {
         params: Value,
         execution: &AcpKernelExecutionContext,
     ) -> Value {
-        let (capability_id, arguments) = Self::jsonrpc_invocation_params(&params);
+        let (capability_id, arguments) =
+            match Self::jsonrpc_invocation_params(&params, "tool/stream") {
+                Ok(parsed) => parsed,
+                Err(error) => return Self::jsonrpc_error_response(id, error),
+            };
         match self.start_stream_task(&capability_id, arguments, execution) {
             Ok(task) => json!({
                 "jsonrpc": "2.0",
@@ -709,17 +649,11 @@ impl ChioAcpEdge {
         params: Value,
         execution: &AcpKernelExecutionContext,
     ) -> Value {
-        let Some(task_id) = params.get("taskId").and_then(Value::as_str) else {
-            return json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "tool/cancel requires params.taskId"
-                }
-            });
+        let task_id = match Self::jsonrpc_task_id_params(&params, "tool/cancel") {
+            Ok(task_id) => task_id,
+            Err(error) => return Self::jsonrpc_error_response(id, error),
         };
-        match self.cancel_stream_task(task_id, execution) {
+        match self.cancel_stream_task(&task_id, execution) {
             Ok(task) => json!({
                 "jsonrpc": "2.0",
                 "id": id,
@@ -745,17 +679,11 @@ impl ChioAcpEdge {
         kernel: &ChioKernel,
         execution: &AcpKernelExecutionContext,
     ) -> Value {
-        let Some(task_id) = params.get("taskId").and_then(Value::as_str) else {
-            return json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "tool/resume requires params.taskId"
-                }
-            });
+        let task_id = match Self::jsonrpc_task_id_params(&params, "tool/resume") {
+            Ok(task_id) => task_id,
+            Err(error) => return Self::jsonrpc_error_response(id, error),
         };
-        match self.resume_stream_task(task_id, kernel, execution) {
+        match self.resume_stream_task(&task_id, kernel, execution) {
             Ok((task, result)) => json!({
                 "jsonrpc": "2.0",
                 "id": id,

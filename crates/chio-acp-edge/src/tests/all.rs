@@ -1255,30 +1255,44 @@ mod tests {
     // ---- JSON-RPC handler tests ----
 
     #[test]
-    fn jsonrpc_param_helpers_preserve_empty_capability_and_default_arguments() {
-        let permission = ChioAcpEdge::jsonrpc_permission_request(&json!({}));
-        assert_eq!(permission.capability_id, "");
-        assert_eq!(permission.arguments, json!({}));
+    fn jsonrpc_param_helpers_validate_capability_and_default_arguments() {
+        let missing = match ChioAcpEdge::jsonrpc_permission_request(&json!({})) {
+            Ok(_) => panic!("expected missing capabilityId to fail"),
+            Err(error) => error,
+        };
+        assert_eq!(
+            missing.to_string(),
+            "invalid request: session/request_permission requires params.capabilityId"
+        );
 
         let permission = ChioAcpEdge::jsonrpc_permission_request(&json!({
             "capabilityId": "read_file",
             "arguments": { "path": "/workspace/README.md" }
-        }));
+        }))
+        .test_unwrap();
         assert_eq!(permission.capability_id, "read_file");
         assert_eq!(permission.arguments, json!({ "path": "/workspace/README.md" }));
 
-        let (missing_capability_id, kept_arguments) =
-            ChioAcpEdge::jsonrpc_invocation_params(&json!({
+        let non_string = match ChioAcpEdge::jsonrpc_invocation_params(
+            &json!({
                 "capabilityId": 7,
                 "arguments": ["kept"]
-            }));
-        assert_eq!(missing_capability_id, "");
-        assert_eq!(kept_arguments, json!(["kept"]));
+            }),
+            "tool/invoke",
+        ) {
+            Ok(_) => panic!("expected non-string capabilityId to fail"),
+            Err(error) => error,
+        };
+        assert_eq!(
+            non_string.to_string(),
+            "invalid request: tool/invoke params.capabilityId must be a string"
+        );
 
         let (capability_id, default_arguments) =
             ChioAcpEdge::jsonrpc_invocation_params(&json!({
                 "capabilityId": "search"
-            }));
+            }), "tool/invoke")
+            .test_unwrap();
         assert_eq!(capability_id, "search");
         assert_eq!(default_arguments, json!({}));
     }
@@ -1372,6 +1386,43 @@ mod tests {
     }
 
     #[test]
+    fn jsonrpc_request_permission_rejects_empty_capability_id_before_preview() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "test-srv", "read_file"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 41,
+                "method": "session/request_permission",
+                "params": {
+                    "capabilityId": "  ",
+                    "arguments": {"path": "/tmp"}
+                }
+            }),
+            &kernel,
+            &execution,
+        );
+
+        assert_eq!(response["error"]["code"], -32602);
+        assert_eq!(
+            response["error"]["message"],
+            "session/request_permission params.capabilityId must not be empty"
+        );
+    }
+
+    #[test]
     fn jsonrpc_tool_invoke() {
         let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
@@ -1404,6 +1455,44 @@ mod tests {
         assert_eq!(
             response["result"]["metadata"]["chio"]["authorityPath"].as_str(),
             Some("cross_protocol_orchestrator")
+        );
+    }
+
+    #[test]
+    fn jsonrpc_tool_invoke_rejects_non_string_capability_id_before_lookup() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let mut kernel = ChioKernel::new(config);
+        kernel.register_tool_server(Box::new(test_server()));
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "test-srv", "search"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 42,
+                "method": "tool/invoke",
+                "params": {
+                    "capabilityId": 7,
+                    "arguments": {"query": "test"}
+                }
+            }),
+            &kernel,
+            &execution,
+        );
+
+        assert_eq!(response["error"]["code"], -32602);
+        assert_eq!(
+            response["error"]["message"],
+            "tool/invoke params.capabilityId must be a string"
         );
     }
 
@@ -1682,6 +1771,44 @@ mod tests {
             Some("completed")
         );
         assert!(!edge.tasks.borrow().contains_key(&task_id));
+    }
+
+    #[test]
+    fn jsonrpc_lifecycle_rejects_empty_task_id_before_lookup() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "streaming-srv", "search_stream"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        for method in ["tool/cancel", "tool/resume"] {
+            let response = edge.handle_jsonrpc(
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": 43,
+                    "method": method,
+                    "params": {
+                        "taskId": ""
+                    }
+                }),
+                &kernel,
+                &execution,
+            );
+
+            assert_eq!(response["error"]["code"], -32602);
+            assert_eq!(
+                response["error"]["message"],
+                format!("{method} params.taskId must not be empty")
+            );
+        }
     }
 
     #[test]
