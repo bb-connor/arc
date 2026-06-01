@@ -428,6 +428,62 @@ mod tests {
     }
 
     #[test]
+    fn evaluate_get_reserved_tools_path_requires_tool_grant() {
+        let keypair = Keypair::generate();
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let query = HashMap::new();
+        let headers = HashMap::new();
+
+        let denied = evaluator
+            .evaluate(
+                HttpMethod::Get,
+                "/chio/tools/matrix/files.read",
+                &query,
+                &headers,
+                None,
+                0,
+            )
+            .test_unwrap();
+        assert!(denied.verdict.is_denied());
+
+        let capability = signed_capability_token_json_with_scope(
+            &keypair,
+            "cap-matrix-read",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "matrix".to_string(),
+                    tool_name: "files.read".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+        let mut headers = HashMap::new();
+        headers.insert("X-Chio-Capability".to_string(), capability.clone());
+
+        let allowed = evaluator
+            .evaluate(
+                HttpMethod::Get,
+                "/chio/tools/matrix/files.read",
+                &query,
+                &headers,
+                None,
+                0,
+            )
+            .test_unwrap();
+        assert!(allowed.verdict.is_allowed());
+        assert_eq!(
+            allowed.receipt.capability_id.as_deref(),
+            Some("cap-matrix-read")
+        );
+    }
+
+    #[test]
     fn evaluate_chio_request_denies_spoofed_tool_identity_on_http_route() {
         let keypair = Keypair::generate();
         let routes = vec![RouteEntry {
