@@ -6,6 +6,7 @@
 //! receipt-construction and signing sequences are unchanged.
 
 use crate::budget_store::BudgetReverseHoldDecision;
+use chio_log_redact::redacted;
 
 use super::*;
 
@@ -377,6 +378,37 @@ impl ChioKernel {
             return Ok(());
         };
         hook.release_reserved(metadata)
+    }
+
+    pub(crate) fn release_runtime_admission_reservations_for_pre_dispatch_denial(
+        &self,
+        metadata: Option<serde_json::Value>,
+    ) -> Option<serde_json::Value> {
+        let metadata_value = metadata?;
+        let Some(hook) = self.runtime_admission_hook.as_ref() else {
+            return Some(metadata_value);
+        };
+
+        match hook.release_reserved(&metadata_value) {
+            Ok(()) => Some(metadata_value),
+            Err(error) => {
+                let reason = error.to_string();
+                warn!(
+                    hook = hook.name(),
+                    reason = %redacted!(&reason),
+                    "runtime admission reservation release failed on pre-dispatch denial"
+                );
+                merge_metadata_objects(
+                    Some(metadata_value),
+                    Some(serde_json::json!({
+                        "chio_runtime": {
+                            "reservation_release_failed": true,
+                            "reservation_release_failure_reason": reason
+                        }
+                    })),
+                )
+            }
+        }
     }
 
     /// Forward the validated request and optionally report actual invocation cost.

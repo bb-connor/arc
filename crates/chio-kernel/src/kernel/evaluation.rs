@@ -840,7 +840,8 @@ impl ChioKernel {
         if let Err(reason) = self.admit_capability_budget(cap) {
             let msg = format!("sibling-sum budget admission failed: {reason}");
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
-            self.release_runtime_admission_reservations(extra_metadata.as_ref())?;
+            let extra_metadata =
+                self.release_runtime_admission_reservations_for_pre_dispatch_denial(extra_metadata);
             let reverse = self.reverse_pre_execution_budget_mutation(cap, &budget_mutation)?;
             if let (Some(charge), Some(reverse)) =
                 (budget_mutation.charge_result(), reverse.as_ref())
@@ -874,7 +875,8 @@ impl ChioKernel {
             Err(error) => {
                 let msg = format!("payment authorization failed: {error}");
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "payment denied");
-                self.release_runtime_admission_reservations(extra_metadata.as_ref())?;
+                let extra_metadata = self
+                    .release_runtime_admission_reservations_for_pre_dispatch_denial(extra_metadata);
                 let reverse = self.reverse_pre_execution_budget_mutation(cap, &budget_mutation)?;
                 if let (Some(charge), Some(reverse)) =
                     (budget_mutation.charge_result(), reverse.as_ref())
@@ -1382,7 +1384,10 @@ impl ChioKernel {
         if let Err(reason) = self.admit_capability_budget(cap) {
             let msg = format!("sibling-sum budget admission failed: {reason}");
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
-            self.release_runtime_admission_reservations(runtime_admission_metadata.as_ref())?;
+            let runtime_admission_metadata = self
+                .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                    runtime_admission_metadata,
+                );
             let reverse = self.reverse_pre_execution_budget_mutation(cap, &budget_mutation)?;
             if let (Some(charge), Some(reverse)) =
                 (budget_mutation.charge_result(), reverse.as_ref())
@@ -1416,7 +1421,10 @@ impl ChioKernel {
             Err(error) => {
                 let msg = format!("payment authorization failed: {error}");
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "payment denied");
-                self.release_runtime_admission_reservations(runtime_admission_metadata.as_ref())?;
+                let runtime_admission_metadata = self
+                    .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                        runtime_admission_metadata,
+                    );
                 let reverse = self.reverse_pre_execution_budget_mutation(cap, &budget_mutation)?;
                 if let (Some(charge), Some(reverse)) =
                     (budget_mutation.charge_result(), reverse.as_ref())
