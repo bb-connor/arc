@@ -1548,6 +1548,46 @@ mod tests {
     }
 
     #[test]
+    fn operator_report_query_requires_read_context_for_evidence_export() {
+        let query = OperatorReportQuery::default();
+
+        let err = query
+            .to_evidence_export_query()
+            .expect_err("evidence export must require explicit read context");
+
+        assert_eq!(
+            err,
+            "operator report evidence export requires an explicit read context"
+        );
+    }
+
+    #[test]
+    fn operator_report_query_maps_tenant_read_context_to_evidence_export() {
+        let query = OperatorReportQuery {
+            capability_id: Some("cap-1".to_string()),
+            agent_subject: Some("agent-1".to_string()),
+            since: Some(10),
+            until: Some(20),
+            read_context: Some(ReceiptReadContext::authenticated_tenant("tenant-a")),
+            ..OperatorReportQuery::default()
+        };
+
+        let export = query
+            .to_evidence_export_query()
+            .expect("tenant read context should map to evidence export");
+
+        assert_eq!(export.capability_id.as_deref(), Some("cap-1"));
+        assert_eq!(export.agent_subject.as_deref(), Some("agent-1"));
+        assert_eq!(export.since, Some(10));
+        assert_eq!(export.until, Some(20));
+        assert_eq!(export.tenant.as_deref(), Some("tenant-a"));
+        assert_eq!(
+            export.read_boundary,
+            Some(ReceiptReadBoundary::tenant_scoped("tenant-a"))
+        );
+    }
+
+    #[test]
     fn operator_report_query_direct_export_support_requires_no_tool_filters() {
         let unrestricted = OperatorReportQuery::default();
         assert!(unrestricted.direct_evidence_export_supported());
