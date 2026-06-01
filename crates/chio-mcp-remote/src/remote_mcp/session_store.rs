@@ -112,7 +112,17 @@ pub(super) fn load_terminal_session_records(
     while let Some(row) = rows.next()? {
         let session_id: String = row.get(0)?;
         let record_json: String = row.get(1)?;
-        let record: RemoteSessionDiagnosticRecord = serde_json::from_str(&record_json)?;
+        let record: RemoteSessionDiagnosticRecord = match serde_json::from_str(&record_json) {
+            Ok(record) => record,
+            Err(error) => {
+                warn!(
+                    session_id = %session_id,
+                    error = %error,
+                    "dropping malformed terminal MCP session tombstone"
+                );
+                continue;
+            }
+        };
         if record.session_id != session_id {
             warn!(
                 session_id = %session_id,

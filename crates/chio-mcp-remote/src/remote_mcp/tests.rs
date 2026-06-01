@@ -682,6 +682,63 @@ mod tests {
     }
 
     #[test]
+    fn remote_session_ledger_startup_skips_malformed_terminal_tombstones() {
+        let path = std::env::temp_dir().join(format!(
+            "chio-remote-terminal-malformed-{}-{}.sqlite3",
+            std::process::id(),
+            session_now_millis()
+        ));
+        let terminal_record = RemoteSessionDiagnosticRecord {
+            session_id: "session-valid".to_string(),
+            auth_context: SessionAuthContext::streamable_http_static_bearer(
+                "agent-terminal",
+                "token-fingerprint",
+                None,
+            ),
+            capabilities: Vec::new(),
+            lifecycle: RemoteSessionLifecycleSnapshot {
+                state: RemoteSessionState::Deleted,
+                created_at: 10,
+                last_seen_at: 11,
+                idle_expires_at: 12,
+                drain_deadline_at: None,
+            },
+            protocol_version: Some("2025-06-18".to_string()),
+            ownership: RemoteSessionOwnershipSnapshot::default(),
+            terminal_at: 13,
+        };
+        persist_terminal_session_record(&path, &terminal_record)
+            .expect("persist valid terminal session tombstone");
+
+        let conn = open_session_state_db(&path).expect("open session state db");
+        conn.execute(
+            &format!(
+                "INSERT INTO {table} (session_id, terminal_at, record_json)
+                 VALUES (?1, ?2, ?3)",
+                table = SESSION_TOMBSTONE_TABLE,
+            ),
+            params!["session-bad", 14_i64, "{not json"],
+        )
+        .expect("insert malformed terminal row");
+        drop(conn);
+
+        let lifecycle_policy = SessionLifecyclePolicy {
+            idle_expiry_millis: 5_000,
+            drain_grace_millis: 1_000,
+            reaper_interval_millis: 100,
+            tombstone_retention_millis: 10_000,
+        };
+        RemoteSessionLedger::new(lifecycle_policy, Some(path.clone()))
+            .expect("malformed terminal tombstone should not abort ledger startup");
+
+        let records = load_terminal_session_records(&path).expect("load terminal session records");
+        assert_eq!(records.len(), 1);
+        assert!(records.contains_key("session-valid"));
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn purge_terminal_session_records_keeps_tombstones_for_stale_active_rows() {
         let path = std::env::temp_dir().join(format!(
             "chio-remote-terminal-retain-active-{}-{}.sqlite3",
