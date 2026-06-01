@@ -1450,7 +1450,9 @@ fn read_bounded_line(
                 if bytes.is_empty() {
                     return Ok(None);
                 }
-                break;
+                return Err(AdapterError::ParseError(
+                    "MCP JSON-RPC frame ended before newline delimiter".into(),
+                ));
             }
 
             let take = match available.iter().position(|byte| *byte == b'\n') {
@@ -1608,6 +1610,20 @@ mod tests {
         assert!(
             matches!(err, AdapterError::ParseError(_)),
             "expected ParseError for oversized frame, got: {err}"
+        );
+    }
+
+    #[test]
+    fn read_line_rejects_eof_before_newline_delimiter() {
+        let input = b"{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"ok\":true}}";
+        let mut reader = BufReader::new(&input[..]);
+        let err = match read_line(&mut reader) {
+            Ok(value) => panic!("unterminated frame must fail closed, got: {value}"),
+            Err(err) => err,
+        };
+        assert!(
+            matches!(err, AdapterError::ParseError(_)),
+            "expected ParseError for unterminated frame, got: {err}"
         );
     }
 

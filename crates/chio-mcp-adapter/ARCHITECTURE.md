@@ -11,9 +11,9 @@
 ## Pain Points
 
 - `lib.rs` mixes public adapter orchestration with MCP-to-Chio manifest projection and tool annotation interpretation.
-- `generate_manifest` delegates Chio manifest validation to `chio-manifest`, but `chio-manifest` does not know MCP-specific JSON Schema shape requirements.
-- Invalid upstream MCP `inputSchema` or `outputSchema` values can currently cross the adapter boundary and become signed Chio manifest metadata.
-- The crate has good behavior tests, but the MCP metadata trust boundary is not isolated enough to audit independently from invocation and provider plumbing.
+- `transport.rs` owns both subprocess lifecycle and low-level stdio framing, so frame boundary drift is easy to miss during nested-flow changes.
+- `read_bounded_line` enforces the maximum frame size, but it also defines whether EOF can terminate a frame.
+- The crate has good behavior tests, but the stdio frame trust boundary needs explicit coverage for truncated or delimiterless upstream output.
 
 ## Constraints
 
@@ -32,4 +32,4 @@
 
 ## Planned Improvement
 
-Move MCP-to-Chio manifest projection into an internal manifest module, then make that boundary reject non-object MCP `inputSchema` and `outputSchema` values before Chio manifest validation. This is architectural because it gives the adapter one auditable metadata trust boundary, keeps public APIs stable, and prevents malformed upstream MCP schemas from becoming signed Chio tool metadata.
+Make the stdio reader reject EOF before the newline delimiter for non-empty frames. This is architectural because MCP stdio is newline-delimited JSON-RPC, so accepting a delimiterless final JSON object weakens the frame boundary and lets a dying upstream process complete a Chio-visible response without producing a complete MCP frame.
