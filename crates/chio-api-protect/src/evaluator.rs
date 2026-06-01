@@ -923,6 +923,26 @@ mod tests {
     }
 
     #[test]
+    fn evaluate_denies_safe_method_reserved_tools_path_without_capability() {
+        let keypair = Keypair::generate();
+        let evaluator = RequestEvaluator::new(vec![], keypair, "test-policy".to_string());
+
+        let result = evaluator
+            .evaluate(
+                HttpMethod::Get,
+                "/chio/tools/billing/read",
+                &HashMap::new(),
+                &HashMap::new(),
+                None,
+                0,
+            )
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+    }
+
+    #[test]
     fn evaluate_invalid_capability_denied_fail_closed() {
         let keypair = Keypair::generate();
         let routes = vec![RouteEntry {
