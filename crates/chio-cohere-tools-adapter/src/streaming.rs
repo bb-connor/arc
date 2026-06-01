@@ -27,6 +27,7 @@ impl CohereAdapter {
     where
         F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
     {
+        self.ensure_supported_api_version()?;
         let frames = parse_sse_frames(raw, SseParseOptions::ignoring_unknown("Cohere"))?;
         let mut output: Vec<u8> = Vec::new();
         let mut invocations = Vec::new();

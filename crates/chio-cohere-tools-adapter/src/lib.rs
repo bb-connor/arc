@@ -114,6 +114,16 @@ impl CohereAdapter {
         &self.transport
     }
 
+    pub(crate) fn ensure_supported_api_version(&self) -> Result<(), ProviderError> {
+        if self.config.api_version != COHERE_API_VERSION {
+            return Err(ProviderError::Malformed(format!(
+                "Cohere adapter supports only API version {COHERE_API_VERSION}; configured {}",
+                self.config.api_version
+            )));
+        }
+        Ok(())
+    }
+
     /// Proxy a Cohere `/v2/chat` request to the upstream endpoint and lift the
     /// tool calls from the buffered response.
     ///
@@ -123,6 +133,7 @@ impl CohereAdapter {
     /// Transport-layer failures are mapped into the [`ProviderError`] taxonomy
     /// so a failed request never reads as an empty success.
     pub async fn chat(&self, request_body: &[u8]) -> Result<Vec<ToolInvocation>, ProviderError> {
+        self.ensure_supported_api_version()?;
         let response = self.transport.send_chat(request_body).await?;
         self.lift_batch(response)
     }
@@ -140,6 +151,7 @@ impl CohereAdapter {
     where
         F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
     {
+        self.ensure_supported_api_version()?;
         let body = self.transport.send_chat_stream(request_body).await?;
         self.gate_sse_stream(&body, evaluate)
     }
@@ -147,6 +159,7 @@ impl CohereAdapter {
     /// Lift every Cohere `tool_calls` block in a non-streaming `/v2/chat`
     /// response payload.
     pub fn lift_batch(&self, raw: ProviderRequest) -> Result<Vec<ToolInvocation>, ProviderError> {
+        self.ensure_supported_api_version()?;
         let calls = tool_calls(raw)?;
         if calls.is_empty() {
             return Err(ProviderError::Malformed(
@@ -163,6 +176,7 @@ impl CohereAdapter {
         &self,
         call: &ToolCallBlock,
     ) -> Result<ToolInvocation, ProviderError> {
+        self.ensure_supported_api_version()?;
         validate_tool_call(call)?;
         let parsed_args: Value =
             serde_json::from_str(&call.function.arguments).map_err(|error| {
@@ -206,6 +220,7 @@ impl CohereAdapter {
         verdict: VerdictResult,
         result: ToolResult,
     ) -> Result<ToolResultMessage, ProviderError> {
+        self.ensure_supported_api_version()?;
         let tool_call_id = non_empty_str(tool_call_id, "tool_call_id")?;
         match verdict {
             VerdictResult::Allow { redactions, .. } => {
@@ -409,6 +424,44 @@ mod tests {
         )
     }
 
+    fn config_with_api_version(api_version: &str) -> CohereAdapterConfig {
+        let mut cfg = config();
+        cfg.api_version = api_version.to_string();
+        cfg
+    }
+
+    fn tool_call_payload() -> Value {
+        json!({
+            "message": {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": "call_api_pin",
+                        "type": "function",
+                        "function": {
+                            "name": "get_weather",
+                            "arguments": "{\"city\":\"Paris\"}"
+                        }
+                    }
+                ]
+            }
+        })
+    }
+
+    fn raw_payload(value: Value) -> ProviderRequest {
+        ProviderRequest(serde_json::to_vec(&value).unwrap())
+    }
+
+    fn assert_api_version_drift(error: ProviderError) {
+        match error {
+            ProviderError::Malformed(message) => {
+                assert!(message.contains("Cohere adapter supports only API version 2025-04"));
+                assert!(message.contains("configured 2024-12"));
+            }
+            other => panic!("expected Malformed API version drift, got {other:?}"),
+        }
+    }
+
     #[test]
     fn config_pins_api_version() {
         let cfg = config();
@@ -423,6 +476,76 @@ mod tests {
         let adapter = CohereAdapter::new(cfg, Arc::new(transport));
         assert_eq!(adapter.provider(), ProviderId::Cohere);
         assert_eq!(adapter.api_version(), "2025-04");
+    }
+
+    #[tokio::test]
+    async fn chat_rejects_api_version_drift_before_transport_call() {
+        let cfg = config_with_api_version("2024-12");
+        let mock = Arc::new(transport::MockTransport::new());
+        mock.push_chat_response(serde_json::to_vec(&tool_call_payload()).unwrap());
+        let adapter = CohereAdapter::new(cfg, mock.clone());
+
+        let err = adapter
+            .chat(b"{\"model\":\"command-r\",\"messages\":[],\"tools\":[]}")
+            .await
+            .expect_err("drifted Cohere API version must fail before transport");
+
+        assert_api_version_drift(err);
+        assert!(mock.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn chat_stream_rejects_api_version_drift_before_transport_call() {
+        let cfg = config_with_api_version("2024-12");
+        let mock = Arc::new(transport::MockTransport::new());
+        mock.push_response(chio_provider_adapter_core::http::HttpResponse::new(
+            200,
+            b"event: tool-call-end\ndata: {\"tool_call\":{\"id\":\"call_api_pin\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"Paris\\\"}\"}}}\n\n".to_vec(),
+            Some("text/event-stream".to_string()),
+        ));
+        let adapter = CohereAdapter::new(cfg, mock.clone());
+
+        let err = adapter
+            .chat_stream(b"{\"stream\":true}", |_invocation| {
+                Ok(VerdictResult::Allow {
+                    redactions: vec![],
+                    receipt_id: chio_tool_call_fabric::ReceiptId("rcpt_pin".to_string()),
+                })
+            })
+            .await
+            .expect_err("drifted Cohere API version must fail before stream transport");
+
+        assert_api_version_drift(err);
+        assert!(mock.calls().is_empty());
+    }
+
+    #[test]
+    fn lift_batch_rejects_api_version_drift_before_provenance_stamp() {
+        let cfg = config_with_api_version("2024-12");
+        let adapter = CohereAdapter::new(cfg, Arc::new(transport::MockTransport::new()));
+
+        let err = adapter
+            .lift_batch(raw_payload(tool_call_payload()))
+            .expect_err("drifted Cohere API version must fail before provenance stamping");
+
+        assert_api_version_drift(err);
+    }
+
+    #[test]
+    fn lower_tool_message_rejects_api_version_drift() {
+        let cfg = config_with_api_version("2024-12");
+        let adapter = CohereAdapter::new(cfg, Arc::new(transport::MockTransport::new()));
+        let verdict = VerdictResult::Allow {
+            redactions: vec![],
+            receipt_id: chio_tool_call_fabric::ReceiptId("rcpt_pin".to_string()),
+        };
+        let result = ToolResult(b"{\"temp\":18}".to_vec());
+
+        let err = adapter
+            .lower_tool_message("call_api_pin", verdict, result)
+            .expect_err("drifted Cohere API version must fail before lowering");
+
+        assert_api_version_drift(err);
     }
 
     #[test]
