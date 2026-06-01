@@ -275,11 +275,13 @@ pub fn sign_manifest(
     keypair: &Keypair,
 ) -> Result<SignedManifest, ManifestError> {
     validate_manifest(manifest)?;
+    let signer_key = keypair.public_key();
+    ensure_embedded_public_key_matches(manifest, &signer_key)?;
     let (signature, _bytes) = keypair.sign_canonical(manifest)?;
     Ok(SignedManifest {
         manifest: manifest.clone(),
         signature,
-        signer_key: keypair.public_key(),
+        signer_key,
     })
 }
 
@@ -289,11 +291,25 @@ pub fn verify_manifest(
     public_key: &PublicKey,
 ) -> Result<(), ManifestError> {
     validate_manifest(&signed.manifest)?;
+    ensure_embedded_public_key_matches(&signed.manifest, &signed.signer_key)?;
     if signed.signer_key != *public_key {
         return Err(ManifestError::VerificationFailed);
     }
     let valid = public_key.verify_canonical(&signed.manifest, &signed.signature)?;
     if valid {
+        Ok(())
+    } else {
+        Err(ManifestError::VerificationFailed)
+    }
+}
+
+fn ensure_embedded_public_key_matches(
+    manifest: &ToolManifest,
+    signer_key: &PublicKey,
+) -> Result<(), ManifestError> {
+    let embedded_key =
+        PublicKey::from_hex(&manifest.public_key).map_err(|_| ManifestError::VerificationFailed)?;
+    if embedded_key == *signer_key {
         Ok(())
     } else {
         Err(ManifestError::VerificationFailed)
@@ -384,9 +400,56 @@ mod tests {
     fn sign_and_verify_manifest() {
         let kp = Keypair::generate();
 
-        let m = sample_manifest();
+        let mut m = sample_manifest();
+        m.public_key = kp.public_key().to_hex();
         let signed = sign_manifest(&m, &kp).unwrap_or_else(|e| panic!("sign: {e}"));
         verify_manifest(&signed, &kp.public_key()).unwrap_or_else(|e| panic!("verify: {e}"));
+    }
+
+    #[test]
+    fn sign_manifest_rejects_mismatched_embedded_public_key() {
+        let signer = Keypair::generate();
+        let other = Keypair::generate();
+        let mut m = sample_manifest();
+        m.public_key = other.public_key().to_hex();
+
+        assert!(matches!(
+            sign_manifest(&m, &signer),
+            Err(ManifestError::VerificationFailed)
+        ));
+    }
+
+    #[test]
+    fn sign_manifest_rejects_invalid_embedded_public_key() {
+        let signer = Keypair::generate();
+        let mut m = sample_manifest();
+        m.public_key = "not-a-public-key".into();
+
+        assert!(matches!(
+            sign_manifest(&m, &signer),
+            Err(ManifestError::VerificationFailed)
+        ));
+    }
+
+    #[test]
+    fn verify_manifest_rejects_mismatched_embedded_public_key() {
+        let trusted = Keypair::generate();
+        let other = Keypair::generate();
+        let mut m = sample_manifest();
+        m.public_key = other.public_key().to_hex();
+        let (signature, _bytes) = trusted
+            .sign_canonical(&m)
+            .unwrap_or_else(|e| panic!("sign: {e}"));
+        let signed = SignedManifest {
+            manifest: m,
+            signature,
+            signer_key: trusted.public_key(),
+        };
+
+        assert!(matches!(
+            verify_manifest(&signed, &trusted.public_key()),
+            Err(ManifestError::VerificationFailed)
+        ));
     }
 
     #[test]
@@ -394,7 +457,8 @@ mod tests {
         let trusted = Keypair::generate();
         let other = Keypair::generate();
 
-        let m = sample_manifest();
+        let mut m = sample_manifest();
+        m.public_key = trusted.public_key().to_hex();
         let mut signed = sign_manifest(&m, &trusted).unwrap_or_else(|e| panic!("sign: {e}"));
         signed.signer_key = other.public_key();
 

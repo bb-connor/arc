@@ -1059,11 +1059,10 @@ fn manifest_cases() -> Vec<Value> {
     let tampered_verification = verify_signed_manifest(&tampered_signed_manifest)
         .test_unwrap("tampered manifest verification");
 
-    let mismatched_key_signed_manifest = sign_manifest(
-        &sample_signed_manifest(alternate.public_key().to_hex(), &["file_read"]),
+    let mismatched_key_signed_manifest = signed_manifest_with_manual_signature(
+        sample_signed_manifest(alternate.public_key().to_hex(), &["file_read"]),
         &server,
-    )
-    .test_unwrap("mismatched key manifest");
+    );
     let mismatched_key_verification = verify_signed_manifest(&mismatched_key_signed_manifest)
         .test_unwrap("mismatched key manifest verification");
 
@@ -1074,11 +1073,10 @@ fn manifest_cases() -> Vec<Value> {
     let duplicate_tool_verification = verify_signed_manifest(&duplicate_tool_signed_manifest)
         .test_unwrap("duplicate tool manifest verification");
 
-    let invalid_embedded_key_signed_manifest = sign_manifest(
-        &sample_signed_manifest("not-a-public-key".to_string(), &["file_read", "file_write"]),
+    let invalid_embedded_key_signed_manifest = signed_manifest_with_manual_signature(
+        sample_signed_manifest("not-a-public-key".to_string(), &["file_read", "file_write"]),
         &server,
-    )
-    .test_unwrap("invalid embedded key manifest");
+    );
     let invalid_embedded_key_verification =
         verify_signed_manifest(&invalid_embedded_key_signed_manifest)
             .test_unwrap("invalid embedded key manifest verification");
