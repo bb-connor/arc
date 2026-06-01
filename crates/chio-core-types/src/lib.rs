@@ -34,6 +34,7 @@ pub mod receipt;
 pub mod runtime_attestation;
 pub mod session;
 pub mod signed_artifact;
+mod signer_binding;
 
 pub use canonical::{
     canonical_json_bytes, canonical_json_string, canonicalize, CanonicalBytes, CanonicalJsonWitness,

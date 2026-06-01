@@ -23,6 +23,9 @@ use crate::runtime_attestation::{
     RuntimeAttestationTrustMaterial,
 };
 use crate::session::SessionAnchorReference;
+use crate::signer_binding::{
+    ensure_backend_matches_embedded_key, ensure_keypair_matches_embedded_key,
+};
 
 /// Capability-negotiation schema exchanged during federation handshakes.
 pub const CHIO_CAPABILITIES_SCHEMA: &str = "chio.capabilities.v1";
@@ -685,6 +688,7 @@ impl CapabilityToken {
     /// byte-identical artifact to pre-`SigningBackend` Chio releases: the
     /// `algorithm` envelope field is omitted from the serialized output.
     pub fn sign(body: CapabilityTokenBody, keypair: &Keypair) -> Result<Self> {
+        ensure_keypair_matches_embedded_key(&body.issuer, keypair, "capability token", "issuer")?;
         let signing_body = CapabilityTokenSigningBody {
             schema: CHIO_CAPABILITY_SCHEMA.to_string(),
             body: body.clone(),
@@ -717,6 +721,12 @@ impl CapabilityToken {
         body: CapabilityTokenAttenuationBody,
         keypair: &Keypair,
     ) -> Result<Self> {
+        ensure_keypair_matches_embedded_key(
+            &body.body.issuer,
+            keypair,
+            "capability token",
+            "issuer",
+        )?;
         let child_hash = scope_hash(&body.body.scope)?;
         if body.attenuation_proof.child_scope_hash != child_hash {
             return Err(Error::AttenuationViolation {
@@ -777,6 +787,7 @@ impl CapabilityToken {
         body: CapabilityTokenBody,
         backend: &dyn SigningBackend,
     ) -> Result<Self> {
+        ensure_backend_matches_embedded_key(&body.issuer, backend, "capability token", "issuer")?;
         let signing_body = CapabilityTokenSigningBody {
             schema: CHIO_CAPABILITY_SCHEMA.to_string(),
             body: body.clone(),
@@ -1798,6 +1809,7 @@ impl GovernedUpstreamCallChainProof {
     }
 
     pub fn sign(body: GovernedUpstreamCallChainProofBody, keypair: &Keypair) -> Result<Self> {
+        ensure_keypair_matches_embedded_key(&body.signer, keypair, "call-chain proof", "signer")?;
         let (signature, _bytes) = keypair.sign_canonical(&body)?;
         Ok(Self {
             signer: body.signer,
@@ -1954,6 +1966,7 @@ impl CallChainContinuationToken {
     }
 
     pub fn sign(body: CallChainContinuationTokenBody, keypair: &Keypair) -> Result<Self> {
+        ensure_keypair_matches_embedded_key(&body.signer, keypair, "continuation token", "signer")?;
         let (signature, _bytes) = keypair.sign_canonical(&body)?;
         Ok(Self {
             schema: body.schema,
@@ -2395,6 +2408,12 @@ impl GovernedApprovalToken {
 
     /// Sign a governed approval token body with the given Ed25519 keypair.
     pub fn sign(body: GovernedApprovalTokenBody, keypair: &Keypair) -> Result<Self> {
+        ensure_keypair_matches_embedded_key(
+            &body.approver,
+            keypair,
+            "governed approval token",
+            "approver",
+        )?;
         let (signature, _bytes) = keypair.sign_canonical(&body)?;
         Ok(Self {
             id: body.id,
@@ -2417,6 +2436,12 @@ impl GovernedApprovalToken {
         body: GovernedApprovalTokenBody,
         backend: &dyn SigningBackend,
     ) -> Result<Self> {
+        ensure_backend_matches_embedded_key(
+            &body.approver,
+            backend,
+            "governed approval token",
+            "approver",
+        )?;
         let (signature, _bytes) = sign_canonical_with_backend(backend, &body)?;
         Ok(Self {
             id: body.id,
@@ -2845,6 +2870,12 @@ pub struct DelegationLinkBody {
 impl DelegationLink {
     /// Sign a delegation link body.
     pub fn sign(body: DelegationLinkBody, keypair: &Keypair) -> Result<Self> {
+        ensure_keypair_matches_embedded_key(
+            &body.delegator,
+            keypair,
+            "delegation link",
+            "delegator",
+        )?;
         let (signature, _bytes) = keypair.sign_canonical(&body)?;
         Ok(Self {
             capability_id: body.capability_id,
@@ -3445,15 +3476,16 @@ mod tests {
         let other_kp = Keypair::generate();
         let body = CapabilityTokenBody {
             id: "cap-003".to_string(),
-            issuer: other_kp.public_key(), // issuer != signer
+            issuer: kp.public_key(),
             subject: Keypair::generate().public_key(),
             scope: make_scope(vec![]),
             issued_at: 1000,
             expires_at: 2000,
             delegation_chain: vec![],
         };
-        let token = CapabilityToken::sign(body, &kp).unwrap();
-        // Signature was made by kp but issuer is other_kp, so it should fail.
+        let mut token = CapabilityToken::sign(body, &kp).unwrap();
+        token.issuer = other_kp.public_key();
+        // Tampering the embedded verifier key after signing should fail.
         assert!(!token.verify_signature().unwrap());
     }
 
