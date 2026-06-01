@@ -2220,6 +2220,22 @@ mod tests {
     }
 
     #[test]
+    fn chio_tools_path_identity_rejects_empty_server_segment() {
+        assert!(matches!(
+            chio_tools_path_identity("/chio/tools//increment"),
+            ChioToolsPathIdentity::Malformed
+        ));
+    }
+
+    #[test]
+    fn decode_path_identity_segment_accepts_uppercase_hex() {
+        assert_eq!(
+            decode_path_identity_segment("terminal%2Fcreate").as_deref(),
+            Some("terminal/create")
+        );
+    }
+
+    #[test]
     fn chio_tools_path_identity_rejects_missing_tool_segment() {
         assert!(matches!(
             chio_tools_path_identity("/chio/tools/matrix"),
