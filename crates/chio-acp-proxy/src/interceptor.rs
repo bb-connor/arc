@@ -281,6 +281,7 @@ impl MessageInterceptor {
 
         let read_params: ReadTextFileParams =
             Self::decode_jsonrpc_params(params, "fs/read_text_file")?;
+        read_params.validate_boundary()?;
         let authorization_parameter_hash = authorization_parameter_hash(params)?;
 
         let capability_context = match self.check_capability_gate(
@@ -331,6 +332,7 @@ impl MessageInterceptor {
 
         let write_params: WriteTextFileParams =
             Self::decode_jsonrpc_params(params, "fs/write_text_file")?;
+        write_params.validate_boundary()?;
         let authorization_parameter_hash = authorization_parameter_hash(params)?;
 
         let capability_context = match self.check_capability_gate(
@@ -381,6 +383,7 @@ impl MessageInterceptor {
 
         let term_params: CreateTerminalParams =
             Self::decode_jsonrpc_params(params, "terminal/create")?;
+        term_params.validate_boundary()?;
         let authorization_parameter_hash = authorization_parameter_hash(params)?;
 
         let capability_context = match self.check_capability_gate(
@@ -452,11 +455,13 @@ impl MessageInterceptor {
             TerminalLifecycleOp::Kill => {
                 let parsed: KillTerminalParams =
                     Self::decode_jsonrpc_params(params, method_name)?;
+                parsed.validate_boundary()?;
                 (parsed.session_id, parsed.terminal_id)
             }
             TerminalLifecycleOp::Release => {
                 let parsed: ReleaseTerminalParams =
                     Self::decode_jsonrpc_params(params, method_name)?;
+                parsed.validate_boundary()?;
                 (parsed.session_id, parsed.terminal_id)
             }
         };
@@ -572,9 +577,11 @@ impl MessageInterceptor {
             .and_then(|p| serde_json::from_value::<SessionUpdateNotification>(p.clone()).ok());
 
         if let Some(ref notif) = notification {
+            notif.validate_boundary()?;
             let update = parse_session_update(&notif.update);
             match update {
                 SessionUpdate::ToolCall(ref event) => {
+                    event.validate_receipt_boundary()?;
                     let capability_context = self
                         .lookup_tool_capability_context(&notif.session_id, &event.tool_call_id)
                         .or_else(|| {
@@ -610,6 +617,7 @@ impl MessageInterceptor {
                     ));
                 }
                 SessionUpdate::ToolCallUpdate(ref event) => {
+                    event.validate_receipt_boundary()?;
                     let capability_context =
                         self.lookup_tool_capability_context(&notif.session_id, &event.tool_call_id);
                     if let Some(receipt) = self.receipt_logger.log_tool_call_update(

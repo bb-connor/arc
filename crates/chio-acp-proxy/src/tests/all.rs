@@ -1672,6 +1672,27 @@ mod extended_tests {
     }
 
     #[test]
+    fn interceptor_fs_read_rejects_empty_session_id_before_forwarding() {
+        let interceptor = MessageInterceptor::new(test_config());
+        let msg = json!({
+            "jsonrpc": "2.0",
+            "id": 105,
+            "method": "fs/read_text_file",
+            "params": {
+                "sessionId": "  ",
+                "path": "/home/user/project/src/lib.rs"
+            }
+        });
+        let err = interceptor
+            .intercept(Direction::AgentToClient, &msg)
+            .expect_err("empty sessionId must fail at the ACP request boundary");
+        assert_eq!(
+            err.to_string(),
+            "protocol error: invalid fs/read_text_file params: sessionId must be a non-empty string"
+        );
+    }
+
+    #[test]
     fn interceptor_fs_write_missing_params_returns_protocol_error() {
         let interceptor = MessageInterceptor::new(test_config());
         let msg = json!({
@@ -1683,6 +1704,31 @@ mod extended_tests {
         assert!(
             result.is_err(),
             "missing params should produce a protocol error"
+        );
+    }
+
+    #[test]
+    fn interceptor_session_update_rejects_empty_tool_call_id_before_receipt() {
+        let interceptor = MessageInterceptor::new(test_config());
+        let msg = json!({
+            "jsonrpc": "2.0",
+            "method": "session/update",
+            "params": {
+                "sessionId": "session-empty-tool-id",
+                "update": {
+                    "toolCallId": " ",
+                    "title": "Read file",
+                    "kind": "read",
+                    "status": "running"
+                }
+            }
+        });
+        let err = interceptor
+            .intercept(Direction::AgentToClient, &msg)
+            .expect_err("empty toolCallId must not produce an ACP audit receipt");
+        assert_eq!(
+            err.to_string(),
+            "protocol error: invalid session/update params: update.toolCallId must be a non-empty string"
         );
     }
 

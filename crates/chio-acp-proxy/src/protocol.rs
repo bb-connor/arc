@@ -121,6 +121,12 @@ pub struct ReadTextFileParams {
     pub limit: Option<u64>,
 }
 
+impl ReadTextFileParams {
+    pub(crate) fn validate_boundary(&self) -> Result<(), AcpProxyError> {
+        validate_non_empty_protocol_field("fs/read_text_file", "sessionId", &self.session_id)
+    }
+}
+
 /// Parameters for `fs/write_text_file`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -128,6 +134,12 @@ pub struct WriteTextFileParams {
     pub session_id: String,
     pub path: String,
     pub content: String,
+}
+
+impl WriteTextFileParams {
+    pub(crate) fn validate_boundary(&self) -> Result<(), AcpProxyError> {
+        validate_non_empty_protocol_field("fs/write_text_file", "sessionId", &self.session_id)
+    }
 }
 
 /// Parameters for `terminal/create`.
@@ -144,12 +156,25 @@ pub struct CreateTerminalParams {
     pub cwd: Option<String>,
 }
 
+impl CreateTerminalParams {
+    pub(crate) fn validate_boundary(&self) -> Result<(), AcpProxyError> {
+        validate_non_empty_protocol_field("terminal/create", "sessionId", &self.session_id)
+    }
+}
+
 /// Parameters for `terminal/kill`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KillTerminalParams {
     pub session_id: String,
     pub terminal_id: String,
+}
+
+impl KillTerminalParams {
+    pub(crate) fn validate_boundary(&self) -> Result<(), AcpProxyError> {
+        validate_non_empty_protocol_field("terminal/kill", "sessionId", &self.session_id)?;
+        validate_non_empty_protocol_field("terminal/kill", "terminalId", &self.terminal_id)
+    }
 }
 
 /// Parameters for `terminal/release`.
@@ -160,12 +185,25 @@ pub struct ReleaseTerminalParams {
     pub terminal_id: String,
 }
 
+impl ReleaseTerminalParams {
+    pub(crate) fn validate_boundary(&self) -> Result<(), AcpProxyError> {
+        validate_non_empty_protocol_field("terminal/release", "sessionId", &self.session_id)?;
+        validate_non_empty_protocol_field("terminal/release", "terminalId", &self.terminal_id)
+    }
+}
+
 /// A `session/update` notification payload.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionUpdateNotification {
     pub session_id: String,
     pub update: Value,
+}
+
+impl SessionUpdateNotification {
+    pub(crate) fn validate_boundary(&self) -> Result<(), AcpProxyError> {
+        validate_non_empty_protocol_field("session/update", "sessionId", &self.session_id)
+    }
 }
 
 /// Typed session update events that the proxy cares about.
@@ -203,6 +241,16 @@ pub struct ToolCallEvent {
     pub extra: BTreeMap<String, Value>,
 }
 
+impl ToolCallEvent {
+    pub(crate) fn validate_receipt_boundary(&self) -> Result<(), AcpProxyError> {
+        validate_non_empty_protocol_field(
+            "session/update",
+            "update.toolCallId",
+            &self.tool_call_id,
+        )
+    }
+}
+
 /// A tool call update event observed in a session update.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -212,6 +260,29 @@ pub struct ToolCallUpdateEvent {
     pub status: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+impl ToolCallUpdateEvent {
+    pub(crate) fn validate_receipt_boundary(&self) -> Result<(), AcpProxyError> {
+        validate_non_empty_protocol_field(
+            "session/update",
+            "update.toolCallId",
+            &self.tool_call_id,
+        )
+    }
+}
+
+fn validate_non_empty_protocol_field(
+    method_name: &str,
+    field_name: &str,
+    value: &str,
+) -> Result<(), AcpProxyError> {
+    if value.trim().is_empty() {
+        return Err(AcpProxyError::Protocol(format!(
+            "invalid {method_name} params: {field_name} must be a non-empty string"
+        )));
+    }
+    Ok(())
 }
 
 /// Attempt to parse a session update `Value` into a typed `SessionUpdate`.
