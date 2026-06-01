@@ -12,10 +12,10 @@
 
 ## Pain Points
 
-- `edge.rs` still mixes JSON-RPC request-boundary parsing with permission and execution logic.
-- `session/request_permission` runs a DPoP preview before `tool/invoke`, but the preview path has used `DpopConfig::default()` instead of the DPoP configuration installed on the kernel.
-- DPoP preview must not consume the replay nonce, but it still has to match the kernel's TTL and clock-skew policy or ACP can preview Allow for an invocation the kernel will deny.
-- The kernel currently keeps its DPoP verifier private to invocation, so ACP has no authoritative stateless verifier to call for permission preview.
+- `edge.rs` still owns multiple trust-boundary responsibilities: manifest-to-capability publication, JSON-RPC dispatch, permission preview, kernel execution, and deferred task lifecycle.
+- Kernel-backed ACP permission preview now uses the kernel-owned stateless DPoP verifier, so preview and invoke agree on installed DPoP TTL, skew, and store/config presence without consuming the nonce.
+- `ChioAcpEdge::new` still maps manifests directly into advertised ACP capabilities and authoritative target bindings before calling the canonical `chio_manifest::validate_manifest` envelope gate.
+- That means unsupported manifest schema versions, invalid embedded public keys, empty tool lists, invalid tool names, malformed schemas, or duplicate server-tool allowlist entries can become ACP-visible capability metadata even though manifest signing and loader paths would reject them.
 
 ## Security And API Constraints
 
@@ -29,11 +29,11 @@
 
 ## Affected Dependents
 
-- `chio-kernel` remains the execution authority and must expose only a stateless DPoP preview verifier, not its nonce store internals.
+- `chio-kernel` remains the execution authority and DPoP preview verifier.
 - `chio-cross-protocol` supplies bridge and lifecycle metadata. This slice should preserve those contracts.
 - `chio-mcp-edge` remains a target executor dependency for multi-hop routes. No transitive edit is planned.
-- ACP clients may see `session/request_permission` Deny when a DPoP proof fails the kernel's configured TTL or clock-skew policy. Valid request and response shapes stay compatible.
+- ACP clients may see construction-time manifest errors earlier. Valid capability, permission, invocation, and deferred-task response shapes stay compatible.
 
 ## Planned Material Improvement
 
-Route kernel-backed ACP permission preview through a kernel-owned stateless DPoP verifier that uses the installed DPoP config and verifies store/config presence without consuming the nonce. This is architectural because it keeps DPoP policy authority in `chio-kernel`, keeps ACP preview non-mutating, and makes `session/request_permission` and `tool/invoke` agree on sender-bound capability admission.
+Validate every `ToolManifest` with `chio_manifest::validate_manifest` before ACP capability publication, bridge-fidelity classification, or authoritative capability binding construction. This is architectural because it makes manifest validation the single envelope gate before external ACP discovery and keeps permission preview focused on request-time admission.

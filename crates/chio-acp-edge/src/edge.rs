@@ -40,6 +40,10 @@ impl ChioAcpEdge {
         let mut capability_sources: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
 
         for manifest in &manifests {
+            chio_manifest::validate_manifest(manifest)?;
+        }
+
+        for manifest in &manifests {
             for tool in &manifest.tools {
                 let cap_id = tool.name.clone();
                 let source = format!("{}/{}", manifest.server_id, tool.name);
