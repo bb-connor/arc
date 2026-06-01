@@ -2253,6 +2253,68 @@ mod tests {
     }
 
     #[test]
+    fn chio_tools_path_identity_rejects_invalid_utf8_percent_encoding() {
+        assert!(decode_path_identity_segment("%FF").is_none());
+        assert!(matches!(
+            chio_tools_path_identity("/chio/tools/acp/%FF"),
+            ChioToolsPathIdentity::Malformed
+        ));
+    }
+
+    #[test]
+    fn deny_by_default_tools_path_requires_both_sidecar_identity_fields() {
+        let query = HashMap::new();
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json_with_scope(
+            &issuer,
+            "cap-billing-charge",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "billing".to_string(),
+                    tool_name: "charge".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-partial-sidecar-tool-server-only".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/chio/tools/billing/charge".to_string(),
+                path: "/chio/tools/billing/charge",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("abc".to_string()),
+                body_length: 3,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: Some("billing"),
+                requested_tool_name: None,
+                requested_arguments: Some(&serde_json::json!({ "amount": 100 })),
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert!(result.receipt.evidence[0]
+            .details
+            .as_deref()
+            .is_some_and(|details| {
+                details.contains("capability does not authorize tool authorize_http_request")
+            }));
+    }
+
+    #[test]
     fn chio_tools_path_identity_non_tools_path_is_not_tools_path() {
         assert!(matches!(
             chio_tools_path_identity("/pets/42"),
