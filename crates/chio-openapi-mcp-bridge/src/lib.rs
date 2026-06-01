@@ -16,6 +16,8 @@
 
 use std::collections::BTreeMap;
 
+mod dispatch;
+
 #[cfg(feature = "fuzz")]
 pub mod fuzz;
 
@@ -23,7 +25,13 @@ use chio_egress_contract::HttpEgressContract;
 use chio_kernel::{KernelError, NestedFlowBridge, ToolServerConnection};
 use chio_manifest::ToolManifest;
 use chio_mcp_edge::McpToolInfo;
-use chio_openapi::{ChioExtensions, GeneratorConfig, ManifestGenerator, OpenApiError, OpenApiSpec};
+use chio_openapi::{GeneratorConfig, ManifestGenerator, OpenApiError, OpenApiSpec};
+#[cfg(test)]
+use dispatch::expand_route_path;
+use dispatch::{
+    bridged_tool_response, build_route_dispatches, dispatch_url, enforce_bridged_response_body,
+    enforce_dispatch_contract, RouteDispatch,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -112,137 +120,6 @@ pub struct BridgedResponse {
 pub type HttpDispatcher =
     dyn Fn(&str, &str, &Value) -> Result<BridgedResponse, BridgeError> + Send + Sync;
 
-fn enforce_dispatch_contract<'a>(
-    contract: Option<&'a HttpEgressContract>,
-    url: &str,
-) -> Result<&'a HttpEgressContract, BridgeError> {
-    let contract = contract.ok_or_else(|| {
-        BridgeError::UpstreamError(
-            "OpenAPI bridge dispatcher requires an HttpEgressContract".to_string(),
-        )
-    })?;
-    contract.enforce_url_with_dns(url, 0).map_err(|err| {
-        BridgeError::UpstreamError(format!("HttpEgressContract rejects bridge URL: {err}"))
-    })?;
-    Ok(contract)
-}
-
-fn enforce_bridged_response_body(
-    contract: &HttpEgressContract,
-    response: &BridgedResponse,
-) -> Result<(), BridgeError> {
-    let body_bytes = serde_json::to_vec(&response.body)
-        .map(|bytes| bytes.len() as u64)
-        .map_err(|err| {
-            BridgeError::UpstreamError(format!("failed to measure bridge response body: {err}"))
-        })?;
-    contract.enforce_response_bytes(body_bytes).map_err(|err| {
-        BridgeError::UpstreamError(format!("HttpEgressContract rejects bridge response: {err}"))
-    })
-}
-
-fn bridged_tool_response(binding: &RouteBinding, response: BridgedResponse) -> Value {
-    let text = serde_json::to_string(&response.body).unwrap_or_else(|_| "{}".to_string());
-    json!({
-        "content": [{
-            "type": "text",
-            "text": text,
-        }],
-        "isError": response.is_error,
-        "structuredContent": {
-            "httpStatus": response.status,
-            "method": binding.method,
-            "path": binding.path,
-            "body": response.body,
-        }
-    })
-}
-
-fn dispatch_url(
-    base_url: &str,
-    binding: &RouteBinding,
-    arguments: &Value,
-) -> Result<String, BridgeError> {
-    let path = expand_route_path(&binding.path, arguments)?;
-    Ok(format!("{base_url}{path}"))
-}
-
-fn expand_route_path(template: &str, arguments: &Value) -> Result<String, BridgeError> {
-    let mut expanded = String::with_capacity(template.len());
-    let mut rest = template;
-
-    while let Some(open) = rest.find('{') {
-        expanded.push_str(&rest[..open]);
-        let after_open = &rest[open + 1..];
-        let close = after_open.find('}').ok_or_else(|| {
-            BridgeError::UpstreamError(format!(
-                "OpenAPI bridge route path `{template}` has an unterminated path parameter"
-            ))
-        })?;
-        let name = &after_open[..close];
-        if name.is_empty() {
-            return Err(BridgeError::UpstreamError(format!(
-                "OpenAPI bridge route path `{template}` has an empty path parameter"
-            )));
-        }
-        let value = path_parameter_value(arguments, name)?;
-        expanded.push_str(&percent_encode_path_segment(&value));
-        rest = &after_open[close + 1..];
-    }
-
-    if rest.contains('}') {
-        return Err(BridgeError::UpstreamError(format!(
-            "OpenAPI bridge route path `{template}` has an unmatched path parameter terminator"
-        )));
-    }
-    expanded.push_str(rest);
-    Ok(expanded)
-}
-
-fn path_parameter_value(arguments: &Value, name: &str) -> Result<String, BridgeError> {
-    let value = arguments.get(name).ok_or_else(|| {
-        BridgeError::UpstreamError(format!("OpenAPI bridge missing path parameter `{name}`"))
-    })?;
-    let text = match value {
-        Value::String(value) => value.clone(),
-        Value::Number(value) => value.to_string(),
-        Value::Bool(value) => value.to_string(),
-        _ => {
-            return Err(BridgeError::UpstreamError(format!(
-                "OpenAPI bridge path parameter `{name}` must be a string, number, or boolean"
-            )));
-        }
-    };
-    if text.is_empty() {
-        return Err(BridgeError::UpstreamError(format!(
-            "OpenAPI bridge path parameter `{name}` must not be empty"
-        )));
-    }
-    Ok(text)
-}
-
-fn percent_encode_path_segment(value: &str) -> String {
-    const HEX: &[u8; 16] = b"0123456789ABCDEF";
-    let mut encoded = String::with_capacity(value.len());
-    for byte in value.as_bytes() {
-        if is_unreserved_path_byte(*byte) {
-            encoded.push(*byte as char);
-        } else {
-            encoded.push('%');
-            encoded.push(HEX[(byte >> 4) as usize] as char);
-            encoded.push(HEX[(byte & 0x0f) as usize] as char);
-        }
-    }
-    encoded
-}
-
-fn is_unreserved_path_byte(byte: u8) -> bool {
-    matches!(
-        byte,
-        b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~'
-    )
-}
-
 /// The OpenAPI-MCP bridge.
 ///
 /// Parses an OpenAPI spec, generates MCP tool definitions, and dispatches
@@ -250,8 +127,7 @@ fn is_unreserved_path_byte(byte: u8) -> bool {
 pub struct OpenApiMcpBridge {
     config: BridgeConfig,
     manifest: ToolManifest,
-    /// Maps tool name to its route binding.
-    route_bindings: BTreeMap<String, RouteBinding>,
+    route_dispatches: BTreeMap<String, RouteDispatch>,
     /// Optional HTTP dispatcher for live calls.
     dispatcher: Option<Box<HttpDispatcher>>,
 }
@@ -280,26 +156,7 @@ impl OpenApiMcpBridge {
             ));
         }
 
-        let mut route_bindings = BTreeMap::new();
-        for (path, path_item) in &spec.paths {
-            for (method_str, operation) in &path_item.operations {
-                let extensions = ChioExtensions::from_operation(&operation.raw);
-                if !extensions.should_publish() {
-                    continue;
-                }
-                let tool_name = operation
-                    .operation_id
-                    .clone()
-                    .unwrap_or_else(|| format!("{} {}", method_str.to_uppercase(), path));
-                route_bindings.insert(
-                    tool_name,
-                    RouteBinding {
-                        method: method_str.to_uppercase(),
-                        path: path.clone(),
-                    },
-                );
-            }
-        }
+        let route_dispatches = build_route_dispatches(spec);
 
         let manifest = ToolManifest {
             schema: "chio.manifest.v1".to_string(),
@@ -321,7 +178,7 @@ impl OpenApiMcpBridge {
         Ok(Self {
             config,
             manifest,
-            route_bindings,
+            route_dispatches,
             dispatcher: None,
         })
     }
@@ -343,7 +200,9 @@ impl OpenApiMcpBridge {
 
     /// Get the route binding for a tool.
     pub fn route_binding(&self, tool_name: &str) -> Option<&RouteBinding> {
-        self.route_bindings.get(tool_name)
+        self.route_dispatches
+            .get(tool_name)
+            .map(RouteDispatch::binding)
     }
 
     /// List all tool names exposed by this bridge.
@@ -373,13 +232,14 @@ impl OpenApiMcpBridge {
     /// Invoke a bridged tool. A dispatcher is required so the kernel cannot
     /// sign successful receipts for simulated side effects.
     pub fn invoke_tool(&self, tool_name: &str, arguments: Value) -> Result<Value, BridgeError> {
-        let binding = self
-            .route_bindings
+        let dispatch = self
+            .route_dispatches
             .get(tool_name)
             .ok_or_else(|| BridgeError::ToolNotFound(tool_name.to_string()))?;
 
         if let Some(dispatcher) = &self.dispatcher {
-            let url = dispatch_url(&self.config.base_url, binding, &arguments)?;
+            let binding = dispatch.binding();
+            let url = dispatch_url(&self.config.base_url, dispatch, &arguments)?;
             // HttpEgressContract: gate the dispatcher invocation on the typed
             // egress contract. The bridge stays transport-agnostic, so we
             // validate URL and DNS pre-flight, then enforce the response-byte
@@ -433,7 +293,7 @@ impl ToolServerConnection for BridgeToolServer<'_> {
 pub struct OwnedBridgeToolServer {
     config: BridgeConfig,
     manifest: ToolManifest,
-    route_bindings: BTreeMap<String, RouteBinding>,
+    route_dispatches: BTreeMap<String, RouteDispatch>,
     dispatcher: Option<Box<HttpDispatcher>>,
 }
 
@@ -443,19 +303,20 @@ impl OwnedBridgeToolServer {
         Self {
             config: bridge.config,
             manifest: bridge.manifest,
-            route_bindings: bridge.route_bindings,
+            route_dispatches: bridge.route_dispatches,
             dispatcher: bridge.dispatcher,
         }
     }
 
     fn invoke_tool(&self, tool_name: &str, arguments: Value) -> Result<Value, BridgeError> {
-        let binding = self
-            .route_bindings
+        let dispatch = self
+            .route_dispatches
             .get(tool_name)
             .ok_or_else(|| BridgeError::ToolNotFound(tool_name.to_string()))?;
 
         if let Some(dispatcher) = &self.dispatcher {
-            let url = dispatch_url(&self.config.base_url, binding, &arguments)?;
+            let binding = dispatch.binding();
+            let url = dispatch_url(&self.config.base_url, dispatch, &arguments)?;
             // HttpEgressContract: validate URL pre-flight and enforce the
             // response-byte ceiling post-dispatch. Missing contract state
             // fails closed for live dispatchers.
@@ -913,6 +774,65 @@ mod tests {
         assert_eq!(
             result["structuredContent"]["body"]["receivedUrl"],
             "https://93.184.216.34/pets/pet-42"
+        );
+    }
+
+    #[test]
+    fn bridge_dispatcher_appends_declared_query_parameters() {
+        let spec = r#"{
+            "openapi": "3.0.3",
+            "info": { "title": "Search API", "version": "1.0.0" },
+            "paths": {
+                "/pets/{petId}/notes": {
+                    "get": {
+                        "operationId": "searchPetNotes",
+                        "parameters": [
+                            {
+                                "name": "petId",
+                                "in": "path",
+                                "required": true,
+                                "schema": { "type": "string" }
+                            },
+                            {
+                                "name": "q",
+                                "in": "query",
+                                "schema": { "type": "string" }
+                            },
+                            {
+                                "name": "limit",
+                                "in": "query",
+                                "schema": { "type": "integer" }
+                            }
+                        ],
+                        "responses": { "200": { "description": "OK" } }
+                    }
+                }
+            }
+        }"#;
+        let mut bridge = OpenApiMcpBridge::from_spec(spec, petstore_config_with_egress()).unwrap();
+        bridge.set_dispatcher(Box::new(|_method, url, _args| {
+            Ok(BridgedResponse {
+                status: 200,
+                body: json!({"receivedUrl": url}),
+                is_error: false,
+            })
+        }));
+
+        let result = bridge
+            .invoke_tool(
+                "searchPetNotes",
+                json!({
+                    "petId": "pet 42",
+                    "q": "needs follow up",
+                    "limit": 10,
+                    "ignored": "not declared in OpenAPI"
+                }),
+            )
+            .unwrap();
+
+        assert_eq!(
+            result["structuredContent"]["body"]["receivedUrl"],
+            "https://93.184.216.34/pets/pet%2042/notes?q=needs%20follow%20up&limit=10"
         );
     }
 
