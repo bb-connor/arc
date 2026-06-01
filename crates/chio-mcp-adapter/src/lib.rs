@@ -29,13 +29,14 @@ use chio_core::{
 use chio_kernel::{
     KernelError, NestedFlowBridge, PromptProvider, ResourceProvider, ToolServerConnection,
 };
-use chio_manifest::{ToolDefinition, ToolManifest};
+use chio_manifest::ToolManifest;
 use tracing::warn;
 
 pub mod edge {
     pub use chio_mcp_edge::{ChioMcpEdge, McpEdgeConfig, McpExposedTool};
 }
 pub mod loaded_weights;
+mod manifest;
 pub mod native;
 pub mod transport;
 
@@ -237,40 +238,9 @@ impl McpAdapter {
     }
 
     /// Query the MCP server for its tool list and generate a Chio manifest.
-    ///
-    /// Each MCP tool becomes a `ToolDefinition` in the manifest. Since MCP
-    /// tools provide no side-effect metadata, all adapted tools are marked
-    /// `has_side_effects: true` (fail-closed).
     pub fn generate_manifest(&self) -> Result<ToolManifest, AdapterError> {
         let mcp_tools = self.transport.list_tools()?;
-
-        let tools: Vec<ToolDefinition> = mcp_tools
-            .into_iter()
-            .map(|t| ToolDefinition {
-                name: t.name,
-                description: t.description.unwrap_or_default(),
-                input_schema: t.input_schema,
-                output_schema: t.output_schema,
-                pricing: None,
-                has_side_effects: infer_has_side_effects(t.annotations.as_ref()),
-                latency_hint: None,
-            })
-            .collect();
-
-        let manifest = ToolManifest {
-            schema: "chio.manifest.v1".into(),
-            server_id: self.config.server_id.clone(),
-            name: self.config.server_name.clone(),
-            description: Some("MCP server adapted to Chio protocol".into()),
-            version: self.config.server_version.clone(),
-            tools,
-            server_tools: Vec::new(),
-            required_permissions: None,
-            public_key: self.config.public_key.clone(),
-        };
-
-        chio_manifest::validate_manifest(&manifest)?;
-        Ok(manifest)
+        manifest::generate_manifest(&self.config, mcp_tools)
     }
 
     pub fn capabilities(&self) -> McpServerCapabilities {
@@ -565,51 +535,9 @@ fn parse_url_elicitation_required_error(
     })
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-struct McpToolSafetyHints {
-    read_only: Option<bool>,
-    destructive: Option<bool>,
-    malformed: bool,
-}
-
-impl McpToolSafetyHints {
-    fn from_annotations(annotations: Option<&serde_json::Value>) -> Self {
-        let Some(annotations) = annotations else {
-            return Self::default();
-        };
-
-        let (read_only, read_only_malformed) = read_bool_hint(annotations, "readOnlyHint");
-        let (destructive, destructive_malformed) = read_bool_hint(annotations, "destructiveHint");
-
-        Self {
-            read_only,
-            destructive,
-            malformed: read_only_malformed || destructive_malformed,
-        }
-    }
-
-    fn has_side_effects(self) -> bool {
-        if self.malformed || self.destructive == Some(true) {
-            return true;
-        }
-        !matches!(self.read_only, Some(true))
-    }
-}
-
-fn read_bool_hint(annotations: &serde_json::Value, key: &str) -> (Option<bool>, bool) {
-    match annotations.get(key) {
-        None | Some(serde_json::Value::Null) => (None, false),
-        Some(serde_json::Value::Bool(value)) => (Some(*value), false),
-        Some(_) => (None, true),
-    }
-}
-
-fn infer_has_side_effects(annotations: Option<&serde_json::Value>) -> bool {
-    McpToolSafetyHints::from_annotations(annotations).has_side_effects()
-}
-
 #[cfg(test)]
 mod tests {
+    use super::manifest::infer_has_side_effects;
     use super::*;
     use chio_core::session::CreateElicitationOperation;
     use chio_kernel::KernelError;
@@ -989,6 +917,50 @@ mod tests {
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
         let err = adapter.generate_manifest().test_unwrap_err();
         assert!(matches!(err, AdapterError::ManifestError(_)));
+    }
+
+    #[test]
+    fn manifest_rejects_non_object_mcp_input_schema() {
+        let transport = MockTransport::simple(
+            vec![McpToolInfo {
+                name: "bad_schema".into(),
+                title: None,
+                description: Some("Bad schema".into()),
+                input_schema: serde_json::json!(["not", "an", "object"]),
+                output_schema: None,
+                annotations: None,
+                execution: None,
+            }],
+            MockCallBehavior::Success(success_result("ok")),
+        );
+        let adapter = McpAdapter::new(default_config(), Box::new(transport));
+
+        let err = adapter.generate_manifest().test_unwrap_err();
+
+        assert!(matches!(err, AdapterError::ParseError(_)));
+        assert!(err.to_string().contains("inputSchema"));
+    }
+
+    #[test]
+    fn manifest_rejects_non_object_mcp_output_schema() {
+        let transport = MockTransport::simple(
+            vec![McpToolInfo {
+                name: "bad_output".into(),
+                title: None,
+                description: Some("Bad output schema".into()),
+                input_schema: serde_json::json!({"type": "object"}),
+                output_schema: Some(serde_json::json!("not an object")),
+                annotations: None,
+                execution: None,
+            }],
+            MockCallBehavior::Success(success_result("ok")),
+        );
+        let adapter = McpAdapter::new(default_config(), Box::new(transport));
+
+        let err = adapter.generate_manifest().test_unwrap_err();
+
+        assert!(matches!(err, AdapterError::ParseError(_)));
+        assert!(err.to_string().contains("outputSchema"));
     }
 
     #[test]
