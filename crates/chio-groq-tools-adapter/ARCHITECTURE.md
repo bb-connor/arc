@@ -10,9 +10,10 @@
 
 ## Pain Points
 
-- `lib.rs` still mixes adapter orchestration, OpenAI-compatible response-envelope parsing, `tool_calls` extraction, validation, and lower-response helpers.
-- The README taxonomy documents safety blocks as `ProviderError::ContentPolicy`, but the batch lift path does not classify a safety-block response before reporting a generic malformed/no-tool-call response.
-- `openai_tool_call_to_function_call` is shared by batch and streaming paths but lives beside the public adapter surface, making the native response trust boundary harder to audit.
+- `GroqAdapterConfig::new` pins `api_version` to `GROQ_API_VERSION`, but the public serializable config can be loaded from disk or mutated with a stale API version before it reaches `GroqAdapter::new`.
+- Runtime paths currently trust `config.api_version` when stamping provenance and exposing provider metadata, even though the transport path always sends the pinned `x-groq-api-version` header.
+- A drifted config can therefore send an upstream request before the mismatch is detected, gate streamed output with stale provenance, or lower a tool result under a local contract that no longer matches the transport pin.
+- `response.rs` now owns OpenAI-compatible response-envelope classification and shared `tool_calls` decoding; that trust boundary should stay internal and should not be weakened by moving parsing back into `lib.rs`.
 
 ## Constraints
 
@@ -30,4 +31,4 @@
 
 ## Planned Improvement
 
-Move Groq response-envelope classification and OpenAI-compatible `tool_calls` decoding into an internal response module, then classify safety-block/refusal envelopes as `ProviderError::ContentPolicy` before reaching the generic malformed/no-tool path. This is architectural because it creates a single native-response trust boundary shared by batch and streaming paths, aligns code with the documented error taxonomy, and keeps public APIs stable.
+Add an adapter-local API-pin guard that fails closed unless `config.api_version == GROQ_API_VERSION`, then invoke it before outbound transport, direct batch lift, direct stream gating, provenance stamping, and tool-result lowering. This is architectural because it tightens the adapter's runtime contract across every trust-boundary entrypoint while preserving the public construction API and the existing internal response module boundary.
