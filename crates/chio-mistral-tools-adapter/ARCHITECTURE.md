@@ -10,9 +10,10 @@
 
 ## Pain Points
 
-- `lib.rs` still mixes adapter orchestration, native response-envelope parsing, OpenAI-compatible `tool_calls` extraction, validation, and lower-response helpers.
-- The README taxonomy documents Mistral safety blocks as `ProviderError::ContentPolicy`, but the batch lift path reaches the generic no-tool-call malformed branch for `finish_reason: content_filter`.
-- `openai_tool_call_to_function_call` is shared by batch and streaming paths but lives beside the public adapter surface, making the native response trust boundary harder to audit.
+- `MistralAdapterConfig::new` pins `api_version` to `MISTRAL_API_VERSION`, but the public serializable config can be deserialized or mutated with a stale API version before it reaches `MistralAdapter::new`.
+- Runtime paths currently trust `config.api_version` when stamping provenance and exposing provider metadata, even though the transport path always sends the pinned `x-mistral-api-version` header.
+- A drifted config can therefore send an upstream request before mismatch detection, gate streamed output with stale provenance, or lower a tool result under a local contract that no longer matches the transport pin.
+- `response.rs` now owns Mistral response-envelope classification and shared OpenAI-compatible `tool_calls` decoding; that trust boundary should stay internal and should not move back into the public adapter surface.
 
 ## Constraints
 
@@ -30,4 +31,4 @@
 
 ## Planned Improvement
 
-Move Mistral response-envelope classification and OpenAI-compatible `tool_calls` decoding into an internal response module, then classify `finish_reason: content_filter` envelopes as `ProviderError::ContentPolicy` before reaching the generic malformed/no-tool path. This is architectural because it creates a single native-response trust boundary shared by batch and streaming paths, aligns code with the documented error taxonomy, and keeps public APIs stable.
+Add an adapter-local API-pin guard that fails closed unless `config.api_version == MISTRAL_API_VERSION`, then invoke it before outbound transport, direct batch lift, direct stream gating, provenance stamping, and tool-result lowering. This is architectural because it tightens the adapter's runtime contract across every trust-boundary entrypoint while preserving the public construction API and the existing internal response module boundary.

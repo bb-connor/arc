@@ -169,6 +169,16 @@ impl MistralAdapter {
         &self.transport
     }
 
+    pub(crate) fn ensure_supported_api_version(&self) -> Result<(), ProviderError> {
+        if self.config.api_version != MISTRAL_API_VERSION {
+            return Err(ProviderError::Malformed(format!(
+                "Mistral adapter supports only API version {MISTRAL_API_VERSION}; configured {}",
+                self.config.api_version
+            )));
+        }
+        Ok(())
+    }
+
     /// Forward a non-streaming chat/completions request to Mistral and lift the
     /// `tool_calls` in the response.
     ///
@@ -182,6 +192,7 @@ impl MistralAdapter {
         &self,
         request: &MistralChatRequest,
     ) -> Result<Vec<ToolInvocation>, ProviderError> {
+        self.ensure_supported_api_version()?;
         let body = request.to_json_bytes()?;
         let response = self
             .transport
@@ -205,6 +216,7 @@ impl MistralAdapter {
     where
         F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
     {
+        self.ensure_supported_api_version()?;
         let mut request = request.clone();
         request.stream = true;
         let body = request.to_json_bytes()?;
@@ -219,6 +231,7 @@ impl MistralAdapter {
     /// Lift every Mistral `tool_calls` part in a non-streaming
     /// `chat/completions` response payload.
     pub fn lift_batch(&self, raw: ProviderRequest) -> Result<Vec<ToolInvocation>, ProviderError> {
+        self.ensure_supported_api_version()?;
         let calls = response::function_calls(raw)?;
         if calls.is_empty() {
             return Err(ProviderError::Malformed(
@@ -235,6 +248,7 @@ impl MistralAdapter {
         &self,
         call: &FunctionCallPart,
     ) -> Result<ToolInvocation, ProviderError> {
+        self.ensure_supported_api_version()?;
         validate_function_call(call)?;
         let arguments = canonical_json_bytes(&call.args).map_err(|error| {
             ProviderError::BadToolArgs(format!(
@@ -266,6 +280,7 @@ impl MistralAdapter {
         verdict: VerdictResult,
         result: ToolResult,
     ) -> Result<FunctionResponsePart, ProviderError> {
+        self.ensure_supported_api_version()?;
         let function_name = non_empty_str(function_name, "functionResponse.name")?;
         match verdict {
             VerdictResult::Allow { redactions, .. } => {
@@ -412,6 +427,73 @@ mod tests {
         )
     }
 
+    fn config_with_api_version(api_version: &str) -> MistralAdapterConfig {
+        let mut cfg = config();
+        cfg.api_version = api_version.to_string();
+        cfg
+    }
+
+    fn tool_call_payload() -> Value {
+        json!({
+            "id": "chatcmpl_api_pin",
+            "object": "chat.completion",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "tool_calls": [{
+                        "id": "call_api_pin",
+                        "type": "function",
+                        "function": {
+                            "name": "get_weather",
+                            "arguments": "{\"city\":\"Paris\"}"
+                        }
+                    }]
+                },
+                "finish_reason": "tool_calls"
+            }]
+        })
+    }
+
+    fn tool_call_stream() -> Vec<u8> {
+        let chunk = json!({
+            "id": "chatcmpl_api_pin_stream",
+            "object": "chat.completion.chunk",
+            "choices": [{
+                "index": 0,
+                "delta": {
+                    "tool_calls": [{
+                        "id": "call_api_pin_stream",
+                        "type": "function",
+                        "function": {
+                            "name": "get_weather",
+                            "arguments": "{\"city\":\"Paris\"}"
+                        }
+                    }]
+                }
+            }]
+        });
+        let mut sse = Vec::new();
+        sse.extend_from_slice(b"data: ");
+        sse.extend_from_slice(&serde_json::to_vec(&chunk).unwrap());
+        sse.extend_from_slice(b"\n\n");
+        sse
+    }
+
+    fn raw_payload(value: Value) -> ProviderRequest {
+        ProviderRequest(serde_json::to_vec(&value).unwrap())
+    }
+
+    fn assert_api_version_drift(error: ProviderError) {
+        match error {
+            ProviderError::Malformed(message) => {
+                assert!(message.contains("Mistral adapter supports only API version 2025-04"));
+                assert!(message.contains("configured 2024-12"));
+            }
+            other => panic!("expected Malformed API version drift, got {other:?}"),
+        }
+    }
+
     #[test]
     fn config_pins_api_version() {
         let cfg = config();
@@ -426,6 +508,98 @@ mod tests {
         let adapter = MistralAdapter::new(cfg, Arc::new(transport));
         assert_eq!(adapter.provider(), ProviderId::Mistral);
         assert_eq!(adapter.api_version(), "2025-04");
+    }
+
+    #[tokio::test]
+    async fn send_chat_completion_rejects_api_version_drift_before_transport_call() {
+        let mock = transport::MockTransport::new();
+        mock.push_response(serde_json::to_vec(&tool_call_payload()).unwrap());
+        let mock = Arc::new(mock);
+        let adapter = MistralAdapter::new(config_with_api_version("2024-12"), mock.clone());
+
+        let err = adapter
+            .send_chat_completion(&chat_request())
+            .await
+            .expect_err("drifted Mistral API version must fail before transport");
+
+        assert_api_version_drift(err);
+        assert!(mock.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn send_chat_completion_stream_rejects_api_version_drift_before_transport_call() {
+        let mock = transport::MockTransport::new();
+        mock.push_response(tool_call_stream());
+        let mock = Arc::new(mock);
+        let adapter = MistralAdapter::new(config_with_api_version("2024-12"), mock.clone());
+
+        let err = adapter
+            .send_chat_completion_stream(&chat_request(), |_invocation| {
+                Ok(VerdictResult::Allow {
+                    redactions: vec![],
+                    receipt_id: chio_tool_call_fabric::ReceiptId("rcpt_pin".into()),
+                })
+            })
+            .await
+            .expect_err("drifted Mistral API version must fail before stream transport");
+
+        assert_api_version_drift(err);
+        assert!(mock.calls().is_empty());
+    }
+
+    #[test]
+    fn lift_batch_rejects_api_version_drift_before_provenance_stamp() {
+        let adapter = MistralAdapter::new(
+            config_with_api_version("2024-12"),
+            Arc::new(transport::MockTransport::new()),
+        );
+
+        let err = adapter
+            .lift_batch(raw_payload(tool_call_payload()))
+            .expect_err("drifted Mistral API version must fail before provenance stamping");
+
+        assert_api_version_drift(err);
+    }
+
+    #[test]
+    fn gate_sse_stream_rejects_api_version_drift_before_evaluator() {
+        let adapter = MistralAdapter::new(
+            config_with_api_version("2024-12"),
+            Arc::new(transport::MockTransport::new()),
+        );
+        let evaluated = std::cell::Cell::new(false);
+
+        let err = adapter
+            .gate_sse_stream(&tool_call_stream(), |_invocation| {
+                evaluated.set(true);
+                Ok(VerdictResult::Allow {
+                    redactions: vec![],
+                    receipt_id: chio_tool_call_fabric::ReceiptId("rcpt_pin".into()),
+                })
+            })
+            .expect_err("drifted Mistral API version must fail before stream evaluation");
+
+        assert_api_version_drift(err);
+        assert!(!evaluated.get());
+    }
+
+    #[test]
+    fn lower_function_response_rejects_api_version_drift() {
+        let adapter = MistralAdapter::new(
+            config_with_api_version("2024-12"),
+            Arc::new(transport::MockTransport::new()),
+        );
+        let verdict = VerdictResult::Allow {
+            redactions: vec![],
+            receipt_id: chio_tool_call_fabric::ReceiptId("rcpt_pin".into()),
+        };
+        let result = ToolResult(b"{\"temp\":18}".to_vec());
+
+        let err = adapter
+            .lower_function_response("get_weather", verdict, result)
+            .expect_err("drifted Mistral API version must fail before lowering");
+
+        assert_api_version_drift(err);
     }
 
     #[test]
