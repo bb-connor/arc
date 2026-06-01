@@ -241,6 +241,39 @@ pub struct TrustServiceConfig {
     pub cluster_sync_interval: Duration,
 }
 
+impl TrustServiceConfig {
+    pub fn validate(&self) -> Result<(), CliError> {
+        if self.service_token.trim().is_empty() {
+            return Err(CliError::cli_other_error(
+                "control service token must be non-empty".to_string(),
+            ));
+        }
+        for (tenant_id, token) in &self.tenant_read_tokens {
+            if tenant_id.trim().is_empty() {
+                return Err(CliError::cli_other_error(
+                    "tenant read token id must be non-empty".to_string(),
+                ));
+            }
+            if token.trim().is_empty() {
+                return Err(CliError::cli_other_error(format!(
+                    "tenant read token for `{tenant_id}` must be non-empty"
+                )));
+            }
+            if token == &self.service_token {
+                return Err(CliError::cli_other_error(
+                    "control tenant read token must not equal service token".to_string(),
+                ));
+            }
+        }
+        if self.cluster_sync_interval.is_zero() {
+            return Err(CliError::cli_other_error(
+                "cluster sync interval must be non-zero".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct TrustServiceState {
     pub(crate) config: TrustServiceConfig,

@@ -1,6 +1,7 @@
 use super::*;
 
 pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
+    config.validate()?;
     let listener = tokio::net::TcpListener::bind(config.listen).await?;
     let local_addr = listener.local_addr()?;
     let enterprise_provider_registry = load_enterprise_provider_registry(
