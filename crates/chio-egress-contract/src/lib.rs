@@ -241,103 +241,67 @@ impl HttpEgressContract {
     }
 
     fn enforce_ipv4_class(&self, address: Ipv4Addr) -> Result<(), HttpEgressError> {
-        if self.deny_loopback && address.is_loopback() {
-            return Err(HttpEgressError::LoopbackDenied {
-                host: address.to_string(),
-            });
-        }
-        if self.deny_link_local && address.is_link_local() {
-            return Err(HttpEgressError::LinkLocalDenied {
-                host: address.to_string(),
-            });
-        }
-        Ok(())
+        self.enforce_ip_address_class(address.to_string(), classify_ipv4_address(&address))
     }
 
     fn enforce_ipv6_class(&self, address: Ipv6Addr) -> Result<(), HttpEgressError> {
         if let Some(mapped) = address.to_ipv4_mapped() {
             return self.enforce_ipv4_class(mapped);
         }
-        if self.deny_loopback && address.is_loopback() {
-            return Err(HttpEgressError::LoopbackDenied {
-                host: address.to_string(),
-            });
-        }
-        if self.deny_link_local && is_ipv6_unicast_link_local(&address) {
-            return Err(HttpEgressError::LinkLocalDenied {
-                host: address.to_string(),
-            });
-        }
-        if self.deny_ipv6_ula && is_ipv6_unique_local(&address) {
-            return Err(HttpEgressError::Ipv6UlaDenied {
-                host: address.to_string(),
-            });
-        }
-        Ok(())
+        self.enforce_ip_address_class(address.to_string(), classify_ipv6_address(&address))
     }
 
     /// Enforce address-class denials after a domain has resolved to an IP.
     pub fn enforce_resolved_ip(&self, host: &str, address: IpAddr) -> Result<(), HttpEgressError> {
         match address {
             IpAddr::V4(address) => {
-                if address.is_loopback() {
-                    if self.deny_loopback {
-                        return Err(HttpEgressError::LoopbackDenied {
-                            host: format!("{host} resolved to {address}"),
-                        });
-                    }
-                    return Ok(());
-                }
-                if address.is_link_local() {
-                    if self.deny_link_local {
-                        return Err(HttpEgressError::LinkLocalDenied {
-                            host: format!("{host} resolved to {address}"),
-                        });
-                    }
-                    return Ok(());
-                }
-                if is_ipv4_private_or_special_use(&address) {
-                    return Err(HttpEgressError::PrivateNetworkDenied {
-                        host: format!("{host} resolved to {address}"),
-                    });
-                }
+                self.enforce_ip_address_class(
+                    format!("{host} resolved to {address}"),
+                    classify_ipv4_address(&address),
+                )?;
             }
             IpAddr::V6(address) => {
                 if let Some(mapped) = address.to_ipv4_mapped() {
                     return self.enforce_resolved_ip(host, IpAddr::V4(mapped));
                 }
-                if address.is_loopback() {
-                    if self.deny_loopback {
-                        return Err(HttpEgressError::LoopbackDenied {
-                            host: format!("{host} resolved to {address}"),
-                        });
-                    }
-                    return Ok(());
-                }
-                if is_ipv6_unicast_link_local(&address) {
-                    if self.deny_link_local {
-                        return Err(HttpEgressError::LinkLocalDenied {
-                            host: format!("{host} resolved to {address}"),
-                        });
-                    }
-                    return Ok(());
-                }
-                if is_ipv6_unique_local(&address) {
-                    if self.deny_ipv6_ula {
-                        return Err(HttpEgressError::Ipv6UlaDenied {
-                            host: format!("{host} resolved to {address}"),
-                        });
-                    }
-                    return Ok(());
-                }
-                if is_ipv6_private_or_special_use(&address) {
-                    return Err(HttpEgressError::PrivateNetworkDenied {
-                        host: format!("{host} resolved to {address}"),
-                    });
-                }
+                self.enforce_ip_address_class(
+                    format!("{host} resolved to {address}"),
+                    classify_ipv6_address(&address),
+                )?;
             }
         }
         Ok(())
+    }
+
+    fn enforce_ip_address_class(
+        &self,
+        host: String,
+        class: IpAddressClass,
+    ) -> Result<(), HttpEgressError> {
+        match class {
+            IpAddressClass::Global => Ok(()),
+            IpAddressClass::Loopback => {
+                if self.deny_loopback {
+                    return Err(HttpEgressError::LoopbackDenied { host });
+                }
+                Ok(())
+            }
+            IpAddressClass::LinkLocal => {
+                if self.deny_link_local {
+                    return Err(HttpEgressError::LinkLocalDenied { host });
+                }
+                Ok(())
+            }
+            IpAddressClass::Ipv6Ula => {
+                if self.deny_ipv6_ula {
+                    return Err(HttpEgressError::Ipv6UlaDenied { host });
+                }
+                Ok(())
+            }
+            IpAddressClass::PrivateOrSpecialUse => {
+                Err(HttpEgressError::PrivateNetworkDenied { host })
+            }
+        }
     }
 
     fn enforce_domain_resolution(&self, url: &Url) -> Result<(), HttpEgressError> {
@@ -515,6 +479,30 @@ mod tests {
                 IpAddr::V6(Ipv6Addr::new(0x2606, 0x2800, 0x220, 0x1, 0, 0, 0, 0)),
             )
             .expect("global resolved addresses remain allowed");
+    }
+
+    #[test]
+    fn private_ipv4_literal_fails_closed_even_when_declared() {
+        let error = strict_contract("10.0.0.5")
+            .enforce_url("https://10.0.0.5/admin", 0)
+            .expect_err("private IPv4 literals must fail closed even when allow-listed");
+
+        assert!(matches!(
+            error,
+            HttpEgressError::PrivateNetworkDenied { host } if host == "10.0.0.5"
+        ));
+    }
+
+    #[test]
+    fn ipv4_mapped_private_literal_fails_closed_even_when_declared() {
+        let error = strict_contract("[::ffff:10.0.0.5]")
+            .enforce_url("https://[::ffff:10.0.0.5]/admin", 0)
+            .expect_err("IPv4-mapped private literals must fail closed even when allow-listed");
+
+        assert!(matches!(
+            error,
+            HttpEgressError::PrivateNetworkDenied { host } if host == "10.0.0.5"
+        ));
     }
 }
 
@@ -990,6 +978,47 @@ fn normalized_authority_host(authority: &str) -> Result<String, HttpEgressError>
 
 fn normalize_domain_name(host: &str) -> String {
     host.trim_end_matches('.').to_ascii_lowercase()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum IpAddressClass {
+    Global,
+    Loopback,
+    LinkLocal,
+    Ipv6Ula,
+    PrivateOrSpecialUse,
+}
+
+fn classify_ipv4_address(address: &Ipv4Addr) -> IpAddressClass {
+    if address.is_loopback() {
+        return IpAddressClass::Loopback;
+    }
+    if address.is_link_local() {
+        return IpAddressClass::LinkLocal;
+    }
+    if is_ipv4_private_or_special_use(address) {
+        return IpAddressClass::PrivateOrSpecialUse;
+    }
+    IpAddressClass::Global
+}
+
+fn classify_ipv6_address(address: &Ipv6Addr) -> IpAddressClass {
+    if let Some(mapped) = address.to_ipv4_mapped() {
+        return classify_ipv4_address(&mapped);
+    }
+    if address.is_loopback() {
+        return IpAddressClass::Loopback;
+    }
+    if is_ipv6_unicast_link_local(address) {
+        return IpAddressClass::LinkLocal;
+    }
+    if is_ipv6_unique_local(address) {
+        return IpAddressClass::Ipv6Ula;
+    }
+    if is_ipv6_private_or_special_use(address) {
+        return IpAddressClass::PrivateOrSpecialUse;
+    }
+    IpAddressClass::Global
 }
 
 fn normalized_url_authority(url: &Url) -> Result<String, HttpEgressError> {

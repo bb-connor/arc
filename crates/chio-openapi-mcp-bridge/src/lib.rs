@@ -601,8 +601,8 @@ mod tests {
 
     fn petstore_config_with_egress() -> BridgeConfig {
         let mut config = petstore_config();
-        config.base_url = "https://203.0.113.10".to_string();
-        config.egress_contract = Some(HttpEgressContract::permissive_for_tests("203.0.113.10"));
+        config.base_url = "https://93.184.216.34".to_string();
+        config.egress_contract = Some(HttpEgressContract::permissive_for_tests("93.184.216.34"));
         config
     }
 
@@ -891,7 +891,7 @@ mod tests {
         let url = result["structuredContent"]["body"]["receivedUrl"]
             .as_str()
             .unwrap_or("");
-        assert!(url.starts_with("https://203.0.113.10"));
+        assert!(url.starts_with("https://93.184.216.34"));
     }
 
     #[test]
@@ -912,7 +912,7 @@ mod tests {
 
         assert_eq!(
             result["structuredContent"]["body"]["receivedUrl"],
-            "https://203.0.113.10/pets/pet-42"
+            "https://93.184.216.34/pets/pet-42"
         );
     }
 
