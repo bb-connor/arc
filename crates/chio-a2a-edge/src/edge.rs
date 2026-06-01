@@ -174,17 +174,10 @@ impl ChioA2aEdge {
             other => (-32603, other.to_string()),
         };
 
-        json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "error": {
-                "code": code,
-                "message": message,
-            }
-        })
+        Self::jsonrpc_error_payload(id, code, &message)
     }
 
-    fn jsonrpc_protocol_error_response(id: Value, code: i64, message: &str) -> Value {
+    fn jsonrpc_error_payload(id: Value, code: i64, message: &str) -> Value {
         json!({
             "jsonrpc": "2.0",
             "id": id,
