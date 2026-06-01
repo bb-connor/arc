@@ -702,6 +702,65 @@ mod tests {
         server.join();
     }
 
+    #[test]
+    fn task_registry_rejects_conflicting_reobserved_task_binding() {
+        let registry_path = unique_path("chio-a2a-task-registry-conflict", ".json");
+        let registry = A2aTaskRegistry::open(&registry_path).expect("open task registry");
+        let selected_interface = A2aAgentInterface {
+            url: "http://localhost:9000/rpc".to_string(),
+            protocol_binding: "JSONRPC".to_string(),
+            protocol_version: "1.0".to_string(),
+            tenant: Some("tenant-alpha".to_string()),
+        };
+        let selected_binding = A2aProtocolBinding::JsonRpc;
+        let first_context = A2aTaskRecordContext {
+            source: "send_message",
+            tool_name: "research",
+            server_id: "srv-a2a",
+            selected_interface: &selected_interface,
+            selected_binding: &selected_binding,
+            partner: "partner-alpha",
+        };
+        registry
+            .record_from_value(
+                &json!({
+                    "task": {
+                        "id": "task-1",
+                        "status": { "state": "TASK_STATE_WORKING" }
+                    }
+                }),
+                &first_context,
+            )
+            .expect("record initial task binding");
+
+        let conflicting_context = A2aTaskRecordContext {
+            source: "send_message",
+            tool_name: "clinical_search",
+            server_id: "srv-a2a",
+            selected_interface: &selected_interface,
+            selected_binding: &selected_binding,
+            partner: "partner-alpha",
+        };
+        let error = registry
+            .record_from_value(
+                &json!({
+                    "task": {
+                        "id": "task-1",
+                        "status": { "state": "TASK_STATE_WORKING" }
+                    }
+                }),
+                &conflicting_context,
+            )
+            .expect_err("conflicting task ownership must fail closed");
+
+        assert!(error.to_string().contains("attempted to rebind"));
+        let reloaded = registry.load().expect("reload task registry");
+        let record = reloaded.tasks.get("task-1").expect("task remains recorded");
+        assert_eq!(record.tool_name, "research");
+
+        let _ = fs::remove_file(registry_path);
+    }
+
     #[tokio::test]
     async fn adapter_invokes_http_json_binding() {
         let Some(server) = FakeA2aServer::spawn_http_json() else {

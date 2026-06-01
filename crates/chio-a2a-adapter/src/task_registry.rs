@@ -208,29 +208,73 @@ impl A2aTaskRegistry {
         let mut registry = self.load()?;
         let now = unix_timestamp_now();
         for (task_id, state) in seen {
-            let entry = registry.tasks.entry(task_id.clone()).or_insert_with(|| A2aTaskRecord {
-                task_id: task_id.clone(),
-                tool_name: context.tool_name.to_string(),
-                server_id: context.server_id.to_string(),
-                interface_url: context.selected_interface.url.clone(),
-                protocol_binding: binding_label(context.selected_binding).to_string(),
-                tenant: context.selected_interface.tenant.clone(),
-                partner: context.partner.to_string(),
-                first_seen_at: now,
-                last_seen_at: now,
-                last_state: None,
-                last_source: context.source.to_string(),
-            });
+            let entry = registry
+                .tasks
+                .entry(task_id.clone())
+                .or_insert_with(|| A2aTaskRecord {
+                    task_id: task_id.clone(),
+                    tool_name: context.tool_name.to_string(),
+                    server_id: context.server_id.to_string(),
+                    interface_url: context.selected_interface.url.clone(),
+                    protocol_binding: binding_label(context.selected_binding).to_string(),
+                    tenant: context.selected_interface.tenant.clone(),
+                    partner: context.partner.to_string(),
+                    first_seen_at: now,
+                    last_seen_at: now,
+                    last_state: None,
+                    last_source: context.source.to_string(),
+                });
+            validate_task_record_binding(entry, context)?;
             entry.last_seen_at = now;
             entry.last_source = context.source.to_string();
             entry.last_state = state.or_else(|| entry.last_state.clone());
-            entry.tool_name = context.tool_name.to_string();
-            entry.server_id = context.server_id.to_string();
-            entry.interface_url = context.selected_interface.url.clone();
-            entry.protocol_binding = binding_label(context.selected_binding).to_string();
-            entry.tenant = context.selected_interface.tenant.clone();
-            entry.partner = context.partner.to_string();
         }
         self.save(&registry)
     }
+}
+
+fn validate_task_record_binding(
+    record: &A2aTaskRecord,
+    context: &A2aTaskRecordContext<'_>,
+) -> Result<(), AdapterError> {
+    if record.tool_name != context.tool_name {
+        return Err(AdapterError::Lifecycle(format!(
+            "A2A task `{}` attempted to rebind from tool `{}` to `{}`",
+            record.task_id, record.tool_name, context.tool_name
+        )));
+    }
+    if record.server_id != context.server_id {
+        return Err(AdapterError::Lifecycle(format!(
+            "A2A task `{}` attempted to rebind from server `{}` to `{}`",
+            record.task_id, record.server_id, context.server_id
+        )));
+    }
+    if record.interface_url != context.selected_interface.url {
+        return Err(AdapterError::Lifecycle(format!(
+            "A2A task `{}` attempted to rebind from interface `{}` to `{}`",
+            record.task_id, record.interface_url, context.selected_interface.url
+        )));
+    }
+    let context_binding = binding_label(context.selected_binding);
+    if record.protocol_binding != context_binding {
+        return Err(AdapterError::Lifecycle(format!(
+            "A2A task `{}` attempted to rebind from binding `{}` to `{}`",
+            record.task_id, record.protocol_binding, context_binding
+        )));
+    }
+    if record.tenant.as_deref() != context.selected_interface.tenant.as_deref() {
+        return Err(AdapterError::Lifecycle(format!(
+            "A2A task `{}` attempted to rebind from tenant `{}` to `{}`",
+            record.task_id,
+            record.tenant.as_deref().unwrap_or("none"),
+            context.selected_interface.tenant.as_deref().unwrap_or("none")
+        )));
+    }
+    if record.partner != context.partner {
+        return Err(AdapterError::Lifecycle(format!(
+            "A2A task `{}` attempted to rebind from partner `{}` to `{}`",
+            record.task_id, record.partner, context.partner
+        )));
+    }
+    Ok(())
 }
