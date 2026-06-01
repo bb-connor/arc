@@ -218,6 +218,9 @@ impl AgUiProxy {
         capability: Option<&CapabilityToken>,
         transport: &mut Transport,
     ) -> Result<(ProxyDecision, AgUiReceipt), AgUiProxyError> {
+        event
+            .validate_boundary()
+            .map_err(AgUiProxyError::InvalidEvent)?;
         let mut server_event = event.clone();
         let decision = match derive_server_classification(event) {
             Ok(classification) => {
@@ -1008,6 +1011,63 @@ mod tests {
         assert_eq!(decision, ProxyDecision::Forward);
         assert!(receipt.allowed);
         assert_eq!(transport.events_forwarded, 1);
+    }
+
+    #[test]
+    fn proxy_rejects_empty_event_id_before_receipt() {
+        let config = AgUiProxyConfig {
+            allow_display_without_capability: true,
+            ..Default::default()
+        };
+        let proxy = AgUiProxy::new(config, Keypair::generate());
+        let event = AgUiEvent {
+            event_id: "  ".to_string(),
+            ..make_event(EventClassification::Display)
+        };
+        let mut transport = Transport::new(
+            TransportKind::Sse,
+            "conn-empty-event-id".to_string(),
+            "agent-1".to_string(),
+        );
+
+        let err = proxy
+            .evaluate(&event, None, &mut transport)
+            .expect_err("empty event_id must fail before AG-UI receipt construction");
+        assert_eq!(
+            err.to_string(),
+            "invalid event: event_id must be a non-empty string"
+        );
+        assert_eq!(transport.total_events(), 0);
+    }
+
+    #[test]
+    fn proxy_rejects_empty_target_component_before_receipt() {
+        let config = AgUiProxyConfig {
+            allow_display_without_capability: true,
+            ..Default::default()
+        };
+        let proxy = AgUiProxy::new(config, Keypair::generate());
+        let event = AgUiEvent {
+            target: Some(TargetComponent {
+                component_type: " ".to_string(),
+                component_id: Some("composer".to_string()),
+            }),
+            ..make_event(EventClassification::Display)
+        };
+        let mut transport = Transport::new(
+            TransportKind::Sse,
+            "conn-empty-target".to_string(),
+            "agent-1".to_string(),
+        );
+
+        let err = proxy
+            .evaluate(&event, None, &mut transport)
+            .expect_err("empty target component type must fail before receipt construction");
+        assert_eq!(
+            err.to_string(),
+            "invalid event: target.component_type must be a non-empty string"
+        );
+        assert_eq!(transport.total_events(), 0);
     }
 
     #[test]
