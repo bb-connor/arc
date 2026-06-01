@@ -1605,4 +1605,72 @@ mod tests {
         let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
         assert!(error.to_string().contains("consistency anchor"));
     }
+
+    fn bilateral_envelope_with_unanimous_deny_verdict(envelope: &DsseEnvelope) -> DsseEnvelope {
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+        use base64::Engine;
+        use chio_core_types::crypto::{Ed25519Backend, Keypair, SigningBackend};
+        use chio_federation::{pae, PAYLOAD_TYPE_IN_TOTO};
+
+        let buyer_key = Keypair::from_seed(&BUYER_SEED);
+        let vendor_a_key = Keypair::from_seed(&VENDORS[0].seed);
+
+        let mut deny_envelope = envelope.clone();
+        let (mut statement, _) = deny_envelope
+            .decode_statement()
+            .expect("bilateral envelope decodes");
+        let summary = statement
+            .predicate
+            .policy_evaluation_summary
+            .as_mut()
+            .expect("bilateral envelope carries policy_evaluation_summary");
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+
+        let statement_bytes = statement
+            .canonical_bytes()
+            .expect("deny bilateral statement serializes");
+        deny_envelope.payload = BASE64_STANDARD.encode(&statement_bytes);
+        let pae_bytes = pae(PAYLOAD_TYPE_IN_TOTO, &statement_bytes);
+        let sig_a = Ed25519Backend::new(buyer_key)
+            .sign_bytes(&pae_bytes)
+            .expect("buyer cosigns deny bilateral statement");
+        let sig_b = Ed25519Backend::new(vendor_a_key)
+            .sign_bytes(&pae_bytes)
+            .expect("vendor cosigns deny bilateral statement");
+        deny_envelope.signatures[0].sig = BASE64_STANDARD.encode(sig_a.to_bytes());
+        deny_envelope.signatures[1].sig = BASE64_STANDARD.encode(sig_b.to_bytes());
+        deny_envelope
+    }
+
+    #[test]
+    fn proof_package_rejects_unanimous_deny_bilateral_verdict() {
+        let mut package = fresh_proof_package().expect("fresh package builds");
+        let context = verification_context();
+
+        package.bilateral_envelopes[0] =
+            bilateral_envelope_with_unanimous_deny_verdict(&package.bilateral_envelopes[0]);
+        package.workflow_receipt.steps[0].bilateral_dsse_sha256 = Some(
+            canonical_sha256(&package.bilateral_envelopes[0]).expect("deny envelope hash computes"),
+        );
+        let mut parent = None;
+        for step in &mut package.workflow_receipt.steps {
+            step.parent_receipt_sha256 = parent.clone();
+            parent = Some(canonical_sha256(step).expect("workflow step hash computes"));
+        }
+        resign_workflow_receipt(&mut package).expect("workflow resigns after deny envelope");
+        let trust_bundle = rebuild_verifier_material(&mut package, &context);
+
+        let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.contains("is not allow"),
+            "expected deny verdict rejection, got: {message}"
+        );
+        assert!(
+            message.contains("deny"),
+            "expected joint verdict in error, got: {message}"
+        );
+    }
 }
