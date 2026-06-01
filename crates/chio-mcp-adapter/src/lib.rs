@@ -416,6 +416,15 @@ impl ToolServerConnection for AdaptedMcpServer {
         arguments: serde_json::Value,
         nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
     ) -> Result<serde_json::Value, KernelError> {
+        if !self
+            .manifest
+            .tools
+            .iter()
+            .any(|tool| tool.name == tool_name)
+        {
+            return Err(KernelError::ToolNotRegistered(tool_name.to_string()));
+        }
+
         self.adapter
             .invoke_with_nested_flow(tool_name, arguments, nested_flow_bridge)
             .map_err(map_tool_invocation_error)
@@ -625,7 +634,7 @@ mod tests {
     struct MockTransport {
         tools: Vec<McpToolInfo>,
         call_behavior: MockCallBehavior,
-        call_count: AtomicUsize,
+        call_count: std::sync::Arc<AtomicUsize>,
         resources: Vec<ResourceDefinition>,
         resource_templates: Vec<ResourceTemplateDefinition>,
         prompts: Vec<chio_core::PromptDefinition>,
@@ -637,7 +646,7 @@ mod tests {
             Self {
                 tools,
                 call_behavior,
-                call_count: AtomicUsize::new(0),
+                call_count: std::sync::Arc::new(AtomicUsize::new(0)),
                 resources: vec![],
                 resource_templates: vec![],
                 prompts: vec![],
@@ -663,6 +672,10 @@ mod tests {
         fn with_prompts(mut self, prompts: Vec<chio_core::PromptDefinition>) -> Self {
             self.prompts = prompts;
             self
+        }
+
+        fn call_count_handle(&self) -> std::sync::Arc<AtomicUsize> {
+            self.call_count.clone()
         }
     }
 
@@ -1190,6 +1203,28 @@ mod tests {
             adapted.tool_names(),
             vec!["read_file".to_string(), "write_file".to_string()]
         );
+    }
+
+    #[tokio::test]
+    async fn adapted_server_rejects_manifest_unknown_tool_without_contacting_upstream() {
+        let transport = MockTransport::simple(
+            vec![text_tool_info("known_tool")],
+            MockCallBehavior::Success(success_result("unexpected")),
+        );
+        let call_count = transport.call_count_handle();
+        let adapted = AdaptedMcpServer::new(McpAdapter::new(default_config(), Box::new(transport)))
+            .unwrap_or_else(|e| panic!("adapted server: {e}"));
+
+        let error = adapted
+            .invoke("unlisted_tool", serde_json::json!({}), None)
+            .await
+            .test_unwrap_err();
+
+        assert!(matches!(
+            error,
+            KernelError::ToolNotRegistered(ref tool) if tool == "unlisted_tool"
+        ));
+        assert_eq!(call_count.load(Ordering::SeqCst), 0);
     }
 
     #[tokio::test]
