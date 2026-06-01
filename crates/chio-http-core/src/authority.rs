@@ -158,35 +158,45 @@ fn http_authority_capability_binding(
     }
 }
 
+fn reserved_tools_proxy_capability_binding(
+    input: &HttpAuthorityInput<'_>,
+    caller_identity_hash: &str,
+) -> CapabilityBinding {
+    let mut binding = http_authority_capability_binding(input, caller_identity_hash);
+    binding.policy = HttpAuthorityPolicy::DenyByDefault;
+    binding
+}
+
 fn capability_binding(
     input: &HttpAuthorityInput<'_>,
     caller_identity_hash: &str,
 ) -> CapabilityBinding {
-    if has_sidecar_tool_identity(input) {
-        match chio_tools_path_identity(input.path) {
-            ChioToolsPathIdentity::Identity {
-                server_id,
-                tool_name,
-            } => {
-                return CapabilityBinding {
-                    requested_tool_server: Some(server_id),
-                    requested_tool_name: Some(tool_name),
-                    requested_arguments: input.requested_arguments.cloned(),
-                    invalid_reason: None,
-                    policy: HttpAuthorityPolicy::DenyByDefault,
-                };
-            }
-            ChioToolsPathIdentity::Malformed => {
-                return CapabilityBinding {
-                    requested_tool_server: None,
-                    requested_tool_name: None,
-                    requested_arguments: input.requested_arguments.cloned(),
-                    invalid_reason: Some(MALFORMED_CHIO_TOOLS_PATH_REASON.to_string()),
-                    policy: HttpAuthorityPolicy::DenyByDefault,
-                };
-            }
-            ChioToolsPathIdentity::NotToolsPath => {}
+    match chio_tools_path_identity(input.path) {
+        ChioToolsPathIdentity::Malformed => {
+            return CapabilityBinding {
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: input.requested_arguments.cloned(),
+                invalid_reason: Some(MALFORMED_CHIO_TOOLS_PATH_REASON.to_string()),
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            };
         }
+        ChioToolsPathIdentity::Identity {
+            server_id,
+            tool_name,
+        } if has_sidecar_tool_identity(input) => {
+            return CapabilityBinding {
+                requested_tool_server: Some(server_id),
+                requested_tool_name: Some(tool_name),
+                requested_arguments: input.requested_arguments.cloned(),
+                invalid_reason: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            };
+        }
+        ChioToolsPathIdentity::Identity { .. } => {
+            return reserved_tools_proxy_capability_binding(input, caller_identity_hash);
+        }
+        ChioToolsPathIdentity::NotToolsPath => {}
     }
 
     if input.policy != HttpAuthorityPolicy::DenyByDefault {
@@ -1873,6 +1883,38 @@ mod tests {
         assert_eq!(
             result.receipt.evidence[0].details.as_deref(),
             Some("capability does not authorize tool charge on server billing")
+        );
+    }
+
+    #[test]
+    fn reserved_tools_proxy_get_path_requires_capability_without_sidecar_fields() {
+        let query = HashMap::new();
+        let result = authority()
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-proxy-get-reserved-tools-path".to_string(),
+                method: HttpMethod::Get,
+                route_pattern: "/chio/tools/billing/read".to_string(),
+                path: "/chio/tools/billing/read",
+                query: &query,
+                caller: caller(),
+                body_hash: None,
+                body_length: 0,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: None,
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::SessionAllow,
+            })
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("side-effect route requires a valid capability token")
         );
     }
 

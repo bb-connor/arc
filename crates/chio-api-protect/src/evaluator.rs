@@ -199,6 +199,11 @@ impl RequestEvaluator {
             }
         }
 
+        // Reserved tool paths require capability regardless of HTTP method.
+        if path.starts_with("/chio/tools/") {
+            return (path.to_string(), PolicyDecision::DenyByDefault, false);
+        }
+
         // Fallback: use method-based default policy.
         let pattern = path.to_string();
         let policy = if method.is_safe() {
@@ -424,6 +429,30 @@ mod tests {
         assert_eq!(
             http_status_scope(result.receipt.metadata.as_ref()),
             Some(CHIO_HTTP_STATUS_SCOPE_DECISION)
+        );
+    }
+
+    #[test]
+    fn evaluate_get_reserved_tools_path_requires_capability() {
+        let keypair = Keypair::generate();
+        let evaluator = RequestEvaluator::new(vec![], keypair, "test-policy".to_string());
+
+        let result = evaluator
+            .evaluate(
+                HttpMethod::Get,
+                "/chio/tools/billing/read",
+                &HashMap::new(),
+                &HashMap::new(),
+                None,
+                0,
+            )
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("side-effect route requires a valid capability token")
         );
     }
 
