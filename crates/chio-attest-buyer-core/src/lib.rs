@@ -1424,12 +1424,7 @@ fn verify_package_inner(
             },
         )
         .map_err(|error| ChioPackageError::Federation(error.to_string()))?;
-        if verified.joint_verdict != "allow" {
-            return Err(ChioPackageError::Federation(format!(
-                "bilateral envelope policy verdict {:?} is not allow",
-                verified.joint_verdict
-            )));
-        }
+        ensure_bilateral_joint_verdict_allows_admission(&verified.joint_verdict)?;
     }
     add_check(
         checks,
@@ -1892,6 +1887,17 @@ fn verify_workflow_intersection(
                 binding.tool_name
             )));
         }
+    }
+    Ok(())
+}
+
+fn ensure_bilateral_joint_verdict_allows_admission(
+    joint_verdict: &str,
+) -> Result<(), ChioPackageError> {
+    if joint_verdict != "allow" {
+        return Err(ChioPackageError::Federation(format!(
+            "bilateral envelope policy verdict {joint_verdict:?} is not allow"
+        )));
     }
     Ok(())
 }
@@ -2500,6 +2506,26 @@ mod tests {
     fn resign_governance_receipt(receipt: &mut SignedGovernanceReceipt) {
         *receipt = SignedExportEnvelope::sign(receipt.body.clone(), &Keypair::from_seed(&[12; 32]))
             .expect("governance receipt re-signs");
+    }
+
+    #[test]
+    fn ensure_bilateral_joint_verdict_allows_admission_accepts_allow() {
+        ensure_bilateral_joint_verdict_allows_admission("allow").expect("allow is admitted");
+    }
+
+    #[test]
+    fn ensure_bilateral_joint_verdict_allows_admission_rejects_deny() {
+        let error =
+            ensure_bilateral_joint_verdict_allows_admission("deny").expect_err("deny is rejected");
+        let message = error.to_string();
+        assert!(
+            message.contains("bilateral envelope policy verdict"),
+            "expected federation admission error, got: {message}"
+        );
+        assert!(
+            message.contains("is not allow"),
+            "expected non-allow verdict rejection, got: {message}"
+        );
     }
 
     #[test]

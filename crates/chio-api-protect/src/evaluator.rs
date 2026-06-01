@@ -625,6 +625,100 @@ mod tests {
     }
 
     #[test]
+    fn evaluate_chio_request_denies_arguments_only_on_reserved_tools_path() {
+        let keypair = Keypair::generate();
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let capability = signed_capability_token_json_with_scope(
+            &keypair,
+            "cap-billing-charge",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "billing".to_string(),
+                    tool_name: "charge".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+
+        let mut request = ChioHttpRequest::new(
+            "req-tools-path-arguments-only".to_string(),
+            HttpMethod::Post,
+            "/chio/tools/billing/charge".to_string(),
+            "/chio/tools/billing/charge".to_string(),
+            CallerIdentity::anonymous(),
+        );
+        request.arguments = Some(serde_json::json!({ "amount": 100 }));
+        request.body_hash = Some("tool-body".to_string());
+        request.body_length = 8;
+
+        let result = evaluator
+            .evaluate_chio_request(request, Some(&capability))
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert!(result.receipt.evidence[0]
+            .details
+            .as_deref()
+            .is_some_and(|details| {
+                details.contains("capability does not authorize tool authorize_http_request")
+            }));
+    }
+
+    #[test]
+    fn evaluate_chio_request_denies_malformed_tools_path_with_spoofed_tool_fields() {
+        let keypair = Keypair::generate();
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let capability = signed_capability_token_json_with_scope(
+            &keypair,
+            "cap-acp-terminal",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "acp".to_string(),
+                    tool_name: "terminal/create".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+
+        let mut request = ChioHttpRequest::new(
+            "req-tools-path-malformed-encoding".to_string(),
+            HttpMethod::Post,
+            "/chio/tools/acp/terminal%ZZcreate".to_string(),
+            "/chio/tools/acp/terminal%ZZcreate".to_string(),
+            CallerIdentity::anonymous(),
+        );
+        request.tool_server = Some("acp".to_string());
+        request.tool_name = Some("terminal/create".to_string());
+        request.arguments = Some(serde_json::json!({ "command": "ls" }));
+        request.body_hash = Some("tool-body".to_string());
+        request.body_length = 8;
+
+        let result = evaluator
+            .evaluate_chio_request(request, Some(&capability))
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("malformed /chio/tools path identity")
+        );
+    }
+
+    #[test]
     fn evaluate_chio_request_allows_model_constrained_capability_when_metadata_matches() {
         let keypair = Keypair::generate();
         let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
