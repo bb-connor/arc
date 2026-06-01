@@ -761,6 +761,51 @@ mod tests {
         let _ = fs::remove_file(registry_path);
     }
 
+    #[test]
+    fn task_registry_rejects_malformed_task_observation_before_persisting() {
+        let registry_path = unique_path("chio-a2a-task-registry-malformed", ".json");
+        let registry = A2aTaskRegistry::open(&registry_path).expect("open task registry");
+        let selected_interface = A2aAgentInterface {
+            url: "http://localhost:9000/rpc".to_string(),
+            protocol_binding: "JSONRPC".to_string(),
+            protocol_version: "1.0".to_string(),
+            tenant: Some("tenant-alpha".to_string()),
+        };
+        let selected_binding = A2aProtocolBinding::JsonRpc;
+        let context = A2aTaskRecordContext {
+            source: "send_message",
+            tool_name: "research",
+            server_id: "srv-a2a",
+            selected_interface: &selected_interface,
+            selected_binding: &selected_binding,
+            partner: "partner-alpha",
+        };
+
+        let error = registry
+            .record_from_value(
+                &json!({
+                    "task": {
+                        "id": "",
+                        "status": { "state": "TASK_STATE_WORKING" }
+                    }
+                }),
+                &context,
+            )
+            .expect_err("malformed task observation must fail closed");
+
+        assert!(
+            error.to_string().contains("id` must not be empty"),
+            "unexpected malformed-observation error: {error}"
+        );
+        let reloaded = registry.load().expect("reload task registry");
+        assert!(
+            reloaded.tasks.is_empty(),
+            "malformed observations must not be persisted"
+        );
+
+        let _ = fs::remove_file(registry_path);
+    }
+
     #[tokio::test]
     async fn adapter_invokes_http_json_binding() {
         let Some(server) = FakeA2aServer::spawn_http_json() else {

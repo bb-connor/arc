@@ -48,6 +48,12 @@ struct A2aTaskRecordContext<'a> {
     partner: &'a str,
 }
 
+#[derive(Debug, Clone)]
+struct A2aTaskObservation {
+    task_id: String,
+    state: Option<String>,
+}
+
 impl A2aTaskRegistry {
     fn open(path: &std::path::Path) -> Result<Self, AdapterError> {
         let registry = Self {
@@ -171,32 +177,7 @@ impl A2aTaskRegistry {
         value: &Value,
         context: &A2aTaskRecordContext<'_>,
     ) -> Result<(), AdapterError> {
-        let mut seen = Vec::new();
-        if let Some(task) = value.get("task") {
-            let task_id = task.get("id").and_then(Value::as_str);
-            let state = task
-                .get("status")
-                .and_then(|status| status.get("state"))
-                .and_then(Value::as_str);
-            if let Some(task_id) = task_id {
-                seen.push((task_id.to_string(), state.map(str::to_string)));
-            }
-        }
-        if let Some(update) = value.get("statusUpdate") {
-            let task_id = update.get("taskId").and_then(Value::as_str);
-            let state = update
-                .get("status")
-                .and_then(|status| status.get("state"))
-                .and_then(Value::as_str);
-            if let Some(task_id) = task_id {
-                seen.push((task_id.to_string(), state.map(str::to_string)));
-            }
-        }
-        if let Some(update) = value.get("artifactUpdate") {
-            if let Some(task_id) = update.get("taskId").and_then(Value::as_str) {
-                seen.push((task_id.to_string(), None));
-            }
-        }
+        let seen = task_observations_from_value(value)?;
         if seen.is_empty() {
             return Ok(());
         }
@@ -207,12 +188,12 @@ impl A2aTaskRegistry {
             .map_err(|_| AdapterError::Lifecycle("A2A task registry lock poisoned".to_string()))?;
         let mut registry = self.load()?;
         let now = unix_timestamp_now();
-        for (task_id, state) in seen {
+        for observation in seen {
             let entry = registry
                 .tasks
-                .entry(task_id.clone())
+                .entry(observation.task_id.clone())
                 .or_insert_with(|| A2aTaskRecord {
-                    task_id: task_id.clone(),
+                    task_id: observation.task_id.clone(),
                     tool_name: context.tool_name.to_string(),
                     server_id: context.server_id.to_string(),
                     interface_url: context.selected_interface.url.clone(),
@@ -227,10 +208,55 @@ impl A2aTaskRegistry {
             validate_task_record_binding(entry, context)?;
             entry.last_seen_at = now;
             entry.last_source = context.source.to_string();
-            entry.last_state = state.or_else(|| entry.last_state.clone());
+            entry.last_state = observation.state.or_else(|| entry.last_state.clone());
         }
         self.save(&registry)
     }
+}
+
+fn task_observations_from_value(value: &Value) -> Result<Vec<A2aTaskObservation>, AdapterError> {
+    let mut observations = Vec::new();
+    if let Some(task) = value.get("task") {
+        validate_task_value(task)?;
+        let task_id = task.get("id").and_then(Value::as_str).ok_or_else(|| {
+            AdapterError::Protocol("A2A task response must contain string `id`".to_string())
+        })?;
+        let state = task
+            .get("status")
+            .and_then(|status| status.get("state"))
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        observations.push(A2aTaskObservation {
+            task_id: task_id.to_string(),
+            state,
+        });
+    }
+    if let Some(update) = value.get("statusUpdate") {
+        validate_status_update(update)?;
+        let task_id = update.get("taskId").and_then(Value::as_str).ok_or_else(|| {
+            AdapterError::Protocol("A2A status update must contain string `taskId`".to_string())
+        })?;
+        let state = update
+            .get("status")
+            .and_then(|status| status.get("state"))
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        observations.push(A2aTaskObservation {
+            task_id: task_id.to_string(),
+            state,
+        });
+    }
+    if let Some(update) = value.get("artifactUpdate") {
+        validate_artifact_update(update)?;
+        let task_id = update.get("taskId").and_then(Value::as_str).ok_or_else(|| {
+            AdapterError::Protocol("A2A artifact update must contain string `taskId`".to_string())
+        })?;
+        observations.push(A2aTaskObservation {
+            task_id: task_id.to_string(),
+            state: None,
+        });
+    }
+    Ok(observations)
 }
 
 fn validate_task_record_binding(
