@@ -1605,4 +1605,65 @@ mod tests {
         let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
         assert!(error.to_string().contains("consistency anchor"));
     }
+
+    #[test]
+    fn unanimous_deny_bilateral_envelope_rejects_proof_package() {
+        let package = fresh_proof_package().expect("fresh package builds");
+        let vendor = &VENDORS[0];
+        let buyer_key = Keypair::from_seed(&BUYER_SEED);
+        let vendor_key = Keypair::from_seed(&vendor.seed);
+        let receipt = package.tool_receipts[0].clone();
+        let lease = &package.capability_leases[0];
+        let mut summary = policy_summary(vendor);
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+        let extensions = BilateralPredicateExtensions {
+            capability_lease_ref: Some(CapabilityLeaseRef {
+                lease_id: lease.body.lease_id.clone(),
+                issuer: lease.body.issuer.clone(),
+                expires_at_unix_ms: lease.body.expires_at_unix_ms,
+                scope_digest: Some(HashRecord {
+                    alg: "sha256".to_string(),
+                    value: lease.body.scope_digest.clone(),
+                }),
+            }),
+            policy_evaluation_summary: Some(summary),
+            governance_receipt_ref: None,
+            consistency_anchor: package.workflow_receipt.steps[0]
+                .consistency_anchor
+                .clone(),
+            consistency_model: None,
+            cross_org_visibility: None,
+            treaty_binding_ref: None,
+        };
+        let envelope = sign_chio_bilateral_dsse_envelope(
+            &receipt,
+            &buyer_key,
+            &vendor_key,
+            BUYER_KERNEL_ID,
+            vendor.kernel_id,
+            vendor.tool_name,
+            GENERATED_AT_UNIX_MS,
+            extensions,
+        )
+        .expect("deny bilateral envelope signs");
+        let envelope_sha256 = canonical_sha256(&envelope).expect("envelope hashes");
+        let mut artifacts = runtime_artifacts_from_package(&package).expect("runtime artifacts");
+        artifacts[0].bilateral_envelope = envelope;
+        artifacts[0].workflow_step.bilateral_dsse_sha256 = Some(envelope_sha256);
+        refresh_runtime_parent_chain(&mut artifacts);
+        let mut package =
+            proof_package_from_runtime_artifacts(artifacts).expect("package rebuilds from artifacts");
+        let context = verification_context();
+        let trust_bundle = rebuild_verifier_material(&mut package, &context);
+
+        let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.contains("bilateral envelope policy verdict"),
+            "expected admission gate failure, got: {message}"
+        );
+        assert!(message.contains("deny"), "expected deny verdict, got: {message}");
+    }
 }
