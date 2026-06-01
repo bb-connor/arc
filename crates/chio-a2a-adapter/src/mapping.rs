@@ -152,6 +152,11 @@ impl A2aSkillInputSurface {
             accepts_text: false,
             accepts_json: false,
         };
+        if modes.is_empty() {
+            surface.accepts_text = true;
+            surface.accepts_json = true;
+            return surface;
+        }
         for mode in modes {
             let essence = input_mode_essence(mode);
             if essence.eq_ignore_ascii_case("text") || essence.eq_ignore_ascii_case("text/plain") {

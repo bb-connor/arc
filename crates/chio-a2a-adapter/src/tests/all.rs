@@ -1264,6 +1264,53 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn empty_default_input_modes_accept_text_and_json() {
+        let mut adapter = local_test_adapter(
+            A2aAgentCapabilities::default(),
+            A2aProtocolBinding::JsonRpc,
+            None,
+        );
+        adapter.agent_card.default_input_modes.clear();
+        adapter.agent_card.skills[0].input_modes = None;
+
+        let manifest = build_manifest(
+            "tenant-test",
+            "0.1.0",
+            &Keypair::generate().public_key().to_hex(),
+            &adapter.agent_card,
+            &A2aProtocolBinding::JsonRpc,
+        )
+        .expect("empty default input modes should fall back to text and JSON");
+        let properties = manifest.tools[0]
+            .input_schema
+            .get("properties")
+            .and_then(Value::as_object)
+            .expect("manifest input schema exposes properties");
+        assert!(properties.contains_key("message"));
+        assert!(properties.contains_key("data"));
+
+        let request = adapter
+            .build_send_message_request(
+                &adapter.agent_card.skills[0],
+                A2aSendToolInput {
+                    message: Some("hello".to_string()),
+                    data: Some(json!({ "query": "hello" })),
+                    context_id: None,
+                    task_id: None,
+                    reference_task_ids: None,
+                    metadata: None,
+                    message_metadata: None,
+                    history_length: None,
+                    return_immediately: None,
+                    stream: false,
+                },
+            )
+            .expect("empty default input modes should admit text and JSON parts");
+
+        assert_eq!(request.message.parts.len(), 2);
+    }
+
+    #[tokio::test]
     async fn get_task_rejects_history_length_without_capability() {
         let adapter = local_test_adapter(
             A2aAgentCapabilities {
