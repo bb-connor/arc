@@ -276,7 +276,8 @@ pub fn evaluate_with_crypto_floor(
 
 /// Evaluate with both a configured crypto floor and a sibling-sum budget
 /// registry. Hosted kernels that track delegated children should call this
-/// so an oversubscribed sibling fails closed at the verify step.
+/// so an oversubscribed sibling fails closed after the request is otherwise
+/// allowed.
 pub fn evaluate_with_crypto_floor_and_budgets(
     input: EvaluateInput<'_>,
     crypto_floor: CapabilityCryptoFloor,
@@ -290,12 +291,13 @@ pub fn evaluate_with_crypto_floor_and_budgets(
         return deny(core_err, None, None);
     }
 
+    let mut verify_only_budgets = NoopBudgetRegistry;
     let verified = match verify_capability_with_floor(
         input.capability,
         input.trusted_issuers,
         input.clock,
         crypto_floor,
-        budgets,
+        &mut verify_only_budgets,
     ) {
         Ok(verified) => verified,
         Err(error) => {
@@ -349,6 +351,11 @@ pub fn evaluate_with_crypto_floor_and_budgets(
                 return deny(core_err, Some(matched_grant_index), Some(verified));
             }
         }
+    }
+
+    if let Err(error) = admit_delegated_budget(input.capability, budgets) {
+        let core_err = KernelCoreError::InvalidCapability(error);
+        return deny(core_err, Some(matched_grant_index), Some(verified));
     }
 
     EvaluationVerdict {
@@ -445,21 +452,9 @@ pub fn evaluate_with_full_floor(
         }
     }
 
-    if let Some(parent_link) = input.capability.delegation_chain.last() {
-        let proposed_share = input
-            .capability
-            .budget_share_bps
-            .unwrap_or(crate::budget_split::MAX_BUDGET_SHARE_BPS);
-        if let Err(error) = budgets.try_admit_child(
-            parent_link.capability_id.as_str(),
-            input.capability.id.clone(),
-            proposed_share,
-        ) {
-            let core_err = KernelCoreError::InvalidCapability(
-                crate::capability_verify::CapabilityError::BudgetSplitRejected(error),
-            );
-            return deny(core_err, Some(matched_grant_index), Some(verified));
-        }
+    if let Err(error) = admit_delegated_budget(input.capability, budgets) {
+        let core_err = KernelCoreError::InvalidCapability(error);
+        return deny(core_err, Some(matched_grant_index), Some(verified));
     }
 
     EvaluationVerdict {
@@ -468,6 +463,25 @@ pub fn evaluate_with_full_floor(
         matched_grant_index: Some(matched_grant_index),
         verified: Some(verified),
     }
+}
+
+fn admit_delegated_budget(
+    capability: &CapabilityToken,
+    budgets: &mut dyn BudgetRegistry,
+) -> Result<(), CapabilityError> {
+    if let Some(parent_link) = capability.delegation_chain.last() {
+        let proposed_share = capability
+            .budget_share_bps
+            .unwrap_or(crate::budget_split::MAX_BUDGET_SHARE_BPS);
+        budgets
+            .try_admit_child(
+                parent_link.capability_id.as_str(),
+                capability.id.clone(),
+                proposed_share,
+            )
+            .map_err(CapabilityError::BudgetSplitRejected)?;
+    }
+    Ok(())
 }
 
 fn deny(
@@ -486,8 +500,13 @@ fn deny(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{BudgetRegistry, InMemoryBudgetRegistry, MAX_BUDGET_SHARE_BPS};
     use alloc::vec;
-    use chio_core_types::capability::{ChioScope, Operation, ToolGrant};
+    use chio_core_types::capability::{
+        CapabilityToken, CapabilityTokenBody, ChioScope, DelegationLink, DelegationLinkBody,
+        Operation, ToolGrant,
+    };
+    use chio_core_types::crypto::Keypair;
 
     fn grant(server_id: &str, tool_name: &str) -> ToolGrant {
         ToolGrant {
@@ -509,6 +528,47 @@ mod tests {
             server_id: "srv-a".to_string(),
             agent_id: "agent-1".to_string(),
             arguments: serde_json::json!({"msg":"hello"}),
+        }
+    }
+
+    fn delegated_capability(
+        issuer: &Keypair,
+        subject: &Keypair,
+        parent_capability_id: &str,
+    ) -> CapabilityToken {
+        let parent_link = match DelegationLink::sign(
+            DelegationLinkBody {
+                capability_id: parent_capability_id.to_string(),
+                delegator: issuer.public_key(),
+                delegatee: issuer.public_key(),
+                attenuations: vec![],
+                timestamp: 100,
+                scope_hash: None,
+            },
+            issuer,
+        ) {
+            Ok(link) => link,
+            Err(error) => panic!("failed to sign parent delegation link: {error:?}"),
+        };
+
+        match CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "child-capability".to_string(),
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope: ChioScope {
+                    grants: vec![grant("srv-a", "echo")],
+                    resource_grants: vec![],
+                    prompt_grants: vec![],
+                },
+                issued_at: 100,
+                expires_at: 200,
+                delegation_chain: vec![parent_link],
+            },
+            issuer,
+        ) {
+            Ok(token) => token,
+            Err(error) => panic!("failed to sign delegated capability: {error:?}"),
         }
     }
 
@@ -542,5 +602,46 @@ mod tests {
                 server: "srv-a".to_string(),
             })
         );
+    }
+
+    #[test]
+    fn budget_admission_waits_until_subject_scope_and_guards_allow() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let wrong_agent = Keypair::generate();
+        let parent_capability_id = "parent-capability";
+        let capability = delegated_capability(&issuer, &subject, parent_capability_id);
+        let mut request = request();
+        request.agent_id = wrong_agent.public_key().to_hex();
+        let trusted = [issuer.public_key()];
+        let clock = crate::FixedClock::new(150);
+        let guards: [&dyn Guard; 0] = [];
+        let mut budgets = InMemoryBudgetRegistry::new();
+        if let Err(error) =
+            budgets.register_parent(parent_capability_id.to_string(), MAX_BUDGET_SHARE_BPS)
+        {
+            panic!("failed to register parent budget split: {error:?}");
+        }
+
+        let verdict = evaluate_with_crypto_floor_and_budgets(
+            EvaluateInput {
+                request: &request,
+                capability: &capability,
+                trusted_issuers: &trusted,
+                clock: &clock,
+                guards: &guards,
+                session_filesystem_roots: None,
+            },
+            CapabilityCryptoFloor::AllowClassical,
+            &mut budgets,
+        );
+
+        assert!(verdict.is_deny());
+        let split = match budgets.split(parent_capability_id) {
+            Some(split) => split,
+            None => panic!("registered parent budget split was missing"),
+        };
+        assert_eq!(split.current_total_child_bps(), 0);
+        assert!(split.children.is_empty());
     }
 }
