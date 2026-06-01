@@ -1,6 +1,8 @@
 use chio_core::receipt::ChioReceipt;
 use serde::{Deserialize, Serialize};
 
+use crate::validation::ensure_non_empty;
+
 pub const MERCURY_RECEIPT_METADATA_SCHEMA: &str = "chio.mercury.receipt_metadata.v1";
 
 #[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
@@ -308,14 +310,6 @@ impl MercuryReceiptMetadata {
     }
 }
 
-fn ensure_non_empty(field: &'static str, value: &str) -> Result<(), MercuryContractError> {
-    if value.trim().is_empty() {
-        Err(MercuryContractError::EmptyField(field))
-    } else {
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
@@ -339,5 +333,18 @@ mod tests {
         metadata.schema = "wrong".to_string();
         let error = metadata.validate().expect_err("schema should fail");
         assert!(matches!(error, MercuryContractError::InvalidSchema { .. }));
+    }
+
+    #[test]
+    fn receipt_metadata_rejects_padded_workflow_id() {
+        let mut metadata = sample_mercury_receipt_metadata();
+        metadata.business_ids.workflow_id = " workflow-release-control ".to_string();
+
+        let error = metadata.validate().expect_err("padded workflow id");
+
+        assert!(matches!(
+            error,
+            MercuryContractError::PaddedField("business_ids.workflow_id")
+        ));
     }
 }

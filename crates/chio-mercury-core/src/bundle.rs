@@ -2,6 +2,7 @@ use chio_core::{canonical_json_bytes, sha256_hex};
 use serde::{Deserialize, Serialize};
 
 use crate::receipt_metadata::{MercuryContractError, MercuryWorkflowIdentifiers};
+use crate::validation::ensure_non_empty;
 
 pub const MERCURY_BUNDLE_MANIFEST_SCHEMA: &str = "chio.mercury.bundle_manifest.v1";
 
@@ -96,16 +97,6 @@ impl MercuryBundleReference {
                 .and_then(|artifact| artifact.retention_class.clone()),
         })
     }
-}
-
-fn ensure_non_empty(field: &'static str, value: &str) -> Result<(), MercuryContractError> {
-    if value.trim().is_empty() {
-        return Err(MercuryContractError::EmptyField(field));
-    }
-    if value.trim() != value {
-        return Err(MercuryContractError::PaddedField(field));
-    }
-    Ok(())
 }
 
 #[cfg(test)]
