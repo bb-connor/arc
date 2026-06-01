@@ -1162,7 +1162,7 @@ impl A2aAdapter {
             self.timeout,
             &self.transport_config,
         )?;
-        let response = decode_jsonrpc_result(response, "")?;
+        let response = decode_jsonrpc_result(response, "SendMessage")?;
         validate_send_message_response(response)
     }
 

@@ -245,6 +245,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn adapter_jsonrpc_send_message_missing_result_names_method() {
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_missing_send_message_result() else {
+            return;
+        };
+        let manifest_key = Keypair::generate();
+        let adapter = A2aAdapter::discover(
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
+                .with_timeout(Duration::from_secs(2)),
+        )
+        .expect("discover JSONRPC adapter");
+
+        let error = adapter
+            .invoke("research", json!({ "message": "hello" }), None)
+            .await
+            .expect_err("missing SendMessage result should fail closed");
+
+        assert!(
+            error
+                .to_string()
+                .contains("A2A JSON-RPC SendMessage response omitted `result`"),
+            "unexpected missing-result error: {error}"
+        );
+        server.join();
+    }
+
+    #[tokio::test]
     async fn adapter_rejects_json_tool_body_on_cross_origin_redirect() {
         let Some(target_listener) = bind_fake_a2a_listener("redirect target A2A listener") else {
             return;
@@ -1308,6 +1334,25 @@ mod tests {
             .expect("empty default input modes should admit text and JSON parts");
 
         assert_eq!(request.message.parts.len(), 2);
+    }
+
+    #[test]
+    fn send_message_schema_requirement_rejects_empty_surface() {
+        let mut one_of = Vec::new();
+        let error = append_send_message_schema_requirement(
+            &mut one_of,
+            A2aSkillInputSurface {
+                accepts_text: false,
+                accepts_json: false,
+            },
+        )
+        .expect_err("empty send surface must not emit an empty anyOf schema");
+
+        assert!(
+            error.to_string().contains("SendMessage schema requires"),
+            "unexpected schema invariant error: {error}"
+        );
+        assert!(one_of.is_empty());
     }
 
     #[tokio::test]
@@ -3773,6 +3818,7 @@ mod tests {
         OAuthClientCredentialsRequired,
         OAuthClientCredentialsSingleInvoke,
         OpenIdClientCredentialsRequired,
+        MissingSendMessageResult,
         StreamingComplete,
         StreamingIncomplete,
         SubscribeComplete,
@@ -3803,6 +3849,10 @@ mod tests {
 
         fn spawn_jsonrpc_task_follow_up() -> Option<Self> {
             Self::spawn(TestBinding::JsonRpc, TestScenario::TaskFollowUp)
+        }
+
+        fn spawn_jsonrpc_missing_send_message_result() -> Option<Self> {
+            Self::spawn(TestBinding::JsonRpc, TestScenario::MissingSendMessageResult)
         }
 
         fn spawn_http_json() -> Option<Self> {
@@ -3925,6 +3975,7 @@ mod tests {
                     TestScenario::OAuthClientCredentialsRequired => 4,
                     TestScenario::OAuthClientCredentialsSingleInvoke => 3,
                     TestScenario::OpenIdClientCredentialsRequired => 4,
+                    TestScenario::MissingSendMessageResult => 2,
                     TestScenario::StreamingComplete
                     | TestScenario::StreamingIncomplete
                     | TestScenario::SubscribeComplete
@@ -4400,9 +4451,14 @@ mod tests {
                                 }]
                             }
                         }
-                    })
+                        })
                     .into()
                 }
+                TestScenario::MissingSendMessageResult => json!({
+                    "jsonrpc": "2.0",
+                    "id": 1
+                })
+                .into(),
                 TestScenario::OAuthClientCredentialsRequired
                 | TestScenario::OAuthClientCredentialsSingleInvoke => {
                     assert!(request.contains("Authorization: Bearer oauth-access-token"));
@@ -4609,6 +4665,9 @@ mod tests {
             | TestScenario::OAuthClientCredentialsSingleInvoke
             | TestScenario::OpenIdClientCredentialsRequired => {
                 panic!("unexpected blocking send for OAuth/OpenID scenario")
+            }
+            TestScenario::MissingSendMessageResult => {
+                panic!("unexpected HTTP send for JSON-RPC malformed-result scenario")
             }
             TestScenario::StreamingComplete
             | TestScenario::StreamingIncomplete
@@ -4890,6 +4949,7 @@ mod tests {
             | TestScenario::CancelTask
             | TestScenario::PushNotificationCrud
             | TestScenario::PushNotificationCapabilityOnly
+            | TestScenario::MissingSendMessageResult
             | TestScenario::StreamingComplete
             | TestScenario::StreamingIncomplete
             | TestScenario::SubscribeComplete

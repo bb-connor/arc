@@ -408,14 +408,7 @@ fn build_tool_definition(
         json!({ "required": ["subscribe_task"] }),
         json!({ "required": ["get_task"] }),
     ];
-    let mut send_requirements = Vec::new();
-    if input_surface.accepts_text {
-        send_requirements.push(json!({ "required": ["message"] }));
-    }
-    if input_surface.accepts_json {
-        send_requirements.push(json!({ "required": ["data"] }));
-    }
-    one_of.push(json!({ "anyOf": send_requirements }));
+    append_send_message_schema_requirement(&mut one_of, input_surface)?;
     input_schema
         .as_object_mut()
         .ok_or_else(|| {
@@ -445,6 +438,26 @@ fn build_tool_definition(
         has_side_effects: true,
         latency_hint: Some(LatencyHint::Moderate),
     })
+}
+
+fn append_send_message_schema_requirement(
+    one_of: &mut Vec<Value>,
+    input_surface: A2aSkillInputSurface,
+) -> Result<(), AdapterError> {
+    let mut send_requirements = Vec::new();
+    if input_surface.accepts_text {
+        send_requirements.push(json!({ "required": ["message"] }));
+    }
+    if input_surface.accepts_json {
+        send_requirements.push(json!({ "required": ["data"] }));
+    }
+    if send_requirements.is_empty() {
+        return Err(AdapterError::Protocol(
+            "A2A SendMessage schema requires text or JSON input support".to_string(),
+        ));
+    }
+    one_of.push(json!({ "anyOf": send_requirements }));
+    Ok(())
 }
 
 fn skill_input_surface(
