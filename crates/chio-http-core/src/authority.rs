@@ -2253,6 +2253,27 @@ mod tests {
     }
 
     #[test]
+    fn chio_tools_path_identity_decodes_percent_encoded_tool_name() {
+        let ChioToolsPathIdentity::Identity {
+            server_id,
+            tool_name,
+        } = chio_tools_path_identity("/chio/tools/acp/terminal%2Elog")
+        else {
+            panic!("expected identity");
+        };
+        assert_eq!(server_id, "acp");
+        assert_eq!(tool_name, "terminal.log");
+    }
+
+    #[test]
+    fn decode_path_identity_segment_decodes_valid_percent_encoding() {
+        assert_eq!(
+            decode_path_identity_segment("terminal%2Elog").as_deref(),
+            Some("terminal.log")
+        );
+    }
+
+    #[test]
     fn chio_tools_path_identity_non_tools_path_is_not_tools_path() {
         assert!(matches!(
             chio_tools_path_identity("/pets/42"),
