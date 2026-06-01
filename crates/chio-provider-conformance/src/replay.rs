@@ -961,6 +961,7 @@ fn assert_replayed_invocations(
             )
         })?;
         let actual = comparable_invocation(
+            &fixture.path,
             invocation,
             expected_invocation.provenance.received_at.clone(),
         )?;
@@ -1347,9 +1348,16 @@ fn validate_record_identifier(path: &Path, value: &str, field: &str) -> Result<(
 }
 
 fn comparable_invocation(
+    path: &Path,
     invocation: &ToolInvocation,
     received_at: Value,
 ) -> Result<ComparableInvocation, ReplayError> {
+    invocation.validate().map_err(|error| {
+        invalid_fixture(
+            path,
+            format!("adapter produced invalid fabric invocation: {error}"),
+        )
+    })?;
     Ok(ComparableInvocation {
         provider: invocation.provider,
         tool_name: invocation.tool_name.clone(),
