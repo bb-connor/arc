@@ -731,6 +731,50 @@ fn streaming_manifest() -> ToolManifest {
     }
 }
 
+#[test]
+fn edge_rejects_non_object_manifest_input_schema() {
+    let (kernel, _) = make_kernel();
+    let agent = Keypair::generate();
+    let mut manifest = sample_manifest();
+    manifest.tools[0].input_schema = json!("not an object");
+
+    let err = match ChioMcpEdge::new(
+        McpEdgeConfig::default(),
+        kernel,
+        agent.public_key().to_hex(),
+        vec![],
+        vec![manifest],
+    ) {
+        Ok(_) => panic!("MCP edge discovery must reject non-object inputSchema"),
+        Err(err) => err,
+    };
+
+    assert!(matches!(err, AdapterError::ParseError(_)));
+    assert!(err.to_string().contains("inputSchema"));
+}
+
+#[test]
+fn edge_rejects_non_object_manifest_output_schema() {
+    let (kernel, _) = make_kernel();
+    let agent = Keypair::generate();
+    let mut manifest = sample_manifest();
+    manifest.tools[1].output_schema = Some(json!(["not", "an", "object"]));
+
+    let err = match ChioMcpEdge::new(
+        McpEdgeConfig::default(),
+        kernel,
+        agent.public_key().to_hex(),
+        vec![],
+        vec![manifest],
+    ) {
+        Ok(_) => panic!("MCP edge discovery must reject non-object outputSchema"),
+        Err(err) => err,
+    };
+
+    assert!(matches!(err, AdapterError::ParseError(_)));
+    assert!(err.to_string().contains("outputSchema"));
+}
+
 fn make_edge(page_size: usize) -> ChioMcpEdge {
     make_edge_with_config(page_size, false)
 }

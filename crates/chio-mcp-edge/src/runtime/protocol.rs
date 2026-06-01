@@ -58,41 +58,6 @@ pub(super) fn parse_jsonrpc_envelope(message: &Value) -> Result<JsonRpcEnvelope,
     Ok(JsonRpcEnvelope { id, method, params })
 }
 
-pub(super) fn manifest_tool_to_mcp_tool(tool: ToolDefinition) -> McpExposedTool {
-    let annotations = Some(json!({
-        "readOnlyHint": !tool.has_side_effects,
-        "destructiveHint": tool.has_side_effects,
-    }));
-
-    let mut execution = serde_json::Map::new();
-    execution.insert("taskSupport".to_string(), json!("optional"));
-    if let Some(latency_hint) = tool.latency_hint {
-        execution.insert(
-            "suggestedLatency".to_string(),
-            json!(latency_hint_to_label(latency_hint)),
-        );
-    }
-
-    McpExposedTool {
-        name: tool.name,
-        title: None,
-        description: tool.description,
-        input_schema: tool.input_schema,
-        output_schema: tool.output_schema,
-        annotations,
-        execution: Some(Value::Object(execution)),
-    }
-}
-
-pub(super) fn latency_hint_to_label(latency_hint: LatencyHint) -> &'static str {
-    match latency_hint {
-        LatencyHint::Instant => "instant",
-        LatencyHint::Fast => "fast",
-        LatencyHint::Moderate => "moderate",
-        LatencyHint::Slow => "slow",
-    }
-}
-
 pub(super) fn kernel_response_to_tool_result(args: KernelResponseToToolResultArgs<'_>) -> Value {
     let KernelResponseToToolResultArgs {
         pending_notifications,

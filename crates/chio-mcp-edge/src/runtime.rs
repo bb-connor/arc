@@ -22,16 +22,22 @@ use chio_kernel::{
     ChioKernel, LateSessionEvent, NestedFlowClient, PeerCapabilities, SessionOperationResponse,
     ToolCallOutput, ToolCallRequest, ToolCallResponse, ToolCallStream, ToolServerEvent, Verdict,
 };
-use chio_manifest::{LatencyHint, ToolDefinition, ToolManifest};
+use chio_manifest::ToolManifest;
+#[cfg(test)]
+use chio_manifest::{LatencyHint, ToolDefinition};
 use chrono::{SecondsFormat, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{json, Value};
 
+#[path = "runtime/discovery.rs"]
+mod discovery;
 #[path = "runtime/nested_flow.rs"]
 mod nested_flow;
 #[path = "runtime/protocol.rs"]
 mod protocol;
 
+pub use discovery::McpExposedTool;
+use discovery::{build_exposed_tool_bindings, ExposedToolBinding};
 use nested_flow::*;
 use protocol::*;
 
@@ -453,34 +459,6 @@ fn negotiate_protocol_version(id: &Value, params: &Value) -> Result<&'static str
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct McpExposedTool {
-    pub name: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-    pub description: String,
-    #[serde(rename = "inputSchema")]
-    pub input_schema: Value,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "outputSchema"
-    )]
-    pub output_schema: Option<Value>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub annotations: Option<Value>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub execution: Option<Value>,
-}
-
-#[derive(Debug, Clone)]
-struct ExposedToolBinding {
-    tool: McpExposedTool,
-    server_id: String,
-    tool_name: String,
-}
-
 #[derive(Debug, Clone)]
 enum EdgeState {
     Uninitialized,
@@ -710,27 +688,7 @@ impl ChioMcpEdge {
         capabilities: Vec<CapabilityToken>,
         manifests: Vec<ToolManifest>,
     ) -> Result<Self, AdapterError> {
-        let mut tool_index = BTreeMap::new();
-        let mut tools = Vec::new();
-
-        for manifest in manifests {
-            for tool in manifest.tools {
-                if tool_index.contains_key(&tool.name) {
-                    return Err(AdapterError::ManifestError(
-                        chio_manifest::ManifestError::DuplicateToolName(tool.name),
-                    ));
-                }
-
-                let exposed_name = tool.name.clone();
-                let binding = ExposedToolBinding {
-                    tool: manifest_tool_to_mcp_tool(tool),
-                    server_id: manifest.server_id.clone(),
-                    tool_name: exposed_name.clone(),
-                };
-                tool_index.insert(exposed_name, tools.len());
-                tools.push(binding);
-            }
-        }
+        let (tools, tool_index) = build_exposed_tool_bindings(manifests)?;
 
         Ok(Self {
             config,
