@@ -237,6 +237,28 @@ impl ChioAcpEdge {
         })
     }
 
+    fn dpop_proof_matches_permission_preview(
+        proof: &dpop::DpopProof,
+        capability: &CapabilityToken,
+        binding: &CapabilityBinding,
+        arguments: &Value,
+    ) -> bool {
+        let Ok(args_bytes) = canonical_json_bytes(arguments) else {
+            return false;
+        };
+        let action_hash = sha256_hex(&args_bytes);
+        let config = dpop::DpopConfig::default();
+        dpop::verify_dpop_proof_stateless(
+            proof,
+            capability,
+            &binding.server_id,
+            &binding.tool_name,
+            &action_hash,
+            &config,
+        )
+        .is_ok()
+    }
+
     /// List all capabilities.
     pub fn capabilities(&self) -> &[AcpCapability] {
         &self.capabilities
@@ -288,15 +310,46 @@ impl ChioAcpEdge {
             return PermissionDecision::Deny;
         }
 
-        match capability_matches_request(
+        let model_metadata = execution.model_metadata.as_ref();
+        let matches_request = match capability_matches_request_with_model_metadata(
             &execution.capability,
             &binding.tool_name,
             &binding.server_id,
             &request.arguments,
+            model_metadata,
         ) {
-            Ok(true) => PermissionDecision::Allow,
-            Ok(false) | Err(_) => PermissionDecision::Deny,
+            Ok(matches) => matches,
+            Err(_) => return PermissionDecision::Deny,
+        };
+        if !matches_request {
+            return PermissionDecision::Deny;
         }
+
+        let requires_dpop = match capability_request_requires_dpop_with_model_metadata(
+            &execution.capability,
+            &binding.tool_name,
+            &binding.server_id,
+            &request.arguments,
+            model_metadata,
+        ) {
+            Ok(requires) => requires,
+            Err(_) => return PermissionDecision::Deny,
+        };
+        if requires_dpop {
+            let Some(proof) = execution.dpop_proof.as_ref() else {
+                return PermissionDecision::Deny;
+            };
+            if !Self::dpop_proof_matches_permission_preview(
+                proof,
+                &execution.capability,
+                binding,
+                &request.arguments,
+            ) {
+                return PermissionDecision::Deny;
+            }
+        }
+
+        PermissionDecision::Allow
     }
 
     /// Evaluate a permission request using the config-only passthrough preview path.

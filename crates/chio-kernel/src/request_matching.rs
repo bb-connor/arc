@@ -207,6 +207,38 @@ pub fn capability_matches_request_with_model_metadata(
     Ok(!resolve_matching_grants(cap, tool_name, server_id, arguments, model_metadata)?.is_empty())
 }
 
+/// Return whether any grant matching this tool request requires DPoP.
+///
+/// A request with no matching grant returns `Ok(false)`. Callers that need
+/// authorization should pair this with [`capability_matches_request`].
+pub fn capability_request_requires_dpop(
+    cap: &CapabilityToken,
+    tool_name: &str,
+    server_id: &str,
+    arguments: &serde_json::Value,
+) -> Result<bool, KernelError> {
+    capability_request_requires_dpop_with_model_metadata(cap, tool_name, server_id, arguments, None)
+}
+
+/// Return whether any grant matching this model-aware tool request requires DPoP.
+///
+/// This uses the same private grant resolver as the kernel dispatch path, so
+/// callers do not need to duplicate wildcard, operation, and constraint
+/// matching semantics.
+pub fn capability_request_requires_dpop_with_model_metadata(
+    cap: &CapabilityToken,
+    tool_name: &str,
+    server_id: &str,
+    arguments: &serde_json::Value,
+    model_metadata: Option<&ModelMetadata>,
+) -> Result<bool, KernelError> {
+    Ok(
+        resolve_matching_grants(cap, tool_name, server_id, arguments, model_metadata)?
+            .iter()
+            .any(|matching| matching.grant.dpop_required == Some(true)),
+    )
+}
+
 pub fn capability_matches_resource_request(
     cap: &CapabilityToken,
     uri: &str,

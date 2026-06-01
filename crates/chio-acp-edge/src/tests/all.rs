@@ -7,7 +7,7 @@ mod tests {
     use chio_core::capability::{CapabilityTokenBody, ChioScope, Operation, ToolGrant};
     use chio_core::crypto::Keypair;
     use chio_kernel::{
-        ChioKernel, KernelConfig, KernelError, NestedFlowBridge, DEFAULT_CHECKPOINT_BATCH_SIZE,
+        dpop, ChioKernel, KernelConfig, KernelError, NestedFlowBridge, DEFAULT_CHECKPOINT_BATCH_SIZE,
         DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
     };
     use chio_manifest::LatencyHint;
@@ -376,6 +376,16 @@ mod tests {
         server_id: &str,
         tool_name: &str,
     ) -> chio_core::capability::CapabilityToken {
+        capability_for_tool_with_dpop_requirement(issuer, subject, server_id, tool_name, None)
+    }
+
+    fn capability_for_tool_with_dpop_requirement(
+        issuer: &Keypair,
+        subject: &Keypair,
+        server_id: &str,
+        tool_name: &str,
+        dpop_required: Option<bool>,
+    ) -> chio_core::capability::CapabilityToken {
         let now = current_unix_timestamp();
         chio_core::capability::CapabilityToken::sign(
             CapabilityTokenBody {
@@ -391,7 +401,7 @@ mod tests {
                         max_invocations: None,
                         max_cost_per_invocation: None,
                         max_total_cost: None,
-                        dpop_required: None,
+                        dpop_required,
                     }],
                     resource_grants: vec![],
                     prompt_grants: vec![],
@@ -403,6 +413,30 @@ mod tests {
             issuer,
         )
         .test_expect("capability should sign")
+    }
+
+    fn dpop_proof_for_request(
+        agent: &Keypair,
+        capability: &CapabilityToken,
+        server_id: &str,
+        tool_name: &str,
+        arguments: &Value,
+        nonce: &str,
+    ) -> dpop::DpopProof {
+        let args_bytes = chio_core::canonical::canonical_json_bytes(arguments)
+            .test_expect("arguments should serialize to canonical JSON");
+        let action_hash = chio_core::crypto::sha256_hex(&args_bytes);
+        let body = dpop::DpopProofBody {
+            schema: dpop::DPOP_SCHEMA.to_string(),
+            capability_id: capability.id.clone(),
+            tool_server: server_id.to_string(),
+            tool_name: tool_name.to_string(),
+            action_hash,
+            nonce: nonce.to_string(),
+            issued_at: current_unix_timestamp(),
+            agent_key: agent.public_key(),
+        };
+        dpop::DpopProof::sign(body, agent).test_expect("DPoP proof should sign")
     }
 
     fn assert_receipt_write_prometheus_sample_at_least(outcome: &str, minimum: u64) {
@@ -649,6 +683,129 @@ mod tests {
             edge.evaluate_permission(&request, &execution),
             PermissionDecision::Allow
         );
+    }
+
+    #[test]
+    fn permission_with_capability_denies_sender_bound_scope_without_dpop() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool_with_dpop_requirement(
+                &issuer,
+                &subject,
+                "test-srv",
+                "read_file",
+                Some(true),
+            ),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+        let request = PermissionRequest {
+            capability_id: "read_file".to_string(),
+            arguments: json!({"path": "/tmp"}),
+        };
+
+        assert_eq!(
+            edge.evaluate_permission(&request, &execution),
+            PermissionDecision::Deny
+        );
+    }
+
+    #[test]
+    fn permission_with_capability_denies_sender_bound_scope_with_mismatched_dpop() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let subject = Keypair::generate();
+        let capability = capability_for_tool_with_dpop_requirement(
+            &issuer,
+            &subject,
+            "test-srv",
+            "read_file",
+            Some(true),
+        );
+        let request_arguments = json!({"path": "/tmp"});
+        let mismatched_proof = dpop_proof_for_request(
+            &subject,
+            &capability,
+            "test-srv",
+            "write_file",
+            &request_arguments,
+            "acp-preview-nonce-wrong-tool",
+        );
+        let execution = AcpKernelExecutionContext {
+            capability,
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: Some(mismatched_proof),
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+        let request = PermissionRequest {
+            capability_id: "read_file".to_string(),
+            arguments: request_arguments,
+        };
+
+        assert_eq!(
+            edge.evaluate_permission(&request, &execution),
+            PermissionDecision::Deny
+        );
+    }
+
+    #[test]
+    fn permission_preview_accepts_valid_dpop_without_consuming_invocation_nonce() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let mut kernel = ChioKernel::new(config);
+        kernel.register_tool_server(Box::new(test_server()));
+        kernel.set_dpop_store(
+            dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300)),
+            dpop::DpopConfig::default(),
+        );
+        let subject = Keypair::generate();
+        let capability = capability_for_tool_with_dpop_requirement(
+            &issuer,
+            &subject,
+            "test-srv",
+            "read_file",
+            Some(true),
+        );
+        let request_arguments = json!({"path": "/tmp"});
+        let proof = dpop_proof_for_request(
+            &subject,
+            &capability,
+            "test-srv",
+            "read_file",
+            &request_arguments,
+            "acp-preview-valid-invoke-nonce",
+        );
+        let execution = AcpKernelExecutionContext {
+            capability,
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: Some(proof),
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+        let request = PermissionRequest {
+            capability_id: "read_file".to_string(),
+            arguments: request_arguments.clone(),
+        };
+
+        assert_eq!(
+            edge.evaluate_permission(&request, &execution),
+            PermissionDecision::Allow
+        );
+        let result = edge
+            .invoke("read_file", request_arguments, &kernel, &execution)
+            .test_expect("valid DPoP proof should remain usable for invoke");
+        assert!(result.success);
     }
 
     #[test]
