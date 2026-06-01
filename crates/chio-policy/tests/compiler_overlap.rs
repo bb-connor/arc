@@ -85,7 +85,7 @@ rules:
 }
 
 #[test]
-fn default_allow_with_human_in_loop_approval_fails_closed_to_empty_scope() {
+fn default_allow_with_human_in_loop_approval_emits_constrained_wildcard_scope() {
     let compiled = compile(
         r#"
 hushspec: "0.1.0"
@@ -99,8 +99,27 @@ rules:
 "#,
     );
 
-    assert!(
-        compiled.default_scope.grants.is_empty(),
-        "default-allow plus human-in-loop approval must not emit an unconstrained wildcard scope"
+    assert_eq!(compiled.default_scope.grants.len(), 1);
+    assert_eq!(compiled.default_scope.grants[0].tool_name, "*");
+    assert_eq!(approval_thresholds(&compiled), vec![15000]);
+}
+
+#[test]
+fn default_allow_with_human_in_loop_confirmation_emits_zero_threshold_wildcard_scope() {
+    let compiled = compile(
+        r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    default: allow
+  human_in_loop:
+    enabled: true
+    require_confirmation: ["shell_*"]
+"#,
     );
+
+    assert_eq!(compiled.default_scope.grants.len(), 1);
+    assert_eq!(compiled.default_scope.grants[0].tool_name, "*");
+    assert_eq!(approval_thresholds(&compiled), vec![0]);
 }

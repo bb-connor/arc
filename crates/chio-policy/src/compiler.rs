@@ -657,6 +657,9 @@ fn compile_scope(policy: &HushSpec) -> Result<ChioScope, CompileError> {
         if tool_access_can_safely_widen_to_wildcard(ta, human_in_loop) {
             return Ok(permissive_scope());
         }
+        if tool_access_can_emit_constrained_wildcard(ta, human_in_loop) {
+            return constrained_wildcard_scope(ta, human_in_loop);
+        }
         return Ok(ChioScope::default());
     }
 
@@ -706,6 +709,25 @@ fn permissive_scope() -> ChioScope {
     }
 }
 
+fn constrained_wildcard_scope(
+    rule: &ToolAccessRule,
+    human_in_loop: Option<&HumanInLoopRule>,
+) -> Result<ChioScope, CompileError> {
+    Ok(ChioScope {
+        grants: vec![ToolGrant {
+            server_id: "*".to_string(),
+            tool_name: "*".to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: compile_tool_constraints(rule, "*", human_in_loop)?,
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        }],
+        ..ChioScope::default()
+    })
+}
+
 fn compile_custom_secret_patterns(rule: &SecretPatternsRule) -> Vec<CustomSecretPattern> {
     rule.patterns
         .iter()
@@ -745,6 +767,21 @@ fn human_in_loop_requires_scope_constraints(human_in_loop: Option<&HumanInLoopRu
     human_in_loop.is_some_and(|rule| {
         rule.enabled && (!rule.require_confirmation.is_empty() || rule.approve_above.is_some())
     })
+}
+
+fn tool_access_can_emit_constrained_wildcard(
+    rule: &ToolAccessRule,
+    human_in_loop: Option<&HumanInLoopRule>,
+) -> bool {
+    rule.allow.is_empty()
+        && rule.block.is_empty()
+        && rule.require_confirmation.is_empty()
+        && rule.max_args_size.is_none()
+        && rule.require_runtime_assurance_tier.is_none()
+        && rule.prefer_runtime_assurance_tier.is_none()
+        && rule.require_workload_identity.is_none()
+        && rule.prefer_workload_identity.is_none()
+        && human_in_loop_requires_scope_constraints(human_in_loop)
 }
 
 fn compile_tool_constraints(
