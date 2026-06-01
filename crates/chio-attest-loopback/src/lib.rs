@@ -1271,6 +1271,28 @@ mod tests {
 
     use super::*;
     use chio_core_types::receipt::SignedExportEnvelope;
+    use chio_federation::{
+        sign_chio_bilateral_dsse_envelope, BilateralPredicateExtensions, PolicyEvaluationSummary,
+    };
+
+    fn unanimous_deny_policy_summary(summary: &PolicyEvaluationSummary) -> PolicyEvaluationSummary {
+        let mut deny = summary.clone();
+        deny.server_a_verdict.verdict = "deny".to_string();
+        deny.server_b_verdict.verdict = "deny".to_string();
+        deny.joint_disposition = Some("deny".to_string());
+        deny
+    }
+
+    fn refresh_workflow_step_parent_chain(
+        package: &mut ChioProofPackage,
+    ) -> Result<(), ChioPackageError> {
+        let mut parent = None;
+        for step in &mut package.workflow_receipt.steps {
+            step.parent_receipt_sha256 = parent;
+            parent = Some(canonical_sha256(step)?);
+        }
+        Ok(())
+    }
 
     fn rebuild_verifier_material(
         package: &mut ChioProofPackage,
@@ -1526,6 +1548,55 @@ mod tests {
             error.to_string().contains("parent hash")
                 || error.to_string().contains("workflow intersection")
         );
+    }
+
+    #[test]
+    fn proof_package_rejects_non_allow_bilateral_joint_verdict() {
+        let mut package = fresh_proof_package().expect("fresh package builds");
+        let receipt = package.tool_receipts[0].clone();
+        let (statement, _) = package.bilateral_envelopes[0]
+            .decode_statement()
+            .expect("bilateral DSSE decodes");
+        let predicate = &statement.predicate;
+        let allow_summary = predicate
+            .policy_evaluation_summary
+            .as_ref()
+            .expect("bilateral DSSE carries policy summary");
+        let extensions = BilateralPredicateExtensions {
+            capability_lease_ref: predicate.capability_lease_ref.clone(),
+            policy_evaluation_summary: Some(unanimous_deny_policy_summary(allow_summary)),
+            governance_receipt_ref: predicate.governance_receipt_ref.clone(),
+            consistency_anchor: predicate.consistency_anchor.clone(),
+            consistency_model: Some(predicate.consistency_model.clone()),
+            cross_org_visibility: Some(predicate.cross_org_visibility.clone()),
+            treaty_binding_ref: predicate.treaty_binding_ref.clone(),
+        };
+        let deny_envelope = sign_chio_bilateral_dsse_envelope(
+            &receipt,
+            &runtime_buyer_keypair(),
+            &runtime_vendor_keypair(0).expect("vendor-a keypair"),
+            BUYER_KERNEL_ID,
+            VENDORS[0].kernel_id,
+            VENDORS[0].tool_name,
+            package.generated_at_unix_ms,
+            extensions,
+        )
+        .expect("deny bilateral DSSE re-signs");
+        package.bilateral_envelopes[0] = deny_envelope;
+        package.workflow_receipt.steps[0].bilateral_dsse_sha256 =
+            Some(canonical_sha256(&package.bilateral_envelopes[0]).expect("envelope hashes"));
+        refresh_workflow_step_parent_chain(&mut package).expect("step parent chain refreshes");
+        resign_workflow_receipt(&mut package).expect("workflow resigns");
+        let context = verification_context();
+        let trust_bundle = rebuild_verifier_material(&mut package, &context);
+        let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("bilateral envelope policy verdict"),
+            "unexpected error: {error}"
+        );
+        assert!(error.to_string().contains("not allow"));
     }
 
     #[test]
