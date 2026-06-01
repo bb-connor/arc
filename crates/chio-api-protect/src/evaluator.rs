@@ -713,6 +713,37 @@ mod tests {
     }
 
     #[test]
+    fn evaluate_chio_request_allows_deny_by_default_http_route_with_authority_grant() {
+        let keypair = Keypair::generate();
+        let routes = vec![RouteEntry {
+            pattern: "/pets".to_string(),
+            method: HttpMethod::Post,
+            operation_id: Some("createPet".to_string()),
+            policy: PolicyDecision::DenyByDefault,
+        }];
+        let evaluator = RequestEvaluator::new(routes, keypair.clone(), "test-policy".to_string());
+        let capability = signed_capability_token_json(&keypair, "cap-http-authority");
+
+        let request = ChioHttpRequest::new(
+            "req-deny-by-default-http-authority".to_string(),
+            HttpMethod::Post,
+            "/pets".to_string(),
+            "/pets".to_string(),
+            CallerIdentity::anonymous(),
+        );
+
+        let result = evaluator
+            .evaluate_chio_request(request, Some(&capability))
+            .test_unwrap();
+
+        assert!(result.verdict.is_allowed());
+        assert_eq!(
+            result.receipt.capability_id.as_deref(),
+            Some("cap-http-authority")
+        );
+    }
+
+    #[test]
     fn evaluate_post_denied_without_capability() {
         let keypair = Keypair::generate();
         let routes = vec![RouteEntry {

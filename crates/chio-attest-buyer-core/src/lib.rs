@@ -2967,4 +2967,68 @@ mod tests {
             .iter()
             .any(|check| check.code == "trust.bbs_issuer"));
     }
+
+    #[test]
+    fn unanimous_deny_bilateral_envelope_fails_package_verification() {
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+        use base64::Engine;
+        use chio_core_types::crypto::{Ed25519Backend, Keypair, SigningBackend};
+        use chio_federation::{pae, PAYLOAD_TYPE_IN_TOTO};
+
+        const BUYER_SEED: [u8; 32] = [11; 32];
+        const VENDOR_A_SEED: [u8; 32] = [21; 32];
+
+        fn resign_envelope(
+            envelope: &mut DsseEnvelope,
+            kp_a: &Keypair,
+            kp_b: &Keypair,
+            statement_bytes: &[u8],
+        ) {
+            envelope.payload = BASE64_STANDARD.encode(statement_bytes);
+            let pae_bytes = pae(PAYLOAD_TYPE_IN_TOTO, statement_bytes);
+            let sig_a = Ed25519Backend::new(kp_a.clone())
+                .sign_bytes(&pae_bytes)
+                .expect("buyer cosignature");
+            let sig_b = Ed25519Backend::new(kp_b.clone())
+                .sign_bytes(&pae_bytes)
+                .expect("vendor cosignature");
+            envelope.signatures[0].sig = BASE64_STANDARD.encode(sig_a.to_bytes());
+            envelope.signatures[1].sig = BASE64_STANDARD.encode(sig_b.to_bytes());
+        }
+
+        let mut package = proof_package_from_json(include_str!(
+            "../../../examples/chio-3vendor/fixtures/buyer-auditor-proof-package.json"
+        ))
+        .expect("package fixture parses");
+        let trust_bundle = trust_bundle_from_fixture().expect("trust bundle parses");
+        let context = verification_context_from_fixture();
+
+        let buyer_key = Keypair::from_seed(&BUYER_SEED);
+        let vendor_key = Keypair::from_seed(&VENDOR_A_SEED);
+        let envelope = &mut package.bilateral_envelopes[0];
+        let (mut statement, _) = envelope
+            .decode_statement()
+            .expect("bilateral envelope decodes");
+        let summary = statement
+            .predicate
+            .policy_evaluation_summary
+            .as_mut()
+            .expect("fixture carries policy evaluation summary");
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+        let statement_bytes = statement.canonical_bytes().expect("statement canonicalizes");
+        resign_envelope(envelope, &buyer_key, &vendor_key, &statement_bytes);
+
+        let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.contains("bilateral envelope policy verdict"),
+            "expected buyer-core admission gate, got: {message}"
+        );
+        assert!(
+            message.contains("not allow"),
+            "expected non-allow joint verdict rejection, got: {message}"
+        );
+    }
 }

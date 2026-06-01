@@ -21,5 +21,9 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 
+[dev-dependencies]
+base64 = { workspace = true }
+chio-core-types = { path = "../chio-core-types" }
+
 [lints]
 workspace = true
