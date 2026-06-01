@@ -23,6 +23,10 @@ mod tests {
         }
     }
 
+    fn manifest_public_key(seed: u8) -> String {
+        Keypair::from_seed(&[seed; 32]).public_key().to_hex()
+    }
+
     struct MockToolServer {
         server_id: String,
         tools: Vec<String>,
@@ -140,7 +144,7 @@ mod tests {
             ],
             server_tools: Vec::new(),
             required_permissions: None,
-            public_key: "aabbccdd".to_string(),
+            public_key: manifest_public_key(1),
         }
     }
 
@@ -174,7 +178,7 @@ mod tests {
             }],
             server_tools: Vec::new(),
             required_permissions: None,
-            public_key: "stream".to_string(),
+            public_key: manifest_public_key(2),
         }
     }
 
@@ -199,7 +203,7 @@ mod tests {
             }],
             server_tools: Vec::new(),
             required_permissions: None,
-            public_key: "approve".to_string(),
+            public_key: manifest_public_key(3),
         }
     }
 
@@ -224,7 +228,7 @@ mod tests {
             }],
             server_tools: Vec::new(),
             required_permissions: None,
-            public_key: "cancel".to_string(),
+            public_key: manifest_public_key(4),
         }
     }
 
@@ -249,7 +253,7 @@ mod tests {
             }],
             server_tools: Vec::new(),
             required_permissions: None,
-            public_key: "mcp-target".to_string(),
+            public_key: manifest_public_key(5),
         }
     }
 
@@ -274,7 +278,7 @@ mod tests {
             }],
             server_tools: Vec::new(),
             required_permissions: None,
-            public_key: "openai-target".to_string(),
+            public_key: manifest_public_key(6),
         }
     }
 
@@ -299,7 +303,7 @@ mod tests {
             }],
             server_tools: Vec::new(),
             required_permissions: None,
-            public_key: "invalid-target".to_string(),
+            public_key: manifest_public_key(7),
         }
     }
 
@@ -324,7 +328,7 @@ mod tests {
             }],
             server_tools: Vec::new(),
             required_permissions: None,
-            public_key: "hidden".to_string(),
+            public_key: manifest_public_key(8),
         }
     }
 
@@ -417,7 +421,25 @@ mod tests {
         );
     }
 
-    // ---- Agent Card tests ----
+    // ---- Constructor and Agent Card tests ----
+
+    #[test]
+    fn edge_rejects_manifest_with_unsupported_schema_version() {
+        let mut manifest = test_manifest();
+        manifest.schema = "chio.manifest.v0".to_string();
+        manifest.public_key = manifest_public_key(99);
+
+        let error = match ChioA2aEdge::new(A2aEdgeConfig::default(), vec![manifest]) {
+            Ok(_) => panic!("A2A edge must reject unsupported manifest schema versions"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(
+            error,
+            A2aEdgeError::Manifest(chio_manifest::ManifestError::UnsupportedSchema(schema))
+                if schema == "chio.manifest.v0"
+        ));
+    }
 
     #[test]
     fn agent_card_has_correct_name() {
@@ -634,7 +656,7 @@ mod tests {
             }],
             server_tools: Vec::new(),
             required_permissions: None,
-            public_key: "aabb".to_string(),
+            public_key: manifest_public_key(9),
         };
         let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![manifest]).test_unwrap();
         let request = text_message("test");
@@ -893,7 +915,7 @@ mod tests {
             }],
             server_tools: Vec::new(),
             required_permissions: None,
-            public_key: "aabb".to_string(),
+            public_key: manifest_public_key(10),
         };
         let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![manifest]).test_unwrap();
         let config = test_kernel_config();

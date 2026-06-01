@@ -44,6 +44,10 @@ impl ChioA2aEdge {
         let mut published_id_counts = BTreeMap::new();
 
         for manifest in &manifests {
+            chio_manifest::validate_manifest(manifest)?;
+        }
+
+        for manifest in &manifests {
             for tool in &manifest.tools {
                 *tool_name_counts.entry(tool.name.clone()).or_insert(0usize) += 1;
             }

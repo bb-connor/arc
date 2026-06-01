@@ -12,10 +12,10 @@
 
 ## Pain Points
 
-- `edge.rs` is still too broad. It mixes durable-ish deferred task lifecycle, JSON-RPC envelope validation, target-skill routing, and kernel execution orchestration.
-- JSON-RPC target and task identifiers are trust-boundary inputs. They decide which Chio tool binding is invoked or which deferred task is resolved.
-- `metadata.chio.targetSkillId` currently accepts empty strings at the parser boundary, then lets later lookup behavior decide the error path.
-- `task/get` and `task/cancel` currently read `params.taskId` inline. Empty task ids fall through to task lookup and can return poor `ToolNotFound` errors instead of a request-boundary denial.
+- `edge.rs` still owns multiple trust-boundary responsibilities: manifest-to-skill publication, JSON-RPC dispatch, target-skill routing, kernel execution, and deferred task lifecycle.
+- JSON-RPC request-boundary parsing now lives in `jsonrpc.rs`, including non-empty `metadata.chio.targetSkillId` and `params.taskId` checks.
+- `ChioA2aEdge::new` still builds Agent Card skills and authoritative skill bindings directly from manifests before calling the canonical `chio_manifest::validate_manifest` envelope gate.
+- That means unsupported manifest schema versions, invalid embedded public keys, empty tool lists, invalid tool names, malformed schemas, or duplicate server-tool allowlist entries can become A2A-visible skill metadata even though manifest signing and loader paths would reject them.
 
 ## Security And API Constraints
 
@@ -31,8 +31,8 @@
 - `chio-kernel` sees this crate through kernel-mediated tool execution. No kernel API change is planned.
 - `chio-cross-protocol` provides bridge and lifecycle metadata contracts. This slice should preserve those values.
 - `chio-mcp-edge` remains a target executor dependency for multi-hop routes. No transitive change is planned.
-- Downstream A2A clients may see clearer JSON-RPC errors for malformed identifiers, but successful request shape and response shape stay compatible.
+- Downstream A2A clients may see construction-time manifest errors earlier. Successful Agent Card, JSON-RPC, task lifecycle, and response shapes stay compatible.
 
 ## Planned Material Improvement
 
-Move JSON-RPC request-boundary parsing into its own internal source fragment and make target skill ids and task ids validate as non-empty strings before dispatch or task lookup. This is architectural rather than cosmetic because it separates protocol-boundary validation from edge execution and prevents malformed identifiers from crossing into authoritative skill or deferred-task resolution.
+Validate every `ToolManifest` with `chio_manifest::validate_manifest` before Agent Card skill publication, bridge-fidelity classification, or authoritative skill binding construction. This is architectural rather than cosmetic because it makes manifest validation the single envelope gate before external A2A discovery and keeps the existing JSON-RPC parser focused on request-boundary inputs.
