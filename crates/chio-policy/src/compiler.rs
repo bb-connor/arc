@@ -98,6 +98,8 @@ pub fn compile_policy_with_source(
     policy: &HushSpec,
     source_path: Option<&Path>,
 ) -> Result<CompiledPolicy, CompileError> {
+    ensure_compilable_policy(policy)?;
+
     let mut builder = PipelineBuilder::new();
     let mut post_invocation = PostInvocationPipeline::new();
     let source_dir = source_path.and_then(|path| path.parent());
@@ -112,6 +114,23 @@ pub fn compile_policy_with_source(
         default_scope,
         guard_names,
     })
+}
+
+fn ensure_compilable_policy(policy: &HushSpec) -> Result<(), CompileError> {
+    let validation = crate::validate::validate(policy);
+    if validation.is_valid() {
+        return Ok(());
+    }
+
+    let messages = validation
+        .errors
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join("; ");
+    Err(CompileError::Invalid(format!(
+        "HushSpec validation failed: {messages}"
+    )))
 }
 
 // ---------------------------------------------------------------------------
@@ -912,6 +931,40 @@ name: empty
     }
 
     #[test]
+    fn compile_rejects_validation_errors_before_materializing_policy() {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "9.9.9"
+rules:
+  tool_access:
+    enabled: true
+    allow: [read_file]
+    default: block
+    max_args_size: 0
+"#,
+        )
+        .unwrap();
+
+        let error = match compile_policy(&spec) {
+            Ok(_) => panic!("invalid policy should fail compilation"),
+            Err(error) => error,
+        };
+        let message = error.to_string();
+        assert!(
+            message.contains("HushSpec validation failed"),
+            "unexpected error: {error}"
+        );
+        assert!(
+            message.contains("unsupported hushspec version"),
+            "unexpected error: {error}"
+        );
+        assert!(
+            message.contains("rules.tool_access.max_args_size must be >= 1"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
     fn compile_forbidden_paths_guard() {
         let spec = HushSpec::parse(
             r#"
@@ -1087,7 +1140,7 @@ rules:
         assert!(
             error
                 .to_string()
-                .contains("invalid patch integrity forbidden pattern"),
+                .contains("rules.patch_integrity.forbidden_patterns[0]"),
             "unexpected error: {error}"
         );
     }
