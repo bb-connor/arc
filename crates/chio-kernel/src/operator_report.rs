@@ -1790,4 +1790,67 @@ mod tests {
             serde_json::json!("hold-2")
         );
     }
+
+    #[test]
+    fn operator_report_evidence_export_requires_read_context() {
+        let query = OperatorReportQuery {
+            capability_id: Some("cap-1".to_string()),
+            since: Some(10),
+            until: Some(20),
+            ..OperatorReportQuery::default()
+        };
+
+        let err = query
+            .to_evidence_export_query()
+            .expect_err("evidence export must not infer read authority from filters alone");
+
+        assert_eq!(
+            err,
+            "operator report evidence export requires an explicit read context"
+        );
+    }
+
+    #[test]
+    fn operator_report_evidence_export_maps_admin_read_context() {
+        let query = OperatorReportQuery {
+            capability_id: Some("cap-1".to_string()),
+            agent_subject: Some("subject-1".to_string()),
+            since: Some(10),
+            until: Some(20),
+            read_context: Some(ReceiptReadContext::local_operator_admin_all()),
+            ..OperatorReportQuery::default()
+        };
+
+        let export_query = query
+            .to_evidence_export_query()
+            .expect("admin read context should authorize evidence export");
+
+        assert_eq!(export_query.capability_id.as_deref(), Some("cap-1"));
+        assert_eq!(export_query.agent_subject.as_deref(), Some("subject-1"));
+        assert_eq!(export_query.since, Some(10));
+        assert_eq!(export_query.until, Some(20));
+        assert_eq!(export_query.tenant, None);
+        assert_eq!(
+            export_query.read_boundary,
+            Some(ReceiptReadBoundary::AdminAll)
+        );
+    }
+
+    #[test]
+    fn operator_report_evidence_export_maps_tenant_scoped_read_context() {
+        let query = OperatorReportQuery {
+            read_context: Some(ReceiptReadContext::local_operator_tenant("tenant-a")),
+            ..OperatorReportQuery::default()
+        };
+
+        let export_query = query
+            .to_evidence_export_query()
+            .expect("tenant-scoped read context should authorize evidence export");
+
+        assert_eq!(export_query.tenant.as_deref(), Some("tenant-a"));
+        assert_eq!(
+            export_query.read_boundary,
+            Some(ReceiptReadBoundary::tenant_scoped("tenant-a"))
+        );
+    }
 }
