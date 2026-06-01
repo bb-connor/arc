@@ -102,51 +102,134 @@ impl Allowlist {
 }
 
 fn strip_toml_comments(manifest: &str) -> String {
+    const BASIC_MULTILINE_DELIMITER: &str = "\"\"\"";
+    const LITERAL_MULTILINE_DELIMITER: &str = "'''";
+
     let mut stripped = String::with_capacity(manifest.len());
-    for line in manifest.lines() {
-        let content = match toml_comment_start(line) {
-            Some(index) => &line[..index],
-            None => line,
+    let mut mode = TomlStringMode::Bare;
+    let mut index = 0;
+    while index < manifest.len() {
+        let Some(rest) = manifest.get(index..) else {
+            break;
         };
-        stripped.push_str(content);
-        stripped.push('\n');
+        match mode {
+            TomlStringMode::Bare => {
+                if rest.starts_with(BASIC_MULTILINE_DELIMITER) {
+                    stripped.push_str(BASIC_MULTILINE_DELIMITER);
+                    index += BASIC_MULTILINE_DELIMITER.len();
+                    mode = TomlStringMode::MultilineBasic { escaped: false };
+                    continue;
+                }
+                if rest.starts_with(LITERAL_MULTILINE_DELIMITER) {
+                    stripped.push_str(LITERAL_MULTILINE_DELIMITER);
+                    index += LITERAL_MULTILINE_DELIMITER.len();
+                    mode = TomlStringMode::MultilineLiteral;
+                    continue;
+                }
+                let Some((ch, width)) = next_toml_char(rest) else {
+                    break;
+                };
+                match ch {
+                    '"' => {
+                        stripped.push(ch);
+                        index += width;
+                        mode = TomlStringMode::Basic { escaped: false };
+                    }
+                    '\'' => {
+                        stripped.push(ch);
+                        index += width;
+                        mode = TomlStringMode::Literal;
+                    }
+                    '#' => {
+                        while let Some((comment_ch, comment_width)) =
+                            manifest.get(index..).and_then(next_toml_char)
+                        {
+                            if comment_ch == '\n' {
+                                break;
+                            }
+                            index += comment_width;
+                        }
+                    }
+                    _ => {
+                        stripped.push(ch);
+                        index += width;
+                    }
+                }
+            }
+            TomlStringMode::Basic { escaped } => {
+                let Some((ch, width)) = next_toml_char(rest) else {
+                    break;
+                };
+                stripped.push(ch);
+                index += width;
+                mode = if ch == '\n' || (!escaped && ch == '"') {
+                    TomlStringMode::Bare
+                } else if !escaped && ch == '\\' {
+                    TomlStringMode::Basic { escaped: true }
+                } else {
+                    TomlStringMode::Basic { escaped: false }
+                };
+            }
+            TomlStringMode::Literal => {
+                let Some((ch, width)) = next_toml_char(rest) else {
+                    break;
+                };
+                stripped.push(ch);
+                index += width;
+                if ch == '\n' || ch == '\'' {
+                    mode = TomlStringMode::Bare;
+                }
+            }
+            TomlStringMode::MultilineBasic { escaped } => {
+                if !escaped && rest.starts_with(BASIC_MULTILINE_DELIMITER) {
+                    stripped.push_str(BASIC_MULTILINE_DELIMITER);
+                    index += BASIC_MULTILINE_DELIMITER.len();
+                    mode = TomlStringMode::Bare;
+                    continue;
+                }
+                let Some((ch, width)) = next_toml_char(rest) else {
+                    break;
+                };
+                stripped.push(ch);
+                index += width;
+                mode = if escaped {
+                    TomlStringMode::MultilineBasic { escaped: false }
+                } else if ch == '\\' {
+                    TomlStringMode::MultilineBasic { escaped: true }
+                } else {
+                    TomlStringMode::MultilineBasic { escaped: false }
+                };
+            }
+            TomlStringMode::MultilineLiteral => {
+                if rest.starts_with(LITERAL_MULTILINE_DELIMITER) {
+                    stripped.push_str(LITERAL_MULTILINE_DELIMITER);
+                    index += LITERAL_MULTILINE_DELIMITER.len();
+                    mode = TomlStringMode::Bare;
+                    continue;
+                }
+                let Some((ch, width)) = next_toml_char(rest) else {
+                    break;
+                };
+                stripped.push(ch);
+                index += width;
+            }
+        }
     }
+
     stripped
 }
 
-fn toml_comment_start(line: &str) -> Option<usize> {
-    let mut in_basic_string = false;
-    let mut in_literal_string = false;
-    let mut escaped = false;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TomlStringMode {
+    Bare,
+    Basic { escaped: bool },
+    Literal,
+    MultilineBasic { escaped: bool },
+    MultilineLiteral,
+}
 
-    for (index, ch) in line.char_indices() {
-        if in_basic_string {
-            if escaped {
-                escaped = false;
-                continue;
-            }
-            match ch {
-                '\\' => escaped = true,
-                '"' => in_basic_string = false,
-                _ => {}
-            }
-            continue;
-        }
-        if in_literal_string {
-            if ch == '\'' {
-                in_literal_string = false;
-            }
-            continue;
-        }
-        match ch {
-            '"' => in_basic_string = true,
-            '\'' => in_literal_string = true,
-            '#' => return Some(index),
-            _ => {}
-        }
-    }
-
-    None
+fn next_toml_char(input: &str) -> Option<(char, usize)> {
+    input.chars().next().map(|ch| (ch, ch.len_utf8()))
 }
 
 /// Result of running the sentinel against a captured hostname stream.
@@ -371,6 +454,25 @@ hosts = []
             .insert("server#1.example.com".to_string());
 
         assert!(allowlist.matches_manifest(manifest));
+    }
+
+    #[test]
+    fn comment_stripping_preserves_hash_inside_multiline_strings() {
+        let manifest = concat!(
+            "note = \"\"\"\n",
+            "basic # not a comment\n",
+            "\"\"\"\n",
+            "literal = '''\n",
+            "literal # not a comment\n",
+            "'''\n",
+            "# real comment\n",
+        );
+
+        let stripped = strip_toml_comments(manifest);
+
+        assert!(stripped.contains("basic # not a comment"));
+        assert!(stripped.contains("literal # not a comment"));
+        assert!(!stripped.contains("# real comment"));
     }
 
     #[test]
