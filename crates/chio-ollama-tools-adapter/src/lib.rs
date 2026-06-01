@@ -26,6 +26,8 @@ pub mod native;
 pub mod streaming;
 pub mod transport;
 
+mod response;
+
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -165,7 +167,7 @@ impl OllamaAdapter {
     /// Lift every Ollama `tool_calls` entry in a non-streaming `/api/chat`
     /// response payload.
     pub fn lift_batch(&self, raw: ProviderRequest) -> Result<Vec<ToolInvocation>, ProviderError> {
-        let calls = tool_calls(raw)?;
+        let calls = response::tool_calls(raw)?;
         if calls.is_empty() {
             return Err(ProviderError::Malformed(
                 "Ollama /api/chat payload did not contain tool_calls entries".to_string(),
@@ -273,55 +275,6 @@ pub enum OllamaAdapterError {
     /// An outbound `/api/chat` call failed at the transport layer.
     #[error(transparent)]
     Transport(#[from] chio_provider_adapter_core::http::HttpTransportError),
-}
-
-fn tool_calls(raw: ProviderRequest) -> Result<Vec<ToolCallPart>, ProviderError> {
-    let value: Value = serde_json::from_slice(&raw.0).map_err(|error| {
-        ProviderError::Malformed(format!("Ollama /api/chat payload was not JSON: {error}"))
-    })?;
-    let body = response_body(value)?;
-    extract_tool_calls(&body)
-}
-
-fn response_body(value: Value) -> Result<Value, ProviderError> {
-    for field in ["body", "response", "payload"] {
-        if let Some(nested) = value.get(field) {
-            return nested_response_body(nested).ok_or_else(|| {
-                ProviderError::Malformed(format!(
-                    "Ollama /api/chat envelope field `{field}` was not a JSON object or string body"
-                ))
-            });
-        }
-    }
-    Ok(value)
-}
-
-fn nested_response_body(value: &Value) -> Option<Value> {
-    if let Some(obj) = value.as_object() {
-        return Some(Value::Object(obj.clone()));
-    }
-    let text = value.as_str()?;
-    let parsed: Value = serde_json::from_str(text).ok()?;
-    parsed.as_object().map(|obj| Value::Object(obj.clone()))
-}
-
-fn extract_tool_calls(body: &Value) -> Result<Vec<ToolCallPart>, ProviderError> {
-    let message = match body.get("message") {
-        Some(value) => value,
-        None => return Ok(Vec::new()),
-    };
-    let array = match message.get("tool_calls").and_then(Value::as_array) {
-        Some(array) => array,
-        None => return Ok(Vec::new()),
-    };
-    let mut calls = Vec::with_capacity(array.len());
-    for entry in array {
-        let parsed: ToolCallPart = serde_json::from_value(entry.clone()).map_err(|error| {
-            ProviderError::Malformed(format!("Ollama tool_call entry was malformed: {error}"))
-        })?;
-        calls.push(parsed);
-    }
-    Ok(calls)
 }
 
 fn validate_tool_call(call: &ToolCallPart) -> Result<(), ProviderError> {
@@ -550,6 +503,36 @@ mod tests {
         assert_eq!(invocations.len(), 1);
         assert_eq!(invocations[0].tool_name, "get_weather");
         assert_eq!(invocations[0].provider, ProviderId::Ollama);
+    }
+
+    #[test]
+    fn lift_batch_classifies_policy_refusal_as_content_policy() {
+        let adapter = adapter();
+        let payload = json!({
+            "done_reason": "stop",
+            "policy": "refusal"
+        });
+        let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
+        let err = adapter.lift_batch(raw).unwrap_err();
+
+        assert!(matches!(err, ProviderError::ContentPolicy(_)));
+    }
+
+    #[test]
+    fn gate_sse_stream_classifies_policy_refusal_before_forwarding() {
+        let adapter = adapter();
+        let ndjson = br#"{"done":true,"done_reason":"stop","policy":"refusal"}
+"#;
+        let err = adapter
+            .gate_sse_stream(ndjson, |_invocation| {
+                Ok(VerdictResult::Allow {
+                    redactions: vec![],
+                    receipt_id: chio_tool_call_fabric::ReceiptId("rcpt_refusal".into()),
+                })
+            })
+            .unwrap_err();
+
+        assert!(matches!(err, ProviderError::ContentPolicy(_)));
     }
 
     #[test]
