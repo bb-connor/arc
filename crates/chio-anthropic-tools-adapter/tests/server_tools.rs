@@ -7,6 +7,12 @@ use chio_manifest::{LatencyHint, ServerTool, ToolDefinition, ToolManifest, TOOL_
 use chio_tool_call_fabric::{ProviderError, ProviderRequest};
 use serde_json::json;
 
+fn valid_test_public_key() -> String {
+    chio_core::Keypair::from_seed(&[29u8; 32])
+        .public_key()
+        .to_hex()
+}
+
 fn config() -> AnthropicAdapterConfig {
     AnthropicAdapterConfig::new(
         "anthropic-1",
@@ -35,7 +41,7 @@ fn manifest(server_tools: Vec<ServerTool>) -> ToolManifest {
         }],
         server_tools,
         required_permissions: None,
-        public_key: "deadbeef".to_string(),
+        public_key: valid_test_public_key(),
     }
 }
 

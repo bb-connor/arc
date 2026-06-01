@@ -1243,7 +1243,9 @@ fn anthropic_server_tool_manifest() -> chio_manifest::ToolManifest {
             ServerTool::TextEditor,
         ],
         required_permissions: None,
-        public_key: "deadbeef".to_string(),
+        public_key: chio_core::Keypair::from_seed(&[31u8; 32])
+            .public_key()
+            .to_hex(),
     }
 }
 
