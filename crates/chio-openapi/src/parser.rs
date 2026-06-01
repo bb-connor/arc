@@ -278,12 +278,18 @@ impl OpenApiSpec {
             .ok_or_else(|| OpenApiError::MissingField("parameter.name".to_string()))?
             .to_string();
 
-        let location = match value.get("in").and_then(|v| v.as_str()) {
-            Some("path") => ParameterLocation::Path,
-            Some("query") => ParameterLocation::Query,
-            Some("header") => ParameterLocation::Header,
-            Some("cookie") => ParameterLocation::Cookie,
-            _ => ParameterLocation::Query, // default fallback
+        let location_value = value
+            .get("in")
+            .and_then(|v| v.as_str())
+            .filter(|location| !location.trim().is_empty())
+            .ok_or_else(|| OpenApiError::MissingField("parameter.in".to_string()))?;
+
+        let location = match location_value {
+            "path" => ParameterLocation::Path,
+            "query" => ParameterLocation::Query,
+            "header" => ParameterLocation::Header,
+            "cookie" => ParameterLocation::Cookie,
+            _ => ParameterLocation::Query,
         };
 
         let required = value
@@ -681,6 +687,29 @@ paths:
         let err = OpenApiSpec::parse(input).unwrap_err();
 
         assert!(matches!(err, OpenApiError::MissingField(ref field) if field == "parameter.name"));
+    }
+
+    #[test]
+    fn parameter_missing_in_is_rejected() {
+        let input = r##"{
+            "openapi": "3.0.3",
+            "info": { "title": "T", "version": "1" },
+            "paths": {
+                "/pets": {
+                    "get": {
+                        "operationId": "listPets",
+                        "parameters": [
+                            { "name": "limit", "schema": { "type": "string" } }
+                        ],
+                        "responses": { "200": { "description": "OK" } }
+                    }
+                }
+            }
+        }"##;
+
+        let err = OpenApiSpec::parse(input).unwrap_err();
+
+        assert!(matches!(err, OpenApiError::MissingField(ref field) if field == "parameter.in"));
     }
 
     #[test]
