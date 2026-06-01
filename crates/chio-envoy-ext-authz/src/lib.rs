@@ -55,6 +55,8 @@ pub mod error;
 pub mod service;
 pub mod translate;
 
+mod response;
+
 pub use error::{KernelError, TranslateError};
 pub use service::{ChioExtAuthzService, EnvoyKernel};
 pub use translate::{

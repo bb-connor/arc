@@ -250,6 +250,41 @@ async fn kernel_error_fails_closed_with_500() {
 }
 
 #[tokio::test]
+async fn kernel_error_redacts_internal_message_from_denied_response() {
+    let internal_error = "db password=secret-token unavailable";
+    let (mut client, _, _) = spawn_server(MockBehavior::Error(internal_error.to_string())).await;
+    let check = make_check("GET", "/resource", &[], "");
+    let response = client.check(check).await.unwrap().into_inner();
+
+    match response.http_response.unwrap() {
+        HttpResponse::DeniedResponse(denied) => {
+            assert_eq!(
+                denied.status.unwrap().code,
+                EnvoyStatusCode::InternalServerError as i32
+            );
+            assert!(denied.body.contains("fail_closed"));
+            assert!(!denied.body.contains(internal_error));
+
+            let reason_header =
+                denied
+                    .headers
+                    .iter()
+                    .find_map(|HeaderValueOption { header, .. }| {
+                        header.as_ref().and_then(|h| {
+                            if h.key == "x-chio-denial-reason" {
+                                Some(h.value.clone())
+                            } else {
+                                None
+                            }
+                        })
+                    });
+            assert_ne!(reason_header.as_deref(), Some(internal_error));
+        }
+        other => panic!("expected DeniedResponse, got {other:?}"),
+    }
+}
+
+#[tokio::test]
 async fn missing_attributes_fails_closed_without_kernel_call() {
     let (mut client, calls, _) = spawn_server(MockBehavior::Allow).await;
     let check = CheckRequest { attributes: None };
