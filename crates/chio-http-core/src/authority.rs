@@ -2259,4 +2259,28 @@ mod tests {
             ChioToolsPathIdentity::NotToolsPath
         ));
     }
+
+    #[test]
+    fn decode_path_identity_segment_rejects_invalid_utf8() {
+        assert!(decode_path_identity_segment("%FF").is_none());
+        assert!(decode_path_identity_segment("acp%FF").is_none());
+    }
+
+    #[test]
+    fn decode_path_identity_segment_rejects_empty_segment() {
+        assert!(decode_path_identity_segment("").is_none());
+    }
+
+    #[test]
+    fn chio_tools_path_identity_decodes_percent_encoded_tool_name() {
+        let ChioToolsPathIdentity::Identity {
+            server_id,
+            tool_name,
+        } = chio_tools_path_identity("/chio/tools/acp/terminal%2Fcreate")
+        else {
+            panic!("expected decoded tool identity");
+        };
+        assert_eq!(server_id, "acp");
+        assert_eq!(tool_name, "terminal/create");
+    }
 }
