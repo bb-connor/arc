@@ -30,6 +30,17 @@ pub struct ShellCommandGuard {
     forbidden_regexes: Vec<Regex>,
     forbidden_path: ForbiddenPathGuard,
     enforce_forbidden_paths: bool,
+    fail_closed: bool,
+}
+
+/// Errors from operator-supplied shell-command guard configuration.
+#[derive(Debug, thiserror::Error)]
+pub enum ShellCommandConfigError {
+    #[error("invalid shell-command forbidden pattern {pattern:?}: {source}")]
+    InvalidPattern {
+        pattern: String,
+        source: regex::Error,
+    },
 }
 
 impl ShellCommandGuard {
@@ -37,17 +48,56 @@ impl ShellCommandGuard {
         Self::with_patterns(default_forbidden_patterns(), true)
     }
 
+    /// Build a guard from operator-supplied regex patterns.
+    ///
+    /// This compatibility constructor preserves the historical return type.
+    /// Invalid regex configuration creates a deny-all guard so direct callers
+    /// cannot accidentally widen access by dropping a malformed pattern.
     pub fn with_patterns(patterns: Vec<String>, enforce_forbidden_paths: bool) -> Self {
-        let forbidden_regexes = patterns.iter().filter_map(|p| Regex::new(p).ok()).collect();
+        match Self::try_with_patterns(patterns, enforce_forbidden_paths) {
+            Ok(guard) => guard,
+            Err(_) => Self::fail_closed(enforce_forbidden_paths),
+        }
+    }
 
-        Self {
+    /// Build a guard from operator-supplied regex patterns, rejecting invalid
+    /// configuration before it reaches the runtime guard pipeline.
+    pub fn try_with_patterns(
+        patterns: Vec<String>,
+        enforce_forbidden_paths: bool,
+    ) -> Result<Self, ShellCommandConfigError> {
+        let forbidden_regexes = patterns
+            .iter()
+            .map(|pattern| {
+                Regex::new(pattern).map_err(|source| ShellCommandConfigError::InvalidPattern {
+                    pattern: pattern.clone(),
+                    source,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(Self {
             forbidden_regexes,
             forbidden_path: ForbiddenPathGuard::new(),
             enforce_forbidden_paths,
+            fail_closed: false,
+        })
+    }
+
+    fn fail_closed(enforce_forbidden_paths: bool) -> Self {
+        Self {
+            forbidden_regexes: Vec::new(),
+            forbidden_path: ForbiddenPathGuard::new(),
+            enforce_forbidden_paths,
+            fail_closed: true,
         }
     }
 
     pub fn is_forbidden(&self, commandline: &str) -> bool {
+        if self.fail_closed {
+            return true;
+        }
+
         let tokens = shlex_split_best_effort(commandline);
         if is_recursive_rm_root(&tokens) {
             return true;
@@ -799,6 +849,12 @@ mod tests {
         assert!(!guard.is_forbidden("git status"));
         assert!(!guard.is_forbidden("ls -la"));
         assert!(!guard.is_forbidden("cargo test"));
+    }
+
+    #[test]
+    fn invalid_operator_regex_fails_closed() {
+        let guard = ShellCommandGuard::with_patterns(vec!["[".to_string()], false);
+        assert!(guard.is_forbidden("echo harmless"));
     }
 
     #[test]

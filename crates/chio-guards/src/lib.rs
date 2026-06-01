@@ -126,7 +126,7 @@ pub use response_sanitization::{
     TokenVault,
 };
 pub use secret_leak::SecretLeakGuard;
-pub use shell_command::ShellCommandGuard;
+pub use shell_command::{ShellCommandConfigError, ShellCommandGuard};
 pub use velocity::VelocityGuard;
 
 pub use action::{extract_action, ToolAction};
