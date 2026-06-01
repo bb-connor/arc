@@ -90,7 +90,7 @@ impl AuthScheme {
 
 fn read_required_env(var: &str) -> Result<String, HttpTransportError> {
     match std::env::var(var) {
-        Ok(value) if !value.is_empty() => Ok(value),
+        Ok(value) if !value.trim().is_empty() => Ok(value),
         _ => Err(HttpTransportError::MissingEnvVar {
             var: var.to_string(),
         }),
@@ -247,23 +247,7 @@ impl HttpTransport {
     /// the workspace convention. Default headers (including any header-style
     /// auth) are resolved up front so per-request work is minimal.
     pub fn new(config: HttpTransportConfig) -> Result<Self, HttpTransportError> {
-        let mut default_headers = HeaderMap::new();
-        for (name, value) in &config.extra_headers {
-            insert_header(&mut default_headers, name, value)?;
-        }
-        if let AuthScheme::Bearer(token) = &config.auth {
-            let value = format!("Bearer {token}");
-            let header_value = HeaderValue::from_str(&value).map_err(|error| {
-                HttpTransportError::InvalidHeader {
-                    name: AUTHORIZATION.to_string(),
-                    detail: error.to_string(),
-                }
-            })?;
-            default_headers.insert(AUTHORIZATION, header_value);
-        }
-        if let AuthScheme::Header { name, value } = &config.auth {
-            insert_header(&mut default_headers, name, value)?;
-        }
+        let default_headers = default_headers_for_config(&config)?;
 
         // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: shared provider-adapter
         // transport; HttpEgressContract wiring across every adapter is a
@@ -349,6 +333,44 @@ impl HttpTransport {
             content_type,
         })
     }
+}
+
+fn default_headers_for_config(
+    config: &HttpTransportConfig,
+) -> Result<HeaderMap, HttpTransportError> {
+    let mut headers = HeaderMap::new();
+    for (name, value) in &config.extra_headers {
+        insert_header(&mut headers, name, value)?;
+    }
+    match &config.auth {
+        AuthScheme::Bearer(token) => insert_bearer_header(&mut headers, token)?,
+        AuthScheme::Header { name, value } => insert_header(&mut headers, name, value)?,
+        AuthScheme::QueryParam { .. } | AuthScheme::None => {}
+    }
+    Ok(headers)
+}
+
+fn insert_bearer_header(headers: &mut HeaderMap, token: &str) -> Result<(), HttpTransportError> {
+    if token.trim().is_empty() {
+        return Err(HttpTransportError::InvalidHeader {
+            name: AUTHORIZATION.to_string(),
+            detail: "bearer token must not be empty".to_string(),
+        });
+    }
+    if token.trim() != token {
+        return Err(HttpTransportError::InvalidHeader {
+            name: AUTHORIZATION.to_string(),
+            detail: "bearer token must not contain surrounding whitespace".to_string(),
+        });
+    }
+    let value = format!("Bearer {token}");
+    let header_value =
+        HeaderValue::from_str(&value).map_err(|error| HttpTransportError::InvalidHeader {
+            name: AUTHORIZATION.to_string(),
+            detail: error.to_string(),
+        })?;
+    headers.insert(AUTHORIZATION, header_value);
+    Ok(())
 }
 
 fn insert_header(
@@ -646,6 +668,57 @@ mod tests {
         let scheme = AuthScheme::bearer_from_env("CHIO_TEST_PRESENT_KEY").test_unwrap();
         assert_eq!(scheme, AuthScheme::Bearer("secret-token".to_string()));
         std::env::remove_var("CHIO_TEST_PRESENT_KEY");
+    }
+
+    #[test]
+    fn auth_scheme_from_env_rejects_whitespace_only_value() {
+        std::env::set_var("CHIO_TEST_BLANK_KEY", "   ");
+        let error = AuthScheme::bearer_from_env("CHIO_TEST_BLANK_KEY")
+            .expect_err("a whitespace-only variable must not yield a token");
+        std::env::remove_var("CHIO_TEST_BLANK_KEY");
+
+        assert!(matches!(error, HttpTransportError::MissingEnvVar { .. }));
+    }
+
+    #[test]
+    fn default_headers_for_config_includes_extra_and_bearer_auth() {
+        let config = HttpTransportConfig::new("https://api.example.test")
+            .with_auth(AuthScheme::Bearer("sk-test".to_string()))
+            .with_header("x-provider-version", "2026-05-31");
+
+        let headers = default_headers_for_config(&config).test_unwrap();
+
+        assert_eq!(
+            headers
+                .get(AUTHORIZATION)
+                .test_unwrap()
+                .to_str()
+                .test_unwrap(),
+            "Bearer sk-test"
+        );
+        assert_eq!(
+            headers
+                .get("x-provider-version")
+                .test_unwrap()
+                .to_str()
+                .test_unwrap(),
+            "2026-05-31"
+        );
+    }
+
+    #[test]
+    fn default_headers_for_config_rejects_blank_bearer_auth() {
+        let config = HttpTransportConfig::new("https://api.example.test")
+            .with_auth(AuthScheme::Bearer("   ".to_string()));
+
+        let error = default_headers_for_config(&config)
+            .expect_err("blank direct bearer auth must fail closed");
+
+        assert!(matches!(
+            error,
+            HttpTransportError::InvalidHeader { ref name, .. } if name == AUTHORIZATION.as_str()
+        ));
+        assert!(error.to_string().contains("bearer token"));
     }
 
     #[test]

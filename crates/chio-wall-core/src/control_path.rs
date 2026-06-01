@@ -21,6 +21,8 @@ pub enum ChioWallContractError {
     MissingField(&'static str),
     #[error("field `{0}` must not be empty")]
     EmptyField(&'static str),
+    #[error("field `{0}` must not have surrounding whitespace")]
+    PaddedField(&'static str),
     #[error("validation error: {0}")]
     Validation(String),
     #[error("json error: {0}")]
@@ -447,10 +449,12 @@ impl ChioWallControlPackage {
 
 fn ensure_non_empty(field: &'static str, value: &str) -> Result<(), ChioWallContractError> {
     if value.trim().is_empty() {
-        Err(ChioWallContractError::EmptyField(field))
-    } else {
-        Ok(())
+        return Err(ChioWallContractError::EmptyField(field));
     }
+    if value.trim() != value {
+        return Err(ChioWallContractError::PaddedField(field));
+    }
+    Ok(())
 }
 
 fn ensure_non_empty_list(
@@ -626,6 +630,17 @@ mod tests {
     #[test]
     fn control_profile_validates() {
         assert_valid(sample_profile().validate(), "profile validates");
+    }
+
+    #[test]
+    fn control_profile_rejects_padded_profile_id() {
+        let mut profile = sample_profile();
+        profile.profile_id = " chio-wall-profile ".to_string();
+        let error = validation_error(profile.validate(), "padded profile id rejected");
+        assert!(matches!(
+            error,
+            ChioWallContractError::PaddedField("control_profile.profile_id")
+        ));
     }
 
     #[test]

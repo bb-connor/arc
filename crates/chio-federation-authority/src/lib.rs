@@ -17,6 +17,7 @@ use chio_attest_buyer_core::{
 use chio_core_types::canonical::canonical_json_bytes;
 use chio_core_types::crypto::{sha256_hex, Keypair, PublicKey};
 use chio_core_types::receipt::SignedExportEnvelope;
+use chio_federation::Keyid;
 use chio_governance::{
     CapabilityLeaseActionClass, CapabilityLeaseArtifact, GovernanceReceiptArtifact,
     GovernanceReceiptCaseKind, SignedCapabilityLease, SignedGovernanceReceipt,
@@ -196,8 +197,12 @@ impl AuthorityProfileDocument {
         for authority in &self.lease_authorities {
             validate_non_empty(&authority.issuer, "leaseAuthorities.issuer")
                 .map_err(ChioAuthorityError::Profile)?;
-            validate_required_key_id(authority.key_id.as_deref(), "leaseAuthorities.keyId")
-                .map_err(ChioAuthorityError::Profile)?;
+            validate_key_id_matches_public_key(
+                authority.key_id.as_deref(),
+                &authority.public_key,
+                "leaseAuthorities.keyId",
+            )
+            .map_err(ChioAuthorityError::Profile)?;
             let (valid_from, valid_until) = required_window(
                 authority.valid_from_unix_ms,
                 authority.valid_until_unix_ms,
@@ -234,8 +239,12 @@ impl AuthorityProfileDocument {
                 "governanceAuthorities.authorizingKernel",
             )
             .map_err(ChioAuthorityError::Profile)?;
-            validate_required_key_id(authority.key_id.as_deref(), "governanceAuthorities.keyId")
-                .map_err(ChioAuthorityError::Profile)?;
+            validate_key_id_matches_public_key(
+                authority.key_id.as_deref(),
+                &authority.public_key,
+                "governanceAuthorities.keyId",
+            )
+            .map_err(ChioAuthorityError::Profile)?;
             let (valid_from, valid_until) = required_window(
                 authority.valid_from_unix_ms,
                 authority.valid_until_unix_ms,
@@ -325,8 +334,12 @@ impl ChioRevocationAuthority {
     fn validate(&self) -> Result<(), ChioAuthorityError> {
         validate_non_empty(&self.authority_id, "revocationAuthority.authorityId")
             .map_err(ChioAuthorityError::Profile)?;
-        validate_non_empty(&self.key_id, "revocationAuthority.keyId")
-            .map_err(ChioAuthorityError::Profile)?;
+        validate_key_id_matches_public_key(
+            Some(&self.key_id),
+            &self.public_key,
+            "revocationAuthority.keyId",
+        )
+        .map_err(ChioAuthorityError::Profile)?;
         if self.valid_until_unix_ms <= self.valid_from_unix_ms {
             return Err(ChioAuthorityError::Profile(
                 "revocation authority validity window is empty".to_string(),
@@ -1006,9 +1019,18 @@ fn ensure_reference_workflow_classes(
     Ok(())
 }
 
-fn validate_required_key_id(value: Option<&str>, field: &str) -> Result<(), String> {
+fn validate_key_id_matches_public_key(
+    value: Option<&str>,
+    public_key: &PublicKey,
+    field: &str,
+) -> Result<(), String> {
     let key_id = value.ok_or_else(|| format!("{field} is required"))?;
-    validate_non_empty(key_id, field)
+    validate_non_empty(key_id, field)?;
+    let expected = Keyid::from_public_key(public_key).0;
+    if key_id != expected {
+        return Err(format!("{field} does not match public key"));
+    }
+    Ok(())
 }
 
 fn validate_non_empty(value: &str, field: &str) -> Result<(), String> {
@@ -1019,10 +1041,14 @@ fn validate_non_empty(value: &str, field: &str) -> Result<(), String> {
 }
 
 fn validate_sha256(value: &str, field: &str) -> Result<(), String> {
-    if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+    if !is_sha256_hex_shape(value) {
         return Err(format!("{field} must be a SHA-256 lowercase hex digest"));
     }
     validate_lowercase_hex(value, field)
+}
+
+fn is_sha256_hex_shape(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn validate_hex(value: &str, field: &str) -> Result<(), String> {
@@ -1080,6 +1106,20 @@ mod tests {
 
     fn key_id(public_key: &PublicKey) -> String {
         Keyid::from_public_key(public_key).0
+    }
+
+    fn different_key_id(public_key: &PublicKey) -> String {
+        let current = key_id(public_key);
+        let replacement = if current.starts_with('f') { '0' } else { 'f' };
+        format!("{replacement}{}", &current[1..])
+    }
+
+    #[test]
+    fn sha256_hex_shape_helper_accepts_exact_hex_before_lowercase_validation() {
+        assert!(crate::is_sha256_hex_shape(&"a".repeat(64)));
+        assert!(crate::is_sha256_hex_shape(&"A".repeat(64)));
+        assert!(!crate::is_sha256_hex_shape(&"a".repeat(63)));
+        assert!(!crate::is_sha256_hex_shape(&format!("{}g", "a".repeat(63))));
     }
 
     fn profile() -> AuthorityProfileDocument {
@@ -1353,6 +1393,35 @@ mod tests {
         assert!(error
             .to_string()
             .contains("governanceAuthorities.keyId is required"));
+    }
+
+    #[test]
+    fn profile_rejects_authority_key_ids_that_do_not_match_public_keys() {
+        let mut lease_profile = profile();
+        lease_profile.lease_authorities[0].key_id = Some(different_key_id(
+            &lease_profile.lease_authorities[0].public_key,
+        ));
+        let error = lease_profile.validate().unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("leaseAuthorities.keyId does not match public key"));
+
+        let mut governance_profile = profile();
+        governance_profile.governance_authorities[0].key_id = Some(different_key_id(
+            &governance_profile.governance_authorities[0].public_key,
+        ));
+        let error = governance_profile.validate().unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("governanceAuthorities.keyId does not match public key"));
+
+        let mut revocation_profile = profile();
+        revocation_profile.revocation_authority.key_id =
+            different_key_id(&revocation_profile.revocation_authority.public_key);
+        let error = revocation_profile.validate().unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("revocationAuthority.keyId does not match public key"));
     }
 
     #[test]

@@ -352,6 +352,14 @@ struct UnsignedCheckpointBody {
 }
 
 fn write_json<T: serde::Serialize>(path: &PathBuf, value: &T) -> Result<(), Box<dyn StdError>> {
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            return Err(format!("refusing symlinked output path {}", path.display()).into());
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
     let bytes = serde_json::to_vec_pretty(value)?;
     std::fs::write(path, bytes)?;
     Ok(())
@@ -436,5 +444,29 @@ mod tests {
             result.is_err(),
             "attacker public key must not verify org_a slot"
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn write_json_rejects_symlinked_output_file() {
+        let mut dir = std::env::temp_dir();
+        dir.push(format!("chiodome-bilateral-output-{}", std::process::id()));
+        let mut outside = std::env::temp_dir();
+        outside.push(format!("chiodome-bilateral-outside-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&outside);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        let outside_target = outside.join("target.json");
+        std::fs::write(&outside_target, "{}").unwrap();
+        let link_path = dir.join("receipt.json");
+        std::os::unix::fs::symlink(&outside_target, &link_path).unwrap();
+
+        let result = write_json(&link_path, &serde_json::json!({"escaped": true}));
+
+        let _ = std::fs::remove_dir_all(dir);
+        let _ = std::fs::remove_dir_all(outside);
+        let error = result.expect_err("symlinked output file should fail closed");
+        assert!(error.to_string().contains("symlink"));
     }
 }

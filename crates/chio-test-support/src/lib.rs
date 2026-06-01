@@ -110,7 +110,7 @@ pub mod plain {
 /// Every method takes a `&str` context label that is prefixed onto the panic
 /// message. Used by call sites written as `value.test_unwrap("loading config")`.
 pub mod ctx {
-    use std::fmt::{Debug, Display};
+    use std::fmt::Display;
 
     /// Extract the `Ok`/`Some` value or fail the test with a context label.
     pub trait TestUnwrap<T> {
@@ -138,10 +138,10 @@ pub mod ctx {
         }
     }
 
-    impl<T: Debug, E> TestUnwrapErr<E> for Result<T, E> {
+    impl<T, E> TestUnwrapErr<E> for Result<T, E> {
         fn test_unwrap_err(self, context: &str) -> E {
             match self {
-                Ok(value) => panic!("{context}: unexpected Ok({value:?})"),
+                Ok(_) => panic!("{context}: unexpected Ok(..)"),
                 Err(error) => error,
             }
         }
@@ -154,4 +154,18 @@ pub mod ctx {
 /// [`plain::TestResultErr`] into scope.
 pub mod prelude {
     pub use crate::plain::{TestResultErr, TestResultOk};
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ctx::TestUnwrapErr;
+
+    struct NonDebugHandle;
+
+    #[test]
+    fn ctx_unwrap_err_accepts_non_debug_ok_payloads() {
+        let result: Result<NonDebugHandle, &str> = Err("denied");
+
+        assert_eq!(result.test_unwrap_err("expected denial"), "denied");
+    }
 }

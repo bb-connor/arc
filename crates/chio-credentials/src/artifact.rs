@@ -93,6 +93,12 @@ pub enum CredentialError {
     #[error("challenge issuance date must be before or equal to expiration date")]
     InvalidChallengeValidityWindow,
 
+    #[error("challenge verifier must be non-empty")]
+    MissingChallengeVerifier,
+
+    #[error("challenge nonce must be non-empty")]
+    MissingChallengeNonce,
+
     #[error("challenge is not yet valid")]
     ChallengeNotYetValid,
 
@@ -247,26 +253,21 @@ impl EnterpriseIdentityProvenance {
     }
 
     fn validate(&self) -> Result<(), CredentialError> {
-        if self.provider_id.trim().is_empty() {
-            return Err(CredentialError::MissingEnterpriseIdentityProvenanceField {
-                field: "providerId",
-            });
-        }
-        if self.provider_kind.trim().is_empty() {
-            return Err(CredentialError::MissingEnterpriseIdentityProvenanceField {
-                field: "providerKind",
-            });
-        }
-        if self.principal.trim().is_empty() {
-            return Err(CredentialError::MissingEnterpriseIdentityProvenanceField {
-                field: "principal",
-            });
-        }
-        if self.subject_key.trim().is_empty() {
-            return Err(CredentialError::MissingEnterpriseIdentityProvenanceField {
-                field: "subjectKey",
-            });
-        }
+        require_enterprise_identity_provenance_field(&self.provider_id, "providerId")?;
+        require_enterprise_identity_provenance_field(&self.provider_kind, "providerKind")?;
+        require_enterprise_identity_provenance_field(&self.principal, "principal")?;
+        require_enterprise_identity_provenance_field(&self.subject_key, "subjectKey")?;
+        Ok(())
+    }
+}
+
+fn require_enterprise_identity_provenance_field(
+    value: &str,
+    field: &'static str,
+) -> Result<(), CredentialError> {
+    if value.trim().is_empty() {
+        Err(CredentialError::MissingEnterpriseIdentityProvenanceField { field })
+    } else {
         Ok(())
     }
 }

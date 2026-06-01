@@ -264,7 +264,8 @@ mod tests {
     use super::*;
     use chio_core_types::capability::{CapabilityToken, CapabilityTokenBody, ChioScope};
     use chio_http_core::{
-        http_status_scope, CHIO_HTTP_STATUS_SCOPE_DECISION, CHIO_HTTP_STATUS_SCOPE_FINAL,
+        http_authority_tool_grant, http_status_scope, CHIO_HTTP_STATUS_SCOPE_DECISION,
+        CHIO_HTTP_STATUS_SCOPE_FINAL,
     };
 
     fn valid_capability_token_json(id: &str, issuer: &Keypair) -> String {
@@ -274,7 +275,10 @@ mod tests {
                 id: id.to_string(),
                 issuer: issuer.public_key(),
                 subject: issuer.public_key(),
-                scope: ChioScope::default(),
+                scope: ChioScope {
+                    grants: vec![http_authority_tool_grant()],
+                    ..ChioScope::default()
+                },
                 issued_at: now.saturating_sub(60),
                 expires_at: now + 3600,
                 delegation_chain: Vec::new(),

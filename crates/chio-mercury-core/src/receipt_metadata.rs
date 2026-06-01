@@ -14,6 +14,8 @@ pub enum MercuryContractError {
     MissingField(&'static str),
     #[error("field `{0}` must not be empty")]
     EmptyField(&'static str),
+    #[error("field `{0}` must not have surrounding whitespace")]
+    PaddedField(&'static str),
     #[error("receipt metadata must be a JSON object")]
     ReceiptMetadataNotObject,
     #[error("validation error: {0}")]

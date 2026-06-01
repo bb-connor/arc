@@ -143,6 +143,13 @@ fn span_tenant_attribute_does_not_set_receipt_tenant() -> Result<(), Box<dyn Err
             .and_then(|receipt| receipt.tenant_id.as_deref()),
         None
     );
+    let metadata = receipts
+        .first()
+        .and_then(|receipt| receipt.metadata.as_ref())
+        .ok_or_else(|| std::io::Error::other("missing receipt metadata"))?;
+    assert!(metadata["otel"]["attributes"]
+        .get("chio.tenant.id")
+        .is_none());
 
     Ok(())
 }
@@ -371,6 +378,44 @@ fn invalid_otel_ids_fail_before_receipt_append() -> Result<(), Box<dyn Error>> {
         "unexpected error: {error}"
     );
     assert!(store.receipts()?.is_empty());
+
+    Ok(())
+}
+
+#[test]
+fn malformed_routing_attributes_prevent_receipt_append() -> Result<(), Box<dyn Error>> {
+    for (key, value) in [
+        ("chio.capability.id", serde_json::json!(" cap-otel")),
+        (ATTR_CHIO_SERVER_ID, serde_json::json!("")),
+        (ATTR_GEN_AI_TOOL_NAME, serde_json::json!(false)),
+    ] {
+        let store = Arc::new(MemoryReceiptStore::default());
+        let sink = ReceiptStoreSink::new(
+            store.clone(),
+            ReceiptStoreSinkConfig::new(Keypair::generate()),
+        );
+        let span = OtlpSpan::new(
+            "0123456789abcdef0123456789abcdef",
+            "0123456789abcdef",
+            "gen_ai.tool.call",
+        )
+        .with_attribute("chio.verdict", serde_json::json!("allow"))
+        .with_attribute(key, value);
+
+        let error = match sink.export_traces(&OtlpGrpcTraceExport::from_spans(vec![span])) {
+            Ok(_) => {
+                return Err(std::io::Error::other(format!("{key} unexpectedly exported")).into());
+            }
+            Err(error) => error,
+        };
+
+        assert!(matches!(error, OTelReceiptExportError::InvalidSpan(_)));
+        assert!(
+            error.to_string().contains(key),
+            "unexpected error for {key}: {error}"
+        );
+        assert!(store.receipts()?.is_empty());
+    }
 
     Ok(())
 }

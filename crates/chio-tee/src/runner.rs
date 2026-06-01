@@ -683,7 +683,7 @@ mod tests {
             },
         );
 
-        let err = runner.after_kernel(&req, &rcpt).unwrap_err();
+        let err = runner.after_kernel(&req, &rcpt).test_unwrap_err();
         assert!(err.to_string().contains("enforce"));
         // The frame is still persisted for audit despite the rejection.
         let body = std::fs::read_to_string(runner.capture_path()).test_unwrap();

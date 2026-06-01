@@ -13,7 +13,7 @@ pub fn validate(config: &ChioConfig) -> Result<(), ConfigError> {
     let mut errors: Vec<String> = Vec::new();
 
     validate_adapters_required(config, &mut errors);
-    let adapter_ids = validate_no_duplicate_adapters(config, &mut errors);
+    let adapter_ids = validate_adapter_ids_and_required_fields(config, &mut errors);
     validate_edges(config, &adapter_ids, &mut errors);
     validate_auth_blocks(config, &mut errors);
     validate_kernel(config, &mut errors);
@@ -33,8 +33,9 @@ fn validate_adapters_required(config: &ChioConfig, errors: &mut Vec<String>) {
     }
 }
 
-/// Adapter IDs must be unique. Returns the set of known IDs for edge validation.
-fn validate_no_duplicate_adapters(
+/// Adapter IDs must be unique. Required adapter fields must be non-empty.
+/// Returns the set of known IDs for edge validation.
+fn validate_adapter_ids_and_required_fields(
     config: &ChioConfig,
     errors: &mut Vec<String>,
 ) -> HashSet<String> {
@@ -42,8 +43,22 @@ fn validate_no_duplicate_adapters(
     for adapter in &config.adapters {
         if adapter.id.is_empty() {
             errors.push("adapter ID must not be empty".to_string());
+        } else if adapter.id.trim() != adapter.id {
+            errors.push("adapter ID must not contain surrounding whitespace".to_string());
         } else if !seen.insert(adapter.id.clone()) {
             errors.push(format!("duplicate adapter ID: \"{}\"", adapter.id));
+        }
+        if adapter.protocol.trim().is_empty() {
+            errors.push(format!(
+                "adapter \"{}\": protocol must not be empty",
+                adapter.id
+            ));
+        }
+        if adapter.upstream.trim().is_empty() {
+            errors.push(format!(
+                "adapter \"{}\": upstream must not be empty",
+                adapter.id
+            ));
         }
     }
     seen
@@ -371,6 +386,49 @@ mod tests {
                         .iter()
                         .any(|e| e.contains("adapter ID must not be empty")),
                     "should mention empty ID: {errors:?}"
+                );
+            }
+            other => panic!("wrong error: {other}"),
+        }
+    }
+
+    #[test]
+    fn padded_adapter_id_rejected() {
+        let mut config = minimal_config();
+        config.adapters[0].id = " test".to_string();
+        let err = validation_error(validate(&config));
+        match err {
+            ConfigError::Validation(errors) => {
+                assert!(
+                    errors
+                        .iter()
+                        .any(|e| e.contains("adapter ID must not contain surrounding whitespace")),
+                    "should mention padded ID: {errors:?}"
+                );
+            }
+            other => panic!("wrong error: {other}"),
+        }
+    }
+
+    #[test]
+    fn empty_adapter_protocol_and_upstream_rejected() {
+        let mut config = minimal_config();
+        config.adapters[0].protocol = " ".to_string();
+        config.adapters[0].upstream = String::new();
+        let err = validation_error(validate(&config));
+        match err {
+            ConfigError::Validation(errors) => {
+                assert!(
+                    errors
+                        .iter()
+                        .any(|e| e.contains("protocol must not be empty")),
+                    "should mention empty protocol: {errors:?}"
+                );
+                assert!(
+                    errors
+                        .iter()
+                        .any(|e| e.contains("upstream must not be empty")),
+                    "should mention empty upstream: {errors:?}"
                 );
             }
             other => panic!("wrong error: {other}"),

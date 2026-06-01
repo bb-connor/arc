@@ -68,6 +68,7 @@ impl Allowlist {
     /// every loopback host listed in the embedded constant. Avoids a
     /// full TOML parser dependency in the bench crate.
     pub fn matches_manifest(&self, manifest: &str) -> bool {
+        let manifest = strip_toml_comments(manifest);
         for host in &self.global_hosts {
             if !manifest.contains(&format!("\"{host}\"")) {
                 return false;
@@ -98,6 +99,16 @@ impl Allowlist {
             .find(|entry| entry.template == template)
             .map(|entry| &entry.hosts)
     }
+}
+
+fn strip_toml_comments(manifest: &str) -> String {
+    let mut stripped = String::with_capacity(manifest.len());
+    for line in manifest.lines() {
+        let content = line.split_once('#').map_or(line, |(before, _)| before);
+        stripped.push_str(content);
+        stripped.push('\n');
+    }
+    stripped
 }
 
 /// Result of running the sentinel against a captured hostname stream.
@@ -281,6 +292,25 @@ mod tests {
         let manifest = include_str!("../sentinel/allowlist.toml");
         let allowlist = Allowlist::embedded();
         assert!(allowlist.matches_manifest(manifest));
+    }
+
+    #[test]
+    fn manifest_match_ignores_commented_hosts() {
+        let manifest = r#"
+# "127.0.0.1"
+global_hosts = ["localhost", "::1"]
+
+[templates.next-ai-sdk-receipts]
+hosts = []
+
+[templates.fastapi-langchain]
+hosts = []
+
+[templates.cloudflare-worker]
+hosts = []
+"#;
+        let allowlist = Allowlist::embedded();
+        assert!(!allowlist.matches_manifest(manifest));
     }
 
     #[test]

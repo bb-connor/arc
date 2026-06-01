@@ -256,12 +256,20 @@ pub fn extract_method(msg: &Value) -> Option<AcpMethod> {
 
 /// Build a JSON-RPC error response for a given request id.
 pub fn json_rpc_error(id: Option<&Value>, code: i64, message: &str) -> Value {
+    let response_id = json_rpc_response_id(id);
     serde_json::json!({
         "jsonrpc": "2.0",
-        "id": id.cloned().unwrap_or(Value::Null),
+        "id": response_id,
         "error": {
             "code": code,
             "message": message
         }
     })
+}
+
+fn json_rpc_response_id(id: Option<&Value>) -> Value {
+    match id {
+        Some(value) if value.is_string() || value.is_number() || value.is_null() => value.clone(),
+        _ => Value::Null,
+    }
 }

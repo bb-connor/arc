@@ -252,6 +252,67 @@ mod tests {
         }
     }
 
+    fn test_local_authorization_server() -> LocalAuthorizationServer {
+        let (sender_dpop_nonce_store, sender_dpop_config) = test_sender_dpop_runtime();
+        LocalAuthorizationServer {
+            signing_key: Keypair::generate(),
+            issuer: "https://auth.example".to_string(),
+            default_audience: "https://edge.example/mcp".to_string(),
+            supported_scopes: vec!["mcp:invoke".to_string()],
+            subject: "operator".to_string(),
+            code_ttl_secs: 300,
+            access_token_ttl_secs: 600,
+            codes: Arc::new(StdMutex::new(HashMap::new())),
+            sender_dpop_nonce_store,
+            sender_dpop_config,
+        }
+    }
+
+    fn test_authorization_approval_form() -> AuthorizationApprovalForm {
+        AuthorizationApprovalForm {
+            response_type: "code".to_string(),
+            client_id: "client-abc".to_string(),
+            redirect_uri: "https://client.example/callback".to_string(),
+            state: Some("state-1".to_string()),
+            scope: Some("mcp:invoke".to_string()),
+            resource: Some("https://edge.example/mcp".to_string()),
+            authorization_details: None,
+            chio_transaction_context: None,
+            code_challenge: "challenge".to_string(),
+            code_challenge_method: "S256".to_string(),
+            chio_sender_dpop_public_key: None,
+            chio_sender_mtls_thumbprint_sha256: None,
+            chio_sender_attestation_sha256: None,
+            decision: "approve".to_string(),
+        }
+    }
+
+    fn authorization_code_from_redirect(redirect: Redirect) -> String {
+        let response = redirect.into_response();
+        let location = response
+            .headers()
+            .get(axum::http::header::LOCATION)
+            .expect("redirect has location")
+            .to_str()
+            .expect("location is valid header text");
+        Url::parse(location)
+            .expect("parse redirect location")
+            .query_pairs()
+            .find_map(|(key, value)| (key == "code").then(|| value.to_string()))
+            .expect("redirect includes authorization code")
+    }
+
+    fn stored_authorization_code_expiry(
+        server: &LocalAuthorizationServer,
+        code: &str,
+    ) -> u64 {
+        let guard = server.codes.lock().expect("lock authorization codes");
+        guard
+            .get(code)
+            .expect("authorization code stored")
+            .expires_at
+    }
+
     fn sample_resume_record() -> RemoteSessionResumeRecord {
         RemoteSessionResumeRecord {
             session_id: "session-valid".to_string(),
@@ -779,6 +840,32 @@ mod tests {
             error.to_string().contains("Chio authorization profile id"),
             "unexpected error: {error}"
         );
+    }
+
+    #[test]
+    fn local_authorization_server_issues_unique_codes_for_same_second_approvals() {
+        for _ in 0..8 {
+            let server = test_local_authorization_server();
+            let first = authorization_code_from_redirect(
+                server
+                    .approve_authorization(test_authorization_approval_form())
+                    .expect("first approval succeeds"),
+            );
+            let first_expires_at = stored_authorization_code_expiry(&server, &first);
+            let second = authorization_code_from_redirect(
+                server
+                    .approve_authorization(test_authorization_approval_form())
+                    .expect("second approval succeeds"),
+            );
+            let second_expires_at = stored_authorization_code_expiry(&server, &second);
+
+            if first_expires_at == second_expires_at {
+                assert_ne!(first, second);
+                return;
+            }
+        }
+
+        panic!("test could not issue two authorization codes in the same second");
     }
 
     #[test]

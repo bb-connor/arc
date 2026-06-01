@@ -153,16 +153,14 @@ pub struct AgUiProxy {
 impl AgUiProxy {
     /// Create a new AG-UI proxy with the given config and signing key.
     pub fn new(config: AgUiProxyConfig, signing_key: Keypair) -> Self {
-        let mut budget_registry = InMemoryBudgetRegistry::new();
-        if let Err(error) =
-            seed_budget_registry(&mut budget_registry, &config.parent_budget_snapshots)
-        {
-            warn!(
-                reason = %error,
-                "AG-UI proxy ignored invalid parent budget snapshot"
-            );
-            budget_registry = InMemoryBudgetRegistry::new();
-        }
+        let budget_registry = build_budget_registry(&config.parent_budget_snapshots)
+            .unwrap_or_else(|error| {
+                warn!(
+                    reason = %error,
+                    "AG-UI proxy ignored invalid parent budget snapshot"
+                );
+                InMemoryBudgetRegistry::new()
+            });
         Self {
             config,
             signing_key,
@@ -172,8 +170,7 @@ impl AgUiProxy {
 
     /// Create a new AG-UI proxy and reject invalid budget snapshot config.
     pub fn try_new(config: AgUiProxyConfig, signing_key: Keypair) -> Result<Self, AgUiProxyError> {
-        let mut budget_registry = InMemoryBudgetRegistry::new();
-        seed_budget_registry(&mut budget_registry, &config.parent_budget_snapshots)?;
+        let budget_registry = build_budget_registry(&config.parent_budget_snapshots)?;
         Ok(Self {
             config,
             signing_key,
@@ -590,6 +587,14 @@ fn custom_constraint_matches_if_present(grant: &ToolGrant, key: &str, expected: 
     })
 }
 
+fn build_budget_registry(
+    snapshots: &[ParentBudgetSnapshot],
+) -> Result<InMemoryBudgetRegistry, AgUiProxyError> {
+    let mut budget_registry = InMemoryBudgetRegistry::new();
+    seed_budget_registry(&mut budget_registry, snapshots)?;
+    Ok(budget_registry)
+}
+
 fn seed_budget_registry(
     budgets: &mut InMemoryBudgetRegistry,
     snapshots: &[ParentBudgetSnapshot],
@@ -903,6 +908,60 @@ mod tests {
                 share_bps: 1,
             }],
         }
+    }
+
+    #[test]
+    fn budget_registry_builder_rejects_invalid_parent_snapshot() {
+        let error = build_budget_registry(&[ParentBudgetSnapshot {
+            parent_token_id: "cap-parent-invalid".to_string(),
+            parent_share_bps: 10_001,
+            admitted_children: vec![],
+        }])
+        .expect_err("invalid parent share should fail closed");
+
+        assert!(error
+            .to_string()
+            .contains("budget registry failed: parent budget snapshot"));
+    }
+
+    #[test]
+    fn permissive_constructor_with_invalid_budget_snapshot_still_fails_closed_on_delegation() {
+        let issuer = Keypair::generate();
+        let proxy = AgUiProxy::new(
+            AgUiProxyConfig {
+                trusted_issuers: vec![issuer.public_key()],
+                parent_budget_snapshots: vec![ParentBudgetSnapshot {
+                    parent_token_id: "cap-parent-invalid".to_string(),
+                    parent_share_bps: 10_001,
+                    admitted_children: vec![],
+                }],
+                ..Default::default()
+            },
+            Keypair::generate(),
+        );
+        let event = make_event(EventClassification::Submit);
+        let cap = make_delegated_scoped_capability(
+            &issuer,
+            "submit",
+            "cap-child-invalid-parent",
+            "cap-parent-invalid",
+        );
+        let mut transport = Transport::new(
+            TransportKind::WebSocket,
+            "ws-invalid-budget-snapshot".to_string(),
+            "agent-1".to_string(),
+        );
+
+        let (decision, receipt) = proxy.evaluate(&event, Some(&cap), &mut transport).unwrap();
+
+        assert!(matches!(decision, ProxyDecision::Block { .. }));
+        assert!(!receipt.allowed);
+        assert!(receipt
+            .denial_reason
+            .as_deref()
+            .unwrap_or_default()
+            .contains("sibling-sum budget"));
+        assert_eq!(transport.events_blocked, 1);
     }
 
     fn proxy_with_trusted_issuer(issuer: &Keypair) -> AgUiProxy {

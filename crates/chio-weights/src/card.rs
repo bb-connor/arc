@@ -201,7 +201,7 @@ impl ModelCard {
                 self.card_version
             )));
         }
-        if self.weights_hash.len() != 64 || !self.weights_hash.bytes().all(is_lowercase_hex_byte) {
+        if !is_lowercase_sha256_hex(&self.weights_hash) {
             return Err(WeightsError::SchemaRejected(format!(
                 "weights_hash must be 64 lowercase hex chars, got {:?}",
                 self.weights_hash
@@ -217,12 +217,8 @@ impl ModelCard {
                 "banned_tools entries must be non-empty strings".to_string(),
             ));
         }
-        if self.training_data_class.is_empty() {
-            return Err(WeightsError::MissingField("training_data_class"));
-        }
-        if self.issuer.is_empty() {
-            return Err(WeightsError::MissingField("issuer"));
-        }
+        validate_required_text_field(&self.training_data_class, "training_data_class")?;
+        validate_required_text_field(&self.issuer, "issuer")?;
         if self.expires_at < self.issued_at {
             return Err(WeightsError::SchemaRejected(format!(
                 "expires_at ({}) precedes issued_at ({})",
@@ -281,6 +277,23 @@ fn is_lowercase_hex_byte(b: u8) -> bool {
     matches!(b, b'0'..=b'9' | b'a'..=b'f')
 }
 
+#[inline]
+fn is_lowercase_sha256_hex(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(is_lowercase_hex_byte)
+}
+
+fn validate_required_text_field(value: &str, field: &'static str) -> Result<(), WeightsError> {
+    if value.trim().is_empty() {
+        return Err(WeightsError::MissingField(field));
+    }
+    if value.trim() != value {
+        return Err(WeightsError::SchemaRejected(format!(
+            "{field} must not contain surrounding whitespace"
+        )));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -331,6 +344,20 @@ mod tests {
     }
 
     #[test]
+    fn lowercase_sha256_hex_helper_accepts_only_exact_lowercase_digest() {
+        assert!(is_lowercase_sha256_hex(
+            "0000000000000000000000000000000000000000000000000000000000000001"
+        ));
+        assert!(!is_lowercase_sha256_hex(
+            "ABCDEF0000000000000000000000000000000000000000000000000000000001"
+        ));
+        assert!(!is_lowercase_sha256_hex("abcdef"));
+        assert!(!is_lowercase_sha256_hex(
+            "000000000000000000000000000000000000000000000000000000000000000g"
+        ));
+    }
+
+    #[test]
     fn validate_rejects_uppercase_weights_hash() {
         let issued = fixed_issued_at();
         let res = ModelCard::new(
@@ -373,6 +400,38 @@ mod tests {
             issued + chrono::Duration::days(1),
         );
         assert!(matches!(res, Err(WeightsError::MissingField(_))));
+    }
+
+    #[test]
+    fn validate_rejects_blank_or_padded_required_text_fields() {
+        let issued = fixed_issued_at();
+        let blank_training = ModelCard::new(
+            "0000000000000000000000000000000000000000000000000000000000000001",
+            StringSet::default(),
+            StringSet::default(),
+            " ",
+            "https://example.com/issuer",
+            issued,
+            issued + chrono::Duration::days(1),
+        );
+        assert!(matches!(
+            blank_training,
+            Err(WeightsError::MissingField("training_data_class"))
+        ));
+
+        let padded_issuer = ModelCard::new(
+            "0000000000000000000000000000000000000000000000000000000000000001",
+            StringSet::default(),
+            StringSet::default(),
+            "public-internet",
+            " https://example.com/issuer",
+            issued,
+            issued + chrono::Duration::days(1),
+        );
+        assert!(matches!(
+            padded_issuer,
+            Err(WeightsError::SchemaRejected(message)) if message.contains("issuer")
+        ));
     }
 
     #[test]

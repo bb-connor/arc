@@ -1008,6 +1008,71 @@ mod tests {
     // ---- JSON-RPC handler tests ----
 
     #[test]
+    fn jsonrpc_send_message_param_parser_infers_single_skill_and_labels_stream_errors() {
+        let edge = ChioA2aEdge::new(
+            A2aEdgeConfig::default(),
+            vec![{
+                let mut manifest = test_manifest();
+                manifest.tools.truncate(1);
+                manifest
+            }],
+        )
+        .test_unwrap();
+
+        let (skill_id, request) = edge
+            .parse_jsonrpc_send_message_params(
+                serde_json::to_value(text_message("hi")).test_unwrap(),
+                "SendMessage",
+            )
+            .test_unwrap();
+        assert_eq!(skill_id, "echo");
+        assert_eq!(request.message.role, "user");
+
+        let error = match edge.parse_jsonrpc_send_message_params(
+            json!({
+                "message": {
+                    "role": "user",
+                    "parts": "bad"
+                }
+            }),
+            "SendStreamingMessage",
+        ) {
+            Ok(_) => panic!("expected invalid request error"),
+            Err(error) => error,
+        };
+        let A2aEdgeError::InvalidRequest(message) = error else {
+            panic!("expected invalid request error");
+        };
+        assert!(message.contains("invalid SendStreamingMessage request:"));
+    }
+
+    #[test]
+    fn jsonrpc_send_message_param_parser_requires_skill_id_for_multiple_skills() {
+        let edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+
+        let error = match edge.parse_jsonrpc_send_message_params(
+            json!({
+                "message": {
+                    "role": "user",
+                    "parts": [{"type": "text", "text": "hi"}]
+                }
+            }),
+            "SendMessage",
+        ) {
+            Ok(_) => panic!("expected missing target skill error"),
+            Err(error) => error,
+        };
+        let A2aEdgeError::InvalidRequest(message) = error else {
+            panic!("expected invalid request error");
+        };
+        assert_eq!(
+            message,
+            "metadata.chio.targetSkillId is required when multiple skills are exposed"
+        );
+    }
+
+    #[test]
     fn jsonrpc_send_message_single_skill() {
         let mut edge = ChioA2aEdge::new(
             A2aEdgeConfig::default(),
@@ -1155,6 +1220,43 @@ mod tests {
             &execution,
         );
         assert_eq!(response["error"]["code"], -32601);
+    }
+
+    #[test]
+    fn jsonrpc_rejects_non_scalar_request_ids_before_method_dispatch() {
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let kernel_issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = A2aKernelExecutionContext {
+            capability: capability_for_tool(&kernel_issuer, &subject, "test-srv", "echo"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        for invalid_id in [json!(true), json!({"nested": 1}), json!([1])] {
+            let response = edge.handle_jsonrpc(
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": invalid_id,
+                    "method": "unknown/method",
+                    "params": {}
+                }),
+                &kernel,
+                &execution,
+            );
+
+            assert_eq!(response["id"], Value::Null);
+            assert_eq!(response["error"]["code"], -32600);
+            assert_eq!(
+                response["error"]["message"],
+                "request id must be string, number, or null"
+            );
+        }
     }
 
     #[test]

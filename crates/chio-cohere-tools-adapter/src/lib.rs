@@ -209,29 +209,9 @@ impl CohereAdapter {
         let tool_call_id = non_empty_str(tool_call_id, "tool_call_id")?;
         match verdict {
             VerdictResult::Allow { redactions, .. } => {
-                let value = parse_value(&result.0)?;
-                let value = apply_redactions(value, &redactions, "Cohere tool_result")?;
-                let canonical = canonical_json_bytes(&value).map_err(|error| {
-                    ProviderError::Malformed(format!(
-                        "Cohere tool_result canonical encoding failed: {error}"
-                    ))
-                })?;
-                let text = String::from_utf8(canonical).map_err(|error| {
-                    ProviderError::Malformed(format!(
-                        "Cohere tool_result canonical bytes were not UTF-8: {error}"
-                    ))
-                })?;
-                Ok(ToolResultMessage::new(tool_call_id, text))
+                lower_allow_tool_message(tool_call_id, result, &redactions)
             }
-            VerdictResult::Deny { reason, .. } => {
-                let payload = deny_payload(&reason);
-                let text = serde_json::to_string(&payload).map_err(|error| {
-                    ProviderError::Malformed(format!(
-                        "Cohere deny payload encoding failed: {error}"
-                    ))
-                })?;
-                Ok(ToolResultMessage::new(tool_call_id, text))
-            }
+            VerdictResult::Deny { reason, .. } => lower_deny_tool_message(tool_call_id, &reason),
         }
     }
 }
@@ -261,19 +241,29 @@ fn tool_calls(raw: ProviderRequest) -> Result<Vec<ToolCallBlock>, ProviderError>
     let value: Value = serde_json::from_slice(&raw.0).map_err(|error| {
         ProviderError::Malformed(format!("Cohere /v2/chat payload was not JSON: {error}"))
     })?;
-    let body = response_body(value);
+    let body = response_body(value)?;
     extract_tool_calls(&body)
 }
 
-fn response_body(value: Value) -> Value {
+fn response_body(value: Value) -> Result<Value, ProviderError> {
     for field in ["body", "response", "payload"] {
         if let Some(nested) = value.get(field) {
-            if let Some(obj) = nested.as_object() {
-                return Value::Object(obj.clone());
-            }
+            return nested_response_body(nested).ok_or_else(|| {
+                ProviderError::Malformed(format!(
+                    "Cohere /v2/chat envelope field `{field}` was not a JSON object or string body"
+                ))
+            });
         }
     }
-    value
+    Ok(value)
+}
+
+fn nested_response_body(value: &Value) -> Option<Value> {
+    match value {
+        Value::Object(_) => Some(value.clone()),
+        Value::String(body) => serde_json::from_str(body).ok(),
+        _ => None,
+    }
 }
 
 fn extract_tool_calls(body: &Value) -> Result<Vec<ToolCallBlock>, ProviderError> {
@@ -296,22 +286,14 @@ fn extract_tool_calls(body: &Value) -> Result<Vec<ToolCallBlock>, ProviderError>
 }
 
 fn validate_tool_call(call: &ToolCallBlock) -> Result<(), ProviderError> {
-    if call.id.trim().is_empty() {
-        return Err(ProviderError::Malformed(
-            "Cohere tool_call id was empty".to_string(),
-        ));
-    }
+    non_empty_str(&call.id, "tool_call id")?;
     if call.kind != "function" {
         return Err(ProviderError::Malformed(format!(
             "Cohere tool_call kind `{}` is not supported on the v2 surface",
             call.kind
         )));
     }
-    if call.function.name.trim().is_empty() {
-        return Err(ProviderError::Malformed(
-            "Cohere tool_call.function.name was empty".to_string(),
-        ));
-    }
+    non_empty_str(&call.function.name, "tool_call.function.name")?;
     Ok(())
 }
 
@@ -348,6 +330,41 @@ fn apply_redactions(
     Ok(value)
 }
 
+fn lower_allow_tool_message(
+    tool_call_id: &str,
+    result: ToolResult,
+    redactions: &[Redaction],
+) -> Result<ToolResultMessage, ProviderError> {
+    let value = parse_value(&result.0)?;
+    let value = apply_redactions(value, redactions, "Cohere tool_result")?;
+    let text = canonical_tool_result_text(&value)?;
+    Ok(ToolResultMessage::new(tool_call_id, text))
+}
+
+fn lower_deny_tool_message(
+    tool_call_id: &str,
+    reason: &DenyReason,
+) -> Result<ToolResultMessage, ProviderError> {
+    let payload = deny_payload(reason);
+    let text = serde_json::to_string(&payload).map_err(|error| {
+        ProviderError::Malformed(format!("Cohere deny payload encoding failed: {error}"))
+    })?;
+    Ok(ToolResultMessage::new(tool_call_id, text))
+}
+
+fn canonical_tool_result_text(value: &Value) -> Result<String, ProviderError> {
+    let canonical = canonical_json_bytes(value).map_err(|error| {
+        ProviderError::Malformed(format!(
+            "Cohere tool_result canonical encoding failed: {error}"
+        ))
+    })?;
+    String::from_utf8(canonical).map_err(|error| {
+        ProviderError::Malformed(format!(
+            "Cohere tool_result canonical bytes were not UTF-8: {error}"
+        ))
+    })
+}
+
 fn deny_payload(reason: &DenyReason) -> Value {
     let text = match reason {
         DenyReason::PolicyDeny { rule_id } => format!("policy_deny: {rule_id}"),
@@ -364,12 +381,16 @@ fn deny_payload(reason: &DenyReason) -> Value {
 fn non_empty_str<'a>(value: &'a str, field: &str) -> Result<&'a str, ProviderError> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
-        Err(ProviderError::Malformed(format!(
+        return Err(ProviderError::Malformed(format!(
             "Cohere {field} must not be empty"
-        )))
-    } else {
-        Ok(trimmed)
+        )));
     }
+    if trimmed != value {
+        return Err(ProviderError::Malformed(format!(
+            "Cohere {field} must not contain surrounding whitespace"
+        )));
+    }
+    Ok(value)
 }
 
 #[cfg(test)]
@@ -433,6 +454,61 @@ mod tests {
     }
 
     #[test]
+    fn lift_batch_rejects_malformed_envelope_before_outer_tool_calls() {
+        let cfg = config();
+        let adapter = CohereAdapter::new(cfg, Arc::new(transport::MockTransport::new()));
+        let payload = json!({
+            "body": 42,
+            "message": {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": "call_outer",
+                        "type": "function",
+                        "function": {
+                            "name": "get_weather",
+                            "arguments": "{\"city\":\"Paris\"}"
+                        }
+                    }
+                ]
+            }
+        });
+        let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
+        let err = adapter.lift_batch(raw).unwrap_err();
+
+        assert!(err.to_string().contains("envelope field `body`"));
+    }
+
+    #[test]
+    fn lift_batch_rejects_tool_call_name_with_surrounding_whitespace() {
+        let cfg = config();
+        let adapter = CohereAdapter::new(cfg, Arc::new(transport::MockTransport::new()));
+        let payload = json!({
+            "message": {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": "call_padded_name",
+                        "type": "function",
+                        "function": {
+                            "name": " get_weather ",
+                            "arguments": "{}"
+                        }
+                    }
+                ]
+            }
+        });
+        let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
+        let err = adapter
+            .lift_batch(raw)
+            .expect_err("whitespace-padded tool name must fail closed");
+
+        assert!(err
+            .to_string()
+            .contains("tool_call.function.name must not contain surrounding whitespace"));
+    }
+
+    #[test]
     fn lift_batch_rejects_payload_without_tool_calls() {
         let cfg = config();
         let adapter = CohereAdapter::new(cfg, Arc::new(transport::MockTransport::new()));
@@ -461,6 +537,26 @@ mod tests {
         assert_eq!(msg.tool_call_id, "call_1");
         assert_eq!(msg.content.len(), 1);
         assert!(msg.content[0].text.contains("\"temp\""));
+    }
+
+    #[test]
+    fn lower_allow_tool_message_helper_applies_redactions_and_canonicalizes() {
+        let message = lower_allow_tool_message(
+            "call_1",
+            ToolResult(br#"{"z":1,"token":"secret"}"#.to_vec()),
+            &[Redaction {
+                path: "/token".to_string(),
+                replacement: "[redacted]".to_string(),
+            }],
+        )
+        .unwrap();
+
+        assert_eq!(message.role, "tool");
+        assert_eq!(message.tool_call_id, "call_1");
+        assert_eq!(
+            message.content[0].text,
+            "{\"token\":\"[redacted]\",\"z\":1}"
+        );
     }
 
     #[test]

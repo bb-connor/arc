@@ -279,6 +279,12 @@ fn walk_schema_files(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
         let file_type = entry
             .file_type()
             .map_err(|err| CodegenError::Io(path.clone(), err))?;
+        if file_type.is_symlink() {
+            return Err(CodegenError::SchemaRef(
+                path,
+                "refusing symlink in schema tree".to_string(),
+            ));
+        }
         if file_type.is_dir() {
             walk_schema_files(&path, out)?;
         } else if file_type.is_file() && is_schema_json(&path) {
@@ -623,6 +629,15 @@ pub(crate) fn write_if_changed(path: &Path, bytes: &[u8]) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_dir(prefix: &str) -> Result<PathBuf> {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|err| CodegenError::Io(PathBuf::from(prefix), std::io::Error::other(err)))?
+            .as_nanos();
+        Ok(std::env::temp_dir().join(format!("{prefix}-{nanos}")))
+    }
 
     #[test]
     fn header_is_non_empty() {
@@ -645,6 +660,35 @@ mod tests {
             Err(other) => panic!("expected SchemasDirMissing, got {other}"),
             Ok(_) => panic!("expected error, got Ok"),
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn walk_schema_files_rejects_symlinked_schema_file() -> Result<()> {
+        let dir = unique_temp_dir("chio-spec-codegen-schemas")?;
+        let outside = unique_temp_dir("chio-spec-codegen-outside")?;
+        fs::create_dir_all(&dir).map_err(|err| CodegenError::Io(dir.clone(), err))?;
+        fs::create_dir_all(&outside).map_err(|err| CodegenError::Io(outside.clone(), err))?;
+        fs::write(outside.join("escape.schema.json"), "{}")
+            .map_err(|err| CodegenError::Io(outside.join("escape.schema.json"), err))?;
+        let link_path = dir.join("escape.schema.json");
+        std::os::unix::fs::symlink(outside.join("escape.schema.json"), &link_path)
+            .map_err(|err| CodegenError::Io(link_path.clone(), err))?;
+
+        let mut files = Vec::new();
+        let result = walk_schema_files(&dir, &mut files);
+
+        let _ = fs::remove_dir_all(dir);
+        let _ = fs::remove_dir_all(outside);
+        match result {
+            Err(CodegenError::SchemaRef(path, message)) => {
+                assert!(path.ends_with("escape.schema.json"));
+                assert!(message.contains("symlink"));
+            }
+            Err(error) => panic!("expected SchemaRef symlink error, got {error}"),
+            Ok(paths) => panic!("symlinked schema should fail closed: {paths:?}"),
+        }
+        Ok(())
     }
 
     #[test]

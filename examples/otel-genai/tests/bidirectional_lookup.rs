@@ -45,7 +45,7 @@ impl ReceiptStore for MemoryReceiptStore {
 #[test]
 #[ignore = "local demo gate: run with --ignored to validate receipt and span lookup"]
 fn receipt_id_and_span_id_lookup_is_bidirectional() -> Result<(), Box<dyn Error>> {
-    let receipt_id = "rcpt-otel-genai-0001";
+    let source_receipt_id = "rcpt-otel-genai-0001";
     let trace_id = "4bf92f3577b34da6a3ce929d0e0e4736";
     let span_id = "00f067aa0ba902b7";
     let store = Arc::new(MemoryReceiptStore::default());
@@ -68,7 +68,7 @@ fn receipt_id_and_span_id_lookup_is_bidirectional() -> Result<(), Box<dyn Error>
         .with_attribute("gen_ai.tool.name", serde_json::json!("customer_lookup"))
         .with_attribute("gen_ai.usage.input_tokens", serde_json::json!(42))
         .with_attribute("gen_ai.usage.output_tokens", serde_json::json!(7))
-        .with_attribute("chio.receipt.id", serde_json::json!(receipt_id))
+        .with_attribute("chio.receipt.id", serde_json::json!(source_receipt_id))
         .with_attribute("chio.tenant.id", serde_json::json!("tenant-demo"))
         .with_attribute("chio.policy.ref", serde_json::json!("policy-demo-otel"))
         .with_attribute("chio.verdict", serde_json::json!("allow"))
@@ -91,7 +91,9 @@ fn receipt_id_and_span_id_lookup_is_bidirectional() -> Result<(), Box<dyn Error>
     let receipt = receipts
         .first()
         .ok_or_else(|| std::io::Error::other("missing exported receipt"))?;
-    assert_eq!(receipt.id, receipt_id);
+    assert_eq!(receipt.id.len(), 64);
+    assert!(receipt.id.chars().all(|value| value.is_ascii_hexdigit()));
+    assert_ne!(receipt.id, source_receipt_id);
     assert_eq!(receipt.tool_server, "srv-openai-demo");
     assert_eq!(receipt.tool_name, "customer_lookup");
     assert!(receipt.verify_signature()?);
@@ -102,6 +104,10 @@ fn receipt_id_and_span_id_lookup_is_bidirectional() -> Result<(), Box<dyn Error>
         .ok_or_else(|| std::io::Error::other("missing receipt metadata"))?;
     assert_eq!(metadata["provenance"]["otel"]["trace_id"], trace_id);
     assert_eq!(metadata["provenance"]["otel"]["span_id"], span_id);
+    assert_eq!(
+        metadata["correlation"]["source_chio_receipt_id"],
+        source_receipt_id
+    );
     assert_eq!(metadata["otel"]["attributes"]["gen_ai.system"], "openai");
     assert_eq!(
         metadata["otel"]["attributes"]["redaction_pass_id"],
@@ -114,9 +120,10 @@ fn receipt_id_and_span_id_lookup_is_bidirectional() -> Result<(), Box<dyn Error>
         .get("chio.receipt.id")
         .is_none());
 
+    let signed_receipt_id = receipt.id.clone();
     let mut receipt_to_span = BTreeMap::new();
     receipt_to_span.insert(
-        receipt.id.clone(),
+        signed_receipt_id.clone(),
         metadata["provenance"]["otel"]["span_id"]
             .as_str()
             .ok_or_else(|| std::io::Error::other("span id is not a string"))?
@@ -128,16 +135,18 @@ fn receipt_id_and_span_id_lookup_is_bidirectional() -> Result<(), Box<dyn Error>
             .as_str()
             .ok_or_else(|| std::io::Error::other("span id is not a string"))?
             .to_string(),
-        receipt.id.clone(),
+        signed_receipt_id.clone(),
     );
 
     assert_eq!(
-        receipt_to_span.get(receipt_id).map(String::as_str),
+        receipt_to_span
+            .get(signed_receipt_id.as_str())
+            .map(String::as_str),
         Some(span_id)
     );
     assert_eq!(
         span_to_receipt.get(span_id).map(String::as_str),
-        Some(receipt_id)
+        Some(signed_receipt_id.as_str())
     );
 
     Ok(())

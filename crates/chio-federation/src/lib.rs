@@ -1342,17 +1342,16 @@ fn validate_positive_money(
 
 fn validate_hex_digest(value: &str, field: &'static str) -> Result<(), FederationContractError> {
     ensure_non_empty(value, field)?;
-    let trimmed = value.trim();
-    if trimmed.len() != 64
-        || !trimmed
-            .chars()
-            .all(|character| character.is_ascii_hexdigit())
-    {
+    if !is_hex_digest_64(value) {
         return Err(FederationContractError::InvalidReference(format!(
             "{field} must be a 64-character lowercase-compatible hex digest"
         )));
     }
     Ok(())
+}
+
+fn is_hex_digest_64(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn ensure_non_empty(value: &str, field: &'static str) -> Result<(), FederationContractError> {
@@ -1418,6 +1417,23 @@ mod tests {
 
     fn hex(seed: char) -> String {
         std::iter::repeat_n(seed, 64).collect()
+    }
+
+    #[test]
+    fn hex_digest_helper_preserves_exact_uppercase_compatible_digest_contract() {
+        assert!(is_hex_digest_64(&"a".repeat(64)));
+        assert!(is_hex_digest_64(&"A".repeat(64)));
+        assert!(!is_hex_digest_64(&"a".repeat(63)));
+        assert!(!is_hex_digest_64(&format!("{}g", "a".repeat(63))));
+    }
+
+    #[test]
+    fn hex_digest_validation_rejects_padded_digest() {
+        let padded = format!(" {} ", hex('a'));
+        assert!(matches!(
+            validate_hex_digest(&padded, "digest"),
+            Err(FederationContractError::InvalidReference(_))
+        ));
     }
 
     fn sample_reference(

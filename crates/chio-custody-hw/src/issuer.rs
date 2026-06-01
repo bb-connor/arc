@@ -222,6 +222,14 @@ impl IssuerService {
             return Err(CustodyError::UserVerificationRequired);
         }
 
+        if verified.credential_id_b64.trim().is_empty()
+            || verified.credential_id_b64.trim() != verified.credential_id_b64
+        {
+            return Err(CustodyError::AssertionRejected(
+                "verified credential id must be non-empty without surrounding whitespace".into(),
+            ));
+        }
+
         // Rate limiting. The cheapest abuse gate runs first so a flood is
         // shed before the oracle, nonce store, or signer are touched. A
         // limited subject (or a lock/clock fault inside the limiter)
@@ -230,9 +238,9 @@ impl IssuerService {
             match limiter.check_and_record(&verified.credential_id_b64, now)? {
                 RateLimitOutcome::Allowed => {}
                 RateLimitOutcome::Limited => {
-                    return Err(CustodyError::RateLimited {
-                        subject: verified.credential_id_b64.clone(),
-                    });
+                    return Err(CustodyError::rate_limited(
+                        verified.credential_id_b64.clone(),
+                    ));
                 }
             }
         }
@@ -342,6 +350,25 @@ mod tests {
             "issued capability MUST be signed; the issuer never emits an unsigned artifact"
         );
         assert_eq!(resp.capability.credential_id, "AAAA");
+    }
+
+    #[test]
+    fn mint_rejects_blank_verified_credential_id() {
+        let svc = issuer("urn:chio:audience:kernel", 1);
+        let req = MintRequest {
+            audience: "urn:chio:audience:kernel".into(),
+            scope_set: ScopeSet::new(["tool:read"]),
+            challenge_nonce: "n".into(),
+        };
+        let mut assertion = verified();
+        assertion.credential_id_b64 = " ".into();
+
+        let res = svc.mint_capability(&assertion, &req, fixed_now());
+
+        assert!(matches!(
+            res,
+            Err(CustodyError::AssertionRejected(message)) if message.contains("credential")
+        ));
     }
 
     #[test]

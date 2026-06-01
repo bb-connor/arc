@@ -222,15 +222,20 @@ impl HttpEgressContract {
     fn enforce_host_class(&self, host: &Host<&str>) -> Result<(), HttpEgressError> {
         match host {
             Host::Domain(domain) => {
-                let normalized = domain.trim_end_matches('.').to_ascii_lowercase();
-                if self.deny_loopback
-                    && matches!(normalized.as_str(), "localhost" | "localhost.localdomain")
-                {
-                    return Err(HttpEgressError::LoopbackDenied { host: normalized });
-                }
+                let normalized = normalize_domain_name(domain);
+                self.enforce_loopback_hostname(&normalized)?;
             }
             Host::Ipv4(address) => self.enforce_ipv4_class(*address)?,
             Host::Ipv6(address) => self.enforce_ipv6_class(*address)?,
+        }
+        Ok(())
+    }
+
+    fn enforce_loopback_hostname(&self, normalized: &str) -> Result<(), HttpEgressError> {
+        if self.deny_loopback && matches!(normalized, "localhost" | "localhost.localdomain") {
+            return Err(HttpEgressError::LoopbackDenied {
+                host: normalized.to_string(),
+            });
         }
         Ok(())
     }
@@ -339,12 +344,8 @@ impl HttpEgressContract {
         let Some(Host::Domain(domain)) = url.host() else {
             return Ok(());
         };
-        let normalized = domain.trim_end_matches('.').to_ascii_lowercase();
-        if self.deny_loopback
-            && matches!(normalized.as_str(), "localhost" | "localhost.localdomain")
-        {
-            return Err(HttpEgressError::LoopbackDenied { host: normalized });
-        }
+        let normalized = normalize_domain_name(domain);
+        self.enforce_loopback_hostname(&normalized)?;
         let port = url.port_or_known_default().ok_or_else(|| {
             HttpEgressError::InvalidUrl(format!(
                 "egress URL {url} has no explicit port or known default port"
@@ -388,17 +389,14 @@ impl HttpEgressContract {
         Ok(false)
     }
 
+    #[cfg(feature = "reqwest-egress")]
     fn enforce_resolver_hostname(&self, host: &str) -> Result<(), HttpEgressError> {
         self.validate_dispatchable_with_pinned_dns()?;
         let normalized = normalize_domain_name(host);
         if normalized.is_empty() {
             return Err(HttpEgressError::MissingAuthority);
         }
-        if self.deny_loopback
-            && matches!(normalized.as_str(), "localhost" | "localhost.localdomain")
-        {
-            return Err(HttpEgressError::LoopbackDenied { host: normalized });
-        }
+        self.enforce_loopback_hostname(&normalized)?;
         for authority in &self.allowed_authority_set {
             if normalized_authority_host(authority)? == normalized {
                 return Ok(());
@@ -432,6 +430,37 @@ mod tests {
             max_redirect_chain: 3,
             max_response_bytes: 1024,
         }
+    }
+
+    #[test]
+    fn loopback_hostname_policy_respects_contract_flag() {
+        let contract = HttpEgressContract::permissive_for_tests("localhost:80");
+        contract
+            .enforce_loopback_hostname("localhost")
+            .expect("loopback hostname remains allowed when loopback denial is disabled");
+
+        let mut denied = contract;
+        denied.deny_loopback = true;
+        let error = denied
+            .enforce_loopback_hostname("localhost.localdomain")
+            .expect_err("known loopback hostname should be denied when flag is enabled");
+        assert!(matches!(
+            error,
+            HttpEgressError::LoopbackDenied { host } if host == "localhost.localdomain"
+        ));
+        denied
+            .enforce_loopback_hostname("api.example.com")
+            .expect("non-loopback hostname remains allowed");
+    }
+
+    #[test]
+    fn validate_rejects_allowed_authority_with_empty_port() {
+        let error = strict_contract("api.example.com:")
+            .validate()
+            .expect_err("empty authority port must fail contract validation");
+
+        assert!(matches!(error, HttpEgressError::InvalidContract(_)));
+        assert!(error.to_string().contains("invalid allowed authority"));
     }
 
     #[test]
@@ -928,11 +957,13 @@ fn validate_authority_token(authority: &str) -> Result<(), HttpEgressError> {
         || authority.contains('@')
         || authority != authority.trim()
         || authority != authority.to_ascii_lowercase()
+        || authority.ends_with(':')
     {
         return Err(HttpEgressError::InvalidContract(format!(
             "invalid allowed authority {authority:?}"
         )));
     }
+    validate_dispatchable_authority(authority)?;
     Ok(())
 }
 

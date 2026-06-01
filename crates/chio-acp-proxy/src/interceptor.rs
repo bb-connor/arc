@@ -256,15 +256,31 @@ impl MessageInterceptor {
 
     // -- private handlers --
 
-    fn intercept_fs_read(&self, message: &Value) -> Result<InterceptResult, AcpProxyError> {
-        let params = message
+    fn jsonrpc_params<'a>(
+        message: &'a Value,
+        method_name: &str,
+    ) -> Result<&'a Value, AcpProxyError> {
+        message
             .get("params")
-            .ok_or_else(|| AcpProxyError::Protocol("missing params in fs/read_text_file".into()))?;
+            .ok_or_else(|| AcpProxyError::Protocol(format!("missing params in {method_name}")))
+    }
+
+    fn decode_jsonrpc_params<T>(
+        params: &Value,
+        method_name: &str,
+    ) -> Result<T, AcpProxyError>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        serde_json::from_value(params.clone())
+            .map_err(|e| AcpProxyError::Protocol(format!("invalid {method_name} params: {e}")))
+    }
+
+    fn intercept_fs_read(&self, message: &Value) -> Result<InterceptResult, AcpProxyError> {
+        let params = Self::jsonrpc_params(message, "fs/read_text_file")?;
 
         let read_params: ReadTextFileParams =
-            serde_json::from_value(params.clone()).map_err(|e| {
-                AcpProxyError::Protocol(format!("invalid fs/read_text_file params: {e}"))
-            })?;
+            Self::decode_jsonrpc_params(params, "fs/read_text_file")?;
         let authorization_parameter_hash = authorization_parameter_hash(params)?;
 
         let capability_context = match self.check_capability_gate(
@@ -311,14 +327,10 @@ impl MessageInterceptor {
     }
 
     fn intercept_fs_write(&self, message: &Value) -> Result<InterceptResult, AcpProxyError> {
-        let params = message.get("params").ok_or_else(|| {
-            AcpProxyError::Protocol("missing params in fs/write_text_file".into())
-        })?;
+        let params = Self::jsonrpc_params(message, "fs/write_text_file")?;
 
         let write_params: WriteTextFileParams =
-            serde_json::from_value(params.clone()).map_err(|e| {
-                AcpProxyError::Protocol(format!("invalid fs/write_text_file params: {e}"))
-            })?;
+            Self::decode_jsonrpc_params(params, "fs/write_text_file")?;
         let authorization_parameter_hash = authorization_parameter_hash(params)?;
 
         let capability_context = match self.check_capability_gate(
@@ -365,12 +377,10 @@ impl MessageInterceptor {
     }
 
     fn intercept_terminal_create(&self, message: &Value) -> Result<InterceptResult, AcpProxyError> {
-        let params = message
-            .get("params")
-            .ok_or_else(|| AcpProxyError::Protocol("missing params in terminal/create".into()))?;
+        let params = Self::jsonrpc_params(message, "terminal/create")?;
 
-        let term_params: CreateTerminalParams = serde_json::from_value(params.clone())
-            .map_err(|e| AcpProxyError::Protocol(format!("invalid terminal/create params: {e}")))?;
+        let term_params: CreateTerminalParams =
+            Self::decode_jsonrpc_params(params, "terminal/create")?;
         let authorization_parameter_hash = authorization_parameter_hash(params)?;
 
         let capability_context = match self.check_capability_gate(
@@ -430,23 +440,17 @@ impl MessageInterceptor {
         op: TerminalLifecycleOp,
     ) -> Result<InterceptResult, AcpProxyError> {
         let method_name = op.method_name();
-        let params = message
-            .get("params")
-            .ok_or_else(|| AcpProxyError::Protocol(format!("missing params in {method_name}")))?;
+        let params = Self::jsonrpc_params(message, method_name)?;
 
         let (session_id, terminal_id) = match op {
             TerminalLifecycleOp::Kill => {
                 let parsed: KillTerminalParams =
-                    serde_json::from_value(params.clone()).map_err(|e| {
-                        AcpProxyError::Protocol(format!("invalid {method_name} params: {e}"))
-                    })?;
+                    Self::decode_jsonrpc_params(params, method_name)?;
                 (parsed.session_id, parsed.terminal_id)
             }
             TerminalLifecycleOp::Release => {
                 let parsed: ReleaseTerminalParams =
-                    serde_json::from_value(params.clone()).map_err(|e| {
-                        AcpProxyError::Protocol(format!("invalid {method_name} params: {e}"))
-                    })?;
+                    Self::decode_jsonrpc_params(params, method_name)?;
                 (parsed.session_id, parsed.terminal_id)
             }
         };

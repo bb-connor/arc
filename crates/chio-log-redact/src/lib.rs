@@ -186,8 +186,10 @@ where
         let metadata = event.metadata();
         let mut visitor = RedactingVisitor::new(self.classes);
         event.record(&mut visitor);
+        let target = redact_text_with_classes(metadata.target(), self.classes)
+            .unwrap_or_else(|_| REDACTION_FAILED_PLACEHOLDER.to_string());
         self.sink.record(RedactedEvent {
-            target: metadata.target().to_string(),
+            target,
             level: *metadata.level(),
             fields: visitor.fields,
         });
@@ -237,6 +239,10 @@ impl Visit for RedactingVisitor {
     fn record_bool(&mut self, field: &Field, value: bool) {
         self.push_value(field, value.to_string());
     }
+
+    fn record_bytes(&mut self, field: &Field, value: &[u8]) {
+        self.push_value(field, String::from_utf8_lossy(value).into_owned());
+    }
 }
 
 #[cfg(test)]
@@ -278,6 +284,50 @@ mod tests {
         assert!(payload.value.contains("[REDACTED-SSN]"));
         assert!(!payload.value.contains("jane@example.com"));
         assert!(!payload.value.contains("123-45-6789"));
+        Ok(())
+    }
+
+    #[test]
+    fn redaction_layer_redacts_utf8_byte_fields() -> Result<(), String> {
+        let sink = MemoryRedactionSink::default();
+        let layer = RedactionLayer::new(sink.clone()).map_err(|error| error.to_string())?;
+        let subscriber = tracing_subscriber::registry().with(layer);
+        let bytes = b"Patient jane@example.com SSN 123-45-6789";
+
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::warn!(payload = bytes.as_slice(), "dispatch failed");
+        });
+
+        let events = sink.events();
+        assert_eq!(events.len(), 1);
+        let event = &events[0];
+        let payload = event
+            .fields
+            .iter()
+            .find(|field| field.name == "payload")
+            .ok_or_else(|| "missing payload field".to_string())?;
+        assert!(payload.value.contains("[REDACTED-EMAIL]"));
+        assert!(payload.value.contains("[REDACTED-SSN]"));
+        assert!(!payload.value.contains("jane@example.com"));
+        assert!(!payload.value.contains("123-45-6789"));
+        Ok(())
+    }
+
+    #[test]
+    fn redaction_layer_redacts_event_target() -> Result<(), String> {
+        let sink = MemoryRedactionSink::default();
+        let layer = RedactionLayer::new(sink.clone()).map_err(|error| error.to_string())?;
+        let subscriber = tracing_subscriber::registry().with(layer);
+
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::warn!(target: "patient.jane@example.com", payload = "safe", "dispatch failed");
+        });
+
+        let events = sink.events();
+        assert_eq!(events.len(), 1);
+        let event = &events[0];
+        assert!(event.target.contains("[REDACTED-EMAIL]"));
+        assert!(!event.target.contains("jane@example.com"));
         Ok(())
     }
 }

@@ -453,6 +453,29 @@ pub fn is_registered_metric(name: &str) -> bool {
 }
 
 #[must_use]
+pub fn is_prometheus_metric_name(name: &str) -> bool {
+    let mut bytes = name.bytes();
+    let Some(first) = bytes.next() else {
+        return false;
+    };
+    (first.is_ascii_alphabetic() || matches!(first, b'_' | b':'))
+        && bytes.all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b':'))
+}
+
+#[must_use]
+pub fn is_prometheus_label_name(name: &str) -> bool {
+    if name.starts_with("__") {
+        return false;
+    }
+    let mut bytes = name.bytes();
+    let Some(first) = bytes.next() else {
+        return false;
+    };
+    (first.is_ascii_alphabetic() || first == b'_')
+        && bytes.all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+}
+
+#[must_use]
 pub fn registry_snapshot() -> String {
     let mut output = String::new();
     for descriptor in REGISTRY {
@@ -500,6 +523,30 @@ mod tests {
             );
             previous = descriptor.name;
         }
+    }
+
+    #[test]
+    fn registry_metric_and_label_names_are_prometheus_safe() {
+        for descriptor in REGISTRY {
+            assert!(
+                is_prometheus_metric_name(descriptor.name),
+                "invalid metric name {}",
+                descriptor.name
+            );
+            for label in descriptor.labels {
+                assert!(
+                    is_prometheus_label_name(label),
+                    "invalid label name {label} on {}",
+                    descriptor.name
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn prometheus_label_names_reject_reserved_internal_prefix() {
+        assert!(!is_prometheus_label_name("__name__"));
+        assert!(!is_prometheus_label_name("__tenant_id"));
     }
 
     #[test]

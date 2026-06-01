@@ -299,19 +299,7 @@ impl McpAdapter {
             self.transport
                 .call_tool_with_nested_flow(tool_name, arguments, nested_flow_bridge)?;
 
-        let mut output = serde_json::Map::new();
-        output.insert(
-            "content".to_string(),
-            serde_json::Value::Array(result.content),
-        );
-        if let Some(structured_content) = result.structured_content {
-            output.insert("structuredContent".to_string(), structured_content);
-        }
-        if let Some(is_error) = result.is_error {
-            output.insert("isError".to_string(), serde_json::Value::Bool(is_error));
-        }
-
-        Ok(serde_json::Value::Object(output))
+        Ok(mcp_tool_result_to_chio_value(result))
     }
 
     pub fn list_resources(&self) -> Result<Vec<ResourceDefinition>, AdapterError> {
@@ -499,6 +487,22 @@ impl PromptProvider for AdaptedMcpPromptProvider {
             .complete_prompt_argument(name, argument_name, value, context)
             .map_err(|error| KernelError::ToolServerError(error.to_string()))
     }
+}
+
+fn mcp_tool_result_to_chio_value(result: McpToolResult) -> serde_json::Value {
+    let mut output = serde_json::Map::new();
+    output.insert(
+        "content".to_string(),
+        serde_json::Value::Array(result.content),
+    );
+    if let Some(structured_content) = result.structured_content {
+        output.insert("structuredContent".to_string(), structured_content);
+    }
+    if let Some(is_error) = result.is_error {
+        output.insert("isError".to_string(), serde_json::Value::Bool(is_error));
+    }
+
+    serde_json::Value::Object(output)
 }
 
 fn map_tool_invocation_error(error: AdapterError) -> KernelError {
@@ -762,6 +766,38 @@ mod tests {
             structured_content: None,
             is_error: Some(false),
         }
+    }
+
+    #[test]
+    fn mcp_tool_result_to_chio_value_preserves_content_and_optional_fields() {
+        let result = McpToolResult {
+            content: vec![serde_json::json!({"type": "text", "text": "hello"})],
+            structured_content: Some(serde_json::json!({"answer": 42})),
+            is_error: Some(true),
+        };
+
+        let output = mcp_tool_result_to_chio_value(result);
+
+        assert_eq!(output["content"][0]["text"], "hello");
+        assert_eq!(output["structuredContent"]["answer"], 42);
+        assert_eq!(output["isError"], true);
+    }
+
+    #[test]
+    fn mcp_tool_result_to_chio_value_omits_absent_optional_fields() {
+        let output = mcp_tool_result_to_chio_value(success_result("ok"));
+
+        assert_eq!(output["content"][0]["text"], "ok");
+        assert!(output.get("structuredContent").is_none());
+        assert_eq!(output["isError"], false);
+
+        let output = mcp_tool_result_to_chio_value(McpToolResult {
+            content: vec![],
+            structured_content: None,
+            is_error: None,
+        });
+        assert!(output.get("isError").is_none());
+        assert!(output.get("structuredContent").is_none());
     }
 
     // ---- Manifest generation tests ----

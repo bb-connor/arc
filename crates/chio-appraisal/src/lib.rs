@@ -874,6 +874,12 @@ mod tests {
                 .to_string()
                 .contains("issuer must not be empty")
         );
+        assert!(
+            RuntimeAttestationAppraisalResult::from_report(" did:chio:test:issuer", &report)
+                .test_expect_err("spaced issuer")
+                .to_string()
+                .contains("issuer must not contain surrounding whitespace")
+        );
 
         let mut missing_artifact_report = report.clone();
         missing_artifact_report.appraisal.artifact = None;

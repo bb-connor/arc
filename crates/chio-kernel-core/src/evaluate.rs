@@ -33,9 +33,10 @@
 //! tool dispatch stay outside this module and outside the present proof claim.
 
 use alloc::string::{String, ToString};
-use alloc::vec::Vec;
 
-use chio_core_types::capability::{CapabilityCryptoFloor, CapabilityNegotiation, CapabilityToken};
+use chio_core_types::capability::{
+    CapabilityCryptoFloor, CapabilityNegotiation, CapabilityToken, ChioScope,
+};
 use chio_core_types::crypto::PublicKey;
 
 use crate::budget_split::{BudgetRegistry, NoopBudgetRegistry};
@@ -46,7 +47,7 @@ use crate::capability_verify::{
 use crate::clock::Clock;
 use crate::guard::{Guard, GuardContext, PortableToolCallRequest};
 use crate::normalized::{NormalizationError, NormalizedEvaluationVerdict};
-use crate::scope::{resolve_matching_grants, MatchedGrant};
+use crate::scope::resolve_matching_grants;
 use crate::Verdict;
 
 /// Inputs to [`evaluate`]. Grouped into a struct so the call site stays
@@ -203,6 +204,36 @@ impl KernelCoreError {
     }
 }
 
+fn out_of_scope_error(request: &PortableToolCallRequest) -> KernelCoreError {
+    KernelCoreError::OutOfScope {
+        tool: request.tool_name.clone(),
+        server: request.server_id.clone(),
+    }
+}
+
+fn resolve_matched_grant_index(
+    scope: &ChioScope,
+    request: &PortableToolCallRequest,
+) -> Result<usize, KernelCoreError> {
+    let matches = match resolve_matching_grants(
+        scope,
+        &request.tool_name,
+        &request.server_id,
+        &request.arguments,
+    ) {
+        Ok(matches) => matches,
+        Err(crate::ScopeMatchError::OutOfScope) => return Err(out_of_scope_error(request)),
+        Err(crate::ScopeMatchError::ConstraintError(reason)) => {
+            return Err(KernelCoreError::ConstraintError { reason });
+        }
+    };
+
+    matches
+        .first()
+        .map(|matched| matched.index)
+        .ok_or_else(|| out_of_scope_error(request))
+}
+
 /// Primary entry point for the portable kernel core.
 ///
 /// Performs in order:
@@ -283,37 +314,10 @@ pub fn evaluate_with_crypto_floor_and_budgets(
     }
 
     // Step 3: scope match.
-    let matches: Vec<MatchedGrant<'_>> = match resolve_matching_grants(
-        &verified.scope,
-        &input.request.tool_name,
-        &input.request.server_id,
-        &input.request.arguments,
-    ) {
-        Ok(matches) if matches.is_empty() => {
-            let core_err = KernelCoreError::OutOfScope {
-                tool: input.request.tool_name.clone(),
-                server: input.request.server_id.clone(),
-            };
-            return deny(core_err, None, Some(verified));
-        }
-        Ok(matches) => matches,
-        Err(crate::ScopeMatchError::OutOfScope) => {
-            let core_err = KernelCoreError::OutOfScope {
-                tool: input.request.tool_name.clone(),
-                server: input.request.server_id.clone(),
-            };
-            return deny(core_err, None, Some(verified));
-        }
-        Err(crate::ScopeMatchError::ConstraintError(reason)) => {
-            return deny(
-                KernelCoreError::ConstraintError { reason },
-                None,
-                Some(verified),
-            );
-        }
+    let matched_grant_index = match resolve_matched_grant_index(&verified.scope, input.request) {
+        Ok(index) => index,
+        Err(error) => return deny(error, None, Some(verified)),
     };
-    // Safe: guarded above.
-    let matched_grant_index = matches[0].index;
 
     // Step 4: guard pipeline.
     let ctx = GuardContext {
@@ -407,37 +411,10 @@ pub fn evaluate_with_full_floor(
     }
 
     // Step 3: scope match.
-    let matches: Vec<MatchedGrant<'_>> = match resolve_matching_grants(
-        &verified.scope,
-        &input.request.tool_name,
-        &input.request.server_id,
-        &input.request.arguments,
-    ) {
-        Ok(matches) if matches.is_empty() => {
-            let core_err = KernelCoreError::OutOfScope {
-                tool: input.request.tool_name.clone(),
-                server: input.request.server_id.clone(),
-            };
-            return deny(core_err, None, Some(verified));
-        }
-        Ok(matches) => matches,
-        Err(crate::ScopeMatchError::OutOfScope) => {
-            let core_err = KernelCoreError::OutOfScope {
-                tool: input.request.tool_name.clone(),
-                server: input.request.server_id.clone(),
-            };
-            return deny(core_err, None, Some(verified));
-        }
-        Err(crate::ScopeMatchError::ConstraintError(reason)) => {
-            return deny(
-                KernelCoreError::ConstraintError { reason },
-                None,
-                Some(verified),
-            );
-        }
+    let matched_grant_index = match resolve_matched_grant_index(&verified.scope, input.request) {
+        Ok(index) => index,
+        Err(error) => return deny(error, None, Some(verified)),
     };
-    // Safe: guarded above.
-    let matched_grant_index = matches[0].index;
 
     // Step 4: guard pipeline.
     let ctx = GuardContext {
@@ -503,5 +480,67 @@ fn deny(
         reason: Some(error.deny_reason()),
         matched_grant_index,
         verified,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec;
+    use chio_core_types::capability::{ChioScope, Operation, ToolGrant};
+
+    fn grant(server_id: &str, tool_name: &str) -> ToolGrant {
+        ToolGrant {
+            server_id: server_id.to_string(),
+            tool_name: tool_name.to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: vec![],
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        }
+    }
+
+    fn request() -> PortableToolCallRequest {
+        PortableToolCallRequest {
+            request_id: "req-1".to_string(),
+            tool_name: "echo".to_string(),
+            server_id: "srv-a".to_string(),
+            agent_id: "agent-1".to_string(),
+            arguments: serde_json::json!({"msg":"hello"}),
+        }
+    }
+
+    #[test]
+    fn resolve_matched_grant_index_uses_scope_specificity_order() {
+        let scope = ChioScope {
+            grants: vec![grant("*", "*"), grant("srv-a", "echo")],
+            resource_grants: vec![],
+            prompt_grants: vec![],
+        };
+
+        let matched_index = resolve_matched_grant_index(&scope, &request());
+
+        assert_eq!(matched_index, Ok(1));
+    }
+
+    #[test]
+    fn resolve_matched_grant_index_maps_missing_grant_to_request_identity() {
+        let scope = ChioScope {
+            grants: vec![grant("srv-b", "echo")],
+            resource_grants: vec![],
+            prompt_grants: vec![],
+        };
+
+        let error = resolve_matched_grant_index(&scope, &request());
+
+        assert_eq!(
+            error,
+            Err(KernelCoreError::OutOfScope {
+                tool: "echo".to_string(),
+                server: "srv-a".to_string(),
+            })
+        );
     }
 }

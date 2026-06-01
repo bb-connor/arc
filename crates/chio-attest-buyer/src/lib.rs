@@ -531,21 +531,15 @@ fn chio_attest_buyer_code(code: &str) -> String {
 pub fn buyer_attestation_packet_from_json(
     json: &str,
 ) -> Result<BuyerAttestationPacket, BuyerAttestationError> {
-    serde_json::from_str::<BuyerAttestationPacket>(json).map_err(|error| {
-        BuyerAttestationError::from_historical(HistoricalBuyerError::Json(format!(
-            "Chio buyer attestation packet JSON: {error}"
-        )))
-    })
+    serde_json::from_str::<BuyerAttestationPacket>(json)
+        .map_err(|error| json_error("Chio buyer attestation packet JSON", error))
 }
 
 pub fn buyer_attestation_review_package_from_json(
     json: &str,
 ) -> Result<BuyerAttestationReviewPackage, BuyerAttestationError> {
-    serde_json::from_str::<BuyerAttestationReviewPackage>(json).map_err(|error| {
-        BuyerAttestationError::from_historical(HistoricalBuyerError::Json(format!(
-            "Chio buyer attestation review package JSON: {error}"
-        )))
-    })
+    serde_json::from_str::<BuyerAttestationReviewPackage>(json)
+        .map_err(|error| json_error("Chio buyer attestation review package JSON", error))
 }
 
 pub fn buyer_attestation_verification_report_json(
@@ -711,31 +705,16 @@ pub fn verify_proof_package_json(
     verification_context_json: &str,
 ) -> Result<ChioProofVerificationReport, BuyerAttestationError> {
     let proof_package = chio_attest_buyer_core::proof_package_from_json(proof_package_json)
-        .map_err(|error| {
-            BuyerAttestationError::from_historical(HistoricalBuyerError::Json(format!(
-                "Chio attest proof package: {error}"
-            )))
-        })?;
+        .map_err(|error| json_error("Chio attest proof package", error))?;
     let trust_bundle =
         chio_attest_buyer_core::verifier_trust_bundle_from_json(verifier_trust_bundle_json)
-            .map_err(|error| {
-                BuyerAttestationError::from_historical(HistoricalBuyerError::Json(format!(
-                    "Chio verifier trust bundle: {error}"
-                )))
-            })?;
+            .map_err(|error| json_error("Chio verifier trust bundle", error))?;
     let context = chio_attest_buyer_core::verification_context_from_json(verification_context_json)
-        .map_err(|error| {
-            BuyerAttestationError::from_historical(HistoricalBuyerError::Json(format!(
-                "Chio verification context: {error}"
-            )))
-        })?;
+        .map_err(|error| json_error("Chio verification context", error))?;
     let report =
         chio_attest_buyer_core::verify_package_report(&proof_package, &trust_bundle, &context);
-    let json = chio_attest_buyer_core::report_json(&report).map_err(|error| {
-        BuyerAttestationError::from_historical(HistoricalBuyerError::Json(format!(
-            "Chio attest proof report: {error}"
-        )))
-    })?;
+    let json = chio_attest_buyer_core::report_json(&report)
+        .map_err(|error| json_error("Chio attest proof report", error))?;
     Ok(ChioProofVerificationReport {
         accepted: report.accepted,
         failure_code: report.failure.as_ref().map(|failure| failure.code.clone()),
@@ -744,11 +723,11 @@ pub fn verify_proof_package_json(
 }
 
 fn parse_json_value(label: &str, json: &str) -> Result<serde_json::Value, BuyerAttestationError> {
-    serde_json::from_str(json).map_err(|error| {
-        BuyerAttestationError::from_historical(HistoricalBuyerError::Json(format!(
-            "{label}: {error}"
-        )))
-    })
+    serde_json::from_str(json).map_err(|error| json_error(label, error))
+}
+
+fn json_error(label: &str, error: impl fmt::Display) -> BuyerAttestationError {
+    BuyerAttestationError::from_historical(HistoricalBuyerError::Json(format!("{label}: {error}")))
 }
 
 fn replay_historical_verifier(
@@ -763,30 +742,15 @@ fn replay_historical_verifier(
             detail: "buyer review package is missing proof_package artifact".to_string(),
         })
     })?;
-    let proof_package_json = std::str::from_utf8(proof_package_bytes).map_err(|error| {
-        BuyerAttestationError::from_historical(HistoricalBuyerError::Json(format!(
-            "Chio buyer proof package artifact: {error}"
-        )))
-    })?;
+    let proof_package_json = std::str::from_utf8(proof_package_bytes)
+        .map_err(|error| json_error("Chio buyer proof package artifact", error))?;
     let proof_package = chio_attest_buyer_core::proof_package_from_json(proof_package_json)
-        .map_err(|error| {
-            BuyerAttestationError::from_historical(HistoricalBuyerError::Json(format!(
-                "Chio buyer proof package: {error}"
-            )))
-        })?;
+        .map_err(|error| json_error("Chio buyer proof package", error))?;
     let trust_bundle =
         chio_attest_buyer_core::verifier_trust_bundle_from_json(verifier_trust_bundle_json)
-            .map_err(|error| {
-                BuyerAttestationError::from_historical(HistoricalBuyerError::Json(format!(
-                    "Chio buyer verifier trust bundle: {error}"
-                )))
-            })?;
+            .map_err(|error| json_error("Chio buyer verifier trust bundle", error))?;
     let context = chio_attest_buyer_core::verification_context_from_json(verification_context_json)
-        .map_err(|error| {
-            BuyerAttestationError::from_historical(HistoricalBuyerError::Json(format!(
-                "Chio buyer verification context: {error}"
-            )))
-        })?;
+        .map_err(|error| json_error("Chio buyer verification context", error))?;
     let verifier_report =
         chio_attest_buyer_core::verify_package_report(&proof_package, &trust_bundle, &context);
     if verifier_report.accepted {
@@ -832,11 +796,9 @@ pub fn runtime_evidence_manifest_from_json(
     json: &str,
 ) -> Result<RuntimeEvidenceManifest, BuyerAttestationError> {
     let historical: chio_runtime_core::RuntimeEvidenceManifest = serde_json::from_str(json)
-        .map_err(|error| {
-            BuyerAttestationError::from_historical(HistoricalBuyerError::Json(format!(
-                "Chio runtime evidence manifest JSON: {error}"
-            )))
-        })?;
+        .map_err(|error| json_error("Chio runtime evidence manifest JSON", error))?;
+    chio_runtime_core::validate_runtime_evidence_manifest(&historical)
+        .map_err(BuyerAttestationError::from_historical)?;
     Ok(RuntimeEvidenceManifest {
         schema: historical.schema,
         run_id: historical.run_id,
@@ -854,4 +816,24 @@ pub fn runtime_evidence_manifest_from_json(
             })
             .collect(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn json_error_helper_keeps_chio_boundary_code_and_label() {
+        let parse_error = match serde_json::from_str::<serde_json::Value>("{") {
+            Ok(_) => panic!("invalid JSON must fail"),
+            Err(error) => error,
+        };
+        let error = json_error("Chio buyer packet JSON", parse_error);
+
+        assert_eq!(error.code(), "runtime_admission_json");
+        assert!(
+            error.to_string().contains("Chio buyer packet JSON"),
+            "label should remain visible in public error text"
+        );
+    }
 }

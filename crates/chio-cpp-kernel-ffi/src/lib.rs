@@ -296,10 +296,18 @@ fn seed_budget_registry(
     snapshots: &[ParentBudgetSnapshot],
 ) -> Result<(), KernelFfiError> {
     for snapshot in snapshots {
+        validate_budget_token_id(
+            "parent_budget_snapshots[].parent_token_id",
+            &snapshot.parent_token_id,
+        )?;
         budgets
             .register_parent(snapshot.parent_token_id.clone(), snapshot.parent_share_bps)
             .map_err(|error| budget_seed_error("parent budget snapshot", &error))?;
         for child in &snapshot.admitted_children {
+            validate_budget_token_id(
+                "parent_budget_snapshots[].admitted_children[].child_token_id",
+                &child.child_token_id,
+            )?;
             budgets
                 .try_admit_child(
                     snapshot.parent_token_id.as_str(),
@@ -308,6 +316,15 @@ fn seed_budget_registry(
                 )
                 .map_err(|error| budget_seed_error("admitted child budget snapshot", &error))?;
         }
+    }
+    Ok(())
+}
+
+fn validate_budget_token_id(field: &str, value: &str) -> Result<(), KernelFfiError> {
+    if value.trim().is_empty() || value.trim() != value {
+        return Err(KernelFfiError::InvalidCapability(format!(
+            "{field} must be non-empty and unpadded"
+        )));
     }
     Ok(())
 }
@@ -789,6 +806,25 @@ mod tests {
                 }
             ],
         })
+    }
+
+    #[test]
+    fn seed_budget_registry_rejects_blank_parent_token_id() {
+        let snapshot = ParentBudgetSnapshot {
+            parent_token_id: " ".to_string(),
+            parent_share_bps: 10_000,
+            admitted_children: Vec::new(),
+        };
+        let mut registry = InMemoryBudgetRegistry::new();
+
+        let error = seed_budget_registry(&mut registry, &[snapshot]).unwrap_err();
+
+        match error {
+            KernelFfiError::InvalidCapability(message) => {
+                assert!(message.contains("parent_token_id"));
+            }
+            other => panic!("expected InvalidCapability, got {other:?}"),
+        }
     }
 
     fn evaluate_envelope_at(

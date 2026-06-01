@@ -134,3 +134,33 @@ fn tee_bless_audit_event_records_required_fields_and_verifies_signature(
 
     Ok(())
 }
+
+#[test]
+fn tee_bless_audit_signing_rejects_blank_operator_identity() {
+    let body = TeeBlessAuditBody::new(
+        "2026-04-25T18:02:11.418Z",
+        BlessOperator {
+            id: " ".to_string(),
+            git_user: "alice@chio.world".to_string(),
+        },
+        BlessCapture {
+            path: "captures/01JTEE00000000000000000000.ndjson".to_string(),
+            frames_in: 1,
+            frames_after_dedupe: 1,
+            frames_after_redact: 1,
+        },
+        BlessFixture {
+            family: "openai_responses_shadow".to_string(),
+            name: "tool_call_with_pii".to_string(),
+            path: "tests/replay/fixtures/openai_responses_shadow/tool_call_with_pii/".to_string(),
+            receipts_root: "a".repeat(64),
+        },
+        "redactors@1.4.0+default",
+    );
+    let keypair = Keypair::from_seed(&[7u8; 32]);
+
+    let error =
+        TeeBlessAuditEntry::sign(body, &keypair).expect_err("blank operator id must not be signed");
+
+    assert!(error.to_string().contains("operator.id"));
+}

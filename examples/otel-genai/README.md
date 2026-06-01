@@ -52,12 +52,13 @@ attributes defined in `docs/integrations/otel.md`, exports it through
 `chio-otel-receipt-exporter`,
 verifies the signed receipt, and builds both lookup directions:
 
-- `receipt id -> span id`
+- signed `receipt id -> span id`
 - `span id -> receipt id`
 
-It also checks that high-cardinality attributes forbidden from
-Prometheus-shaped sinks are stripped from the receipt metadata copy while the
-receipt id remains the signed receipt identifier.
+It also checks that high-cardinality attributes forbidden from Prometheus-shaped
+sinks are stripped from the receipt metadata copy while the inbound
+`chio.receipt.id` span attribute is preserved only as
+`metadata.correlation.source_chio_receipt_id`.
 
 ## Expected span attributes
 

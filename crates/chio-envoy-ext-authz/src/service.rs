@@ -111,25 +111,17 @@ fn verdict_to_response(verdict: &Verdict) -> CheckResponse {
                 header_option("x-chio-denial-reason", reason),
                 header_option("x-chio-denial-guard", guard),
             ];
-            CheckResponse {
-                status: Some(RpcStatus {
-                    code: Code::PermissionDenied as i32,
-                    message: reason.clone(),
-                    details: Vec::new(),
-                }),
-                http_response: Some(HttpResponse::DeniedResponse(DeniedHttpResponse {
-                    status: Some(HttpStatus {
-                        code: envoy_status_code(*http_status),
-                    }),
-                    headers,
-                    body: format!(
-                        "{{\"verdict\":\"deny\",\"reason\":{},\"guard\":{}}}",
-                        json_string(reason),
-                        json_string(guard),
-                    ),
-                })),
-                dynamic_metadata: None,
-            }
+            denied_check_response(
+                Code::PermissionDenied,
+                reason.clone(),
+                envoy_status_code(*http_status),
+                headers,
+                format!(
+                    "{{\"verdict\":\"deny\",\"reason\":{},\"guard\":{}}}",
+                    json_string(reason),
+                    json_string(guard),
+                ),
+            )
         }
     }
 }
@@ -138,21 +130,37 @@ fn verdict_to_response(verdict: &Verdict) -> CheckResponse {
 /// kernel evaluation errors out. The response denies with status 500 so the
 /// downstream client sees an internal-error rather than a false allow.
 fn fail_closed_response(reason: &str) -> CheckResponse {
+    denied_check_response(
+        Code::Internal,
+        reason.to_string(),
+        EnvoyStatusCode::InternalServerError as i32,
+        vec![header_option("x-chio-denial-reason", reason)],
+        format!(
+            "{{\"verdict\":\"deny\",\"reason\":{},\"guard\":\"fail_closed\"}}",
+            json_string(reason),
+        ),
+    )
+}
+
+fn denied_check_response(
+    rpc_code: Code,
+    message: String,
+    http_status_code: i32,
+    headers: Vec<HeaderValueOption>,
+    body: String,
+) -> CheckResponse {
     CheckResponse {
         status: Some(RpcStatus {
-            code: Code::Internal as i32,
-            message: reason.to_string(),
+            code: rpc_code as i32,
+            message,
             details: Vec::new(),
         }),
         http_response: Some(HttpResponse::DeniedResponse(DeniedHttpResponse {
             status: Some(HttpStatus {
-                code: EnvoyStatusCode::InternalServerError as i32,
+                code: http_status_code,
             }),
-            headers: vec![header_option("x-chio-denial-reason", reason)],
-            body: format!(
-                "{{\"verdict\":\"deny\",\"reason\":{},\"guard\":\"fail_closed\"}}",
-                json_string(reason),
-            ),
+            headers,
+            body,
         })),
         dynamic_metadata: None,
     }
@@ -268,6 +276,33 @@ mod tests {
                     EnvoyStatusCode::InternalServerError as i32
                 );
                 assert!(denied.body.contains("fail_closed"));
+            }
+            other => panic!("expected DeniedResponse, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn denied_check_response_sets_rpc_and_http_status() {
+        let response = denied_check_response(
+            Code::PermissionDenied,
+            "policy denied".to_string(),
+            EnvoyStatusCode::TooManyRequests as i32,
+            vec![header_option("x-chio-denial-reason", "policy denied")],
+            "{\"verdict\":\"deny\"}".to_string(),
+        );
+
+        let status = response.status.unwrap();
+        assert_eq!(status.code, Code::PermissionDenied as i32);
+        assert_eq!(status.message, "policy denied");
+
+        match response.http_response.unwrap() {
+            HttpResponse::DeniedResponse(denied) => {
+                assert_eq!(
+                    denied.status.unwrap().code,
+                    EnvoyStatusCode::TooManyRequests as i32
+                );
+                assert_eq!(denied.headers.len(), 1);
+                assert_eq!(denied.body, "{\"verdict\":\"deny\"}");
             }
             other => panic!("expected DeniedResponse, got {other:?}"),
         }

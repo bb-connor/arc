@@ -746,21 +746,7 @@ impl A2aAdapter {
             self.timeout,
             &self.transport_config,
         )?;
-        if response.jsonrpc != "2.0" {
-            return Err(AdapterError::Protocol(format!(
-                "unexpected JSON-RPC version {}",
-                response.jsonrpc
-            )));
-        }
-        if let Some(error) = response.error {
-            return Err(AdapterError::Remote(format!(
-                "A2A JSON-RPC error {}: {}",
-                error.code, error.message
-            )));
-        }
-        let task = response.result.ok_or_else(|| {
-            AdapterError::Protocol("A2A JSON-RPC GetTask response omitted `result`".to_string())
-        })?;
+        let task = decode_jsonrpc_result(response, "GetTask")?;
         validate_task_response(task)
     }
 
@@ -810,21 +796,7 @@ impl A2aAdapter {
             self.timeout,
             &self.transport_config,
         )?;
-        if response.jsonrpc != "2.0" {
-            return Err(AdapterError::Protocol(format!(
-                "unexpected JSON-RPC version {}",
-                response.jsonrpc
-            )));
-        }
-        if let Some(error) = response.error {
-            return Err(AdapterError::Remote(format!(
-                "A2A JSON-RPC error {}: {}",
-                error.code, error.message
-            )));
-        }
-        let task = response.result.ok_or_else(|| {
-            AdapterError::Protocol("A2A JSON-RPC CancelTask response omitted `result`".to_string())
-        })?;
+        let task = decode_jsonrpc_result(response, "CancelTask")?;
         validate_task_response(task)
     }
 
@@ -874,24 +846,7 @@ impl A2aAdapter {
             self.timeout,
             &self.transport_config,
         )?;
-        if response.jsonrpc != "2.0" {
-            return Err(AdapterError::Protocol(format!(
-                "unexpected JSON-RPC version {}",
-                response.jsonrpc
-            )));
-        }
-        if let Some(error) = response.error {
-            return Err(AdapterError::Remote(format!(
-                "A2A JSON-RPC error {}: {}",
-                error.code, error.message
-            )));
-        }
-        response.result.ok_or_else(|| {
-            AdapterError::Protocol(
-                "A2A JSON-RPC CreateTaskPushNotificationConfig response omitted `result`"
-                    .to_string(),
-            )
-        })
+        decode_jsonrpc_result(response, "CreateTaskPushNotificationConfig")
     }
 
     fn create_push_notification_config_http_json(
@@ -940,23 +895,7 @@ impl A2aAdapter {
             self.timeout,
             &self.transport_config,
         )?;
-        if response.jsonrpc != "2.0" {
-            return Err(AdapterError::Protocol(format!(
-                "unexpected JSON-RPC version {}",
-                response.jsonrpc
-            )));
-        }
-        if let Some(error) = response.error {
-            return Err(AdapterError::Remote(format!(
-                "A2A JSON-RPC error {}: {}",
-                error.code, error.message
-            )));
-        }
-        response.result.ok_or_else(|| {
-            AdapterError::Protocol(
-                "A2A JSON-RPC GetTaskPushNotificationConfig response omitted `result`".to_string(),
-            )
-        })
+        decode_jsonrpc_result(response, "GetTaskPushNotificationConfig")
     }
 
     fn get_push_notification_config_http_json(
@@ -1005,24 +944,7 @@ impl A2aAdapter {
             self.timeout,
             &self.transport_config,
         )?;
-        if response.jsonrpc != "2.0" {
-            return Err(AdapterError::Protocol(format!(
-                "unexpected JSON-RPC version {}",
-                response.jsonrpc
-            )));
-        }
-        if let Some(error) = response.error {
-            return Err(AdapterError::Remote(format!(
-                "A2A JSON-RPC error {}: {}",
-                error.code, error.message
-            )));
-        }
-        response.result.ok_or_else(|| {
-            AdapterError::Protocol(
-                "A2A JSON-RPC ListTaskPushNotificationConfigs response omitted `result`"
-                    .to_string(),
-            )
-        })
+        decode_jsonrpc_result(response, "ListTaskPushNotificationConfigs")
     }
 
     fn list_push_notification_configs_http_json(
@@ -1208,21 +1130,7 @@ impl A2aAdapter {
             self.timeout,
             &self.transport_config,
         )?;
-        if response.jsonrpc != "2.0" {
-            return Err(AdapterError::Protocol(format!(
-                "unexpected JSON-RPC version {}",
-                response.jsonrpc
-            )));
-        }
-        if let Some(error) = response.error {
-            return Err(AdapterError::Remote(format!(
-                "A2A JSON-RPC error {}: {}",
-                error.code, error.message
-            )));
-        }
-        let response = response.result.ok_or_else(|| {
-            AdapterError::Protocol("A2A JSON-RPC response omitted `result`".to_string())
-        })?;
+        let response = decode_jsonrpc_result(response, "")?;
         validate_send_message_response(response)
     }
 
@@ -1311,6 +1219,34 @@ impl A2aAdapter {
             Ok,
         )
     }
+}
+
+fn decode_jsonrpc_result<T>(
+    response: A2aJsonRpcResponse<T>,
+    method: &str,
+) -> Result<T, AdapterError> {
+    if response.jsonrpc != "2.0" {
+        return Err(AdapterError::Protocol(format!(
+            "unexpected JSON-RPC version {}",
+            response.jsonrpc
+        )));
+    }
+    if let Some(error) = response.error {
+        return Err(AdapterError::Remote(format!(
+            "A2A JSON-RPC error {}: {}",
+            error.code, error.message
+        )));
+    }
+    response.result.ok_or_else(|| {
+        let response_label = if method.is_empty() {
+            "response".to_string()
+        } else {
+            format!("{method} response")
+        };
+        AdapterError::Protocol(format!(
+            "A2A JSON-RPC {response_label} omitted `result`"
+        ))
+    })
 }
 
 #[async_trait::async_trait]

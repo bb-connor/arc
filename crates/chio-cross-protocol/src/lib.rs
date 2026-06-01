@@ -87,12 +87,13 @@ impl<'a> TargetProtocolRegistry<'a> {
         &self,
         tool: &ToolDefinition,
     ) -> Result<DiscoveryProtocol, String> {
-        let target =
-            schema_string_extension(&tool.input_schema, "x-chio-target-protocol").or_else(|| {
-                tool.output_schema
-                    .as_ref()
-                    .and_then(|schema| schema_string_extension(schema, "x-chio-target-protocol"))
-            });
+        let target = match schema_string_extension(&tool.input_schema, "x-chio-target-protocol")? {
+            Some(value) => Some(value),
+            None => match tool.output_schema.as_ref() {
+                Some(schema) => schema_string_extension(schema, "x-chio-target-protocol")?,
+                None => None,
+            },
+        };
 
         match target {
             Some(value) => parse_discovery_protocol(&value),
@@ -1454,12 +1455,22 @@ fn render_protocol_output(
     }
 }
 
-fn schema_bool_extension(schema: &Value, key: &str) -> Option<bool> {
-    schema.as_object()?.get(key)?.as_bool()
+fn schema_extension<'a>(schema: &'a Value, key: &str) -> Option<&'a Value> {
+    schema.as_object()?.get(key)
 }
 
-fn schema_string_extension(schema: &Value, key: &str) -> Option<String> {
-    schema.as_object()?.get(key)?.as_str().map(str::to_string)
+fn schema_bool_extension(schema: &Value, key: &str) -> Option<bool> {
+    schema_extension(schema, key)?.as_bool()
+}
+
+fn schema_string_extension(schema: &Value, key: &str) -> Result<Option<String>, String> {
+    let Some(value) = schema_extension(schema, key) else {
+        return Ok(None);
+    };
+    value
+        .as_str()
+        .map(|value| Some(value.to_string()))
+        .ok_or_else(|| format!("{key} must be a string when present"))
 }
 
 #[cfg(test)]
@@ -1766,6 +1777,22 @@ mod tests {
             None,
         );
         assert!(target_protocol_for_tool(&tool).is_err());
+    }
+
+    #[test]
+    fn target_protocol_rejects_non_string_extension_value() {
+        let tool = semantic_tool(
+            "echo",
+            Some(LatencyHint::Instant),
+            json!({
+                "type": "object",
+                "x-chio-target-protocol": 42
+            }),
+            None,
+        );
+        let err = target_protocol_for_tool(&tool).unwrap_err();
+
+        assert!(err.contains("x-chio-target-protocol must be a string"));
     }
 
     #[test]
@@ -2241,6 +2268,24 @@ mod tests {
             Some(
                 "governed intent disallowed projected protocols and no native route was available"
             )
+        );
+    }
+
+    #[test]
+    fn schema_extension_returns_named_extension_only_for_object_schema() {
+        let schema = json!({
+            "type": "object",
+            "x-chio-publish": false
+        });
+
+        assert_eq!(
+            schema_extension(&schema, "x-chio-publish"),
+            Some(&Value::Bool(false))
+        );
+        assert_eq!(schema_extension(&schema, "x-chio-missing"), None);
+        assert_eq!(
+            schema_extension(&Value::String("not-object".to_string()), "x"),
+            None
         );
     }
 

@@ -9,6 +9,13 @@ struct DeferredA2aTask {
     expires_at_ms: u64,
 }
 
+#[derive(Debug)]
+struct A2aJsonRpcEnvelope {
+    id: Value,
+    method: String,
+    params: Value,
+}
+
 /// The A2A edge server.
 ///
 /// Wraps a set of Chio tool manifests and exposes them as A2A skills.
@@ -178,6 +185,88 @@ impl ChioA2aEdge {
                 "message": message,
             }
         })
+    }
+
+    fn jsonrpc_protocol_error_response(id: Value, code: i64, message: &str) -> Value {
+        json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "error": {
+                "code": code,
+                "message": message,
+            }
+        })
+    }
+
+    fn parse_jsonrpc_envelope(message: &Value) -> Result<A2aJsonRpcEnvelope, Value> {
+        if message.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
+            return Err(Self::jsonrpc_protocol_error_response(
+                Value::Null,
+                -32600,
+                "invalid jsonrpc envelope",
+            ));
+        }
+
+        let id = message.get("id").cloned().unwrap_or(Value::Null);
+        if !id.is_string() && !id.is_number() && !id.is_null() {
+            return Err(Self::jsonrpc_protocol_error_response(
+                Value::Null,
+                -32600,
+                "request id must be string, number, or null",
+            ));
+        }
+
+        let Some(method) = message.get("method").and_then(Value::as_str) else {
+            return Err(Self::jsonrpc_protocol_error_response(
+                id,
+                -32600,
+                "request missing method",
+            ));
+        };
+        let params = message.get("params").cloned().unwrap_or_else(|| json!({}));
+
+        Ok(A2aJsonRpcEnvelope {
+            id,
+            method: method.to_string(),
+            params,
+        })
+    }
+
+    fn parse_jsonrpc_send_message_params(
+        &self,
+        params: Value,
+        request_name: &str,
+    ) -> Result<(String, SendMessageRequest), A2aEdgeError> {
+        let skill_id = self.resolve_jsonrpc_target_skill_id(&params)?;
+        let request = serde_json::from_value::<SendMessageRequest>(params).map_err(|error| {
+            A2aEdgeError::InvalidRequest(format!("invalid {request_name} request: {error}"))
+        })?;
+
+        Ok((skill_id, request))
+    }
+
+    fn resolve_jsonrpc_target_skill_id(&self, params: &Value) -> Result<String, A2aEdgeError> {
+        let skill_id_from_metadata = params
+            .get("metadata")
+            .and_then(|metadata| metadata.get("chio"))
+            .and_then(|chio| chio.get("targetSkillId"))
+            .and_then(Value::as_str)
+            .map(String::from);
+
+        skill_id_from_metadata
+            .or_else(|| {
+                if self.skills.len() == 1 {
+                    self.skills.first().map(|skill| skill.id.clone())
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| {
+                A2aEdgeError::InvalidRequest(
+                    "metadata.chio.targetSkillId is required when multiple skills are exposed"
+                        .to_string(),
+                )
+            })
     }
 
     /// Generate the A2A Agent Card for `/.well-known/agent-card.json`.
@@ -449,11 +538,13 @@ impl ChioA2aEdge {
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
     ) -> Value {
-        let method = message.get("method").and_then(Value::as_str).unwrap_or("");
-        let id = message.get("id").cloned().unwrap_or(Value::Null);
-        let params = message.get("params").cloned().unwrap_or_else(|| json!({}));
+        let A2aJsonRpcEnvelope { id, method, params } =
+            match Self::parse_jsonrpc_envelope(&message) {
+                Ok(envelope) => envelope,
+                Err(response) => return response,
+            };
 
-        match method {
+        match method.as_str() {
             "message/send" => self.handle_jsonrpc_send_message(id, params, kernel, execution),
             "message/stream" => self.handle_jsonrpc_stream_message(id, params, execution),
             "task/get" => self.handle_jsonrpc_task_get(id, params, kernel, execution),
@@ -480,11 +571,13 @@ impl ChioA2aEdge {
         message: Value,
         server: &dyn ToolServerConnection,
     ) -> Value {
-        let method = message.get("method").and_then(Value::as_str).unwrap_or("");
-        let id = message.get("id").cloned().unwrap_or(Value::Null);
-        let params = message.get("params").cloned().unwrap_or_else(|| json!({}));
+        let A2aJsonRpcEnvelope { id, method, params } =
+            match Self::parse_jsonrpc_envelope(&message) {
+                Ok(envelope) => envelope,
+                Err(response) => return response,
+            };
 
-        match method {
+        match method.as_str() {
             "message/send" => self.handle_jsonrpc_send_message_passthrough(id, params, server),
             "message/stream" => self.jsonrpc_stream_not_supported(id),
             _ => json!({
@@ -505,46 +598,11 @@ impl ChioA2aEdge {
         params: Value,
         server: &dyn ToolServerConnection,
     ) -> Value {
-        let skill_id_from_metadata = params
-            .get("metadata")
-            .and_then(|m| m.get("chio"))
-            .and_then(|a| a.get("targetSkillId"))
-            .and_then(Value::as_str)
-            .map(String::from);
-
-        let skill_id = skill_id_from_metadata.or_else(|| {
-            // Try to find a single skill if there's only one
-            if self.skills.len() == 1 {
-                self.skills.first().map(|s| s.id.clone())
-            } else {
-                None
-            }
-        });
-
-        let Some(skill_id) = skill_id else {
-            return json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "metadata.chio.targetSkillId is required when multiple skills are exposed"
-                }
-            });
-        };
-
-        let request = match serde_json::from_value::<SendMessageRequest>(params.clone()) {
-            Ok(req) => req,
-            Err(e) => {
-                return json!({
-                    "jsonrpc": "2.0",
-                    "id": id,
-                    "error": {
-                        "code": -32602,
-                        "message": format!("invalid SendMessage request: {e}")
-                    }
-                });
-            }
-        };
+        let (skill_id, request) =
+            match self.parse_jsonrpc_send_message_params(params, "SendMessage") {
+                Ok(parsed) => parsed,
+                Err(error) => return Self::jsonrpc_error_response(id, error),
+            };
 
         match self.handle_send_message_passthrough(&skill_id, &request, server) {
             Ok(response) => json!({
@@ -563,45 +621,11 @@ impl ChioA2aEdge {
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
     ) -> Value {
-        let skill_id_from_metadata = params
-            .get("metadata")
-            .and_then(|m| m.get("chio"))
-            .and_then(|a| a.get("targetSkillId"))
-            .and_then(Value::as_str)
-            .map(String::from);
-
-        let skill_id = skill_id_from_metadata.or_else(|| {
-            if self.skills.len() == 1 {
-                self.skills.first().map(|s| s.id.clone())
-            } else {
-                None
-            }
-        });
-
-        let Some(skill_id) = skill_id else {
-            return json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "metadata.chio.targetSkillId is required when multiple skills are exposed"
-                }
-            });
-        };
-
-        let request = match serde_json::from_value::<SendMessageRequest>(params.clone()) {
-            Ok(req) => req,
-            Err(error) => {
-                return json!({
-                    "jsonrpc": "2.0",
-                    "id": id,
-                    "error": {
-                        "code": -32602,
-                        "message": format!("invalid SendMessage request: {error}")
-                    }
-                });
-            }
-        };
+        let (skill_id, request) =
+            match self.parse_jsonrpc_send_message_params(params, "SendMessage") {
+                Ok(parsed) => parsed,
+                Err(error) => return Self::jsonrpc_error_response(id, error),
+            };
 
         match self.handle_send_message(&skill_id, &request, kernel, execution) {
             Ok(response) => json!({
@@ -619,45 +643,11 @@ impl ChioA2aEdge {
         params: Value,
         execution: &A2aKernelExecutionContext,
     ) -> Value {
-        let skill_id_from_metadata = params
-            .get("metadata")
-            .and_then(|m| m.get("chio"))
-            .and_then(|a| a.get("targetSkillId"))
-            .and_then(Value::as_str)
-            .map(String::from);
-
-        let skill_id = skill_id_from_metadata.or_else(|| {
-            if self.skills.len() == 1 {
-                self.skills.first().map(|s| s.id.clone())
-            } else {
-                None
-            }
-        });
-
-        let Some(skill_id) = skill_id else {
-            return json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "metadata.chio.targetSkillId is required when multiple skills are exposed"
-                }
-            });
-        };
-
-        let request = match serde_json::from_value::<SendMessageRequest>(params.clone()) {
-            Ok(req) => req,
-            Err(error) => {
-                return json!({
-                    "jsonrpc": "2.0",
-                    "id": id,
-                    "error": {
-                        "code": -32602,
-                        "message": format!("invalid SendStreamingMessage request: {error}")
-                    }
-                });
-            }
-        };
+        let (skill_id, request) =
+            match self.parse_jsonrpc_send_message_params(params, "SendStreamingMessage") {
+                Ok(parsed) => parsed,
+                Err(error) => return Self::jsonrpc_error_response(id, error),
+            };
 
         match self.handle_stream_message(&skill_id, &request, execution) {
             Ok(response) => json!({

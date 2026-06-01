@@ -11,6 +11,48 @@ pub(super) struct KernelResponseToToolResultArgs<'a> {
     pub related_task_id: Option<&'a str>,
 }
 
+pub(super) struct JsonRpcEnvelope {
+    pub id: Option<Value>,
+    pub method: String,
+    pub params: Value,
+}
+
+pub(super) fn parse_jsonrpc_envelope(message: &Value) -> Result<JsonRpcEnvelope, Value> {
+    if message.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
+        return Err(jsonrpc_error(
+            Value::Null,
+            JSONRPC_INVALID_REQUEST,
+            "invalid jsonrpc envelope",
+        ));
+    }
+
+    let id = message.get("id").cloned();
+    if id
+        .as_ref()
+        .is_some_and(|id| !id.is_string() && !id.is_number() && !id.is_null())
+    {
+        return Err(jsonrpc_error(
+            Value::Null,
+            JSONRPC_INVALID_REQUEST,
+            "request id must be string, number, or null",
+        ));
+    }
+
+    let method = message
+        .get("method")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            jsonrpc_error(
+                id.clone().unwrap_or(Value::Null),
+                JSONRPC_INVALID_REQUEST,
+                "request missing method",
+            )
+        })?
+        .to_string();
+    let params = message.get("params").cloned().unwrap_or_else(|| json!({}));
+    Ok(JsonRpcEnvelope { id, method, params })
+}
+
 pub(super) fn manifest_tool_to_mcp_tool(tool: ToolDefinition) -> McpExposedTool {
     let annotations = Some(json!({
         "readOnlyHint": !tool.has_side_effects,
@@ -1145,4 +1187,67 @@ pub(super) fn matches_server(pattern: &str, server_id: &str) -> bool {
 
 pub(super) fn matches_name(pattern: &str, tool_name: &str) -> bool {
     pattern == "*" || pattern == tool_name
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_jsonrpc_envelope_preserves_id_method_and_default_params() {
+        let envelope = parse_jsonrpc_envelope(&json!({
+            "jsonrpc": "2.0",
+            "id": "req-1",
+            "method": "tools/list",
+        }))
+        .expect("valid envelope");
+
+        assert_eq!(envelope.id, Some(json!("req-1")));
+        assert_eq!(envelope.method, "tools/list");
+        assert_eq!(envelope.params, json!({}));
+    }
+
+    #[test]
+    fn parse_jsonrpc_envelope_rejects_non_scalar_request_ids() {
+        for invalid_id in [json!(true), json!([]), json!({"nested": "bad"})] {
+            let Err(response) = parse_jsonrpc_envelope(&json!({
+                "jsonrpc": "2.0",
+                "id": invalid_id,
+                "method": "tools/list",
+            })) else {
+                panic!("non-scalar request id must fail closed");
+            };
+
+            assert_eq!(response["id"], Value::Null);
+            assert_eq!(response["error"]["code"], JSONRPC_INVALID_REQUEST);
+            assert_eq!(
+                response["error"]["message"],
+                "request id must be string, number, or null"
+            );
+        }
+    }
+
+    #[test]
+    fn parse_jsonrpc_envelope_returns_structured_errors() {
+        let Err(response) = parse_jsonrpc_envelope(&json!({
+            "jsonrpc": "1.0",
+            "id": "req-1",
+            "method": "tools/list",
+        })) else {
+            panic!("invalid jsonrpc version must fail closed");
+        };
+        assert_eq!(response["id"], Value::Null);
+        assert_eq!(response["error"]["code"], JSONRPC_INVALID_REQUEST);
+        assert_eq!(response["error"]["message"], "invalid jsonrpc envelope");
+
+        let Err(response) = parse_jsonrpc_envelope(&json!({
+            "jsonrpc": "2.0",
+            "id": "req-2",
+        })) else {
+            panic!("missing method must fail closed");
+        };
+        assert_eq!(response["id"], json!("req-2"));
+        assert_eq!(response["error"]["code"], JSONRPC_INVALID_REQUEST);
+        assert_eq!(response["error"]["message"], "request missing method");
+    }
 }

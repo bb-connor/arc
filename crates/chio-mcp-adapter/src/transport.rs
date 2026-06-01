@@ -1417,16 +1417,23 @@ fn jsonrpc_request_id_label(request_id: &serde_json::Value) -> String {
 
 /// Read a single newline-terminated JSON line from the reader.
 fn read_line(reader: &mut impl BufRead) -> Result<serde_json::Value, AdapterError> {
-    let Some(line) = read_bounded_line(reader, MAX_STDIO_MCP_FRAME_BYTES)? else {
-        return Err(AdapterError::ConnectionFailed(
-            "MCP server closed stdout (EOF)".into(),
-        ));
-    };
+    loop {
+        let Some(line) = read_bounded_line(reader, MAX_STDIO_MCP_FRAME_BYTES)? else {
+            return Err(AdapterError::ConnectionFailed(
+                "MCP server closed stdout (EOF)".into(),
+            ));
+        };
 
-    debug!("<- {}", line.trim_end());
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
 
-    serde_json::from_str(line.trim())
-        .map_err(|e| AdapterError::ParseError(format!("invalid JSON from MCP server: {e}")))
+        debug!("<- {}", line.trim_end());
+
+        return serde_json::from_str(trimmed)
+            .map_err(|e| AdapterError::ParseError(format!("invalid JSON from MCP server: {e}")));
+    }
 }
 
 fn read_bounded_line(
@@ -1553,6 +1560,15 @@ mod tests {
     #[test]
     fn read_line_parses_json() {
         let input = b"{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"ok\":true}}\n";
+        let mut reader = BufReader::new(&input[..]);
+        let value = read_line(&mut reader).unwrap();
+        assert_eq!(value["id"], 1);
+        assert_eq!(value["result"]["ok"], true);
+    }
+
+    #[test]
+    fn read_line_skips_blank_lines_before_json_frame() {
+        let input = b"\n  \r\n{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"ok\":true}}\n";
         let mut reader = BufReader::new(&input[..]);
         let value = read_line(&mut reader).unwrap();
         assert_eq!(value["id"], 1);

@@ -36,6 +36,10 @@ pub enum SessionJournalError {
     #[error("session journal lock poisoned")]
     LockPoisoned,
 
+    /// A record field was empty or had surrounding whitespace.
+    #[error("session journal record field {field} must be non-empty and unpadded")]
+    InvalidRecordField { field: &'static str },
+
     /// Hash chain integrity check failed.
     #[error("hash chain integrity violation at entry {index}: expected {expected}, got {actual}")]
     IntegrityViolation {
@@ -97,6 +101,13 @@ fn compute_entry_hash(entry: &JournalEntry) -> String {
     hasher.update(entry.delegation_depth.to_le_bytes());
     hasher.update(if entry.allowed { &[1u8] } else { &[0u8] });
     hex::encode(hasher.finalize())
+}
+
+fn validate_record_field(value: &str, field: &'static str) -> Result<(), SessionJournalError> {
+    if value.trim().is_empty() || value.trim() != value {
+        return Err(SessionJournalError::InvalidRecordField { field });
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -216,6 +227,10 @@ impl SessionJournal {
     /// The entry is hash-chained to the previous entry. Returns the
     /// sequence number of the new entry.
     pub fn record(&self, params: RecordParams) -> Result<u64, SessionJournalError> {
+        validate_record_field(&params.tool_name, "tool_name")?;
+        validate_record_field(&params.server_id, "server_id")?;
+        validate_record_field(&params.agent_id, "agent_id")?;
+
         let mut inner = self.lock_inner()?;
 
         let sequence = inner.entries.len() as u64;
@@ -392,6 +407,20 @@ mod tests {
         assert_eq!(entries[0].prev_hash, ZERO_HASH);
         assert!(!entries[0].entry_hash.is_empty());
         assert_eq!(entries[0].tool_name, "read_file");
+    }
+
+    #[test]
+    fn record_rejects_padded_tool_name() {
+        let journal = SessionJournal::new("sess-1".to_string());
+        let mut params = test_params("read_file");
+        params.tool_name = " read_file".to_string();
+
+        let error = journal.record(params).unwrap_err();
+
+        assert!(matches!(
+            error,
+            SessionJournalError::InvalidRecordField { field: "tool_name" }
+        ));
     }
 
     #[test]

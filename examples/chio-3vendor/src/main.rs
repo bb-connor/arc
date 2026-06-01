@@ -748,7 +748,61 @@ fn canonical_sha256<T: serde::Serialize>(value: &T) -> Result<String, ChioPackag
 }
 
 fn write_json<T: serde::Serialize>(path: PathBuf, value: &T) -> Result<(), ChioPackageError> {
+    match fs::symlink_metadata(&path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            return Err(ChioPackageError::Json(format!(
+                "refusing symlinked output path {}",
+                path.display()
+            )));
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(ChioPackageError::Json(error.to_string())),
+    }
     let json = serde_json::to_string_pretty(value)
         .map_err(|error| ChioPackageError::Json(error.to_string()))?;
     fs::write(path, format!("{json}\n")).map_err(|error| ChioPackageError::Json(error.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{write_json, ChioPackageError};
+    use serde_json::json;
+    use std::fs;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_dir(prefix: &str) -> Result<PathBuf, ChioPackageError> {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|error| ChioPackageError::Json(error.to_string()))?
+            .as_nanos();
+        Ok(std::env::temp_dir().join(format!("{prefix}-{nonce}")))
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn write_json_rejects_symlinked_output_file() -> Result<(), ChioPackageError> {
+        let dir = unique_dir("chio-three-vendor-output")?;
+        let outside = unique_dir("chio-three-vendor-outside")?;
+        fs::create_dir_all(&dir).map_err(|error| ChioPackageError::Json(error.to_string()))?;
+        fs::create_dir_all(&outside).map_err(|error| ChioPackageError::Json(error.to_string()))?;
+        let outside_target = outside.join("target.json");
+        fs::write(&outside_target, "{}\n")
+            .map_err(|error| ChioPackageError::Json(error.to_string()))?;
+        let link_path = dir.join("fixture.json");
+        std::os::unix::fs::symlink(&outside_target, &link_path)
+            .map_err(|error| ChioPackageError::Json(error.to_string()))?;
+
+        let result = write_json(link_path, &json!({"escaped": true}));
+
+        let _ = fs::remove_dir_all(dir);
+        let _ = fs::remove_dir_all(outside);
+        match result {
+            Err(ChioPackageError::Json(message)) => assert!(message.contains("symlink")),
+            Err(error) => panic!("expected Json symlink error, got {error}"),
+            Ok(()) => panic!("symlinked output file should fail closed"),
+        }
+        Ok(())
+    }
 }

@@ -607,28 +607,7 @@ pub fn validate_extension_manifest(
             "extensions must not claim trust widening".to_string(),
         ));
     }
-    if manifest.runtime.evidence_mode != ExtensionEvidenceMode::None {
-        if !manifest.runtime.requires_subject_binding {
-            return Err(ExtensionContractError::InvalidGuardrail(
-                "evidence-capable extensions must require subject binding".to_string(),
-            ));
-        }
-        if !manifest.runtime.requires_signer_verification {
-            return Err(ExtensionContractError::InvalidGuardrail(
-                "evidence-capable extensions must require signer verification".to_string(),
-            ));
-        }
-        if !manifest.runtime.requires_freshness_check {
-            return Err(ExtensionContractError::InvalidGuardrail(
-                "evidence-capable extensions must require freshness checks".to_string(),
-            ));
-        }
-        if !manifest.runtime.requires_local_policy_activation {
-            return Err(ExtensionContractError::InvalidGuardrail(
-                "evidence-capable extensions must require local policy activation".to_string(),
-            ));
-        }
-    }
+    validate_evidence_runtime_guardrails(&manifest.runtime)?;
 
     Ok(())
 }
@@ -996,6 +975,35 @@ where
                 "{field}:{value:?}"
             )));
         }
+    }
+    Ok(())
+}
+
+fn validate_evidence_runtime_guardrails(
+    runtime: &ExtensionRuntimeEnvelope,
+) -> Result<(), ExtensionContractError> {
+    if runtime.evidence_mode == ExtensionEvidenceMode::None {
+        return Ok(());
+    }
+    if !runtime.requires_subject_binding {
+        return Err(ExtensionContractError::InvalidGuardrail(
+            "evidence-capable extensions must require subject binding".to_string(),
+        ));
+    }
+    if !runtime.requires_signer_verification {
+        return Err(ExtensionContractError::InvalidGuardrail(
+            "evidence-capable extensions must require signer verification".to_string(),
+        ));
+    }
+    if !runtime.requires_freshness_check {
+        return Err(ExtensionContractError::InvalidGuardrail(
+            "evidence-capable extensions must require freshness checks".to_string(),
+        ));
+    }
+    if !runtime.requires_local_policy_activation {
+        return Err(ExtensionContractError::InvalidGuardrail(
+            "evidence-capable extensions must require local policy activation".to_string(),
+        ));
     }
     Ok(())
 }
@@ -1657,6 +1665,45 @@ mod tests {
             validate_extension_manifest(&manifest),
             Err(ExtensionContractError::InvalidGuardrail(_))
         ));
+    }
+
+    #[test]
+    fn evidence_runtime_guardrail_helper_preserves_fail_closed_requirements() {
+        let mut runtime = sample_manifest().runtime;
+        runtime.evidence_mode = ExtensionEvidenceMode::None;
+        assert!(validate_evidence_runtime_guardrails(&runtime).is_ok());
+
+        runtime.evidence_mode = ExtensionEvidenceMode::ImportOnly;
+        runtime.requires_subject_binding = true;
+        runtime.requires_signer_verification = true;
+        runtime.requires_freshness_check = true;
+        runtime.requires_local_policy_activation = true;
+        assert!(validate_evidence_runtime_guardrails(&runtime).is_ok());
+
+        let cases: [(&str, fn(&mut ExtensionRuntimeEnvelope)); 4] = [
+            ("subject binding", |runtime| {
+                runtime.requires_subject_binding = false;
+            }),
+            ("signer verification", |runtime| {
+                runtime.requires_signer_verification = false;
+            }),
+            ("freshness checks", |runtime| {
+                runtime.requires_freshness_check = false;
+            }),
+            ("local policy activation", |runtime| {
+                runtime.requires_local_policy_activation = false;
+            }),
+        ];
+        for (expected_detail, remove_guardrail) in cases {
+            let mut runtime = runtime.clone();
+            remove_guardrail(&mut runtime);
+            let Err(ExtensionContractError::InvalidGuardrail(message)) =
+                validate_evidence_runtime_guardrails(&runtime)
+            else {
+                panic!("missing guardrail should fail closed: {expected_detail}");
+            };
+            assert!(message.contains(expected_detail));
+        }
     }
 
     #[test]

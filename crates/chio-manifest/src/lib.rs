@@ -224,6 +224,9 @@ pub enum ManifestError {
     #[error("duplicate tool name: {0}")]
     DuplicateToolName(String),
 
+    #[error("invalid tool name: {0}")]
+    InvalidToolName(String),
+
     #[error("duplicate server tool allowlist entry: {0}")]
     DuplicateServerTool(String),
 
@@ -246,6 +249,9 @@ pub fn validate_manifest(manifest: &ToolManifest) -> Result<(), ManifestError> {
 
     let mut seen = std::collections::HashSet::new();
     for tool in &manifest.tools {
+        if tool.name.trim().is_empty() || tool.name.trim() != tool.name {
+            return Err(ManifestError::InvalidToolName(tool.name.clone()));
+        }
         if !seen.insert(&tool.name) {
             return Err(ManifestError::DuplicateToolName(tool.name.clone()));
         }
@@ -283,6 +289,9 @@ pub fn verify_manifest(
     public_key: &PublicKey,
 ) -> Result<(), ManifestError> {
     validate_manifest(&signed.manifest)?;
+    if signed.signer_key != *public_key {
+        return Err(ManifestError::VerificationFailed);
+    }
     let valid = public_key.verify_canonical(&signed.manifest, &signed.signature)?;
     if valid {
         Ok(())
@@ -361,12 +370,38 @@ mod tests {
     }
 
     #[test]
+    fn validate_rejects_padded_tool_name() {
+        let mut m = sample_manifest();
+        m.tools[0].name = " greet".into();
+
+        assert!(matches!(
+            validate_manifest(&m),
+            Err(ManifestError::InvalidToolName(_))
+        ));
+    }
+
+    #[test]
     fn sign_and_verify_manifest() {
         let kp = Keypair::generate();
 
         let m = sample_manifest();
         let signed = sign_manifest(&m, &kp).unwrap_or_else(|e| panic!("sign: {e}"));
         verify_manifest(&signed, &kp.public_key()).unwrap_or_else(|e| panic!("verify: {e}"));
+    }
+
+    #[test]
+    fn verify_manifest_rejects_mismatched_signed_signer_key() {
+        let trusted = Keypair::generate();
+        let other = Keypair::generate();
+
+        let m = sample_manifest();
+        let mut signed = sign_manifest(&m, &trusted).unwrap_or_else(|e| panic!("sign: {e}"));
+        signed.signer_key = other.public_key();
+
+        assert!(matches!(
+            verify_manifest(&signed, &trusted.public_key()),
+            Err(ManifestError::VerificationFailed)
+        ));
     }
 
     #[test]

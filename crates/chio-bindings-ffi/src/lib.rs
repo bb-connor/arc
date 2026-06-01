@@ -42,6 +42,7 @@ pub const CHIO_FFI_ERROR_DUPLICATE_TOOL_NAME: i32 = 19;
 pub const CHIO_FFI_ERROR_UNSUPPORTED_SCHEMA: i32 = 20;
 pub const CHIO_FFI_ERROR_MANIFEST_VERIFICATION_FAILED: i32 = 21;
 pub const CHIO_FFI_ERROR_DUPLICATE_SERVER_TOOL: i32 = 22;
+pub const CHIO_FFI_ERROR_INVALID_TOOL_NAME: i32 = 23;
 pub const CHIO_FFI_ERROR_INTERNAL: i32 = 255;
 
 #[repr(C)]
@@ -110,7 +111,11 @@ fn err_string(status: i32, error_code: i32, message: String) -> ChioFfiResult {
 }
 
 fn helper_error_code(error: &Error) -> i32 {
-    match error.code() {
+    ffi_error_code_from_helper_code(error.code())
+}
+
+fn ffi_error_code_from_helper_code(code: ErrorCode) -> i32 {
+    match code {
         ErrorCode::InvalidPublicKey => CHIO_FFI_ERROR_INVALID_PUBLIC_KEY,
         ErrorCode::InvalidHex => CHIO_FFI_ERROR_INVALID_HEX,
         ErrorCode::InvalidSignature => CHIO_FFI_ERROR_INVALID_SIGNATURE,
@@ -130,6 +135,7 @@ fn helper_error_code(error: &Error) -> i32 {
         ErrorCode::InvalidProofIndex => CHIO_FFI_ERROR_INVALID_PROOF_INDEX,
         ErrorCode::EmptyManifest => CHIO_FFI_ERROR_EMPTY_MANIFEST,
         ErrorCode::DuplicateToolName => CHIO_FFI_ERROR_DUPLICATE_TOOL_NAME,
+        ErrorCode::InvalidToolName => CHIO_FFI_ERROR_INVALID_TOOL_NAME,
         ErrorCode::DuplicateServerTool => CHIO_FFI_ERROR_DUPLICATE_SERVER_TOOL,
         ErrorCode::UnsupportedSchema => CHIO_FFI_ERROR_UNSUPPORTED_SCHEMA,
         ErrorCode::ManifestVerificationFailed => CHIO_FFI_ERROR_MANIFEST_VERIFICATION_FAILED,
@@ -379,8 +385,9 @@ mod tests {
     use super::{
         chio_buffer_free, chio_canonicalize_json, chio_ffi_abi_version, chio_ffi_build_info,
         chio_sha256_hex_bytes, chio_sha256_hex_utf8, chio_sign_utf8_message_ed25519,
-        chio_verify_utf8_message_ed25519, ChioFfiBuffer, CHIO_FFI_STATUS_ERROR,
-        CHIO_FFI_STATUS_NULL_ARGUMENT, CHIO_FFI_STATUS_OK,
+        chio_verify_utf8_message_ed25519, ffi_error_code_from_helper_code, ChioFfiBuffer,
+        CHIO_FFI_ERROR_INVALID_TOOL_NAME, CHIO_FFI_STATUS_ERROR, CHIO_FFI_STATUS_NULL_ARGUMENT,
+        CHIO_FFI_STATUS_OK,
     };
     use std::ffi::CString;
     use std::os::raw::c_char;
@@ -514,6 +521,14 @@ mod tests {
         assert_eq!(result.status, CHIO_FFI_STATUS_ERROR);
         assert_ne!(result.error_code, 0);
         assert!(!result_to_string(result.data).is_empty());
+    }
+
+    #[test]
+    fn invalid_manifest_tool_name_maps_to_stable_ffi_error_code() {
+        assert_eq!(
+            ffi_error_code_from_helper_code(chio_binding_helpers::ErrorCode::InvalidToolName),
+            CHIO_FFI_ERROR_INVALID_TOOL_NAME
+        );
     }
 
     #[test]

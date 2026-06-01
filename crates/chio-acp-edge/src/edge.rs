@@ -10,6 +10,13 @@ struct DeferredAcpTask {
     expires_at_ms: u64,
 }
 
+#[derive(Debug)]
+struct AcpJsonRpcEnvelope {
+    id: Value,
+    method: String,
+    params: Value,
+}
+
 /// The ACP edge server.
 ///
 /// Maps Chio tools to ACP capabilities and routes invocations through
@@ -131,6 +138,77 @@ impl ChioAcpEdge {
             .get(capability_id)
             .cloned()
             .ok_or_else(|| AcpEdgeError::ToolNotFound(capability_id.to_string()))
+    }
+
+    fn jsonrpc_protocol_error_response(id: Value, code: i64, message: &str) -> Value {
+        json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "error": {
+                "code": code,
+                "message": message,
+            }
+        })
+    }
+
+    fn parse_jsonrpc_envelope(message: &Value) -> Result<AcpJsonRpcEnvelope, Value> {
+        if message.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
+            return Err(Self::jsonrpc_protocol_error_response(
+                Value::Null,
+                -32600,
+                "invalid jsonrpc envelope",
+            ));
+        }
+
+        let id = message.get("id").cloned().unwrap_or(Value::Null);
+        if !id.is_string() && !id.is_number() && !id.is_null() {
+            return Err(Self::jsonrpc_protocol_error_response(
+                Value::Null,
+                -32600,
+                "request id must be string, number, or null",
+            ));
+        }
+
+        let Some(method) = message.get("method").and_then(Value::as_str) else {
+            return Err(Self::jsonrpc_protocol_error_response(
+                id,
+                -32600,
+                "request missing method",
+            ));
+        };
+        let params = message.get("params").cloned().unwrap_or_else(|| json!({}));
+
+        Ok(AcpJsonRpcEnvelope {
+            id,
+            method: method.to_string(),
+            params,
+        })
+    }
+
+    fn jsonrpc_permission_request(params: &Value) -> PermissionRequest {
+        PermissionRequest {
+            capability_id: Self::jsonrpc_capability_id(params),
+            arguments: Self::jsonrpc_arguments(params),
+        }
+    }
+
+    fn jsonrpc_invocation_params(params: &Value) -> (String, Value) {
+        (
+            Self::jsonrpc_capability_id(params),
+            Self::jsonrpc_arguments(params),
+        )
+    }
+
+    fn jsonrpc_capability_id(params: &Value) -> String {
+        params
+            .get("capabilityId")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string()
+    }
+
+    fn jsonrpc_arguments(params: &Value) -> Value {
+        params.get("arguments").cloned().unwrap_or_else(|| json!({}))
     }
 
     fn build_execution_request(
@@ -393,11 +471,13 @@ impl ChioAcpEdge {
         kernel: &ChioKernel,
         execution: &AcpKernelExecutionContext,
     ) -> Value {
-        let method = message.get("method").and_then(Value::as_str).unwrap_or("");
-        let id = message.get("id").cloned().unwrap_or(Value::Null);
-        let params = message.get("params").cloned().unwrap_or_else(|| json!({}));
+        let AcpJsonRpcEnvelope { id, method, params } =
+            match Self::parse_jsonrpc_envelope(&message) {
+                Ok(envelope) => envelope,
+                Err(response) => return response,
+            };
 
-        match method {
+        match method.as_str() {
             "session/list_capabilities" => {
                 json!({
                     "jsonrpc": "2.0",
@@ -410,17 +490,7 @@ impl ChioAcpEdge {
                 })
             }
             "session/request_permission" => {
-                let cap_id = params
-                    .get("capabilityId")
-                    .and_then(Value::as_str)
-                    .unwrap_or("");
-                let request = PermissionRequest {
-                    capability_id: cap_id.to_string(),
-                    arguments: params
-                        .get("arguments")
-                        .cloned()
-                        .unwrap_or_else(|| json!({})),
-                };
+                let request = Self::jsonrpc_permission_request(&params);
                 let decision = self.evaluate_permission(&request, execution);
                 json!({
                     "jsonrpc": "2.0",
@@ -433,15 +503,8 @@ impl ChioAcpEdge {
                 })
             }
             "tool/invoke" => {
-                let cap_id = params
-                    .get("capabilityId")
-                    .and_then(Value::as_str)
-                    .unwrap_or("");
-                let arguments = params
-                    .get("arguments")
-                    .cloned()
-                    .unwrap_or_else(|| json!({}));
-                match self.invoke(cap_id, arguments, kernel, execution) {
+                let (capability_id, arguments) = Self::jsonrpc_invocation_params(&params);
+                match self.invoke(&capability_id, arguments, kernel, execution) {
                     Ok(result) => json!({
                         "jsonrpc": "2.0",
                         "id": id,
@@ -482,11 +545,13 @@ impl ChioAcpEdge {
         message: Value,
         server: &dyn ToolServerConnection,
     ) -> Value {
-        let method = message.get("method").and_then(Value::as_str).unwrap_or("");
-        let id = message.get("id").cloned().unwrap_or(Value::Null);
-        let params = message.get("params").cloned().unwrap_or_else(|| json!({}));
+        let AcpJsonRpcEnvelope { id, method, params } =
+            match Self::parse_jsonrpc_envelope(&message) {
+                Ok(envelope) => envelope,
+                Err(response) => return response,
+            };
 
-        match method {
+        match method.as_str() {
             "session/list_capabilities" => {
                 json!({
                     "jsonrpc": "2.0",
@@ -499,17 +564,7 @@ impl ChioAcpEdge {
                 })
             }
             "session/request_permission" => {
-                let cap_id = params
-                    .get("capabilityId")
-                    .and_then(Value::as_str)
-                    .unwrap_or("");
-                let request = PermissionRequest {
-                    capability_id: cap_id.to_string(),
-                    arguments: params
-                        .get("arguments")
-                        .cloned()
-                        .unwrap_or_else(|| json!({})),
-                };
+                let request = Self::jsonrpc_permission_request(&params);
                 let decision = self.evaluate_permission_passthrough(&request);
                 json!({
                     "jsonrpc": "2.0",
@@ -522,15 +577,8 @@ impl ChioAcpEdge {
                 })
             }
             "tool/invoke" => {
-                let cap_id = params
-                    .get("capabilityId")
-                    .and_then(Value::as_str)
-                    .unwrap_or("");
-                let arguments = params
-                    .get("arguments")
-                    .cloned()
-                    .unwrap_or_else(|| json!({}));
-                match self.invoke_passthrough(cap_id, arguments, server) {
+                let (capability_id, arguments) = Self::jsonrpc_invocation_params(&params);
+                match self.invoke_passthrough(&capability_id, arguments, server) {
                     Ok(result) => json!({
                         "jsonrpc": "2.0",
                         "id": id,
@@ -582,15 +630,8 @@ impl ChioAcpEdge {
         params: Value,
         execution: &AcpKernelExecutionContext,
     ) -> Value {
-        let cap_id = params
-            .get("capabilityId")
-            .and_then(Value::as_str)
-            .unwrap_or("");
-        let arguments = params
-            .get("arguments")
-            .cloned()
-            .unwrap_or_else(|| json!({}));
-        match self.start_stream_task(cap_id, arguments, execution) {
+        let (capability_id, arguments) = Self::jsonrpc_invocation_params(&params);
+        match self.start_stream_task(&capability_id, arguments, execution) {
             Ok(task) => json!({
                 "jsonrpc": "2.0",
                 "id": id,

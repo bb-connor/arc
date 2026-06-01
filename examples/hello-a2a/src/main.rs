@@ -109,7 +109,8 @@ fn demo_manifest() -> ToolManifest {
     }
 }
 
-fn build_demo_state() -> (ChioA2aEdge, ChioKernel, A2aKernelExecutionContext) {
+fn build_demo_state() -> Result<(ChioA2aEdge, ChioKernel, A2aKernelExecutionContext), Box<dyn Error>>
+{
     let mut kernel = ChioKernel::new(kernel_config());
     kernel.register_tool_server(Box::new(HelloStreamServer));
 
@@ -132,7 +133,7 @@ fn build_demo_state() -> (ChioA2aEdge, ChioKernel, A2aKernelExecutionContext) {
             },
             300,
         )
-        .expect("issue capability");
+        .map_err(|error| -> Box<dyn Error> { format!("issue capability: {error}").into() })?;
 
     let execution = A2aKernelExecutionContext {
         capability,
@@ -143,17 +144,18 @@ fn build_demo_state() -> (ChioA2aEdge, ChioKernel, A2aKernelExecutionContext) {
         model_metadata: None,
     };
 
-    (
-        ChioA2aEdge::new(A2aEdgeConfig::default(), vec![demo_manifest()]).expect("create edge"),
+    Ok((
+        ChioA2aEdge::new(A2aEdgeConfig::default(), vec![demo_manifest()])
+            .map_err(|error| -> Box<dyn Error> { format!("create edge: {error}").into() })?,
         kernel,
         execution,
-    )
+    ))
 }
 
 fn serve() -> Result<(), Box<dyn Error>> {
     let stdin = io::stdin();
     let mut stdout = io::stdout();
-    let (mut edge, kernel, execution) = build_demo_state();
+    let (mut edge, kernel, execution) = build_demo_state()?;
 
     for line in stdin.lock().lines() {
         let line = line?;
@@ -171,19 +173,43 @@ fn serve() -> Result<(), Box<dyn Error>> {
 }
 
 fn agent_card() -> Result<(), Box<dyn Error>> {
-    let (edge, _, _) = build_demo_state();
+    let (edge, _, _) = build_demo_state()?;
     serde_json::to_writer_pretty(io::stdout(), &edge.agent_card())?;
     writeln!(io::stdout())?;
     Ok(())
 }
 
+fn parse_mode_arg(args: impl IntoIterator<Item = String>) -> Result<String, Box<dyn Error>> {
+    let mut args = args.into_iter();
+    let _program = args.next();
+    let mode = args.next().unwrap_or_else(|| "serve".to_string());
+    if let Some(extra) = args.next() {
+        return Err(format!("unexpected argument: {extra}").into());
+    }
+    Ok(mode)
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    let mode = std::env::args()
-        .nth(1)
-        .unwrap_or_else(|| "serve".to_string());
+    let mode = parse_mode_arg(std::env::args())?;
     match mode.as_str() {
         "serve" => serve(),
         "agent-card" => agent_card(),
         other => Err(format!("unknown mode: {other}").into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_mode_arg;
+
+    #[test]
+    fn parse_mode_arg_rejects_extra_positionals() {
+        let result = parse_mode_arg([
+            "hello-a2a".to_string(),
+            "agent-card".to_string(),
+            "extra".to_string(),
+        ]);
+
+        assert!(result.is_err(), "extra positional args should be rejected");
     }
 }

@@ -216,31 +216,42 @@ impl OllamaAdapter {
         let tool_name = non_empty_str(tool_name, "tool_call.function.name")?;
         match verdict {
             VerdictResult::Allow { redactions, .. } => {
-                let value = parse_value(&result.0)?;
-                let value = apply_redactions(value, &redactions, "Ollama tool_result")?;
-                let content = canonical_json_bytes(&value).map_err(|error| {
-                    ProviderError::Malformed(format!(
-                        "Ollama tool_result canonical encoding failed: {error}"
-                    ))
-                })?;
-                let content = String::from_utf8(content).map_err(|error| {
-                    ProviderError::Malformed(format!(
-                        "Ollama tool_result canonical bytes were not UTF-8: {error}"
-                    ))
-                })?;
-                Ok(ToolResultMessage::new(tool_name, content))
+                lower_allow_tool_message(tool_name, result, &redactions)
             }
-            VerdictResult::Deny { reason, .. } => {
-                let payload = deny_payload(&reason);
-                let content = serde_json::to_string(&payload).map_err(|error| {
-                    ProviderError::Malformed(format!(
-                        "Ollama deny payload encoding failed: {error}"
-                    ))
-                })?;
-                Ok(ToolResultMessage::new(tool_name, content))
-            }
+            VerdictResult::Deny { reason, .. } => lower_deny_tool_message(tool_name, &reason),
         }
     }
+}
+
+fn lower_allow_tool_message(
+    tool_name: &str,
+    result: ToolResult,
+    redactions: &[Redaction],
+) -> Result<ToolResultMessage, ProviderError> {
+    let value = parse_value(&result.0)?;
+    let value = apply_redactions(value, redactions, "Ollama tool_result")?;
+    let content = canonical_json_bytes(&value).map_err(|error| {
+        ProviderError::Malformed(format!(
+            "Ollama tool_result canonical encoding failed: {error}"
+        ))
+    })?;
+    let content = String::from_utf8(content).map_err(|error| {
+        ProviderError::Malformed(format!(
+            "Ollama tool_result canonical bytes were not UTF-8: {error}"
+        ))
+    })?;
+    Ok(ToolResultMessage::new(tool_name, content))
+}
+
+fn lower_deny_tool_message(
+    tool_name: &str,
+    reason: &DenyReason,
+) -> Result<ToolResultMessage, ProviderError> {
+    let payload = deny_payload(reason);
+    let content = serde_json::to_string(&payload).map_err(|error| {
+        ProviderError::Malformed(format!("Ollama deny payload encoding failed: {error}"))
+    })?;
+    Ok(ToolResultMessage::new(tool_name, content))
 }
 
 impl chio_provider_adapter_core::Provider for OllamaAdapter {
@@ -268,19 +279,30 @@ fn tool_calls(raw: ProviderRequest) -> Result<Vec<ToolCallPart>, ProviderError> 
     let value: Value = serde_json::from_slice(&raw.0).map_err(|error| {
         ProviderError::Malformed(format!("Ollama /api/chat payload was not JSON: {error}"))
     })?;
-    let body = response_body(value);
+    let body = response_body(value)?;
     extract_tool_calls(&body)
 }
 
-fn response_body(value: Value) -> Value {
+fn response_body(value: Value) -> Result<Value, ProviderError> {
     for field in ["body", "response", "payload"] {
         if let Some(nested) = value.get(field) {
-            if let Some(obj) = nested.as_object() {
-                return Value::Object(obj.clone());
-            }
+            return nested_response_body(nested).ok_or_else(|| {
+                ProviderError::Malformed(format!(
+                    "Ollama /api/chat envelope field `{field}` was not a JSON object or string body"
+                ))
+            });
         }
     }
-    value
+    Ok(value)
+}
+
+fn nested_response_body(value: &Value) -> Option<Value> {
+    if let Some(obj) = value.as_object() {
+        return Some(Value::Object(obj.clone()));
+    }
+    let text = value.as_str()?;
+    let parsed: Value = serde_json::from_str(text).ok()?;
+    parsed.as_object().map(|obj| Value::Object(obj.clone()))
 }
 
 fn extract_tool_calls(body: &Value) -> Result<Vec<ToolCallPart>, ProviderError> {
@@ -303,11 +325,7 @@ fn extract_tool_calls(body: &Value) -> Result<Vec<ToolCallPart>, ProviderError> 
 }
 
 fn validate_tool_call(call: &ToolCallPart) -> Result<(), ProviderError> {
-    if call.function.name.trim().is_empty() {
-        return Err(ProviderError::Malformed(
-            "Ollama tool_call.function.name was empty".to_string(),
-        ));
-    }
+    non_empty_str(&call.function.name, "tool_call.function.name")?;
     if !call.function.arguments.is_object() {
         return Err(ProviderError::BadToolArgs(format!(
             "Ollama tool_call `{}` arguments were not a JSON object",
@@ -373,8 +391,12 @@ fn non_empty_str<'a>(value: &'a str, field: &str) -> Result<&'a str, ProviderErr
         Err(ProviderError::Malformed(format!(
             "Ollama {field} must not be empty"
         )))
+    } else if trimmed != value {
+        Err(ProviderError::Malformed(format!(
+            "Ollama {field} must not contain surrounding whitespace"
+        )))
     } else {
-        Ok(trimmed)
+        Ok(value)
     }
 }
 
@@ -516,6 +538,62 @@ mod tests {
     }
 
     #[test]
+    fn lift_batch_extracts_tool_calls_from_string_body_envelope() {
+        let adapter = adapter();
+        let payload = json!({
+            "body": r#"{"message":{"role":"assistant","tool_calls":[{"function":{"name":"get_weather","arguments":{"city":"Paris"}}}]}}"#
+        });
+        let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
+
+        let invocations = adapter.lift_batch(raw).unwrap();
+
+        assert_eq!(invocations.len(), 1);
+        assert_eq!(invocations[0].tool_name, "get_weather");
+        assert_eq!(invocations[0].provider, ProviderId::Ollama);
+    }
+
+    #[test]
+    fn lift_batch_rejects_tool_call_name_with_surrounding_whitespace() {
+        let adapter = adapter();
+        let payload = json!({
+            "message": {
+                "role": "assistant",
+                "tool_calls": [
+                    {"function": {"name": " get_weather ", "arguments": {"city": "Paris"}}}
+                ]
+            }
+        });
+        let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
+        let err = adapter.lift_batch(raw).unwrap_err();
+
+        assert!(err.to_string().contains("surrounding whitespace"));
+    }
+
+    #[test]
+    fn lift_batch_rejects_malformed_envelope_before_outer_tool_calls() {
+        let adapter = adapter();
+        let payload = json!({
+            "body": 42,
+            "message": {
+                "role": "assistant",
+                "tool_calls": [
+                    {"function": {"name": "unsafe_outer", "arguments": {"source": "outer"}}}
+                ]
+            }
+        });
+        let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
+
+        let err = adapter.lift_batch(raw).unwrap_err();
+
+        match err {
+            ProviderError::Malformed(message) => {
+                assert!(message.contains("envelope field `body`"));
+            }
+            other => panic!("expected Malformed, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn lift_batch_rejects_payload_without_tool_calls() {
         let adapter = adapter();
         let payload = json!({"message": {"role": "assistant", "content": "no tools"}});
@@ -541,6 +619,23 @@ mod tests {
         assert_eq!(msg.role, "tool");
         assert_eq!(msg.name, "get_weather");
         assert!(msg.content.contains("\"temp\""));
+    }
+
+    #[test]
+    fn lower_allow_tool_message_helper_applies_redactions_and_canonicalizes() {
+        let msg = lower_allow_tool_message(
+            "get_weather",
+            ToolResult(br#"{"token":"secret","ok":true}"#.to_vec()),
+            &[Redaction {
+                path: "/token".to_string(),
+                replacement: "[redacted]".to_string(),
+            }],
+        )
+        .unwrap();
+
+        assert_eq!(msg.role, "tool");
+        assert_eq!(msg.name, "get_weather");
+        assert_eq!(msg.content, r#"{"ok":true,"token":"[redacted]"}"#);
     }
 
     #[test]

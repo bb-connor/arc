@@ -91,6 +91,7 @@ impl AgUiEvent {
         matches!(
             self.classification,
             EventClassification::Mutate
+                | EventClassification::Navigate
                 | EventClassification::Create
                 | EventClassification::Destroy
                 | EventClassification::Submit
@@ -141,6 +142,22 @@ mod tests {
             event_type: EventType::StateUpdate,
             target: None,
             classification: EventClassification::Mutate,
+            payload: serde_json::Value::Null,
+        };
+        assert!(event.is_mutating());
+        assert!(!event.is_display_only());
+    }
+
+    #[test]
+    fn navigation_events_are_mutating() {
+        let event = AgUiEvent {
+            event_id: "evt-nav".to_string(),
+            timestamp: 0,
+            agent_id: "a".to_string(),
+            session_id: None,
+            event_type: EventType::Navigation,
+            target: None,
+            classification: EventClassification::Navigate,
             payload: serde_json::Value::Null,
         };
         assert!(event.is_mutating());

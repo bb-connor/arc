@@ -336,26 +336,14 @@ impl ChioKernel {
             federated_origin_kernel_id: None,
         };
 
-        let matching_grants = match resolve_matching_grants(
+        let matching_grants = match resolve_required_matching_grants(
             cap,
             &synthesised.tool_name,
             &synthesised.server_id,
             &synthesised.arguments,
             synthesised.model_metadata.as_ref(),
         ) {
-            Ok(grants) if !grants.is_empty() => grants,
-            Ok(_) => {
-                let error = KernelError::OutOfScope {
-                    tool: synthesised.tool_name.clone(),
-                    server: synthesised.server_id.clone(),
-                };
-                return StepVerdict {
-                    step_index: index,
-                    verdict: StepVerdictKind::Denied,
-                    reason: Some(error.to_string()),
-                    guard: None,
-                };
-            }
+            Ok(grants) => grants,
             Err(error) => {
                 return StepVerdict {
                     step_index: index,
@@ -585,31 +573,16 @@ impl ChioKernel {
             );
         }
 
-        let matching_grants = match resolve_matching_grants(
+        let matching_grants = match resolve_required_matching_grants(
             cap,
             &request.tool_name,
             &request.server_id,
             &request.arguments,
             request.model_metadata.as_ref(),
         ) {
-            Ok(grants) if !grants.is_empty() => grants,
-            Ok(_) => {
-                let e = KernelError::OutOfScope {
-                    tool: request.tool_name.clone(),
-                    server: request.server_id.clone(),
-                };
-                let msg = e.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
-                return self.build_deny_response_with_metadata(
-                    request,
-                    &msg,
-                    now,
-                    None,
-                    extra_metadata.clone(),
-                );
-            }
-            Err(e) => {
-                let msg = e.to_string();
+            Ok(grants) => grants,
+            Err(error) => {
+                let msg = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
                 return self.build_deny_response_with_metadata(
                     request,
@@ -1188,25 +1161,16 @@ impl ChioKernel {
             return self.build_deny_response(request, &msg, now, None);
         }
 
-        let matching_grants = match resolve_matching_grants(
+        let matching_grants = match resolve_required_matching_grants(
             cap,
             &request.tool_name,
             &request.server_id,
             &request.arguments,
             request.model_metadata.as_ref(),
         ) {
-            Ok(grants) if !grants.is_empty() => grants,
-            Ok(_) => {
-                let e = KernelError::OutOfScope {
-                    tool: request.tool_name.clone(),
-                    server: request.server_id.clone(),
-                };
-                let msg = e.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
-                return self.build_deny_response(request, &msg, now, None);
-            }
-            Err(e) => {
-                let msg = e.to_string();
+            Ok(grants) => grants,
+            Err(error) => {
+                let msg = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
                 return self.build_deny_response(request, &msg, now, None);
             }

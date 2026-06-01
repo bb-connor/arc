@@ -117,11 +117,7 @@ pub fn compute_marketplace_invocation_price(
     base: &MarketplaceBasePrice,
     ctx: &MarketplacePricingContext,
 ) -> MarketplaceInvocationPrice {
-    let tier_index = ctx.reputation_tier as usize;
-    let discount = TIER_DISCOUNT_PER_HUNDRED
-        .get(tier_index)
-        .copied()
-        .unwrap_or(0);
+    let discount = discount_for_reputation_tier(ctx.reputation_tier);
 
     let units = if base.units == 0 {
         0
@@ -137,6 +133,13 @@ pub fn compute_marketplace_invocation_price(
         applied_tier: ctx.reputation_tier,
         discount_basis_points_per_hundred: discount,
     }
+}
+
+fn discount_for_reputation_tier(tier: MarketplaceReputationTier) -> u32 {
+    TIER_DISCOUNT_PER_HUNDRED
+        .get(tier as usize)
+        .copied()
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -161,6 +164,26 @@ mod tests {
         let priced = compute_marketplace_invocation_price(&base, &ctx);
         assert_eq!(priced.units, 1_000);
         assert_eq!(priced.discount_basis_points_per_hundred, 0);
+    }
+
+    #[test]
+    fn discount_for_reputation_tier_uses_table_order() {
+        assert_eq!(
+            discount_for_reputation_tier(MarketplaceReputationTier::Tier0),
+            0
+        );
+        assert_eq!(
+            discount_for_reputation_tier(MarketplaceReputationTier::Tier1),
+            5
+        );
+        assert_eq!(
+            discount_for_reputation_tier(MarketplaceReputationTier::Tier2),
+            10
+        );
+        assert_eq!(
+            discount_for_reputation_tier(MarketplaceReputationTier::Tier3),
+            20
+        );
     }
 
     #[test]

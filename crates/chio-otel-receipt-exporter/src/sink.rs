@@ -213,22 +213,19 @@ impl ReceiptStoreSink {
         }))
         .map_err(OTelReceiptExportError::Sign)?;
         validate_span_verdict(span)?;
+        let capability_id = optional_routing_attribute(span, "chio.capability.id")?
+            .unwrap_or_else(|| self.config.default_capability_id.clone());
+        let tool_server = optional_routing_attribute(span, ATTR_CHIO_SERVER_ID)?
+            .unwrap_or_else(|| self.config.default_tool_server.clone());
+        let tool_name = optional_routing_attribute(span, ATTR_GEN_AI_TOOL_NAME)?
+            .unwrap_or_else(|| self.config.default_tool_name.clone());
 
         let body = ChioReceiptBody {
             id: next_receipt_id(),
             timestamp: timestamp_from_span(span),
-            capability_id: span
-                .attribute_string("chio.capability.id")
-                .map(str::to_string)
-                .unwrap_or_else(|| self.config.default_capability_id.clone()),
-            tool_server: span
-                .attribute_string(ATTR_CHIO_SERVER_ID)
-                .map(str::to_string)
-                .unwrap_or_else(|| self.config.default_tool_server.clone()),
-            tool_name: span
-                .attribute_string(ATTR_GEN_AI_TOOL_NAME)
-                .map(str::to_string)
-                .unwrap_or_else(|| self.config.default_tool_name.clone()),
+            capability_id,
+            tool_server,
+            tool_name,
             action,
             decision: None,
             receipt_kind: ReceiptKind::TraceObservation,
@@ -250,6 +247,28 @@ impl ReceiptStoreSink {
             .map_err(OTelReceiptExportError::Sign)?;
         CanonicalChioReceipt::from_receipt(receipt)
     }
+}
+
+fn optional_routing_attribute(
+    span: &OtlpSpan,
+    key: &str,
+) -> Result<Option<String>, OTelReceiptExportError> {
+    match span.attribute_value(key) {
+        None => Ok(None),
+        Some(serde_json::Value::String(value)) if is_non_empty_unpadded(value) => {
+            Ok(Some(value.clone()))
+        }
+        Some(serde_json::Value::String(_)) => Err(OTelReceiptExportError::InvalidSpan(format!(
+            "{key} must be a non-empty unpadded string"
+        ))),
+        Some(value) => Err(OTelReceiptExportError::InvalidSpan(format!(
+            "{key} must be a string, got {value}"
+        ))),
+    }
+}
+
+fn is_non_empty_unpadded(value: &str) -> bool {
+    !value.is_empty() && value.trim() == value
 }
 
 fn validate_export_batch_limits(

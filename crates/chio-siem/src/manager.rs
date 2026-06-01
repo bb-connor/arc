@@ -105,6 +105,12 @@ impl ExporterManager {
     /// Opens the SQLite database at `config.db_path` immediately and returns
     /// an error if the file cannot be opened.
     pub fn new(config: SiemConfig) -> Result<Self, SiemError> {
+        if config.batch_size == 0 {
+            return Err(SiemError::ConfigError(
+                "batch_size must be greater than zero".to_string(),
+            ));
+        }
+
         let rate_limiter = config
             .rate_limit
             .clone()

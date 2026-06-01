@@ -8,10 +8,29 @@ use chio_guard_sdk_macros::chio_guard;
 
 #[chio_guard]
 fn evaluate(req: GuardRequest) -> GuardVerdict {
-    match req.tool_name.as_str() {
-        "dangerous_tool" | "rm_rf" | "drop_database" => {
-            GuardVerdict::deny("tool is blocked by policy")
-        }
-        _ => GuardVerdict::allow(),
+    if tool_is_blocked(req.tool_name.as_str()) {
+        GuardVerdict::deny("tool is blocked by policy")
+    } else {
+        GuardVerdict::allow()
+    }
+}
+
+fn tool_is_blocked(tool_name: &str) -> bool {
+    let trimmed = tool_name.trim();
+    if trimmed.is_empty() || trimmed != tool_name {
+        return true;
+    }
+    matches!(trimmed, "dangerous_tool" | "rm_rf" | "drop_database")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::tool_is_blocked;
+
+    #[test]
+    fn tool_is_blocked_rejects_padded_blocked_names() {
+        assert!(tool_is_blocked("dangerous_tool"));
+        assert!(tool_is_blocked(" dangerous_tool "));
+        assert!(tool_is_blocked(" safe_tool "));
     }
 }

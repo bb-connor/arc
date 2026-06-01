@@ -43,30 +43,26 @@ impl Default for CapitalBookQuery {
 impl CapitalBookQuery {
     #[must_use]
     pub fn receipt_limit_or_default(&self) -> usize {
-        self.receipt_limit
-            .unwrap_or(100)
-            .clamp(1, MAX_EXPOSURE_LEDGER_RECEIPT_LIMIT)
+        bounded_limit_or_default(self.receipt_limit, 100, MAX_EXPOSURE_LEDGER_RECEIPT_LIMIT)
     }
 
     #[must_use]
     pub fn facility_limit_or_default(&self) -> usize {
-        self.facility_limit
-            .unwrap_or(10)
-            .clamp(1, MAX_CREDIT_FACILITY_LIST_LIMIT)
+        bounded_limit_or_default(self.facility_limit, 10, MAX_CREDIT_FACILITY_LIST_LIMIT)
     }
 
     #[must_use]
     pub fn bond_limit_or_default(&self) -> usize {
-        self.bond_limit
-            .unwrap_or(10)
-            .clamp(1, MAX_CREDIT_BOND_LIST_LIMIT)
+        bounded_limit_or_default(self.bond_limit, 10, MAX_CREDIT_BOND_LIST_LIMIT)
     }
 
     #[must_use]
     pub fn loss_event_limit_or_default(&self) -> usize {
-        self.loss_event_limit
-            .unwrap_or(25)
-            .clamp(1, MAX_CREDIT_LOSS_LIFECYCLE_LIST_LIMIT)
+        bounded_limit_or_default(
+            self.loss_event_limit,
+            25,
+            MAX_CREDIT_LOSS_LIFECYCLE_LIST_LIMIT,
+        )
     }
 
     #[must_use]
@@ -717,6 +713,14 @@ mod tests {
     use crate::crypto::Keypair;
 
     #[test]
+    fn bounded_limit_helper_preserves_default_and_clamps_edges() {
+        assert_eq!(bounded_limit_or_default(None, 50, 100), 50);
+        assert_eq!(bounded_limit_or_default(Some(0), 50, 100), 1);
+        assert_eq!(bounded_limit_or_default(Some(75), 50, 100), 75);
+        assert_eq!(bounded_limit_or_default(Some(250), 50, 100), 100);
+    }
+
+    #[test]
     fn exposure_ledger_query_clamps_limits() {
         let query = ExposureLedgerQuery {
             receipt_limit: Some(5_000),
@@ -751,6 +755,31 @@ mod tests {
                 .validate()
                 .unwrap_err()
                 .contains("require at least one anchor")
+        );
+    }
+
+    #[test]
+    fn exposure_ledger_query_rejects_blank_filter_values() {
+        let query = ExposureLedgerQuery {
+            agent_subject: Some(" ".to_string()),
+            ..ExposureLedgerQuery::default()
+        };
+        assert!(
+            query
+                .validate()
+                .unwrap_err()
+                .contains("--agent-subject must be non-empty")
+        );
+
+        let query = ExposureLedgerQuery {
+            tool_server: Some(" tool-server ".to_string()),
+            ..ExposureLedgerQuery::default()
+        };
+        assert!(
+            query
+                .validate()
+                .unwrap_err()
+                .contains("--tool-server must not contain surrounding whitespace")
         );
     }
 

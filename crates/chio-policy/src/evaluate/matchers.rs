@@ -11,31 +11,12 @@ fn apply_conditions(
 
     if let Some(rules) = &mut effective.rules {
         for (block_name, condition) in conditions {
-            if !evaluate_condition(condition, context) {
-                // Block names must stay in sync with
-                // conditions::CONDITIONABLE_RULE_BLOCKS (the set the load-time
-                // validator accepts) and the fields of models::Rules.
-                match block_name.as_str() {
-                    "forbidden_paths" => rules.forbidden_paths = None,
-                    "path_allowlist" => rules.path_allowlist = None,
-                    "egress" => rules.egress = None,
-                    "secret_patterns" => rules.secret_patterns = None,
-                    "patch_integrity" => rules.patch_integrity = None,
-                    "shell_commands" => rules.shell_commands = None,
-                    "tool_access" => rules.tool_access = None,
-                    "computer_use" => rules.computer_use = None,
-                    "remote_desktop_channels" => rules.remote_desktop_channels = None,
-                    "input_injection" => rules.input_injection = None,
-                    "browser_automation" => rules.browser_automation = None,
-                    "code_execution" => rules.code_execution = None,
-                    "velocity" => rules.velocity = None,
-                    "human_in_loop" => rules.human_in_loop = None,
-                    _ => debug_assert!(
-                        false,
-                        "unknown condition block name `{block_name}`; \
-                         validate_condition_keys should have rejected it"
-                    ),
-                }
+            if !evaluate_condition(condition, context) && !rules.clear_block(block_name) {
+                debug_assert!(
+                    false,
+                    "unknown condition block name `{block_name}`; \
+                     validate_condition_keys should have rejected it"
+                );
             }
         }
     }

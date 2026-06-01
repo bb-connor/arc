@@ -1682,16 +1682,16 @@ fn sqrt_passport_cap(active_peers: u64) -> u64 {
 }
 
 fn validate_non_empty(value: &str, field: &str) -> Result<(), PheromoneError> {
-    if value.trim().is_empty() {
+    if value.trim().is_empty() || value.trim() != value {
         return Err(PheromoneError::InvalidField(format!(
-            "{field} must not be empty"
+            "{field} must be non-empty and unpadded"
         )));
     }
     Ok(())
 }
 
 fn validate_hex64(value: &str, field: &str) -> Result<(), PheromoneError> {
-    if value.len() != 64 || !value.chars().all(|ch| ch.is_ascii_hexdigit()) {
+    if !is_hex64_shape(value) {
         return Err(PheromoneError::InvalidField(format!(
             "{field} must be 64 lowercase hex characters"
         )));
@@ -1702,4 +1702,19 @@ fn validate_hex64(value: &str, field: &str) -> Result<(), PheromoneError> {
         )));
     }
     Ok(())
+}
+
+fn is_hex64_shape(value: &str) -> bool {
+    value.len() == 64 && value.as_bytes().iter().all(u8::is_ascii_hexdigit)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn hex64_shape_helper_accepts_exact_ascii_hex_before_lowercase_validation() {
+        assert!(super::is_hex64_shape(&"a".repeat(64)));
+        assert!(super::is_hex64_shape(&"A".repeat(64)));
+        assert!(!super::is_hex64_shape(&"a".repeat(63)));
+        assert!(!super::is_hex64_shape(&format!("{}g", "a".repeat(63))));
+    }
 }

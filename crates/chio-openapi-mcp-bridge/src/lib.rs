@@ -141,6 +141,108 @@ fn enforce_bridged_response_body(
     })
 }
 
+fn bridged_tool_response(binding: &RouteBinding, response: BridgedResponse) -> Value {
+    let text = serde_json::to_string(&response.body).unwrap_or_else(|_| "{}".to_string());
+    json!({
+        "content": [{
+            "type": "text",
+            "text": text,
+        }],
+        "isError": response.is_error,
+        "structuredContent": {
+            "httpStatus": response.status,
+            "method": binding.method,
+            "path": binding.path,
+            "body": response.body,
+        }
+    })
+}
+
+fn dispatch_url(
+    base_url: &str,
+    binding: &RouteBinding,
+    arguments: &Value,
+) -> Result<String, BridgeError> {
+    let path = expand_route_path(&binding.path, arguments)?;
+    Ok(format!("{base_url}{path}"))
+}
+
+fn expand_route_path(template: &str, arguments: &Value) -> Result<String, BridgeError> {
+    let mut expanded = String::with_capacity(template.len());
+    let mut rest = template;
+
+    while let Some(open) = rest.find('{') {
+        expanded.push_str(&rest[..open]);
+        let after_open = &rest[open + 1..];
+        let close = after_open.find('}').ok_or_else(|| {
+            BridgeError::UpstreamError(format!(
+                "OpenAPI bridge route path `{template}` has an unterminated path parameter"
+            ))
+        })?;
+        let name = &after_open[..close];
+        if name.is_empty() {
+            return Err(BridgeError::UpstreamError(format!(
+                "OpenAPI bridge route path `{template}` has an empty path parameter"
+            )));
+        }
+        let value = path_parameter_value(arguments, name)?;
+        expanded.push_str(&percent_encode_path_segment(&value));
+        rest = &after_open[close + 1..];
+    }
+
+    if rest.contains('}') {
+        return Err(BridgeError::UpstreamError(format!(
+            "OpenAPI bridge route path `{template}` has an unmatched path parameter terminator"
+        )));
+    }
+    expanded.push_str(rest);
+    Ok(expanded)
+}
+
+fn path_parameter_value(arguments: &Value, name: &str) -> Result<String, BridgeError> {
+    let value = arguments.get(name).ok_or_else(|| {
+        BridgeError::UpstreamError(format!("OpenAPI bridge missing path parameter `{name}`"))
+    })?;
+    let text = match value {
+        Value::String(value) => value.clone(),
+        Value::Number(value) => value.to_string(),
+        Value::Bool(value) => value.to_string(),
+        _ => {
+            return Err(BridgeError::UpstreamError(format!(
+                "OpenAPI bridge path parameter `{name}` must be a string, number, or boolean"
+            )));
+        }
+    };
+    if text.is_empty() {
+        return Err(BridgeError::UpstreamError(format!(
+            "OpenAPI bridge path parameter `{name}` must not be empty"
+        )));
+    }
+    Ok(text)
+}
+
+fn percent_encode_path_segment(value: &str) -> String {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    let mut encoded = String::with_capacity(value.len());
+    for byte in value.as_bytes() {
+        if is_unreserved_path_byte(*byte) {
+            encoded.push(*byte as char);
+        } else {
+            encoded.push('%');
+            encoded.push(HEX[(byte >> 4) as usize] as char);
+            encoded.push(HEX[(byte & 0x0f) as usize] as char);
+        }
+    }
+    encoded
+}
+
+fn is_unreserved_path_byte(byte: u8) -> bool {
+    matches!(
+        byte,
+        b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~'
+    )
+}
+
 /// The OpenAPI-MCP bridge.
 ///
 /// Parses an OpenAPI spec, generates MCP tool definitions, and dispatches
@@ -277,7 +379,7 @@ impl OpenApiMcpBridge {
             .ok_or_else(|| BridgeError::ToolNotFound(tool_name.to_string()))?;
 
         if let Some(dispatcher) = &self.dispatcher {
-            let url = format!("{}{}", self.config.base_url, binding.path);
+            let url = dispatch_url(&self.config.base_url, binding, &arguments)?;
             // HttpEgressContract: gate the dispatcher invocation on the typed
             // egress contract. The bridge stays transport-agnostic, so we
             // validate URL and DNS pre-flight, then enforce the response-byte
@@ -285,20 +387,7 @@ impl OpenApiMcpBridge {
             let contract = enforce_dispatch_contract(self.config.egress_contract.as_ref(), &url)?;
             let response = dispatcher(&binding.method, &url, &arguments)?;
             enforce_bridged_response_body(contract, &response)?;
-            Ok(json!({
-                "content": [{
-                    "type": "text",
-                    "text": serde_json::to_string(&response.body)
-                        .unwrap_or_else(|_| "{}".to_string()),
-                }],
-                "isError": response.is_error,
-                "structuredContent": {
-                    "httpStatus": response.status,
-                    "method": binding.method,
-                    "path": binding.path,
-                    "body": response.body,
-                }
-            }))
+            Ok(bridged_tool_response(binding, response))
         } else {
             Err(BridgeError::Kernel(
                 "OpenAPI bridge requires a dispatcher for live tool invocation".to_string(),
@@ -366,27 +455,14 @@ impl OwnedBridgeToolServer {
             .ok_or_else(|| BridgeError::ToolNotFound(tool_name.to_string()))?;
 
         if let Some(dispatcher) = &self.dispatcher {
-            let url = format!("{}{}", self.config.base_url, binding.path);
+            let url = dispatch_url(&self.config.base_url, binding, &arguments)?;
             // HttpEgressContract: validate URL pre-flight and enforce the
             // response-byte ceiling post-dispatch. Missing contract state
             // fails closed for live dispatchers.
             let contract = enforce_dispatch_contract(self.config.egress_contract.as_ref(), &url)?;
             let response = dispatcher(&binding.method, &url, &arguments)?;
             enforce_bridged_response_body(contract, &response)?;
-            Ok(json!({
-                "content": [{
-                    "type": "text",
-                    "text": serde_json::to_string(&response.body)
-                        .unwrap_or_else(|_| "{}".to_string()),
-                }],
-                "isError": response.is_error,
-                "structuredContent": {
-                    "httpStatus": response.status,
-                    "method": binding.method,
-                    "path": binding.path,
-                    "body": response.body,
-                }
-            }))
+            Ok(bridged_tool_response(binding, response))
         } else {
             Err(BridgeError::Kernel(
                 "OpenAPI bridge requires a dispatcher for live tool invocation".to_string(),
@@ -528,6 +604,29 @@ mod tests {
         config.base_url = "https://203.0.113.10".to_string();
         config.egress_contract = Some(HttpEgressContract::permissive_for_tests("203.0.113.10"));
         config
+    }
+
+    #[test]
+    fn bridged_tool_response_preserves_metadata_and_body() {
+        let binding = RouteBinding {
+            method: "GET".to_string(),
+            path: "/pets".to_string(),
+        };
+        let response = BridgedResponse {
+            status: 202,
+            body: json!({"ok": true}),
+            is_error: false,
+        };
+
+        let result = bridged_tool_response(&binding, response);
+
+        assert_eq!(result["content"][0]["type"], "text");
+        assert_eq!(result["content"][0]["text"], r#"{"ok":true}"#);
+        assert_eq!(result["isError"], false);
+        assert_eq!(result["structuredContent"]["httpStatus"], 202);
+        assert_eq!(result["structuredContent"]["method"], "GET");
+        assert_eq!(result["structuredContent"]["path"], "/pets");
+        assert_eq!(result["structuredContent"]["body"]["ok"], true);
     }
 
     #[test]
@@ -793,6 +892,48 @@ mod tests {
             .as_str()
             .unwrap_or("");
         assert!(url.starts_with("https://203.0.113.10"));
+    }
+
+    #[test]
+    fn bridge_dispatcher_expands_path_parameters() {
+        let mut bridge =
+            OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config_with_egress()).unwrap();
+        bridge.set_dispatcher(Box::new(|_method, url, _args| {
+            Ok(BridgedResponse {
+                status: 200,
+                body: json!({"receivedUrl": url}),
+                is_error: false,
+            })
+        }));
+
+        let result = bridge
+            .invoke_tool("getPet", json!({"petId": "pet-42"}))
+            .unwrap();
+
+        assert_eq!(
+            result["structuredContent"]["body"]["receivedUrl"],
+            "https://203.0.113.10/pets/pet-42"
+        );
+    }
+
+    #[test]
+    fn bridge_dispatcher_rejects_missing_path_parameter() {
+        let mut bridge =
+            OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config_with_egress()).unwrap();
+        bridge.set_dispatcher(Box::new(|_method, _url, _args| {
+            panic!("dispatcher must not run when path parameter is missing")
+        }));
+
+        let error = bridge.invoke_tool("getPet", json!({})).unwrap_err();
+
+        assert!(format!("{error}").contains("missing path parameter `petId`"));
+    }
+
+    #[test]
+    fn expand_route_path_rejects_unmatched_closing_brace() {
+        let error = expand_route_path("/pets/{petId}}", &json!({"petId": "42"})).unwrap_err();
+
+        assert!(format!("{error}").contains("unmatched"));
     }
 
     #[test]

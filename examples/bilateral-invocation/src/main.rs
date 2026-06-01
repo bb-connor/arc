@@ -45,12 +45,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "  origin kernel:   {} (passport pubkey hex prefix={}…)",
         origin_kernel_id,
-        &kp_origin.public_key().to_hex()[..16]
+        display_prefix(&kp_origin.public_key().to_hex(), 16)
     );
     println!(
         "  tool-host kernel: {} (passport pubkey hex prefix={}…)",
         tool_host_kernel_id,
-        &kp_tool_host.public_key().to_hex()[..16]
+        display_prefix(&kp_tool_host.public_key().to_hex(), 16)
     );
 
     // ---- 2. Build a receipt for the invocation ------------------------
@@ -177,7 +177,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!(
         "  envelope payload (base64, prefix): {}…",
-        &outcome.artifacts.dsse_envelope.payload[..40]
+        display_prefix(&outcome.artifacts.dsse_envelope.payload, 40)
     );
 
     println!();
@@ -227,4 +227,30 @@ fn sample_receipt(kp: &Keypair) -> Result<ChioReceipt, Box<dyn std::error::Error
     };
     ChioReceipt::sign(body, kp)
         .map_err(|e| -> Box<dyn std::error::Error> { format!("receipt sign: {e:?}").into() })
+}
+
+fn display_prefix(value: &str, bytes: usize) -> &str {
+    if value.len() <= bytes {
+        return value;
+    }
+    let mut end = bytes;
+    while !value.is_char_boundary(end) {
+        end -= 1;
+    }
+    &value[..end]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::display_prefix;
+
+    #[test]
+    fn display_prefix_returns_short_values_without_panicking() {
+        assert_eq!(display_prefix("short", 40), "short");
+    }
+
+    #[test]
+    fn display_prefix_preserves_utf8_boundaries() {
+        assert_eq!(display_prefix("abcdé", 5), "abcd");
+    }
 }

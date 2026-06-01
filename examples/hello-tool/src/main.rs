@@ -6,8 +6,19 @@
 
 use chio_core::crypto::Keypair;
 use chio_core::{PromptMessage, ResourceContent};
-use chio_kernel::{PromptProvider, ResourceProvider, ToolServerConnection, ToolServerEvent};
+use chio_kernel::{
+    KernelError, PromptProvider, ResourceProvider, ToolServerConnection, ToolServerEvent,
+};
 use chio_mcp_adapter::{NativeChioServiceBuilder, NativePrompt, NativeResource, NativeTool};
+
+fn greeting_name(arguments: &serde_json::Value) -> Result<&str, KernelError> {
+    arguments
+        .get("name")
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| {
+            KernelError::RequestIncomplete("greet requires string field name".to_string())
+        })
+}
 
 fn build_service(public_key_hex: String) -> chio_mcp_adapter::NativeChioService {
     NativeChioServiceBuilder::new("srv-hello", public_key_hex)
@@ -39,10 +50,7 @@ fn build_service(public_key_hex: String) -> chio_mcp_adapter::NativeChioService 
             .per_invocation_price(25, "USD")
             .latency_hint(chio_manifest::LatencyHint::Instant),
             |arguments| {
-                let name = arguments
-                    .get("name")
-                    .and_then(|value| value.as_str())
-                    .unwrap_or("stranger");
+                let name = greeting_name(&arguments)?;
                 Ok(serde_json::json!({
                     "greeting": format!("Hello, {name}! This greeting was served by a native Chio service.")
                 }))
@@ -163,6 +171,7 @@ async fn main() {
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::build_service;
+    use chio_kernel::{KernelError, ToolServerConnection};
     use chio_manifest::PricingModel;
 
     #[test]
@@ -190,5 +199,19 @@ mod tests {
                 .and_then(|pricing| pricing.billing_unit.as_deref()),
             Some("invocation")
         );
+    }
+
+    #[tokio::test]
+    async fn greet_rejects_missing_required_name() {
+        let service = build_service(
+            "7b0f6f631f6e66207140ead0b6b2e9418916d2c4b3c7448ba5f7ed27f5c8d038".to_string(),
+        );
+
+        let error = service
+            .invoke("greet", serde_json::json!({}), None)
+            .await
+            .expect_err("missing name should fail closed");
+
+        assert!(matches!(error, KernelError::RequestIncomplete(reason) if reason.contains("name")));
     }
 }

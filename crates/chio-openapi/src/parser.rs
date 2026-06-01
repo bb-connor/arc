@@ -264,17 +264,18 @@ impl OpenApiSpec {
         let mut result = Vec::new();
         for param_value in arr {
             let resolved = Self::maybe_resolve(root, param_value)?;
-            let param = Self::parse_single_parameter(resolved)?;
+            let param = Self::parse_single_parameter(resolved, root)?;
             result.push(param);
         }
         Ok(result)
     }
 
-    fn parse_single_parameter(value: &Value) -> Result<Parameter> {
+    fn parse_single_parameter(value: &Value, root: &Value) -> Result<Parameter> {
         let name = value
             .get("name")
             .and_then(|v| v.as_str())
-            .unwrap_or("unknown")
+            .filter(|name| !name.trim().is_empty())
+            .ok_or_else(|| OpenApiError::MissingField("parameter.name".to_string()))?
             .to_string();
 
         let location = match value.get("in").and_then(|v| v.as_str()) {
@@ -291,7 +292,10 @@ impl OpenApiSpec {
             // Path parameters are always required per the OpenAPI spec.
             .unwrap_or(location == ParameterLocation::Path);
 
-        let schema = value.get("schema").cloned();
+        let schema = value
+            .get("schema")
+            .map(|schema| Self::maybe_resolve(root, schema).cloned())
+            .transpose()?;
 
         let description = value
             .get("description")
@@ -319,9 +323,7 @@ impl OpenApiSpec {
             None => return Ok(None),
         };
 
-        let media = content
-            .get("application/json")
-            .or_else(|| content.values().next());
+        let media = preferred_content_media(content);
 
         match media {
             Some(m) => {
@@ -360,9 +362,7 @@ impl OpenApiSpec {
             None => return Ok(None),
         };
 
-        let media = content
-            .get("application/json")
-            .or_else(|| content.values().next());
+        let media = preferred_content_media(content);
 
         match media {
             Some(m) => {
@@ -394,10 +394,24 @@ fn parse_yaml_value(input: &str) -> Result<Value> {
     Ok(serde_yaml::from_str(input)?)
 }
 
+fn preferred_content_media(content: &serde_json::Map<String, Value>) -> Option<&Value> {
+    content
+        .get("application/json")
+        .or_else(|| content.values().next())
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+
+    fn op_parameter_schema<'a>(operation: &'a Operation, name: &str) -> Option<&'a Value> {
+        operation
+            .parameters
+            .iter()
+            .find(|parameter| parameter.name == name)
+            .and_then(|parameter| parameter.schema.as_ref())
+    }
 
     fn minimal_spec_json() -> &'static str {
         r##"{
@@ -485,6 +499,23 @@ paths:
     }
 
     #[test]
+    fn preferred_content_media_selects_application_json_when_present() {
+        let content = serde_json::json!({
+            "text/plain": { "schema": { "type": "string" } },
+            "application/json": { "schema": { "type": "object" } }
+        });
+        let media = preferred_content_media(content.as_object().unwrap()).unwrap();
+
+        assert_eq!(
+            media
+                .get("schema")
+                .and_then(|schema| schema.get("type"))
+                .and_then(Value::as_str),
+            Some("object")
+        );
+    }
+
+    #[test]
     fn unsupported_version() {
         let input = r##"{"openapi": "2.0", "info": {"title": "T", "version": "1"}, "paths": {}}"##;
         let err = OpenApiSpec::parse(input).unwrap_err();
@@ -531,6 +562,42 @@ paths:
         let op = &item.operations[0].1;
         assert_eq!(op.parameters.len(), 1);
         assert_eq!(op.parameters[0].name, "limit");
+    }
+
+    #[test]
+    fn parameter_schema_ref_is_resolved() {
+        let input = r##"{
+            "openapi": "3.0.3",
+            "info": { "title": "T", "version": "1" },
+            "paths": {
+                "/things": {
+                    "get": {
+                        "operationId": "getThings",
+                        "parameters": [
+                            {
+                                "name": "limit",
+                                "in": "query",
+                                "schema": { "$ref": "#/components/schemas/Limit" }
+                            }
+                        ],
+                        "responses": { "200": { "description": "OK" } }
+                    }
+                }
+            },
+            "components": {
+                "schemas": {
+                    "Limit": { "type": "integer", "minimum": 1 }
+                }
+            }
+        }"##;
+
+        let spec = OpenApiSpec::parse(input).unwrap();
+        let (_, item) = &spec.paths[0];
+        let schema = op_parameter_schema(&item.operations[0].1, "limit").unwrap();
+
+        assert_eq!(schema.get("type").and_then(Value::as_str), Some("integer"));
+        assert_eq!(schema.get("minimum").and_then(Value::as_i64), Some(1));
+        assert!(schema.get("$ref").is_none());
     }
 
     #[test]
@@ -591,6 +658,29 @@ paths:
         let op = &item.operations[0].1;
         assert!(op.parameters[0].required);
         assert_eq!(op.parameters[0].location, ParameterLocation::Path);
+    }
+
+    #[test]
+    fn parameter_missing_name_is_rejected() {
+        let input = r##"{
+            "openapi": "3.0.3",
+            "info": { "title": "T", "version": "1" },
+            "paths": {
+                "/pets": {
+                    "get": {
+                        "operationId": "listPets",
+                        "parameters": [
+                            { "in": "query", "schema": { "type": "string" } }
+                        ],
+                        "responses": { "200": { "description": "OK" } }
+                    }
+                }
+            }
+        }"##;
+
+        let err = OpenApiSpec::parse(input).unwrap_err();
+
+        assert!(matches!(err, OpenApiError::MissingField(ref field) if field == "parameter.name"));
     }
 
     #[test]

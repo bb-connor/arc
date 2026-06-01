@@ -197,7 +197,12 @@ impl Retrieve for LocalSchemaRetriever {
             }
             "file" => {
                 let path = PathBuf::from(uri.path().as_str());
-                let file = fs::File::open(path)?;
+                let canonical_path = fs::canonicalize(&path)?;
+                let canonical_root = fs::canonicalize(&self.schema_root)?;
+                if !canonical_path.starts_with(&canonical_root) {
+                    return Err("file schema reference resolves outside schema root".into());
+                }
+                let file = fs::File::open(canonical_path)?;
                 Ok(serde_json::from_reader(file)?)
             }
             "http" | "https" => Err("unregistered network schema reference is not resolved".into()),
@@ -285,6 +290,7 @@ mod tests {
     #[test]
     fn absolute_id_sibling_schema_ref_resolves_from_local_files() {
         let root = unique_temp_dir("chio-spec-validate-sibling-ref");
+        let _ = fs::remove_dir_all(&root);
         let schema_dir = root.join("spec/schemas/test/v1");
         fs::create_dir_all(&schema_dir)
             .unwrap_or_else(|err| panic!("failed to create {}: {err}", schema_dir.display()));
@@ -330,6 +336,66 @@ mod tests {
         fs::remove_dir_all(&root)
             .unwrap_or_else(|err| panic!("failed to remove {}: {err}", root.display()));
         result.unwrap_or_else(|err| panic!("absolute $id sibling ref should resolve: {err}"));
+    }
+
+    #[test]
+    fn file_ref_outside_schema_root_is_rejected() {
+        let root = unique_temp_dir("chio-spec-validate-file-ref-outside");
+        let _ = fs::remove_dir_all(&root);
+        let schema_dir = root.join("spec/schemas/test/v1");
+        let outside_dir = root.join("outside");
+        fs::create_dir_all(&schema_dir)
+            .unwrap_or_else(|err| panic!("failed to create {}: {err}", schema_dir.display()));
+        fs::create_dir_all(&outside_dir)
+            .unwrap_or_else(|err| panic!("failed to create {}: {err}", outside_dir.display()));
+        let schema_path = schema_dir.join("root.schema.json");
+        let outside_schema = outside_dir.join("outside.schema.json");
+        let doc_path = root.join("doc.json");
+
+        fs::write(
+            &outside_schema,
+            serde_json::to_vec_pretty(&json!({
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object"
+            }))
+            .unwrap_or_else(|err| panic!("failed to encode outside schema: {err}")),
+        )
+        .unwrap_or_else(|err| panic!("failed to write {}: {err}", outside_schema.display()));
+        fs::write(
+            &schema_path,
+            serde_json::to_vec_pretty(&json!({
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "$id": "https://chio.world/schemas/test/v1/root.schema.json",
+                "$ref": file_uri(&outside_schema)
+            }))
+            .unwrap_or_else(|err| panic!("failed to encode root schema: {err}")),
+        )
+        .unwrap_or_else(|err| panic!("failed to write {}: {err}", schema_path.display()));
+        fs::write(&doc_path, br#"{}"#)
+            .unwrap_or_else(|err| panic!("failed to write {}: {err}", doc_path.display()));
+
+        let result = validate(&schema_path, &doc_path);
+        fs::remove_dir_all(&root)
+            .unwrap_or_else(|err| panic!("failed to remove {}: {err}", root.display()));
+
+        match result {
+            Err(ValidateError::SchemaCompile(_, message)) => {
+                assert!(
+                    message.contains("outside schema root"),
+                    "expected schema-root rejection, got: {message}"
+                );
+            }
+            Err(error) => panic!("expected SchemaCompile rejection, got {error}"),
+            Ok(()) => panic!("file:// ref outside schema root should fail closed"),
+        }
+    }
+
+    fn file_uri(path: &Path) -> String {
+        let mut value = path.to_string_lossy().replace('\\', "/");
+        if !value.starts_with('/') {
+            value.insert(0, '/');
+        }
+        format!("file://{value}")
     }
 
     fn unique_temp_dir(label: &str) -> PathBuf {

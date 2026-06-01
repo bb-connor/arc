@@ -115,6 +115,12 @@ fn write_json_file<T: serde::Serialize>(path: &Path, value: &T) -> Result<(), Cl
 
 fn ensure_empty_directory(path: &Path) -> Result<(), CliError> {
     if path.exists() {
+        if fs::symlink_metadata(path)?.file_type().is_symlink() {
+            return Err(CliError::Other(format!(
+                "output path must not be a symlink: {}",
+                path.display()
+            )));
+        }
         if !path.is_dir() {
             return Err(CliError::Other(format!(
                 "output path must be a directory: {}",
@@ -760,6 +766,21 @@ mod tests {
         assert!(error.to_string().contains("output directory must be empty"));
 
         let _ = fs::remove_dir_all(dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn ensure_empty_directory_rejects_symlink_dir() {
+        let target = unique_test_dir("chio-wall-output-target");
+        let link = unique_test_dir("chio-wall-output-link");
+        fs::create_dir_all(&target).expect("create target dir");
+        std::os::unix::fs::symlink(&target, &link).expect("create output symlink");
+
+        let error = ensure_empty_directory(&link).expect_err("symlink dir should fail");
+
+        assert!(error.to_string().contains("symlink"));
+        let _ = fs::remove_file(link);
+        let _ = fs::remove_dir_all(target);
     }
 
     #[test]

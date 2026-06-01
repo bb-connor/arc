@@ -533,6 +533,45 @@ mod tests {
     }
 
     #[test]
+    fn interceptor_jsonrpc_param_decoder_preserves_method_specific_protocol_errors() {
+        let missing = MessageInterceptor::jsonrpc_params(&json!({}), "fs/read_text_file")
+            .expect_err("missing params should fail closed");
+        assert_eq!(
+            missing.to_string(),
+            "protocol error: missing params in fs/read_text_file"
+        );
+
+        let invalid = MessageInterceptor::decode_jsonrpc_params::<ReadTextFileParams>(
+            &json!({
+                "sessionId": "s1",
+                "path": 42
+            }),
+            "fs/read_text_file",
+        )
+        .expect_err("invalid typed params should fail closed");
+        assert!(invalid
+            .to_string()
+            .contains("protocol error: invalid fs/read_text_file params:"));
+
+        let decoded = match MessageInterceptor::decode_jsonrpc_params::<ReadTextFileParams>(
+            &json!({
+                "sessionId": "s1",
+                "path": "/home/user/project/README.md",
+                "line": 1,
+                "limit": 5
+            }),
+            "fs/read_text_file",
+        ) {
+            Ok(decoded) => decoded,
+            Err(error) => panic!("valid fs/read_text_file params should decode: {error}"),
+        };
+        assert_eq!(decoded.session_id, "s1");
+        assert_eq!(decoded.path, "/home/user/project/README.md");
+        assert_eq!(decoded.line, Some(1));
+        assert_eq!(decoded.limit, Some(5));
+    }
+
+    #[test]
     fn interceptor_forwards_unrelated_message() {
         let interceptor = MessageInterceptor::new(test_config());
         let msg = json!({
@@ -1145,6 +1184,14 @@ mod extended_tests {
     fn protocol_json_rpc_error_builder_with_none_id() {
         let error = json_rpc_error(None, -32000, "access denied");
         assert_eq!(error["id"], serde_json::Value::Null);
+    }
+
+    #[test]
+    fn protocol_json_rpc_error_builder_replaces_non_scalar_ids_with_null() {
+        for invalid_id in [json!(true), json!({"nested": 1}), json!([1])] {
+            let error = json_rpc_error(Some(&invalid_id), -32000, "access denied");
+            assert_eq!(error["id"], serde_json::Value::Null);
+        }
     }
 
     #[test]

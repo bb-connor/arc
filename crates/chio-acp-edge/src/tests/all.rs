@@ -1098,6 +1098,35 @@ mod tests {
     // ---- JSON-RPC handler tests ----
 
     #[test]
+    fn jsonrpc_param_helpers_preserve_empty_capability_and_default_arguments() {
+        let permission = ChioAcpEdge::jsonrpc_permission_request(&json!({}));
+        assert_eq!(permission.capability_id, "");
+        assert_eq!(permission.arguments, json!({}));
+
+        let permission = ChioAcpEdge::jsonrpc_permission_request(&json!({
+            "capabilityId": "read_file",
+            "arguments": { "path": "/workspace/README.md" }
+        }));
+        assert_eq!(permission.capability_id, "read_file");
+        assert_eq!(permission.arguments, json!({ "path": "/workspace/README.md" }));
+
+        let (missing_capability_id, kept_arguments) =
+            ChioAcpEdge::jsonrpc_invocation_params(&json!({
+                "capabilityId": 7,
+                "arguments": ["kept"]
+            }));
+        assert_eq!(missing_capability_id, "");
+        assert_eq!(kept_arguments, json!(["kept"]));
+
+        let (capability_id, default_arguments) =
+            ChioAcpEdge::jsonrpc_invocation_params(&json!({
+                "capabilityId": "search"
+            }));
+        assert_eq!(capability_id, "search");
+        assert_eq!(default_arguments, json!({}));
+    }
+
+    #[test]
     fn jsonrpc_list_capabilities() {
         let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
@@ -1247,6 +1276,43 @@ mod tests {
             &execution,
         );
         assert_eq!(response["error"]["code"], -32601);
+    }
+
+    #[test]
+    fn jsonrpc_rejects_non_scalar_request_ids_before_method_dispatch() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "test-srv", "read_file"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        for invalid_id in [json!(false), json!({"nested": 1}), json!([1])] {
+            let response = edge.handle_jsonrpc(
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": invalid_id,
+                    "method": "unknown/method",
+                    "params": {}
+                }),
+                &kernel,
+                &execution,
+            );
+
+            assert_eq!(response["id"], Value::Null);
+            assert_eq!(response["error"]["code"], -32600);
+            assert_eq!(
+                response["error"]["message"],
+                "request id must be string, number, or null"
+            );
+        }
     }
 
     #[test]

@@ -78,10 +78,18 @@ fn walk_json_files(path: &Path, files: &mut Vec<PathBuf>) -> Result<(), LoadErro
     for entry in fs::read_dir(path)? {
         let entry = entry?;
         let entry_path = entry.path();
-        let metadata = entry.metadata()?;
-        if metadata.is_dir() {
+        let file_type = entry.file_type()?;
+        if file_type.is_symlink() {
+            return Err(LoadError::Io(std::io::Error::other(format!(
+                "refusing symlink in conformance fixture tree: {}",
+                entry_path.display()
+            ))));
+        }
+        if file_type.is_dir() {
             walk_json_files(&entry_path, files)?;
-        } else if entry_path.extension().and_then(|value| value.to_str()) == Some("json") {
+        } else if file_type.is_file()
+            && entry_path.extension().and_then(|value| value.to_str()) == Some("json")
+        {
             files.push(entry_path);
         }
     }
@@ -147,6 +155,25 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert_eq!(scenarios[0].id, "initialize");
         assert_eq!(results[0].peer, "js");
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn collect_json_files_rejects_symlinked_json_file() -> Result<(), LoadError> {
+        let dir = unique_dir("chio-conformance-load-symlink")?;
+        let outside = unique_dir("chio-conformance-load-outside")?;
+        fs::create_dir_all(&dir)?;
+        fs::create_dir_all(&outside)?;
+        fs::write(outside.join("escape.json"), "{}")?;
+        std::os::unix::fs::symlink(outside.join("escape.json"), dir.join("escape.json"))?;
+
+        match collect_json_files(&dir) {
+            Ok(files) => panic!("symlinked JSON should fail closed: {files:?}"),
+            Err(error) => assert!(error.to_string().contains("symlink")),
+        }
+        let _ = fs::remove_dir_all(dir);
+        let _ = fs::remove_dir_all(outside);
         Ok(())
     }
 }

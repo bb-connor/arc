@@ -274,6 +274,15 @@ pub struct LiabilityQuoteResponseArtifact {
 
 impl LiabilityQuoteResponseArtifact {
     pub fn validate(&self) -> Result<(), String> {
+        if self.schema != crate::LIABILITY_QUOTE_RESPONSE_ARTIFACT_SCHEMA {
+            return Err(format!(
+                "unsupported liability quote response schema: {}",
+                self.schema
+            ));
+        }
+        if self.quote_response_id.trim().is_empty() {
+            return Err("quote response requires quote_response_id".to_string());
+        }
         if !self.quote_request.verify_signature().map_err(|error| {
             format!("quote response quote_request signature verification failed: {error}")
         })? {

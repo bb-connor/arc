@@ -118,6 +118,47 @@ fn lift_reads_org_id_from_header_envelope() {
 }
 
 #[test]
+fn lift_rejects_malformed_org_header_before_config_fallback() {
+    let adapter = OpenAiAdapter::new(OpenAiAdapterConfig::new("org_config"));
+    let err = block_on(adapter.lift(raw(json!({
+        "headers": {
+            "OpenAI-Organization": 42
+        },
+        "body": {
+            "output": [
+                {
+                    "type": "function_call",
+                    "call_id": "call_search_1",
+                    "name": "search_web",
+                    "arguments": "{\"query\":\"chio\"}"
+                }
+            ]
+        }
+    }))))
+    .expect_err("malformed explicit organization header must fail closed");
+
+    assert!(err.to_string().contains("OpenAI organization header"));
+}
+
+#[test]
+fn lift_rejects_function_call_name_with_surrounding_whitespace() {
+    let adapter = OpenAiAdapter::new(OpenAiAdapterConfig::new("org_config"));
+    let err = block_on(adapter.lift(raw(json!({
+        "output": [
+            {
+                "type": "function_call",
+                "call_id": "call_search_1",
+                "name": " search_web ",
+                "arguments": "{\"query\":\"chio\"}"
+            }
+        ]
+    }))))
+    .expect_err("whitespace-padded function names must fail closed");
+
+    assert!(err.to_string().contains("surrounding whitespace"));
+}
+
+#[test]
 fn lift_accepts_single_function_call_item_payload() {
     let adapter = OpenAiAdapter::new("org_direct_item");
     let payload = raw(json!({

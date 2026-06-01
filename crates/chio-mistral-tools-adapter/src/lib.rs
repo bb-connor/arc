@@ -267,16 +267,27 @@ impl MistralAdapter {
         let function_name = non_empty_str(function_name, "functionResponse.name")?;
         match verdict {
             VerdictResult::Allow { redactions, .. } => {
-                let value = parse_value(&result.0)?;
-                let value = apply_redactions(value, &redactions, "Mistral functionResponse")?;
-                Ok(FunctionResponsePart::new(function_name, value))
+                lower_allow_function_response(function_name, result, &redactions)
             }
-            VerdictResult::Deny { reason, .. } => Ok(FunctionResponsePart::new(
-                function_name,
-                deny_payload(&reason),
-            )),
+            VerdictResult::Deny { reason, .. } => {
+                Ok(lower_deny_function_response(function_name, &reason))
+            }
         }
     }
+}
+
+fn lower_allow_function_response(
+    function_name: &str,
+    result: ToolResult,
+    redactions: &[Redaction],
+) -> Result<FunctionResponsePart, ProviderError> {
+    let value = parse_value(&result.0)?;
+    let value = apply_redactions(value, redactions, "Mistral functionResponse")?;
+    Ok(FunctionResponsePart::new(function_name, value))
+}
+
+fn lower_deny_function_response(function_name: &str, reason: &DenyReason) -> FunctionResponsePart {
+    FunctionResponsePart::new(function_name, deny_payload(reason))
 }
 
 impl chio_provider_adapter_core::Provider for MistralAdapter {
@@ -317,19 +328,29 @@ fn function_calls(raw: ProviderRequest) -> Result<Vec<FunctionCallPart>, Provide
             "Mistral chat/completions payload was not JSON: {error}"
         ))
     })?;
-    let body = response_body(value);
+    let body = response_body(value)?;
     extract_function_calls(&body)
 }
 
-fn response_body(value: Value) -> Value {
+fn response_body(value: Value) -> Result<Value, ProviderError> {
     for field in ["body", "response", "payload"] {
         if let Some(nested) = value.get(field) {
-            if let Some(obj) = nested.as_object() {
-                return Value::Object(obj.clone());
-            }
+            return nested_response_body(nested).ok_or_else(|| {
+                ProviderError::Malformed(format!(
+                    "Mistral chat/completions envelope field `{field}` was not a JSON object or string body"
+                ))
+            });
         }
     }
-    value
+    Ok(value)
+}
+
+fn nested_response_body(value: &Value) -> Option<Value> {
+    match value {
+        Value::Object(_) => Some(value.clone()),
+        Value::String(body) => serde_json::from_str(body).ok(),
+        _ => None,
+    }
 }
 
 fn extract_function_calls(body: &Value) -> Result<Vec<FunctionCallPart>, ProviderError> {
@@ -400,11 +421,7 @@ pub(crate) fn openai_tool_call_to_function_call(
 }
 
 fn validate_function_call(call: &FunctionCallPart) -> Result<(), ProviderError> {
-    if call.name.trim().is_empty() {
-        return Err(ProviderError::Malformed(
-            "Mistral functionCall name was empty".to_string(),
-        ));
-    }
+    non_empty_str(&call.name, "functionCall name")?;
     if !call.args.is_object() {
         return Err(ProviderError::BadToolArgs(format!(
             "Mistral functionCall `{}` args were not a JSON object",
@@ -466,8 +483,12 @@ fn non_empty_str<'a>(value: &'a str, field: &str) -> Result<&'a str, ProviderErr
         Err(ProviderError::Malformed(format!(
             "Mistral {field} must not be empty"
         )))
+    } else if trimmed != value {
+        Err(ProviderError::Malformed(format!(
+            "Mistral {field} must not contain surrounding whitespace"
+        )))
     } else {
-        Ok(trimmed)
+        Ok(value)
     }
 }
 
@@ -582,6 +603,63 @@ mod tests {
     }
 
     #[test]
+    fn lift_batch_rejects_malformed_envelope_before_outer_tool_calls() {
+        let cfg = config();
+        let adapter = MistralAdapter::new(cfg, Arc::new(transport::MockTransport::new()));
+        let payload = json!({
+            "body": 42,
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "tool_calls": [{
+                        "id": "call_outer",
+                        "type": "function",
+                        "function": {
+                            "name": "get_weather",
+                            "arguments": "{\"city\":\"Paris\"}"
+                        }
+                    }]
+                },
+                "finish_reason": "tool_calls"
+            }]
+        });
+        let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
+        let err = adapter.lift_batch(raw).unwrap_err();
+
+        assert!(err.to_string().contains("envelope field `body`"));
+    }
+
+    #[test]
+    fn lift_batch_rejects_function_call_name_with_surrounding_whitespace() {
+        let cfg = config();
+        let adapter = MistralAdapter::new(cfg, Arc::new(transport::MockTransport::new()));
+        let payload = json!({
+            "id": "chatcmpl_test",
+            "object": "chat.completion",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "tool_calls": [{
+                        "id": "call_weather_1",
+                        "type": "function",
+                        "function": {
+                            "name": " get_weather ",
+                            "arguments": "{\"city\":\"Paris\"}"
+                        }
+                    }]
+                },
+                "finish_reason": "tool_calls"
+            }]
+        });
+        let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
+        let err = adapter.lift_batch(raw).unwrap_err();
+
+        assert!(err.to_string().contains("surrounding whitespace"));
+    }
+
+    #[test]
     fn lower_function_response_allow() {
         let cfg = config();
         let adapter = MistralAdapter::new(cfg, Arc::new(transport::MockTransport::new()));
@@ -594,6 +672,22 @@ mod tests {
             .lower_function_response("get_weather", verdict, result)
             .unwrap();
         assert_eq!(part.name, "get_weather");
+    }
+
+    #[test]
+    fn lower_allow_function_response_helper_applies_redactions() {
+        let part = lower_allow_function_response(
+            "get_weather",
+            ToolResult(br#"{"token":"secret","ok":true}"#.to_vec()),
+            &[Redaction {
+                path: "/token".to_string(),
+                replacement: "[redacted]".to_string(),
+            }],
+        )
+        .unwrap();
+
+        assert_eq!(part.name, "get_weather");
+        assert_eq!(part.response, json!({"token": "[redacted]", "ok": true}));
     }
 
     #[test]

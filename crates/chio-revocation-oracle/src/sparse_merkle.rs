@@ -89,10 +89,16 @@ impl InMemoryRevocationOracle {
     fn leaf_hash(key: &RevocationKey) -> Result<[u8; 32]> {
         let subject = key.subject_id.as_str().as_bytes();
         let mut bytes = Vec::with_capacity(subject.len() + 16);
-        bytes.extend_from_slice(&(subject.len() as u64).to_be_bytes());
+        bytes.extend_from_slice(&Self::subject_len_prefix(subject)?);
         bytes.extend_from_slice(subject);
         bytes.extend_from_slice(&key.epoch_nonce.get().to_be_bytes());
         Ok(Sha256::hash(&bytes))
+    }
+
+    fn subject_len_prefix(subject: &[u8]) -> Result<[u8; 8]> {
+        let length = u64::try_from(subject.len())
+            .map_err(|error| RevocationOracleError::Serialization(error.to_string()))?;
+        Ok(length.to_be_bytes())
     }
 
     pub fn signed_epoch_root(&self, signer: &impl EpochRootSigner) -> Result<SignedEpochRoot> {
@@ -221,6 +227,15 @@ impl RevocationOracle for InMemoryRevocationOracle {
 mod tests {
     use super::*;
     use crate::{EpochNonce, SubjectId};
+
+    #[test]
+    fn subject_len_prefix_encodes_subject_length_big_endian() -> Result<()> {
+        assert_eq!(
+            InMemoryRevocationOracle::subject_len_prefix(b"subject-a")?,
+            9_u64.to_be_bytes()
+        );
+        Ok(())
+    }
 
     #[test]
     fn inclusion_proof_verifies_for_revoked_subject() -> Result<()> {

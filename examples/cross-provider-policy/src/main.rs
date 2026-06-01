@@ -120,6 +120,8 @@ enum DemoError {
     ToolNotAllowed { policy_id: String, tool: String },
     #[error("policy fixture contract is disabled")]
     DisabledContract,
+    #[error("policy field {field} must be non-empty and unpadded, got {value:?}")]
+    InvalidPolicyField { field: &'static str, value: String },
     #[error("read fixture {path:?}: {source}")]
     ReadFixture {
         path: PathBuf,
@@ -254,6 +256,19 @@ fn load_policy(path: &Path) -> Result<DemoPolicy, DemoError> {
 }
 
 fn validate_policy(policy: &DemoPolicy) -> Result<(), DemoError> {
+    validate_policy_field("name", &policy.name)?;
+    validate_policy_field(
+        "rules.fixture_contract.scenario_id",
+        &policy.rules.fixture_contract.scenario_id,
+    )?;
+    validate_policy_field(
+        "rules.fixture_contract.required_tool",
+        &policy.rules.fixture_contract.required_tool,
+    )?;
+    for tool in &policy.rules.tool_access.allow {
+        validate_policy_field("rules.tool_access.allow[]", tool)?;
+    }
+
     if !policy.rules.tool_access.enabled {
         return Err(DemoError::DisabledContract);
     }
@@ -273,6 +288,17 @@ fn validate_policy(policy: &DemoPolicy) -> Result<(), DemoError> {
         policy_id: policy.name.clone(),
         tool: required_tool.clone(),
     })
+}
+
+fn validate_policy_field(field: &'static str, value: &str) -> Result<(), DemoError> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed != value {
+        return Err(DemoError::InvalidPolicyField {
+            field,
+            value: value.to_string(),
+        });
+    }
+    Ok(())
 }
 
 fn run_case(case: &ProviderCase, policy: &DemoPolicy) -> Result<DemoReceipt, DemoError> {
@@ -448,5 +474,42 @@ fn body_without_provenance(body: &ReceiptBody) -> ReceiptBodyWithoutProvenance {
         tool_name: body.tool_name.clone(),
         arguments: body.arguments.clone(),
         verdict: body.verdict.clone(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{validate_policy, DemoError, DemoPolicy};
+
+    #[test]
+    fn validate_policy_rejects_padded_required_tool() {
+        let policy = match serde_yml::from_str::<DemoPolicy>(
+            r#"
+name: cross-provider-policy-demo
+rules:
+  tool_access:
+    enabled: true
+    allow:
+      - " get_weather "
+  fixture_contract:
+    scenario_id: weather_lookup_allow
+    required_tool: " get_weather "
+    required_arguments:
+      location: "San Francisco, CA"
+      unit: celsius
+    expected_verdict: allow
+"#,
+        ) {
+            Ok(policy) => policy,
+            Err(error) => panic!("test policy should parse: {error}"),
+        };
+
+        assert!(matches!(
+            validate_policy(&policy),
+            Err(DemoError::InvalidPolicyField {
+                field: "rules.fixture_contract.required_tool",
+                ..
+            })
+        ));
     }
 }

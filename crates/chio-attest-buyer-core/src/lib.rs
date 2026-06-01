@@ -856,7 +856,7 @@ fn validate_trust_field(value: &str, field: &str) -> Result<(), ChioPackageError
 }
 
 fn validate_sha256_hex(value: &str, field: &str) -> Result<(), ChioPackageError> {
-    if value.len() != 64 || !is_lower_hex(value) {
+    if !is_lower_sha256_hex(value) {
         return Err(ChioPackageError::TrustBundle(format!(
             "{field} must be a lowercase 64-character SHA-256 hex digest"
         )));
@@ -883,16 +883,16 @@ fn validate_scope_field(value: &str, field: &str) -> Result<(), ChioPackageError
 }
 
 fn validate_context_field(value: &str, field: &str) -> Result<(), ChioPackageError> {
-    if value.is_empty() {
+    if value.is_empty() || value.trim() != value {
         return Err(ChioPackageError::VerificationContext(format!(
-            "{field} must be non-empty"
+            "{field} must be non-empty and unpadded"
         )));
     }
     Ok(())
 }
 
 fn validate_sha256_hex_for_scope(value: &str, field: &str) -> Result<(), ChioPackageError> {
-    if value.len() != 64 || !is_lower_hex(value) {
+    if !is_lower_sha256_hex(value) {
         return Err(ChioPackageError::LeaseScopeBinding(format!(
             "{field} must be a lowercase 64-character SHA-256 hex digest"
         )));
@@ -1112,6 +1112,10 @@ fn is_lower_hex(value: &str) -> bool {
     value
         .bytes()
         .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn is_lower_sha256_hex(value: &str) -> bool {
+    value.len() == 64 && is_lower_hex(value)
 }
 
 fn canonical_sha256<T: Serialize>(value: &T) -> Result<String, ChioPackageError> {
@@ -2457,6 +2461,14 @@ mod tests {
     use chio_core_types::crypto::Keypair;
     use chio_core_types::receipt::SignedExportEnvelope;
 
+    #[test]
+    fn lower_sha256_hex_helper_accepts_exact_lowercase_digest_only() {
+        assert!(is_lower_sha256_hex(&"a".repeat(64)));
+        assert!(!is_lower_sha256_hex(&"A".repeat(64)));
+        assert!(!is_lower_sha256_hex(&"a".repeat(63)));
+        assert!(!is_lower_sha256_hex(&format!("{}g", "a".repeat(63))));
+    }
+
     fn trust_bundle_document_from_fixture() -> ChioVerifierTrustBundleDocument {
         serde_json::from_str(include_str!(
             "../../../examples/chio-3vendor/fixtures/verifier-trust-bundle.json"
@@ -2523,6 +2535,26 @@ mod tests {
             report.context_sha256.as_deref(),
             Some(context_sha256.as_str())
         );
+    }
+
+    #[test]
+    fn verification_context_rejects_blank_or_padded_fields() {
+        let mut context = verification_context_from_fixture();
+        context.challenge = " ".to_string();
+        let error = context.validate().unwrap_err();
+        assert!(error.to_string().contains("verificationContext.challenge"));
+
+        let mut context = verification_context_from_fixture();
+        context.audience = format!("{} ", context.audience);
+        let error = context.validate().unwrap_err();
+        assert!(error.to_string().contains("verificationContext.audience"));
+
+        let mut context = verification_context_from_fixture();
+        context.proof_purpose = format!(" {}", context.proof_purpose);
+        let error = context.validate().unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("verificationContext.proofPurpose"));
     }
 
     #[test]

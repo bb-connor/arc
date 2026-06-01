@@ -112,6 +112,94 @@ mod tests {
         );
     }
 
+    #[test]
+    fn jsonrpc_result_decoder_preserves_fail_closed_error_precedence() {
+        let version_error = decode_jsonrpc_result(
+            A2aJsonRpcResponse::<Value> {
+                jsonrpc: "1.0".to_string(),
+                result: None,
+                error: Some(A2aJsonRpcError {
+                    code: -32000,
+                    message: "remote denied".to_string(),
+                }),
+            },
+            "GetTask",
+        )
+        .expect_err("unexpected protocol version should fail before remote error");
+        assert!(
+            version_error
+                .to_string()
+                .contains("unexpected JSON-RPC version 1.0"),
+            "unexpected version error: {version_error}"
+        );
+
+        let remote_error = decode_jsonrpc_result(
+            A2aJsonRpcResponse::<Value> {
+                jsonrpc: "2.0".to_string(),
+                result: None,
+                error: Some(A2aJsonRpcError {
+                    code: -32001,
+                    message: "remote denied".to_string(),
+                }),
+            },
+            "GetTask",
+        )
+        .expect_err("remote JSON-RPC error should fail before missing result");
+        assert!(
+            remote_error
+                .to_string()
+                .contains("A2A JSON-RPC error -32001: remote denied"),
+            "unexpected remote error: {remote_error}"
+        );
+
+        let missing_result = decode_jsonrpc_result(
+            A2aJsonRpcResponse::<Value> {
+                jsonrpc: "2.0".to_string(),
+                result: None,
+                error: None,
+            },
+            "GetTask",
+        )
+        .expect_err("missing result should fail closed");
+        assert!(
+            missing_result
+                .to_string()
+                .contains("A2A JSON-RPC GetTask response omitted `result`"),
+            "unexpected missing-result error: {missing_result}"
+        );
+
+        let missing_unlabeled_result = decode_jsonrpc_result(
+            A2aJsonRpcResponse::<Value> {
+                jsonrpc: "2.0".to_string(),
+                result: None,
+                error: None,
+            },
+            "",
+        )
+        .expect_err("unlabeled response without result should fail closed");
+        assert!(
+            missing_unlabeled_result
+                .to_string()
+                .contains("A2A JSON-RPC response omitted `result`"),
+            "unexpected unlabeled missing-result error: {missing_unlabeled_result}"
+        );
+    }
+
+    #[test]
+    fn jsonrpc_result_decoder_returns_present_result() {
+        let value = decode_jsonrpc_result(
+            A2aJsonRpcResponse {
+                jsonrpc: "2.0".to_string(),
+                result: Some(json!({ "ok": true })),
+                error: None,
+            },
+            "GetTask",
+        )
+        .expect("present result should decode");
+
+        assert_eq!(value, json!({ "ok": true }));
+    }
+
     #[tokio::test]
     async fn adapter_discovers_jsonrpc_and_invokes_skill() {
         let Some(server) = FakeA2aServer::spawn_jsonrpc() else {
@@ -1928,6 +2016,56 @@ mod tests {
         assert!(
             message.contains("body-bearing request rejected cross-origin redirect"),
             "expected body-bearing redirect rejection, got: {message}"
+        );
+    }
+
+    #[test]
+    fn oauth_client_credentials_rejects_token_response_without_bearer_type() {
+        let Some(listener) = bind_fake_a2a_listener("OAuth token type listener") else {
+            return;
+        };
+        let address = listener.local_addr().expect("token listener address");
+        let base_url = format!("http://{address}");
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept token request");
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .expect("set token read timeout");
+            let request = read_http_request(&mut stream);
+            assert!(request.starts_with("POST /oauth/token HTTP/1.1"));
+            assert!(request.contains("grant_type=client_credentials"));
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 49\r\nConnection: close\r\n\r\n{{\"access_token\":\"opaque-token\",\"expires_in\":3600}}"
+            )
+            .expect("write token response");
+        });
+
+        let transport_config = A2aTransportConfig {
+            default_tls_config: None,
+            mutual_tls_config: None,
+            egress_contract: Some(test_egress_contract(&base_url)),
+        };
+        let token_endpoint =
+            Url::parse(&format!("{base_url}/oauth/token")).expect("token endpoint URL");
+        let credentials = A2aOAuthClientCredentials {
+            client_id: "client-id".to_string(),
+            client_secret: "client-secret".to_string(),
+        };
+
+        let error = request_client_credentials_token(
+            &token_endpoint,
+            &credentials,
+            &["a2a.invoke".to_string()],
+            Duration::from_secs(2),
+            &transport_config,
+        )
+        .expect_err("token response without bearer token_type must fail closed");
+
+        handle.join().expect("join token type server");
+        assert!(
+            error.to_string().contains("token_type"),
+            "unexpected token response error: {error}"
         );
     }
 

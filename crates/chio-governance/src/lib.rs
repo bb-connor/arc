@@ -333,6 +333,14 @@ impl GenericGovernanceEvidenceReference {
         if let Some(uri) = self.uri.as_deref() {
             validate_non_empty(uri, &format!("{field}.uri"))?;
         }
+        if let Some(sha256) = self.sha256.as_deref() {
+            let sha256_field = format!("{field}.sha256");
+            if !is_sha256_hex(sha256) {
+                return Err(format!(
+                    "{sha256_field} must be a 64-character SHA-256 hex digest"
+                ));
+            }
+        }
         Ok(())
     }
 }
@@ -1063,12 +1071,16 @@ fn validate_non_empty(value: &str, field: &str) -> Result<(), String> {
 }
 
 fn validate_sha256_hex(value: &str, field: &str) -> Result<(), GovernanceAuthorizationError> {
-    if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+    if !is_sha256_hex(value) {
         return Err(GovernanceAuthorizationError::InvalidArtifact(format!(
             "{field} must be a 64-character SHA-256 hex digest"
         )));
     }
     Ok(())
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 #[cfg(test)]
@@ -1190,6 +1202,29 @@ mod tests {
         .test_expect("build activation");
         SignedGenericTrustActivation::sign(activation, &authority_keypair)
             .test_expect("sign activation")
+    }
+
+    #[test]
+    fn sha256_hex_helper_accepts_exact_uppercase_compatible_digest() {
+        assert!(is_sha256_hex(&"a".repeat(64)));
+        assert!(is_sha256_hex(&"A".repeat(64)));
+        assert!(!is_sha256_hex(&"a".repeat(63)));
+        assert!(!is_sha256_hex(&format!("{}g", "a".repeat(63))));
+    }
+
+    #[test]
+    fn governance_evidence_reference_rejects_invalid_sha256() {
+        let reference = GenericGovernanceEvidenceReference {
+            kind: GenericGovernanceEvidenceKind::External,
+            reference_id: "external-report-1".to_string(),
+            uri: None,
+            sha256: Some("not-a-digest".to_string()),
+        };
+
+        let error = reference
+            .validate("evidence")
+            .test_expect_err("invalid evidence sha256 rejected");
+        assert!(error.contains("evidence.sha256"));
     }
 
     fn sample_charter_request() -> GenericGovernanceCharterIssueRequest {

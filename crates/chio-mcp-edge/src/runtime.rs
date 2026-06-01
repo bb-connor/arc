@@ -813,29 +813,13 @@ impl ChioMcpEdge {
     }
 
     pub fn handle_jsonrpc(&mut self, message: Value) -> Option<Value> {
-        if message.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
-            return Some(jsonrpc_error(
-                Value::Null,
-                JSONRPC_INVALID_REQUEST,
-                "invalid jsonrpc envelope",
-            ));
-        }
-
-        let method = match message.get("method").and_then(Value::as_str) {
-            Some(method) => method,
-            None => {
-                return Some(jsonrpc_error(
-                    message.get("id").cloned().unwrap_or(Value::Null),
-                    JSONRPC_INVALID_REQUEST,
-                    "request missing method",
-                ))
-            }
+        let JsonRpcEnvelope { id, method, params } = match parse_jsonrpc_envelope(&message) {
+            Ok(envelope) => envelope,
+            Err(response) => return Some(response),
         };
-
-        let params = message.get("params").cloned().unwrap_or_else(|| json!({}));
-        match message.get("id").cloned() {
-            Some(id) => Some(self.handle_request(id, method, params)),
-            None => self.handle_notification(method, params),
+        match id {
+            Some(id) => Some(self.handle_request(id, &method, params)),
+            None => self.handle_notification(&method, params),
         }
     }
 
@@ -857,31 +841,15 @@ impl ChioMcpEdge {
         reader: &mut R,
         writer: &mut W,
     ) -> Option<Value> {
-        if message.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
-            return Some(jsonrpc_error(
-                Value::Null,
-                JSONRPC_INVALID_REQUEST,
-                "invalid jsonrpc envelope",
-            ));
-        }
-
-        let method = match message.get("method").and_then(Value::as_str) {
-            Some(method) => method,
-            None => {
-                return Some(jsonrpc_error(
-                    message.get("id").cloned().unwrap_or(Value::Null),
-                    JSONRPC_INVALID_REQUEST,
-                    "request missing method",
-                ))
-            }
+        let JsonRpcEnvelope { id, method, params } = match parse_jsonrpc_envelope(&message) {
+            Ok(envelope) => envelope,
+            Err(response) => return Some(response),
         };
-
-        let params = message.get("params").cloned().unwrap_or_else(|| json!({}));
-        match message.get("id").cloned() {
+        match id {
             Some(id) => {
-                Some(self.handle_request_with_transport(id, method, params, reader, writer))
+                Some(self.handle_request_with_transport(id, &method, params, reader, writer))
             }
-            None => self.handle_notification(method, params),
+            None => self.handle_notification(&method, params),
         }
     }
 
@@ -892,31 +860,15 @@ impl ChioMcpEdge {
         cancel_rx: &mpsc::Receiver<Value>,
         writer: &mut W,
     ) -> Option<Value> {
-        if message.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
-            return Some(jsonrpc_error(
-                Value::Null,
-                JSONRPC_INVALID_REQUEST,
-                "invalid jsonrpc envelope",
-            ));
-        }
-
-        let method = match message.get("method").and_then(Value::as_str) {
-            Some(method) => method,
-            None => {
-                return Some(jsonrpc_error(
-                    message.get("id").cloned().unwrap_or(Value::Null),
-                    JSONRPC_INVALID_REQUEST,
-                    "request missing method",
-                ))
-            }
+        let JsonRpcEnvelope { id, method, params } = match parse_jsonrpc_envelope(&message) {
+            Ok(envelope) => envelope,
+            Err(response) => return Some(response),
         };
-
-        let params = message.get("params").cloned().unwrap_or_else(|| json!({}));
-        match message.get("id").cloned() {
+        match id {
             Some(id) => Some(self.handle_request_with_transport_channel(
-                id, method, params, client_rx, cancel_rx, writer,
+                id, &method, params, client_rx, cancel_rx, writer,
             )),
-            None => self.handle_notification(method, params),
+            None => self.handle_notification(&method, params),
         }
     }
 

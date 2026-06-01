@@ -597,9 +597,7 @@ pub fn proof_package_from_runtime_artifacts(
 }
 
 pub fn runtime_vendor_keypair(step_index: usize) -> Result<Keypair, ChioPackageError> {
-    let vendor = VENDORS.get(step_index).ok_or_else(|| {
-        ChioPackageError::Inconsistent(format!("unknown runtime vendor step {step_index}"))
-    })?;
+    let vendor = runtime_vendor(step_index)?;
     Ok(Keypair::from_seed(&vendor.seed))
 }
 
@@ -610,10 +608,14 @@ pub fn runtime_buyer_keypair() -> Keypair {
 pub fn runtime_vendor_binding(
     step_index: usize,
 ) -> Result<(&'static str, &'static str, &'static str), ChioPackageError> {
-    let vendor = VENDORS.get(step_index).ok_or_else(|| {
-        ChioPackageError::Inconsistent(format!("unknown runtime vendor step {step_index}"))
-    })?;
+    let vendor = runtime_vendor(step_index)?;
     Ok((vendor.kernel_id, vendor.server_id, vendor.tool_name))
+}
+
+fn runtime_vendor(step_index: usize) -> Result<&'static VendorFixture, ChioPackageError> {
+    VENDORS.get(step_index).ok_or_else(|| {
+        ChioPackageError::Inconsistent(format!("unknown runtime vendor step {step_index}"))
+    })
 }
 
 pub fn fixture_proof_package() -> Result<ChioProofPackage, ChioPackageError> {
@@ -863,6 +865,13 @@ fn validate_runtime_artifact_for_issued_material(
             index
         )));
     }
+    let expected_anchor = format!("chio:consistency:{WORKFLOW_ID}:{index}");
+    if step.consistency_anchor.as_deref() != Some(expected_anchor.as_str()) {
+        return Err(ChioPackageError::Workflow(format!(
+            "runtime step {} consistency anchor must be {}",
+            index, expected_anchor
+        )));
+    }
 
     let (statement, _) = envelope
         .decode_statement()
@@ -901,6 +910,12 @@ fn validate_runtime_artifact_for_issued_material(
         return Err(ChioPackageError::Workflow(format!(
             "runtime step {} DSSE args hash does not match receipt",
             index
+        )));
+    }
+    if predicate.consistency_anchor.as_deref() != Some(expected_anchor.as_str()) {
+        return Err(ChioPackageError::Workflow(format!(
+            "runtime step {} DSSE consistency anchor must be {}",
+            index, expected_anchor
         )));
     }
     let lease_ref = predicate.capability_lease_ref.as_ref().ok_or_else(|| {
@@ -1317,6 +1332,12 @@ mod tests {
     }
 
     #[test]
+    fn runtime_vendor_helper_reports_unknown_step() {
+        let error = runtime_vendor(VENDORS.len()).expect_err("unknown step must fail");
+        assert!(error.to_string().contains("unknown runtime vendor step 3"));
+    }
+
+    #[test]
     fn fresh_proof_package_binds_disclosure_subject_to_workflow() {
         let package = fresh_proof_package().expect("fresh package builds");
         let projection = project_workflow_receipt_body(&package.workflow_receipt.body())
@@ -1445,6 +1466,19 @@ mod tests {
         let error = proof_package_from_runtime_artifacts(artifacts).unwrap_err();
 
         assert!(error.to_string().contains("DSSE hash"));
+    }
+
+    #[test]
+    fn runtime_artifact_package_rejects_step_consistency_anchor_mismatch() {
+        let baseline = fresh_proof_package().expect("fresh package builds");
+        let mut artifacts = runtime_artifacts_from_package(&baseline).expect("runtime artifacts");
+        artifacts[0].workflow_step.consistency_anchor =
+            Some("chio:consistency:wf-chio-refund-001:wrong".to_string());
+        refresh_runtime_parent_chain(&mut artifacts);
+
+        let error = proof_package_from_runtime_artifacts(artifacts).unwrap_err();
+
+        assert!(error.to_string().contains("consistency anchor"));
     }
 
     #[test]

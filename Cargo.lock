@@ -13673,6 +13673,7 @@ dependencies = [
 name = "zed-chio"
 version = "0.1.0"
 dependencies = [
+ "serde_json",
  "toml 0.8.23",
  "zed_extension_api",
 ]

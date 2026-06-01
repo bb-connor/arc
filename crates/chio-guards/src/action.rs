@@ -80,9 +80,7 @@ pub fn extract_action(tool_name: &str, arguments: &Value) -> ToolAction {
         "write_file" | "write" | "file_write" | "create_file" | "put_file" | "edit_file" | "edit"
     ) {
         if let Some(path) = extract_path(arguments) {
-            let content = arguments
-                .get("content")
-                .and_then(|v| v.as_str())
+            let content = string_arg(arguments, &["content"])
                 .unwrap_or("")
                 .as_bytes()
                 .to_vec();
@@ -94,9 +92,7 @@ pub fn extract_action(tool_name: &str, arguments: &Value) -> ToolAction {
     // the `action` parameter or the presence of `content`.
     if matches!(tool.as_str(), "filesystem" | "fs" | "file") {
         if let Some(path) = extract_path(arguments) {
-            let is_write = arguments
-                .get("action")
-                .and_then(|v| v.as_str())
+            let is_write = string_arg(arguments, &["action"])
                 .map(|a| {
                     let a = a.to_lowercase();
                     a == "write" || a == "create" || a == "append"
@@ -105,9 +101,7 @@ pub fn extract_action(tool_name: &str, arguments: &Value) -> ToolAction {
                 || arguments.get("content").is_some();
 
             if is_write {
-                let content = arguments
-                    .get("content")
-                    .and_then(|v| v.as_str())
+                let content = string_arg(arguments, &["content"])
                     .unwrap_or("")
                     .as_bytes()
                     .to_vec();
@@ -121,10 +115,7 @@ pub fn extract_action(tool_name: &str, arguments: &Value) -> ToolAction {
     // Patch / apply diff tools
     if matches!(tool.as_str(), "apply_patch" | "patch" | "apply_diff") {
         if let Some(path) = extract_path(arguments) {
-            let diff = arguments
-                .get("diff")
-                .or_else(|| arguments.get("patch"))
-                .and_then(|v| v.as_str())
+            let diff = string_arg(arguments, &["diff", "patch"])
                 .unwrap_or("")
                 .to_string();
             return ToolAction::Patch(path, diff);
@@ -136,12 +127,7 @@ pub fn extract_action(tool_name: &str, arguments: &Value) -> ToolAction {
         tool.as_str(),
         "bash" | "shell" | "run_command" | "exec" | "execute" | "run" | "shell_exec" | "terminal"
     ) {
-        if let Some(cmd) = arguments
-            .get("command")
-            .or_else(|| arguments.get("cmd"))
-            .or_else(|| arguments.get("input"))
-            .and_then(|v| v.as_str())
-        {
+        if let Some(cmd) = string_arg(arguments, &["command", "cmd", "input"]) {
             return ToolAction::ShellCommand(cmd.to_string());
         }
     }
@@ -151,11 +137,7 @@ pub fn extract_action(tool_name: &str, arguments: &Value) -> ToolAction {
         tool.as_str(),
         "http_request" | "fetch" | "curl" | "http" | "request" | "web_request"
     ) {
-        if let Some(url) = arguments
-            .get("url")
-            .or_else(|| arguments.get("uri"))
-            .and_then(|v| v.as_str())
-        {
+        if let Some(url) = string_arg(arguments, &["url", "uri"]) {
             if let Some((host, port)) = parse_host_port(url) {
                 return ToolAction::NetworkEgress(host, port);
             }
@@ -179,19 +161,10 @@ pub fn extract_action(tool_name: &str, arguments: &Value) -> ToolAction {
             | "jupyter"
             | "ipython"
     ) {
-        let code = arguments
-            .get("code")
-            .or_else(|| arguments.get("source"))
-            .or_else(|| arguments.get("snippet"))
-            .or_else(|| arguments.get("script"))
-            .or_else(|| arguments.get("input"))
-            .and_then(|v| v.as_str())
+        let code = string_arg(arguments, &["code", "source", "snippet", "script", "input"])
             .unwrap_or("")
             .to_string();
-        let language = arguments
-            .get("language")
-            .or_else(|| arguments.get("lang"))
-            .and_then(|v| v.as_str())
+        let language = string_arg(arguments, &["language", "lang"])
             .map(String::from)
             .unwrap_or_else(|| infer_language_from_tool(&tool));
         return ToolAction::CodeExecution { language, code };
@@ -215,19 +188,11 @@ pub fn extract_action(tool_name: &str, arguments: &Value) -> ToolAction {
             | "puppeteer"
             | "selenium"
     ) {
-        let verb = arguments
-            .get("action")
-            .or_else(|| arguments.get("verb"))
-            .and_then(|v| v.as_str())
+        let verb = string_arg(arguments, &["action", "verb"])
             .map(String::from)
             .unwrap_or_else(|| tool.clone());
-        let target = arguments
-            .get("url")
-            .or_else(|| arguments.get("target"))
-            .or_else(|| arguments.get("href"))
-            .or_else(|| arguments.get("selector"))
-            .and_then(|v| v.as_str())
-            .map(String::from);
+        let target =
+            string_arg(arguments, &["url", "target", "href", "selector"]).map(String::from);
         return ToolAction::BrowserAction { verb, target };
     }
 
@@ -251,18 +216,8 @@ pub fn extract_action(tool_name: &str, arguments: &Value) -> ToolAction {
             | "mongodb"
             | "redis"
     ) {
-        if let Some(q) = arguments
-            .get("query")
-            .or_else(|| arguments.get("sql"))
-            .or_else(|| arguments.get("statement"))
-            .or_else(|| arguments.get("command"))
-            .and_then(|v| v.as_str())
-        {
-            let database = arguments
-                .get("database")
-                .or_else(|| arguments.get("db"))
-                .or_else(|| arguments.get("connection"))
-                .and_then(|v| v.as_str())
+        if let Some(q) = string_arg(arguments, &["query", "sql", "statement", "command"]) {
+            let database = string_arg(arguments, &["database", "db", "connection"])
                 .map(String::from)
                 .unwrap_or_else(|| tool.clone());
             return ToolAction::DatabaseQuery {
@@ -285,19 +240,10 @@ pub fn extract_action(tool_name: &str, arguments: &Value) -> ToolAction {
             | "weaviate_write"
             | "qdrant_upsert"
     ) {
-        let store = arguments
-            .get("collection")
-            .or_else(|| arguments.get("index"))
-            .or_else(|| arguments.get("namespace"))
-            .or_else(|| arguments.get("store"))
-            .and_then(|v| v.as_str())
+        let store = string_arg(arguments, &["collection", "index", "namespace", "store"])
             .map(String::from)
             .unwrap_or_else(|| tool.clone());
-        let key = arguments
-            .get("id")
-            .or_else(|| arguments.get("key"))
-            .or_else(|| arguments.get("memory_id"))
-            .and_then(|v| v.as_str())
+        let key = string_arg(arguments, &["id", "key", "memory_id"])
             .map(String::from)
             .unwrap_or_default();
         return ToolAction::MemoryWrite { store, key };
@@ -316,31 +262,16 @@ pub fn extract_action(tool_name: &str, arguments: &Value) -> ToolAction {
             | "weaviate_search"
             | "qdrant_search"
     ) {
-        let store = arguments
-            .get("collection")
-            .or_else(|| arguments.get("index"))
-            .or_else(|| arguments.get("namespace"))
-            .or_else(|| arguments.get("store"))
-            .and_then(|v| v.as_str())
+        let store = string_arg(arguments, &["collection", "index", "namespace", "store"])
             .map(String::from)
             .unwrap_or_else(|| tool.clone());
-        let key = arguments
-            .get("id")
-            .or_else(|| arguments.get("key"))
-            .or_else(|| arguments.get("memory_id"))
-            .and_then(|v| v.as_str())
-            .map(String::from);
+        let key = string_arg(arguments, &["id", "key", "memory_id"]).map(String::from);
         return ToolAction::MemoryRead { store, key };
     }
 
     // External API calls with recognizable service prefixes.
     if let Some(service) = detect_api_service(&tool) {
-        let endpoint = arguments
-            .get("endpoint")
-            .or_else(|| arguments.get("path"))
-            .or_else(|| arguments.get("action"))
-            .or_else(|| arguments.get("method"))
-            .and_then(|v| v.as_str())
+        let endpoint = string_arg(arguments, &["endpoint", "path", "action", "method"])
             .map(String::from)
             .unwrap_or_else(|| tool.clone());
         return ToolAction::ExternalApiCall { service, endpoint };
@@ -393,14 +324,13 @@ fn detect_api_service(tool: &str) -> Option<String> {
     None
 }
 
+fn string_arg<'a>(arguments: &'a Value, keys: &[&str]) -> Option<&'a str> {
+    keys.iter()
+        .find_map(|key| arguments.get(*key).and_then(Value::as_str))
+}
+
 fn extract_path(arguments: &Value) -> Option<String> {
-    arguments
-        .get("path")
-        .or_else(|| arguments.get("file"))
-        .or_else(|| arguments.get("file_path"))
-        .or_else(|| arguments.get("filename"))
-        .and_then(|v| v.as_str())
-        .map(String::from)
+    string_arg(arguments, &["path", "file", "file_path", "filename"]).map(String::from)
 }
 
 fn parse_host_port(url: &str) -> Option<(String, u16)> {
@@ -501,6 +431,32 @@ mod tests {
         let args = serde_json::json!({"path": "/etc/shadow"});
         let action = extract_action("read_file", &args);
         assert!(matches!(action, ToolAction::FileAccess(ref p) if p == "/etc/shadow"));
+    }
+
+    #[test]
+    fn string_arg_preserves_key_priority_and_ignores_non_strings() {
+        let args = serde_json::json!({
+            "path": "/tmp/from-path",
+            "file": "/tmp/from-file",
+            "filename": "/tmp/from-filename"
+        });
+
+        assert_eq!(
+            string_arg(&args, &["path", "file", "filename"]),
+            Some("/tmp/from-path")
+        );
+
+        let args = serde_json::json!({
+            "path": 42,
+            "file": "/tmp/from-file",
+            "filename": "/tmp/from-filename"
+        });
+
+        assert_eq!(
+            string_arg(&args, &["path", "file", "filename"]),
+            Some("/tmp/from-file")
+        );
+        assert_eq!(string_arg(&args, &["missing", "path"]), None);
     }
 
     #[test]

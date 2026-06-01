@@ -93,12 +93,14 @@ fn demo_manifest() -> ToolManifest {
     }
 }
 
-fn build_demo_state() -> (
+type DemoState = (
     ChioKernel,
     chio_core::capability::CapabilityToken,
     String,
     ToolManifest,
-) {
+);
+
+fn build_demo_state() -> Result<DemoState, Box<dyn Error>> {
     let authority = Keypair::generate();
     let mut kernel = ChioKernel::new(kernel_config(authority.clone()));
     kernel.register_tool_server(Box::new(HelloServer));
@@ -122,18 +124,18 @@ fn build_demo_state() -> (
             },
             300,
         )
-        .expect("issue capability");
+        .map_err(|error| -> Box<dyn Error> { format!("issue capability: {error}").into() })?;
 
-    (
+    Ok((
         kernel,
         capability,
         agent.public_key().to_hex(),
         demo_manifest(),
-    )
+    ))
 }
 
-fn make_edge() -> ChioMcpEdge {
-    let (kernel, capability, agent_id, manifest) = build_demo_state();
+fn make_edge() -> Result<ChioMcpEdge, Box<dyn Error>> {
+    let (kernel, capability, agent_id, manifest) = build_demo_state()?;
     ChioMcpEdge::new(
         McpEdgeConfig::default(),
         kernel,
@@ -141,13 +143,13 @@ fn make_edge() -> ChioMcpEdge {
         vec![capability],
         vec![manifest],
     )
-    .expect("create hello-mcp edge")
+    .map_err(|error| -> Box<dyn Error> { format!("create hello-mcp edge: {error}").into() })
 }
 
 fn serve() -> Result<(), Box<dyn Error>> {
     let stdin = io::stdin();
     let mut stdout = io::stdout();
-    let mut edge = make_edge();
+    let mut edge = make_edge()?;
 
     for line in stdin.lock().lines() {
         let line = line?;
@@ -166,7 +168,7 @@ fn serve() -> Result<(), Box<dyn Error>> {
 }
 
 fn bridge_call() -> Result<(), Box<dyn Error>> {
-    let (kernel, capability, agent_id, _manifest) = build_demo_state();
+    let (kernel, capability, agent_id, _manifest) = build_demo_state()?;
     let response = kernel.evaluate_tool_call_blocking_with_metadata(
         &ToolCallRequest {
             request_id: "hello-mcp-bridge".to_string(),
@@ -208,13 +210,37 @@ fn bridge_call() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn parse_mode_arg(args: impl IntoIterator<Item = String>) -> Result<String, Box<dyn Error>> {
+    let mut args = args.into_iter();
+    let _program = args.next();
+    let mode = args.next().unwrap_or_else(|| "serve".to_string());
+    if let Some(extra) = args.next() {
+        return Err(format!("unexpected argument: {extra}").into());
+    }
+    Ok(mode)
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    let mode = std::env::args()
-        .nth(1)
-        .unwrap_or_else(|| "serve".to_string());
+    let mode = parse_mode_arg(std::env::args())?;
     match mode.as_str() {
         "serve" => serve(),
         "bridge-call" => bridge_call(),
         other => Err(format!("unknown mode: {other}").into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_mode_arg;
+
+    #[test]
+    fn parse_mode_arg_rejects_extra_positionals() {
+        let result = parse_mode_arg([
+            "hello-mcp".to_string(),
+            "bridge-call".to_string(),
+            "extra".to_string(),
+        ]);
+
+        assert!(result.is_err(), "extra positional args should be rejected");
     }
 }

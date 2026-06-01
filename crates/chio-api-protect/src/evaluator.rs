@@ -296,14 +296,16 @@ fn extract_caller(headers: &HashMap<String, String>) -> CallerIdentity {
         .or_else(|| headers.get("Authorization"))
     {
         if let Some(token) = auth.strip_prefix("Bearer ") {
-            let token_hash = chio_core_types::sha256_hex(token.as_bytes());
-            return CallerIdentity {
-                subject: format!("bearer:{}", &token_hash[..16]),
-                auth_method: AuthMethod::Bearer { token_hash },
-                verified: false,
-                tenant: None,
-                agent_id: None,
-            };
+            if !token.trim().is_empty() && token.trim() == token {
+                let token_hash = chio_core_types::sha256_hex(token.as_bytes());
+                return CallerIdentity {
+                    subject: format!("bearer:{}", &token_hash[..16]),
+                    auth_method: AuthMethod::Bearer { token_hash },
+                    verified: false,
+                    tenant: None,
+                    agent_id: None,
+                };
+            }
         }
     }
 
@@ -389,6 +391,17 @@ mod tests {
         let caller = extract_caller(&headers);
         assert!(caller.subject.starts_with("bearer:"));
         assert!(matches!(caller.auth_method, AuthMethod::Bearer { .. }));
+    }
+
+    #[test]
+    fn extract_caller_ignores_blank_bearer_token() {
+        let mut headers = HashMap::new();
+        headers.insert("authorization".to_string(), "Bearer ".to_string());
+
+        let caller = extract_caller(&headers);
+
+        assert!(matches!(caller.auth_method, AuthMethod::Anonymous));
+        assert_eq!(caller.subject, "anonymous");
     }
 
     #[test]

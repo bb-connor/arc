@@ -91,6 +91,12 @@ impl ExchangeRate {
                 self.pair()
             )));
         }
+        if self.updated_at > now {
+            return Err(PriceOracleError::InvalidFeed(format!(
+                "{} returned a future updated_at timestamp",
+                self.pair()
+            )));
+        }
         let age_seconds = self.age_seconds(now);
         if age_seconds > self.max_age_seconds {
             return Err(PriceOracleError::Stale {
@@ -210,6 +216,12 @@ pub enum PriceOracleError {
     InvalidFeed(String),
     #[error("arithmetic overflow: {0}")]
     ArithmeticOverflow(String),
+}
+
+impl PriceOracleError {
+    pub(crate) fn invalid_configuration(message: impl Into<String>) -> Self {
+        Self::InvalidConfiguration(message.into())
+    }
 }
 
 pub trait PriceOracle: Send + Sync {
@@ -1058,6 +1070,28 @@ mod tests {
             build_default_egress_contract(&config.pyth, &config.operator.chains);
         config.egress_contract.deny_loopback = false;
         config
+    }
+
+    #[test]
+    fn invalid_configuration_constructor_preserves_message() {
+        let error = PriceOracleError::invalid_configuration("bad oracle config");
+        assert!(matches!(
+            error,
+            PriceOracleError::InvalidConfiguration(message) if message == "bad oracle config"
+        ));
+    }
+
+    #[test]
+    fn future_rate_updates_fail_closed() {
+        let now = now_unix().test_unwrap("now");
+        let mut rate = sample_rate("chainlink", "feed-1", 300_000);
+        rate.updated_at = now + 1;
+
+        assert!(matches!(
+            rate.ensure_fresh(now),
+            Err(PriceOracleError::InvalidFeed(message))
+                if message.contains("future updated_at")
+        ));
     }
 
     #[tokio::test]

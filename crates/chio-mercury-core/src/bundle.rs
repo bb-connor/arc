@@ -100,10 +100,12 @@ impl MercuryBundleReference {
 
 fn ensure_non_empty(field: &'static str, value: &str) -> Result<(), MercuryContractError> {
     if value.trim().is_empty() {
-        Err(MercuryContractError::EmptyField(field))
-    } else {
-        Ok(())
+        return Err(MercuryContractError::EmptyField(field));
     }
+    if value.trim() != value {
+        return Err(MercuryContractError::PaddedField(field));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -126,5 +128,18 @@ mod tests {
         let reference = MercuryBundleReference::from_manifest(&manifest).expect("bundle ref");
         assert_eq!(reference.bundle_id, manifest.bundle_id);
         assert_eq!(reference.artifact_count, manifest.artifacts.len() as u64);
+    }
+
+    #[test]
+    fn bundle_manifest_rejects_padded_bundle_id() {
+        let mut manifest = sample_mercury_bundle_manifest();
+        manifest.bundle_id = " bundle-release-2026-04-02 ".to_string();
+
+        let error = manifest.validate().expect_err("padded bundle id");
+
+        assert!(matches!(
+            error,
+            MercuryContractError::PaddedField("bundle_id")
+        ));
     }
 }

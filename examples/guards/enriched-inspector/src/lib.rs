@@ -24,13 +24,13 @@ fn evaluate(req: GuardRequest) -> GuardVerdict {
 
                 // Check against configured blocked path
                 if let Some(ref bp) = blocked_path {
-                    if path.starts_with(bp.as_str()) {
+                    if path_is_under(path, bp) {
                         return GuardVerdict::deny("write to protected path blocked by policy");
                     }
                 }
 
                 // Default: block writes to /etc
-                if path.starts_with("/etc") {
+                if path_is_under(path, "/etc") {
                     return GuardVerdict::deny("write to /etc blocked");
                 }
             }
@@ -38,4 +38,30 @@ fn evaluate(req: GuardRequest) -> GuardVerdict {
     }
 
     GuardVerdict::allow()
+}
+
+fn path_is_under(path: &str, root: &str) -> bool {
+    if root == "/" {
+        return path.starts_with('/');
+    }
+    let root = root.trim_end_matches('/');
+    if root.is_empty() {
+        return false;
+    }
+    path == root
+        || path
+            .strip_prefix(root)
+            .is_some_and(|suffix| suffix.starts_with('/'))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::path_is_under;
+
+    #[test]
+    fn path_is_under_respects_segment_boundaries() {
+        assert!(path_is_under("/etc", "/etc"));
+        assert!(path_is_under("/etc/passwd", "/etc"));
+        assert!(!path_is_under("/etcetera/passwd", "/etc"));
+    }
 }

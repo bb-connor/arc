@@ -26,6 +26,13 @@ pub const RECEIPT_WRITE_OUTCOME_DENY: &str = "deny";
 pub const RECEIPT_WRITE_OUTCOME_PENDING_APPROVAL: &str = "pending_approval";
 pub const RECEIPT_WRITE_OUTCOME_ERROR: &str = "error";
 
+const RECEIPT_WRITE_OUTCOMES: [&str; 4] = [
+    RECEIPT_WRITE_OUTCOME_ALLOW,
+    RECEIPT_WRITE_OUTCOME_DENY,
+    RECEIPT_WRITE_OUTCOME_PENDING_APPROVAL,
+    RECEIPT_WRITE_OUTCOME_ERROR,
+];
+
 /// Map a kernel [`Verdict`] to its receipt-write outcome label.
 #[must_use]
 pub fn receipt_write_outcome_for_verdict(verdict: Verdict) -> &'static str {
@@ -76,16 +83,16 @@ impl ReceiptWriteCounters {
     pub fn record(&self, outcome: &str) {
         match outcome {
             RECEIPT_WRITE_OUTCOME_ALLOW => {
-                self.allow.fetch_add(1, Ordering::Relaxed);
+                increment_saturating(&self.allow);
             }
             RECEIPT_WRITE_OUTCOME_DENY => {
-                self.deny.fetch_add(1, Ordering::Relaxed);
+                increment_saturating(&self.deny);
             }
             RECEIPT_WRITE_OUTCOME_PENDING_APPROVAL => {
-                self.pending_approval.fetch_add(1, Ordering::Relaxed);
+                increment_saturating(&self.pending_approval);
             }
             _ => {
-                self.error.fetch_add(1, Ordering::Relaxed);
+                increment_saturating(&self.error);
             }
         }
     }
@@ -114,12 +121,7 @@ impl ReceiptWriteCounters {
         output.push_str("# TYPE ");
         output.push_str(CHIO_RECEIPT_WRITE_TOTAL);
         output.push_str(" counter\n");
-        for outcome in [
-            RECEIPT_WRITE_OUTCOME_ALLOW,
-            RECEIPT_WRITE_OUTCOME_DENY,
-            RECEIPT_WRITE_OUTCOME_PENDING_APPROVAL,
-            RECEIPT_WRITE_OUTCOME_ERROR,
-        ] {
+        for outcome in RECEIPT_WRITE_OUTCOMES {
             output.push_str(CHIO_RECEIPT_WRITE_TOTAL);
             output.push_str("{outcome=\"");
             output.push_str(outcome);
@@ -135,6 +137,12 @@ impl Default for ReceiptWriteCounters {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn increment_saturating(counter: &AtomicU64) {
+    let _ = counter.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
+        Some(value.saturating_add(1))
+    });
 }
 
 #[cfg(test)]
@@ -157,6 +165,19 @@ mod tests {
     }
 
     #[test]
+    fn receipt_write_outcomes_are_rendered_in_stable_order() {
+        assert_eq!(
+            RECEIPT_WRITE_OUTCOMES,
+            [
+                RECEIPT_WRITE_OUTCOME_ALLOW,
+                RECEIPT_WRITE_OUTCOME_DENY,
+                RECEIPT_WRITE_OUTCOME_PENDING_APPROVAL,
+                RECEIPT_WRITE_OUTCOME_ERROR,
+            ]
+        );
+    }
+
+    #[test]
     fn counters_are_isolated_per_instance() {
         let a = ReceiptWriteCounters::new();
         let b = ReceiptWriteCounters::new();
@@ -171,6 +192,16 @@ mod tests {
         counters.record("totally-unknown");
         assert_eq!(counters.total(RECEIPT_WRITE_OUTCOME_ERROR), 1);
         assert_eq!(counters.total("totally-unknown"), 1);
+    }
+
+    #[test]
+    fn receipt_write_counters_saturate_instead_of_wrapping() {
+        let counters = ReceiptWriteCounters::new();
+        counters.allow.store(u64::MAX, Ordering::Relaxed);
+
+        counters.record(RECEIPT_WRITE_OUTCOME_ALLOW);
+
+        assert_eq!(counters.total(RECEIPT_WRITE_OUTCOME_ALLOW), u64::MAX);
     }
 
     #[test]

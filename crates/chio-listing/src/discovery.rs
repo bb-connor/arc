@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::crypto::PublicKey;
 use crate::receipt::SignedExportEnvelope;
+use crate::util::bounded_listing_limit;
 use crate::{
     aggregate_generic_listing_reports, normalize_namespace, GenericListingActorKind,
     GenericListingFreshnessState, GenericListingQuery, GenericListingReplicaFreshness,
@@ -178,9 +179,7 @@ fn default_require_fresh() -> bool {
 impl ListingQuery {
     #[must_use]
     pub fn limit_or_default(&self) -> usize {
-        self.limit
-            .unwrap_or(100)
-            .clamp(1, MAX_MARKETPLACE_SEARCH_LIMIT)
+        bounded_listing_limit(self.limit, MAX_MARKETPLACE_SEARCH_LIMIT)
     }
 
     /// Translate this marketplace query into a listing query for use with

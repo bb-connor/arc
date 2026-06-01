@@ -453,6 +453,7 @@ pub fn create_passport_presentation_challenge_with_reference(
     if issued_at > expires_at {
         return Err(CredentialError::InvalidChallengeValidityWindow);
     }
+    validate_challenge_identity_fields(&verifier, &nonce)?;
     if let Some(policy) = &policy {
         policy.validate()?;
     }
@@ -478,6 +479,7 @@ pub fn verify_passport_presentation_challenge(
     if !is_supported_passport_presentation_challenge_schema(&challenge.schema) {
         return Err(CredentialError::InvalidChallengeSchema);
     }
+    validate_challenge_identity_fields(&challenge.verifier, &challenge.nonce)?;
 
     let issued_at = unix_from_rfc3339(&challenge.issued_at)?;
     let expires_at = unix_from_rfc3339(&challenge.expires_at)?;
@@ -492,6 +494,16 @@ pub fn verify_passport_presentation_challenge(
     }
     if let Some(policy) = &challenge.policy {
         policy.validate()?;
+    }
+    Ok(())
+}
+
+fn validate_challenge_identity_fields(verifier: &str, nonce: &str) -> Result<(), CredentialError> {
+    if verifier.trim().is_empty() {
+        return Err(CredentialError::MissingChallengeVerifier);
+    }
+    if nonce.trim().is_empty() {
+        return Err(CredentialError::MissingChallengeNonce);
     }
     Ok(())
 }

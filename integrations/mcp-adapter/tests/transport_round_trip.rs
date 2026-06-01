@@ -1,5 +1,5 @@
 use chio_mcp_adapter_integration::{
-    emit_tool_call_receipt, verify_tool_call_receipt, StreamableHttpTransport,
+    emit_tool_call_receipt, verify_tool_call_receipt, McpReceiptError, StreamableHttpTransport,
 };
 use chio_mcp_edge::{McpToolInfo, McpToolResult, McpTransport};
 use serde_json::json;
@@ -60,4 +60,18 @@ fn streamable_http_transport_round_trip_emits_receipt() -> Result<(), Box<dyn st
     assert_eq!(exchanges[0].headers["mcp-protocol-version"], "2025-06-18");
     assert_eq!(exchanges[1].body["method"], "tools/call");
     Ok(())
+}
+
+#[test]
+fn receipt_emission_rejects_padded_capability_id() {
+    let error = emit_tool_call_receipt(
+        " cap-mcp-a",
+        "tenant-a",
+        "chio.receipt.issue",
+        json!({}),
+        json!({}),
+    )
+    .err();
+
+    assert_eq!(error, Some(McpReceiptError::MissingCapabilityId));
 }
