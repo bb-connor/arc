@@ -519,10 +519,18 @@ pub fn validate_official_stack_package(
 
     for point in &inventory.extension_points {
         for component_id in &point.official_component_ids {
-            if !components_by_id.contains_key(component_id.as_str()) {
-                return Err(ExtensionContractError::UnknownReference(
-                    component_id.clone(),
-                ));
+            let component = components_by_id
+                .get(component_id.as_str())
+                .ok_or_else(|| ExtensionContractError::UnknownReference(component_id.clone()))?;
+            if !component
+                .extension_point_ids
+                .iter()
+                .any(|point_id| point_id == &point.id)
+            {
+                return Err(ExtensionContractError::UnknownReference(format!(
+                    "{} -> {}",
+                    point.id, component_id
+                )));
             }
         }
     }
@@ -1401,6 +1409,18 @@ mod tests {
         );
         assert_eq!(report.outcome, ExtensionNegotiationOutcome::Accepted);
         assert!(report.reasons.is_empty());
+    }
+
+    #[test]
+    fn official_stack_validation_rejects_inventory_components_that_do_not_implement_the_point() {
+        let mut inventory = sample_inventory();
+        inventory.extension_points[0].official_component_ids =
+            vec!["chio.native-chio-service".to_string()];
+
+        assert!(matches!(
+            validate_official_stack_package(&inventory, &sample_official_stack()),
+            Err(ExtensionContractError::UnknownReference(_))
+        ));
     }
 
     #[test]
