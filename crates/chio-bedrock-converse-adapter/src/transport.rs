@@ -642,6 +642,11 @@ fn required_str(
             "{display} must not be empty"
         )));
     }
+    if raw.trim() != raw {
+        return Err(TransportError::MalformedRequest(format!(
+            "{display} must not contain surrounding whitespace"
+        )));
+    }
     Ok(raw.to_string())
 }
 
@@ -816,6 +821,50 @@ mod tests {
     fn converse_request_rejects_missing_model_id() {
         let err = ConverseRequest::from_json_bytes(br#"{"messages": []}"#).unwrap_err();
         assert!(matches!(err, TransportError::MalformedRequest(_)));
+    }
+
+    #[test]
+    fn build_message_rejects_tool_use_identifier_padding_before_sdk_request() {
+        let err = build_message(&json!({
+            "role": "assistant",
+            "content": [
+                {
+                    "toolUse": {
+                        "toolUseId": " tooluse_padded_1 ",
+                        "name": "get_weather",
+                        "input": {}
+                    }
+                }
+            ]
+        }))
+        .expect_err("padded toolUseId must fail before SDK serialization");
+
+        assert!(matches!(err, TransportError::MalformedRequest(_)));
+        assert!(err
+            .to_string()
+            .contains("toolUse.toolUseId must not contain surrounding whitespace"));
+    }
+
+    #[test]
+    fn build_message_rejects_tool_result_identifier_padding_before_sdk_request() {
+        let err = build_message(&json!({
+            "role": "user",
+            "content": [
+                {
+                    "toolResult": {
+                        "toolUseId": " tooluse_padded_1 ",
+                        "content": [{"json": {"ok": true}}],
+                        "status": "success"
+                    }
+                }
+            ]
+        }))
+        .expect_err("padded toolResult toolUseId must fail before SDK serialization");
+
+        assert!(matches!(err, TransportError::MalformedRequest(_)));
+        assert!(err
+            .to_string()
+            .contains("toolResult.toolUseId must not contain surrounding whitespace"));
     }
 
     #[test]
