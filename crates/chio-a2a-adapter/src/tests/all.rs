@@ -1195,6 +1195,75 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn build_manifest_accepts_parameterized_json_input_mode() {
+        let mut adapter = local_test_adapter(
+            A2aAgentCapabilities::default(),
+            A2aProtocolBinding::JsonRpc,
+            None,
+        );
+        adapter.agent_card.skills[0].input_modes =
+            Some(vec!["application/json; charset=utf-8".to_string()]);
+
+        let manifest = build_manifest(
+            "tenant-test",
+            "0.1.0",
+            &Keypair::generate().public_key().to_hex(),
+            &adapter.agent_card,
+            &A2aProtocolBinding::JsonRpc,
+        )
+        .expect("parameterized JSON mode should project to manifest data input");
+        let properties = manifest.tools[0]
+            .input_schema
+            .get("properties")
+            .and_then(Value::as_object)
+            .expect("manifest input schema exposes properties");
+
+        assert!(!properties.contains_key("message"));
+        assert!(properties.contains_key("data"));
+    }
+
+    #[tokio::test]
+    async fn build_send_message_request_accepts_parameterized_text_and_json_input_modes() {
+        let mut adapter = local_test_adapter(
+            A2aAgentCapabilities::default(),
+            A2aProtocolBinding::JsonRpc,
+            None,
+        );
+        adapter.agent_card.skills[0].input_modes = Some(vec![
+            "text/plain; charset=utf-8".to_string(),
+            "application/json; charset=utf-8".to_string(),
+        ]);
+
+        let request = adapter
+            .build_send_message_request(
+                &adapter.agent_card.skills[0],
+                A2aSendToolInput {
+                    message: Some("hello".to_string()),
+                    data: Some(json!({ "query": "hello" })),
+                    context_id: None,
+                    task_id: None,
+                    reference_task_ids: None,
+                    metadata: None,
+                    message_metadata: None,
+                    history_length: None,
+                    return_immediately: None,
+                    stream: false,
+                },
+            )
+            .expect("parameterized text and JSON modes should admit both part shapes");
+
+        assert_eq!(request.message.parts.len(), 2);
+        assert_eq!(
+            request.message.parts[0].media_type.as_deref(),
+            Some("text/plain")
+        );
+        assert_eq!(
+            request.message.parts[1].media_type.as_deref(),
+            Some("application/json")
+        );
+    }
+
+    #[tokio::test]
     async fn get_task_rejects_history_length_without_capability() {
         let adapter = local_test_adapter(
             A2aAgentCapabilities {

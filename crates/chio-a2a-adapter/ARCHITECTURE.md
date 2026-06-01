@@ -35,3 +35,32 @@
 ## Planned Material Improvement
 
 Move task-observation extraction into a small internal registry boundary that validates recognized A2A task payloads before persistence. Malformed `task`, `statusUpdate`, or `artifactUpdate` observations should fail closed and leave the registry unchanged. This is architectural because it makes durable follow-up correlation self-defensive instead of dependent on all upstream call sites remembering to validate first.
+
+## Input Mode Slice
+
+### Current Boundary
+
+- `protocol.rs` preserves Agent Card `defaultInputModes` and per-skill `inputModes` as provider-supplied strings.
+- `mapping.rs` is the only place that interprets those strings into the internal `A2aSkillInputSurface` used by both manifest projection and send-path admission.
+- `invoke.rs` must not re-parse Agent Card mode strings; it should only consume the already-normalized surface when deciding whether to send text or JSON parts.
+
+### Pain Point
+
+`A2aSkillInputSurface::from_modes` currently recognizes only exact `text/plain` and `application/json` tokens after trim and ASCII lowercase. Agent Cards can carry MIME-style parameters such as `application/json; charset=utf-8`; treating those as unknown rejects valid JSON/text surfaces during discovery and can deny runtime sends that match the remote card's advertised media type.
+
+### Security And API Constraints
+
+- Preserve public API compatibility and keep mode parsing internal to the crate.
+- Do not widen arbitrary media types into JSON or text. Only recognized aliases and MIME essences should project.
+- Continue failing closed when no projectable input mode remains after normalization.
+- Keep the generated A2A part media types canonical: outbound text remains `text/plain`, outbound structured data remains `application/json`.
+
+### Affected Dependents
+
+- `build_manifest` depends on the parsed surface to decide whether the generated tool schema exposes `message`, `data`, or both.
+- `A2aAdapter::build_send_message_request` depends on the same surface to admit text and data parts before kernel-mediated dispatch.
+- No downstream crate needs a schema or public API change if the normalization boundary is kept internal.
+
+### Planned Material Improvement
+
+Add a small internal normalization step for skill input modes that strips MIME parameters before alias classification. Prove the boundary through both manifest projection and send-path tests so discovery and invocation stay aligned.

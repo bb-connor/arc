@@ -153,11 +153,13 @@ impl A2aSkillInputSurface {
             accepts_json: false,
         };
         for mode in modes {
-            let normalized = mode.trim().to_ascii_lowercase();
-            match normalized.as_str() {
-                "text" | "text/plain" => surface.accepts_text = true,
-                "json" | "application/json" => surface.accepts_json = true,
-                _ => {}
+            let essence = input_mode_essence(mode);
+            if essence.eq_ignore_ascii_case("text") || essence.eq_ignore_ascii_case("text/plain") {
+                surface.accepts_text = true;
+            } else if essence.eq_ignore_ascii_case("json")
+                || essence.eq_ignore_ascii_case("application/json")
+            {
+                surface.accepts_json = true;
             }
         }
         surface
@@ -165,6 +167,13 @@ impl A2aSkillInputSurface {
 
     fn is_projectable(self) -> bool {
         self.accepts_text || self.accepts_json
+    }
+}
+
+fn input_mode_essence(mode: &str) -> &str {
+    match mode.split_once(';') {
+        Some((essence, _parameters)) => essence.trim(),
+        None => mode.trim(),
     }
 }
 
