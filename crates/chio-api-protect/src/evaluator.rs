@@ -428,6 +428,30 @@ mod tests {
     }
 
     #[test]
+    fn evaluate_get_tools_path_denies_without_capability() {
+        let keypair = Keypair::generate();
+        let evaluator = RequestEvaluator::new(vec![], keypair, "test-policy".to_string());
+
+        let result = evaluator
+            .evaluate(
+                HttpMethod::Get,
+                "/chio/tools/matrix/files.read",
+                &HashMap::new(),
+                &HashMap::new(),
+                None,
+                0,
+            )
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert!(result.receipt.evidence[0]
+            .details
+            .as_deref()
+            .is_some_and(|details| details.contains("capability")));
+    }
+
+    #[test]
     fn evaluate_chio_request_denies_spoofed_tool_identity_on_http_route() {
         let keypair = Keypair::generate();
         let routes = vec![RouteEntry {
