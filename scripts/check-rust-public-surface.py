@@ -49,6 +49,96 @@ def require_readme(
         errors.append(f"{display_path} points to missing README {readme!r}.")
 
 
+def require_description(
+    display_path: Path,
+    package: dict[str, object],
+    label: str,
+    errors: list[str],
+) -> None:
+    description = package.get("description")
+    if not isinstance(description, str) or not description.strip():
+        errors.append(
+            f"{display_path} is {label} but does not declare a non-empty "
+            "package description."
+        )
+
+
+def existing_auto_bin_sources(manifest_path: Path) -> list[Path]:
+    src_dir = manifest_path.parent / "src"
+    sources: list[Path] = []
+    main_rs = src_dir / "main.rs"
+    if main_rs.is_file():
+        sources.append(main_rs)
+
+    bin_dir = src_dir / "bin"
+    if not bin_dir.exists():
+        return sources
+
+    sources.extend(path for path in sorted(bin_dir.glob("*.rs")) if path.is_file())
+    sources.extend(
+        path / "main.rs"
+        for path in sorted(bin_dir.iterdir())
+        if path.is_dir() and (path / "main.rs").exists()
+    )
+    return sources
+
+
+def target_path(manifest_path: Path, target: dict[str, object], default: str) -> Path:
+    path = target.get("path")
+    if isinstance(path, str):
+        return manifest_path.parent / path
+    return manifest_path.parent / default
+
+
+def require_implementation_target(
+    manifest_path: Path,
+    display_path: Path,
+    manifest: dict[str, object],
+    package: dict[str, object],
+    label: str,
+    errors: list[str],
+) -> None:
+    checked_sources: list[Path] = []
+
+    lib = manifest.get("lib")
+    if isinstance(lib, dict):
+        source = target_path(manifest_path, lib, "src/lib.rs")
+        if not source.is_file():
+            errors.append(
+                f"{display_path} declares a lib target at "
+                f"{source.relative_to(manifest_path.parent)} but the file is missing."
+            )
+        checked_sources.append(source)
+    elif package.get("autolib") is not False:
+        source = manifest_path.parent / "src/lib.rs"
+        if source.is_file():
+            checked_sources.append(source)
+
+    bins = manifest.get("bin", [])
+    if isinstance(bins, list):
+        for bin_target in bins:
+            if not isinstance(bin_target, dict):
+                continue
+            source = target_path(manifest_path, bin_target, "src/main.rs")
+            if not source.is_file():
+                errors.append(
+                    f"{display_path} declares a bin target at "
+                    f"{source.relative_to(manifest_path.parent)} but the file is missing."
+                )
+            checked_sources.append(source)
+    elif bins:
+        errors.append(f"{display_path} declares malformed bin target metadata.")
+
+    if package.get("autobins") is not False:
+        checked_sources.extend(existing_auto_bin_sources(manifest_path))
+
+    if not any(source.is_file() for source in checked_sources):
+        errors.append(
+            f"{display_path} is {label} but does not declare an existing lib "
+            "or bin target."
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -91,9 +181,23 @@ def main() -> int:
                     "workspace.metadata.chio.rust_registry_public_crates "
                     "but sets publish = false."
                 )
+            require_description(
+                display_path,
+                package,
+                "a registry-public crate",
+                errors,
+            )
             require_readme(
                 manifest_path,
                 display_path,
+                package,
+                "a registry-public crate",
+                errors,
+            )
+            require_implementation_target(
+                manifest_path,
+                display_path,
+                manifest,
                 package,
                 "a registry-public crate",
                 errors,
@@ -105,6 +209,20 @@ def main() -> int:
             )
 
         if crate_name in entrypoint_names:
+            require_description(
+                display_path,
+                package,
+                "a public entrypoint",
+                errors,
+            )
+            require_implementation_target(
+                manifest_path,
+                display_path,
+                manifest,
+                package,
+                "a public entrypoint",
+                errors,
+            )
             require_readme(
                 manifest_path,
                 display_path,
@@ -135,7 +253,7 @@ def main() -> int:
     print(
         "Rust public surface policy is consistent: every workspace member is "
         "either publish=false or explicitly registry-public, and every public "
-        "entrypoint has a README."
+        "Rust surface has a README, description, and implementation target."
     )
     return 0
 

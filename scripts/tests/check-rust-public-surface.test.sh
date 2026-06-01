@@ -10,15 +10,18 @@ trap 'rm -rf "$work"' EXIT
 write_member() {
   local dir="$1" name="$2" readme="${3:-README.md}"
   mkdir -p "$dir"
+  mkdir -p "$dir/src"
   cat > "$dir/Cargo.toml" <<EOF
 [package]
 name = "$name"
+description = "Synthetic public crate for gate tests"
 version = "0.1.0"
 edition = "2021"
 publish = false
 readme = "$readme"
 EOF
   printf '# %s\n' "$name" > "$dir/$readme"
+  printf 'pub fn marker() {}\n' > "$dir/src/lib.rs"
 }
 
 write_workspace() {
@@ -87,5 +90,35 @@ assert_rc "$(run_checker "$missing_readme/Cargo.toml" "$work/missing-readme.out"
   "missing public entrypoint README fails"
 grep -F "crates/chio-core/Cargo.toml points to missing README 'README.md'" \
   "$work/missing-readme.err" >/dev/null
+
+missing_description="$work/missing-description"
+write_workspace "$missing_description" '    "chio-cli",' '    "chio-core",'
+python3 - "$missing_description/crates/chio-core/Cargo.toml" <<'PY'
+from pathlib import Path
+import sys
+
+manifest = Path(sys.argv[1])
+manifest.write_text(
+    "\n".join(
+        line
+        for line in manifest.read_text(encoding="utf-8").splitlines()
+        if not line.startswith("description = ")
+    )
+    + "\n",
+    encoding="utf-8",
+)
+PY
+assert_rc "$(run_checker "$missing_description/Cargo.toml" "$work/missing-description.out" "$work/missing-description.err")" 1 \
+  "missing public entrypoint description fails"
+grep -F "crates/chio-core/Cargo.toml is a public entrypoint but does not declare a non-empty package description." \
+  "$work/missing-description.err" >/dev/null
+
+missing_target="$work/missing-target"
+write_workspace "$missing_target" '    "chio-cli",' '    "chio-core",'
+rm "$missing_target/crates/chio-core/src/lib.rs"
+assert_rc "$(run_checker "$missing_target/Cargo.toml" "$work/missing-target.out" "$work/missing-target.err")" 1 \
+  "missing public entrypoint implementation target fails"
+grep -F "crates/chio-core/Cargo.toml is a public entrypoint but does not declare an existing lib or bin target." \
+  "$work/missing-target.err" >/dev/null
 
 echo "check-rust-public-surface.test.sh: all assertions passed"
