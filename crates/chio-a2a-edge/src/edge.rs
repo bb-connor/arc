@@ -246,12 +246,7 @@ impl ChioA2aEdge {
     }
 
     fn resolve_jsonrpc_target_skill_id(&self, params: &Value) -> Result<String, A2aEdgeError> {
-        let skill_id_from_metadata = params
-            .get("metadata")
-            .and_then(|metadata| metadata.get("chio"))
-            .and_then(|chio| chio.get("targetSkillId"))
-            .and_then(Value::as_str)
-            .map(String::from);
+        let skill_id_from_metadata = Self::target_skill_id_from_metadata(params)?;
 
         skill_id_from_metadata
             .or_else(|| {
@@ -267,6 +262,45 @@ impl ChioA2aEdge {
                         .to_string(),
                 )
             })
+    }
+
+    fn target_skill_id_from_metadata(params: &Value) -> Result<Option<String>, A2aEdgeError> {
+        let Some(metadata) = params.get("metadata") else {
+            return Ok(None);
+        };
+        if metadata.is_null() {
+            return Ok(None);
+        }
+        let Some(metadata) = metadata.as_object() else {
+            return Err(A2aEdgeError::InvalidRequest(
+                "metadata must be a JSON object".to_string(),
+            ));
+        };
+
+        let Some(chio) = metadata.get("chio") else {
+            return Ok(None);
+        };
+        if chio.is_null() {
+            return Ok(None);
+        }
+        let Some(chio) = chio.as_object() else {
+            return Err(A2aEdgeError::InvalidRequest(
+                "metadata.chio must be a JSON object".to_string(),
+            ));
+        };
+
+        let Some(target_skill_id) = chio.get("targetSkillId") else {
+            return Ok(None);
+        };
+        if target_skill_id.is_null() {
+            return Ok(None);
+        }
+        let Some(target_skill_id) = target_skill_id.as_str() else {
+            return Err(A2aEdgeError::InvalidRequest(
+                "metadata.chio.targetSkillId must be a string".to_string(),
+            ));
+        };
+        Ok(Some(target_skill_id.to_string()))
     }
 
     /// Generate the A2A Agent Card for `/.well-known/agent-card.json`.
@@ -356,7 +390,7 @@ impl ChioA2aEdge {
     ) -> Result<TaskResponse, A2aEdgeError> {
         let binding = self.resolve_skill_binding(skill_id)?;
 
-        let arguments = extract_arguments_from_message(&request.message);
+        let arguments = extract_arguments_from_message(&request.message)?;
         let task_id = self.next_task_id();
         let request = CrossProtocolExecutionRequest {
             origin_request_id: task_id.clone(),
@@ -392,7 +426,7 @@ impl ChioA2aEdge {
         reason: impl Into<String>,
     ) -> Result<TaskResponse, A2aEdgeError> {
         let binding = self.resolve_skill_binding(skill_id)?;
-        let arguments = extract_arguments_from_message(&request.message);
+        let arguments = extract_arguments_from_message(&request.message)?;
         let task_id = self.next_task_id();
         let request = CrossProtocolExecutionRequest {
             origin_request_id: task_id.clone(),
@@ -436,7 +470,7 @@ impl ChioA2aEdge {
             target_server_id: binding.server_id,
             target_tool_name: binding.tool_name,
             agent_id: execution.agent_id.clone(),
-            arguments: extract_arguments_from_message(&request.message),
+            arguments: extract_arguments_from_message(&request.message)?,
             capability: execution.capability.clone(),
             source_envelope: build_a2a_source_envelope(skill_id, request)?,
             dpop_proof: execution.dpop_proof.clone(),
@@ -484,7 +518,7 @@ impl ChioA2aEdge {
             binding.tool_name
         };
 
-        let arguments = extract_arguments_from_message(&request.message);
+        let arguments = extract_arguments_from_message(&request.message)?;
         let task_id = self.next_task_id();
 
         let invoke_result =

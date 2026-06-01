@@ -937,7 +937,7 @@ mod tests {
             }],
             metadata: None,
         };
-        let args = extract_arguments_from_message(&msg);
+        let args = extract_arguments_from_message(&msg).test_unwrap();
         assert_eq!(args["message"], "hello world");
     }
 
@@ -950,7 +950,7 @@ mod tests {
             }],
             metadata: None,
         };
-        let args = extract_arguments_from_message(&msg);
+        let args = extract_arguments_from_message(&msg).test_unwrap();
         assert_eq!(args["key"], "value");
     }
 
@@ -968,8 +968,46 @@ mod tests {
             ],
             metadata: None,
         };
-        let args = extract_arguments_from_message(&msg);
+        let args = extract_arguments_from_message(&msg).test_unwrap();
         assert_eq!(args["priority"], "high");
+    }
+
+    #[test]
+    fn compatibility_send_rejects_multiple_data_parts() {
+        let mut edge = ChioA2aEdge::new(
+            A2aEdgeConfig::default(),
+            vec![{
+                let mut m = test_manifest();
+                m.tools.truncate(1);
+                m
+            }],
+        )
+        .test_unwrap();
+        let server = test_server();
+        let request = SendMessageRequest {
+            message: A2aMessage {
+                role: "user".to_string(),
+                parts: vec![
+                    A2aPart::Data {
+                        data: json!({"first": true}),
+                    },
+                    A2aPart::Data {
+                        data: json!({"second": true}),
+                    },
+                ],
+                metadata: None,
+            },
+            metadata: None,
+        };
+
+        let error = edge
+            .compatibility()
+            .handle_send_message_compatibility("echo", &request, &server)
+            .unwrap_err();
+        let A2aEdgeError::InvalidRequest(message) = error else {
+            panic!("expected invalid request error");
+        };
+        assert!(message.contains("at most one data part"));
     }
 
     // ---- Result conversion tests ----
@@ -1073,6 +1111,72 @@ mod tests {
     }
 
     #[test]
+    fn jsonrpc_single_skill_rejects_malformed_chio_metadata() {
+        let edge = ChioA2aEdge::new(
+            A2aEdgeConfig::default(),
+            vec![{
+                let mut manifest = test_manifest();
+                manifest.tools.truncate(1);
+                manifest
+            }],
+        )
+        .test_unwrap();
+
+        let error = match edge.parse_jsonrpc_send_message_params(
+            json!({
+                "message": {
+                    "role": "user",
+                    "parts": [{"type": "text", "text": "hi"}]
+                },
+                "metadata": {
+                    "chio": "not-an-object"
+                }
+            }),
+            "SendMessage",
+        ) {
+            Ok(_) => panic!("expected malformed metadata.chio to fail"),
+            Err(error) => error,
+        };
+        let A2aEdgeError::InvalidRequest(message) = error else {
+            panic!("expected invalid request error");
+        };
+        assert_eq!(message, "metadata.chio must be a JSON object");
+    }
+
+    #[test]
+    fn jsonrpc_single_skill_rejects_non_string_target_skill_id() {
+        let edge = ChioA2aEdge::new(
+            A2aEdgeConfig::default(),
+            vec![{
+                let mut manifest = test_manifest();
+                manifest.tools.truncate(1);
+                manifest
+            }],
+        )
+        .test_unwrap();
+
+        let error = match edge.parse_jsonrpc_send_message_params(
+            json!({
+                "message": {
+                    "role": "user",
+                    "parts": [{"type": "text", "text": "hi"}]
+                },
+                "metadata": {
+                    "chio": {"targetSkillId": 123}
+                }
+            }),
+            "SendMessage",
+        ) {
+            Ok(_) => panic!("expected non-string targetSkillId to fail"),
+            Err(error) => error,
+        };
+        let A2aEdgeError::InvalidRequest(message) = error else {
+            panic!("expected invalid request error");
+        };
+        assert_eq!(message, "metadata.chio.targetSkillId must be a string");
+    }
+
+    #[test]
     fn jsonrpc_send_message_single_skill() {
         let mut edge = ChioA2aEdge::new(
             A2aEdgeConfig::default(),
@@ -1115,6 +1219,54 @@ mod tests {
         assert_eq!(
             response["result"]["metadata"]["chio"]["authorityPath"].as_str(),
             Some("cross_protocol_orchestrator")
+        );
+    }
+
+    #[test]
+    fn jsonrpc_send_message_rejects_empty_parts() {
+        let mut edge = ChioA2aEdge::new(
+            A2aEdgeConfig::default(),
+            vec![{
+                let mut m = test_manifest();
+                m.tools.truncate(1);
+                m
+            }],
+        )
+        .test_unwrap();
+        let config = test_kernel_config();
+        let kernel_issuer = config.keypair.clone();
+        let mut kernel = ChioKernel::new(config);
+        kernel.register_tool_server(Box::new(test_server()));
+        let subject = Keypair::generate();
+        let execution = A2aKernelExecutionContext {
+            capability: capability_for_tool(&kernel_issuer, &subject, "test-srv", "echo"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "message/send",
+                "params": {
+                    "message": {
+                        "role": "user",
+                        "parts": []
+                    }
+                }
+            }),
+            &kernel,
+            &execution,
+        );
+
+        assert_eq!(response["error"]["code"], -32602);
+        assert_eq!(
+            response["error"]["message"],
+            "message.parts must contain at least one part"
         );
     }
 
