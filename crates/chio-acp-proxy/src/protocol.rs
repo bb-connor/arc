@@ -100,6 +100,25 @@ pub struct RequestPermissionParams {
     pub options: Vec<PermissionOption>,
 }
 
+impl RequestPermissionParams {
+    pub(crate) fn validate_boundary(&self) -> Result<(), AcpProxyError> {
+        validate_non_empty_protocol_field(
+            "session/request_permission",
+            "sessionId",
+            &self.session_id,
+        )?;
+        for (index, option) in self.options.iter().enumerate() {
+            let field_name = format!("options[{index}].optionId");
+            validate_non_empty_protocol_field(
+                "session/request_permission",
+                &field_name,
+                &option.option_id,
+            )?;
+        }
+        Ok(())
+    }
+}
+
 /// A single permission option presented to the user.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

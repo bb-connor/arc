@@ -554,17 +554,16 @@ impl MessageInterceptor {
     ) -> Result<InterceptResult, AcpProxyError> {
         // Parse permission params for logging/mapping.
         if let Some(params) = message.get("params") {
-            if let Ok(perm_params) =
-                serde_json::from_value::<RequestPermissionParams>(params.clone())
-            {
-                for option in &perm_params.options {
-                    let mapped = self.permission_mapper.map_option(option);
-                    tracing::info!(
-                        option_id = %mapped.original_option_id,
-                        decision = ?mapped.chio_decision,
-                        "permission mapped"
-                    );
-                }
+            let perm_params: RequestPermissionParams =
+                Self::decode_jsonrpc_params(params, "session/request_permission")?;
+            perm_params.validate_boundary()?;
+            for option in &perm_params.options {
+                let mapped = self.permission_mapper.map_option(option);
+                tracing::info!(
+                    option_id = %mapped.original_option_id,
+                    decision = ?mapped.chio_decision,
+                    "permission mapped"
+                );
             }
         }
         // Forward the permission request to the client for user decision.

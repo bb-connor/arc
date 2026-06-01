@@ -1869,6 +1869,48 @@ mod extended_tests {
     }
 
     #[test]
+    fn interceptor_permission_request_rejects_empty_boundary_ids() {
+        let interceptor = MessageInterceptor::new(test_config());
+        let empty_session = json!({
+            "jsonrpc": "2.0",
+            "id": 202,
+            "method": "session/request_permission",
+            "params": {
+                "sessionId": " ",
+                "options": [
+                    {"optionId": "allow-once", "name": "Allow once", "kind": "allow_once"}
+                ]
+            }
+        });
+        let err = interceptor
+            .intercept(Direction::AgentToClient, &empty_session)
+            .expect_err("empty permission sessionId must fail at the ACP boundary");
+        assert_eq!(
+            err.to_string(),
+            "protocol error: invalid session/request_permission params: sessionId must be a non-empty string"
+        );
+
+        let empty_option = json!({
+            "jsonrpc": "2.0",
+            "id": 203,
+            "method": "session/request_permission",
+            "params": {
+                "sessionId": "s1",
+                "options": [
+                    {"optionId": " ", "name": "Allow once", "kind": "allow_once"}
+                ]
+            }
+        });
+        let err = interceptor
+            .intercept(Direction::AgentToClient, &empty_option)
+            .expect_err("empty permission optionId must fail at the ACP boundary");
+        assert_eq!(
+            err.to_string(),
+            "protocol error: invalid session/request_permission params: options[0].optionId must be a non-empty string"
+        );
+    }
+
+    #[test]
     fn interceptor_unknown_method_forwarded() {
         let interceptor = MessageInterceptor::new(test_config());
         let msg = json!({

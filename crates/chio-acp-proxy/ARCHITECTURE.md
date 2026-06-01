@@ -14,11 +14,13 @@ kernel-backed authorization and receipt flows, and `transport.rs` plus
 
 ## Pain Points
 
-The interceptor decodes method-specific params in each handler, but the ACP
-request boundary does not centralize validation of identifiers that later
-become capability, pending-context, and receipt correlation keys. Empty
-`sessionId` or `toolCallId` values can therefore cross from JSON-RPC parsing
-into guard and receipt logic unless a later subsystem happens to reject them.
+The guarded fs, terminal, lifecycle, and receipt-producing session-update
+paths now validate boundary identifiers before they become capability,
+pending-context, and receipt correlation keys. The remaining weak point is
+`session/request_permission`: it still treats malformed params as best-effort
+logging input and forwards the request, so empty `sessionId` or option ids can
+cross into the editor/user decision boundary without a trustworthy ACP
+correlation key.
 
 ## Security and API Constraints
 
@@ -40,10 +42,12 @@ handling.
 
 ## Planned Material Improvement
 
-Move ACP boundary identifier validation into `protocol.rs` and have
-`MessageInterceptor` use it before guarded fs, terminal, lifecycle, and
-receipt-producing session-update paths. Non-empty `sessionId` is required for
-guarded operations, and non-empty `toolCallId` is required before an ACP
-`session/update` can generate a receipt-bearing audit entry. This makes the
-session and receipt correlation invariants explicit at the protocol boundary
-without changing the public root API shape.
+Extend the existing ACP boundary identifier validation in `protocol.rs` to
+`session/request_permission` and have `MessageInterceptor` require valid params
+whenever the request supplies them. Non-empty `sessionId` remains required for
+guarded operations, non-empty `toolCallId` remains required before ACP
+`session/update` can generate a receipt-bearing audit entry, and permission
+requests with option lists must carry non-empty option ids before they cross the
+user decision boundary. This keeps no-params compatibility while rejecting
+malformed permission correlation evidence without changing the public root API
+shape.
