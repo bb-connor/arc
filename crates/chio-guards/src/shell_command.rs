@@ -209,12 +209,26 @@ impl chio_kernel::Guard for ShellCommandGuard {
     }
 }
 
+const MAX_SHELL_COMMAND_NESTING: usize = 4;
+
 fn is_recursive_rm_root(tokens: &[String]) -> bool {
+    is_recursive_rm_root_with_depth(tokens, 0)
+}
+
+fn is_recursive_rm_root_with_depth(tokens: &[String], depth: usize) -> bool {
     for segment in tokens.split(|token| is_shell_separator(token)) {
         let expanded_segment = expand_env_split_string_options(segment);
         for expanded_shell_segment in expanded_segment.split(|token| is_shell_separator(token)) {
             if segment_has_recursive_rm_root(expanded_shell_segment) {
                 return true;
+            }
+            if depth < MAX_SHELL_COMMAND_NESTING {
+                if let Some(command_string) = shell_command_string(expanded_shell_segment) {
+                    let nested = shlex_split_best_effort(command_string);
+                    if is_recursive_rm_root_with_depth(&nested, depth + 1) {
+                        return true;
+                    }
+                }
             }
         }
     }
@@ -308,6 +322,11 @@ fn expand_env_split_string_options(tokens: &[String]) -> Vec<String> {
 }
 
 fn executable_rm_index(tokens: &[String]) -> Option<usize> {
+    let index = executable_command_index(tokens)?;
+    (tokens[index] == "rm").then_some(index)
+}
+
+fn executable_command_index(tokens: &[String]) -> Option<usize> {
     let mut index = 0usize;
     while index < tokens.len() {
         let token = tokens[index].as_str();
@@ -372,10 +391,60 @@ fn executable_rm_index(tokens: &[String]) -> Option<usize> {
             continue;
         }
 
-        return (token == "rm").then_some(index);
+        return Some(index);
     }
 
     None
+}
+
+fn shell_command_string(tokens: &[String]) -> Option<&str> {
+    let index = executable_command_index(tokens)?;
+    if !is_shell_interpreter(tokens[index].as_str()) {
+        return None;
+    }
+    shell_c_argument(&tokens[index + 1..])
+}
+
+fn is_shell_interpreter(command: &str) -> bool {
+    let name = command.rsplit(['/', '\\']).next().unwrap_or(command);
+    matches!(name, "sh" | "bash" | "zsh" | "dash" | "ksh")
+}
+
+fn shell_c_argument(tokens: &[String]) -> Option<&str> {
+    let mut index = 0usize;
+    while index < tokens.len() {
+        let token = tokens[index].as_str();
+        if token == "--" {
+            return None;
+        }
+        if token == "-c" || short_shell_options_include_c(token) {
+            return tokens.get(index + 1).map(String::as_str);
+        }
+        if shell_option_takes_value(token) {
+            index += 2;
+            continue;
+        }
+        if token.starts_with('-') && token != "-" {
+            index += 1;
+            continue;
+        }
+        return None;
+    }
+    None
+}
+
+fn short_shell_options_include_c(token: &str) -> bool {
+    token
+        .strip_prefix('-')
+        .filter(|value| !value.is_empty() && !value.starts_with('-'))
+        .is_some_and(|value| value.chars().any(|ch| ch == 'c'))
+}
+
+fn shell_option_takes_value(token: &str) -> bool {
+    matches!(
+        token,
+        "-o" | "+o" | "-O" | "+O" | "--rcfile" | "--init-file"
+    )
 }
 
 fn is_sudo_option(token: &str) -> bool {
@@ -746,6 +815,14 @@ mod tests {
         assert!(guard.is_forbidden("echo ok\nrm -r'f' /"));
         assert!(guard.is_forbidden("echo ok\rrm -r'f' /"));
         assert!(guard.is_forbidden("echo ok\r\nrm -r'f' /"));
+    }
+
+    #[test]
+    fn blocks_quote_obfuscated_rm_rf_root_inside_shell_command_string() {
+        let guard = ShellCommandGuard::new();
+        assert!(guard.is_forbidden("sh -c \"rm -r'f' /\""));
+        assert!(guard.is_forbidden("bash -lc \"sudo rm -r'f' /\""));
+        assert!(!guard.is_forbidden("sh -c \"echo rm -r'f' /\""));
     }
 
     #[test]
