@@ -62,8 +62,20 @@ struct CapabilityBinding {
     policy: HttpAuthorityPolicy,
 }
 
+const CHIO_TOOLS_PATH_PREFIX: &str = "/chio/tools/";
+
+fn strip_chio_tools_path_prefix(path: &str) -> Option<&str> {
+    if path.len() < CHIO_TOOLS_PATH_PREFIX.len() {
+        return None;
+    }
+    if !path[..CHIO_TOOLS_PATH_PREFIX.len()].eq_ignore_ascii_case(CHIO_TOOLS_PATH_PREFIX) {
+        return None;
+    }
+    Some(&path[CHIO_TOOLS_PATH_PREFIX.len()..])
+}
+
 fn chio_tools_path_identity(path: &str) -> ChioToolsPathIdentity {
-    let Some(rest) = path.strip_prefix("/chio/tools/") else {
+    let Some(rest) = strip_chio_tools_path_prefix(path) else {
         return ChioToolsPathIdentity::NotToolsPath;
     };
     let Some((server_id, tool_name)) = rest.split_once('/') else {
@@ -2258,5 +2270,60 @@ mod tests {
             chio_tools_path_identity("/pets/42"),
             ChioToolsPathIdentity::NotToolsPath
         ));
+    }
+
+    #[test]
+    fn chio_tools_path_identity_accepts_ascii_case_variant_prefix() {
+        let ChioToolsPathIdentity::Identity {
+            server_id,
+            tool_name,
+        } = chio_tools_path_identity("/chio/Tools/billing/charge")
+        else {
+            panic!("expected identity for case-variant tools prefix");
+        };
+        assert_eq!(server_id, "billing");
+        assert_eq!(tool_name, "charge");
+    }
+
+    #[test]
+    fn deny_by_default_tools_path_case_variant_binds_to_path_identity() {
+        let query = HashMap::new();
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json_with_scope(
+            &issuer,
+            "cap-http-authority-only",
+            ChioScope {
+                grants: vec![http_authority_tool_grant()],
+                ..ChioScope::default()
+            },
+        );
+
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-tools-path-case-variant".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/chio/tools/billing/charge".to_string(),
+                path: "/chio/Tools/billing/charge",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("abc".to_string()),
+                body_length: 3,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: Some("billing"),
+                requested_tool_name: Some("charge"),
+                requested_arguments: Some(&serde_json::json!({ "amount": 100 })),
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("capability does not authorize tool charge on server billing")
+        );
     }
 }
