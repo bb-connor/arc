@@ -400,9 +400,14 @@ pub fn validate_extension_inventory(
             &point.official_component_ids,
             "extension_points.official_component_ids",
         )?;
-        if point.policy_activation_required
-            && point.allowed_evidence_modes == [ExtensionEvidenceMode::None]
-        {
+        let admits_evidence = admits_evidence_capable_mode(&point.allowed_evidence_modes);
+        if admits_evidence && !point.policy_activation_required {
+            return Err(ExtensionContractError::InvalidGuardrail(format!(
+                "extension point {} admits evidence-capable modes without local policy activation",
+                point.id
+            )));
+        }
+        if point.policy_activation_required && !admits_evidence {
             return Err(ExtensionContractError::InvalidGuardrail(format!(
                 "extension point {} requires policy activation but admits no evidence-capable mode",
                 point.id
@@ -1008,6 +1013,12 @@ fn validate_evidence_runtime_guardrails(
     Ok(())
 }
 
+fn admits_evidence_capable_mode(modes: &[ExtensionEvidenceMode]) -> bool {
+    modes
+        .iter()
+        .any(|mode| *mode != ExtensionEvidenceMode::None)
+}
+
 fn negotiation_rejection(
     code: ExtensionNegotiationRejectionCode,
     detail: impl Into<String>,
@@ -1230,6 +1241,17 @@ mod tests {
         assert!(matches!(
             validate_extension_inventory(&inventory),
             Err(ExtensionContractError::DuplicateValue(_))
+        ));
+    }
+
+    #[test]
+    fn inventory_rejects_evidence_capable_points_without_policy_activation() {
+        let mut inventory = sample_inventory();
+        inventory.extension_points[1].policy_activation_required = false;
+
+        assert!(matches!(
+            validate_extension_inventory(&inventory),
+            Err(ExtensionContractError::InvalidGuardrail(_))
         ));
     }
 
