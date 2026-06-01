@@ -648,6 +648,19 @@ impl A2aAdapter {
         if input.history_length.is_some() {
             self.ensure_state_transition_history_supported()?;
         }
+        let input_surface = skill_input_surface(&self.agent_card, skill)?;
+        if input.message.is_some() && !input_surface.accepts_text {
+            return Err(AdapterError::InvalidToolInput(format!(
+                "A2A skill `{}` does not advertise a text input mode compatible with text parts",
+                skill.id
+            )));
+        }
+        if input.data.is_some() && !input_surface.accepts_json {
+            return Err(AdapterError::InvalidToolInput(format!(
+                "A2A skill `{}` does not advertise a JSON input mode compatible with data parts",
+                skill.id
+            )));
+        }
         let mut parts = Vec::new();
         if let Some(message) = input.message {
             parts.push(A2aPart {

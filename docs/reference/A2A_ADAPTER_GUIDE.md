@@ -82,6 +82,13 @@ Task-history semantics are also fail-closed. Chio will only send
 `historyLength` on `SendMessage` or `GetTask` when the Agent Card advertises
 `capabilities.stateTransitionHistory = true`.
 
+Skill input modes are projected into the generated Chio tool schema. A skill
+that advertises only `application/json` accepts the `data` field but not
+`message`; a skill that advertises only `text` or `text/plain` accepts
+`message` but not `data`. Invocation also checks the selected skill before
+serializing an A2A part, so unsupported text or JSON payloads fail locally
+instead of being sent upstream.
+
 Lifecycle payload validation is fail-closed too. `SendMessage` task responses,
 `GetTask` results, streamed `task` objects, `statusUpdate` events, and
 `artifactUpdate` events must contain the required lifecycle fields Chio relies

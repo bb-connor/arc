@@ -1000,6 +1000,97 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn build_send_message_request_rejects_text_when_skill_declares_json_only_input() {
+        let mut adapter = local_test_adapter(
+            A2aAgentCapabilities::default(),
+            A2aProtocolBinding::JsonRpc,
+            None,
+        );
+        adapter.agent_card.skills[0].input_modes = Some(vec!["application/json".to_string()]);
+
+        let error = adapter
+            .build_send_message_request(
+                &adapter.agent_card.skills[0],
+                A2aSendToolInput {
+                    message: Some("hello".to_string()),
+                    data: None,
+                    context_id: None,
+                    task_id: None,
+                    reference_task_ids: None,
+                    metadata: None,
+                    message_metadata: None,
+                    history_length: None,
+                    return_immediately: None,
+                    stream: false,
+                },
+            )
+            .expect_err("JSON-only A2A skill must reject text parts");
+        assert!(
+            error.to_string().contains("text input mode"),
+            "unexpected input-mode error: {error}"
+        );
+    }
+
+    #[tokio::test]
+    async fn build_send_message_request_rejects_data_when_skill_declares_text_only_input() {
+        let mut adapter = local_test_adapter(
+            A2aAgentCapabilities::default(),
+            A2aProtocolBinding::JsonRpc,
+            None,
+        );
+        adapter.agent_card.skills[0].input_modes = Some(vec!["text/plain".to_string()]);
+
+        let error = adapter
+            .build_send_message_request(
+                &adapter.agent_card.skills[0],
+                A2aSendToolInput {
+                    message: None,
+                    data: Some(json!({ "query": "hello" })),
+                    context_id: None,
+                    task_id: None,
+                    reference_task_ids: None,
+                    metadata: None,
+                    message_metadata: None,
+                    history_length: None,
+                    return_immediately: None,
+                    stream: false,
+                },
+            )
+            .expect_err("text-only A2A skill must reject JSON data parts");
+        assert!(
+            error.to_string().contains("JSON input mode"),
+            "unexpected input-mode error: {error}"
+        );
+    }
+
+    #[tokio::test]
+    async fn build_manifest_projects_skill_input_modes_into_tool_schema() {
+        let mut adapter = local_test_adapter(
+            A2aAgentCapabilities::default(),
+            A2aProtocolBinding::JsonRpc,
+            None,
+        );
+        adapter.agent_card.skills[0].input_modes = Some(vec!["application/json".to_string()]);
+
+        let manifest = build_manifest(
+            "tenant-test",
+            "0.1.0",
+            &Keypair::generate().public_key().to_hex(),
+            &adapter.agent_card,
+            &A2aProtocolBinding::JsonRpc,
+        )
+        .expect("build manifest");
+        let properties = manifest.tools[0]
+            .input_schema
+            .get("properties")
+            .and_then(Value::as_object)
+            .expect("manifest input schema exposes properties");
+
+        assert!(!properties.contains_key("message"));
+        assert!(properties.contains_key("data"));
+    }
+
+    #[tokio::test]
     async fn get_task_rejects_history_length_without_capability() {
         let adapter = local_test_adapter(
             A2aAgentCapabilities {
