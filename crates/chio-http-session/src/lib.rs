@@ -127,6 +127,23 @@ pub struct CumulativeDataFlow {
     pub max_delegation_depth: u32,
 }
 
+/// Immutable guard-read snapshot captured under one journal lock.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionJournalSnapshot {
+    /// Session identifier for the journal that produced this snapshot.
+    pub session_id: String,
+    /// Number of entries present when the snapshot was captured.
+    pub entry_count: usize,
+    /// Hash of the most recent entry, or the zero hash for an empty journal.
+    pub head_hash: String,
+    /// Cumulative data flow state.
+    pub data_flow: CumulativeDataFlow,
+    /// Ordered tool invocation sequence.
+    pub tool_sequence: Vec<String>,
+    /// Per-tool invocation counts.
+    pub tool_counts: HashMap<String, u64>,
+}
+
 // ---------------------------------------------------------------------------
 // Session journal (inner, not thread-safe)
 // ---------------------------------------------------------------------------
@@ -159,6 +176,17 @@ impl JournalInner {
             .last()
             .map(|e| e.entry_hash.as_str())
             .unwrap_or(ZERO_HASH)
+    }
+
+    fn snapshot(&self, session_id: &str) -> SessionJournalSnapshot {
+        SessionJournalSnapshot {
+            session_id: session_id.to_string(),
+            entry_count: self.entries.len(),
+            head_hash: self.last_hash().to_string(),
+            data_flow: self.data_flow.clone(),
+            tool_sequence: self.tool_sequence.clone(),
+            tool_counts: self.tool_counts.clone(),
+        }
     }
 }
 
@@ -285,6 +313,16 @@ impl SessionJournal {
     pub fn data_flow(&self) -> Result<CumulativeDataFlow, SessionJournalError> {
         let inner = self.lock_inner()?;
         Ok(inner.data_flow.clone())
+    }
+
+    /// Return a coherent snapshot of guard-facing journal state.
+    ///
+    /// The snapshot captures cumulative data flow, tool sequence, tool counts,
+    /// entry count, and head hash while holding one journal lock. Guards that
+    /// need more than one view should prefer this method over multiple getters.
+    pub fn snapshot(&self) -> Result<SessionJournalSnapshot, SessionJournalError> {
+        let inner = self.lock_inner()?;
+        Ok(inner.snapshot(&self.session_id))
     }
 
     /// Return the ordered tool invocation sequence.
@@ -491,6 +529,50 @@ mod tests {
         let counts = journal.tool_counts().unwrap();
         assert_eq!(counts.get("read_file"), Some(&2));
         assert_eq!(counts.get("bash"), Some(&1));
+    }
+
+    #[test]
+    fn snapshot_captures_guard_state_under_one_read_boundary() {
+        let journal = SessionJournal::new("sess-snapshot".to_string());
+        journal.record(test_params("read_file")).unwrap();
+        journal
+            .record(RecordParams {
+                tool_name: "bash".to_string(),
+                server_id: "srv-1".to_string(),
+                agent_id: "agent-1".to_string(),
+                bytes_read: 25,
+                bytes_written: 10,
+                delegation_depth: 2,
+                allowed: false,
+            })
+            .unwrap();
+
+        let snapshot = journal.snapshot().unwrap();
+
+        assert_eq!(snapshot.session_id, "sess-snapshot");
+        assert_eq!(snapshot.entry_count, 2);
+        assert_eq!(snapshot.head_hash, journal.head_hash().unwrap());
+        assert_eq!(snapshot.data_flow.total_bytes_read, 125);
+        assert_eq!(snapshot.data_flow.total_bytes_written, 60);
+        assert_eq!(snapshot.data_flow.total_invocations, 2);
+        assert_eq!(snapshot.data_flow.max_delegation_depth, 2);
+        assert_eq!(snapshot.tool_sequence, vec!["read_file", "bash"]);
+        assert_eq!(snapshot.tool_counts.get("read_file"), Some(&1));
+        assert_eq!(snapshot.tool_counts.get("bash"), Some(&1));
+    }
+
+    #[test]
+    fn snapshot_is_an_immutable_view_of_capture_time() {
+        let journal = SessionJournal::new("sess-snapshot-stale".to_string());
+        journal.record(test_params("read_file")).unwrap();
+
+        let snapshot = journal.snapshot().unwrap();
+        journal.record(test_params("write_file")).unwrap();
+
+        assert_eq!(snapshot.entry_count, 1);
+        assert_eq!(snapshot.tool_sequence, vec!["read_file"]);
+        assert_eq!(snapshot.tool_counts.get("write_file"), None);
+        assert_eq!(journal.len().unwrap(), 2);
     }
 
     #[test]
