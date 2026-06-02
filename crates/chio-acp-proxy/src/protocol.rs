@@ -119,6 +119,19 @@ impl RequestPermissionParams {
     }
 }
 
+/// Parameters for `session/cancel`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCancelParams {
+    pub session_id: String,
+}
+
+impl SessionCancelParams {
+    pub(crate) fn validate_boundary(&self) -> Result<(), AcpProxyError> {
+        validate_non_empty_protocol_field("session/cancel", "sessionId", &self.session_id)
+    }
+}
+
 /// A single permission option presented to the user.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

@@ -4073,6 +4073,80 @@ mod attestation_and_telemetry_tests {
     }
 
     #[test]
+    fn interceptor_session_cancel_rejects_malformed_params_without_draining_contexts() {
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let checker = always_allow_sequenced_checker(Arc::clone(&requests), 1);
+        let config = AcpProxyConfig::new("echo", "deadbeef")
+            .with_allowed_path_prefix("/home/user/project")
+            .with_allowed_command("cargo")
+            .with_server_id("proxy-server");
+        let interceptor = MessageInterceptor::with_kernel(
+            config,
+            None,
+            Some(Box::new(checker)),
+            AcpAttestationMode::BestEffort,
+        );
+
+        let read = json!({
+            "jsonrpc": "2.0",
+            "id": 701,
+            "method": "fs/read_text_file",
+            "params": {
+                "sessionId": "session-cancel-invalid",
+                "path": "/home/user/project/src/read.rs",
+                "capabilityToken": "token-read"
+            }
+        });
+        interceptor
+            .intercept(Direction::AgentToClient, &read)
+            .expect("fs/read should forward and create pending context");
+        assert_eq!(
+            interceptor.pending_capability_context_count("session-cancel-invalid"),
+            1,
+            "expected pending context before malformed session/cancel"
+        );
+
+        let missing_params = json!({
+            "jsonrpc": "2.0",
+            "id": 702,
+            "method": "session/cancel"
+        });
+        let err = interceptor
+            .intercept(Direction::AgentToClient, &missing_params)
+            .expect_err("missing cancel params must fail before forwarding");
+        assert_eq!(
+            err.to_string(),
+            "protocol error: missing params in session/cancel"
+        );
+        assert_eq!(
+            interceptor.pending_capability_context_count("session-cancel-invalid"),
+            1,
+            "missing cancel params must not drain pending context"
+        );
+
+        let empty_session = json!({
+            "jsonrpc": "2.0",
+            "id": 703,
+            "method": "session/cancel",
+            "params": {
+                "sessionId": " "
+            }
+        });
+        let err = interceptor
+            .intercept(Direction::AgentToClient, &empty_session)
+            .expect_err("empty cancel sessionId must fail before forwarding");
+        assert_eq!(
+            err.to_string(),
+            "protocol error: invalid session/cancel params: sessionId must be a non-empty string"
+        );
+        assert_eq!(
+            interceptor.pending_capability_context_count("session-cancel-invalid"),
+            1,
+            "invalid cancel params must not drain pending context"
+        );
+    }
+
+    #[test]
     fn interceptor_checker_denies_and_errors_fail_closed_before_builtin_guards() {
         let deny_requests = Arc::new(Mutex::new(Vec::new()));
         let config = AcpProxyConfig::new("echo", "deadbeef")

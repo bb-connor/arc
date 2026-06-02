@@ -124,10 +124,47 @@ first when installed, then built-in guard, then forwarding.
 planned. The expected compatibility proof is the owning crate test suite plus a
 targeted `chio-cli` check if the crate compiles cleanly.
 
-### Planned Material Improvement
+### Completed Material Improvement
 
 Replace session-wide context clearing on blocked fs and terminal-create paths
 with request-scoped cleanup. If the blocked request carried a `toolCallId`, only
 that live context is removed; requests without a `toolCallId` have not been
 buffered yet and require no cleanup. Add regression tests proving that a denied
 request cannot erase unrelated live or pending authorization evidence.
+
+## Session Cancel Params Boundary Slice
+
+### Current Boundary
+
+`session/cancel` is the lifecycle cleanup path for live and pending ACP
+authorization contexts. It clears the per-session pending FIFO and the
+`tool:<session>:*` live context index so cancelled sessions do not retain
+authorization material.
+
+### Pain Point
+
+The interceptor currently treats `session/cancel` params as optional. Missing,
+non-object, or blank `sessionId` values are forwarded unchanged and do not drain
+any context. That is weaker than the rest of the recognized ACP lifecycle
+surface: malformed cancel messages can cross the proxy as if they were valid
+control messages while leaving captured authorization evidence alive.
+
+### Security and API Constraints
+
+The public flattened root API must remain source-compatible. Valid
+`session/cancel` messages should still forward unchanged after context cleanup.
+Malformed `session/cancel` messages should fail closed with the existing
+`AcpProxyError::Protocol` shape used by guarded ACP methods. Unknown ACP
+methods still forward for forward compatibility.
+
+### Affected Dependents
+
+Only owning-crate tests are expected to change. No downstream API or wire shape
+change is planned for valid cancel messages.
+
+### Completed Material Improvement
+
+Add typed `session/cancel` params validation and route the method through the
+same params-required decode boundary as guarded fs, terminal, permission, and
+session-update methods. Add regression coverage proving malformed cancel
+messages fail before forwarding and do not drain unrelated pending contexts.

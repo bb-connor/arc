@@ -202,8 +202,7 @@ impl MessageInterceptor {
             // in-flight tool call associated with the session is
             // implicitly cancelled.
             (_, Some(AcpMethod::SessionCancel)) => {
-                self.intercept_session_cancel(message);
-                Ok(InterceptResult::Forward(message.clone()))
+                self.intercept_session_cancel(message)
             }
             // -- New ACP methods: forward unchanged (no guard needed) --
             (_, Some(AcpMethod::Authenticate))
@@ -914,20 +913,12 @@ impl MessageInterceptor {
     /// before their pending `fs/read` / `terminal/create` requests bind to
     /// a `session/update` would leak captured authorization material for
     /// the lifetime of the proxy.
-    fn intercept_session_cancel(&self, message: &Value) {
-        let Some(params) = message.get("params") else {
-            return;
-        };
-        let session_id = params
-            .get("sessionId")
-            .and_then(Value::as_str)
-            .or_else(|| params.get("session_id").and_then(Value::as_str));
-        let Some(session_id) = session_id else {
-            return;
-        };
-        if session_id.trim().is_empty() {
-            return;
-        }
+    fn intercept_session_cancel(&self, message: &Value) -> Result<InterceptResult, AcpProxyError> {
+        let params = Self::jsonrpc_params(message, "session/cancel")?;
+        let cancel_params: SessionCancelParams =
+            Self::decode_jsonrpc_params(params, "session/cancel")?;
+        cancel_params.validate_boundary()?;
+        let session_id = cancel_params.session_id.as_str();
         let pending_drained = self
             .pending_capability_contexts
             .lock()
@@ -946,6 +937,7 @@ impl MessageInterceptor {
                 "session/cancel cleared pending capability contexts"
             );
         }
+        Ok(InterceptResult::Forward(message.clone()))
     }
 }
 
