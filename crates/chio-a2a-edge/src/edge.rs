@@ -36,6 +36,8 @@ pub struct ChioA2aEdgeCompatibility<'a> {
 impl ChioA2aEdge {
     /// Create a new A2A edge from Chio tool manifests.
     pub fn new(config: A2aEdgeConfig, manifests: Vec<ToolManifest>) -> Result<Self, A2aEdgeError> {
+        config.validate_for_agent_card()?;
+
         let mut skills = Vec::new();
         let mut skill_fidelity = BTreeMap::new();
         let mut skill_bindings = BTreeMap::new();

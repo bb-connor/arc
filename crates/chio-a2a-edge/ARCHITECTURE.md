@@ -103,3 +103,46 @@ Update lifecycle tests to prove completed tasks are not re-executed or removed
 on the first `task/get`, cancelled tasks remain visible for idempotent
 follow-up, and the deferred-task cap applies to all retained task records after
 TTL pruning.
+
+## Agent Card Config Validation Slice
+
+### Current Boundary
+
+- `config.rs` defines the public `A2aEdgeConfig` fields that become Agent Card
+  identity and interface metadata.
+- `edge.rs` owns `ChioA2aEdge::new`, which is the last gate before tool
+  manifests are converted into externally discoverable A2A skills.
+- `agent_card` publishes config fields without further normalization or
+  validation.
+
+### Pain Point
+
+The bridge spec requires at least the advertised Agent Card name to be
+non-empty, and the interface entry must be usable by clients. Today callers can
+construct an edge with blank identity fields, blank endpoint URLs, or blank
+protocol bindings, and those values are published directly in discovery
+metadata. That lets malformed operator configuration escape as a valid-looking
+A2A Agent Card before any request-boundary or kernel guard can reject it.
+
+### Security And API Constraints
+
+- Preserve `A2aEdgeConfig` as a public struct and preserve `ChioA2aEdge::new`
+  as the constructor.
+- Fail closed at construction with `A2aEdgeError::InvalidRequest`.
+- Do not trim and silently rewrite operator-provided public metadata.
+- Keep successful default config and existing Agent Card JSON shape stable.
+- No dependent crate API change is planned.
+
+### Affected Dependents
+
+- Downstream A2A clients no longer see malformed Agent Cards from blank edge
+  config.
+- Existing callers with valid config are unchanged.
+
+### Completed Material Improvement
+
+Add a config publication gate in the owning crate that rejects blank Agent Card
+identity and interface fields before manifest validation, skill publication, or
+JSON-RPC dispatch can occur. Add focused constructor tests for each rejected
+field and a stability test proving valid default Agent Card fields are still
+published unchanged.

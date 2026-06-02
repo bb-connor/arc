@@ -423,6 +423,18 @@ mod tests {
 
     // ---- Constructor and Agent Card tests ----
 
+    fn assert_invalid_agent_card_config_rejected(config: A2aEdgeConfig, expected: &str) {
+        let error = match ChioA2aEdge::new(config, vec![test_manifest()]) {
+            Ok(_) => panic!("A2A edge must reject invalid Agent Card config"),
+            Err(error) => error,
+        };
+
+        let A2aEdgeError::InvalidRequest(message) = error else {
+            panic!("expected invalid request error");
+        };
+        assert_eq!(message, expected);
+    }
+
     #[test]
     fn edge_rejects_manifest_with_unsupported_schema_version() {
         let mut manifest = test_manifest();
@@ -439,6 +451,72 @@ mod tests {
             A2aEdgeError::Manifest(chio_manifest::ManifestError::UnsupportedSchema(schema))
                 if schema == "chio.manifest.v0"
         ));
+    }
+
+    #[test]
+    fn edge_rejects_blank_agent_card_name_before_publication() {
+        let config = A2aEdgeConfig {
+            agent_name: "  ".to_string(),
+            ..A2aEdgeConfig::default()
+        };
+
+        assert_invalid_agent_card_config_rejected(
+            config,
+            "agent card name must not be empty",
+        );
+    }
+
+    #[test]
+    fn edge_rejects_blank_agent_card_version_before_publication() {
+        let config = A2aEdgeConfig {
+            agent_version: String::new(),
+            ..A2aEdgeConfig::default()
+        };
+
+        assert_invalid_agent_card_config_rejected(
+            config,
+            "agent card version must not be empty",
+        );
+    }
+
+    #[test]
+    fn edge_rejects_blank_agent_card_endpoint_before_publication() {
+        let config = A2aEdgeConfig {
+            endpoint_url: "\t".to_string(),
+            ..A2aEdgeConfig::default()
+        };
+
+        assert_invalid_agent_card_config_rejected(
+            config,
+            "agent card endpoint URL must not be empty",
+        );
+    }
+
+    #[test]
+    fn edge_rejects_blank_agent_card_protocol_binding_before_publication() {
+        let config = A2aEdgeConfig {
+            protocol_binding: "\n".to_string(),
+            ..A2aEdgeConfig::default()
+        };
+
+        assert_invalid_agent_card_config_rejected(
+            config,
+            "agent card protocol binding must not be empty",
+        );
+    }
+
+    #[test]
+    fn agent_card_default_config_fields_stay_stable() {
+        let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let card = edge.agent_card();
+
+        assert_eq!(card.name, "Chio A2A Edge");
+        assert_eq!(card.description, "Chio-governed tools exposed as A2A skills");
+        assert_eq!(card.version, "0.1.0");
+        assert_eq!(card.supported_interfaces.len(), 1);
+        assert_eq!(card.supported_interfaces[0].url, "http://localhost:8080");
+        assert_eq!(card.supported_interfaces[0].protocol_binding, "JSONRPC");
+        assert_eq!(card.supported_interfaces[0].protocol_version, "1.0");
     }
 
     #[test]
