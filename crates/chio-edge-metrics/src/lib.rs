@@ -26,7 +26,8 @@ pub const RECEIPT_WRITE_OUTCOME_DENY: &str = "deny";
 pub const RECEIPT_WRITE_OUTCOME_PENDING_APPROVAL: &str = "pending_approval";
 pub const RECEIPT_WRITE_OUTCOME_ERROR: &str = "error";
 
-const RECEIPT_WRITE_OUTCOMES: [ReceiptWriteOutcome; 4] = [
+/// Stable exporter order for receipt-write outcome samples.
+pub const RECEIPT_WRITE_OUTCOMES: [ReceiptWriteOutcome; 4] = [
     ReceiptWriteOutcome::Allow,
     ReceiptWriteOutcome::Deny,
     ReceiptWriteOutcome::PendingApproval,
@@ -92,6 +93,21 @@ pub struct ReceiptWriteSnapshot {
     pub error: u64,
 }
 
+/// One labelled receipt-write counter sample from a snapshot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReceiptWriteSample {
+    pub outcome: ReceiptWriteOutcome,
+    pub total: u64,
+}
+
+impl ReceiptWriteSample {
+    /// Stable Prometheus label value for this sample.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        self.outcome.as_str()
+    }
+}
+
 impl ReceiptWriteSnapshot {
     /// Return the count for a typed outcome.
     #[must_use]
@@ -102,6 +118,29 @@ impl ReceiptWriteSnapshot {
             ReceiptWriteOutcome::PendingApproval => self.pending_approval,
             ReceiptWriteOutcome::Error => self.error,
         }
+    }
+
+    /// Return all samples in the stable exporter order.
+    #[must_use]
+    pub const fn samples(self) -> [ReceiptWriteSample; 4] {
+        [
+            ReceiptWriteSample {
+                outcome: ReceiptWriteOutcome::Allow,
+                total: self.allow,
+            },
+            ReceiptWriteSample {
+                outcome: ReceiptWriteOutcome::Deny,
+                total: self.deny,
+            },
+            ReceiptWriteSample {
+                outcome: ReceiptWriteOutcome::PendingApproval,
+                total: self.pending_approval,
+            },
+            ReceiptWriteSample {
+                outcome: ReceiptWriteOutcome::Error,
+                total: self.error,
+            },
+        ]
     }
 }
 
@@ -209,13 +248,12 @@ impl ReceiptWriteCounters {
         output.push_str("# TYPE ");
         output.push_str(CHIO_RECEIPT_WRITE_TOTAL);
         output.push_str(" counter\n");
-        let snapshot = self.snapshot();
-        for outcome in RECEIPT_WRITE_OUTCOMES {
+        for sample in self.snapshot().samples() {
             output.push_str(CHIO_RECEIPT_WRITE_TOTAL);
             output.push_str("{outcome=\"");
-            output.push_str(outcome.as_str());
+            output.push_str(sample.label());
             output.push_str("\"} ");
-            output.push_str(&snapshot.total(outcome).to_string());
+            output.push_str(&sample.total.to_string());
             output.push('\n');
         }
         output
@@ -321,6 +359,41 @@ mod tests {
         assert_eq!(snapshot.total(ReceiptWriteOutcome::Deny), 0);
         assert_eq!(snapshot.total(ReceiptWriteOutcome::PendingApproval), 1);
         assert_eq!(snapshot.total(ReceiptWriteOutcome::Error), 1);
+    }
+
+    #[test]
+    fn snapshot_samples_preserve_stable_order_and_totals() {
+        let counters = ReceiptWriteCounters::new();
+        counters.record_outcome(ReceiptWriteOutcome::Allow);
+        counters.record_outcome(ReceiptWriteOutcome::Allow);
+        counters.record_outcome(ReceiptWriteOutcome::Deny);
+        counters.record_outcome(ReceiptWriteOutcome::PendingApproval);
+        counters.record("unknown-label");
+
+        let samples = counters.snapshot().samples();
+
+        assert_eq!(
+            samples,
+            [
+                ReceiptWriteSample {
+                    outcome: ReceiptWriteOutcome::Allow,
+                    total: 2,
+                },
+                ReceiptWriteSample {
+                    outcome: ReceiptWriteOutcome::Deny,
+                    total: 1,
+                },
+                ReceiptWriteSample {
+                    outcome: ReceiptWriteOutcome::PendingApproval,
+                    total: 1,
+                },
+                ReceiptWriteSample {
+                    outcome: ReceiptWriteOutcome::Error,
+                    total: 1,
+                },
+            ]
+        );
+        assert_eq!(samples[0].label(), RECEIPT_WRITE_OUTCOME_ALLOW);
     }
 
     #[test]
