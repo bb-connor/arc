@@ -1601,6 +1601,109 @@ mod tests {
     }
 
     #[test]
+    fn jsonrpc_list_capabilities_rejects_non_object_params_before_listing() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "test-srv", "read_file"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 44,
+                "method": "session/list_capabilities",
+                "params": []
+            }),
+            &kernel,
+            &execution,
+        );
+
+        assert_eq!(response["error"]["code"], -32602);
+        assert_eq!(
+            response["error"]["message"],
+            "session/list_capabilities params must be an object"
+        );
+    }
+
+    #[test]
+    fn jsonrpc_tool_invoke_rejects_non_object_params_before_capability_lookup() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let mut kernel = ChioKernel::new(config);
+        kernel.register_tool_server(Box::new(test_server()));
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "test-srv", "search"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 45,
+                "method": "tool/invoke",
+                "params": []
+            }),
+            &kernel,
+            &execution,
+        );
+
+        assert_eq!(response["error"]["code"], -32602);
+        assert_eq!(
+            response["error"]["message"],
+            "tool/invoke params must be an object"
+        );
+    }
+
+    #[test]
+    fn jsonrpc_resume_rejects_non_object_params_before_task_lookup() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "streaming-srv", "search_stream"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 46,
+                "method": "tool/resume",
+                "params": []
+            }),
+            &kernel,
+            &execution,
+        );
+
+        assert_eq!(response["error"]["code"], -32602);
+        assert_eq!(
+            response["error"]["message"],
+            "tool/resume params must be an object"
+        );
+    }
+
+    #[test]
     fn jsonrpc_unknown_method() {
         let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
@@ -1663,6 +1766,28 @@ mod tests {
                 "request id must be string, number, or null"
             );
         }
+    }
+
+    #[test]
+    fn jsonrpc_compatibility_permission_rejects_non_object_params_before_preview() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let server = test_server();
+
+        let response = edge.compatibility().handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 47,
+                "method": "session/request_permission",
+                "params": []
+            }),
+            &server,
+        );
+
+        assert_eq!(response["error"]["code"], -32602);
+        assert_eq!(
+            response["error"]["message"],
+            "session/request_permission params must be an object"
+        );
     }
 
     #[test]

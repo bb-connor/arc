@@ -14,8 +14,15 @@
 
 - `edge.rs` still owns multiple trust-boundary responsibilities: manifest-to-capability publication, JSON-RPC dispatch, permission preview, kernel execution, and deferred task lifecycle.
 - Kernel-backed ACP permission preview now uses the kernel-owned stateless DPoP verifier, so preview and invoke agree on installed DPoP TTL, skew, and store/config presence without consuming the nonce.
-- `ChioAcpEdge::new` still maps manifests directly into advertised ACP capabilities and authoritative target bindings before calling the canonical `chio_manifest::validate_manifest` envelope gate.
-- That means unsupported manifest schema versions, invalid embedded public keys, empty tool lists, invalid tool names, malformed schemas, or duplicate server-tool allowlist entries can become ACP-visible capability metadata even though manifest signing and loader paths would reject them.
+- `ChioAcpEdge::new` now validates every manifest with
+  `chio_manifest::validate_manifest` before ACP capability publication,
+  bridge-fidelity classification, or authoritative capability binding
+  construction.
+- The remaining request-boundary gap is JSON-RPC params shape. The envelope
+  parser defaults missing params to `{}`, but non-object params are preserved.
+  Known ACP methods then fall through into method-specific parsers or no-params
+  responses, producing deeper errors or successful responses instead of
+  rejecting malformed request params at the JSON-RPC boundary.
 
 ## Security And API Constraints
 
@@ -34,6 +41,14 @@
 - `chio-mcp-edge` remains a target executor dependency for multi-hop routes. No transitive edit is planned.
 - ACP clients may see construction-time manifest errors earlier. Valid capability, permission, invocation, and deferred-task response shapes stay compatible.
 
-## Planned Material Improvement
+## Completed Baseline
 
 Validate every `ToolManifest` with `chio_manifest::validate_manifest` before ACP capability publication, bridge-fidelity classification, or authoritative capability binding construction. This is architectural because it makes manifest validation the single envelope gate before external ACP discovery and keeps permission preview focused on request-time admission.
+
+## Completed Material Improvement
+
+Added a centralized known-method params-object gate for authoritative and
+compatibility JSON-RPC dispatch. Missing params remain compatible as `{}`,
+unknown methods still return method-not-found, and non-object params for known
+ACP methods fail with `-32602` before permission preview, invocation parsing,
+task lifecycle lookup, or capability listing can observe malformed params.

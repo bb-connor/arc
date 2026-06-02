@@ -477,6 +477,14 @@ impl ChioAcpEdge {
                 Ok(envelope) => envelope,
                 Err(response) => return response,
             };
+        if let Err(response) = Self::ensure_jsonrpc_params_object_for_known_method(
+            &id,
+            &method,
+            &params,
+            ACP_JSONRPC_KNOWN_METHODS,
+        ) {
+            return response;
+        }
 
         match method.as_str() {
             "session/list_capabilities" => {
@@ -558,6 +566,14 @@ impl ChioAcpEdge {
                 Ok(envelope) => envelope,
                 Err(response) => return response,
             };
+        if let Err(response) = Self::ensure_jsonrpc_params_object_for_known_method(
+            &id,
+            &method,
+            &params,
+            ACP_JSONRPC_KNOWN_METHODS,
+        ) {
+            return response;
+        }
 
         match method.as_str() {
             "session/list_capabilities" => {

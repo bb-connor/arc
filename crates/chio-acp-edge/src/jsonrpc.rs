@@ -7,6 +7,15 @@ struct AcpJsonRpcEnvelope {
     params: Value,
 }
 
+const ACP_JSONRPC_KNOWN_METHODS: &[&str] = &[
+    "session/list_capabilities",
+    "session/request_permission",
+    "tool/invoke",
+    "tool/stream",
+    "tool/cancel",
+    "tool/resume",
+];
+
 impl ChioAcpEdge {
     fn jsonrpc_protocol_error_response(id: Value, code: i64, message: &str) -> Value {
         json!({
@@ -67,6 +76,23 @@ impl ChioAcpEdge {
             method: method.to_string(),
             params,
         })
+    }
+
+    fn ensure_jsonrpc_params_object_for_known_method(
+        id: &Value,
+        method: &str,
+        params: &Value,
+        known_methods: &[&str],
+    ) -> Result<(), Value> {
+        if !known_methods.contains(&method) || params.is_object() {
+            return Ok(());
+        }
+
+        Err(Self::jsonrpc_protocol_error_response(
+            id.clone(),
+            -32602,
+            &format!("{method} params must be an object"),
+        ))
     }
 
     fn jsonrpc_permission_request(params: &Value) -> Result<PermissionRequest, AcpEdgeError> {
