@@ -2817,6 +2817,58 @@ mod tests {
         );
     }
 
+    #[test]
+    fn oauth_client_credentials_accepts_padded_bearer_token_type() {
+        let Some(listener) = bind_fake_a2a_listener("OAuth padded token type listener") else {
+            return;
+        };
+        let address = listener.local_addr().expect("token listener address");
+        let base_url = format!("http://{address}");
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept token request");
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .expect("set token read timeout");
+            let request = read_http_request(&mut stream);
+            assert!(request.starts_with("POST /oauth/token HTTP/1.1"));
+            assert!(request.contains("grant_type=client_credentials"));
+            let body =
+                r#"{"access_token":"opaque-token","token_type":"  bEaReR  ","expires_in":3600}"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body,
+            )
+            .expect("write token response");
+        });
+
+        let transport_config = A2aTransportConfig {
+            default_tls_config: None,
+            mutual_tls_config: None,
+            egress_contract: Some(test_egress_contract(&base_url)),
+        };
+        let token_endpoint =
+            Url::parse(&format!("{base_url}/oauth/token")).expect("token endpoint URL");
+        let credentials = A2aOAuthClientCredentials {
+            client_id: "client-id".to_string(),
+            client_secret: "client-secret".to_string(),
+        };
+
+        let token = request_client_credentials_token(
+            &token_endpoint,
+            &credentials,
+            &["a2a.invoke".to_string()],
+            Duration::from_secs(2),
+            &transport_config,
+        )
+        .expect("padded bearer token_type is accepted");
+
+        handle.join().expect("join padded token type server");
+        assert_eq!(token.access_token, "opaque-token");
+        assert_eq!(token.token_type.as_deref(), Some("  bEaReR  "));
+    }
+
     #[tokio::test]
     async fn adapter_openid_client_credentials_fetches_discovery_and_token() {
         let Some(server) = FakeA2aServer::spawn_jsonrpc_openid_client_credentials_required() else {
@@ -5137,7 +5189,7 @@ mod tests {
                 assert!(request.contains("a2a.invoke"));
                 json!({
                     "access_token": "oauth-access-token",
-                    "token_type": "Bearer",
+                    "token_type": "  Bearer  ",
                     "expires_in": 3600
                 })
                 .into()

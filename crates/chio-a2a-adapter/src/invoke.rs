@@ -451,7 +451,7 @@ impl A2aAdapter {
             &self.transport_config,
         )?;
         if let Some(token_type) = response.token_type.as_deref() {
-            if !token_type.eq_ignore_ascii_case("bearer") {
+            if !token_type.trim().eq_ignore_ascii_case("bearer") {
                 return Err(AdapterError::AuthNegotiation(format!(
                     "token endpoint for `{scheme_name}` returned unsupported token type `{token_type}`"
                 )));

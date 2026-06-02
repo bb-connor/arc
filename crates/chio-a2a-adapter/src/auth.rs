@@ -94,7 +94,7 @@ fn validate_oauth_token_response(
     let token_type = response.token_type.as_deref().ok_or_else(|| {
         AdapterError::AuthNegotiation("OAuth token endpoint omitted token_type".to_string())
     })?;
-    if !token_type.eq_ignore_ascii_case("bearer") {
+    if !token_type.trim().eq_ignore_ascii_case("bearer") {
         return Err(AdapterError::AuthNegotiation(format!(
             "OAuth token endpoint returned unsupported token_type `{token_type}`"
         )));
