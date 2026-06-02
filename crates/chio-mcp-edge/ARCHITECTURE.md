@@ -92,3 +92,41 @@ state transitions.
 Centralize cancellation-side-channel classification so `notifications/cancelled`
 remains notification shaped, but `tasks/cancel` is treated as a cancellation
 signal only when it is a well-formed JSON-RPC request with a scalar `id`.
+
+## Inbound Stdio Framing Slice
+
+### Current Boundary
+
+`runtime/protocol.rs` owns JSON-RPC envelope parsing and the blocking stdio
+pump that feeds `ChioMcpEdge`. `fuzz.rs` owns the feature-gated decode then
+dispatch fuzz entrypoint.
+
+### Pain Point
+
+The edge accepts client JSON-RPC over newline-delimited stdio, but both
+`pump_client_messages` and `read_jsonrpc_line` call `BufRead::read_line`
+directly. That leaves the edge without an explicit byte ceiling and accepts a
+non-empty EOF as a complete frame even when the client never sent the newline
+delimiter.
+
+### Security And API Constraints
+
+- Preserve public APIs and all JSON-RPC method behavior.
+- Preserve notification, task, cancellation, and nested-flow side-channel
+  semantics after a complete frame is decoded.
+- Reject truncated, delimiterless, invalid UTF-8, invalid JSON, and oversized
+  stdio frames before runtime dispatch.
+- Keep the fuzz feature off by default and free of production-only dependencies.
+
+### Affected Dependents
+
+`chio-mcp-adapter`, `chio-mcp-remote`, `chio-hosted-mcp`, and
+`examples/hello-mcp` depend on the MCP edge runtime. They should see no API
+change. The focused proof is crate-local stdio framing tests plus fuzz-feature
+tests that prove the fuzz decoder exercises the same boundary.
+
+### Planned Improvement
+
+Extract bounded newline-delimited JSON-RPC frame decoding into
+`runtime/framing.rs`, route stdio pumps and blocking nested-flow reads through
+it, and make the fuzz entrypoint use the same decoder.

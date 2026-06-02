@@ -1,3 +1,4 @@
+use super::framing::read_jsonrpc_frame;
 use super::*;
 
 pub(super) struct KernelResponseToToolResultArgs<'a> {
@@ -998,26 +999,22 @@ pub(super) fn pump_client_messages<R: BufRead>(
     cancel_sender: mpsc::Sender<Value>,
 ) {
     loop {
-        let mut line = String::new();
-        match reader.read_line(&mut line) {
-            Ok(0) => {
+        match read_jsonrpc_frame(&mut reader) {
+            Ok(None) => {
                 let _ = sender.send(ClientInbound::Closed);
                 return;
             }
-            Ok(_) => {}
             Err(error) => {
-                let _ = sender.send(ClientInbound::ReadError(error.to_string()));
-                return;
+                let inbound = match error {
+                    AdapterError::ConnectionFailed(message) => ClientInbound::ReadError(message),
+                    AdapterError::ParseError(message) => ClientInbound::ParseError(message),
+                    other => ClientInbound::ParseError(other.to_string()),
+                };
+                if sender.send(inbound).is_err() {
+                    return;
+                }
             }
-        }
-
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-
-        match serde_json::from_str::<Value>(trimmed) {
-            Ok(message) => {
+            Ok(Some(message)) => {
                 let is_cancel_signal = is_cancellation_side_channel_signal(&message);
                 if sender
                     .send(ClientInbound::Message(message.clone()))
@@ -1029,14 +1026,6 @@ pub(super) fn pump_client_messages<R: BufRead>(
                 // nested-flow cancellation can still defer and answer tasks/cancel.
                 if is_cancel_signal {
                     let _ = cancel_sender.send(message);
-                }
-            }
-            Err(error) => {
-                if sender
-                    .send(ClientInbound::ParseError(error.to_string()))
-                    .is_err()
-                {
-                    return;
                 }
             }
         }
@@ -1130,19 +1119,10 @@ pub(super) fn write_jsonrpc_line(
 }
 
 pub(super) fn read_jsonrpc_line(reader: &mut impl BufRead) -> Result<Value, AdapterError> {
-    let mut line = String::new();
-    let bytes_read = reader.read_line(&mut line).map_err(|error| {
-        AdapterError::ConnectionFailed(format!("failed to read MCP edge request: {error}"))
-    })?;
-
-    if bytes_read == 0 {
-        return Err(AdapterError::ConnectionFailed(
+    read_jsonrpc_frame(reader)?.ok_or_else(|| {
+        AdapterError::ConnectionFailed(
             "MCP client closed connection while request was in flight".into(),
-        ));
-    }
-
-    serde_json::from_str(line.trim()).map_err(|error| {
-        AdapterError::ParseError(format!("failed to parse MCP edge message: {error}"))
+        )
     })
 }
 

@@ -31,6 +31,8 @@ use serde_json::{json, Value};
 
 #[path = "runtime/discovery.rs"]
 mod discovery;
+#[path = "runtime/framing.rs"]
+pub(crate) mod framing;
 #[path = "runtime/nested_flow.rs"]
 mod nested_flow;
 #[path = "runtime/protocol.rs"]

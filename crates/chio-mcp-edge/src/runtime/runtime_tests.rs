@@ -3041,6 +3041,74 @@ fn channel_pump_does_not_signal_notification_shaped_tasks_cancel() {
 }
 
 #[test]
+fn stdio_pump_rejects_delimiterless_jsonrpc_frame() {
+    let (inbound_tx, inbound_rx) = mpsc::channel();
+    let (cancel_tx, cancel_rx) = mpsc::channel();
+    let input = b"{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}";
+    let pump = std::thread::spawn(move || {
+        pump_client_messages(Cursor::new(&input[..]), inbound_tx, cancel_tx)
+    });
+
+    let inbound = inbound_rx
+        .recv_timeout(Duration::from_secs(1))
+        .unwrap_or_else(|error| panic!("pump did not report parse error: {error}"));
+    match inbound {
+        ClientInbound::ParseError(message) => {
+            assert!(message.contains("newline delimiter"));
+        }
+        ClientInbound::Message(_) | ClientInbound::ReadError(_) | ClientInbound::Closed => {
+            panic!("expected parse error for delimiterless frame")
+        }
+    }
+    assert!(
+        cancel_rx.recv_timeout(Duration::from_millis(50)).is_err(),
+        "delimiterless frame entered cancellation side channel"
+    );
+
+    pump.join()
+        .unwrap_or_else(|_| panic!("stdio pump thread panicked"));
+}
+
+#[test]
+fn stdio_pump_rejects_oversized_jsonrpc_frame() {
+    let (inbound_tx, inbound_rx) = mpsc::channel();
+    let (cancel_tx, cancel_rx) = mpsc::channel();
+    let input = format!("{}\n", "x".repeat(framing::MAX_STDIO_MCP_FRAME_BYTES + 1));
+    let pump = std::thread::spawn(move || {
+        pump_client_messages(Cursor::new(input.into_bytes()), inbound_tx, cancel_tx)
+    });
+
+    let inbound = inbound_rx
+        .recv_timeout(Duration::from_secs(1))
+        .unwrap_or_else(|error| panic!("pump did not report oversized frame: {error}"));
+    match inbound {
+        ClientInbound::ParseError(message) => {
+            assert!(message.contains("exceeded"));
+        }
+        ClientInbound::Message(_) | ClientInbound::ReadError(_) | ClientInbound::Closed => {
+            panic!("expected parse error for oversized frame")
+        }
+    }
+    assert!(
+        cancel_rx.recv_timeout(Duration::from_millis(50)).is_err(),
+        "oversized frame entered cancellation side channel"
+    );
+
+    pump.join()
+        .unwrap_or_else(|_| panic!("stdio pump thread panicked"));
+}
+
+#[test]
+fn read_jsonrpc_line_rejects_delimiterless_frame() {
+    let mut reader = Cursor::new(b"{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}");
+    let err = read_jsonrpc_line(&mut reader).unwrap_err();
+    assert!(
+        matches!(err, AdapterError::ParseError(ref message) if message.contains("newline delimiter")),
+        "expected delimiter parse error, got: {err}"
+    );
+}
+
+#[test]
 fn resources_list_is_filtered_by_capabilities() {
     let mut edge = make_edge(10);
     let _ = edge.handle_jsonrpc(json!({
