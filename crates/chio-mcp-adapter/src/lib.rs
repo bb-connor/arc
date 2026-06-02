@@ -211,7 +211,11 @@ impl McpTransport for SerializedMcpTransport {
     }
 
     fn drain_notifications(&self) -> Vec<serde_json::Value> {
-        self.inner.drain_notifications()
+        self.with_request_gate(|inner| Ok(inner.drain_notifications()))
+            .unwrap_or_else(|error| {
+                warn!(error = %error, "wrapped MCP notification drain failed");
+                vec![]
+            })
     }
 }
 
@@ -542,6 +546,7 @@ mod tests {
     use chio_core::session::CreateElicitationOperation;
     use chio_kernel::KernelError;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Condvar, Mutex as StdMutex};
 
     use chio_test_support::prelude::*;
 
@@ -718,6 +723,65 @@ mod tests {
                 has_more: false,
                 values: vec![format!("{value}-res-completed")],
             }))
+        }
+    }
+
+    struct BlockingDrainProbeTransport {
+        entered_call_tx: StdMutex<Option<std::sync::mpsc::Sender<()>>>,
+        release: (StdMutex<bool>, Condvar),
+    }
+
+    impl BlockingDrainProbeTransport {
+        fn new(entered_call_tx: std::sync::mpsc::Sender<()>) -> Self {
+            Self {
+                entered_call_tx: StdMutex::new(Some(entered_call_tx)),
+                release: (StdMutex::new(false), Condvar::new()),
+            }
+        }
+
+        fn release_call(&self) {
+            let (released, cvar) = &self.release;
+            let mut released = released
+                .lock()
+                .unwrap_or_else(|error| panic!("release mutex poisoned: {error}"));
+            *released = true;
+            cvar.notify_all();
+        }
+    }
+
+    impl McpTransport for BlockingDrainProbeTransport {
+        fn list_tools(&self) -> Result<Vec<McpToolInfo>, AdapterError> {
+            Ok(vec![])
+        }
+
+        fn call_tool(
+            &self,
+            _tool_name: &str,
+            _arguments: serde_json::Value,
+        ) -> Result<McpToolResult, AdapterError> {
+            if let Some(tx) = self
+                .entered_call_tx
+                .lock()
+                .unwrap_or_else(|error| panic!("entered-call mutex poisoned: {error}"))
+                .take()
+            {
+                let _ = tx.send(());
+            }
+
+            let (released, cvar) = &self.release;
+            let released = released
+                .lock()
+                .unwrap_or_else(|error| panic!("release mutex poisoned: {error}"));
+            let _released = cvar
+                .wait_while(released, |released| !*released)
+                .unwrap_or_else(|error| panic!("release condvar poisoned: {error}"));
+            Ok(success_result("released"))
+        }
+
+        fn drain_notifications(&self) -> Vec<serde_json::Value> {
+            vec![serde_json::json!({
+                "method": "notifications/probe"
+            })]
         }
     }
 
@@ -1640,11 +1704,45 @@ mod tests {
     }
 
     #[test]
-    fn serialized_transport_drains_notifications() {
-        let inner = MockTransport::simple(vec![], MockCallBehavior::Success(success_result("ok")));
-        let serialized = SerializedMcpTransport::from_arc(Arc::new(inner));
-        let notifications = serialized.drain_notifications();
-        assert!(notifications.is_empty());
+    fn serialized_transport_serializes_notification_drain_with_active_request() {
+        let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+        let inner = Arc::new(BlockingDrainProbeTransport::new(entered_tx));
+        let serialized = Arc::new(SerializedMcpTransport::from_arc(inner.clone()));
+
+        let call_serialized = serialized.clone();
+        let call_thread =
+            std::thread::spawn(move || call_serialized.call_tool("t", serde_json::json!({})));
+        entered_rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .unwrap_or_else(|error| panic!("serialized call did not enter transport: {error}"));
+
+        let (drained_tx, drained_rx) = std::sync::mpsc::channel();
+        let drain_serialized = serialized.clone();
+        let drain_thread = std::thread::spawn(move || {
+            let notifications = drain_serialized.drain_notifications();
+            let _ = drained_tx.send(notifications);
+        });
+
+        assert!(
+            drained_rx
+                .recv_timeout(std::time::Duration::from_millis(50))
+                .is_err(),
+            "notification drain bypassed the active request gate"
+        );
+
+        inner.release_call();
+        let call_result = call_thread
+            .join()
+            .unwrap_or_else(|_| panic!("call thread panicked"));
+        call_result.unwrap_or_else(|error| panic!("call_tool failed: {error}"));
+        let notifications = drained_rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .unwrap_or_else(|error| panic!("drain did not complete after release: {error}"));
+        assert_eq!(notifications.len(), 1);
+        assert_eq!(notifications[0]["method"], "notifications/probe");
+        drain_thread
+            .join()
+            .unwrap_or_else(|_| panic!("drain thread panicked"));
     }
 
     // ---- Chunked output tests ----
