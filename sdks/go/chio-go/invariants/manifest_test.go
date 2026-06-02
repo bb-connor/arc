@@ -48,6 +48,43 @@ func TestManifestStructureDoesNotIncludeEmbeddedPublicKeyValidity(t *testing.T) 
 	}
 }
 
+func TestManifestStructureRejectsEmptyOrPaddedIdentityFields(t *testing.T) {
+	cases := []struct {
+		field string
+		value string
+	}{
+		{"server_id", ""},
+		{"server_id", " srv-priced"},
+		{"server_id", "srv-priced "},
+		{"name", ""},
+		{"name", " Priced Server"},
+		{"name", "Priced Server "},
+		{"version", ""},
+		{"version", " 1.0.0"},
+		{"version", "1.0.0 "},
+	}
+	for _, tc := range cases {
+		t.Run(tc.field+"="+tc.value, func(t *testing.T) {
+			signedManifest := pricedSignedManifest()
+			signedManifest["manifest"].(map[string]any)[tc.field] = tc.value
+
+			verification, err := invariants.VerifySignedManifest(signedManifest)
+			if err != nil {
+				t.Fatalf("VerifySignedManifest returned error: %v", err)
+			}
+			if verification.StructureValid {
+				t.Fatalf("%s value %q must be structurally invalid", tc.field, tc.value)
+			}
+			if verification.SignatureValid {
+				t.Fatalf("mutated identity field should invalidate the signature")
+			}
+			if !verification.EmbeddedPublicKeyValid {
+				t.Fatalf("embedded public key validity must remain independent")
+			}
+		})
+	}
+}
+
 func TestManifestStructureRejectsEmptyOrPaddedToolNames(t *testing.T) {
 	for _, name := range []string{"", " greet", "greet "} {
 		t.Run(name, func(t *testing.T) {

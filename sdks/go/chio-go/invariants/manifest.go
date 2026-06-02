@@ -76,6 +76,11 @@ func validateManifestStructure(manifest map[string]any) bool {
 	if !ok || schema != "chio.manifest.v1" {
 		return false
 	}
+	if !isValidManifestTextField(manifest["server_id"]) ||
+		!isValidManifestTextField(manifest["name"]) ||
+		!isValidManifestTextField(manifest["version"]) {
+		return false
+	}
 	tools, ok := manifest["tools"].([]any)
 	if !ok || len(tools) == 0 {
 		return false
@@ -104,9 +109,17 @@ func validateManifestStructure(manifest map[string]any) bool {
 	return true
 }
 
+func isValidManifestTextField(value any) bool {
+	text, ok := value.(string)
+	if !ok {
+		return false
+	}
+	trimmed := strings.TrimSpace(text)
+	return trimmed != "" && trimmed == text
+}
+
 func isValidToolName(name string) bool {
-	trimmed := strings.TrimSpace(name)
-	return trimmed != "" && trimmed == name
+	return isValidManifestTextField(name)
 }
 
 func isJSONObject(value any) bool {
