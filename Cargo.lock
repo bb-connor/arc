@@ -6459,6 +6459,7 @@ dependencies = [
  "chio-kernel",
  "chio-manifest",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]
