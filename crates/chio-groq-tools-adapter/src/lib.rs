@@ -149,6 +149,7 @@ impl GroqAdapter {
         request_body: &[u8],
     ) -> Result<Vec<ToolInvocation>, ProviderError> {
         self.ensure_supported_api_version()?;
+        validate_chat_request_body(request_body)?;
         let response = self.post_chat_completion(request_body).await?;
         self.lift_batch(ProviderRequest(response.body))
     }
@@ -168,6 +169,7 @@ impl GroqAdapter {
         F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
     {
         self.ensure_supported_api_version()?;
+        validate_chat_request_body(request_body)?;
         let body = self
             .transport
             .post_sse(GROQ_CHAT_COMPLETIONS_PATH, request_body)
@@ -283,6 +285,42 @@ fn validate_function_call(call: &FunctionCallPart) -> Result<(), ProviderError> 
             "Groq functionCall `{}` args were not a JSON object",
             call.name
         )));
+    }
+    Ok(())
+}
+
+fn validate_chat_request_body(request_body: &[u8]) -> Result<(), ProviderError> {
+    let value: Value = serde_json::from_slice(request_body).map_err(|error| {
+        ProviderError::Malformed(format!(
+            "Groq chat/completions request body was not JSON: {error}"
+        ))
+    })?;
+    let request = value.as_object().ok_or_else(|| {
+        ProviderError::BadToolArgs(
+            "Groq chat/completions request body must be a JSON object".to_string(),
+        )
+    })?;
+    let model = request
+        .get("model")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            ProviderError::BadToolArgs(
+                "Groq chat/completions request model must be a string".to_string(),
+            )
+        })?;
+    non_empty_str(model, "chat/completions request model")?;
+    let messages = request
+        .get("messages")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            ProviderError::BadToolArgs(
+                "Groq chat/completions request messages must be an array".to_string(),
+            )
+        })?;
+    if messages.is_empty() {
+        return Err(ProviderError::BadToolArgs(
+            "Groq chat/completions request must include at least one message".to_string(),
+        ));
     }
     Ok(())
 }
@@ -483,6 +521,50 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn send_chat_completion_rejects_invalid_request_body_before_transport_call() {
+        let cases = [
+            (
+                "not-json",
+                b"not-json".to_vec(),
+                "Groq chat/completions request body was not JSON",
+            ),
+            (
+                "not-object",
+                b"[]".to_vec(),
+                "Groq chat/completions request body must be a JSON object",
+            ),
+            (
+                "padded-model",
+                br#"{"model":" llama-3.3-70b-versatile ","messages":[{"role":"user","content":"hello"}]}"#
+                    .to_vec(),
+                "Groq chat/completions request model must not contain surrounding whitespace",
+            ),
+            (
+                "empty-messages",
+                br#"{"model":"llama-3.3-70b-versatile","messages":[]}"#.to_vec(),
+                "Groq chat/completions request must include at least one message",
+            ),
+        ];
+
+        for (name, request, expected) in cases {
+            let mock = Arc::new(transport::MockTransport::new());
+            mock.push_json_response(tool_call_response());
+            let adapter = GroqAdapter::new(config(), mock.clone());
+
+            let err = adapter
+                .send_chat_completion(&request)
+                .await
+                .expect_err("invalid Groq request must fail before transport");
+
+            assert!(
+                err.to_string().contains(expected),
+                "{name} error `{err}` did not contain `{expected}`"
+            );
+            assert!(mock.calls().is_empty(), "{name} reached transport");
+        }
+    }
+
+    #[tokio::test]
     async fn send_chat_completion_stream_rejects_api_version_drift_before_transport_call() {
         let mock = Arc::new(transport::MockTransport::new());
         mock.push_response(transport::HttpResponse::new(
@@ -503,6 +585,35 @@ mod tests {
             .expect_err("drifted Groq API version must fail before stream transport");
 
         assert_api_version_drift(err);
+        assert!(mock.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn send_chat_completion_stream_rejects_invalid_request_body_before_transport_call() {
+        let mock = Arc::new(transport::MockTransport::new());
+        mock.push_response(transport::HttpResponse::new(
+            200,
+            tool_call_stream(),
+            Some("text/event-stream".to_string()),
+        ));
+        let adapter = GroqAdapter::new(config(), mock.clone());
+
+        let err = adapter
+            .send_chat_completion_stream(
+                br#"{"model":"","messages":[{"role":"user","content":"hello"}]}"#,
+                |_invocation| {
+                    Ok(VerdictResult::Allow {
+                        redactions: vec![],
+                        receipt_id: chio_tool_call_fabric::ReceiptId("rcpt_pin".into()),
+                    })
+                },
+            )
+            .await
+            .expect_err("invalid Groq stream request must fail before transport");
+
+        assert!(err
+            .to_string()
+            .contains("Groq chat/completions request model must not be empty"));
         assert!(mock.calls().is_empty());
     }
 

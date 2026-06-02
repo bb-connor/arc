@@ -10,14 +10,15 @@
 
 ## Pain Points
 
-- `GroqAdapterConfig::new` pins `api_version` to `GROQ_API_VERSION`, but the public serializable config can be loaded from disk or mutated with a stale API version before it reaches `GroqAdapter::new`.
-- Runtime paths currently trust `config.api_version` when stamping provenance and exposing provider metadata, even though the transport path always sends the pinned `x-groq-api-version` header.
-- A drifted config can therefore send an upstream request before the mismatch is detected, gate streamed output with stale provenance, or lower a tool result under a local contract that no longer matches the transport pin.
+- `GroqAdapterConfig::new` pins `api_version` to `GROQ_API_VERSION`, and the adapter now fails closed when a deserialized or mutated config drifts from that pin before send, lift, stream gating, provenance stamping, or lowering.
+- The outbound request entrypoints still accept raw bytes and trust callers to provide a valid OpenAI-compatible chat/completions request before crossing the transport boundary.
+- A malformed, non-object, empty-model, or no-message request can therefore be posted upstream before the adapter discovers any local contract violation, which weakens fail-closed behavior and pushes request-shape enforcement onto the provider.
 - `response.rs` now owns OpenAI-compatible response-envelope classification and shared `tool_calls` decoding; that trust boundary should stay internal and should not be weakened by moving parsing back into `lib.rs`.
 
 ## Constraints
 
 - Preserve public API compatibility for `GroqAdapter`, `GroqAdapterConfig`, transport constructors, `FunctionCallPart`, and `FunctionResponsePart`.
+- Preserve the raw-byte `send_chat_completion` and `send_chat_completion_stream` entrypoints while tightening what they accept before transport.
 - Preserve canonical JSON byte stability for decoded `function.arguments`.
 - Preserve fail-closed behavior for malformed upstream payloads, invalid arguments, transport failures, bad lower-response bytes, and streaming verdict failures.
 - Preserve the pinned upstream API version `2025-04`.
@@ -31,4 +32,4 @@
 
 ## Planned Improvement
 
-Add an adapter-local API-pin guard that fails closed unless `config.api_version == GROQ_API_VERSION`, then invoke it before outbound transport, direct batch lift, direct stream gating, provenance stamping, and tool-result lowering. This is architectural because it tightens the adapter's runtime contract across every trust-boundary entrypoint while preserving the public construction API and the existing internal response module boundary.
+Add an adapter-local request-shape guard that parses outbound request bytes before transport and fails closed unless the request is a JSON object with a non-empty, unpadded `model` and at least one `messages` entry. Invoke it on both batch and streaming send paths before `post_json` or `post_sse`. This is architectural because it moves native request contract enforcement into the adapter boundary while preserving public construction and response parsing APIs.
