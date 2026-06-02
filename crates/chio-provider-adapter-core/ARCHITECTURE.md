@@ -8,15 +8,17 @@
 
 ## Pain Points
 
-- The public facade currently carries the whole SSE parser implementation, which mixes provider identity helpers with a byte-stream parser used by multiple adapters.
-- `SseFrame::raw` is documented as original bytes retained for exact forwarding, but the parser rebuilds raw frames from normalized text lines. CRLF-delimited upstream streams therefore lose byte fidelity.
-- SSE parsing is a provider trust boundary. A parser that advertises byte-exact forwarding but silently rewrites line endings is too easy for adapters to misuse.
+- The public facade now keeps SSE parsing behind an internal `sse` module while preserving public re-exports and CRLF byte fidelity for `SseFrame::raw`.
+- `HttpTransportConfig::base_url` is public and caller supplied. Today `HttpTransport::new` accepts blank strings, surrounding whitespace, unsupported schemes, URL userinfo, query strings, and fragments, deferring most failures until a request is sent.
+- Provider adapters inject auth through `AuthScheme` and provider-specific headers. Allowing credentials or query material in `base_url` creates a second ambient authority path and makes request-target construction harder to audit.
 
 ## Constraints
 
 - Preserve public API compatibility for `SseFrame`, `SseParseOptions`, `UnknownSseFieldPolicy`, and `parse_sse_frames`.
 - Preserve fail-closed parsing for invalid UTF-8, malformed JSON data, unknown-field rejection, event/type mismatch, and missing event names under cross-check mode.
 - Preserve done-sentinel semantics: terminator frames expose `done = true`, `data = None`, and retain the original bytes for forwarding.
+- Preserve public API compatibility for `HttpTransportConfig`, `HttpTransportError`, `ProviderHttpTransport`, `MockHttpTransport`, and status/transport error mapping.
+- Keep provider secrets flowing through `AuthScheme`, never through URL userinfo or opaque base URL query strings.
 - Do not change provider adapters unless the public compatibility tests prove a dependent regression.
 
 ## Affected Dependents
@@ -26,4 +28,4 @@
 
 ## Planned Improvement
 
-Move SSE parsing behind an internal `sse` module while keeping the existing public exports. The parser will retain each frame's exact original raw bytes, including provider CRLF delimiters, while preserving the current fail-closed validation behavior.
+Validate the configured HTTP base URL when constructing `HttpTransport`: reject empty or padded values, non-HTTP(S) schemes, embedded userinfo, query strings, and fragments before any request can be built. This is architectural because it tightens the shared outbound trust boundary for every provider adapter while preserving the existing config and transport trait surface.

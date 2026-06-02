@@ -247,6 +247,7 @@ impl HttpTransport {
     /// the workspace convention. Default headers (including any header-style
     /// auth) are resolved up front so per-request work is minimal.
     pub fn new(config: HttpTransportConfig) -> Result<Self, HttpTransportError> {
+        validate_base_url(&config.base_url)?;
         let default_headers = default_headers_for_config(&config)?;
 
         // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: shared provider-adapter
@@ -332,6 +333,59 @@ impl HttpTransport {
             body: bytes.to_vec(),
             content_type,
         })
+    }
+}
+
+fn validate_base_url(base_url: &str) -> Result<(), HttpTransportError> {
+    let trimmed = base_url.trim();
+    if trimmed.is_empty() {
+        return Err(invalid_base_url(
+            base_url,
+            "base URL must not be empty".to_string(),
+        ));
+    }
+    if trimmed != base_url {
+        return Err(invalid_base_url(
+            base_url,
+            "base URL must not contain surrounding whitespace".to_string(),
+        ));
+    }
+    let parsed = reqwest::Url::parse(base_url)
+        .map_err(|error| invalid_base_url(base_url, error.to_string()))?;
+    match parsed.scheme() {
+        "http" | "https" => {}
+        scheme => {
+            return Err(invalid_base_url(
+                base_url,
+                format!("base URL scheme `{scheme}` must be http or https"),
+            ));
+        }
+    }
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err(invalid_base_url(
+            base_url,
+            "base URL must not contain username or password material".to_string(),
+        ));
+    }
+    if parsed.query().is_some() {
+        return Err(invalid_base_url(
+            base_url,
+            "base URL must not contain a query string".to_string(),
+        ));
+    }
+    if parsed.fragment().is_some() {
+        return Err(invalid_base_url(
+            base_url,
+            "base URL must not contain a fragment".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn invalid_base_url(base_url: &str, detail: String) -> HttpTransportError {
+    HttpTransportError::InvalidUrl {
+        url: base_url.to_string(),
+        detail,
     }
 }
 
@@ -719,6 +773,58 @@ mod tests {
             HttpTransportError::InvalidHeader { ref name, .. } if name == AUTHORIZATION.as_str()
         ));
         assert!(error.to_string().contains("bearer token"));
+    }
+
+    #[test]
+    fn http_transport_rejects_blank_base_url_at_construction() {
+        let error = match HttpTransport::new(HttpTransportConfig::new("   ")) {
+            Ok(_) => panic!("blank base URL must fail closed before any request is sent"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(error, HttpTransportError::InvalidUrl { .. }));
+        assert!(error.to_string().contains("base URL"));
+    }
+
+    #[test]
+    fn http_transport_rejects_padded_base_url_at_construction() {
+        let error = match HttpTransport::new(HttpTransportConfig::new(" https://api.example.test "))
+        {
+            Ok(_) => panic!("padded base URL must fail closed before any request is sent"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(error, HttpTransportError::InvalidUrl { .. }));
+        assert!(error.to_string().contains("surrounding whitespace"));
+    }
+
+    #[test]
+    fn http_transport_rejects_non_http_base_url_at_construction() {
+        let error = match HttpTransport::new(HttpTransportConfig::new("file:///tmp/provider.sock"))
+        {
+            Ok(_) => panic!("non-HTTP base URL must fail closed before any request is sent"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(error, HttpTransportError::InvalidUrl { .. }));
+        assert!(error.to_string().contains("http or https"));
+    }
+
+    #[test]
+    fn http_transport_rejects_authority_material_in_base_url() {
+        for base_url in [
+            "https://user:pass@api.example.test",
+            "https://api.example.test?key=secret",
+            "https://api.example.test#fragment",
+        ] {
+            let error = match HttpTransport::new(HttpTransportConfig::new(base_url)) {
+                Ok(_) => panic!("authority material in base URL must fail closed"),
+                Err(error) => error,
+            };
+
+            assert!(matches!(error, HttpTransportError::InvalidUrl { .. }));
+            assert!(error.to_string().contains("base URL"));
+        }
     }
 
     #[test]
