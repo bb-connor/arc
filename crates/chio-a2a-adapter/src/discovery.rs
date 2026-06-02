@@ -304,14 +304,20 @@ fn upsert_request_query_param(
     query_params: &mut Vec<A2aRequestQueryParam>,
     name: String,
     value: String,
+    sensitive: bool,
 ) {
     if let Some(existing) = query_params
         .iter_mut()
         .find(|query_param| query_param.name == name)
     {
         existing.value = value;
+        existing.sensitive |= sensitive;
     } else {
-        query_params.push(A2aRequestQueryParam { name, value });
+        query_params.push(A2aRequestQueryParam {
+            name,
+            value,
+            sensitive,
+        });
     }
 }
 

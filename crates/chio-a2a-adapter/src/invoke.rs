@@ -348,6 +348,7 @@ impl A2aAdapter {
                             supported = false;
                             break;
                         };
+                        validate_url_auth_value("request query parameter value", &query_param.value)?;
                         query_params.push(query_param);
                         Ok(None)
                     }

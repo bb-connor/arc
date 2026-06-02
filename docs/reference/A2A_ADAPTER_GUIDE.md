@@ -296,7 +296,7 @@ and you want discovery to fail closed instead of silently adapting:
 - `with_required_tenant(...)` rejects the partner if the selected interface
   advertises a different tenant
 - `require_skill(...)` rejects the partner if the Agent Card does not expose
-  the required skill ids
+  the required skill ids as Chio-projectable tools
 - `require_security_scheme(...)` rejects the partner if the required scheme is
   missing or not referenced by the Agent Card security requirements
 - `allow_interface_origin(...)` rejects the partner if no supported interface

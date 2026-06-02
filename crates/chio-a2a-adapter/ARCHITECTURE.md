@@ -417,3 +417,51 @@ Harden `validate_notification_target_url` so callback URLs containing userinfo
 or fragments fail closed before dispatch. Add adapter-level regressions proving
 malformed callback URLs do not issue a create request to the upstream A2A
 agent.
+
+## Auth And Projected Skill Admission Slice
+
+### Current Boundary
+
+- `config.rs` owns caller-supplied static auth material for discovery and
+  invocation, including bearer headers and API key query parameters.
+- `invoke.rs` resolves static auth material against the Agent Card security
+  schemes before dispatch.
+- `mapping.rs` owns both Agent Card skill projection into the Chio manifest and
+  partner-policy admission checks.
+
+### Pain Point
+
+Auth validation is split at the wrong level for two credential shapes. Query
+parameter auth validates only the parameter name, so an empty or padded API key
+can be appended to every outbound request. Static bearer auth stores the
+formatted `Authorization` header before validation, so a padded raw token can
+still produce a syntactically acceptable header. Partner `require_skill`
+checks raw Agent Card skills instead of the projectable skill set, allowing a
+partner to satisfy admission with a skill that the adapter later drops from
+the generated manifest.
+
+### Security And API Constraints
+
+- Preserve public builder signatures and generated manifest schema shape.
+- Keep valid bearer tokens and API key query parameters unchanged.
+- Fail closed before discovery or invocation dispatch when static auth material
+  is empty, padded, or otherwise malformed.
+- Do not include secret values in error messages.
+- Required partner skills must correspond to skills the adapter can actually
+  expose as Chio tools after input-mode projection.
+
+### Affected Dependents
+
+- Existing callers with valid auth material and projectable required skills do
+  not need any code changes.
+- `chio-kernel` continues to receive adapter failures through the existing
+  `ToolServerConnection` error path.
+- No downstream crate or public schema change is planned.
+
+### Planned Material Improvement
+
+Move bearer-token and query-auth value checks into the config validation
+boundary and align partner required-skill admission with the manifest
+projection boundary. Prove the change with tests that malformed auth material
+fails before any request is sent and that a required but non-projectable skill
+is denied during discovery.

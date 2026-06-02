@@ -650,6 +650,17 @@ mod tests {
                 "request query parameter",
             ),
             (
+                "bad API key query value",
+                test_adapter_config(base_url, public_key.clone())
+                    .with_api_key_query_param("partner", " secret-query"),
+                "request query parameter value",
+            ),
+            (
+                "bad bearer token",
+                test_adapter_config(base_url, public_key.clone()).with_bearer_token(" secret"),
+                "bearer token",
+            ),
+            (
                 "bad cookie name",
                 test_adapter_config(base_url, public_key.clone())
                     .with_request_cookie("partner session", "secret-cookie"),
@@ -697,6 +708,28 @@ mod tests {
             .to_string()
             .contains("requires tenant `tenant-required`"));
         server.join();
+    }
+
+    #[tokio::test]
+    async fn partner_policy_rejects_required_skill_filtered_by_input_modes() {
+        let mut adapter = local_test_adapter(
+            A2aAgentCapabilities::default(),
+            A2aProtocolBinding::JsonRpc,
+            None,
+        );
+        adapter.agent_card.skills[0].input_modes = Some(vec!["image/png".to_string()]);
+        let policy = A2aPartnerPolicy::new("partner-alpha").require_skill("research");
+
+        let error = validate_partner_policy(
+            &policy,
+            &adapter.agent_card,
+            &adapter.selected_interface,
+        )
+        .expect_err("required non-projectable skill should fail partner admission");
+
+        assert!(error
+            .to_string()
+            .contains("does not expose a Chio-projectable input mode"));
     }
 
     #[tokio::test]
@@ -3374,6 +3407,31 @@ mod tests {
         assert!(requests[1].starts_with("POST /message:send?a2a_key=secret-key "));
         assert!(!requests[1].contains("Authorization: Bearer"));
         server.join();
+    }
+
+    #[test]
+    fn adapter_api_key_query_security_rejects_empty_value_before_dispatch() {
+        let mut adapter = local_test_adapter(
+            A2aAgentCapabilities::default(),
+            A2aProtocolBinding::HttpJson,
+            None,
+        );
+        let (security_schemes, security_requirements) =
+            agent_card_security_metadata(TestScenario::ApiKeyQueryRequired, "http://localhost");
+        adapter.agent_card.security_schemes = Some(security_schemes);
+        adapter.agent_card.security_requirements = Some(security_requirements);
+        adapter.configured_query_params = vec![A2aRequestQueryParam {
+            name: "a2a_key".to_string(),
+            value: String::new(),
+            sensitive: false,
+        }];
+
+        let error = adapter
+            .resolve_request_auth(&adapter.agent_card.skills[0])
+            .expect_err("empty API key query value should fail closed before dispatch");
+        assert!(error
+            .to_string()
+            .contains("request query parameter value"));
     }
 
     #[tokio::test]

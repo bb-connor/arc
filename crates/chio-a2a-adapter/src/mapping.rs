@@ -536,9 +536,15 @@ fn validate_partner_policy(
         }
     }
     for skill_id in &policy.required_skills {
-        if !agent_card.skills.iter().any(|skill| &skill.id == skill_id) {
+        let Some(skill) = agent_card.skills.iter().find(|skill| &skill.id == skill_id) else {
             return Err(AdapterError::PartnerAdmission(format!(
                 "partner `{}` requires advertised skill `{skill_id}`, but it was missing from the Agent Card",
+                policy.partner_id
+            )));
+        };
+        if projectable_skill_input_surface(agent_card, skill).is_none() {
+            return Err(AdapterError::PartnerAdmission(format!(
+                "partner `{}` requires advertised skill `{skill_id}`, but it does not expose a Chio-projectable input mode",
                 policy.partner_id
             )));
         }
