@@ -2,7 +2,7 @@
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use std::io::{Read, Write};
+    use std::io::{BufRead, BufReader, Read, Write};
     use std::net::TcpListener;
     use std::path::PathBuf;
     use std::sync::Once;
@@ -2380,6 +2380,37 @@ mod tests {
 
         assert!(message.contains("response bytes"));
         assert!(!message.contains("line"));
+    }
+
+    #[tokio::test]
+    async fn sse_line_reader_consumes_chunk_on_response_limit_error() {
+        let body = b"data: overflow\nnext: event\n";
+        let mut reader = BufReader::new(body.as_slice());
+        let mut line = String::new();
+        let mut total_bytes = 0;
+
+        let error = read_sse_line(&mut reader, &mut line, &mut total_bytes, 8).unwrap_err();
+
+        assert!(error.to_string().contains("response bytes"));
+        assert!(line.is_empty());
+        assert_eq!(total_bytes, "data: overflow\n".len() as u64);
+        assert_eq!(reader.fill_buf().unwrap(), b"next: event\n");
+    }
+
+    #[tokio::test]
+    async fn sse_line_reader_consumes_chunk_on_byte_counter_overflow_error() {
+        let body = b"data: overflow\nnext: event\n";
+        let mut reader = BufReader::new(body.as_slice());
+        let mut line = String::new();
+        let mut total_bytes = u64::MAX;
+
+        let error =
+            read_sse_line(&mut reader, &mut line, &mut total_bytes, u64::MAX).unwrap_err();
+
+        assert!(error.to_string().contains("byte counter overflowed"));
+        assert!(line.is_empty());
+        assert_eq!(total_bytes, u64::MAX);
+        assert_eq!(reader.fill_buf().unwrap(), b"next: event\n");
     }
 
     #[tokio::test]

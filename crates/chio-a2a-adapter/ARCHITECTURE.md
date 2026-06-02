@@ -505,6 +505,46 @@ return. Prove the boundary with parser regressions where oversized
 newline-delimited and delimiterless lines exceed a smaller total response
 limit.
 
+## SSE Overflow Consumption Follow-up
+
+### Current Boundary
+
+- `read_sse_line` owns buffered input consumption for each line fragment.
+- `parse_sse_stream_with_limit` treats total response-byte exhaustion as a
+  parser-fatal condition.
+- Callers do not retry a failed SSE parse, but buffered readers still must leave
+  coherent consumption and accounting state when returning an error.
+
+### Pain Point
+
+The response-limit overflow branch returns before consuming the buffered chunk
+that crossed the configured total response-byte budget. That leaves unread bytes
+in the line reader despite reporting that they exhausted the stream budget.
+
+### Security And API Constraints
+
+- Preserve fail-closed behavior when the stream exceeds the configured response
+  budget.
+- Preserve line-limit precedence only when the total response budget has not
+  already been crossed.
+- Do not parse, decode, or accept any bytes after the response budget is
+  exhausted.
+- Keep the existing public parser API unchanged.
+
+### Affected Dependents
+
+- `A2aAdapter::invoke_stream` and task-subscription callers continue receiving
+  the same adapter error type for budget exhaustion.
+- Tests may now assert that the buffered reader advanced past the offending
+  chunk before the error was returned.
+- No downstream crate or public schema change is planned.
+
+### Planned Material Improvement
+
+Advance the buffered reader and charge `total_bytes` for the chunk that crosses
+the configured total response-byte budget, then return the existing fail-closed
+response-limit error before extending or decoding the current line.
+
 ## Projected Skill Invocation Slice
 
 ### Current Boundary

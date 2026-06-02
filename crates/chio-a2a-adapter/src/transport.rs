@@ -111,7 +111,14 @@ fn read_sse_line(
     let mut bytes = Vec::new();
     let mut bytes_read = 0usize;
     loop {
-        let (take, has_newline, exceeds_limit, next_total) = {
+        let (
+            take,
+            has_newline,
+            counter_overflowed,
+            exceeds_total_limit,
+            exceeds_line_limit,
+            next_total,
+        ) = {
             let available = reader.fill_buf().map_err(|error| {
                 AdapterError::Remote(format!("failed to read A2A SSE stream: {error}"))
             })?;
@@ -127,24 +134,38 @@ fn read_sse_line(
                 None => available.len(),
             };
             let has_newline = available.get(take.saturating_sub(1)) == Some(&b'\n');
-            let next_total = total_bytes.checked_add(take as u64).ok_or_else(|| {
-                AdapterError::Protocol("A2A SSE stream byte counter overflowed".to_string())
-            })?;
-            if next_total > max_total_bytes {
-                return Err(AdapterError::Protocol(format!(
-                    "A2A SSE stream exceeded {max_total_bytes} response bytes"
-                )));
-            }
-            let exceeds_limit = bytes_read.saturating_add(take) > MAX_SSE_LINE_BYTES;
-            if !exceeds_limit {
+            let (next_total, counter_overflowed) = match total_bytes.checked_add(take as u64) {
+                Some(total) => (total, false),
+                None => (u64::MAX, true),
+            };
+            let exceeds_total_limit = counter_overflowed || next_total > max_total_bytes;
+            let exceeds_line_limit = bytes_read.saturating_add(take) > MAX_SSE_LINE_BYTES;
+            if !exceeds_total_limit && !exceeds_line_limit {
                 bytes.extend_from_slice(&available[..take]);
             }
-            (take, has_newline, exceeds_limit, next_total)
+            (
+                take,
+                has_newline,
+                counter_overflowed,
+                exceeds_total_limit,
+                exceeds_line_limit,
+                next_total,
+            )
         };
 
         reader.consume(take);
         *total_bytes = next_total;
-        if exceeds_limit {
+        if counter_overflowed {
+            return Err(AdapterError::Protocol(
+                "A2A SSE stream byte counter overflowed".to_string(),
+            ));
+        }
+        if exceeds_total_limit {
+            return Err(AdapterError::Protocol(format!(
+                "A2A SSE stream exceeded {max_total_bytes} response bytes"
+            )));
+        }
+        if exceeds_line_limit {
             return Err(AdapterError::Protocol(format!(
                 "A2A SSE line exceeded {MAX_SSE_LINE_BYTES} bytes"
             )));
