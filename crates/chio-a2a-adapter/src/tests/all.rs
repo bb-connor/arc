@@ -869,6 +869,85 @@ mod tests {
     }
 
     #[test]
+    fn task_registry_persists_valid_batch_records_before_rebind_conflict() {
+        let registry_path = unique_path("chio-a2a-task-registry-batch-conflict", ".json");
+        let registry = A2aTaskRegistry::open(&registry_path).expect("open task registry");
+        let selected_interface = A2aAgentInterface {
+            url: "http://localhost:9000/rpc".to_string(),
+            protocol_binding: "JSONRPC".to_string(),
+            protocol_version: "1.0".to_string(),
+            tenant: Some("tenant-alpha".to_string()),
+        };
+        let selected_binding = A2aProtocolBinding::JsonRpc;
+        let first_context = A2aTaskRecordContext {
+            source: "send_message",
+            tool_name: "clinical_search",
+            server_id: "srv-a2a",
+            selected_interface: &selected_interface,
+            selected_binding: &selected_binding,
+            partner: "partner-alpha",
+        };
+        registry
+            .record_from_value(
+                &json!({
+                    "task": {
+                        "id": "task-conflict",
+                        "status": { "state": "TASK_STATE_WORKING" }
+                    }
+                }),
+                &first_context,
+            )
+            .expect("record initial task binding");
+
+        let research_context = A2aTaskRecordContext {
+            source: "send_message",
+            tool_name: "research",
+            server_id: "srv-a2a",
+            selected_interface: &selected_interface,
+            selected_binding: &selected_binding,
+            partner: "partner-alpha",
+        };
+        let error = registry
+            .record_from_value(
+                &json!({
+                    "task": {
+                        "id": "task-new",
+                        "status": { "state": "TASK_STATE_WORKING" }
+                    },
+                    "statusUpdate": {
+                        "taskId": "task-conflict",
+                        "status": { "state": "TASK_STATE_COMPLETED" }
+                    }
+                }),
+                &research_context,
+            )
+            .expect_err("rebind conflict should still be reported");
+
+        assert!(error.to_string().contains("attempted to rebind"));
+        let reloaded = registry.load().expect("reload task registry");
+        let new_record = reloaded
+            .tasks
+            .get("task-new")
+            .expect("non-conflicting task from same batch should persist");
+        assert_eq!(new_record.tool_name, "research");
+        assert_eq!(
+            new_record.last_state.as_deref(),
+            Some("TASK_STATE_WORKING")
+        );
+        let conflict_record = reloaded
+            .tasks
+            .get("task-conflict")
+            .expect("conflicting task remains recorded");
+        assert_eq!(conflict_record.tool_name, "clinical_search");
+        assert_eq!(
+            conflict_record.last_state.as_deref(),
+            Some("TASK_STATE_WORKING")
+        );
+
+        let _ = fs::remove_file(registry_path);
+    }
+
+    #[test]
     fn task_registry_rejects_malformed_task_observation_before_persisting() {
         let registry_path = unique_path("chio-a2a-task-registry-malformed", ".json");
         let registry = A2aTaskRegistry::open(&registry_path).expect("open task registry");

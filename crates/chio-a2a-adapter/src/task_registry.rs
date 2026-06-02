@@ -234,6 +234,8 @@ impl A2aTaskRegistry {
         })?;
         let mut registry = self.load().map_err(A2aTaskRegistryRecordError::Fatal)?;
         let now = unix_timestamp_now();
+        let mut first_rebind_conflict = None;
+        let mut changed = false;
         for observation in seen {
             let entry = registry
                 .tasks
@@ -251,14 +253,25 @@ impl A2aTaskRegistry {
                     last_state: None,
                     last_source: context.source.to_string(),
                 });
-            validate_task_record_binding(entry, context)
-                .map_err(A2aTaskRegistryRecordError::RebindConflict)?;
+            if let Err(error) = validate_task_record_binding(entry, context) {
+                if first_rebind_conflict.is_none() {
+                    first_rebind_conflict = Some(error);
+                }
+                continue;
+            }
             entry.last_seen_at = now;
             entry.last_source = context.source.to_string();
             entry.last_state = observation.state.or_else(|| entry.last_state.clone());
+            changed = true;
         }
-        self.save(&registry)
-            .map_err(A2aTaskRegistryRecordError::Fatal)
+        if changed {
+            self.save(&registry)
+                .map_err(A2aTaskRegistryRecordError::Fatal)?;
+        }
+        if let Some(error) = first_rebind_conflict {
+            return Err(A2aTaskRegistryRecordError::RebindConflict(error));
+        }
+        Ok(())
     }
 }
 

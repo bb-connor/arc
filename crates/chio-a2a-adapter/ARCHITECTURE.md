@@ -239,3 +239,49 @@ task operations whose partner differs from the recorded task authority. Prove
 the boundary with an adapter-level restart-style test that records a task under
 one partner and denies follow-up through another partner using the same durable
 registry.
+
+## Batch Rebind Persistence Slice
+
+### Current Boundary
+
+- `task_registry.rs` extracts all task observations from one accepted A2A
+  payload, then persists them under one durable registry lock.
+- Registry rebind conflicts are classified separately from fatal registry
+  failures because blocking and streaming invoke paths can deliver the accepted
+  current response while keeping future follow-up authority fail-closed.
+- Malformed task, status-update, or artifact-update observations remain fatal
+  validation errors before registry mutation starts.
+
+### Pain Point
+
+The current persistence loop returns immediately on the first rebind conflict
+and saves nothing from that payload. If an earlier observation in the same
+payload recorded a new valid task id, the warning-only conflict later in the
+batch discards that valid task authority even though the invoke path still
+delivers the remote response.
+
+### Security And API Constraints
+
+- Preserve public API compatibility and the internal classified error shape.
+- Do not overwrite or mutate conflicting task records.
+- Keep malformed observations, corrupted registry state, poisoned locks, and
+  write failures fatal for the current invocation.
+- Preserve warning-only classification for actual rebind conflicts after all
+  non-conflicting observations have been durably saved.
+
+### Affected Dependents
+
+- `chio-kernel` should still receive accepted blocking or streaming responses
+  for stale rebind conflicts.
+- Later `GetTask`, `SubscribeToTask`, `CancelTask`, and push-notification calls
+  should retain follow-up authority for non-conflicting task ids observed in the
+  same accepted payload.
+- No downstream crate or public schema change is planned.
+
+### Completed Material Improvement
+
+Continue scanning a validated observation batch after rebind conflicts, persist
+all non-conflicting records, and then return the rebind-conflict classification
+for caller warning behavior. Prove the boundary with a registry test that
+combines one new valid task observation and one conflicting existing task in the
+same payload.
