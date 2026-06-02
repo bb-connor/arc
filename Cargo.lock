@@ -6483,6 +6483,7 @@ dependencies = [
  "chio-manifest",
  "chio-mcp-edge",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]
