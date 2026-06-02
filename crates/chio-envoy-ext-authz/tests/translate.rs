@@ -24,6 +24,7 @@ use chio_envoy_ext_authz::proto::envoy::service::auth::v3::{AttributeContext, Ch
 use chio_envoy_ext_authz::{
     ChioExtAuthzService, EnvoyKernel, KernelError, ToolCallRequest, Verdict,
 };
+use prost_types::value::Kind;
 use tokio::net::TcpListener;
 use tonic::transport::{Channel, Endpoint, Server};
 use tonic::Code;
@@ -147,12 +148,29 @@ fn make_check(method: &str, path: &str, headers: &[(&str, &str)], body: &str) ->
     }
 }
 
+fn metadata_string(metadata: &prost_types::Struct, key: &str) -> Option<String> {
+    metadata.fields.get(key).and_then(|value| {
+        value.kind.as_ref().and_then(|kind| match kind {
+            Kind::StringValue(value) => Some(value.clone()),
+            _ => None,
+        })
+    })
+}
+
 #[tokio::test]
 async fn allow_verdict_returns_ok_response() {
     let (mut client, calls, last_tool) = spawn_server(MockBehavior::Allow).await;
     let check = make_check("GET", "/resource", &[], "");
     let response = client.check(check).await.unwrap().into_inner();
 
+    let metadata = response
+        .dynamic_metadata
+        .as_ref()
+        .expect("allow response carries dynamic metadata");
+    assert_eq!(
+        metadata_string(metadata, "chio.verdict").as_deref(),
+        Some("allow")
+    );
     let status = response.status.unwrap();
     assert_eq!(status.code, Code::Ok as i32);
     match response.http_response.unwrap() {
@@ -216,6 +234,22 @@ async fn deny_verdict_honours_custom_http_status() {
     let check = make_check("GET", "/resource", &[], "");
     let response = client.check(check).await.unwrap().into_inner();
 
+    let metadata = response
+        .dynamic_metadata
+        .as_ref()
+        .expect("deny response carries dynamic metadata");
+    assert_eq!(
+        metadata_string(metadata, "chio.verdict").as_deref(),
+        Some("deny")
+    );
+    assert_eq!(
+        metadata_string(metadata, "chio.denial_guard").as_deref(),
+        Some("RateGuard")
+    );
+    assert_eq!(
+        metadata_string(metadata, "chio.denial_reason").as_deref(),
+        Some("rate limited")
+    );
     match response.http_response.unwrap() {
         HttpResponse::DeniedResponse(denied) => {
             assert_eq!(
@@ -256,6 +290,20 @@ async fn kernel_error_redacts_internal_message_from_denied_response() {
     let check = make_check("GET", "/resource", &[], "");
     let response = client.check(check).await.unwrap().into_inner();
 
+    let metadata = response
+        .dynamic_metadata
+        .as_ref()
+        .expect("fail-closed response carries dynamic metadata");
+    assert_eq!(
+        metadata_string(metadata, "chio.denial_guard").as_deref(),
+        Some("fail_closed")
+    );
+    assert!(!metadata.fields.values().any(|value| {
+        matches!(
+            value.kind.as_ref(),
+            Some(Kind::StringValue(value)) if value.contains(internal_error)
+        )
+    }));
     match response.http_response.unwrap() {
         HttpResponse::DeniedResponse(denied) => {
             assert_eq!(

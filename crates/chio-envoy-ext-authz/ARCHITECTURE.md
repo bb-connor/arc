@@ -30,3 +30,28 @@
 ## Planned improvement
 
 Split Envoy response construction into its own internal module and make fail-closed response bodies and headers use a stable generic reason. This is architectural because it narrows `service.rs` to RPC orchestration, creates a distinct response boundary for audit, and prevents internal kernel or translation faults from crossing the ext_authz trust boundary while preserving public API shape.
+
+## Dynamic Metadata Boundary Slice
+
+### Boundary
+
+`response.rs` owns Envoy `CheckResponse` construction, while a dedicated internal metadata module should own the `google.protobuf.Struct` payload attached to those responses. `service.rs` must remain unaware of metadata field names.
+
+### Pain point
+
+The protocol integration doc describes `CheckResponse.dynamic_metadata` as the access-log surface for Chio verdict data, but the current crate returns `None` for allow, deny, and fail-closed responses. That makes the adapter harder to operate in Envoy because downstream logging and filters cannot observe even the stable verdict class without parsing headers or bodies.
+
+### Security and API constraints
+
+- Do not expose raw bearer tokens, capability tokens, request bodies, translation errors, or kernel error strings through metadata.
+- Preserve public API compatibility: no changes to `EnvoyKernel`, `ToolCallRequest`, `Verdict`, or `TranslateError`.
+- Preserve fail-closed behavior and stable generic fail-closed client-visible reason.
+- Keep denial verdict behavior visible: policy denial reason, guard name, and HTTP status remain available to Envoy.
+
+### Affected dependents
+
+No Rust dependent imports response helpers or metadata builders because both remain crate-private. Envoy deployments gain structured metadata fields for logging and filter chaining without any required configuration or public API migration.
+
+### Material improvement planned
+
+Add an internal dynamic metadata module and attach stable Chio metadata to every response: verdict class for allow, denial reason/guard/status for policy denies, and fail-closed markers for translation or kernel faults. This is architectural because it separates the observability contract from response plumbing and makes the documented Envoy integration behavior true without widening the public surface.

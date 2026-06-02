@@ -2,6 +2,9 @@
 
 use tonic::Code;
 
+use crate::metadata::{
+    allow_dynamic_metadata, deny_dynamic_metadata, fail_closed_dynamic_metadata,
+};
 use crate::proto::envoy::config::core::v3::{HeaderValue, HeaderValueOption};
 use crate::proto::envoy::r#type::v3::{HttpStatus, StatusCode as EnvoyStatusCode};
 use crate::proto::envoy::service::auth::v3::{
@@ -31,7 +34,7 @@ pub(crate) fn verdict_to_response(verdict: &Verdict) -> CheckResponse {
                 query_parameters_to_set: Vec::new(),
                 query_parameters_to_remove: Vec::new(),
             })),
-            dynamic_metadata: None,
+            dynamic_metadata: Some(allow_dynamic_metadata()),
         },
         Verdict::Deny {
             reason,
@@ -52,6 +55,7 @@ pub(crate) fn verdict_to_response(verdict: &Verdict) -> CheckResponse {
                     json_string(reason),
                     json_string(guard),
                 ),
+                Some(deny_dynamic_metadata(reason, guard, *http_status)),
             )
         }
     }
@@ -71,6 +75,7 @@ pub(crate) fn fail_closed_response() -> CheckResponse {
             "{{\"verdict\":\"deny\",\"reason\":{},\"guard\":\"fail_closed\"}}",
             json_string(FAIL_CLOSED_REASON),
         ),
+        Some(fail_closed_dynamic_metadata(FAIL_CLOSED_REASON)),
     )
 }
 
@@ -80,6 +85,7 @@ fn denied_check_response(
     http_status_code: i32,
     headers: Vec<HeaderValueOption>,
     body: String,
+    dynamic_metadata: Option<prost_types::Struct>,
 ) -> CheckResponse {
     CheckResponse {
         status: Some(RpcStatus {
@@ -94,7 +100,7 @@ fn denied_check_response(
             headers,
             body,
         })),
-        dynamic_metadata: None,
+        dynamic_metadata,
     }
 }
 
@@ -167,12 +173,47 @@ fn json_string(value: &str) -> String {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use prost_types::value::Kind;
+
+    fn metadata_string(metadata: &prost_types::Struct, key: &str) -> Option<String> {
+        metadata.fields.get(key).and_then(|value| {
+            value.kind.as_ref().and_then(|kind| match kind {
+                Kind::StringValue(value) => Some(value.clone()),
+                _ => None,
+            })
+        })
+    }
+
+    fn metadata_number(metadata: &prost_types::Struct, key: &str) -> Option<f64> {
+        metadata.fields.get(key).and_then(|value| {
+            value.kind.as_ref().and_then(|kind| match kind {
+                Kind::NumberValue(value) => Some(*value),
+                _ => None,
+            })
+        })
+    }
+
+    fn metadata_bool(metadata: &prost_types::Struct, key: &str) -> Option<bool> {
+        metadata.fields.get(key).and_then(|value| {
+            value.kind.as_ref().and_then(|kind| match kind {
+                Kind::BoolValue(value) => Some(*value),
+                _ => None,
+            })
+        })
+    }
 
     #[test]
     fn allow_verdict_produces_ok_response() {
         let response = verdict_to_response(&Verdict::Allow);
         let status = response.status.unwrap();
         assert_eq!(status.code, Code::Ok as i32);
+        let metadata = response
+            .dynamic_metadata
+            .expect("allow response carries dynamic metadata");
+        assert_eq!(
+            metadata_string(&metadata, "chio.verdict").as_deref(),
+            Some("allow")
+        );
         match response.http_response.unwrap() {
             HttpResponse::OkResponse(_) => (),
             other => panic!("expected OkResponse, got {other:?}"),
@@ -185,6 +226,22 @@ mod tests {
         let response = verdict_to_response(&verdict);
         let status = response.status.unwrap();
         assert_eq!(status.code, Code::PermissionDenied as i32);
+        let metadata = response
+            .dynamic_metadata
+            .expect("deny response carries dynamic metadata");
+        assert_eq!(
+            metadata_string(&metadata, "chio.verdict").as_deref(),
+            Some("deny")
+        );
+        assert_eq!(
+            metadata_string(&metadata, "chio.denial_reason").as_deref(),
+            Some("scope missing")
+        );
+        assert_eq!(
+            metadata_string(&metadata, "chio.denial_guard").as_deref(),
+            Some("ScopeGuard")
+        );
+        assert_eq!(metadata_number(&metadata, "chio.http_status"), Some(403.0));
         match response.http_response.unwrap() {
             HttpResponse::DeniedResponse(denied) => {
                 assert_eq!(
@@ -204,6 +261,23 @@ mod tests {
         let status = response.status.unwrap();
         assert_eq!(status.code, Code::Internal as i32);
         assert_eq!(status.message, FAIL_CLOSED_REASON);
+        let metadata = response
+            .dynamic_metadata
+            .expect("fail-closed response carries dynamic metadata");
+        assert_eq!(
+            metadata_string(&metadata, "chio.verdict").as_deref(),
+            Some("deny")
+        );
+        assert_eq!(
+            metadata_string(&metadata, "chio.denial_reason").as_deref(),
+            Some(FAIL_CLOSED_REASON)
+        );
+        assert_eq!(
+            metadata_string(&metadata, "chio.denial_guard").as_deref(),
+            Some("fail_closed")
+        );
+        assert_eq!(metadata_number(&metadata, "chio.http_status"), Some(500.0));
+        assert_eq!(metadata_bool(&metadata, "chio.fail_closed"), Some(true));
         match response.http_response.unwrap() {
             HttpResponse::DeniedResponse(denied) => {
                 assert_eq!(
@@ -225,6 +299,7 @@ mod tests {
             EnvoyStatusCode::TooManyRequests as i32,
             vec![header_option("x-chio-denial-reason", "policy denied")],
             "{\"verdict\":\"deny\"}".to_string(),
+            None,
         );
 
         let status = response.status.unwrap();
