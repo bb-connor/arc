@@ -10,10 +10,17 @@
 
 ## Pain Points
 
-- `runtime/discovery.rs` owns Chio-manifest to MCP-tool projection, but it only validates projection-local schema object shape and duplicate exposed tool names.
-- `ChioMcpEdge::new` can still accept manifests that fail the canonical `chio_manifest::validate_manifest` envelope checks, including unsupported schema versions, invalid embedded public keys, empty tool lists, invalid tool names, and duplicate server-tool allowlist entries.
-- This leaves discovery with two trust boundaries: manifest envelope validation in signer/loader paths, and partial projection validation at the MCP edge.
-- MCP clients should never see tools derived from a manifest envelope the workspace manifest validator would reject.
+- `runtime/discovery.rs` now validates every manifest through
+  `chio_manifest::validate_manifest` before projection, keeping the manifest
+  envelope gate canonical.
+- The remaining request-boundary gap is JSON-RPC `params` shape. The envelope
+  parser defaults missing params to `{}`, but it preserves non-object params.
+  Several MCP request handlers then call `params.get(...)`, so malformed array,
+  string, number, or boolean params can be treated as if no params were
+  supplied.
+- That is too permissive for hosted MCP request methods whose params are
+  object-shaped. It can allow malformed initialize/list requests to pass
+  protocol gates instead of failing with a JSON-RPC invalid-params response.
 
 ## Constraints
 
@@ -31,6 +38,18 @@
 - `docs/architecture/CHIO_RUNTIME_BOUNDARIES.md` records the current `runtime.rs` versus `runtime/protocol.rs` ownership split.
 - `docs/protocols/EDGE-CRATE-SYMMETRY.md` treats `manifest_tool_to_mcp_tool` as the reference outward-edge discovery projection.
 
+## Completed Baseline
+
+Validate every `ToolManifest` with `chio_manifest::validate_manifest` before
+discovery projection or exposed-name indexing, while keeping cross-manifest
+duplicate exposed-name checks in `runtime/discovery.rs`. This is architectural
+because it makes manifest validation the single canonical envelope gate and
+leaves the MCP discovery module responsible only for outward projection and
+cross-manifest exposure rules.
+
 ## Planned Improvement
 
-Validate every `ToolManifest` with `chio_manifest::validate_manifest` before discovery projection or exposed-name indexing, while keeping cross-manifest duplicate exposed-name checks in `runtime/discovery.rs`. This is architectural because it makes manifest validation the single canonical envelope gate and leaves the MCP discovery module responsible only for outward projection and cross-manifest exposure rules.
+Add one centralized known-request-method params-object gate before dispatch.
+Missing params still normalize to `{}` for compatibility, but non-object params
+for known MCP request methods fail closed with `-32602` before session state,
+discovery, or kernel operation paths can observe coerced empty params.
