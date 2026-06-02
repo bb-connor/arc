@@ -158,39 +158,46 @@ fn http_authority_capability_binding(
     }
 }
 
+fn tools_path_capability_binding(input: &HttpAuthorityInput<'_>) -> Option<CapabilityBinding> {
+    match chio_tools_path_identity(input.path) {
+        ChioToolsPathIdentity::Identity {
+            server_id,
+            tool_name,
+        } => Some(CapabilityBinding {
+            requested_tool_server: Some(server_id),
+            requested_tool_name: Some(tool_name),
+            requested_arguments: input.requested_arguments.cloned(),
+            invalid_reason: None,
+            // Reserved tool paths always require a matching capability grant,
+            // even when the HTTP method is session-allow (for example GET reads).
+            policy: HttpAuthorityPolicy::DenyByDefault,
+        }),
+        ChioToolsPathIdentity::Malformed => Some(CapabilityBinding {
+            requested_tool_server: None,
+            requested_tool_name: None,
+            requested_arguments: input.requested_arguments.cloned(),
+            invalid_reason: Some(MALFORMED_CHIO_TOOLS_PATH_REASON.to_string()),
+            policy: HttpAuthorityPolicy::DenyByDefault,
+        }),
+        ChioToolsPathIdentity::NotToolsPath => None,
+    }
+}
+
 fn capability_binding(
     input: &HttpAuthorityInput<'_>,
     caller_identity_hash: &str,
 ) -> CapabilityBinding {
-    if has_sidecar_tool_identity(input) {
-        match chio_tools_path_identity(input.path) {
-            ChioToolsPathIdentity::Identity {
-                server_id,
-                tool_name,
-            } => {
-                return CapabilityBinding {
-                    requested_tool_server: Some(server_id),
-                    requested_tool_name: Some(tool_name),
-                    requested_arguments: input.requested_arguments.cloned(),
-                    invalid_reason: None,
-                    policy: HttpAuthorityPolicy::DenyByDefault,
-                };
-            }
-            ChioToolsPathIdentity::Malformed => {
-                return CapabilityBinding {
-                    requested_tool_server: None,
-                    requested_tool_name: None,
-                    requested_arguments: input.requested_arguments.cloned(),
-                    invalid_reason: Some(MALFORMED_CHIO_TOOLS_PATH_REASON.to_string()),
-                    policy: HttpAuthorityPolicy::DenyByDefault,
-                };
-            }
-            ChioToolsPathIdentity::NotToolsPath => {}
-        }
+    if let Some(binding) = tools_path_capability_binding(input) {
+        return binding;
     }
 
     if input.policy != HttpAuthorityPolicy::DenyByDefault {
         return request_field_capability_binding(input);
+    }
+
+    if has_sidecar_tool_identity(input) {
+        // Unmatched HTTP routes must not trust synthetic tool context fields.
+        return http_authority_capability_binding(input, caller_identity_hash);
     }
 
     http_authority_capability_binding(input, caller_identity_hash)
@@ -1720,7 +1727,7 @@ mod tests {
     }
 
     #[test]
-    fn deny_by_default_reserved_tools_proxy_path_requires_http_authority_grant() {
+    fn deny_by_default_reserved_tools_path_without_fields_allows_matching_tool_grant() {
         let query = HashMap::new();
         let (authority, issuer) = authority_with_issuer();
         let capability = signed_capability_token_json_with_scope(
@@ -1743,7 +1750,42 @@ mod tests {
 
         let result = authority
             .evaluate(HttpAuthorityInput {
-                request_id: "req-proxy-reserved-tools-path".to_string(),
+                request_id: "req-reserved-tools-path-without-fields".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/chio/tools/billing/charge".to_string(),
+                path: "/chio/tools/billing/charge",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("abc".to_string()),
+                body_length: 3,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: Some(&serde_json::json!({ "amount": 100 })),
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .test_unwrap();
+
+        assert!(result.verdict.is_allowed());
+        assert_eq!(
+            result.receipt.capability_id.as_deref(),
+            Some("cap-billing-charge")
+        );
+    }
+
+    #[test]
+    fn deny_by_default_reserved_tools_path_without_fields_denies_http_authority_only_grant(
+    ) {
+        let query = HashMap::new();
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json(&issuer, "cap-http-authority-only");
+
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-reserved-tools-path-http-authority-only".to_string(),
                 method: HttpMethod::Post,
                 route_pattern: "/chio/tools/billing/charge".to_string(),
                 path: "/chio/tools/billing/charge",
@@ -1764,65 +1806,10 @@ mod tests {
 
         assert!(result.verdict.is_denied());
         assert!(result.receipt.capability_id.is_none());
-        assert!(result.receipt.evidence[0]
-            .details
-            .as_deref()
-            .is_some_and(|details| {
-                details.contains("capability does not authorize tool authorize_http_request")
-            }));
-    }
-
-    #[test]
-    fn deny_by_default_reserved_tools_arguments_only_requires_http_authority_grant() {
-        let query = HashMap::new();
-        let (authority, issuer) = authority_with_issuer();
-        let capability = signed_capability_token_json_with_scope(
-            &issuer,
-            "cap-billing-charge",
-            ChioScope {
-                grants: vec![ToolGrant {
-                    server_id: "billing".to_string(),
-                    tool_name: "charge".to_string(),
-                    operations: vec![Operation::Invoke],
-                    constraints: Vec::new(),
-                    max_invocations: None,
-                    max_cost_per_invocation: None,
-                    max_total_cost: None,
-                    dpop_required: None,
-                }],
-                ..ChioScope::default()
-            },
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("capability does not authorize tool charge on server billing")
         );
-
-        let result = authority
-            .evaluate(HttpAuthorityInput {
-                request_id: "req-proxy-reserved-tools-arguments-only".to_string(),
-                method: HttpMethod::Post,
-                route_pattern: "/chio/tools/billing/charge".to_string(),
-                path: "/chio/tools/billing/charge",
-                query: &query,
-                caller: caller(),
-                body_hash: Some("abc".to_string()),
-                body_length: 3,
-                session_id: None,
-                capability_id_hint: None,
-                presented_capability: Some(&capability),
-                requested_tool_server: None,
-                requested_tool_name: None,
-                requested_arguments: Some(&serde_json::json!({ "amount": 100 })),
-                model_metadata: None,
-                policy: HttpAuthorityPolicy::DenyByDefault,
-            })
-            .test_unwrap();
-
-        assert!(result.verdict.is_denied());
-        assert!(result.receipt.capability_id.is_none());
-        assert!(result.receipt.evidence[0]
-            .details
-            .as_deref()
-            .is_some_and(|details| {
-                details.contains("capability does not authorize tool authorize_http_request")
-            }));
     }
 
     #[test]
@@ -1895,6 +1882,38 @@ mod tests {
                 requested_tool_server: Some("billing"),
                 requested_tool_name: Some("read"),
                 requested_arguments: Some(&Value::Null),
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::SessionAllow,
+            })
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("side-effect route requires a valid capability token")
+        );
+    }
+
+    #[test]
+    fn reserved_tools_path_safe_policy_requires_capability_without_request_fields() {
+        let query = HashMap::new();
+        let result = authority()
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-safe-tools-path-no-fields-no-capability".to_string(),
+                method: HttpMethod::Get,
+                route_pattern: "/chio/tools/billing/read".to_string(),
+                path: "/chio/tools/billing/read",
+                query: &query,
+                caller: caller(),
+                body_hash: None,
+                body_length: 0,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: None,
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
                 model_metadata: None,
                 policy: HttpAuthorityPolicy::SessionAllow,
             })
