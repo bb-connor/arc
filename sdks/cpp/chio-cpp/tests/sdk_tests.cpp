@@ -143,6 +143,25 @@ std::string read_file(const std::string& relative_path) {
                      std::istreambuf_iterator<char>());
 }
 
+std::pair<std::string, std::string> allow_receipt_fixture() {
+  const auto receipt_vectors = read_file("tests/bindings/vectors/receipt/v1.json");
+  auto parsed = chio::detail::parse_json(receipt_vectors);
+  require(parsed.has_value(), "expected receipt vectors to parse");
+  const auto* cases = parsed->get("cases");
+  require(cases != nullptr && cases->is_array(), "expected receipt vector cases");
+  for (const auto& test_case : cases->as_array()) {
+    if (test_case.string_field("id") != "allow_receipt") {
+      continue;
+    }
+    const auto* receipt = test_case.get("receipt");
+    require(receipt != nullptr && receipt->is_object(), "expected allow receipt object");
+    auto signer = receipt->string_field("kernel_key");
+    require(!signer.empty(), "expected allow receipt kernel key");
+    return {receipt->dump(), std::move(signer)};
+  }
+  throw std::runtime_error("missing allow_receipt fixture");
+}
+
 void test_invariants_from_shared_vectors() {
   require(chio::invariants::ffi_abi_version() == 1, "expected ABI version 1");
   const auto build_info = chio::invariants::ffi_build_info();
@@ -171,6 +190,21 @@ void test_invariants_from_shared_vectors() {
       "4b134ccad3c684ef462bf085ea2e87c416557980e01da869703d18016f3811a0f0310f38075e2019480f8c1abc06c7d823ef1776eb95687785e5eacdbe57250c");
   require(verified.ok(), verified.error().message);
   require(verified.value(), "expected vector signature to verify");
+
+  const auto receipt_vectors = read_file("tests/bindings/vectors/receipt/v1.json");
+  require_contains(receipt_vectors, "allow_receipt", "receipt vectors");
+  const auto allow_receipt = allow_receipt_fixture();
+  const auto trusted_receipt =
+      chio::invariants::verify_receipt_json_with_trusted_signers(
+          allow_receipt.first,
+          std::vector<std::string>{allow_receipt.second});
+  require(trusted_receipt.ok(), trusted_receipt.error().message);
+  require_contains(trusted_receipt.value(),
+                   "\"signer_trusted\":true",
+                   "trusted receipt verification");
+  require_contains(trusted_receipt.value(),
+                   "\"authorized\":true",
+                   "trusted receipt verification");
 }
 
 void test_private_json_helpers_are_strict() {

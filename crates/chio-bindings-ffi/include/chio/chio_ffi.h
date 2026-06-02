@@ -122,6 +122,9 @@ ChioFfiResult chio_verify_capability_json(const char *input_json,
 
 ChioFfiResult chio_verify_receipt_json(const char *input_json);
 
+ChioFfiResult chio_verify_receipt_json_with_trusted_signers(const char *input_json,
+                                                            const char *trusted_signers_json);
+
 ChioFfiResult chio_verify_manifest_json(const char *input_json);
 
 #ifdef __cplusplus
