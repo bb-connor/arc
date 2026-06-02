@@ -529,6 +529,27 @@ mod tests {
     }
 
     #[test]
+    fn evaluate_chio_request_denies_safe_method_on_tools_path_without_capability() {
+        let keypair = Keypair::generate();
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+
+        let request = ChioHttpRequest::new(
+            "req-safe-tools-path-no-cap".to_string(),
+            HttpMethod::Get,
+            "/chio/tools/matrix/files.read".to_string(),
+            "/chio/tools/matrix/files.read".to_string(),
+            CallerIdentity::anonymous(),
+        );
+
+        let result = evaluator
+            .evaluate_chio_request(request, None)
+            .test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+    }
+
+    #[test]
     fn evaluate_chio_request_denies_unmatched_http_path_with_spoofed_synthetic_pattern() {
         let keypair = Keypair::generate();
         let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
