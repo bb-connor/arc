@@ -67,3 +67,42 @@ Add a matching `TrustControlClient` construction validator. It should reject
 blank or padded service tokens, empty endpoint lists, non-HTTP(S) endpoints,
 userinfo, query strings, and fragments, then preserve the existing normalized
 endpoint list for valid clients.
+
+## Service Token Startup Validation Slice
+
+### Current Boundary
+
+`TrustServiceConfig::validate` is called before `serve_async` binds the
+trust-control service and before cluster state is built. Remote and cluster
+client construction separately validates control tokens before bearer headers
+or cluster peer signatures are created.
+
+### Pain Point
+
+The client boundary rejects blank or padded control tokens, but service startup
+only rejects tokens that become empty after trimming. A padded service token can
+therefore start the authority service and later fail when the same token is
+used to build remote or cluster clients.
+
+### Security And API Constraints
+
+- Preserve public `TrustServiceConfig` and `TrustControlClient` fields and
+  constructors.
+- Keep constant-time bearer comparison behavior in request authentication.
+- Do not trim or normalize token material silently. Ambiguous secrets must be
+  rejected before service startup or client construction.
+- Preserve existing valid token behavior and existing error taxonomy through
+  `CliError`.
+
+### Affected Dependents
+
+`chio-cli`, remote receipt/revocation/budget/authority stores, and cluster peer
+sync continue to use the same public APIs. The behavior change is limited to
+rejecting an invalid service configuration before the trust-control service can
+start.
+
+### Completed Material Improvement
+
+Use a shared internal secret validator for service startup and client
+construction. Add a startup-config regression proving padded `service_token`
+values fail closed at `TrustServiceConfig::validate`.

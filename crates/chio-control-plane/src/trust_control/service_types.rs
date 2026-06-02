@@ -243,11 +243,7 @@ pub struct TrustServiceConfig {
 
 impl TrustServiceConfig {
     pub fn validate(&self) -> Result<(), CliError> {
-        if self.service_token.trim().is_empty() {
-            return Err(CliError::cli_other_error(
-                "control service token must be non-empty".to_string(),
-            ));
-        }
+        validate_control_secret(&self.service_token, "control service token")?;
         for (tenant_id, token) in &self.tenant_read_tokens {
             if tenant_id.trim().is_empty() {
                 return Err(CliError::cli_other_error(
@@ -271,6 +267,78 @@ impl TrustServiceConfig {
             ));
         }
         Ok(())
+    }
+}
+
+pub(crate) fn validate_control_secret(secret: &str, label: &str) -> Result<(), CliError> {
+    if secret.trim().is_empty() {
+        return Err(CliError::cli_other_error(format!(
+            "{label} must be non-empty"
+        )));
+    }
+    if secret.trim() != secret {
+        return Err(CliError::cli_other_error(format!(
+            "{label} must not contain surrounding whitespace"
+        )));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod service_config_tests {
+    use super::*;
+
+    fn base_config() -> TrustServiceConfig {
+        let listen = match "127.0.0.1:0".parse() {
+            Ok(addr) => addr,
+            Err(error) => panic!("test listen address should parse: {error}"),
+        };
+        TrustServiceConfig {
+            listen,
+            service_token: "token".to_string(),
+            tenant_read_tokens: BTreeMap::new(),
+            receipt_db_path: None,
+            revocation_db_path: None,
+            authority_seed_path: None,
+            authority_db_path: None,
+            budget_db_path: None,
+            enterprise_providers_file: None,
+            federation_policies_file: None,
+            scim_lifecycle_file: None,
+            verifier_policies_file: None,
+            verifier_challenge_db_path: None,
+            passport_statuses_file: None,
+            passport_issuance_offers_file: None,
+            certification_registry_file: None,
+            certification_discovery_file: None,
+            issuance_policy: None,
+            runtime_assurance_policy: None,
+            advertise_url: None,
+            allow_local_peer_urls: true,
+            certification_public_metadata_ttl_seconds: PUBLIC_DISCOVERY_TTL_SECS,
+            peer_urls: Vec::new(),
+            cluster_sync_interval: Duration::from_millis(25),
+        }
+    }
+
+    #[test]
+    fn trust_service_config_rejects_padded_service_token_at_startup() {
+        for token in [" token", "token "] {
+            let mut config = base_config();
+            config.service_token = token.to_string();
+
+            let error = match config.validate() {
+                Ok(()) => panic!("padded service token should fail closed at startup"),
+                Err(error) => error,
+            };
+
+            assert!(
+                error
+                    .to_string()
+                    .contains("control service token must not contain surrounding whitespace"),
+                "unexpected error for token `{token:?}`: {error}",
+            );
+        }
     }
 }
 

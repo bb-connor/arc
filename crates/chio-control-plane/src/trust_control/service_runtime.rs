@@ -622,17 +622,7 @@ fn build_client_with_cluster_peer(
 }
 
 fn validate_control_token(control_token: &str) -> Result<(), CliError> {
-    if control_token.trim().is_empty() {
-        return Err(CliError::cli_other_error(
-            "control token must be non-empty".to_string(),
-        ));
-    }
-    if control_token.trim() != control_token {
-        return Err(CliError::cli_other_error(
-            "control token must not contain surrounding whitespace".to_string(),
-        ));
-    }
-    Ok(())
+    validate_control_secret(control_token, "control token")
 }
 
 fn normalize_control_endpoint(endpoint: &str) -> Result<String, CliError> {
