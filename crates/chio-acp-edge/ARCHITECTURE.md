@@ -52,3 +52,46 @@ compatibility JSON-RPC dispatch. Missing params remain compatible as `{}`,
 unknown methods still return method-not-found, and non-object params for known
 ACP methods fail with `-32602` before permission preview, invocation parsing,
 task lifecycle lookup, or capability listing can observe malformed params.
+
+## Deferred Terminal Task Retention Slice
+
+### Current Boundary
+
+- `edge.rs` owns the authoritative `tool/stream`, `tool/resume`, and
+  `tool/cancel` lifecycle.
+- `conversion.rs` owns receipt-bearing `AcpInvocationResult` construction and
+  pending/cancelled lifecycle metadata.
+- `bridge.rs` owns the bounded deferred-task cap and TTL constants.
+
+### Pain Point
+
+The ACP lifecycle contract advertises deferred `tool/stream` tasks resolved by
+`tool/resume` with `resumed_terminal_payload` delivery. The current edge stores
+the terminal task and result during resume, but removes the task record before
+returning it. Cancelled tasks are also removed immediately. That makes repeated
+`tool/resume` or idempotent `tool/cancel` return `tool not found` instead of
+the owner-bound terminal task state that the edge just produced.
+
+### Security And API Constraints
+
+- Preserve public Rust structs, JSON-RPC methods, and response shapes.
+- Preserve owner binding for working, completed, failed, and cancelled tasks.
+- Do not execute the deferred kernel request more than once.
+- Keep task retention bounded by the existing TTL and deferred-task cap.
+- Preserve signed receipt metadata on completed or failed resumed results and
+  cancellation metadata on cancelled tasks.
+
+### Affected Dependents
+
+- ACP clients can repeat `tool/resume` after terminal resolution and receive
+  the same retained task and result until TTL expiry.
+- Repeated `tool/cancel` on an already cancelled task returns the retained
+  cancelled task.
+- `chio-kernel`, `chio-cross-protocol`, and `chio-mcp-edge` APIs are unchanged.
+
+### Planned Material Improvement
+
+Retain terminal deferred-task records until the existing TTL expires, while
+preserving owner checks and bounded capacity. Update lifecycle tests to prove
+resume does not re-execute or remove a terminal task, and cancel remains
+idempotent for retained cancelled tasks.

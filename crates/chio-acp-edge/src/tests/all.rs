@@ -1978,7 +1978,7 @@ mod tests {
     }
 
     #[test]
-    fn jsonrpc_resume_removes_completed_deferred_task() {
+    fn jsonrpc_resume_retains_completed_deferred_task_result() {
         let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let issuer = config.keypair.clone();
@@ -2031,7 +2031,26 @@ mod tests {
             resumed["result"]["task"]["status"].as_str(),
             Some("completed")
         );
-        assert!(!edge.tasks.borrow().contains_key(&task_id));
+        assert!(edge.tasks.borrow().contains_key(&task_id));
+
+        let repeated = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 32,
+                "method": "tool/resume",
+                "params": { "taskId": task_id.clone() }
+            }),
+            &kernel,
+            &execution,
+        );
+        assert_eq!(
+            repeated["result"]["task"]["status"].as_str(),
+            Some("completed")
+        );
+        assert_eq!(
+            repeated["result"]["result"]["metadata"]["chio"]["receiptId"],
+            resumed["result"]["result"]["metadata"]["chio"]["receiptId"]
+        );
     }
 
     #[test]
@@ -2180,6 +2199,27 @@ mod tests {
         );
         assert_eq!(
             cancelled["result"]["task"]["metadata"]["chio"]["decision"].as_str(),
+            Some("cancelled")
+        );
+
+        let cancelled_again = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 13,
+                "method": "tool/cancel",
+                "params": {
+                    "taskId": task_id
+                }
+            }),
+            &kernel,
+            &execution,
+        );
+        assert_eq!(
+            cancelled_again["result"]["task"]["status"].as_str(),
+            Some("cancelled")
+        );
+        assert_eq!(
+            cancelled_again["result"]["task"]["metadata"]["chio"]["decision"].as_str(),
             Some("cancelled")
         );
     }

@@ -115,9 +115,9 @@ impl ChioAcpEdge {
 
     fn prune_deferred_tasks(&self) {
         let now = current_unix_millis();
-        self.tasks.borrow_mut().retain(|_, task| {
-            task.task.status == AcpTaskStatus::Working && task.expires_at_ms > now
-        });
+        self.tasks
+            .borrow_mut()
+            .retain(|_, task| task.expires_at_ms > now);
     }
 
     fn ensure_deferred_task_capacity(&self) -> Result<(), AcpEdgeError> {
@@ -807,9 +807,7 @@ impl ChioAcpEdge {
                 task.task.metadata = Some(cancelled_stream_task_metadata(
                     "cross_protocol_orchestrator",
                 ));
-                let task_view = task.task.clone();
-                tasks.remove(task_id);
-                Ok(task_view)
+                Ok(task.task.clone())
             }
             AcpTaskStatus::Cancelled => Ok(task.task.clone()),
             status => Err(AcpEdgeError::InvalidRequest(format!(
@@ -854,7 +852,6 @@ impl ChioAcpEdge {
                 task.result = Some(result.clone());
                 let task_view = task.task.clone();
                 let result_value = serde_json::to_value(&result).unwrap_or(Value::Null);
-                tasks.remove(task_id);
                 return Ok((task_view, result_value));
             }
         }
