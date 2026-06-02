@@ -14,8 +14,15 @@
 
 - `edge.rs` still owns multiple trust-boundary responsibilities: manifest-to-skill publication, JSON-RPC dispatch, target-skill routing, kernel execution, and deferred task lifecycle.
 - JSON-RPC request-boundary parsing now lives in `jsonrpc.rs`, including non-empty `metadata.chio.targetSkillId` and `params.taskId` checks.
-- `ChioA2aEdge::new` still builds Agent Card skills and authoritative skill bindings directly from manifests before calling the canonical `chio_manifest::validate_manifest` envelope gate.
-- That means unsupported manifest schema versions, invalid embedded public keys, empty tool lists, invalid tool names, malformed schemas, or duplicate server-tool allowlist entries can become A2A-visible skill metadata even though manifest signing and loader paths would reject them.
+- `ChioA2aEdge::new` now validates every manifest with
+  `chio_manifest::validate_manifest` before Agent Card skill publication,
+  bridge-fidelity classification, or authoritative skill binding construction.
+- `jsonrpc.rs` now owns a centralized known-method params-object gate used by
+  both authoritative and compatibility dispatch. Missing params remain
+  compatible as `{}`, unknown methods still return method-not-found, and
+  non-object params for known A2A methods fail with `-32602` before message
+  parsing, task lookup, or deferred lifecycle mutation can observe malformed
+  params.
 
 ## Security And API Constraints
 
@@ -33,6 +40,14 @@
 - `chio-mcp-edge` remains a target executor dependency for multi-hop routes. No transitive change is planned.
 - Downstream A2A clients may see construction-time manifest errors earlier. Successful Agent Card, JSON-RPC, task lifecycle, and response shapes stay compatible.
 
-## Planned Material Improvement
+## Completed Baseline
 
 Validate every `ToolManifest` with `chio_manifest::validate_manifest` before Agent Card skill publication, bridge-fidelity classification, or authoritative skill binding construction. This is architectural rather than cosmetic because it makes manifest validation the single envelope gate before external A2A discovery and keeps the existing JSON-RPC parser focused on request-boundary inputs.
+
+## Completed Material Improvement
+
+Added a centralized known-method params-object gate for the authoritative and
+compatibility JSON-RPC dispatch paths. Missing params remain compatible as `{}`,
+unknown methods still return method-not-found, and non-object params for known
+A2A methods fail with `-32602` before message parsing, task lookup, or deferred
+lifecycle mutation can observe malformed params.

@@ -1430,6 +1430,69 @@ mod tests {
     }
 
     #[test]
+    fn jsonrpc_send_rejects_non_object_params_before_skill_resolution() {
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let kernel_issuer = config.keypair.clone();
+        let mut kernel = ChioKernel::new(config);
+        kernel.register_tool_server(Box::new(test_server()));
+        let subject = Keypair::generate();
+        let execution = A2aKernelExecutionContext {
+            capability: capability_for_tool(&kernel_issuer, &subject, "test-srv", "echo"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 41,
+                "method": "message/send",
+                "params": []
+            }),
+            &kernel,
+            &execution,
+        );
+
+        assert_eq!(response["error"]["code"], -32602);
+        assert_eq!(response["error"]["message"], "message/send params must be an object");
+    }
+
+    #[test]
+    fn jsonrpc_task_get_rejects_non_object_params_before_lookup() {
+        let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let kernel_issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = A2aKernelExecutionContext {
+            capability: capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 42,
+                "method": "task/get",
+                "params": []
+            }),
+            &kernel,
+            &execution,
+        );
+
+        assert_eq!(response["error"]["code"], -32602);
+        assert_eq!(response["error"]["message"], "task/get params must be an object");
+    }
+
+    #[test]
     fn jsonrpc_rejects_non_scalar_request_ids_before_method_dispatch() {
         let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
@@ -1464,6 +1527,33 @@ mod tests {
                 "request id must be string, number, or null"
             );
         }
+    }
+
+    #[test]
+    fn jsonrpc_compatibility_send_rejects_non_object_params_before_passthrough() {
+        let mut edge = ChioA2aEdge::new(
+            A2aEdgeConfig::default(),
+            vec![{
+                let mut m = test_manifest();
+                m.tools.truncate(1);
+                m
+            }],
+        )
+        .test_unwrap();
+        let server = test_server();
+
+        let response = edge.compatibility().handle_jsonrpc_compatibility(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 43,
+                "method": "message/send",
+                "params": []
+            }),
+            &server,
+        );
+
+        assert_eq!(response["error"]["code"], -32602);
+        assert_eq!(response["error"]["message"], "message/send params must be an object");
     }
 
     #[test]

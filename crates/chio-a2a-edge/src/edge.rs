@@ -462,6 +462,14 @@ impl ChioA2aEdge {
                 Ok(envelope) => envelope,
                 Err(response) => return response,
             };
+        if let Err(response) = Self::ensure_jsonrpc_params_object_for_supported_method(
+            &id,
+            &method,
+            &params,
+            &["message/send", "message/stream", "task/get", "task/cancel"],
+        ) {
+            return response;
+        }
 
         match method.as_str() {
             "message/send" => self.handle_jsonrpc_send_message(id, params, kernel, execution),
@@ -495,6 +503,14 @@ impl ChioA2aEdge {
                 Ok(envelope) => envelope,
                 Err(response) => return response,
             };
+        if let Err(response) = Self::ensure_jsonrpc_params_object_for_supported_method(
+            &id,
+            &method,
+            &params,
+            &["message/send", "message/stream"],
+        ) {
+            return response;
+        }
 
         match method.as_str() {
             "message/send" => self.handle_jsonrpc_send_message_passthrough(id, params, server),

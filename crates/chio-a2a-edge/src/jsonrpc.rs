@@ -42,6 +42,23 @@ impl ChioA2aEdge {
         })
     }
 
+    fn ensure_jsonrpc_params_object_for_supported_method(
+        id: &Value,
+        method: &str,
+        params: &Value,
+        supported_methods: &[&str],
+    ) -> Result<(), Value> {
+        if !supported_methods.contains(&method) || params.is_object() {
+            return Ok(());
+        }
+
+        Err(Self::jsonrpc_error_payload(
+            id.clone(),
+            -32602,
+            &format!("{method} params must be an object"),
+        ))
+    }
+
     fn parse_jsonrpc_send_message_params(
         &self,
         params: Value,
