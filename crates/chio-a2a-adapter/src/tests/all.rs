@@ -1710,6 +1710,44 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn adapter_streaming_registry_corruption_fails_closed() {
+        let registry_path = unique_path("chio-a2a-jsonrpc-stream-corrupt", ".json");
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_streaming_complete() else {
+            return;
+        };
+        let manifest_key = Keypair::generate();
+        let adapter = A2aAdapter::discover(
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
+                .with_task_registry_file(&registry_path)
+                .with_timeout(Duration::from_secs(2)),
+        )
+        .expect("discover JSONRPC adapter");
+        fs::write(&registry_path, b"{not-json").expect("corrupt task registry");
+
+        let stream_result = adapter
+            .invoke_stream(
+                "research",
+                json!({
+                    "message": "Stream the answer",
+                    "stream": true
+                }),
+                None,
+            )
+            .await;
+        server.join();
+
+        let error = stream_result.expect_err("corrupt stream registry should fail closed");
+        assert!(
+            error
+                .to_string()
+                .contains("failed to parse A2A task registry"),
+            "unexpected stream error: {error}"
+        );
+
+        let _ = fs::remove_file(registry_path);
+    }
+
+    #[tokio::test]
     async fn adapter_http_json_streaming_invocation_returns_complete_stream() {
         let Some(server) = FakeA2aServer::spawn_http_json_streaming_complete() else {
             return;

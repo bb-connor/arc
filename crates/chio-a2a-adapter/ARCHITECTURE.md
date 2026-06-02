@@ -92,3 +92,31 @@ The stream path currently treats any registry persistence failure as a fatal inv
 ### Planned Material Improvement
 
 Introduce a stream-specific recording boundary that first re-validates accepted chunks as A2A stream responses, then treats registry persistence failures as non-fatal for the current stream while preserving the registry unchanged. This keeps current stream delivery aligned with parser validation and keeps future follow-up authority fail-closed.
+
+## Stream Registry Error Classification Slice
+
+### Current Boundary
+
+- `record_stream_task_activity` is the only stream path that decides whether a registry recording error is fatal for the current invocation.
+- `task_registry.rs` reports malformed payloads, corrupted registry files, unsupported registry versions, poisoned locks, write failures, and binding conflicts through `AdapterError`.
+- Follow-up operations still call `validate_follow_up`, so a task with no valid durable binding fails closed later.
+
+### Pain Point
+
+The current stream recording path swallows every registry error after stream validation. That is too broad: a stale binding conflict is safe to keep non-fatal because it leaves future follow-up denied by the unchanged binding, but a malformed or unreadable durable registry means the adapter cannot prove the local follow-up authority state it is preserving.
+
+### Security And API Constraints
+
+- Preserve the public `A2aAdapter` and `AdapterError` API.
+- Keep valid-stream binding conflicts non-fatal for the current stream.
+- Keep malformed stream chunks and unreadable durable registry state fail-closed.
+- Do not log or persist request credentials while reporting registry errors.
+
+### Affected Dependents
+
+- `chio-kernel` should continue to receive a `ToolServerError` when A2A stream recording cannot establish a safe durable boundary.
+- Existing A2A stream conflict tests must continue to prove that conflicting task ids do not overwrite the old binding and do not abort the current valid stream.
+
+### Planned Material Improvement
+
+Classify stream registry recording errors at the invocation boundary. Only task rebind conflicts stay non-fatal; validation, parsing, unsupported-version, lock, and storage errors return an adapter error so the current tool call fails closed instead of hiding an untrusted durable-authority state.

@@ -183,13 +183,17 @@ impl A2aAdapter {
     ) -> Result<(), AdapterError> {
         validate_stream_response(response.clone())?;
         if let Err(error) = self.record_task_activity(tool_name, response, source) {
-            tracing::warn!(
-                target: "chio_a2a_adapter",
-                tool_name,
-                source,
-                error = %error,
-                "skipping A2A stream task registry persistence"
-            );
+            if stream_registry_error_is_nonfatal(&error) {
+                tracing::warn!(
+                    target: "chio_a2a_adapter",
+                    tool_name,
+                    source,
+                    error = %error,
+                    "skipping A2A stream task registry persistence"
+                );
+            } else {
+                return Err(error);
+            }
         }
         Ok(())
     }
@@ -1279,6 +1283,10 @@ fn decode_jsonrpc_result<T>(
             "A2A JSON-RPC {response_label} omitted `result`"
         ))
     })
+}
+
+fn stream_registry_error_is_nonfatal(error: &AdapterError) -> bool {
+    matches!(error, AdapterError::Lifecycle(message) if message.contains("attempted to rebind"))
 }
 
 #[async_trait::async_trait]

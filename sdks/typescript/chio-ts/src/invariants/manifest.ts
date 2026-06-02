@@ -57,6 +57,9 @@ function validateManifestStructure(manifest: ToolManifest): boolean {
   if (manifest.schema !== "chio.manifest.v1") {
     return false;
   }
+  if (!isValidEd25519PublicKeyHex(manifest.public_key)) {
+    return false;
+  }
   if (manifest.tools.length === 0) {
     return false;
   }

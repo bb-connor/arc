@@ -18,6 +18,8 @@ def signed_manifest_body_canonical_json(signed_manifest: dict[str, Any]) -> str:
 def _validate_manifest_structure(manifest: dict[str, Any]) -> bool:
     if manifest.get("schema") != "chio.manifest.v1":
         return False
+    if not is_valid_public_key_hex(manifest.get("public_key")):
+        return False
     tools = manifest.get("tools", [])
     if not tools:
         return False

@@ -57,7 +57,7 @@ func VerifySignedManifest(signedManifest map[string]any) (ManifestVerification, 
 		EmbeddedPublicKeyMatchesSigner: embeddedPublicKeyValid && PublicKeyHexMatches(embeddedPublicKey, signerKey),
 		EmbeddedPublicKeyValid:         embeddedPublicKeyValid,
 		SignatureValid:                 signatureValid,
-		StructureValid:                 validateManifestStructure(manifest),
+		StructureValid:                 validateManifestStructure(manifest, embeddedPublicKeyValid),
 	}, nil
 }
 
@@ -69,9 +69,12 @@ func VerifySignedManifestJSON(input string) (ManifestVerification, error) {
 	return VerifySignedManifest(signedManifest)
 }
 
-func validateManifestStructure(manifest map[string]any) bool {
+func validateManifestStructure(manifest map[string]any, embeddedPublicKeyValid bool) bool {
 	schema, ok := manifest["schema"].(string)
 	if !ok || schema != "chio.manifest.v1" {
+		return false
+	}
+	if !embeddedPublicKeyValid {
 		return false
 	}
 	tools, ok := manifest["tools"].([]any)
