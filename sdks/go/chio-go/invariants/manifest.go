@@ -1,5 +1,7 @@
 package invariants
 
+import "strings"
+
 type ManifestVerification struct {
 	EmbeddedPublicKeyMatchesSigner bool `json:"embedded_public_key_matches_signer"`
 	EmbeddedPublicKeyValid         bool `json:"embedded_public_key_valid"`
@@ -88,13 +90,29 @@ func validateManifestStructure(manifest map[string]any, embeddedPublicKeyValid b
 			return false
 		}
 		name, ok := tool["name"].(string)
-		if !ok || name == "" {
+		if !ok || !isValidToolName(name) {
 			return false
 		}
 		if _, exists := seen[name]; exists {
 			return false
 		}
 		seen[name] = struct{}{}
+		if !isJSONObject(tool["input_schema"]) {
+			return false
+		}
+		if outputSchema, exists := tool["output_schema"]; exists && outputSchema != nil && !isJSONObject(outputSchema) {
+			return false
+		}
 	}
 	return true
+}
+
+func isValidToolName(name string) bool {
+	trimmed := strings.TrimSpace(name)
+	return trimmed != "" && trimmed == name
+}
+
+func isJSONObject(value any) bool {
+	_, ok := value.(map[string]any)
+	return ok
 }

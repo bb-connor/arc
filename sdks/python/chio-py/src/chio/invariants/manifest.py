@@ -21,15 +21,30 @@ def _validate_manifest_structure(manifest: dict[str, Any]) -> bool:
     if not is_valid_public_key_hex(manifest.get("public_key")):
         return False
     tools = manifest.get("tools", [])
-    if not tools:
+    if not isinstance(tools, list) or not tools:
         return False
     seen: set[str] = set()
     for tool in tools:
+        if not isinstance(tool, dict):
+            return False
         name = tool.get("name")
-        if not isinstance(name, str) or name in seen:
+        if not _is_valid_tool_name(name) or name in seen:
             return False
         seen.add(name)
+        if not _is_json_object(tool.get("input_schema")):
+            return False
+        output_schema = tool.get("output_schema")
+        if output_schema is not None and not _is_json_object(output_schema):
+            return False
     return True
+
+
+def _is_valid_tool_name(name: Any) -> bool:
+    return isinstance(name, str) and bool(name.strip()) and name.strip() == name
+
+
+def _is_json_object(value: Any) -> bool:
+    return isinstance(value, dict)
 
 
 def verify_signed_manifest(signed_manifest: dict[str, Any]) -> dict[str, Any]:
