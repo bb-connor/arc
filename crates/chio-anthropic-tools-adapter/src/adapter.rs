@@ -13,6 +13,7 @@ use std::pin::Pin;
 use std::time::SystemTime;
 
 use chio_core::canonical::canonical_json_bytes;
+use chio_manifest::ServerTool;
 use chio_tool_call_fabric::{
     DenyReason, Principal, ProvenanceStamp, ProviderAdapter, ProviderError, ProviderId,
     ProviderRequest, ProviderResponse, Redaction, ToolInvocation, ToolResult, VerdictResult,
@@ -20,12 +21,6 @@ use chio_tool_call_fabric::{
 use serde_json::{json, Value};
 
 use crate::{AnthropicAdapter, ToolResultBlock, ToolUseBlock};
-
-const SERVER_TOOL_NAMES: [&str; 3] = [
-    "computer_use_20241022",
-    "bash_20241022",
-    "text_editor_20241022",
-];
 
 impl AnthropicAdapter {
     /// Lift every Anthropic `tool_use` content block in a non-streaming
@@ -278,7 +273,7 @@ fn validate_provider_identifier(value: &str, field: &str) -> Result<(), Provider
 }
 
 fn ensure_server_tool_feature(name: &str) -> Result<(), ProviderError> {
-    if SERVER_TOOL_NAMES.contains(&name) && !cfg!(feature = "computer-use") {
+    if ServerTool::from_anthropic_wire_name(name).is_some() && !cfg!(feature = "computer-use") {
         return Err(ProviderError::Malformed(format!(
             "Anthropic server tool `{name}` requires the `computer-use` cargo feature"
         )));

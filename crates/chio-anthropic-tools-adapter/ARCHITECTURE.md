@@ -29,11 +29,14 @@ HTTP transport classification, or provider-fixture replay. Those remain in
 
 ## Pain Points
 
-The streaming module still carries a local SSE parser even though the shared
-provider adapter core owns the cross-provider SSE parser. The local parser
-reconstructs forwarded frame bytes with normalized newline delimiters, so an
-allowed CRLF Anthropic event stream is released with LF bytes. That is avoidable
-byte drift at the mediation boundary.
+The streaming module now uses the shared provider-core SSE parser and preserves
+forwarded frame bytes, but server-tool classification is still split across two
+places. `adapter.rs` carries an exact local list of beta wire names for the
+`computer-use` cargo feature gate, while `chio-manifest` intentionally maps the
+whole date-suffixed Anthropic server-tool families (`bash_*`,
+`computer_use_*`, `text_editor_*`) to stable manifest entries. A future
+date-suffixed server-tool name can therefore be classified as a server tool by
+the manifest gate but missed by the feature gate.
 
 ## Security And API Constraints
 
@@ -48,18 +51,22 @@ byte drift at the mediation boundary.
 - Server tools remain gated by both the `computer-use` feature and manifest
   `server_tools`; custom client-hosted tools must not be forced through the
   server-tool allowlist.
+- The feature gate and manifest gate must use the same server-tool taxonomy.
+  A version bump in Anthropic's server-tool wire suffix cannot turn the tool
+  into a regular customer tool in default builds.
 
 ## Affected Dependents
 
 `chio-provider-conformance` replays Anthropic fixtures through this adapter
-when built with `fixtures-anthropic`. The intended change is internal to SSE
-parsing and should preserve public APIs and fixture semantics. If dependent
-replay fails, the parser contract should be corrected here rather than patched
-in replay code.
+when built with `fixtures-anthropic`. The intended change is internal to
+server-tool classification and should preserve public APIs and fixture
+semantics. If dependent replay fails, the classification contract should be
+corrected here rather than patched in replay code.
 
-## Planned Improvement
+## Implemented Improvement
 
-Move Anthropic streaming onto the shared
-`chio-provider-adapter-core::parse_sse_frames` parser while keeping the
-Anthropic-specific event/data cross-check. Add a regression proving allowed
-CRLF event-stream bytes are forwarded unchanged.
+The adapter's `computer-use` feature gate delegates server-tool recognition
+to the same `chio-manifest::ServerTool::from_anthropic_wire_name` mapping used
+by the runtime manifest allowlist. A regression proves a date-suffixed
+server-tool family name fails closed in default builds even when the manifest
+allowlists that stable server-tool entry.
