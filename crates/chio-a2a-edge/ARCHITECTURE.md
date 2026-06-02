@@ -73,6 +73,10 @@ of the already-produced terminal task response, and it loses the owner-bound
 task state that proves the terminal receipt or cancellation belonged to the
 same caller.
 
+Terminal retention also has to count against the deferred task cap. Otherwise
+callers can repeatedly create streams, resolve or cancel them, and retain
+terminal entries until TTL expiry without consuming pending-task capacity.
+
 ### Security And API Constraints
 
 - Preserve public API and wire structs.
@@ -91,10 +95,11 @@ same caller.
   an already cancelled task returns the retained cancelled response.
 - `chio-kernel`, `chio-cross-protocol`, and `chio-mcp-edge` APIs are unchanged.
 
-### Planned Material Improvement
+### Completed Material Improvement
 
 Retain terminal deferred-task responses in the internal task map until the
 existing TTL expires, while preserving owner checks and bounded capacity.
 Update lifecycle tests to prove completed tasks are not re-executed or removed
-on the first `task/get`, and cancelled tasks remain visible for idempotent
-follow-up.
+on the first `task/get`, cancelled tasks remain visible for idempotent
+follow-up, and the deferred-task cap applies to all retained task records after
+TTL pruning.

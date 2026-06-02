@@ -251,14 +251,9 @@ impl ChioA2aEdge {
 
     fn ensure_deferred_task_capacity(&mut self) -> Result<(), A2aEdgeError> {
         self.prune_deferred_tasks();
-        let working_tasks = self
-            .tasks
-            .values()
-            .filter(|task| task.response.status == TaskStatus::Working)
-            .count();
-        if working_tasks >= MAX_DEFERRED_A2A_TASKS {
+        if self.tasks.len() >= MAX_DEFERRED_A2A_TASKS {
             return Err(A2aEdgeError::InvalidRequest(
-                "too many deferred tasks are pending".to_string(),
+                "too many deferred tasks are retained".to_string(),
             ));
         }
         Ok(())
