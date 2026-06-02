@@ -1477,6 +1477,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn build_manifest_skips_non_projectable_skills() {
+        let mut adapter = local_test_adapter(
+            A2aAgentCapabilities::default(),
+            A2aProtocolBinding::JsonRpc,
+            None,
+        );
+        let mut image_skill = adapter.agent_card.skills[0].clone();
+        image_skill.id = "image-only".to_string();
+        image_skill.name = "Image Only".to_string();
+        image_skill.input_modes = Some(vec!["image/png".to_string()]);
+        adapter.agent_card.skills.push(image_skill);
+
+        let manifest = build_manifest(
+            "tenant-test",
+            "0.1.0",
+            &Keypair::generate().public_key().to_hex(),
+            &adapter.agent_card,
+            &A2aProtocolBinding::JsonRpc,
+        )
+        .expect("mixed projectable and non-projectable skills should build manifest");
+
+        assert_eq!(manifest.tools.len(), 1);
+        assert_eq!(manifest.tools[0].name, "research");
+    }
+
+    #[tokio::test]
     async fn build_send_message_request_accepts_parameterized_text_and_json_input_modes() {
         let mut adapter = local_test_adapter(
             A2aAgentCapabilities::default(),

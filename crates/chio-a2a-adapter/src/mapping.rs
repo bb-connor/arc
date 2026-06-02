@@ -229,6 +229,16 @@ fn build_manifest(
         A2aProtocolBinding::JsonRpc => "JSONRPC",
         A2aProtocolBinding::HttpJson => "HTTP+JSON",
     };
+    let tools = agent_card
+        .skills
+        .iter()
+        .filter_map(|skill| projectable_skill_input_surface(agent_card, skill).map(|_| skill))
+        .map(|skill| build_tool_definition(agent_card, skill))
+        .collect::<Result<Vec<_>, _>>()?;
+    if tools.is_empty() {
+        return Err(AdapterError::NoSkillsAdvertised);
+    }
+
     let manifest = ToolManifest {
         schema: "chio.manifest.v1".to_string(),
         server_id: server_id.to_string(),
@@ -238,11 +248,7 @@ fn build_manifest(
             agent_card.description
         )),
         version: server_version.to_string(),
-        tools: agent_card
-            .skills
-            .iter()
-            .map(|skill| build_tool_definition(agent_card, skill))
-            .collect::<Result<Vec<_>, _>>()?,
+        tools,
         server_tools: Vec::new(),
         required_permissions: None,
         public_key: public_key.to_string(),
@@ -464,20 +470,25 @@ fn skill_input_surface(
     agent_card: &A2aAgentCard,
     skill: &A2aAgentSkill,
 ) -> Result<A2aSkillInputSurface, AdapterError> {
+    projectable_skill_input_surface(agent_card, skill).ok_or_else(|| {
+        AdapterError::Protocol(format!(
+            "A2A skill `{}` does not advertise a Chio-projectable input mode",
+            skill.id
+        ))
+    })
+}
+
+fn projectable_skill_input_surface(
+    agent_card: &A2aAgentCard,
+    skill: &A2aAgentSkill,
+) -> Option<A2aSkillInputSurface> {
     let modes = skill
         .input_modes
         .as_ref()
         .filter(|modes| !modes.is_empty())
         .unwrap_or(&agent_card.default_input_modes);
     let surface = A2aSkillInputSurface::from_modes(modes);
-    if surface.is_projectable() {
-        Ok(surface)
-    } else {
-        Err(AdapterError::Protocol(format!(
-            "A2A skill `{}` does not advertise a Chio-projectable input mode",
-            skill.id
-        )))
-    }
+    surface.is_projectable().then_some(surface)
 }
 
 fn interface_origin(url: &str) -> Result<String, AdapterError> {
