@@ -18,6 +18,9 @@ use chio_core::capability::MonetaryAmount;
 use chio_core::crypto::{Keypair, PublicKey, Signature};
 use serde::{Deserialize, Serialize};
 
+mod validation;
+pub use validation::validate_manifest;
+
 /// Supported Chio tool-manifest schema identifier.
 pub const TOOL_MANIFEST_SCHEMA: &str = "chio.manifest.v1";
 
@@ -227,6 +230,9 @@ pub enum ManifestError {
     #[error("invalid tool name: {0}")]
     InvalidToolName(String),
 
+    #[error("invalid manifest field: {0}")]
+    InvalidManifestField(&'static str),
+
     #[error("tool input schema is not a JSON object: {0}")]
     InvalidInputSchema(String),
 
@@ -236,57 +242,17 @@ pub enum ManifestError {
     #[error("duplicate server tool allowlist entry: {0}")]
     DuplicateServerTool(String),
 
+    #[error("invalid required permission {field}: {value}")]
+    InvalidRequiredPermission { field: &'static str, value: String },
+
+    #[error("duplicate required permission {field}: {value}")]
+    DuplicateRequiredPermission { field: &'static str, value: String },
+
     #[error("manifest schema version is not supported: {0}")]
     UnsupportedSchema(String),
 
     #[error("signature verification failed")]
     VerificationFailed,
-}
-
-/// Validate that a manifest is structurally well-formed (no duplicate tool
-/// names, at least one tool, supported schema version).
-///
-/// This does not authenticate signer material. Use [`sign_manifest`] or
-/// [`verify_manifest`] when the embedded public key must be parsed and matched
-/// against a signer.
-pub fn validate_manifest(manifest: &ToolManifest) -> Result<(), ManifestError> {
-    if manifest.schema != TOOL_MANIFEST_SCHEMA {
-        return Err(ManifestError::UnsupportedSchema(manifest.schema.clone()));
-    }
-    if manifest.tools.is_empty() {
-        return Err(ManifestError::EmptyManifest);
-    }
-
-    let mut seen = std::collections::HashSet::new();
-    for tool in &manifest.tools {
-        if tool.name.trim().is_empty() || tool.name.trim() != tool.name {
-            return Err(ManifestError::InvalidToolName(tool.name.clone()));
-        }
-        if !seen.insert(&tool.name) {
-            return Err(ManifestError::DuplicateToolName(tool.name.clone()));
-        }
-        if !tool.input_schema.is_object() {
-            return Err(ManifestError::InvalidInputSchema(tool.name.clone()));
-        }
-        if tool
-            .output_schema
-            .as_ref()
-            .is_some_and(|schema| !schema.is_object())
-        {
-            return Err(ManifestError::InvalidOutputSchema(tool.name.clone()));
-        }
-    }
-
-    let mut seen_server_tools = std::collections::HashSet::new();
-    for server_tool in &manifest.server_tools {
-        if !seen_server_tools.insert(*server_tool) {
-            return Err(ManifestError::DuplicateServerTool(
-                server_tool.as_str().to_string(),
-            ));
-        }
-    }
-
-    Ok(())
 }
 
 /// Sign a manifest with an Ed25519 keypair.
@@ -428,6 +394,28 @@ mod tests {
     }
 
     #[test]
+    fn validate_rejects_blank_manifest_identity() {
+        let mut m = sample_manifest();
+        m.server_id = " ".into();
+
+        assert!(matches!(
+            validate_manifest(&m),
+            Err(ManifestError::InvalidManifestField("server_id"))
+        ));
+    }
+
+    #[test]
+    fn validate_rejects_padded_manifest_identity() {
+        let mut m = sample_manifest();
+        m.version = " 0.1.0".into();
+
+        assert!(matches!(
+            validate_manifest(&m),
+            Err(ManifestError::InvalidManifestField("version"))
+        ));
+    }
+
+    #[test]
     fn validate_rejects_non_object_input_schema() {
         let mut m = sample_manifest();
         m.tools[0].input_schema = serde_json::json!(["not", "an", "object"]);
@@ -446,6 +434,44 @@ mod tests {
         assert!(matches!(
             validate_manifest(&m),
             Err(ManifestError::InvalidOutputSchema(tool)) if tool == "greet"
+        ));
+    }
+
+    #[test]
+    fn validate_rejects_empty_required_permission_entry() {
+        let mut m = sample_manifest();
+        m.required_permissions = Some(RequiredPermissions {
+            read_paths: Some(vec![String::new()]),
+            write_paths: None,
+            network_hosts: None,
+            environment_variables: None,
+        });
+
+        assert!(matches!(
+            validate_manifest(&m),
+            Err(ManifestError::InvalidRequiredPermission {
+                field: "required_permissions.read_paths",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn validate_rejects_duplicate_required_permission_entry() {
+        let mut m = sample_manifest();
+        m.required_permissions = Some(RequiredPermissions {
+            read_paths: None,
+            write_paths: None,
+            network_hosts: Some(vec!["api.example.com".into(), "api.example.com".into()]),
+            environment_variables: None,
+        });
+
+        assert!(matches!(
+            validate_manifest(&m),
+            Err(ManifestError::DuplicateRequiredPermission {
+                field: "required_permissions.network_hosts",
+                value,
+            }) if value == "api.example.com"
         ));
     }
 
