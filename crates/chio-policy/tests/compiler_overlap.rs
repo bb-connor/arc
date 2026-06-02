@@ -149,7 +149,7 @@ rules:
 }
 
 #[test]
-fn default_allow_with_human_in_loop_confirmation_emits_zero_threshold_wildcard_scope() {
+fn default_allow_with_selective_human_in_loop_confirmation_stays_permissive() {
     let compiled = compile(
         r#"
 hushspec: "0.1.0"
@@ -160,6 +160,26 @@ rules:
   human_in_loop:
     enabled: true
     require_confirmation: ["shell_*"]
+"#,
+    );
+
+    assert_eq!(compiled.default_scope.grants.len(), 1);
+    assert_eq!(compiled.default_scope.grants[0].tool_name, "*");
+    assert_eq!(approval_thresholds(&compiled), Vec::<u64>::new());
+}
+
+#[test]
+fn default_allow_with_global_human_in_loop_confirmation_emits_zero_threshold_wildcard_scope() {
+    let compiled = compile(
+        r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    default: allow
+  human_in_loop:
+    enabled: true
+    require_confirmation: ["*"]
 "#,
     );
 

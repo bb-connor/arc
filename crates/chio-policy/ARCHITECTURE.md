@@ -54,3 +54,21 @@ When an origins extension is configured with deny behavior, requests without a
 matching origin profile should return a deny result naming the origins boundary.
 Requests with a matching profile and policies that opt into `minimal_profile`
 fallback should continue through the existing evaluator path.
+
+## Default-Allow Confirmation Projection Follow-up
+
+### Boundary
+
+`compiler.rs` translates HushSpec `tool_access` and `human_in_loop` intent into
+default `ChioScope` grants. A single wildcard grant can faithfully carry global
+constraints such as max-argument size, minimum runtime assurance, global
+approval thresholds, or confirmation rules that apply to every tool. It cannot
+faithfully carry a selective confirmation glob such as `git_push` or `shell_*`
+without over-applying approval to unrelated default-allowed tools.
+
+### Planned Improvement
+
+Keep default-allow scopes permissive when the only unrepresentable constraint is
+a selective confirmation glob. Continue emitting constrained wildcard grants for
+global confirmation (`*`) and other constraints that truly apply to the entire
+default-allowed tool set.

@@ -758,7 +758,7 @@ fn tool_access_can_safely_widen_to_wildcard(
 ) -> bool {
     rule.allow.is_empty()
         && rule.block.is_empty()
-        && rule.require_confirmation.is_empty()
+        && !confirmation_applies_to_all_tools(&rule.require_confirmation)
         && rule.max_args_size.is_none()
         && rule.require_runtime_assurance_tier.is_none()
         && rule.require_workload_identity.is_none()
@@ -768,8 +768,14 @@ fn tool_access_can_safely_widen_to_wildcard(
 
 fn human_in_loop_requires_scope_constraints(human_in_loop: Option<&HumanInLoopRule>) -> bool {
     human_in_loop.is_some_and(|rule| {
-        rule.enabled && (!rule.require_confirmation.is_empty() || rule.approve_above.is_some())
+        rule.enabled
+            && (confirmation_applies_to_all_tools(&rule.require_confirmation)
+                || rule.approve_above.is_some())
     })
+}
+
+fn confirmation_applies_to_all_tools(patterns: &[String]) -> bool {
+    patterns.iter().any(|pattern| pattern == "*")
 }
 
 fn tool_access_can_emit_constrained_wildcard(
@@ -782,7 +788,7 @@ fn tool_access_can_emit_constrained_wildcard(
         && rule.prefer_workload_identity.is_none()
         && (rule.max_args_size.is_some()
             || rule.require_runtime_assurance_tier.is_some()
-            || !rule.require_confirmation.is_empty()
+            || confirmation_applies_to_all_tools(&rule.require_confirmation)
             || human_in_loop_requires_scope_constraints(human_in_loop))
 }
 
@@ -796,18 +802,17 @@ fn compile_tool_constraints(
         constraints.push(Constraint::MaxArgsSize(max_args_size));
     }
 
-    // Determine approval threshold. tool_access.require_confirmation always
-    // forces threshold=0 (approval required for every invocation). A
-    // top-level `rules.human_in_loop` with `require_confirmation` globs that
-    // match this tool does the same. Otherwise, if `human_in_loop` is
-    // enabled and declares an `approve_above` threshold, use that threshold.
+    // Determine approval threshold. require_confirmation forces threshold=0
+    // when it matches the compiled grant. A wildcard grant can only carry
+    // confirmation when the source pattern applies to all tools; selective
+    // confirmations stay in the policy evaluator instead of being widened.
     let mut approval_threshold: Option<u64> = None;
-    if confirmation_overlap(tool_pattern, &rule.require_confirmation)? {
+    if confirmation_matches_compiled_grant(tool_pattern, &rule.require_confirmation)? {
         approval_threshold = Some(0);
     }
     if let Some(hil) = human_in_loop {
         if hil.enabled {
-            if confirmation_overlap(tool_pattern, &hil.require_confirmation)? {
+            if confirmation_matches_compiled_grant(tool_pattern, &hil.require_confirmation)? {
                 approval_threshold = Some(0);
             } else if approval_threshold.is_none() {
                 if let Some(threshold) = hil.approve_above {
@@ -824,6 +829,16 @@ fn compile_tool_constraints(
         constraints.push(Constraint::MinimumRuntimeAssurance(tier));
     }
     Ok(constraints)
+}
+
+fn confirmation_matches_compiled_grant(
+    tool_pattern: &str,
+    confirmation_patterns: &[String],
+) -> Result<bool, CompileError> {
+    if tool_pattern == "*" {
+        return Ok(confirmation_applies_to_all_tools(confirmation_patterns));
+    }
+    confirmation_overlap(tool_pattern, confirmation_patterns)
 }
 
 /// Translate a `VelocityRule` into optional `VelocityConfig` +
@@ -1522,7 +1537,7 @@ rules:
     }
 
     #[test]
-    fn compile_tool_access_default_allow_confirmation_emits_constrained_wildcard() {
+    fn compile_tool_access_default_allow_selective_confirmation_stays_permissive() {
         let spec = HushSpec::parse(
             r#"
 hushspec: "0.1.0"
@@ -1530,6 +1545,28 @@ rules:
   tool_access:
     enabled: true
     require_confirmation: [git_push]
+    default: allow
+"#,
+        )
+        .unwrap();
+        let compiled = compile_policy(&spec).unwrap();
+
+        assert_eq!(compiled.default_scope.grants.len(), 1);
+        let grant = &compiled.default_scope.grants[0];
+        assert_eq!(grant.server_id, "*");
+        assert_eq!(grant.tool_name, "*");
+        assert!(grant.constraints.is_empty());
+    }
+
+    #[test]
+    fn compile_tool_access_default_allow_global_confirmation_emits_constrained_wildcard() {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    require_confirmation: ["*"]
     default: allow
 "#,
         )
@@ -1555,6 +1592,30 @@ rules:
   tool_access:
     enabled: true
     max_args_size: 2048
+    default: allow
+"#,
+        )
+        .unwrap();
+        let compiled = compile_policy(&spec).unwrap();
+
+        assert_eq!(compiled.default_scope.grants.len(), 1);
+        let grant = &compiled.default_scope.grants[0];
+        assert_eq!(grant.server_id, "*");
+        assert_eq!(grant.tool_name, "*");
+        assert_eq!(grant.constraints, vec![Constraint::MaxArgsSize(2048)]);
+    }
+
+    #[test]
+    fn compile_tool_access_default_allow_max_args_size_ignores_selective_confirmation_on_wildcard()
+    {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    max_args_size: 2048
+    require_confirmation: [git_push]
     default: allow
 "#,
         )
