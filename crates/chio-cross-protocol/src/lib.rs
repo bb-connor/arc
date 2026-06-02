@@ -913,7 +913,7 @@ impl<'a> CrossProtocolOrchestrator<'a> {
         let provided_ref = bridge.extract_capability_ref(&request.source_envelope)?;
         let capability_ref = match provided_ref {
             Some(cap_ref) => {
-                validate_provided_capability_ref(&cap_ref, &request.capability)?;
+                validate_provided_capability_ref(&cap_ref, &request.capability, source_protocol)?;
                 cap_ref
             }
             None => CrossProtocolCapabilityRef::from_capability(
@@ -1244,7 +1244,15 @@ fn validate_non_empty_request_field(field_name: &str, value: &str) -> Result<(),
 fn validate_provided_capability_ref(
     cap_ref: &CrossProtocolCapabilityRef,
     capability: &CapabilityToken,
+    source_protocol: DiscoveryProtocol,
 ) -> Result<(), BridgeError> {
+    if cap_ref.origin_protocol != source_protocol {
+        return Err(BridgeError::InvalidRequest(format!(
+            "capabilityRef originProtocol {} does not match source protocol {}",
+            cap_ref.origin_protocol, source_protocol
+        )));
+    }
+
     if cap_ref.chio_capability_id != capability.id {
         return Err(BridgeError::CapabilityRefMismatch {
             expected: capability.id.clone(),
@@ -1912,6 +1920,54 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "invalid request envelope: capabilityRef parentCapabilityHash does not match active capability lineage"
+        );
+    }
+
+    #[test]
+    fn orchestrator_rejects_capability_ref_origin_protocol_drift() {
+        let (issuer, kernel) = test_kernel();
+        let subject = Keypair::generate();
+        let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+        let capability = capability_for_tool(&issuer, &subject, "test-srv", "echo");
+        let parent_hash = parent_capability_hash(&capability).unwrap();
+
+        let err = orchestrator
+            .execute(
+                &MockBridge,
+                CrossProtocolExecutionRequest {
+                    origin_request_id: "a2a-drifted-cap-ref".to_string(),
+                    kernel_request_id: "a2a-drifted-cap-ref-kernel-1".to_string(),
+                    target_protocol: DiscoveryProtocol::Native,
+                    target_server_id: "test-srv".to_string(),
+                    target_tool_name: "echo".to_string(),
+                    agent_id: subject.public_key().to_hex(),
+                    arguments: json!({"message":"hello"}),
+                    capability,
+                    source_envelope: json!({
+                        "message": {"role":"user"},
+                        "metadata": {
+                            "chio": {
+                                "targetSkillId": "echo",
+                                "capabilityRef": {
+                                    "chioCapabilityId": "cap-test-srv-echo",
+                                    "originProtocol": "acp",
+                                    "protocolContext": {"targetSkillId": "echo"},
+                                    "parentCapabilityHash": parent_hash
+                                }
+                            }
+                        }
+                    }),
+                    dpop_proof: None,
+                    governed_intent: None,
+                    approval_token: None,
+                    model_metadata: None,
+                },
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            err.to_string(),
+            "invalid request envelope: capabilityRef originProtocol acp does not match source protocol a2a"
         );
     }
 
