@@ -190,6 +190,7 @@ rust_public_entrypoints = [
     "chio-mcp-edge",
     "chio-mcp-remote",
     "chio-policy",
+    "chio-wall",
 ]
 rust_registry_public_crates = []
 

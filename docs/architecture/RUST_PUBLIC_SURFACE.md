@@ -230,3 +230,45 @@ The checker rejects a workspace manifest that omits either
 `workspace.metadata.chio.rust_public_entrypoints` or
 `workspace.metadata.chio.rust_registry_public_crates`, with regressions proving
 that missing lists fail closed rather than defaulting to empty policy.
+
+## Chio-Wall Product Entrypoint Slice
+
+### Current Boundary
+
+`rust_public_entrypoints` is the reviewable list of repo-public Rust crates
+that are supported as Chio entrypoints while the workspace remains pre-release.
+Product binaries belong in that list when they are documented as supported
+operator-facing surfaces, even if they remain `publish = false`.
+
+### Pain Point Addressed
+
+`chio-wall` is a documented companion-product CLI with a real `chio-wall`
+binary, README, and architecture note, but it was not declared in the root
+public-entrypoint list or acknowledged with package-local Chio metadata. That
+left a product surface outside the checker contract, so future README,
+description, or target regressions would not be caught by the public-surface
+gate.
+
+### Security And API Constraints
+
+- Keep `chio-wall-core` private to the product boundary. The public entrypoint
+  is the CLI crate, not the internal contract crate.
+- Keep `publish = false`; repo-public support does not imply crates.io
+  publication.
+- Preserve sorted root metadata and the root/local marker handshake.
+- Do not change Chio-Wall command behavior, package generation, evidence
+  semantics, or validation-package layout in this metadata slice.
+
+### Affected Dependents
+
+The real workspace manifest and `crates/chio-wall/Cargo.toml` are the only
+metadata changes expected. The structural checker should prove that the newly
+declared product entrypoint has a README, description, package-local marker,
+and binary implementation target.
+
+### Material Improvement
+
+Register `chio-wall` as a root Rust public entrypoint, add the local
+`package.metadata.chio.public_entrypoint = true` marker, and declare its crate
+README so the public-surface gate owns this product binary alongside the other
+supported repo-public Rust surfaces.
