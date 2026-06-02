@@ -18,6 +18,12 @@ def signed_manifest_body_canonical_json(signed_manifest: dict[str, Any]) -> str:
 def _validate_manifest_structure(manifest: dict[str, Any]) -> bool:
     if manifest.get("schema") != "chio.manifest.v1":
         return False
+    if not (
+        _is_valid_manifest_text_field(manifest.get("server_id"))
+        and _is_valid_manifest_text_field(manifest.get("name"))
+        and _is_valid_manifest_text_field(manifest.get("version"))
+    ):
+        return False
     tools = manifest.get("tools", [])
     if not isinstance(tools, list) or not tools:
         return False
@@ -37,8 +43,12 @@ def _validate_manifest_structure(manifest: dict[str, Any]) -> bool:
     return True
 
 
+def _is_valid_manifest_text_field(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip()) and value.strip() == value
+
+
 def _is_valid_tool_name(name: Any) -> bool:
-    return isinstance(name, str) and bool(name.strip()) and name.strip() == name
+    return _is_valid_manifest_text_field(name)
 
 
 def _is_json_object(value: Any) -> bool:

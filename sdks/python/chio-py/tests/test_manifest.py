@@ -38,6 +38,29 @@ def test_manifest_structure_does_not_include_embedded_public_key_validity() -> N
     assert verification["embedded_public_key_matches_signer"] is False
 
 
+def test_manifest_structure_rejects_empty_or_padded_identity_fields() -> None:
+    cases = [
+        ("server_id", ""),
+        ("server_id", " srv-priced"),
+        ("server_id", "srv-priced "),
+        ("name", ""),
+        ("name", " Priced Server"),
+        ("name", "Priced Server "),
+        ("version", ""),
+        ("version", " 1.0.0"),
+        ("version", "1.0.0 "),
+    ]
+    for field, value in cases:
+        signed_manifest = priced_signed_manifest()
+        signed_manifest["manifest"][field] = value
+
+        verification = verify_signed_manifest(signed_manifest)
+
+        assert verification["structure_valid"] is False, f"{field} {value!r}"
+        assert verification["signature_valid"] is False
+        assert verification["embedded_public_key_valid"] is True
+
+
 def test_manifest_structure_rejects_empty_or_padded_tool_names() -> None:
     for name in ["", " greet", "greet "]:
         signed_manifest = priced_signed_manifest()
