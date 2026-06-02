@@ -288,7 +288,7 @@
         "embedded_public_key_matches_signer": false,
         "embedded_public_key_valid": false,
         "signature_valid": true,
-        "structure_valid": false
+        "structure_valid": true
       },
       "id": "invalid_embedded_public_key",
       "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"not-a-public-key\",\"required_permissions\":{\"environment_variables\":[\"CHIO_ENV\"],\"network_hosts\":[\"api.example.com\"],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"chio.manifest.v1\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}},{\"description\":\"Tool definition for file_write\",\"has_side_effects\":true,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"moderate\",\"name\":\"file_write\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.0\"}",

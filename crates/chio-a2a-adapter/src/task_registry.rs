@@ -256,7 +256,7 @@ fn task_observations_from_value(value: &Value) -> Result<Vec<A2aTaskObservation>
             .and_then(Value::as_str)
             .map(str::to_string);
         observations.push(A2aTaskObservation {
-            task_id: canonical_observed_task_id(task_id),
+            task_id: observed_task_id(task_id),
             state,
         });
     }
@@ -271,7 +271,7 @@ fn task_observations_from_value(value: &Value) -> Result<Vec<A2aTaskObservation>
             .and_then(Value::as_str)
             .map(str::to_string);
         observations.push(A2aTaskObservation {
-            task_id: canonical_observed_task_id(task_id),
+            task_id: observed_task_id(task_id),
             state,
         });
     }
@@ -281,15 +281,15 @@ fn task_observations_from_value(value: &Value) -> Result<Vec<A2aTaskObservation>
             AdapterError::Protocol("A2A artifact update must contain string `taskId`".to_string())
         })?;
         observations.push(A2aTaskObservation {
-            task_id: canonical_observed_task_id(task_id),
+            task_id: observed_task_id(task_id),
             state: None,
         });
     }
     Ok(observations)
 }
 
-fn canonical_observed_task_id(task_id: &str) -> String {
-    task_id.trim().to_string()
+fn observed_task_id(task_id: &str) -> String {
+    task_id.to_string()
 }
 
 fn validate_task_record_binding(

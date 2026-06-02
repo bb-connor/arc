@@ -47,6 +47,17 @@ test("signed manifest typing and verification preserve pricing metadata", () => 
   assert.equal(verification.embedded_public_key_matches_signer, false);
 });
 
+test("manifest structure does not include embedded public key validity", () => {
+  const signedManifest = pricedSignedManifest();
+  signedManifest.manifest.public_key = "demo-placeholder";
+
+  const verification = verifySignedManifest(signedManifest);
+
+  assert.equal(verification.structure_valid, true);
+  assert.equal(verification.embedded_public_key_valid, false);
+  assert.equal(verification.embedded_public_key_matches_signer, false);
+});
+
 test("manifest structure rejects empty or padded tool names", () => {
   for (const name of ["", " greet", "greet "]) {
     const signedManifest = pricedSignedManifest();

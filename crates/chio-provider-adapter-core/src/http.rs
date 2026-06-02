@@ -392,6 +392,7 @@ fn invalid_base_url(base_url: &str, detail: String) -> HttpTransportError {
 fn default_headers_for_config(
     config: &HttpTransportConfig,
 ) -> Result<HeaderMap, HttpTransportError> {
+    validate_auth_scheme(&config.auth)?;
     let mut headers = HeaderMap::new();
     for (name, value) in &config.extra_headers {
         insert_header(&mut headers, name, value)?;
@@ -404,19 +405,39 @@ fn default_headers_for_config(
     Ok(headers)
 }
 
+fn validate_auth_scheme(auth: &AuthScheme) -> Result<(), HttpTransportError> {
+    match auth {
+        AuthScheme::Bearer(token) => {
+            validate_auth_secret(AUTHORIZATION.as_str(), token, "bearer token")
+        }
+        AuthScheme::Header { name, value } => {
+            validate_auth_secret(name, value, "auth header value")
+        }
+        AuthScheme::QueryParam { name, value } => {
+            validate_auth_secret(name, value, "auth query value")
+        }
+        AuthScheme::None => Ok(()),
+    }
+}
+
+fn validate_auth_secret(name: &str, value: &str, label: &str) -> Result<(), HttpTransportError> {
+    if value.trim().is_empty() {
+        return Err(HttpTransportError::InvalidHeader {
+            name: name.to_string(),
+            detail: format!("{label} must not be empty"),
+        });
+    }
+    if value.trim() != value {
+        return Err(HttpTransportError::InvalidHeader {
+            name: name.to_string(),
+            detail: format!("{label} must not contain surrounding whitespace"),
+        });
+    }
+    Ok(())
+}
+
 fn insert_bearer_header(headers: &mut HeaderMap, token: &str) -> Result<(), HttpTransportError> {
-    if token.trim().is_empty() {
-        return Err(HttpTransportError::InvalidHeader {
-            name: AUTHORIZATION.to_string(),
-            detail: "bearer token must not be empty".to_string(),
-        });
-    }
-    if token.trim() != token {
-        return Err(HttpTransportError::InvalidHeader {
-            name: AUTHORIZATION.to_string(),
-            detail: "bearer token must not contain surrounding whitespace".to_string(),
-        });
-    }
+    validate_auth_secret(AUTHORIZATION.as_str(), token, "bearer token")?;
     let value = format!("Bearer {token}");
     let header_value =
         HeaderValue::from_str(&value).map_err(|error| HttpTransportError::InvalidHeader {
@@ -773,6 +794,52 @@ mod tests {
             HttpTransportError::InvalidHeader { ref name, .. } if name == AUTHORIZATION.as_str()
         ));
         assert!(error.to_string().contains("bearer token"));
+    }
+
+    #[test]
+    fn http_transport_rejects_blank_or_padded_direct_header_auth() {
+        for value in ["", "   ", " secret", "secret "] {
+            let config = HttpTransportConfig::new("https://api.example.test").with_auth(
+                AuthScheme::Header {
+                    name: "x-api-key".to_string(),
+                    value: value.to_string(),
+                },
+            );
+
+            let error = match HttpTransport::new(config) {
+                Ok(_) => panic!("blank or padded direct header auth must fail closed"),
+                Err(error) => error,
+            };
+
+            assert!(matches!(
+                error,
+                HttpTransportError::InvalidHeader { ref name, .. } if name == "x-api-key"
+            ));
+            assert!(error.to_string().contains("auth header value"));
+        }
+    }
+
+    #[test]
+    fn http_transport_rejects_blank_or_padded_direct_query_auth() {
+        for value in ["", "   ", " secret", "secret "] {
+            let config = HttpTransportConfig::new("https://api.example.test").with_auth(
+                AuthScheme::QueryParam {
+                    name: "key".to_string(),
+                    value: value.to_string(),
+                },
+            );
+
+            let error = match HttpTransport::new(config) {
+                Ok(_) => panic!("blank or padded direct query auth must fail closed"),
+                Err(error) => error,
+            };
+
+            assert!(matches!(
+                error,
+                HttpTransportError::InvalidHeader { ref name, .. } if name == "key"
+            ));
+            assert!(error.to_string().contains("auth query value"));
+        }
     }
 
     #[test]

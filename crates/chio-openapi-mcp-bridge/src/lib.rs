@@ -109,6 +109,11 @@ pub struct BridgedResponse {
     pub status: u16,
     /// Response body.
     pub body: Value,
+    /// Raw response body byte count observed by the dispatcher before JSON
+    /// parsing or normalization. When absent, the bridge falls back to the
+    /// compact JSON body length for legacy in-process dispatchers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observed_body_bytes: Option<u64>,
     /// Whether the response indicates an error.
     pub is_error: bool,
 }
@@ -482,6 +487,7 @@ mod tests {
         let response = BridgedResponse {
             status: 202,
             body: json!({"ok": true}),
+            observed_body_bytes: None,
             is_error: false,
         };
 
@@ -565,6 +571,7 @@ mod tests {
                     "url": url,
                     "pets": [{"name": "Fido"}]
                 }),
+                observed_body_bytes: None,
                 is_error: false,
             })
         }));
@@ -582,6 +589,7 @@ mod tests {
             Ok(BridgedResponse {
                 status: 404,
                 body: json!({"error": "not found"}),
+                observed_body_bytes: None,
                 is_error: true,
             })
         }));
@@ -599,6 +607,7 @@ mod tests {
             Ok(BridgedResponse {
                 status: 200,
                 body: json!({"ok": true}),
+                observed_body_bytes: None,
                 is_error: false,
             })
         }));
@@ -619,6 +628,28 @@ mod tests {
             Ok(BridgedResponse {
                 status: 200,
                 body: json!({"oversized": "response"}),
+                observed_body_bytes: None,
+                is_error: false,
+            })
+        }));
+        let error = bridge.invoke_tool("listPets", json!({})).unwrap_err();
+        assert!(format!("{error}").contains("response size"));
+    }
+
+    #[test]
+    fn bridge_dispatcher_response_body_cap_uses_observed_raw_bytes() {
+        let mut config = petstore_config_with_egress();
+        config
+            .egress_contract
+            .as_mut()
+            .expect("egress contract")
+            .max_response_bytes = 16;
+        let mut bridge = OpenApiMcpBridge::from_spec(PETSTORE_SPEC, config).unwrap();
+        bridge.set_dispatcher(Box::new(|_method, _url, _args| {
+            Ok(BridgedResponse {
+                status: 200,
+                body: json!({"ok": true}),
+                observed_body_bytes: Some(128),
                 is_error: false,
             })
         }));
@@ -696,6 +727,7 @@ mod tests {
             Ok(BridgedResponse {
                 status: 200,
                 body: json!({"ok": true}),
+                observed_body_bytes: None,
                 is_error: false,
             })
         }));
@@ -749,6 +781,7 @@ mod tests {
             Ok(BridgedResponse {
                 status: 200,
                 body: json!({"receivedUrl": url}),
+                observed_body_bytes: None,
                 is_error: false,
             })
         }));
@@ -769,6 +802,7 @@ mod tests {
             Ok(BridgedResponse {
                 status: 200,
                 body: json!({"receivedUrl": url}),
+                observed_body_bytes: None,
                 is_error: false,
             })
         }));
@@ -820,6 +854,7 @@ mod tests {
             Ok(BridgedResponse {
                 status: 200,
                 body: json!({"receivedUrl": url}),
+                observed_body_bytes: None,
                 is_error: false,
             })
         }));

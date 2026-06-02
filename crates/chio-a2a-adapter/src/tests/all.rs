@@ -833,8 +833,8 @@ mod tests {
     }
 
     #[test]
-    fn task_registry_canonicalizes_observed_task_ids_before_persisting() {
-        let registry_path = unique_path("chio-a2a-task-registry-canonical-task-id", ".json");
+    fn task_registry_preserves_observed_task_ids_exactly() {
+        let registry_path = unique_path("chio-a2a-task-registry-observed-task-id", ".json");
         let registry = A2aTaskRegistry::open(&registry_path).expect("open task registry");
         let selected_interface = A2aAgentInterface {
             url: "http://localhost:9000/rpc".to_string(),
@@ -875,25 +875,26 @@ mod tests {
         let reloaded = registry.load().expect("reload task registry");
         assert_eq!(
             reloaded.tasks.len(),
-            1,
-            "padded observations should share one canonical task key"
+            2,
+            "distinct observed task ids must not be collapsed before follow-up lookup"
         );
         let record = reloaded
             .tasks
-            .get("task-1")
-            .expect("canonical task key is recorded");
-        assert_eq!(record.task_id, "task-1");
-        assert_eq!(record.last_state.as_deref(), Some("TASK_STATE_COMPLETED"));
+            .get(" task-1 ")
+            .expect("exact task response id is recorded");
+        assert_eq!(record.task_id, " task-1 ");
+        assert_eq!(record.last_state.as_deref(), Some("TASK_STATE_WORKING"));
+        assert!(reloaded.tasks.contains_key("\ttask-1\n"));
         registry
             .validate_follow_up(
-                "task-1",
+                " task-1 ",
                 "research",
                 "srv-a2a",
                 &selected_interface,
                 &selected_binding,
                 "get_task.id",
             )
-            .expect("normal follow-up id should match padded observation");
+            .expect("exact follow-up id should match exact observation");
 
         let _ = fs::remove_file(registry_path);
     }

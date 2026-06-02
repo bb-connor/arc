@@ -61,6 +61,7 @@ fn bridge_rejects_oversize_dispatcher_response_via_enforce_attempt() {
         Ok(BridgedResponse {
             status: 200,
             body: json!({ "payload": "x".repeat(512) }),
+            observed_body_bytes: None,
             is_error: false,
         })
     }));
