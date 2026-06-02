@@ -75,6 +75,36 @@ mod tests {
         assert!(!key.contains("token-secret"));
     }
 
+    #[test]
+    fn mcp_session_id_header_classifies_missing_invalid_and_valid_values() {
+        let mut headers = HeaderMap::new();
+        assert_eq!(mcp_session_id_header(&headers), McpSessionIdHeader::Missing);
+
+        headers.insert(MCP_SESSION_ID_HEADER, HeaderValue::from_static(""));
+        assert_eq!(mcp_session_id_header(&headers), McpSessionIdHeader::Invalid);
+
+        headers.insert(
+            MCP_SESSION_ID_HEADER,
+            HeaderValue::from_static(" session-123"),
+        );
+        assert_eq!(mcp_session_id_header(&headers), McpSessionIdHeader::Invalid);
+
+        headers.insert(
+            MCP_SESSION_ID_HEADER,
+            HeaderValue::from_static("session-123 "),
+        );
+        assert_eq!(mcp_session_id_header(&headers), McpSessionIdHeader::Invalid);
+
+        headers.insert(
+            MCP_SESSION_ID_HEADER,
+            HeaderValue::from_static("session-123"),
+        );
+        assert_eq!(
+            mcp_session_id_header(&headers),
+            McpSessionIdHeader::Valid("session-123".to_string())
+        );
+    }
+
     fn sign_jwt_rs256(
         private_key: &rsa::RsaPrivateKey,
         claims: &serde_json::Value,

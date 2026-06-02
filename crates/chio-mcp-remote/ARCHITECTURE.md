@@ -11,10 +11,10 @@
 
 ## Pain Points
 
-- `session_core.rs` mixes session lifecycle orchestration with raw SQLite table definitions and persistence helpers.
-- Active resumable rows fail closed when the row key and serialized payload disagree, but terminal tombstone rows are loaded without the same key/payload consistency check.
-- A corrupt terminal tombstone can therefore enter the in-memory ledger under one lookup key while reporting a different `sessionId` in admin diagnostics.
-- The flat `include!` layout makes ownership unclear enough that storage invariants are easy to apply to active rows but miss tombstone rows.
+- `http_service.rs` owns the public hosted MCP admission boundary, but `MCP-Session-Id` parsing is currently represented as `Option<String>`.
+- That optional helper conflates three different protocol states: header missing, header present but malformed, and header present on initialize where any session header is forbidden.
+- Empty or padded session identifiers can therefore proceed to session lookup as ordinary unknown sessions instead of failing at HTTP admission as invalid protocol input.
+- The flat `include!` layout still makes it easy for admission helpers, lifecycle helpers, and OAuth error projection to bleed into each other instead of forming explicit internal APIs.
 
 ## Constraints
 
@@ -34,4 +34,4 @@
 
 ## Planned Improvement
 
-Move SQLite-backed remote session state into an internal persistence module and make terminal tombstone loading enforce the same row-key versus payload-session invariant already used for active resumable rows. This is architectural because it gives session storage one owning boundary and tightens the recovery/admin diagnostic trust boundary without changing hosted MCP wire APIs.
+Introduce an internal hosted-session header admission boundary with explicit missing, invalid, and valid states for `MCP-Session-Id`. Established-session `POST`, `GET`, and `DELETE` requests should require a non-empty canonical header value before session lookup, while initialize requests should reject any present session header regardless of its value. This is architectural because it turns a public wire-protocol invariant into a typed boundary at the Axum edge without changing the public `serve_http` API or the generated session identifier format.

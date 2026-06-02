@@ -318,12 +318,12 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     }
 
     let session = {
-        let Some(session_id) = session_id_from_headers(&headers) else {
-            return jsonrpc_http_error(
-                StatusCode::BAD_REQUEST,
-                -32600,
-                "request requires MCP-Session-Id",
-            );
+        let session_id = match jsonrpc_session_id_from_headers(
+            &headers,
+            "request requires MCP-Session-Id",
+        ) {
+            Ok(session_id) => session_id,
+            Err(response) => return response,
         };
         let Some(entry) = resolve_session_entry(&state, &session_id).await else {
             return plain_http_error(StatusCode::NOT_FOUND, "unknown MCP session");
@@ -458,7 +458,7 @@ async fn handle_initialize_post(
     headers: &HeaderMap,
     message: Value,
 ) -> Response {
-    if session_id_from_headers(headers).is_some() {
+    if mcp_session_id_header(headers) != McpSessionIdHeader::Missing {
         return jsonrpc_http_error(
             StatusCode::BAD_REQUEST,
             -32600,
@@ -650,12 +650,12 @@ async fn handle_get(State(state): State<RemoteAppState>, request: Request) -> Re
         return response;
     }
 
-    let Some(session_id) = session_id_from_headers(request.headers()) else {
-        return jsonrpc_http_error(
-            StatusCode::BAD_REQUEST,
-            -32600,
-            "GET stream requires MCP-Session-Id",
-        );
+    let session_id = match jsonrpc_session_id_from_headers(
+        request.headers(),
+        "GET stream requires MCP-Session-Id",
+    ) {
+        Ok(session_id) => session_id,
+        Err(response) => return response,
     };
     let session = {
         let Some(entry) = resolve_session_entry(&state, &session_id).await else {
@@ -888,8 +888,10 @@ async fn handle_delete(State(state): State<RemoteAppState>, request: Request) ->
         Err(response) => return response,
     };
 
-    let Some(session_id) = session_id_from_headers(request.headers()) else {
-        return plain_http_error(StatusCode::BAD_REQUEST, "missing MCP-Session-Id");
+    let session_id =
+        match plain_session_id_from_headers(request.headers(), "missing MCP-Session-Id") {
+        Ok(session_id) => session_id,
+        Err(response) => return response,
     };
     let Some(entry) = resolve_session_entry(&state, &session_id).await else {
         return plain_http_error(StatusCode::NOT_FOUND, "unknown MCP session");
@@ -1174,11 +1176,58 @@ fn should_emit_post_stream_event(
     }
 }
 
-fn session_id_from_headers(headers: &HeaderMap) -> Option<String> {
-    headers
-        .get(HeaderName::from_static(MCP_SESSION_ID_HEADER))
-        .and_then(|value| value.to_str().ok())
-        .map(ToOwned::to_owned)
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum McpSessionIdHeader {
+    Missing,
+    Invalid,
+    Valid(String),
+}
+
+fn mcp_session_id_header(headers: &HeaderMap) -> McpSessionIdHeader {
+    let Some(value) = headers.get(HeaderName::from_static(MCP_SESSION_ID_HEADER)) else {
+        return McpSessionIdHeader::Missing;
+    };
+    let Ok(session_id) = value.to_str() else {
+        return McpSessionIdHeader::Invalid;
+    };
+    if session_id.is_empty() || session_id.trim() != session_id {
+        return McpSessionIdHeader::Invalid;
+    }
+    McpSessionIdHeader::Valid(session_id.to_owned())
+}
+
+fn jsonrpc_session_id_from_headers(
+    headers: &HeaderMap,
+    missing_message: &str,
+) -> Result<String, Response> {
+    match mcp_session_id_header(headers) {
+        McpSessionIdHeader::Valid(session_id) => Ok(session_id),
+        McpSessionIdHeader::Missing => Err(jsonrpc_http_error(
+            StatusCode::BAD_REQUEST,
+            -32600,
+            missing_message,
+        )),
+        McpSessionIdHeader::Invalid => Err(jsonrpc_http_error(
+            StatusCode::BAD_REQUEST,
+            -32600,
+            "invalid MCP-Session-Id",
+        )),
+    }
+}
+
+fn plain_session_id_from_headers(
+    headers: &HeaderMap,
+    missing_message: &str,
+) -> Result<String, Response> {
+    match mcp_session_id_header(headers) {
+        McpSessionIdHeader::Valid(session_id) => Ok(session_id),
+        McpSessionIdHeader::Missing => {
+            Err(plain_http_error(StatusCode::BAD_REQUEST, missing_message))
+        }
+        McpSessionIdHeader::Invalid => {
+            Err(plain_http_error(StatusCode::BAD_REQUEST, "invalid MCP-Session-Id"))
+        }
+    }
 }
 
 async fn resolve_session_entry(
