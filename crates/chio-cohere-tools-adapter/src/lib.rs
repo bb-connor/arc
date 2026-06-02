@@ -121,6 +121,12 @@ impl CohereAdapter {
                 self.config.api_version
             )));
         }
+        if self.transport.api_version() != COHERE_API_VERSION {
+            return Err(ProviderError::Malformed(format!(
+                "Cohere adapter supports only API version {COHERE_API_VERSION}; transport advertised {}",
+                self.transport.api_version()
+            )));
+        }
         Ok(())
     }
 
@@ -412,7 +418,36 @@ fn non_empty_str<'a>(value: &'a str, field: &str) -> Result<&'a str, ProviderErr
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
     use serde_json::json;
+
+    struct DriftedTransport {
+        called: Arc<AtomicBool>,
+    }
+
+    impl DriftedTransport {
+        fn new(called: Arc<AtomicBool>) -> Self {
+            Self { called }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl transport::Transport for DriftedTransport {
+        fn api_version(&self) -> &str {
+            "2024-12"
+        }
+
+        async fn send_chat(&self, _body: &[u8]) -> Result<ProviderRequest, ProviderError> {
+            self.called.store(true, Ordering::SeqCst);
+            Ok(raw_payload(tool_call_payload()))
+        }
+
+        async fn send_chat_stream(&self, _body: &[u8]) -> Result<Vec<u8>, ProviderError> {
+            self.called.store(true, Ordering::SeqCst);
+            Ok(b"event: tool-call-end\ndata: {\"tool_call\":{\"id\":\"call_api_pin\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"Paris\\\"}\"}}}\n\n".to_vec())
+        }
+    }
 
     fn config() -> CohereAdapterConfig {
         CohereAdapterConfig::new(
@@ -456,7 +491,7 @@ mod tests {
         match error {
             ProviderError::Malformed(message) => {
                 assert!(message.contains("Cohere adapter supports only API version 2025-04"));
-                assert!(message.contains("configured 2024-12"));
+                assert!(message.contains("2024-12"));
             }
             other => panic!("expected Malformed API version drift, got {other:?}"),
         }
@@ -517,6 +552,41 @@ mod tests {
 
         assert_api_version_drift(err);
         assert!(mock.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn chat_rejects_transport_api_version_drift_before_send() {
+        let called = Arc::new(AtomicBool::new(false));
+        let transport = Arc::new(DriftedTransport::new(called.clone()));
+        let adapter = CohereAdapter::new(config(), transport);
+
+        let err = adapter
+            .chat(b"{\"model\":\"command-r\",\"messages\":[],\"tools\":[]}")
+            .await
+            .expect_err("drifted Cohere transport API version must fail before send");
+
+        assert_api_version_drift(err);
+        assert!(!called.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn chat_stream_rejects_transport_api_version_drift_before_send() {
+        let called = Arc::new(AtomicBool::new(false));
+        let transport = Arc::new(DriftedTransport::new(called.clone()));
+        let adapter = CohereAdapter::new(config(), transport);
+
+        let err = adapter
+            .chat_stream(b"{\"stream\":true}", |_invocation| {
+                Ok(VerdictResult::Allow {
+                    redactions: vec![],
+                    receipt_id: chio_tool_call_fabric::ReceiptId("rcpt_pin".to_string()),
+                })
+            })
+            .await
+            .expect_err("drifted Cohere transport API version must fail before stream send");
+
+        assert_api_version_drift(err);
+        assert!(!called.load(Ordering::SeqCst));
     }
 
     #[test]
