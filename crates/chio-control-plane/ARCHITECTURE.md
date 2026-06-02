@@ -73,16 +73,19 @@ endpoint list for valid clients.
 ### Current Boundary
 
 `TrustServiceConfig::validate` is called before `serve_async` binds the
-trust-control service and before cluster state is built. Remote and cluster
-client construction separately validates control tokens before bearer headers
-or cluster peer signatures are created.
+trust-control service and before cluster state is built. It owns service-token
+and tenant read-token config validation. Remote and cluster client construction
+separately validates control tokens before bearer headers or cluster peer
+signatures are created.
 
 ### Pain Point
 
 The client boundary rejects blank or padded control tokens, but service startup
-only rejects tokens that become empty after trimming. A padded service token can
-therefore start the authority service and later fail when the same token is
-used to build remote or cluster clients.
+only rejected secrets that become empty after trimming. A padded service token
+could therefore start the authority service and later fail when the same token
+is used to build remote or cluster clients. A padded tenant read token could
+also start the service and then require whitespace-bearing bearer material at
+read time.
 
 ### Security And API Constraints
 
@@ -104,5 +107,5 @@ start.
 ### Completed Material Improvement
 
 Use a shared internal secret validator for service startup and client
-construction. Add a startup-config regression proving padded `service_token`
-values fail closed at `TrustServiceConfig::validate`.
+construction. Add startup-config regressions proving padded `service_token` and
+tenant read-token values fail closed at `TrustServiceConfig::validate`.
