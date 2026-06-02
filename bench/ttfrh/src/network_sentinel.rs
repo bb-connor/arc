@@ -181,11 +181,21 @@ fn strip_toml_comments(manifest: &str) -> String {
                 }
             }
             TomlStringMode::MultilineBasic { escaped } => {
-                if !escaped && rest.starts_with(BASIC_MULTILINE_DELIMITER) {
-                    stripped.push_str(BASIC_MULTILINE_DELIMITER);
-                    index += BASIC_MULTILINE_DELIMITER.len();
-                    mode = TomlStringMode::Bare;
-                    continue;
+                if !escaped {
+                    match multiline_quote_prefix(rest, '"') {
+                        MultilineQuotePrefix::ClosingDelimiter => {
+                            stripped.push_str(BASIC_MULTILINE_DELIMITER);
+                            index += BASIC_MULTILINE_DELIMITER.len();
+                            mode = TomlStringMode::Bare;
+                            continue;
+                        }
+                        MultilineQuotePrefix::ContentQuotes(count) => {
+                            stripped.extend(std::iter::repeat_n('"', count));
+                            index += count;
+                            continue;
+                        }
+                        MultilineQuotePrefix::None => {}
+                    }
                 }
                 let Some((ch, width)) = next_toml_char(rest) else {
                     break;
@@ -201,11 +211,19 @@ fn strip_toml_comments(manifest: &str) -> String {
                 };
             }
             TomlStringMode::MultilineLiteral => {
-                if rest.starts_with(LITERAL_MULTILINE_DELIMITER) {
-                    stripped.push_str(LITERAL_MULTILINE_DELIMITER);
-                    index += LITERAL_MULTILINE_DELIMITER.len();
-                    mode = TomlStringMode::Bare;
-                    continue;
+                match multiline_quote_prefix(rest, '\'') {
+                    MultilineQuotePrefix::ClosingDelimiter => {
+                        stripped.push_str(LITERAL_MULTILINE_DELIMITER);
+                        index += LITERAL_MULTILINE_DELIMITER.len();
+                        mode = TomlStringMode::Bare;
+                        continue;
+                    }
+                    MultilineQuotePrefix::ContentQuotes(count) => {
+                        stripped.extend(std::iter::repeat_n('\'', count));
+                        index += count;
+                        continue;
+                    }
+                    MultilineQuotePrefix::None => {}
                 }
                 let Some((ch, width)) = next_toml_char(rest) else {
                     break;
@@ -217,6 +235,23 @@ fn strip_toml_comments(manifest: &str) -> String {
     }
 
     stripped
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MultilineQuotePrefix {
+    None,
+    ContentQuotes(usize),
+    ClosingDelimiter,
+}
+
+fn multiline_quote_prefix(rest: &str, quote: char) -> MultilineQuotePrefix {
+    let quote_count = rest.chars().take_while(|ch| *ch == quote).count();
+    match quote_count {
+        0..=2 => MultilineQuotePrefix::None,
+        3 => MultilineQuotePrefix::ClosingDelimiter,
+        4 | 5 => MultilineQuotePrefix::ContentQuotes(quote_count - 3),
+        _ => MultilineQuotePrefix::ClosingDelimiter,
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -472,6 +507,34 @@ hosts = []
 
         assert!(stripped.contains("basic # not a comment"));
         assert!(stripped.contains("literal # not a comment"));
+        assert!(!stripped.contains("# real comment"));
+    }
+
+    #[test]
+    fn comment_stripping_handles_basic_quote_next_to_multiline_delimiter() {
+        let manifest = concat!(
+            "quote = \"\"\"\"quoted # not a comment\"\"\"\" # trailing comment\n",
+            "# real comment\n",
+        );
+
+        let stripped = strip_toml_comments(manifest);
+
+        assert!(stripped.contains("quoted # not a comment"));
+        assert!(!stripped.contains("# trailing comment"));
+        assert!(!stripped.contains("# real comment"));
+    }
+
+    #[test]
+    fn comment_stripping_handles_literal_quote_next_to_multiline_delimiter() {
+        let manifest = concat!(
+            "quote = ''''quoted # not a comment'''' # trailing comment\n",
+            "# real comment\n",
+        );
+
+        let stripped = strip_toml_comments(manifest);
+
+        assert!(stripped.contains("quoted # not a comment"));
+        assert!(!stripped.contains("# trailing comment"));
         assert!(!stripped.contains("# real comment"));
     }
 
