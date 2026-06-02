@@ -5,9 +5,12 @@
 //! marketplace prices from it. It defines appraisal descriptors and an
 //! artifact inventory, the attestation-verifier family taxonomy, and the
 //! deterministic marketplace invocation-pricing model
-//! (`compute_marketplace_invocation_price`, base prices, reputation tiers, and
-//! tier discounts). The underwriting, credit, and market crates build on these
-//! types.
+//! (`compute_checked_marketplace_invocation_price`,
+//! `compute_marketplace_invocation_price`, base prices, reputation tiers, and
+//! tier discounts). Settlement-facing callers should use the checked pricing
+//! boundary; the unchecked compute helper remains for compatibility with
+//! callers that already validate their inputs. The underwriting, credit, and
+//! market crates build on these types.
 //!
 //! # Modules
 //!
@@ -21,8 +24,9 @@ pub use chio_core_types::{canonical, capability, crypto, error, receipt, Error};
 pub mod marketplace_pricing;
 
 pub use marketplace_pricing::{
-    compute_marketplace_invocation_price, MarketplaceBasePrice, MarketplaceInvocationPrice,
-    MarketplacePricingContext, MarketplaceReputationTier, TIER_DISCOUNT_PER_HUNDRED,
+    compute_checked_marketplace_invocation_price, compute_marketplace_invocation_price,
+    MarketplaceBasePrice, MarketplaceInvocationPrice, MarketplacePricingContext,
+    MarketplacePricingError, MarketplaceReputationTier, TIER_DISCOUNT_PER_HUNDRED,
 };
 
 pub use chio_core_types::runtime_attestation::AttestationVerifierFamily;

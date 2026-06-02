@@ -15,6 +15,21 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Errors raised by checked marketplace pricing boundaries.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum MarketplacePricingError {
+    /// Tenant id is required so downstream audit records can bind a
+    /// computed price to the party whose tier was applied.
+    #[error("marketplace pricing tenant_id must be non-empty")]
+    EmptyTenantId,
+    /// Marketplace prices use ISO-style uppercase three-letter currency
+    /// codes at this boundary.
+    #[error(
+        "marketplace pricing currency `{currency}` must be a three-letter uppercase ISO 4217 code"
+    )]
+    InvalidCurrency { currency: String },
+}
+
 /// Tenant-side reputation tier visible to the pricing helper. Mirrors
 /// the four-tier shape of `chio_reputation::ReputationTier` without
 /// pulling in the dependency: callers convert their concrete tier into
@@ -55,6 +70,24 @@ impl MarketplacePricingContext {
             reputation_tier,
         }
     }
+
+    /// Build and validate a pricing context for fail-closed callers.
+    pub fn try_new(
+        tenant_id: impl Into<String>,
+        reputation_tier: MarketplaceReputationTier,
+    ) -> Result<Self, MarketplacePricingError> {
+        let context = Self::new(tenant_id, reputation_tier);
+        context.validate()?;
+        Ok(context)
+    }
+
+    /// Validate fields required by settlement-grade pricing consumers.
+    pub fn validate(&self) -> Result<(), MarketplacePricingError> {
+        if self.tenant_id.trim().is_empty() {
+            return Err(MarketplacePricingError::EmptyTenantId);
+        }
+        Ok(())
+    }
 }
 
 /// Manifest base price input mirror. Mirrors
@@ -76,6 +109,21 @@ impl MarketplaceBasePrice {
             units,
             currency: currency.into(),
         }
+    }
+
+    /// Build and validate a base price for fail-closed callers.
+    pub fn try_new(
+        units: u64,
+        currency: impl Into<String>,
+    ) -> Result<Self, MarketplacePricingError> {
+        let base = Self::new(units, currency);
+        base.validate()?;
+        Ok(base)
+    }
+
+    /// Validate fields required by settlement-grade pricing consumers.
+    pub fn validate(&self) -> Result<(), MarketplacePricingError> {
+        validate_currency_code(&self.currency)
     }
 }
 
@@ -107,6 +155,10 @@ pub const TIER_DISCOUNT_PER_HUNDRED: [u32; 4] = [0, 5, 10, 20];
 /// Compute the per-invocation price for a guard manifest under a
 /// given tenant pricing context.
 ///
+/// This compatibility function assumes its inputs were already
+/// validated by the caller. New marketplace catalog and settlement
+/// consumers should prefer [`compute_checked_marketplace_invocation_price`].
+///
 /// The helper is deterministic in `(base, ctx)`: equal inputs produce
 /// equal outputs. Zero-priced manifests stay zero-priced regardless of
 /// tier (free-tier guards are pinned at zero). The
@@ -135,11 +187,31 @@ pub fn compute_marketplace_invocation_price(
     }
 }
 
+/// Validate inputs and compute the per-invocation price for
+/// settlement-facing marketplace consumers.
+pub fn compute_checked_marketplace_invocation_price(
+    base: &MarketplaceBasePrice,
+    ctx: &MarketplacePricingContext,
+) -> Result<MarketplaceInvocationPrice, MarketplacePricingError> {
+    base.validate()?;
+    ctx.validate()?;
+    Ok(compute_marketplace_invocation_price(base, ctx))
+}
+
 fn discount_for_reputation_tier(tier: MarketplaceReputationTier) -> u32 {
     TIER_DISCOUNT_PER_HUNDRED
         .get(tier as usize)
         .copied()
         .unwrap_or(0)
+}
+
+fn validate_currency_code(currency: &str) -> Result<(), MarketplacePricingError> {
+    if currency.len() == 3 && currency.bytes().all(|byte| byte.is_ascii_uppercase()) {
+        return Ok(());
+    }
+    Err(MarketplacePricingError::InvalidCurrency {
+        currency: currency.to_string(),
+    })
 }
 
 #[cfg(test)]
@@ -233,5 +305,44 @@ mod tests {
         let priced = compute_marketplace_invocation_price(&base, &ctx);
         // 80% of u64::MAX fits inside u64.
         assert!(priced.units > 0);
+    }
+
+    #[test]
+    fn checked_pricing_accepts_canonical_currency_and_tenant() {
+        let base = MarketplaceBasePrice::try_new(1_000, "USD")
+            .unwrap_or_else(|error| panic!("base should validate: {error}"));
+        let ctx = MarketplacePricingContext::try_new("tenant-a", MarketplaceReputationTier::Tier1)
+            .unwrap_or_else(|error| panic!("context should validate: {error}"));
+        let priced = compute_checked_marketplace_invocation_price(&base, &ctx)
+            .unwrap_or_else(|error| panic!("pricing should validate: {error}"));
+        assert_eq!(priced.units, 950);
+        assert_eq!(priced.currency, "USD");
+    }
+
+    #[test]
+    fn checked_pricing_rejects_non_canonical_currency_codes() {
+        for currency in ["", "usd", " USD", "US", "US1", "USDD"] {
+            let base = MarketplaceBasePrice::new(1_000, currency);
+            let ctx = MarketplacePricingContext::new("tenant-a", MarketplaceReputationTier::Tier1);
+            let error = compute_checked_marketplace_invocation_price(&base, &ctx)
+                .err()
+                .unwrap_or_else(|| panic!("currency `{currency}` should be rejected"));
+            assert_eq!(
+                error,
+                MarketplacePricingError::InvalidCurrency {
+                    currency: currency.to_string()
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn checked_pricing_rejects_empty_tenant_id() {
+        let base = MarketplaceBasePrice::new(1_000, "USD");
+        let ctx = MarketplacePricingContext::new("  ", MarketplaceReputationTier::Tier1);
+        let error = compute_checked_marketplace_invocation_price(&base, &ctx)
+            .err()
+            .unwrap_or_else(|| panic!("empty tenant should be rejected"));
+        assert_eq!(error, MarketplacePricingError::EmptyTenantId);
     }
 }
