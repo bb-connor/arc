@@ -42,6 +42,8 @@ The crate ships with the same fixture tree it exercises in CI. The Cargo
 - `tests/conformance/scenarios/**` - JSON scenario descriptors covering
   `mcp_core`, `auth`, `tasks`, `nested_callbacks`, `notifications`, and
   `chio-extensions`.
+- `tests/conformance/fixtures/mcp_core/**` - the default MCP policy and
+  mock upstream server used by `default_run_options()`.
 - `tests/conformance/peers/python/**` - reference Python peer (server and
   client) used by the `--peer python` mode.
 - `tests/conformance/peers/js/**` - reference Node.js peer used by the
@@ -70,9 +72,11 @@ C++ P0 scenario coverage (`mcp_core` and `auth`) is covered by the
 
 - `in-repo-fixtures` (default): keep the historical Chio repository layout
   for resolving fixture and scenario paths through `default_repo_root()`
-  and `default_run_options()`. Disable via `--no-default-features` when
-  driving the runner with explicit absolute paths through
-  `ConformanceRunOptions`.
+  and `default_run_options()`. When the crate is consumed from a package
+  without the monorepo root, the same defaults fall back to the bundled
+  crate-local `tests/conformance/` tree. Disable via
+  `--no-default-features` when driving the runner with explicit absolute
+  paths through `ConformanceRunOptions`.
 
 ## Library entry points
 

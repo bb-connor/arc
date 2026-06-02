@@ -83,6 +83,33 @@ assert_rc "$(run_checker "$unknown/Cargo.toml" "$work/unknown.out" "$work/unknow
   "unknown public entrypoint fails"
 grep -F "references unknown crates: chio-missing" "$work/unknown.err" >/dev/null
 
+unlisted_publishable="$work/unlisted-publishable"
+write_workspace "$unlisted_publishable" '    "chio-cli",' '    "chio-core",'
+write_member "$unlisted_publishable/crates/chio-leaky" "chio-leaky"
+python3 - "$unlisted_publishable/Cargo.toml" "$unlisted_publishable/crates/chio-leaky/Cargo.toml" <<'PY'
+from pathlib import Path
+import sys
+
+workspace = Path(sys.argv[1])
+workspace.write_text(
+    workspace.read_text(encoding="utf-8").replace(
+        '    "crates/chio-core",\n]',
+        '    "crates/chio-core",\n    "crates/chio-leaky",\n]',
+    ),
+    encoding="utf-8",
+)
+
+manifest = Path(sys.argv[2])
+manifest.write_text(
+    manifest.read_text(encoding="utf-8").replace("publish = false\n", ""),
+    encoding="utf-8",
+)
+PY
+assert_rc "$(run_checker "$unlisted_publishable/Cargo.toml" "$work/unlisted-publishable.out" "$work/unlisted-publishable.err")" 1 \
+  "unlisted publishable crate fails"
+grep -F "crates/chio-leaky/Cargo.toml must set publish = false or be listed in workspace.metadata.chio.rust_registry_public_crates." \
+  "$work/unlisted-publishable.err" >/dev/null
+
 missing_readme="$work/missing-readme"
 write_workspace "$missing_readme" '    "chio-cli",' '    "chio-core",'
 rm "$missing_readme/crates/chio-core/README.md"
