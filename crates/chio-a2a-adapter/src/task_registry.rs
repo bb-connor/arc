@@ -48,6 +48,15 @@ struct A2aTaskRecordContext<'a> {
     partner: &'a str,
 }
 
+struct A2aTaskFollowUpContext<'a> {
+    operation: &'a str,
+    tool_name: &'a str,
+    server_id: &'a str,
+    selected_interface: &'a A2aAgentInterface,
+    selected_binding: &'a A2aProtocolBinding,
+    partner: &'a str,
+}
+
 #[derive(Debug, Clone)]
 struct A2aTaskObservation {
     task_id: String,
@@ -135,12 +144,9 @@ impl A2aTaskRegistry {
     fn validate_follow_up(
         &self,
         task_id: &str,
-        tool_name: &str,
-        server_id: &str,
-        selected_interface: &A2aAgentInterface,
-        selected_binding: &A2aProtocolBinding,
-        operation: &str,
+        context: &A2aTaskFollowUpContext<'_>,
     ) -> Result<(), AdapterError> {
+        let operation = context.operation;
         let _guard = self
             .lock
             .lock()
@@ -152,36 +158,49 @@ impl A2aTaskRegistry {
                 self.path.display()
             )));
         };
-        if record.tool_name != tool_name {
+        if record.tool_name != context.tool_name {
             return Err(AdapterError::Lifecycle(format!(
                 "{operation} attempted to use task `{task_id}` from tool `{}` through `{tool_name}`",
-                record.tool_name
+                record.tool_name,
+                tool_name = context.tool_name
             )));
         }
-        if record.server_id != server_id {
+        if record.server_id != context.server_id {
             return Err(AdapterError::Lifecycle(format!(
                 "{operation} attempted to use task `{task_id}` from server `{}` through `{server_id}`",
-                record.server_id
+                record.server_id,
+                server_id = context.server_id
             )));
         }
-        if record.interface_url != selected_interface.url {
+        if record.interface_url != context.selected_interface.url {
             return Err(AdapterError::Lifecycle(format!(
                 "{operation} attempted to use task `{task_id}` against interface `{}` instead of `{}`",
-                selected_interface.url, record.interface_url
+                context.selected_interface.url, record.interface_url
             )));
         }
-        if record.protocol_binding != binding_label(selected_binding) {
+        if record.protocol_binding != binding_label(context.selected_binding) {
             return Err(AdapterError::Lifecycle(format!(
                 "{operation} attempted to use task `{task_id}` over binding `{}` instead of `{}`",
-                binding_label(selected_binding),
+                binding_label(context.selected_binding),
                 record.protocol_binding
             )));
         }
-        if record.tenant.as_deref() != selected_interface.tenant.as_deref() {
+        if record.tenant.as_deref() != context.selected_interface.tenant.as_deref() {
             return Err(AdapterError::Lifecycle(format!(
                 "{operation} attempted to use task `{task_id}` with tenant `{}` instead of `{}`",
-                selected_interface.tenant.as_deref().unwrap_or("none"),
+                context
+                    .selected_interface
+                    .tenant
+                    .as_deref()
+                    .unwrap_or("none"),
                 record.tenant.as_deref().unwrap_or("none")
+            )));
+        }
+        if record.partner != context.partner {
+            return Err(AdapterError::Lifecycle(format!(
+                "{operation} attempted to use task `{task_id}` from partner `{}` through `{partner}`",
+                record.partner,
+                partner = context.partner
             )));
         }
         Ok(())

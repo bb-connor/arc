@@ -181,15 +181,61 @@ current invocation fail-closed.
 
 ### Pain Point
 
-The observation validators reject all-whitespace task ids, but they do not make
-the durable registry key canonical. A remote A2A server can return a padded task
-id that passes validation and persists as a padded key. A later normal follow-up
-for the same logical id then misses the registry entry and fails for the wrong
-reason.
+The observation validators reject all-whitespace task ids, but task ids are
+provider-controlled protocol values. Normalizing them at persistence time can
+collapse two distinct provider-observed task authorities into one local durable
+key. Follow-up lookup must therefore use the exact observed id, including
+whitespace, after validation has proved the id is non-empty.
 
 ### Completed Material Improvement
 
-Normalize task ids with `trim()` at the registry observation boundary before the
-id becomes a durable key or stored record value. This keeps padded remote ids
-from fragmenting follow-up authority while preserving the existing fail-closed
-behavior for empty or malformed observations.
+Preserve observed task ids exactly at the registry observation boundary while
+continuing to reject empty or malformed observations. This keeps durable
+follow-up authority keyed to the precise provider value and prevents unrelated
+task ids from being collapsed by local canonicalization.
+
+## Follow-up Partner Binding Slice
+
+### Current Boundary
+
+- `task_registry.rs` stores the partner label with each task observation and
+  rejects partner changes when the same task id is re-observed.
+- `invoke.rs` computes the partner label from the configured partner policy,
+  falling back to the Agent Card host when no explicit partner id is present.
+- `A2aTaskRegistry::validate_follow_up` is the durable gate for later
+  `GetTask`, `SubscribeToTask`, `CancelTask`, and push-notification operations.
+
+### Pain Point
+
+The registry already treats partner as part of the recorded task binding, but
+follow-up validation currently omits partner comparison. Two adapter instances
+that share a task registry, selected tool, server id, interface, binding, and
+tenant can therefore validate follow-up authority for the same task even if
+their configured partner identities differ.
+
+### Security And API Constraints
+
+- Preserve public API compatibility. This slice must keep the partner binding
+  internal to adapter and registry internals.
+- Preserve exact task-id lookup and all existing tool, server, interface,
+  binding, and tenant checks.
+- Do not persist request credentials or include auth material in errors.
+- Keep follow-up operations fail-closed when partner identity does not match the
+  recorded task authority.
+
+### Affected Dependents
+
+- `chio-kernel` still sees the denial as a tool-server lifecycle failure through
+  the existing `ToolServerConnection` path.
+- `chio-a2a-edge` and conformance surfaces should not need public schema
+  changes because partner comparison stays internal to this crate.
+- Existing registry tests need only pass the same partner label they already
+  record.
+
+### Completed Material Improvement
+
+Pass the resolved partner label into durable follow-up validation and reject
+task operations whose partner differs from the recorded task authority. Prove
+the boundary with an adapter-level restart-style test that records a task under
+one partner and denies follow-up through another partner using the same durable
+registry.

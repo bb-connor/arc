@@ -728,6 +728,87 @@ mod tests {
         server.join();
     }
 
+    #[tokio::test]
+    async fn task_registry_rejects_follow_up_from_different_partner() {
+        let registry_path = unique_path("chio-a2a-task-registry-partner", ".json");
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_task_follow_up() else {
+            return;
+        };
+        let manifest_key = Keypair::generate();
+        let adapter = A2aAdapter::discover(
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
+                .with_partner_policy(A2aPartnerPolicy::new("partner-alpha"))
+                .with_task_registry_file(&registry_path)
+                .with_timeout(Duration::from_secs(2)),
+        )
+        .expect("discover adapter");
+
+        adapter
+            .invoke(
+                "research",
+                json!({
+                    "message": "Begin partner-bound research task",
+                    "return_immediately": true
+                }),
+                None,
+            )
+            .await
+            .expect("initial invoke");
+
+        let adapter_for_other_partner = A2aAdapter {
+            manifest: adapter.manifest.clone(),
+            agent_card: adapter.agent_card.clone(),
+            agent_card_url: adapter.agent_card_url.clone(),
+            selected_interface: adapter.selected_interface.clone(),
+            selected_binding: adapter.selected_binding,
+            configured_headers: adapter.configured_headers.clone(),
+            configured_query_params: adapter.configured_query_params.clone(),
+            configured_cookies: adapter.configured_cookies.clone(),
+            oauth_client_credentials: adapter.oauth_client_credentials.clone(),
+            oauth_scopes: adapter.oauth_scopes.clone(),
+            oauth_token_endpoint_override: adapter.oauth_token_endpoint_override.clone(),
+            transport_config: adapter.transport_config.clone(),
+            token_cache: Mutex::new(Vec::new()),
+            timeout: adapter.timeout,
+            request_counter: AtomicU64::new(0),
+            partner_policy: Some(A2aPartnerPolicy::new("partner-beta")),
+            task_registry: Some(A2aTaskRegistry::open(&registry_path).expect("reopen registry")),
+        };
+        let error = adapter_for_other_partner
+            .invoke(
+                "research",
+                json!({
+                    "get_task": {
+                        "id": "task-1"
+                    }
+                }),
+                None,
+            )
+            .await
+            .expect_err("partner mismatch must fail closed before remote follow-up");
+
+        let agent_card_url = format!("{}/.well-known/agent-card.json", server.base_url());
+        let _ = ureq::get(&agent_card_url).call().expect("unblock fake server");
+        assert!(
+            error.to_string().contains("partner `partner-alpha`"),
+            "unexpected partner-mismatch error: {error}"
+        );
+        let requests = server.requests();
+        assert_eq!(
+            requests.len(),
+            3,
+            "mismatched partner must not dispatch a follow-up request"
+        );
+        assert!(
+            requests[2].starts_with("GET /.well-known/agent-card.json"),
+            "third request should only unblock the fake server, got: {}",
+            requests[2].lines().next().unwrap_or_default()
+        );
+
+        let _ = fs::remove_file(registry_path);
+        server.join();
+    }
+
     #[test]
     fn task_registry_rejects_conflicting_reobserved_task_binding() {
         let registry_path = unique_path("chio-a2a-task-registry-conflict", ".json");
@@ -885,15 +966,16 @@ mod tests {
         assert_eq!(record.task_id, " task-1 ");
         assert_eq!(record.last_state.as_deref(), Some("TASK_STATE_WORKING"));
         assert!(reloaded.tasks.contains_key("\ttask-1\n"));
+        let follow_up_context = A2aTaskFollowUpContext {
+            operation: "get_task.id",
+            tool_name: "research",
+            server_id: "srv-a2a",
+            selected_interface: &selected_interface,
+            selected_binding: &selected_binding,
+            partner: "partner-alpha",
+        };
         registry
-            .validate_follow_up(
-                " task-1 ",
-                "research",
-                "srv-a2a",
-                &selected_interface,
-                &selected_binding,
-                "get_task.id",
-            )
+            .validate_follow_up(" task-1 ", &follow_up_context)
             .expect("exact follow-up id should match exact observation");
 
         let _ = fs::remove_file(registry_path);

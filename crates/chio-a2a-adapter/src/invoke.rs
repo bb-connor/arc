@@ -144,14 +144,16 @@ impl A2aAdapter {
                 "{operation} requires an A2A task registry before task `{task_id}` can be used by tool `{tool_name}`"
             )));
         };
-        registry.validate_follow_up(
-            task_id,
-            tool_name,
-            self.server_id(),
-            &self.selected_interface,
-            &self.selected_binding,
+        let partner = self.partner_label();
+        let context = A2aTaskFollowUpContext {
             operation,
-        )
+            tool_name,
+            server_id: self.server_id(),
+            selected_interface: &self.selected_interface,
+            selected_binding: &self.selected_binding,
+            partner: partner.as_str(),
+        };
+        registry.validate_follow_up(task_id, &context)
     }
 
     fn record_task_activity(
