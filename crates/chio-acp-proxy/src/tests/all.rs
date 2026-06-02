@@ -3837,6 +3837,177 @@ mod attestation_and_telemetry_tests {
     }
 
     #[test]
+    fn interceptor_blocked_request_preserves_unrelated_capability_contexts() {
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let checker = SequencedChecker::new(
+            Arc::clone(&requests),
+            vec![
+                AcpVerdict {
+                    allowed: true,
+                    capability_id: Some("cap-live".to_string()),
+                    receipt_id: Some("auth-live".to_string()),
+                    receipt_request_id: Some("req-live".to_string()),
+                    reason: "live allow".to_string(),
+                },
+                AcpVerdict {
+                    allowed: true,
+                    capability_id: Some("cap-pending".to_string()),
+                    receipt_id: Some("auth-pending".to_string()),
+                    receipt_request_id: Some("req-pending".to_string()),
+                    reason: "pending allow".to_string(),
+                },
+                AcpVerdict {
+                    allowed: true,
+                    capability_id: Some("cap-blocked".to_string()),
+                    receipt_id: Some("auth-blocked".to_string()),
+                    receipt_request_id: Some("req-blocked".to_string()),
+                    reason: "checker allowed but built-in guard will block".to_string(),
+                },
+            ],
+        );
+        let config = AcpProxyConfig::new("echo", "deadbeef")
+            .with_allowed_path_prefix("/home/user/project")
+            .with_allowed_command("cargo")
+            .with_server_id("proxy-server");
+        let interceptor = MessageInterceptor::with_kernel(
+            config,
+            None,
+            Some(Box::new(checker)),
+            AcpAttestationMode::BestEffort,
+        );
+
+        let live_read = json!({
+            "jsonrpc": "2.0",
+            "id": 610,
+            "method": "fs/read_text_file",
+            "params": {
+                "sessionId": "session-preserve-context",
+                "toolCallId": "tool-live-preserve",
+                "path": "/home/user/project/src/live.rs",
+                "capabilityToken": "token-live"
+            }
+        });
+        match interceptor
+            .intercept(Direction::AgentToClient, &live_read)
+            .expect("live read should forward after capability and path checks")
+        {
+            InterceptResult::Forward(_) => {}
+            other => panic!("expected Forward, got {:?}", other),
+        }
+        assert_eq!(
+            interceptor.live_capability_context_count_for_session("session-preserve-context"),
+            1,
+            "explicit toolCallId should create one live capability context"
+        );
+
+        let pending_read = json!({
+            "jsonrpc": "2.0",
+            "id": 611,
+            "method": "fs/read_text_file",
+            "params": {
+                "sessionId": "session-preserve-context",
+                "path": "/home/user/project/src/pending.rs",
+                "capabilityToken": "token-pending"
+            }
+        });
+        match interceptor
+            .intercept(Direction::AgentToClient, &pending_read)
+            .expect("toolCallId-less read should forward and buffer pending context")
+        {
+            InterceptResult::Forward(_) => {}
+            other => panic!("expected Forward, got {:?}", other),
+        }
+        assert_eq!(
+            interceptor.pending_capability_context_count("session-preserve-context"),
+            1,
+            "toolCallId-less read should create one pending capability context"
+        );
+
+        let blocked_read = json!({
+            "jsonrpc": "2.0",
+            "id": 612,
+            "method": "fs/read_text_file",
+            "params": {
+                "sessionId": "session-preserve-context",
+                "path": "/tmp/out-of-scope.rs",
+                "capabilityToken": "token-blocked"
+            }
+        });
+        match interceptor
+            .intercept(Direction::AgentToClient, &blocked_read)
+            .expect("built-in guard denial should return a block response")
+        {
+            InterceptResult::Block(value) => {
+                assert_eq!(value["error"]["code"], ACP_ERROR_ACCESS_DENIED);
+            }
+            other => panic!("expected Block, got {:?}", other),
+        }
+
+        assert_eq!(
+            interceptor.live_capability_context_count_for_session("session-preserve-context"),
+            1,
+            "blocked request must not erase unrelated live capability context"
+        );
+        assert_eq!(
+            interceptor.pending_capability_context_count("session-preserve-context"),
+            1,
+            "blocked request must not erase unrelated pending capability context"
+        );
+
+        let live_complete = json!({
+            "jsonrpc": "2.0",
+            "method": "session/update",
+            "params": {
+                "sessionId": "session-preserve-context",
+                "update": {
+                    "toolCallId": "tool-live-preserve",
+                    "status": "completed"
+                }
+            }
+        });
+        match interceptor
+            .intercept(Direction::AgentToClient, &live_complete)
+            .expect("live completion should still resolve its authorization context")
+        {
+            InterceptResult::ForwardWithReceipt(_, receipt) => {
+                assert_eq!(receipt.capability_id.as_deref(), Some("cap-live"));
+                assert_eq!(
+                    receipt.enforcement_mode,
+                    Some(AcpEnforcementMode::CryptographicallyEnforced)
+                );
+            }
+            other => panic!("expected ForwardWithReceipt, got {:?}", other),
+        }
+
+        let pending_start = json!({
+            "jsonrpc": "2.0",
+            "method": "session/update",
+            "params": {
+                "sessionId": "session-preserve-context",
+                "update": {
+                    "toolCallId": "tool-pending-preserve",
+                    "title": "Read pending file",
+                    "kind": "read",
+                    "status": "running"
+                }
+            }
+        });
+        match interceptor
+            .intercept(Direction::AgentToClient, &pending_start)
+            .expect("pending start should bind its preserved pending context")
+        {
+            InterceptResult::ForwardWithReceipt(_, receipt) => {
+                assert_eq!(receipt.capability_id.as_deref(), Some("cap-pending"));
+                assert_eq!(
+                    receipt.enforcement_mode,
+                    Some(AcpEnforcementMode::CryptographicallyEnforced)
+                );
+            }
+            other => panic!("expected ForwardWithReceipt, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn interceptor_session_cancel_clears_pending_capability_contexts() {
         // Verifies that session/cancel drains the per-session pending FIFO:
         // authorization material must not leak across long-lived sessions.

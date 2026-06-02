@@ -90,3 +90,44 @@ by guarded fs, terminal, and permission methods. Missing params and malformed
 params should return protocol errors before forwarding; valid non-tool updates
 should still pass through, and valid tool updates should preserve the existing
 receipt behavior.
+
+## Blocked Request Context Isolation Slice
+
+### Current Boundary
+
+`interceptor.rs` is the trust boundary between ACP JSON-RPC traffic and Chio
+authorization evidence. It captures live capability contexts after successful
+kernel checks, stores pending contexts for ACP requests that do not yet carry a
+`toolCallId`, and later attaches those contexts to `session/update` receipts.
+
+### Pain Point
+
+Guard-denied or checker-denied fs and terminal-create requests currently call
+`clear_capability_context(session_id)`. That clears every live and pending
+authorization context in the session, not just any context associated with the
+blocked request. A denied unrelated operation can therefore downgrade later
+receipts for already-authorized tool calls to `AuditOnly` or discard pending
+evidence for authorized requests that have not emitted their ACP `toolCallId`
+yet.
+
+### Security and API Constraints
+
+The public flattened root API, `InterceptResult` variants, ACP wire structs,
+canonical parameter hashes, and receipt field semantics must remain unchanged.
+Denied requests must still fail closed and must not leave behind a context for
+the denied request. The fix must preserve guard ordering: capability checker
+first when installed, then built-in guard, then forwarding.
+
+### Affected Dependents
+
+`chio-cli` depends on `chio-acp-proxy`, but no transitive public API change is
+planned. The expected compatibility proof is the owning crate test suite plus a
+targeted `chio-cli` check if the crate compiles cleanly.
+
+### Planned Material Improvement
+
+Replace session-wide context clearing on blocked fs and terminal-create paths
+with request-scoped cleanup. If the blocked request carried a `toolCallId`, only
+that live context is removed; requests without a `toolCallId` have not been
+buffered yet and require no cleanup. Add regression tests proving that a denied
+request cannot erase unrelated live or pending authorization evidence.
