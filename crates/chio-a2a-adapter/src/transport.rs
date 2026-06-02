@@ -39,10 +39,7 @@ where
 
     loop {
         line.clear();
-        let bytes_read = reader.read_line(&mut line).map_err(|error| {
-            AdapterError::Remote(format!("failed to read A2A SSE stream: {error}"))
-        })?;
-        if bytes_read == 0 {
+        let Some(bytes_read) = read_sse_line(&mut reader, &mut line)? else {
             if !data_lines.is_empty() {
                 process_sse_event(
                     &mut chunks,
@@ -53,15 +50,12 @@ where
                 )?;
             }
             break;
-        }
-        if bytes_read > MAX_SSE_LINE_BYTES {
-            return Err(AdapterError::Protocol(format!(
-                "A2A SSE line exceeded {MAX_SSE_LINE_BYTES} bytes"
-            )));
-        }
+        };
         total_bytes = total_bytes
             .checked_add(bytes_read as u64)
-            .ok_or_else(|| AdapterError::Protocol("A2A SSE stream byte counter overflowed".to_string()))?;
+            .ok_or_else(|| {
+                AdapterError::Protocol("A2A SSE stream byte counter overflowed".to_string())
+            })?;
         if total_bytes > max_total_bytes {
             return Err(AdapterError::Protocol(format!(
                 "A2A SSE stream exceeded {max_total_bytes} response bytes"
@@ -114,6 +108,56 @@ where
                 .to_string(),
         })
     }
+}
+
+fn read_sse_line(
+    reader: &mut impl BufRead,
+    output: &mut String,
+) -> Result<Option<usize>, AdapterError> {
+    let mut bytes = Vec::new();
+    let mut bytes_read = 0usize;
+    loop {
+        let (take, has_newline, exceeds_limit) = {
+            let available = reader.fill_buf().map_err(|error| {
+                AdapterError::Remote(format!("failed to read A2A SSE stream: {error}"))
+            })?;
+            if available.is_empty() {
+                if bytes_read == 0 {
+                    return Ok(None);
+                }
+                break;
+            }
+
+            let take = match available.iter().position(|byte| *byte == b'\n') {
+                Some(index) => index + 1,
+                None => available.len(),
+            };
+            let has_newline = available.get(take.saturating_sub(1)) == Some(&b'\n');
+            let exceeds_limit = bytes_read.saturating_add(take) > MAX_SSE_LINE_BYTES;
+            if !exceeds_limit {
+                bytes.extend_from_slice(&available[..take]);
+            }
+            (take, has_newline, exceeds_limit)
+        };
+
+        reader.consume(take);
+        if exceeds_limit {
+            return Err(AdapterError::Protocol(format!(
+                "A2A SSE line exceeded {MAX_SSE_LINE_BYTES} bytes"
+            )));
+        }
+
+        bytes_read = bytes_read.saturating_add(take);
+        if has_newline {
+            break;
+        }
+    }
+
+    let line = String::from_utf8(bytes).map_err(|error| {
+        AdapterError::Protocol(format!("A2A SSE stream line was not UTF-8: {error}"))
+    })?;
+    output.push_str(line.as_str());
+    Ok(Some(bytes_read))
 }
 
 fn process_sse_event<F>(

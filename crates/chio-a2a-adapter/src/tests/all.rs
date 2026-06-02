@@ -2167,6 +2167,58 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn sse_parser_rejects_oversized_delimiterless_line() {
+        let body = format!("data: {}", "x".repeat(MAX_SSE_LINE_BYTES + 1));
+
+        let error = parse_sse_stream(body.as_bytes(), Ok).unwrap_err();
+
+        assert!(error.to_string().contains("line"));
+    }
+
+    #[tokio::test]
+    async fn sse_parser_preserves_utf8_split_across_reads() {
+        struct OneByteReader {
+            bytes: Vec<u8>,
+            offset: usize,
+        }
+
+        impl Read for OneByteReader {
+            fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+                if self.offset >= self.bytes.len() || output.is_empty() {
+                    return Ok(0);
+                }
+                output[0] = self.bytes[self.offset];
+                self.offset += 1;
+                Ok(1)
+            }
+        }
+
+        let text = "caf\u{00e9}";
+        let terminal = json!({
+            "message": {
+                "messageId": "msg-utf8",
+                "role": "agent",
+                "parts": [{ "text": text }]
+            }
+        });
+        let body = format!("data: {}\n\n", serde_json::to_string(&terminal).unwrap());
+
+        let parsed = parse_sse_stream(
+            OneByteReader {
+                bytes: body.into_bytes(),
+                offset: 0,
+            },
+            Ok,
+        )
+        .unwrap();
+
+        let ToolServerStreamResult::Complete(stream) = parsed else {
+            panic!("expected terminal stream to complete");
+        };
+        assert_eq!(stream.chunks[0].data["message"]["parts"][0]["text"], text);
+    }
+
+    #[tokio::test]
     async fn sse_parser_enforces_contract_response_limit() {
         let working = json!({
             "task": task_payload("TASK_STATE_WORKING", false)

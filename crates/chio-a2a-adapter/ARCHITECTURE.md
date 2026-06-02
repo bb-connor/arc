@@ -285,3 +285,52 @@ all non-conflicting records, and then return the rebind-conflict classification
 for caller warning behavior. Prove the boundary with a registry test that
 combines one new valid task observation and one conflicting existing task in the
 same payload.
+
+## Bounded SSE Framing Slice
+
+### Current Boundary
+
+- `transport.rs` owns A2A SSE parsing for both JSON-RPC and HTTP+JSON stream
+  bindings.
+- `invoke.rs` supplies the binding-specific event decoder, then relies on
+  `transport.rs` to validate every stream event before a `ToolCallChunk` enters
+  the kernel stream path.
+- `fuzz.rs` reaches the same parser through the `fuzz` feature, so the parser
+  is the shared byte-to-envelope trust boundary for streaming A2A calls.
+
+### Pain Point
+
+`parse_sse_stream_with_limit` enforces line, event, total-byte, and chunk
+ceilings, but it currently calls `BufRead::read_line` before checking the line
+length. A delimiterless or oversized SSE line can therefore force allocation up
+to the remote response size before the adapter reports the configured line
+limit. That weakens the parser boundary even though the later validation result
+is fail-closed.
+
+### Security And API Constraints
+
+- Preserve public API compatibility and keep parser helpers internal.
+- Preserve existing SSE semantics for blank-line event delimiters, comment
+  lines, multiline `data:` payloads, terminal-state completion, incomplete
+  streams, and binding-specific JSON-RPC unwrapping.
+- Keep all outbound HTTP dispatch gated by `HttpEgressContract`; this slice is
+  only about response-body framing after the contract admits the response.
+- Reject oversized lines before buffering beyond the line ceiling, and keep the
+  total response-byte ceiling authoritative.
+- Do not widen accepted stream event shapes or task lifecycle semantics.
+
+### Affected Dependents
+
+- `A2aAdapter::invoke_stream` and `SubscribeToTask` should continue returning
+  the same `ToolServerStreamResult` shapes for valid streams.
+- `chio-kernel` and receipt paths should see no public API or schema change.
+- The fuzz feature should continue driving the same parser boundary.
+
+### Planned Material Improvement
+
+Replace direct `read_line` use in the SSE parser with a bounded internal line
+reader that consumes at most the admitted bytes for each line, rejects
+oversized lines immediately, and reports clean EOF without allocating an
+unbounded delimiterless line. Prove the boundary with parser tests for valid
+streams, oversized newline-delimited lines, oversized delimiterless lines, and
+total response-byte enforcement.
