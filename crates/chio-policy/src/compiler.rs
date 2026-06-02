@@ -779,12 +779,12 @@ fn tool_access_can_emit_constrained_wildcard(
 ) -> bool {
     rule.allow.is_empty()
         && rule.block.is_empty()
-        && rule.max_args_size.is_none()
-        && rule.require_runtime_assurance_tier.is_none()
-        && rule.prefer_runtime_assurance_tier.is_none()
         && rule.require_workload_identity.is_none()
         && rule.prefer_workload_identity.is_none()
-        && (!rule.require_confirmation.is_empty()
+        && (rule.max_args_size.is_some()
+            || rule.require_runtime_assurance_tier.is_some()
+            || rule.prefer_runtime_assurance_tier.is_some()
+            || !rule.require_confirmation.is_empty()
             || human_in_loop_requires_scope_constraints(human_in_loop))
 }
 
@@ -950,6 +950,7 @@ fn glob_matches(pattern: &str, target: &str) -> Result<bool, CompileError> {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use chio_core::capability::RuntimeAssuranceTier;
     use std::path::PathBuf;
 
     fn sample_threat_intel_pattern_db() -> &'static str {
@@ -1547,6 +1548,55 @@ rules:
         assert_eq!(
             grant.constraints,
             vec![Constraint::RequireApprovalAbove { threshold_units: 0 }]
+        );
+    }
+
+    #[test]
+    fn compile_tool_access_default_allow_max_args_size_emits_constrained_wildcard() {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    max_args_size: 2048
+    default: allow
+"#,
+        )
+        .unwrap();
+        let compiled = compile_policy(&spec).unwrap();
+
+        assert_eq!(compiled.default_scope.grants.len(), 1);
+        let grant = &compiled.default_scope.grants[0];
+        assert_eq!(grant.server_id, "*");
+        assert_eq!(grant.tool_name, "*");
+        assert_eq!(grant.constraints, vec![Constraint::MaxArgsSize(2048)]);
+    }
+
+    #[test]
+    fn compile_tool_access_default_allow_runtime_assurance_emits_constrained_wildcard() {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    require_runtime_assurance_tier: attested
+    default: allow
+"#,
+        )
+        .unwrap();
+        let compiled = compile_policy(&spec).unwrap();
+
+        assert_eq!(compiled.default_scope.grants.len(), 1);
+        let grant = &compiled.default_scope.grants[0];
+        assert_eq!(grant.server_id, "*");
+        assert_eq!(grant.tool_name, "*");
+        assert_eq!(
+            grant.constraints,
+            vec![Constraint::MinimumRuntimeAssurance(
+                RuntimeAssuranceTier::Attested
+            )]
         );
     }
 

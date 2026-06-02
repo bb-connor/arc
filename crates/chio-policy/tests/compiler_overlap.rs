@@ -66,7 +66,7 @@ rules:
 }
 
 #[test]
-fn default_allow_with_security_constraints_fails_closed_to_empty_scope() {
+fn default_allow_with_representable_security_constraints_emits_constrained_wildcard_scope() {
     let compiled = compile(
         r#"
 hushspec: "0.1.0"
@@ -78,10 +78,11 @@ rules:
 "#,
     );
 
-    assert!(
-        compiled.default_scope.grants.is_empty(),
-        "default-allow plus security constraints must not widen to wildcard scope"
-    );
+    assert_eq!(compiled.default_scope.grants.len(), 1);
+    let grant = &compiled.default_scope.grants[0];
+    assert_eq!(grant.server_id, "*");
+    assert_eq!(grant.tool_name, "*");
+    assert_eq!(grant.constraints, vec![Constraint::MaxArgsSize(4096)]);
 }
 
 #[test]
