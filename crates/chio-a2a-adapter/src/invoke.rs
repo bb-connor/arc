@@ -21,6 +21,7 @@ pub struct A2aAdapter {
 
 impl A2aAdapter {
     pub fn discover(config: A2aAdapterConfig) -> Result<Self, AdapterError> {
+        config.validate_request_auth_material()?;
         let agent_card_url = normalize_agent_card_url(&config.agent_card_url)?;
         let transport_config = A2aTransportConfig {
             default_tls_config: build_optional_default_tls_config(&config.tls_root_ca_pems)?,

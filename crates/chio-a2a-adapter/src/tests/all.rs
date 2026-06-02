@@ -627,6 +627,58 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn adapter_rejects_malformed_request_auth_material_before_discovery() {
+        let public_key = Keypair::generate().public_key().to_hex();
+        let base_url = "http://127.0.0.1:9";
+        let cases = vec![
+            (
+                "bad header name",
+                test_adapter_config(base_url, public_key.clone())
+                    .with_request_header(" X-Partner", "secret-header"),
+                "request header",
+            ),
+            (
+                "bad header value",
+                test_adapter_config(base_url, public_key.clone())
+                    .with_request_header("X-Partner", "secret\r\nInjected: yes"),
+                "request header value",
+            ),
+            (
+                "bad query name",
+                test_adapter_config(base_url, public_key.clone())
+                    .with_request_query_param(" partner", "secret-query"),
+                "request query parameter",
+            ),
+            (
+                "bad cookie name",
+                test_adapter_config(base_url, public_key.clone())
+                    .with_request_cookie("partner session", "secret-cookie"),
+                "request cookie name",
+            ),
+            (
+                "bad cookie value",
+                test_adapter_config(base_url, public_key)
+                    .with_request_cookie("partner_session", "secret-cookie; injected=yes"),
+                "request cookie value",
+            ),
+        ];
+
+        for (label, config, expected) in cases {
+            let error = A2aAdapter::discover(config.with_timeout(Duration::from_millis(10)))
+                .expect_err(label);
+            let message = error.to_string();
+            assert!(
+                message.contains(expected),
+                "{label}: expected `{expected}`, got `{message}`"
+            );
+            assert!(
+                !message.contains("secret") && !message.contains("Injected"),
+                "{label}: auth material leaked in `{message}`"
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn partner_policy_rejects_wrong_tenant_on_discovery() {
         let Some(server) = FakeA2aServer::spawn_jsonrpc_bearer_required() else {
             return;

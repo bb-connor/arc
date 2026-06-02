@@ -290,4 +290,106 @@ impl A2aAdapterConfig {
         self.task_registry_path = Some(path.into());
         self
     }
+
+    fn validate_request_auth_material(&self) -> Result<(), AdapterError> {
+        for header in &self.request_headers {
+            validate_http_header_name("request header", &header.name)?;
+            validate_header_value("request header value", &header.value)?;
+        }
+        for query_param in &self.request_query_params {
+            validate_url_component_name("request query parameter", &query_param.name)?;
+        }
+        for cookie in &self.request_cookies {
+            validate_http_token("request cookie name", &cookie.name)?;
+            validate_cookie_value("request cookie value", &cookie.value)?;
+        }
+        Ok(())
+    }
+}
+
+fn validate_http_header_name(field: &str, value: &str) -> Result<(), AdapterError> {
+    validate_http_token(field, value)
+}
+
+fn validate_http_token(field: &str, value: &str) -> Result<(), AdapterError> {
+    if value.is_empty() || value.trim() != value || !value.bytes().all(is_http_token_byte) {
+        return Err(AdapterError::AuthNegotiation(format!(
+            "invalid A2A {field} in configuration"
+        )));
+    }
+    Ok(())
+}
+
+fn is_http_token_byte(byte: u8) -> bool {
+    matches!(
+        byte,
+        b'A'..=b'Z'
+            | b'a'..=b'z'
+            | b'0'..=b'9'
+            | b'!'
+            | b'#'
+            | b'$'
+            | b'%'
+            | b'&'
+            | b'\''
+            | b'*'
+            | b'+'
+            | b'-'
+            | b'.'
+            | b'/'
+            | b':'
+            | b'<'
+            | b'='
+            | b'>'
+            | b'?'
+            | b'@'
+            | b'['
+            | b']'
+            | b'^'
+            | b'_'
+            | b'`'
+            | b'{'
+            | b'|'
+            | b'}'
+            | b'~'
+    )
+}
+
+fn validate_header_value(field: &str, value: &str) -> Result<(), AdapterError> {
+    if value.is_empty()
+        || value.trim() != value
+        || value.bytes().any(|byte| byte < 0x20 || byte == 0x7f)
+    {
+        return Err(AdapterError::AuthNegotiation(format!(
+            "invalid A2A {field} in configuration"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_url_component_name(field: &str, value: &str) -> Result<(), AdapterError> {
+    if value.is_empty()
+        || value.trim() != value
+        || value
+            .chars()
+            .any(|character| character.is_ascii_control())
+    {
+        return Err(AdapterError::AuthNegotiation(format!(
+            "invalid A2A {field} in configuration"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_cookie_value(field: &str, value: &str) -> Result<(), AdapterError> {
+    if value.is_empty()
+        || value.trim() != value
+        || value.contains(';')
+        || value.bytes().any(|byte| byte < 0x20 || byte == 0x7f)
+    {
+        return Err(AdapterError::AuthNegotiation(format!(
+            "invalid A2A {field} in configuration"
+        )));
+    }
+    Ok(())
 }

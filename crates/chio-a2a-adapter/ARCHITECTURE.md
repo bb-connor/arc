@@ -334,3 +334,45 @@ oversized lines immediately, and reports clean EOF without allocating an
 unbounded delimiterless line. Prove the boundary with parser tests for valid
 streams, oversized newline-delimited lines, oversized delimiterless lines, and
 total response-byte enforcement.
+
+## Request Auth Material Slice
+
+### Current Boundary
+
+`A2aAdapterConfig` accepts caller-supplied request headers, query parameters,
+cookies, bearer/basic/API key material, OAuth client credentials, TLS material,
+and task-registry configuration before discovery. `auth.rs` later applies that
+material to discovery, OAuth, blocking dispatch, and streaming dispatch.
+
+### Pain Point
+
+The public builder methods currently store request-auth atoms without a shared
+validation boundary. Header names and values eventually cross `ureq::Request`;
+query names are appended to remote URLs; cookies are manually joined into a
+single `Cookie` header. Empty, padded, control-character-bearing, or cookie
+separator-bearing names and values should fail closed before any outbound A2A
+request can be assembled.
+
+### Security And API Constraints
+
+- Preserve public `A2aAdapterConfig` builder signatures.
+- Do not log or persist auth values while reporting malformed auth material.
+- Keep normal bearer, basic, API key, query, and cookie configuration behavior
+  unchanged for valid atoms.
+- Do not reject arbitrary query values; URL encoding owns value escaping.
+- Reject cookie separators because cookie values are manually serialized into
+  one header.
+
+### Affected Dependents
+
+Existing callers keep using the same builder methods. Malformed auth
+configuration now fails during `A2aAdapter::discover` before agent-card fetch,
+OAuth negotiation, or tool invocation dispatch. No downstream crate or public
+schema change is planned.
+
+### Completed Material Improvement
+
+Added an internal request-auth material validator at discovery time. It rejects
+malformed header names/values, query parameter names, cookie names, and cookie
+values without exposing secret values in diagnostics, and tests prove malformed
+configuration fails before the first outbound A2A request can be assembled.
