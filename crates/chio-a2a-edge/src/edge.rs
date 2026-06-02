@@ -642,15 +642,32 @@ impl ChioA2aEdge {
                 A2aEdgeError::InvalidRequest("task is not owned by the current agent".to_string()),
             );
         }
+        if task.response.status != TaskStatus::Working {
+            return json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": serde_json::to_value(&task.response).unwrap_or(Value::Null)
+            });
+        }
 
         let orchestrated = match execute_orchestrated_a2a_request(kernel, task.request) {
             Ok(orchestrated) => orchestrated,
             Err(error) => return Self::jsonrpc_error_response(id, error),
         };
         let response = task_response_from_orchestrated(task_id.to_string(), orchestrated);
-        if let Some(task) = self.tasks.get_mut(task_id) {
-            task.response = response.clone();
-        }
+        let response = match self.tasks.get_mut(task_id) {
+            Some(task) if task.response.status == TaskStatus::Working => {
+                task.response = response;
+                task.response.clone()
+            }
+            Some(task) => task.response.clone(),
+            None => {
+                return Self::jsonrpc_error_response(
+                    id,
+                    A2aEdgeError::ToolNotFound(task_id.to_string()),
+                );
+            }
+        };
         json!({
             "jsonrpc": "2.0",
             "id": id,

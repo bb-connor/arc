@@ -2060,6 +2060,80 @@ mod tests {
     }
 
     #[test]
+    fn complete_task_preserves_cancelled_deferred_task() {
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let kernel_issuer = config.keypair.clone();
+        let mut kernel = ChioKernel::new(config);
+        kernel.register_tool_server(Box::new(StreamingToolServer));
+        let subject = Keypair::generate();
+        let execution = A2aKernelExecutionContext {
+            capability: capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let created = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 15,
+                "method": "message/stream",
+                "params": {
+                    "message": {
+                        "role": "user",
+                        "parts": [{"type": "text", "text": "start"}]
+                    }
+                }
+            }),
+            &kernel,
+            &execution,
+        );
+        let task_id = created["result"]["id"].as_str().test_unwrap().to_string();
+
+        let cancelled = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 16,
+                "method": "task/cancel",
+                "params": {
+                    "taskId": task_id.clone()
+                }
+            }),
+            &kernel,
+            &execution,
+        );
+        assert_eq!(cancelled["result"]["status"].as_str(), Some("cancelled"));
+
+        let completed_after_cancel = edge.complete_task(&task_id, &kernel, &execution, json!(17));
+        assert_eq!(
+            completed_after_cancel["result"]["status"].as_str(),
+            Some("cancelled")
+        );
+        assert_eq!(
+            completed_after_cancel["result"]["metadata"]["chio"]["decision"].as_str(),
+            Some("cancelled")
+        );
+
+        let repeated = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 18,
+                "method": "task/get",
+                "params": {
+                    "taskId": task_id
+                }
+            }),
+            &kernel,
+            &execution,
+        );
+        assert_eq!(repeated["result"]["status"].as_str(), Some("cancelled"));
+    }
+
+    #[test]
     fn authoritative_send_uses_protocol_aware_target_binding() {
         let mut edge =
             ChioA2aEdge::new(A2aEdgeConfig::default(), vec![mcp_target_manifest()]).test_unwrap();
