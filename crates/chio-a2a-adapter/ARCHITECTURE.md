@@ -465,3 +465,42 @@ boundary and align partner required-skill admission with the manifest
 projection boundary. Prove the change with tests that malformed auth material
 fails before any request is sent and that a required but non-projectable skill
 is denied during discovery.
+
+## SSE Byte Accounting Follow-up
+
+### Current Boundary
+
+- `transport.rs` owns bounded A2A SSE line reading and stream parsing.
+- `parse_sse_stream_with_limit` owns the total response-byte budget.
+- `read_sse_line` owns buffered line consumption and the per-line byte limit.
+
+### Pain Point
+
+The bounded line reader consumes bytes while detecting an oversized SSE line,
+but total response-byte accounting is updated only after a successful line
+read. A delimiterless or oversized line can therefore cross a caller-supplied
+total response limit before the parser reports the response-byte violation.
+
+### Security And API Constraints
+
+- Preserve public API compatibility and valid SSE parsing behavior.
+- Preserve per-line, per-event, total-response, and chunk-count fail-closed
+  limits.
+- Keep UTF-8 validation and terminal-state handling unchanged.
+- Do not widen accepted stream event shapes or task lifecycle semantics.
+
+### Affected Dependents
+
+- `A2aAdapter::invoke_stream` and `SubscribeToTask` continue using the same
+  parser boundary and `ToolServerStreamResult` shapes.
+- `chio-kernel` should see the same adapter error path for invalid streams,
+  with stricter response-budget precedence when a line is also oversized.
+- No downstream crate or public schema change is planned.
+
+### Planned Material Improvement
+
+Move total-byte accounting into the same internal helper that consumes SSE line
+bytes, so every consumed byte is charged before an oversized-line error can
+return. Prove the boundary with parser regressions where oversized
+newline-delimited and delimiterless lines exceed a smaller total response
+limit.

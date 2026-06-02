@@ -2287,6 +2287,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn sse_parser_charges_oversized_line_against_response_limit() {
+        let body = format!("data: {}\n", "x".repeat(MAX_SSE_LINE_BYTES + 1));
+
+        let error = parse_sse_stream_with_limit(body.as_bytes(), 8, Ok).unwrap_err();
+        let message = error.to_string();
+
+        assert!(message.contains("response bytes"));
+        assert!(!message.contains("line"));
+    }
+
+    #[tokio::test]
+    async fn sse_parser_charges_delimiterless_line_against_response_limit() {
+        let body = format!("data: {}", "x".repeat(MAX_SSE_LINE_BYTES + 1));
+
+        let error = parse_sse_stream_with_limit(body.as_bytes(), 8, Ok).unwrap_err();
+        let message = error.to_string();
+
+        assert!(message.contains("response bytes"));
+        assert!(!message.contains("line"));
+    }
+
+    #[tokio::test]
     async fn sse_parser_preserves_utf8_split_across_reads() {
         struct OneByteReader {
             bytes: Vec<u8>,
