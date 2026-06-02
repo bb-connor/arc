@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::{debug, warn};
 
+use crate::framing::read_jsonrpc_frame;
 use crate::{AdapterError, McpServerCapabilities, McpToolInfo, McpToolResult, McpTransport};
 use chio_core::{
     CompletionResult, PromptDefinition, PromptResult, ResourceContent, ResourceDefinition,
@@ -29,7 +30,6 @@ const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
 const UPSTREAM_REQUEST_POLL_INTERVAL: Duration = Duration::from_millis(20);
 const TASK_POLL_INTERVAL_MILLIS: u64 = 500;
 const MAX_BACKGROUND_TASKS_PER_TICK: usize = 8;
-const MAX_STDIO_MCP_FRAME_BYTES: usize = 1024 * 1024;
 const MAX_STDIO_MCP_BUFFERED_MESSAGES: usize = 128;
 const RELATED_TASK_META_KEY: &str = "io.modelcontextprotocol/related-task";
 
@@ -1417,77 +1417,15 @@ fn jsonrpc_request_id_label(request_id: &serde_json::Value) -> String {
 
 /// Read a single newline-terminated JSON line from the reader.
 fn read_line(reader: &mut impl BufRead) -> Result<serde_json::Value, AdapterError> {
-    loop {
-        let Some(line) = read_bounded_line(reader, MAX_STDIO_MCP_FRAME_BYTES)? else {
-            return Err(AdapterError::ConnectionFailed(
-                "MCP server closed stdout (EOF)".into(),
-            ));
-        };
-
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-
-        debug!("<- {}", line.trim_end());
-
-        return serde_json::from_str(trimmed)
-            .map_err(|e| AdapterError::ParseError(format!("invalid JSON from MCP server: {e}")));
-    }
-}
-
-fn read_bounded_line(
-    reader: &mut impl BufRead,
-    max_bytes: usize,
-) -> Result<Option<String>, AdapterError> {
-    let mut bytes = Vec::new();
-    loop {
-        let (take, has_newline, exceeds_limit) = {
-            let available = reader.fill_buf().map_err(|e| {
-                AdapterError::ConnectionFailed(format!("failed to read from stdout: {e}"))
-            })?;
-            if available.is_empty() {
-                if bytes.is_empty() {
-                    return Ok(None);
-                }
-                return Err(AdapterError::ParseError(
-                    "MCP JSON-RPC frame ended before newline delimiter".into(),
-                ));
-            }
-
-            let take = match available.iter().position(|byte| *byte == b'\n') {
-                Some(index) => index + 1,
-                None => available.len(),
-            };
-            let has_newline = available.get(take.saturating_sub(1)) == Some(&b'\n');
-            let exceeds_limit = bytes.len().saturating_add(take) > max_bytes;
-            if !exceeds_limit {
-                bytes.extend_from_slice(&available[..take]);
-            }
-            (take, has_newline, exceeds_limit)
-        };
-
-        reader.consume(take);
-        if exceeds_limit {
-            return Err(AdapterError::ParseError(format!(
-                "MCP JSON-RPC frame exceeded {max_bytes} bytes"
-            )));
-        }
-
-        if has_newline {
-            break;
-        }
-    }
-
-    String::from_utf8(bytes).map(Some).map_err(|error| {
-        AdapterError::ParseError(format!("MCP JSON-RPC frame was not UTF-8: {error}"))
-    })
+    read_jsonrpc_frame(reader)?
+        .ok_or_else(|| AdapterError::ConnectionFailed("MCP server closed stdout (EOF)".into()))
 }
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use crate::framing::MAX_STDIO_MCP_FRAME_BYTES;
     use chio_core::session::ElicitationAction;
     use chio_core::RequestId;
 

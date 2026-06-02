@@ -59,3 +59,28 @@ No dependent crate API should change. `chio-cli`, `chio-control-plane`, `chio-ho
 ### Planned Improvement
 
 Route `SerializedMcpTransport::drain_notifications` through `with_request_gate` and replace the empty delegation test with a concurrency regression that fails if notification draining bypasses the shared upstream gate.
+
+## Shared Stdio Framing Slice
+
+### Current Boundary
+
+`transport.rs` owns the production MCP stdio reader, while `fuzz.rs` owns the feature-gated envelope parse entrypoint used by the fuzz workspace.
+
+### Pain Point
+
+The production reader now rejects non-empty EOF before a newline delimiter, but the fuzz entrypoint still uses `std::io::BufRead::read_line` directly and therefore accepts a delimiterless final JSON object as a parse candidate. That makes the fuzz target slightly weaker than the production trust boundary it claims to exercise.
+
+### Security And API Constraints
+
+- Preserve the public `McpAdapter`, `StdioMcpTransport`, and fuzz feature APIs.
+- Preserve the production wire contract: MCP stdio messages are newline-delimited JSON-RPC frames with a bounded byte size.
+- Preserve fail-closed behavior for invalid JSON, invalid UTF-8, oversized frames, and truncated frames.
+- Keep fuzz instrumentation behind the `fuzz` feature and keep production builds free of `arbitrary`.
+
+### Affected Dependents
+
+No downstream crate API should change. `chio-cli`, `chio-control-plane`, `chio-hosted-mcp`, `chio-mcp-remote`, and `examples/hello-tool` should continue to compile unchanged. The focused proof is crate-local transport and fuzz-feature tests.
+
+### Planned Improvement
+
+Extract MCP stdio frame decoding into an internal `framing` module and route both `StdioMcpTransport` and `fuzz_mcp_envelope_parse` through it so fuzz coverage matches the production delimiter, size, UTF-8, and JSON parse boundary.
