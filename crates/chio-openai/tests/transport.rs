@@ -12,6 +12,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chio_core::canonical::canonical_json_bytes;
+use chio_openai::adapter::OpenAiAdapterConfig;
 use chio_openai::transport::{
     OpenAiTransport, OPENAI_CHAT_COMPLETIONS_PATH, OPENAI_RESPONSES_PATH,
 };
@@ -30,7 +31,112 @@ fn allow_verdict() -> VerdictResult {
     }
 }
 
+fn config_with_api_version(api_version: &str) -> OpenAiAdapterConfig {
+    let mut config = OpenAiAdapterConfig::new("org_mock");
+    config.api_version = api_version.to_string();
+    config
+}
+
+fn assert_api_version_drift(error: ProviderError) {
+    match error {
+        ProviderError::Malformed(message) => {
+            assert!(
+                message.contains("OpenAI adapter supports only API version responses.2026-04-25")
+            );
+            assert!(message.contains("configured responses.2025-01-01"));
+        }
+        other => panic!("expected Malformed API version drift, got {other:?}"),
+    }
+}
+
 // ---- MockHttpTransport: hermetic request/response, no reqwest ----
+
+#[tokio::test]
+async fn send_responses_rejects_api_version_drift_before_transport_call() {
+    let mock = Arc::new(MockHttpTransport::new("mock://openai"));
+    mock.push_json_response(
+        json!({
+            "output": [{
+                "type": "function_call",
+                "call_id": "call_drift_1",
+                "name": "get_weather",
+                "arguments": "{\"location\":\"NYC\"}"
+            }]
+        })
+        .to_string()
+        .into_bytes(),
+    );
+    let transport = OpenAiTransport::with_transport(
+        mock.clone(),
+        config_with_api_version("responses.2025-01-01"),
+    );
+
+    let err = transport
+        .send_responses(b"{}")
+        .await
+        .expect_err("drifted OpenAI Responses API version must fail before transport");
+
+    assert_api_version_drift(err);
+    assert!(mock.calls().is_empty());
+}
+
+#[tokio::test]
+async fn send_chat_completions_rejects_api_version_drift_before_transport_call() {
+    let mock = Arc::new(MockHttpTransport::new("mock://openai"));
+    mock.push_json_response(
+        json!({
+            "choices": [{
+                "message": {
+                    "role": "assistant",
+                    "tool_calls": [{
+                        "id": "call_chat_drift",
+                        "type": "function",
+                        "function": {
+                            "name": "get_weather",
+                            "arguments": "{\"location\":\"NYC\"}"
+                        }
+                    }]
+                }
+            }]
+        })
+        .to_string()
+        .into_bytes(),
+    );
+    let transport = OpenAiTransport::with_transport(
+        mock.clone(),
+        config_with_api_version("responses.2025-01-01"),
+    );
+
+    let err = transport
+        .send_chat_completions(b"{}")
+        .await
+        .expect_err("drifted OpenAI Responses API version must fail before chat transport");
+
+    assert_api_version_drift(err);
+    assert!(mock.calls().is_empty());
+}
+
+#[tokio::test]
+async fn stream_responses_rejects_api_version_drift_before_transport_call() {
+    let mock = Arc::new(MockHttpTransport::new("mock://openai"));
+    mock.push_response(HttpResponse::new(
+        200,
+        b"event: response.completed\ndata: {\"type\":\"response.completed\"}\n\n".to_vec(),
+        Some("text/event-stream".to_string()),
+    ));
+    let transport = OpenAiTransport::with_transport(
+        mock.clone(),
+        config_with_api_version("responses.2025-01-01"),
+    );
+
+    let err = transport
+        .stream_responses(b"{}", |_| Ok(allow_verdict()))
+        .await
+        .expect_err("drifted OpenAI Responses API version must fail before stream transport");
+
+    assert_api_version_drift(err);
+    assert!(mock.calls().is_empty());
+}
 
 #[tokio::test]
 async fn send_responses_posts_to_responses_path_and_lifts_tool_calls() {

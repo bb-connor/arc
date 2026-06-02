@@ -160,6 +160,7 @@ impl OpenAiTransport {
         &self,
         request_body: &[u8],
     ) -> Result<Vec<ToolInvocation>, ProviderError> {
+        self.adapter.ensure_supported_api_version()?;
         let response = self
             .transport
             .post_json(OPENAI_RESPONSES_PATH, request_body)
@@ -182,6 +183,7 @@ impl OpenAiTransport {
         &self,
         request_body: &[u8],
     ) -> Result<ChatCompletionsOutcome, ProviderError> {
+        self.adapter.ensure_supported_api_version()?;
         let response = self
             .transport
             .post_json(OPENAI_CHAT_COMPLETIONS_PATH, request_body)
@@ -221,6 +223,7 @@ impl OpenAiTransport {
     where
         F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
     {
+        self.adapter.ensure_supported_api_version()?;
         let body = self
             .transport
             .post_sse(OPENAI_RESPONSES_PATH, request_body)

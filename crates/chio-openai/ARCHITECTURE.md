@@ -19,14 +19,15 @@
   OpenAI tool-call validation, but the large `src/lib.rs` file still carries
   much of the stable public surface. Changing that shape would be high-risk
   API work, so this slice does not move those public types.
-- The transport boundary documents fail-closed status classification, but the
-  injected transport seam can return an `HttpResponse` carrying a non-2xx
-  status. `send_responses` and `send_chat_completions` currently parse those
-  bytes before checking the status, which can downgrade a provider rate limit
-  or upstream failure into `Malformed`.
-- Streaming uses the shared transport's `post_sse` surface, which already
-  fails real non-2xx responses as transport errors. The status gap is limited
-  to buffered JSON responses that are returned as `HttpResponse` values.
+- The buffered transport status boundary is now normalized before body parsing
+  for `/v1/responses` and `/v1/chat/completions`, so injected transports and
+  real HTTP transports share the same fail-closed taxonomy.
+- `OpenAiAdapterConfig.api_version` is public on the provider-adapter config,
+  and callers can construct or mutate a stale Responses API snapshot while the
+  adapter still stamps that value into provenance.
+- Batch lift, lower, streaming gates, and outbound transport all share the same
+  Responses API snapshot contract, but they do not currently enforce that the
+  configured `api_version` equals `responses.2026-04-25` before work begins.
 
 ## Security And API Constraints
 
@@ -49,7 +50,8 @@
 
 ## Planned Improvement
 
-Normalize every buffered JSON `HttpResponse` status inside `OpenAiTransport`
-before parsing or lifting the body. This makes injected transports obey the
-same fail-closed taxonomy as real OpenAI HTTP responses and keeps the README
-error table truthful for both `/v1/responses` and `/v1/chat/completions`.
+Add an adapter-local API-version guard that accepts only
+`responses.2026-04-25`, then invoke it before batch lift, lower, streaming
+evaluation, and outbound transport. This makes the Responses API snapshot pin a
+runtime contract across every provider-adapter trust boundary while preserving
+the default feature surface and the public config shape.
