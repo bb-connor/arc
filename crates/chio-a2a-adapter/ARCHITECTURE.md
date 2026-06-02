@@ -620,3 +620,51 @@ Those values are then formatted into malformed bearer Authorization headers.
 Add a bearer-token validator that reuses existing auth-value checks and also
 rejects any whitespace inside bearer token bytes. Apply it to configured bearer
 headers and to OAuth token responses before caching.
+
+## Runtime Tool Input Schema Parity Slice
+
+### Current Boundary
+
+- `mapping.rs` generates a manifest input schema for every projected A2A skill
+  with `additionalProperties: false` at the top level and inside follow-up
+  operation objects.
+- `parse_tool_input` deserializes runtime tool arguments into adapter-local
+  structs before `invoke.rs` decides whether to send `SendMessage`, task
+  follow-up, streaming, or push-notification management requests.
+- Kernel-mediated callers should normally see the signed manifest schema, but
+  the adapter also has direct public `ToolServerConnection` entry points and
+  unit tests that bypass schema validation.
+
+### Pain Point
+
+The runtime serde structs currently ignore unknown keys even though the signed
+manifest advertises a closed object shape. A direct adapter call or a caller
+that bypasses schema validation can include misspelled or stale operation
+fields, nested push-notification fields, or follow-up fields that the adapter
+silently discards before dispatching the remaining valid request.
+
+### Security And API Constraints
+
+- Preserve public API compatibility and keep existing snake-case plus camelCase
+  aliases for supported fields.
+- Preserve the existing mutually exclusive operation-mode checks.
+- Keep valid `SendMessage`, task follow-up, streaming, and push-notification
+  management inputs unchanged.
+- Fail closed on unknown runtime keys instead of silently trimming caller
+  intent before a remote A2A request is assembled.
+
+### Affected Dependents
+
+- No downstream crate or public schema change is planned because the manifest
+  already exposes a closed input schema.
+- `chio-kernel` continues to receive invalid direct adapter inputs as
+  `ToolServerError` through the existing `ToolServerConnection` path.
+- Existing A2A callers using documented fields are unchanged.
+
+### Completed Material Improvement
+
+Added closed-shape serde admission to the adapter-local tool-input structs and
+proved runtime parity with regressions for unknown top-level, follow-up, and
+push-notification nested fields. Supported snake-case fields and camelCase
+aliases remain accepted, while stale or misspelled keys now fail before any
+remote A2A request is assembled.

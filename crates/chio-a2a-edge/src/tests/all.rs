@@ -1081,6 +1081,42 @@ mod tests {
     }
 
     #[test]
+    fn extract_rejects_scalar_data_part_arguments() {
+        let msg = A2aMessage {
+            role: "user".to_string(),
+            parts: vec![A2aPart::Data {
+                data: json!("not-an-argument-object"),
+            }],
+            metadata: None,
+        };
+
+        let error = extract_arguments_from_message(&msg)
+            .expect_err("scalar data parts must fail before dispatch");
+        let A2aEdgeError::InvalidRequest(message) = error else {
+            panic!("expected invalid request error");
+        };
+        assert!(message.contains("data part must be a JSON object"));
+    }
+
+    #[test]
+    fn extract_rejects_array_data_part_arguments() {
+        let msg = A2aMessage {
+            role: "user".to_string(),
+            parts: vec![A2aPart::Data {
+                data: json!(["not", "an", "argument", "object"]),
+            }],
+            metadata: None,
+        };
+
+        let error = extract_arguments_from_message(&msg)
+            .expect_err("array data parts must fail before dispatch");
+        let A2aEdgeError::InvalidRequest(message) = error else {
+            panic!("expected invalid request error");
+        };
+        assert!(message.contains("data part must be a JSON object"));
+    }
+
+    #[test]
     fn extract_prefers_data_over_text() {
         let msg = A2aMessage {
             role: "user".to_string(),

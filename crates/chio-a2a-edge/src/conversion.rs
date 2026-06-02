@@ -16,6 +16,11 @@ fn extract_arguments_from_message(message: &A2aMessage) -> Result<Value, A2aEdge
         match part {
             A2aPart::Text { text } => text_parts.push(text.clone()),
             A2aPart::Data { data } => {
+                if !data.is_object() {
+                    return Err(A2aEdgeError::InvalidRequest(
+                        "message.parts data part must be a JSON object".to_string(),
+                    ));
+                }
                 if data_part.replace(data.clone()).is_some() {
                     return Err(A2aEdgeError::InvalidRequest(
                         "message.parts must contain at most one data part".to_string(),

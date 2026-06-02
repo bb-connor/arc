@@ -128,6 +128,11 @@ impl ChioAcpEdge {
                 "{operation} params.taskId must not be empty"
             )));
         }
+        if task_id.trim() != task_id {
+            return Err(AcpEdgeError::InvalidRequest(format!(
+                "{operation} params.taskId must not include leading or trailing whitespace"
+            )));
+        }
         Ok(task_id.to_string())
     }
 
@@ -145,6 +150,11 @@ impl ChioAcpEdge {
         if capability_id.trim().is_empty() {
             return Err(AcpEdgeError::InvalidRequest(format!(
                 "{operation} params.capabilityId must not be empty"
+            )));
+        }
+        if capability_id.trim() != capability_id {
+            return Err(AcpEdgeError::InvalidRequest(format!(
+                "{operation} params.capabilityId must not include leading or trailing whitespace"
             )));
         }
         Ok(capability_id.to_string())

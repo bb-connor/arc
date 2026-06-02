@@ -107,3 +107,49 @@ Make the deferred-task capacity gate count every retained task record after TTL
 pruning, not just `working` tasks. Update lifecycle tests so retained cancelled
 tasks at the cap reject a new `tool/stream`, proving terminal retention cannot
 grow without bound until TTL expiry.
+
+## JSON-RPC Identifier Shape Slice
+
+### Current Boundary
+
+- `jsonrpc.rs` owns ACP request-boundary extraction for
+  `params.capabilityId` before permission preview, `tool/invoke`, and
+  `tool/stream`.
+- `jsonrpc.rs` owns `params.taskId` extraction before `tool/cancel` and
+  `tool/resume` reach deferred-task lookup or owner checks.
+- `bridge.rs` records the accepted capability id into ACP protocol context for
+  cross-protocol receipt metadata.
+
+### Pain Point
+
+The request-boundary parsers reject missing, non-string, and all-whitespace
+identifiers, but padded non-empty identifiers keep their original bytes and
+flow into exact capability or task lookup. Values such as `" read_file "` and
+`" acp-task-1 "` therefore produce misleading deny, tool-not-found, or
+lifecycle errors instead of an ACP JSON-RPC invalid-params response at the
+boundary.
+
+### Security And API Constraints
+
+- Preserve public Rust structs and successful exact identifier bytes.
+- Do not trim or silently rewrite client-supplied identifiers.
+- Reject malformed identifiers before permission preview, capability binding
+  lookup, task lookup, owner checks, lifecycle mutation, kernel dispatch, or
+  bridge protocol-context metadata construction.
+- Keep existing missing, non-string, and empty identifier errors stable.
+
+### Affected Dependents
+
+- ACP clients that send exact identifiers are unchanged.
+- Clients that send padded `capabilityId` or `taskId` values now receive
+  JSON-RPC `-32602` invalid-params errors instead of downstream lookup or deny
+  behavior.
+- `chio-kernel`, `chio-cross-protocol`, and `chio-mcp-edge` APIs are
+  unchanged.
+
+### Completed Material Improvement
+
+Extended ACP JSON-RPC identifier parsing so `params.capabilityId` and
+`params.taskId` reject leading or trailing whitespace, with focused
+regressions proving padded capability and task identifiers fail before
+downstream lookup.

@@ -1341,6 +1341,59 @@ mod tests {
             .contains("mutually exclusive with SendMessage and `get_task` fields"));
     }
 
+    #[test]
+    fn parse_tool_input_rejects_unknown_top_level_fields() {
+        let error = parse_tool_input(json!({
+            "message": "hello",
+            "typoed_field": true
+        }))
+        .expect_err("unknown top-level tool input fields must fail closed");
+
+        let message = error.to_string();
+        assert!(
+            message.contains("unknown field") && message.contains("typoed_field"),
+            "unexpected unknown-field error: {message}"
+        );
+    }
+
+    #[test]
+    fn parse_tool_input_rejects_unknown_follow_up_fields() {
+        let error = parse_tool_input(json!({
+            "get_task": {
+                "id": "task-1",
+                "extra": true
+            }
+        }))
+        .expect_err("unknown follow-up fields must fail closed");
+
+        let message = error.to_string();
+        assert!(
+            message.contains("unknown field") && message.contains("extra"),
+            "unexpected unknown-field error: {message}"
+        );
+    }
+
+    #[test]
+    fn parse_tool_input_rejects_unknown_push_authentication_fields() {
+        let error = parse_tool_input(json!({
+            "create_push_notification_config": {
+                "task_id": "task-1",
+                "url": "https://callback.example/hook",
+                "authentication": {
+                    "scheme": "bearer",
+                    "extra": true
+                }
+            }
+        }))
+        .expect_err("unknown nested push authentication fields must fail closed");
+
+        let message = error.to_string();
+        assert!(
+            message.contains("unknown field") && message.contains("extra"),
+            "unexpected unknown-field error: {message}"
+        );
+    }
+
     #[tokio::test]
     async fn build_send_message_request_propagates_interface_tenant() {
         let agent_card = A2aAgentCard {

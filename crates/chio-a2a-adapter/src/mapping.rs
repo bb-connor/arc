@@ -1,4 +1,5 @@
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct A2aToolInput {
     #[serde(default)]
     message: Option<String>,
@@ -37,6 +38,7 @@ struct A2aToolInput {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct A2aGetTaskToolInput {
     id: String,
     #[serde(default, alias = "historyLength")]
@@ -44,11 +46,13 @@ struct A2aGetTaskToolInput {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct A2aSubscribeTaskToolInput {
     id: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct A2aCancelTaskToolInput {
     id: String,
     #[serde(default)]
@@ -56,6 +60,7 @@ struct A2aCancelTaskToolInput {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct A2aAuthenticationInfoToolInput {
     scheme: String,
     #[serde(default)]
@@ -63,6 +68,7 @@ struct A2aAuthenticationInfoToolInput {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct A2aCreatePushNotificationConfigToolInput {
     task_id: String,
     #[serde(default)]
@@ -75,12 +81,14 @@ struct A2aCreatePushNotificationConfigToolInput {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct A2aPushNotificationConfigRefToolInput {
     task_id: String,
     id: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct A2aListPushNotificationConfigsToolInput {
     task_id: String,
     #[serde(default, alias = "pageSize")]

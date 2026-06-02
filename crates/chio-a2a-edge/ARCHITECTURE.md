@@ -221,3 +221,45 @@ Extend the JSON-RPC identifier parser so `metadata.chio.targetSkillId` and
 `params.taskId` reject leading or trailing whitespace after the existing
 non-empty checks. Add tests proving padded target-skill ids and task ids fail
 closed before lookup.
+
+## Data Part Argument Shape Slice
+
+### Current Boundary
+
+- `types.rs` models A2A message parts, including structured `data` parts, as
+  protocol-facing wire values.
+- `conversion.rs` owns extraction of A2A message parts into Chio tool
+  arguments before authoritative kernel dispatch or compatibility passthrough.
+- `bridge.rs` and `edge.rs` assume the extracted value is the target tool
+  argument payload carried into `CrossProtocolExecutionRequest`.
+
+### Pain Point
+
+The edge publishes Chio tools with object-shaped input schemas, and the bridge
+spec describes an A2A `data` part as the arguments object. Runtime extraction
+currently accepts any JSON value as a data part, including scalars and arrays,
+and forwards it as tool arguments. That lets malformed A2A data reach kernel
+dispatch or compatibility passthrough before the edge request boundary rejects
+it.
+
+### Security And API Constraints
+
+- Preserve public wire structs and valid text-message behavior.
+- Preserve valid object-shaped `data` part behavior.
+- Preserve the existing one-data-part maximum and text-plus-data precedence.
+- Fail closed before kernel dispatch, receipt construction, deferred task
+  creation, or compatibility passthrough when a data part is not an object.
+
+### Affected Dependents
+
+- Downstream A2A clients that send object-shaped arguments are unchanged.
+- Clients that send scalar or array data parts now receive
+  `A2aEdgeError::InvalidRequest` through the existing JSON-RPC `-32602`
+  mapping.
+- `chio-kernel`, `chio-cross-protocol`, and `chio-mcp-edge` APIs are
+  unchanged.
+
+### Completed Material Improvement
+
+Made the message-to-arguments boundary reject non-object data parts and added
+focused regressions proving scalar and array data fail before dispatch.
