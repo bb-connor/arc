@@ -1334,9 +1334,6 @@ fn verify_package_inner(
         "workflow-vendor-cosignatures",
     );
 
-    verify_step_links(package)?;
-    add_check(checks, "workflow.step_links", "workflow-step-links");
-
     let mut receipt_store = InMemoryReceiptStore::new();
     for receipt in &package.tool_receipts {
         receipt_store.insert(receipt.clone());
@@ -1436,6 +1433,9 @@ fn verify_package_inner(
         "federation.strict_bilateral_invocations",
         "strict-bilateral-invocations",
     );
+
+    verify_step_links(package)?;
+    add_check(checks, "workflow.step_links", "workflow-step-links");
 
     let workflow_projection = project_workflow_receipt_body(&package.workflow_receipt.body())
         .map_err(|error| ChioPackageError::SelectiveDisclosure(error.to_string()))?;
@@ -2966,5 +2966,59 @@ mod tests {
             .checks
             .iter()
             .any(|check| check.code == "trust.bbs_issuer"));
+    }
+
+    #[test]
+    fn proof_package_rejects_unanimous_deny_bilateral_joint_verdict() {
+        const BUYER_SEED: [u8; 32] = [11; 32];
+        const VENDOR_A_SEED: [u8; 32] = [21; 32];
+
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+        use base64::Engine as _;
+        use chio_core_types::crypto::{Ed25519Backend, Keypair, SigningBackend};
+        use chio_federation::bilateral_dsse::{pae, PAYLOAD_TYPE_IN_TOTO};
+
+        let mut package = proof_package_from_json(include_str!(
+            "../../../examples/chio-3vendor/fixtures/buyer-auditor-proof-package.json"
+        ))
+        .expect("package fixture parses");
+        let trust_bundle = trust_bundle_from_fixture().expect("trust bundle parses");
+        let context = verification_context_from_fixture();
+
+        let buyer_key = Keypair::from_seed(&BUYER_SEED);
+        let vendor_a_key = Keypair::from_seed(&VENDOR_A_SEED);
+        let mut envelope = package.bilateral_envelopes[0].clone();
+        let (mut statement, _) = envelope.decode_statement().expect("envelope decodes");
+        let summary = statement
+            .predicate
+            .policy_evaluation_summary
+            .as_mut()
+            .expect("fixture carries policy evaluation summary");
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+        let statement_bytes = statement
+            .canonical_bytes()
+            .expect("statement canonicalizes");
+        envelope.payload = BASE64_STANDARD.encode(&statement_bytes);
+        let pae_bytes = pae(PAYLOAD_TYPE_IN_TOTO, &statement_bytes);
+        let sig_a = Ed25519Backend::new(buyer_key.clone())
+            .sign_bytes(&pae_bytes)
+            .expect("buyer cosigns deny envelope");
+        let sig_b = Ed25519Backend::new(vendor_a_key.clone())
+            .sign_bytes(&pae_bytes)
+            .expect("vendor cosigns deny envelope");
+        envelope.signatures[0].sig = BASE64_STANDARD.encode(sig_a.to_bytes());
+        envelope.signatures[1].sig = BASE64_STANDARD.encode(sig_b.to_bytes());
+        package.bilateral_envelopes[0] = envelope;
+
+        let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("bilateral envelope policy verdict"),
+            "unexpected error: {error}"
+        );
+        assert!(error.to_string().contains("deny"));
     }
 }
