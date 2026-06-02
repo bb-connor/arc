@@ -9,9 +9,9 @@ mod tests {
     use crate::models::{
         ComputerUseMode, ComputerUseRule, DefaultAction, EgressRule, Extensions,
         ForbiddenPathsRule, HushSpec, InputInjectionRule, OriginMatch, OriginProfile,
-        OriginsExtension, PatchIntegrityRule, PostureExtension, PostureState, PostureTransition,
-        RemoteDesktopChannelsRule, Rules, SecretPattern, SecretPatternsRule, Severity,
-        ShellCommandsRule, ToolAccessRule, WorkloadIdentityMatch,
+        OriginDefaultBehavior, OriginsExtension, PatchIntegrityRule, PostureExtension,
+        PostureState, PostureTransition, RemoteDesktopChannelsRule, Rules, SecretPattern,
+        SecretPatternsRule, Severity, ShellCommandsRule, ToolAccessRule, WorkloadIdentityMatch,
     };
 
     use super::{
@@ -484,6 +484,145 @@ mod tests {
         );
 
         assert_eq!(matched.as_deref(), Some("legacy-actor-role"));
+    }
+
+    #[test]
+    fn origin_default_deny_blocks_unmatched_origin_before_base_rules_allow() {
+        let mut spec = enterprise_origin_spec(vec![origin_profile(
+            "trusted",
+            OriginMatch {
+                provider: Some("trusted-provider".to_string()),
+                tenant_id: Some("tenant-1".to_string()),
+                organization_id: None,
+                space_id: None,
+                space_type: None,
+                visibility: None,
+                external_participants: None,
+                tags: Vec::new(),
+                groups: Vec::new(),
+                roles: Vec::new(),
+                sensitivity: None,
+                actor_role: None,
+            },
+        )]);
+        spec.rules = Some(Rules {
+            tool_access: Some(ToolAccessRule {
+                enabled: true,
+                allow: Vec::new(),
+                block: Vec::new(),
+                require_confirmation: Vec::new(),
+                default: DefaultAction::Allow,
+                max_args_size: None,
+                require_runtime_assurance_tier: None,
+                prefer_runtime_assurance_tier: None,
+                require_workload_identity: None,
+                prefer_workload_identity: None,
+            }),
+            ..Rules::default()
+        });
+        let origins = spec
+            .extensions
+            .as_mut()
+            .and_then(|extensions| extensions.origins.as_mut())
+            .expect("test spec should contain origins extension");
+        origins.default_behavior = Some(OriginDefaultBehavior::Deny);
+
+        let mut request = action("tool_call", "read_file");
+        request.origin = Some(OriginContext {
+            provider: Some("untrusted-provider".to_string()),
+            tenant_id: Some("tenant-1".to_string()),
+            organization_id: None,
+            space_id: None,
+            space_type: None,
+            visibility: None,
+            external_participants: None,
+            tags: Vec::new(),
+            groups: Vec::new(),
+            roles: Vec::new(),
+            sensitivity: None,
+            actor_role: None,
+        });
+
+        let result = evaluate(&spec, &request);
+
+        assert_eq!(result.decision, Decision::Deny);
+        assert_eq!(
+            result.matched_rule.as_deref(),
+            Some("extensions.origins.default_behavior")
+        );
+
+        let missing_origin_result = evaluate(&spec, &action("tool_call", "read_file"));
+        assert_eq!(missing_origin_result.decision, Decision::Deny);
+        assert_eq!(
+            missing_origin_result.reason.as_deref(),
+            Some("origin context is required by origins policy")
+        );
+    }
+
+    #[test]
+    fn origin_minimal_profile_preserves_base_rule_fallback_for_unmatched_origin() {
+        let mut spec = enterprise_origin_spec(vec![origin_profile(
+            "trusted",
+            OriginMatch {
+                provider: Some("trusted-provider".to_string()),
+                tenant_id: None,
+                organization_id: None,
+                space_id: None,
+                space_type: None,
+                visibility: None,
+                external_participants: None,
+                tags: Vec::new(),
+                groups: Vec::new(),
+                roles: Vec::new(),
+                sensitivity: None,
+                actor_role: None,
+            },
+        )]);
+        spec.rules = Some(Rules {
+            tool_access: Some(ToolAccessRule {
+                enabled: true,
+                allow: Vec::new(),
+                block: Vec::new(),
+                require_confirmation: Vec::new(),
+                default: DefaultAction::Allow,
+                max_args_size: None,
+                require_runtime_assurance_tier: None,
+                prefer_runtime_assurance_tier: None,
+                require_workload_identity: None,
+                prefer_workload_identity: None,
+            }),
+            ..Rules::default()
+        });
+        let origins = spec
+            .extensions
+            .as_mut()
+            .and_then(|extensions| extensions.origins.as_mut())
+            .expect("test spec should contain origins extension");
+        origins.default_behavior = Some(OriginDefaultBehavior::MinimalProfile);
+
+        let mut action = action("tool_call", "read_file");
+        action.origin = Some(OriginContext {
+            provider: Some("untrusted-provider".to_string()),
+            tenant_id: None,
+            organization_id: None,
+            space_id: None,
+            space_type: None,
+            visibility: None,
+            external_participants: None,
+            tags: Vec::new(),
+            groups: Vec::new(),
+            roles: Vec::new(),
+            sensitivity: None,
+            actor_role: None,
+        });
+
+        let result = evaluate(&spec, &action);
+
+        assert_eq!(result.decision, Decision::Allow);
+        assert_eq!(
+            result.matched_rule.as_deref(),
+            Some("rules.tool_access.default")
+        );
     }
 
     #[test]

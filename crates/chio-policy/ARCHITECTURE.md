@@ -1,47 +1,56 @@
 # chio-policy Architecture Notes
 
-## Boundary
+## Boundaries
 
-`chio-policy` owns HushSpec parsing, validation, merge resolution, reference
-evaluation, and compilation into Chio guard pipelines plus default capability
-scope fragments. It should translate policy intent into existing Chio kernel
-and guard primitives without owning guard internals, receipt signing, budget
-mutation, capability verification, or persistent runtime state.
+- `models.rs` owns the HushSpec schema, YAML parser hardening, rule-block
+  inventory, and extension structs.
+- `validate.rs` owns schema and semantic validation before policies are
+  compiled or evaluated.
+- `merge.rs` and `resolve.rs` own inheritance, deep merge, and filesystem
+  resolution.
+- `evaluate/*` owns the reference allow, warn, and deny evaluator, including
+  condition filtering, posture transitions, and origin profile selection.
+- `compiler.rs` owns translation from HushSpec intent into Chio guard
+  pipelines, post-invocation hooks, and default `ChioScope` fragments.
+- `receipt.rs` owns audited evaluation receipts. The crate does not own guard
+  internals, receipt signing, capability verification, or persistent runtime
+  state.
 
 ## Current Pain Point
 
-Policy compilation has two different security surfaces: emitted guard pipelines
-and the compiled `ChioScope`. Guard pipelines can express allow, block, warning,
-runtime, workload, and size rules. Capability scopes are positive grants with
-constraints, and have no negative grant form. That makes `tool_access` deny-list
-semantics security-sensitive: compiling an allow-list grant while ignoring a
-block list can issue a capability that is broader than the policy intent if the
-allow and block patterns overlap and a caller consumes `default_scope` outside
-the full guard pipeline.
+Origin profiles are represented as first-class HushSpec extension state and
+carry a `default_behavior` whose schema default is deny. The evaluator selects
+the best matching origin profile and passes its id into rule evaluation, but
+unmatched or missing origin context currently falls through to the base policy
+as if no origin admission decision existed. That makes `default_behavior: deny`
+advisory instead of load-bearing and can allow actions from origins that failed
+profile admission.
 
 ## Security And API Constraints
 
 - Invalid HushSpec documents must reject before guard or scope materialization.
 - Public parser, validator, compiler, and evaluator APIs should remain
   compatible.
-- Default scope compilation must not silently widen access when workload
-  identity, deny-list, or other unrepresentable semantics are present. It may
-  emit constrained grants only for semantics that `ChioScope` can enforce
-  directly.
-- Existing guard ordering, fail-closed regex validation, and policy evaluator
-  decisions must remain stable unless a test proves the current behavior drops
-  policy intent.
+- `extensions.origins.default_behavior: deny` must fail closed for unmatched
+  or missing origin context before action-specific rules can allow the request.
+- `default_behavior: minimal_profile` should preserve the current fallback
+  behavior for callers that intentionally want base-rule evaluation without a
+  matched profile.
+- Existing guard ordering, regex fail-closed behavior, posture checks,
+  conditions, and default-scope compilation must remain stable unless a test
+  proves the current behavior drops policy intent.
 
 ## Affected Dependents
 
-The owning-crate change is internal to `chio-policy`. It affects callers that
-consume `compile_policy(...).default_scope` to issue initial capabilities,
-including CLI and runtime policy-loading paths. No dependent API change is
-planned.
+The owning-crate change is internal to `chio-policy` and affects callers of the
+reference evaluator, audited evaluator, and any control-plane or CLI path that
+uses `evaluate` / `evaluate_with_context` for HushSpec decisions. No public API
+change is planned.
 
 ## Planned Improvement
 
-Make block-by-default scope compilation fail closed when `tool_access.block`
-overlaps the grants that would otherwise be emitted. The guard pipeline should
-still enforce the complete policy, but `default_scope` should emit no grants
-when a deny-list would be required to make those grants faithful.
+Add an explicit origin admission step before posture and action evaluation.
+When an origins extension is configured with deny behavior, requests without a
+matching origin profile should return a deny result naming the origins boundary.
+Requests with a matching profile and policies that opt into `minimal_profile`
+fallback should continue through the existing evaluator path.

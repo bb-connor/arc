@@ -1258,6 +1258,33 @@ fn next_posture_state(posture: &PostureExtension, current: &str, signal: &str) -
 // Origin profile selection
 // ---------------------------------------------------------------------------
 
+fn origin_admission_denial(
+    spec: &HushSpec,
+    origin: Option<&OriginContext>,
+    matched_profile: Option<&OriginProfile>,
+) -> Option<EvaluationResult> {
+    if matched_profile.is_some() {
+        return None;
+    }
+
+    let origins = spec.extensions.as_ref()?.origins.as_ref()?;
+    if origins.default_behavior.unwrap_or_default() == OriginDefaultBehavior::MinimalProfile {
+        return None;
+    }
+
+    let reason = if origin.is_some() {
+        "origin context did not match any configured origin profile"
+    } else {
+        "origin context is required by origins policy"
+    };
+    Some(deny_result(
+        Some("extensions.origins.default_behavior".to_string()),
+        Some(reason.to_string()),
+        None,
+        None,
+    ))
+}
+
 fn select_origin_profile<'a>(
     spec: &'a HushSpec,
     origin: Option<&OriginContext>,
