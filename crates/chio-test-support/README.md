@@ -20,6 +20,10 @@ Two intentionally distinct families are exposed:
 Both families deliberately use the `test_unwrap` method name, so a single source
 file imports exactly one of them.
 
+Helper panics preserve the test call site with `#[track_caller]`, so failures
+point at the assertion that made the bad assumption rather than the support
+crate implementation line.
+
 ## Where it fits
 
 Add it as a `[dev-dependencies]` entry and import the helpers from a
