@@ -761,7 +761,6 @@ fn tool_access_can_safely_widen_to_wildcard(
         && rule.require_confirmation.is_empty()
         && rule.max_args_size.is_none()
         && rule.require_runtime_assurance_tier.is_none()
-        && rule.prefer_runtime_assurance_tier.is_none()
         && rule.require_workload_identity.is_none()
         && rule.prefer_workload_identity.is_none()
         && !human_in_loop_requires_scope_constraints(human_in_loop)
@@ -783,7 +782,6 @@ fn tool_access_can_emit_constrained_wildcard(
         && rule.prefer_workload_identity.is_none()
         && (rule.max_args_size.is_some()
             || rule.require_runtime_assurance_tier.is_some()
-            || rule.prefer_runtime_assurance_tier.is_some()
             || !rule.require_confirmation.is_empty()
             || human_in_loop_requires_scope_constraints(human_in_loop))
 }
@@ -822,10 +820,7 @@ fn compile_tool_constraints(
         constraints.push(Constraint::RequireApprovalAbove { threshold_units });
     }
 
-    if let Some(tier) = rule
-        .require_runtime_assurance_tier
-        .or(rule.prefer_runtime_assurance_tier)
-    {
+    if let Some(tier) = rule.require_runtime_assurance_tier {
         constraints.push(Constraint::MinimumRuntimeAssurance(tier));
     }
     Ok(constraints)
@@ -1598,6 +1593,51 @@ rules:
                 RuntimeAssuranceTier::Attested
             )]
         );
+    }
+
+    #[test]
+    fn compile_tool_access_default_allow_runtime_assurance_preference_stays_warning_only() {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    prefer_runtime_assurance_tier: attested
+    default: allow
+"#,
+        )
+        .unwrap();
+        let compiled = compile_policy(&spec).unwrap();
+
+        assert_eq!(compiled.default_scope.grants.len(), 1);
+        let grant = &compiled.default_scope.grants[0];
+        assert_eq!(grant.server_id, "*");
+        assert_eq!(grant.tool_name, "*");
+        assert!(grant.constraints.is_empty());
+    }
+
+    #[test]
+    fn compile_tool_access_allow_runtime_assurance_preference_does_not_harden_grant() {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    allow: [payments.charge]
+    prefer_runtime_assurance_tier: attested
+    default: block
+"#,
+        )
+        .unwrap();
+        let compiled = compile_policy(&spec).unwrap();
+
+        assert_eq!(compiled.default_scope.grants.len(), 1);
+        let grant = &compiled.default_scope.grants[0];
+        assert_eq!(grant.server_id, "*");
+        assert_eq!(grant.tool_name, "payments.charge");
+        assert!(grant.constraints.is_empty());
     }
 
     #[test]
