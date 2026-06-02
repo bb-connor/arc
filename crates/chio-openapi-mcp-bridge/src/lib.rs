@@ -478,6 +478,34 @@ mod tests {
         config
     }
 
+    fn required_query_spec() -> &'static str {
+        r#"{
+            "openapi": "3.0.3",
+            "info": { "title": "Search API", "version": "1.0.0" },
+            "paths": {
+                "/search": {
+                    "get": {
+                        "operationId": "searchPets",
+                        "parameters": [
+                            {
+                                "name": "q",
+                                "in": "query",
+                                "required": true,
+                                "schema": { "type": "string" }
+                            },
+                            {
+                                "name": "page",
+                                "in": "query",
+                                "schema": { "type": "integer" }
+                            }
+                        ],
+                        "responses": { "200": { "description": "OK" } }
+                    }
+                }
+            }
+        }"#
+    }
+
     #[test]
     fn bridged_tool_response_preserves_metadata_and_body() {
         let binding = RouteBinding {
@@ -860,6 +888,7 @@ mod tests {
                             {
                                 "name": "q",
                                 "in": "query",
+                                "required": true,
                                 "schema": { "type": "string" }
                             },
                             {
@@ -899,6 +928,55 @@ mod tests {
             result["structuredContent"]["body"]["receivedUrl"],
             "https://93.184.216.34/pets/pet%2042/notes?q=needs%20follow%20up&limit=10"
         );
+    }
+
+    #[test]
+    fn bridge_dispatcher_rejects_missing_required_query_parameter() {
+        let mut bridge =
+            OpenApiMcpBridge::from_spec(required_query_spec(), petstore_config_with_egress())
+                .unwrap();
+        bridge.set_dispatcher(Box::new(|_method, _url, _args| {
+            panic!("dispatcher must not run when required query parameter is missing")
+        }));
+
+        let error = bridge
+            .invoke_tool("searchPets", json!({"page": 2}))
+            .unwrap_err();
+
+        assert!(format!("{error}").contains("missing required query parameter `q`"));
+    }
+
+    #[test]
+    fn bridge_dispatcher_rejects_null_or_empty_required_query_parameter() {
+        let mut bridge =
+            OpenApiMcpBridge::from_spec(required_query_spec(), petstore_config_with_egress())
+                .unwrap();
+        bridge.set_dispatcher(Box::new(|_method, _url, _args| {
+            panic!("dispatcher must not run when required query parameter is empty")
+        }));
+
+        for arguments in [json!({"q": null}), json!({"q": []})] {
+            let error = bridge.invoke_tool("searchPets", arguments).unwrap_err();
+            assert!(format!("{error}").contains("missing required query parameter `q`"));
+        }
+    }
+
+    #[tokio::test]
+    async fn owned_bridge_tool_server_rejects_missing_required_query_parameter() {
+        let mut bridge =
+            OpenApiMcpBridge::from_spec(required_query_spec(), petstore_config_with_egress())
+                .unwrap();
+        bridge.set_dispatcher(Box::new(|_method, _url, _args| {
+            panic!("dispatcher must not run when owned bridge is missing a required query")
+        }));
+        let owned = OwnedBridgeToolServer::from_bridge(bridge);
+
+        let error = owned
+            .invoke("searchPets", json!({"page": 2}), None)
+            .await
+            .unwrap_err();
+
+        assert!(format!("{error}").contains("missing required query parameter `q`"));
     }
 
     #[test]

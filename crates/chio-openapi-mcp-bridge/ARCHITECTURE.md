@@ -39,3 +39,45 @@ placeholder in a route path is declared as an OpenAPI `in: path` parameter after
 path-level and operation-level parameter merge. The bridge should reject
 malformed specs before manifest publication instead of advertising an input
 schema that cannot satisfy live URL construction.
+
+## Required Query Dispatch Slice
+
+### Current Boundary
+
+`dispatch.rs` now owns live URL construction after OpenAPI ingest. It receives
+the merged path-level and operation-level parameters, records the public route
+binding, expands path placeholders, appends declared query parameters, and hands
+the final URL to the `HttpEgressContract` before the caller-supplied dispatcher
+runs.
+
+### Pain Point
+
+The manifest generator already marks required query parameters in the generated
+tool input schema, but the live dispatcher stores only query parameter names.
+If a caller invokes the bridge directly, or a protocol layer fails to validate
+the manifest schema, missing required query arguments are silently omitted from
+the upstream URL. That creates drift between the advertised Chio tool contract
+and the actual HTTP request the bridge is willing to dispatch.
+
+### Security and API Constraints
+
+The public `RouteBinding`, `BridgeConfig`, `BridgeError`, `BridgedResponse`,
+`OpenApiMcpBridge`, and `OwnedBridgeToolServer` APIs must stay source
+compatible. Egress contract enforcement must still run on the final URL, and
+the dispatcher must not run when live request construction is missing required
+OpenAPI evidence. Optional query parameters should remain optional.
+
+### Affected Dependents
+
+`chio-conformance` imports `OpenApiMcpBridge` for SSRF and response-size tests,
+and fuzz targets compile the feature-gated ingest harness. No transitive source
+changes are planned because the required-query metadata is internal to
+`RouteDispatch`.
+
+### Planned Material Improvement
+
+Extend the internal dispatch plan from `Vec<String>` query names to query
+metadata that includes OpenAPI `required`. Validate required query parameters
+before appending any query string, reject missing/null/empty-array required
+values before egress and before the dispatcher runs, and add focused tests for
+both borrowed and owned bridge invocation paths.

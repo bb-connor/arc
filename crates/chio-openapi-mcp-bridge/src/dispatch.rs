@@ -9,11 +9,11 @@ use crate::{BridgeError, BridgedResponse, RouteBinding};
 #[derive(Debug, Clone)]
 pub(crate) struct RouteDispatch {
     binding: RouteBinding,
-    query_parameters: Vec<String>,
+    query_parameters: Vec<QueryParameter>,
 }
 
 impl RouteDispatch {
-    fn new(binding: RouteBinding, query_parameters: Vec<String>) -> Self {
+    fn new(binding: RouteBinding, query_parameters: Vec<QueryParameter>) -> Self {
         Self {
             binding,
             query_parameters,
@@ -22,6 +22,21 @@ impl RouteDispatch {
 
     pub(crate) fn binding(&self) -> &RouteBinding {
         &self.binding
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct QueryParameter {
+    name: String,
+    required: bool,
+}
+
+impl QueryParameter {
+    fn from_openapi(parameter: &Parameter) -> Self {
+        Self {
+            name: parameter.name.clone(),
+            required: parameter.required,
+        }
     }
 }
 
@@ -42,7 +57,7 @@ pub(crate) fn build_route_dispatches(
             let query_parameters = params
                 .iter()
                 .filter(|param| param.location == ParameterLocation::Query)
-                .map(|param| param.name.clone())
+                .map(QueryParameter::from_openapi)
                 .collect();
             let tool_name = operation
                 .operation_id
@@ -231,17 +246,33 @@ pub(crate) fn expand_route_path(template: &str, arguments: &Value) -> Result<Str
 
 fn append_query_parameters(
     url: &mut String,
-    query_parameters: &[String],
+    query_parameters: &[QueryParameter],
     arguments: &Value,
 ) -> Result<(), BridgeError> {
     let mut first = !url.contains('?');
-    for name in query_parameters {
-        let Some(value) = arguments.get(name) else {
+    for parameter in query_parameters {
+        let Some(value) = arguments.get(&parameter.name) else {
+            if parameter.required {
+                return Err(missing_required_query_parameter(&parameter.name));
+            }
             continue;
         };
-        append_query_value(url, &mut first, name, value)?;
+        if parameter.required && query_value_is_effectively_missing(value) {
+            return Err(missing_required_query_parameter(&parameter.name));
+        }
+        append_query_value(url, &mut first, &parameter.name, value)?;
     }
     Ok(())
+}
+
+fn query_value_is_effectively_missing(value: &Value) -> bool {
+    matches!(value, Value::Null) || matches!(value, Value::Array(values) if values.is_empty())
+}
+
+fn missing_required_query_parameter(name: &str) -> BridgeError {
+    BridgeError::UpstreamError(format!(
+        "OpenAPI bridge missing required query parameter `{name}`"
+    ))
 }
 
 fn append_query_value(
