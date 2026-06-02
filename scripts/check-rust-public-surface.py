@@ -348,6 +348,12 @@ def main() -> int:
             )
 
         if crate_name in entrypoint_names:
+            if not local_public_entrypoint:
+                errors.append(
+                    f"{display_path} is listed in "
+                    "workspace.metadata.chio.rust_public_entrypoints but does not "
+                    "declare package.metadata.chio.public_entrypoint = true."
+                )
             require_description(
                 display_path,
                 package,

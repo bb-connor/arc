@@ -24,12 +24,36 @@ EOF
   printf 'pub fn marker() {}\n' > "$dir/src/lib.rs"
 }
 
+mark_public_entrypoint() {
+  local manifest="$1"
+  cat >> "$manifest" <<'EOF'
+
+[package.metadata.chio]
+public_entrypoint = true
+EOF
+}
+
+unmark_public_entrypoint() {
+  local manifest="$1"
+  python3 - "$manifest" <<'PY'
+from pathlib import Path
+import sys
+
+manifest = Path(sys.argv[1])
+text = manifest.read_text(encoding="utf-8")
+text = text.replace("\n[package.metadata.chio]\npublic_entrypoint = true\n", "\n")
+manifest.write_text(text, encoding="utf-8")
+PY
+}
+
 write_workspace() {
   local root="$1"
   shift
   mkdir -p "$root/crates"
   write_member "$root/crates/chio-cli" "chio-cli"
   write_member "$root/crates/chio-core" "chio-core"
+  mark_public_entrypoint "$root/crates/chio-cli/Cargo.toml"
+  mark_public_entrypoint "$root/crates/chio-core/Cargo.toml"
   cat > "$root/Cargo.toml" <<EOF
 [workspace]
 members = [
@@ -65,6 +89,14 @@ good="$work/good"
 write_workspace "$good" '    "chio-cli",' '    "chio-core",'
 assert_rc "$(run_checker "$good/Cargo.toml" "$work/good.out" "$work/good.err")" 0 \
   "valid synthetic workspace passes"
+
+root_only_public_entrypoint="$work/root-only-public-entrypoint"
+write_workspace "$root_only_public_entrypoint" '    "chio-cli",' '    "chio-core",'
+unmark_public_entrypoint "$root_only_public_entrypoint/crates/chio-core/Cargo.toml"
+assert_rc "$(run_checker "$root_only_public_entrypoint/Cargo.toml" "$work/root-only-public-entrypoint.out" "$work/root-only-public-entrypoint.err")" 1 \
+  "root-listed public entrypoint without package marker fails"
+grep -F "crates/chio-core/Cargo.toml is listed in workspace.metadata.chio.rust_public_entrypoints but does not declare package.metadata.chio.public_entrypoint = true." \
+  "$work/root-only-public-entrypoint.err" >/dev/null
 
 duplicate="$work/duplicate"
 write_workspace "$duplicate" '    "chio-cli",' '    "chio-core",' '    "chio-core",'
@@ -184,11 +216,6 @@ grep -F "crates/chio-core/Cargo.toml is a public entrypoint but does not declare
 
 local_public_marker="$work/local-public-marker"
 write_workspace "$local_public_marker" '    "chio-cli",'
-cat >> "$local_public_marker/crates/chio-core/Cargo.toml" <<'EOF'
-
-[package.metadata.chio]
-public_entrypoint = true
-EOF
 assert_rc "$(run_checker "$local_public_marker/Cargo.toml" "$work/local-public-marker.out" "$work/local-public-marker.err")" 1 \
   "package-local public entrypoint marker missing from root list fails"
 grep -F "crates/chio-core/Cargo.toml declares package.metadata.chio.public_entrypoint = true but is missing from workspace.metadata.chio.rust_public_entrypoints." \
