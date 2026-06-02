@@ -51,3 +51,50 @@ compatibility JSON-RPC dispatch paths. Missing params remain compatible as `{}`,
 unknown methods still return method-not-found, and non-object params for known
 A2A methods fail with `-32602` before message parsing, task lookup, or deferred
 lifecycle mutation can observe malformed params.
+
+## Deferred Terminal Task Retention Slice
+
+### Current Boundary
+
+- `edge.rs` owns the authoritative `message/stream`, `task/get`, and
+  `task/cancel` lifecycle.
+- `conversion.rs` owns terminal `TaskResponse` construction and receipt-bearing
+  metadata projection.
+- `bridge.rs` owns the bounded deferred-task cap and TTL constants.
+
+### Pain Point
+
+The A2A bridge contract says `task/get` executes a working deferred task once
+and then persists the terminal result. The current edge updates the stored
+response after execution but immediately removes the task record. It also
+removes cancelled tasks after returning the cancellation response. That makes a
+follow-up `task/get` or idempotent `task/cancel` see `tool not found` instead
+of the already-produced terminal task response, and it loses the owner-bound
+task state that proves the terminal receipt or cancellation belonged to the
+same caller.
+
+### Security And API Constraints
+
+- Preserve public API and wire structs.
+- Preserve owner binding for all task states.
+- Do not re-execute the kernel-backed deferred request after the first
+  successful `task/get`.
+- Keep task retention bounded by the existing TTL and deferred-task cap.
+- Preserve signed receipt metadata on completed or failed terminal responses
+  and cancellation metadata on cancelled responses.
+
+### Affected Dependents
+
+- A2A clients can now repeat `task/get` after completion and receive the same
+  terminal response until TTL expiry instead of `tool not found`.
+- `task/cancel` remains able to cancel only working tasks; repeated cancel for
+  an already cancelled task returns the retained cancelled response.
+- `chio-kernel`, `chio-cross-protocol`, and `chio-mcp-edge` APIs are unchanged.
+
+### Planned Material Improvement
+
+Retain terminal deferred-task responses in the internal task map until the
+existing TTL expires, while preserving owner checks and bounded capacity.
+Update lifecycle tests to prove completed tasks are not re-executed or removed
+on the first `task/get`, and cancelled tasks remain visible for idempotent
+follow-up.

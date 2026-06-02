@@ -1756,7 +1756,7 @@ mod tests {
     }
 
     #[test]
-    fn jsonrpc_task_get_removes_completed_deferred_task() {
+    fn jsonrpc_task_get_retains_completed_deferred_task_result() {
         let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
@@ -1801,7 +1801,23 @@ mod tests {
         );
 
         assert_eq!(resolved["result"]["status"].as_str(), Some("completed"));
-        assert!(!edge.tasks.contains_key(&task_id));
+        assert!(edge.tasks.contains_key(&task_id));
+
+        let repeated = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 32,
+                "method": "task/get",
+                "params": { "taskId": task_id.clone() }
+            }),
+            &kernel,
+            &execution,
+        );
+        assert_eq!(repeated["result"]["status"].as_str(), Some("completed"));
+        assert_eq!(
+            repeated["result"]["metadata"]["chio"]["receiptId"],
+            resolved["result"]["metadata"]["chio"]["receiptId"]
+        );
     }
 
     #[test]
@@ -1943,6 +1959,27 @@ mod tests {
         assert_eq!(cancelled["result"]["status"].as_str(), Some("cancelled"));
         assert_eq!(
             cancelled["result"]["metadata"]["chio"]["decision"].as_str(),
+            Some("cancelled")
+        );
+
+        let cancelled_again = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 14,
+                "method": "task/cancel",
+                "params": {
+                    "taskId": task_id
+                }
+            }),
+            &kernel,
+            &execution,
+        );
+        assert_eq!(
+            cancelled_again["result"]["status"].as_str(),
+            Some("cancelled")
+        );
+        assert_eq!(
+            cancelled_again["result"]["metadata"]["chio"]["decision"].as_str(),
             Some("cancelled")
         );
     }

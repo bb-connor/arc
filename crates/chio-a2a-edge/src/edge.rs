@@ -246,9 +246,7 @@ impl ChioA2aEdge {
 
     fn prune_deferred_tasks(&mut self) {
         let now = unix_now_millis();
-        self.tasks.retain(|_, task| {
-            task.response.status == TaskStatus::Working && task.expires_at_ms > now
-        });
+        self.tasks.retain(|_, task| task.expires_at_ms > now);
     }
 
     fn ensure_deferred_task_capacity(&mut self) -> Result<(), A2aEdgeError> {
@@ -648,7 +646,6 @@ impl ChioA2aEdge {
         if let Some(task) = self.tasks.get_mut(task_id) {
             task.response = response.clone();
         }
-        self.tasks.remove(task_id);
         json!({
             "jsonrpc": "2.0",
             "id": id,
@@ -689,7 +686,6 @@ impl ChioA2aEdge {
                     "deferred_task_poll",
                 ));
                 let response = task.response.clone();
-                self.tasks.remove(&task_id);
                 json!({
                     "jsonrpc": "2.0",
                     "id": id,
