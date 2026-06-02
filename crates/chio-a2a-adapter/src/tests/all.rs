@@ -1666,6 +1666,46 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn adapter_blocking_registry_conflict_does_not_abort_valid_task_response() {
+        let registry_path = unique_path("chio-a2a-http-blocking-conflict", ".json");
+        let Some(server) = FakeA2aServer::spawn_http_json() else {
+            return;
+        };
+        let manifest_key = Keypair::generate();
+        let adapter = A2aAdapter::discover(
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
+                .with_task_registry_file(&registry_path)
+                .with_timeout(Duration::from_secs(2)),
+        )
+        .expect("discover HTTP+JSON adapter");
+        seed_a2a_task(&adapter, "clinical_search", "task-1");
+
+        let result = adapter
+            .invoke(
+                "research",
+                json!({
+                    "data": { "query": "hypertension staging guidelines" },
+                    "return_immediately": true
+                }),
+                None,
+            )
+            .await;
+        server.join();
+
+        let result = result.expect("valid blocking response should not fail on registry conflict");
+        assert_eq!(result["task"]["id"], "task-1");
+        assert_eq!(result["task"]["status"]["state"], "TASK_STATE_COMPLETED");
+        assert!(
+            adapter
+                .validate_task_binding("research", "task-1", "test_follow_up")
+                .is_err(),
+            "conflicting registry binding must still deny future follow-up"
+        );
+
+        let _ = fs::remove_file(registry_path);
+    }
+
+    #[tokio::test]
     async fn adapter_streaming_registry_conflict_does_not_abort_valid_stream() {
         let registry_path = unique_path("chio-a2a-jsonrpc-stream-conflict", ".json");
         let Some(server) = FakeA2aServer::spawn_jsonrpc_streaming_complete() else {

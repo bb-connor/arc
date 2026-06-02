@@ -61,6 +61,7 @@ enum A2aTaskRegistryRecordError {
 }
 
 impl A2aTaskRegistryRecordError {
+    #[cfg(test)]
     fn into_adapter_error(self) -> AdapterError {
         match self {
             Self::Fatal(error) | Self::RebindConflict(error) => error,
@@ -186,6 +187,7 @@ impl A2aTaskRegistry {
         Ok(())
     }
 
+    #[cfg(test)]
     fn record_from_value(
         &self,
         value: &Value,

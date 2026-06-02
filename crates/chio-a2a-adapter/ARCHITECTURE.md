@@ -126,3 +126,46 @@ storage errors return an adapter error so the current tool call fails closed
 instead of hiding an untrusted durable-authority state. This also prevents
 diagnostic text, file paths, or unrelated lifecycle errors from accidentally
 matching the rebind-conflict path.
+
+## Blocking Registry Error Classification Slice
+
+### Current Boundary
+
+- Blocking `SendMessage`, `GetTask`, and `CancelTask` calls validate the remote
+  A2A payload before converting it into a Chio tool result.
+- `record_task_activity` observes accepted blocking responses and writes durable
+  task correlation through `A2aTaskRegistry::record_from_value`.
+- `A2aTaskRegistry::validate_follow_up` remains the fail-closed gate for later
+  task operations.
+
+### Pain Point
+
+The blocking path still treats every registry recording error as fatal after a
+remote A2A operation has already succeeded. A stale local rebind conflict can
+therefore turn a valid current `SendMessage`, `GetTask`, or `CancelTask`
+response into `ToolServerError`, while streaming already classifies the same
+conflict as non-fatal and preserves the unchanged registry so future follow-up
+authority stays denied.
+
+### Security And API Constraints
+
+- Preserve public API compatibility and `ToolServerConnection` behavior.
+- Keep malformed task observations, corrupted registry files, unsupported
+  registry versions, lock failures, and write failures fail-closed.
+- Do not overwrite conflicting task bindings or widen follow-up authority.
+- Do not expose credentials in registry warnings.
+
+### Affected Dependents
+
+- `chio-kernel` should receive the accepted current blocking A2A response for a
+  stale rebind conflict instead of a late local persistence error.
+- Future A2A follow-up operations continue to depend on
+  `A2aTaskRegistry::validate_follow_up`; no downstream public schema change is
+  planned.
+
+### Completed Material Improvement
+
+Routed blocking response recording through the same internal classified registry
+boundary used by streams. Rebind conflicts should be warning-only for the
+current accepted response, while fatal registry errors continue to abort the
+current invocation fail-closed.

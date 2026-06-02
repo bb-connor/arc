@@ -172,7 +172,7 @@ impl A2aAdapter {
             selected_binding: &self.selected_binding,
             partner: partner.as_str(),
         };
-        registry.record_from_value(response, &context)
+        Self::record_classified_task_activity(registry, response, &context)
     }
 
     fn record_stream_task_activity(
@@ -194,15 +194,23 @@ impl A2aAdapter {
             selected_binding: &self.selected_binding,
             partner: partner.as_str(),
         };
-        if let Err(error) = registry.record_from_value_classified(response, &context) {
+        Self::record_classified_task_activity(registry, response, &context)
+    }
+
+    fn record_classified_task_activity(
+        registry: &A2aTaskRegistry,
+        response: &Value,
+        context: &A2aTaskRecordContext<'_>,
+    ) -> Result<(), AdapterError> {
+        if let Err(error) = registry.record_from_value_classified(response, context) {
             match error {
                 A2aTaskRegistryRecordError::RebindConflict(error) => {
                     tracing::warn!(
                         target: "chio_a2a_adapter",
-                        tool_name,
-                        source,
+                        tool_name = context.tool_name,
+                        source = context.source,
                         error = %error,
-                        "skipping A2A stream task registry persistence"
+                        "skipping A2A task registry persistence"
                     );
                 }
                 A2aTaskRegistryRecordError::Fatal(error) => return Err(error),
