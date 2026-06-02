@@ -12,12 +12,15 @@ crates such as `chio-store-sqlite`.
 ## Current Pain Point
 
 Runtime admission hooks can reserve external runtime capacity after guards pass
-but before dispatch begins. If a later pre-dispatch gate denies the call
-(sibling-sum admission or payment authorization), the kernel attempts to release
-those reservations before returning the denial. Today a release failure bubbles
-out as `KernelError`, which masks the original fail-closed denial and prevents a
-signed denial receipt from being recorded for a request that never reached the
-tool server.
+but before dispatch begins. If a later pre-dispatch gate denies the call, such
+as sibling-sum admission or payment authorization, the kernel must release
+those reservations, reverse any pre-execution budget mutation, and still sign a
+denial receipt that preserves the original denial.
+
+The direct and nested-flow dispatch paths currently hand-roll that same
+sequence. The behavior is mostly correct, but duplication makes this a fragile
+security boundary: future fixes to release-failure metadata, budget reversal,
+or monetary denial metadata can land in one path and drift from the other.
 
 ## Security And API Constraints
 
@@ -30,6 +33,8 @@ tool server.
 - Runtime admission reservations must be released on provably pre-dispatch
   denials, but release failures must be evidence on the denial receipt rather
   than a replacement for the denial.
+- Direct and nested-flow dispatch must share the same pre-dispatch cleanup and
+  denial receipt path.
 - Public kernel APIs and receipt JSON compatibility should remain unchanged.
 
 ## Affected Dependents
@@ -40,9 +45,10 @@ slots. HTTP, ACP, A2A, and product callers should continue to receive ordinary
 deny responses for pre-dispatch denials instead of transport-level kernel
 errors.
 
-## Planned Improvement
+## Improvement In This Slice
 
-Make runtime-admission reservation release best-effort at the pre-dispatch
-denial boundary. The kernel should still attempt release, record release
-failure metadata on the signed denial receipt, and preserve the original denial
-reason and budget rollback evidence.
+Move runtime-admission release, pre-execution budget reversal, monetary denial
+metadata construction, and signed denial response creation behind one internal
+pre-dispatch cleanup boundary. Both sibling-sum and payment denials in direct
+and nested-flow dispatch use that boundary. Add nested-flow coverage for a
+runtime-admission release failure so the shared behavior stays explicit.

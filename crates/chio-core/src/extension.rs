@@ -483,6 +483,23 @@ pub fn validate_official_stack_package(
         .iter()
         .map(|component| (component.id.as_str(), component))
         .collect();
+    for component in &package.components {
+        for point_id in &component.extension_point_ids {
+            let point = points_by_id
+                .get(point_id.as_str())
+                .ok_or_else(|| ExtensionContractError::UnknownReference(point_id.clone()))?;
+            if !point
+                .official_component_ids
+                .iter()
+                .any(|component_id| component_id == &component.id)
+            {
+                return Err(ExtensionContractError::UnknownReference(format!(
+                    "{} -> {}",
+                    component.id, point_id
+                )));
+            }
+        }
+    }
     let mut profile_ids = HashSet::new();
     for profile in &package.profiles {
         ensure_non_empty(&profile.id, "official_stack.profiles.id")?;
@@ -1421,6 +1438,30 @@ mod tests {
             validate_official_stack_package(&inventory, &sample_official_stack()),
             Err(ExtensionContractError::UnknownReference(_))
         ));
+    }
+
+    #[test]
+    fn official_stack_validation_rejects_components_not_advertised_by_inventory() {
+        let mut package = sample_official_stack();
+        package.components[0].extension_point_ids =
+            vec!["chio.kernel.tool_server_connection".to_string()];
+
+        assert!(matches!(
+            validate_official_stack_package(&sample_inventory(), &package),
+            Err(ExtensionContractError::UnknownReference(_))
+        ));
+    }
+
+    #[test]
+    fn negotiation_rejects_unreciprocated_official_component_edges() {
+        let mut package = sample_official_stack();
+        package.components[0].extension_point_ids =
+            vec!["chio.kernel.tool_server_connection".to_string()];
+
+        let report = negotiate_extension(&sample_inventory(), &package, &sample_manifest());
+        assert_eq!(report.outcome, ExtensionNegotiationOutcome::Rejected);
+        assert!(rejection_codes(&report)
+            .contains(&ExtensionNegotiationRejectionCode::MalformedOfficialStack));
     }
 
     #[test]

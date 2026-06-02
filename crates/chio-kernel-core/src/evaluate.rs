@@ -306,64 +306,7 @@ pub fn evaluate_with_crypto_floor_and_budgets(
         }
     };
 
-    // Step 2: subject binding.
-    if verified.subject_hex != input.request.agent_id {
-        let core_err = KernelCoreError::SubjectMismatch {
-            expected: verified.subject_hex.clone(),
-            actual: input.request.agent_id.clone(),
-        };
-        return deny(core_err, None, Some(verified));
-    }
-
-    // Step 3: scope match.
-    let matched_grant_index = match resolve_matched_grant_index(&verified.scope, input.request) {
-        Ok(index) => index,
-        Err(error) => return deny(error, None, Some(verified)),
-    };
-
-    // Step 4: guard pipeline.
-    let ctx = GuardContext {
-        request: input.request,
-        scope: &verified.scope,
-        agent_id: &input.request.agent_id,
-        server_id: &input.request.server_id,
-        session_filesystem_roots: input.session_filesystem_roots,
-        matched_grant_index: Some(matched_grant_index),
-    };
-
-    for guard in input.guards {
-        match guard.evaluate(&ctx) {
-            Ok(Verdict::Allow) => {}
-            Ok(Verdict::Deny) | Ok(Verdict::PendingApproval) => {
-                // PendingApproval is reserved for the full kernel orchestration
-                // layer (chio-kernel::approval::ApprovalGuard); if a legacy sync
-                // guard surfaces it here we fail closed.
-                let core_err = KernelCoreError::GuardDenied {
-                    guard: guard.name().to_string(),
-                };
-                return deny(core_err, Some(matched_grant_index), Some(verified));
-            }
-            Err(error) => {
-                let core_err = KernelCoreError::GuardError {
-                    guard: guard.name().to_string(),
-                    reason: error.deny_reason(),
-                };
-                return deny(core_err, Some(matched_grant_index), Some(verified));
-            }
-        }
-    }
-
-    if let Err(error) = admit_delegated_budget(input.capability, budgets) {
-        let core_err = KernelCoreError::InvalidCapability(error);
-        return deny(core_err, Some(matched_grant_index), Some(verified));
-    }
-
-    EvaluationVerdict {
-        verdict: Verdict::Allow,
-        reason: None,
-        matched_grant_index: Some(matched_grant_index),
-        verified: Some(verified),
-    }
+    finish_verified_evaluation(input, verified, budgets)
 }
 
 /// Full current-semantics evaluation entry point.
@@ -408,6 +351,14 @@ pub fn evaluate_with_full_floor(
         }
     };
 
+    finish_verified_evaluation(input, verified, budgets)
+}
+
+fn finish_verified_evaluation(
+    input: EvaluateInput<'_>,
+    verified: VerifiedCapability,
+    budgets: &mut dyn BudgetRegistry,
+) -> EvaluationVerdict {
     // Step 2: subject binding.
     if verified.subject_hex != input.request.agent_id {
         let core_err = KernelCoreError::SubjectMismatch {
@@ -437,6 +388,9 @@ pub fn evaluate_with_full_floor(
         match guard.evaluate(&ctx) {
             Ok(Verdict::Allow) => {}
             Ok(Verdict::Deny) | Ok(Verdict::PendingApproval) => {
+                // PendingApproval is reserved for the full kernel orchestration
+                // layer (chio-kernel::approval::ApprovalGuard); if a sync guard
+                // surfaces it here we fail closed.
                 let core_err = KernelCoreError::GuardDenied {
                     guard: guard.name().to_string(),
                 };
@@ -452,6 +406,8 @@ pub fn evaluate_with_full_floor(
         }
     }
 
+    // Step 5: mutate delegated sibling budget only after every deny-capable
+    // local check has passed.
     if let Err(error) = admit_delegated_budget(input.capability, budgets) {
         let core_err = KernelCoreError::InvalidCapability(error);
         return deny(core_err, Some(matched_grant_index), Some(verified));
@@ -633,6 +589,51 @@ mod tests {
                 session_filesystem_roots: None,
             },
             CapabilityCryptoFloor::AllowClassical,
+            &mut budgets,
+        );
+
+        assert!(verdict.is_deny());
+        let split = match budgets.split(parent_capability_id) {
+            Some(split) => split,
+            None => panic!("registered parent budget split was missing"),
+        };
+        assert_eq!(split.current_total_child_bps(), 0);
+        assert!(split.children.is_empty());
+    }
+
+    #[test]
+    fn full_floor_budget_admission_waits_until_subject_scope_and_guards_allow() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let wrong_agent = Keypair::generate();
+        let parent_capability_id = "parent-capability-full";
+        let capability = delegated_capability(&issuer, &subject, parent_capability_id);
+        let mut request = request();
+        request.agent_id = wrong_agent.public_key().to_hex();
+        let trusted = [issuer.public_key()];
+        let clock = crate::FixedClock::new(150);
+        let guards: [&dyn Guard; 0] = [];
+        let peer = CapabilityNegotiation::t1_default();
+        let trust_roots = |_issuer: &chio_core_types::crypto::PublicKey| None;
+        let mut budgets = InMemoryBudgetRegistry::new();
+        if let Err(error) =
+            budgets.register_parent(parent_capability_id.to_string(), MAX_BUDGET_SHARE_BPS)
+        {
+            panic!("failed to register parent budget split: {error:?}");
+        }
+
+        let verdict = evaluate_with_full_floor(
+            EvaluateInput {
+                request: &request,
+                capability: &capability,
+                trusted_issuers: &trusted,
+                clock: &clock,
+                guards: &guards,
+                session_filesystem_roots: None,
+            },
+            CapabilityCryptoFloor::AllowClassical,
+            &peer,
+            &trust_roots,
             &mut budgets,
         );
 

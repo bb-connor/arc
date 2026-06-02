@@ -46,21 +46,25 @@ feature gated.
 
 ## Current Pain Points
 
-The hot path now has reasonable separation, but wire-boundary strictness is
-uneven. Most signed Chio artifacts deny unknown fields at their serde boundary.
-`PortablePassportBody` and `PortablePassportEnvelope` currently do not, even
-though the verifier treats them as the signed passport boundary for portable
-adapters. Unknown fields are ignored before verification and are not part of
-the returned verified projection, which is a needless ambiguity at a trust
-boundary.
+The hot path has two public evaluation entry points: the legacy
+floor-aware path and the current full-semantics path. They differ in capability
+verification, but after a capability is verified they must perform the same
+subject binding, scope match, guard pipeline, and deferred budget admission.
+That post-verification sequence is security-critical because ordering prevents
+invalid subjects, out-of-scope calls, and guard-denied calls from consuming
+delegated sibling budget.
 
-## Planned Improvement
+That sequence is currently duplicated. Any future fix in one branch can drift
+from the other branch and silently weaken fail-closed ordering for browser,
+mobile, FFI, or hosted callers.
 
-Tighten portable passport parsing so unknown fields in either the envelope or
-body fail closed before signature verification. This keeps the portable passport
-wire contract explicit, aligns it with the rest of Chio's signed-artifact
-posture, and does not alter canonical bytes for valid envelopes.
+## Improvement In This Slice
 
-Affected dependents are the mobile and C++ FFI passport helpers, which generate
-the typed envelope and should continue to round-trip unchanged. No generated
-code should be edited for this slice.
+Move the post-verification evaluation sequence behind one internal boundary
+used by both public evaluation entry points. Capability verification remains
+separate because the entry points intentionally accept different trust-root and
+feature-negotiation inputs. Subject binding, scope matching, guard ordering,
+and budget admission become one shared implementation.
+
+No public API or wire format changes are planned. No dependent crates should
+need edits unless they rely on behavior that contradicts the existing ordering.
