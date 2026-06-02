@@ -182,17 +182,30 @@ impl A2aAdapter {
         source: &str,
     ) -> Result<(), AdapterError> {
         validate_stream_response(response.clone())?;
-        if let Err(error) = self.record_task_activity(tool_name, response, source) {
-            if stream_registry_error_is_nonfatal(&error) {
-                tracing::warn!(
-                    target: "chio_a2a_adapter",
-                    tool_name,
-                    source,
-                    error = %error,
-                    "skipping A2A stream task registry persistence"
-                );
-            } else {
-                return Err(error);
+        let Some(registry) = self.task_registry.as_ref() else {
+            return Ok(());
+        };
+        let partner = self.partner_label();
+        let context = A2aTaskRecordContext {
+            source,
+            tool_name,
+            server_id: self.server_id(),
+            selected_interface: &self.selected_interface,
+            selected_binding: &self.selected_binding,
+            partner: partner.as_str(),
+        };
+        if let Err(error) = registry.record_from_value_classified(response, &context) {
+            match error {
+                A2aTaskRegistryRecordError::RebindConflict(error) => {
+                    tracing::warn!(
+                        target: "chio_a2a_adapter",
+                        tool_name,
+                        source,
+                        error = %error,
+                        "skipping A2A stream task registry persistence"
+                    );
+                }
+                A2aTaskRegistryRecordError::Fatal(error) => return Err(error),
             }
         }
         Ok(())
@@ -1283,10 +1296,6 @@ fn decode_jsonrpc_result<T>(
             "A2A JSON-RPC {response_label} omitted `result`"
         ))
     })
-}
-
-fn stream_registry_error_is_nonfatal(error: &AdapterError) -> bool {
-    matches!(error, AdapterError::Lifecycle(message) if message.contains("attempted to rebind"))
 }
 
 #[async_trait::async_trait]

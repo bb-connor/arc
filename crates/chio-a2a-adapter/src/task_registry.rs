@@ -54,6 +54,20 @@ struct A2aTaskObservation {
     state: Option<String>,
 }
 
+#[derive(Debug)]
+enum A2aTaskRegistryRecordError {
+    Fatal(AdapterError),
+    RebindConflict(AdapterError),
+}
+
+impl A2aTaskRegistryRecordError {
+    fn into_adapter_error(self) -> AdapterError {
+        match self {
+            Self::Fatal(error) | Self::RebindConflict(error) => error,
+        }
+    }
+}
+
 impl A2aTaskRegistry {
     fn open(path: &std::path::Path) -> Result<Self, AdapterError> {
         let registry = Self {
@@ -177,16 +191,27 @@ impl A2aTaskRegistry {
         value: &Value,
         context: &A2aTaskRecordContext<'_>,
     ) -> Result<(), AdapterError> {
-        let seen = task_observations_from_value(value)?;
+        self.record_from_value_classified(value, context)
+            .map_err(A2aTaskRegistryRecordError::into_adapter_error)
+    }
+
+    fn record_from_value_classified(
+        &self,
+        value: &Value,
+        context: &A2aTaskRecordContext<'_>,
+    ) -> Result<(), A2aTaskRegistryRecordError> {
+        let seen =
+            task_observations_from_value(value).map_err(A2aTaskRegistryRecordError::Fatal)?;
         if seen.is_empty() {
             return Ok(());
         }
 
-        let _guard = self
-            .lock
-            .lock()
-            .map_err(|_| AdapterError::Lifecycle("A2A task registry lock poisoned".to_string()))?;
-        let mut registry = self.load()?;
+        let _guard = self.lock.lock().map_err(|_| {
+            A2aTaskRegistryRecordError::Fatal(AdapterError::Lifecycle(
+                "A2A task registry lock poisoned".to_string(),
+            ))
+        })?;
+        let mut registry = self.load().map_err(A2aTaskRegistryRecordError::Fatal)?;
         let now = unix_timestamp_now();
         for observation in seen {
             let entry = registry
@@ -205,12 +230,14 @@ impl A2aTaskRegistry {
                     last_state: None,
                     last_source: context.source.to_string(),
                 });
-            validate_task_record_binding(entry, context)?;
+            validate_task_record_binding(entry, context)
+                .map_err(A2aTaskRegistryRecordError::RebindConflict)?;
             entry.last_seen_at = now;
             entry.last_source = context.source.to_string();
             entry.last_state = observation.state.or_else(|| entry.last_state.clone());
         }
         self.save(&registry)
+            .map_err(A2aTaskRegistryRecordError::Fatal)
     }
 }
 

@@ -117,6 +117,12 @@ The current stream recording path swallows every registry error after stream val
 - `chio-kernel` should continue to receive a `ToolServerError` when A2A stream recording cannot establish a safe durable boundary.
 - Existing A2A stream conflict tests must continue to prove that conflicting task ids do not overwrite the old binding and do not abort the current valid stream.
 
-### Planned Material Improvement
+### Completed Material Improvement
 
-Classify stream registry recording errors at the invocation boundary. Only task rebind conflicts stay non-fatal; validation, parsing, unsupported-version, lock, and storage errors return an adapter error so the current tool call fails closed instead of hiding an untrusted durable-authority state.
+Classify stream registry recording errors at the registry boundary with an
+internal typed result. Only actual task rebind conflicts stay non-fatal for the
+current valid stream; validation, parsing, unsupported-version, lock, and
+storage errors return an adapter error so the current tool call fails closed
+instead of hiding an untrusted durable-authority state. This also prevents
+diagnostic text, file paths, or unrelated lifecycle errors from accidentally
+matching the rebind-conflict path.
