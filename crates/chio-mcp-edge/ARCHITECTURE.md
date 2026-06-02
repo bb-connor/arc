@@ -130,3 +130,45 @@ tests that prove the fuzz decoder exercises the same boundary.
 Extract bounded newline-delimited JSON-RPC frame decoding into
 `runtime/framing.rs`, route stdio pumps and blocking nested-flow reads through
 it, and make the fuzz entrypoint use the same decoder.
+
+## Known Notification Params Gate Slice
+
+### Current Boundary
+
+`runtime/protocol.rs` parses JSON-RPC envelopes and validates object-shaped
+params for known MCP request methods. `runtime.rs` then dispatches request
+methods or notification methods into lifecycle and runtime state handling.
+
+### Pain Point
+
+Known request methods already fail closed when `params` is present but not an
+object. Known notification methods do not. A malformed
+`notifications/initialized` notification can therefore advance an initialized
+session into the ready state even though the inbound lifecycle frame does not
+match the MCP object params shape.
+
+### Security And API Constraints
+
+- Preserve notification semantics: notification-shaped inputs still do not
+  receive JSON-RPC responses.
+- Preserve missing `params` compatibility by normalizing it to `{}`.
+- Preserve ready-state gating for `tools/list`, `tools/call`, resource, prompt,
+  completion, logging, and task methods.
+- Preserve request-shaped `tasks/cancel` behavior and cancellation-side-channel
+  ordering.
+- Keep this slice inside `chio-mcp-edge`; no public API change is intended.
+
+### Affected Dependents
+
+`chio-mcp-remote`, `chio-hosted-mcp`, and stdio/channel embedders all drive the
+same runtime dispatcher. They should observe no API change for well-formed MCP
+notifications. The compatibility proof is crate-local: malformed known
+notifications are ignored without state transitions, while well-formed
+`notifications/initialized` still enters the ready state.
+
+### Completed Improvement
+
+Added one shared known-notification params gate in `runtime/protocol.rs`, routed
+all direct and transport-backed JSON-RPC notification dispatch through it, and
+made the cancellation side channel reject malformed
+`notifications/cancelled` params before nested-flow cancellation matching.

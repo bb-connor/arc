@@ -75,6 +75,10 @@ pub(super) fn ensure_known_request_params_object(
     ))
 }
 
+pub(super) fn known_notification_params_are_object(method: &str, params: &Value) -> bool {
+    !known_notification_method(method) || params.is_object()
+}
+
 fn known_request_method(method: &str) -> bool {
     matches!(
         method,
@@ -95,6 +99,15 @@ fn known_request_method(method: &str) -> bool {
             | "prompts/get"
             | "completion/complete"
             | "logging/setLevel"
+    )
+}
+
+fn known_notification_method(method: &str) -> bool {
+    matches!(
+        method,
+        "notifications/initialized"
+            | "notifications/roots/list_changed"
+            | "notifications/cancelled"
     )
 }
 
@@ -946,7 +959,7 @@ pub(super) fn task_cancel_matches_related_task(
 
 pub(super) fn is_cancellation_side_channel_signal(message: &Value) -> bool {
     match message.get("method").and_then(Value::as_str) {
-        Some("notifications/cancelled") => true,
+        Some("notifications/cancelled") => message.get("params").is_some_and(Value::is_object),
         Some("tasks/cancel") => has_jsonrpc_request_id(message),
         _ => false,
     }
@@ -1277,6 +1290,46 @@ mod tests {
         assert_eq!(response["id"], json!("req-2"));
         assert_eq!(response["error"]["code"], JSONRPC_INVALID_REQUEST);
         assert_eq!(response["error"]["message"], "request missing method");
+    }
+
+    #[test]
+    fn known_notification_params_gate_rejects_non_object_known_params() {
+        assert!(known_notification_params_are_object(
+            "notifications/initialized",
+            &json!({})
+        ));
+        assert!(known_notification_params_are_object(
+            "notifications/initialized",
+            &json!({"client": "ready"})
+        ));
+        assert!(!known_notification_params_are_object(
+            "notifications/initialized",
+            &json!([])
+        ));
+        assert!(known_notification_params_are_object(
+            "notifications/unknown",
+            &json!([])
+        ));
+    }
+
+    #[test]
+    fn cancelled_notification_side_channel_requires_object_params() {
+        assert!(is_cancellation_side_channel_signal(&json!({
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": {
+                "requestId": "edge-client-1"
+            }
+        })));
+        assert!(!is_cancellation_side_channel_signal(&json!({
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled",
+            "params": []
+        })));
+        assert!(!is_cancellation_side_channel_signal(&json!({
+            "jsonrpc": "2.0",
+            "method": "notifications/cancelled"
+        })));
     }
 
     #[test]

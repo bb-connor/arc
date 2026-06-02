@@ -785,7 +785,7 @@ impl ChioMcpEdge {
                 }
                 Some(self.handle_request(id, &method, params))
             }
-            None => self.handle_notification(&method, params),
+            None => self.handle_known_notification(&method, params),
         }
     }
 
@@ -818,7 +818,7 @@ impl ChioMcpEdge {
                 }
                 Some(self.handle_request_with_transport(id, &method, params, reader, writer))
             }
-            None => self.handle_notification(&method, params),
+            None => self.handle_known_notification(&method, params),
         }
     }
 
@@ -842,7 +842,7 @@ impl ChioMcpEdge {
                     id, &method, params, client_rx, cancel_rx, writer,
                 ))
             }
-            None => self.handle_notification(&method, params),
+            None => self.handle_known_notification(&method, params),
         }
     }
 
@@ -988,6 +988,14 @@ impl ChioMcpEdge {
             ),
             _ => self.handle_request(id, method, params),
         }
+    }
+
+    fn handle_known_notification(&mut self, method: &str, params: Value) -> Option<Value> {
+        if !known_notification_params_are_object(method, &params) {
+            return None;
+        }
+
+        self.handle_notification(method, params)
     }
 
     fn handle_notification(&mut self, method: &str, _params: Value) -> Option<Value> {

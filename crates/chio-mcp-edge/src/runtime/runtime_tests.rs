@@ -1650,6 +1650,49 @@ fn initialize_then_initialized_enters_ready_state() {
 }
 
 #[test]
+fn malformed_initialized_notification_does_not_enter_ready_state() {
+    let mut edge = make_edge(10);
+
+    let initialize = edge
+        .handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {}
+        }))
+        .unwrap();
+    assert_eq!(
+        initialize["result"]["protocolVersion"],
+        MCP_PROTOCOL_VERSION
+    );
+    assert!(matches!(
+        edge.state,
+        EdgeState::WaitingForInitialized { .. }
+    ));
+
+    let initialized = edge.handle_jsonrpc(json!({
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized",
+        "params": []
+    }));
+    assert!(initialized.is_none());
+    assert!(matches!(
+        edge.state,
+        EdgeState::WaitingForInitialized { .. }
+    ));
+
+    let tools_list = edge
+        .handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/list",
+            "params": {}
+        }))
+        .unwrap();
+    assert_eq!(tools_list["error"]["code"], JSONRPC_SERVER_NOT_INITIALIZED);
+}
+
+#[test]
 fn initialize_unsupported_protocol_version_rejected() {
     let mut edge = make_edge(10);
 
@@ -2809,6 +2852,40 @@ fn serve_stdio_handles_initialize_and_tools_list_roundtrip() {
     let tools = responses[1]["result"]["tools"].as_array().unwrap();
     assert_eq!(tools.len(), 2);
     assert!(tools.iter().all(|tool| tool["name"] != "write_file"));
+}
+
+#[test]
+fn serve_stdio_malformed_initialized_notification_does_not_enter_ready_state() {
+    let mut edge = make_edge(10);
+    let input = concat!(
+        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}\n",
+        "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\",\"params\":[]}\n",
+        "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}\n"
+    );
+
+    let mut output = Vec::new();
+    edge.serve_stdio(Cursor::new(input.as_bytes()), &mut output)
+        .unwrap();
+
+    let lines = String::from_utf8(output).unwrap();
+    let responses = lines
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .collect::<Vec<_>>();
+
+    assert_eq!(responses.len(), 2);
+    assert_eq!(
+        responses[0]["result"]["protocolVersion"],
+        MCP_PROTOCOL_VERSION
+    );
+    assert_eq!(
+        responses[1]["error"]["code"],
+        JSONRPC_SERVER_NOT_INITIALIZED
+    );
+    assert!(matches!(
+        edge.state,
+        EdgeState::WaitingForInitialized { .. }
+    ));
 }
 
 #[test]
