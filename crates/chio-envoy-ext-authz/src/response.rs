@@ -45,17 +45,22 @@ pub(crate) fn verdict_to_response(verdict: &Verdict) -> CheckResponse {
                 header_option("x-chio-denial-reason", reason),
                 header_option("x-chio-denial-guard", guard),
             ];
+            let admitted_http_status = envoy_status_code(*http_status);
             denied_check_response(
                 Code::PermissionDenied,
                 reason.clone(),
-                envoy_status_code(*http_status),
+                admitted_http_status,
                 headers,
                 format!(
                     "{{\"verdict\":\"deny\",\"reason\":{},\"guard\":{}}}",
                     json_string(reason),
                     json_string(guard),
                 ),
-                Some(deny_dynamic_metadata(reason, guard, *http_status)),
+                Some(deny_dynamic_metadata(
+                    reason,
+                    guard,
+                    status_code_to_http_status(admitted_http_status),
+                )),
             )
         }
     }
@@ -145,6 +150,10 @@ fn envoy_status_code(code: u16) -> i32 {
         _ => EnvoyStatusCode::Forbidden,
     };
     mapped as i32
+}
+
+fn status_code_to_http_status(code: i32) -> u16 {
+    u16::try_from(code).unwrap_or(403)
 }
 
 /// JSON-escape a string so it can be embedded inside the fail-closed body
@@ -250,6 +259,30 @@ mod tests {
                 );
                 assert!(denied.body.contains("\"reason\":\"scope missing\""));
                 assert!(denied.body.contains("\"guard\":\"ScopeGuard\""));
+            }
+            other => panic!("expected DeniedResponse, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn deny_verdict_metadata_reports_admitted_envoy_status() {
+        let verdict = Verdict::Deny {
+            reason: "unsupported downstream status".to_string(),
+            guard: "StatusGuard".to_string(),
+            http_status: 999,
+        };
+        let response = verdict_to_response(&verdict);
+        let metadata = response
+            .dynamic_metadata
+            .expect("deny response carries dynamic metadata");
+        assert_eq!(metadata_number(&metadata, "chio.http_status"), Some(403.0));
+
+        match response.http_response.unwrap() {
+            HttpResponse::DeniedResponse(denied) => {
+                assert_eq!(
+                    denied.status.unwrap().code,
+                    EnvoyStatusCode::Forbidden as i32
+                );
             }
             other => panic!("expected DeniedResponse, got {other:?}"),
         }

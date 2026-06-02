@@ -55,3 +55,43 @@ No Rust dependent imports response helpers or metadata builders because both rem
 ### Material improvement planned
 
 Add an internal dynamic metadata module and attach stable Chio metadata to every response: verdict class for allow, denial reason/guard/status for policy denies, and fail-closed markers for translation or kernel faults. This is architectural because it separates the observability contract from response plumbing and makes the documented Envoy integration behavior true without widening the public surface.
+
+## Deny Status Metadata Slice
+
+### Boundary
+
+`response.rs` owns the conversion from local Chio verdicts to Envoy
+`CheckResponse` messages, including the HTTP status Envoy will actually return
+and the dynamic metadata Envoy may expose to access logs or follow-on filters.
+`metadata.rs` owns field construction, but it must receive already-admitted
+wire facts rather than raw, unrepresentable verdict data.
+
+### Pain Point Addressed
+
+`Verdict::Deny` carries a caller-supplied `http_status`. Envoy's generated
+`StatusCode` enum cannot represent every `u16`, so `response.rs` maps unknown
+or non-denial values to `403 Forbidden`. The denied response already uses that
+mapped status, but dynamic metadata records the original value. A downstream
+filter or access-log pipeline could therefore observe `chio.http_status=200`
+or `999` while Envoy actually denies with 403.
+
+### Security And API Constraints
+
+- Preserve the public `Verdict` shape and `EnvoyKernel` API.
+- Preserve fail-closed translation and kernel-error behavior.
+- Preserve explicit supported denial statuses such as 401, 403, 429, and 503.
+- Do not expose an unsupported or non-denial status as applied policy state in
+  dynamic metadata.
+
+### Affected Dependents
+
+No Rust dependent imports the private response or metadata helpers. Envoy
+deployments that read dynamic metadata gain consistency: `chio.http_status`
+tracks the actual denied HTTP status Envoy receives, not the raw status the
+kernel attempted to request.
+
+### Material Improvement Planned
+
+Make deny response construction compute the admitted Envoy status once and use
+that same value for the `DeniedHttpResponse` and dynamic metadata. Add a
+focused regression proving unsupported deny statuses report 403 in both places.
