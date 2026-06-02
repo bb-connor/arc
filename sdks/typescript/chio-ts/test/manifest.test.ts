@@ -58,6 +58,33 @@ test("manifest structure does not include embedded public key validity", () => {
   assert.equal(verification.embedded_public_key_matches_signer, false);
 });
 
+test("manifest structure rejects empty or padded identity fields", () => {
+  for (const [field, value] of [
+    ["server_id", ""],
+    ["server_id", " srv-priced"],
+    ["server_id", "srv-priced "],
+    ["name", ""],
+    ["name", " Priced Server"],
+    ["name", "Priced Server "],
+    ["version", ""],
+    ["version", " 1.0.0"],
+    ["version", "1.0.0 "],
+  ] as const) {
+    const signedManifest = pricedSignedManifest();
+    signedManifest.manifest[field] = value;
+
+    const verification = verifySignedManifest(signedManifest);
+
+    assert.equal(
+      verification.structure_valid,
+      false,
+      `${field} ${JSON.stringify(value)}`,
+    );
+    assert.equal(verification.signature_valid, false);
+    assert.equal(verification.embedded_public_key_valid, true);
+  }
+});
+
 test("manifest structure rejects empty or padded tool names", () => {
   for (const name of ["", " greet", "greet "]) {
     const signedManifest = pricedSignedManifest();

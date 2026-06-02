@@ -57,6 +57,13 @@ function validateManifestStructure(manifest: ToolManifest): boolean {
   if (manifest.schema !== "chio.manifest.v1") {
     return false;
   }
+  if (
+    !isValidManifestTextField(manifest.server_id) ||
+    !isValidManifestTextField(manifest.name) ||
+    !isValidManifestTextField(manifest.version)
+  ) {
+    return false;
+  }
   if (!Array.isArray(manifest.tools) || manifest.tools.length === 0) {
     return false;
   }
@@ -85,8 +92,12 @@ function validateManifestStructure(manifest: ToolManifest): boolean {
   return true;
 }
 
+function isValidManifestTextField(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0 && value.trim() === value;
+}
+
 function isValidToolName(name: unknown): name is string {
-  return typeof name === "string" && name.trim().length > 0 && name.trim() === name;
+  return isValidManifestTextField(name);
 }
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {

@@ -29,3 +29,46 @@
 ## Planned Material Improvement
 
 Mirror Rust manifest structure checks in `src/invariants/manifest.ts`: reject empty or whitespace-padded tool names, reject non-object `input_schema`, and reject non-object `output_schema` when present. Prove with red TypeScript manifest tests before changing the validator.
+
+## Manifest Identity Parity Slice
+
+### Current Boundary
+
+- `src/invariants/manifest.ts` owns TypeScript signed manifest structure
+  admission through `ManifestVerification.structure_valid`.
+- Rust `chio-manifest::validate_manifest` owns the canonical admission rule
+  for signed manifests before verification and persistence.
+- `test/manifest.test.ts` is the local SDK harness for this parity boundary.
+
+### Pain Point
+
+Rust now rejects blank or whitespace-padded manifest identity fields:
+`server_id`, `name`, and `version`. The TypeScript SDK currently validates the
+schema, non-empty tool list, tool names, duplicate tools, and schema shapes,
+but it does not reject malformed top-level identity fields. That lets Node or
+browser callers accept manifest structures that Rust rejects.
+
+### Security And API Constraints
+
+- Preserve the public `verifySignedManifest` and `verifySignedManifestJson`
+  return shape.
+- Keep canonical JSON bytes and signature verification independent from
+  `structure_valid`.
+- Treat identity-field divergence as fail-closed `structure_valid: false`.
+- Do not change Rust crates or generated artifacts for this SDK-only parity
+  fix.
+
+### Affected Dependents
+
+- `@chio-protocol/sdk/invariants` consumers get stricter structure parity with
+  Rust manifest admission.
+- Existing valid manifests are unchanged.
+- Documentation and package exports do not need a signature or API-shape
+  change.
+
+### Planned Material Improvement
+
+Add a shared TypeScript manifest text-field validator for `server_id`, `name`,
+and `version`, mirroring Rust `validate_manifest_text_field`. Prove the
+boundary with tests for blank and padded identity fields while preserving
+signature and embedded-key result behavior.
