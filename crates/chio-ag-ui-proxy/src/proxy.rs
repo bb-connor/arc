@@ -263,29 +263,28 @@ impl AgUiProxy {
     }
 
     fn decide(&self, event: &AgUiEvent, capability: Option<&CapabilityToken>) -> ProxyDecision {
-        // Check if this classification requires a capability
         let requires_capability = self
             .config
             .restricted_classifications
             .contains(&event.classification);
 
-        if requires_capability {
-            match capability {
-                None => ProxyDecision::Block {
-                    reason: format!("capability required for {:?} events", event.classification),
-                },
-                Some(cap) => self.decide_restricted_event(event, cap),
-            }
-        } else if self.config.allow_display_without_capability || capability.is_some() {
-            ProxyDecision::Forward
-        } else {
-            ProxyDecision::Block {
-                reason: "no capability token provided".to_string(),
-            }
+        if let Some(capability) = capability {
+            return self.decide_capability_bound_event(event, capability);
         }
+
+        if self.config.allow_display_without_capability && !requires_capability {
+            return ProxyDecision::Forward;
+        }
+
+        let reason = if requires_capability {
+            format!("capability required for {:?} events", event.classification)
+        } else {
+            "no capability token provided".to_string()
+        };
+        ProxyDecision::Block { reason }
     }
 
-    fn decide_restricted_event(
+    fn decide_capability_bound_event(
         &self,
         event: &AgUiEvent,
         capability: &CapabilityToken,
@@ -1011,6 +1010,56 @@ mod tests {
         assert_eq!(decision, ProxyDecision::Forward);
         assert!(receipt.allowed);
         assert_eq!(transport.events_forwarded, 1);
+    }
+
+    #[test]
+    fn display_event_rejects_untrusted_capability_by_default() {
+        let proxy = AgUiProxy::new(AgUiProxyConfig::default(), Keypair::generate());
+        let event = make_event(EventClassification::Display);
+        let cap = make_capability();
+        let mut transport = Transport::new(
+            TransportKind::Sse,
+            "conn-display-untrusted".to_string(),
+            "agent-1".to_string(),
+        );
+
+        let (decision, receipt) = proxy.evaluate(&event, Some(&cap), &mut transport).unwrap();
+
+        assert!(matches!(decision, ProxyDecision::Block { .. }));
+        assert!(!receipt.allowed);
+        assert_eq!(receipt.capability_id, "cap-test");
+        assert_eq!(transport.events_blocked, 1);
+        assert!(receipt
+            .denial_reason
+            .as_deref()
+            .unwrap_or_default()
+            .contains("issuer is not trusted"));
+    }
+
+    #[test]
+    fn display_event_requires_display_scope_when_capability_supplied() {
+        let issuer = Keypair::generate();
+        let proxy = proxy_with_trusted_issuer(&issuer);
+        let event = make_event(EventClassification::Display);
+        let submit_cap = make_scoped_capability(&issuer, "submit");
+        let mut transport = Transport::new(
+            TransportKind::Sse,
+            "conn-display-wrong-scope".to_string(),
+            "agent-1".to_string(),
+        );
+
+        let (decision, receipt) = proxy
+            .evaluate(&event, Some(&submit_cap), &mut transport)
+            .unwrap();
+
+        assert!(matches!(decision, ProxyDecision::Block { .. }));
+        assert!(!receipt.allowed);
+        assert_eq!(transport.events_blocked, 1);
+        assert!(receipt
+            .denial_reason
+            .as_deref()
+            .unwrap_or_default()
+            .contains("scope does not authorize"));
     }
 
     #[test]

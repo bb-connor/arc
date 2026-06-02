@@ -10,14 +10,14 @@ payload hashing plus AG-UI receipt signing and verification. `transport.rs`
 owns connection metadata and forwarded or blocked counters. `lib.rs` exposes
 the public facade without hiding those modules.
 
-## Pain Points
+## Completed Event Identity Boundary Slice
 
 `proxy.rs` is the dominant file and combines boundary validation, policy
 derivation, capability scope matching, budget accounting, and tests. The
 highest-risk issue is not line count alone: `AgUiProxy::evaluate` currently
-trusts caller-supplied event identifiers before using them in receipt ids,
-payload-scope arguments, audit metadata, and transport decisions. Empty
-`event_id`, `agent_id`, session ids, or target component fields can therefore
+used to trust caller-supplied event identifiers before using them in receipt
+ids, payload-scope arguments, audit metadata, and transport decisions. Empty
+`event_id`, `agent_id`, session ids, or target component fields could therefore
 reach receipt construction or scope comparison as if they were meaningful
 protocol identities.
 
@@ -40,7 +40,7 @@ and `TransportKind`. Tightening event-boundary validation should preserve those
 types while changing malformed-event behavior from receipt-producing decisions
 to `AgUiProxyError::InvalidEvent`.
 
-## Planned Material Improvement
+## Completed Material Improvement
 
 Move event identity validation into `event.rs` and have `AgUiProxy::evaluate`
 invoke it before classification, capability checks, transport counters, or
@@ -49,3 +49,44 @@ receipt signing. Require non-empty `event_id` and `agent_id`; require optional
 non-empty when present. This makes AG-UI event identity a real protocol
 boundary invariant instead of an implicit assumption inside receipt and scope
 logic.
+
+## Capability-Present Display Boundary Slice
+
+### Current Boundary
+
+`AgUiProxy::evaluate` derives a server-side classification, then delegates to
+`decide`. Restricted classifications already route through
+`verify_capability_full`, issuer trust, scope matching, chain-binding checks,
+and sibling-sum budget admission. Display events can be configured to forward
+without a token, but the default config still requires some capability material.
+
+### Pain Point
+
+The non-restricted branch treats any supplied capability as sufficient. Under
+the default config, a display event with a self-signed, expired, revoked,
+untrusted, or out-of-scope token can forward and produce a receipt carrying that
+capability id without the hot path ever validating the token. That contradicts
+the crate's capability-validated proxy contract and the kernel-core expectation
+that AG-UI uses full capability verification on the hot path.
+
+### Security and API Constraints
+
+Public type names and module exports must remain source-compatible. Operators
+that intentionally allow display-only traffic without capability can keep using
+`allow_display_without_capability`. Whenever a token is supplied or required,
+it must be validated with the same issuer, revocation, scope, chain-binding, and
+budget semantics already used for restricted events. AG-UI receipts remain
+observational and must not imply authorization.
+
+### Affected Dependents
+
+No transitive crate edits are expected. The only behavior change is inside this
+owning crate: display events that rely on an invalid or out-of-scope token now
+produce a blocked AG-UI receipt instead of forwarding.
+
+### Completed Material Improvement
+
+Route every capability-present event through the existing full capability
+verification and scope-matching path. Keep tokenless display forwarding only
+when `allow_display_without_capability` is enabled; otherwise require a valid
+capability grant for the server-derived event classification.
