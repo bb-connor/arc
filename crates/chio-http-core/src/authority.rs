@@ -2253,6 +2253,23 @@ mod tests {
     }
 
     #[test]
+    fn decode_path_identity_segment_accepts_valid_percent_encoding() {
+        assert_eq!(
+            decode_path_identity_segment("files%2eread").as_deref(),
+            Some("files.read")
+        );
+        let ChioToolsPathIdentity::Identity {
+            server_id,
+            tool_name,
+        } = chio_tools_path_identity("/chio/tools/matrix/files%2eread")
+        else {
+            panic!("expected identity from percent-encoded tool segment");
+        };
+        assert_eq!(server_id, "matrix");
+        assert_eq!(tool_name, "files.read");
+    }
+
+    #[test]
     fn chio_tools_path_identity_non_tools_path_is_not_tools_path() {
         assert!(matches!(
             chio_tools_path_identity("/pets/42"),

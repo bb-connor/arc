@@ -2944,6 +2944,92 @@ mod tests {
     }
 
     #[test]
+    fn verify_package_rejects_bilateral_envelope_with_deny_joint_verdict() {
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+        use base64::Engine;
+        use chio_core_types::crypto::{Ed25519Backend, Keypair, SigningBackend};
+        use chio_federation::{pae, PAYLOAD_TYPE_IN_TOTO};
+
+        const BUYER_SEED: [u8; 32] = [11; 32];
+        const VENDOR_A_SEED: [u8; 32] = [21; 32];
+
+        let mut package = proof_package_from_json(include_str!(
+            "../../../examples/chio-3vendor/fixtures/buyer-auditor-proof-package.json"
+        ))
+        .expect("package fixture parses");
+        let context = verification_context_from_fixture();
+
+        let buyer_key = Keypair::from_seed(&BUYER_SEED);
+        let vendor_key = Keypair::from_seed(&VENDOR_A_SEED);
+        let envelope = &mut package.bilateral_envelopes[0];
+        let (mut statement, _) = envelope.decode_statement().expect("envelope decodes");
+        let summary = statement
+            .predicate
+            .policy_evaluation_summary
+            .as_mut()
+            .expect("fixture carries policy evaluation summary");
+        summary.server_a_verdict.verdict = "deny".to_string();
+        summary.server_b_verdict.verdict = "deny".to_string();
+        summary.joint_disposition = Some("deny".to_string());
+        let statement_bytes = statement
+            .canonical_bytes()
+            .expect("statement canonicalizes");
+        envelope.payload = BASE64_STANDARD.encode(&statement_bytes);
+        let pae_bytes = pae(PAYLOAD_TYPE_IN_TOTO, &statement_bytes);
+        let sig_a = Ed25519Backend::new(buyer_key.clone())
+            .sign_bytes(&pae_bytes)
+            .expect("buyer signs PAE");
+        let sig_b = Ed25519Backend::new(vendor_key.clone())
+            .sign_bytes(&pae_bytes)
+            .expect("vendor signs PAE");
+        envelope.signatures[0].sig = BASE64_STANDARD.encode(sig_a.to_bytes());
+        envelope.signatures[1].sig = BASE64_STANDARD.encode(sig_b.to_bytes());
+
+        let envelope_sha256 =
+            canonical_sha256(&package.bilateral_envelopes[0]).expect("envelope hash");
+        package.workflow_receipt.steps[0].bilateral_dsse_sha256 = Some(envelope_sha256);
+        let mut previous_step_sha256 = None;
+        for step in &mut package.workflow_receipt.steps {
+            step.parent_receipt_sha256 = previous_step_sha256.clone();
+            previous_step_sha256 = Some(canonical_sha256(step).expect("step hash"));
+        }
+        let mut workflow = WorkflowReceipt::sign(package.workflow_receipt.body(), &buyer_key)
+            .expect("workflow re-signs");
+        for (vendor_id, vendor_seed) in [
+            ("vendor-a", VENDOR_A_SEED),
+            ("vendor-b", [22; 32]),
+            ("vendor-c", [23; 32]),
+        ] {
+            workflow
+                .add_vendor_signature(vendor_id, &Keypair::from_seed(&vendor_seed))
+                .expect("vendor cosignature");
+        }
+        package.workflow_receipt = workflow;
+        package
+            .workflow_intersection
+            .aggregate_workflow_receipt_sha256 =
+            canonical_sha256(&package.workflow_receipt.body()).expect("workflow body hash");
+        let intersection_hash =
+            canonical_sha256(&package.workflow_intersection).expect("intersection hash");
+        let mut trust_document = trust_bundle_document_from_fixture();
+        for trusted in &mut trust_document.workflow_intersections {
+            if trusted.intersection_id == package.workflow_intersection.intersection_id {
+                trusted.sha256 = intersection_hash;
+                break;
+            }
+        }
+        let trust_bundle =
+            ChioVerifierTrustBundle::from_document(trust_document).expect("trust bundle parses");
+
+        let error = verify_package(&package, &trust_bundle, &context).unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.contains("bilateral envelope policy verdict") && message.contains("not allow"),
+            "expected deny joint_verdict gate, got: {message}"
+        );
+    }
+
+    #[test]
     fn wrong_verifier_context_nonce_fails_and_report_keeps_prior_checks() {
         let package = proof_package_from_json(include_str!(
             "../../../examples/chio-3vendor/fixtures/buyer-auditor-proof-package.json"
