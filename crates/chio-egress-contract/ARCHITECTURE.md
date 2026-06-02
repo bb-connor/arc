@@ -55,12 +55,53 @@ slice is additive for callers: existing raw-contract APIs remain available.
 The optional reqwest helper can use the prepared boundary internally without
 requiring downstream source changes.
 
-## Planned Improvement
+## Prepared Contract Lifecycle Slice
 
-Add `PreparedHttpEgressContract`, an immutable pre-validated contract handle.
+`PreparedHttpEgressContract` is an immutable pre-validated contract handle.
 It separates config admission from per-attempt enforcement and lets dispatch
 helpers avoid repeatedly validating raw policy shape while preserving the same
 fail-closed URL, DNS, redirect, and byte checks.
 
 The change is architectural because it introduces a distinct contract lifecycle:
 raw config -> prepared contract -> per-hop enforcement.
+
+## Canonical Authority Admission Slice
+
+### Current Boundary
+
+`allowed_authority_set` is the exact authority allow-list used after each
+target URL has been normalized. Contract validation therefore owns both syntax
+admission and canonical-form admission for authority entries.
+
+### Pain Point Addressed
+
+The authority validator rejects obvious malformed entries, but it can still
+admit authorities that are parseable but not canonical, such as trailing-dot
+domains, zero-padded ports, or non-compressed IPv6 literals. Those entries are
+bad configuration: they pass admission but do not line up with the normalized
+authority string produced during URL enforcement.
+
+### Security And API Constraints
+
+- Preserve exact normalized host or host:port allow-list semantics.
+- Preserve default-port compatibility: callers may continue to allow either
+  `example.com` or `example.com:443` and match HTTPS targets consistently.
+- Preserve public API compatibility; tighten invalid raw policy admission
+  without changing enforcement return types.
+- Keep the optional `reqwest-egress` feature boundary unchanged.
+
+### Affected Dependents
+
+Downstream crates that already build authorities from parsed URLs should be
+unchanged. Dependents with non-canonical hard-coded authorities should fail
+early at config validation rather than silently producing an unusable contract.
+Focused proof belongs in `cargo test -p chio-egress-contract`; no transitive
+source edits are expected unless a dependent test exposes a real non-canonical
+fixture.
+
+### Material Improvement
+
+Validate authority entries against their canonical representation before a raw
+contract can be prepared. Regression tests should prove that trailing-dot
+domains, zero-padded ports, and non-canonical IPv6 literals fail during
+contract validation while explicit default-port authorities remain compatible.

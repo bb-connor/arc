@@ -517,6 +517,27 @@ mod tests {
     }
 
     #[test]
+    fn validate_rejects_non_canonical_allowed_authorities() {
+        for authority in ["api.example.com.", "api.example.com:0443", "[2001:0db8::1]"] {
+            let error = strict_contract(authority)
+                .validate()
+                .expect_err("non-canonical authority should be rejected");
+            assert!(matches!(error, HttpEgressError::InvalidContract(_)));
+            assert!(
+                error.to_string().contains("must be normalized"),
+                "unexpected canonicalization error for {authority:?}: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_accepts_explicit_default_port_authority() {
+        strict_contract("api.example.com:443")
+            .validate()
+            .expect("explicit default ports remain valid authority entries");
+    }
+
+    #[test]
     fn prepare_rejects_invalid_contract_shape() {
         let mut contract = strict_contract("api.example.com");
         contract.allowed_schemes.clear();
@@ -1083,12 +1104,52 @@ fn validate_authority_token(authority: &str) -> Result<(), HttpEgressError> {
         )));
     }
     validate_dispatchable_authority(authority)?;
+    let normalized = normalize_authority_token(authority)?;
+    if normalized != authority {
+        return Err(HttpEgressError::InvalidContract(format!(
+            "allowed authority {authority:?} must be normalized as {normalized:?}"
+        )));
+    }
     Ok(())
 }
 
 fn validate_dispatchable_authority(authority: &str) -> Result<(), HttpEgressError> {
     let _ = normalized_authority_host(authority)?;
     Ok(())
+}
+
+fn normalize_authority_token(authority: &str) -> Result<String, HttpEgressError> {
+    let parsed = Url::parse(&format!("http://{authority}/")).map_err(|error| {
+        HttpEgressError::InvalidContract(format!(
+            "invalid allowed authority {authority:?}: {error}"
+        ))
+    })?;
+    let host = parsed.host().ok_or_else(|| {
+        HttpEgressError::InvalidContract(format!("invalid allowed authority {authority:?}"))
+    })?;
+    let normalized_host = match host {
+        Host::Domain(domain) => normalize_domain_name(domain),
+        Host::Ipv4(address) => address.to_string(),
+        Host::Ipv6(address) => format!("[{address}]"),
+    };
+    if authority_has_explicit_port(authority) {
+        let port = parsed.port_or_known_default().ok_or_else(|| {
+            HttpEgressError::InvalidContract(format!("invalid allowed authority {authority:?}"))
+        })?;
+        return Ok(format!("{normalized_host}:{port}"));
+    }
+    Ok(normalized_host)
+}
+
+fn authority_has_explicit_port(authority: &str) -> bool {
+    if authority.starts_with('[') {
+        return authority
+            .rsplit_once(']')
+            .is_some_and(|(_, suffix)| suffix.starts_with(':'));
+    }
+    authority
+        .rsplit_once(':')
+        .is_some_and(|(host, _)| !host.contains(':'))
 }
 
 fn normalized_authority_host(authority: &str) -> Result<String, HttpEgressError> {
