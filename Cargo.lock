@@ -3318,6 +3318,7 @@ version = "0.1.0"
 dependencies = [
  "chio-guard-sdk",
  "chio-guard-sdk-macros",
+ "serde_json",
 ]
 
 [[package]]

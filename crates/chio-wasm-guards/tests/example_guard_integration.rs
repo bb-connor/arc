@@ -112,6 +112,29 @@ fn tool_gate_denies_dangerous_tool() {
 }
 
 #[test]
+fn tool_gate_denies_padded_tool_name() {
+    let wasm_bytes = load_example_wasm("chio_example_tool_gate");
+    let engine = create_shared_engine().unwrap();
+    let mut backend = WasmtimeBackend::with_engine(engine);
+    backend.load_module(&wasm_bytes, 1_000_000).unwrap();
+
+    let verdict = backend.evaluate(&make_request(" dangerous_tool ")).unwrap();
+    assert!(
+        verdict.is_deny(),
+        "expected Deny for padded dangerous_tool, got {verdict:?}"
+    );
+    match verdict {
+        GuardVerdict::Deny { reason: Some(r) } => {
+            assert!(
+                r.contains("not canonical"),
+                "expected reason to mention canonical tool names, got: {r}"
+            );
+        }
+        other => panic!("expected Deny with reason, got {other:?}"),
+    }
+}
+
+#[test]
 fn tool_gate_denies_rm_rf() {
     let wasm_bytes = load_example_wasm("chio_example_tool_gate");
     let engine = create_shared_engine().unwrap();
