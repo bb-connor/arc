@@ -48,6 +48,13 @@ pub struct ValidatedHttpEgressTarget {
     pub authority: String,
 }
 
+/// Immutable egress contract that has passed shape validation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreparedHttpEgressContract {
+    contract: HttpEgressContract,
+    tenant_egress_namespace: String,
+}
+
 /// Fail-closed reasons returned by HTTP egress contract enforcement.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum HttpEgressError {
@@ -100,11 +107,8 @@ impl HttpEgressContract {
         redirect_chain_len: u8,
         observed_response_bytes: Option<u64>,
     ) -> Result<ValidatedHttpEgressTarget, HttpEgressError> {
-        let target = self.enforce_url(target_url, redirect_chain_len)?;
-        if let Some(observed) = observed_response_bytes {
-            self.enforce_response_bytes(observed)?;
-        }
-        Ok(target)
+        self.prepare()?
+            .enforce_attempt(target_url, redirect_chain_len, observed_response_bytes)
     }
 
     /// Enforce target URL and redirect hop constraints.
@@ -113,38 +117,7 @@ impl HttpEgressContract {
         target_url: &str,
         redirect_chain_len: u8,
     ) -> Result<ValidatedHttpEgressTarget, HttpEgressError> {
-        self.validate()?;
-        if redirect_chain_len > self.max_redirect_chain {
-            return Err(HttpEgressError::RedirectLimitExceeded {
-                observed: redirect_chain_len,
-                max: self.max_redirect_chain,
-            });
-        }
-
-        let url = Url::parse(target_url)
-            .map_err(|error| HttpEgressError::InvalidUrl(error.to_string()))?;
-        if !url.username().is_empty() || url.password().is_some() {
-            return Err(HttpEgressError::UserinfoDenied);
-        }
-
-        let scheme = url.scheme().to_ascii_lowercase();
-        if !self.allowed_schemes.contains(&scheme) {
-            return Err(HttpEgressError::SchemeDenied { scheme });
-        }
-
-        let host = url.host().ok_or(HttpEgressError::MissingAuthority)?;
-        self.enforce_host_class(&host)?;
-
-        let authority = normalized_url_authority(&url)?;
-        if !self.authority_is_allowed(&url, &authority)? {
-            return Err(HttpEgressError::AuthorityDenied { authority });
-        }
-
-        Ok(ValidatedHttpEgressTarget {
-            tenant_egress_namespace: self.tenant_egress_namespace.trim().to_string(),
-            scheme,
-            authority,
-        })
+        self.prepare()?.enforce_url(target_url, redirect_chain_len)
     }
 
     /// Enforce target URL, redirect hop constraints, and DNS safety.
@@ -157,24 +130,14 @@ impl HttpEgressContract {
         target_url: &str,
         redirect_chain_len: u8,
     ) -> Result<ValidatedHttpEgressTarget, HttpEgressError> {
-        let target = self.enforce_url(target_url, redirect_chain_len)?;
-        let url = Url::parse(target_url)
-            .map_err(|error| HttpEgressError::InvalidUrl(error.to_string()))?;
-        self.enforce_domain_resolution(&url)?;
-        Ok(target)
+        self.prepare()?
+            .enforce_url_with_dns(target_url, redirect_chain_len)
     }
 
     /// Enforce the response-byte ceiling after headers or streaming counters
     /// expose the observed size.
     pub fn enforce_response_bytes(&self, observed: u64) -> Result<(), HttpEgressError> {
-        self.validate()?;
-        if observed > self.max_response_bytes {
-            return Err(HttpEgressError::ResponseTooLarge {
-                observed,
-                max: self.max_response_bytes,
-            });
-        }
-        Ok(())
+        self.prepare()?.enforce_response_bytes(observed)
     }
 
     /// Validate the contract shape before use.
@@ -206,6 +169,15 @@ impl HttpEgressContract {
             validate_authority_token(authority)?;
         }
         Ok(())
+    }
+
+    /// Validate this raw contract and return an immutable enforcement handle.
+    pub fn prepare(&self) -> Result<PreparedHttpEgressContract, HttpEgressError> {
+        self.validate()?;
+        Ok(PreparedHttpEgressContract {
+            contract: self.clone(),
+            tenant_egress_namespace: self.tenant_egress_namespace.trim().to_string(),
+        })
     }
 
     /// Validate that this contract can be used by the reqwest-backed
@@ -355,13 +327,130 @@ impl HttpEgressContract {
 
     #[cfg(feature = "reqwest-egress")]
     fn enforce_resolver_hostname(&self, host: &str) -> Result<(), HttpEgressError> {
+        self.prepare()?.enforce_resolver_hostname(host)
+    }
+}
+
+impl PreparedHttpEgressContract {
+    /// Return the validated raw contract that backs this prepared handle.
+    #[must_use]
+    pub fn contract(&self) -> &HttpEgressContract {
+        &self.contract
+    }
+
+    /// Return the normalized tenant namespace captured during preparation.
+    #[must_use]
+    pub fn tenant_egress_namespace(&self) -> &str {
+        &self.tenant_egress_namespace
+    }
+
+    /// Return the prepared redirect-hop ceiling.
+    #[must_use]
+    pub fn max_redirect_chain(&self) -> u8 {
+        self.contract.max_redirect_chain
+    }
+
+    /// Return the prepared response-byte ceiling.
+    #[must_use]
+    pub fn max_response_bytes(&self) -> u64 {
+        self.contract.max_response_bytes
+    }
+
+    /// Enforce target, redirect, and optional response-size bounds.
+    pub fn enforce_attempt(
+        &self,
+        target_url: &str,
+        redirect_chain_len: u8,
+        observed_response_bytes: Option<u64>,
+    ) -> Result<ValidatedHttpEgressTarget, HttpEgressError> {
+        let target = self.enforce_url(target_url, redirect_chain_len)?;
+        if let Some(observed) = observed_response_bytes {
+            self.enforce_response_bytes(observed)?;
+        }
+        Ok(target)
+    }
+
+    /// Enforce target URL and redirect hop constraints.
+    pub fn enforce_url(
+        &self,
+        target_url: &str,
+        redirect_chain_len: u8,
+    ) -> Result<ValidatedHttpEgressTarget, HttpEgressError> {
+        if redirect_chain_len > self.contract.max_redirect_chain {
+            return Err(HttpEgressError::RedirectLimitExceeded {
+                observed: redirect_chain_len,
+                max: self.contract.max_redirect_chain,
+            });
+        }
+
+        let url = Url::parse(target_url)
+            .map_err(|error| HttpEgressError::InvalidUrl(error.to_string()))?;
+        if !url.username().is_empty() || url.password().is_some() {
+            return Err(HttpEgressError::UserinfoDenied);
+        }
+
+        let scheme = url.scheme().to_ascii_lowercase();
+        if !self.contract.allowed_schemes.contains(&scheme) {
+            return Err(HttpEgressError::SchemeDenied { scheme });
+        }
+
+        let host = url.host().ok_or(HttpEgressError::MissingAuthority)?;
+        self.contract.enforce_host_class(&host)?;
+
+        let authority = normalized_url_authority(&url)?;
+        if !self.contract.authority_is_allowed(&url, &authority)? {
+            return Err(HttpEgressError::AuthorityDenied { authority });
+        }
+
+        Ok(ValidatedHttpEgressTarget {
+            tenant_egress_namespace: self.tenant_egress_namespace.clone(),
+            scheme,
+            authority,
+        })
+    }
+
+    /// Enforce target URL, redirect hop constraints, and DNS safety.
+    pub fn enforce_url_with_dns(
+        &self,
+        target_url: &str,
+        redirect_chain_len: u8,
+    ) -> Result<ValidatedHttpEgressTarget, HttpEgressError> {
+        let target = self.enforce_url(target_url, redirect_chain_len)?;
+        let url = Url::parse(target_url)
+            .map_err(|error| HttpEgressError::InvalidUrl(error.to_string()))?;
+        self.contract.enforce_domain_resolution(&url)?;
+        Ok(target)
+    }
+
+    /// Enforce the response-byte ceiling.
+    pub fn enforce_response_bytes(&self, observed: u64) -> Result<(), HttpEgressError> {
+        if observed > self.contract.max_response_bytes {
+            return Err(HttpEgressError::ResponseTooLarge {
+                observed,
+                max: self.contract.max_response_bytes,
+            });
+        }
+        Ok(())
+    }
+
+    /// Validate that this prepared contract can be used by the reqwest-backed
+    /// dispatcher whose resolver enforces address-class policy at connect time.
+    pub fn validate_dispatchable_with_pinned_dns(&self) -> Result<(), HttpEgressError> {
+        for authority in &self.contract.allowed_authority_set {
+            validate_dispatchable_authority(authority)?;
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "reqwest-egress")]
+    fn enforce_resolver_hostname(&self, host: &str) -> Result<(), HttpEgressError> {
         self.validate_dispatchable_with_pinned_dns()?;
         let normalized = normalize_domain_name(host);
         if normalized.is_empty() {
             return Err(HttpEgressError::MissingAuthority);
         }
-        self.enforce_loopback_hostname(&normalized)?;
-        for authority in &self.allowed_authority_set {
+        self.contract.enforce_loopback_hostname(&normalized)?;
+        for authority in &self.contract.allowed_authority_set {
             if normalized_authority_host(authority)? == normalized {
                 return Ok(());
             }
@@ -425,6 +514,48 @@ mod tests {
 
         assert!(matches!(error, HttpEgressError::InvalidContract(_)));
         assert!(error.to_string().contains("invalid allowed authority"));
+    }
+
+    #[test]
+    fn prepare_rejects_invalid_contract_shape() {
+        let mut contract = strict_contract("api.example.com");
+        contract.allowed_schemes.clear();
+
+        let error = contract
+            .prepare()
+            .expect_err("prepared contracts must reject invalid raw policy shape");
+        assert!(matches!(error, HttpEgressError::InvalidContract(_)));
+    }
+
+    #[test]
+    fn prepared_contract_normalizes_tenant_namespace() {
+        let mut contract = strict_contract("api.example.com");
+        contract.tenant_egress_namespace = " tenant-a ".to_string();
+
+        let prepared = contract.prepare().expect("prepare valid contract");
+        assert_eq!(prepared.tenant_egress_namespace(), "tenant-a");
+
+        let target = prepared
+            .enforce_url("https://api.example.com/v1", 0)
+            .expect("prepared contract should enforce allowed target");
+        assert_eq!(target.tenant_egress_namespace, "tenant-a");
+    }
+
+    #[test]
+    fn prepared_contract_keeps_validated_snapshot_after_raw_mutation() {
+        let mut contract = strict_contract("api.example.com");
+        let prepared = contract.prepare().expect("prepare valid contract");
+
+        contract.allowed_schemes.clear();
+        contract.max_response_bytes = 1;
+
+        prepared
+            .enforce_attempt("https://api.example.com/v1", 0, Some(1024))
+            .expect("prepared snapshot should retain original valid policy");
+        let error = contract
+            .enforce_attempt("https://api.example.com/v1", 0, Some(2))
+            .expect_err("mutated raw contract should be rejected when reused");
+        assert!(matches!(error, HttpEgressError::InvalidContract(_)));
     }
 
     #[test]
@@ -1077,7 +1208,7 @@ fn is_ipv6_private_or_special_use(address: &Ipv6Addr) -> bool {
 /// point and substrate adapters can keep their existing client builder.
 #[cfg(feature = "reqwest-egress")]
 pub mod reqwest_helper {
-    use super::{HttpEgressContract, HttpEgressError};
+    use super::{HttpEgressContract, HttpEgressError, PreparedHttpEgressContract};
     use reqwest::header::{
         HeaderMap, HeaderName, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, COOKIE, HOST, LOCATION,
         PROXY_AUTHORIZATION,
@@ -1137,12 +1268,13 @@ pub mod reqwest_helper {
         client: &reqwest::Client,
         request: reqwest::Request,
     ) -> Result<ContractResponse, HttpEgressError> {
+        let prepared = contract.prepare()?;
         let mut request = request;
         let mut redirect_chain_len = 0_u8;
 
         loop {
             let request_url = request.url().clone();
-            contract.enforce_url_with_dns(request_url.as_str(), redirect_chain_len)?;
+            prepared.enforce_url_with_dns(request_url.as_str(), redirect_chain_len)?;
             let reusable_request = request.try_clone();
             let redirect_request = RedirectRequestParts {
                 method: request.method().clone(),
@@ -1161,10 +1293,10 @@ pub mod reqwest_helper {
             let status = response.status();
             if is_redirect_status(status) {
                 if let Some(location) = response.headers().get(LOCATION).cloned() {
-                    if redirect_chain_len >= contract.max_redirect_chain {
+                    if redirect_chain_len >= prepared.max_redirect_chain() {
                         return Err(HttpEgressError::RedirectLimitExceeded {
                             observed: redirect_chain_len.saturating_add(1),
-                            max: contract.max_redirect_chain,
+                            max: prepared.max_redirect_chain(),
                         });
                     }
                     let location = location.to_str().map_err(|error| {
@@ -1178,7 +1310,7 @@ pub mod reqwest_helper {
                         ))
                     })?;
                     let next_chain_len = redirect_chain_len.saturating_add(1);
-                    contract.enforce_url_with_dns(next_url.as_str(), next_chain_len)?;
+                    prepared.enforce_url_with_dns(next_url.as_str(), next_chain_len)?;
                     let cross_origin = !same_origin(&request_url, &next_url);
                     request = build_redirect_request(
                         client,
@@ -1193,7 +1325,7 @@ pub mod reqwest_helper {
                 }
             }
 
-            return collect_capped_response(contract, response).await;
+            return collect_capped_response(&prepared, response).await;
         }
     }
 
@@ -1382,7 +1514,7 @@ pub mod reqwest_helper {
     }
 
     async fn collect_capped_response(
-        contract: &HttpEgressContract,
+        contract: &PreparedHttpEgressContract,
         mut response: reqwest::Response,
     ) -> Result<ContractResponse, HttpEgressError> {
         if let Some(content_length) = response.content_length() {
@@ -1398,7 +1530,7 @@ pub mod reqwest_helper {
             observed = observed.checked_add(chunk.len() as u64).ok_or(
                 HttpEgressError::ResponseTooLarge {
                     observed: u64::MAX,
-                    max: contract.max_response_bytes,
+                    max: contract.max_response_bytes(),
                 },
             )?;
             contract.enforce_response_bytes(observed)?;
