@@ -183,9 +183,9 @@ fn strip_toml_comments(manifest: &str) -> String {
             TomlStringMode::MultilineBasic { escaped } => {
                 if !escaped {
                     match multiline_quote_prefix(rest, '"') {
-                        MultilineQuotePrefix::ClosingDelimiter => {
-                            stripped.push_str(BASIC_MULTILINE_DELIMITER);
-                            index += BASIC_MULTILINE_DELIMITER.len();
+                        MultilineQuotePrefix::ClosingDelimiter(count) => {
+                            stripped.extend(std::iter::repeat_n('"', count));
+                            index += count;
                             mode = TomlStringMode::Bare;
                             continue;
                         }
@@ -212,9 +212,9 @@ fn strip_toml_comments(manifest: &str) -> String {
             }
             TomlStringMode::MultilineLiteral => {
                 match multiline_quote_prefix(rest, '\'') {
-                    MultilineQuotePrefix::ClosingDelimiter => {
-                        stripped.push_str(LITERAL_MULTILINE_DELIMITER);
-                        index += LITERAL_MULTILINE_DELIMITER.len();
+                    MultilineQuotePrefix::ClosingDelimiter(count) => {
+                        stripped.extend(std::iter::repeat_n('\'', count));
+                        index += count;
                         mode = TomlStringMode::Bare;
                         continue;
                     }
@@ -241,16 +241,16 @@ fn strip_toml_comments(manifest: &str) -> String {
 enum MultilineQuotePrefix {
     None,
     ContentQuotes(usize),
-    ClosingDelimiter,
+    ClosingDelimiter(usize),
 }
 
 fn multiline_quote_prefix(rest: &str, quote: char) -> MultilineQuotePrefix {
     let quote_count = rest.chars().take_while(|ch| *ch == quote).count();
     match quote_count {
         0..=2 => MultilineQuotePrefix::None,
-        3 => MultilineQuotePrefix::ClosingDelimiter,
+        3 => MultilineQuotePrefix::ClosingDelimiter(3),
         4 | 5 => MultilineQuotePrefix::ContentQuotes(quote_count - 3),
-        _ => MultilineQuotePrefix::ClosingDelimiter,
+        _ => MultilineQuotePrefix::ClosingDelimiter(quote_count),
     }
 }
 
@@ -536,6 +536,62 @@ hosts = []
         assert!(stripped.contains("quoted # not a comment"));
         assert!(!stripped.contains("# trailing comment"));
         assert!(!stripped.contains("# real comment"));
+    }
+
+    #[test]
+    fn comment_stripping_consumes_oversized_basic_multiline_quote_runs() {
+        for quote_count in [6, 7] {
+            let closing = "\"".repeat(quote_count);
+            let manifest = format!(
+                "quote = \"\"\"quoted{closing} # trailing comment\n\
+                 next = \"hash # not a comment\"\n\
+                 # real comment\n"
+            );
+
+            let stripped = strip_toml_comments(&manifest);
+
+            assert!(stripped.contains("quoted"), "{stripped}");
+            assert!(
+                stripped.contains("hash # not a comment"),
+                "{quote_count}: {stripped}"
+            );
+            assert!(
+                !stripped.contains("# trailing comment"),
+                "{quote_count}: {stripped}"
+            );
+            assert!(
+                !stripped.contains("# real comment"),
+                "{quote_count}: {stripped}"
+            );
+        }
+    }
+
+    #[test]
+    fn comment_stripping_consumes_oversized_literal_multiline_quote_runs() {
+        for quote_count in [6, 7] {
+            let closing = "'".repeat(quote_count);
+            let manifest = format!(
+                "quote = '''quoted{closing} # trailing comment\n\
+                 next = 'hash # not a comment'\n\
+                 # real comment\n"
+            );
+
+            let stripped = strip_toml_comments(&manifest);
+
+            assert!(stripped.contains("quoted"), "{stripped}");
+            assert!(
+                stripped.contains("hash # not a comment"),
+                "{quote_count}: {stripped}"
+            );
+            assert!(
+                !stripped.contains("# trailing comment"),
+                "{quote_count}: {stripped}"
+            );
+            assert!(
+                !stripped.contains("# real comment"),
+                "{quote_count}: {stripped}"
+            );
+        }
     }
 
     #[test]
