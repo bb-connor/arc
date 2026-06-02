@@ -29,6 +29,25 @@ func pricedSignedManifest() map[string]any {
 	}
 }
 
+func TestManifestStructureDoesNotIncludeEmbeddedPublicKeyValidity(t *testing.T) {
+	signedManifest := pricedSignedManifest()
+	signedManifest["manifest"].(map[string]any)["public_key"] = "demo-placeholder"
+
+	verification, err := invariants.VerifySignedManifest(signedManifest)
+	if err != nil {
+		t.Fatalf("VerifySignedManifest returned error: %v", err)
+	}
+	if !verification.StructureValid {
+		t.Fatalf("malformed embedded public key must not invalidate manifest structure")
+	}
+	if verification.EmbeddedPublicKeyValid {
+		t.Fatalf("malformed embedded public key must be reported separately")
+	}
+	if verification.EmbeddedPublicKeyMatchesSigner {
+		t.Fatalf("malformed embedded public key must not match signer")
+	}
+}
+
 func TestManifestStructureRejectsEmptyOrPaddedToolNames(t *testing.T) {
 	for _, name := range []string{"", " greet", "greet "} {
 		t.Run(name, func(t *testing.T) {

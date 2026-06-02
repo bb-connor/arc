@@ -27,6 +27,17 @@ def priced_signed_manifest() -> dict[str, Any]:
     }
 
 
+def test_manifest_structure_does_not_include_embedded_public_key_validity() -> None:
+    signed_manifest = priced_signed_manifest()
+    signed_manifest["manifest"]["public_key"] = "demo-placeholder"
+
+    verification = verify_signed_manifest(signed_manifest)
+
+    assert verification["structure_valid"] is True
+    assert verification["embedded_public_key_valid"] is False
+    assert verification["embedded_public_key_matches_signer"] is False
+
+
 def test_manifest_structure_rejects_empty_or_padded_tool_names() -> None:
     for name in ["", " greet", "greet "]:
         signed_manifest = priced_signed_manifest()
