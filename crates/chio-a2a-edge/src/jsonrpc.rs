@@ -91,6 +91,11 @@ impl ChioA2aEdge {
                 "{operation} params.taskId must not be empty"
             )));
         }
+        if task_id.trim() != task_id {
+            return Err(A2aEdgeError::InvalidRequest(format!(
+                "{operation} params.taskId must not include leading or trailing whitespace"
+            )));
+        }
         Ok(task_id.to_string())
     }
 
@@ -152,6 +157,12 @@ impl ChioA2aEdge {
         if target_skill_id.trim().is_empty() {
             return Err(A2aEdgeError::InvalidRequest(
                 "metadata.chio.targetSkillId must not be empty".to_string(),
+            ));
+        }
+        if target_skill_id.trim() != target_skill_id {
+            return Err(A2aEdgeError::InvalidRequest(
+                "metadata.chio.targetSkillId must not include leading or trailing whitespace"
+                    .to_string(),
             ));
         }
         Ok(Some(target_skill_id.to_string()))

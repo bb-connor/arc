@@ -1310,6 +1310,35 @@ mod tests {
     }
 
     #[test]
+    fn jsonrpc_rejects_padded_target_skill_id_before_lookup() {
+        let edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+
+        let error = match edge.parse_jsonrpc_send_message_params(
+            json!({
+                "message": {
+                    "role": "user",
+                    "parts": [{"type": "text", "text": "hi"}]
+                },
+                "metadata": {
+                    "chio": {"targetSkillId": " echo "}
+                }
+            }),
+            "SendMessage",
+        ) {
+            Ok(_) => panic!("expected padded targetSkillId to fail before lookup"),
+            Err(error) => error,
+        };
+        let A2aEdgeError::InvalidRequest(message) = error else {
+            panic!("expected invalid request error");
+        };
+        assert_eq!(
+            message,
+            "metadata.chio.targetSkillId must not include leading or trailing whitespace"
+        );
+    }
+
+    #[test]
     fn jsonrpc_send_message_single_skill() {
         let mut edge = ChioA2aEdge::new(
             A2aEdgeConfig::default(),
@@ -1929,6 +1958,24 @@ mod tests {
         assert_eq!(
             response["error"]["message"],
             "task/get params.taskId must not be empty"
+        );
+    }
+
+    #[test]
+    fn jsonrpc_task_id_params_reject_surrounding_whitespace_before_lookup() {
+        let error = match ChioA2aEdge::parse_jsonrpc_task_id_params(
+            &json!({ "taskId": " task-1 " }),
+            "task/cancel",
+        ) {
+            Ok(_) => panic!("expected padded taskId to fail before lookup"),
+            Err(error) => error,
+        };
+        let A2aEdgeError::InvalidRequest(message) = error else {
+            panic!("expected invalid request error");
+        };
+        assert_eq!(
+            message,
+            "task/cancel params.taskId must not include leading or trailing whitespace"
         );
     }
 

@@ -13,7 +13,9 @@
 ## Pain Points
 
 - `edge.rs` still owns multiple trust-boundary responsibilities: manifest-to-skill publication, JSON-RPC dispatch, target-skill routing, kernel execution, and deferred task lifecycle.
-- JSON-RPC request-boundary parsing now lives in `jsonrpc.rs`, including non-empty `metadata.chio.targetSkillId` and `params.taskId` checks.
+- JSON-RPC request-boundary parsing now lives in `jsonrpc.rs`, including
+  non-empty and unpadded `metadata.chio.targetSkillId` and `params.taskId`
+  checks before skill resolution or task lookup.
 - `ChioA2aEdge::new` now validates every manifest with
   `chio_manifest::validate_manifest` before Agent Card skill publication,
   bridge-fidelity classification, or authoritative skill binding construction.
@@ -146,3 +148,41 @@ identity and interface fields before manifest validation, skill publication, or
 JSON-RPC dispatch can occur. Add focused constructor tests for each rejected
 field and a stability test proving valid default Agent Card fields are still
 published unchanged.
+
+## JSON-RPC Identifier Shape Slice
+
+### Current Boundary
+
+- `jsonrpc.rs` owns `metadata.chio.targetSkillId` extraction before A2A
+  send/stream requests reach skill resolution.
+- `jsonrpc.rs` owns `params.taskId` extraction before `task/get` and
+  `task/cancel` reach deferred-task lookup or owner checks.
+
+### Pain Point
+
+The request-boundary checks reject all-whitespace identifiers, but padded
+non-empty identifiers currently keep their original bytes. Values such as
+`" echo "` and `" task-1 "` can flow into exact skill and task map lookups,
+which returns misleading tool-not-found or ownership errors instead of a
+JSON-RPC invalid-params response at the boundary.
+
+### Security And API Constraints
+
+- Preserve public request/response structs and successful identifier bytes.
+- Do not silently trim or rewrite identifiers.
+- Reject malformed identifiers before skill resolution, task lookup, owner
+  checks, lifecycle mutation, or kernel dispatch.
+- Keep all-whitespace identifier error messages stable.
+
+### Affected Dependents
+
+- A2A clients that send padded identifiers now receive `-32602` invalid-params
+  errors instead of downstream lookup errors.
+- Clients that send exact identifiers are unchanged.
+
+### Completed Material Improvement
+
+Extend the JSON-RPC identifier parser so `metadata.chio.targetSkillId` and
+`params.taskId` reject leading or trailing whitespace after the existing
+non-empty checks. Add tests proving padded target-skill ids and task ids fail
+closed before lookup.
