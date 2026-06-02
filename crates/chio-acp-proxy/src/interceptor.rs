@@ -640,6 +640,9 @@ impl MessageInterceptor {
                     ));
                 }
             }
+            SessionUpdate::MalformedToolCall(ref message) => {
+                return Err(AcpProxyError::Protocol(message.clone()));
+            }
             SessionUpdate::AgentMessageChunk(_)
             | SessionUpdate::AgentThoughtChunk(_)
             | SessionUpdate::Plan(_)

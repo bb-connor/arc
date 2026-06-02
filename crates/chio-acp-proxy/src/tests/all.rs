@@ -428,6 +428,39 @@ mod tests {
         }
     }
 
+    #[test]
+    fn parse_session_update_malformed_tool_call_id_fails_closed() {
+        let raw = json!({
+            "toolCallId": 7,
+            "status": "completed"
+        });
+
+        match parse_session_update(&raw) {
+            SessionUpdate::MalformedToolCall(message) => {
+                assert!(message.contains("toolCallId"));
+                assert!(message.contains("must be a string"));
+            }
+            other => panic!("expected MalformedToolCall, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_session_update_tool_call_id_takes_precedence_over_known_type() {
+        let raw = json!({
+            "type": "agent_message_chunk",
+            "content": "hello",
+            "toolCallId": 7
+        });
+
+        match parse_session_update(&raw) {
+            SessionUpdate::MalformedToolCall(message) => {
+                assert!(message.contains("toolCallId"));
+                assert!(message.contains("must be a string"));
+            }
+            other => panic!("expected MalformedToolCall, got {:?}", other),
+        }
+    }
+
     // -- New ACP method variants --
 
     #[test]
@@ -1730,6 +1763,28 @@ mod extended_tests {
             err.to_string(),
             "protocol error: invalid session/update params: update.toolCallId must be a non-empty string"
         );
+    }
+
+    #[test]
+    fn interceptor_session_update_rejects_malformed_tool_call_shape_before_forwarding() {
+        let interceptor = MessageInterceptor::new(test_config());
+        let msg = json!({
+            "jsonrpc": "2.0",
+            "method": "session/update",
+            "params": {
+                "sessionId": "session-malformed-tool-call",
+                "update": {
+                    "toolCallId": "tc-malformed",
+                    "status": 7
+                }
+            }
+        });
+
+        let err = interceptor
+            .intercept(Direction::AgentToClient, &msg)
+            .expect_err("malformed tool-call update must fail before forwarding");
+
+        assert!(err.to_string().contains("malformed tool call update"));
     }
 
     #[test]

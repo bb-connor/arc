@@ -91,6 +91,11 @@ fn validate_oauth_token_response(
             "OAuth token endpoint returned empty access_token".to_string(),
         ));
     }
+    if response.access_token.trim() != response.access_token {
+        return Err(AdapterError::AuthNegotiation(
+            "OAuth token endpoint returned access_token with surrounding whitespace".to_string(),
+        ));
+    }
     let token_type = response.token_type.as_deref().ok_or_else(|| {
         AdapterError::AuthNegotiation("OAuth token endpoint omitted token_type".to_string())
     })?;

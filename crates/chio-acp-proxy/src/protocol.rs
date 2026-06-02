@@ -235,6 +235,7 @@ impl SessionUpdateNotification {
 pub enum SessionUpdate {
     ToolCall(ToolCallEvent),
     ToolCallUpdate(ToolCallUpdateEvent),
+    MalformedToolCall(String),
     AgentMessageChunk(Value),
     AgentThoughtChunk(Value),
     Plan(Value),
@@ -306,6 +307,34 @@ fn validate_non_empty_protocol_field(
 
 /// Attempt to parse a session update `Value` into a typed `SessionUpdate`.
 pub fn parse_session_update(value: &Value) -> SessionUpdate {
+    let tool_call_id = value.get("toolCallId");
+    if let Some(tool_call_id) = tool_call_id {
+        if !tool_call_id.is_string() {
+            return SessionUpdate::MalformedToolCall(
+                "invalid session/update params: update.toolCallId must be a string".to_string(),
+            );
+        }
+    }
+
+    // Try tool_call first (has title field)
+    if tool_call_id.is_some() && value.get("title").is_some() {
+        return match serde_json::from_value::<ToolCallEvent>(value.clone()) {
+            Ok(event) => SessionUpdate::ToolCall(event),
+            Err(err) => SessionUpdate::MalformedToolCall(format!(
+                "invalid session/update params: malformed tool call update: {err}"
+            )),
+        };
+    }
+    // Try tool_call_update (has toolCallId but no title)
+    if tool_call_id.is_some() {
+        return match serde_json::from_value::<ToolCallUpdateEvent>(value.clone()) {
+            Ok(event) => SessionUpdate::ToolCallUpdate(event),
+            Err(err) => SessionUpdate::MalformedToolCall(format!(
+                "invalid session/update params: malformed tool call update: {err}"
+            )),
+        };
+    }
+
     // Check for a discriminator field "type" used by non-tool-call updates.
     if let Some(update_type) = value.get("type").and_then(|v| v.as_str()) {
         match update_type {
@@ -322,18 +351,6 @@ pub fn parse_session_update(value: &Value) -> SessionUpdate {
         }
     }
 
-    // Try tool_call first (has title field)
-    if value.get("toolCallId").is_some() && value.get("title").is_some() {
-        if let Ok(event) = serde_json::from_value::<ToolCallEvent>(value.clone()) {
-            return SessionUpdate::ToolCall(event);
-        }
-    }
-    // Try tool_call_update (has toolCallId but no title)
-    if value.get("toolCallId").is_some() {
-        if let Ok(event) = serde_json::from_value::<ToolCallUpdateEvent>(value.clone()) {
-            return SessionUpdate::ToolCallUpdate(event);
-        }
-    }
     SessionUpdate::Other(value.clone())
 }
 

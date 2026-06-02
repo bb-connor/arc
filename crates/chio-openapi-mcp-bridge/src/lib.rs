@@ -818,6 +818,30 @@ mod tests {
     }
 
     #[test]
+    fn bridge_dispatcher_normalizes_base_url_trailing_slash() {
+        let mut config = petstore_config_with_egress();
+        config.base_url = "https://93.184.216.34/".to_string();
+        let mut bridge = OpenApiMcpBridge::from_spec(PETSTORE_SPEC, config).unwrap();
+        bridge.set_dispatcher(Box::new(|_method, url, _args| {
+            Ok(BridgedResponse {
+                status: 200,
+                body: json!({"receivedUrl": url}),
+                observed_body_bytes: None,
+                is_error: false,
+            })
+        }));
+
+        let result = bridge
+            .invoke_tool("getPet", json!({"petId": "pet-42"}))
+            .unwrap();
+
+        assert_eq!(
+            result["structuredContent"]["body"]["receivedUrl"],
+            "https://93.184.216.34/pets/pet-42"
+        );
+    }
+
+    #[test]
     fn bridge_dispatcher_appends_declared_query_parameters() {
         let spec = r#"{
             "openapi": "3.0.3",

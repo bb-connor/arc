@@ -183,9 +183,18 @@ pub(crate) fn dispatch_url(
     arguments: &Value,
 ) -> Result<String, BridgeError> {
     let path = expand_route_path(&dispatch.binding.path, arguments)?;
-    let mut url = format!("{base_url}{path}");
+    let mut url = join_base_url_and_path(base_url, &path);
     append_query_parameters(&mut url, &dispatch.query_parameters, arguments)?;
     Ok(url)
+}
+
+fn join_base_url_and_path(base_url: &str, path: &str) -> String {
+    let base = base_url.trim_end_matches('/');
+    if path.starts_with('/') {
+        format!("{base}{path}")
+    } else {
+        format!("{base}/{path}")
+    }
 }
 
 pub(crate) fn expand_route_path(template: &str, arguments: &Value) -> Result<String, BridgeError> {
