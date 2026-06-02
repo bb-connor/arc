@@ -661,6 +661,12 @@ mod tests {
                 "bearer token",
             ),
             (
+                "bad authorization scheme",
+                test_adapter_config(base_url, public_key.clone())
+                    .with_request_header("Authorization", "\u{e9}\u{e9}\u{e9}\u{e9}"),
+                "authorization scheme",
+            ),
+            (
                 "bad cookie name",
                 test_adapter_config(base_url, public_key.clone())
                     .with_request_cookie("partner session", "secret-cookie"),

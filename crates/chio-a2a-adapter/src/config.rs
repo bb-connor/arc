@@ -318,13 +318,15 @@ fn validate_authorization_header_material(header: &A2aRequestHeader) -> Result<(
     if !header.name.eq_ignore_ascii_case("Authorization") {
         return Ok(());
     }
-    let prefix_len = "Bearer ".len();
-    if header.value.len() < prefix_len
-        || !header.value[..prefix_len].eq_ignore_ascii_case("Bearer ")
-    {
+    let (scheme, token) = header
+        .value
+        .split_once(' ')
+        .unwrap_or((header.value.as_str(), ""));
+    validate_http_token("authorization scheme", scheme)?;
+    if !scheme.eq_ignore_ascii_case("Bearer") {
         return Ok(());
     }
-    validate_url_auth_value("bearer token", &header.value[prefix_len..])
+    validate_url_auth_value("bearer token", token)
 }
 
 fn validate_http_header_name(field: &str, value: &str) -> Result<(), AdapterError> {
