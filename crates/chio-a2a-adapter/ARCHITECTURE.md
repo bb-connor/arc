@@ -504,3 +504,42 @@ bytes, so every consumed byte is charged before an oversized-line error can
 return. Prove the boundary with parser regressions where oversized
 newline-delimited and delimiterless lines exceed a smaller total response
 limit.
+
+## Projected Skill Invocation Slice
+
+### Current Boundary
+
+- `mapping.rs` projects only Chio-projectable Agent Card skills into the signed
+  `ToolManifest`.
+- `ToolServerConnection::tool_names` exposes only manifest tool names to the
+  kernel.
+- `invoke.rs` resolves runtime `invoke` and `invoke_stream` targets against
+  the raw Agent Card skill list before dispatch.
+
+### Pain Point
+
+After non-projectable skills are filtered out of the manifest, runtime
+invocation still accepts those raw Agent Card skill ids. A caller can target a
+skill that is absent from `tool_names()` and the signed manifest, including
+follow-up task operations that do not need text or JSON input.
+
+### Security And API Constraints
+
+- Preserve public API compatibility and valid projected skill behavior.
+- Keep manifest projection as the source of truth for exposed tool authority.
+- Do not widen accepted input modes or expose non-projectable skills through
+  runtime dispatch.
+- Preserve existing `ToolNotRegistered` behavior for unknown tool names.
+
+### Affected Dependents
+
+- `chio-kernel` should see non-manifest skill targets as unregistered tools.
+- Existing A2A callers invoking manifest-exposed skills are unchanged.
+- No downstream crate or public schema change is planned.
+
+### Planned Material Improvement
+
+Add one runtime skill-resolution boundary that first checks the signed manifest
+tool set and only then returns the matching Agent Card skill. Use it for both
+blocking and streaming invocation, and prove non-projectable raw skills cannot
+be invoked through either path.

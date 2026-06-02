@@ -1280,6 +1280,16 @@ impl A2aAdapter {
             Ok,
         )
     }
+
+    fn manifest_skill(&self, tool_name: &str) -> Option<&A2aAgentSkill> {
+        if !self.manifest.tools.iter().any(|tool| tool.name == tool_name) {
+            return None;
+        }
+        self.agent_card
+            .skills
+            .iter()
+            .find(|skill| skill.id == tool_name)
+    }
 }
 
 fn decode_jsonrpc_result<T>(
@@ -1330,12 +1340,7 @@ impl ToolServerConnection for A2aAdapter {
         arguments: Value,
         _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
     ) -> Result<Value, KernelError> {
-        let Some(skill) = self
-            .agent_card
-            .skills
-            .iter()
-            .find(|skill| skill.id == tool_name)
-        else {
+        let Some(skill) = self.manifest_skill(tool_name) else {
             return Err(KernelError::ToolNotRegistered(tool_name.to_string()));
         };
         let response = self
@@ -1350,12 +1355,7 @@ impl ToolServerConnection for A2aAdapter {
         arguments: Value,
         _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
     ) -> Result<Option<ToolServerStreamResult>, KernelError> {
-        let Some(skill) = self
-            .agent_card
-            .skills
-            .iter()
-            .find(|skill| skill.id == tool_name)
-        else {
+        let Some(skill) = self.manifest_skill(tool_name) else {
             return Err(KernelError::ToolNotRegistered(tool_name.to_string()));
         };
         let invocation = parse_tool_input(arguments)

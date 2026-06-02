@@ -1588,6 +1588,74 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn invoke_rejects_raw_skill_filtered_from_manifest() {
+        let mut adapter = local_test_adapter(
+            A2aAgentCapabilities::default(),
+            A2aProtocolBinding::JsonRpc,
+            None,
+        );
+        let mut image_skill = adapter.agent_card.skills[0].clone();
+        image_skill.id = "image-only".to_string();
+        image_skill.name = "Image Only".to_string();
+        image_skill.input_modes = Some(vec!["image/png".to_string()]);
+        adapter.agent_card.skills.push(image_skill);
+
+        assert_eq!(adapter.tool_names(), vec!["research".to_string()]);
+
+        let error = adapter
+            .invoke(
+                "image-only",
+                json!({
+                    "get_task": { "id": "task-1" }
+                }),
+                None,
+            )
+            .await
+            .expect_err("non-manifest skill should not be invokable");
+
+        assert!(matches!(
+            error,
+            KernelError::ToolNotRegistered(ref tool_name) if tool_name == "image-only"
+        ));
+    }
+
+    #[tokio::test]
+    async fn invoke_stream_rejects_raw_skill_filtered_from_manifest() {
+        let mut adapter = local_test_adapter(
+            A2aAgentCapabilities {
+                streaming: true,
+                push_notifications: false,
+                state_transition_history: false,
+            },
+            A2aProtocolBinding::JsonRpc,
+            None,
+        );
+        let mut image_skill = adapter.agent_card.skills[0].clone();
+        image_skill.id = "image-only".to_string();
+        image_skill.name = "Image Only".to_string();
+        image_skill.input_modes = Some(vec!["image/png".to_string()]);
+        adapter.agent_card.skills.push(image_skill);
+
+        assert_eq!(adapter.tool_names(), vec!["research".to_string()]);
+
+        let error = adapter
+            .invoke_stream(
+                "image-only",
+                json!({
+                    "subscribe_task": { "id": "task-1" }
+                }),
+                None,
+            )
+            .await
+            .expect_err("non-manifest skill should not be stream-invokable");
+
+        assert!(matches!(
+            error,
+            KernelError::ToolNotRegistered(ref tool_name) if tool_name == "image-only"
+        ));
+    }
+
+    #[tokio::test]
     async fn build_send_message_request_accepts_parameterized_text_and_json_input_modes() {
         let mut adapter = local_test_adapter(
             A2aAgentCapabilities::default(),
