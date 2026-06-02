@@ -3002,6 +3002,45 @@ fn serve_message_channels_matches_stdio_for_task_cancellation_flow() {
 }
 
 #[test]
+fn channel_pump_does_not_signal_notification_shaped_tasks_cancel() {
+    let (client_tx, client_rx) = mpsc::channel();
+    let (inbound_tx, inbound_rx) = mpsc::channel();
+    let (cancel_tx, cancel_rx) = mpsc::channel();
+    let pump = std::thread::spawn(move || pump_channel_messages(client_rx, inbound_tx, cancel_tx));
+
+    client_tx
+        .send(json!({
+            "jsonrpc": "2.0",
+            "method": "tasks/cancel",
+            "params": {
+                "taskId": "mcp-edge-task-1"
+            }
+        }))
+        .unwrap();
+
+    let inbound = inbound_rx
+        .recv_timeout(Duration::from_secs(1))
+        .unwrap_or_else(|error| panic!("pump did not forward inbound message: {error}"));
+    match inbound {
+        ClientInbound::Message(message) => {
+            assert_eq!(message["method"], "tasks/cancel");
+            assert!(message.get("id").is_none());
+        }
+        ClientInbound::ParseError(_) | ClientInbound::ReadError(_) | ClientInbound::Closed => {
+            panic!("expected forwarded message")
+        }
+    }
+    assert!(
+        cancel_rx.recv_timeout(Duration::from_millis(50)).is_err(),
+        "notification-shaped tasks/cancel entered the cancellation side channel"
+    );
+
+    drop(client_tx);
+    pump.join()
+        .unwrap_or_else(|_| panic!("channel pump thread panicked"));
+}
+
+#[test]
 fn resources_list_is_filtered_by_capabilities() {
     let mut edge = make_edge(10);
     let _ = edge.handle_jsonrpc(json!({

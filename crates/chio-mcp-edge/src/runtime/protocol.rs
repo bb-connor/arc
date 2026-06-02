@@ -934,12 +934,27 @@ pub(super) fn task_cancel_matches_related_task(
         return false;
     };
 
-    message.get("method").and_then(Value::as_str) == Some("tasks/cancel")
+    has_jsonrpc_request_id(message)
+        && message.get("method").and_then(Value::as_str) == Some("tasks/cancel")
         && message
             .get("params")
             .and_then(|params| params.get("taskId"))
             .and_then(Value::as_str)
             == Some(related_task_id)
+}
+
+pub(super) fn is_cancellation_side_channel_signal(message: &Value) -> bool {
+    match message.get("method").and_then(Value::as_str) {
+        Some("notifications/cancelled") => true,
+        Some("tasks/cancel") => has_jsonrpc_request_id(message),
+        _ => false,
+    }
+}
+
+fn has_jsonrpc_request_id(message: &Value) -> bool {
+    message
+        .get("id")
+        .is_some_and(|id| id.is_string() || id.is_number() || id.is_null())
 }
 
 pub(super) fn explicit_task_cancel_reason() -> &'static str {
@@ -1003,10 +1018,7 @@ pub(super) fn pump_client_messages<R: BufRead>(
 
         match serde_json::from_str::<Value>(trimmed) {
             Ok(message) => {
-                let is_cancel_signal = matches!(
-                    message.get("method").and_then(Value::as_str),
-                    Some("notifications/cancelled" | "tasks/cancel")
-                );
+                let is_cancel_signal = is_cancellation_side_channel_signal(&message);
                 if sender
                     .send(ClientInbound::Message(message.clone()))
                     .is_err()
@@ -1037,10 +1049,7 @@ pub(super) fn pump_channel_messages(
     cancel_sender: mpsc::Sender<Value>,
 ) {
     while let Ok(message) = receiver.recv() {
-        let is_cancel_signal = matches!(
-            message.get("method").and_then(Value::as_str),
-            Some("notifications/cancelled" | "tasks/cancel")
-        );
+        let is_cancel_signal = is_cancellation_side_channel_signal(&message);
         if sender
             .send(ClientInbound::Message(message.clone()))
             .is_err()
@@ -1288,5 +1297,46 @@ mod tests {
         assert_eq!(response["id"], json!("req-2"));
         assert_eq!(response["error"]["code"], JSONRPC_INVALID_REQUEST);
         assert_eq!(response["error"]["message"], "request missing method");
+    }
+
+    #[test]
+    fn task_cancel_related_task_requires_request_id() {
+        let notification_shaped_cancel = json!({
+            "jsonrpc": "2.0",
+            "method": "tasks/cancel",
+            "params": {
+                "taskId": "mcp-edge-task-1"
+            }
+        });
+        assert!(!task_cancel_matches_related_task(
+            &notification_shaped_cancel,
+            Some("mcp-edge-task-1")
+        ));
+
+        let malformed_request_id_cancel = json!({
+            "jsonrpc": "2.0",
+            "id": { "nested": "bad" },
+            "method": "tasks/cancel",
+            "params": {
+                "taskId": "mcp-edge-task-1"
+            }
+        });
+        assert!(!task_cancel_matches_related_task(
+            &malformed_request_id_cancel,
+            Some("mcp-edge-task-1")
+        ));
+
+        let request_shaped_cancel = json!({
+            "jsonrpc": "2.0",
+            "id": 7,
+            "method": "tasks/cancel",
+            "params": {
+                "taskId": "mcp-edge-task-1"
+            }
+        });
+        assert!(task_cancel_matches_related_task(
+            &request_shaped_cancel,
+            Some("mcp-edge-task-1")
+        ));
     }
 }

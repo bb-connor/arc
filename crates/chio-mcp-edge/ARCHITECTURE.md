@@ -13,14 +13,12 @@
 - `runtime/discovery.rs` now validates every manifest through
   `chio_manifest::validate_manifest` before projection, keeping the manifest
   envelope gate canonical.
-- The remaining request-boundary gap is JSON-RPC `params` shape. The envelope
-  parser defaults missing params to `{}`, but it preserves non-object params.
-  Several MCP request handlers then call `params.get(...)`, so malformed array,
-  string, number, or boolean params can be treated as if no params were
-  supplied.
-- That is too permissive for hosted MCP request methods whose params are
-  object-shaped. It can allow malformed initialize/list requests to pass
-  protocol gates instead of failing with a JSON-RPC invalid-params response.
+- The JSON-RPC `params` shape gate is now centralized for known request
+  methods. The cancellation side channel is the next raw inbound-message
+  boundary because it classifies messages before normal dispatch.
+- `tasks/cancel` is request-shaped because it returns a task view. It must not
+  be accepted as a notification-shaped cancellation signal while nested client
+  work is in flight.
 
 ## Constraints
 
@@ -47,9 +45,50 @@ because it makes manifest validation the single canonical envelope gate and
 leaves the MCP discovery module responsible only for outward projection and
 cross-manifest exposure rules.
 
-## Planned Improvement
+## Completed Params Gate
 
 Add one centralized known-request-method params-object gate before dispatch.
 Missing params still normalize to `{}` for compatibility, but non-object params
 for known MCP request methods fail closed with `-32602` before session state,
 discovery, or kernel operation paths can observe coerced empty params.
+
+## Task Cancellation Side-Channel Slice
+
+### Current Boundary
+
+The runtime pumps inbound client messages through the main JSON-RPC dispatcher
+and a side channel used by nested-flow clients to notice parent cancellation
+while a child request is in flight. `notifications/cancelled` is notification
+shaped. `tasks/cancel` is request shaped and should still pass through the main
+dispatcher so the edge can return the task view or a JSON-RPC error.
+
+### Pain Point
+
+Before this slice, `pump_client_messages`, `pump_channel_messages`, and
+`task_cancel_matches_related_task` classified `tasks/cancel` by method alone. A
+notification-shaped `tasks/cancel` with no `id` could therefore enter the
+cancellation side channel even though the main dispatcher would treat it as a
+notification and ignore it.
+
+### Security And API Constraints
+
+- Preserve normal request-shaped `tasks/cancel` behavior and response payloads.
+- Preserve `notifications/cancelled` as the notification-shaped cancellation
+  primitive.
+- Preserve deferred request handling during nested flows so an in-flight client
+  request can still be answered after the child flow unwinds.
+- Keep this slice inside `chio-mcp-edge`; no public API change is intended.
+
+### Affected Dependents
+
+`chio-mcp-remote`, `chio-hosted-mcp`, and channel-based embedders depend on the
+same runtime loop and should observe no API change. The compatibility proof is
+crate-local: request-shaped `tasks/cancel` remains in the side channel, while
+notification-shaped `tasks/cancel` does not cancel nested work or produce hidden
+state transitions.
+
+### Completed Improvement
+
+Centralize cancellation-side-channel classification so `notifications/cancelled`
+remains notification shaped, but `tasks/cancel` is treated as a cancellation
+signal only when it is a well-formed JSON-RPC request with a scalar `id`.
