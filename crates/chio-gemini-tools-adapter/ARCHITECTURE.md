@@ -10,9 +10,9 @@
 
 ## Pain points
 
-- `GeminiAdapterConfig::new` pins `api_version` to `GEMINI_API_VERSION`, but the public serializable config can be loaded from disk or mutated with a stale API version before it reaches `GeminiAdapter::new`.
-- Runtime paths currently trust `config.api_version` when stamping provenance and exposing provider metadata, even though the transport path always posts to the pinned `v1beta` endpoint.
-- A drifted config can therefore send an upstream request before the mismatch is detected, gate streamed output with stale provenance, or lower a tool result under a local contract that no longer matches the transport pin.
+- `GeminiAdapterConfig::new` pins `api_version` to `GEMINI_API_VERSION`, and the adapter now fails closed when a deserialized or mutated config drifts from that pin before send, lift, stream gating, provenance stamping, or lowering.
+- The remaining drift boundary is the injectable `Arc<dyn Transport>`: the trait advertises `api_version()`, but the adapter does not currently verify that the injected transport reports the same pin as the config before outbound calls.
+- A custom transport can therefore claim a stale upstream contract while the adapter stamps `v1beta` provenance and exposes `Provider::api_version()` from config.
 - `response.rs` now owns Gemini response-envelope classification and `functionCall` extraction; that trust boundary should stay internal and should not be weakened by moving parsing back into `lib.rs`.
 
 ## Constraints
@@ -31,4 +31,4 @@
 
 ## Planned improvement
 
-Add an adapter-local API-pin guard that fails closed unless `config.api_version == GEMINI_API_VERSION`, then invoke it before outbound transport, direct batch lift, direct stream gating, provenance stamping, and tool-result lowering. This is architectural because it tightens the adapter's runtime contract across every trust-boundary entrypoint while preserving the public construction API and the internal response module boundary.
+Extend the adapter-local API-pin guard so outbound paths fail closed unless both `config.api_version` and `transport.api_version()` equal `GEMINI_API_VERSION`. This is architectural because it makes the injected transport boundary part of the same runtime contract as provenance stamping and fixture pins while preserving the public construction API and the internal response module boundary.

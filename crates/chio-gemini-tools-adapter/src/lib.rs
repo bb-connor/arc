@@ -115,6 +115,12 @@ impl GeminiAdapter {
                 self.config.api_version
             )));
         }
+        let transport_api_version = self.transport.api_version();
+        if transport_api_version != GEMINI_API_VERSION {
+            return Err(ProviderError::Malformed(format!(
+                "Gemini adapter supports only API version {GEMINI_API_VERSION}; transport advertised {transport_api_version}"
+            )));
+        }
         Ok(())
     }
 
@@ -346,6 +352,8 @@ fn non_empty_str<'a>(value: &'a str, field: &str) -> Result<&'a str, ProviderErr
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
     use serde_json::json;
 
     fn config() -> GeminiAdapterConfig {
@@ -389,6 +397,41 @@ mod tests {
         ProviderRequest(serde_json::to_vec(&value).unwrap())
     }
 
+    struct DriftedTransport {
+        called: Arc<AtomicBool>,
+    }
+
+    impl DriftedTransport {
+        fn new(called: Arc<AtomicBool>) -> Self {
+            Self { called }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl transport::Transport for DriftedTransport {
+        fn api_version(&self) -> &str {
+            "v1alpha"
+        }
+
+        async fn send_generate_content(
+            &self,
+            _model: &str,
+            _body: &[u8],
+        ) -> Result<ProviderRequest, ProviderError> {
+            self.called.store(true, Ordering::SeqCst);
+            Ok(raw_payload(function_call_payload()))
+        }
+
+        async fn send_generate_content_stream(
+            &self,
+            _model: &str,
+            _body: &[u8],
+        ) -> Result<Vec<u8>, ProviderError> {
+            self.called.store(true, Ordering::SeqCst);
+            Ok(function_call_stream())
+        }
+    }
+
     fn allow_verdict() -> VerdictResult {
         VerdictResult::Allow {
             redactions: vec![],
@@ -400,7 +443,7 @@ mod tests {
         match error {
             ProviderError::Malformed(message) => {
                 assert!(message.contains("Gemini adapter supports only API version v1beta"));
-                assert!(message.contains("configured v1alpha"));
+                assert!(message.contains("v1alpha"));
             }
             other => panic!("expected Malformed API version drift, got {other:?}"),
         }
@@ -438,6 +481,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn generate_content_rejects_transport_api_version_drift_before_send() {
+        let called = Arc::new(AtomicBool::new(false));
+        let transport = Arc::new(DriftedTransport::new(called.clone()));
+        let adapter = GeminiAdapter::new(config(), transport);
+
+        let err = adapter
+            .generate_content("gemini-1.5-pro", b"{\"contents\":[]}")
+            .await
+            .expect_err("drifted Gemini transport API version must fail before send");
+
+        assert_api_version_drift(err);
+        assert!(!called.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
     async fn generate_content_stream_rejects_api_version_drift_before_transport_call() {
         let mock = Arc::new(transport::MockTransport::new());
         mock.push_generate_content_response(function_call_stream());
@@ -452,6 +510,23 @@ mod tests {
 
         assert_api_version_drift(err);
         assert!(mock.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn generate_content_stream_rejects_transport_api_version_drift_before_send() {
+        let called = Arc::new(AtomicBool::new(false));
+        let transport = Arc::new(DriftedTransport::new(called.clone()));
+        let adapter = GeminiAdapter::new(config(), transport);
+
+        let err = adapter
+            .generate_content_stream("gemini-1.5-pro", b"{\"contents\":[]}", |_invocation| {
+                Ok(allow_verdict())
+            })
+            .await
+            .expect_err("drifted Gemini stream transport API version must fail before send");
+
+        assert_api_version_drift(err);
+        assert!(!called.load(Ordering::SeqCst));
     }
 
     #[test]
