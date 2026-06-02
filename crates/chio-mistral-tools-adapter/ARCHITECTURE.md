@@ -10,9 +10,9 @@
 
 ## Pain Points
 
-- `MistralAdapterConfig::new` pins `api_version` to `MISTRAL_API_VERSION`, but the public serializable config can be deserialized or mutated with a stale API version before it reaches `MistralAdapter::new`.
-- Runtime paths currently trust `config.api_version` when stamping provenance and exposing provider metadata, even though the transport path always sends the pinned `x-mistral-api-version` header.
-- A drifted config can therefore send an upstream request before mismatch detection, gate streamed output with stale provenance, or lower a tool result under a local contract that no longer matches the transport pin.
+- `MistralAdapterConfig::new` pins `api_version` to `MISTRAL_API_VERSION`, and the adapter now fails closed when a deserialized or mutated config drifts from that pin before send, lift, stream gating, provenance stamping, or lowering.
+- The remaining drift boundary is the injectable `Arc<dyn Transport>`: the trait advertises `api_version()`, but the adapter does not currently verify that the injected transport reports the same pin as the config before outbound calls.
+- A custom transport can therefore claim a stale upstream contract while the adapter stamps `2025-04` provenance and exposes `Provider::api_version()` from config.
 - `response.rs` now owns Mistral response-envelope classification and shared OpenAI-compatible `tool_calls` decoding; that trust boundary should stay internal and should not move back into the public adapter surface.
 
 ## Constraints
@@ -31,4 +31,4 @@
 
 ## Planned Improvement
 
-Add an adapter-local API-pin guard that fails closed unless `config.api_version == MISTRAL_API_VERSION`, then invoke it before outbound transport, direct batch lift, direct stream gating, provenance stamping, and tool-result lowering. This is architectural because it tightens the adapter's runtime contract across every trust-boundary entrypoint while preserving the public construction API and the existing internal response module boundary.
+Extend the adapter-local API-pin guard so outbound paths fail closed unless both `config.api_version` and `transport.api_version()` equal `MISTRAL_API_VERSION`. This is architectural because it makes the injected transport boundary part of the same runtime contract as provenance stamping and fixture pins while preserving the public construction API and the existing internal response module boundary.

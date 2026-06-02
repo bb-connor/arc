@@ -176,6 +176,12 @@ impl MistralAdapter {
                 self.config.api_version
             )));
         }
+        let transport_api_version = self.transport.api_version();
+        if transport_api_version != MISTRAL_API_VERSION {
+            return Err(ProviderError::Malformed(format!(
+                "Mistral adapter supports only API version {MISTRAL_API_VERSION}; transport advertised {transport_api_version}"
+            )));
+        }
         Ok(())
     }
 
@@ -415,6 +421,8 @@ fn non_empty_str<'a>(value: &'a str, field: &str) -> Result<&'a str, ProviderErr
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
     use serde_json::json;
 
     fn config() -> MistralAdapterConfig {
@@ -484,11 +492,44 @@ mod tests {
         ProviderRequest(serde_json::to_vec(&value).unwrap())
     }
 
+    struct DriftedTransport {
+        called: Arc<AtomicBool>,
+    }
+
+    impl DriftedTransport {
+        fn new(called: Arc<AtomicBool>) -> Self {
+            Self { called }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl transport::Transport for DriftedTransport {
+        fn api_version(&self) -> &str {
+            "2024-12"
+        }
+
+        async fn chat_completion(
+            &self,
+            _body: &[u8],
+        ) -> Result<Vec<u8>, transport::TransportError> {
+            self.called.store(true, Ordering::SeqCst);
+            Ok(serde_json::to_vec(&tool_call_payload()).unwrap())
+        }
+
+        async fn chat_completion_stream(
+            &self,
+            _body: &[u8],
+        ) -> Result<Vec<u8>, transport::TransportError> {
+            self.called.store(true, Ordering::SeqCst);
+            Ok(tool_call_stream())
+        }
+    }
+
     fn assert_api_version_drift(error: ProviderError) {
         match error {
             ProviderError::Malformed(message) => {
                 assert!(message.contains("Mistral adapter supports only API version 2025-04"));
-                assert!(message.contains("configured 2024-12"));
+                assert!(message.contains("2024-12"));
             }
             other => panic!("expected Malformed API version drift, got {other:?}"),
         }
@@ -527,6 +568,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn send_chat_completion_rejects_transport_api_version_drift_before_send() {
+        let called = Arc::new(AtomicBool::new(false));
+        let transport = Arc::new(DriftedTransport::new(called.clone()));
+        let adapter = MistralAdapter::new(config(), transport);
+
+        let err = adapter
+            .send_chat_completion(&chat_request())
+            .await
+            .expect_err("drifted Mistral transport API version must fail before send");
+
+        assert_api_version_drift(err);
+        assert!(!called.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
     async fn send_chat_completion_stream_rejects_api_version_drift_before_transport_call() {
         let mock = transport::MockTransport::new();
         mock.push_response(tool_call_stream());
@@ -545,6 +601,26 @@ mod tests {
 
         assert_api_version_drift(err);
         assert!(mock.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn send_chat_completion_stream_rejects_transport_api_version_drift_before_send() {
+        let called = Arc::new(AtomicBool::new(false));
+        let transport = Arc::new(DriftedTransport::new(called.clone()));
+        let adapter = MistralAdapter::new(config(), transport);
+
+        let err = adapter
+            .send_chat_completion_stream(&chat_request(), |_invocation| {
+                Ok(VerdictResult::Allow {
+                    redactions: vec![],
+                    receipt_id: chio_tool_call_fabric::ReceiptId("rcpt_pin".into()),
+                })
+            })
+            .await
+            .expect_err("drifted Mistral stream transport API version must fail before send");
+
+        assert_api_version_drift(err);
+        assert!(!called.load(Ordering::SeqCst));
     }
 
     #[test]
