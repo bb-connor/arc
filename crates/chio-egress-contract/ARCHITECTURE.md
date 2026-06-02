@@ -105,3 +105,43 @@ Validate authority entries against their canonical representation before a raw
 contract can be prepared. Regression tests should prove that trailing-dot
 domains, zero-padded ports, and non-canonical IPv6 literals fail during
 contract validation while explicit default-port authorities remain compatible.
+
+## HTTP Scheme Admission Slice
+
+### Current Boundary
+
+`allowed_schemes` is part of the HTTP egress contract admitted before any URL,
+DNS answer, redirect hop, or response body is accepted. The contract is not the
+wire mediation boundary for WebSocket, FTP, database sockets, or other
+non-HTTP substrates.
+
+### Pain Point Addressed
+
+The scheme validator currently admits any lowercase URI scheme token. That
+makes a raw contract with `ftp`, `ws`, or another non-HTTP scheme validate even
+though every enforcement rule in this crate is URL-shaped HTTP egress policy.
+
+### Security And API Constraints
+
+- Preserve the public `HttpEgressContract` shape and all existing enforcement
+  return types.
+- Preserve `http` and `https` contracts, including local loopback test
+  contracts.
+- Fail closed during contract admission for non-HTTP schemes instead of
+  allowing an unusable or misleading egress policy to reach dispatch.
+- Do not extend this crate into generic wire mediation; future non-HTTP policy
+  belongs in a sibling boundary.
+
+### Affected Dependents
+
+Workspace callers already build HTTP egress contracts from `http` or `https`
+URLs. Callers that accidentally pass `ws`, `ftp`, or another non-HTTP scheme
+should receive an `InvalidContract` denial at validation time. No transitive
+source edits are expected unless a dependent fixture was relying on an invalid
+non-HTTP contract.
+
+### Material Improvement
+
+Constrain scheme admission to HTTP egress by accepting only `http` and `https`
+after token syntax validation. Add focused regressions proving non-HTTP
+schemes fail closed while existing HTTP contracts remain valid.

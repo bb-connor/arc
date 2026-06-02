@@ -18,7 +18,7 @@ pub struct HttpEgressContract {
     /// Tenant-scoped namespace used by callers to bind egress receipts and
     /// deployment policy to one authority domain.
     pub tenant_egress_namespace: String,
-    /// Lowercase URL schemes allowed by this contract, for example `https`.
+    /// Lowercase HTTP URL schemes allowed by this contract: `http` or `https`.
     #[serde(default)]
     pub allowed_schemes: BTreeSet<String>,
     /// Exact normalized URL authorities allowed by this contract.
@@ -535,6 +535,33 @@ mod tests {
         strict_contract("api.example.com:443")
             .validate()
             .expect("explicit default ports remain valid authority entries");
+    }
+
+    #[test]
+    fn validate_rejects_non_http_allowed_schemes() {
+        for scheme in ["ftp", "ws", "custom+scheme"] {
+            let mut contract = strict_contract("api.example.com");
+            contract.allowed_schemes = BTreeSet::from([scheme.to_string()]);
+
+            let error = contract
+                .validate()
+                .expect_err("non-HTTP schemes must fail HTTP egress contract validation");
+            assert!(matches!(error, HttpEgressError::InvalidContract(_)));
+            assert!(
+                error.to_string().contains("invalid HTTP egress scheme"),
+                "unexpected scheme validation error for {scheme:?}: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_accepts_http_allowed_schemes() {
+        let mut contract = strict_contract("api.example.com");
+        contract.allowed_schemes = BTreeSet::from(["http".to_string(), "https".to_string()]);
+
+        contract
+            .validate()
+            .expect("http and https remain valid HTTP egress schemes");
     }
 
     #[test]
@@ -1084,6 +1111,11 @@ fn validate_scheme_token(scheme: &str) -> Result<(), HttpEgressError> {
     {
         return Err(HttpEgressError::InvalidContract(format!(
             "invalid allowed scheme {scheme:?}"
+        )));
+    }
+    if !matches!(scheme, "http" | "https") {
+        return Err(HttpEgressError::InvalidContract(format!(
+            "invalid HTTP egress scheme {scheme:?}; expected \"http\" or \"https\""
         )));
     }
     Ok(())
