@@ -2148,6 +2148,86 @@ mod tests {
     }
 
     #[test]
+    fn jsonrpc_stream_capacity_excludes_cancelled_deferred_tasks() {
+        let edge =
+            ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "streaming-srv", "search_stream"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        for index in 0..MAX_DEFERRED_ACP_TASKS {
+            let created = edge.handle_jsonrpc(
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": index,
+                    "method": "tool/stream",
+                    "params": {
+                        "capabilityId": "search_stream",
+                        "arguments": {"query": "test"}
+                    }
+                }),
+                &kernel,
+                &execution,
+            );
+            assert_eq!(
+                created["result"]["task"]["status"].as_str(),
+                Some("working")
+            );
+            let task_id = created["result"]["task"]["id"]
+                .as_str()
+                .test_expect("tool/stream should return task id")
+                .to_string();
+
+            let cancelled = edge.handle_jsonrpc(
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": index + MAX_DEFERRED_ACP_TASKS,
+                    "method": "tool/cancel",
+                    "params": {
+                        "taskId": task_id
+                    }
+                }),
+                &kernel,
+                &execution,
+            );
+            assert_eq!(
+                cancelled["result"]["task"]["status"].as_str(),
+                Some("cancelled")
+            );
+        }
+
+        assert_eq!(edge.tasks.borrow().len(), MAX_DEFERRED_ACP_TASKS);
+
+        let accepted = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 3_000,
+                "method": "tool/stream",
+                "params": {
+                    "capabilityId": "search_stream",
+                    "arguments": {"query": "test"}
+                }
+            }),
+            &kernel,
+            &execution,
+        );
+
+        assert_eq!(
+            accepted["result"]["task"]["status"].as_str(),
+            Some("working")
+        );
+    }
+
+    #[test]
     fn jsonrpc_cancel_marks_deferred_stream_task_cancelled() {
         let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
         let config = test_kernel_config();

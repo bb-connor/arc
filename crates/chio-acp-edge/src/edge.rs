@@ -122,7 +122,13 @@ impl ChioAcpEdge {
 
     fn ensure_deferred_task_capacity(&self) -> Result<(), AcpEdgeError> {
         self.prune_deferred_tasks();
-        if self.tasks.borrow().len() >= MAX_DEFERRED_ACP_TASKS {
+        let working_tasks = self
+            .tasks
+            .borrow()
+            .values()
+            .filter(|task| task.task.status == AcpTaskStatus::Working)
+            .count();
+        if working_tasks >= MAX_DEFERRED_ACP_TASKS {
             return Err(AcpEdgeError::InvalidRequest(
                 "too many deferred tasks are pending".to_string(),
             ));

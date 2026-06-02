@@ -1912,6 +1912,81 @@ mod tests {
     }
 
     #[test]
+    fn jsonrpc_stream_capacity_excludes_cancelled_deferred_tasks() {
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let kernel_issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = A2aKernelExecutionContext {
+            capability: capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        for index in 0..MAX_DEFERRED_A2A_TASKS {
+            let created = edge.handle_jsonrpc(
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": index,
+                    "method": "message/stream",
+                    "params": {
+                        "message": {
+                            "role": "user",
+                            "parts": [{"type": "text", "text": "start"}]
+                        }
+                    }
+                }),
+                &kernel,
+                &execution,
+            );
+            assert_eq!(created["result"]["status"].as_str(), Some("working"));
+            let task_id = created["result"]["id"]
+                .as_str()
+                .test_expect("message/stream should return task id")
+                .to_string();
+
+            let cancelled = edge.handle_jsonrpc(
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": index + MAX_DEFERRED_A2A_TASKS,
+                    "method": "task/cancel",
+                    "params": {
+                        "taskId": task_id
+                    }
+                }),
+                &kernel,
+                &execution,
+            );
+            assert_eq!(cancelled["result"]["status"].as_str(), Some("cancelled"));
+        }
+
+        assert_eq!(edge.tasks.len(), MAX_DEFERRED_A2A_TASKS);
+
+        let accepted = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 3_000,
+                "method": "message/stream",
+                "params": {
+                    "message": {
+                        "role": "user",
+                        "parts": [{"type": "text", "text": "start"}]
+                    }
+                }
+            }),
+            &kernel,
+            &execution,
+        );
+
+        assert_eq!(accepted["result"]["status"].as_str(), Some("working"));
+    }
+
+    #[test]
     fn jsonrpc_task_cancel_marks_stream_task_cancelled() {
         let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
