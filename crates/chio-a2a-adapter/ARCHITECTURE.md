@@ -376,3 +376,44 @@ Added an internal request-auth material validator at discovery time. It rejects
 malformed header names/values, query parameter names, cookie names, and cookie
 values without exposing secret values in diagnostics, and tests prove malformed
 configuration fails before the first outbound A2A request can be assembled.
+
+## Push Notification Callback Authority Slice
+
+### Current Boundary
+
+- `invoke.rs` builds `CreateTaskPushNotificationConfig` requests for both
+  JSON-RPC and HTTP+JSON bindings.
+- `discovery.rs` owns callback URL validation through
+  `validate_notification_target_url` before the management request is sent.
+- The validated callback URL is handed to the upstream A2A agent as future
+  authority for task notification delivery.
+
+### Pain Point
+
+The callback URL validator rejects non-HTTPS remote targets, but it still
+accepts URL userinfo and fragments. Userinfo embeds ambient authority in the
+callback URL itself, while fragments are not sent by HTTP clients but can still
+leak operator-supplied material to the upstream agent when the URL is
+registered.
+
+### Security And API Constraints
+
+- Preserve public API compatibility and existing valid callback URL behavior.
+- Continue allowing HTTPS remote callbacks and localhost HTTP test callbacks.
+- Reject callback URL userinfo and fragments before any push-notification
+  management request is dispatched.
+- Do not log or persist callback tokens or authentication credentials.
+
+### Affected Dependents
+
+- A2A callers using valid callback URLs are unchanged.
+- `chio-kernel` continues to see invalid callback URL inputs as
+  `ToolServerError` through the existing `ToolServerConnection` path.
+- No downstream crate or public schema change is planned.
+
+### Completed Material Improvement
+
+Harden `validate_notification_target_url` so callback URLs containing userinfo
+or fragments fail closed before dispatch. Add adapter-level regressions proving
+malformed callback URLs do not issue a create request to the upstream A2A
+agent.

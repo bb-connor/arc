@@ -737,6 +737,16 @@ fn validate_notification_target_url(value: &str) -> Result<String, AdapterError>
             "push notification URL must use https, or http on localhost during local testing: {error}"
         ))
     })?;
+    if !url.username().is_empty() || url.password().is_some() {
+        return Err(AdapterError::InvalidToolInput(
+            "push notification URL must not include userinfo".to_string(),
+        ));
+    }
+    if url.fragment().is_some() {
+        return Err(AdapterError::InvalidToolInput(
+            "push notification URL must not include a fragment".to_string(),
+        ));
+    }
     Ok(url.to_string())
 }
 

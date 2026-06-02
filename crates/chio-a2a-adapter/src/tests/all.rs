@@ -2767,6 +2767,76 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn adapter_rejects_push_notification_callback_url_userinfo_before_dispatch() {
+        let registry_path = unique_path("chio-a2a-userinfo-push", ".json");
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_push_notification_capability_only() else {
+            return;
+        };
+        let manifest_key = Keypair::generate();
+        let adapter = A2aAdapter::discover(
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
+                .with_task_registry_file(&registry_path)
+                .with_timeout(Duration::from_secs(2)),
+        )
+        .expect("discover JSONRPC adapter");
+        seed_a2a_task(&adapter, "research", "task-1");
+
+        let error = adapter
+            .invoke(
+                "research",
+                json!({
+                    "create_push_notification_config": {
+                        "task_id": "task-1",
+                        "url": "https://user:secret@callbacks.example.com/chio"
+                    }
+                }),
+                None,
+            )
+            .await
+            .expect_err("callback URL userinfo should fail closed");
+        assert!(error
+            .to_string()
+            .contains("push notification URL must not include userinfo"));
+        assert_eq!(server.requests().len(), 1);
+        server.join();
+    }
+
+    #[tokio::test]
+    async fn adapter_rejects_push_notification_callback_url_fragment_before_dispatch() {
+        let registry_path = unique_path("chio-a2a-fragment-push", ".json");
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_push_notification_capability_only() else {
+            return;
+        };
+        let manifest_key = Keypair::generate();
+        let adapter = A2aAdapter::discover(
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
+                .with_task_registry_file(&registry_path)
+                .with_timeout(Duration::from_secs(2)),
+        )
+        .expect("discover JSONRPC adapter");
+        seed_a2a_task(&adapter, "research", "task-1");
+
+        let error = adapter
+            .invoke(
+                "research",
+                json!({
+                    "create_push_notification_config": {
+                        "task_id": "task-1",
+                        "url": "https://callbacks.example.com/chio#secret"
+                    }
+                }),
+                None,
+            )
+            .await
+            .expect_err("callback URL fragment should fail closed");
+        assert!(error
+            .to_string()
+            .contains("push notification URL must not include a fragment"));
+        assert_eq!(server.requests().len(), 1);
+        server.join();
+    }
+
+    #[tokio::test]
     async fn adapter_oauth2_client_credentials_fetches_token_and_caches_it() {
         let Some(server) = FakeA2aServer::spawn_jsonrpc_oauth_client_credentials_required() else {
             return;
