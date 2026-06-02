@@ -791,6 +791,14 @@ impl RequestLineageRecord {
         }
     }
 
+    pub fn validate_schema(&self) -> Result<()> {
+        ensure_schema_matches(
+            &self.schema,
+            CHIO_REQUEST_LINEAGE_RECORD_SCHEMA,
+            "request lineage record",
+        )
+    }
+
     #[must_use]
     pub fn with_parent_request_id(mut self, parent_request_id: RequestId) -> Self {
         self.parent_request_id = Some(parent_request_id);
@@ -2165,6 +2173,21 @@ mod tests {
             decoded.continuation_token_id.as_deref(),
             Some("continuation-1")
         );
+        assert!(decoded.validate_schema().is_ok());
+    }
+
+    #[test]
+    fn request_lineage_record_rejects_unknown_schema() {
+        let mut record = RequestLineageRecord::new(
+            RequestId::new("req-schema"),
+            SessionAnchorReference::new("anchor-1", "anchor-hash-1"),
+            OperationKind::ToolCall,
+            RequestLineageMode::LocalChild,
+            1_710_000_030,
+        );
+        record.schema = "chio.request_lineage_record.v999".to_string();
+
+        assert!(record.validate_schema().is_err());
     }
 
     #[test]

@@ -8,9 +8,12 @@ use chio_core_types::receipt::{
     ReceiptLineageStatementBody,
 };
 use chio_core_types::session::{
-    SessionAnchor, SessionAnchorBody, SessionAnchorContext, SessionAnchorReference,
+    RequestLineageMode, RequestLineageRecord, SessionAnchor, SessionAnchorBody,
+    SessionAnchorContext, SessionAnchorReference,
 };
-use chio_core_types::{sha256_hex, Keypair, RequestId, SessionAuthContext, SessionId, Signature};
+use chio_core_types::{
+    sha256_hex, Keypair, OperationKind, RequestId, SessionAuthContext, SessionId, Signature,
+};
 
 const UNSUPPORTED_SCHEMA: &str = "chio.unsupported_future_schema.v999";
 
@@ -75,6 +78,16 @@ fn continuation_body(signer: &Keypair) -> CallChainContinuationTokenBody {
         issued_at: 1_710_000_000,
         expires_at: 1_710_003_600,
     }
+}
+
+fn request_lineage_record() -> RequestLineageRecord {
+    RequestLineageRecord::new(
+        RequestId::new("request-lineage-schema"),
+        SessionAnchorReference::new("anchor-schema", sha256_hex(b"anchor-schema")),
+        OperationKind::ToolCall,
+        RequestLineageMode::LocalChild,
+        1_710_000_000,
+    )
 }
 
 fn sign_body<T: serde::Serialize>(body: &T, keypair: &Keypair) -> Signature {
@@ -186,4 +199,13 @@ fn schema_tagged_verifiers_reject_supported_key_with_unsupported_schema() {
     let continuation_signature = sign_body(&continuation_body, &keypair);
     let continuation = continuation_from_body(continuation_body, continuation_signature);
     assert!(continuation.verify_signature().is_err());
+}
+
+#[test]
+fn schema_tagged_request_lineage_record_rejects_unsupported_schema_id() {
+    let mut record = request_lineage_record();
+    assert!(record.validate_schema().is_ok());
+
+    record.schema = UNSUPPORTED_SCHEMA.to_string();
+    assert!(record.validate_schema().is_err());
 }

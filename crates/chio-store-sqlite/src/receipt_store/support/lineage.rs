@@ -12,6 +12,16 @@ fn provenance_json_sha256(value: &serde_json::Value) -> Result<String, ReceiptSt
     Ok(sha256_hex(&canonical))
 }
 
+fn validate_request_lineage_schema(
+    lineage_json: &serde_json::Value,
+) -> Result<(), ReceiptStoreError> {
+    let record: chio_core::session::RequestLineageRecord =
+        serde_json::from_value(lineage_json.clone())?;
+    record
+        .validate_schema()
+        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))
+}
+
 fn sanitize_required_identifier(
     record_kind: &str,
     record_id: &str,
@@ -606,6 +616,7 @@ pub(crate) fn persist_request_lineage_tx(
         request_fingerprint,
     )?;
 
+    validate_request_lineage_schema(lineage_json)?;
     let raw_json = serde_json::to_string(lineage_json)?;
     let json_sha256 = provenance_json_sha256(lineage_json)?;
     tx.execute(

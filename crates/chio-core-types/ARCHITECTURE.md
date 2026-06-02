@@ -53,10 +53,12 @@ by the change.
 
 ## Planned Improvement
 
-Complete the signed-artifact boundary in this crate by rejecting unsupported
-schema IDs for schema-tagged session anchors, receipt-lineage statements, and
-call-chain continuation tokens before signing or verification. This is an
-architectural invariant, not a cosmetic cleanup: it centralizes current-schema
-admission at the owning wire-type crate and prevents downstream kernels or
-adapters from treating future or foreign schema payloads as valid merely
-because their signatures verify.
+Complete the schema-tagged artifact boundary in this crate by rejecting
+unsupported schema IDs for session anchors, receipt-lineage statements, and
+call-chain continuation tokens before signing or verification. Request-lineage
+records are not signed, but they are still schema-tagged provenance artifacts,
+so the owning type must expose the same fail-closed schema admission check for
+load and persistence paths. This is an architectural invariant, not a cosmetic
+cleanup: it centralizes current-schema admission at the owning wire-type crate
+and prevents downstream kernels, stores, or adapters from treating future or
+foreign schema payloads as valid merely because their bytes deserialize.
