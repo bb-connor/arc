@@ -2259,4 +2259,28 @@ mod tests {
             ChioToolsPathIdentity::NotToolsPath
         ));
     }
+
+    #[test]
+    fn decode_path_identity_segment_decodes_percent_encoded_tool_name() {
+        assert_eq!(
+            decode_path_identity_segment("files%2eread"),
+            Some("files.read".to_string())
+        );
+        let ChioToolsPathIdentity::Identity {
+            server_id,
+            tool_name,
+        } = chio_tools_path_identity("/chio/tools/matrix/files%2eread")
+        else {
+            panic!("expected decoded tools path identity");
+        };
+        assert_eq!(server_id, "matrix");
+        assert_eq!(tool_name, "files.read");
+    }
+
+    #[test]
+    fn decode_path_identity_segment_rejects_invalid_hex_and_empty_decode() {
+        assert!(decode_path_identity_segment("bad%gg").is_none());
+        assert!(decode_path_identity_segment("terminal%2").is_none());
+        assert!(decode_path_identity_segment("").is_none());
+    }
 }
