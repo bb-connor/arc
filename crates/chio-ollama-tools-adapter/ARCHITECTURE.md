@@ -10,9 +10,9 @@
 
 ## Pain Points
 
-- `OllamaAdapterConfig.api_version` is public and serializable, so persisted or hand-built configs can drift away from the crate pin even though the transport, README, and fixtures define a single supported API snapshot.
-- `api_version()` and provenance stamps currently trust the mutable config field directly, which can make a stale local config look like an accepted upstream contract.
-- Outbound calls, captured batch lifting, streamed gating, direct tool-call lifting, and lower-response helpers share the same trust boundary but do not currently enforce the pin before doing work.
+- `OllamaAdapterConfig.api_version` is public and serializable, so persisted or hand-built configs can drift away from the crate pin even though the README and fixtures define a single supported API snapshot. The adapter now fails closed before outbound calls, captured lifting, streamed gating, direct tool-call lifting, and lower-response helpers when that config pin drifts.
+- The conformance corpus records `x-ollama-api-version: 2025-04`, but `transport::resolve_config` currently builds real HTTP transports with no default headers.
+- A live Ollama transport can therefore omit the same API snapshot header that fixtures and downstream replay gates treat as part of the adapter contract.
 
 ## Constraints
 
@@ -31,4 +31,4 @@
 
 ## Planned Improvement
 
-Add an adapter-local API-version guard that accepts only `OLLAMA_API_VERSION` before any outbound transport, captured lift, streaming evaluation, direct provenance stamp, or lower-response operation. This is architectural because it turns the upstream contract pin from documentation and fixture metadata into an enforced boundary across every public mediation path while keeping the public config shape stable.
+Make the Ollama transport config stamp `x-ollama-api-version: 2025-04` on every real HTTP transport path, including default localhost, `OLLAMA_HOST` overrides, optional remote-gateway bearer auth, and explicit `live_transport_for` construction. This is architectural because it aligns live outbound transport with the replay fixture contract and the adapter's provenance/API pin without changing the public adapter config shape.
