@@ -597,12 +597,13 @@ fn build_client_with_cluster_peer(
     control_token: &str,
     cluster_peer_auth: Option<ClusterPeerClientAuth>,
 ) -> Result<TrustControlClient, CliError> {
+    validate_control_token(control_token)?;
     let endpoints = control_url
         .split(',')
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .map(|value| value.trim_end_matches('/').to_string())
-        .collect::<Vec<_>>();
+        .map(normalize_control_endpoint)
+        .collect::<Result<Vec<_>, _>>()?;
     if endpoints.is_empty() {
         return Err(CliError::cli_other_error(
             "control URL must not be empty".to_string(),
@@ -618,6 +619,52 @@ fn build_client_with_cluster_peer(
         http,
         cluster_peer_auth,
     })
+}
+
+fn validate_control_token(control_token: &str) -> Result<(), CliError> {
+    if control_token.trim().is_empty() {
+        return Err(CliError::cli_other_error(
+            "control token must be non-empty".to_string(),
+        ));
+    }
+    if control_token.trim() != control_token {
+        return Err(CliError::cli_other_error(
+            "control token must not contain surrounding whitespace".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn normalize_control_endpoint(endpoint: &str) -> Result<String, CliError> {
+    let parsed = Url::parse(endpoint).map_err(|error| {
+        CliError::cli_other_error(format!(
+            "control URL `{endpoint}` must be a valid URL: {error}"
+        ))
+    })?;
+    match parsed.scheme() {
+        "http" | "https" => {}
+        scheme => {
+            return Err(CliError::cli_other_error(format!(
+                "control URL `{endpoint}` scheme `{scheme}` must be http or https"
+            )));
+        }
+    }
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err(CliError::cli_other_error(format!(
+            "control URL `{endpoint}` must not contain username or password material"
+        )));
+    }
+    if parsed.query().is_some() {
+        return Err(CliError::cli_other_error(format!(
+            "control URL `{endpoint}` must not contain a query string"
+        )));
+    }
+    if parsed.fragment().is_some() {
+        return Err(CliError::cli_other_error(format!(
+            "control URL `{endpoint}` must not contain a fragment"
+        )));
+    }
+    Ok(endpoint.trim_end_matches('/').to_string())
 }
 
 fn encode_path_segment(segment: &str) -> String {
@@ -4186,6 +4233,40 @@ mod service_runtime_tests {
 
         client.mark_preferred(1);
         assert_eq!(client.endpoint_order(), vec![1, 0]);
+    }
+
+    #[test]
+    fn build_client_rejects_blank_or_padded_control_token() {
+        for token in ["", "   ", " secret", "secret "] {
+            let error = match build_client("http://control.example.test", token) {
+                Ok(_) => panic!("blank or padded control token should fail"),
+                Err(error) => error,
+            };
+            assert!(
+                error.to_string().contains("control token"),
+                "unexpected error for token `{token:?}`: {error}",
+            );
+        }
+    }
+
+    #[test]
+    fn build_client_rejects_malformed_or_ambient_authority_endpoints() {
+        for endpoint in [
+            "not-a-url",
+            "file:///tmp/chio.sock",
+            "https://user:pass@control.example.test",
+            "https://control.example.test?token=secret",
+            "https://control.example.test#fragment",
+        ] {
+            let error = match build_client(endpoint, "secret") {
+                Ok(_) => panic!("malformed or ambiguous control endpoint should fail"),
+                Err(error) => error,
+            };
+            assert!(
+                error.to_string().contains("control URL"),
+                "unexpected error for endpoint `{endpoint}`: {error}",
+            );
+        }
     }
 
     #[test]
