@@ -53,6 +53,14 @@ export interface ManifestVerification {
   embedded_public_key_matches_signer: boolean;
 }
 
+const REQUIRED_PERMISSION_FIELDS = [
+  "read_paths",
+  "write_paths",
+  "network_hosts",
+  "environment_variables",
+] as const;
+const REQUIRED_PERMISSION_FIELD_SET = new Set<string>(REQUIRED_PERMISSION_FIELDS);
+
 function validateManifestStructure(manifest: ToolManifest): boolean {
   if (manifest.schema !== "chio.manifest.v1") {
     return false;
@@ -89,7 +97,7 @@ function validateManifestStructure(manifest: ToolManifest): boolean {
     }
   }
 
-  return true;
+  return validateRequiredPermissions(manifest.required_permissions);
 }
 
 function isValidManifestTextField(value: unknown): value is string {
@@ -102,6 +110,43 @@ function isValidToolName(name: unknown): name is string {
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function validateRequiredPermissions(permissions: unknown): boolean {
+  if (permissions === undefined || permissions === null) {
+    return true;
+  }
+  if (!isJsonObject(permissions)) {
+    return false;
+  }
+  for (const field of Object.keys(permissions)) {
+    if (!REQUIRED_PERMISSION_FIELD_SET.has(field)) {
+      return false;
+    }
+  }
+  for (const field of REQUIRED_PERMISSION_FIELDS) {
+    if (!validateRequiredPermissionValues(permissions[field])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function validateRequiredPermissionValues(values: unknown): boolean {
+  if (values === undefined || values === null) {
+    return true;
+  }
+  if (!Array.isArray(values)) {
+    return false;
+  }
+  const seen = new Set<string>();
+  for (const value of values) {
+    if (!isValidManifestTextField(value) || seen.has(value)) {
+      return false;
+    }
+    seen.add(value);
+  }
+  return true;
 }
 
 export function parseSignedManifestJson(input: string): SignedManifest {

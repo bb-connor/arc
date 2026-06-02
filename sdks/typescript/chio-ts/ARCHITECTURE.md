@@ -72,3 +72,45 @@ Add a shared TypeScript manifest text-field validator for `server_id`, `name`,
 and `version`, mirroring Rust `validate_manifest_text_field`. Prove the
 boundary with tests for blank and padded identity fields while preserving
 signature and embedded-key result behavior.
+
+## Manifest Required Permissions Parity Slice
+
+### Current Boundary
+
+- `src/invariants/manifest.ts` owns TypeScript signed manifest structure
+  admission through `ManifestVerification.structure_valid`.
+- Rust `chio-manifest::validate_manifest` rejects malformed
+  `required_permissions` after validating manifest identity, tools, and server
+  tools.
+- `test/manifest.test.ts` is the local SDK harness for this parity boundary.
+
+### Pain Point
+
+Rust rejects blank, whitespace-padded, duplicate, unknown, and non-array
+`required_permissions` entries. The TypeScript SDK currently accepts those
+structures after the identity and tool checks pass, so Node or browser callers
+can report `structure_valid: true` for manifests Rust rejects.
+
+### Security And API Constraints
+
+- Preserve the public `verifySignedManifest` and `verifySignedManifestJson`
+  return shape.
+- Keep canonical JSON bytes and signature verification independent from
+  `structure_valid`.
+- Treat required-permission divergence as fail-closed `structure_valid: false`.
+- Do not change Rust crates or generated artifacts for this SDK-only parity fix.
+
+### Affected Dependents
+
+- `@chio-protocol/sdk/invariants` consumers get stricter structure parity with
+  Rust manifest admission.
+- Existing valid manifests and manifests without `required_permissions` are
+  unchanged.
+- Documentation and package exports do not need a signature or API-shape change.
+
+### Planned Material Improvement
+
+Add TypeScript validation for `required_permissions.read_paths`,
+`write_paths`, `network_hosts`, and `environment_variables`: absent or null is
+accepted, present values must be arrays of nonblank, unpadded, nonduplicate
+strings, and unknown permission fields are rejected.

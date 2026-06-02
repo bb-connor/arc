@@ -6,6 +6,14 @@ from ..errors import parse_json_text
 from .json import canonicalize_json
 from .signing import is_valid_public_key_hex, public_key_hex_matches, verify_utf8_message_ed25519
 
+_REQUIRED_PERMISSION_FIELDS = (
+    "read_paths",
+    "write_paths",
+    "network_hosts",
+    "environment_variables",
+)
+_REQUIRED_PERMISSION_FIELD_SET = set(_REQUIRED_PERMISSION_FIELDS)
+
 
 def parse_signed_manifest_json(input_text: str) -> dict[str, Any]:
     return parse_json_text(input_text)
@@ -40,7 +48,7 @@ def _validate_manifest_structure(manifest: dict[str, Any]) -> bool:
         output_schema = tool.get("output_schema")
         if output_schema is not None and not _is_json_object(output_schema):
             return False
-    return True
+    return _validate_required_permissions(manifest.get("required_permissions"))
 
 
 def _is_valid_manifest_text_field(value: Any) -> bool:
@@ -53,6 +61,32 @@ def _is_valid_tool_name(name: Any) -> bool:
 
 def _is_json_object(value: Any) -> bool:
     return isinstance(value, dict)
+
+
+def _validate_required_permissions(permissions: Any) -> bool:
+    if permissions is None:
+        return True
+    if not isinstance(permissions, dict):
+        return False
+    if any(field not in _REQUIRED_PERMISSION_FIELD_SET for field in permissions):
+        return False
+    return all(
+        _validate_required_permission_values(permissions.get(field))
+        for field in _REQUIRED_PERMISSION_FIELDS
+    )
+
+
+def _validate_required_permission_values(values: Any) -> bool:
+    if values is None:
+        return True
+    if not isinstance(values, list):
+        return False
+    seen: set[str] = set()
+    for value in values:
+        if not _is_valid_manifest_text_field(value) or value in seen:
+            return False
+        seen.add(value)
+    return True
 
 
 def verify_signed_manifest(signed_manifest: dict[str, Any]) -> dict[str, Any]:

@@ -109,3 +109,56 @@ test("manifest structure rejects non-object tool schemas", () => {
   badOutputSchema.manifest.tools[0].output_schema = "not an object";
   assert.equal(verifySignedManifest(badOutputSchema).structure_valid, false);
 });
+
+test("manifest structure accepts valid required permissions", () => {
+  const signedManifest = pricedSignedManifest();
+  signedManifest.manifest.required_permissions = {
+    read_paths: ["/tmp/in"],
+    write_paths: ["/tmp/out"],
+    network_hosts: ["api.example.com"],
+    environment_variables: ["TOKEN"],
+  };
+
+  const verification = verifySignedManifest(signedManifest);
+
+  assert.equal(verification.structure_valid, true);
+  assert.equal(verification.signature_valid, false);
+  assert.equal(verification.embedded_public_key_valid, true);
+});
+
+test("manifest structure rejects invalid required permissions", () => {
+  for (const [field, values] of [
+    ["read_paths", [""]],
+    ["write_paths", [" /tmp/out"]],
+    ["network_hosts", ["api.example.com "]],
+    ["environment_variables", ["TOKEN", "TOKEN"]],
+    ["read_paths", [123]],
+  ] as const) {
+    const signedManifest = pricedSignedManifest();
+    signedManifest.manifest.required_permissions = { [field]: values };
+
+    const verification = verifySignedManifest(signedManifest);
+
+    assert.equal(
+      verification.structure_valid,
+      false,
+      `${field} ${JSON.stringify(values)}`,
+    );
+    assert.equal(verification.signature_valid, false);
+    assert.equal(verification.embedded_public_key_valid, true);
+  }
+});
+
+test("manifest structure rejects malformed required permissions object", () => {
+  const unknownField = pricedSignedManifest();
+  (unknownField.manifest as { required_permissions?: unknown }).required_permissions = {
+    unknown: ["/tmp"],
+  };
+  assert.equal(verifySignedManifest(unknownField).structure_valid, false);
+
+  const nonArrayValues = pricedSignedManifest();
+  (nonArrayValues.manifest as { required_permissions?: unknown }).required_permissions = {
+    read_paths: "/tmp",
+  };
+  assert.equal(verifySignedManifest(nonArrayValues).structure_valid, false);
+});

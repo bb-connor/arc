@@ -2,6 +2,13 @@ package invariants
 
 import "strings"
 
+var requiredPermissionFields = map[string]struct{}{
+	"read_paths":            {},
+	"write_paths":           {},
+	"network_hosts":         {},
+	"environment_variables": {},
+}
+
 type ManifestVerification struct {
 	EmbeddedPublicKeyMatchesSigner bool `json:"embedded_public_key_matches_signer"`
 	EmbeddedPublicKeyValid         bool `json:"embedded_public_key_valid"`
@@ -106,7 +113,7 @@ func validateManifestStructure(manifest map[string]any) bool {
 			return false
 		}
 	}
-	return true
+	return validateRequiredPermissions(manifest["required_permissions"])
 }
 
 func isValidManifestTextField(value any) bool {
@@ -125,4 +132,47 @@ func isValidToolName(name string) bool {
 func isJSONObject(value any) bool {
 	_, ok := value.(map[string]any)
 	return ok
+}
+
+func validateRequiredPermissions(value any) bool {
+	if value == nil {
+		return true
+	}
+	permissions, ok := value.(map[string]any)
+	if !ok {
+		return false
+	}
+	for field := range permissions {
+		if _, ok := requiredPermissionFields[field]; !ok {
+			return false
+		}
+	}
+	for field := range requiredPermissionFields {
+		if !validateRequiredPermissionValues(permissions[field]) {
+			return false
+		}
+	}
+	return true
+}
+
+func validateRequiredPermissionValues(value any) bool {
+	if value == nil {
+		return true
+	}
+	values, ok := value.([]any)
+	if !ok {
+		return false
+	}
+	seen := make(map[string]struct{}, len(values))
+	for _, entry := range values {
+		text, ok := entry.(string)
+		if !ok || !isValidManifestTextField(text) {
+			return false
+		}
+		if _, exists := seen[text]; exists {
+			return false
+		}
+		seen[text] = struct{}{}
+	}
+	return true
 }
