@@ -482,9 +482,10 @@ fn mcp_tool_result_to_chio_value(result: McpToolResult) -> serde_json::Value {
     if let Some(structured_content) = result.structured_content {
         output.insert("structuredContent".to_string(), structured_content);
     }
-    if let Some(is_error) = result.is_error {
-        output.insert("isError".to_string(), serde_json::Value::Bool(is_error));
-    }
+    output.insert(
+        "isError".to_string(),
+        serde_json::Value::Bool(result.is_error.unwrap_or(false)),
+    );
 
     serde_json::Value::Object(output)
 }
@@ -831,7 +832,7 @@ mod tests {
     }
 
     #[test]
-    fn mcp_tool_result_to_chio_value_omits_absent_optional_fields() {
+    fn mcp_tool_result_to_chio_value_defaults_absent_is_error_to_false() {
         let output = mcp_tool_result_to_chio_value(success_result("ok"));
 
         assert_eq!(output["content"][0]["text"], "ok");
@@ -843,7 +844,7 @@ mod tests {
             structured_content: None,
             is_error: None,
         });
-        assert!(output.get("isError").is_none());
+        assert_eq!(output["isError"], false);
         assert!(output.get("structuredContent").is_none());
     }
 
@@ -1164,7 +1165,7 @@ mod tests {
     }
 
     #[test]
-    fn invoke_omits_is_error_when_none() {
+    fn invoke_defaults_missing_is_error_to_false() {
         let result = McpToolResult {
             content: vec![serde_json::json!({"type": "text", "text": "ok"})],
             structured_content: None,
@@ -1175,7 +1176,7 @@ mod tests {
         let output = adapter
             .invoke("t", serde_json::json!({}))
             .unwrap_or_else(|e| panic!("{e}"));
-        assert!(output.get("isError").is_none());
+        assert_eq!(output["isError"], false);
     }
 
     #[test]

@@ -13,16 +13,17 @@ or billing enforcement.
 
 The manifest has both discovery metadata and trust metadata. `validate_manifest`
 is the structural discovery gate used by adapters and examples before a manifest
-is signed. It should reject impossible tool contracts and malformed manifest
-identity or sandbox-permission metadata, but it should not require
-signed-material parsing. Public-key parsing belongs on the signing and
-verification paths, where the crate can compare the embedded manifest key with
-the actual signer and fail closed before admitting a signed manifest.
+is signed. It rejects impossible tool contracts and malformed manifest identity
+or sandbox-permission metadata, but it does not require signed-material parsing.
+Public-key parsing belongs on the signing and verification paths, where the
+crate compares the embedded manifest key with the actual signer and fails closed
+before admitting a signed manifest.
 
-`lib.rs` also carries schema types, server-tool mapping, structural validation,
-and signing in one file. That makes it too easy for caller-facing schema changes
-and trust-boundary validation changes to drift together without a clear review
-line.
+The signed envelope is a separate trust boundary. The inner `ToolManifest`
+already rejects unknown fields, but the envelope must do the same or admission
+payloads can carry unsigned side metadata that serde silently discards before
+verification. Even if current callers ignore that side metadata, the signed
+artifact should have a single canonical shape at parse time.
 
 ## Security And API Constraints
 
@@ -47,11 +48,14 @@ line.
 Potential dependents are adapter tests and examples that synthesize manifests
 before calling `validate_manifest`. Structural validation should keep rejecting
 malformed tool schemas for those dependents, while unsigned/demo manifests with
-placeholder public keys should remain usable until a caller explicitly signs or
-verifies the manifest.
+placeholder public keys remain usable until a caller explicitly signs or
+verifies the manifest. Signed-manifest JSON with extra envelope fields now
+rejects at deserialization.
 
-## Planned Improvement
+## Implemented Improvement
 
-Move structural validation into its own module and tighten the unsigned
-manifest gate for identity and required-permission text fields. Keep embedded
-public-key parsing on the signing and verification boundary.
+Structural validation lives in its own module and tightens the unsigned manifest
+gate for identity and required-permission text fields. Embedded public-key
+parsing stays on the signing and verification boundary. The signed envelope now
+uses `deny_unknown_fields`, matching the inner manifest schema's fail-closed
+parsing behavior.

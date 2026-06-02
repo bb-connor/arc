@@ -10,34 +10,40 @@ signing, capability validation, budget mutation, or persistent kernel state.
 
 ## Current Pain Point
 
-The shell-command guard now recursively checks shell interpreter command strings
-for destructive root deletion, but forbidden-path extraction still stops at the
-outer command line. Some sensitive-path substrings are caught accidentally when
-they remain visible inside the outer `sh -c` argument, but bare relative targets
-such as `sh -c "cat .env"` are collapsed into one token and the delegated
-`ForbiddenPathGuard` never sees `.env` as a path. That creates a weaker path
-boundary for `sh -c`, `bash -lc`, and wrapper-mediated shell execution than for
-top-level commands.
+The response sanitizer exposes `OutputSanitizerConfig::redaction_strategies`
+for category-level policy. That policy boundary must not apply equally to every
+secret finding. Ordinary built-in detectors can follow category defaults, but
+explicit denylist matches and fail-closed findings are mandatory redaction
+findings. If those findings take the same `SensitiveCategory::Secret` strategy
+path as ordinary detectors, a caller can set `Secret -> Keep` and downgrade a
+forced-redaction match to no redaction. `SanitizerHook` feeds sanitized JSON and
+finding summaries into the post-invocation pipeline, so this boundary is part of
+agent-visible output control rather than local formatting only.
 
 ## Security And API Constraints
 
 - Guard evaluation must remain fail-closed for malformed guard configuration.
-- Public guard constructors and re-exports should remain compatible.
-- Wrapper handling must preserve existing `sudo`, `env`, `command`, quoted
-  separator, root-deletion, and forbidden-path behavior.
-- Nested shell analysis must share the existing maximum recursion depth.
-- Path extraction must remain best-effort and fail closed through the existing
-  guard verdict path rather than adding kernel-side state.
+- Public guard constructors, config structs, result structs, and re-exports
+  must remain compatible.
+- Category-level redaction policy can still weaken ordinary built-in detectors
+  when the caller explicitly chooses that policy, but explicit denylist matches
+  and fail-closed redaction-unavailable findings must not be downgraded.
+- Receipt evidence must never include raw secret material, and sanitizer
+  evidence must remain consistent with the transformed output.
+- Post-invocation behavior must preserve JSON structure and existing
+  `SanitizerHook` integration.
 
 ## Affected Dependents
 
 The owning-crate change is internal to `chio-guards`. It affects callers that
-install `ShellCommandGuard` directly or through `GuardPipeline`, including
-kernel and CLI policy paths. No dependent API change is planned.
+install `OutputSanitizer` or `SanitizerHook` directly or through post-invocation
+policy paths. No dependent API change is planned; dependent behavior should
+only become stricter for explicit denylist matches.
 
-## Planned Improvement
+## Implemented Improvement
 
-Extend structured path extraction to recurse into shell interpreter `-c` command
-strings. The nested analysis should pass the same candidate paths to
-`ForbiddenPathGuard` that top-level shell commands already expose, including
-redirection targets and flag-embedded paths.
+Redaction strategy selection now sits behind an internal policy boundary that
+distinguish configurable detector recommendations from mandatory denylist and
+fail-closed findings. Regression coverage proves exact and regex denylist
+matches remain redacted even when the caller sets `SensitiveCategory::Secret` to
+`Keep`.

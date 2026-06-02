@@ -153,6 +153,33 @@ assert_rc "$(run_checker "$unknown/Cargo.toml" "$work/unknown.out" "$work/unknow
   "unknown public entrypoint fails"
 grep -F "references unknown crates: chio-missing" "$work/unknown.err" >/dev/null
 
+padded_root_entrypoint="$work/padded-root-entrypoint"
+write_workspace "$padded_root_entrypoint" '    " chio-core",' '    "chio-cli",'
+assert_rc "$(run_checker "$padded_root_entrypoint/Cargo.toml" "$work/padded-root-entrypoint.out" "$work/padded-root-entrypoint.err")" 1 \
+  "padded root public entrypoint fails"
+grep -F "workspace.metadata.chio.rust_public_entrypoints[0] must not include leading or trailing whitespace." \
+  "$work/padded-root-entrypoint.err" >/dev/null
+
+blank_registry_entry="$work/blank-registry-entry"
+write_workspace "$blank_registry_entry" '    "chio-cli",' '    "chio-core",'
+python3 - "$blank_registry_entry/Cargo.toml" <<'PY'
+from pathlib import Path
+import sys
+
+workspace = Path(sys.argv[1])
+workspace.write_text(
+    workspace.read_text(encoding="utf-8").replace(
+        "rust_registry_public_crates = []\n",
+        'rust_registry_public_crates = [\n    "",\n]\n',
+    ),
+    encoding="utf-8",
+)
+PY
+assert_rc "$(run_checker "$blank_registry_entry/Cargo.toml" "$work/blank-registry-entry.out" "$work/blank-registry-entry.err")" 1 \
+  "blank root registry-public crate fails"
+grep -F "workspace.metadata.chio.rust_registry_public_crates[0] must not be empty." \
+  "$work/blank-registry-entry.err" >/dev/null
+
 missing_member_manifest="$work/missing-member-manifest"
 write_workspace "$missing_member_manifest" '    "chio-cli",' '    "chio-core",'
 python3 - "$missing_member_manifest/Cargo.toml" <<'PY'

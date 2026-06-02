@@ -109,3 +109,44 @@ No downstream Rust API changes. `chio-cli`, `chio-control-plane`, `chio-hosted-m
 ### Planned Improvement
 
 Introduce an internal manifest projection type that validates the MCP tool once, preserves MCP title by folding it into the Chio description, and then emits `ToolDefinition`. This is architectural because it gives `manifest.rs` an explicit admission/projection boundary instead of scattering MCP-field interpretation directly inside `ToolDefinition` construction.
+
+## Wrapped Tool Result Normalization Slice
+
+### Current Boundary
+
+`lib.rs` owns the adapter-facing conversion from upstream `McpToolResult` into
+the Chio-visible JSON value returned by `McpAdapter::invoke` and
+`AdaptedMcpServer::invoke`. `chio-mcp-edge` owns the inverse hosting path from
+Chio tool output into MCP `tools/call` results.
+
+### Pain Point
+
+The hosting edge inserts `isError: false` when an MCP-shaped success result
+omits `isError`, but the wrapped adapter currently preserves the omission. That
+creates two Chio-owned MCP result shapes for the same success state. Downstream
+bridges and task-status projection use `isError` as the explicit success/error
+switch, so the wrapped path should not force every caller to rediscover the MCP
+default.
+
+### Security And API Constraints
+
+- Preserve `McpToolResult` deserialization compatibility with upstream MCP
+  servers that omit `isError`.
+- Preserve explicit upstream `isError: true` and `isError: false` values.
+- Preserve content and structuredContent byte values exactly except for adding
+  the missing boolean default.
+- Do not change manifest projection, guard ordering, nested-flow behavior,
+  notification handling, or edge hosting behavior in this adapter slice.
+
+### Affected Dependents
+
+No dependent Rust API changes are expected. `chio-cli`, `chio-control-plane`,
+`chio-hosted-mcp`, and `chio-mcp-remote` receive a more explicit JSON result
+from wrapped MCP calls when upstream omits `isError`.
+
+### Implemented Improvement
+
+Wrapped MCP result normalization now inserts `isError: false` when upstream
+omits it, matching `chio-mcp-edge::runtime::protocol::value_to_tool_result`.
+Helper and invocation tests prove the adapter boundary cannot regress to an
+ambiguous success shape.

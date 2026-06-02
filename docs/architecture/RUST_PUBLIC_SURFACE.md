@@ -272,3 +272,47 @@ Register `chio-wall` as a root Rust public entrypoint, add the local
 `package.metadata.chio.public_entrypoint = true` marker, and declare its crate
 README so the public-surface gate owns this product binary alongside the other
 supported repo-public Rust surfaces.
+
+## Root Metadata Identifier Hygiene Slice
+
+### Current Boundary
+
+The root workspace metadata lists are the ordered policy keys for the
+repo-public Rust entrypoint surface and the registry-public Rust crate surface.
+They are more than display strings: the checker converts them into set
+membership for root/local entrypoint agreement, registry dependency closure, and
+unknown-crate detection.
+
+### Pain Point Addressed
+
+The checker requires both root lists to be lists of strings, sorted, unique, and
+known workspace crate names. It does not currently reject blank or padded list
+entries at the point where the policy key is read. A value such as
+`" chio-core"` eventually fails as an unknown crate, but the diagnostic points
+at membership fallout rather than the malformed policy key itself. Blank values
+produce even weaker unknown-crate output.
+
+### Security And API Constraints
+
+- Keep the root lists explicit and sorted; do not infer or normalize public
+  crate names from invalid strings.
+- Preserve the package-local marker handshake and registry dependency closure
+  behavior after syntactic validation succeeds.
+- Keep the checker pure, local, and network-free.
+- Do not treat identifier hygiene as public API compatibility proof. It only
+  proves the metadata keys are syntactically reviewable before semantic checks
+  run.
+
+### Affected Dependents
+
+CI continues to invoke `python3 scripts/check-rust-public-surface.py`, and the
+focused synthetic regression suite remains
+`bash scripts/tests/check-rust-public-surface.test.sh`. Real workspace metadata
+already uses unpadded names, so no crate manifest transitive edits are expected.
+
+### Implemented Improvement
+
+The checker rejects blank or leading/trailing-whitespace entries in both
+`rust_public_entrypoints` and `rust_registry_public_crates` with explicit
+index-addressed diagnostics. Existing sorted, duplicate, unknown-crate,
+root/local marker, and registry closure checks remain intact.

@@ -77,13 +77,26 @@ fn validate_rules(rules: &Rules, errors: &mut Vec<ValidationError>) {
             errors,
         );
         let mut seen = HashSet::new();
-        for pattern in &secret_patterns.patterns {
-            if !seen.insert(&pattern.name) {
-                errors.push(ValidationError::DuplicatePatternName(pattern.name.clone()));
+        for (index, pattern) in secret_patterns.patterns.iter().enumerate() {
+            let name_field = format!("rules.secret_patterns.patterns[{index}].name");
+            let trimmed_name = pattern.name.trim();
+            if trimmed_name.is_empty() {
+                errors.push(ValidationError::Custom(format!(
+                    "{name_field} must not be empty"
+                )));
+            } else if trimmed_name != pattern.name {
+                errors.push(ValidationError::Custom(format!(
+                    "{name_field} must not have leading or trailing whitespace"
+                )));
+            }
+            if !trimmed_name.is_empty() && !seen.insert(trimmed_name.to_string()) {
+                errors.push(ValidationError::DuplicatePatternName(
+                    trimmed_name.to_string(),
+                ));
             }
             validate_regex(
                 &pattern.pattern,
-                &format!("rules.secret_patterns.patterns.{}", pattern.name),
+                &format!("rules.secret_patterns.patterns[{index}].pattern"),
                 errors,
             );
         }
@@ -702,7 +715,7 @@ rules:
 
         let result = validate(&spec);
 
-        assert_error_contains(&result, "rules.secret_patterns.patterns.broken");
+        assert_error_contains(&result, "rules.secret_patterns.patterns[0].pattern");
         assert_error_contains(&result, "must be at most 512 characters");
         assert_error_contains(
             &result,

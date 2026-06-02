@@ -51,6 +51,14 @@ def read_metadata_list(
     if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
         errors.append(f"workspace.metadata.chio.{key} must be a list of strings")
         return []
+    for index, value in enumerate(values):
+        if not value.strip():
+            errors.append(f"workspace.metadata.chio.{key}[{index}] must not be empty.")
+        elif value.strip() != value:
+            errors.append(
+                f"workspace.metadata.chio.{key}[{index}] must not include "
+                "leading or trailing whitespace."
+            )
     return values
 
 

@@ -204,6 +204,7 @@ pub enum LatencyHint {
 
 /// A manifest wrapped in its Ed25519 signature.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SignedManifest {
     /// The tool manifest.
     pub manifest: ToolManifest,
@@ -565,6 +566,27 @@ mod tests {
             verify_manifest(&signed, &trusted.public_key()),
             Err(ManifestError::VerificationFailed)
         ));
+    }
+
+    #[test]
+    fn signed_manifest_rejects_unknown_envelope_fields() {
+        let kp = Keypair::generate();
+        let mut m = sample_manifest();
+        m.public_key = kp.public_key().to_hex();
+        let signed = sign_manifest(&m, &kp).unwrap_or_else(|e| panic!("sign: {e}"));
+        let mut encoded =
+            serde_json::to_value(&signed).unwrap_or_else(|e| panic!("encode signed manifest: {e}"));
+        encoded
+            .as_object_mut()
+            .unwrap_or_else(|| panic!("signed manifest encodes as object"))
+            .insert("unsigned_policy_hint".to_string(), serde_json::json!(true));
+
+        let error = serde_json::from_value::<SignedManifest>(encoded).unwrap_err();
+
+        assert!(
+            error.to_string().contains("unknown field"),
+            "expected unknown-field parse error, got {error}"
+        );
     }
 
     #[test]
