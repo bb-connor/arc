@@ -41,7 +41,7 @@ if [ -z "$SIDECAR_URL" ] || [ -z "$OUTPUT" ]; then
   exit 2
 fi
 
-if [[ "$SIDECAR_URL" == *\"* || "$SIDECAR_URL" == *\\* || "$SIDECAR_URL" == *$'\n'* || "$SIDECAR_URL" == *$'\r'* || "$SIDECAR_URL" == *$'\t'* ]]; then
+if [[ "$SIDECAR_URL" == *\"* || "$SIDECAR_URL" == *\\* || "$SIDECAR_URL" == *[[:cntrl:]]* ]]; then
   printf 'shadow-capture: sidecar url contains characters unsafe for JSON manifest\n' >&2
   exit 2
 fi
