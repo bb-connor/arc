@@ -60,3 +60,50 @@ Strengthen the public Rust surface gate so
 `package.metadata.chio.public_entrypoint = true` fails unless the package also
 appears in `workspace.metadata.chio.rust_public_entrypoints`, then register
 `chio-api-protect` as a root public entrypoint with explicit README metadata.
+
+## Registry Dependency Closure Slice
+
+### Current Boundary
+
+`rust_registry_public_crates` declares which workspace crates may be treated as
+crates.io candidates. The structural gate owns this declaration, but the Cargo
+registry resolver owns the actual install boundary: a published crate's normal
+and build dependencies resolve from the registry, not from workspace `path`
+dependencies.
+
+### Pain Point
+
+The gate currently checks that a registry-public crate is itself publishable,
+documented, and implemented. It does not check whether that crate's non-dev
+workspace dependencies are also registry-public. A crate can therefore appear
+safe in metadata while `cargo package` or a downstream `cargo install` fails
+because a normal dependency is still private to the workspace.
+
+### Security And API Constraints
+
+- Do not broaden the registry surface by implication. Making one crate
+  registry-public must not silently publish its private dependency graph.
+- Keep dev-dependencies out of this check. They exercise in-repo verification
+  and are not required for normal downstream resolution.
+- Optional normal dependencies still count. A published feature that points at
+  an unpublished workspace crate is an advertised but unresolvable public
+  surface.
+- Keep the gate pure and local by parsing manifests. Do not invoke Cargo
+  packaging, registry lookup, or network access from the structural check.
+
+### Affected Dependents
+
+CI runs `python3 scripts/check-rust-public-surface.py` from the workspace
+structural gate. The shell regression suite owns synthetic workspaces that
+prove this policy without depending on the real registry. Real workspace
+metadata may need to stop advertising a crate as registry-public until its
+normal dependency graph is itself registry-resolvable.
+
+### Planned Material Improvement
+
+Teach the structural gate to fail any registry-public crate whose normal or
+build workspace `path` dependency is not also listed in
+`rust_registry_public_crates`. Then make the real workspace metadata honest:
+`chio-conformance` remains a repo-public conformance harness, but it must not
+be listed as registry-public while it still depends on private Chio kernel and
+selective-disclosure crates.

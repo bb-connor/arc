@@ -6,7 +6,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-publish = true
+publish = false
 readme = "README.md"
 keywords = ["chio", "conformance", "mcp", "agent-protocol"]
 categories = ["development-tools::testing", "command-line-utilities"]
@@ -62,6 +62,9 @@ chio-bbs = [
     "dep:chio-workflow",
     "chio-selective-disclosure/bbs",
 ]
+
+[package.metadata.chio]
+public_entrypoint = true
 
 [dependencies]
 chio-core = { package = "chio-core-types", version = "0.1.0", path = "../chio-core-types" }

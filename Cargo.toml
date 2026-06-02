@@ -179,6 +179,7 @@ repository = "https://github.com/backbay-labs/chio"
 rust_public_entrypoints = [
     "chio-api-protect",
     "chio-cli",
+    "chio-conformance",
     "chio-control-plane",
     "chio-core",
     "chio-guards",
@@ -190,9 +191,7 @@ rust_public_entrypoints = [
     "chio-mcp-remote",
     "chio-policy",
 ]
-rust_registry_public_crates = [
-    "chio-conformance",
-]
+rust_registry_public_crates = []
 
 [workspace.metadata.cargo-vet]
 

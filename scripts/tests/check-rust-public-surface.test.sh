@@ -41,6 +41,7 @@ members = [
 rust_public_entrypoints = [
 $*
 ]
+rust_registry_public_crates = []
 EOF
 }
 
@@ -109,6 +110,39 @@ assert_rc "$(run_checker "$unlisted_publishable/Cargo.toml" "$work/unlisted-publ
   "unlisted publishable crate fails"
 grep -F "crates/chio-leaky/Cargo.toml must set publish = false or be listed in workspace.metadata.chio.rust_registry_public_crates." \
   "$work/unlisted-publishable.err" >/dev/null
+
+registry_private_dep="$work/registry-private-dep"
+write_workspace "$registry_private_dep" '    "chio-cli",' '    "chio-core",'
+write_member "$registry_private_dep/crates/chio-harness" "chio-harness"
+python3 - "$registry_private_dep/Cargo.toml" "$registry_private_dep/crates/chio-harness/Cargo.toml" <<'PY'
+from pathlib import Path
+import sys
+
+workspace = Path(sys.argv[1])
+workspace.write_text(
+    workspace.read_text(encoding="utf-8")
+    .replace(
+        '    "crates/chio-core",\n]',
+        '    "crates/chio-core",\n    "crates/chio-harness",\n]',
+    )
+    .replace(
+        "rust_registry_public_crates = []\n",
+        'rust_registry_public_crates = [\n    "chio-harness",\n]\n',
+    ),
+    encoding="utf-8",
+)
+
+manifest = Path(sys.argv[2])
+manifest.write_text(
+    manifest.read_text(encoding="utf-8").replace("publish = false\n", "")
+    + '\n[dependencies]\nchio-core = { version = "0.1.0", path = "../chio-core" }\n',
+    encoding="utf-8",
+)
+PY
+assert_rc "$(run_checker "$registry_private_dep/Cargo.toml" "$work/registry-private-dep.out" "$work/registry-private-dep.err")" 1 \
+  "registry-public crate depending on private workspace crate fails"
+grep -F 'crates/chio-harness/Cargo.toml is registry-public but dependency `chio-core` points at workspace crate `chio-core`, which is not listed in workspace.metadata.chio.rust_registry_public_crates.' \
+  "$work/registry-private-dep.err" >/dev/null
 
 missing_readme="$work/missing-readme"
 write_workspace "$missing_readme" '    "chio-cli",' '    "chio-core",'

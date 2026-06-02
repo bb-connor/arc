@@ -8,14 +8,15 @@ HTTP edge, and renders a Markdown compatibility report.
 It is the same harness Chio uses internally to keep the kernel, the
 TypeScript reference peer, the Python reference peer, the C++ peer (via
 `chio-cpp-kernel-ffi`) and Go peer in agreement on the wire shape defined
-by `spec/schemas/chio-wire/v1/`. The crate is now packaged so that external
-implementers can run the same scenarios without checking out the Chio
-monorepo.
+by `spec/schemas/chio-wire/v1/`. The crate is source-installable from the
+Chio repository so external implementers can run the same scenarios without a
+manual monorepo checkout. It is not listed as registry-public yet because its
+non-dev dependency graph still includes private Chio workspace crates.
 
 ## Quickstart
 
 ```bash
-cargo install chio-conformance
+cargo install --git https://github.com/backbay-labs/chio chio-conformance
 chio-conformance-runner \
     --peer python \
     --scenarios-dir <path/to/scenarios> \
@@ -37,7 +38,7 @@ external-consumer flow.
 ## Bundled fixtures
 
 The crate ships with the same fixture tree it exercises in CI. The Cargo
-`include` directive bundles the following paths into the published crate:
+`include` directive keeps the following paths in the installable package:
 
 - `tests/conformance/scenarios/**` - JSON scenario descriptors covering
   `mcp_core`, `auth`, `tasks`, `nested_callbacks`, `notifications`, and

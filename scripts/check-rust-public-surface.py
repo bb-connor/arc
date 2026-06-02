@@ -157,6 +157,93 @@ def package_chio_metadata(
     return chio_metadata
 
 
+def non_dev_dependency_entries(
+    manifest: dict[str, object],
+) -> list[tuple[str, str, object]]:
+    entries: list[tuple[str, str, object]] = []
+    for table_name in ("dependencies", "build-dependencies"):
+        table = manifest.get(table_name, {})
+        if isinstance(table, dict):
+            entries.extend((table_name, name, value) for name, value in table.items())
+
+    targets = manifest.get("target", {})
+    if isinstance(targets, dict):
+        for target_name, target in targets.items():
+            if not isinstance(target, dict):
+                continue
+            for table_name in ("dependencies", "build-dependencies"):
+                table = target.get(table_name, {})
+                if isinstance(table, dict):
+                    entries.extend(
+                        (
+                            f"target.{target_name}.{table_name}",
+                            name,
+                            value,
+                        )
+                        for name, value in table.items()
+                    )
+
+    return entries
+
+
+def dependency_path(
+    root: Path,
+    manifest_path: Path,
+    workspace_dependencies: dict[str, object],
+    dependency_name: str,
+    dependency: object,
+) -> Path | None:
+    dependency_base = manifest_path.parent
+    dependency_spec = dependency
+    if isinstance(dependency_spec, str):
+        return None
+    if not isinstance(dependency_spec, dict):
+        return None
+    if dependency_spec.get("workspace") is True:
+        dependency_spec = workspace_dependencies.get(dependency_name)
+        dependency_base = root
+        if isinstance(dependency_spec, str) or not isinstance(dependency_spec, dict):
+            return None
+
+    path = dependency_spec.get("path")
+    if not isinstance(path, str):
+        return None
+    return (dependency_base / path).resolve()
+
+
+def require_registry_dependency_closure(
+    root: Path,
+    manifest_path: Path,
+    display_path: Path,
+    manifest: dict[str, object],
+    workspace_dependencies: dict[str, object],
+    registry_names: set[str],
+    member_names_by_dir: dict[Path, str],
+    errors: list[str],
+) -> None:
+    for _table_name, dependency_name, dependency in non_dev_dependency_entries(manifest):
+        resolved_dependency_path = dependency_path(
+            root,
+            manifest_path,
+            workspace_dependencies,
+            dependency_name,
+            dependency,
+        )
+        if resolved_dependency_path is None:
+            continue
+
+        dependency_crate = member_names_by_dir.get(resolved_dependency_path)
+        if dependency_crate is None or dependency_crate in registry_names:
+            continue
+
+        errors.append(
+            f"{display_path} is registry-public but dependency "
+            f"`{dependency_name}` points at workspace crate `{dependency_crate}`, "
+            "which is not listed in "
+            "workspace.metadata.chio.rust_registry_public_crates."
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -172,6 +259,9 @@ def main() -> int:
     workspace = tomllib.loads(workspace_manifest.read_text())
     members = workspace["workspace"]["members"]
     metadata = workspace["workspace"]["metadata"]["chio"]
+    workspace_dependencies = workspace["workspace"].get("dependencies", {})
+    if not isinstance(workspace_dependencies, dict):
+        workspace_dependencies = {}
     entrypoints = read_metadata_list(metadata, "rust_public_entrypoints")
     registry_crates = read_metadata_list(metadata, "rust_registry_public_crates")
 
@@ -183,6 +273,8 @@ def main() -> int:
     require_sorted_unique("rust_registry_public_crates", registry_crates, errors)
 
     seen_names: set[str] = set()
+    member_records: list[tuple[str, Path, Path, dict[str, object], dict[str, object]]] = []
+    member_names_by_dir: dict[Path, str] = {}
 
     for member in members:
         manifest_path = root / member / "Cargo.toml"
@@ -191,6 +283,10 @@ def main() -> int:
         crate_name = package["name"]
         seen_names.add(crate_name)
         display_path = manifest_path.relative_to(root)
+        member_records.append((crate_name, manifest_path, display_path, manifest, package))
+        member_names_by_dir[manifest_path.parent.resolve()] = crate_name
+
+    for crate_name, manifest_path, display_path, manifest, package in member_records:
         chio_metadata = package_chio_metadata(display_path, package, errors)
         local_public_entrypoint = chio_metadata.get("public_entrypoint", False)
         if not isinstance(local_public_entrypoint, bool):
@@ -233,6 +329,16 @@ def main() -> int:
                 manifest,
                 package,
                 "a registry-public crate",
+                errors,
+            )
+            require_registry_dependency_closure(
+                root,
+                manifest_path,
+                display_path,
+                manifest,
+                workspace_dependencies,
+                registry_names,
+                member_names_by_dir,
                 errors,
             )
         elif package.get("publish") is not False:
