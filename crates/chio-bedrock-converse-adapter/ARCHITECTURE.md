@@ -13,7 +13,8 @@
 
 - Batch and streaming lift paths already treat Bedrock `toolUseId` and tool names as trust-boundary identifiers and reject surrounding whitespace before provenance or canonical arguments are produced.
 - The outbound SDK request conversion path in `transport.rs` is a separate trust boundary: it signs and sends caller-supplied message content to Bedrock. That path currently checks only that string identifiers are non-empty.
-- If an outbound assistant message or follow-up tool result carries padded `toolUseId` or `name`, the live SDK path can serialize an ambiguous identifier instead of failing before SigV4 signing.
+- Existing transport tests cover padded `toolUseId`, `toolUse.name`, and `toolResult.toolUseId`, but the same boundary still accepts a padded `modelId`.
+- `modelId` selects the Bedrock model or inference profile. Sending a caller-supplied padded value to the SDK pushes malformed identity material across the SigV4 boundary instead of failing closed in Chio.
 - The mock transport does not exercise the SDK conversion path, so the transport module itself needs targeted boundary tests.
 
 ## Security And API Constraints
@@ -33,4 +34,4 @@
 
 ## Planned Material Improvement
 
-Make the outbound Bedrock SDK request conversion boundary reject surrounding whitespace in `toolUseId`, `toolUse.name`, and `toolResult.toolUseId` before request signing. Prove it with transport-local red tests because the mock transport intentionally bypasses live AWS SDK serialization.
+Make the outbound Bedrock SDK request conversion boundary reject empty or whitespace-padded `modelId` values before request signing. Prove it with a hermetic SDK transport red test that records zero dispatched requests, then share the same validator with JSON request-envelope parsing so both construction paths enforce the same invariant.

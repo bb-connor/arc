@@ -112,13 +112,8 @@ impl ConverseRequest {
             .and_then(Value::as_str)
             .ok_or_else(|| {
                 TransportError::MalformedRequest("request is missing string modelId".to_string())
-            })?
-            .to_string();
-        if model_id.trim().is_empty() {
-            return Err(TransportError::MalformedRequest(
-                "request modelId must not be empty".to_string(),
-            ));
-        }
+            })?;
+        let model_id = required_identifier(model_id, "request modelId")?.to_string();
 
         let messages = object
             .get("messages")
@@ -272,6 +267,7 @@ impl AwsSdkTransport {
     }
 
     async fn converse_inner(&self, request: &ConverseRequest) -> Result<Vec<u8>, TransportError> {
+        let model_id = required_identifier(&request.model_id, "request modelId")?;
         let messages = build_messages(&request.messages)?;
         let tool_config = match &request.tool_config {
             Some(config) => Some(build_tool_configuration(config)?),
@@ -281,7 +277,7 @@ impl AwsSdkTransport {
         let mut call = self
             .client
             .converse()
-            .model_id(&request.model_id)
+            .model_id(model_id)
             .set_messages(Some(messages));
         if let Some(tool_config) = tool_config {
             call = call.tool_config(tool_config);
@@ -637,6 +633,10 @@ fn required_str(
         .get(field)
         .and_then(Value::as_str)
         .ok_or_else(|| TransportError::MalformedRequest(format!("{display} is missing")))?;
+    Ok(required_identifier(raw, display)?.to_string())
+}
+
+fn required_identifier<'a>(raw: &'a str, display: &str) -> Result<&'a str, TransportError> {
     if raw.trim().is_empty() {
         return Err(TransportError::MalformedRequest(format!(
             "{display} must not be empty"
@@ -647,7 +647,7 @@ fn required_str(
             "{display} must not contain surrounding whitespace"
         )));
     }
-    Ok(raw.to_string())
+    Ok(raw)
 }
 
 fn json_to_document(value: &Value) -> Document {
@@ -821,6 +821,22 @@ mod tests {
     fn converse_request_rejects_missing_model_id() {
         let err = ConverseRequest::from_json_bytes(br#"{"messages": []}"#).unwrap_err();
         assert!(matches!(err, TransportError::MalformedRequest(_)));
+    }
+
+    #[test]
+    fn converse_request_rejects_padded_model_id_from_json_envelope() {
+        let err = ConverseRequest::from_json_bytes(
+            br#"{
+                "modelId": " anthropic.claude-3-sonnet ",
+                "messages": [{"role": "user", "content": [{"text": "hi"}]}]
+            }"#,
+        )
+        .expect_err("padded modelId must fail during request parsing");
+
+        assert!(matches!(err, TransportError::MalformedRequest(_)));
+        assert!(err
+            .to_string()
+            .contains("request modelId must not contain surrounding whitespace"));
     }
 
     #[test]
