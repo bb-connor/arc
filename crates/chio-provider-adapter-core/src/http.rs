@@ -408,9 +408,7 @@ fn default_headers_for_config(
 
 fn validate_auth_scheme(auth: &AuthScheme) -> Result<(), HttpTransportError> {
     match auth {
-        AuthScheme::Bearer(token) => {
-            validate_auth_secret(AUTHORIZATION.as_str(), token, "bearer token")
-        }
+        AuthScheme::Bearer(token) => validate_bearer_auth_secret(token),
         AuthScheme::Header { name, value } => {
             validate_auth_secret(name, value, "auth header value")
         }
@@ -479,8 +477,22 @@ fn validate_auth_secret(name: &str, value: &str, label: &str) -> Result<(), Http
     Ok(())
 }
 
+fn validate_bearer_auth_secret(value: &str) -> Result<(), HttpTransportError> {
+    validate_auth_secret(AUTHORIZATION.as_str(), value, "bearer token")?;
+    if value
+        .bytes()
+        .any(|byte| byte.is_ascii_whitespace() || byte.is_ascii_control())
+    {
+        return Err(HttpTransportError::InvalidHeader {
+            name: AUTHORIZATION.to_string(),
+            detail: "bearer token must not contain whitespace or control bytes".to_string(),
+        });
+    }
+    Ok(())
+}
+
 fn insert_bearer_header(headers: &mut HeaderMap, token: &str) -> Result<(), HttpTransportError> {
-    validate_auth_secret(AUTHORIZATION.as_str(), token, "bearer token")?;
+    validate_bearer_auth_secret(token)?;
     let value = format!("Bearer {token}");
     let header_value =
         HeaderValue::from_str(&value).map_err(|error| HttpTransportError::InvalidHeader {
@@ -837,6 +849,23 @@ mod tests {
             HttpTransportError::InvalidHeader { ref name, .. } if name == AUTHORIZATION.as_str()
         ));
         assert!(error.to_string().contains("bearer token"));
+    }
+
+    #[test]
+    fn default_headers_for_config_rejects_whitespace_in_bearer_auth() {
+        for token in ["abc def", "abc\tdef"] {
+            let config = HttpTransportConfig::new("https://api.example.test")
+                .with_auth(AuthScheme::Bearer(token.to_string()));
+
+            let error = default_headers_for_config(&config)
+                .expect_err("whitespace-bearing bearer auth must fail closed");
+
+            assert!(matches!(
+                error,
+                HttpTransportError::InvalidHeader { ref name, .. } if name == AUTHORIZATION.as_str()
+            ));
+            assert!(error.to_string().contains("bearer token"));
+        }
     }
 
     #[test]

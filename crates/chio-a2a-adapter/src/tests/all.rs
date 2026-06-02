@@ -661,6 +661,17 @@ mod tests {
                 "bearer token",
             ),
             (
+                "bad bearer token internal whitespace",
+                test_adapter_config(base_url, public_key.clone()).with_bearer_token("abc def"),
+                "bearer token",
+            ),
+            (
+                "bad authorization bearer token internal whitespace",
+                test_adapter_config(base_url, public_key.clone())
+                    .with_request_header("Authorization", "Bearer abc def"),
+                "bearer token",
+            ),
+            (
                 "bad authorization scheme",
                 test_adapter_config(base_url, public_key.clone())
                     .with_request_header("Authorization", "\u{e9}\u{e9}\u{e9}\u{e9}"),
@@ -3227,6 +3238,60 @@ mod tests {
         handle.join().expect("join padded access token server");
         assert!(
             error.to_string().contains("surrounding whitespace"),
+            "unexpected token response error: {error}"
+        );
+    }
+
+    #[test]
+    fn oauth_client_credentials_rejects_control_access_token() {
+        let Some(listener) = bind_fake_a2a_listener("OAuth control access token listener") else {
+            return;
+        };
+        let address = listener.local_addr().expect("token listener address");
+        let base_url = format!("http://{address}");
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept token request");
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .expect("set token read timeout");
+            let request = read_http_request(&mut stream);
+            assert!(request.starts_with("POST /oauth/token HTTP/1.1"));
+            assert!(request.contains("grant_type=client_credentials"));
+            let body =
+                r#"{"access_token":"opaque\n-token","token_type":"bearer","expires_in":3600}"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body,
+            )
+            .expect("write token response");
+        });
+
+        let transport_config = A2aTransportConfig {
+            default_tls_config: None,
+            mutual_tls_config: None,
+            egress_contract: Some(test_egress_contract(&base_url)),
+        };
+        let token_endpoint =
+            Url::parse(&format!("{base_url}/oauth/token")).expect("token endpoint URL");
+        let credentials = A2aOAuthClientCredentials {
+            client_id: "client-id".to_string(),
+            client_secret: "client-secret".to_string(),
+        };
+
+        let error = request_client_credentials_token(
+            &token_endpoint,
+            &credentials,
+            &["a2a.invoke".to_string()],
+            Duration::from_secs(2),
+            &transport_config,
+        )
+        .expect_err("control access_token must fail closed");
+
+        handle.join().expect("join control access token server");
+        assert!(
+            error.to_string().contains("whitespace or control"),
             "unexpected token response error: {error}"
         );
     }

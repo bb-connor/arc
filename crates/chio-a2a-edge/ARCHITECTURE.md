@@ -149,6 +149,41 @@ JSON-RPC dispatch can occur. Add focused constructor tests for each rejected
 field and a stability test proving valid default Agent Card fields are still
 published unchanged.
 
+## Agent Card Config Padding Follow-up
+
+### Current Boundary
+
+- `config.rs` owns the public `A2aEdgeConfig` fields that are published into the
+  Agent Card.
+- `ChioA2aEdge::new` calls `validate_for_agent_card` before any Agent Card is
+  exposed.
+- `agent_card` publishes config bytes without trimming or normalization.
+
+### Pain Point
+
+The constructor rejects blank endpoint URLs and protocol bindings but accepts
+non-empty values with leading or trailing whitespace. Those raw values are then
+published into Agent Cards that downstream clients cannot reliably parse or
+match.
+
+### Security And API Constraints
+
+- Preserve public config fields and successful default Agent Card output.
+- Fail closed at construction with `A2aEdgeError::InvalidRequest`.
+- Do not trim and silently rewrite operator-provided metadata.
+- Keep existing blank-field error messages stable.
+
+### Affected Dependents
+
+- Existing callers with exact, valid config are unchanged.
+- Padded Agent Card config now fails before discovery publication.
+
+### Planned Material Improvement
+
+Extend the Agent Card config validator to reject leading or trailing whitespace
+for non-empty fields and add focused constructor regressions for padded endpoint
+URLs and protocol bindings.
+
 ## JSON-RPC Identifier Shape Slice
 
 ### Current Boundary

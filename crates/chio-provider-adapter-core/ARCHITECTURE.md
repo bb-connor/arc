@@ -73,3 +73,38 @@ path and cover it with focused tests for direct and environment-backed
 `AuthScheme::QueryParam` construction. This is architectural because every
 provider-native adapter relying on this shared transport inherits the stronger
 fail-closed outbound auth boundary.
+
+## Bearer Auth Secret Grammar Slice
+
+### Current Boundary
+
+- `http.rs` owns `AuthScheme` validation before shared provider HTTP transport
+  construction.
+- Bearer auth secrets become `Authorization: Bearer <token>` default headers.
+- Custom header and query auth values keep their existing generic secret
+  validation.
+
+### Pain Point
+
+`AuthScheme::Bearer` rejects empty and padded tokens, but accepts internal
+whitespace such as `abc def`. `HeaderValue::from_str` accepts that value after
+formatting, so the shared transport can send malformed bearer credentials.
+
+### Security And API Constraints
+
+- Preserve public `AuthScheme`, `HttpTransportConfig`, and transport APIs.
+- Preserve valid bearer token behavior.
+- Reject malformed bearer tokens before a provider request can be built.
+- Do not broaden validation for custom header or query auth values unless their
+  existing tests require it.
+
+### Affected Dependents
+
+- Bearer-token provider adapters inherit the stricter construction boundary.
+- Query-auth and custom-header auth dependents keep their current value grammar.
+
+### Planned Material Improvement
+
+Add a bearer-only auth-secret validator that reuses the generic secret checks and
+also rejects internal whitespace or control bytes before inserting the
+Authorization header.

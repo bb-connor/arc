@@ -45,6 +45,9 @@ pub const CHIO_FFI_ERROR_DUPLICATE_SERVER_TOOL: i32 = 22;
 pub const CHIO_FFI_ERROR_INVALID_TOOL_NAME: i32 = 23;
 pub const CHIO_FFI_ERROR_INVALID_INPUT_SCHEMA: i32 = 24;
 pub const CHIO_FFI_ERROR_INVALID_OUTPUT_SCHEMA: i32 = 25;
+pub const CHIO_FFI_ERROR_INVALID_MANIFEST_FIELD: i32 = 26;
+pub const CHIO_FFI_ERROR_INVALID_REQUIRED_PERMISSION: i32 = 27;
+pub const CHIO_FFI_ERROR_DUPLICATE_REQUIRED_PERMISSION: i32 = 28;
 pub const CHIO_FFI_ERROR_INTERNAL: i32 = 255;
 
 #[repr(C)]
@@ -141,6 +144,9 @@ fn ffi_error_code_from_helper_code(code: ErrorCode) -> i32 {
         ErrorCode::InvalidInputSchema => CHIO_FFI_ERROR_INVALID_INPUT_SCHEMA,
         ErrorCode::InvalidOutputSchema => CHIO_FFI_ERROR_INVALID_OUTPUT_SCHEMA,
         ErrorCode::DuplicateServerTool => CHIO_FFI_ERROR_DUPLICATE_SERVER_TOOL,
+        ErrorCode::InvalidManifestField => CHIO_FFI_ERROR_INVALID_MANIFEST_FIELD,
+        ErrorCode::InvalidRequiredPermission => CHIO_FFI_ERROR_INVALID_REQUIRED_PERMISSION,
+        ErrorCode::DuplicateRequiredPermission => CHIO_FFI_ERROR_DUPLICATE_REQUIRED_PERMISSION,
         ErrorCode::UnsupportedSchema => CHIO_FFI_ERROR_UNSUPPORTED_SCHEMA,
         ErrorCode::ManifestVerificationFailed => CHIO_FFI_ERROR_MANIFEST_VERIFICATION_FAILED,
     }
@@ -414,8 +420,10 @@ mod tests {
         chio_buffer_free, chio_canonicalize_json, chio_ffi_abi_version, chio_ffi_build_info,
         chio_sha256_hex_bytes, chio_sha256_hex_utf8, chio_sign_utf8_message_ed25519,
         chio_verify_receipt_json_with_trusted_signers, chio_verify_utf8_message_ed25519,
-        ffi_error_code_from_helper_code, ChioFfiBuffer, CHIO_FFI_ERROR_INVALID_HEX,
-        CHIO_FFI_ERROR_INVALID_INPUT_SCHEMA, CHIO_FFI_ERROR_INVALID_OUTPUT_SCHEMA,
+        ffi_error_code_from_helper_code, ChioFfiBuffer,
+        CHIO_FFI_ERROR_DUPLICATE_REQUIRED_PERMISSION, CHIO_FFI_ERROR_INVALID_HEX,
+        CHIO_FFI_ERROR_INVALID_INPUT_SCHEMA, CHIO_FFI_ERROR_INVALID_MANIFEST_FIELD,
+        CHIO_FFI_ERROR_INVALID_OUTPUT_SCHEMA, CHIO_FFI_ERROR_INVALID_REQUIRED_PERMISSION,
         CHIO_FFI_ERROR_INVALID_TOOL_NAME, CHIO_FFI_STATUS_ERROR, CHIO_FFI_STATUS_NULL_ARGUMENT,
         CHIO_FFI_STATUS_OK,
     };
@@ -611,6 +619,26 @@ mod tests {
         assert_eq!(
             ffi_error_code_from_helper_code(chio_binding_helpers::ErrorCode::InvalidOutputSchema),
             CHIO_FFI_ERROR_INVALID_OUTPUT_SCHEMA
+        );
+    }
+
+    #[test]
+    fn invalid_manifest_permission_errors_map_to_stable_ffi_error_codes() {
+        assert_eq!(
+            ffi_error_code_from_helper_code(chio_binding_helpers::ErrorCode::InvalidManifestField),
+            CHIO_FFI_ERROR_INVALID_MANIFEST_FIELD
+        );
+        assert_eq!(
+            ffi_error_code_from_helper_code(
+                chio_binding_helpers::ErrorCode::InvalidRequiredPermission
+            ),
+            CHIO_FFI_ERROR_INVALID_REQUIRED_PERMISSION
+        );
+        assert_eq!(
+            ffi_error_code_from_helper_code(
+                chio_binding_helpers::ErrorCode::DuplicateRequiredPermission
+            ),
+            CHIO_FFI_ERROR_DUPLICATE_REQUIRED_PERMISSION
         );
     }
 

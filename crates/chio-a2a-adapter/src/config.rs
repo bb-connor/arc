@@ -326,7 +326,7 @@ fn validate_authorization_header_material(header: &A2aRequestHeader) -> Result<(
     if !scheme.eq_ignore_ascii_case("Bearer") {
         return Ok(());
     }
-    validate_url_auth_value("bearer token", token)
+    validate_bearer_token_value("bearer token", token)
 }
 
 fn validate_http_header_name(field: &str, value: &str) -> Result<(), AdapterError> {
@@ -415,6 +415,22 @@ fn validate_url_auth_value(field: &str, value: &str) -> Result<(), AdapterError>
         )));
     }
     Ok(())
+}
+
+fn validate_bearer_token_value(field: &str, value: &str) -> Result<(), AdapterError> {
+    validate_url_auth_value(field, value)?;
+    if bearer_token_contains_forbidden_character(value) {
+        return Err(AdapterError::AuthNegotiation(format!(
+            "invalid A2A {field} in configuration"
+        )));
+    }
+    Ok(())
+}
+
+fn bearer_token_contains_forbidden_character(value: &str) -> bool {
+    value
+        .chars()
+        .any(|character| character.is_whitespace() || character.is_control())
 }
 
 fn validate_cookie_value(field: &str, value: &str) -> Result<(), AdapterError> {

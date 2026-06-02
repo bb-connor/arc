@@ -493,6 +493,19 @@ mod tests {
     }
 
     #[test]
+    fn edge_rejects_padded_agent_card_endpoint_before_publication() {
+        let config = A2aEdgeConfig {
+            endpoint_url: " https://agent.example/a2a".to_string(),
+            ..A2aEdgeConfig::default()
+        };
+
+        assert_invalid_agent_card_config_rejected(
+            config,
+            "agent card endpoint URL must not include leading or trailing whitespace",
+        );
+    }
+
+    #[test]
     fn edge_rejects_blank_agent_card_protocol_binding_before_publication() {
         let config = A2aEdgeConfig {
             protocol_binding: "\n".to_string(),
@@ -502,6 +515,19 @@ mod tests {
         assert_invalid_agent_card_config_rejected(
             config,
             "agent card protocol binding must not be empty",
+        );
+    }
+
+    #[test]
+    fn edge_rejects_padded_agent_card_protocol_binding_before_publication() {
+        let config = A2aEdgeConfig {
+            protocol_binding: "JSONRPC ".to_string(),
+            ..A2aEdgeConfig::default()
+        };
+
+        assert_invalid_agent_card_config_rejected(
+            config,
+            "agent card protocol binding must not include leading or trailing whitespace",
         );
     }
 

@@ -1075,6 +1075,23 @@ void test_receipt_query_client() {
              "receipt query auth header");
 }
 
+void test_manifest_validation_error_code_names() {
+  require(static_cast<int>(chio::ErrorCode::DuplicateServerTool) == 22,
+          "duplicate server tool error code");
+  require(static_cast<int>(chio::ErrorCode::InvalidToolName) == 23,
+          "invalid tool name error code");
+  require(static_cast<int>(chio::ErrorCode::InvalidInputSchema) == 24,
+          "invalid input schema error code");
+  require(static_cast<int>(chio::ErrorCode::InvalidOutputSchema) == 25,
+          "invalid output schema error code");
+  require(static_cast<int>(chio::ErrorCode::InvalidManifestField) == 26,
+          "invalid manifest field error code");
+  require(static_cast<int>(chio::ErrorCode::InvalidRequiredPermission) == 27,
+          "invalid required permission error code");
+  require(static_cast<int>(chio::ErrorCode::DuplicateRequiredPermission) == 28,
+          "duplicate required permission error code");
+}
+
 void test_feature_helpers_and_middleware() {
   chio::CapabilityVerifier verifier(
       std::make_shared<FixedClock>(),
@@ -1412,6 +1429,7 @@ int main() {
     test_builder_retry_trace_typed_models_and_streaming();
     test_auth_metadata_and_pkce();
     test_receipt_query_client();
+    test_manifest_validation_error_code_names();
     test_feature_helpers_and_middleware();
     test_http_substrate_evaluator();
     test_http_substrate_middleware_verdict_parsing();

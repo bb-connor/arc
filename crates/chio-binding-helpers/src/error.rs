@@ -26,6 +26,9 @@ pub enum ErrorCode {
     InvalidInputSchema,
     InvalidOutputSchema,
     DuplicateServerTool,
+    InvalidManifestField,
+    InvalidRequiredPermission,
+    DuplicateRequiredPermission,
     UnsupportedSchema,
     ManifestVerificationFailed,
 }
@@ -53,6 +56,9 @@ impl Error {
                 chio_manifest::ManifestError::EmptyManifest => ErrorCode::EmptyManifest,
                 chio_manifest::ManifestError::DuplicateToolName(_) => ErrorCode::DuplicateToolName,
                 chio_manifest::ManifestError::InvalidToolName(_) => ErrorCode::InvalidToolName,
+                chio_manifest::ManifestError::InvalidManifestField(_) => {
+                    ErrorCode::InvalidManifestField
+                }
                 chio_manifest::ManifestError::InvalidInputSchema(_) => {
                     ErrorCode::InvalidInputSchema
                 }
@@ -61,6 +67,12 @@ impl Error {
                 }
                 chio_manifest::ManifestError::DuplicateServerTool(_) => {
                     ErrorCode::DuplicateServerTool
+                }
+                chio_manifest::ManifestError::InvalidRequiredPermission { .. } => {
+                    ErrorCode::InvalidRequiredPermission
+                }
+                chio_manifest::ManifestError::DuplicateRequiredPermission { .. } => {
+                    ErrorCode::DuplicateRequiredPermission
                 }
                 chio_manifest::ManifestError::UnsupportedSchema(_) => ErrorCode::UnsupportedSchema,
                 chio_manifest::ManifestError::VerificationFailed => {
@@ -132,5 +144,33 @@ mod tests {
             "echo".to_string(),
         ));
         assert_eq!(output.code(), ErrorCode::InvalidOutputSchema);
+    }
+
+    #[test]
+    fn codes_map_manifest_identity_and_permission_errors() {
+        let identity = Error::from(chio_manifest::ManifestError::InvalidManifestField(
+            "server_id",
+        ));
+        assert_eq!(identity.code(), ErrorCode::InvalidManifestField);
+
+        let invalid_permission =
+            Error::from(chio_manifest::ManifestError::InvalidRequiredPermission {
+                field: "required_permissions.read_paths",
+                value: String::new(),
+            });
+        assert_eq!(
+            invalid_permission.code(),
+            ErrorCode::InvalidRequiredPermission
+        );
+
+        let duplicate_permission =
+            Error::from(chio_manifest::ManifestError::DuplicateRequiredPermission {
+                field: "required_permissions.network_hosts",
+                value: "api.example.com".to_string(),
+            });
+        assert_eq!(
+            duplicate_permission.code(),
+            ErrorCode::DuplicateRequiredPermission
+        );
     }
 }

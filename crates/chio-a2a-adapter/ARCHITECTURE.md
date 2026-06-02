@@ -583,3 +583,40 @@ Add one runtime skill-resolution boundary that first checks the signed manifest
 tool set and only then returns the matching Agent Card skill. Use it for both
 blocking and streaming invocation, and prove non-projectable raw skills cannot
 be invoked through either path.
+
+## Bearer Token Grammar Follow-up
+
+### Current Boundary
+
+- `config.rs` owns configured request auth validation before discovery or
+  invocation can send caller-provided credentials.
+- `auth.rs` owns OAuth and OpenID token response admission before access tokens
+  are cached and emitted as `Authorization: Bearer` headers.
+- `transport.rs` only serializes accepted request-auth material into HTTP bytes.
+
+### Pain Point
+
+Configured bearer tokens and OAuth-issued access tokens can contain internal
+whitespace after the existing empty, padded, and control-character checks pass.
+Those values are then formatted into malformed bearer Authorization headers.
+
+### Security And API Constraints
+
+- Preserve valid bearer, API key, cookie, Basic, OAuth, and OpenID behavior.
+- Reject malformed bearer material before any discovery, invocation, token cache
+  write, or outbound Authorization header send.
+- Do not silently trim or rewrite configured or remotely issued credential bytes.
+- Keep public config APIs unchanged.
+
+### Affected Dependents
+
+- A2A callers with valid bearer tokens and OAuth access tokens are unchanged.
+- Callers with whitespace-bearing bearer material now fail closed with
+  `AdapterError::AuthNegotiation`.
+- No downstream crate or public schema change is planned.
+
+### Planned Material Improvement
+
+Add a bearer-token validator that reuses existing auth-value checks and also
+rejects any whitespace inside bearer token bytes. Apply it to configured bearer
+headers and to OAuth token responses before caching.
