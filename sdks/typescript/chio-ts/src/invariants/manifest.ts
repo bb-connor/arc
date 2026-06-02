@@ -60,19 +60,40 @@ function validateManifestStructure(manifest: ToolManifest): boolean {
   if (!isValidEd25519PublicKeyHex(manifest.public_key)) {
     return false;
   }
-  if (manifest.tools.length === 0) {
+  if (!Array.isArray(manifest.tools) || manifest.tools.length === 0) {
     return false;
   }
 
   const seen = new Set<string>();
   for (const tool of manifest.tools) {
+    if (!isValidToolName(tool.name)) {
+      return false;
+    }
     if (seen.has(tool.name)) {
       return false;
     }
     seen.add(tool.name);
+    if (!isJsonObject(tool.input_schema)) {
+      return false;
+    }
+    if (
+      tool.output_schema !== undefined &&
+      tool.output_schema !== null &&
+      !isJsonObject(tool.output_schema)
+    ) {
+      return false;
+    }
   }
 
   return true;
+}
+
+function isValidToolName(name: unknown): name is string {
+  return typeof name === "string" && name.trim().length > 0 && name.trim() === name;
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function parseSignedManifestJson(input: string): SignedManifest {

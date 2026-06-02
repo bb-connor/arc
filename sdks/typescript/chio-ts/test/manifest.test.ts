@@ -4,11 +4,8 @@ import assert from "node:assert/strict";
 import { verifySignedManifest } from "../src/index.ts";
 import type { SignedManifest } from "../src/index.ts";
 
-test("signed manifest typing and verification preserve pricing metadata", () => {
-  const signerKey = "11".repeat(32);
-  const manifestKey = "22".repeat(32);
-  const signature = "33".repeat(64);
-  const signedManifest: SignedManifest = {
+function pricedSignedManifest(): SignedManifest {
+  return {
     manifest: {
       schema: "chio.manifest.v1",
       server_id: "srv-priced",
@@ -28,11 +25,15 @@ test("signed manifest typing and verification preserve pricing metadata", () => 
           latency_hint: "instant",
         },
       ],
-      public_key: manifestKey,
+      public_key: "22".repeat(32),
     },
-    signature,
-    signer_key: signerKey,
+    signature: "33".repeat(64),
+    signer_key: "11".repeat(32),
   };
+}
+
+test("signed manifest typing and verification preserve pricing metadata", () => {
+  const signedManifest = pricedSignedManifest();
 
   assert.equal(
     signedManifest.manifest.tools[0].pricing?.unit_price?.units,
@@ -44,4 +45,29 @@ test("signed manifest typing and verification preserve pricing metadata", () => 
   assert.equal(verification.signature_valid, false);
   assert.equal(verification.embedded_public_key_valid, true);
   assert.equal(verification.embedded_public_key_matches_signer, false);
+});
+
+test("manifest structure rejects empty or padded tool names", () => {
+  for (const name of ["", " greet", "greet "]) {
+    const signedManifest = pricedSignedManifest();
+    signedManifest.manifest.tools[0].name = name;
+
+    const verification = verifySignedManifest(signedManifest);
+
+    assert.equal(
+      verification.structure_valid,
+      false,
+      `name ${JSON.stringify(name)}`,
+    );
+  }
+});
+
+test("manifest structure rejects non-object tool schemas", () => {
+  const badInputSchema = pricedSignedManifest();
+  badInputSchema.manifest.tools[0].input_schema = [];
+  assert.equal(verifySignedManifest(badInputSchema).structure_valid, false);
+
+  const badOutputSchema = pricedSignedManifest();
+  badOutputSchema.manifest.tools[0].output_schema = "not an object";
+  assert.equal(verifySignedManifest(badOutputSchema).structure_valid, false);
 });
