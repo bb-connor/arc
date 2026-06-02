@@ -45,6 +45,9 @@ The crate ships with the same fixture tree it exercises in CI. The Cargo
   `chio-extensions`.
 - `tests/conformance/fixtures/mcp_core/**` - the default MCP policy and
   mock upstream server used by `default_run_options()`.
+- `tests/conformance/native/scenarios/**` - native capability, delegation,
+  receipt, revocation, DPoP, and governed-transaction scenarios used by
+  `default_native_run_options()`.
 - `tests/conformance/peers/python/**` - reference Python peer (server and
   client) used by the `--peer python` mode.
 - `tests/conformance/peers/js/**` - reference Node.js peer used by the

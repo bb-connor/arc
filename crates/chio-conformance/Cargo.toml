@@ -18,6 +18,7 @@ include = [
     "verdict_matrix/**",
     "tests/cross_surface/**",
     "tests/conformance/fixtures/mcp_core/**",
+    "tests/conformance/native/scenarios/**",
     "tests/conformance/scenarios/**",
     "tests/conformance/peers/python/**",
     "!tests/conformance/peers/python/__pycache__/**",

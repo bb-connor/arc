@@ -261,7 +261,9 @@ pub fn load_native_scenarios_from_dir(
     path: impl AsRef<Path>,
 ) -> Result<Vec<NativeScenarioDescriptor>, NativeSuiteError> {
     let mut scenarios = Vec::new();
-    collect_native_scenarios(path.as_ref(), &mut scenarios)?;
+    let path = path.as_ref();
+    require_native_scenario_directory(path)?;
+    collect_native_scenarios(path, &mut scenarios)?;
     scenarios.sort_by(|left, right| left.id.cmp(&right.id));
     Ok(scenarios)
 }
@@ -377,15 +379,21 @@ fn collect_native_scenarios(
     path: &Path,
     scenarios: &mut Vec<NativeScenarioDescriptor>,
 ) -> Result<(), NativeSuiteError> {
-    if !path.exists() {
-        return Ok(());
-    }
     for entry in fs::read_dir(path)? {
         let entry = entry?;
         let entry_path = entry.path();
-        if entry.metadata()?.is_dir() {
+        let file_type = entry.file_type()?;
+        if file_type.is_symlink() {
+            return Err(NativeSuiteError::Io(std::io::Error::other(format!(
+                "refusing symlink in native conformance scenario tree: {}",
+                entry_path.display()
+            ))));
+        }
+        if file_type.is_dir() {
             collect_native_scenarios(&entry_path, scenarios)?;
-        } else if entry_path.extension().and_then(|value| value.to_str()) == Some("json") {
+        } else if file_type.is_file()
+            && entry_path.extension().and_then(|value| value.to_str()) == Some("json")
+        {
             let content = fs::read_to_string(&entry_path)?;
             let scenario =
                 serde_json::from_str(&content).map_err(|source| NativeSuiteError::Json {
@@ -394,6 +402,35 @@ fn collect_native_scenarios(
                 })?;
             scenarios.push(scenario);
         }
+    }
+    Ok(())
+}
+
+fn require_native_scenario_directory(path: &Path) -> Result<(), NativeSuiteError> {
+    let metadata = fs::symlink_metadata(path).map_err(|source| {
+        NativeSuiteError::Io(std::io::Error::new(
+            source.kind(),
+            format!(
+                "native conformance scenario directory {} is not readable: {source}",
+                path.display()
+            ),
+        ))
+    })?;
+    let file_type = metadata.file_type();
+    if file_type.is_symlink() {
+        return Err(NativeSuiteError::Io(std::io::Error::other(format!(
+            "refusing symlinked native conformance scenario directory: {}",
+            path.display()
+        ))));
+    }
+    if !file_type.is_dir() {
+        return Err(NativeSuiteError::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!(
+                "native conformance scenario directory {} is not a directory",
+                path.display()
+            ),
+        )));
     }
     Ok(())
 }
@@ -1292,6 +1329,60 @@ mod tests {
         assert!(scenarios.iter().any(|scenario| {
             scenario.category == NativeScenarioCategory::GovernedTransactionEnforcement
         }));
+    }
+
+    #[test]
+    fn load_native_scenarios_rejects_missing_directory() {
+        let missing = std::env::temp_dir().join(format!(
+            "chio-conformance-native-missing-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&missing);
+
+        match load_native_scenarios_from_dir(&missing) {
+            Ok(scenarios) => panic!("missing native scenario directory should fail: {scenarios:?}"),
+            Err(error) => assert!(error.to_string().contains("directory")),
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn load_native_scenarios_rejects_symlinked_json_file() {
+        let dir = std::env::temp_dir().join(format!(
+            "chio-conformance-native-symlink-{}",
+            std::process::id()
+        ));
+        let outside = std::env::temp_dir().join(format!(
+            "chio-conformance-native-symlink-outside-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        let _ = fs::remove_dir_all(&outside);
+        fs::create_dir_all(&dir).expect("create native scenario dir");
+        fs::create_dir_all(&outside).expect("create outside dir");
+        fs::write(
+            outside.join("escape.json"),
+            r#"{
+              "id": "escape",
+              "title": "Escape",
+              "category": "capability_validation",
+              "driver": "artifact",
+              "fixture": "valid-capability",
+              "specVersion": "1.0",
+              "assertions": []
+            }"#,
+        )
+        .expect("write outside scenario");
+        std::os::unix::fs::symlink(outside.join("escape.json"), dir.join("escape.json"))
+            .expect("create scenario symlink");
+
+        match load_native_scenarios_from_dir(&dir) {
+            Ok(scenarios) => panic!("symlinked native scenario should fail: {scenarios:?}"),
+            Err(error) => assert!(error.to_string().contains("symlink")),
+        }
+
+        let _ = fs::remove_dir_all(dir);
+        let _ = fs::remove_dir_all(outside);
     }
 
     #[test]

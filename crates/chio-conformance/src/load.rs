@@ -65,16 +65,43 @@ fn deserialize<T: DeserializeOwned>(path: &Path, content: &str) -> Result<T, Loa
 }
 
 fn collect_json_files(path: &Path) -> Result<Vec<PathBuf>, LoadError> {
+    require_json_directory(path)?;
     let mut files = Vec::new();
     walk_json_files(path, &mut files)?;
     files.sort();
     Ok(files)
 }
 
-fn walk_json_files(path: &Path, files: &mut Vec<PathBuf>) -> Result<(), LoadError> {
-    if !path.exists() {
-        return Ok(());
+fn require_json_directory(path: &Path) -> Result<(), LoadError> {
+    let metadata = fs::symlink_metadata(path).map_err(|source| {
+        LoadError::Io(std::io::Error::new(
+            source.kind(),
+            format!(
+                "conformance JSON directory {} is not readable: {source}",
+                path.display()
+            ),
+        ))
+    })?;
+    let file_type = metadata.file_type();
+    if file_type.is_symlink() {
+        return Err(LoadError::Io(std::io::Error::other(format!(
+            "refusing symlinked conformance fixture directory: {}",
+            path.display()
+        ))));
     }
+    if !file_type.is_dir() {
+        return Err(LoadError::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!(
+                "conformance JSON directory {} is not a directory",
+                path.display()
+            ),
+        )));
+    }
+    Ok(())
+}
+
+fn walk_json_files(path: &Path, files: &mut Vec<PathBuf>) -> Result<(), LoadError> {
     for entry in fs::read_dir(path)? {
         let entry = entry?;
         let entry_path = entry.path();
@@ -155,6 +182,30 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert_eq!(scenarios[0].id, "initialize");
         assert_eq!(results[0].peer, "js");
+        Ok(())
+    }
+
+    #[test]
+    fn load_scenarios_rejects_missing_directory() -> Result<(), LoadError> {
+        let dir = unique_dir("chio-conformance-load-missing-scenarios")?;
+        let _ = fs::remove_dir_all(&dir);
+
+        match load_scenarios_from_dir(&dir) {
+            Ok(scenarios) => panic!("missing scenario directory should fail: {scenarios:?}"),
+            Err(error) => assert!(error.to_string().contains("directory")),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn load_results_rejects_missing_directory() -> Result<(), LoadError> {
+        let dir = unique_dir("chio-conformance-load-missing-results")?;
+        let _ = fs::remove_dir_all(&dir);
+
+        match load_results_from_dir(&dir) {
+            Ok(results) => panic!("missing results directory should fail: {results:?}"),
+            Err(error) => assert!(error.to_string().contains("directory")),
+        }
         Ok(())
     }
 
