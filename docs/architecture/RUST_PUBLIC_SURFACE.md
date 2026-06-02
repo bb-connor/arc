@@ -190,3 +190,43 @@ The checker should fail closed with explicit diagnostics for unresolved member
 manifests, invalid member manifests, malformed package tables, missing package
 names, and duplicate workspace package names before it evaluates public
 entrypoint or registry closure policy.
+
+## Required Root Metadata Slice
+
+### Current Boundary
+
+The root workspace metadata remains the only ordered source of truth for the
+repo-public Rust surface and registry-public Rust surface. Package-local
+metadata is an acknowledgment of that root contract, not a replacement for it.
+
+### Pain Point Addressed
+
+Before this slice, the checker defaulted a missing `rust_public_entrypoints` or
+`rust_registry_public_crates` key to an empty list. That keeps type checking
+simple, but it weakens the boundary: a malformed root workspace manifest can
+silently erase one side of the public-surface contract instead of producing an
+explicit policy failure.
+
+### Security And API Constraints
+
+- Keep the root lists explicit even when the registry list is intentionally
+  empty.
+- Keep sorted-unique validation and root/local public-entrypoint agreement
+  unchanged once both lists exist.
+- Do not infer a default public surface from package-local markers,
+  `publish = false`, README files, binaries, or docs.
+- Keep the gate pure, local, and network-free.
+
+### Affected Dependents
+
+CI continues to invoke `python3 scripts/check-rust-public-surface.py`, and the
+focused synthetic regression suite remains
+`bash scripts/tests/check-rust-public-surface.test.sh`. Real workspace metadata
+already declares both lists, so no crate manifest transitive edits are expected.
+
+### Material Improvement
+
+The checker rejects a workspace manifest that omits either
+`workspace.metadata.chio.rust_public_entrypoints` or
+`workspace.metadata.chio.rust_registry_public_crates`, with regressions proving
+that missing lists fail closed rather than defaulting to empty policy.

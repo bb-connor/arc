@@ -90,6 +90,43 @@ write_workspace "$good" '    "chio-cli",' '    "chio-core",'
 assert_rc "$(run_checker "$good/Cargo.toml" "$work/good.out" "$work/good.err")" 0 \
   "valid synthetic workspace passes"
 
+missing_root_entrypoints="$work/missing-root-entrypoints"
+write_workspace "$missing_root_entrypoints" '    "chio-cli",' '    "chio-core",'
+python3 - "$missing_root_entrypoints/Cargo.toml" <<'PY'
+from pathlib import Path
+import sys
+
+workspace = Path(sys.argv[1])
+text = workspace.read_text(encoding="utf-8")
+start = text.index("rust_public_entrypoints = [")
+end = text.index("]\n", start) + 2
+workspace.write_text(text[:start] + text[end:], encoding="utf-8")
+PY
+assert_rc "$(run_checker "$missing_root_entrypoints/Cargo.toml" "$work/missing-root-entrypoints.out" "$work/missing-root-entrypoints.err")" 1 \
+  "missing root public entrypoint list fails"
+grep -F "workspace.metadata.chio.rust_public_entrypoints must be declared." \
+  "$work/missing-root-entrypoints.err" >/dev/null
+
+missing_registry_list="$work/missing-registry-list"
+write_workspace "$missing_registry_list" '    "chio-cli",' '    "chio-core",'
+python3 - "$missing_registry_list/Cargo.toml" <<'PY'
+from pathlib import Path
+import sys
+
+workspace = Path(sys.argv[1])
+workspace.write_text(
+    workspace.read_text(encoding="utf-8").replace(
+        "rust_registry_public_crates = []\n",
+        "",
+    ),
+    encoding="utf-8",
+)
+PY
+assert_rc "$(run_checker "$missing_registry_list/Cargo.toml" "$work/missing-registry-list.out" "$work/missing-registry-list.err")" 1 \
+  "missing registry-public list fails"
+grep -F "workspace.metadata.chio.rust_registry_public_crates must be declared." \
+  "$work/missing-registry-list.err" >/dev/null
+
 root_only_public_entrypoint="$work/root-only-public-entrypoint"
 write_workspace "$root_only_public_entrypoint" '    "chio-cli",' '    "chio-core",'
 unmark_public_entrypoint "$root_only_public_entrypoint/crates/chio-core/Cargo.toml"

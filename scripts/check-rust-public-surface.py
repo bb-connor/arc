@@ -38,10 +38,19 @@ def duplicate_values(values: list[str]) -> list[str]:
     return sorted(value for value, count in counts.items() if count > 1)
 
 
-def read_metadata_list(metadata: dict[str, object], key: str) -> list[str]:
-    values = metadata.get(key, [])
+def read_metadata_list(
+    metadata: dict[str, object],
+    key: str,
+    errors: list[str],
+) -> list[str]:
+    if key not in metadata:
+        errors.append(f"workspace.metadata.chio.{key} must be declared.")
+        return []
+
+    values = metadata[key]
     if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
-        raise TypeError(f"workspace.metadata.chio.{key} must be a list of strings")
+        errors.append(f"workspace.metadata.chio.{key} must be a list of strings")
+        return []
     return values
 
 
@@ -313,16 +322,8 @@ def main() -> int:
     workspace_dependencies = workspace_table.get("dependencies", {})
     if not isinstance(workspace_dependencies, dict):
         workspace_dependencies = {}
-    try:
-        entrypoints = read_metadata_list(metadata, "rust_public_entrypoints")
-    except TypeError as exc:
-        errors.append(str(exc))
-        entrypoints = []
-    try:
-        registry_crates = read_metadata_list(metadata, "rust_registry_public_crates")
-    except TypeError as exc:
-        errors.append(str(exc))
-        registry_crates = []
+    entrypoints = read_metadata_list(metadata, "rust_public_entrypoints", errors)
+    registry_crates = read_metadata_list(metadata, "rust_registry_public_crates", errors)
 
     entrypoint_names = set(entrypoints)
     registry_names = set(registry_crates)
