@@ -250,6 +250,11 @@ impl TrustServiceConfig {
                     "tenant read token id must be non-empty".to_string(),
                 ));
             }
+            if tenant_id.trim() != tenant_id {
+                return Err(CliError::cli_other_error(
+                    "tenant read token id must not contain surrounding whitespace".to_string(),
+                ));
+            }
             let token_label = format!("tenant read token for `{tenant_id}`");
             validate_control_secret(token, &token_label)?;
             if token == &self.service_token {
@@ -356,6 +361,28 @@ mod service_config_tests {
                     "tenant read token for `tenant-a` must not contain surrounding whitespace"
                 ),
                 "unexpected error for token `{token:?}`: {error}",
+            );
+        }
+    }
+
+    #[test]
+    fn trust_service_config_rejects_padded_tenant_read_token_ids_at_startup() {
+        for tenant_id in [" tenant-a", "tenant-a "] {
+            let mut config = base_config();
+            config
+                .tenant_read_tokens
+                .insert(tenant_id.to_string(), "tenant-token".to_string());
+
+            let error = match config.validate() {
+                Ok(()) => panic!("padded tenant read token id should fail closed at startup"),
+                Err(error) => error,
+            };
+
+            assert!(
+                error
+                    .to_string()
+                    .contains("tenant read token id must not contain surrounding whitespace"),
+                "unexpected error for tenant id `{tenant_id:?}`: {error}",
             );
         }
     }

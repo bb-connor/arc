@@ -85,7 +85,9 @@ only rejected secrets that become empty after trimming. A padded service token
 could therefore start the authority service and later fail when the same token
 is used to build remote or cluster clients. A padded tenant read token could
 also start the service and then require whitespace-bearing bearer material at
-read time.
+read time. A padded tenant read-token id could start the service under a
+whitespace-bearing tenant principal and then fail exact tenant read-boundary
+authorization for the intended tenant.
 
 ### Security And API Constraints
 
@@ -108,4 +110,4 @@ start.
 
 Use a shared internal secret validator for service startup and client
 construction. Add startup-config regressions proving padded `service_token` and
-tenant read-token values fail closed at `TrustServiceConfig::validate`.
+tenant read-token ids and values fail closed at `TrustServiceConfig::validate`.

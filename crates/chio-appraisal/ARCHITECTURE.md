@@ -15,7 +15,7 @@
 
 ## Pain Points
 
-- The pricing helper currently treats currency as an opaque string. Catalog callers can compute and persist prices with empty, padded, lowercase, or otherwise non-canonical currency codes.
+- The unchecked pricing helper treats tenant ids and currency as caller-validated input. Catalog callers that need settlement-grade pricing must use the checked boundary so empty or padded tenant ids and non-canonical currency codes fail closed before prices are persisted.
 - The existing `compute_marketplace_invocation_price` API returns a value rather than a `Result`, so hardening the public function directly would break current callers.
 - Downstream marketplace CLI code persists computed prices into install records, so pricing input validation has to fail closed before those records are written.
 
@@ -29,8 +29,8 @@
 
 ## Affected Dependents
 
-`crates/chio-cli/src/market.rs` consumes marketplace pricing for `guard market list`, `info`, and `install`. If pricing validation is added, the CLI catalog path needs a minimal transitive update so malformed catalog prices fail closed instead of being displayed or persisted.
+`crates/chio-cli/src/market.rs` consumes marketplace pricing for `guard market list`, `info`, and `install`. The CLI catalog path uses the checked API so malformed catalog prices fail closed instead of being displayed or persisted. Trust-control startup separately validates tenant read-token ids because those tenant principals participate in read-boundary authorization.
 
-## Planned Improvement
+## Completed Material Improvement
 
-Add checked pricing constructors and a checked invocation-pricing API that validates tenant id and ISO-style uppercase currency codes. Keep the existing unchecked compute function for compatibility, then move the CLI marketplace catalog path onto the checked API.
+Add checked pricing constructors and a checked invocation-pricing API that validate tenant id shape and ISO-style uppercase currency codes. Keep the existing unchecked compute function for compatibility, then move settlement-facing marketplace callers onto the checked API.

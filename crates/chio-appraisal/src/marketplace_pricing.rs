@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 pub enum MarketplacePricingError {
     /// Tenant id is required so downstream audit records can bind a
     /// computed price to the party whose tier was applied.
-    #[error("marketplace pricing tenant_id must be non-empty")]
+    #[error("marketplace pricing tenant_id must be non-empty and must not contain surrounding whitespace")]
     EmptyTenantId,
     /// Marketplace prices use ISO-style uppercase three-letter currency
     /// codes at this boundary.
@@ -83,7 +83,7 @@ impl MarketplacePricingContext {
 
     /// Validate fields required by settlement-grade pricing consumers.
     pub fn validate(&self) -> Result<(), MarketplacePricingError> {
-        if self.tenant_id.trim().is_empty() {
+        if self.tenant_id.trim().is_empty() || self.tenant_id.trim() != self.tenant_id {
             return Err(MarketplacePricingError::EmptyTenantId);
         }
         Ok(())
@@ -344,5 +344,17 @@ mod tests {
             .err()
             .unwrap_or_else(|| panic!("empty tenant should be rejected"));
         assert_eq!(error, MarketplacePricingError::EmptyTenantId);
+    }
+
+    #[test]
+    fn checked_pricing_rejects_padded_tenant_id() {
+        let base = MarketplaceBasePrice::new(1_000, "USD");
+        for tenant_id in [" tenant-a", "tenant-a "] {
+            let ctx = MarketplacePricingContext::new(tenant_id, MarketplaceReputationTier::Tier1);
+            let error = compute_checked_marketplace_invocation_price(&base, &ctx)
+                .err()
+                .unwrap_or_else(|| panic!("padded tenant `{tenant_id}` should be rejected"));
+            assert_eq!(error, MarketplacePricingError::EmptyTenantId);
+        }
     }
 }
