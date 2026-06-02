@@ -243,13 +243,16 @@ pub enum ManifestError {
     VerificationFailed,
 }
 
-/// Validate that a manifest is well-formed (no duplicate tool names, at least
-/// one tool, supported schema version).
+/// Validate that a manifest is structurally well-formed (no duplicate tool
+/// names, at least one tool, supported schema version).
+///
+/// This does not authenticate signer material. Use [`sign_manifest`] or
+/// [`verify_manifest`] when the embedded public key must be parsed and matched
+/// against a signer.
 pub fn validate_manifest(manifest: &ToolManifest) -> Result<(), ManifestError> {
     if manifest.schema != TOOL_MANIFEST_SCHEMA {
         return Err(ManifestError::UnsupportedSchema(manifest.schema.clone()));
     }
-    let _ = embedded_public_key(manifest)?;
     if manifest.tools.is_empty() {
         return Err(ManifestError::EmptyManifest);
     }
@@ -417,14 +420,11 @@ mod tests {
     }
 
     #[test]
-    fn validate_rejects_unparseable_embedded_public_key() {
+    fn validate_allows_unsigned_demo_public_key() {
         let mut m = sample_manifest();
-        m.public_key = "not-a-public-key".into();
+        m.public_key = "hello-a2a-manifest".into();
 
-        assert!(matches!(
-            validate_manifest(&m),
-            Err(ManifestError::VerificationFailed)
-        ));
+        validate_manifest(&m).unwrap_or_else(|e| panic!("validation: {e}"));
     }
 
     #[test]
@@ -490,6 +490,26 @@ mod tests {
         let other = Keypair::generate();
         let mut m = sample_manifest();
         m.public_key = other.public_key().to_hex();
+        let (signature, _bytes) = trusted
+            .sign_canonical(&m)
+            .unwrap_or_else(|e| panic!("sign: {e}"));
+        let signed = SignedManifest {
+            manifest: m,
+            signature,
+            signer_key: trusted.public_key(),
+        };
+
+        assert!(matches!(
+            verify_manifest(&signed, &trusted.public_key()),
+            Err(ManifestError::VerificationFailed)
+        ));
+    }
+
+    #[test]
+    fn verify_manifest_rejects_invalid_embedded_public_key() {
+        let trusted = Keypair::generate();
+        let mut m = sample_manifest();
+        m.public_key = "not-a-public-key".into();
         let (signature, _bytes) = trusted
             .sign_canonical(&m)
             .unwrap_or_else(|e| panic!("sign: {e}"));

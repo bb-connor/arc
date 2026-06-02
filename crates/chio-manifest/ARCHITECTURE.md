@@ -11,35 +11,38 @@ or billing enforcement.
 
 ## Current Pain Point
 
-The manifest has both discovery metadata and trust metadata. Validation already
-checks the schema identifier, duplicate tools, duplicate server-tool entries,
-and embedded public-key parsing before signing or verification. The remaining
-gap is that `input_schema` and `output_schema` are still arbitrary JSON values
-at the manifest boundary. Some adapter edges reject non-object schemas before
-projection, but any caller that relies only on `validate_manifest` can still
-expose a malformed tool contract as a signed manifest.
+The manifest has both discovery metadata and trust metadata. `validate_manifest`
+is the structural discovery gate used by adapters and examples before a manifest
+is signed. It should reject impossible tool contracts, but it should not require
+signed-material parsing. Public-key parsing belongs on the signing and
+verification paths, where the crate can compare the embedded manifest key with
+the actual signer and fail closed before admitting a signed manifest.
 
 ## Security And API Constraints
 
 - `chio.manifest.v1` must stay frozen and backward-compatible for valid
   manifests.
-- Unknown schema values, malformed signer material, duplicate tool names,
-  malformed server-tool allowlists, and non-object per-tool schemas must fail
-  closed.
+- Unknown schema values, duplicate tool names, malformed server-tool
+  allowlists, and non-object per-tool schemas must fail closed in structural
+  validation.
+- Missing, malformed, or mismatched signer material must fail closed in
+  `sign_manifest` and `verify_manifest`, not in unsigned structural validation.
 - Validation must use Chio's algorithm-aware `PublicKey` decoder so Ed25519 and
-  supported FIPS encodings stay compatible.
-- Adapter fixture updates, if needed, should only replace fake keys with
-  deterministic valid keys. They must not change adapter behavior.
+  supported FIPS encodings stay compatible when signed material is evaluated.
+- Adapter fixture updates should not be required solely to satisfy unsigned
+  structural validation. Fixtures that exercise signed-manifest admission should
+  still use deterministic valid keys.
 
 ## Affected Dependents
 
 Potential dependents are adapter tests and examples that synthesize manifests
-with non-object schema placeholders before calling `validate_manifest`. If this
-slice exposes those fixtures, the required transitive change is to use object
-schema placeholders while preserving the tested adapter behavior.
+before calling `validate_manifest`. Structural validation should keep rejecting
+malformed tool schemas for those dependents, while unsigned/demo manifests with
+placeholder public keys should remain usable until a caller explicitly signs or
+verifies the manifest.
 
 ## Planned Improvement
 
-Move per-tool JSON schema object checks into `validate_manifest`, so manifest
-validation rejects impossible discovery metadata before signing, verification,
-or adapter exposure.
+Keep per-tool JSON schema object checks in `validate_manifest`, but move
+embedded public-key parsing out of that structural gate and onto the signing and
+verification boundary.
