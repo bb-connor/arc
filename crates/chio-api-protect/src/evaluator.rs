@@ -529,6 +529,56 @@ mod tests {
     }
 
     #[test]
+    fn evaluate_chio_request_ignores_client_route_pattern_field() {
+        let keypair = Keypair::generate();
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let capability = signed_capability_token_json_with_scope(
+            &keypair,
+            "cap-matrix-read",
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "matrix".to_string(),
+                    tool_name: "files.read".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ChioScope::default()
+            },
+        );
+
+        let mut request = ChioHttpRequest::new(
+            "req-spoofed-route-pattern-field".to_string(),
+            HttpMethod::Post,
+            "/pets".to_string(),
+            "/chio/tools/matrix/files.read".to_string(),
+            CallerIdentity::anonymous(),
+        );
+        request.tool_server = Some("matrix".to_string());
+        request.tool_name = Some("files.read".to_string());
+        request.arguments = Some(serde_json::json!({ "path": "/tmp/a" }));
+        request.body_hash = Some("tool-body".to_string());
+        request.body_length = 8;
+
+        let result = evaluator
+            .evaluate_chio_request(request, Some(&capability))
+            .test_unwrap();
+
+        assert!(result.verdict.is_allowed());
+        assert_eq!(
+            result.receipt.route_pattern,
+            "/chio/tools/matrix/files.read"
+        );
+        assert_eq!(
+            result.receipt.capability_id.as_deref(),
+            Some("cap-matrix-read")
+        );
+    }
+
+    #[test]
     fn evaluate_chio_request_denies_unmatched_http_path_with_spoofed_synthetic_pattern() {
         let keypair = Keypair::generate();
         let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
