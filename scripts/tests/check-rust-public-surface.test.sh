@@ -116,6 +116,84 @@ assert_rc "$(run_checker "$unknown/Cargo.toml" "$work/unknown.out" "$work/unknow
   "unknown public entrypoint fails"
 grep -F "references unknown crates: chio-missing" "$work/unknown.err" >/dev/null
 
+missing_member_manifest="$work/missing-member-manifest"
+write_workspace "$missing_member_manifest" '    "chio-cli",' '    "chio-core",'
+python3 - "$missing_member_manifest/Cargo.toml" <<'PY'
+from pathlib import Path
+import sys
+
+workspace = Path(sys.argv[1])
+workspace.write_text(
+    workspace.read_text(encoding="utf-8").replace(
+        '    "crates/chio-core",\n]',
+        '    "crates/chio-core",\n    "crates/chio-missing",\n]',
+    ),
+    encoding="utf-8",
+)
+PY
+assert_rc "$(run_checker "$missing_member_manifest/Cargo.toml" "$work/missing-member-manifest.out" "$work/missing-member-manifest.err")" 1 \
+  "missing workspace member manifest fails"
+grep -F "workspace member 'crates/chio-missing' points to missing manifest crates/chio-missing/Cargo.toml." \
+  "$work/missing-member-manifest.err" >/dev/null
+
+invalid_member_manifest="$work/invalid-member-manifest"
+write_workspace "$invalid_member_manifest" '    "chio-cli",' '    "chio-core",'
+printf '[package\n' > "$invalid_member_manifest/crates/chio-core/Cargo.toml"
+assert_rc "$(run_checker "$invalid_member_manifest/Cargo.toml" "$work/invalid-member-manifest.out" "$work/invalid-member-manifest.err")" 1 \
+  "invalid workspace member manifest fails"
+grep -F "workspace member 'crates/chio-core' has invalid TOML:" \
+  "$work/invalid-member-manifest.err" >/dev/null
+
+missing_package_table="$work/missing-package-table"
+write_workspace "$missing_package_table" '    "chio-cli",' '    "chio-core",'
+printf '[lib]\npath = \"src/lib.rs\"\n' > "$missing_package_table/crates/chio-core/Cargo.toml"
+assert_rc "$(run_checker "$missing_package_table/Cargo.toml" "$work/missing-package-table.out" "$work/missing-package-table.err")" 1 \
+  "workspace member without package table fails"
+grep -F "crates/chio-core/Cargo.toml does not declare a [package] table." \
+  "$work/missing-package-table.err" >/dev/null
+
+missing_package_name="$work/missing-package-name"
+write_workspace "$missing_package_name" '    "chio-cli",' '    "chio-core",'
+python3 - "$missing_package_name/crates/chio-core/Cargo.toml" <<'PY'
+from pathlib import Path
+import sys
+
+manifest = Path(sys.argv[1])
+manifest.write_text(
+    "\n".join(
+        line
+        for line in manifest.read_text(encoding="utf-8").splitlines()
+        if not line.startswith("name = ")
+    )
+    + "\n",
+    encoding="utf-8",
+)
+PY
+assert_rc "$(run_checker "$missing_package_name/Cargo.toml" "$work/missing-package-name.out" "$work/missing-package-name.err")" 1 \
+  "workspace member without package name fails"
+grep -F "crates/chio-core/Cargo.toml does not declare a non-empty package name." \
+  "$work/missing-package-name.err" >/dev/null
+
+duplicate_package_name="$work/duplicate-package-name"
+write_workspace "$duplicate_package_name" '    "chio-cli",' '    "chio-core",'
+python3 - "$duplicate_package_name/crates/chio-core/Cargo.toml" <<'PY'
+from pathlib import Path
+import sys
+
+manifest = Path(sys.argv[1])
+manifest.write_text(
+    manifest.read_text(encoding="utf-8").replace(
+        'name = "chio-core"',
+        'name = "chio-cli"',
+    ),
+    encoding="utf-8",
+)
+PY
+assert_rc "$(run_checker "$duplicate_package_name/Cargo.toml" "$work/duplicate-package-name.out" "$work/duplicate-package-name.err")" 1 \
+  "duplicate workspace package names fail"
+grep -F "workspace package name 'chio-cli' appears in multiple member manifests: crates/chio-cli/Cargo.toml, crates/chio-core/Cargo.toml." \
+  "$work/duplicate-package-name.err" >/dev/null
+
 unlisted_publishable="$work/unlisted-publishable"
 write_workspace "$unlisted_publishable" '    "chio-cli",' '    "chio-core",'
 write_member "$unlisted_publishable/crates/chio-leaky" "chio-leaky"

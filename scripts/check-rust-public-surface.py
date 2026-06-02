@@ -9,6 +9,30 @@ import sys
 import tomllib
 
 
+def display_path_for(root: Path, path: Path) -> Path:
+    try:
+        return path.relative_to(root)
+    except ValueError:
+        return path
+
+
+def load_toml_file(path: Path, label: str, errors: list[str]) -> dict[str, object] | None:
+    try:
+        content = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        errors.append(f"{label} points to missing manifest {path}.")
+        return None
+    except OSError as exc:
+        errors.append(f"{label} could not be read: {exc}.")
+        return None
+
+    try:
+        return tomllib.loads(content)
+    except tomllib.TOMLDecodeError as exc:
+        errors.append(f"{label} has invalid TOML: {exc}.")
+        return None
+
+
 def duplicate_values(values: list[str]) -> list[str]:
     counts = Counter(values)
     return sorted(value for value, count in counts.items() if count > 1)
@@ -256,35 +280,94 @@ def main() -> int:
 
     workspace_manifest = args.workspace_manifest.resolve()
     root = workspace_manifest.parent
-    workspace = tomllib.loads(workspace_manifest.read_text())
-    members = workspace["workspace"]["members"]
-    metadata = workspace["workspace"]["metadata"]["chio"]
-    workspace_dependencies = workspace["workspace"].get("dependencies", {})
+    errors: list[str] = []
+    workspace = load_toml_file(workspace_manifest, "workspace manifest", errors)
+    if workspace is None:
+        for error in errors:
+            print(error, file=sys.stderr)
+        return 1
+
+    workspace_table = workspace.get("workspace", {})
+    if not isinstance(workspace_table, dict):
+        errors.append("workspace manifest must declare a [workspace] table.")
+        workspace_table = {}
+
+    members_raw = workspace_table.get("members", [])
+    if not isinstance(members_raw, list) or not all(
+        isinstance(member, str) and member.strip() for member in members_raw
+    ):
+        errors.append("workspace.members must be a list of non-empty strings.")
+        members: list[str] = []
+    else:
+        members = members_raw
+
+    workspace_metadata = workspace_table.get("metadata", {})
+    if not isinstance(workspace_metadata, dict):
+        errors.append("workspace.metadata must be a table.")
+        workspace_metadata = {}
+    metadata = workspace_metadata.get("chio", {})
+    if not isinstance(metadata, dict):
+        errors.append("workspace.metadata.chio must be a table.")
+        metadata = {}
+
+    workspace_dependencies = workspace_table.get("dependencies", {})
     if not isinstance(workspace_dependencies, dict):
         workspace_dependencies = {}
-    entrypoints = read_metadata_list(metadata, "rust_public_entrypoints")
-    registry_crates = read_metadata_list(metadata, "rust_registry_public_crates")
+    try:
+        entrypoints = read_metadata_list(metadata, "rust_public_entrypoints")
+    except TypeError as exc:
+        errors.append(str(exc))
+        entrypoints = []
+    try:
+        registry_crates = read_metadata_list(metadata, "rust_registry_public_crates")
+    except TypeError as exc:
+        errors.append(str(exc))
+        registry_crates = []
 
     entrypoint_names = set(entrypoints)
     registry_names = set(registry_crates)
 
-    errors: list[str] = []
     require_sorted_unique("rust_public_entrypoints", entrypoints, errors)
     require_sorted_unique("rust_registry_public_crates", registry_crates, errors)
 
     seen_names: set[str] = set()
     member_records: list[tuple[str, Path, Path, dict[str, object], dict[str, object]]] = []
     member_names_by_dir: dict[Path, str] = {}
+    package_paths_by_name: dict[str, list[Path]] = {}
 
     for member in members:
         manifest_path = root / member / "Cargo.toml"
-        manifest = tomllib.loads(manifest_path.read_text())
-        package = manifest["package"]
-        crate_name = package["name"]
+        display_path = display_path_for(root, manifest_path)
+        if not manifest_path.is_file():
+            errors.append(
+                f"workspace member {member!r} points to missing manifest {display_path}."
+            )
+            continue
+        manifest = load_toml_file(manifest_path, f"workspace member {member!r}", errors)
+        if manifest is None:
+            continue
+
+        package = manifest.get("package")
+        if not isinstance(package, dict):
+            errors.append(f"{display_path} does not declare a [package] table.")
+            continue
+
+        crate_name = package.get("name")
+        if not isinstance(crate_name, str) or not crate_name.strip():
+            errors.append(f"{display_path} does not declare a non-empty package name.")
+            continue
+
         seen_names.add(crate_name)
-        display_path = manifest_path.relative_to(root)
         member_records.append((crate_name, manifest_path, display_path, manifest, package))
         member_names_by_dir[manifest_path.parent.resolve()] = crate_name
+        package_paths_by_name.setdefault(crate_name, []).append(display_path)
+
+    for crate_name, paths in sorted(package_paths_by_name.items()):
+        if len(paths) > 1:
+            errors.append(
+                f"workspace package name {crate_name!r} appears in multiple "
+                f"member manifests: {', '.join(str(path) for path in paths)}."
+            )
 
     for crate_name, manifest_path, display_path, manifest, package in member_records:
         chio_metadata = package_chio_metadata(display_path, package, errors)

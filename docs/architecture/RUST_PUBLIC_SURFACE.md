@@ -150,3 +150,43 @@ workspace `path` dependency is not also listed in
 `chio-conformance` remains a repo-public conformance harness, but it must not
 be listed as registry-public while it still depends on private Chio kernel and
 selective-disclosure crates.
+
+## Workspace Member Manifest Closure Slice
+
+### Current Boundary
+
+The public surface checker derives the allowed public Rust surface from three
+local sources: the root workspace manifest, each workspace member manifest, and
+the member source paths used to prove implementation targets.
+
+### Pain Point Addressed
+
+The gate can only reason about public entrypoints and registry candidates after
+the workspace member set has been resolved. Before this slice, malformed member
+entries, missing member manifests, invalid member TOML, and duplicate package
+names could escape the policy layer as Python exceptions or ambiguous member
+state instead of first-class gate failures.
+
+### Security And API Constraints
+
+- Keep the gate pure, local, and network-free.
+- Treat malformed workspace structure as a policy failure rather than a partial
+  pass.
+- Preserve the existing public entrypoint and registry semantics once member
+  manifests load successfully.
+- Do not infer public API compatibility from this check. It only proves that
+  the metadata graph being checked is complete enough for the existing policy.
+
+### Affected Dependents
+
+CI continues to invoke `python3 scripts/check-rust-public-surface.py`. The
+focused synthetic regression suite remains
+`bash scripts/tests/check-rust-public-surface.test.sh`, because the test file
+is intentionally not executable in this checkout.
+
+### Material Improvement
+
+The checker should fail closed with explicit diagnostics for unresolved member
+manifests, invalid member manifests, malformed package tables, missing package
+names, and duplicate workspace package names before it evaluates public
+entrypoint or registry closure policy.
