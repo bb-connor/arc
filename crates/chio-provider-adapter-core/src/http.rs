@@ -81,6 +81,7 @@ impl AuthScheme {
 
     /// Build an [`AuthScheme::QueryParam`] reading the secret from `var`.
     pub fn query_param_from_env(param_name: &str, var: &str) -> Result<Self, HttpTransportError> {
+        validate_auth_query_param_name(param_name)?;
         Ok(Self::QueryParam {
             name: param_name.to_string(),
             value: read_required_env(var)?,
@@ -414,9 +415,51 @@ fn validate_auth_scheme(auth: &AuthScheme) -> Result<(), HttpTransportError> {
             validate_auth_secret(name, value, "auth header value")
         }
         AuthScheme::QueryParam { name, value } => {
+            validate_auth_query_param_name(name)?;
             validate_auth_secret(name, value, "auth query value")
         }
         AuthScheme::None => Ok(()),
+    }
+}
+
+fn validate_auth_query_param_name(name: &str) -> Result<(), HttpTransportError> {
+    if name.is_empty() {
+        return Err(invalid_auth_query_param_name(
+            name,
+            "auth query parameter name must not be empty",
+        ));
+    }
+    if name.trim() != name {
+        return Err(invalid_auth_query_param_name(
+            name,
+            "auth query parameter name must not contain surrounding whitespace",
+        ));
+    }
+    if name
+        .bytes()
+        .any(|byte| byte.is_ascii_control() || byte.is_ascii_whitespace())
+    {
+        return Err(invalid_auth_query_param_name(
+            name,
+            "auth query parameter name must not contain whitespace or control bytes",
+        ));
+    }
+    if name
+        .bytes()
+        .any(|byte| matches!(byte, b'&' | b'=' | b'?' | b'#'))
+    {
+        return Err(invalid_auth_query_param_name(
+            name,
+            "auth query parameter name must not contain query delimiters",
+        ));
+    }
+    Ok(())
+}
+
+fn invalid_auth_query_param_name(name: &str, detail: &str) -> HttpTransportError {
+    HttpTransportError::InvalidHeader {
+        name: name.to_string(),
+        detail: detail.to_string(),
     }
 }
 
@@ -840,6 +883,57 @@ mod tests {
             ));
             assert!(error.to_string().contains("auth query value"));
         }
+    }
+
+    #[test]
+    fn http_transport_rejects_invalid_direct_query_auth_name() {
+        for name in [
+            "",
+            " key",
+            "key ",
+            "api key",
+            "key=value",
+            "key&other",
+            "key?debug",
+            "key#fragment",
+            "key\n",
+        ] {
+            let config = HttpTransportConfig::new("https://api.example.test").with_auth(
+                AuthScheme::QueryParam {
+                    name: name.to_string(),
+                    value: "secret-value".to_string(),
+                },
+            );
+
+            let error = match HttpTransport::new(config) {
+                Ok(_) => panic!("invalid direct query auth name must fail closed"),
+                Err(error) => error,
+            };
+            let message = error.to_string();
+
+            assert!(matches!(error, HttpTransportError::InvalidHeader { .. }));
+            assert!(message.contains("auth query parameter name"));
+            assert!(
+                !message.contains("secret-value"),
+                "query auth secret leaked in `{message}`"
+            );
+        }
+    }
+
+    #[test]
+    fn query_param_from_env_rejects_invalid_name_before_returning_secret() {
+        std::env::set_var("CHIO_TEST_QUERY_KEY", "secret-value");
+        let error = AuthScheme::query_param_from_env(" key", "CHIO_TEST_QUERY_KEY")
+            .expect_err("invalid query auth name must fail closed");
+        std::env::remove_var("CHIO_TEST_QUERY_KEY");
+        let message = error.to_string();
+
+        assert!(matches!(error, HttpTransportError::InvalidHeader { .. }));
+        assert!(message.contains("auth query parameter name"));
+        assert!(
+            !message.contains("secret-value"),
+            "query auth secret leaked in `{message}`"
+        );
     }
 
     #[test]

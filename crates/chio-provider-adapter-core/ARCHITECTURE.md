@@ -29,3 +29,47 @@
 ## Planned Improvement
 
 Validate the configured HTTP base URL when constructing `HttpTransport`: reject empty or padded values, non-HTTP(S) schemes, embedded userinfo, query strings, and fragments before any request can be built. This is architectural because it tightens the shared outbound trust boundary for every provider adapter while preserving the existing config and transport trait surface.
+
+## Query Auth Name Validation Slice
+
+### Current Boundary
+
+- `http.rs` owns `AuthScheme`, `HttpTransportConfig`, and the shared
+  `HttpTransport` construction boundary for provider-native adapters.
+- `validate_auth_scheme` checks caller-supplied auth material before the
+  `reqwest::Client` transport is returned.
+- Query-parameter auth is currently applied later in `HttpTransport::send`
+  through `request.query(&[(name.as_str(), value.as_str())])`.
+
+### Pain Point
+
+`AuthScheme::QueryParam` validates the API key value but does not validate the
+parameter name. A direct config with an empty, padded, or control-byte-bearing
+name can build a transport and only fail or misroute when a request is sent,
+which weakens the shared provider-auth trust boundary.
+
+### Security And API Constraints
+
+- Preserve the public `AuthScheme`, `HttpTransportConfig`,
+  `HttpTransportError`, and `ProviderHttpTransport` API surface.
+- Keep valid Gemini query auth behavior unchanged.
+- Reject malformed query-auth names at transport construction before any
+  provider request can be built.
+- Do not include query-auth secret values in diagnostics.
+- Do not change provider-specific adapters unless a dependent gate proves a
+  real compatibility break.
+
+### Affected Dependents
+
+- `chio-gemini-tools-adapter` is the direct query-auth dependent and uses the
+  stable `key` parameter name, so no transitive source change is planned.
+- Other provider adapters use bearer or header auth through the same shared
+  construction boundary and should remain behaviorally unchanged.
+
+### Planned Material Improvement
+
+Add an internal query-auth name validator to the shared transport construction
+path and cover it with focused tests for direct and environment-backed
+`AuthScheme::QueryParam` construction. This is architectural because every
+provider-native adapter relying on this shared transport inherits the stronger
+fail-closed outbound auth boundary.
