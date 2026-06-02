@@ -2337,42 +2337,37 @@ mod extended_tests {
     }
 
     #[test]
-    fn interceptor_session_update_with_bad_params_forwarded() {
-        // session/update with params that cannot deserialize to
-        // SessionUpdateNotification should still forward.
+    fn interceptor_session_update_rejects_bad_params_before_forwarding() {
         let interceptor = MessageInterceptor::new(test_config());
         let msg = json!({
             "jsonrpc": "2.0",
             "method": "session/update",
             "params": "not an object"
         });
-        let result = interceptor.intercept(Direction::AgentToClient, &msg);
-        assert!(result.is_ok());
-        match result {
-            Ok(InterceptResult::Forward(_)) => {}
-            other => panic!(
-                "expected Forward for malformed session/update params, got {:?}",
-                other
-            ),
-        }
+        let err = interceptor
+            .intercept(Direction::AgentToClient, &msg)
+            .expect_err("malformed session/update params must fail at the ACP boundary");
+        assert!(
+            err.to_string()
+                .contains("protocol error: invalid session/update params:"),
+            "unexpected malformed session/update error: {err}"
+        );
     }
 
     #[test]
-    fn interceptor_session_update_with_no_params_forwarded() {
+    fn interceptor_session_update_rejects_missing_params_before_forwarding() {
         let interceptor = MessageInterceptor::new(test_config());
         let msg = json!({
             "jsonrpc": "2.0",
             "method": "session/update"
         });
-        let result = interceptor.intercept(Direction::AgentToClient, &msg);
-        assert!(result.is_ok());
-        match result {
-            Ok(InterceptResult::Forward(_)) => {}
-            other => panic!(
-                "expected Forward for session/update with no params, got {:?}",
-                other
-            ),
-        }
+        let err = interceptor
+            .intercept(Direction::AgentToClient, &msg)
+            .expect_err("missing session/update params must fail at the ACP boundary");
+        assert_eq!(
+            err.to_string(),
+            "protocol error: missing params in session/update"
+        );
     }
 
     #[test]

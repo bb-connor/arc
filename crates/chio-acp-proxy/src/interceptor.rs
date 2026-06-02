@@ -571,88 +571,83 @@ impl MessageInterceptor {
     }
 
     fn intercept_session_update(&self, message: &Value) -> Result<InterceptResult, AcpProxyError> {
-        let params = message.get("params");
-        let notification = params
-            .and_then(|p| serde_json::from_value::<SessionUpdateNotification>(p.clone()).ok());
+        let params = Self::jsonrpc_params(message, "session/update")?;
+        let notif: SessionUpdateNotification =
+            Self::decode_jsonrpc_params(params, "session/update")?;
+        notif.validate_boundary()?;
 
-        if let Some(ref notif) = notification {
-            notif.validate_boundary()?;
-            let update = parse_session_update(&notif.update);
-            match update {
-                SessionUpdate::ToolCall(ref event) => {
-                    event.validate_receipt_boundary()?;
-                    let capability_context = self
-                        .lookup_tool_capability_context(&notif.session_id, &event.tool_call_id)
-                        .or_else(|| {
-                            // The originating ACP fs/terminal-create request had
-                            // no toolCallId, so the CryptographicallyEnforced
-                            // context was buffered per session. Bind it now when
-                            // exactly one pending context matches the event's
-                            // kind (and re-index it under the resolved
-                            // tool_call_id so the terminal session/update can
-                            // find it the same way).
-                            self.bind_pending_capability_context(
-                                &notif.session_id,
-                                &event.tool_call_id,
-                                event.kind.as_deref(),
-                            )
-                        });
-                    let receipt = self.receipt_logger.log_tool_call(
-                        &notif.session_id,
-                        event,
-                        capability_context.as_ref(),
-                    );
+        let update = parse_session_update(&notif.update);
+        match update {
+            SessionUpdate::ToolCall(ref event) => {
+                event.validate_receipt_boundary()?;
+                let capability_context = self
+                    .lookup_tool_capability_context(&notif.session_id, &event.tool_call_id)
+                    .or_else(|| {
+                        // The originating ACP fs/terminal-create request had
+                        // no toolCallId, so the CryptographicallyEnforced
+                        // context was buffered per session. Bind it now when
+                        // exactly one pending context matches the event's
+                        // kind (and re-index it under the resolved
+                        // tool_call_id so the terminal session/update can
+                        // find it the same way).
+                        self.bind_pending_capability_context(
+                            &notif.session_id,
+                            &event.tool_call_id,
+                            event.kind.as_deref(),
+                        )
+                    });
+                let receipt = self.receipt_logger.log_tool_call(
+                    &notif.session_id,
+                    event,
+                    capability_context.as_ref(),
+                );
+                if let Some(block) = self.sign_or_block(message.get("id"), &receipt) {
+                    return Ok(InterceptResult::Block(block));
+                }
+                tracing::info!(
+                    tool_call_id = %receipt.tool_call_id,
+                    status = %receipt.status,
+                    "tool call receipt"
+                );
+                return Ok(InterceptResult::ForwardWithReceipt(
+                    message.clone(),
+                    Box::new(receipt),
+                ));
+            }
+            SessionUpdate::ToolCallUpdate(ref event) => {
+                event.validate_receipt_boundary()?;
+                let capability_context =
+                    self.lookup_tool_capability_context(&notif.session_id, &event.tool_call_id);
+                if let Some(receipt) = self.receipt_logger.log_tool_call_update(
+                    &notif.session_id,
+                    event,
+                    capability_context.as_ref(),
+                ) {
                     if let Some(block) = self.sign_or_block(message.get("id"), &receipt) {
                         return Ok(InterceptResult::Block(block));
+                    }
+                    if should_clear_capability_context(&receipt.status) {
+                        self.clear_tool_capability_context(&notif.session_id, &event.tool_call_id);
                     }
                     tracing::info!(
                         tool_call_id = %receipt.tool_call_id,
                         status = %receipt.status,
-                        "tool call receipt"
+                        "tool call update receipt"
                     );
                     return Ok(InterceptResult::ForwardWithReceipt(
                         message.clone(),
                         Box::new(receipt),
                     ));
                 }
-                SessionUpdate::ToolCallUpdate(ref event) => {
-                    event.validate_receipt_boundary()?;
-                    let capability_context =
-                        self.lookup_tool_capability_context(&notif.session_id, &event.tool_call_id);
-                    if let Some(receipt) = self.receipt_logger.log_tool_call_update(
-                        &notif.session_id,
-                        event,
-                        capability_context.as_ref(),
-                    ) {
-                        if let Some(block) = self.sign_or_block(message.get("id"), &receipt) {
-                            return Ok(InterceptResult::Block(block));
-                        }
-                        if should_clear_capability_context(&receipt.status) {
-                            self.clear_tool_capability_context(
-                                &notif.session_id,
-                                &event.tool_call_id,
-                            );
-                        }
-                        tracing::info!(
-                            tool_call_id = %receipt.tool_call_id,
-                            status = %receipt.status,
-                            "tool call update receipt"
-                        );
-                        return Ok(InterceptResult::ForwardWithReceipt(
-                            message.clone(),
-                            Box::new(receipt),
-                        ));
-                    }
-                }
-                SessionUpdate::AgentMessageChunk(_)
-                | SessionUpdate::AgentThoughtChunk(_)
-                | SessionUpdate::Plan(_)
-                | SessionUpdate::AvailableCommandsUpdate(_)
-                | SessionUpdate::CurrentModeUpdate(_)
-                | SessionUpdate::ConfigOptionUpdate(_)
-                | SessionUpdate::SessionInfoUpdate(_)
-                | SessionUpdate::Other(_) => {}
             }
+            SessionUpdate::AgentMessageChunk(_)
+            | SessionUpdate::AgentThoughtChunk(_)
+            | SessionUpdate::Plan(_)
+            | SessionUpdate::AvailableCommandsUpdate(_)
+            | SessionUpdate::CurrentModeUpdate(_)
+            | SessionUpdate::ConfigOptionUpdate(_)
+            | SessionUpdate::SessionInfoUpdate(_)
+            | SessionUpdate::Other(_) => {}
         }
 
         Ok(InterceptResult::Forward(message.clone()))
