@@ -2148,7 +2148,7 @@ mod tests {
     }
 
     #[test]
-    fn jsonrpc_stream_capacity_excludes_cancelled_deferred_tasks() {
+    fn jsonrpc_stream_capacity_counts_retained_cancelled_deferred_tasks() {
         let edge =
             ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
         let config = test_kernel_config();
@@ -2207,7 +2207,7 @@ mod tests {
 
         assert_eq!(edge.tasks.borrow().len(), MAX_DEFERRED_ACP_TASKS);
 
-        let accepted = edge.handle_jsonrpc(
+        let rejected = edge.handle_jsonrpc(
             json!({
                 "jsonrpc": "2.0",
                 "id": 3_000,
@@ -2221,10 +2221,10 @@ mod tests {
             &execution,
         );
 
-        assert_eq!(
-            accepted["result"]["task"]["status"].as_str(),
-            Some("working")
-        );
+        assert!(rejected["error"]["message"]
+            .as_str()
+            .test_unwrap()
+            .contains("too many deferred tasks"));
     }
 
     #[test]

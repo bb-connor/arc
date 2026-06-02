@@ -66,18 +66,23 @@ task lifecycle lookup, or capability listing can observe malformed params.
 ### Pain Point
 
 The ACP lifecycle contract advertises deferred `tool/stream` tasks resolved by
-`tool/resume` with `resumed_terminal_payload` delivery. The current edge stores
-the terminal task and result during resume, but removes the task record before
-returning it. Cancelled tasks are also removed immediately. That makes repeated
-`tool/resume` or idempotent `tool/cancel` return `tool not found` instead of
-the owner-bound terminal task state that the edge just produced.
+`tool/resume` with `resumed_terminal_payload` delivery. The edge now retains
+completed, failed, and cancelled task records until TTL expiry so repeated
+`tool/resume` or idempotent `tool/cancel` can return owner-bound terminal task
+state.
+
+The remaining capacity bug is that the deferred-task cap currently counts only
+working tasks. Retained completed or cancelled task records can accumulate until
+TTL expiry without consuming capacity, even though they still occupy the
+owner-bound task registry.
 
 ### Security And API Constraints
 
 - Preserve public Rust structs, JSON-RPC methods, and response shapes.
 - Preserve owner binding for working, completed, failed, and cancelled tasks.
 - Do not execute the deferred kernel request more than once.
-- Keep task retention bounded by the existing TTL and deferred-task cap.
+- Keep all retained task records bounded by the existing TTL and deferred-task
+  cap.
 - Preserve signed receipt metadata on completed or failed resumed results and
   cancellation metadata on cancelled tasks.
 
@@ -89,9 +94,16 @@ the owner-bound terminal task state that the edge just produced.
   cancelled task.
 - `chio-kernel`, `chio-cross-protocol`, and `chio-mcp-edge` APIs are unchanged.
 
-### Planned Material Improvement
+### Completed Terminal Retention Baseline
 
 Retain terminal deferred-task records until the existing TTL expires, while
-preserving owner checks and bounded capacity. Update lifecycle tests to prove
-resume does not re-execute or remove a terminal task, and cancel remains
-idempotent for retained cancelled tasks.
+preserving owner checks. Lifecycle tests prove resume does not re-execute or
+remove a terminal task, and cancel remains idempotent for retained cancelled
+tasks.
+
+### Completed Capacity Accounting Improvement
+
+Make the deferred-task capacity gate count every retained task record after TTL
+pruning, not just `working` tasks. Update lifecycle tests so retained cancelled
+tasks at the cap reject a new `tool/stream`, proving terminal retention cannot
+grow without bound until TTL expiry.
