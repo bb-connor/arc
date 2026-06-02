@@ -169,3 +169,27 @@ Routed blocking response recording through the same internal classified registry
 boundary used by streams. Rebind conflicts should be warning-only for the
 current accepted response, while fatal registry errors continue to abort the
 current invocation fail-closed.
+
+## Task Registry Id Canonicalization Follow-up
+
+### Current Boundary
+
+- `task_registry.rs` extracts task ids from accepted `task`, `statusUpdate`,
+  and `artifactUpdate` payloads before writing durable follow-up authority.
+- The same registry later looks up exact task-id keys when tool calls perform
+  follow-up operations.
+
+### Pain Point
+
+The observation validators reject all-whitespace task ids, but they do not make
+the durable registry key canonical. A remote A2A server can return a padded task
+id that passes validation and persists as a padded key. A later normal follow-up
+for the same logical id then misses the registry entry and fails for the wrong
+reason.
+
+### Completed Material Improvement
+
+Normalize task ids with `trim()` at the registry observation boundary before the
+id becomes a durable key or stored record value. This keeps padded remote ids
+from fragmenting follow-up authority while preserving the existing fail-closed
+behavior for empty or malformed observations.

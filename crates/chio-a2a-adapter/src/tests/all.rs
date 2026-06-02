@@ -832,6 +832,72 @@ mod tests {
         let _ = fs::remove_file(registry_path);
     }
 
+    #[test]
+    fn task_registry_canonicalizes_observed_task_ids_before_persisting() {
+        let registry_path = unique_path("chio-a2a-task-registry-canonical-task-id", ".json");
+        let registry = A2aTaskRegistry::open(&registry_path).expect("open task registry");
+        let selected_interface = A2aAgentInterface {
+            url: "http://localhost:9000/rpc".to_string(),
+            protocol_binding: "JSONRPC".to_string(),
+            protocol_version: "1.0".to_string(),
+            tenant: Some("tenant-alpha".to_string()),
+        };
+        let selected_binding = A2aProtocolBinding::JsonRpc;
+        let context = A2aTaskRecordContext {
+            source: "send_message",
+            tool_name: "research",
+            server_id: "srv-a2a",
+            selected_interface: &selected_interface,
+            selected_binding: &selected_binding,
+            partner: "partner-alpha",
+        };
+
+        registry
+            .record_from_value(
+                &json!({
+                    "task": {
+                        "id": " task-1 ",
+                        "status": { "state": "TASK_STATE_WORKING" }
+                    },
+                    "statusUpdate": {
+                        "taskId": "\ttask-1\n",
+                        "status": { "state": "TASK_STATE_COMPLETED" }
+                    },
+                    "artifactUpdate": {
+                        "taskId": " task-1 ",
+                        "artifact": { "artifactId": "artifact-1" }
+                    }
+                }),
+                &context,
+            )
+            .expect("record padded task observations");
+
+        let reloaded = registry.load().expect("reload task registry");
+        assert_eq!(
+            reloaded.tasks.len(),
+            1,
+            "padded observations should share one canonical task key"
+        );
+        let record = reloaded
+            .tasks
+            .get("task-1")
+            .expect("canonical task key is recorded");
+        assert_eq!(record.task_id, "task-1");
+        assert_eq!(record.last_state.as_deref(), Some("TASK_STATE_COMPLETED"));
+        registry
+            .validate_follow_up(
+                "task-1",
+                "research",
+                "srv-a2a",
+                &selected_interface,
+                &selected_binding,
+                "get_task.id",
+            )
+            .expect("normal follow-up id should match padded observation");
+
+        let _ = fs::remove_file(registry_path);
+    }
+
     #[tokio::test]
     async fn adapter_invokes_http_json_binding() {
         let Some(server) = FakeA2aServer::spawn_http_json() else {
