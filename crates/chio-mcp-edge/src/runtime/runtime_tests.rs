@@ -1695,6 +1695,26 @@ fn initialize_unsupported_protocol_version_rejected() {
 }
 
 #[test]
+fn initialize_rejects_non_object_params_without_opening_session() {
+    let mut edge = make_edge(10);
+    let response = edge
+        .handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": []
+        }))
+        .unwrap();
+
+    assert_eq!(response["error"]["code"], JSONRPC_INVALID_PARAMS);
+    assert_eq!(
+        response["error"]["message"],
+        "initialize params must be an object"
+    );
+    assert!(matches!(edge.state, EdgeState::Uninitialized));
+}
+
+#[test]
 fn tools_list_is_paginated() {
     let mut edge = make_edge(2);
     let _ = edge.handle_jsonrpc(json!({
@@ -1743,6 +1763,27 @@ fn tools_list_is_paginated() {
         .unwrap();
     assert_eq!(second_page["result"]["tools"].as_array().unwrap().len(), 0);
     assert!(second_page["result"]["nextCursor"].is_null());
+}
+
+#[test]
+fn tools_list_rejects_non_object_params() {
+    let mut edge = make_edge(10);
+    initialize_edge(&mut edge);
+
+    let response = edge
+        .handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/list",
+            "params": []
+        }))
+        .unwrap();
+
+    assert_eq!(response["error"]["code"], JSONRPC_INVALID_PARAMS);
+    assert_eq!(
+        response["error"]["message"],
+        "tools/list params must be an object"
+    );
 }
 
 #[test]

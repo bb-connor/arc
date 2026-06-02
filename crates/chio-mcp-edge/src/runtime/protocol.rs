@@ -58,6 +58,45 @@ pub(super) fn parse_jsonrpc_envelope(message: &Value) -> Result<JsonRpcEnvelope,
     Ok(JsonRpcEnvelope { id, method, params })
 }
 
+pub(super) fn ensure_known_request_params_object(
+    id: &Value,
+    method: &str,
+    params: &Value,
+) -> Result<(), Value> {
+    if !known_request_method(method) || params.is_object() {
+        return Ok(());
+    }
+
+    Err(jsonrpc_error(
+        id.clone(),
+        JSONRPC_INVALID_PARAMS,
+        &format!("{method} params must be an object"),
+    ))
+}
+
+fn known_request_method(method: &str) -> bool {
+    matches!(
+        method,
+        "initialize"
+            | "ping"
+            | "tools/list"
+            | "tools/call"
+            | "tasks/list"
+            | "tasks/get"
+            | "tasks/result"
+            | "tasks/cancel"
+            | "resources/list"
+            | "resources/read"
+            | "resources/subscribe"
+            | "resources/unsubscribe"
+            | "resources/templates/list"
+            | "prompts/list"
+            | "prompts/get"
+            | "completion/complete"
+            | "logging/setLevel"
+    )
+}
+
 pub(super) fn kernel_response_to_tool_result(args: KernelResponseToToolResultArgs<'_>) -> Value {
     let KernelResponseToToolResultArgs {
         pending_notifications,

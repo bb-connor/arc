@@ -777,7 +777,12 @@ impl ChioMcpEdge {
             Err(response) => return Some(response),
         };
         match id {
-            Some(id) => Some(self.handle_request(id, &method, params)),
+            Some(id) => {
+                if let Err(response) = ensure_known_request_params_object(&id, &method, &params) {
+                    return Some(response);
+                }
+                Some(self.handle_request(id, &method, params))
+            }
             None => self.handle_notification(&method, params),
         }
     }
@@ -806,6 +811,9 @@ impl ChioMcpEdge {
         };
         match id {
             Some(id) => {
+                if let Err(response) = ensure_known_request_params_object(&id, &method, &params) {
+                    return Some(response);
+                }
                 Some(self.handle_request_with_transport(id, &method, params, reader, writer))
             }
             None => self.handle_notification(&method, params),
@@ -824,9 +832,14 @@ impl ChioMcpEdge {
             Err(response) => return Some(response),
         };
         match id {
-            Some(id) => Some(self.handle_request_with_transport_channel(
-                id, &method, params, client_rx, cancel_rx, writer,
-            )),
+            Some(id) => {
+                if let Err(response) = ensure_known_request_params_object(&id, &method, &params) {
+                    return Some(response);
+                }
+                Some(self.handle_request_with_transport_channel(
+                    id, &method, params, client_rx, cancel_rx, writer,
+                ))
+            }
             None => self.handle_notification(&method, params),
         }
     }
