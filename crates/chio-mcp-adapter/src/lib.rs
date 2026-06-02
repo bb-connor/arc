@@ -878,11 +878,54 @@ mod tests {
 
         assert_eq!(manifest.tools.len(), 1);
         assert_eq!(manifest.tools[0].name, "read_file");
+        assert_eq!(manifest.tools[0].description, "Read File\n\nRead a file");
         assert_eq!(
             manifest.tools[0].output_schema,
             Some(serde_json::json!({"type": "string"}))
         );
         assert!(!manifest.tools[0].has_side_effects);
+    }
+
+    #[test]
+    fn manifest_uses_mcp_title_when_description_is_absent() {
+        let transport = MockTransport::simple(
+            vec![McpToolInfo {
+                name: "search_docs".into(),
+                title: Some("Search Docs".into()),
+                description: None,
+                input_schema: serde_json::json!({"type": "object"}),
+                output_schema: None,
+                annotations: None,
+                execution: None,
+            }],
+            MockCallBehavior::Success(success_result("ok")),
+        );
+        let adapter = McpAdapter::new(default_config(), Box::new(transport));
+
+        let manifest = adapter.generate_manifest().test_unwrap();
+
+        assert_eq!(manifest.tools[0].description, "Search Docs");
+    }
+
+    #[test]
+    fn manifest_description_only_tools_remain_unchanged() {
+        let transport = MockTransport::simple(
+            vec![McpToolInfo {
+                name: "describe".into(),
+                title: None,
+                description: Some("Existing description".into()),
+                input_schema: serde_json::json!({"type": "object"}),
+                output_schema: None,
+                annotations: None,
+                execution: None,
+            }],
+            MockCallBehavior::Success(success_result("ok")),
+        );
+        let adapter = McpAdapter::new(default_config(), Box::new(transport));
+
+        let manifest = adapter.generate_manifest().test_unwrap();
+
+        assert_eq!(manifest.tools[0].description, "Existing description");
     }
 
     #[test]

@@ -29,20 +29,59 @@ pub(crate) fn generate_manifest(
 }
 
 fn tool_definition_from_mcp(tool: McpToolInfo) -> Result<ToolDefinition, AdapterError> {
-    validate_schema_object(&tool.name, "inputSchema", &tool.input_schema)?;
-    if let Some(output_schema) = tool.output_schema.as_ref() {
-        validate_schema_object(&tool.name, "outputSchema", output_schema)?;
-    }
+    let tool = ProjectedMcpTool::try_from(tool)?;
 
     Ok(ToolDefinition {
         name: tool.name,
-        description: tool.description.unwrap_or_default(),
+        description: tool.description,
         input_schema: tool.input_schema,
         output_schema: tool.output_schema,
         pricing: None,
-        has_side_effects: infer_has_side_effects(tool.annotations.as_ref()),
+        has_side_effects: tool.has_side_effects,
         latency_hint: None,
     })
+}
+
+struct ProjectedMcpTool {
+    name: String,
+    description: String,
+    input_schema: Value,
+    output_schema: Option<Value>,
+    has_side_effects: bool,
+}
+
+impl TryFrom<McpToolInfo> for ProjectedMcpTool {
+    type Error = AdapterError;
+
+    fn try_from(tool: McpToolInfo) -> Result<Self, Self::Error> {
+        validate_schema_object(&tool.name, "inputSchema", &tool.input_schema)?;
+        if let Some(output_schema) = tool.output_schema.as_ref() {
+            validate_schema_object(&tool.name, "outputSchema", output_schema)?;
+        }
+
+        Ok(Self {
+            name: tool.name,
+            description: project_tool_description(
+                tool.title.as_deref(),
+                tool.description.as_deref(),
+            ),
+            input_schema: tool.input_schema,
+            output_schema: tool.output_schema,
+            has_side_effects: infer_has_side_effects(tool.annotations.as_ref()),
+        })
+    }
+}
+
+fn project_tool_description(title: Option<&str>, description: Option<&str>) -> String {
+    let title = title.filter(|value| !value.is_empty());
+    let description = description.filter(|value| !value.is_empty());
+    match (title, description) {
+        (Some(title), Some(description)) if title == description => description.to_string(),
+        (Some(title), Some(description)) => format!("{title}\n\n{description}"),
+        (Some(title), None) => title.to_string(),
+        (None, Some(description)) => description.to_string(),
+        (None, None) => String::new(),
+    }
 }
 
 fn validate_schema_object(

@@ -84,3 +84,28 @@ No downstream crate API should change. `chio-cli`, `chio-control-plane`, `chio-h
 ### Planned Improvement
 
 Extract MCP stdio frame decoding into an internal `framing` module and route both `StdioMcpTransport` and `fuzz_mcp_envelope_parse` through it so fuzz coverage matches the production delimiter, size, UTF-8, and JSON parse boundary.
+
+## MCP Tool Description Projection Slice
+
+### Current Boundary
+
+`manifest.rs` owns projection from `McpToolInfo` into Chio `ToolDefinition`. It validates JSON schemas and translates MCP safety annotations into Chio side-effect metadata.
+
+### Pain Point
+
+`McpToolInfo` includes a display `title`, but the current manifest projection drops it because `ToolDefinition` has only a `description` field. That loses upstream discovery metadata before the kernel, cross-protocol bridges, CLI surfaces, and LLM-facing tool selectors can see it. The execution plan calls out metadata preservation for wrapped MCP tools; output schemas and annotation-derived side effects are covered, but title is not.
+
+### Security And API Constraints
+
+- Preserve the public `McpToolInfo`, `McpAdapter`, and `ToolDefinition` APIs.
+- Keep schema validation and fail-closed side-effect inference unchanged.
+- Do not add a new manifest field or generated schema change in this adapter slice.
+- Do not preserve raw execution metadata until the manifest format has a typed destination for it.
+
+### Affected Dependents
+
+No downstream Rust API changes. `chio-cli`, `chio-control-plane`, `chio-hosted-mcp`, `chio-mcp-remote`, and cross-protocol bridges receive richer manifest descriptions when wrapped MCP servers advertise titles. Existing description-only tools keep the same description text.
+
+### Planned Improvement
+
+Introduce an internal manifest projection type that validates the MCP tool once, preserves MCP title by folding it into the Chio description, and then emits `ToolDefinition`. This is architectural because it gives `manifest.rs` an explicit admission/projection boundary instead of scattering MCP-field interpretation directly inside `ToolDefinition` construction.
