@@ -45,20 +45,20 @@ impl ChioAcpEdge {
     }
 
     fn parse_jsonrpc_envelope(message: &Value) -> Result<AcpJsonRpcEnvelope, Value> {
-        if message.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
-            return Err(Self::jsonrpc_protocol_error_response(
-                Value::Null,
-                -32600,
-                "invalid jsonrpc envelope",
-            ));
-        }
-
         let id = message.get("id").cloned().unwrap_or(Value::Null);
         if !id.is_string() && !id.is_number() && !id.is_null() {
             return Err(Self::jsonrpc_protocol_error_response(
                 Value::Null,
                 -32600,
                 "request id must be string, number, or null",
+            ));
+        }
+
+        if message.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
+            return Err(Self::jsonrpc_protocol_error_response(
+                id,
+                -32600,
+                "invalid jsonrpc envelope",
             ));
         }
 

@@ -1769,6 +1769,38 @@ mod tests {
     }
 
     #[test]
+    fn jsonrpc_invalid_version_preserves_scalar_request_id() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "test-srv", "read_file"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "1.0",
+                "id": "request-7",
+                "method": "session/list_capabilities",
+                "params": {}
+            }),
+            &kernel,
+            &execution,
+        );
+
+        assert_eq!(response["id"], "request-7");
+        assert_eq!(response["error"]["code"], -32600);
+        assert_eq!(response["error"]["message"], "invalid jsonrpc envelope");
+    }
+
+    #[test]
     fn jsonrpc_compatibility_permission_rejects_non_object_params_before_preview() {
         let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let server = test_server();
