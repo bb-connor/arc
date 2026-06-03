@@ -315,6 +315,11 @@ fn validate_non_empty_protocol_field(
             "invalid {method_name} params: {field_name} must be a non-empty string"
         )));
     }
+    if value.trim() != value || value.chars().any(|character| character.is_control()) {
+        return Err(AcpProxyError::Protocol(format!(
+            "invalid {method_name} params: {field_name} must be a non-empty unpadded string"
+        )));
+    }
     Ok(())
 }
 

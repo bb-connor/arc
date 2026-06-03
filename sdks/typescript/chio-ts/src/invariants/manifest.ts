@@ -60,6 +60,12 @@ const REQUIRED_PERMISSION_FIELDS = [
   "environment_variables",
 ] as const;
 const REQUIRED_PERMISSION_FIELD_SET = new Set<string>(REQUIRED_PERMISSION_FIELDS);
+const PRICING_MODEL_SET = new Set<string>([
+  "flat",
+  "per_invocation",
+  "per_unit",
+  "hybrid",
+]);
 
 function validateManifestStructure(manifest: ToolManifest): boolean {
   if (manifest.schema !== "chio.manifest.v1") {
@@ -78,6 +84,9 @@ function validateManifestStructure(manifest: ToolManifest): boolean {
 
   const seen = new Set<string>();
   for (const tool of manifest.tools) {
+    if (!isJsonObject(tool)) {
+      return false;
+    }
     if (!isValidToolName(tool.name)) {
       return false;
     }
@@ -95,6 +104,9 @@ function validateManifestStructure(manifest: ToolManifest): boolean {
     ) {
       return false;
     }
+    if (!validateToolPricing(tool.pricing)) {
+      return false;
+    }
   }
 
   return validateRequiredPermissions(manifest.required_permissions);
@@ -110,6 +122,82 @@ function isValidToolName(name: unknown): name is string {
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function validateToolPricing(pricing: unknown): boolean {
+  if (pricing === undefined || pricing === null) {
+    return true;
+  }
+  if (!isJsonObject(pricing)) {
+    return false;
+  }
+  const model = pricing.pricing_model;
+  if (typeof model !== "string" || !PRICING_MODEL_SET.has(model)) {
+    return false;
+  }
+  switch (model) {
+    case "flat":
+      if (!requirePricingAmount(pricing.base_price)) {
+        return false;
+      }
+      break;
+    case "per_invocation":
+    case "per_unit":
+      if (!requirePricingAmount(pricing.unit_price) || !isValidManifestTextField(pricing.billing_unit)) {
+        return false;
+      }
+      break;
+    case "hybrid":
+      if (
+        !requirePricingAmount(pricing.base_price) ||
+        !requirePricingAmount(pricing.unit_price) ||
+        !isValidManifestTextField(pricing.billing_unit)
+      ) {
+        return false;
+      }
+      break;
+  }
+  if (!validateOptionalPricingAmount(pricing.base_price)) {
+    return false;
+  }
+  if (!validateOptionalPricingAmount(pricing.unit_price)) {
+    return false;
+  }
+  if (
+    pricing.billing_unit !== undefined &&
+    pricing.billing_unit !== null &&
+    !isValidManifestTextField(pricing.billing_unit)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function requirePricingAmount(amount: unknown): boolean {
+  return amount !== undefined && amount !== null && validatePricingAmount(amount);
+}
+
+function validateOptionalPricingAmount(amount: unknown): boolean {
+  if (amount === undefined || amount === null) {
+    return true;
+  }
+  return validatePricingAmount(amount);
+}
+
+function validatePricingAmount(amount: unknown): boolean {
+  if (!isJsonObject(amount)) {
+    return false;
+  }
+  return (
+    typeof amount.units === "number" &&
+    Number.isSafeInteger(amount.units) &&
+    amount.units >= 0 &&
+    isIso4217CurrencyCode(amount.currency)
+  );
+}
+
+function isIso4217CurrencyCode(currency: unknown): currency is string {
+  return typeof currency === "string" && /^[A-Z]{3}$/.test(currency);
 }
 
 function validateRequiredPermissions(permissions: unknown): boolean {

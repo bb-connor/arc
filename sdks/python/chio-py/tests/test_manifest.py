@@ -17,6 +17,11 @@ def priced_signed_manifest() -> dict[str, Any]:
                     "name": "greet",
                     "description": "Returns a greeting",
                     "input_schema": {"type": "object"},
+                    "pricing": {
+                        "pricing_model": "per_invocation",
+                        "unit_price": {"units": 25, "currency": "USD"},
+                        "billing_unit": "invocation",
+                    },
                     "has_side_effects": False,
                 }
             ],
@@ -77,6 +82,50 @@ def test_manifest_structure_rejects_non_object_tool_schemas() -> None:
     bad_output_schema = priced_signed_manifest()
     bad_output_schema["manifest"]["tools"][0]["output_schema"] = "not an object"
     assert verify_signed_manifest(bad_output_schema)["structure_valid"] is False
+
+
+def test_manifest_structure_rejects_malformed_pricing_metadata() -> None:
+    cases = [
+        (
+            "per_invocation missing unit_price",
+            {"pricing_model": "per_invocation", "billing_unit": "invocation"},
+        ),
+        (
+            "per_unit missing billing_unit",
+            {"pricing_model": "per_unit", "unit_price": {"units": 25, "currency": "USD"}},
+        ),
+        (
+            "hybrid missing base_price",
+            {
+                "pricing_model": "hybrid",
+                "unit_price": {"units": 25, "currency": "USD"},
+                "billing_unit": "document",
+            },
+        ),
+        (
+            "padded billing_unit",
+            {
+                "pricing_model": "per_invocation",
+                "unit_price": {"units": 25, "currency": "USD"},
+                "billing_unit": " invocation",
+            },
+        ),
+        (
+            "invalid currency",
+            {
+                "pricing_model": "per_invocation",
+                "unit_price": {"units": 25, "currency": "usd"},
+                "billing_unit": "invocation",
+            },
+        ),
+    ]
+    for label, pricing in cases:
+        signed_manifest = priced_signed_manifest()
+        signed_manifest["manifest"]["tools"][0]["pricing"] = pricing
+
+        assert (
+            verify_signed_manifest(signed_manifest)["structure_valid"] is False
+        ), label
 
 
 def test_manifest_structure_accepts_valid_required_permissions() -> None:

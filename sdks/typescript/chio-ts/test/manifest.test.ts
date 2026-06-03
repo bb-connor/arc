@@ -110,6 +110,59 @@ test("manifest structure rejects non-object tool schemas", () => {
   assert.equal(verifySignedManifest(badOutputSchema).structure_valid, false);
 });
 
+test("manifest structure rejects non-object tool entries", () => {
+  const signedManifest = pricedSignedManifest();
+  (signedManifest.manifest.tools as unknown[])[0] = null;
+
+  assert.equal(verifySignedManifest(signedManifest).structure_valid, false);
+});
+
+test("manifest structure rejects malformed pricing metadata", () => {
+  for (const [label, pricing] of [
+    [
+      "per_invocation missing unit_price",
+      { pricing_model: "per_invocation", billing_unit: "invocation" },
+    ],
+    [
+      "per_unit missing billing_unit",
+      { pricing_model: "per_unit", unit_price: { units: 25, currency: "USD" } },
+    ],
+    [
+      "hybrid missing base_price",
+      {
+        pricing_model: "hybrid",
+        unit_price: { units: 25, currency: "USD" },
+        billing_unit: "document",
+      },
+    ],
+    [
+      "padded billing_unit",
+      {
+        pricing_model: "per_invocation",
+        unit_price: { units: 25, currency: "USD" },
+        billing_unit: " invocation",
+      },
+    ],
+    [
+      "invalid currency",
+      {
+        pricing_model: "per_invocation",
+        unit_price: { units: 25, currency: "usd" },
+        billing_unit: "invocation",
+      },
+    ],
+  ] as const) {
+    const signedManifest = pricedSignedManifest();
+    (signedManifest.manifest.tools[0] as { pricing?: unknown }).pricing = pricing;
+
+    assert.equal(
+      verifySignedManifest(signedManifest).structure_valid,
+      false,
+      label,
+    );
+  }
+});
+
 test("manifest structure accepts valid required permissions", () => {
   const signedManifest = pricedSignedManifest();
   signedManifest.manifest.required_permissions = {

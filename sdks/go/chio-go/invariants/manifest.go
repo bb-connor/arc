@@ -1,12 +1,23 @@
 package invariants
 
-import "strings"
+import (
+	"encoding/json"
+	"math"
+	"strings"
+)
 
 var requiredPermissionFields = map[string]struct{}{
 	"read_paths":            {},
 	"write_paths":           {},
 	"network_hosts":         {},
 	"environment_variables": {},
+}
+
+var pricingModels = map[string]struct{}{
+	"flat":           {},
+	"per_invocation": {},
+	"per_unit":       {},
+	"hybrid":         {},
 }
 
 type ManifestVerification struct {
@@ -112,6 +123,9 @@ func validateManifestStructure(manifest map[string]any) bool {
 		if outputSchema, exists := tool["output_schema"]; exists && outputSchema != nil && !isJSONObject(outputSchema) {
 			return false
 		}
+		if !validateToolPricing(tool["pricing"]) {
+			return false
+		}
 	}
 	return validateRequiredPermissions(manifest["required_permissions"])
 }
@@ -132,6 +146,101 @@ func isValidToolName(name string) bool {
 func isJSONObject(value any) bool {
 	_, ok := value.(map[string]any)
 	return ok
+}
+
+func validateToolPricing(value any) bool {
+	if value == nil {
+		return true
+	}
+	pricing, ok := value.(map[string]any)
+	if !ok {
+		return false
+	}
+	model, ok := pricing["pricing_model"].(string)
+	if !ok {
+		return false
+	}
+	if _, ok := pricingModels[model]; !ok {
+		return false
+	}
+	switch model {
+	case "flat":
+		if !requirePricingAmount(pricing["base_price"]) {
+			return false
+		}
+	case "per_invocation", "per_unit":
+		if !requirePricingAmount(pricing["unit_price"]) ||
+			!isValidManifestTextField(pricing["billing_unit"]) {
+			return false
+		}
+	case "hybrid":
+		if !requirePricingAmount(pricing["base_price"]) ||
+			!requirePricingAmount(pricing["unit_price"]) ||
+			!isValidManifestTextField(pricing["billing_unit"]) {
+			return false
+		}
+	}
+	if !validateOptionalPricingAmount(pricing["base_price"]) {
+		return false
+	}
+	if !validateOptionalPricingAmount(pricing["unit_price"]) {
+		return false
+	}
+	if billingUnit, exists := pricing["billing_unit"]; exists && billingUnit != nil && !isValidManifestTextField(billingUnit) {
+		return false
+	}
+	return true
+}
+
+func requirePricingAmount(value any) bool {
+	return value != nil && validatePricingAmount(value)
+}
+
+func validateOptionalPricingAmount(value any) bool {
+	if value == nil {
+		return true
+	}
+	return validatePricingAmount(value)
+}
+
+func validatePricingAmount(value any) bool {
+	amount, ok := value.(map[string]any)
+	if !ok {
+		return false
+	}
+	if !isNonNegativeInteger(amount["units"]) {
+		return false
+	}
+	currency, ok := amount["currency"].(string)
+	return ok && isISO4217CurrencyCode(currency)
+}
+
+func isNonNegativeInteger(value any) bool {
+	switch units := value.(type) {
+	case int:
+		return units >= 0
+	case int64:
+		return units >= 0
+	case float64:
+		return units >= 0 && math.Trunc(units) == units
+	case json.Number:
+		parsed, err := units.Int64()
+		return err == nil && parsed >= 0
+	default:
+		return false
+	}
+}
+
+func isISO4217CurrencyCode(currency string) bool {
+	if len(currency) != 3 {
+		return false
+	}
+	for _, char := range currency {
+		if char < 'A' || char > 'Z' {
+			return false
+		}
+	}
+	return true
 }
 
 func validateRequiredPermissions(value any) bool {

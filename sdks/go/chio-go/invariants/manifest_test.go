@@ -16,9 +16,17 @@ func pricedSignedManifest() map[string]any {
 			"version":   "1.0.0",
 			"tools": []any{
 				map[string]any{
-					"name":             "greet",
-					"description":      "Returns a greeting",
-					"input_schema":     map[string]any{"type": "object"},
+					"name":         "greet",
+					"description":  "Returns a greeting",
+					"input_schema": map[string]any{"type": "object"},
+					"pricing": map[string]any{
+						"pricing_model": "per_invocation",
+						"unit_price": map[string]any{
+							"units":    float64(25),
+							"currency": "USD",
+						},
+						"billing_unit": "invocation",
+					},
 					"has_side_effects": false,
 				},
 			},
@@ -122,6 +130,76 @@ func TestManifestStructureRejectsNonObjectToolSchemas(t *testing.T) {
 	}
 	if outputVerification.StructureValid {
 		t.Fatalf("string output_schema must be structurally invalid")
+	}
+}
+
+func TestManifestStructureRejectsMalformedPricingMetadata(t *testing.T) {
+	cases := []struct {
+		label   string
+		pricing map[string]any
+	}{
+		{
+			"per_invocation missing unit_price",
+			map[string]any{"pricing_model": "per_invocation", "billing_unit": "invocation"},
+		},
+		{
+			"per_unit missing billing_unit",
+			map[string]any{
+				"pricing_model": "per_unit",
+				"unit_price": map[string]any{
+					"units":    float64(25),
+					"currency": "USD",
+				},
+			},
+		},
+		{
+			"hybrid missing base_price",
+			map[string]any{
+				"pricing_model": "hybrid",
+				"unit_price": map[string]any{
+					"units":    float64(25),
+					"currency": "USD",
+				},
+				"billing_unit": "document",
+			},
+		},
+		{
+			"padded billing_unit",
+			map[string]any{
+				"pricing_model": "per_invocation",
+				"unit_price": map[string]any{
+					"units":    float64(25),
+					"currency": "USD",
+				},
+				"billing_unit": " invocation",
+			},
+		},
+		{
+			"invalid currency",
+			map[string]any{
+				"pricing_model": "per_invocation",
+				"unit_price": map[string]any{
+					"units":    float64(25),
+					"currency": "usd",
+				},
+				"billing_unit": "invocation",
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.label, func(t *testing.T) {
+			signedManifest := pricedSignedManifest()
+			tool := signedManifest["manifest"].(map[string]any)["tools"].([]any)[0].(map[string]any)
+			tool["pricing"] = tc.pricing
+
+			verification, err := invariants.VerifySignedManifest(signedManifest)
+			if err != nil {
+				t.Fatalf("VerifySignedManifest returned error: %v", err)
+			}
+			if verification.StructureValid {
+				t.Fatalf("%s pricing must be structurally invalid", tc.label)
+			}
+		})
 	}
 }
 
