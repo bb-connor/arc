@@ -36,8 +36,8 @@ pub enum SessionJournalError {
     #[error("session journal lock poisoned")]
     LockPoisoned,
 
-    /// A record field was empty or had surrounding whitespace.
-    #[error("session journal record field {field} must be non-empty and unpadded")]
+    /// A record field was empty, padded, or contained control characters.
+    #[error("session journal record field {field} must be non-empty, unpadded, and control-free")]
     InvalidRecordField { field: &'static str },
 
     /// Hash chain integrity check failed.
@@ -104,7 +104,7 @@ fn compute_entry_hash(entry: &JournalEntry) -> String {
 }
 
 fn validate_record_field(value: &str, field: &'static str) -> Result<(), SessionJournalError> {
-    if value.trim().is_empty() || value.trim() != value {
+    if value.trim().is_empty() || value.trim() != value || value.chars().any(char::is_control) {
         return Err(SessionJournalError::InvalidRecordField { field });
     }
     Ok(())
@@ -459,6 +459,39 @@ mod tests {
             error,
             SessionJournalError::InvalidRecordField { field: "tool_name" }
         ));
+    }
+
+    #[test]
+    fn record_rejects_control_characters_in_identity_fields() {
+        for (field, params) in [
+            {
+                let mut params = test_params("read\nfile");
+                params.server_id = "srv-1".to_string();
+                params.agent_id = "agent-1".to_string();
+                ("tool_name", params)
+            },
+            {
+                let mut params = test_params("read_file");
+                params.server_id = "srv\t1".to_string();
+                params.agent_id = "agent-1".to_string();
+                ("server_id", params)
+            },
+            {
+                let mut params = test_params("read_file");
+                params.server_id = "srv-1".to_string();
+                params.agent_id = "agent\r1".to_string();
+                ("agent_id", params)
+            },
+        ] {
+            let journal = SessionJournal::new(format!("sess-control-{field}"));
+
+            let error = journal.record(params).unwrap_err();
+
+            assert!(matches!(
+                error,
+                SessionJournalError::InvalidRecordField { field: actual } if actual == field
+            ));
+        }
     }
 
     #[test]
