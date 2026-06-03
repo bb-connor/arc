@@ -10,40 +10,40 @@ signing, capability validation, budget mutation, or persistent kernel state.
 
 ## Current Pain Point
 
-The response sanitizer exposes `OutputSanitizerConfig::redaction_strategies`
-for category-level policy. That policy boundary must not apply equally to every
-secret finding. Ordinary built-in detectors can follow category defaults, but
-explicit denylist matches and fail-closed findings are mandatory redaction
-findings. If those findings take the same `SensitiveCategory::Secret` strategy
-path as ordinary detectors, a caller can set `Secret -> Keep` and downgrade a
-forced-redaction match to no redaction. `SanitizerHook` feeds sanitized JSON and
-finding summaries into the post-invocation pipeline, so this boundary is part of
-agent-visible output control rather than local formatting only.
+Guard policy only runs after `action::extract_action` classifies a tool call.
+The classifier recognizes canonical names such as `read_file`, `write_file`,
+`filesystem`, and `fs`, but Chio's ACP bridge uses slash-delimited tools such as
+`fs/read_text_file` and `fs/write_text_file`. Those names can currently fall
+through as generic MCP tools, which means `ForbiddenPathGuard` and
+`PathAllowlistGuard` never see the path-bearing action. The bridge spec already
+treats filesystem-like names as filesystem category inputs, so the built-in
+guard classifier must apply the same boundary before policy evaluation.
 
 ## Security And API Constraints
 
 - Guard evaluation must remain fail-closed for malformed guard configuration.
 - Public guard constructors, config structs, result structs, and re-exports
   must remain compatible.
-- Category-level redaction policy can still weaken ordinary built-in detectors
-  when the caller explicitly chooses that policy, but explicit denylist matches
-  and fail-closed redaction-unavailable findings must not be downgraded.
-- Receipt evidence must never include raw secret material, and sanitizer
-  evidence must remain consistent with the transformed output.
-- Post-invocation behavior must preserve JSON structure and existing
-  `SanitizerHook` integration.
+- Existing canonical tool names must keep their current action classification.
+- Slash-delimited and prefix filesystem tools must not bypass path guards when
+  they carry a `path` argument.
+- Read-like filesystem tools should remain read actions, write/delete/create
+  tools should use write policy, and patch tools should still use patch policy.
+- Unknown tools without filesystem shape must continue to fall back to
+  `McpTool` so `McpToolGuard` allow/block lists still apply.
 
 ## Affected Dependents
 
-The owning-crate change is internal to `chio-guards`. It affects callers that
-install `OutputSanitizer` or `SanitizerHook` directly or through post-invocation
-policy paths. No dependent API change is planned; dependent behavior should
-only become stricter for explicit denylist matches.
+The owning-crate change is internal to `chio-guards`, but it protects callers
+that install `ForbiddenPathGuard` or `PathAllowlistGuard` around ACP-style
+filesystem tools. `chio-acp-proxy` already enforces its own local guard path;
+this slice keeps the shared built-in guard pipeline aligned for kernels that
+receive the same tool names directly. No dependent API change is planned.
 
 ## Implemented Improvement
 
-Redaction strategy selection now sits behind an internal policy boundary that
-distinguish configurable detector recommendations from mandatory denylist and
-fail-closed findings. Regression coverage proves exact and regex denylist
-matches remain redacted even when the caller sets `SensitiveCategory::Secret` to
-`Keep`.
+Move filesystem tool-name classification behind a shared action-extractor
+boundary that understands canonical, prefix, substring, and ACP slash-delimited
+filesystem names. Regression coverage proves `fs/read_text_file` reaches
+`ForbiddenPathGuard`, `fs/write_text_file` reaches write allowlist policy, and
+unknown non-filesystem tools still fall back to MCP classification.

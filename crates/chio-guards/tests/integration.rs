@@ -129,6 +129,23 @@ async fn forbidden_path_blocks_etc_shadow() {
 }
 
 #[tokio::test]
+async fn acp_fs_read_text_file_blocks_etc_shadow() {
+    let (mut kernel, _kp) = make_kernel();
+    kernel.add_guard(Box::new(ForbiddenPathGuard::new()));
+
+    let agent_kp = make_keypair();
+    let req = make_request(
+        &kernel,
+        &agent_kp,
+        "fs/read_text_file",
+        serde_json::json!({"sessionId": "sess-1", "path": "/etc/shadow"}),
+    );
+
+    let resp = kernel.evaluate_tool_call(&req).await.unwrap();
+    assert_eq!(resp.verdict, Verdict::Deny);
+}
+
+#[tokio::test]
 async fn forbidden_path_allows_normal_file() {
     let (mut kernel, _kp) = make_kernel();
     kernel.add_guard(Box::new(ForbiddenPathGuard::new()));

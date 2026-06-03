@@ -64,62 +64,8 @@ impl ToolAction {
 pub fn extract_action(tool_name: &str, arguments: &Value) -> ToolAction {
     let tool = tool_name.to_lowercase();
 
-    // File read tools
-    if matches!(
-        tool.as_str(),
-        "read_file" | "read" | "file_read" | "get_file" | "cat"
-    ) {
-        if let Some(path) = extract_path(arguments) {
-            return ToolAction::FileAccess(path);
-        }
-    }
-
-    // File write tools
-    if matches!(
-        tool.as_str(),
-        "write_file" | "write" | "file_write" | "create_file" | "put_file" | "edit_file" | "edit"
-    ) {
-        if let Some(path) = extract_path(arguments) {
-            let content = string_arg(arguments, &["content"])
-                .unwrap_or("")
-                .as_bytes()
-                .to_vec();
-            return ToolAction::FileWrite(path, content);
-        }
-    }
-
-    // Generic filesystem tools -- disambiguate read vs write by inspecting
-    // the `action` parameter or the presence of `content`.
-    if matches!(tool.as_str(), "filesystem" | "fs" | "file") {
-        if let Some(path) = extract_path(arguments) {
-            let is_write = string_arg(arguments, &["action"])
-                .map(|a| {
-                    let a = a.to_lowercase();
-                    a == "write" || a == "create" || a == "append"
-                })
-                .unwrap_or(false)
-                || arguments.get("content").is_some();
-
-            if is_write {
-                let content = string_arg(arguments, &["content"])
-                    .unwrap_or("")
-                    .as_bytes()
-                    .to_vec();
-                return ToolAction::FileWrite(path, content);
-            } else {
-                return ToolAction::FileAccess(path);
-            }
-        }
-    }
-
-    // Patch / apply diff tools
-    if matches!(tool.as_str(), "apply_patch" | "patch" | "apply_diff") {
-        if let Some(path) = extract_path(arguments) {
-            let diff = string_arg(arguments, &["diff", "patch"])
-                .unwrap_or("")
-                .to_string();
-            return ToolAction::Patch(path, diff);
-        }
+    if let Some(action) = extract_filesystem_action(&tool, arguments) {
+        return action;
     }
 
     // Shell / command execution tools
@@ -333,6 +279,92 @@ fn extract_path(arguments: &Value) -> Option<String> {
     string_arg(arguments, &["path", "file", "file_path", "filename"]).map(String::from)
 }
 
+fn extract_filesystem_action(tool: &str, arguments: &Value) -> Option<ToolAction> {
+    let path = extract_path(arguments)?;
+    let normalized = normalize_tool_name_for_classification(tool);
+
+    if is_patch_tool(&normalized) {
+        let diff = string_arg(arguments, &["diff", "patch"])
+            .unwrap_or("")
+            .to_string();
+        return Some(ToolAction::Patch(path, diff));
+    }
+
+    if is_filesystem_write_tool(&normalized) || filesystem_action_argument_is_write(arguments) {
+        let content = string_arg(arguments, &["content"])
+            .unwrap_or("")
+            .as_bytes()
+            .to_vec();
+        return Some(ToolAction::FileWrite(path, content));
+    }
+
+    if is_filesystem_read_tool(&normalized) || is_filesystem_namespace_tool(&normalized) {
+        return Some(ToolAction::FileAccess(path));
+    }
+
+    None
+}
+
+fn normalize_tool_name_for_classification(tool: &str) -> String {
+    tool.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+fn is_filesystem_read_tool(tool: &str) -> bool {
+    matches!(
+        tool,
+        "read_file" | "read" | "file_read" | "get_file" | "cat"
+    ) || tool.contains("read_file")
+        || tool.contains("read_text_file")
+        || tool.contains("list_dir")
+        || tool.contains("list_directory")
+        || (tool.starts_with("fs_") && (tool.contains("_read") || tool.contains("_stat")))
+}
+
+fn is_filesystem_write_tool(tool: &str) -> bool {
+    matches!(
+        tool,
+        "write_file" | "write" | "file_write" | "create_file" | "put_file" | "edit_file" | "edit"
+    ) || tool.contains("write_file")
+        || tool.contains("write_text_file")
+        || tool.contains("create_file")
+        || tool.contains("delete_file")
+        || tool.contains("remove_file")
+        || (tool.starts_with("fs_")
+            && (tool.contains("_write")
+                || tool.contains("_create")
+                || tool.contains("_append")
+                || tool.contains("_delete")
+                || tool.contains("_remove")))
+}
+
+fn is_patch_tool(tool: &str) -> bool {
+    matches!(tool, "apply_patch" | "patch" | "apply_diff") || tool.contains("apply_patch")
+}
+
+fn is_filesystem_namespace_tool(tool: &str) -> bool {
+    matches!(tool, "filesystem" | "fs" | "file") || tool.starts_with("fs_")
+}
+
+fn filesystem_action_argument_is_write(arguments: &Value) -> bool {
+    string_arg(arguments, &["action"])
+        .map(|action| {
+            matches!(
+                action.to_ascii_lowercase().as_str(),
+                "write" | "create" | "append" | "delete" | "remove"
+            )
+        })
+        .unwrap_or(false)
+        || arguments.get("content").is_some()
+}
+
 fn parse_host_port(url: &str) -> Option<(String, u16)> {
     let url = url.trim();
     if url.is_empty() {
@@ -541,6 +573,13 @@ mod tests {
     }
 
     #[test]
+    fn unknown_tool_with_path_still_becomes_mcp_tool() {
+        let args = serde_json::json!({"path": "/etc/shadow"});
+        let action = extract_action("custom_tool", &args);
+        assert!(matches!(action, ToolAction::McpTool(_, _)));
+    }
+
+    #[test]
     fn filesystem_tool_read_by_default() {
         let args = serde_json::json!({"path": "/etc/shadow"});
         let action = extract_action("filesystem", &args);
@@ -587,6 +626,41 @@ mod tests {
         assert!(
             matches!(action, ToolAction::FileAccess(ref p) if p == "/etc/passwd"),
             "expected FileAccess for fs tool alias, got: {action:?}"
+        );
+    }
+
+    #[test]
+    fn acp_fs_read_text_file_classifies_as_file_access() {
+        let args = serde_json::json!({"path": "/etc/shadow", "sessionId": "sess-1"});
+        let action = extract_action("fs/read_text_file", &args);
+        assert!(
+            matches!(action, ToolAction::FileAccess(ref p) if p == "/etc/shadow"),
+            "expected FileAccess for ACP fs/read_text_file, got: {action:?}"
+        );
+    }
+
+    #[test]
+    fn acp_fs_write_text_file_classifies_as_file_write() {
+        let args = serde_json::json!({
+            "path": "/workspace/out.txt",
+            "content": "hello",
+            "sessionId": "sess-1"
+        });
+        let action = extract_action("fs/write_text_file", &args);
+        assert!(
+            matches!(action, ToolAction::FileWrite(ref p, ref content)
+                if p == "/workspace/out.txt" && content == b"hello"),
+            "expected FileWrite for ACP fs/write_text_file, got: {action:?}"
+        );
+    }
+
+    #[test]
+    fn fs_prefix_stat_classifies_as_file_access() {
+        let args = serde_json::json!({"path": "/workspace/file.txt"});
+        let action = extract_action("fs_stat", &args);
+        assert!(
+            matches!(action, ToolAction::FileAccess(ref p) if p == "/workspace/file.txt"),
+            "expected FileAccess for fs_stat, got: {action:?}"
         );
     }
 

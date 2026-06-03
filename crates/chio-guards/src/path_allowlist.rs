@@ -375,6 +375,61 @@ mod tests {
         assert_eq!(result, Verdict::Deny);
     }
 
+    #[test]
+    fn evaluate_denies_acp_write_text_file_outside_allowlist() {
+        let guard = PathAllowlistGuard::with_config(enabled_config(
+            vec!["**/repo/**"],
+            vec!["**/repo/**"],
+            vec![],
+        ));
+
+        let kp = chio_core::crypto::Keypair::generate();
+        let scope = chio_core::capability::ChioScope::default();
+        let agent_id = kp.public_key().to_hex();
+        let server_id = "srv-test".to_string();
+
+        let cap_body = chio_core::capability::CapabilityTokenBody {
+            id: "cap-test".to_string(),
+            issuer: kp.public_key(),
+            subject: kp.public_key(),
+            scope: scope.clone(),
+            issued_at: 0,
+            expires_at: u64::MAX,
+            delegation_chain: vec![],
+        };
+        let cap = chio_core::capability::CapabilityToken::sign(cap_body, &kp).expect("sign cap");
+
+        let request = chio_kernel::ToolCallRequest {
+            request_id: "req-test".to_string(),
+            capability: cap,
+            tool_name: "fs/write_text_file".to_string(),
+            server_id: server_id.clone(),
+            agent_id: agent_id.clone(),
+            arguments: serde_json::json!({
+                "sessionId": "sess-1",
+                "path": "/etc/passwd",
+                "content": "bad"
+            }),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        };
+
+        let ctx = chio_kernel::GuardContext {
+            request: &request,
+            scope: &scope,
+            agent_id: &agent_id,
+            server_id: &server_id,
+            session_filesystem_roots: None,
+            matched_grant_index: None,
+        };
+
+        let result = guard.evaluate(&ctx).expect("evaluate should not error");
+        assert_eq!(result, Verdict::Deny);
+    }
+
     #[cfg(unix)]
     #[test]
     fn symlink_escape_outside_allowlist_is_denied() {
