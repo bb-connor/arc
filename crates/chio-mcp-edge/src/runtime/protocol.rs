@@ -1033,12 +1033,13 @@ pub(super) fn pump_client_messages<R: BufRead>(
                 return;
             }
             Err(error) => {
+                let stop_after_send = matches!(error, AdapterError::ConnectionFailed(_));
                 let inbound = match error {
                     AdapterError::ConnectionFailed(message) => ClientInbound::ReadError(message),
                     AdapterError::ParseError(message) => ClientInbound::ParseError(message),
                     other => ClientInbound::ParseError(other.to_string()),
                 };
-                if sender.send(inbound).is_err() {
+                if sender.send(inbound).is_err() || stop_after_send {
                     return;
                 }
             }
@@ -1247,6 +1248,9 @@ pub(super) fn matches_name(pattern: &str, tool_name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::io::{self, Read};
+    use std::time::Duration;
+
     use super::*;
 
     #[test]
@@ -1345,6 +1349,56 @@ mod tests {
             "jsonrpc": "2.0",
             "method": "notifications/cancelled"
         })));
+    }
+
+    #[derive(Default)]
+    struct OneErrorThenEofReader {
+        emitted_error: bool,
+    }
+
+    impl Read for OneErrorThenEofReader {
+        fn read(&mut self, _buf: &mut [u8]) -> io::Result<usize> {
+            Ok(0)
+        }
+    }
+
+    impl BufRead for OneErrorThenEofReader {
+        fn fill_buf(&mut self) -> io::Result<&[u8]> {
+            if self.emitted_error {
+                Ok(&[])
+            } else {
+                self.emitted_error = true;
+                Err(io::Error::other("synthetic reader failure"))
+            }
+        }
+
+        fn consume(&mut self, _amt: usize) {}
+    }
+
+    #[test]
+    fn pump_client_messages_stops_after_read_error() {
+        let (sender, receiver) = mpsc::channel();
+        let (cancel_sender, _cancel_receiver) = mpsc::channel();
+
+        pump_client_messages(OneErrorThenEofReader::default(), sender, cancel_sender);
+
+        match receiver
+            .recv_timeout(Duration::from_millis(100))
+            .unwrap_or_else(|error| panic!("expected read error from pump: {error}"))
+        {
+            ClientInbound::ReadError(message) => {
+                assert!(message.contains("synthetic reader failure"));
+            }
+            ClientInbound::Message(_) => panic!("expected read error, got message"),
+            ClientInbound::ParseError(message) => {
+                panic!("expected read error, got parse error: {message}")
+            }
+            ClientInbound::Closed => panic!("expected read error, got closed"),
+        }
+        assert!(
+            receiver.recv_timeout(Duration::from_millis(50)).is_err(),
+            "pump should close after read error without emitting EOF"
+        );
     }
 
     #[test]

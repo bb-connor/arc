@@ -149,7 +149,7 @@ rules:
 }
 
 #[test]
-fn default_allow_with_selective_human_in_loop_confirmation_stays_permissive() {
+fn default_allow_with_selective_human_in_loop_confirmation_fails_closed() {
     let compiled = compile(
         r#"
 hushspec: "0.1.0"
@@ -163,8 +163,7 @@ rules:
 "#,
     );
 
-    assert_eq!(compiled.default_scope.grants.len(), 1);
-    assert_eq!(compiled.default_scope.grants[0].tool_name, "*");
+    assert!(compiled.default_scope.grants.is_empty());
     assert_eq!(approval_thresholds(&compiled), Vec::<u64>::new());
 }
 

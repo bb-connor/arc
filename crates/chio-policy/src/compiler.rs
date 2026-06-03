@@ -654,6 +654,9 @@ fn compile_scope(policy: &HushSpec) -> Result<ChioScope, CompileError> {
     let human_in_loop = rules.human_in_loop.as_ref();
 
     if ta.default == DefaultAction::Allow {
+        if default_allow_has_unrepresentable_selective_confirmation(ta, human_in_loop) {
+            return Ok(ChioScope::default());
+        }
         if tool_access_can_safely_widen_to_wildcard(ta, human_in_loop) {
             return Ok(permissive_scope());
         }
@@ -764,12 +767,22 @@ fn tool_access_can_safely_widen_to_wildcard(
 ) -> bool {
     rule.allow.is_empty()
         && rule.block.is_empty()
-        && !confirmation_applies_to_all_tools(&rule.require_confirmation)
+        && rule.require_confirmation.is_empty()
         && rule.max_args_size.is_none()
         && rule.require_runtime_assurance_tier.is_none()
         && rule.require_workload_identity.is_none()
         && rule.prefer_workload_identity.is_none()
         && !human_in_loop_requires_scope_constraints(human_in_loop)
+}
+
+fn default_allow_has_unrepresentable_selective_confirmation(
+    rule: &ToolAccessRule,
+    human_in_loop: Option<&HumanInLoopRule>,
+) -> bool {
+    confirmation_requires_selective_scope(&rule.require_confirmation)
+        || human_in_loop.is_some_and(|rule| {
+            rule.enabled && confirmation_requires_selective_scope(&rule.require_confirmation)
+        })
 }
 
 fn human_in_loop_requires_scope_constraints(human_in_loop: Option<&HumanInLoopRule>) -> bool {
@@ -782,6 +795,10 @@ fn human_in_loop_requires_scope_constraints(human_in_loop: Option<&HumanInLoopRu
 
 fn confirmation_applies_to_all_tools(patterns: &[String]) -> bool {
     patterns.iter().any(|pattern| pattern == "*")
+}
+
+fn confirmation_requires_selective_scope(patterns: &[String]) -> bool {
+    !patterns.is_empty() && !confirmation_applies_to_all_tools(patterns)
 }
 
 fn tool_access_can_emit_constrained_wildcard(
@@ -1553,7 +1570,7 @@ rules:
     }
 
     #[test]
-    fn compile_tool_access_default_allow_selective_confirmation_stays_permissive() {
+    fn compile_tool_access_default_allow_selective_confirmation_fails_closed() {
         let spec = HushSpec::parse(
             r#"
 hushspec: "0.1.0"
@@ -1567,11 +1584,7 @@ rules:
         .unwrap();
         let compiled = compile_policy(&spec).unwrap();
 
-        assert_eq!(compiled.default_scope.grants.len(), 1);
-        let grant = &compiled.default_scope.grants[0];
-        assert_eq!(grant.server_id, "*");
-        assert_eq!(grant.tool_name, "*");
-        assert!(grant.constraints.is_empty());
+        assert!(compiled.default_scope.grants.is_empty());
     }
 
     #[test]
@@ -1622,8 +1635,7 @@ rules:
     }
 
     #[test]
-    fn compile_tool_access_default_allow_max_args_size_ignores_selective_confirmation_on_wildcard()
-    {
+    fn compile_tool_access_default_allow_max_args_size_with_selective_confirmation_fails_closed() {
         let spec = HushSpec::parse(
             r#"
 hushspec: "0.1.0"
@@ -1638,11 +1650,7 @@ rules:
         .unwrap();
         let compiled = compile_policy(&spec).unwrap();
 
-        assert_eq!(compiled.default_scope.grants.len(), 1);
-        let grant = &compiled.default_scope.grants[0];
-        assert_eq!(grant.server_id, "*");
-        assert_eq!(grant.tool_name, "*");
-        assert_eq!(grant.constraints, vec![Constraint::MaxArgsSize(2048)]);
+        assert!(compiled.default_scope.grants.is_empty());
     }
 
     #[test]

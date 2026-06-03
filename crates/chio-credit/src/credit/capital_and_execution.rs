@@ -495,6 +495,12 @@ pub fn validate_capital_execution_envelope(
                 "capital execution authorityChain requires approvedAt <= expiresAt".to_string(),
             );
         }
+        if step.approved_at > issued_at {
+            return Err(format!(
+                "capital execution authority step `{}` approvedAt is after instruction issuance",
+                step.principal_id
+            ));
+        }
         if step.expires_at < issued_at {
             return Err(format!(
                 "capital execution authority step `{}` is stale at issuance time",
@@ -1268,6 +1274,23 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("stale"));
+    }
+
+    #[test]
+    fn capital_execution_envelope_rejects_future_dated_authority_approval() {
+        let mut artifact = valid_capital_instruction_artifact();
+        artifact.authority_chain[0].approved_at = artifact.issued_at + 1;
+
+        let error = validate_capital_execution_envelope(
+            &artifact.authority_chain,
+            &artifact.execution_window,
+            &artifact.rail,
+            artifact.issued_at,
+        )
+        .unwrap_err();
+
+        assert!(error.contains("approvedAt"));
+        assert!(error.contains("after instruction issuance"));
     }
 
     #[test]
