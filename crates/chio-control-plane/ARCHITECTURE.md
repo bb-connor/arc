@@ -111,6 +111,13 @@ start.
 Use a shared internal secret validator for service startup and client
 construction. Add startup-config regressions proving padded `service_token` and
 tenant read-token ids and values fail closed at `TrustServiceConfig::validate`.
+Extend the same startup boundary to reject control characters in tenant
+read-token ids and values before they enter service state or bearer-token
+comparison.
+Keep service-auth and public trust-control clients on separate constructors:
+`build_client` continues to require validated service bearer material, while
+`build_public_client` reuses the same endpoint normalization for intentionally
+unauthenticated public endpoints.
 
 ## Cluster Peer URL Boundary Slice
 

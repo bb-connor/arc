@@ -255,6 +255,11 @@ impl TrustServiceConfig {
                     "tenant read token id must not contain surrounding whitespace".to_string(),
                 ));
             }
+            if tenant_id.chars().any(char::is_control) {
+                return Err(CliError::cli_other_error(
+                    "tenant read token id must not contain control characters".to_string(),
+                ));
+            }
             let token_label = format!("tenant read token for `{tenant_id}`");
             validate_control_secret(token, &token_label)?;
             if token == &self.service_token {
@@ -281,6 +286,11 @@ pub(crate) fn validate_control_secret(secret: &str, label: &str) -> Result<(), C
     if secret.trim() != secret {
         return Err(CliError::cli_other_error(format!(
             "{label} must not contain surrounding whitespace"
+        )));
+    }
+    if secret.chars().any(char::is_control) {
+        return Err(CliError::cli_other_error(format!(
+            "{label} must not contain control characters"
         )));
     }
     Ok(())
@@ -383,6 +393,29 @@ mod service_config_tests {
                     .to_string()
                     .contains("tenant read token id must not contain surrounding whitespace"),
                 "unexpected error for tenant id `{tenant_id:?}`: {error}",
+            );
+        }
+    }
+
+    #[test]
+    fn trust_service_config_rejects_control_bearing_tenant_read_tokens_at_startup() {
+        for (tenant_id, token) in [
+            ("tenant-\na", "tenant-token"),
+            ("tenant-a", "tenant\u{7f}token"),
+        ] {
+            let mut config = base_config();
+            config
+                .tenant_read_tokens
+                .insert(tenant_id.to_string(), token.to_string());
+
+            let error = match config.validate() {
+                Ok(()) => panic!("control-bearing tenant read token should fail closed at startup"),
+                Err(error) => error,
+            };
+
+            assert!(
+                error.to_string().contains("control characters"),
+                "unexpected error for tenant token mapping `{tenant_id:?}`: {error}",
             );
         }
     }

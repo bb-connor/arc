@@ -575,7 +575,16 @@ pub fn build_client(
     control_url: &str,
     control_token: &str,
 ) -> Result<TrustControlClient, CliError> {
-    build_client_with_cluster_peer(control_url, control_token, None)
+    build_client_with_cluster_peer(
+        control_url,
+        control_token,
+        None,
+        ControlClientAuthKind::Service,
+    )
+}
+
+pub fn build_public_client(control_url: &str) -> Result<TrustControlClient, CliError> {
+    build_client_with_cluster_peer(control_url, "", None, ControlClientAuthKind::Public)
 }
 
 pub(crate) fn build_cluster_peer_client(
@@ -589,15 +598,25 @@ pub(crate) fn build_cluster_peer_client(
         Some(ClusterPeerClientAuth {
             node_id: Arc::<str>::from(normalize_cluster_url(node_id)?),
         }),
+        ControlClientAuthKind::Service,
     )
+}
+
+#[derive(Clone, Copy)]
+enum ControlClientAuthKind {
+    Service,
+    Public,
 }
 
 fn build_client_with_cluster_peer(
     control_url: &str,
     control_token: &str,
     cluster_peer_auth: Option<ClusterPeerClientAuth>,
+    auth_kind: ControlClientAuthKind,
 ) -> Result<TrustControlClient, CliError> {
-    validate_control_token(control_token)?;
+    if matches!(auth_kind, ControlClientAuthKind::Service) {
+        validate_control_token(control_token)?;
+    }
     let endpoints = control_url
         .split(',')
         .map(str::trim)
@@ -4235,6 +4254,34 @@ mod service_runtime_tests {
             assert!(
                 error.to_string().contains("control token"),
                 "unexpected error for token `{token:?}`: {error}",
+            );
+        }
+    }
+
+    #[test]
+    fn build_public_client_allows_empty_token_for_public_endpoints_and_keeps_endpoint_validation() {
+        let client = build_public_client(" http://one/ , http://two// ,,")
+            .test_expect("build public client with normalized endpoints");
+        assert_eq!(
+            client.endpoints.as_ref(),
+            &vec!["http://one".to_string(), "http://two".to_string()]
+        );
+        assert_eq!(client.token.as_ref(), "");
+
+        for endpoint in [
+            " , , ",
+            "not-a-url",
+            "https://user:pass@control.example.test",
+            "https://control.example.test?token=secret",
+            "https://control.example.test#fragment",
+        ] {
+            let error = match build_public_client(endpoint) {
+                Ok(_) => panic!("malformed or ambiguous public control endpoint should fail"),
+                Err(error) => error,
+            };
+            assert!(
+                error.to_string().contains("control URL"),
+                "unexpected error for public endpoint `{endpoint}`: {error}",
             );
         }
     }
