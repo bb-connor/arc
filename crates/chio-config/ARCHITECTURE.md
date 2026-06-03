@@ -21,17 +21,7 @@ deserialization, defaults, and validation have all succeeded.
 - `fuzz` is feature-gated and drives arbitrary bytes through the same loader
   path without adding production dependencies.
 
-## Pain Points
-
-- The loader currently uses the same raw interpolation function as general
-  string callers, even though loader interpolation happens before YAML parsing.
-- Raw environment values can therefore affect YAML syntax if a replacement
-  contains line breaks, quote delimiters, comment markers, or surrounding
-  whitespace.
-- Validation is correctly typed and aggregate, but it only runs after YAML has
-  already accepted the interpolated document.
-
-## Security And API Constraints
+## Trust Invariants
 
 - Existing public API entry points must remain compatible:
   `load_from_file`, `load_from_str`, `interpolation::interpolate`, schema
@@ -43,26 +33,14 @@ deserialization, defaults, and validation have all succeeded.
 - Loader interpolation must not let environment variables or defaults inject
   new YAML structure, truncate scalar values through comments, or break quoted
   strings.
+- Raw `interpolation::interpolate` remains compatibility-oriented; only
+  `loader::load_from_str` applies YAML-scalar-safe interpolation.
 - Validation must keep returning all detected semantic errors in one pass.
+- Bearer and API-key auth headers must be present, non-empty, and unpadded.
 - The `fuzz` feature must remain optional and must not affect production
   dependencies.
 
-## Affected Dependents
-
-Direct dependents include `chio-wasm-guards`; downstream consumers include
-`chio-cli`, e2e tests, `chio-conformance`, `chio-control-plane`,
-`chio-hosted-mcp`, `chio-mcp-remote`, `chio-mercury`, and `chio-wall`.
-The planned change is additive at the public API level and should not require
-dependent source edits.
-
-## Planned Improvement
-
-Introduce a loader-specific interpolation boundary. Keep
-`interpolation::interpolate` as the raw compatibility function, but make
-`loader::load_from_str` call a stricter interpolation path that rejects
-replacement values capable of changing YAML syntax before deserialization.
-
-This is architectural because it separates general string interpolation from
-trusted config ingestion and moves a security invariant to the earliest point
-in the load lifecycle:
+The loader separates general string interpolation from trusted config
+ingestion and moves the YAML-scalar safety invariant to the earliest point in
+the load lifecycle:
 raw config -> loader-safe interpolation -> YAML deserialization -> validation.

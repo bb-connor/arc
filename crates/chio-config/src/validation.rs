@@ -103,6 +103,18 @@ fn validate_single_auth(adapter_id: &str, auth: &AdapterAuthConfig, errors: &mut
         return;
     }
 
+    if let Some(header) = auth.header.as_deref() {
+        if header.trim().is_empty() {
+            errors.push(format!(
+                "adapter \"{adapter_id}\": auth header must not be empty"
+            ));
+        } else if header.trim() != header {
+            errors.push(format!(
+                "adapter \"{adapter_id}\": auth header must not contain surrounding whitespace"
+            ));
+        }
+    }
+
     // bearer and api_key require a header field.
     if (auth.auth_type == "bearer" || auth.auth_type == "api_key") && auth.header.is_none() {
         errors.push(format!(
@@ -142,8 +154,12 @@ fn validate_logging(config: &ChioConfig, errors: &mut Vec<String>) {
 
 #[cfg(test)]
 mod tests {
+    use std::error::Error;
+
     use super::*;
     use crate::schema::*;
+
+    type TestResult = Result<(), Box<dyn Error>>;
 
     /// Helper to build a minimal valid config.
     fn minimal_config() -> ChioConfig {
@@ -257,6 +273,33 @@ mod tests {
             }
             other => panic!("wrong error: {other}"),
         }
+    }
+
+    #[test]
+    fn bearer_auth_blank_or_padded_header_rejected() -> TestResult {
+        for auth_type in ["bearer", "api_key"] {
+            for header in ["", " Authorization"] {
+                let mut config = minimal_config();
+                config.adapters[0].auth = Some(AdapterAuthConfig {
+                    auth_type: auth_type.to_string(),
+                    header: Some(header.to_string()),
+                });
+
+                let err = validation_error(validate(&config));
+                let ConfigError::Validation(errors) = err else {
+                    return Err(std::io::Error::other(format!(
+                        "wrong error variant for {auth_type} header {header:?}: {err}"
+                    ))
+                    .into());
+                };
+
+                assert!(
+                    errors.iter().any(|error| error.contains("auth header")),
+                    "should mention invalid {auth_type} auth header for {header:?}: {errors:?}"
+                );
+            }
+        }
+        Ok(())
     }
 
     #[test]
