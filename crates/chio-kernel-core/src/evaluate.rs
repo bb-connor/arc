@@ -41,8 +41,8 @@ use chio_core_types::crypto::PublicKey;
 
 use crate::budget_split::{BudgetRegistry, NoopBudgetRegistry};
 use crate::capability_verify::{
-    verify_capability_full, verify_capability_with_floor, CapabilityError, TrustRootResolver,
-    VerifiedCapability,
+    admit_delegated_budget, verify_capability_full, verify_capability_with_floor, CapabilityError,
+    TrustRootResolver, VerifiedCapability,
 };
 use crate::clock::Clock;
 use crate::guard::{Guard, GuardContext, PortableToolCallRequest};
@@ -419,25 +419,6 @@ fn finish_verified_evaluation(
         matched_grant_index: Some(matched_grant_index),
         verified: Some(verified),
     }
-}
-
-fn admit_delegated_budget(
-    capability: &CapabilityToken,
-    budgets: &mut dyn BudgetRegistry,
-) -> Result<(), CapabilityError> {
-    if let Some(parent_link) = capability.delegation_chain.last() {
-        let proposed_share = capability
-            .budget_share_bps
-            .unwrap_or(crate::budget_split::MAX_BUDGET_SHARE_BPS);
-        budgets
-            .try_admit_child(
-                parent_link.capability_id.as_str(),
-                capability.id.clone(),
-                proposed_share,
-            )
-            .map_err(CapabilityError::BudgetSplitRejected)?;
-    }
-    Ok(())
 }
 
 fn deny(

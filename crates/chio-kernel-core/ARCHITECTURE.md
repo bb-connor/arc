@@ -46,25 +46,38 @@ feature gated.
 
 ## Current Pain Points
 
-The hot path has two public evaluation entry points: the legacy
-floor-aware path and the current full-semantics path. They differ in capability
-verification, but after a capability is verified they must perform the same
-subject binding, scope match, guard pipeline, and deferred budget admission.
-That post-verification sequence is security-critical because ordering prevents
-invalid subjects, out-of-scope calls, and guard-denied calls from consuming
-delegated sibling budget.
+The hot path now has one shared post-verification boundary for subject binding,
+scope matching, guard ordering, and deferred delegated-budget admission. That
+removed the prior duplicated ordering risk.
 
-That sequence is currently duplicated. Any future fix in one branch can drift
-from the other branch and silently weaken fail-closed ordering for browser,
-mobile, FFI, or hosted callers.
+The remaining verification-ordering risk is inside the full capability
+verifier. `verify_capability_full` owns the current production semantics for
+browser, mobile, C++ FFI, AG-UI proxy, and hosted kernel callers, but it runs
+chain-binding checks before the base verifier has proven issuer trust,
+signature validity, crypto-floor compliance, or token time bounds. The result is
+still fail-closed, but untrusted, forged, or expired attenuated tokens can reach
+the trust-root resolver and can be reported as chain-binding failures instead of
+the more fundamental admission failure.
+
+That ordering is a poor security boundary for the portable TCB. The verifier
+should prove base token admissibility first, then check chain binding, then
+mutate sibling-budget state last. This preserves public API compatibility while
+making the verifier phases explicit enough that downstream portable adapters do
+not accidentally grow resolver work or budget mutation before signature and time
+admission.
 
 ## Improvement In This Slice
 
-Move the post-verification evaluation sequence behind one internal boundary
-used by both public evaluation entry points. Capability verification remains
-separate because the entry points intentionally accept different trust-root and
-feature-negotiation inputs. Subject binding, scope matching, guard ordering,
-and budget admission become one shared implementation.
+Refactor full capability verification into explicit internal phases:
 
-No public API or wire format changes are planned. No dependent crates should
-need edits unless they rely on behavior that contradicts the existing ordering.
+- base verification: issuer trust, signature, crypto floor, and time window
+- chain-binding verification: negotiated feature gate and issuer trust-root
+  binding, only after base verification succeeds
+- sibling-budget admission: last, only after the signed token and its binding are
+  acceptable
+
+Add focused regressions proving untrusted, signature-invalid, and expired
+attenuated tokens stop at the base verifier and do not call the trust-root
+resolver. No public API, wire format, canonical JSON, or dependent crate changes
+are planned. Dependent gates should only need to prove the existing callers still
+compile and preserve the same successful verification paths.
