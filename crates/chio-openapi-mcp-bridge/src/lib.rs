@@ -891,6 +891,32 @@ mod tests {
     }
 
     #[test]
+    fn bridge_rejects_declared_path_parameter_missing_from_template() {
+        let spec = r#"{
+            "openapi": "3.0.3",
+            "info": { "title": "Bad API", "version": "1" },
+            "paths": {
+                "/pets": {
+                    "get": {
+                        "operationId": "getPet",
+                        "parameters": [
+                            { "name": "petId", "in": "path", "required": true, "schema": { "type": "string" } }
+                        ],
+                        "responses": { "200": { "description": "OK" } }
+                    }
+                }
+            }
+        }"#;
+
+        let error = match OpenApiMcpBridge::from_spec(spec, petstore_config()) {
+            Ok(_) => panic!("bridge should reject unused declared path parameters"),
+            Err(error) => error,
+        };
+
+        assert!(format!("{error}").contains("declares unused path parameter `petId`"));
+    }
+
+    #[test]
     fn bridge_dispatcher_rejects_redirect_responses() {
         let mut bridge =
             OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config_with_egress()).unwrap();

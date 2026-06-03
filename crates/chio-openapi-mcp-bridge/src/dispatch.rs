@@ -110,10 +110,22 @@ fn validate_path_template_parameters(path: &str, params: &[Parameter]) -> Result
         .filter(|param| param.location == ParameterLocation::Path)
         .map(|param| param.name.as_str())
         .collect();
-    for name in route_path_parameter_names(path)? {
+    let template_path_parameters = route_path_parameter_names(path)?;
+    let template_path_parameter_set: BTreeSet<&str> = template_path_parameters
+        .iter()
+        .map(String::as_str)
+        .collect();
+    for name in &template_path_parameters {
         if !declared_path_parameters.contains(name.as_str()) {
             return Err(BridgeError::UpstreamError(format!(
                 "OpenAPI bridge route path `{path}` contains undeclared path parameter `{name}`"
+            )));
+        }
+    }
+    for name in declared_path_parameters {
+        if !template_path_parameter_set.contains(name) {
+            return Err(BridgeError::UpstreamError(format!(
+                "OpenAPI bridge route path `{path}` declares unused path parameter `{name}`"
             )));
         }
     }

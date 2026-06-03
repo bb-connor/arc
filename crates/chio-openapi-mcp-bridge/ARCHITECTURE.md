@@ -40,6 +40,28 @@ make redirect handling explicit at the bridge boundary. Live dispatchers must
 surface redirects as responses instead of following them internally, and the
 bridge must reject redirect statuses before returning a tool result.
 
+## Path Parameter Closure Slice
+
+### Current Boundary
+
+`dispatch.rs` validates route templates before building `RouteDispatch` records.
+It already fails closed when a `{placeholder}` in the path is not declared as an
+OpenAPI `in: path` parameter.
+
+### Pain Point
+
+The inverse check is still missing: a path-level or operation-level `in: path`
+parameter can be declared without appearing in the route template. The generated
+manifest then requires an input field that live URL construction ignores. That
+is schema-to-dispatch drift at the bridge trust boundary.
+
+### Completed Material Improvement
+
+Reject any declared path parameter that is not present in the route template
+before publishing the manifest or dispatch table. Keep public `RouteBinding`
+and response shapes unchanged, and prove the bridge fails closed before
+creating a route binding for the malformed spec.
+
 ## Required Query Dispatch Slice
 
 ### Current Boundary
