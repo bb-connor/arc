@@ -408,9 +408,32 @@ fn workload_identity_matches(
             || expected
                 .path_prefixes
                 .iter()
-                .any(|prefix| actual.path.starts_with(prefix)))
+                .any(|prefix| workload_identity_path_matches_prefix(prefix, &actual.path)))
         && (expected.credential_kinds.is_empty()
             || expected.credential_kinds.contains(&actual.credential_kind))
+}
+
+fn workload_identity_path_matches_prefix(expected_prefix: &str, actual_path: &str) -> bool {
+    if !actual_path.starts_with('/') || actual_path.contains("//") {
+        return false;
+    }
+
+    let prefix = if expected_prefix == "/" {
+        expected_prefix
+    } else {
+        expected_prefix.trim_end_matches('/')
+    };
+    if prefix == "/" {
+        return true;
+    }
+    if prefix.is_empty() || !prefix.starts_with('/') || prefix.contains("//") {
+        return false;
+    }
+
+    actual_path == prefix
+        || actual_path
+            .strip_prefix(prefix)
+            .is_some_and(|suffix| suffix.starts_with('/'))
 }
 
 fn evaluate_egress(

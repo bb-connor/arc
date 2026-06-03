@@ -118,6 +118,55 @@ mod tests {
         }
     }
 
+    fn workload_identity_spec_with_path_prefixes(path_prefixes: Vec<&str>) -> HushSpec {
+        spec_with_rules(Rules {
+            tool_access: Some(ToolAccessRule {
+                enabled: true,
+                allow: vec!["payments.charge".to_string()],
+                block: Vec::new(),
+                require_confirmation: Vec::new(),
+                default: DefaultAction::Allow,
+                max_args_size: None,
+                require_runtime_assurance_tier: None,
+                prefer_runtime_assurance_tier: None,
+                require_workload_identity: Some(WorkloadIdentityMatch {
+                    scheme: Some(WorkloadIdentityScheme::Spiffe),
+                    trust_domain: Some("prod.chio".to_string()),
+                    path_prefixes: path_prefixes
+                        .into_iter()
+                        .map(str::to_string)
+                        .collect(),
+                    credential_kinds: vec![WorkloadCredentialKind::X509Svid],
+                }),
+                prefer_workload_identity: None,
+            }),
+            ..Rules::default()
+        })
+    }
+
+    fn workload_identity_tool_call(path: &str) -> EvaluationAction {
+        EvaluationAction {
+            action_type: "tool_call".to_string(),
+            target: Some("payments.charge".to_string()),
+            content: None,
+            origin: None,
+            posture: None,
+            args_size: None,
+            runtime_attestation: Some(RuntimeAttestationContext {
+                tier: RuntimeAssuranceTier::Verified,
+                valid: true,
+                verifier: Some("verifier.chio".to_string()),
+                workload_identity: Some(WorkloadIdentity {
+                    scheme: WorkloadIdentityScheme::Spiffe,
+                    credential_kind: WorkloadCredentialKind::X509Svid,
+                    uri: format!("spiffe://prod.chio{path}"),
+                    trust_domain: "prod.chio".to_string(),
+                    path: path.to_string(),
+                }),
+            }),
+        }
+    }
+
     #[test]
     fn enterprise_origin_matches_provider_tenant_and_organization_exactly() {
         let spec = enterprise_origin_spec(vec![origin_profile(
@@ -688,6 +737,29 @@ mod tests {
                 .as_deref()
                 .is_some_and(|reason| reason.contains("workload identity")),
             "expected workload-identity denial reason"
+        );
+    }
+
+    #[test]
+    fn tool_access_workload_identity_requirement_allows_exact_and_child_segment_prefixes() {
+        let exact_spec = workload_identity_spec_with_path_prefixes(vec!["/payments"]);
+        let exact_result = evaluate(&exact_spec, &workload_identity_tool_call("/payments"));
+        assert_eq!(exact_result.decision, Decision::Allow);
+
+        let child_spec = workload_identity_spec_with_path_prefixes(vec!["/payments/"]);
+        let child_result = evaluate(&child_spec, &workload_identity_tool_call("/payments/worker"));
+        assert_eq!(child_result.decision, Decision::Allow);
+    }
+
+    #[test]
+    fn tool_access_workload_identity_requirement_denies_sibling_prefix_confusion() {
+        let spec = workload_identity_spec_with_path_prefixes(vec!["/payments"]);
+        let result = evaluate(&spec, &workload_identity_tool_call("/payments-v2/worker"));
+
+        assert_eq!(result.decision, Decision::Deny);
+        assert_eq!(
+            result.matched_rule.as_deref(),
+            Some("rules.tool_access.require_workload_identity")
         );
     }
 

@@ -18,38 +18,41 @@
 
 ## Current Pain Point
 
-`rules.secret_patterns` feeds two downstream enforcement paths: pre-invocation
-`SecretLeakGuard` configuration and post-invocation `SanitizerHook` denylist
-configuration. The compiler can only preserve policy intent if validation has
-already rejected ambiguous pattern shape. Blank pattern names must not reach
-guard materialization because they create empty evidence names. Regex
-diagnostics must also stay independent from caller-controlled names; otherwise
-an invalid or blank name can collapse a validation path to unstable strings such
-as `rules.secret_patterns.patterns.`.
+`rules.tool_access.require_workload_identity.path_prefixes` is a policy
+admission boundary for SPIFFE/SVID-style runtime identities. The evaluator
+currently treats configured path prefixes as raw strings, so a policy prefix
+such as `/payments` can also match a sibling workload path such as
+`/payments-v2/worker`. That silently widens runtime identity admission beyond
+the path segment the operator named. The compiler already fails closed for
+workload-identity requirements when building default scopes because capability
+grants cannot encode that predicate, so the reference evaluator is the owning
+boundary that must preserve the identity semantics.
 
 ## Security And API Constraints
 
 - Invalid HushSpec documents must reject before guard or scope materialization.
 - Public parser, validator, compiler, and evaluator APIs should remain
   compatible.
-- Secret pattern names must be non-empty before guard evidence can reference
-  them.
-- Secret pattern regex diagnostics should use stable array indices rather than
-  caller-controlled names, especially when the name itself is invalid.
-- Existing regex safety, guard ordering, sanitizer denylist projection,
-  posture checks, conditions, and default-scope compilation must remain stable
-  unless a test proves the current behavior drops policy intent.
+- Workload identity path prefixes must match either the exact workload path or
+  a child segment boundary, never a sibling string prefix.
+- The root prefix `/` should keep matching all canonical workload paths.
+- Trailing slash input in policy prefixes should remain compatible by
+  normalizing to the same segment boundary.
+- Existing tool allow/block/default semantics, runtime-assurance checks,
+  warning-only workload identity preferences, posture checks, conditions, and
+  default-scope compilation must remain stable.
 
 ## Affected Dependents
 
 The owning-crate change is internal to `chio-policy` and affects callers of the
-validator, compiler, and any control-plane or CLI path that loads HushSpec
-documents before building guard pipelines. `chio-guards` remains unchanged
-because policy validation owns the schema boundary.
+reference evaluator, including control-plane and CLI policy-check paths that
+evaluate HushSpec tool access rules with runtime attestation context. No
+dependent API change is planned. `chio-core` already owns SPIFFE workload
+identity parsing and binding; this slice aligns policy matching with that
+canonical path shape.
 
 ## Implemented Improvement
 
-Validation now rejects blank secret pattern names, keeps existing regex
-fail-closed validation, and reports pattern regex errors by `patterns[index]`
-paths. `compile_policy` fails before constructing a `SecretLeakGuard` or
-`SanitizerHook` from invalid secret-pattern shape.
+Workload identity matching now evaluates `path_prefixes` through a segment
+boundary helper. Regression coverage proves `/payments-v2/worker` no longer
+satisfies `/payments`, while exact and child-segment matches continue to pass.
