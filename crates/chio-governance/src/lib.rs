@@ -131,10 +131,14 @@ pub enum GovernanceAuthorizationError {
     InvalidSignature,
     #[error("capability lease is expired or unknown: {0}")]
     LeaseExpiredOrUnknown(String),
+    #[error("capability lease is not yet valid: {0}")]
+    LeaseNotYetValid(String),
     #[error("capability lease scope digest mismatch")]
     ScopeDigestMismatch,
     #[error("governance receipt is required for destructive steps")]
     GovernanceReceiptRequired,
+    #[error("governance receipt is not yet valid: {0}")]
+    GovernanceReceiptNotYetValid(String),
     #[error("governance receipt workflow mismatch")]
     WorkflowMismatch,
     #[error("governance receipt step hash mismatch")]
@@ -156,6 +160,11 @@ pub fn verify_capability_lease(
         .map_err(|e| GovernanceAuthorizationError::Crypto(e.to_string()))?
     {
         return Err(GovernanceAuthorizationError::InvalidSignature);
+    }
+    if lease.body.issued_at_unix_ms > now_unix_ms {
+        return Err(GovernanceAuthorizationError::LeaseNotYetValid(
+            lease.body.lease_id.clone(),
+        ));
     }
     if lease.body.expires_at_unix_ms <= now_unix_ms {
         return Err(GovernanceAuthorizationError::LeaseExpiredOrUnknown(
@@ -185,6 +194,11 @@ pub fn verify_destructive_authorization(
         .map_err(|e| GovernanceAuthorizationError::Crypto(e.to_string()))?
     {
         return Err(GovernanceAuthorizationError::InvalidSignature);
+    }
+    if receipt.body.issued_at_unix_ms > now_unix_ms {
+        return Err(GovernanceAuthorizationError::GovernanceReceiptNotYetValid(
+            receipt.body.receipt_id.clone(),
+        ));
     }
     if receipt.body.expires_at_unix_ms <= now_unix_ms {
         return Err(GovernanceAuthorizationError::LeaseExpiredOrUnknown(
@@ -225,6 +239,11 @@ pub fn verify_step_governance_boundary(
         .map_err(|e| GovernanceAuthorizationError::Crypto(e.to_string()))?
     {
         return Err(GovernanceAuthorizationError::InvalidSignature);
+    }
+    if receipt.body.issued_at_unix_ms > now_unix_ms {
+        return Err(GovernanceAuthorizationError::GovernanceReceiptNotYetValid(
+            receipt.body.receipt_id.clone(),
+        ));
     }
     Ok(())
 }
@@ -2016,6 +2035,10 @@ mod tests {
         };
         let signed = SignedCapabilityLease::sign(lease, &issuer).test_expect("sign lease");
 
+        assert!(matches!(
+            verify_capability_lease(&signed, 999, Some("a".repeat(64))),
+            Err(GovernanceAuthorizationError::LeaseNotYetValid(_))
+        ));
         assert!(verify_capability_lease(&signed, 1_500, Some("a".repeat(64))).is_ok());
         assert!(matches!(
             verify_capability_lease(&signed, 2_000, Some("a".repeat(64))),
@@ -2052,6 +2075,24 @@ mod tests {
             1_500,
         )
         .is_ok());
+        assert!(matches!(
+            verify_destructive_authorization(
+                &signed,
+                "lease:buyer:refund:001",
+                "wf-chio-refund-001",
+                &"c".repeat(64),
+                1_099,
+            ),
+            Err(GovernanceAuthorizationError::GovernanceReceiptNotYetValid(
+                _
+            ))
+        ));
+        assert!(matches!(
+            verify_step_governance_boundary(true, Some(&signed), 1_099),
+            Err(GovernanceAuthorizationError::GovernanceReceiptNotYetValid(
+                _
+            ))
+        ));
         assert!(matches!(
             verify_destructive_authorization(
                 &signed,
