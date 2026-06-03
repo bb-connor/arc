@@ -1,7 +1,10 @@
 use std::collections::HashSet;
 
+use chio_core::capability::MonetaryAmount;
+
 use crate::{
-    ManifestError, RequiredPermissions, ToolDefinition, ToolManifest, TOOL_MANIFEST_SCHEMA,
+    ManifestError, PricingModel, RequiredPermissions, ToolDefinition, ToolManifest, ToolPricing,
+    TOOL_MANIFEST_SCHEMA,
 };
 
 /// Validate that a manifest is structurally well-formed.
@@ -28,6 +31,10 @@ fn validate_manifest_identity(manifest: &ToolManifest) -> Result<(), ManifestErr
 }
 
 fn validate_manifest_text_field(field: &'static str, value: &str) -> Result<(), ManifestError> {
+    validate_text_value(field, value)
+}
+
+fn validate_text_value(field: &'static str, value: &str) -> Result<(), ManifestError> {
     if value.trim().is_empty() || value.trim() != value {
         Err(ManifestError::InvalidManifestField(field))
     } else {
@@ -65,7 +72,74 @@ fn validate_tool(tool: &ToolDefinition) -> Result<(), ManifestError> {
     {
         return Err(ManifestError::InvalidOutputSchema(tool.name.clone()));
     }
+    validate_tool_pricing(tool.pricing.as_ref())?;
     Ok(())
+}
+
+fn validate_tool_pricing(pricing: Option<&ToolPricing>) -> Result<(), ManifestError> {
+    let Some(pricing) = pricing else {
+        return Ok(());
+    };
+
+    match pricing.pricing_model {
+        PricingModel::Flat => {
+            require_pricing_amount(pricing.base_price.as_ref(), "tools.pricing.base_price")?;
+        }
+        PricingModel::PerInvocation | PricingModel::PerUnit => {
+            require_pricing_amount(pricing.unit_price.as_ref(), "tools.pricing.unit_price")?;
+            require_billing_unit(pricing.billing_unit.as_deref())?;
+        }
+        PricingModel::Hybrid => {
+            require_pricing_amount(pricing.base_price.as_ref(), "tools.pricing.base_price")?;
+            require_pricing_amount(pricing.unit_price.as_ref(), "tools.pricing.unit_price")?;
+            require_billing_unit(pricing.billing_unit.as_deref())?;
+        }
+    }
+
+    validate_optional_pricing_amount(pricing.base_price.as_ref())?;
+    validate_optional_pricing_amount(pricing.unit_price.as_ref())?;
+    if let Some(billing_unit) = pricing.billing_unit.as_deref() {
+        validate_text_value("tools.pricing.billing_unit", billing_unit)?;
+    }
+    Ok(())
+}
+
+fn require_pricing_amount(
+    amount: Option<&MonetaryAmount>,
+    field: &'static str,
+) -> Result<(), ManifestError> {
+    if amount.is_some() {
+        Ok(())
+    } else {
+        Err(ManifestError::InvalidManifestField(field))
+    }
+}
+
+fn require_billing_unit(billing_unit: Option<&str>) -> Result<(), ManifestError> {
+    if billing_unit.is_some() {
+        Ok(())
+    } else {
+        Err(ManifestError::InvalidManifestField(
+            "tools.pricing.billing_unit",
+        ))
+    }
+}
+
+fn validate_optional_pricing_amount(amount: Option<&MonetaryAmount>) -> Result<(), ManifestError> {
+    let Some(amount) = amount else {
+        return Ok(());
+    };
+    if is_iso_4217_currency_code(&amount.currency) {
+        Ok(())
+    } else {
+        Err(ManifestError::InvalidManifestField(
+            "tools.pricing.currency",
+        ))
+    }
+}
+
+fn is_iso_4217_currency_code(currency: &str) -> bool {
+    currency.len() == 3 && currency.bytes().all(|byte| byte.is_ascii_uppercase())
 }
 
 fn validate_server_tools(manifest: &ToolManifest) -> Result<(), ManifestError> {

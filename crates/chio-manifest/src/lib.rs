@@ -477,6 +477,72 @@ mod tests {
     }
 
     #[test]
+    fn validate_rejects_per_invocation_pricing_without_unit_price() {
+        let mut m = sample_manifest();
+        m.tools[0].pricing.as_mut().unwrap().unit_price = None;
+
+        assert!(matches!(
+            validate_manifest(&m),
+            Err(ManifestError::InvalidManifestField(
+                "tools.pricing.unit_price"
+            ))
+        ));
+    }
+
+    #[test]
+    fn validate_rejects_hybrid_pricing_without_base_price() {
+        let mut m = sample_manifest();
+        let pricing = m.tools[0].pricing.as_mut().unwrap();
+        pricing.pricing_model = PricingModel::Hybrid;
+        pricing.base_price = None;
+        pricing.unit_price = Some(MonetaryAmount {
+            units: 10,
+            currency: "USD".to_string(),
+        });
+        pricing.billing_unit = Some("document".to_string());
+
+        assert!(matches!(
+            validate_manifest(&m),
+            Err(ManifestError::InvalidManifestField(
+                "tools.pricing.base_price"
+            ))
+        ));
+    }
+
+    #[test]
+    fn validate_rejects_padded_pricing_billing_unit() {
+        let mut m = sample_manifest();
+        m.tools[0].pricing.as_mut().unwrap().billing_unit = Some(" invocation".to_string());
+
+        assert!(matches!(
+            validate_manifest(&m),
+            Err(ManifestError::InvalidManifestField(
+                "tools.pricing.billing_unit"
+            ))
+        ));
+    }
+
+    #[test]
+    fn validate_rejects_invalid_pricing_currency() {
+        let mut m = sample_manifest();
+        m.tools[0]
+            .pricing
+            .as_mut()
+            .unwrap()
+            .unit_price
+            .as_mut()
+            .unwrap()
+            .currency = "usd".to_string();
+
+        assert!(matches!(
+            validate_manifest(&m),
+            Err(ManifestError::InvalidManifestField(
+                "tools.pricing.currency"
+            ))
+        ));
+    }
+
+    #[test]
     fn sign_and_verify_manifest() {
         let kp = Keypair::generate();
 

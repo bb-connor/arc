@@ -11,19 +11,15 @@ or billing enforcement.
 
 ## Current Pain Point
 
-The manifest has both discovery metadata and trust metadata. `validate_manifest`
-is the structural discovery gate used by adapters and examples before a manifest
-is signed. It rejects impossible tool contracts and malformed manifest identity
-or sandbox-permission metadata, but it does not require signed-material parsing.
-Public-key parsing belongs on the signing and verification paths, where the
-crate compares the embedded manifest key with the actual signer and fails closed
-before admitting a signed manifest.
-
-The signed envelope is a separate trust boundary. The inner `ToolManifest`
-already rejects unknown fields, but the envelope must do the same or admission
-payloads can carry unsigned side metadata that serde silently discards before
-verification. Even if current callers ignore that side metadata, the signed
-artifact should have a single canonical shape at parse time.
+The manifest carries advisory pricing metadata that operators and authorities
+can use before issuing budgeted capabilities. `validate_manifest` already
+rejects malformed identity, schema, server-tool, and sandbox-permission
+metadata before a manifest is signed, but it does not validate pricing shape.
+That allows a signed manifest to advertise `per_invocation`, `per_unit`, or
+`hybrid` pricing without the required unit price or billing unit, or with a
+malformed currency code. The kernel still enforces issued capability budgets,
+but the signed discovery artifact should not contain ambiguous quote inputs
+that can mislead authority-side planning.
 
 ## Security And API Constraints
 
@@ -39,6 +35,10 @@ artifact should have a single canonical shape at parse time.
 - Server identity, display name, version, and required permission entries are
   adapter and kernel admission metadata. Empty, padded, or duplicate text values
   should fail closed during structural validation.
+- Pricing metadata is advisory, not the enforcement boundary, but signed
+  manifests must still reject model shapes that omit required quote fields.
+- Existing valid native builder output for flat, per-invocation, per-unit, and
+  hybrid pricing must continue to validate.
 - Adapter fixture updates should not be required solely to satisfy unsigned
   structural validation. Fixtures that exercise signed-manifest admission should
   still use deterministic valid keys.
@@ -49,13 +49,14 @@ Potential dependents are adapter tests and examples that synthesize manifests
 before calling `validate_manifest`. Structural validation should keep rejecting
 malformed tool schemas for those dependents, while unsigned/demo manifests with
 placeholder public keys remain usable until a caller explicitly signs or
-verifies the manifest. Signed-manifest JSON with extra envelope fields now
-rejects at deserialization.
+verifies the manifest. Maintained `NativeTool` pricing builders already emit
+the required fields, so dependent source changes should not be required.
 
 ## Implemented Improvement
 
-Structural validation lives in its own module and tightens the unsigned manifest
-gate for identity and required-permission text fields. Embedded public-key
-parsing stays on the signing and verification boundary. The signed envelope now
-uses `deny_unknown_fields`, matching the inner manifest schema's fail-closed
-parsing behavior.
+Structural validation now checks optional per-tool pricing metadata before a
+manifest can be signed. Flat pricing requires a base price; per-invocation and
+per-unit pricing require a unit price plus billing unit; hybrid pricing requires
+both base and unit prices plus a billing unit. Any present price amount must
+carry a three-letter uppercase currency code, and billing units must be
+non-empty and unpadded.
