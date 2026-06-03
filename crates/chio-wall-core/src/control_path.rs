@@ -470,6 +470,11 @@ fn ensure_non_empty(field: &'static str, value: &str) -> Result<(), ChioWallCont
     if value.trim() != value {
         return Err(ChioWallContractError::PaddedField(field));
     }
+    if value.chars().any(char::is_control) {
+        return Err(ChioWallContractError::Validation(format!(
+            "{field} must not contain control characters"
+        )));
+    }
     Ok(())
 }
 
@@ -483,6 +488,19 @@ fn ensure_non_empty_list(
     if values.iter().any(|value| value.trim().is_empty()) {
         return Err(ChioWallContractError::Validation(format!(
             "{field} must not contain empty values"
+        )));
+    }
+    if values.iter().any(|value| value.trim() != value) {
+        return Err(ChioWallContractError::Validation(format!(
+            "{field} must not contain padded values"
+        )));
+    }
+    if values
+        .iter()
+        .any(|value| value.chars().any(char::is_control))
+    {
+        return Err(ChioWallContractError::Validation(format!(
+            "{field} must not contain control characters"
         )));
     }
     Ok(())
@@ -686,6 +704,14 @@ mod tests {
     }
 
     #[test]
+    fn control_profile_rejects_control_character_profile_id() {
+        let mut profile = sample_profile();
+        profile.profile_id = "chio-wall\nprofile".to_string();
+        let error = validation_error(profile.validate(), "control profile id rejected");
+        assert!(error.to_string().contains("control characters"));
+    }
+
+    #[test]
     fn control_profile_rejects_same_domain_boundary() {
         let mut profile = sample_profile();
         profile.protected_domain = ChioWallInformationDomain::Research;
@@ -710,6 +736,17 @@ mod tests {
         snapshot.allowed_tools = vec!["research_news.read".to_string(), "   ".to_string()];
         let error = validation_error(snapshot.validate(), "empty allowlist entry rejected");
         assert!(error.to_string().contains("must not contain empty values"));
+    }
+
+    #[test]
+    fn policy_snapshot_rejects_padded_allowed_tool_entries() {
+        let mut snapshot = sample_policy_snapshot();
+        snapshot.allowed_tools = vec![
+            "research_news.read".to_string(),
+            " execution_oms.submit_order ".to_string(),
+        ];
+        let error = validation_error(snapshot.validate(), "padded allowlist entry rejected");
+        assert!(error.to_string().contains("padded values"));
     }
 
     #[test]

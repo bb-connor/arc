@@ -17,14 +17,14 @@ platform claims.
 
 ## Pain Points
 
-- `ChioWallControlPackage::validate` checks artifact shape and duplicate kinds
-  but does not require the complete bounded artifact set described in
-  `docs/chio-wall/VALIDATION_PACKAGE.md`.
-- The current unit helper can construct a structurally valid control package
-  with only a profile artifact. That weakens the core boundary and leaves the
-  CLI as the only path proving package completeness.
-- There is no crate-local architecture note, so the division between core
-  contracts and CLI file orchestration is implicit.
+- `ChioWallControlPackage::validate` now requires the complete bounded artifact
+  set described in `docs/chio-wall/VALIDATION_PACKAGE.md`, but the foundational
+  string validators still allow embedded control characters.
+- List validators reject empty allowlist entries, but they do not yet reject
+  padded or control-bearing entries that would be invalid as stable package
+  identifiers and reviewer-facing evidence fields.
+- The crate intentionally has a small surface, so validation drift tends to
+  concentrate in helper functions rather than module boundaries.
 
 ## Security And API Constraints
 
@@ -47,8 +47,7 @@ platform claims.
 
 ## Planned Improvement
 
-Harden `ChioWallControlPackage::validate` so a control package must contain the
-complete bounded Chio-Wall artifact set exactly once: control profile, policy
-snapshot, authorization context, guard outcome, denied access record, buyer
-review package, and Chio evidence export. This is a core package invariant, not
-a CLI rendering detail.
+Harden foundational string validation across the Chio-Wall contracts. Scalar
+fields that already reject empty and padded values must also reject control
+characters, and non-empty string lists must reject padded or control-bearing
+entries before package data reaches CLI artifact generation or reviewer output.
