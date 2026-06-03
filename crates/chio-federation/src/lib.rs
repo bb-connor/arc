@@ -1327,9 +1327,9 @@ fn validate_positive_money(
             "{field} must be greater than zero"
         )));
     }
-    let normalized = amount.currency.trim().to_ascii_uppercase();
-    if normalized.len() != 3
-        || !normalized
+    if amount.currency.len() != 3
+        || !amount
+            .currency
             .chars()
             .all(|character| character.is_ascii_uppercase())
     {
@@ -2434,6 +2434,21 @@ mod tests {
         assert!(matches!(
             validate_stake_requirement(&requirement),
             Err(FederationContractError::InvalidAdmission(_))
+        ));
+    }
+
+    #[test]
+    fn federated_stake_requirement_rejects_lowercase_bond_currency() {
+        let mut requirement = sample_open_admission_policy().stake_requirements[0].clone();
+        requirement.minimum_bond_amount = Some(MonetaryAmount {
+            units: 10,
+            currency: "usd".to_string(),
+        });
+
+        assert!(matches!(
+            validate_stake_requirement(&requirement),
+            Err(FederationContractError::InvalidAdmission(message))
+                if message.contains("currency")
         ));
     }
 
