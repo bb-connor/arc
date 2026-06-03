@@ -150,3 +150,45 @@ Wrapped MCP result normalization now inserts `isError: false` when upstream
 omits it, matching `chio-mcp-edge::runtime::protocol::value_to_tool_result`.
 Helper and invocation tests prove the adapter boundary cannot regress to an
 ambiguous success shape.
+
+## URL-Required Elicitation Admission Slice
+
+### Current Boundary
+
+`lib.rs` maps wrapped MCP server `-32042` errors into
+`KernelError::UrlElicitationsRequired` so a Chio session can surface
+browser-mediated URL elicitations and later match completion notifications by
+`elicitationId`.
+
+### Pain Point
+
+The mapper currently checks only that `data.elicitations` deserializes into
+URL-mode `CreateElicitationOperation` values. It does not reject empty or
+padded `message`, `url`, or `elicitationId` fields, and it does not prove that
+the URL is a browser-safe HTTP(S) URL before the kernel stores the elicitation
+ID as pending session state.
+
+### Security And API Constraints
+
+- Preserve standard `-32042` URL-required error mapping for well-formed HTTPS
+  and HTTP URL elicitations.
+- Keep form-mode or mixed-mode elicitations rejected on this wrapped-tool
+  error path.
+- Do not move session storage or edge-hosted completion ownership into this
+  adapter crate.
+- Reject malformed URL-required payloads before they become kernel errors or
+  pending session identifiers.
+
+### Affected Dependents
+
+No public Rust API change is expected. `chio-cli`, `chio-control-plane`,
+`chio-hosted-mcp`, `chio-mcp-remote`, and conformance fixtures should continue
+to compile and accept the existing HTTPS URL elicitation examples.
+
+### Planned Improvement
+
+Add an internal URL-required elicitation admission helper that validates each
+URL-mode operation's message, URL, and elicitation ID before constructing
+`KernelError::UrlElicitationsRequired`. Regressions should prove padded IDs and
+non-HTTP(S) or userinfo-bearing URLs fail closed while existing valid URL
+elicitations still map through.
