@@ -61,6 +61,9 @@ fn read_bounded_line(
 
         reader.consume(take);
         if exceeds_limit {
+            if !has_newline {
+                discard_remaining_line(reader)?;
+            }
             return Err(AdapterError::ParseError(format!(
                 "MCP edge JSON-RPC frame exceeded {max_bytes} bytes"
             )));
@@ -74,6 +77,31 @@ fn read_bounded_line(
     String::from_utf8(bytes).map(Some).map_err(|error| {
         AdapterError::ParseError(format!("MCP edge JSON-RPC frame was not UTF-8: {error}"))
     })
+}
+
+fn discard_remaining_line(reader: &mut impl BufRead) -> Result<(), AdapterError> {
+    loop {
+        let (take, has_newline) = {
+            let available = reader.fill_buf().map_err(|error| {
+                AdapterError::ConnectionFailed(format!("failed to read MCP edge request: {error}"))
+            })?;
+            if available.is_empty() {
+                return Ok(());
+            }
+
+            let take = match available.iter().position(|byte| *byte == b'\n') {
+                Some(index) => index + 1,
+                None => available.len(),
+            };
+            let has_newline = available.get(take.saturating_sub(1)) == Some(&b'\n');
+            (take, has_newline)
+        };
+
+        reader.consume(take);
+        if has_newline {
+            return Ok(());
+        }
+    }
 }
 
 #[cfg(test)]
@@ -119,5 +147,26 @@ mod tests {
             matches!(err, AdapterError::ParseError(_)),
             "expected ParseError, got: {err}"
         );
+    }
+
+    #[test]
+    fn frame_reader_discards_oversized_frame_tail_before_next_frame() {
+        let tainted = r#"{"jsonrpc":"2.0","id":7,"method":"cancel"}"#;
+        let next = r#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#;
+        let input = format!(
+            "{}{tainted}\n{next}\n",
+            "x".repeat(MAX_STDIO_MCP_FRAME_BYTES + 1)
+        );
+        let mut reader = BufReader::with_capacity(1, input.as_bytes());
+
+        let err = read_jsonrpc_frame(&mut reader).unwrap_err();
+        assert!(
+            matches!(err, AdapterError::ParseError(ref message) if message.contains("exceeded")),
+            "expected oversized ParseError, got: {err}"
+        );
+        let frame = read_jsonrpc_frame(&mut reader)
+            .unwrap()
+            .unwrap_or_else(|| panic!("expected next clean frame"));
+        assert_eq!(frame["method"], "ping");
     }
 }

@@ -486,7 +486,7 @@ fn non_empty_str_field<'a>(
     context: &'static str,
 ) -> Result<&'a str, BundleError> {
     let value = str_field(object, field)?;
-    if value.is_empty() {
+    if value.trim().is_empty() {
         Err(BundleError::SchemaMismatch(format!(
             "{context} must not be empty"
         )))
@@ -793,6 +793,64 @@ mod tests {
             err,
             Some(BundleError::SchemaMismatch(detail))
                 if detail.contains("eval_run.pipeline_language") && detail.contains("bash")
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_whitespace_only_required_identity_fields_with_recomputed_signature(
+    ) -> Result<(), BundleError> {
+        let signed = signed_bundle_with_mutation(|value| {
+            value
+                .as_object_mut()
+                .ok_or(BundleError::WrongType("bundle root"))?
+                .get_mut("producer")
+                .and_then(Value::as_object_mut)
+                .ok_or(BundleError::WrongType("producer"))?
+                .insert("name".to_owned(), Value::String("   ".to_owned()));
+            Ok(())
+        })?;
+        let err = verify_fixture_bundle(&signed).err();
+        assert!(matches!(
+            err,
+            Some(BundleError::SchemaMismatch(detail)) if detail.contains("producer.name")
+        ));
+
+        let signed = signed_bundle_with_mutation(|value| {
+            value
+                .as_object_mut()
+                .ok_or(BundleError::WrongType("bundle root"))?
+                .get_mut("eval_run")
+                .and_then(Value::as_object_mut)
+                .ok_or(BundleError::WrongType("eval_run"))?
+                .insert("run_id".to_owned(), Value::String("\t".to_owned()));
+            Ok(())
+        })?;
+        let err = verify_fixture_bundle(&signed).err();
+        assert!(matches!(
+            err,
+            Some(BundleError::SchemaMismatch(detail)) if detail.contains("eval_run.run_id")
+        ));
+
+        let signed = signed_bundle_with_mutation(|value| {
+            value
+                .as_object_mut()
+                .ok_or(BundleError::WrongType("bundle root"))?
+                .get_mut("receipts")
+                .and_then(Value::as_array_mut)
+                .and_then(|receipts| receipts.first_mut())
+                .and_then(Value::as_object_mut)
+                .and_then(|receipt| receipt.get_mut("evidence"))
+                .and_then(Value::as_object_mut)
+                .ok_or(BundleError::WrongType("receipts[].evidence"))?
+                .insert("trace_id".to_owned(), Value::String("\n".to_owned()));
+            Ok(())
+        })?;
+        let err = verify_fixture_bundle(&signed).err();
+        assert!(matches!(
+            err,
+            Some(BundleError::SchemaMismatch(detail))
+                if detail.contains("receipts[].evidence.trace_id")
         ));
         Ok(())
     }

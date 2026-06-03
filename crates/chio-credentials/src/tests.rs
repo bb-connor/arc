@@ -1113,6 +1113,28 @@ mod tests {
             ),
             Err(CredentialError::MissingChallengeNonce)
         ));
+        assert!(matches!(
+            create_passport_presentation_challenge(
+                " https://rp.example.com",
+                "nonce-123",
+                1_710_000_050,
+                1_710_000_350,
+                PassportPresentationOptions::default(),
+                None,
+            ),
+            Err(CredentialError::MissingChallengeVerifier)
+        ));
+        assert!(matches!(
+            create_passport_presentation_challenge(
+                "https://rp.example.com",
+                "nonce-123 ",
+                1_710_000_050,
+                1_710_000_350,
+                PassportPresentationOptions::default(),
+                None,
+            ),
+            Err(CredentialError::MissingChallengeNonce)
+        ));
 
         let mut challenge = create_passport_presentation_challenge(
             "https://rp.example.com",
@@ -1127,6 +1149,12 @@ mod tests {
         assert!(matches!(
             verify_passport_presentation_challenge(&challenge, 1_710_000_100),
             Err(CredentialError::MissingChallengeNonce)
+        ));
+        challenge.nonce = "nonce-123".to_string();
+        challenge.verifier = "https://rp.example.com ".to_string();
+        assert!(matches!(
+            verify_passport_presentation_challenge(&challenge, 1_710_000_100),
+            Err(CredentialError::MissingChallengeVerifier)
         ));
     }
 

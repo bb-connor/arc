@@ -1243,6 +1243,11 @@ mod tests {
         response.quote_response_id = " ".to_string();
         let error = require_err(response.validate(), "empty quote response id rejected");
         assert!(error.contains("quote_response_id"));
+
+        let mut response = fixtures.quote_response.body.clone();
+        response.quote_response_id = " quote-1 ".to_string();
+        let error = require_err(response.validate(), "padded quote response id rejected");
+        assert!(error.contains("quote_response_id"));
     }
 
     #[test]

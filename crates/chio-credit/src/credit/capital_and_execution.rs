@@ -453,6 +453,7 @@ impl CapitalExecutionInstructionArtifact {
             &self.rail,
             self.issued_at,
         )?;
+        ensure_capital_execution_owner_authority(&self.authority_chain, self.owner_role)?;
         validate_capital_instruction_action_shape(self)?;
         validate_capital_instruction_reconciliation(self)?;
         Ok(())
@@ -1051,6 +1052,20 @@ mod tests {
                 .unwrap_err()
                 .contains("require at least one anchor")
         );
+    }
+
+    #[test]
+    fn capital_execution_instruction_requires_source_owner_authority() {
+        let mut artifact = valid_capital_instruction_artifact();
+        let owner_role = artifact.owner_role;
+        artifact
+            .authority_chain
+            .retain(|step| step.role != owner_role);
+
+        let error = artifact
+            .validate()
+            .expect_err("missing source-owner authority must reject");
+        assert!(error.contains("source-owner approval"));
     }
 
     #[test]

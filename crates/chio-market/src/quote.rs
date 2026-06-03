@@ -280,8 +280,15 @@ impl LiabilityQuoteResponseArtifact {
                 self.schema
             ));
         }
-        if self.quote_response_id.trim().is_empty() {
+        let quote_response_id = self.quote_response_id.trim();
+        if quote_response_id.is_empty() {
             return Err("quote response requires quote_response_id".to_string());
+        }
+        if quote_response_id != self.quote_response_id {
+            return Err(
+                "quote response quote_response_id must not have leading or trailing whitespace"
+                    .to_string(),
+            );
         }
         if !self.quote_request.verify_signature().map_err(|error| {
             format!("quote response quote_request signature verification failed: {error}")
