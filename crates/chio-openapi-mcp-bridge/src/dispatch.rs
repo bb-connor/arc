@@ -175,6 +175,16 @@ pub(crate) fn enforce_bridged_response_body(
     })
 }
 
+pub(crate) fn enforce_no_redirect_response(response: &BridgedResponse) -> Result<(), BridgeError> {
+    if (300..=399).contains(&response.status) {
+        return Err(BridgeError::UpstreamError(format!(
+            "OpenAPI bridge dispatchers must not follow redirects; returned HTTP redirect status {}",
+            response.status
+        )));
+    }
+    Ok(())
+}
+
 pub(crate) fn bridged_tool_response(binding: &RouteBinding, response: BridgedResponse) -> Value {
     let text = serde_json::to_string(&response.body).unwrap_or_else(|_| "{}".to_string());
     json!({
@@ -342,6 +352,11 @@ fn path_parameter_value(arguments: &Value, name: &str) -> Result<String, BridgeE
     if text.is_empty() {
         return Err(BridgeError::UpstreamError(format!(
             "OpenAPI bridge path parameter `{name}` must not be empty"
+        )));
+    }
+    if matches!(text.as_str(), "." | "..") {
+        return Err(BridgeError::UpstreamError(format!(
+            "OpenAPI bridge path parameter `{name}` must not be a dot segment"
         )));
     }
     Ok(text)

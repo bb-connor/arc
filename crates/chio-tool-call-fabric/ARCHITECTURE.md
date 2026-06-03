@@ -17,11 +17,11 @@
 - `ToolInvocation::validate` fails closed on provider/provenance mismatch and
   non-canonical argument bytes, and provider conformance replay calls that
   contract before comparing captured invocations.
-- The same validation boundary still accepts empty or padded `tool_name`,
-  `provenance.request_id`, and `provenance.api_version` values. Those fields are
-  load-bearing receipt, replay, and provenance identifiers; accepting ambiguous
-  identities at the owning fabric type lets malformed adapter output travel
-  until a downstream crate happens to reject it.
+- The same validation boundary still accepts a provider-specific principal for
+  the wrong provenance provider when the top-level provider fields match.
+  Cross-provider principal provenance is load-bearing receipt and policy input,
+  so adapters must not be able to lift an OpenAI invocation carrying a Bedrock
+  IAM principal into trusted fabric state.
 - Existing property generators now cover all provider ids, so new provider enum
   variants are less likely to drift silently from generated invariants.
 
@@ -42,9 +42,9 @@
 
 ## Planned Improvement
 
-Tighten `ToolInvocation::validate` so the owning fabric type rejects empty or
-padded invocation identities before replay or receipt code trusts them. This is
-architectural because the fabric crate is the single provider-agnostic boundary
-between native adapters and Chio verdict/receipt machinery; downstream
-conformance should not need separate ad hoc checks to decide whether a provider
-invocation has a usable tool name, request id, or API-version identity.
+Tighten `ToolInvocation::validate` so the owning fabric type binds
+`provenance.principal` to `provenance.provider` after confirming the invocation
+and provenance provider fields match. This is architectural because the fabric
+crate is the single provider-agnostic boundary between native adapters and Chio
+verdict/receipt machinery; downstream conformance should not need separate ad
+hoc checks to decide whether provider identity is internally coherent.

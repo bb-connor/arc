@@ -12,11 +12,12 @@
 
 - `src/lib.rs` is carrying route binding, URL construction, egress enforcement, response shaping, and test fixtures in one file.
 - Manifest tool generation and route dispatch planning are parallel paths, so drift between advertised input schema and live dispatch behavior is easy to miss.
-- Query parameter dispatch now follows the generated tool schema, but path
-  template placeholders are still discovered by the dispatcher independently of
-  declared OpenAPI path parameters. A malformed spec can therefore publish a
-  tool whose input schema omits a required path argument, then fail only at live
-  dispatch time.
+- Path parameter expansion still percent-encodes unreserved `.` bytes, so `.` or
+  `..` parameter values can become real URL path segments after a downstream
+  HTTP client reparses the URL.
+- The caller-supplied dispatcher receives only a pre-flight-checked URL. If it
+  follows redirects internally, the bridge cannot validate the redirected
+  authority before the second network hop.
 
 ## Constraints
 
@@ -34,11 +35,10 @@
 
 ## Planned Improvement
 
-Validate dispatch plans at ingest time by checking that every `{name}`
-placeholder in a route path is declared as an OpenAPI `in: path` parameter after
-path-level and operation-level parameter merge. The bridge should reject
-malformed specs before manifest publication instead of advertising an input
-schema that cannot satisfy live URL construction.
+Reject dot-segment path parameter values before URL construction completes, and
+make redirect handling explicit at the bridge boundary. Live dispatchers must
+surface redirects as responses instead of following them internally, and the
+bridge must reject redirect statuses before returning a tool result.
 
 ## Required Query Dispatch Slice
 

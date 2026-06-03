@@ -30,7 +30,7 @@ use chio_openapi::{GeneratorConfig, ManifestGenerator, OpenApiError, OpenApiSpec
 use dispatch::expand_route_path;
 use dispatch::{
     bridged_tool_response, build_route_dispatches, dispatch_url, enforce_bridged_response_body,
-    enforce_dispatch_contract, RouteDispatch,
+    enforce_dispatch_contract, enforce_no_redirect_response, RouteDispatch,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -122,6 +122,9 @@ pub struct BridgedResponse {
 ///
 /// Bridge users provide a function that performs the actual HTTP call.
 /// This allows the bridge to remain transport-agnostic (no reqwest dependency).
+/// Dispatchers must perform a single-hop request and return 3xx redirects
+/// without following them internally. A dispatcher that follows redirects
+/// violates the bridge egress contract.
 pub type HttpDispatcher =
     dyn Fn(&str, &str, &Value) -> Result<BridgedResponse, BridgeError> + Send + Sync;
 
@@ -189,6 +192,10 @@ impl OpenApiMcpBridge {
     }
 
     /// Set the HTTP dispatcher function.
+    ///
+    /// The dispatcher must not follow redirects internally. Return redirect
+    /// responses to the bridge so they can be rejected instead of performing an
+    /// ungated second network hop.
     pub fn set_dispatcher(&mut self, dispatcher: Box<HttpDispatcher>) {
         self.dispatcher = Some(dispatcher);
     }
@@ -251,6 +258,7 @@ impl OpenApiMcpBridge {
             // ceiling post-dispatch. Missing contract state fails closed.
             let contract = enforce_dispatch_contract(self.config.egress_contract.as_ref(), &url)?;
             let response = dispatcher(&binding.method, &url, &arguments)?;
+            enforce_no_redirect_response(&response)?;
             enforce_bridged_response_body(contract, &response)?;
             Ok(bridged_tool_response(binding, response))
         } else {
@@ -327,6 +335,7 @@ impl OwnedBridgeToolServer {
             // fails closed for live dispatchers.
             let contract = enforce_dispatch_contract(self.config.egress_contract.as_ref(), &url)?;
             let response = dispatcher(&binding.method, &url, &arguments)?;
+            enforce_no_redirect_response(&response)?;
             enforce_bridged_response_body(contract, &response)?;
             Ok(bridged_tool_response(binding, response))
         } else {
@@ -843,6 +852,42 @@ mod tests {
             result["structuredContent"]["body"]["receivedUrl"],
             "https://93.184.216.34/pets/pet-42"
         );
+    }
+
+    #[test]
+    fn bridge_dispatcher_rejects_dot_segment_path_parameters() {
+        let mut bridge =
+            OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config_with_egress()).unwrap();
+        bridge.set_dispatcher(Box::new(|_method, _url, _args| {
+            panic!("dispatcher must not run when path parameter is a dot segment")
+        }));
+
+        for pet_id in [".", ".."] {
+            let error = bridge
+                .invoke_tool("getPet", json!({"petId": pet_id}))
+                .unwrap_err();
+            assert!(format!("{error}").contains("must not be a dot segment"));
+        }
+    }
+
+    #[test]
+    fn bridge_dispatcher_rejects_redirect_responses() {
+        let mut bridge =
+            OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config_with_egress()).unwrap();
+        bridge.set_dispatcher(Box::new(|_method, _url, _args| {
+            Ok(BridgedResponse {
+                status: 302,
+                body: json!({"location": "https://169.254.169.254/latest/meta-data"}),
+                observed_body_bytes: None,
+                is_error: true,
+            })
+        }));
+
+        let error = bridge
+            .invoke_tool("getPet", json!({"petId": "pet-42"}))
+            .unwrap_err();
+
+        assert!(format!("{error}").contains("must not follow redirects"));
     }
 
     #[test]

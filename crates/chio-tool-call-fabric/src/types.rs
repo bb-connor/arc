@@ -87,6 +87,7 @@ impl ToolInvocation {
                 provenance: self.provenance.provider,
             });
         }
+        validate_principal_provider(self.provenance.provider, &self.provenance.principal)?;
         validate_identity_field("tool_name", &self.tool_name)?;
         validate_identity_field("provenance.request_id", &self.provenance.request_id)?;
         validate_identity_field("provenance.api_version", &self.provenance.api_version)?;
@@ -104,6 +105,30 @@ impl ToolInvocation {
 
         Ok(())
     }
+}
+
+fn validate_principal_provider(
+    provider: ProviderId,
+    principal: &Principal,
+) -> Result<(), ToolInvocationValidationError> {
+    let matches_provider = matches!(
+        (provider, principal),
+        (ProviderId::OpenAi, Principal::OpenAiOrg { .. })
+            | (ProviderId::Anthropic, Principal::AnthropicWorkspace { .. },)
+            | (ProviderId::Bedrock, Principal::BedrockIam { .. })
+            | (ProviderId::Gemini, Principal::GeminiProject { .. })
+            | (ProviderId::Mistral, Principal::MistralProject { .. })
+            | (ProviderId::Groq, Principal::GroqProject { .. })
+            | (ProviderId::Ollama, Principal::OllamaHost { .. })
+            | (ProviderId::Cohere, Principal::CohereOrg { .. })
+    );
+    if matches_provider {
+        return Ok(());
+    }
+    Err(ToolInvocationValidationError::InvalidIdentity {
+        field: "provenance.principal",
+        reason: "must match provenance.provider",
+    })
 }
 
 fn validate_identity_field(

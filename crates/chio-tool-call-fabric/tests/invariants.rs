@@ -218,6 +218,25 @@ fn validation_rejects_provider_mismatch_between_invocation_and_provenance() {
 }
 
 #[test]
+fn validation_rejects_cross_provider_principal() {
+    let mut invocation = sample_invocation();
+    invocation.provenance.principal = Principal::BedrockIam {
+        caller_arn: "arn:aws:iam::123456789012:role/chio".to_string(),
+        account_id: "123456789012".to_string(),
+        assumed_role_session_arn: None,
+    };
+
+    let error = invocation.validate().unwrap_err();
+    assert!(matches!(
+        error,
+        ToolInvocationValidationError::InvalidIdentity {
+            field: "provenance.principal",
+            ..
+        }
+    ));
+}
+
+#[test]
 fn validation_rejects_non_canonical_argument_bytes() {
     let mut invocation = sample_invocation();
     invocation.arguments = br#"{"unit":"celsius","location":"San Francisco, CA"}"#.to_vec();

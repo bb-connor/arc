@@ -10,8 +10,9 @@ adapter implements `lift(ProviderRequest) -> ToolInvocation` and
 `lower(VerdictResult, ToolResult) -> ProviderResponse` so verdict-time
 enforcement and receipt emission stay identical across providers.
 Use `ToolInvocation::validate` before trusting lifted or replayed invocations;
-it rejects provider/provenance mismatches, empty or padded invocation identity
-fields, non-JSON argument bytes, and non-canonical argument encodings.
+it rejects provider/provenance mismatches, provider/principal mismatches, empty
+or padded invocation identity fields, non-JSON argument bytes, and
+non-canonical argument encodings.
 
 The trait surface, provenance signing helper, streaming state machine, and
 lift/lower conformance fixtures are shared by every provider adapter, so a
