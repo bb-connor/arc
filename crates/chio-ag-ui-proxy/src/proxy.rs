@@ -1120,6 +1120,67 @@ mod tests {
     }
 
     #[test]
+    fn proxy_rejects_padded_or_control_event_identity_before_receipt() {
+        let cases = vec![
+            (
+                "event_id",
+                AgUiEvent {
+                    event_id: " evt-padded ".to_string(),
+                    ..make_event(EventClassification::Display)
+                },
+            ),
+            (
+                "agent_id",
+                AgUiEvent {
+                    agent_id: "agent\ncontrol".to_string(),
+                    ..make_event(EventClassification::Display)
+                },
+            ),
+            (
+                "session_id",
+                AgUiEvent {
+                    session_id: Some(" sess-padded ".to_string()),
+                    ..make_event(EventClassification::Display)
+                },
+            ),
+            (
+                "target.component_id",
+                AgUiEvent {
+                    target: Some(TargetComponent {
+                        component_type: "chat".to_string(),
+                        component_id: Some("composer\rcontrol".to_string()),
+                    }),
+                    ..make_event(EventClassification::Display)
+                },
+            ),
+        ];
+
+        for (field, event) in cases {
+            let config = AgUiProxyConfig {
+                allow_display_without_capability: true,
+                ..Default::default()
+            };
+            let proxy = AgUiProxy::new(config, Keypair::generate());
+            let mut transport = Transport::new(
+                TransportKind::Sse,
+                format!("conn-malformed-{field}"),
+                "agent-1".to_string(),
+            );
+
+            let err = proxy
+                .evaluate(&event, None, &mut transport)
+                .expect_err("malformed event identity must fail before receipt construction");
+            assert_eq!(
+                err.to_string(),
+                format!(
+                    "invalid event: {field} must be unpadded and contain no control characters"
+                )
+            );
+            assert_eq!(transport.total_events(), 0);
+        }
+    }
+
+    #[test]
     fn mutating_event_requires_capability() {
         let proxy = AgUiProxy::new(AgUiProxyConfig::default(), Keypair::generate());
         let event = make_event(EventClassification::Mutate);

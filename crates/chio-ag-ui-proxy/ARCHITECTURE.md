@@ -90,3 +90,38 @@ Route every capability-present event through the existing full capability
 verification and scope-matching path. Keep tokenless display forwarding only
 when `allow_display_without_capability` is enabled; otherwise require a valid
 capability grant for the server-derived event classification.
+
+## Event Identity Normalization Boundary Slice
+
+### Current Boundary
+
+`AgUiEvent::validate_boundary` is the only protocol identity gate before
+`AgUiProxy::evaluate` derives classification, resolves capability scopes,
+updates transport counters, and signs an `AgUiReceipt`.
+
+### Pain Point
+
+The completed event identity slice made empty identities fail closed, but it
+still accepted padded or control-bearing identifiers. That leaves ambiguous
+`event_id`, `agent_id`, `session_id`, `target.component_type`, and
+`target.component_id` values eligible for receipt IDs, scope arguments, audit
+metadata, and transport decisions.
+
+### Security and API Constraints
+
+Public AG-UI event and proxy types must remain source-compatible. Empty-field
+error text should stay stable for existing callers. Canonical payload hashing,
+receipt signatures, server-derived classification, and capability scope
+matching must stay unchanged for valid events.
+
+### Affected Dependents
+
+No downstream crate edits are expected. The behavior change is limited to
+malformed AG-UI event identity data, which now fails before receipt
+construction and before transport counters move.
+
+### Completed Material Improvement
+
+Reject padded or control-bearing AG-UI identity fields at the event boundary
+while preserving the existing empty-field rejection. Add coverage proving these
+malformed identities cannot produce receipts or transport accounting changes.

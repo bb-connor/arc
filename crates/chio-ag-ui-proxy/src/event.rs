@@ -86,15 +86,15 @@ pub enum EventClassification {
 
 impl AgUiEvent {
     pub(crate) fn validate_boundary(&self) -> Result<(), String> {
-        validate_non_empty_field("event_id", &self.event_id)?;
-        validate_non_empty_field("agent_id", &self.agent_id)?;
+        validate_identity_field("event_id", &self.event_id)?;
+        validate_identity_field("agent_id", &self.agent_id)?;
         if let Some(session_id) = &self.session_id {
-            validate_non_empty_field("session_id", session_id)?;
+            validate_identity_field("session_id", session_id)?;
         }
         if let Some(target) = &self.target {
-            validate_non_empty_field("target.component_type", &target.component_type)?;
+            validate_identity_field("target.component_type", &target.component_type)?;
             if let Some(component_id) = &target.component_id {
-                validate_non_empty_field("target.component_id", component_id)?;
+                validate_identity_field("target.component_id", component_id)?;
             }
         }
         Ok(())
@@ -120,9 +120,14 @@ impl AgUiEvent {
     }
 }
 
-fn validate_non_empty_field(field_name: &str, value: &str) -> Result<(), String> {
+fn validate_identity_field(field_name: &str, value: &str) -> Result<(), String> {
     if value.trim().is_empty() {
         return Err(format!("{field_name} must be a non-empty string"));
+    }
+    if value.trim() != value || value.chars().any(char::is_control) {
+        return Err(format!(
+            "{field_name} must be unpadded and contain no control characters"
+        ));
     }
     Ok(())
 }
