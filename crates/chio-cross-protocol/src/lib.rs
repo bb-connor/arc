@@ -1224,18 +1224,23 @@ fn build_route_evidence(
 fn validate_execution_request_boundary(
     request: &CrossProtocolExecutionRequest,
 ) -> Result<(), BridgeError> {
-    validate_non_empty_request_field("origin_request_id", &request.origin_request_id)?;
-    validate_non_empty_request_field("kernel_request_id", &request.kernel_request_id)?;
-    validate_non_empty_request_field("target_server_id", &request.target_server_id)?;
-    validate_non_empty_request_field("target_tool_name", &request.target_tool_name)?;
-    validate_non_empty_request_field("agent_id", &request.agent_id)?;
+    validate_request_identity_field("origin_request_id", &request.origin_request_id)?;
+    validate_request_identity_field("kernel_request_id", &request.kernel_request_id)?;
+    validate_request_identity_field("target_server_id", &request.target_server_id)?;
+    validate_request_identity_field("target_tool_name", &request.target_tool_name)?;
+    validate_request_identity_field("agent_id", &request.agent_id)?;
     Ok(())
 }
 
-fn validate_non_empty_request_field(field_name: &str, value: &str) -> Result<(), BridgeError> {
+fn validate_request_identity_field(field_name: &str, value: &str) -> Result<(), BridgeError> {
     if value.trim().is_empty() {
         return Err(BridgeError::InvalidRequest(format!(
             "{field_name} must be a non-empty string"
+        )));
+    }
+    if value.trim() != value || value.chars().any(char::is_control) {
+        return Err(BridgeError::InvalidRequest(format!(
+            "{field_name} must be unpadded and contain no control characters"
         )));
     }
     Ok(())
@@ -1874,6 +1879,62 @@ mod tests {
             err.to_string(),
             "invalid request envelope: origin_request_id must be a non-empty string"
         );
+    }
+
+    #[test]
+    fn orchestrator_rejects_padded_or_control_execution_identity_before_signed_lineage() {
+        let (issuer, kernel) = test_kernel();
+        let subject = Keypair::generate();
+        let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+        let capability = capability_for_tool(&issuer, &subject, "test-srv", "echo");
+        let agent_id = subject.public_key().to_hex();
+
+        let cases = [
+            ("origin_request_id", " a2a-padded-origin "),
+            ("kernel_request_id", "kernel\ncontrol"),
+            ("target_server_id", " test-srv "),
+            ("target_tool_name", "echo\rcontrol"),
+            ("agent_id", " agent-padded "),
+        ];
+
+        for (field_name, malformed_value) in cases {
+            let mut request = CrossProtocolExecutionRequest {
+                origin_request_id: "a2a-valid-origin".to_string(),
+                kernel_request_id: "a2a-valid-kernel".to_string(),
+                target_protocol: DiscoveryProtocol::Native,
+                target_server_id: "test-srv".to_string(),
+                target_tool_name: "echo".to_string(),
+                agent_id: agent_id.clone(),
+                arguments: json!({"message":"hello"}),
+                capability: capability.clone(),
+                source_envelope: json!({
+                    "message": {"role":"user"},
+                    "metadata": { "chio": { "targetSkillId": "echo" } }
+                }),
+                dpop_proof: None,
+                governed_intent: None,
+                approval_token: None,
+                model_metadata: None,
+            };
+
+            match field_name {
+                "origin_request_id" => request.origin_request_id = malformed_value.to_string(),
+                "kernel_request_id" => request.kernel_request_id = malformed_value.to_string(),
+                "target_server_id" => request.target_server_id = malformed_value.to_string(),
+                "target_tool_name" => request.target_tool_name = malformed_value.to_string(),
+                "agent_id" => request.agent_id = malformed_value.to_string(),
+                _ => unreachable!("test case uses only request identity fields"),
+            }
+
+            let err = orchestrator.execute(&MockBridge, request).unwrap_err();
+
+            assert_eq!(
+                err.to_string(),
+                format!(
+                    "invalid request envelope: {field_name} must be unpadded and contain no control characters"
+                )
+            );
+        }
     }
 
     #[test]

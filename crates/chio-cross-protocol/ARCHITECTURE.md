@@ -92,3 +92,47 @@ Extended the orchestrator-owned capability-reference validation so supplied
 protocol as well as the capability id and parent hash, with a focused
 regression proving mismatched source-protocol metadata fails before signed
 lineage construction.
+
+## Execution Identity Normalization Slice
+
+### Current Boundary
+
+- `CrossProtocolExecutionRequest` identity fields feed bridge ids, route
+  selection ids, trace ids, receipt metadata, and kernel-bound
+  `ToolCallRequest` values.
+- `origin_request_id` becomes the source hop id and bridge id suffix.
+- `kernel_request_id`, `target_server_id`, `target_tool_name`, and `agent_id`
+  cross from protocol edges into native kernel execution.
+
+### Pain Point
+
+The boundary validation rejects whitespace-only identity fields, but it does
+not reject padded or control-bearing values. A malformed protocol edge request
+can therefore create signed bridge metadata, route evidence, trace hops, or
+kernel requests with ambiguous identifiers even though the orchestrator is the
+shared authority for this cross-protocol hop.
+
+### Security And API Constraints
+
+- Preserve valid request behavior, public struct fields, and serialized field
+  names.
+- Keep the existing empty-field error stable for whitespace-only values.
+- Reject padded or control-bearing request identity values before capability
+  reference injection, route planning, trace construction, target execution, or
+  receipt signing.
+- Do not normalize by trimming because signed lineage should describe exactly
+  what the caller submitted.
+
+### Affected Dependents
+
+`chio-a2a-edge`, `chio-acp-edge`, `chio-acp-proxy`, `chio-mcp-edge`, and other
+orchestrator callers keep the same API. Valid requests are byte-stable.
+Malformed requests now fail at the shared orchestrator boundary instead of
+reaching route planning or kernel execution.
+
+### Completed Material Improvement
+
+Replaced non-empty-only request field checks with orchestrator-owned identity
+validation that requires non-empty, unpadded, control-free execution identity
+fields, with a regression proving padded and control-bearing values fail before
+signed lineage construction.
