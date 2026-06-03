@@ -61,7 +61,8 @@ the remote client exists.
 Add a central `TrustServiceConfig` validation boundary and call it before
 `serve_async` binds sockets or loads runtime state. The validator should reject
 blank service tokens, blank tenant ids, blank tenant-read tokens, tenant tokens
-that equal the admin service token, and zero cluster sync intervals.
+that equal the admin service token, zero cluster sync intervals, and zero
+public certification metadata TTLs.
 
 Add a matching `TrustControlClient` construction validator. It should reject
 blank or padded service tokens, empty endpoint lists, non-HTTP(S) endpoints,
@@ -118,6 +119,38 @@ Keep service-auth and public trust-control clients on separate constructors:
 `build_client` continues to require validated service bearer material, while
 `build_public_client` reuses the same endpoint normalization for intentionally
 unauthenticated public endpoints.
+
+## Public Certification Metadata TTL Slice
+
+### Current Boundary
+
+`TrustServiceConfig::validate` runs before the trust-control service binds its
+listen socket or builds public certification discovery state. Public
+certification metadata derives `expires_at` by adding
+`certification_public_metadata_ttl_seconds` to the generated timestamp.
+
+### Pain Point
+
+The metadata builder accepted a zero TTL, which produced public discovery
+metadata whose `expires_at` equaled `generated_at`. That let the service start
+with immediately expired discovery metadata even though peer and client config
+boundaries already reject invalid authority material before runtime state is
+created.
+
+### Security And API Constraints
+
+- Preserve the public `TrustServiceConfig` field shape and default
+  `PUBLIC_DISCOVERY_TTL_SECS`.
+- Keep valid configured TTLs unchanged.
+- Reject invalid public metadata lifetime before the service can publish
+  registry discovery documents.
+
+### Completed Material Improvement
+
+Extend `TrustServiceConfig::validate` to reject zero
+`certification_public_metadata_ttl_seconds`. Add a startup-config regression
+proving immediately expired public certification metadata fails closed at the
+service config boundary.
 
 ## Cluster Peer URL Boundary Slice
 

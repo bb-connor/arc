@@ -273,6 +273,11 @@ impl TrustServiceConfig {
                 "cluster sync interval must be non-zero".to_string(),
             ));
         }
+        if self.certification_public_metadata_ttl_seconds == 0 {
+            return Err(CliError::cli_other_error(
+                "certification public metadata TTL must be non-zero".to_string(),
+            ));
+        }
         Ok(())
     }
 }
@@ -299,6 +304,7 @@ pub(crate) fn validate_control_secret(secret: &str, label: &str) -> Result<(), C
 #[cfg(test)]
 mod service_config_tests {
     use super::*;
+    use chio_test_support::prelude::*;
 
     fn base_config() -> TrustServiceConfig {
         let listen = match "127.0.0.1:0".parse() {
@@ -418,6 +424,21 @@ mod service_config_tests {
                 "unexpected error for tenant token mapping `{tenant_id:?}`: {error}",
             );
         }
+    }
+
+    #[test]
+    fn trust_service_config_rejects_zero_public_certification_metadata_ttl() {
+        let mut config = base_config();
+        config.certification_public_metadata_ttl_seconds = 0;
+
+        let error = config.validate().test_unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("certification public metadata TTL must be non-zero"),
+            "unexpected zero TTL error: {error}",
+        );
     }
 }
 
