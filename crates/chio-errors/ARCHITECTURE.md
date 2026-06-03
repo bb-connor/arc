@@ -25,13 +25,16 @@ metadata when a registry entry exists.
 
 - Registry entries already carry canonical URN, domain, severity, summary, help,
   stability, string-code, and JSON-RPC metadata.
-- Callers that want a `ChioError` from an `ErrorCodeSpec` currently reconstruct
-  the diagnostic fields manually, which duplicates registry binding logic.
-- Free-form `Code::new` must remain available for compatibility, so stronger
-  registry invariants need an additive constructor path rather than a breaking
-  validation change.
-- Generated lookup helpers are intentionally simple, but no non-generated API
-  currently centralizes the common "registered error with caller message" path.
+- Registry-bound constructors now centralize the common
+  `ErrorCodeSpec` plus caller message path, but free-form constructors can still
+  create a diagnostic whose code is a registered URN while its domain or
+  severity disagrees with the registry.
+- A code-only registry lookup is useful for hovers and direct registry queries,
+  but treating a mismatched diagnostic as registry-bound can attach stable
+  string-code, stability, or help metadata to a contradictory local error.
+- Generated lookup helpers are intentionally simple. Non-generated diagnostic
+  APIs should own the stronger "is this diagnostic actually bound to the
+  registry entry it names" rule.
 
 ## Security And API Constraints
 
@@ -51,15 +54,18 @@ metadata when a registry entry exists.
 Direct dependents include `chio-cli`, `chio-control-plane`, and `chio-lsp`.
 Downstream consumers through `chio-control-plane` include `chio-hosted-mcp`,
 `chio-mcp-remote`, `chio-conformance`, `chio-mercury`, and `chio-wall`.
-The planned change is additive and should not force dependent source edits.
+The diagnostic API keeps its return type, but `chio-control-plane` reporting
+must use the verified method so it does not attach registry metadata to a
+mismatched diagnostic by raw code alone.
 
 ## Planned Improvement
 
-Add registry-bound constructors for diagnostics and errors. Keep the existing
-free-form constructors intact, but add a path that takes an `ErrorCodeSpec` and
-caller-supplied message, then fills in the canonical URN, domain, severity, and
-help directly from the registry entry.
+Make diagnostic registry binding verified rather than code-only. Keep
+`lookup_error_code` available for direct registry lookup, but make
+`Diagnostic::registry_spec` and `ChioError::registry_spec` return a registry
+entry only when the diagnostic code, domain, and severity all match that entry.
 
-This is architectural because it moves registry binding into the owning crate
-instead of making every consumer rebuild the same structure by convention:
-registry entry + local message -> canonical diagnostic -> `ChioError`.
+This is architectural because it defines the ownership boundary between raw
+registry queries and typed diagnostic binding. Dependents that report
+`ChioError` metadata should use the verified method instead of reattaching
+registry metadata by code alone.

@@ -133,6 +133,33 @@ fn registry_bound_constructors_preserve_registry_metadata() {
 }
 
 #[test]
+fn registry_spec_rejects_registered_code_with_mismatched_metadata() {
+    let spec = match lookup_error_code("urn:chio:error:capability:expired") {
+        Some(spec) => spec,
+        None => panic!("registry fixture should contain capability expired"),
+    };
+
+    let wrong_domain = diagnostic(
+        spec.urn,
+        Domain::Manifest,
+        spec.severity,
+        "registered code with wrong domain",
+    );
+    assert_eq!(wrong_domain.registry_spec(), None);
+
+    let wrong_severity = diagnostic(
+        spec.urn,
+        spec.domain,
+        Severity::Fatal,
+        "registered code with wrong severity",
+    );
+    assert_eq!(wrong_severity.registry_spec(), None);
+
+    let err = wrong_domain.into_error();
+    assert_eq!(err.registry_spec(), None);
+}
+
+#[test]
 fn free_form_diagnostic_keeps_unregistered_code_compatibility() {
     let diagnostic = diagnostic(
         "CHIO-LOCAL-ONLY",

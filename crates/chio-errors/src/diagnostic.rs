@@ -69,7 +69,8 @@ impl Diagnostic {
 
     #[must_use]
     pub fn registry_spec(&self) -> Option<&'static ErrorCodeSpec> {
-        lookup_error_code(self.code.as_str())
+        let spec = lookup_error_code(self.code.as_str())?;
+        (self.domain == spec.domain && self.severity == spec.severity).then_some(spec)
     }
 
     #[must_use]

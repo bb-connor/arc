@@ -14,3 +14,8 @@ For registered errors, prefer `Diagnostic::from_spec`, `ChioError::from_spec`,
 registry entry's URN, domain, severity, and help text to the caller's local
 message, while the free-form constructors remain available for legacy or
 unregistered surfaces.
+
+Use `lookup_error_code` for direct registry queries by URN. Use
+`Diagnostic::registry_spec` or `ChioError::registry_spec` when reporting a
+diagnostic as registry-bound, because those methods verify that the diagnostic's
+domain and severity still match the registry entry it names.
