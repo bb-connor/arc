@@ -31,6 +31,29 @@ pub struct ChioAcpEdgeCompatibility<'a> {
     edge: &'a ChioAcpEdge,
 }
 
+fn validate_execution_context(execution: &AcpKernelExecutionContext) -> Result<(), AcpEdgeError> {
+    validate_execution_agent_id(&execution.agent_id)
+}
+
+fn validate_execution_agent_id(agent_id: &str) -> Result<(), AcpEdgeError> {
+    if agent_id.trim().is_empty() {
+        return Err(AcpEdgeError::InvalidRequest(
+            "ACP execution agent_id must not be empty".to_string(),
+        ));
+    }
+    if agent_id.trim() != agent_id {
+        return Err(AcpEdgeError::InvalidRequest(
+            "ACP execution agent_id must not include leading or trailing whitespace".to_string(),
+        ));
+    }
+    if agent_id.chars().any(|character| character.is_control()) {
+        return Err(AcpEdgeError::InvalidRequest(
+            "ACP execution agent_id must not include control characters".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 impl ChioAcpEdge {
     /// Create a new ACP edge from Chio tool manifests.
     pub fn new(config: AcpEdgeConfig, manifests: Vec<ToolManifest>) -> Result<Self, AcpEdgeError> {
@@ -240,6 +263,10 @@ impl ChioAcpEdge {
         execution: &AcpKernelExecutionContext,
         kernel: Option<&ChioKernel>,
     ) -> PermissionDecision {
+        if validate_execution_context(execution).is_err() {
+            return PermissionDecision::Deny;
+        }
+
         let Some(binding) = self.capability_bindings.get(&request.capability_id) else {
             return PermissionDecision::Deny;
         };
@@ -329,6 +356,7 @@ impl ChioAcpEdge {
         kernel: &ChioKernel,
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationResult, AcpEdgeError> {
+        validate_execution_context(execution)?;
         let binding = self.capability_binding(capability_id)?;
         let request_suffix = current_unix_timestamp();
         let request = self.build_execution_request(
@@ -360,6 +388,7 @@ impl ChioAcpEdge {
         execution: &AcpKernelExecutionContext,
         reason: impl Into<String>,
     ) -> Result<AcpInvocationResult, AcpEdgeError> {
+        validate_execution_context(execution)?;
         let binding = self.capability_binding(capability_id)?;
         let request_suffix = current_unix_timestamp();
         let request = self.build_execution_request(
@@ -394,6 +423,7 @@ impl ChioAcpEdge {
         kernel: &ChioKernel,
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationResult, AcpEdgeError> {
+        validate_execution_context(execution)?;
         let binding = self.capability_binding(capability_id)?;
         let request_suffix = current_unix_timestamp();
         let request = self.build_execution_request(
@@ -503,6 +533,9 @@ impl ChioAcpEdge {
                     Ok(request) => request,
                     Err(error) => return Self::jsonrpc_error_response(id, error),
                 };
+                if let Err(error) = validate_execution_context(execution) {
+                    return Self::jsonrpc_error_response(id, error);
+                }
                 let decision = self.evaluate_permission_with_kernel(&request, kernel, execution);
                 json!({
                     "jsonrpc": "2.0",
@@ -520,6 +553,9 @@ impl ChioAcpEdge {
                         Ok(parsed) => parsed,
                         Err(error) => return Self::jsonrpc_error_response(id, error),
                     };
+                if let Err(error) = validate_execution_context(execution) {
+                    return Self::jsonrpc_error_response(id, error);
+                }
                 match self.invoke(&capability_id, arguments, kernel, execution) {
                     Ok(result) => json!({
                         "jsonrpc": "2.0",
@@ -666,6 +702,9 @@ impl ChioAcpEdge {
                 Ok(parsed) => parsed,
                 Err(error) => return Self::jsonrpc_error_response(id, error),
             };
+        if let Err(error) = validate_execution_context(execution) {
+            return Self::jsonrpc_error_response(id, error);
+        }
         match self.start_stream_task(&capability_id, arguments, execution) {
             Ok(task) => json!({
                 "jsonrpc": "2.0",
@@ -695,6 +734,9 @@ impl ChioAcpEdge {
             Ok(task_id) => task_id,
             Err(error) => return Self::jsonrpc_error_response(id, error),
         };
+        if let Err(error) = validate_execution_context(execution) {
+            return Self::jsonrpc_error_response(id, error);
+        }
         match self.cancel_stream_task(&task_id, execution) {
             Ok(task) => json!({
                 "jsonrpc": "2.0",
@@ -725,6 +767,9 @@ impl ChioAcpEdge {
             Ok(task_id) => task_id,
             Err(error) => return Self::jsonrpc_error_response(id, error),
         };
+        if let Err(error) = validate_execution_context(execution) {
+            return Self::jsonrpc_error_response(id, error);
+        }
         match self.resume_stream_task(&task_id, kernel, execution) {
             Ok((task, result)) => json!({
                 "jsonrpc": "2.0",
@@ -751,6 +796,7 @@ impl ChioAcpEdge {
         arguments: Value,
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationTask, AcpEdgeError> {
+        validate_execution_context(execution)?;
         let binding = self.capability_binding(capability_id)?;
         self.ensure_deferred_task_capacity()?;
         let task_id = self.next_task_id();
@@ -790,6 +836,7 @@ impl ChioAcpEdge {
         task_id: &str,
         execution: &AcpKernelExecutionContext,
     ) -> Result<AcpInvocationTask, AcpEdgeError> {
+        validate_execution_context(execution)?;
         self.prune_deferred_tasks();
         let mut tasks = self.tasks.borrow_mut();
         let task = tasks
@@ -822,6 +869,7 @@ impl ChioAcpEdge {
         kernel: &ChioKernel,
         execution: &AcpKernelExecutionContext,
     ) -> Result<(AcpInvocationTask, Value), AcpEdgeError> {
+        validate_execution_context(execution)?;
         self.prune_deferred_tasks();
         let task_snapshot = {
             let tasks = self.tasks.borrow();

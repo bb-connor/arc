@@ -1050,6 +1050,62 @@ mod tests {
     }
 
     #[test]
+    fn invoke_rejects_blank_execution_agent_id_before_dispatch() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let mut kernel = ChioKernel::new(config);
+        kernel.register_tool_server(Box::new(test_server()));
+
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "test-srv", "read_file"),
+            agent_id: "\n".to_string(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let error = edge
+            .invoke("read_file", json!({"path": "/tmp"}), &kernel, &execution)
+            .unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "invalid request: ACP execution agent_id must not be empty"
+        );
+    }
+
+    #[test]
+    fn invoke_rejects_control_character_execution_agent_id_before_dispatch() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let mut kernel = ChioKernel::new(config);
+        kernel.register_tool_server(Box::new(test_server()));
+
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "test-srv", "read_file"),
+            agent_id: format!("{}{}suffix", subject.public_key().to_hex(), '\u{7}'),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let error = edge
+            .invoke("read_file", json!({"path": "/tmp"}), &kernel, &execution)
+            .unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "invalid request: ACP execution agent_id must not include control characters"
+        );
+    }
+
+    #[test]
     fn invoke_with_kernel_denial_still_emits_receipt_metadata() {
         let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
@@ -1486,6 +1542,43 @@ mod tests {
         assert_eq!(
             response["result"]["metadata"]["chio"]["invokeAuthorityPath"].as_str(),
             Some("cross_protocol_orchestrator")
+        );
+    }
+
+    #[test]
+    fn jsonrpc_permission_rejects_padded_execution_agent_id_before_preview() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "test-srv", "read_file"),
+            agent_id: format!(" {} ", subject.public_key().to_hex()),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 49,
+                "method": "session/request_permission",
+                "params": {
+                    "capabilityId": "read_file",
+                    "arguments": {"path": "/tmp"}
+                }
+            }),
+            &kernel,
+            &execution,
+        );
+
+        assert_eq!(response["error"]["code"], -32602);
+        assert_eq!(
+            response["error"]["message"].as_str(),
+            Some("ACP execution agent_id must not include leading or trailing whitespace")
         );
     }
 
@@ -2258,6 +2351,45 @@ mod tests {
             .as_str()
             .test_unwrap()
             .contains("too many deferred tasks"));
+    }
+
+    #[test]
+    fn jsonrpc_stream_rejects_padded_execution_agent_id_before_task_retention() {
+        let edge =
+            ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "streaming-srv", "search_stream"),
+            agent_id: format!(" {} ", subject.public_key().to_hex()),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let rejected = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 2_500,
+                "method": "tool/stream",
+                "params": {
+                    "capabilityId": "search_stream",
+                    "arguments": {"query": "test"}
+                }
+            }),
+            &kernel,
+            &execution,
+        );
+
+        assert_eq!(rejected["error"]["code"], -32602);
+        assert_eq!(
+            rejected["error"]["message"].as_str(),
+            Some("ACP execution agent_id must not include leading or trailing whitespace")
+        );
+        assert!(edge.tasks.borrow().is_empty());
     }
 
     #[test]

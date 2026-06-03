@@ -153,3 +153,50 @@ Extended ACP JSON-RPC identifier parsing so `params.capabilityId` and
 `params.taskId` reject leading or trailing whitespace, with focused
 regressions proving padded capability and task identifiers fail before
 downstream lookup.
+
+## Execution Context Agent Identity Slice
+
+### Current Boundary
+
+- `types.rs` exposes `AcpKernelExecutionContext`, including authenticated
+  caller `agent_id` for permission preview, kernel execution, and deferred-task
+  ownership.
+- `edge.rs` copies `execution.agent_id` into `CrossProtocolExecutionRequest`
+  and retained `DeferredAcpTask.owner_agent_id`.
+- Direct permission preview returns `Deny` for subject mismatches, but JSON-RPC
+  permission preview, invocation, and lifecycle handling do not reject malformed
+  authenticated identity at the ACP edge boundary.
+
+### Pain Point
+
+Blank agent ids depend on downstream cross-protocol validation during blocking
+invocation, while padded non-empty ids can be stored as distinct deferred-task
+owners before any kernel execution occurs. JSON-RPC permission preview also
+turns malformed authenticated caller metadata into a normal denial instead of
+an invalid-params boundary error.
+
+### Security And API Constraints
+
+- Preserve `AcpKernelExecutionContext` as a public struct.
+- Preserve direct permission-preview return type; malformed execution context
+  should continue to fail closed as `Deny` there.
+- Reject malformed JSON-RPC execution context with `-32602` before permission
+  preview, invocation, deferred task allocation, owner checks, lifecycle
+  mutation, or kernel dispatch.
+- Do not trim or normalize authenticated caller metadata.
+- Preserve successful exact agent-id behavior and existing owner checks.
+
+### Affected Dependents
+
+- Callers with exact authenticated agent ids are unchanged.
+- Callers that pass blank, padded, or control-bearing execution agent ids now
+  receive `AcpEdgeError::InvalidRequest` through direct invocation/lifecycle
+  APIs or JSON-RPC `-32602` where a JSON-RPC method uses the execution context.
+
+### Completed Material Improvement
+
+Add an ACP edge execution-context validator and apply it to permission preview,
+blocking invocation, MCP-target invocation, deferred stream creation,
+cancellation, resume, and test-only pending projection. Add focused regressions
+proving malformed agent ids fail closed before dispatch, preview, or task
+retention.
