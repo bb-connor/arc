@@ -528,6 +528,49 @@ impl PeerPinsDocument {
                 "peer pins must include peers, vendors, and action classes".to_string(),
             ));
         }
+        let mut peer_kernel_ids = BTreeSet::new();
+        for peer in &self.peers {
+            validate_non_empty(&peer.kernel_id, "peer.kernelId")
+                .map_err(ChioAuthorityError::TrustBundle)?;
+            peer.ladder_manifest_ref
+                .validate()
+                .map_err(|error| ChioAuthorityError::TrustBundle(error.to_string()))?;
+            if !peer_kernel_ids.insert(peer.kernel_id.as_str()) {
+                return Err(ChioAuthorityError::TrustBundle(
+                    "duplicate peer kernel id".to_string(),
+                ));
+            }
+        }
+
+        let mut vendor_ids = BTreeSet::new();
+        for vendor in &self.vendors {
+            validate_non_empty(&vendor.vendor_id, "vendor.vendorId")
+                .map_err(ChioAuthorityError::TrustBundle)?;
+            if !vendor_ids.insert(vendor.vendor_id.as_str()) {
+                return Err(ChioAuthorityError::TrustBundle(
+                    "duplicate vendor id".to_string(),
+                ));
+            }
+        }
+
+        let mut action_class_ids = BTreeSet::new();
+        let mut action_tool_names = BTreeSet::new();
+        for action_class in &self.action_classes {
+            validate_non_empty(&action_class.action_class_id, "actionClass.actionClassId")
+                .map_err(ChioAuthorityError::TrustBundle)?;
+            validate_non_empty(&action_class.tool_name, "actionClass.toolName")
+                .map_err(ChioAuthorityError::TrustBundle)?;
+            if !action_class_ids.insert(action_class.action_class_id.as_str()) {
+                return Err(ChioAuthorityError::TrustBundle(
+                    "duplicate action class id".to_string(),
+                ));
+            }
+            if !action_tool_names.insert(action_class.tool_name.as_str()) {
+                return Err(ChioAuthorityError::TrustBundle(
+                    "duplicate action class tool name".to_string(),
+                ));
+            }
+        }
         ensure_reference_workflow_classes(&self.action_classes)?;
         Ok(())
     }
@@ -1235,6 +1278,38 @@ mod tests {
         }
     }
 
+    fn peer_pins() -> PeerPinsDocument {
+        PeerPinsDocument {
+            schema: PEER_PINS_SCHEMA.to_string(),
+            peers: vec![chio_attest_buyer_core::PeerLadderBinding {
+                kernel_id: "did:chio:vendor-a".to_string(),
+                public_key: key(21).public_key(),
+                ladder_manifest_ref: LadderManifestRef {
+                    manifest_id: "ladder:vendor-a".to_string(),
+                    sha256: "f".repeat(64),
+                    issued_at_unix_ms: NOW - 1_000,
+                    expires_at_unix_ms: NOW + 60_000,
+                },
+            }],
+            vendors: vec![VendorKeyBinding {
+                vendor_id: "vendor-a".to_string(),
+                public_key: key(21).public_key(),
+            }],
+            action_classes: vec![
+                ChioTrustedActionClass {
+                    action_class_id: WORKFLOW_GRANT_ISSUE_ACTION_CLASS_ID.to_string(),
+                    tool_name: WORKFLOW_GRANT_ISSUE_ACTION_CLASS_ID.to_string(),
+                    kind: chio_attest_buyer_core::ChioActionClassKind::Routine,
+                },
+                ChioTrustedActionClass {
+                    action_class_id: WORKFLOW_AGGREGATE_PUBLISH_ACTION_CLASS_ID.to_string(),
+                    tool_name: WORKFLOW_AGGREGATE_PUBLISH_ACTION_CLASS_ID.to_string(),
+                    kind: chio_attest_buyer_core::ChioActionClassKind::Routine,
+                },
+            ],
+        }
+    }
+
     #[test]
     fn issuer_outputs_verifier_compatible_lease_and_governance_artifacts() {
         let bundle =
@@ -1368,6 +1443,16 @@ mod tests {
         );
         ChioVerifierTrustBundle::from_document(trust_bundle)
             .expect("Chio-native trust bundle remains verifier compatible");
+    }
+
+    #[test]
+    fn peer_pins_reject_duplicate_peer_kernel_ids_before_bundle_assembly() {
+        let mut peer_pins = peer_pins();
+        peer_pins.peers.push(peer_pins.peers[0].clone());
+
+        let error = peer_pins.validate().unwrap_err();
+
+        assert!(error.to_string().contains("duplicate peer kernel id"));
     }
 
     #[test]
