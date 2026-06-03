@@ -120,3 +120,39 @@ Extend `RouteDispatch` with request-body requirement metadata, validate missing
 or null `body` arguments before live dispatch, and add borrowed plus owned
 bridge regression tests proving the dispatcher does not run on malformed body
 operations.
+
+## Observed Response Byte Enforcement Slice
+
+### Current Boundary
+
+Live dispatchers return `BridgedResponse` values after reading upstream HTTP
+responses. `HttpEgressContract::max_response_bytes` must be enforced against
+the upstream bytes the dispatcher observed, before the bridge returns tool
+content to MCP callers.
+
+### Pain Point
+
+When `observed_body_bytes` is absent, the bridge previously measured the
+reserialized JSON body. That can be smaller than the upstream byte stream after
+the dispatcher parses or normalizes a response, weakening the response-size
+egress contract.
+
+### Security and API Constraints
+
+Keep the public `BridgedResponse` field optional for source compatibility, but
+make live bridge dispatch fail closed when a dispatcher omits the observed byte
+count. Redirect rejection remains independent because redirects are denied
+before accepted response content is returned.
+
+### Affected Dependents
+
+`chio-conformance` OpenAPI bridge SSRF tests must provide the observed byte
+count when proving response-size denial. Other callers that use live
+dispatchers without the byte count now receive `BridgeError::UpstreamError`
+instead of fallback measurement.
+
+### Completed Material Improvement
+
+Removed fallback JSON reserialization from response-size enforcement, required
+`observed_body_bytes` for live bridge responses, and added a regression that
+fails closed when dispatchers omit the observed byte count.

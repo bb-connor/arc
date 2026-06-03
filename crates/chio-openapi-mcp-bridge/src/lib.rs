@@ -110,8 +110,9 @@ pub struct BridgedResponse {
     /// Response body.
     pub body: Value,
     /// Raw response body byte count observed by the dispatcher before JSON
-    /// parsing or normalization. When absent, the bridge falls back to the
-    /// compact JSON body length for legacy in-process dispatchers.
+    /// parsing or normalization. Live dispatchers must provide this so the
+    /// egress contract is enforced against upstream bytes, not reserialized
+    /// JSON.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub observed_body_bytes: Option<u64>,
     /// Whether the response indicates an error.
@@ -124,7 +125,8 @@ pub struct BridgedResponse {
 /// This allows the bridge to remain transport-agnostic (no reqwest dependency).
 /// Dispatchers must perform a single-hop request and return 3xx redirects
 /// without following them internally. A dispatcher that follows redirects
-/// violates the bridge egress contract.
+/// violates the bridge egress contract. Live dispatchers must also populate
+/// `BridgedResponse::observed_body_bytes` with the upstream body byte count.
 pub type HttpDispatcher =
     dyn Fn(&str, &str, &Value) -> Result<BridgedResponse, BridgeError> + Send + Sync;
 
@@ -524,7 +526,7 @@ mod tests {
         let response = BridgedResponse {
             status: 202,
             body: json!({"ok": true}),
-            observed_body_bytes: None,
+            observed_body_bytes: Some(64),
             is_error: false,
         };
 
@@ -608,7 +610,7 @@ mod tests {
                     "url": url,
                     "pets": [{"name": "Fido"}]
                 }),
-                observed_body_bytes: None,
+                observed_body_bytes: Some(64),
                 is_error: false,
             })
         }));
@@ -626,7 +628,7 @@ mod tests {
             Ok(BridgedResponse {
                 status: 404,
                 body: json!({"error": "not found"}),
-                observed_body_bytes: None,
+                observed_body_bytes: Some(64),
                 is_error: true,
             })
         }));
@@ -644,7 +646,7 @@ mod tests {
             Ok(BridgedResponse {
                 status: 200,
                 body: json!({"ok": true}),
-                observed_body_bytes: None,
+                observed_body_bytes: Some(64),
                 is_error: false,
             })
         }));
@@ -665,7 +667,7 @@ mod tests {
             Ok(BridgedResponse {
                 status: 200,
                 body: json!({"oversized": "response"}),
-                observed_body_bytes: None,
+                observed_body_bytes: Some(64),
                 is_error: false,
             })
         }));
@@ -692,6 +694,24 @@ mod tests {
         }));
         let error = bridge.invoke_tool("listPets", json!({})).unwrap_err();
         assert!(format!("{error}").contains("response size"));
+    }
+
+    #[test]
+    fn bridge_dispatcher_requires_observed_response_body_bytes() {
+        let mut bridge =
+            OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config_with_egress()).unwrap();
+        bridge.set_dispatcher(Box::new(|_method, _url, _args| {
+            Ok(BridgedResponse {
+                status: 200,
+                body: json!({"ok": true}),
+                observed_body_bytes: None,
+                is_error: false,
+            })
+        }));
+
+        let error = bridge.invoke_tool("listPets", json!({})).unwrap_err();
+
+        assert!(format!("{error}").contains("observed_body_bytes"));
     }
 
     #[test]
@@ -764,7 +784,7 @@ mod tests {
             Ok(BridgedResponse {
                 status: 200,
                 body: json!({"ok": true}),
-                observed_body_bytes: None,
+                observed_body_bytes: Some(64),
                 is_error: false,
             })
         }));
@@ -818,7 +838,7 @@ mod tests {
             Ok(BridgedResponse {
                 status: 200,
                 body: json!({"receivedUrl": url}),
-                observed_body_bytes: None,
+                observed_body_bytes: Some(64),
                 is_error: false,
             })
         }));
@@ -839,7 +859,7 @@ mod tests {
             Ok(BridgedResponse {
                 status: 200,
                 body: json!({"receivedUrl": url}),
-                observed_body_bytes: None,
+                observed_body_bytes: Some(64),
                 is_error: false,
             })
         }));
@@ -878,7 +898,7 @@ mod tests {
             Ok(BridgedResponse {
                 status: 302,
                 body: json!({"location": "https://169.254.169.254/latest/meta-data"}),
-                observed_body_bytes: None,
+                observed_body_bytes: Some(64),
                 is_error: true,
             })
         }));
@@ -899,7 +919,7 @@ mod tests {
             Ok(BridgedResponse {
                 status: 200,
                 body: json!({"receivedUrl": url}),
-                observed_body_bytes: None,
+                observed_body_bytes: Some(64),
                 is_error: false,
             })
         }));
@@ -952,7 +972,7 @@ mod tests {
             Ok(BridgedResponse {
                 status: 200,
                 body: json!({"receivedUrl": url}),
-                observed_body_bytes: None,
+                observed_body_bytes: Some(64),
                 is_error: false,
             })
         }));

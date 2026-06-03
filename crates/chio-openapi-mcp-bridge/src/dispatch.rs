@@ -169,14 +169,12 @@ pub(crate) fn enforce_bridged_response_body(
     contract: &HttpEgressContract,
     response: &BridgedResponse,
 ) -> Result<(), BridgeError> {
-    let body_bytes = match response.observed_body_bytes {
-        Some(bytes) => bytes,
-        None => serde_json::to_vec(&response.body)
-            .map(|bytes| bytes.len() as u64)
-            .map_err(|err| {
-                BridgeError::UpstreamError(format!("failed to measure bridge response body: {err}"))
-            })?,
-    };
+    let body_bytes = response.observed_body_bytes.ok_or_else(|| {
+        BridgeError::UpstreamError(
+            "OpenAPI bridge dispatcher must provide observed_body_bytes for response-size enforcement"
+                .to_string(),
+        )
+    })?;
     contract.enforce_response_bytes(body_bytes).map_err(|err| {
         BridgeError::UpstreamError(format!("HttpEgressContract rejects bridge response: {err}"))
     })

@@ -638,6 +638,12 @@ mod tests {
                 "request header",
             ),
             (
+                "bad header name separator",
+                test_adapter_config(base_url, public_key.clone())
+                    .with_request_header("X=Partner", "secret-header"),
+                "request header",
+            ),
+            (
                 "bad header value",
                 test_adapter_config(base_url, public_key.clone())
                     .with_request_header("X-Partner", "secret\r\nInjected: yes"),
@@ -678,9 +684,21 @@ mod tests {
                 "authorization scheme",
             ),
             (
+                "bad authorization scheme separator",
+                test_adapter_config(base_url, public_key.clone())
+                    .with_request_header("Authorization", "Bearer=opaque"),
+                "authorization scheme",
+            ),
+            (
                 "bad cookie name",
                 test_adapter_config(base_url, public_key.clone())
                     .with_request_cookie("partner session", "secret-cookie"),
+                "request cookie name",
+            ),
+            (
+                "bad cookie name separator",
+                test_adapter_config(base_url, public_key.clone())
+                    .with_request_cookie("partner=session", "secret-cookie"),
                 "request cookie name",
             ),
             (
