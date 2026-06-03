@@ -94,3 +94,11 @@ ids now receive `BlobStoreError` before any encrypted row is written.
 Strengthen encrypted blob tenant validation from whitespace-only rejection to
 non-empty, unpadded, control-free validation, with a regression proving
 malformed tenant ids fail before persistence.
+
+## Verification Focus
+
+Tests should cover receipt query pagination, checkpoint projection, budget
+usage and hold replay idempotence, rejection of negative unsigned row fields,
+capability-lineage corruption rejection, encrypted blob tenant validation,
+memory provenance isolation, revocation persistence, and dead-letter retention
+without leaking encrypted payload material.

@@ -7,7 +7,7 @@ use regex::Regex;
 
 use chio_kernel::{GuardContext, KernelError, Verdict};
 
-use crate::action::{extract_action, ToolAction};
+use crate::action::{extract_action_checked, ToolAction};
 use crate::forbidden_path::ForbiddenPathGuard;
 
 fn default_forbidden_patterns() -> Vec<String> {
@@ -210,7 +210,10 @@ impl chio_kernel::Guard for ShellCommandGuard {
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<Verdict, KernelError> {
-        let action = extract_action(&ctx.request.tool_name, &ctx.request.arguments);
+        let action = match extract_action_checked(&ctx.request.tool_name, &ctx.request.arguments) {
+            Ok(action) => action,
+            Err(_) => return Ok(Verdict::Deny),
+        };
 
         let commandline = match &action {
             ToolAction::ShellCommand(cmd) => cmd.as_str(),

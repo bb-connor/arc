@@ -136,3 +136,12 @@ Replaced non-empty-only request field checks with orchestrator-owned identity
 validation that requires non-empty, unpadded, control-free execution identity
 fields, with a regression proving padded and control-bearing values fail before
 signed lineage construction.
+
+## Verification Focus
+
+Tests should cover identity-field rejection before route planning, capability
+id and parent-hash mismatch rejection, source-protocol drift rejection,
+metadata byte stability for valid bridge requests, and kernel handoff parity
+for native and registered executors. Edge-crate smoke tests should continue to
+prove that A2A, ACP, MCP, and OpenAPI callers inherit the shared orchestrator
+boundary without reimplementing lineage validation.

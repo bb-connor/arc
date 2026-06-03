@@ -32,3 +32,11 @@ Primary dependents are `chio-core` and `chio-kernel` reexports, `chio-control-pl
 ## Validation Boundary
 
 `credit/capital_and_execution.rs` exposes the owning-crate capital execution validation boundary. The validator covers authority chains, execution windows, custody-provider authority, capital rail identifiers, intended versus observed execution, cancel instruction shape, transfer receipt provenance, and nonzero amount rules. `chio-control-plane` reuses that validator through a thin status-mapping wrapper instead of keeping the generic economic contract checks as downstream-only logic.
+
+## Verification Focus
+
+Tests should cover schema-string stability, signed IOU envelope compatibility,
+capital instruction validation, stale or missing authority rejection, execution
+window rejection, custody-provider authority mismatch, nonzero amount rules,
+cancel instruction shape, transfer receipt provenance, and downstream
+control-plane reuse of the owning validator.

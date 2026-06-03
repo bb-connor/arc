@@ -4,60 +4,67 @@ import os
 import unittest
 from unittest.mock import patch
 
-from fastapi.testclient import TestClient
+import httpx
 
 from app import build_chio_config, create_app
 
 
-class FastAPIAppTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.client = TestClient(create_app(enable_chio=False))
+class FastAPIAppTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self) -> None:
+        transport = httpx.ASGITransport(app=create_app(enable_chio=False))
+        self.client = httpx.AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+        )
 
-    def test_healthz(self) -> None:
-        response = self.client.get("/healthz")
+    async def asyncTearDown(self) -> None:
+        await self.client.aclose()
+
+    async def test_healthz(self) -> None:
+        response = await self.client.get("/healthz")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
 
-    def test_hello(self) -> None:
-        response = self.client.get("/hello")
+    async def test_hello(self) -> None:
+        response = await self.client.get("/hello")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"message": "hello from fastapi"})
 
-    def test_echo_defaults_count(self) -> None:
-        response = self.client.post("/echo", json={"message": "hello"})
+    async def test_echo_defaults_count(self) -> None:
+        response = await self.client.post("/echo", json={"message": "hello"})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"message": "hello", "count": 1})
 
-    def test_echo_requires_nonempty_message(self) -> None:
-        response = self.client.post("/echo", json={"message": "", "count": 1})
+    async def test_echo_requires_nonempty_message(self) -> None:
+        response = await self.client.post("/echo", json={"message": "", "count": 1})
 
         self.assertEqual(response.status_code, 422)
 
-    def test_echo_rejects_coerced_count(self) -> None:
-        response = self.client.post("/echo", json={"message": "hello", "count": "2"})
+    async def test_echo_rejects_coerced_count(self) -> None:
+        response = await self.client.post("/echo", json={"message": "hello", "count": "2"})
 
         self.assertEqual(response.status_code, 422)
 
-    def test_echo_rejects_boolean_count(self) -> None:
-        response = self.client.post("/echo", json={"message": "hello", "count": True})
+    async def test_echo_rejects_boolean_count(self) -> None:
+        response = await self.client.post("/echo", json={"message": "hello", "count": True})
 
         self.assertEqual(response.status_code, 422)
 
-    def test_echo_rejects_extra_fields(self) -> None:
-        response = self.client.post(
+    async def test_echo_rejects_extra_fields(self) -> None:
+        response = await self.client.post(
             "/echo",
             json={"message": "hello", "count": 1, "admin": True},
         )
 
         self.assertEqual(response.status_code, 422)
 
-    def test_builtin_docs_are_disabled(self) -> None:
+    async def test_builtin_docs_are_disabled(self) -> None:
         for path in ("/docs", "/redoc", "/openapi.json"):
             with self.subTest(path=path):
-                response = self.client.get(path)
+                response = await self.client.get(path)
                 self.assertEqual(response.status_code, 404)
 
 

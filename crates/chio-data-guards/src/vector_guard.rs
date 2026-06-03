@@ -64,7 +64,7 @@ use serde_json::Value;
 use tracing::warn;
 
 use chio_core::capability::{ChioScope, Constraint, SqlOperationClass, ToolGrant};
-use chio_guards::{extract_action, ToolAction};
+use chio_guards::{extract_action_checked, ToolAction};
 use chio_kernel::{GuardContext, KernelError, Verdict};
 use thiserror::Error;
 
@@ -499,7 +499,10 @@ impl chio_kernel::Guard for VectorDbGuard {
     fn evaluate(&self, ctx: &GuardContext) -> Result<Verdict, KernelError> {
         let tool = &ctx.request.tool_name;
         let args = &ctx.request.arguments;
-        let action = extract_action(tool, args);
+        let action = match extract_action_checked(tool, args) {
+            Ok(action) => action,
+            Err(_) => return Ok(Verdict::Deny),
+        };
 
         let database = match &action {
             ToolAction::DatabaseQuery { database, .. } => database.clone(),
@@ -920,6 +923,41 @@ mod tests {
             server_id: "srv".to_string(),
             agent_id: "agent".to_string(),
             arguments: serde_json::json!({"namespace": "tenant-a"}),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        };
+        let scope = ChioScope::default();
+        let agent_id = String::from("agent");
+        let server_id = String::from("srv");
+        let verdict = guard
+            .evaluate(&GuardContext {
+                request: &request,
+                scope: &scope,
+                agent_id: &agent_id,
+                server_id: &server_id,
+                session_filesystem_roots: None,
+                matched_grant_index: None,
+            })
+            .unwrap();
+        assert_eq!(verdict, Verdict::Deny);
+    }
+
+    #[test]
+    fn evaluate_denies_malformed_vector_action_arguments() {
+        let guard = VectorDbGuard::new(VectorGuardConfig {
+            allow_all: true,
+            ..Default::default()
+        });
+        let request = ToolCallRequest {
+            request_id: "req-vector-malformed-action".to_string(),
+            capability: test_capability(),
+            tool_name: "vector_query".to_string(),
+            server_id: "srv".to_string(),
+            agent_id: "agent".to_string(),
+            arguments: serde_json::json!({"collection": ["docs"], "top_k": 5}),
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,

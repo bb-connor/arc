@@ -18,6 +18,11 @@
 //! The two families deliberately collide on the `test_unwrap` method name, so a
 //! single source file should import exactly one of them.
 //!
+//! The [`loopback`] module provides shared helpers for integration tests that
+//! need to bind local listeners. Tests can probe whether the current sandbox
+//! permits loopback sockets and return early only when the operating system
+//! denies the bind itself.
+//!
 //! These helpers are intended for use from `#[cfg(test)]` code only. Add the
 //! crate as a `[dev-dependencies]` entry and bring the traits into scope with
 //! `use chio_test_support::prelude::*;` (or `use chio_test_support::ctx::*;`).
@@ -177,6 +182,79 @@ pub mod prelude {
     pub use crate::plain::{TestResultErr, TestResultOk};
 }
 
+/// Loopback listener helpers for integration tests that spawn local services.
+///
+/// CI runners should normally allow `127.0.0.1:0` binds. Locked-down local
+/// sandboxes can deny the bind with `PermissionDenied`, in which case tests may
+/// return early after calling [`skip_when_loopback_bind_denied`]. Other bind
+/// errors still fail the test because they may indicate a real regression.
+pub mod loopback {
+    use std::io::{self, ErrorKind};
+    use std::net::{SocketAddr, TcpListener};
+
+    /// Return true when this process can bind an ephemeral IPv4 loopback port.
+    pub fn loopback_bind_available() -> bool {
+        TcpListener::bind(("127.0.0.1", 0)).is_ok()
+    }
+
+    /// Return true only when the local environment denies loopback binding.
+    ///
+    /// Unexpected probe failures panic instead of being treated as a skip so a
+    /// broken test environment does not hide production bind regressions.
+    #[track_caller]
+    pub fn skip_when_loopback_bind_denied(test_name: &str) -> bool {
+        match TcpListener::bind(("127.0.0.1", 0)) {
+            Ok(listener) => {
+                drop(listener);
+                false
+            }
+            Err(error) if is_loopback_bind_denied(&error) => {
+                eprintln!("skipping {test_name}: loopback bind denied: {error}");
+                true
+            }
+            Err(error) => panic!("probe loopback bind for {test_name}: {error}"),
+        }
+    }
+
+    /// Reserve an ephemeral loopback address for a local test server.
+    ///
+    /// Callers should invoke [`skip_when_loopback_bind_denied`] at the start of
+    /// a socket-backed test before reserving an address. If they do not, a
+    /// sandbox permission failure is reported with a diagnostic that points at
+    /// the missing probe.
+    #[track_caller]
+    pub fn reserve_listen_addr() -> SocketAddr {
+        reserve_listen_addr_for("integration test")
+    }
+
+    /// Reserve an ephemeral loopback address with a diagnostic label.
+    #[track_caller]
+    pub fn reserve_listen_addr_for(label: &str) -> SocketAddr {
+        match TcpListener::bind("127.0.0.1:0") {
+            Ok(listener) => {
+                let addr = match listener.local_addr() {
+                    Ok(addr) => addr,
+                    Err(error) => panic!("read listener addr for {label}: {error}"),
+                };
+                drop(listener);
+                addr
+            }
+            Err(error) if is_loopback_bind_denied(&error) => panic!(
+                "loopback bind denied while reserving address for {label}: {error}; \
+                 call skip_when_loopback_bind_denied at test start"
+            ),
+            Err(error) => panic!("bind temp listener for {label}: {error}"),
+        }
+    }
+
+    /// True for operating-system permission denials caused by locked-down test
+    /// sandboxes. This intentionally excludes address conflicts and malformed
+    /// addresses, which should still fail tests.
+    pub fn is_loopback_bind_denied(error: &io::Error) -> bool {
+        error.kind() == ErrorKind::PermissionDenied
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::panic::{self, Location, UnwindSafe};
@@ -246,6 +324,20 @@ mod tests {
             panic.location_file
         );
         assert_eq!(panic.message, "ctx: denied");
+    }
+
+    #[test]
+    fn loopback_denied_helper_recognizes_permission_denied() {
+        let error = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+
+        assert!(crate::loopback::is_loopback_bind_denied(&error));
+    }
+
+    #[test]
+    fn loopback_denied_helper_rejects_address_conflicts() {
+        let error = std::io::Error::from(std::io::ErrorKind::AddrInUse);
+
+        assert!(!crate::loopback::is_loopback_bind_denied(&error));
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]

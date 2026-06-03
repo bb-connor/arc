@@ -34,3 +34,11 @@
 ## Completed Material Improvement
 
 Add checked pricing constructors and a checked invocation-pricing API that validate tenant id shape and ISO-style uppercase currency codes. Keep the existing unchecked compute function for compatibility, then move settlement-facing marketplace callers onto the checked API.
+
+## Verification Focus
+
+Tests should cover appraisal determinism, signed descriptor and trust-bundle
+round trips, imported appraisal policy rejection, checked pricing rejection for
+empty or padded tenant ids, uppercase currency enforcement, integer minor-unit
+pricing stability, and CLI marketplace paths that persist checked prices rather
+than unchecked catalog values.

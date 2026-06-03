@@ -59,3 +59,10 @@ This is architectural because it makes the cache an explicit LSP lifecycle
 state machine instead of a generic URI map:
 `didOpen` admits and classifies, `didChange` mutates existing state,
 `didClose` removes state.
+
+## Verification Focus
+
+Tests should cover `didOpen` admission, ignored unknown `didChange` events,
+`didClose` removal, UTF-16 position conversion at multibyte boundaries,
+registry-coded diagnostics for `chio.yaml`, manifest, and guard DSL documents,
+and no filesystem reads outside explicit manifest resolution paths.

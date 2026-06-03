@@ -7,7 +7,7 @@
 use chio_kernel::{GuardContext, KernelError, Verdict};
 use glob::Pattern;
 
-use crate::action::{extract_action, ToolAction};
+use crate::action::{extract_action_checked, ToolAction};
 use crate::path_normalization::{
     normalize_path_for_policy, normalize_path_for_policy_lexical_absolute,
     normalize_path_for_policy_with_fs,
@@ -183,7 +183,10 @@ impl chio_kernel::Guard for PathAllowlistGuard {
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<Verdict, KernelError> {
-        let action = extract_action(&ctx.request.tool_name, &ctx.request.arguments);
+        let action = match extract_action_checked(&ctx.request.tool_name, &ctx.request.arguments) {
+            Ok(action) => action,
+            Err(_) => return Ok(Verdict::Deny),
+        };
         let Some(path) = action.filesystem_path() else {
             return Ok(Verdict::Allow);
         };

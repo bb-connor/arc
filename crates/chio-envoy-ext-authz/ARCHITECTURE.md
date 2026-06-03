@@ -95,3 +95,11 @@ kernel attempted to request.
 Make deny response construction compute the admitted Envoy status once and use
 that same value for the `DeniedHttpResponse` and dynamic metadata. Add a
 focused regression proving unsupported deny statuses report 403 in both places.
+
+## Verification Focus
+
+Tests should cover translation rejection for malformed Envoy requests, stable
+fail-closed response bodies for translation and kernel faults, deny-status
+metadata matching the admitted Envoy status, absence of raw bearer tokens and
+request bodies in metadata, and preservation of supported policy deny statuses
+such as 401, 403, 429, and 503.

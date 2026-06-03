@@ -49,3 +49,10 @@
 Reject parameters whose `in` field is absent, empty, or not a string. Keep the
 existing compatibility behavior for explicitly unknown string locations by
 mapping them to query, matching the current integration spec text.
+
+## Verification Focus
+
+Tests should cover JSON and YAML parsing parity, local `$ref` resolution,
+required parameter fields, malformed `in` rejection, deterministic tool
+ordering, stable generated input schemas, `x-chio-*` extension parsing, and
+bridge compatibility through `chio-openapi-mcp-bridge` for valid specs.

@@ -12,7 +12,7 @@
 //! feature re-enables `std`-backed error impls via `thiserror`, along with
 //! the `std` feature on every transitive dependency.
 
-#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
 
 extern crate alloc;
 

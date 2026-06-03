@@ -129,7 +129,7 @@ pub use secret_leak::SecretLeakGuard;
 pub use shell_command::{ShellCommandConfigError, ShellCommandGuard};
 pub use velocity::VelocityGuard;
 
-pub use action::{extract_action, ToolAction};
+pub use action::{extract_action, extract_action_checked, MalformedAction, ToolAction};
 
 pub use external::{
     AsyncGuardAdapter, AsyncGuardAdapterBuilder, AsyncGuardAdapterConfig, CircuitBreaker,

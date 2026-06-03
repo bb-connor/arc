@@ -1,5 +1,13 @@
 # bilateral-invocation Architecture Notes
 
+## Boundary
+
+The example boundary is the local bilateral fixture itself: it constructs a
+small signed invocation scenario, runs the production partial verifier, and
+prints the resulting evidence summary. It must not become a mock-only demo or a
+generic receipt pretty-printer because the value of the example is exercising
+the real bilateral co-signing path.
+
 ## Module Boundaries
 
 This package is an executable example for the local bilateral invocation

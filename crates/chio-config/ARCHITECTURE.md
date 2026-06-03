@@ -44,3 +44,11 @@ The loader separates general string interpolation from trusted config
 ingestion and moves the YAML-scalar safety invariant to the earliest point in
 the load lifecycle:
 raw config -> loader-safe interpolation -> YAML deserialization -> validation.
+
+## Verification Focus
+
+Tests should cover unknown-field rejection, missing interpolation variables,
+unsafe interpolation defaults, YAML boundary injection attempts, duplicate
+adapter and edge ids, missing adapter references, auth block completeness,
+blank or padded bearer/API-key headers, logging validation, and optional fuzz
+entrypoints staying outside the default dependency graph.

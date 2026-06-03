@@ -227,6 +227,19 @@ lto = "fat"
 strip = "symbols"
 panic = "abort"
 
+# Dev/test debuginfo is disabled to keep `target/` from exploding. With ~130+
+# workspace members, the default `debug = 2` made a full `cargo test --workspace`
+# materialise ~130G+ of debuginfo and exhaust the disk mid-run. `debug = 0` cuts
+# dev/test artifacts by well over half. Trade-off: backtraces lose file:line.
+# Bump to `debug = 1` (line tables only) if you need them and have disk headroom.
+# Debug-assertions and overflow-checks are unaffected (still on), so test
+# behaviour is unchanged.
+[profile.dev]
+debug = 0
+
+[profile.test]
+debug = 0
+
 [workspace.dependencies]
 async-trait = "0.1"
 aws-sdk-bedrockruntime = { version = "1.130.0", default-features = false, features = [

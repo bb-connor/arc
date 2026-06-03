@@ -59,6 +59,15 @@ inventory and stack do not actually share.
 - `validate_qualification_matrix` remains shape-only until a separate
   contextual matrix validator is added.
 
+## Verification Focus
+
+Tests should cover facade export stability, extension inventory/package graph
+agreement in both directions, manifest negotiation rejection paths, identity
+network validation, and byte-stable serde for public protocol artifacts that
+flow through this facade. When lower-level crates add signed or canonical
+types, `chio-core` verification should prove the re-export path does not
+change their construction, validation, or serialized field names.
+
 ## Improvement In This Slice
 
 Strengthen `validate_official_stack_package` so the inventory and official
