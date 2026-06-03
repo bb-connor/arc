@@ -62,9 +62,16 @@ human approval workflows.
 
 ## Planned Improvement
 
-Unify caller identity normalization so direct proxy requests and evaluator
-requests reject the same malformed bearer/API-key credentials and produce the
-same anonymous identity fallback. This is architectural rather than cosmetic:
-the signed receipt caller identity is part of the product trust boundary, and
-split parsing lets one path treat blank or padded authorization material as an
-authenticated caller while another path treats it as anonymous.
+The caller identity helper is now shared by proxy and evaluator paths, but the
+underlying header map lookups still recognize only selected spellings such as
+`Authorization`, `authorization`, `X-Chio-Capability`, and
+`x-chio-capability`. HTTP header names are case-insensitive, so this product
+boundary must use one case-insensitive lookup for caller credentials,
+capability transport, revocation preflight, and upstream header scrubbing.
+
+Planned improvement for this slice: introduce a shared case-insensitive header
+lookup inside the evaluator/proxy boundary and route all Chio authorization
+header decisions through it. This is architectural rather than cosmetic because
+header spelling currently changes whether a side-effect request is authorized,
+which caller identity hash is signed into the receipt, and whether Chio
+transport credentials can be recognized consistently before forwarding.

@@ -214,10 +214,7 @@ fn extract_presented_capability<'a>(
     headers: &'a HashMap<String, String>,
     query: &'a HashMap<String, String>,
 ) -> Option<&'a str> {
-    headers
-        .get("x-chio-capability")
-        .or_else(|| headers.get("X-Chio-Capability"))
-        .map(String::as_str)
+    header_value(headers, "x-chio-capability")
         .or_else(|| query.get("chio_capability").map(String::as_str))
 }
 
@@ -291,10 +288,7 @@ fn path_segment_matches_pattern(path_segment: &str, pattern_segment: &str) -> bo
 /// Extract caller identity from HTTP headers.
 pub(crate) fn caller_identity_from_headers(headers: &HashMap<String, String>) -> CallerIdentity {
     // Authorization headers become stable hashed caller identities.
-    if let Some(auth) = headers
-        .get("authorization")
-        .or_else(|| headers.get("Authorization"))
-    {
+    if let Some(auth) = header_value(headers, "authorization") {
         if let Some(token) = auth.strip_prefix("Bearer ") {
             if credential_value_is_well_formed(token) {
                 let token_hash = chio_core_types::sha256_hex(token.as_bytes());
@@ -310,16 +304,13 @@ pub(crate) fn caller_identity_from_headers(headers: &HashMap<String, String>) ->
     }
 
     // API keys follow the same non-secret identity derivation.
-    for key_header in &["x-api-key", "X-Api-Key", "X-API-Key"] {
-        if let Some(key_value) = headers.get(*key_header) {
-            if !credential_value_is_well_formed(key_value) {
-                continue;
-            }
+    if let Some(key_value) = header_value(headers, "x-api-key") {
+        if credential_value_is_well_formed(key_value) {
             let key_hash = chio_core_types::sha256_hex(key_value.as_bytes());
             return CallerIdentity {
                 subject: format!("apikey:{}", &key_hash[..16]),
                 auth_method: AuthMethod::ApiKey {
-                    key_name: key_header.to_string(),
+                    key_name: "x-api-key".to_string(),
                     key_hash,
                 },
                 verified: false,
@@ -332,8 +323,20 @@ pub(crate) fn caller_identity_from_headers(headers: &HashMap<String, String>) ->
     CallerIdentity::anonymous()
 }
 
+pub(crate) fn header_value<'a>(
+    headers: &'a HashMap<String, String>,
+    name: &str,
+) -> Option<&'a str> {
+    headers
+        .iter()
+        .find(|(key, _)| key.eq_ignore_ascii_case(name))
+        .map(|(_, value)| value.as_str())
+}
+
 fn credential_value_is_well_formed(value: &str) -> bool {
-    !value.trim().is_empty() && value.trim() == value
+    !value.trim().is_empty()
+        && value.trim() == value
+        && !value.chars().any(|character| character.is_control())
 }
 
 #[cfg(test)]
@@ -395,6 +398,15 @@ mod tests {
     fn extract_bearer_caller() {
         let mut headers = HashMap::new();
         headers.insert("Authorization".to_string(), "Bearer mytoken123".to_string());
+        let caller = caller_identity_from_headers(&headers);
+        assert!(caller.subject.starts_with("bearer:"));
+        assert!(matches!(caller.auth_method, AuthMethod::Bearer { .. }));
+    }
+
+    #[test]
+    fn extract_bearer_caller_accepts_case_insensitive_authorization_header() {
+        let mut headers = HashMap::new();
+        headers.insert("AUTHORIZATION".to_string(), "Bearer mytoken123".to_string());
         let caller = caller_identity_from_headers(&headers);
         assert!(caller.subject.starts_with("bearer:"));
         assert!(matches!(caller.auth_method, AuthMethod::Bearer { .. }));
@@ -794,6 +806,40 @@ mod tests {
         assert_eq!(
             http_status_scope(result.receipt.metadata.as_ref()),
             Some(CHIO_HTTP_STATUS_SCOPE_DECISION)
+        );
+    }
+
+    #[test]
+    fn evaluate_post_accepts_case_insensitive_capability_header() {
+        let keypair = Keypair::generate();
+        let routes = vec![RouteEntry {
+            pattern: "/pets".to_string(),
+            method: HttpMethod::Post,
+            operation_id: Some("createPet".to_string()),
+            policy: PolicyDecision::DenyByDefault,
+        }];
+        let evaluator = RequestEvaluator::new(routes, keypair.clone(), "test-policy".to_string());
+
+        let mut headers = HashMap::new();
+        headers.insert(
+            "X-CHIO-CAPABILITY".to_string(),
+            signed_capability_token_json(&keypair, "cap-uppercase"),
+        );
+
+        let result = evaluator
+            .evaluate(
+                HttpMethod::Post,
+                "/pets",
+                &HashMap::new(),
+                &headers,
+                None,
+                0,
+            )
+            .test_unwrap();
+        assert!(result.verdict.is_allowed());
+        assert_eq!(
+            result.receipt.capability_id.as_deref(),
+            Some("cap-uppercase")
         );
     }
 

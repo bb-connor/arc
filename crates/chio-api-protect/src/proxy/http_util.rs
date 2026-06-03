@@ -85,10 +85,7 @@ pub(crate) fn extract_presented_capability_from_maps<'a>(
     headers: &'a HashMap<String, String>,
     query: &'a HashMap<String, String>,
 ) -> Option<&'a str> {
-    headers
-        .get("x-chio-capability")
-        .or_else(|| headers.get("X-Chio-Capability"))
-        .map(String::as_str)
+    crate::evaluator::header_value(headers, "x-chio-capability")
         .or_else(|| query.get("chio_capability").map(String::as_str))
 }
 
@@ -111,21 +108,23 @@ pub(crate) fn revoked_capability_verdict() -> Verdict {
 }
 
 pub(crate) fn should_forward_request_header(name: &str) -> bool {
-    !matches!(
-        name,
-        "connection"
-            | "proxy-connection"
-            | "keep-alive"
-            | "proxy-authenticate"
-            | "proxy-authorization"
-            | "te"
-            | "trailer"
-            | "transfer-encoding"
-            | "upgrade"
-            | "host"
-            | "content-length"
-            | "x-chio-capability"
-    )
+    const LOCAL_HEADERS: &[&str] = &[
+        "connection",
+        "proxy-connection",
+        "keep-alive",
+        "proxy-authenticate",
+        "proxy-authorization",
+        "te",
+        "trailer",
+        "transfer-encoding",
+        "upgrade",
+        "host",
+        "content-length",
+        "x-chio-capability",
+    ];
+    !LOCAL_HEADERS
+        .iter()
+        .any(|local| name.eq_ignore_ascii_case(local))
 }
 
 pub(crate) fn verdict_http_status(verdict: &Verdict) -> u16 {

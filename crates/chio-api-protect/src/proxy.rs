@@ -573,8 +573,10 @@ paths:
         for (header_name, header_value) in [
             ("authorization", "Bearer "),
             ("authorization", "Bearer token-with-padding "),
+            ("authorization", "Bearer token\nwith-control"),
             ("x-api-key", ""),
             ("x-api-key", " api-key-with-padding"),
+            ("x-api-key", "api-key\nwith-control"),
         ] {
             let mut headers = HashMap::new();
             headers.insert(header_name.to_string(), header_value.to_string());
@@ -587,6 +589,20 @@ paths:
             );
             assert_eq!(caller.subject, "anonymous");
         }
+    }
+
+    #[test]
+    fn chio_transport_header_helpers_are_case_insensitive() {
+        let token = signed_capability_token_json(&Keypair::generate(), "cap-header-case");
+        let mut headers = HashMap::new();
+        headers.insert("X-CHIO-CAPABILITY".to_string(), token.clone());
+        let query = HashMap::new();
+
+        assert_eq!(
+            extract_presented_capability_from_maps(&headers, &query),
+            Some(token.as_str())
+        );
+        assert!(!should_forward_request_header("X-CHIO-CAPABILITY"));
     }
 
     #[tokio::test]
