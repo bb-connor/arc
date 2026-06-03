@@ -108,6 +108,7 @@ fn bundle_manifest_file_name(index: usize, bundle_id: &str) -> Result<String, Cl
         || bundle_id.contains('/')
         || bundle_id.contains('\\')
         || bundle_id.contains(':')
+        || bundle_id.chars().any(char::is_control)
     {
         return Err(CliError::Other(format!(
             "bundle_id {bundle_id:?} is not safe for a bundle manifest file name"
@@ -1957,5 +1958,20 @@ mod shared_tests {
         let error = write_bundle_manifests(&dir, &[safe, unsafe_manifest]).unwrap_err();
 
         assert!(error.to_string().contains("bundle_id"));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn write_bundle_manifests_rejects_bundle_id_control_character() {
+        let dir = unique_temp_dir("mercury-bundle-manifest-stem");
+        let mut safe = chio_mercury_core::sample_mercury_bundle_manifest();
+        safe.bundle_id = "safe-bundle".to_string();
+        let mut unsafe_manifest = chio_mercury_core::sample_mercury_bundle_manifest();
+        unsafe_manifest.bundle_id = "unsafe\tbundle".to_string();
+
+        let error = write_bundle_manifests(&dir, &[safe, unsafe_manifest]).unwrap_err();
+
+        assert!(error.to_string().contains("bundle_id"));
+        let _ = fs::remove_dir_all(dir);
     }
 }
