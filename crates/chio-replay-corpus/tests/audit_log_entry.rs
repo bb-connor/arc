@@ -164,3 +164,67 @@ fn tee_bless_audit_signing_rejects_blank_operator_identity() {
 
     assert!(error.to_string().contains("operator.id"));
 }
+
+#[test]
+fn tee_bless_audit_signing_rejects_malformed_receipts_root() {
+    let body = TeeBlessAuditBody::new(
+        "2026-04-25T18:02:11.418Z",
+        BlessOperator {
+            id: "did:web:integrations.chio.world:alice".to_string(),
+            git_user: "alice@chio.world".to_string(),
+        },
+        BlessCapture {
+            path: "captures/01JTEE00000000000000000000.ndjson".to_string(),
+            frames_in: 1,
+            frames_after_dedupe: 1,
+            frames_after_redact: 1,
+        },
+        BlessFixture {
+            family: "openai_responses_shadow".to_string(),
+            name: "tool_call_with_pii".to_string(),
+            path: "tests/replay/fixtures/openai_responses_shadow/tool_call_with_pii/".to_string(),
+            receipts_root: "A".repeat(64),
+        },
+        "redactors@1.4.0+default",
+    );
+    let keypair = Keypair::from_seed(&[7u8; 32]);
+
+    let error = match TeeBlessAuditEntry::sign(body, &keypair) {
+        Ok(_) => panic!("uppercase receipts_root must not be signed"),
+        Err(error) => error,
+    };
+
+    assert!(error.to_string().contains("fixture.receipts_root"));
+}
+
+#[test]
+fn tee_bless_audit_signing_rejects_zero_capture_counts() {
+    let body = TeeBlessAuditBody::new(
+        "2026-04-25T18:02:11.418Z",
+        BlessOperator {
+            id: "did:web:integrations.chio.world:alice".to_string(),
+            git_user: "alice@chio.world".to_string(),
+        },
+        BlessCapture {
+            path: "captures/01JTEE00000000000000000000.ndjson".to_string(),
+            frames_in: 0,
+            frames_after_dedupe: 0,
+            frames_after_redact: 0,
+        },
+        BlessFixture {
+            family: "openai_responses_shadow".to_string(),
+            name: "tool_call_with_pii".to_string(),
+            path: "tests/replay/fixtures/openai_responses_shadow/tool_call_with_pii/".to_string(),
+            receipts_root: "a".repeat(64),
+        },
+        "redactors@1.4.0+default",
+    );
+    let keypair = Keypair::from_seed(&[7u8; 32]);
+
+    let error = match TeeBlessAuditEntry::sign(body, &keypair) {
+        Ok(_) => panic!("zero-frame bless audit must not be signed"),
+        Err(error) => error,
+    };
+
+    assert!(error.to_string().contains("frames_in"));
+}

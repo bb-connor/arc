@@ -14,6 +14,7 @@ pub const TEE_BLESS_EVENT: &str = "tee.bless";
 pub const TEE_BLESS_CAPABILITY: &str = "chio:tee/bless@1";
 
 const ED25519_SIGNATURE_PREFIX: &str = "ed25519:";
+const RECEIPTS_ROOT_HEX_LEN: usize = 64;
 
 /// Operator identity recorded for a bless event.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -114,6 +115,8 @@ impl TeeBlessAuditBody {
         validate_required_audit_field(&self.fixture.path, "fixture.path")?;
         validate_required_audit_field(&self.fixture.receipts_root, "fixture.receipts_root")?;
         validate_required_audit_field(&self.redaction_pass_id, "redaction_pass_id")?;
+        validate_capture_counts(&self.capture)?;
+        validate_receipts_root(&self.fixture.receipts_root)?;
         if self.capture.frames_after_dedupe > self.capture.frames_in {
             return Err(BlessAuditError::InvalidAuditBody(
                 "capture.frames_after_dedupe must not exceed capture.frames_in".to_string(),
@@ -235,6 +238,42 @@ fn validate_required_audit_field(value: &str, field: &str) -> Result<(), BlessAu
         return Err(BlessAuditError::InvalidAuditBody(format!(
             "{field} must not contain surrounding whitespace"
         )));
+    }
+    Ok(())
+}
+
+fn validate_capture_counts(capture: &BlessCapture) -> Result<(), BlessAuditError> {
+    if capture.frames_in == 0 {
+        return Err(BlessAuditError::InvalidAuditBody(
+            "capture.frames_in must be greater than zero".to_string(),
+        ));
+    }
+    if capture.frames_after_dedupe == 0 {
+        return Err(BlessAuditError::InvalidAuditBody(
+            "capture.frames_after_dedupe must be greater than zero".to_string(),
+        ));
+    }
+    if capture.frames_after_redact == 0 {
+        return Err(BlessAuditError::InvalidAuditBody(
+            "capture.frames_after_redact must be greater than zero".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_receipts_root(value: &str) -> Result<(), BlessAuditError> {
+    if value.len() != RECEIPTS_ROOT_HEX_LEN {
+        return Err(BlessAuditError::InvalidAuditBody(format!(
+            "fixture.receipts_root must be {RECEIPTS_ROOT_HEX_LEN} lowercase hex characters"
+        )));
+    }
+    if !value
+        .bytes()
+        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(BlessAuditError::InvalidAuditBody(
+            "fixture.receipts_root must be lowercase hex".to_string(),
+        ));
     }
     Ok(())
 }
