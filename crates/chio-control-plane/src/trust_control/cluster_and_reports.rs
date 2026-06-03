@@ -1547,6 +1547,21 @@ fn normalize_cluster_config_url(value: &str, allow_local: bool) -> Result<String
             )));
         }
     }
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err(CliError::cli_other_error(
+            "cluster URL must not contain username or password material".to_string(),
+        ));
+    }
+    if parsed.query().is_some() {
+        return Err(CliError::cli_other_error(
+            "cluster URL must not contain a query string".to_string(),
+        ));
+    }
+    if parsed.fragment().is_some() {
+        return Err(CliError::cli_other_error(
+            "cluster URL must not contain a fragment".to_string(),
+        ));
+    }
     if allow_local {
         return Ok(normalized);
     }
@@ -4263,6 +4278,21 @@ mod cluster_and_reports_tests {
         let normalized =
             normalize_cluster_config_url(" http://127.0.0.1:3300/ ", true).test_unwrap();
         assert_eq!(normalized, "http://127.0.0.1:3300");
+    }
+
+    #[test]
+    fn cluster_peer_url_validation_rejects_ambient_authority_material() {
+        for peer_url in [
+            "https://user:pass@control.example.test:443",
+            "http://127.0.0.1:3300?token=secret",
+            "http://127.0.0.1:3300#fragment",
+        ] {
+            let error = normalize_cluster_config_url(peer_url, true).test_unwrap_err();
+            assert!(
+                error.to_string().contains("cluster URL"),
+                "unexpected error for peer URL `{peer_url}`: {error}",
+            );
+        }
     }
 
     #[test]

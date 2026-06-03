@@ -111,3 +111,44 @@ start.
 Use a shared internal secret validator for service startup and client
 construction. Add startup-config regressions proving padded `service_token` and
 tenant read-token ids and values fail closed at `TrustServiceConfig::validate`.
+
+## Cluster Peer URL Boundary Slice
+
+### Current Boundary
+
+`build_cluster_state` normalizes `advertise_url` and `peer_urls` before the HA
+trust-control runtime starts. The same normalized peer URLs become the cluster
+allowlist, peer-sync targets, consensus identifiers, leader metadata, and
+internal peer-auth node ids.
+
+### Pain Point
+
+Remote trust-control client endpoints already reject URL username/password
+material, query strings, and fragments at construction. Cluster peer URLs use a
+separate validator that only checks scheme and host safety. A peer URL with
+userinfo, query, or fragment material can therefore enter the HA allowlist and
+internal peer-auth signature material, turning an operator configuration field
+into ambiguous authority-bearing or metadata-bearing URL material.
+
+### Security And API Constraints
+
+- Preserve the existing `TrustServiceConfig` fields and cluster URL
+  normalization behavior for valid HTTP and HTTPS peers.
+- Continue allowing loopback peer URLs only when `allow_local_peer_urls` is set.
+- Do not silently strip userinfo, query strings, or fragments from cluster
+  URLs. Reject them before cluster state is built.
+- Preserve cluster peer-auth signature semantics for valid normalized peers.
+
+### Affected Dependents
+
+No transitive crate edits are expected. `chio-cli` still passes the same
+cluster config fields into `chio-control-plane`; invalid HA peer configuration
+now fails before the service builds cluster state instead of becoming internal
+peer-sync or allowlist state.
+
+### Completed Material Improvement
+
+Strengthen the cluster URL validator to reject username/password material,
+query strings, and fragments for both advertised self URLs and configured peer
+URLs. Add a regression proving these ambiguous peer URLs fail before cluster
+state can use them, even when local peer URLs are explicitly allowed.
