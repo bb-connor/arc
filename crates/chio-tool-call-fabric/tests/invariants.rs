@@ -229,6 +229,54 @@ fn validation_rejects_non_canonical_argument_bytes() {
     ));
 }
 
+#[test]
+fn validation_rejects_empty_or_padded_tool_names() {
+    for tool_name in ["", "   ", " get_weather", "get_weather "] {
+        let mut invocation = sample_invocation();
+        invocation.tool_name = tool_name.to_string();
+
+        let error = invocation.validate().unwrap_err();
+        assert!(matches!(
+            error,
+            ToolInvocationValidationError::InvalidIdentity {
+                field: "tool_name",
+                ..
+            }
+        ));
+    }
+}
+
+#[test]
+fn validation_rejects_empty_or_padded_provenance_identity_fields() {
+    for request_id in ["", "   ", " resp_sample", "resp_sample "] {
+        let mut invocation = sample_invocation();
+        invocation.provenance.request_id = request_id.to_string();
+
+        let error = invocation.validate().unwrap_err();
+        assert!(matches!(
+            error,
+            ToolInvocationValidationError::InvalidIdentity {
+                field: "provenance.request_id",
+                ..
+            }
+        ));
+    }
+
+    for api_version in ["", "   ", " responses.2026-04-25", "responses.2026-04-25 "] {
+        let mut invocation = sample_invocation();
+        invocation.provenance.api_version = api_version.to_string();
+
+        let error = invocation.validate().unwrap_err();
+        assert!(matches!(
+            error,
+            ToolInvocationValidationError::InvalidIdentity {
+                field: "provenance.api_version",
+                ..
+            }
+        ));
+    }
+}
+
 // -- properties -----------------------------------------------------------
 
 proptest! {

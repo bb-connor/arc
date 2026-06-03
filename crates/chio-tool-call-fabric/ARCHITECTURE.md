@@ -12,9 +12,18 @@
 
 ## Pain Points
 
-- The root module currently mixes public data model, error taxonomy, adapter trait, byte wrappers, and unit tests, making the crate facade the de facto implementation module.
-- `ToolInvocation` documents canonical-JSON argument bytes, but the crate has no public validation API that can fail closed on non-JSON, non-canonical, or provider-mismatched invocations.
-- Existing property generators cover all principal variants but only three provider ids in the provider-id generator, so newer provider enum variants can drift from generated invariants.
+- The root module now stays a facade, while `types.rs`, `adapter.rs`,
+  `error.rs`, `stream.rs`, and `provenance.rs` own the implementation surface.
+- `ToolInvocation::validate` fails closed on provider/provenance mismatch and
+  non-canonical argument bytes, and provider conformance replay calls that
+  contract before comparing captured invocations.
+- The same validation boundary still accepts empty or padded `tool_name`,
+  `provenance.request_id`, and `provenance.api_version` values. Those fields are
+  load-bearing receipt, replay, and provenance identifiers; accepting ambiguous
+  identities at the owning fabric type lets malformed adapter output travel
+  until a downstream crate happens to reject it.
+- Existing property generators now cover all provider ids, so new provider enum
+  variants are less likely to drift silently from generated invariants.
 
 ## Security And API Constraints
 
@@ -33,4 +42,9 @@
 
 ## Planned Improvement
 
-Move the public facade into explicit implementation modules, add `ToolInvocation::validate`, and use that contract in provider conformance replay before comparing adapter invocations. This makes the fabric boundary materially clearer while turning a documented invariant into executable validation.
+Tighten `ToolInvocation::validate` so the owning fabric type rejects empty or
+padded invocation identities before replay or receipt code trusts them. This is
+architectural because the fabric crate is the single provider-agnostic boundary
+between native adapters and Chio verdict/receipt machinery; downstream
+conformance should not need separate ad hoc checks to decide whether a provider
+invocation has a usable tool name, request id, or API-version identity.

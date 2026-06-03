@@ -87,6 +87,9 @@ impl ToolInvocation {
                 provenance: self.provenance.provider,
             });
         }
+        validate_identity_field("tool_name", &self.tool_name)?;
+        validate_identity_field("provenance.request_id", &self.provenance.request_id)?;
+        validate_identity_field("provenance.api_version", &self.provenance.api_version)?;
 
         let arguments_value = serde_json::from_slice::<serde_json::Value>(&self.arguments)
             .map_err(|source| ToolInvocationValidationError::InvalidArgumentJson { source })?;
@@ -101,6 +104,25 @@ impl ToolInvocation {
 
         Ok(())
     }
+}
+
+fn validate_identity_field(
+    field: &'static str,
+    value: &str,
+) -> Result<(), ToolInvocationValidationError> {
+    if value.trim().is_empty() {
+        return Err(ToolInvocationValidationError::InvalidIdentity {
+            field,
+            reason: "must not be empty",
+        });
+    }
+    if value.trim() != value {
+        return Err(ToolInvocationValidationError::InvalidIdentity {
+            field,
+            reason: "must not contain surrounding whitespace",
+        });
+    }
+    Ok(())
 }
 
 #[derive(Debug, Error)]
@@ -121,6 +143,11 @@ pub enum ToolInvocationValidationError {
     ArgumentCanonicalization { message: String },
     #[error("tool invocation arguments were not canonical JSON bytes")]
     NonCanonicalArguments,
+    #[error("tool invocation {field} {reason}")]
+    InvalidIdentity {
+        field: &'static str,
+        reason: &'static str,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
