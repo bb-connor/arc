@@ -310,6 +310,10 @@ impl A2aAdapterConfig {
             validate_http_token("request cookie name", &cookie.name)?;
             validate_cookie_value("request cookie value", &cookie.value)?;
         }
+        if let Some(credentials) = self.oauth_client_credentials.as_ref() {
+            validate_oauth_client_credential("OAuth client id", &credentials.client_id)?;
+            validate_oauth_client_credential("OAuth client credential", &credentials.client_secret)?;
+        }
         Ok(())
     }
 }
@@ -398,6 +402,18 @@ fn validate_url_auth_value(field: &str, value: &str) -> Result<(), AdapterError>
         || value
             .chars()
             .any(|character| character.is_ascii_control())
+    {
+        return Err(AdapterError::AuthNegotiation(format!(
+            "invalid A2A {field} in configuration"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_oauth_client_credential(field: &str, value: &str) -> Result<(), AdapterError> {
+    if value.is_empty()
+        || value.trim() != value
+        || value.chars().any(|character| character.is_control())
     {
         return Err(AdapterError::AuthNegotiation(format!(
             "invalid A2A {field} in configuration"

@@ -113,12 +113,31 @@ fn header_option(key: &str, value: &str) -> HeaderValueOption {
     HeaderValueOption {
         header: Some(HeaderValue {
             key: key.to_string(),
-            value: value.to_string(),
+            value: sanitize_header_value(value),
             raw_value: Vec::new(),
         }),
         append: None,
         append_action: 0,
         keep_empty_value: false,
+    }
+}
+
+fn sanitize_header_value(value: &str) -> String {
+    let sanitized: String = value
+        .chars()
+        .map(|character| {
+            if character.is_control() {
+                ' '
+            } else {
+                character
+            }
+        })
+        .collect();
+    let trimmed = sanitized.trim();
+    if trimmed.is_empty() {
+        "unspecified".to_string()
+    } else {
+        trimmed.to_string()
     }
 }
 
@@ -283,6 +302,30 @@ mod tests {
                     denied.status.unwrap().code,
                     EnvoyStatusCode::Forbidden as i32
                 );
+            }
+            other => panic!("expected DeniedResponse, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn deny_verdict_sanitizes_control_characters_before_headers() {
+        let verdict = Verdict::Deny {
+            reason: "scope\nmissing".to_string(),
+            guard: "Guard\rName\tInjected".to_string(),
+            http_status: 403,
+        };
+        let response = verdict_to_response(&verdict);
+
+        match response.http_response.unwrap() {
+            HttpResponse::DeniedResponse(denied) => {
+                assert_eq!(denied.headers.len(), 2);
+                for header in denied.headers {
+                    let value = header.header.unwrap().value;
+                    assert!(
+                        !value.chars().any(char::is_control),
+                        "header value retained control characters: {value:?}"
+                    );
+                }
             }
             other => panic!("expected DeniedResponse, got {other:?}"),
         }

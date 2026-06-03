@@ -703,9 +703,33 @@ mod tests {
             ),
             (
                 "bad cookie value",
-                test_adapter_config(base_url, public_key)
+                test_adapter_config(base_url, public_key.clone())
                     .with_request_cookie("partner_session", "secret-cookie; injected=yes"),
                 "request cookie value",
+            ),
+            (
+                "bad OAuth client id",
+                test_adapter_config(base_url, public_key.clone())
+                    .with_oauth_client_credentials("", "client-secret"),
+                "OAuth client id",
+            ),
+            (
+                "bad OAuth client id padding",
+                test_adapter_config(base_url, public_key.clone())
+                    .with_oauth_client_credentials(" client-id", "client-secret"),
+                "OAuth client id",
+            ),
+            (
+                "bad OAuth client secret padding",
+                test_adapter_config(base_url, public_key.clone())
+                    .with_oauth_client_credentials("client-id", " client-secret"),
+                "OAuth client credential",
+            ),
+            (
+                "bad OAuth client secret control",
+                test_adapter_config(base_url, public_key)
+                    .with_oauth_client_credentials("client-id", "client\nsecret"),
+                "OAuth client credential",
             ),
         ];
 
