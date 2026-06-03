@@ -263,3 +263,47 @@ it.
 
 Made the message-to-arguments boundary reject non-object data parts and added
 focused regressions proving scalar and array data fail before dispatch.
+
+## Execution Context Agent Identity Slice
+
+### Current Boundary
+
+- `types.rs` exposes `A2aKernelExecutionContext`, including the authenticated
+  caller `agent_id` used for kernel execution and deferred-task ownership.
+- `edge.rs` copies `execution.agent_id` into `CrossProtocolExecutionRequest`
+  and into retained `DeferredA2aTask.owner_agent_id`.
+- `chio-cross-protocol` rejects all-whitespace `agent_id` values at
+  orchestration time, but `message/stream` can retain a task before
+  orchestration, and padded values can still become owner keys.
+
+### Pain Point
+
+The edge treats `agent_id` as already authenticated caller metadata but does
+not validate its shape before dispatch or task retention. Blank IDs depend on a
+downstream cross-protocol error on blocking sends, while padded IDs can be
+stored as distinct task owners in the deferred lifecycle and later produce
+misleading ownership errors.
+
+### Security And API Constraints
+
+- Preserve `A2aKernelExecutionContext` as a public struct.
+- Reject malformed execution context before skill resolution, kernel dispatch,
+  deferred task allocation, owner checks, or lifecycle mutation.
+- Do not trim or normalize the authenticated identifier.
+- Preserve successful exact agent-id behavior and existing task ownership
+  semantics.
+- No dependent crate API change is planned.
+
+### Affected Dependents
+
+- Callers with exact authenticated agent ids are unchanged.
+- Callers that pass blank, padded, or control-bearing execution agent ids now
+  receive `A2aEdgeError::InvalidRequest` through direct APIs or JSON-RPC
+  `-32602` before side effects.
+
+### Completed Material Improvement
+
+Add an A2A edge execution-context validator and call it from blocking send,
+deferred stream creation, deferred task resolution, cancellation, and test-only
+pending projection. Add focused regressions proving malformed agent ids fail
+closed before dispatch or task retention.

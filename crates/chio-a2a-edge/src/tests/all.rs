@@ -836,6 +836,55 @@ mod tests {
     }
 
     #[test]
+    fn send_message_rejects_blank_execution_agent_id_before_dispatch() {
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let kernel_issuer = config.keypair.clone();
+        let mut kernel = ChioKernel::new(config);
+        kernel.register_tool_server(Box::new(test_server()));
+
+        let subject = Keypair::generate();
+        let execution = A2aKernelExecutionContext {
+            capability: capability_for_tool(&kernel_issuer, &subject, "test-srv", "echo"),
+            agent_id: "\t".to_string(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let error = edge
+            .handle_send_message("echo", &text_message("hello"), &kernel, &execution)
+            .unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "invalid request: A2A execution agent_id must not be empty"
+        );
+    }
+
+    #[test]
+    fn execution_context_rejects_control_character_agent_id() {
+        let subject = Keypair::generate();
+        let execution = A2aKernelExecutionContext {
+            capability: capability_for_tool(&Keypair::generate(), &subject, "test-srv", "echo"),
+            agent_id: format!("{}{}suffix", subject.public_key().to_hex(), '\u{7}'),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let error = validate_execution_context(&execution).unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "invalid request: A2A execution agent_id must not include control characters"
+        );
+    }
+
+    #[test]
     fn send_message_with_kernel_denial_still_returns_receipt_metadata() {
         let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
@@ -2096,6 +2145,47 @@ mod tests {
             .as_str()
             .test_unwrap()
             .contains("too many deferred tasks"));
+    }
+
+    #[test]
+    fn jsonrpc_stream_rejects_padded_execution_agent_id_before_task_retention() {
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let kernel_issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = A2aKernelExecutionContext {
+            capability: capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream"),
+            agent_id: format!(" {} ", subject.public_key().to_hex()),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let rejected = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 2_500,
+                "method": "message/stream",
+                "params": {
+                    "message": {
+                        "role": "user",
+                        "parts": [{"type": "text", "text": "start"}]
+                    }
+                }
+            }),
+            &kernel,
+            &execution,
+        );
+
+        assert_eq!(rejected["error"]["code"], -32602);
+        assert_eq!(
+            rejected["error"]["message"].as_str(),
+            Some("A2A execution agent_id must not include leading or trailing whitespace")
+        );
+        assert!(edge.tasks.is_empty());
     }
 
     #[test]

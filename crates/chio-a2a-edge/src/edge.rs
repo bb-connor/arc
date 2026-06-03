@@ -33,6 +33,29 @@ pub struct ChioA2aEdgeCompatibility<'a> {
     edge: &'a mut ChioA2aEdge,
 }
 
+fn validate_execution_context(execution: &A2aKernelExecutionContext) -> Result<(), A2aEdgeError> {
+    validate_execution_agent_id(&execution.agent_id)
+}
+
+fn validate_execution_agent_id(agent_id: &str) -> Result<(), A2aEdgeError> {
+    if agent_id.trim().is_empty() {
+        return Err(A2aEdgeError::InvalidRequest(
+            "A2A execution agent_id must not be empty".to_string(),
+        ));
+    }
+    if agent_id.trim() != agent_id {
+        return Err(A2aEdgeError::InvalidRequest(
+            "A2A execution agent_id must not include leading or trailing whitespace".to_string(),
+        ));
+    }
+    if agent_id.chars().any(|character| character.is_control()) {
+        return Err(A2aEdgeError::InvalidRequest(
+            "A2A execution agent_id must not include control characters".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 impl ChioA2aEdge {
     /// Create a new A2A edge from Chio tool manifests.
     pub fn new(config: A2aEdgeConfig, manifests: Vec<ToolManifest>) -> Result<Self, A2aEdgeError> {
@@ -273,6 +296,7 @@ impl ChioA2aEdge {
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
     ) -> Result<TaskResponse, A2aEdgeError> {
+        validate_execution_context(execution)?;
         let binding = self.resolve_skill_binding(skill_id)?;
 
         let arguments = extract_arguments_from_message(&request.message)?;
@@ -310,6 +334,7 @@ impl ChioA2aEdge {
         execution: &A2aKernelExecutionContext,
         reason: impl Into<String>,
     ) -> Result<TaskResponse, A2aEdgeError> {
+        validate_execution_context(execution)?;
         let binding = self.resolve_skill_binding(skill_id)?;
         let arguments = extract_arguments_from_message(&request.message)?;
         let task_id = self.next_task_id();
@@ -344,6 +369,7 @@ impl ChioA2aEdge {
         request: &SendMessageRequest,
         execution: &A2aKernelExecutionContext,
     ) -> Result<TaskResponse, A2aEdgeError> {
+        validate_execution_context(execution)?;
         let binding = self.resolve_skill_binding(skill_id)?;
         self.ensure_deferred_task_capacity()?;
         let task_id = self.next_task_id();
@@ -606,6 +632,9 @@ impl ChioA2aEdge {
             Ok(task_id) => task_id,
             Err(error) => return Self::jsonrpc_error_response(id, error),
         };
+        if let Err(error) = validate_execution_context(execution) {
+            return Self::jsonrpc_error_response(id, error);
+        }
 
         match self.resolve_task(&task_id, execution) {
             Ok(response) => json!({
@@ -627,6 +656,9 @@ impl ChioA2aEdge {
         execution: &A2aKernelExecutionContext,
         id: Value,
     ) -> Value {
+        if let Err(error) = validate_execution_context(execution) {
+            return Self::jsonrpc_error_response(id, error);
+        }
         let Some(task) = self.tasks.get(task_id).cloned() else {
             return Self::jsonrpc_error_response(
                 id,
@@ -683,6 +715,9 @@ impl ChioA2aEdge {
             Ok(task_id) => task_id,
             Err(error) => return Self::jsonrpc_error_response(id, error),
         };
+        if let Err(error) = validate_execution_context(execution) {
+            return Self::jsonrpc_error_response(id, error);
+        }
 
         let Some(task) = self.tasks.get_mut(&task_id) else {
             return Self::jsonrpc_error_response(
