@@ -27,16 +27,19 @@ for stable wire shapes, so public API compatibility matters.
 
 ## Pain Points
 
-- `authority.rs` mixes several trust boundaries in one file: reserved
-  `/chio/tools` path identity decoding, request-field capability binding,
-  kernel projection payloads, kernel invocation, transport-deny receipt
-  signing, and authority tests.
+- `authority.rs` still owns kernel invocation, receipt signing, capability
+  validation, and authority tests, while the reserved path binding and kernel
+  projection payload now live in `authority_projection`.
 - The reserved `/chio/tools/{server}/{tool}` path is security-sensitive because
   path-derived identity must override spoofable request fields and must fail
   closed on malformed path identity.
 - The kernel projection payload is an internal wire contract between
   `HttpAuthority` and its private `HttpProjectionGuard`; keeping that payload
   close to binding logic makes the intended authority boundary easier to audit.
+- The emergency admin handler stores its configured token as raw `String` state
+  and compares it at request time. That keeps the public constructor simple,
+  but a blank or malformed configured token must still fail closed because the
+  spec requires operator-level authentication for kill-switch routes.
 
 ## Security And API Constraints
 
@@ -49,16 +52,21 @@ for stable wire shapes, so public API compatibility matters.
   request fields supplied by an adapter.
 - Malformed reserved tool paths must deny before a wildcard or HTTP-authority
   grant can accidentally authorize the request.
+- Emergency kill-switch routes must require a non-empty operator credential. A
+  missing, blank, or control-character-bearing configured token must not turn an
+  empty incoming header into operator authority.
 
 ## Affected Dependents
 
 Direct dependents include `chio-api-protect`, `chio-envoy-ext-authz`,
 `chio-openapi`, `chio-config`, `chio-conformance`, SDK middleware crates, and
-tests that import HTTP DTOs and route constants. This slice does not change the
-public API. Dependent behavior is covered by the `chio-http-core` authority
-tests and by the crate-level test and clippy gates.
+tests that import HTTP DTOs and route constants. This slice keeps the public
+API intact: `EmergencyAdmin::new` still returns `Self`, but the shared handler
+refuses unusable configured admin tokens at authorization time. Dependent
+behavior is covered by `chio-http-core` emergency endpoint tests and by the
+crate-level test and clippy gates.
 
-## Planned Improvement
+## Completed Authority Projection
 
 Split the private HTTP authority projection and capability-binding logic out of
 `authority.rs` into a focused internal module. Keep `HttpAuthority` responsible
@@ -73,3 +81,11 @@ owns:
 The change is architectural because it separates the most sensitive binding
 decision from receipt signing and kernel orchestration without changing public
 wire contracts.
+
+## Completed Emergency Admin Hardening
+
+Harden the emergency admin boundary so `EmergencyAdmin` never authorizes with a
+blank or control-character-bearing configured token. The shared handler should
+fail closed before comparing the incoming header, preserving existing public API
+compatibility while preventing adapter-specific token validation gaps from
+opening `/emergency-stop`, `/emergency-resume`, or `/emergency-status`.
