@@ -12,3 +12,13 @@ pub(crate) fn ensure_non_empty(
     }
     Ok(())
 }
+
+pub(crate) fn ensure_optional_non_empty(
+    field: &'static str,
+    value: Option<&str>,
+) -> Result<(), MercuryContractError> {
+    if let Some(value) = value {
+        ensure_non_empty(field, value)?;
+    }
+    Ok(())
+}

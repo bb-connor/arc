@@ -65,6 +65,8 @@ publication claims while leaving command orchestration to `chio-mercury`.
 
 Introduce a small internal validation boundary for foundational MERCURY string
 fields and use it in the metadata, bundle, and proof-package contracts. The
-first hardening target is padded identifiers and digest/schema fields: builders
-already emit clean values, so accepting padded deserialized values only weakens
-verification and creates divergent canonical bytes.
+current slice hardens `MercuryWorkflowIdentifiers`: optional business
+identifiers such as account, desk, strategy, release, rollback, exception, and
+inquiry IDs must be absent or clean, never present as empty or padded strings.
+Builders already emit clean values, so accepting padded deserialized identifiers
+only weakens verification and creates divergent canonical bytes.

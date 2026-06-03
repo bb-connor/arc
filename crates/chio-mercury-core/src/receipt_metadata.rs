@@ -1,7 +1,7 @@
 use chio_core::receipt::ChioReceipt;
 use serde::{Deserialize, Serialize};
 
-use crate::validation::ensure_non_empty;
+use crate::validation::{ensure_non_empty, ensure_optional_non_empty};
 
 pub const MERCURY_RECEIPT_METADATA_SCHEMA: &str = "chio.mercury.receipt_metadata.v1";
 
@@ -54,7 +54,14 @@ pub struct MercuryWorkflowIdentifiers {
 
 impl MercuryWorkflowIdentifiers {
     pub fn validate(&self) -> Result<(), MercuryContractError> {
-        ensure_non_empty("business_ids.workflow_id", &self.workflow_id)
+        ensure_non_empty("business_ids.workflow_id", &self.workflow_id)?;
+        ensure_optional_non_empty("business_ids.account_id", self.account_id.as_deref())?;
+        ensure_optional_non_empty("business_ids.desk_id", self.desk_id.as_deref())?;
+        ensure_optional_non_empty("business_ids.strategy_id", self.strategy_id.as_deref())?;
+        ensure_optional_non_empty("business_ids.release_id", self.release_id.as_deref())?;
+        ensure_optional_non_empty("business_ids.rollback_id", self.rollback_id.as_deref())?;
+        ensure_optional_non_empty("business_ids.exception_id", self.exception_id.as_deref())?;
+        ensure_optional_non_empty("business_ids.inquiry_id", self.inquiry_id.as_deref())
     }
 }
 
@@ -345,6 +352,32 @@ mod tests {
         assert!(matches!(
             error,
             MercuryContractError::PaddedField("business_ids.workflow_id")
+        ));
+    }
+
+    #[test]
+    fn receipt_metadata_rejects_empty_optional_business_ids() {
+        let mut metadata = sample_mercury_receipt_metadata();
+        metadata.business_ids.account_id = Some(" ".to_string());
+
+        let error = metadata.validate().expect_err("empty optional account id");
+
+        assert!(matches!(
+            error,
+            MercuryContractError::EmptyField("business_ids.account_id")
+        ));
+    }
+
+    #[test]
+    fn receipt_metadata_rejects_padded_optional_business_ids() {
+        let mut metadata = sample_mercury_receipt_metadata();
+        metadata.business_ids.inquiry_id = Some(" inquiry-2026-04-02 ".to_string());
+
+        let error = metadata.validate().expect_err("padded optional inquiry id");
+
+        assert!(matches!(
+            error,
+            MercuryContractError::PaddedField("business_ids.inquiry_id")
         ));
     }
 }
