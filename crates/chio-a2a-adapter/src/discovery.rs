@@ -772,8 +772,40 @@ fn validate_authentication_info(
     match input {
         None => Ok(None),
         Some(input) => Ok(Some(A2aAuthenticationInfo {
-            scheme: validate_identifier("authentication.scheme", input.scheme)?,
-            credentials: input.credentials.filter(|value| !value.trim().is_empty()),
+            scheme: validate_push_auth_scheme("authentication.scheme", input.scheme)?,
+            credentials: validate_optional_push_auth_material(
+                "authentication.credentials",
+                input.credentials,
+            )?,
         })),
+    }
+}
+
+fn validate_push_auth_scheme(field_name: &str, value: String) -> Result<String, AdapterError> {
+    if value.is_empty() || value.trim() != value || !value.bytes().all(is_http_token_byte) {
+        return Err(AdapterError::InvalidToolInput(format!(
+            "`{field_name}` must be a non-empty HTTP token"
+        )));
+    }
+    Ok(value)
+}
+
+fn validate_optional_push_auth_material(
+    field_name: &str,
+    value: Option<String>,
+) -> Result<Option<String>, AdapterError> {
+    match value {
+        None => Ok(None),
+        Some(value) => {
+            if value.is_empty()
+                || value.trim() != value
+                || value.chars().any(|character| character.is_control())
+            {
+                return Err(AdapterError::InvalidToolInput(format!(
+                    "`{field_name}` must be a non-empty unpadded string without control characters"
+                )));
+            }
+            Ok(Some(value))
+        }
     }
 }

@@ -668,3 +668,44 @@ proved runtime parity with regressions for unknown top-level, follow-up, and
 push-notification nested fields. Supported snake-case fields and camelCase
 aliases remain accepted, while stale or misspelled keys now fail before any
 remote A2A request is assembled.
+
+## Push Notification Auth Material Slice
+
+### Current Boundary
+
+`invoke.rs` builds `CreateTaskPushNotificationConfig` requests from
+adapter-local tool input before the upstream A2A agent records a callback URL,
+optional callback token, and optional authentication descriptor for future task
+notifications.
+
+### Pain Point
+
+Callback tokens and authentication credentials are optional, but a caller who
+provides empty or padded values is expressing malformed callback authority, not
+absence. The current builder silently drops trim-empty token and credential
+values, and authentication schemes only pass through the generic non-empty id
+check before being serialized into the upstream request.
+
+### Security And API Constraints
+
+- Preserve public API compatibility and valid push-notification configuration
+  requests.
+- Preserve exact task-id follow-up behavior; provider-observed task ids can
+  contain whitespace and are not part of this slice.
+- Reject malformed callback auth material before any push-notification
+  management request is dispatched.
+- Do not log or persist callback tokens or authentication credentials.
+
+### Affected Dependents
+
+`chio-kernel` continues to receive malformed callback auth inputs as
+`ToolServerError` through the existing `ToolServerConnection` path. JSON-RPC
+and HTTP+JSON A2A push-notification callers with valid callback auth material
+should observe no behavior change.
+
+### Completed Material Improvement
+
+Added a push-notification auth-material admission helper that rejects provided
+empty, padded, or control-character-bearing token and credential values, and
+requires authentication schemes to be non-empty HTTP tokens before the upstream
+A2A agent can record the callback configuration.

@@ -1103,7 +1103,10 @@ impl A2aAdapter {
             },
             task_id: validate_identifier("create_push_notification_config.task_id", input.task_id)?,
             url: validate_notification_target_url(input.url.as_str())?,
-            token: input.token.filter(|value| !value.trim().is_empty()),
+            token: validate_optional_push_auth_material(
+                "create_push_notification_config.token",
+                input.token,
+            )?,
             authentication: validate_authentication_info(input.authentication)?,
         })
     }

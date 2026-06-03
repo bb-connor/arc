@@ -3061,6 +3061,70 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn adapter_rejects_malformed_push_notification_auth_material_before_dispatch() {
+        let registry_path = unique_path("chio-a2a-push-auth-material", ".json");
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_push_notification_capability_only() else {
+            return;
+        };
+        let manifest_key = Keypair::generate();
+        let adapter = A2aAdapter::discover(
+            test_adapter_config(server.base_url(), manifest_key.public_key().to_hex())
+                .with_task_registry_file(&registry_path)
+                .with_timeout(Duration::from_secs(2)),
+        )
+        .expect("discover JSONRPC adapter");
+        seed_a2a_task(&adapter, "research", "task-1");
+
+        for (input, expected_error) in [
+            (
+                json!({
+                    "task_id": "task-1",
+                    "url": "https://callbacks.example.com/chio",
+                    "token": " "
+                }),
+                "`create_push_notification_config.token` must be a non-empty unpadded string without control characters",
+            ),
+            (
+                json!({
+                    "task_id": "task-1",
+                    "url": "https://callbacks.example.com/chio",
+                    "authentication": {
+                        "scheme": "bearer\n",
+                        "credentials": "callback-secret"
+                    }
+                }),
+                "`authentication.scheme` must be a non-empty HTTP token",
+            ),
+            (
+                json!({
+                    "task_id": "task-1",
+                    "url": "https://callbacks.example.com/chio",
+                    "authentication": {
+                        "scheme": "bearer",
+                        "credentials": " callback-secret "
+                    }
+                }),
+                "`authentication.credentials` must be a non-empty unpadded string without control characters",
+            ),
+        ] {
+            let error = adapter
+                .invoke(
+                    "research",
+                    json!({ "create_push_notification_config": input }),
+                    None,
+                )
+                .await
+                .expect_err("malformed push notification auth material should fail closed");
+            assert!(
+                error.to_string().contains(expected_error),
+                "unexpected push auth material error: {error}"
+            );
+            assert_eq!(server.requests().len(), 1);
+        }
+        server.join();
+    }
+
+    #[tokio::test]
     async fn adapter_oauth2_client_credentials_fetches_token_and_caches_it() {
         let Some(server) = FakeA2aServer::spawn_jsonrpc_oauth_client_credentials_required() else {
             return;
