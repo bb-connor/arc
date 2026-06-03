@@ -1,12 +1,12 @@
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PassportPresentationOptions {
     pub issuer_allowlist: BTreeSet<String>,
     pub max_credentials: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PassportPresentationChallengeArgs {
     pub verifier: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -22,7 +22,7 @@ pub struct PassportPresentationChallengeArgs {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PassportPresentationChallenge {
     pub schema: String,
     pub verifier: String,
@@ -42,7 +42,7 @@ pub struct PassportPresentationChallenge {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PresentationProof {
     #[serde(rename = "type")]
     pub proof_type: String,
@@ -53,7 +53,7 @@ pub struct PresentationProof {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PassportPresentationResponse {
     pub schema: String,
     pub challenge: PassportPresentationChallenge,
@@ -62,7 +62,7 @@ pub struct PassportPresentationResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PassportPresentationVerification {
     pub subject: String,
     pub verifier: String,

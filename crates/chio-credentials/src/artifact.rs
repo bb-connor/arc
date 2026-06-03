@@ -179,7 +179,7 @@ pub enum CredentialError {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AttestationWindow {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub since: Option<u64>,
@@ -187,7 +187,7 @@ pub struct AttestationWindow {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ChioCredentialEvidence {
     pub query: AttestationWindow,
     pub receipt_count: usize,
@@ -202,7 +202,7 @@ pub struct ChioCredentialEvidence {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct EnterpriseIdentityProvenance {
     pub provider_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -279,7 +279,7 @@ impl From<&EnterpriseIdentityContext> for EnterpriseIdentityProvenance {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ReputationCredentialSubject {
     pub id: String,
     pub metrics: LocalReputationScorecard,
@@ -302,7 +302,7 @@ pub struct UnsignedReputationCredential {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CredentialProof {
     #[serde(rename = "type")]
     pub proof_type: String,
