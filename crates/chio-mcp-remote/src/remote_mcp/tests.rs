@@ -1919,6 +1919,36 @@ mod tests {
     }
 
     #[test]
+    fn remote_auth_state_rejects_unusable_static_bearer_tokens() {
+        for (field, value) in [
+            ("--auth-token", ""),
+            ("--auth-token", " remote-auth-token"),
+            ("--auth-token", "remote-auth-token\n"),
+            ("--admin-token", ""),
+            ("--admin-token", " admin-token"),
+            ("--admin-token", "admin-token\r"),
+        ] {
+            let mut config = test_remote_config();
+            match field {
+                "--auth-token" => config.auth_token = Some(value.to_string()),
+                "--admin-token" => config.admin_token = Some(value.to_string()),
+                other => panic!("unexpected field {other}"),
+            }
+
+            let error =
+                build_remote_auth_state(&config, "127.0.0.1:0".parse().unwrap(), None, None)
+                    .unwrap_err()
+                    .to_string();
+
+            assert!(error.contains(field), "error should name {field}: {error}");
+            assert!(
+                error.contains("must be non-empty, unpadded, and control-free"),
+                "error should describe usable bearer requirements: {error}"
+            );
+        }
+    }
+
+    #[test]
     fn shared_upstream_notification_fanout_copies_notifications_and_prunes_dead_queues() {
         let subscribers = Arc::new(StdMutex::new(Vec::new()));
         let stats = SharedUpstreamNotificationStats::default();

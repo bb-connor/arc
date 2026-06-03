@@ -11,9 +11,12 @@
 
 ## Pain Points
 
-- `http_service.rs` owns the public hosted MCP admission boundary, but `MCP-Session-Id` parsing is currently represented as `Option<String>`.
-- That optional helper conflates three different protocol states: header missing, header present but malformed, and header present on initialize where any session header is forbidden.
-- Empty or padded session identifiers can therefore proceed to session lookup as ordinary unknown sessions instead of failing at HTTP admission as invalid protocol input.
+- `MCP-Session-Id` now has an explicit internal admission boundary with
+  missing, invalid, and valid states, but `http_service.rs` still has several
+  other startup and request admission edges in one file.
+- Static bearer material from `--auth-token` and `--admin-token` is stored as
+  raw strings. Empty, padded, or control-character-bearing values should fail at
+  startup instead of becoming an unusable or log-breaking bearer credential.
 - The flat `include!` layout still makes it easy for admission helpers, lifecycle helpers, and OAuth error projection to bleed into each other instead of forming explicit internal APIs.
 
 ## Constraints
@@ -21,6 +24,8 @@
 - Preserve the public `serve_http(RemoteServeHttpConfig)` entrypoint and `RemoteServeHttpConfig` fields.
 - Preserve hosted MCP wire behavior for `POST /mcp`, `GET /mcp`, `DELETE /mcp`, `MCP-Session-Id`, `MCP-Protocol-Version`, SSE replay, and ready-state admission.
 - Preserve OAuth bearer, JWT, introspection, DPoP, mTLS thumbprint, attestation-bound, resource-indicator, and request-time authorization fail-closed semantics.
+- Static bearer and admin tokens must be validated before constructing
+  `RemoteAuthMode` or admin route state.
 - Preserve receipt, revocation, budget, capability, session lifecycle, resumability, shared hosted owner, and admin route behavior.
 - Keep changes scoped to `chio-mcp-remote` unless dependent tests prove a compatibility update is required.
 
@@ -32,6 +37,14 @@
 - `spec/SECURITY.md` defines hosted MCP TLS, DPoP, mTLS, and sender-proof requirements.
 - Admin session diagnostics depend on terminal tombstone records staying internally consistent.
 
-## Planned Improvement
+## Completed Hosted-Session Header Admission
 
 Introduce an internal hosted-session header admission boundary with explicit missing, invalid, and valid states for `MCP-Session-Id`. Established-session `POST`, `GET`, and `DELETE` requests should require a non-empty canonical header value before session lookup, while initialize requests should reject any present session header regardless of its value. This is architectural because it turns a public wire-protocol invariant into a typed boundary at the Axum edge without changing the public `serve_http` API or the generated session identifier format.
+
+## Completed Static Bearer Validation
+
+Add a shared startup validation boundary for static MCP bearer and admin API
+tokens. `--auth-token` and `--admin-token` should be non-empty, unpadded, and
+control-free before they can seed `RemoteAuthMode::StaticBearer` or admin route
+authorization state. This keeps HTTP admission fail-closed at configuration
+load time while preserving the public `RemoteServeHttpConfig` shape.

@@ -1261,9 +1261,9 @@ fn build_remote_auth_state(
     )?;
 
     let admin_token = if let Some(token) = config.admin_token.as_deref() {
-        Some(Arc::<str>::from(token.to_string()))
+        Some(validated_static_bearer_token(token, "--admin-token")?)
     } else if let Some(token) = config.auth_token.as_deref() {
-        Some(Arc::<str>::from(token.to_string()))
+        Some(validated_static_bearer_token(token, "--auth-token")?)
     } else {
         return Err(CliError::cli_other_error(
             "bearer-authenticated remote MCP edge requires --admin-token for admin APIs"
@@ -1272,6 +1272,15 @@ fn build_remote_auth_state(
     };
 
     Ok((auth_mode, admin_token))
+}
+
+fn validated_static_bearer_token(token: &str, flag: &str) -> Result<Arc<str>, CliError> {
+    if token.trim().is_empty() || token.trim() != token || token.chars().any(char::is_control) {
+        return Err(CliError::cli_other_error(format!(
+            "{flag} must be non-empty, unpadded, and control-free"
+        )));
+    }
+    Ok(Arc::<str>::from(token.to_string()))
 }
 
 fn build_chio_oauth_authorization_profile_metadata() -> Result<Value, CliError> {
@@ -1617,7 +1626,7 @@ fn build_remote_auth_mode(
 
     if let Some(token) = config.auth_token.as_deref() {
         return Ok(RemoteAuthMode::StaticBearer {
-            token: Arc::<str>::from(token.to_string()),
+            token: validated_static_bearer_token(token, "--auth-token")?,
         });
     }
 
