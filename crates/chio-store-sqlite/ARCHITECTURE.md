@@ -60,3 +60,37 @@ Extend the same storage invariant to capability lineage by using a shared
 non-negative SQLite integer decoder for lineage snapshots, parent-depth lookup,
 and replication rows. This keeps valid lineage byte-stable while rejecting
 corrupt rows before audit or replication code can consume them.
+
+## Encrypted Blob Tenant Boundary Slice
+
+### Current Boundary
+
+`encrypted_blob.rs` stores tenant-scoped encrypted payloads. The tenant id is
+used as the SQLite lookup scope and is also bound into the ChaCha20-Poly1305
+associated data with the blob id and creation timestamp.
+
+### Pain Point
+
+The encrypted blob store rejects whitespace-only tenant ids, but it accepts
+padded or control-bearing tenant ids. Those values become durable tenant scope
+keys and AEAD metadata. A caller can therefore persist a blob under
+` tenant-a ` or `tenant-a\n`, creating ambiguous storage scope strings that
+look like tenant `tenant-a` to humans but decrypt only under a different AAD.
+
+### Security and API Constraints
+
+Preserve valid tenant ids, generated blob ids, ciphertext format, nonce
+format, and AAD layout for accepted writes. Reject malformed tenant ids before
+encryption and before SQLite insertion. Public type names remain compatible.
+
+### Affected Dependents
+
+No transitive source changes are expected. Existing callers using exact tenant
+ids keep the same behavior. Callers passing padded or control-bearing tenant
+ids now receive `BlobStoreError` before any encrypted row is written.
+
+### Completed Material Improvement
+
+Strengthen encrypted blob tenant validation from whitespace-only rejection to
+non-empty, unpadded, control-free validation, with a regression proving
+malformed tenant ids fail before persistence.
