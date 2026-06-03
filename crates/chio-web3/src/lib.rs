@@ -1484,8 +1484,22 @@ fn ensure_money(amount: &MonetaryAmount, field: &'static str) -> Result<(), Web3
             "{field} must be non-zero"
         )));
     }
-    ensure_non_empty(&amount.currency, field)
-        .map_err(|_| Web3ContractError::invalid_settlement(format!("{field} currency is required")))
+    if amount.currency.trim().is_empty() {
+        return Err(Web3ContractError::invalid_settlement(format!(
+            "{field} currency is required"
+        )));
+    }
+    if amount.currency.len() != 3
+        || !amount
+            .currency
+            .chars()
+            .all(|character| character.is_ascii_uppercase())
+    {
+        return Err(Web3ContractError::invalid_settlement(format!(
+            "{field} currency must be a 3-letter uppercase code"
+        )));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1921,6 +1935,25 @@ mod tests {
         assert!(matches!(
             validate_web3_settlement_dispatch(&dispatch),
             Err(Web3ContractError::InvalidSettlement(_))
+        ));
+    }
+
+    #[test]
+    fn web3_dispatch_rejects_lowercase_settlement_currency() {
+        let mut dispatch = sample_dispatch();
+        dispatch.settlement_amount.currency = "usd".to_string();
+        dispatch
+            .capital_instruction
+            .body
+            .amount
+            .as_mut()
+            .unwrap()
+            .currency = "usd".to_string();
+
+        assert!(matches!(
+            validate_web3_settlement_dispatch(&dispatch),
+            Err(Web3ContractError::InvalidSettlement(message))
+                if message.contains("currency")
         ));
     }
 
