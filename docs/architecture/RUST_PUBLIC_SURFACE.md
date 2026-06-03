@@ -316,3 +316,43 @@ The checker rejects blank or leading/trailing-whitespace entries in both
 `rust_public_entrypoints` and `rust_registry_public_crates` with explicit
 index-addressed diagnostics. Existing sorted, duplicate, unknown-crate,
 root/local marker, and registry closure checks remain intact.
+
+## Public Entrypoint README Containment Slice
+
+### Current Boundary
+
+Public Rust entrypoint crates and registry-public crates must declare README
+metadata that points at documentation packaged with the crate itself. The gate
+uses that README as local evidence that the declared public surface has
+crate-owned operator or downstream guidance.
+
+### Pain Point Addressed
+
+Before this slice, the checker accepted any existing README path. A public
+entrypoint manifest could point outside its package directory, or point at a
+directory such as `src`, and still satisfy the public-surface gate. That made
+the README requirement weaker than its stated purpose: proving that the public
+crate carries package-local documentation.
+
+### Security And API Constraints
+
+- Do not let a package borrow root-level or sibling-crate documentation to
+  satisfy its own public-surface contract.
+- Keep missing README diagnostics stable for ordinary in-package missing files.
+- Treat symlink escapes as escapes by resolving the path before containment
+  checks.
+- Keep the gate pure, local, and network-free.
+
+### Affected Dependents
+
+CI continues to invoke `python3 scripts/check-rust-public-surface.py`, and the
+focused synthetic regression suite remains
+`bash scripts/tests/check-rust-public-surface.test.sh`. Real public entrypoint
+manifests already use package-local `README.md` files, so no crate manifest
+metadata changes are expected.
+
+### Implemented Improvement
+
+The checker now resolves declared README paths, rejects paths outside the
+package directory, and rejects paths that exist but are not files. Regressions
+cover both an escaping `../README.md` path and a directory-valued README path.

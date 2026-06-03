@@ -326,6 +326,47 @@ assert_rc "$(run_checker "$missing_readme/Cargo.toml" "$work/missing-readme.out"
 grep -F "crates/chio-core/Cargo.toml points to missing README 'README.md'" \
   "$work/missing-readme.err" >/dev/null
 
+escaped_readme="$work/escaped-readme"
+write_workspace "$escaped_readme" '    "chio-cli",' '    "chio-core",'
+printf '# shared\n' > "$escaped_readme/crates/README.md"
+python3 - "$escaped_readme/crates/chio-core/Cargo.toml" <<'PY'
+from pathlib import Path
+import sys
+
+manifest = Path(sys.argv[1])
+manifest.write_text(
+    manifest.read_text(encoding="utf-8").replace(
+        'readme = "README.md"',
+        'readme = "../README.md"',
+    ),
+    encoding="utf-8",
+)
+PY
+assert_rc "$(run_checker "$escaped_readme/Cargo.toml" "$work/escaped-readme.out" "$work/escaped-readme.err")" 1 \
+  "public entrypoint README escaping crate root fails"
+grep -F "crates/chio-core/Cargo.toml declares README '../README.md' outside the package directory." \
+  "$work/escaped-readme.err" >/dev/null
+
+directory_readme="$work/directory-readme"
+write_workspace "$directory_readme" '    "chio-cli",' '    "chio-core",'
+python3 - "$directory_readme/crates/chio-core/Cargo.toml" <<'PY'
+from pathlib import Path
+import sys
+
+manifest = Path(sys.argv[1])
+manifest.write_text(
+    manifest.read_text(encoding="utf-8").replace(
+        'readme = "README.md"',
+        'readme = "src"',
+    ),
+    encoding="utf-8",
+)
+PY
+assert_rc "$(run_checker "$directory_readme/Cargo.toml" "$work/directory-readme.out" "$work/directory-readme.err")" 1 \
+  "public entrypoint README directory fails"
+grep -F "crates/chio-core/Cargo.toml declares README 'src' but it is not a file." \
+  "$work/directory-readme.err" >/dev/null
+
 missing_description="$work/missing-description"
 write_workspace "$missing_description" '    "chio-cli",' '    "chio-core",'
 python3 - "$missing_description/crates/chio-core/Cargo.toml" <<'PY'

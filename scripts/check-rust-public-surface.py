@@ -85,9 +85,21 @@ def require_readme(
         errors.append(f"{display_path} declares non-string README metadata.")
         return
 
-    readme_path = manifest_path.parent / readme
+    package_dir = manifest_path.parent.resolve()
+    readme_spec = Path(readme)
+    readme_path = (manifest_path.parent / readme_spec).resolve()
+    try:
+        readme_path.relative_to(package_dir)
+    except ValueError:
+        errors.append(
+            f"{display_path} declares README {readme!r} outside the package directory."
+        )
+        return
+
     if not readme_path.exists():
         errors.append(f"{display_path} points to missing README {readme!r}.")
+    elif not readme_path.is_file():
+        errors.append(f"{display_path} declares README {readme!r} but it is not a file.")
 
 
 def require_description(
