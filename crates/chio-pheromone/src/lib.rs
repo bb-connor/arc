@@ -931,6 +931,7 @@ fn validate_deposit_static(
     validate_non_empty(&body.subject_class, "subject_class")?;
     validate_non_empty(&body.subject_class_namespace, "subject_class_namespace")?;
     validate_non_empty(&body.nonce, "nonce")?;
+    validate_unique_non_empty_strings(&body.treaty_scope, "treaty_scope")?;
     if !body.confidence.is_finite() || !(0.0..=1.0).contains(&body.confidence) {
         return Err(PheromoneError::ConfidenceOutOfRange(body.confidence));
     }
@@ -1231,6 +1232,7 @@ pub fn validate_scarcity_policy_material(
             policy.policy_id
         )));
     }
+    validate_unique_non_empty_strings(&policy.treaty_scope, "scarcity treaty scope")?;
     if !context
         .known_reputation_epochs
         .contains(&policy.reputation_epoch)
@@ -1686,6 +1688,24 @@ fn validate_non_empty(value: &str, field: &str) -> Result<(), PheromoneError> {
         return Err(PheromoneError::InvalidField(format!(
             "{field} must be non-empty and unpadded"
         )));
+    }
+    Ok(())
+}
+
+fn validate_unique_non_empty_strings(values: &[String], field: &str) -> Result<(), PheromoneError> {
+    if values.is_empty() {
+        return Err(PheromoneError::InvalidField(format!(
+            "{field} must not be empty"
+        )));
+    }
+    let mut seen = BTreeSet::new();
+    for value in values {
+        validate_non_empty(value, field)?;
+        if !seen.insert(value.as_str()) {
+            return Err(PheromoneError::InvalidField(format!(
+                "{field} contains duplicate value {value}"
+            )));
+        }
     }
     Ok(())
 }
