@@ -110,6 +110,11 @@ impl ExporterManager {
                 "batch_size must be greater than zero".to_string(),
             ));
         }
+        if config.poll_interval.is_zero() {
+            return Err(SiemError::ConfigError(
+                "poll_interval must be greater than zero".to_string(),
+            ));
+        }
 
         let rate_limiter = config
             .rate_limit
@@ -406,5 +411,21 @@ mod tests {
     #[test]
     fn retry_backoff_ms_saturates_overflowing_base_delay() {
         assert_eq!(retry_backoff_ms(u64::MAX, 2), MAX_RETRY_BACKOFF_MS);
+    }
+
+    #[test]
+    fn manager_new_rejects_zero_poll_interval_before_opening_db() {
+        let error = match ExporterManager::new(SiemConfig {
+            db_path: PathBuf::from("/definitely/not/a/chio/receipt/db.sqlite3"),
+            poll_interval: Duration::ZERO,
+            ..SiemConfig::default()
+        }) {
+            Ok(_) => panic!("zero poll interval should be rejected before opening db"),
+            Err(error) => error,
+        };
+
+        assert!(
+            matches!(error, SiemError::ConfigError(message) if message.contains("poll_interval"))
+        );
     }
 }
