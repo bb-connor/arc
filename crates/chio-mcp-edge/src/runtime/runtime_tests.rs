@@ -2689,6 +2689,43 @@ fn task_creation_rejects_deferred_task_map_over_cap() {
 }
 
 #[test]
+fn task_methods_reject_malformed_task_ids_before_lookup() {
+    let mut edge = make_streaming_edge(10);
+    let _ = edge.handle_jsonrpc(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {}
+    }));
+    let _ = edge.handle_jsonrpc(json!({
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized",
+        "params": {}
+    }));
+
+    for (index, method, task_id) in [
+        (10, "tasks/get", ""),
+        (11, "tasks/result", " mcp-edge-task-1"),
+        (12, "tasks/cancel", "mcp-edge-task-1\n"),
+    ] {
+        let rejected = edge
+            .handle_jsonrpc(json!({
+                "jsonrpc": "2.0",
+                "id": index,
+                "method": method,
+                "params": { "taskId": task_id }
+            }))
+            .unwrap();
+
+        assert_eq!(rejected["error"]["code"], JSONRPC_INVALID_PARAMS);
+        assert_eq!(
+            rejected["error"]["message"],
+            "taskId must be a non-empty unpadded string without control characters"
+        );
+    }
+}
+
+#[test]
 fn tasks_cancel_marks_working_task_cancelled_and_result_returns_error_payload() {
     let mut edge = make_streaming_edge(10);
     let _ = edge.handle_jsonrpc(json!({
@@ -3724,6 +3761,73 @@ fn completion_complete_returns_candidates_for_prompt_and_resource_refs() {
     assert_eq!(
         resource_response["result"]["completion"]["values"],
         json!(["architecture", "api"])
+    );
+}
+
+#[test]
+fn completion_complete_rejects_malformed_target_identifiers() {
+    let mut edge = make_edge(10);
+    let _ = edge.handle_jsonrpc(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {}
+    }));
+    let _ = edge.handle_jsonrpc(json!({
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized",
+        "params": {}
+    }));
+
+    let malformed_prompt_name = edge
+        .handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "completion/complete",
+            "params": {
+                "ref": { "type": "ref/prompt", "name": "" },
+                "argument": { "name": "topic", "value": "r" },
+                "context": { "arguments": {} }
+            }
+        }))
+        .unwrap();
+    assert_eq!(
+        malformed_prompt_name["error"]["message"],
+        "prompt ref name must be a non-empty unpadded string without control characters"
+    );
+
+    let malformed_resource_uri = edge
+        .handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "completion/complete",
+            "params": {
+                "ref": { "type": "ref/resource", "uri": " repo://docs/{slug}" },
+                "argument": { "name": "slug", "value": "a" },
+                "context": { "arguments": {} }
+            }
+        }))
+        .unwrap();
+    assert_eq!(
+        malformed_resource_uri["error"]["message"],
+        "resource ref uri must be a non-empty unpadded string without control characters"
+    );
+
+    let malformed_argument_name = edge
+        .handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "completion/complete",
+            "params": {
+                "ref": { "type": "ref/prompt", "name": "summarize_docs" },
+                "argument": { "name": "topic\n", "value": "r" },
+                "context": { "arguments": {} }
+            }
+        }))
+        .unwrap();
+    assert_eq!(
+        malformed_argument_name["error"]["message"],
+        "completion argument name must be a non-empty unpadded string without control characters"
     );
 }
 

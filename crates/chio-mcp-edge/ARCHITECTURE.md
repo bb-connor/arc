@@ -172,3 +172,40 @@ Added one shared known-notification params gate in `runtime/protocol.rs`, routed
 all direct and transport-backed JSON-RPC notification dispatch through it, and
 made the cancellation side channel reject malformed
 `notifications/cancelled` params before nested-flow cancellation matching.
+
+## Protocol Identifier Admission Slice
+
+### Current Boundary
+
+`runtime/protocol.rs` admits JSON-RPC params for task lookups and
+`completion/complete` targets before those values reach task maps, capability
+selection, prompt providers, and resource providers.
+
+### Pain Point
+
+The existing admission logic checks only that `taskId`, completion prompt
+names, completion resource URIs, and completion argument names are strings.
+Empty, padded, or control-character-bearing identifiers therefore pass the edge
+boundary and are treated as ordinary lookup keys or provider arguments.
+
+### Security And API Constraints
+
+- Preserve generated task IDs and normal `tasks/get`, `tasks/result`, and
+  `tasks/cancel` behavior.
+- Preserve completion argument values exactly, including an empty prefix, since
+  completion callers can ask for all candidates.
+- Preserve JSON-RPC `-32602` error classification for malformed params.
+- Keep this slice inside `chio-mcp-edge`; no public API change is intended.
+
+### Affected Dependents
+
+`chio-mcp-remote`, `chio-hosted-mcp`, and channel or stdio embedders share the
+same parser and should observe no change for well-formed identifiers. The
+compatibility proof is crate-local parser and runtime coverage plus dependent
+edge checks.
+
+### Completed Improvement
+
+Added a shared protocol identifier parser that rejects empty, padded, and control
+character strings, then routed task ID and completion target identifier parsing
+through it while leaving completion argument values as caller-provided prefixes.

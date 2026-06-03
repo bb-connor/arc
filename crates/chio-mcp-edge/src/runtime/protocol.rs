@@ -338,17 +338,19 @@ pub(super) fn parse_requested_task(
 }
 
 pub(super) fn parse_task_id(id: &Value, params: &Value) -> Result<String, Value> {
-    params
+    let task_id = params
         .get("taskId")
         .and_then(Value::as_str)
-        .map(ToString::to_string)
         .ok_or_else(|| {
             jsonrpc_error(
                 id.clone(),
                 JSONRPC_INVALID_PARAMS,
                 "taskId must be a string",
             )
-        })
+        })?;
+    let task_id = parse_protocol_identifier(task_id, "taskId")
+        .map_err(|message| jsonrpc_error(id.clone(), JSONRPC_INVALID_PARAMS, message.as_str()))?;
+    Ok(task_id.to_string())
 }
 
 pub(super) fn edge_task_status_label(status: EdgeTaskStatus) -> &'static str {
@@ -658,6 +660,7 @@ pub(super) fn parse_completion_reference(params: &Value) -> Result<CompletionRef
                 .get("name")
                 .and_then(Value::as_str)
                 .ok_or_else(|| "prompt ref requires a name".to_string())?;
+            let name = parse_protocol_identifier(name, "prompt ref name")?;
             Ok(CompletionReference::Prompt {
                 name: name.to_string(),
             })
@@ -667,6 +670,7 @@ pub(super) fn parse_completion_reference(params: &Value) -> Result<CompletionRef
                 .get("uri")
                 .and_then(Value::as_str)
                 .ok_or_else(|| "resource ref requires a uri".to_string())?;
+            let uri = parse_protocol_identifier(uri, "resource ref uri")?;
             Ok(CompletionReference::Resource {
                 uri: uri.to_string(),
             })
@@ -686,6 +690,7 @@ pub(super) fn parse_completion_argument(params: &Value) -> Result<CompletionArgu
         .get("name")
         .and_then(Value::as_str)
         .ok_or_else(|| "completion argument requires a name".to_string())?;
+    let name = parse_protocol_identifier(name, "completion argument name")?;
     let value = argument
         .get("value")
         .and_then(Value::as_str)
@@ -695,6 +700,16 @@ pub(super) fn parse_completion_argument(params: &Value) -> Result<CompletionArgu
         name: name.to_string(),
         value: value.to_string(),
     })
+}
+
+fn parse_protocol_identifier<'a>(value: &'a str, label: &str) -> Result<&'a str, String> {
+    if value.is_empty() || value.trim() != value || value.chars().any(|ch| ch.is_control()) {
+        return Err(format!(
+            "{label} must be a non-empty unpadded string without control characters"
+        ));
+    }
+
+    Ok(value)
 }
 
 pub(super) fn paginate_response(
