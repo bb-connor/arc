@@ -358,7 +358,7 @@ impl ShadowRunner {
             },
             request_blob_sha256,
             response_blob_sha256,
-            redaction_pass_id: chio_data_guards_redactors_default::PASS_ID.to_string(),
+            redaction_pass_id: crate::DEFAULT_REDACTION_PASS_ID.to_string(),
             verdict,
             deny_reason: deny_reason.clone(),
             would_have_blocked,

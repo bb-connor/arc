@@ -323,6 +323,65 @@ mod tests {
     }
 
     #[test]
+    fn recognized_extractors_reject_malformed_higher_priority_aliases() {
+        let cases = [
+            (
+                "python",
+                serde_json::json!({"code": ["print('unsafe')"], "source": "print('safe')"}),
+                "code",
+            ),
+            (
+                "eval",
+                serde_json::json!({"code": "console.log(1)", "language": ["javascript"], "lang": "python"}),
+                "language",
+            ),
+            (
+                "browser",
+                serde_json::json!({"action": ["click"], "verb": "navigate"}),
+                "action",
+            ),
+            (
+                "browser",
+                serde_json::json!({"action": "click", "url": ["https://evil.example"], "selector": "#safe"}),
+                "url",
+            ),
+            (
+                "sql",
+                serde_json::json!({"query": {"raw": "DROP TABLE users"}, "sql": "SELECT 1"}),
+                "query",
+            ),
+            (
+                "postgres",
+                serde_json::json!({"query": "SELECT 1", "database": ["prod"], "db": "readonly"}),
+                "database",
+            ),
+            (
+                "vector_upsert",
+                serde_json::json!({"collection": ["sensitive"], "store": "safe"}),
+                "collection",
+            ),
+            (
+                "vector_query",
+                serde_json::json!({"collection": "facts", "id": ["secret"], "key": "safe"}),
+                "id",
+            ),
+            (
+                "slack_send_message",
+                serde_json::json!({"endpoint": ["chat.postMessage"], "path": "chat.safe"}),
+                "endpoint",
+            ),
+        ];
+
+        for (tool_name, args, expected_field) in cases {
+            assert_eq!(
+                malformed_field(tool_name, &args),
+                expected_field,
+                "tool {tool_name} should reject malformed {expected_field}"
+            );
+        }
+    }
+
+    #[test]
     fn filesystem_tool_explicit_read_action() {
         let args = serde_json::json!({"path": "/etc/shadow", "action": "read"});
         let action = extract_action("filesystem", &args);

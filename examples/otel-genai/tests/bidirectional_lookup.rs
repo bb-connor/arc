@@ -22,7 +22,10 @@ fn receipt_id_and_span_id_lookup_is_bidirectional() -> Result<(), Box<dyn Error>
         .first()
         .ok_or_else(|| std::io::Error::other("missing exported receipt"))?;
     assert_eq!(receipt.id.len(), 64);
-    assert!(receipt.id.chars().all(|value| value.is_ascii_hexdigit()));
+    assert!(receipt
+        .id
+        .chars()
+        .all(|value| matches!(value, '0'..='9' | 'a'..='f')));
     assert_ne!(receipt.id, SOURCE_RECEIPT_ID);
     assert_eq!(receipt.capability_id, CAPABILITY_ID);
     assert_eq!(receipt.tool_server, TOOL_SERVER);
@@ -47,7 +50,7 @@ fn receipt_id_and_span_id_lookup_is_bidirectional() -> Result<(), Box<dyn Error>
     );
     assert_eq!(
         metadata["otel"]["attributes"]["redaction_pass_id"],
-        "redactors@1.4.0+default"
+        "redactors@1.5.0+default"
     );
     assert_eq!(metadata["otel"]["source_verdict"], "allow");
     assert_eq!(

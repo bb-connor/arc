@@ -16,7 +16,8 @@ use chio_otel_receipt_exporter::{
     ReceiptStoreSinkSummary,
 };
 
-pub const SOURCE_RECEIPT_ID: &str = "rcpt-otel-genai-0001";
+pub const SOURCE_RECEIPT_ID: &str =
+    "1111111111111111111111111111111111111111111111111111111111111111";
 pub const TRACE_ID: &str = "4bf92f3577b34da6a3ce929d0e0e4736";
 pub const SPAN_ID: &str = "00f067aa0ba902b7";
 pub const TOOL_NAME: &str = "customer_lookup";
@@ -115,7 +116,7 @@ fn demo_span() -> OtlpSpan {
         .with_attribute(ATTR_CHIO_AGENT_ID, serde_json::json!("agent-demo"))
         .with_attribute(
             "redaction_pass_id",
-            serde_json::json!("redactors@1.4.0+default"),
+            serde_json::json!("redactors@1.5.0+default"),
         )
         .with_attribute("redaction_elapsed_micros", serde_json::json!(12450_u64))
 }

@@ -488,7 +488,7 @@ mod tests {
             },
             request_blob_sha256: "a".repeat(64),
             response_blob_sha256: "b".repeat(64),
-            redaction_pass_id: "redactors@1.4.0+default".to_string(),
+            redaction_pass_id: crate::DEFAULT_REDACTION_PASS_ID.to_string(),
             verdict,
             deny_reason: match verdict {
                 Verdict::Allow => None,

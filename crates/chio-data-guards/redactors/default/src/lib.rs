@@ -91,7 +91,7 @@ pub struct RedactionMatch {
 /// Mirrors WIT `redaction-manifest`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RedactionManifest {
-    /// e.g. `"redactors@1.4.0+default"`.
+    /// e.g. `"redactors@1.5.0+default"`.
     pub pass_id: String,
     pub matches: Vec<RedactionMatch>,
     pub elapsed_micros: u64,

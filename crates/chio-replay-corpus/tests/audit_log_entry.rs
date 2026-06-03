@@ -3,7 +3,8 @@ use std::fs;
 use chio_core::Keypair;
 use chio_replay_corpus::{
     write_fixture, write_tee_bless_audit_entry, BlessCapture, BlessFixture, BlessOperator,
-    TeeBlessAuditBody, TeeBlessAuditEntry, TEE_BLESS_CAPABILITY, TEE_BLESS_EVENT,
+    TeeBlessAuditBody, TeeBlessAuditEntry, DEFAULT_REDACTION_PASS_ID, TEE_BLESS_CAPABILITY,
+    TEE_BLESS_EVENT,
 };
 use chio_tee_frame::{Frame, FrameInputs, Otel, Provenance, Upstream, UpstreamSystem, Verdict};
 use serde_json::{json, Value};
@@ -32,7 +33,7 @@ fn frame(
         },
         request_blob_sha256: "c".repeat(64),
         response_blob_sha256: "d".repeat(64),
-        redaction_pass_id: "redactors@1.4.0+default".to_string(),
+        redaction_pass_id: DEFAULT_REDACTION_PASS_ID.to_string(),
         verdict,
         deny_reason: None,
         would_have_blocked: false,
@@ -87,7 +88,7 @@ fn tee_bless_audit_event_records_required_fields_and_verifies_signature(
         operator,
         capture,
         fixture,
-        "redactors@1.4.0+default",
+        DEFAULT_REDACTION_PASS_ID,
     );
     let keypair = Keypair::from_seed(&[7u8; 32]);
     let entry = TeeBlessAuditEntry::sign(body, &keypair)?;
@@ -123,7 +124,7 @@ fn tee_bless_audit_event_records_required_fields_and_verifies_signature(
     assert_eq!(value["fixture"]["name"], "tool_call_with_pii");
     assert_eq!(value["fixture"]["path"], fixture_path);
     assert_eq!(value["fixture"]["receipts_root"], summary.root_hex);
-    assert_eq!(value["redaction_pass_id"], "redactors@1.4.0+default");
+    assert_eq!(value["redaction_pass_id"], DEFAULT_REDACTION_PASS_ID);
     assert_eq!(value["control_plane_capability"], TEE_BLESS_CAPABILITY);
     assert!(value["signature"]
         .as_str()
@@ -155,7 +156,7 @@ fn tee_bless_audit_signing_rejects_blank_operator_identity() {
             path: "tests/replay/fixtures/openai_responses_shadow/tool_call_with_pii/".to_string(),
             receipts_root: "a".repeat(64),
         },
-        "redactors@1.4.0+default",
+        DEFAULT_REDACTION_PASS_ID,
     );
     let keypair = Keypair::from_seed(&[7u8; 32]);
 
@@ -185,7 +186,7 @@ fn tee_bless_audit_signing_rejects_malformed_receipts_root() {
             path: "tests/replay/fixtures/openai_responses_shadow/tool_call_with_pii/".to_string(),
             receipts_root: "A".repeat(64),
         },
-        "redactors@1.4.0+default",
+        DEFAULT_REDACTION_PASS_ID,
     );
     let keypair = Keypair::from_seed(&[7u8; 32]);
 
@@ -217,7 +218,7 @@ fn tee_bless_audit_signing_rejects_zero_capture_counts() {
             path: "tests/replay/fixtures/openai_responses_shadow/tool_call_with_pii/".to_string(),
             receipts_root: "a".repeat(64),
         },
-        "redactors@1.4.0+default",
+        DEFAULT_REDACTION_PASS_ID,
     );
     let keypair = Keypair::from_seed(&[7u8; 32]);
 
