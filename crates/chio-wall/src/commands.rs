@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fmt::Debug;
 use std::fs;
 use std::path::Path;
@@ -143,6 +144,29 @@ fn ensure_non_empty_directory(path: &Path) -> Result<(), CliError> {
             "required Chio-Wall evidence directory is empty: {}",
             path.display()
         )));
+    }
+    Ok(())
+}
+
+fn ensure_only_expected_package_entries(
+    output: &Path,
+    expected_entries: &[&'static str],
+) -> Result<(), CliError> {
+    let expected = expected_entries.iter().copied().collect::<BTreeSet<_>>();
+    for entry in fs::read_dir(output)? {
+        let entry = entry?;
+        let entry_name = entry.file_name().into_string().map_err(|_| {
+            CliError::Other(format!(
+                "unexpected non-UTF-8 Chio-Wall package entry: {}",
+                entry.path().display()
+            ))
+        })?;
+        if !expected.contains(entry_name.as_str()) {
+            return Err(CliError::Other(format!(
+                "unexpected Chio-Wall package entry: {}",
+                entry.path().display()
+            )));
+        }
     }
     Ok(())
 }
@@ -520,6 +544,17 @@ fn verify_control_path_export(
     let control_package_path = output.join("control-package.json");
     let control_path_summary_path = output.join("control-path-summary.json");
     let chio_evidence_dir = output.join("chio-evidence");
+    let expected_entries = [
+        "control-profile.json",
+        "policy-snapshot.json",
+        "authorization-context.json",
+        "guard-outcome.json",
+        "denied-access-record.json",
+        "buyer-review-package.json",
+        "control-package.json",
+        "control-path-summary.json",
+        "chio-evidence",
+    ];
 
     for path in [
         &control_profile_path,
@@ -534,6 +569,7 @@ fn verify_control_path_export(
         ensure_file_exists(path)?;
     }
     ensure_non_empty_directory(&chio_evidence_dir)?;
+    ensure_only_expected_package_entries(output, &expected_entries)?;
 
     let control_profile: ChioWallControlProfile = read_json_file(&control_profile_path)?;
     let policy_snapshot: ChioWallPolicySnapshot = read_json_file(&policy_snapshot_path)?;
@@ -1160,6 +1196,23 @@ mod tests {
             .expect_err("missing guard outcome should fail reconciliation");
 
         assert!(error.to_string().contains("guard-outcome.json"));
+        let _ = fs::remove_dir_all(output);
+    }
+
+    #[test]
+    fn control_path_export_reconciliation_rejects_unexpected_top_level_artifact() {
+        let output = unique_test_dir("chio-wall-export-closed");
+        let summary = export_control_path(&output).expect("export control path");
+        fs::write(output.join(".chio-wall-receipts.sqlite3"), b"stale db")
+            .expect("write undeclared artifact");
+
+        let error = verify_control_path_export(&output, &summary)
+            .expect_err("undeclared top-level artifact should fail reconciliation");
+
+        assert!(error
+            .to_string()
+            .contains("unexpected Chio-Wall package entry"));
+        assert!(error.to_string().contains(".chio-wall-receipts.sqlite3"));
         let _ = fs::remove_dir_all(output);
     }
 

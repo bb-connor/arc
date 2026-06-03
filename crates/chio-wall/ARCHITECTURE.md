@@ -44,10 +44,33 @@ creation, SQLite-backed evidence export, and validation-package rendering.
 - Documentation under `docs/chio-wall` is the source of truth for output layout
   and fail-closed operating expectations.
 
-## Planned Improvement
+## Completed Post-Write Reconciliation Slice
 
 Add a post-write reconciliation boundary to `export_control_path`: after the
 CLI writes the control-path package and Chio evidence export, read the package
 back from disk, validate the typed contracts, verify cross-file consistency, and
 fail before printing success if any required artifact or evidence directory is
 missing.
+
+## Package Closure Slice
+
+### Current Boundary
+
+`verify_control_path_export` confirms that the required Chio-Wall files exist,
+the Chio evidence directory is non-empty, typed contracts validate, and declared
+cross-file references agree. It does not reject undeclared top-level files in
+the generated package directory.
+
+### Pain Point
+
+The export command creates a transient SQLite receipt database before producing
+the evidence bundle. If that file or any other unexpected artifact remains in
+the output root, the package can still be reported as valid even though the
+buyer-facing package contains material outside the declared control-path
+contract.
+
+### Planned Improvement
+
+Add a package-closure check that fails reconciliation when the output root
+contains any undeclared top-level entry. Keep evidence-export internals scoped
+inside `chio-evidence`; only the Chio-Wall package root is closed.
