@@ -22,6 +22,28 @@ fn validate_request_lineage_schema(
         .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))
 }
 
+pub(crate) fn child_receipt_request_lineage_json(
+    receipt: &ChildRequestReceipt,
+) -> Result<serde_json::Value, ReceiptStoreError> {
+    let body_hash = canonical_json_bytes(&receipt.body())
+        .map(|bytes| sha256_hex(&bytes))
+        .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?;
+    let anchor = SessionAnchorReference::new(
+        format!("child-receipt-backfill:{}", receipt.session_id.as_str()),
+        body_hash,
+    );
+    let lineage = RequestLineageRecord::new(
+        receipt.request_id.clone(),
+        anchor,
+        receipt.operation_kind,
+        RequestLineageMode::LocalChild,
+        receipt.timestamp,
+    )
+    .with_parent_request_id(receipt.parent_request_id.clone());
+
+    Ok(serde_json::to_value(lineage)?)
+}
+
 fn sanitize_required_identifier(
     record_kind: &str,
     record_id: &str,
@@ -1037,7 +1059,7 @@ pub(crate) fn backfill_provenance_lineage_tables(
             receipt.timestamp,
             None,
             CHILD_RECEIPT_BACKFILL_SOURCE_KIND,
-            &serde_json::from_str::<serde_json::Value>(&raw_json)?,
+            &child_receipt_request_lineage_json(&receipt)?,
         )?;
     }
 

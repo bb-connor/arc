@@ -11,44 +11,44 @@ crates such as `chio-store-sqlite`.
 
 ## Current Pain Point
 
-Runtime admission hooks can reserve external runtime capacity after guards pass
-but before dispatch begins. If a later pre-dispatch gate denies the call, such
-as sibling-sum admission or payment authorization, the kernel must release
-those reservations, reverse any pre-execution budget mutation, and still sign a
-denial receipt that preserves the original denial.
+The `chio-kernel` retention gate verifies that archived child-request receipts
+remain queryable and that tenant-scoped archival moves only the child receipts
+bound to archived parent receipts. That owning-crate gate currently fails
+before archive logic runs: `SqliteReceiptStore::append_child_receipt` persists
+the signed child receipt, then tries to backfill request-lineage evidence by
+passing the child receipt JSON through the request-lineage schema validator.
+`ChildRequestReceipt` is a signed receipt shape, not a
+`RequestLineageRecord`, so the store rejects valid child receipts with
+`missing field schema`.
 
-The direct and nested-flow dispatch paths currently hand-roll that same
-sequence. The behavior is mostly correct, but duplication makes this a fragile
-security boundary: future fixes to release-failure metadata, budget reversal,
-or monetary denial metadata can land in one path and drift from the other.
+The kernel owns the retention behavior and the security invariant, while the
+bad serializer sits in the SQLite store implementation used by the gate. This
+is a necessary transitive storage fix, not an invitation to broaden the slice
+into storage cleanup.
 
 ## Security And API Constraints
 
-- Deny paths must remain fail-closed and must keep producing signed deny
-  receipts.
-- Monetary holds must be reversed before pre-dispatch denials become receipts.
-- Non-monetary invocation limits must still roll back if a later pre-execution
-  gate denies the call.
-- Unlimited grants must not depend on synthetic zero-cost reversals.
-- Runtime admission reservations must be released on provably pre-dispatch
-  denials, but release failures must be evidence on the denial receipt rather
-  than a replacement for the denial.
-- Direct and nested-flow dispatch must share the same pre-dispatch cleanup and
-  denial receipt path.
-- Public kernel APIs and receipt JSON compatibility should remain unchanged.
+- Signed child receipt bytes and signature verification must remain unchanged.
+- Request-lineage rows must be schema-tagged `RequestLineageRecord` values, not
+  ad hoc projections or receipt JSON.
+- Archival must remain tenant-scoped: child receipts move only when their
+  parent receipt is in the archived tenant/cutoff set.
+- Receipt and lineage readers must continue to fail closed on malformed JSON or
+  unsupported schema identifiers.
+- Public kernel and receipt-store APIs should remain unchanged.
 
 ## Affected Dependents
 
-The owning-crate change is internal to `chio-kernel`, but it protects runtime
-admission integrations that reserve destructive leases or treaty-continuation
-slots. HTTP, ACP, A2A, and product callers should continue to receive ordinary
-deny responses for pre-dispatch denials instead of transport-level kernel
-errors.
+`chio-store-sqlite` requires a scoped transitive patch because its child receipt
+append path creates the malformed lineage backfill. The change should stay on
+that path only. Kernel, evidence-export, and operator-report callers observe the
+result through existing receipt-store methods and should see valid child
+receipt listings plus valid request-lineage rows.
 
 ## Improvement In This Slice
 
-Move runtime-admission release, pre-execution budget reversal, monetary denial
-metadata construction, and signed denial response creation behind one internal
-pre-dispatch cleanup boundary. Both sibling-sum and payment denials in direct
-and nested-flow dispatch use that boundary. Add nested-flow coverage for a
-runtime-admission release failure so the shared behavior stays explicit.
+Create the child-receipt request-lineage backfill as a typed
+`RequestLineageRecord` derived from the child receipt fields before passing it
+to the SQLite lineage persistence boundary. Add/restore focused retention
+coverage for child receipt archival and tenant-scoped child receipt archival,
+then run the full retention test target before broader `chio-kernel` gates.
