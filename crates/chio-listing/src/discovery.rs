@@ -90,7 +90,7 @@ impl ListingPricingHint {
         non_empty(&self.namespace, "namespace")?;
         non_empty(&self.provider_operator_id, "provider_operator_id")?;
         non_empty(&self.capability_scope, "capability_scope")?;
-        non_empty(&self.price_per_call.currency, "price_per_call.currency")?;
+        validate_currency_code(&self.price_per_call.currency, "price_per_call.currency")?;
         if self.price_per_call.units == 0 {
             return Err("price_per_call.units must be greater than zero".to_string());
         }
@@ -613,6 +613,20 @@ fn non_empty(value: &str, field: &str) -> Result<(), String> {
     }
 }
 
+fn validate_currency_code(value: &str, field: &str) -> Result<(), String> {
+    if value.len() == 3
+        && value
+            .chars()
+            .all(|character| character.is_ascii_uppercase())
+    {
+        Ok(())
+    } else {
+        Err(format!(
+            "{field} must be a 3-letter uppercase currency code"
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -750,6 +764,26 @@ mod tests {
             SignedListingPricingHint::sign(body, operator_keypair),
             "sign hint",
         )
+    }
+
+    #[test]
+    fn listing_pricing_hint_rejects_lowercase_currency() {
+        let operator_keypair = Keypair::generate();
+        let mut hint = sample_pricing_hint(
+            &operator_keypair,
+            "operator-a",
+            "listing-1",
+            "tools:search",
+            50,
+            100,
+        );
+        hint.body.price_per_call.currency = "usd".to_string();
+
+        let error = hint
+            .body
+            .validate()
+            .expect_err("lowercase pricing currency must fail closed");
+        assert!(error.contains("currency"));
     }
 
     #[test]
