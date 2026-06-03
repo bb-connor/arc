@@ -50,5 +50,7 @@ Add a shared fixture-directory validation boundary for cross-language and
 native scenario loading. Missing or non-directory roots should return an
 existing I/O-style error, symlinks should remain rejected, and the native
 scenario tree should be packaged alongside the existing cross-language
-fixtures. This preserves public API signatures while making packaged and
-standalone conformance runs fail closed instead of producing empty evidence.
+fixtures. Empty scenario directories should also fail closed instead of
+producing empty evidence. This preserves public API signatures while making
+packaged and standalone conformance runs fail closed instead of producing
+empty evidence.

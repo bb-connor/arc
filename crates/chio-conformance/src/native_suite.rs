@@ -264,6 +264,9 @@ pub fn load_native_scenarios_from_dir(
     let path = path.as_ref();
     require_native_scenario_directory(path)?;
     collect_native_scenarios(path, &mut scenarios)?;
+    if scenarios.is_empty() {
+        return Err(empty_native_scenario_directory_error(path));
+    }
     scenarios.sort_by(|left, right| left.id.cmp(&right.id));
     Ok(scenarios)
 }
@@ -433,6 +436,16 @@ fn require_native_scenario_directory(path: &Path) -> Result<(), NativeSuiteError
         )));
     }
     Ok(())
+}
+
+fn empty_native_scenario_directory_error(path: &Path) -> NativeSuiteError {
+    NativeSuiteError::Io(std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        format!(
+            "native conformance scenario directory {} is empty: expected at least one JSON scenario",
+            path.display()
+        ),
+    ))
 }
 
 fn execute_native_scenario(
@@ -1343,6 +1356,23 @@ mod tests {
             Ok(scenarios) => panic!("missing native scenario directory should fail: {scenarios:?}"),
             Err(error) => assert!(error.to_string().contains("directory")),
         }
+    }
+
+    #[test]
+    fn load_native_scenarios_rejects_empty_directory() {
+        let dir = std::env::temp_dir().join(format!(
+            "chio-conformance-native-empty-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("create empty native scenario dir");
+
+        match load_native_scenarios_from_dir(&dir) {
+            Ok(scenarios) => panic!("empty native scenario directory should fail: {scenarios:?}"),
+            Err(error) => assert!(error.to_string().contains("empty")),
+        }
+
+        let _ = fs::remove_dir_all(dir);
     }
 
     #[cfg(unix)]

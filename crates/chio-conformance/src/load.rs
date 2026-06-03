@@ -21,7 +21,11 @@ pub enum LoadError {
 pub fn load_scenarios_from_dir(
     path: impl AsRef<Path>,
 ) -> Result<Vec<ScenarioDescriptor>, LoadError> {
-    let mut scenarios = read_json_files::<ScenarioDescriptor>(path.as_ref())?;
+    let path = path.as_ref();
+    let mut scenarios = read_json_files::<ScenarioDescriptor>(path)?;
+    if scenarios.is_empty() {
+        return Err(empty_scenario_directory_error(path));
+    }
     scenarios.sort_by(|left, right| left.id.cmp(&right.id));
     Ok(scenarios)
 }
@@ -70,6 +74,16 @@ fn collect_json_files(path: &Path) -> Result<Vec<PathBuf>, LoadError> {
     walk_json_files(path, &mut files)?;
     files.sort();
     Ok(files)
+}
+
+fn empty_scenario_directory_error(path: &Path) -> LoadError {
+    LoadError::Io(std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        format!(
+            "conformance scenario directory {} is empty: expected at least one JSON scenario",
+            path.display()
+        ),
+    ))
 }
 
 fn require_json_directory(path: &Path) -> Result<(), LoadError> {
@@ -194,6 +208,21 @@ mod tests {
             Ok(scenarios) => panic!("missing scenario directory should fail: {scenarios:?}"),
             Err(error) => assert!(error.to_string().contains("directory")),
         }
+        Ok(())
+    }
+
+    #[test]
+    fn load_scenarios_rejects_empty_directory() -> Result<(), LoadError> {
+        let dir = unique_dir("chio-conformance-load-empty-scenarios")?;
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir)?;
+
+        match load_scenarios_from_dir(&dir) {
+            Ok(scenarios) => panic!("empty scenario directory should fail: {scenarios:?}"),
+            Err(error) => assert!(error.to_string().contains("empty")),
+        }
+
+        let _ = fs::remove_dir_all(dir);
         Ok(())
     }
 
