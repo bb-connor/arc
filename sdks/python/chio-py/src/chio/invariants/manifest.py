@@ -14,6 +14,8 @@ _REQUIRED_PERMISSION_FIELDS = (
 )
 _REQUIRED_PERMISSION_FIELD_SET = set(_REQUIRED_PERMISSION_FIELDS)
 _PRICING_MODELS = {"flat", "per_invocation", "per_unit", "hybrid"}
+_SIGNED_MANIFEST_FIELDS = {"manifest", "signature", "signer_key"}
+_MAX_U64 = 2**64 - 1
 
 
 def parse_signed_manifest_json(input_text: str) -> dict[str, Any]:
@@ -115,6 +117,7 @@ def _validate_pricing_amount(amount: Any) -> bool:
         and isinstance(amount.get("units"), int)
         and not isinstance(amount.get("units"), bool)
         and amount["units"] >= 0
+        and amount["units"] <= _MAX_U64
         and _is_iso_4217_currency_code(amount.get("currency"))
     )
 
@@ -158,7 +161,8 @@ def verify_signed_manifest(signed_manifest: dict[str, Any]) -> dict[str, Any]:
         signed_manifest["manifest"]["public_key"]
     )
     return {
-        "structure_valid": _validate_manifest_structure(signed_manifest["manifest"]),
+        "structure_valid": _validate_signed_manifest_envelope(signed_manifest)
+        and _validate_manifest_structure(signed_manifest["manifest"]),
         "signature_valid": verify_utf8_message_ed25519(
             signed_manifest_body_canonical_json(signed_manifest),
             signed_manifest["signer_key"],
@@ -171,6 +175,10 @@ def verify_signed_manifest(signed_manifest: dict[str, Any]) -> dict[str, Any]:
             signed_manifest["signer_key"],
         ),
     }
+
+
+def _validate_signed_manifest_envelope(signed_manifest: Any) -> bool:
+    return isinstance(signed_manifest, dict) and set(signed_manifest) == _SIGNED_MANIFEST_FIELDS
 
 
 def verify_signed_manifest_json(input_text: str) -> dict[str, Any]:

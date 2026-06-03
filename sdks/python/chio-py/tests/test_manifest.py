@@ -118,6 +118,14 @@ def test_manifest_structure_rejects_malformed_pricing_metadata() -> None:
                 "billing_unit": "invocation",
             },
         ),
+        (
+            "units above u64 max",
+            {
+                "pricing_model": "per_invocation",
+                "unit_price": {"units": 2**64, "currency": "USD"},
+                "billing_unit": "invocation",
+            },
+        ),
     ]
     for label, pricing in cases:
         signed_manifest = priced_signed_manifest()
@@ -126,6 +134,20 @@ def test_manifest_structure_rejects_malformed_pricing_metadata() -> None:
         assert (
             verify_signed_manifest(signed_manifest)["structure_valid"] is False
         ), label
+
+
+def test_manifest_structure_accepts_u64_max_pricing_units() -> None:
+    signed_manifest = priced_signed_manifest()
+    signed_manifest["manifest"]["tools"][0]["pricing"]["unit_price"]["units"] = 2**64 - 1
+
+    assert verify_signed_manifest(signed_manifest)["structure_valid"] is True
+
+
+def test_signed_manifest_envelope_rejects_unknown_top_level_fields() -> None:
+    signed_manifest = priced_signed_manifest()
+    signed_manifest["unsigned_policy_hint"] = {"allow": True}
+
+    assert verify_signed_manifest(signed_manifest)["structure_valid"] is False
 
 
 def test_manifest_structure_accepts_valid_required_permissions() -> None:

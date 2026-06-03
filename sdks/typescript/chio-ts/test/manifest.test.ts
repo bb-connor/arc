@@ -151,6 +151,14 @@ test("manifest structure rejects malformed pricing metadata", () => {
         billing_unit: "invocation",
       },
     ],
+    [
+      "units above u64 max",
+      {
+        pricing_model: "per_invocation",
+        unit_price: { units: 2 ** 64, currency: "USD" },
+        billing_unit: "invocation",
+      },
+    ],
   ] as const) {
     const signedManifest = pricedSignedManifest();
     (signedManifest.manifest.tools[0] as { pricing?: unknown }).pricing = pricing;
@@ -161,6 +169,25 @@ test("manifest structure rejects malformed pricing metadata", () => {
       label,
     );
   }
+});
+
+test("manifest structure accepts Rust u64 pricing units above JS safe integer", () => {
+  const signedManifest = pricedSignedManifest();
+  const largeRustU64Units = Number.MAX_SAFE_INTEGER + 2;
+  assert.equal(Number.isSafeInteger(largeRustU64Units), false);
+  (signedManifest.manifest.tools[0] as { pricing?: { unit_price?: { units?: number } } })
+    .pricing!.unit_price!.units = largeRustU64Units;
+
+  assert.equal(verifySignedManifest(signedManifest).structure_valid, true);
+});
+
+test("signed manifest envelope rejects unknown top-level fields", () => {
+  const signedManifest = pricedSignedManifest() as SignedManifest & {
+    unsigned_policy_hint?: unknown;
+  };
+  signedManifest.unsigned_policy_hint = { allow: true };
+
+  assert.equal(verifySignedManifest(signedManifest).structure_valid, false);
 });
 
 test("manifest structure accepts valid required permissions", () => {

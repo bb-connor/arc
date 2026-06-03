@@ -66,6 +66,8 @@ const PRICING_MODEL_SET = new Set<string>([
   "per_unit",
   "hybrid",
 ]);
+const SIGNED_MANIFEST_FIELD_SET = new Set<string>(["manifest", "signature", "signer_key"]);
+const U64_MAX_EXCLUSIVE = 2 ** 64;
 
 function validateManifestStructure(manifest: ToolManifest): boolean {
   if (manifest.schema !== "chio.manifest.v1") {
@@ -189,10 +191,17 @@ function validatePricingAmount(amount: unknown): boolean {
     return false;
   }
   return (
-    typeof amount.units === "number" &&
-    Number.isSafeInteger(amount.units) &&
-    amount.units >= 0 &&
+    isJsonU64(amount.units) &&
     isIso4217CurrencyCode(amount.currency)
+  );
+}
+
+function isJsonU64(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 0 &&
+    value < U64_MAX_EXCLUSIVE
   );
 }
 
@@ -245,11 +254,22 @@ export function signedManifestBodyCanonicalJson(signedManifest: SignedManifest):
   return canonicalizeJson(signedManifest.manifest);
 }
 
+function validateSignedManifestEnvelope(signedManifest: unknown): boolean {
+  if (!isJsonObject(signedManifest)) {
+    return false;
+  }
+  const keys = Object.keys(signedManifest);
+  return keys.length === SIGNED_MANIFEST_FIELD_SET.size &&
+    keys.every((key) => SIGNED_MANIFEST_FIELD_SET.has(key));
+}
+
 export function verifySignedManifest(signedManifest: SignedManifest): ManifestVerification {
   const embedded_public_key_valid = isValidEd25519PublicKeyHex(signedManifest.manifest.public_key);
 
   return {
-    structure_valid: validateManifestStructure(signedManifest.manifest),
+    structure_valid:
+      validateSignedManifestEnvelope(signedManifest) &&
+      validateManifestStructure(signedManifest.manifest),
     signature_valid: verifyEd25519Signature(
       signedManifestBodyCanonicalJson(signedManifest),
       signedManifest.signer_key,

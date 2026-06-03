@@ -1,6 +1,7 @@
 package invariants_test
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -185,6 +186,17 @@ func TestManifestStructureRejectsMalformedPricingMetadata(t *testing.T) {
 				"billing_unit": "invocation",
 			},
 		},
+		{
+			"units above u64 max",
+			map[string]any{
+				"pricing_model": "per_invocation",
+				"unit_price": map[string]any{
+					"units":    json.Number("18446744073709551616"),
+					"currency": "USD",
+				},
+				"billing_unit": "invocation",
+			},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.label, func(t *testing.T) {
@@ -200,6 +212,35 @@ func TestManifestStructureRejectsMalformedPricingMetadata(t *testing.T) {
 				t.Fatalf("%s pricing must be structurally invalid", tc.label)
 			}
 		})
+	}
+}
+
+func TestManifestStructureAcceptsRustU64PricingUnits(t *testing.T) {
+	signedManifest := pricedSignedManifest()
+	tool := signedManifest["manifest"].(map[string]any)["tools"].([]any)[0].(map[string]any)
+	pricing := tool["pricing"].(map[string]any)
+	unitPrice := pricing["unit_price"].(map[string]any)
+	unitPrice["units"] = json.Number("9223372036854775808")
+
+	verification, err := invariants.VerifySignedManifest(signedManifest)
+	if err != nil {
+		t.Fatalf("VerifySignedManifest returned error: %v", err)
+	}
+	if !verification.StructureValid {
+		t.Fatalf("Rust-valid u64 pricing units above int64 max must be structurally valid")
+	}
+}
+
+func TestSignedManifestEnvelopeRejectsUnknownTopLevelFields(t *testing.T) {
+	signedManifest := pricedSignedManifest()
+	signedManifest["unsigned_policy_hint"] = map[string]any{"allow": true}
+
+	verification, err := invariants.VerifySignedManifest(signedManifest)
+	if err != nil {
+		t.Fatalf("VerifySignedManifest returned error: %v", err)
+	}
+	if verification.StructureValid {
+		t.Fatalf("signed manifest envelope with unknown top-level fields must be structurally invalid")
 	}
 }
 

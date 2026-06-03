@@ -3,6 +3,7 @@ package invariants
 import (
 	"encoding/json"
 	"math"
+	"strconv"
 	"strings"
 )
 
@@ -19,6 +20,14 @@ var pricingModels = map[string]struct{}{
 	"per_unit":       {},
 	"hybrid":         {},
 }
+
+var signedManifestFields = map[string]struct{}{
+	"manifest":   {},
+	"signature":  {},
+	"signer_key": {},
+}
+
+const maxUint64ExclusiveAsFloat = 18446744073709551616.0
 
 type ManifestVerification struct {
 	EmbeddedPublicKeyMatchesSigner bool `json:"embedded_public_key_matches_signer"`
@@ -48,6 +57,7 @@ func SignedManifestBodyCanonicalJSON(signedManifest map[string]any) (string, err
 }
 
 func VerifySignedManifest(signedManifest map[string]any) (ManifestVerification, error) {
+	envelopeValid := validateSignedManifestEnvelope(signedManifest)
 	manifest, err := mapField(signedManifest, "manifest")
 	if err != nil {
 		return ManifestVerification{}, err
@@ -77,7 +87,7 @@ func VerifySignedManifest(signedManifest map[string]any) (ManifestVerification, 
 		EmbeddedPublicKeyMatchesSigner: embeddedPublicKeyValid && PublicKeyHexMatches(embeddedPublicKey, signerKey),
 		EmbeddedPublicKeyValid:         embeddedPublicKeyValid,
 		SignatureValid:                 signatureValid,
-		StructureValid:                 validateManifestStructure(manifest),
+		StructureValid:                 envelopeValid && validateManifestStructure(manifest),
 	}, nil
 }
 
@@ -128,6 +138,18 @@ func validateManifestStructure(manifest map[string]any) bool {
 		}
 	}
 	return validateRequiredPermissions(manifest["required_permissions"])
+}
+
+func validateSignedManifestEnvelope(signedManifest map[string]any) bool {
+	if len(signedManifest) != len(signedManifestFields) {
+		return false
+	}
+	for field := range signedManifest {
+		if _, ok := signedManifestFields[field]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func isValidManifestTextField(value any) bool {
@@ -222,10 +244,10 @@ func isNonNegativeInteger(value any) bool {
 	case int64:
 		return units >= 0
 	case float64:
-		return units >= 0 && math.Trunc(units) == units
+		return units >= 0 && math.Trunc(units) == units && units < maxUint64ExclusiveAsFloat
 	case json.Number:
-		parsed, err := units.Int64()
-		return err == nil && parsed >= 0
+		_, err := strconv.ParseUint(units.String(), 10, 64)
+		return err == nil
 	default:
 		return false
 	}

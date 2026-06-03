@@ -668,17 +668,23 @@ fn compile_scope(policy: &HushSpec) -> Result<ChioScope, CompileError> {
         return Ok(ChioScope::default());
     }
 
-    if tool_access_block_overlaps_allow(ta)? {
-        return Ok(ChioScope::default());
-    }
-
     if ta.require_workload_identity.is_some() || ta.prefer_workload_identity.is_some() {
         return Ok(ChioScope::default());
     }
 
-    // Each allowed tool pattern becomes a grant on a wildcard server
-    let mut grants = Vec::with_capacity(ta.allow.len());
+    let mut allowed_tool_patterns = Vec::with_capacity(ta.allow.len());
     for tool_pattern in &ta.allow {
+        if !confirmation_overlap(tool_pattern, &ta.block)? {
+            allowed_tool_patterns.push(tool_pattern);
+        }
+    }
+    if allowed_tool_patterns.is_empty() {
+        return Ok(ChioScope::default());
+    }
+
+    // Each allowed tool pattern becomes a grant on a wildcard server
+    let mut grants = Vec::with_capacity(allowed_tool_patterns.len());
+    for tool_pattern in allowed_tool_patterns {
         grants.push(ToolGrant {
             server_id: "*".to_string(),
             tool_name: tool_pattern.clone(),
@@ -888,15 +894,6 @@ fn confirmation_overlap(
 ) -> Result<bool, CompileError> {
     for pattern in confirmation_patterns {
         if tool_patterns_overlap(tool_pattern, pattern)? {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
-fn tool_access_block_overlaps_allow(rule: &ToolAccessRule) -> Result<bool, CompileError> {
-    for allow_pattern in &rule.allow {
-        if confirmation_overlap(allow_pattern, &rule.block)? {
             return Ok(true);
         }
     }
@@ -1508,6 +1505,25 @@ rules:
         assert_eq!(compiled.default_scope.grants[0].tool_name, "read_file");
         assert_eq!(compiled.default_scope.grants[1].tool_name, "write_file");
         assert_eq!(compiled.default_scope.grants[2].tool_name, "shell_exec");
+    }
+
+    #[test]
+    fn compile_tool_access_scope_omits_only_allow_entries_overlapping_block() {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    allow: [read_file, shell_exec]
+    block: [shell_exec]
+    default: block
+"#,
+        )
+        .unwrap();
+        let compiled = compile_policy(&spec).unwrap();
+        assert_eq!(compiled.default_scope.grants.len(), 1);
+        assert_eq!(compiled.default_scope.grants[0].tool_name, "read_file");
     }
 
     #[test]
