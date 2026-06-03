@@ -1471,16 +1471,15 @@ fn validate_positive_money(
 }
 
 fn money_currency_matches_declared(amount: &MonetaryAmount, declared_currency: &str) -> bool {
-    amount.currency.trim().to_ascii_uppercase() == declared_currency
+    amount.currency == declared_currency
 }
 
 fn validate_currency_code(
     currency: &str,
     field: &'static str,
 ) -> Result<(), AutonomyContractError> {
-    let normalized = currency.trim().to_ascii_uppercase();
-    if normalized.len() != 3
-        || !normalized
+    if currency.len() != 3
+        || !currency
             .chars()
             .all(|character| character.is_ascii_uppercase())
     {
@@ -2067,13 +2066,32 @@ mod tests {
     }
 
     #[test]
-    fn money_currency_matcher_normalizes_money_currency_against_declared_currency() {
+    fn pricing_input_rejects_padded_money_currency() {
+        let mut input = sample_input();
+        input.requested_coverage_amount.currency = " usd ".to_string();
+
+        assert!(matches!(
+            validate_autonomous_pricing_input(&input),
+            Err(AutonomyContractError::InvalidDecision(message))
+                if message.contains("currency")
+        ));
+    }
+
+    #[test]
+    fn money_currency_matcher_requires_exact_currency_match() {
         let amount = MonetaryAmount {
             units: 1,
-            currency: " usd ".to_string(),
+            currency: "USD".to_string(),
         };
 
         assert!(money_currency_matches_declared(&amount, "USD"));
+        assert!(!money_currency_matches_declared(
+            &MonetaryAmount {
+                units: 1,
+                currency: " usd ".to_string(),
+            },
+            "USD"
+        ));
         assert!(!money_currency_matches_declared(&amount, "EUR"));
     }
 
