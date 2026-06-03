@@ -79,6 +79,7 @@ SLICES: tuple[ReviewSlice, ...] = (
             "crates/chio-guard-sdk-macros/**",
             "crates/chio-guard-registry/**",
             "sdks/guard/**",
+            "wit/**",
         ),
     ),
     ReviewSlice(
