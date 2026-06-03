@@ -81,3 +81,42 @@ metadata that includes OpenAPI `required`. Validate required query parameters
 before appending any query string, reject missing/null/empty-array required
 values before egress and before the dispatcher runs, and add focused tests for
 both borrowed and owned bridge invocation paths.
+
+## Request Body Dispatch Contract Slice
+
+### Current Boundary
+
+`ManifestGenerator::generate_tools` turns every parsed OpenAPI request body
+schema into a required top-level `body` property in the Chio tool input schema.
+`chio-openapi-mcp-bridge` then stores an internal `RouteDispatch` per tool and
+uses that dispatch plan for borrowed `OpenApiMcpBridge::invoke_tool` calls and
+owned `OwnedBridgeToolServer::invoke` calls.
+
+### Pain Point
+
+The dispatch plan carries path and query metadata, but it does not carry
+whether the operation has a request body schema. A caller can invoke a body
+operation directly through the bridge without a `body` argument. That bypasses
+the generated manifest contract and runs the live dispatcher with arguments the
+advertised Chio tool schema would reject.
+
+### Security and API Constraints
+
+The public bridge APIs and response shape must remain source-compatible.
+Valid body-bearing calls that already supply `body` must remain valid. Missing
+body evidence must fail before URL construction, egress enforcement, or live
+dispatcher execution. The bridge must keep matching the current generator
+contract, which treats any parsed request body schema as required.
+
+### Affected Dependents
+
+No transitive source changes are expected. Existing callers that invoke
+request-body operations without the manifest-declared `body` field will now get
+`BridgeError::UpstreamError` before dispatch.
+
+### Completed Material Improvement
+
+Extend `RouteDispatch` with request-body requirement metadata, validate missing
+or null `body` arguments before live dispatch, and add borrowed plus owned
+bridge regression tests proving the dispatcher does not run on malformed body
+operations.

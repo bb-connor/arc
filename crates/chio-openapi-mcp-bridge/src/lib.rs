@@ -770,7 +770,7 @@ mod tests {
         }));
         let owned = OwnedBridgeToolServer::from_bridge(bridge);
         let result = owned
-            .invoke("createPet", json!({"name": "Buddy"}), None)
+            .invoke("createPet", json!({"body": {"name": "Buddy"}}), None)
             .await
             .unwrap();
         assert_eq!(result["structuredContent"]["httpStatus"], 200);
@@ -992,6 +992,21 @@ mod tests {
     }
 
     #[test]
+    fn bridge_dispatcher_rejects_missing_request_body_before_dispatcher() {
+        let mut bridge =
+            OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config_with_egress()).unwrap();
+        bridge.set_dispatcher(Box::new(|_method, _url, _args| {
+            panic!("dispatcher must not run when required request body is missing")
+        }));
+
+        let error = bridge
+            .invoke_tool("createPet", json!({"name": "no-body"}))
+            .unwrap_err();
+
+        assert!(format!("{error}").contains("missing required request body `body`"));
+    }
+
+    #[test]
     fn bridge_dispatcher_rejects_null_or_empty_required_query_parameter() {
         let mut bridge =
             OpenApiMcpBridge::from_spec(required_query_spec(), petstore_config_with_egress())
@@ -1022,6 +1037,23 @@ mod tests {
             .unwrap_err();
 
         assert!(format!("{error}").contains("missing required query parameter `q`"));
+    }
+
+    #[tokio::test]
+    async fn owned_bridge_tool_server_rejects_missing_request_body_before_dispatcher() {
+        let mut bridge =
+            OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config_with_egress()).unwrap();
+        bridge.set_dispatcher(Box::new(|_method, _url, _args| {
+            panic!("dispatcher must not run when owned bridge is missing a required body")
+        }));
+        let owned = OwnedBridgeToolServer::from_bridge(bridge);
+
+        let error = owned
+            .invoke("createPet", json!({"name": "no-body"}), None)
+            .await
+            .unwrap_err();
+
+        assert!(format!("{error}").contains("missing required request body `body`"));
     }
 
     #[test]

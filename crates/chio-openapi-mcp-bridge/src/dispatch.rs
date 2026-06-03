@@ -10,13 +10,19 @@ use crate::{BridgeError, BridgedResponse, RouteBinding};
 pub(crate) struct RouteDispatch {
     binding: RouteBinding,
     query_parameters: Vec<QueryParameter>,
+    requires_request_body: bool,
 }
 
 impl RouteDispatch {
-    fn new(binding: RouteBinding, query_parameters: Vec<QueryParameter>) -> Self {
+    fn new(
+        binding: RouteBinding,
+        query_parameters: Vec<QueryParameter>,
+        requires_request_body: bool,
+    ) -> Self {
         Self {
             binding,
             query_parameters,
+            requires_request_body,
         }
     }
 
@@ -72,6 +78,7 @@ pub(crate) fn build_route_dispatches(
                         path: path.clone(),
                     },
                     query_parameters,
+                    operation.request_body_schema.is_some(),
                 ),
             );
         }
@@ -207,10 +214,32 @@ pub(crate) fn dispatch_url(
     dispatch: &RouteDispatch,
     arguments: &Value,
 ) -> Result<String, BridgeError> {
+    validate_dispatch_arguments(dispatch, arguments)?;
     let path = expand_route_path(&dispatch.binding.path, arguments)?;
     let mut url = join_base_url_and_path(base_url, &path);
     append_query_parameters(&mut url, &dispatch.query_parameters, arguments)?;
     Ok(url)
+}
+
+fn validate_dispatch_arguments(
+    dispatch: &RouteDispatch,
+    arguments: &Value,
+) -> Result<(), BridgeError> {
+    if dispatch.requires_request_body {
+        validate_required_request_body(arguments)?;
+    }
+    Ok(())
+}
+
+fn validate_required_request_body(arguments: &Value) -> Result<(), BridgeError> {
+    match arguments.get("body") {
+        Some(Value::Null) | None => Err(missing_required_request_body()),
+        Some(_) => Ok(()),
+    }
+}
+
+fn missing_required_request_body() -> BridgeError {
+    BridgeError::UpstreamError("OpenAPI bridge missing required request body `body`".to_string())
 }
 
 fn join_base_url_and_path(base_url: &str, path: &str) -> String {
