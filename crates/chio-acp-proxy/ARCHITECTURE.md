@@ -168,3 +168,40 @@ Add typed `session/cancel` params validation and route the method through the
 same params-required decode boundary as guarded fs, terminal, permission, and
 session-update methods. Add regression coverage proving malformed cancel
 messages fail before forwarding and do not drain unrelated pending contexts.
+
+## Capability Checker Evidence Boundary Slice
+
+### Current Boundary
+
+`interceptor.rs` accepts `AcpVerdict` values from any injected
+`CapabilityChecker` implementation. When a verdict is allowed, the interceptor
+promotes its `capability_id`, authorization receipt id, and authorization
+request id into `AcpCapabilityAuditContext`; later ACP `session/update` traffic
+can copy that evidence into audit entries or signed receipts.
+
+### Pain Point
+
+The proxy previously checked only that allowed verdict evidence existed. Padded
+or control-bearing capability and receipt identifiers could therefore cross the
+checker boundary and be stored as authorization metadata. The kernel-backed
+checker emits normalized values, but the trait is public and other
+implementations can be injected.
+
+### Security and API Constraints
+
+The public `CapabilityChecker` trait and ACP wire shape must remain unchanged.
+The interceptor must keep failing closed, preserve existing missing-evidence
+errors, and avoid changing canonical ACP parameter hashes. Valid checker
+verdicts should still forward exactly as before.
+
+### Affected Dependents
+
+No downstream API change is expected. `chio-cli` is the direct workspace
+dependent to recheck after the owning crate passes.
+
+### Completed Material Improvement
+
+Reject allowed checker verdicts whose `capability_id`, authorization receipt
+id, or authorization request id is empty after trimming, padded, or contains
+ASCII or Unicode control characters. Add regression coverage proving malformed
+evidence blocks before the ACP request is forwarded.

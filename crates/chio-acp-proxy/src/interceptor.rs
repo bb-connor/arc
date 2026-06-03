@@ -673,6 +673,13 @@ impl MessageInterceptor {
                         "capability checker allowed access without a capability_id",
                     ));
                 };
+                if !is_valid_checker_evidence_id(&capability_id) {
+                    return CapabilityGate::Block(json_rpc_error(
+                        id,
+                        ACP_ERROR_ACCESS_DENIED,
+                        "capability checker allowed access with malformed capability_id",
+                    ));
+                }
                 if request
                     .authorization_correlation_id
                     .as_deref()
@@ -703,16 +710,32 @@ impl MessageInterceptor {
                         "capability checker allowed access without a tool_call_id binding",
                     ));
                 }
-                if verdict.receipt_id.as_deref().is_none_or(str::is_empty)
-                    || verdict
-                        .receipt_request_id
-                        .as_deref()
-                        .is_none_or(str::is_empty)
-                {
+                let Some(receipt_id) = verdict.receipt_id else {
                     return CapabilityGate::Block(json_rpc_error(
                         id,
                         ACP_ERROR_ACCESS_DENIED,
                         "capability checker allowed access without a signed authorization receipt and request id",
+                    ));
+                };
+                let Some(receipt_request_id) = verdict.receipt_request_id else {
+                    return CapabilityGate::Block(json_rpc_error(
+                        id,
+                        ACP_ERROR_ACCESS_DENIED,
+                        "capability checker allowed access without a signed authorization receipt and request id",
+                    ));
+                };
+                if !is_valid_checker_evidence_id(&receipt_id) {
+                    return CapabilityGate::Block(json_rpc_error(
+                        id,
+                        ACP_ERROR_ACCESS_DENIED,
+                        "capability checker allowed access with malformed signed authorization receipt id",
+                    ));
+                }
+                if !is_valid_checker_evidence_id(&receipt_request_id) {
+                    return CapabilityGate::Block(json_rpc_error(
+                        id,
+                        ACP_ERROR_ACCESS_DENIED,
+                        "capability checker allowed access with malformed signed authorization request id",
                     ));
                 }
                 CapabilityGate::Allow(AcpCapabilityAuditContext {
@@ -723,8 +746,8 @@ impl MessageInterceptor {
                     authorization_operation: Some(request.operation.clone()),
                     authorization_resource: Some(request.resource.clone()),
                     authorization_parameter_hash: Some(request.authorization_parameter_hash.clone()),
-                    authorization_receipt_id: verdict.receipt_id,
-                    authorization_request_id: verdict.receipt_request_id,
+                    authorization_receipt_id: Some(receipt_id),
+                    authorization_request_id: Some(receipt_request_id),
                 })
             }
             Ok(verdict) => {
@@ -1033,6 +1056,11 @@ fn authorization_parameter_hash(params: &Value) -> Result<String, AcpProxyError>
 /// binding at the capability gate.
 fn requires_tool_call_id_binding(operation: &str) -> bool {
     matches!(operation, "terminal_kill" | "terminal_release")
+}
+
+fn is_valid_checker_evidence_id(value: &str) -> bool {
+    let trimmed = value.trim();
+    !trimmed.is_empty() && trimmed == value && !value.chars().any(char::is_control)
 }
 
 fn authorization_correlation_id(

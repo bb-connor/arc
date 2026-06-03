@@ -3719,6 +3719,90 @@ mod attestation_and_telemetry_tests {
     }
 
     #[test]
+    fn interceptor_rejects_malformed_checker_verdict_evidence() {
+        let cases = vec![
+            (
+                "capability_id",
+                AcpVerdict {
+                    allowed: true,
+                    capability_id: Some(" cap-padded ".to_string()),
+                    receipt_id: Some("auth-valid".to_string()),
+                    receipt_request_id: Some("req-valid".to_string()),
+                    reason: "malformed capability id".to_string(),
+                },
+                "malformed capability_id",
+            ),
+            (
+                "receipt_id",
+                AcpVerdict {
+                    allowed: true,
+                    capability_id: Some("cap-valid".to_string()),
+                    receipt_id: Some("auth\ncontrol".to_string()),
+                    receipt_request_id: Some("req-valid".to_string()),
+                    reason: "malformed receipt id".to_string(),
+                },
+                "malformed signed authorization receipt id",
+            ),
+            (
+                "receipt_request_id",
+                AcpVerdict {
+                    allowed: true,
+                    capability_id: Some("cap-valid".to_string()),
+                    receipt_id: Some("auth-valid".to_string()),
+                    receipt_request_id: Some(" req-padded ".to_string()),
+                    reason: "malformed receipt request id".to_string(),
+                },
+                "malformed signed authorization request id",
+            ),
+        ];
+
+        for (index, (field, verdict, expected_message)) in cases.into_iter().enumerate() {
+            let requests = Arc::new(Mutex::new(Vec::new()));
+            let checker = SequencedChecker::new(Arc::clone(&requests), vec![verdict]);
+            let config = AcpProxyConfig::new("echo", "deadbeef")
+                .with_allowed_path_prefix("/home/user/project")
+                .with_allowed_command("cargo")
+                .with_server_id("proxy-server");
+            let interceptor = MessageInterceptor::with_kernel(
+                config,
+                None,
+                Some(Box::new(checker)),
+                AcpAttestationMode::BestEffort,
+            );
+            let id = 384 + index;
+            let read = json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "method": "fs/read_text_file",
+                "params": {
+                    "sessionId": format!("session-malformed-{field}"),
+                    "toolCallId": format!("tool-malformed-{field}"),
+                    "path": "/home/user/project/src/lib.rs",
+                    "capabilityToken": "signed-capability-json"
+                }
+            });
+
+            match interceptor
+                .intercept(Direction::AgentToClient, &read)
+                .expect("malformed checker evidence should return a block response")
+            {
+                InterceptResult::Block(value) => {
+                    assert_eq!(value["error"]["code"], ACP_ERROR_ACCESS_DENIED);
+                    assert!(
+                        value["error"]["message"]
+                            .as_str()
+                            .unwrap_or_default()
+                            .contains(expected_message),
+                        "field {field} returned {value:?}"
+                    );
+                }
+                other => panic!("expected Block for {field}, got {:?}", other),
+            }
+            assert_eq!(requests.lock().expect("requests should lock").len(), 1);
+        }
+    }
+
+    #[test]
     fn interceptor_does_not_bind_ambiguous_pending_contexts_to_tool_calls() {
         let requests = Arc::new(Mutex::new(Vec::new()));
         let checker = SequencedChecker::new(
