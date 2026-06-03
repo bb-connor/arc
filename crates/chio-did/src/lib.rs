@@ -203,8 +203,13 @@ impl DidService {
         service_endpoint: impl Into<String>,
     ) -> Result<Self, DidError> {
         let service_endpoint = service_endpoint.into();
-        Url::parse(&service_endpoint)
+        let parsed = Url::parse(&service_endpoint)
             .map_err(|error| DidError::InvalidServiceEndpoint(error.to_string()))?;
+        if parsed.scheme() != "https" {
+            return Err(DidError::InvalidServiceEndpoint(
+                "service endpoint must use https".to_string(),
+            ));
+        }
         Ok(Self {
             id: id.into(),
             service_type: service_type.into(),
@@ -350,5 +355,23 @@ mod tests {
         let error =
             DidService::receipt_log(&did, 0, "not-a-url").expect_err("invalid service endpoint");
         assert!(matches!(error, DidError::InvalidServiceEndpoint(_)));
+    }
+
+    #[test]
+    fn rejects_non_https_service_endpoints() {
+        let did = fixed_did();
+
+        for endpoint in [
+            "http://trust.example.com/v1/receipts",
+            "file:///var/lib/chio/receipts.sqlite3",
+            "ftp://trust.example.com/receipts",
+        ] {
+            let error = DidService::receipt_log(&did, 0, endpoint)
+                .expect_err("non-https service endpoint must reject");
+            assert!(
+                matches!(error, DidError::InvalidServiceEndpoint(_)),
+                "endpoint {endpoint:?} returned {error:?}"
+            );
+        }
     }
 }
