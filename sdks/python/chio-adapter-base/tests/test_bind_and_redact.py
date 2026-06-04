@@ -1631,6 +1631,38 @@ def test_typeerror_fallback_protected_var_positional_distinct_byte_counts() -> N
     assert kwargs["path"] == "/tmp/x"
 
 
+def test_typeerror_fallback_unprotected_var_positional_redacts_all_overflow() -> None:
+    """Regression:
+
+    ``def write_file(path, *rest, body)`` invoked with multiple
+    positionals and no ``body`` kwarg. ``bind_partial`` raises TypeError,
+    but receipts are emitted before the wrapped fn runs. Every positional
+    past the fixed ``path`` slot must redact under a protected canonical,
+    not only the first overflow value when ``*rest`` is unrelated to the
+    protected field name.
+    """
+
+    def write_file(path: str, *rest: object, body: str) -> None:
+        del path, rest, body
+
+    args, kwargs = bind_and_redact(
+        write_file,
+        ("/tmp/x", "SECRET_ONE", "SECRET_TWO"),
+        {},
+        tool_name="chio_file_write",
+    )
+    assert args[0] == "/tmp/x"
+    assert args[1] == {
+        "omitted": True,
+        "byte_count": len(b"SECRET_ONE"),
+    }
+    assert args[2] == {
+        "omitted": True,
+        "byte_count": len(b"SECRET_TWO"),
+    }
+    assert kwargs == {}
+
+
 def test_signature_path_kwonly_body_with_unrelated_var_positional() -> None:
     """Regression:
 
