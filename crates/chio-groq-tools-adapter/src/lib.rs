@@ -751,6 +751,43 @@ mod tests {
     }
 
     #[test]
+    fn lift_batch_rejects_function_tool_call_missing_function_object() {
+        let cfg = config();
+        let adapter = GroqAdapter::new(cfg, Arc::new(transport::MockTransport::new()));
+        let payload = json!({
+            "id": "chatcmpl_malformed_tool",
+            "object": "chat.completion",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": "call_weather_1",
+                            "type": "function",
+                            "function": {
+                                "name": "get_weather",
+                                "arguments": "{\"city\":\"Paris\"}"
+                            }
+                        },
+                        {
+                            "id": "call_missing_function",
+                            "type": "function"
+                        }
+                    ]
+                },
+                "finish_reason": "tool_calls"
+            }]
+        });
+        let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
+        let err = adapter.lift_batch(raw).unwrap_err();
+
+        assert!(
+            matches!(err, ProviderError::Malformed(message) if message.contains("tool_calls[].function was missing"))
+        );
+    }
+
+    #[test]
     fn lift_batch_rejects_malformed_envelope_before_outer_tool_calls() {
         let cfg = config();
         let adapter = GroqAdapter::new(cfg, Arc::new(transport::MockTransport::new()));

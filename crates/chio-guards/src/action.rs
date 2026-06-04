@@ -194,6 +194,20 @@ mod tests {
     }
 
     #[test]
+    fn network_tool_with_filesystem_shaped_arguments_stays_network_egress() {
+        let args = serde_json::json!({
+            "url": "http://169.254.169.254/latest",
+            "path": "/tmp/cache-entry",
+            "action": "delete"
+        });
+        let action = extract_action("http_request", &args);
+        assert!(
+            matches!(action, ToolAction::NetworkEgress(ref h, 80) if h == "169.254.169.254"),
+            "expected NetworkEgress for http_request, got: {action:?}"
+        );
+    }
+
+    #[test]
     fn network_rejects_malformed_primary_alias() {
         let args =
             serde_json::json!({"url": {"host": "169.254.169.254"}, "uri": "https://example.com"});

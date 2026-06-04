@@ -145,7 +145,13 @@ impl ChioAcpEdge {
 
     fn ensure_deferred_task_capacity(&self) -> Result<(), AcpEdgeError> {
         self.prune_deferred_tasks();
-        if self.tasks.borrow().len() >= MAX_DEFERRED_ACP_TASKS {
+        let active_count = self
+            .tasks
+            .borrow()
+            .values()
+            .filter(|task| !task.task.status.is_terminal())
+            .count();
+        if active_count >= MAX_DEFERRED_ACP_TASKS {
             return Err(AcpEdgeError::InvalidRequest(
                 "too many deferred tasks are retained".to_string(),
             ));
@@ -501,22 +507,24 @@ impl ChioAcpEdge {
         message: Value,
         kernel: &ChioKernel,
         execution: &AcpKernelExecutionContext,
-    ) -> Value {
+    ) -> AcpJsonRpcResponse {
         let AcpJsonRpcEnvelope { id, method, params } =
             match Self::parse_jsonrpc_envelope(&message) {
                 Ok(envelope) => envelope,
-                Err(response) => return response,
+                Err(response) => return AcpJsonRpcResponse::from_optional(response),
             };
+        let should_respond = id.is_some();
+        let id = id.unwrap_or(Value::Null);
         if let Err(response) = Self::ensure_jsonrpc_params_object_for_known_method(
             &id,
             &method,
             &params,
             ACP_JSONRPC_KNOWN_METHODS,
         ) {
-            return response;
+            return AcpJsonRpcResponse::from_optional(should_respond.then_some(response));
         }
 
-        match method.as_str() {
+        let response = match method.as_str() {
             "session/list_capabilities" => {
                 json!({
                     "jsonrpc": "2.0",
@@ -531,10 +539,16 @@ impl ChioAcpEdge {
             "session/request_permission" => {
                 let request = match Self::jsonrpc_permission_request(&params) {
                     Ok(request) => request,
-                    Err(error) => return Self::jsonrpc_error_response(id, error),
+                    Err(error) => {
+                        return AcpJsonRpcResponse::from_optional(
+                            should_respond.then_some(Self::jsonrpc_error_response(id, error)),
+                        )
+                    }
                 };
                 if let Err(error) = validate_execution_context(execution) {
-                    return Self::jsonrpc_error_response(id, error);
+                    return AcpJsonRpcResponse::from_optional(
+                        should_respond.then_some(Self::jsonrpc_error_response(id, error)),
+                    );
                 }
                 let decision = self.evaluate_permission_with_kernel(&request, kernel, execution);
                 json!({
@@ -551,10 +565,16 @@ impl ChioAcpEdge {
                 let (capability_id, arguments) =
                     match Self::jsonrpc_invocation_params(&params, "tool/invoke") {
                         Ok(parsed) => parsed,
-                        Err(error) => return Self::jsonrpc_error_response(id, error),
+                        Err(error) => {
+                            return AcpJsonRpcResponse::from_optional(
+                                should_respond.then_some(Self::jsonrpc_error_response(id, error)),
+                            )
+                        }
                     };
                 if let Err(error) = validate_execution_context(execution) {
-                    return Self::jsonrpc_error_response(id, error);
+                    return AcpJsonRpcResponse::from_optional(
+                        should_respond.then_some(Self::jsonrpc_error_response(id, error)),
+                    );
                 }
                 match self.invoke(&capability_id, arguments, kernel, execution) {
                     Ok(result) => json!({
@@ -584,7 +604,8 @@ impl ChioAcpEdge {
                     "message": "method not found"
                 }
             }),
-        }
+        };
+        AcpJsonRpcResponse::from_optional(should_respond.then_some(response))
     }
 
     /// Handle a JSON-RPC ACP request through the direct passthrough path.
@@ -596,22 +617,24 @@ impl ChioAcpEdge {
         &self,
         message: Value,
         server: &dyn ToolServerConnection,
-    ) -> Value {
+    ) -> AcpJsonRpcResponse {
         let AcpJsonRpcEnvelope { id, method, params } =
             match Self::parse_jsonrpc_envelope(&message) {
                 Ok(envelope) => envelope,
-                Err(response) => return response,
+                Err(response) => return AcpJsonRpcResponse::from_optional(response),
             };
+        let should_respond = id.is_some();
+        let id = id.unwrap_or(Value::Null);
         if let Err(response) = Self::ensure_jsonrpc_params_object_for_known_method(
             &id,
             &method,
             &params,
             ACP_JSONRPC_KNOWN_METHODS,
         ) {
-            return response;
+            return AcpJsonRpcResponse::from_optional(should_respond.then_some(response));
         }
 
-        match method.as_str() {
+        let response = match method.as_str() {
             "session/list_capabilities" => {
                 json!({
                     "jsonrpc": "2.0",
@@ -626,7 +649,11 @@ impl ChioAcpEdge {
             "session/request_permission" => {
                 let request = match Self::jsonrpc_permission_request(&params) {
                     Ok(request) => request,
-                    Err(error) => return Self::jsonrpc_error_response(id, error),
+                    Err(error) => {
+                        return AcpJsonRpcResponse::from_optional(
+                            should_respond.then_some(Self::jsonrpc_error_response(id, error)),
+                        )
+                    }
                 };
                 let decision = self.evaluate_permission_passthrough(&request);
                 json!({
@@ -643,7 +670,11 @@ impl ChioAcpEdge {
                 let (capability_id, arguments) =
                     match Self::jsonrpc_invocation_params(&params, "tool/invoke") {
                         Ok(parsed) => parsed,
-                        Err(error) => return Self::jsonrpc_error_response(id, error),
+                        Err(error) => {
+                            return AcpJsonRpcResponse::from_optional(
+                                should_respond.then_some(Self::jsonrpc_error_response(id, error)),
+                            )
+                        }
                     };
                 match self.invoke_passthrough(&capability_id, arguments, server) {
                     Ok(result) => json!({
@@ -688,7 +719,8 @@ impl ChioAcpEdge {
                     "message": "method not found"
                 }
             }),
-        }
+        };
+        AcpJsonRpcResponse::from_optional(should_respond.then_some(response))
     }
 
     fn handle_jsonrpc_stream(
@@ -947,7 +979,11 @@ impl ChioAcpEdgeCompatibility<'_> {
     ///
     /// This compatibility helper exposes config-preview and direct tool
     /// invocation, but marks both as non-authoritative.
-    pub fn handle_jsonrpc(&self, message: Value, server: &dyn ToolServerConnection) -> Value {
+    pub fn handle_jsonrpc(
+        &self,
+        message: Value,
+        server: &dyn ToolServerConnection,
+    ) -> AcpJsonRpcResponse {
         self.edge.handle_jsonrpc_passthrough(message, server)
     }
 }

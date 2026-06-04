@@ -2,36 +2,35 @@
 
 #[derive(Debug)]
 struct A2aJsonRpcEnvelope {
-    id: Value,
+    id: Option<Value>,
     method: String,
     params: Value,
 }
 
 impl ChioA2aEdge {
-    fn parse_jsonrpc_envelope(message: &Value) -> Result<A2aJsonRpcEnvelope, Value> {
-        let id = message.get("id").cloned().unwrap_or(Value::Null);
-        if !id.is_string() && !id.is_number() && !id.is_null() {
-            return Err(Self::jsonrpc_error_payload(
+    fn parse_jsonrpc_envelope(message: &Value) -> Result<A2aJsonRpcEnvelope, Option<Value>> {
+        let id = message.get("id").cloned();
+        if id
+            .as_ref()
+            .is_some_and(|id| !id.is_string() && !id.is_number() && !id.is_null())
+        {
+            return Err(Some(Self::jsonrpc_error_payload(
                 Value::Null,
                 -32600,
                 "request id must be string, number, or null",
-            ));
+            )));
         }
 
         if message.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
-            return Err(Self::jsonrpc_error_payload(
-                id,
-                -32600,
-                "invalid jsonrpc envelope",
-            ));
+            return Err(id.clone().map(|id| {
+                Self::jsonrpc_error_payload(id, -32600, "invalid jsonrpc envelope")
+            }));
         }
 
         let Some(method) = message.get("method").and_then(Value::as_str) else {
-            return Err(Self::jsonrpc_error_payload(
-                id,
-                -32600,
-                "request missing method",
-            ));
+            return Err(id
+                .clone()
+                .map(|id| Self::jsonrpc_error_payload(id, -32600, "request missing method")));
         };
         let params = message.get("params").cloned().unwrap_or_else(|| json!({}));
 

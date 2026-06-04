@@ -48,9 +48,9 @@ impl<'a> ActionExtractor<'a> {
             };
         }
 
+        try_extract!(self.extract_network_action());
         try_extract!(self.extract_filesystem_action());
         try_extract!(self.extract_shell_action());
-        try_extract!(self.extract_network_action());
         try_extract!(self.extract_code_execution_action());
         try_extract!(self.extract_browser_action());
         try_extract!(self.extract_database_action());

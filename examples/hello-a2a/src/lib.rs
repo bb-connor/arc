@@ -204,9 +204,11 @@ where
         let response = state
             .edge
             .handle_jsonrpc(message, &state.kernel, &state.execution);
-        serde_json::to_writer(&mut writer, &response)?;
-        writeln!(&mut writer)?;
-        writer.flush()?;
+        if let Some(response) = response.as_value() {
+            serde_json::to_writer(&mut writer, response)?;
+            writeln!(&mut writer)?;
+            writer.flush()?;
+        }
     }
 
     Ok(())

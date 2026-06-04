@@ -2146,6 +2146,40 @@ mod tests {
     }
 
     #[test]
+    fn jsonrpc_stream_notification_creates_task_without_response() {
+        let edge =
+            ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "streaming-srv", "search_stream"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "method": "tool/stream",
+                "params": {
+                    "capabilityId": "search_stream",
+                    "arguments": {"query": "test"}
+                }
+            }),
+            &kernel,
+            &execution,
+        );
+
+        assert!(response.is_notification());
+        assert_eq!(edge.tasks.borrow().len(), 1);
+    }
+
+    #[test]
     fn jsonrpc_resume_retains_completed_deferred_task_result() {
         let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
         let config = test_kernel_config();
@@ -2393,7 +2427,7 @@ mod tests {
     }
 
     #[test]
-    fn jsonrpc_stream_capacity_counts_retained_cancelled_deferred_tasks() {
+    fn jsonrpc_stream_capacity_ignores_retained_cancelled_deferred_tasks() {
         let edge =
             ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
         let config = test_kernel_config();
@@ -2452,7 +2486,7 @@ mod tests {
 
         assert_eq!(edge.tasks.borrow().len(), MAX_DEFERRED_ACP_TASKS);
 
-        let rejected = edge.handle_jsonrpc(
+        let accepted = edge.handle_jsonrpc(
             json!({
                 "jsonrpc": "2.0",
                 "id": 3_000,
@@ -2466,10 +2500,10 @@ mod tests {
             &execution,
         );
 
-        assert!(rejected["error"]["message"]
-            .as_str()
-            .test_unwrap()
-            .contains("too many deferred tasks"));
+        assert_eq!(
+            accepted["result"]["task"]["status"].as_str(),
+            Some("working")
+        );
     }
 
     #[test]

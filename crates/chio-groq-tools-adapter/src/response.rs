@@ -108,7 +108,11 @@ pub(crate) fn openai_tool_call_to_function_call(
     }
     let function = match entry.get("function") {
         Some(function) => function,
-        None => return Ok(None),
+        None => {
+            return Err(ProviderError::Malformed(format!(
+                "{provider_label} tool_calls[].function was missing"
+            )))
+        }
     };
     let name = function
         .get("name")

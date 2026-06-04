@@ -276,7 +276,12 @@ impl ChioA2aEdge {
 
     fn ensure_deferred_task_capacity(&mut self) -> Result<(), A2aEdgeError> {
         self.prune_deferred_tasks();
-        if self.tasks.len() >= MAX_DEFERRED_A2A_TASKS {
+        let active_count = self
+            .tasks
+            .values()
+            .filter(|task| !task.response.status.is_terminal())
+            .count();
+        if active_count >= MAX_DEFERRED_A2A_TASKS {
             return Err(A2aEdgeError::InvalidRequest(
                 "too many deferred tasks are retained".to_string(),
             ));
@@ -482,22 +487,24 @@ impl ChioA2aEdge {
         message: Value,
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
-    ) -> Value {
+    ) -> A2aJsonRpcResponse {
         let A2aJsonRpcEnvelope { id, method, params } =
             match Self::parse_jsonrpc_envelope(&message) {
                 Ok(envelope) => envelope,
-                Err(response) => return response,
+                Err(response) => return A2aJsonRpcResponse::from_optional(response),
             };
+        let should_respond = id.is_some();
+        let id = id.unwrap_or(Value::Null);
         if let Err(response) = Self::ensure_jsonrpc_params_object_for_supported_method(
             &id,
             &method,
             &params,
             &["message/send", "message/stream", "task/get", "task/cancel"],
         ) {
-            return response;
+            return A2aJsonRpcResponse::from_optional(should_respond.then_some(response));
         }
 
-        match method.as_str() {
+        let response = match method.as_str() {
             "message/send" => self.handle_jsonrpc_send_message(id, params, kernel, execution),
             "message/stream" => self.handle_jsonrpc_stream_message(id, params, execution),
             "task/get" => self.handle_jsonrpc_task_get(id, params, kernel, execution),
@@ -510,7 +517,8 @@ impl ChioA2aEdge {
                     "message": "method not found"
                 }
             }),
-        }
+        };
+        A2aJsonRpcResponse::from_optional(should_respond.then_some(response))
     }
 
     /// Handle a JSON-RPC A2A request through the direct passthrough path.
@@ -523,22 +531,24 @@ impl ChioA2aEdge {
         &mut self,
         message: Value,
         server: &dyn ToolServerConnection,
-    ) -> Value {
+    ) -> A2aJsonRpcResponse {
         let A2aJsonRpcEnvelope { id, method, params } =
             match Self::parse_jsonrpc_envelope(&message) {
                 Ok(envelope) => envelope,
-                Err(response) => return response,
+                Err(response) => return A2aJsonRpcResponse::from_optional(response),
             };
+        let should_respond = id.is_some();
+        let id = id.unwrap_or(Value::Null);
         if let Err(response) = Self::ensure_jsonrpc_params_object_for_supported_method(
             &id,
             &method,
             &params,
             &["message/send", "message/stream"],
         ) {
-            return response;
+            return A2aJsonRpcResponse::from_optional(should_respond.then_some(response));
         }
 
-        match method.as_str() {
+        let response = match method.as_str() {
             "message/send" => self.handle_jsonrpc_send_message_passthrough(id, params, server),
             "message/stream" => self.jsonrpc_stream_not_supported(id),
             _ => json!({
@@ -549,7 +559,8 @@ impl ChioA2aEdge {
                     "message": "method not found"
                 }
             }),
-        }
+        };
+        A2aJsonRpcResponse::from_optional(should_respond.then_some(response))
     }
 
     #[cfg(any(test, feature = "compatibility-surface"))]
@@ -809,7 +820,7 @@ impl ChioA2aEdgeCompatibility<'_> {
         &mut self,
         message: Value,
         server: &dyn ToolServerConnection,
-    ) -> Value {
+    ) -> A2aJsonRpcResponse {
         self.edge.handle_jsonrpc_passthrough(message, server)
     }
 
