@@ -1251,6 +1251,21 @@ mod tests {
     }
 
     #[test]
+    fn liability_quote_response_rejects_control_character_id() {
+        let fixtures = sample_market_fixtures();
+        let mut response = fixtures.quote_response.body.clone();
+        response.quote_response_id = "quote-1\nquote-2".to_string();
+
+        let error = require_err(
+            response.validate(),
+            "control-character quote response id rejected",
+        );
+
+        assert!(error.contains("quote_response_id"));
+        assert!(error.contains("control characters"));
+    }
+
+    #[test]
     fn liability_quote_response_declined_requires_reason() {
         let fixtures = sample_market_fixtures();
         let mut response = fixtures.quote_response.body.clone();

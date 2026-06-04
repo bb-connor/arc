@@ -95,6 +95,11 @@ impl ChioA2aEdge {
                 "{operation} params.taskId must not include leading or trailing whitespace"
             )));
         }
+        if task_id.chars().any(char::is_control) {
+            return Err(A2aEdgeError::InvalidRequest(format!(
+                "{operation} params.taskId must not include control characters"
+            )));
+        }
         Ok(task_id.to_string())
     }
 

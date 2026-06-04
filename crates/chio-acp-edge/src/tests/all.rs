@@ -1657,6 +1657,43 @@ mod tests {
     }
 
     #[test]
+    fn jsonrpc_request_permission_rejects_control_character_capability_id_before_preview() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "test-srv", "read_file"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 47,
+                "method": "session/request_permission",
+                "params": {
+                    "capabilityId": "read_file\nwrite_file",
+                    "arguments": {"path": "/tmp"}
+                }
+            }),
+            &kernel,
+            &execution,
+        );
+
+        assert_eq!(response["error"]["code"], -32602);
+        assert_eq!(
+            response["error"]["message"],
+            "session/request_permission params.capabilityId must not include control characters"
+        );
+    }
+
+    #[test]
     fn jsonrpc_tool_invoke() {
         let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
         let config = test_kernel_config();
@@ -1765,6 +1802,44 @@ mod tests {
         assert_eq!(
             response["error"]["message"],
             "tool/invoke params.capabilityId must not include leading or trailing whitespace"
+        );
+    }
+
+    #[test]
+    fn jsonrpc_tool_invoke_rejects_control_character_capability_id_before_lookup() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let mut kernel = ChioKernel::new(config);
+        kernel.register_tool_server(Box::new(test_server()));
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "test-srv", "search"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 48,
+                "method": "tool/invoke",
+                "params": {
+                    "capabilityId": "search\nread_file",
+                    "arguments": {"query": "test"}
+                }
+            }),
+            &kernel,
+            &execution,
+        );
+
+        assert_eq!(response["error"]["code"], -32602);
+        assert_eq!(
+            response["error"]["message"],
+            "tool/invoke params.capabilityId must not include control characters"
         );
     }
 
@@ -2327,6 +2402,44 @@ mod tests {
             assert_eq!(
                 response["error"]["message"],
                 format!("{method} params.taskId must not include leading or trailing whitespace")
+            );
+        }
+    }
+
+    #[test]
+    fn jsonrpc_lifecycle_rejects_control_character_task_id_before_lookup() {
+        let edge = ChioAcpEdge::new(AcpEdgeConfig::default(), vec![streaming_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = AcpKernelExecutionContext {
+            capability: capability_for_tool(&issuer, &subject, "streaming-srv", "search_stream"),
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        for method in ["tool/cancel", "tool/resume"] {
+            let response = edge.handle_jsonrpc(
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": 49,
+                    "method": method,
+                    "params": {
+                        "taskId": "acp-task-1\nacp-task-2"
+                    }
+                }),
+                &kernel,
+                &execution,
+            );
+
+            assert_eq!(response["error"]["code"], -32602);
+            assert_eq!(
+                response["error"]["message"],
+                format!("{method} params.taskId must not include control characters")
             );
         }
     }

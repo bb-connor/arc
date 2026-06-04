@@ -290,6 +290,11 @@ impl LiabilityQuoteResponseArtifact {
                     .to_string(),
             );
         }
+        if self.quote_response_id.chars().any(char::is_control) {
+            return Err(
+                "quote response quote_response_id must not include control characters".to_string(),
+            );
+        }
         if !self.quote_request.verify_signature().map_err(|error| {
             format!("quote response quote_request signature verification failed: {error}")
         })? {

@@ -2127,6 +2127,24 @@ mod tests {
     }
 
     #[test]
+    fn jsonrpc_task_id_params_reject_control_characters_before_lookup() {
+        let error = match ChioA2aEdge::parse_jsonrpc_task_id_params(
+            &json!({ "taskId": "a2a-task-1\na2a-task-2" }),
+            "task/get",
+        ) {
+            Ok(_) => panic!("expected control-character taskId to fail before lookup"),
+            Err(error) => error,
+        };
+        let A2aEdgeError::InvalidRequest(message) = error else {
+            panic!("expected invalid request error");
+        };
+        assert_eq!(
+            message,
+            "task/get params.taskId must not include control characters"
+        );
+    }
+
+    #[test]
     fn jsonrpc_stream_rejects_deferred_task_map_over_cap() {
         let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();

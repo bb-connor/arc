@@ -663,6 +663,9 @@ fn validate_non_empty_clean(value: &str, label: &str) -> Result<(), String> {
     if value.trim() != value {
         return Err(format!("{label} cannot contain surrounding whitespace"));
     }
+    if value.chars().any(char::is_control) {
+        return Err(format!("{label} cannot contain control characters"));
+    }
     Ok(())
 }
 
@@ -1259,6 +1262,45 @@ mod tests {
     fn capital_execution_instruction_artifact_validates_authority_and_reconciliation() {
         let artifact = valid_capital_instruction_artifact();
         artifact.validate().unwrap();
+    }
+
+    #[test]
+    fn capital_execution_instruction_rejects_control_character_identities() {
+        let mut artifact = valid_capital_instruction_artifact();
+        artifact.instruction_id = "cei-1\ncei-2".to_string();
+        let error = match artifact.validate() {
+            Ok(_) => panic!("expected control-character instruction id to fail"),
+            Err(error) => error,
+        };
+        assert!(error.contains("instructionId"));
+        assert!(error.contains("control characters"));
+
+        let mut artifact = valid_capital_instruction_artifact();
+        artifact.subject_key = "subject-1\nsubject-2".to_string();
+        let error = match artifact.validate() {
+            Ok(_) => panic!("expected control-character subject key to fail"),
+            Err(error) => error,
+        };
+        assert!(error.contains("subjectKey"));
+        assert!(error.contains("control characters"));
+
+        let mut artifact = valid_capital_instruction_artifact();
+        artifact.rail.rail_id = "rail-1\nrail-2".to_string();
+        let error = match artifact.validate() {
+            Ok(_) => panic!("expected control-character rail id to fail"),
+            Err(error) => error,
+        };
+        assert!(error.contains("railId"));
+        assert!(error.contains("control characters"));
+
+        let mut artifact = valid_capital_instruction_artifact();
+        artifact.authority_chain[0].principal_id = "principal-1\nprincipal-2".to_string();
+        let error = match artifact.validate() {
+            Ok(_) => panic!("expected control-character authority principal to fail"),
+            Err(error) => error,
+        };
+        assert!(error.contains("principalId"));
+        assert!(error.contains("control characters"));
     }
 
     #[test]

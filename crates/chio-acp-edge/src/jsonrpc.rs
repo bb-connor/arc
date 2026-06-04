@@ -132,6 +132,11 @@ impl ChioAcpEdge {
                 "{operation} params.taskId must not include leading or trailing whitespace"
             )));
         }
+        if task_id.chars().any(char::is_control) {
+            return Err(AcpEdgeError::InvalidRequest(format!(
+                "{operation} params.taskId must not include control characters"
+            )));
+        }
         Ok(task_id.to_string())
     }
 
@@ -154,6 +159,11 @@ impl ChioAcpEdge {
         if capability_id.trim() != capability_id {
             return Err(AcpEdgeError::InvalidRequest(format!(
                 "{operation} params.capabilityId must not include leading or trailing whitespace"
+            )));
+        }
+        if capability_id.chars().any(char::is_control) {
+            return Err(AcpEdgeError::InvalidRequest(format!(
+                "{operation} params.capabilityId must not include control characters"
             )));
         }
         Ok(capability_id.to_string())
