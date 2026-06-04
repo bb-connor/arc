@@ -78,7 +78,7 @@ pub(crate) fn build_route_dispatches(
                         path: path.clone(),
                     },
                     query_parameters,
-                    operation.request_body_schema.is_some(),
+                    operation.request_body_schema.is_some() && operation.request_body_required,
                 ),
             );
         }

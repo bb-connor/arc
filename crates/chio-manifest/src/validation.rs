@@ -35,7 +35,7 @@ fn validate_manifest_text_field(field: &'static str, value: &str) -> Result<(), 
 }
 
 fn validate_text_value(field: &'static str, value: &str) -> Result<(), ManifestError> {
-    if value.trim().is_empty() || value.trim() != value {
+    if value.trim().is_empty() || value.trim() != value || value.chars().any(char::is_control) {
         Err(ManifestError::InvalidManifestField(field))
     } else {
         Ok(())
@@ -59,7 +59,10 @@ fn validate_tools(tools: &[ToolDefinition]) -> Result<(), ManifestError> {
 }
 
 fn validate_tool(tool: &ToolDefinition) -> Result<(), ManifestError> {
-    if tool.name.trim().is_empty() || tool.name.trim() != tool.name {
+    if tool.name.trim().is_empty()
+        || tool.name.trim() != tool.name
+        || tool.name.chars().any(char::is_control)
+    {
         return Err(ManifestError::InvalidToolName(tool.name.clone()));
     }
     if !tool.input_schema.is_object() {
@@ -191,7 +194,7 @@ fn validate_permission_values(
 
     let mut seen = HashSet::new();
     for value in values {
-        if value.trim().is_empty() || value.trim() != value {
+        if value.trim().is_empty() || value.trim() != value || value.chars().any(char::is_control) {
             return Err(ManifestError::InvalidRequiredPermission {
                 field,
                 value: value.clone(),

@@ -500,11 +500,17 @@ pub fn verify_passport_presentation_challenge(
 
 fn validate_challenge_identity_fields(verifier: &str, nonce: &str) -> Result<(), CredentialError> {
     let verifier_trimmed = verifier.trim();
-    if verifier_trimmed.is_empty() || verifier_trimmed != verifier {
+    if verifier_trimmed.is_empty()
+        || verifier_trimmed != verifier
+        || verifier.chars().any(char::is_control)
+    {
         return Err(CredentialError::MissingChallengeVerifier);
     }
     let nonce_trimmed = nonce.trim();
-    if nonce_trimmed.is_empty() || nonce_trimmed != nonce {
+    if nonce_trimmed.is_empty()
+        || nonce_trimmed != nonce
+        || nonce.chars().any(char::is_control)
+    {
         return Err(CredentialError::MissingChallengeNonce);
     }
     Ok(())

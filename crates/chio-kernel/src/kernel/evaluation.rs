@@ -1026,6 +1026,8 @@ impl ChioKernel {
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
                 denial.runtime_admission_metadata,
             );
+        self.release_admitted_capability_budget(denial.cap)
+            .map_err(KernelError::DelegationInvalid)?;
         let reverse =
             self.reverse_pre_execution_budget_mutation(denial.cap, denial.budget_mutation)?;
 

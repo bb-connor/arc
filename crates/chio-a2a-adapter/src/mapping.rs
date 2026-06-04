@@ -207,6 +207,9 @@ pub enum AdapterError {
     #[error("A2A agent card advertised no skills")]
     NoSkillsAdvertised,
 
+    #[error("A2A agent card advertised skills but none expose a Chio-projectable input mode")]
+    NoProjectableSkillsAdvertised,
+
     #[error("invalid A2A tool input: {0}")]
     InvalidToolInput(String),
 
@@ -244,7 +247,11 @@ fn build_manifest(
         .map(|skill| build_tool_definition(agent_card, skill))
         .collect::<Result<Vec<_>, _>>()?;
     if tools.is_empty() {
-        return Err(AdapterError::NoSkillsAdvertised);
+        return if agent_card.skills.is_empty() {
+            Err(AdapterError::NoSkillsAdvertised)
+        } else {
+            Err(AdapterError::NoProjectableSkillsAdvertised)
+        };
     }
 
     let manifest = ToolManifest {

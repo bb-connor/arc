@@ -323,6 +323,31 @@ impl ChioKernel {
         Ok(())
     }
 
+    pub(crate) fn release_admitted_capability_budget(
+        &self,
+        cap: &CapabilityToken,
+    ) -> Result<(), String> {
+        if let Some(parent_link) = cap.delegation_chain.last() {
+            use chio_kernel_core::BudgetRegistry;
+            let proposed_share = cap
+                .budget_share_bps
+                .unwrap_or(chio_kernel_core::MAX_BUDGET_SHARE_BPS);
+            let mut budgets = match self.budget_registry.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            budgets
+                .release_child(
+                    parent_link.capability_id.as_str(),
+                    cap.id.as_str(),
+                    proposed_share,
+                )
+                .map_err(|err| err.to_string())?;
+        }
+
+        Ok(())
+    }
+
     /// Run the portable pure-compute verdict path provided by
     /// `chio-kernel-core`.
     ///

@@ -7,6 +7,7 @@ pub fn serve_http(config: RemoteServeHttpConfig) -> Result<(), CliError> {
 const MCP_RATE_LIMIT_MAX_REQUESTS: u32 = 600;
 const MCP_RATE_LIMIT_WINDOW: Duration = Duration::from_secs(60);
 const MCP_RATE_LIMIT_MAX_KEYS: usize = 4_096;
+const MCP_MAX_POST_BODY_BYTES: usize = 8 * 1024 * 1024;
 
 #[derive(Clone)]
 struct McpRateLimiter {
@@ -282,16 +283,9 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         return response;
     }
 
-    let headers = request.headers().clone();
-    let body = match axum::body::to_bytes(request.into_body(), usize::MAX).await {
+    let (headers, body) = match read_limited_mcp_post_body(request).await {
         Ok(body) => body,
-        Err(error) => {
-            return jsonrpc_http_error(
-                StatusCode::BAD_REQUEST,
-                -32700,
-                &format!("failed to read request body: {error}"),
-            );
-        }
+        Err(response) => return response,
     };
     let message: Value = match serde_json::from_slice(&body) {
         Ok(message) => message,
@@ -928,6 +922,47 @@ async fn handle_delete(State(state): State<RemoteAppState>, request: Request) ->
     StatusCode::NO_CONTENT.into_response()
 }
 
+async fn read_limited_mcp_post_body(
+    request: Request,
+) -> Result<(HeaderMap, axum::body::Bytes), Response> {
+    let headers = request.headers().clone();
+    validate_mcp_post_content_length(&headers)?;
+    match axum::body::to_bytes(request.into_body(), MCP_MAX_POST_BODY_BYTES).await {
+        Ok(body) => Ok((headers, body)),
+        Err(error) if error.to_string().contains("length limit") => Err(jsonrpc_http_error(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            -32600,
+            &format!("request body exceeds {MCP_MAX_POST_BODY_BYTES}-byte limit"),
+        )),
+        Err(error) => Err(jsonrpc_http_error(
+            StatusCode::BAD_REQUEST,
+            -32700,
+            &format!("failed to read request body: {error}"),
+        )),
+    }
+}
+
+fn validate_mcp_post_content_length(headers: &HeaderMap) -> Result<(), Response> {
+    let Some(value) = headers.get(axum::http::header::CONTENT_LENGTH) else {
+        return Ok(());
+    };
+    let length = value
+        .to_str()
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .ok_or_else(|| {
+            jsonrpc_http_error(StatusCode::BAD_REQUEST, -32600, "invalid Content-Length")
+        })?;
+    if length > MCP_MAX_POST_BODY_BYTES as u64 {
+        return Err(jsonrpc_http_error(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            -32600,
+            &format!("request body exceeds {MCP_MAX_POST_BODY_BYTES}-byte limit"),
+        ));
+    }
+    Ok(())
+}
+
 fn is_initialize_request(message: &Value) -> bool {
     message.get("method").and_then(Value::as_str) == Some("initialize")
 }
@@ -1037,6 +1072,46 @@ fn parse_remote_session_peer_capabilities(params: &Value) -> PeerCapabilities {
 mod http_service_tests {
     use super::*;
     use serde_json::json;
+
+    #[tokio::test]
+    async fn read_limited_mcp_post_body_rejects_oversized_content_length() {
+        let request = match Request::builder()
+            .method("POST")
+            .uri(MCP_ENDPOINT_PATH)
+            .header(
+                axum::http::header::CONTENT_LENGTH,
+                (MCP_MAX_POST_BODY_BYTES + 1).to_string(),
+            )
+            .body(axum::body::Body::empty())
+        {
+            Ok(request) => request,
+            Err(error) => panic!("failed to build request: {error}"),
+        };
+
+        let Err(response) = read_limited_mcp_post_body(request).await else {
+            panic!("oversized Content-Length should be rejected");
+        };
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    #[tokio::test]
+    async fn read_limited_mcp_post_body_rejects_streaming_body_over_limit() {
+        let request = match Request::builder()
+            .method("POST")
+            .uri(MCP_ENDPOINT_PATH)
+            .body(axum::body::Body::from(vec![
+                b'a';
+                MCP_MAX_POST_BODY_BYTES + 1
+            ])) {
+            Ok(request) => request,
+            Err(error) => panic!("failed to build request: {error}"),
+        };
+
+        let Err(response) = read_limited_mcp_post_body(request).await else {
+            panic!("oversized streaming body should be rejected");
+        };
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    }
 
     #[test]
     fn parse_remote_session_peer_capabilities_honors_progress_and_cancellation_declarations() {

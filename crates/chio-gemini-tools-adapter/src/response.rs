@@ -38,21 +38,41 @@ fn nested_response_body(value: &Value) -> Option<Value> {
 }
 
 fn classify_content_policy(body: &Value) -> Result<(), ProviderError> {
-    let Some(block_reason) = body
-        .get("promptFeedback")
-        .and_then(|feedback| feedback.get("blockReason"))
-        .and_then(Value::as_str)
-    else {
+    let Some(block_reason) = gemini_safety_block_reason(body) else {
         return Ok(());
     };
 
-    if block_reason.trim().is_empty() {
-        return Ok(());
-    }
-
     Err(ProviderError::ContentPolicy(format!(
-        "Gemini promptFeedback.blockReason={block_reason}"
+        "Gemini safety block: {block_reason}"
     )))
+}
+
+fn gemini_safety_block_reason(body: &Value) -> Option<String> {
+    if let Some(block_reason) = body
+        .get("promptFeedback")
+        .and_then(|feedback| feedback.get("blockReason"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|reason| !reason.is_empty())
+    {
+        return Some(format!("promptFeedback.blockReason={block_reason}"));
+    };
+
+    body.get("candidates")
+        .and_then(Value::as_array)
+        .and_then(|candidates| {
+            candidates
+                .iter()
+                .enumerate()
+                .find_map(|(index, candidate)| {
+                    candidate
+                        .get("finishReason")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .filter(|reason| *reason == "SAFETY")
+                        .map(|reason| format!("candidates[{index}].finishReason={reason}"))
+                })
+        })
 }
 
 fn extract_function_calls(body: &Value) -> Result<Vec<FunctionCallPart>, ProviderError> {

@@ -9451,6 +9451,145 @@ fn nested_hosted_sibling_sum_denial_reverses_pre_execution_monetary_charge() {
 }
 
 #[test]
+fn payment_authorization_denial_releases_delegated_sibling_budget() {
+    let fixture = make_sibling_sum_monetary_fixture("delegated-payment-deny-budget");
+    let mut kernel = fixture.kernel;
+    kernel.set_payment_adapter(Box::new(DecliningPaymentAdapter));
+
+    let denied_response = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: "req-delegated-payment-deny-a".to_string(),
+            capability: fixture.child_a.clone(),
+            tool_name: "compute".to_string(),
+            server_id: "cost-srv".to_string(),
+            agent_id: fixture.child_a_kp.public_key().to_hex(),
+            arguments: serde_json::json!({}),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        })
+        .unwrap();
+    assert_eq!(denied_response.verdict, Verdict::Deny);
+    assert!(denied_response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("payment authorization failed")));
+
+    kernel.set_payment_adapter(Box::new(StubPaymentAdapter));
+    let allowed_sibling = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: "req-delegated-payment-deny-b".to_string(),
+            capability: fixture.child_b.clone(),
+            tool_name: "compute".to_string(),
+            server_id: "cost-srv".to_string(),
+            agent_id: fixture.child_b_kp.public_key().to_hex(),
+            arguments: serde_json::json!({}),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        })
+        .unwrap();
+    assert_eq!(
+        allowed_sibling.verdict,
+        Verdict::Allow,
+        "payment-denied child must not starve a later sibling: {:?}",
+        allowed_sibling.reason
+    );
+
+    let _ = std::fs::remove_file(fixture.path);
+}
+
+#[test]
+fn nested_payment_authorization_denial_releases_delegated_sibling_budget() {
+    let fixture = make_sibling_sum_monetary_fixture("nested-delegated-payment-deny-budget");
+    let mut kernel = fixture.kernel;
+    kernel.set_payment_adapter(Box::new(DecliningPaymentAdapter));
+    let session_id = kernel.open_session("nested-parent-agent".to_string(), Vec::new());
+    kernel.activate_session(&session_id).unwrap();
+    let parent_context = make_operation_context(
+        &session_id,
+        "req-nested-payment-deny-parent",
+        "nested-parent-agent",
+    );
+    kernel
+        .begin_session_request(&parent_context, OperationKind::ToolCall, true)
+        .unwrap();
+    let mut client = MockNestedFlowClient {
+        roots: Vec::new(),
+        sampled_message: CreateMessageResult {
+            role: "assistant".to_string(),
+            content: serde_json::json!({ "type": "text", "text": "unused" }),
+            model: "unused".to_string(),
+            stop_reason: None,
+        },
+        elicited_content: make_elicited_content(),
+        cancel_parent_on_create_message: false,
+        cancel_child_on_create_message: false,
+        completed_elicitation_ids: Vec::new(),
+        resource_updates: Vec::new(),
+        resources_list_changed_count: 0,
+    };
+
+    let denied_response = kernel
+        .evaluate_tool_call_with_nested_flow_client(
+            &parent_context,
+            &ToolCallRequest {
+                request_id: "req-nested-payment-deny-a".to_string(),
+                capability: fixture.child_a.clone(),
+                tool_name: "compute".to_string(),
+                server_id: "cost-srv".to_string(),
+                agent_id: fixture.child_a_kp.public_key().to_hex(),
+                arguments: serde_json::json!({}),
+                dpop_proof: None,
+                governed_intent: None,
+                approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
+            },
+            &mut client,
+        )
+        .unwrap();
+    assert_eq!(denied_response.verdict, Verdict::Deny);
+    assert!(denied_response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("payment authorization failed")));
+
+    kernel.set_payment_adapter(Box::new(StubPaymentAdapter));
+    let allowed_sibling = kernel
+        .evaluate_tool_call_with_nested_flow_client(
+            &parent_context,
+            &ToolCallRequest {
+                request_id: "req-nested-payment-deny-b".to_string(),
+                capability: fixture.child_b.clone(),
+                tool_name: "compute".to_string(),
+                server_id: "cost-srv".to_string(),
+                agent_id: fixture.child_b_kp.public_key().to_hex(),
+                arguments: serde_json::json!({}),
+                dpop_proof: None,
+                governed_intent: None,
+                approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
+            },
+            &mut client,
+        )
+        .unwrap();
+    assert_eq!(
+        allowed_sibling.verdict,
+        Verdict::Allow,
+        "nested payment-denied child must not starve a later sibling: {:?}",
+        allowed_sibling.reason
+    );
+
+    let _ = std::fs::remove_file(fixture.path);
+}
+
+#[test]
 fn hosted_named_remote_without_fresh_peer_fails_before_dispatch() {
     let fixture = make_sibling_sum_monetary_fixture("missing-remote-peer");
     let kernel = fixture.kernel;

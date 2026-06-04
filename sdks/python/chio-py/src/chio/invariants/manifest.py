@@ -15,6 +15,29 @@ _REQUIRED_PERMISSION_FIELDS = (
 _REQUIRED_PERMISSION_FIELD_SET = set(_REQUIRED_PERMISSION_FIELDS)
 _PRICING_MODELS = {"flat", "per_invocation", "per_unit", "hybrid"}
 _SIGNED_MANIFEST_FIELDS = {"manifest", "signature", "signer_key"}
+_MANIFEST_FIELDS = {
+    "schema",
+    "server_id",
+    "name",
+    "description",
+    "version",
+    "tools",
+    "server_tools",
+    "required_permissions",
+    "public_key",
+}
+_TOOL_FIELDS = {
+    "name",
+    "description",
+    "input_schema",
+    "output_schema",
+    "pricing",
+    "has_side_effects",
+    "latency_hint",
+}
+_PRICING_FIELDS = {"pricing_model", "base_price", "unit_price", "billing_unit"}
+_SERVER_TOOLS = {"computer_use", "bash", "text_editor"}
+_LATENCY_HINTS = {"instant", "fast", "moderate", "slow"}
 _MAX_U64 = 2**64 - 1
 
 
@@ -27,6 +50,8 @@ def signed_manifest_body_canonical_json(signed_manifest: dict[str, Any]) -> str:
 
 
 def _validate_manifest_structure(manifest: dict[str, Any]) -> bool:
+    if not _has_only_known_keys(manifest, _MANIFEST_FIELDS):
+        return False
     if manifest.get("schema") != "chio.manifest.v1":
         return False
     if not (
@@ -38,9 +63,15 @@ def _validate_manifest_structure(manifest: dict[str, Any]) -> bool:
     tools = manifest.get("tools", [])
     if not isinstance(tools, list) or not tools:
         return False
+    if not isinstance(manifest.get("public_key"), str):
+        return False
+    if not _validate_server_tools(manifest.get("server_tools")):
+        return False
     seen: set[str] = set()
     for tool in tools:
         if not isinstance(tool, dict):
+            return False
+        if not _has_only_known_keys(tool, _TOOL_FIELDS):
             return False
         name = tool.get("name")
         if not _is_valid_tool_name(name) or name in seen:
@@ -48,16 +79,28 @@ def _validate_manifest_structure(manifest: dict[str, Any]) -> bool:
         seen.add(name)
         if not _is_json_object(tool.get("input_schema")):
             return False
+        if not isinstance(tool.get("description"), str) or not isinstance(
+            tool.get("has_side_effects"), bool
+        ):
+            return False
         output_schema = tool.get("output_schema")
         if output_schema is not None and not _is_json_object(output_schema):
             return False
         if not _validate_tool_pricing(tool.get("pricing")):
             return False
+        latency_hint = tool.get("latency_hint")
+        if latency_hint is not None and latency_hint not in _LATENCY_HINTS:
+            return False
     return _validate_required_permissions(manifest.get("required_permissions"))
 
 
 def _is_valid_manifest_text_field(value: Any) -> bool:
-    return isinstance(value, str) and bool(value.strip()) and value.strip() == value
+    return (
+        isinstance(value, str)
+        and bool(value.strip())
+        and value.strip() == value
+        and not any(ord(character) < 32 or ord(character) == 127 for character in value)
+    )
 
 
 def _is_valid_tool_name(name: Any) -> bool:
@@ -68,10 +111,16 @@ def _is_json_object(value: Any) -> bool:
     return isinstance(value, dict)
 
 
+def _has_only_known_keys(value: dict[str, Any], known_keys: set[str]) -> bool:
+    return all(key in known_keys for key in value)
+
+
 def _validate_tool_pricing(pricing: Any) -> bool:
     if pricing is None:
         return True
     if not isinstance(pricing, dict):
+        return False
+    if not _has_only_known_keys(pricing, _PRICING_FIELDS):
         return False
     model = pricing.get("pricing_model")
     if model not in _PRICING_MODELS:
@@ -130,6 +179,23 @@ def _is_iso_4217_currency_code(currency: Any) -> bool:
     )
 
 
+def _validate_server_tools(server_tools: Any) -> bool:
+    if server_tools is None:
+        return True
+    if not isinstance(server_tools, list):
+        return False
+    seen: set[str] = set()
+    for server_tool in server_tools:
+        if (
+            not isinstance(server_tool, str)
+            or server_tool not in _SERVER_TOOLS
+            or server_tool in seen
+        ):
+            return False
+        seen.add(server_tool)
+    return True
+
+
 def _validate_required_permissions(permissions: Any) -> bool:
     if permissions is None:
         return True
@@ -157,24 +223,48 @@ def _validate_required_permission_values(values: Any) -> bool:
 
 
 def verify_signed_manifest(signed_manifest: dict[str, Any]) -> dict[str, Any]:
-    embedded_public_key_valid = is_valid_public_key_hex(
-        signed_manifest["manifest"]["public_key"]
+    envelope_valid = _validate_signed_manifest_envelope(signed_manifest)
+    manifest = signed_manifest.get("manifest") if isinstance(signed_manifest, dict) else None
+    manifest_valid = isinstance(manifest, dict)
+    signature = signed_manifest.get("signature") if isinstance(signed_manifest, dict) else None
+    signer_key = signed_manifest.get("signer_key") if isinstance(signed_manifest, dict) else None
+    embedded_public_key = manifest.get("public_key") if manifest_valid else None
+    embedded_public_key_valid = isinstance(
+        embedded_public_key, str
+    ) and is_valid_public_key_hex(embedded_public_key)
+    signature_valid = (
+        envelope_valid
+        and manifest_valid
+        and isinstance(signature, str)
+        and isinstance(signer_key, str)
+        and _verify_signed_manifest_signature(manifest, signer_key, signature)
     )
     return {
-        "structure_valid": _validate_signed_manifest_envelope(signed_manifest)
-        and _validate_manifest_structure(signed_manifest["manifest"]),
-        "signature_valid": verify_utf8_message_ed25519(
-            signed_manifest_body_canonical_json(signed_manifest),
-            signed_manifest["signer_key"],
-            signed_manifest["signature"],
-        ),
+        "structure_valid": envelope_valid
+        and manifest_valid
+        and _validate_manifest_structure(manifest),
+        "signature_valid": signature_valid,
         "embedded_public_key_valid": embedded_public_key_valid,
         "embedded_public_key_matches_signer": embedded_public_key_valid
+        and isinstance(signer_key, str)
         and public_key_hex_matches(
-            signed_manifest["manifest"]["public_key"],
-            signed_manifest["signer_key"],
+            embedded_public_key,
+            signer_key,
         ),
     }
+
+
+def _verify_signed_manifest_signature(
+    manifest: dict[str, Any], signer_key: str, signature: str
+) -> bool:
+    try:
+        return verify_utf8_message_ed25519(
+            canonicalize_json(manifest),
+            signer_key,
+            signature,
+        )
+    except Exception:
+        return False
 
 
 def _validate_signed_manifest_envelope(signed_manifest: Any) -> bool:

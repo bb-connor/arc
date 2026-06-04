@@ -51,6 +51,8 @@ pub struct Operation {
     pub parameters: Vec<Parameter>,
     /// Request body schema, if any.
     pub request_body_schema: Option<Value>,
+    /// Whether requestBody.required is true. Defaults false per OpenAPI.
+    pub request_body_required: bool,
     /// Response schemas keyed by status code.
     pub response_schemas: Vec<(String, Option<Value>)>,
     /// Raw operation object for extension extraction.
@@ -239,6 +241,7 @@ impl OpenApiSpec {
             Vec::new()
         };
 
+        let request_body_required = Self::request_body_required(op_value, root)?;
         let request_body_schema = Self::extract_request_body_schema(op_value, root)?;
 
         let response_schemas = Self::extract_response_schemas(op_value, root)?;
@@ -250,6 +253,7 @@ impl OpenApiSpec {
             tags,
             parameters,
             request_body_schema,
+            request_body_required,
             response_schemas,
             raw: op_value.clone(),
         })
@@ -342,6 +346,17 @@ impl OpenApiSpec {
             }
             None => Ok(None),
         }
+    }
+
+    fn request_body_required(op_value: &Value, root: &Value) -> Result<bool> {
+        let body = match op_value.get("requestBody") {
+            Some(body) => Self::maybe_resolve(root, body)?,
+            None => return Ok(false),
+        };
+        Ok(body
+            .get("required")
+            .and_then(Value::as_bool)
+            .unwrap_or(false))
     }
 
     fn extract_response_schemas(
@@ -637,8 +652,49 @@ paths:
         let (_, item) = &spec.paths[0];
         let op = &item.operations[0].1;
         assert!(op.request_body_schema.is_some());
+        assert!(!op.request_body_required);
         let schema = op.request_body_schema.as_ref().unwrap();
         assert_eq!(schema.get("type").and_then(|v| v.as_str()), Some("object"));
+    }
+
+    #[test]
+    fn request_body_required_is_extracted_after_ref_resolution() {
+        let input = r##"{
+            "openapi": "3.0.3",
+            "info": { "title": "T", "version": "1" },
+            "paths": {
+                "/pets": {
+                    "post": {
+                        "operationId": "createPet",
+                        "requestBody": { "$ref": "#/components/requestBodies/PetBody" },
+                        "responses": { "201": { "description": "Created" } }
+                    }
+                }
+            },
+            "components": {
+                "requestBodies": {
+                    "PetBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": { "type": "string" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }"##;
+
+        let spec = OpenApiSpec::parse(input).unwrap();
+        let (_, item) = &spec.paths[0];
+        let op = &item.operations[0].1;
+        assert!(op.request_body_schema.is_some());
+        assert!(op.request_body_required);
     }
 
     #[test]

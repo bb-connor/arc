@@ -296,6 +296,144 @@ fn validation_rejects_empty_or_padded_provenance_identity_fields() {
     }
 }
 
+#[test]
+fn validation_rejects_control_characters_in_invocation_identity_fields() {
+    for (field, tool_name, request_id, api_version) in [
+        (
+            "tool_name",
+            "get\nweather",
+            "resp_sample",
+            "responses.2026-04-25",
+        ),
+        (
+            "provenance.request_id",
+            "get_weather",
+            "resp\rsample",
+            "responses.2026-04-25",
+        ),
+        (
+            "provenance.api_version",
+            "get_weather",
+            "resp_sample",
+            "responses\0v1",
+        ),
+    ] {
+        let mut invocation = sample_invocation();
+        invocation.tool_name = tool_name.to_string();
+        invocation.provenance.request_id = request_id.to_string();
+        invocation.provenance.api_version = api_version.to_string();
+
+        let error = invocation.validate().unwrap_err();
+        assert!(matches!(
+            error,
+            ToolInvocationValidationError::InvalidIdentity {
+                field: actual,
+                ..
+            } if actual == field
+        ));
+    }
+}
+
+#[test]
+fn validation_rejects_control_characters_in_principal_fields() {
+    let cases = vec![
+        (
+            ProviderId::OpenAi,
+            Principal::OpenAiOrg {
+                org_id: "org\nbad".to_string(),
+            },
+            "provenance.principal.org_id",
+        ),
+        (
+            ProviderId::Anthropic,
+            Principal::AnthropicWorkspace {
+                workspace_id: "workspace\nbad".to_string(),
+            },
+            "provenance.principal.workspace_id",
+        ),
+        (
+            ProviderId::Bedrock,
+            Principal::BedrockIam {
+                caller_arn: "arn:aws:iam::123456789012:role/chio\nbad".to_string(),
+                account_id: "123456789012".to_string(),
+                assumed_role_session_arn: None,
+            },
+            "provenance.principal.caller_arn",
+        ),
+        (
+            ProviderId::Bedrock,
+            Principal::BedrockIam {
+                caller_arn: "arn:aws:iam::123456789012:role/chio".to_string(),
+                account_id: "123456789012\n".to_string(),
+                assumed_role_session_arn: None,
+            },
+            "provenance.principal.account_id",
+        ),
+        (
+            ProviderId::Bedrock,
+            Principal::BedrockIam {
+                caller_arn: "arn:aws:iam::123456789012:role/chio".to_string(),
+                account_id: "123456789012".to_string(),
+                assumed_role_session_arn: Some(
+                    "arn:aws:sts::123456789012:assumed-role/chio/session\nbad".to_string(),
+                ),
+            },
+            "provenance.principal.assumed_role_session_arn",
+        ),
+        (
+            ProviderId::Gemini,
+            Principal::GeminiProject {
+                project_id: "gemini\nbad".to_string(),
+            },
+            "provenance.principal.project_id",
+        ),
+        (
+            ProviderId::Groq,
+            Principal::GroqProject {
+                project_id: "groq\nbad".to_string(),
+            },
+            "provenance.principal.project_id",
+        ),
+        (
+            ProviderId::Mistral,
+            Principal::MistralProject {
+                project_id: "mistral\nbad".to_string(),
+            },
+            "provenance.principal.project_id",
+        ),
+        (
+            ProviderId::Cohere,
+            Principal::CohereOrg {
+                org_id: "cohere\nbad".to_string(),
+            },
+            "provenance.principal.org_id",
+        ),
+        (
+            ProviderId::Ollama,
+            Principal::OllamaHost {
+                host: "http://localhost\nbad".to_string(),
+            },
+            "provenance.principal.host",
+        ),
+    ];
+
+    for (provider, principal, field) in cases {
+        let mut invocation = sample_invocation();
+        invocation.provider = provider;
+        invocation.provenance.provider = provider;
+        invocation.provenance.principal = principal;
+
+        let error = invocation.validate().unwrap_err();
+        assert!(matches!(
+            error,
+            ToolInvocationValidationError::InvalidIdentity {
+                field: actual,
+                ..
+            } if actual == field
+        ));
+    }
+}
+
 // -- properties -----------------------------------------------------------
 
 proptest! {

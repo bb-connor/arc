@@ -47,6 +47,23 @@ fn classify_content_policy(body: &Value) -> Result<(), ProviderError> {
 }
 
 fn safety_block_reason(body: &Value) -> Option<String> {
+    if let Some(reason) = body
+        .get("choices")
+        .and_then(Value::as_array)
+        .and_then(|choices| {
+            choices.iter().enumerate().find_map(|(index, choice)| {
+                choice
+                    .get("finish_reason")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|reason| *reason == "content_filter")
+                    .map(|reason| format!("choices[{index}].finish_reason={reason}"))
+            })
+        })
+    {
+        return Some(reason);
+    }
+
     body.get("promptFeedback")
         .and_then(|feedback| feedback.get("blockReason"))
         .and_then(Value::as_str)

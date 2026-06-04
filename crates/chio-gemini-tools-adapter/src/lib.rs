@@ -655,6 +655,25 @@ mod tests {
     }
 
     #[test]
+    fn lift_batch_maps_candidate_safety_finish_reason_to_content_policy() {
+        let cfg = config();
+        let adapter = GeminiAdapter::new(cfg, Arc::new(transport::MockTransport::new()));
+        let payload = json!({
+            "candidates": [{
+                "finishReason": "SAFETY",
+                "content": { "parts": [] }
+            }]
+        });
+        let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
+        let err = adapter
+            .lift_batch(raw)
+            .expect_err("Gemini candidate safety finish reason must fail closed");
+
+        assert!(matches!(err, ProviderError::ContentPolicy(_)));
+        assert!(err.to_string().contains("SAFETY"));
+    }
+
+    #[test]
     fn lift_batch_rejects_function_call_name_with_surrounding_whitespace() {
         let cfg = config();
         let adapter = GeminiAdapter::new(cfg, Arc::new(transport::MockTransport::new()));

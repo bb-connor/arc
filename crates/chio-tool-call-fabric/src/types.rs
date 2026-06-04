@@ -123,12 +123,49 @@ fn validate_principal_provider(
             | (ProviderId::Cohere, Principal::CohereOrg { .. })
     );
     if matches_provider {
-        return Ok(());
+        return validate_principal_fields(principal);
     }
     Err(ToolInvocationValidationError::InvalidIdentity {
         field: "provenance.principal",
         reason: "must match provenance.provider",
     })
+}
+
+fn validate_principal_fields(principal: &Principal) -> Result<(), ToolInvocationValidationError> {
+    match principal {
+        Principal::OpenAiOrg { org_id } => {
+            validate_identity_field("provenance.principal.org_id", org_id)
+        }
+        Principal::AnthropicWorkspace { workspace_id } => {
+            validate_identity_field("provenance.principal.workspace_id", workspace_id)
+        }
+        Principal::BedrockIam {
+            caller_arn,
+            account_id,
+            assumed_role_session_arn,
+        } => {
+            validate_identity_field("provenance.principal.caller_arn", caller_arn)?;
+            validate_identity_field("provenance.principal.account_id", account_id)?;
+            if let Some(assumed_role_session_arn) = assumed_role_session_arn {
+                validate_identity_field(
+                    "provenance.principal.assumed_role_session_arn",
+                    assumed_role_session_arn,
+                )?;
+            }
+            Ok(())
+        }
+        Principal::GeminiProject { project_id }
+        | Principal::GroqProject { project_id }
+        | Principal::MistralProject { project_id } => {
+            validate_identity_field("provenance.principal.project_id", project_id)
+        }
+        Principal::CohereOrg { org_id } => {
+            validate_identity_field("provenance.principal.org_id", org_id)
+        }
+        Principal::OllamaHost { host } => {
+            validate_identity_field("provenance.principal.host", host)
+        }
+    }
 }
 
 fn validate_identity_field(
@@ -145,6 +182,12 @@ fn validate_identity_field(
         return Err(ToolInvocationValidationError::InvalidIdentity {
             field,
             reason: "must not contain surrounding whitespace",
+        });
+    }
+    if value.chars().any(char::is_control) {
+        return Err(ToolInvocationValidationError::InvalidIdentity {
+            field,
+            reason: "must not contain control characters",
         });
     }
     Ok(())

@@ -191,7 +191,7 @@ impl OtelIngest {
 }
 
 fn validate_required_field(value: &str, field: &'static str) -> Result<(), OtelIngestError> {
-    if value.is_empty() || value.trim() != value {
+    if value.is_empty() || value.trim() != value || value.chars().any(char::is_control) {
         return Err(OtelIngestError::InvalidRequiredField { field });
     }
     Ok(())
@@ -263,6 +263,12 @@ mod tests {
         });
         assert_rejected("span_id", |frame| {
             frame.span_id = "s1 ".into();
+        });
+        assert_rejected("receipt_id", |frame| {
+            frame.receipt_id = "receipt\nbad".into();
+        });
+        assert_rejected("span_id", |frame| {
+            frame.span_id = "span\0bad".into();
         });
     }
 

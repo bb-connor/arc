@@ -798,6 +798,25 @@ mod tests {
     }
 
     #[test]
+    fn lift_batch_maps_content_filter_finish_reason_to_content_policy() {
+        let cfg = config();
+        let adapter = GroqAdapter::new(cfg, Arc::new(transport::MockTransport::new()));
+        let payload = json!({
+            "choices": [{
+                "message": { "role": "assistant", "content": "" },
+                "finish_reason": "content_filter"
+            }]
+        });
+        let raw = ProviderRequest(serde_json::to_vec(&payload).unwrap());
+        let err = adapter
+            .lift_batch(raw)
+            .expect_err("Groq content_filter finish reason must fail closed");
+
+        assert!(matches!(err, ProviderError::ContentPolicy(_)));
+        assert!(err.to_string().contains("content_filter"));
+    }
+
+    #[test]
     fn lift_batch_rejects_function_call_name_with_surrounding_whitespace() {
         let cfg = config();
         let adapter = GroqAdapter::new(cfg, Arc::new(transport::MockTransport::new()));

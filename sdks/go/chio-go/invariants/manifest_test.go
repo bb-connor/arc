@@ -65,6 +65,7 @@ func TestManifestStructureRejectsEmptyOrPaddedIdentityFields(t *testing.T) {
 		{"server_id", ""},
 		{"server_id", " srv-priced"},
 		{"server_id", "srv-priced "},
+		{"server_id", "srv\npriced"},
 		{"name", ""},
 		{"name", " Priced Server"},
 		{"name", "Priced Server "},
@@ -277,6 +278,7 @@ func TestManifestStructureRejectsInvalidRequiredPermissions(t *testing.T) {
 		{"write_paths", []any{" /tmp/out"}},
 		{"network_hosts", []any{"api.example.com "}},
 		{"environment_variables", []any{"TOKEN", "TOKEN"}},
+		{"read_paths", []any{"/tmp/in\nbad"}},
 		{"read_paths", []any{123}},
 	}
 	for _, tc := range cases {
@@ -326,5 +328,124 @@ func TestManifestStructureRejectsMalformedRequiredPermissionsObject(t *testing.T
 	}
 	if nonArrayVerification.StructureValid {
 		t.Fatalf("non-array required_permissions value must be structurally invalid")
+	}
+}
+
+func TestSignedManifestVerificationIsFailSoftForMalformedEnvelopes(t *testing.T) {
+	for _, signedManifest := range []map[string]any{
+		{},
+		{"manifest": nil, "signature": "", "signer_key": ""},
+	} {
+		verification, err := invariants.VerifySignedManifest(signedManifest)
+		if err != nil {
+			t.Fatalf("VerifySignedManifest returned error: %v", err)
+		}
+		if verification.StructureValid {
+			t.Fatalf("malformed envelope must be structurally invalid")
+		}
+		if verification.SignatureValid {
+			t.Fatalf("malformed envelope must not verify signature")
+		}
+		if verification.EmbeddedPublicKeyValid {
+			t.Fatalf("malformed envelope must not report a valid embedded public key")
+		}
+		if verification.EmbeddedPublicKeyMatchesSigner {
+			t.Fatalf("malformed envelope must not report public key match")
+		}
+	}
+}
+
+func TestManifestStructureRejectsMissingRequiredToolFieldsAndUnknownNestedFields(t *testing.T) {
+	missingDescription := pricedSignedManifest()
+	delete(missingDescription["manifest"].(map[string]any)["tools"].([]any)[0].(map[string]any), "description")
+	missingDescriptionVerification, err := invariants.VerifySignedManifest(missingDescription)
+	if err != nil {
+		t.Fatalf("VerifySignedManifest returned error for missing description: %v", err)
+	}
+	if missingDescriptionVerification.StructureValid {
+		t.Fatalf("missing description must be structurally invalid")
+	}
+
+	missingSideEffects := pricedSignedManifest()
+	delete(missingSideEffects["manifest"].(map[string]any)["tools"].([]any)[0].(map[string]any), "has_side_effects")
+	missingSideEffectsVerification, err := invariants.VerifySignedManifest(missingSideEffects)
+	if err != nil {
+		t.Fatalf("VerifySignedManifest returned error for missing has_side_effects: %v", err)
+	}
+	if missingSideEffectsVerification.StructureValid {
+		t.Fatalf("missing has_side_effects must be structurally invalid")
+	}
+
+	unknownManifestField := pricedSignedManifest()
+	unknownManifestField["manifest"].(map[string]any)["unsigned_policy_hint"] = true
+	unknownManifestVerification, err := invariants.VerifySignedManifest(unknownManifestField)
+	if err != nil {
+		t.Fatalf("VerifySignedManifest returned error for unknown manifest field: %v", err)
+	}
+	if unknownManifestVerification.StructureValid {
+		t.Fatalf("unknown manifest field must be structurally invalid")
+	}
+
+	unknownToolField := pricedSignedManifest()
+	unknownToolField["manifest"].(map[string]any)["tools"].([]any)[0].(map[string]any)["annotations"] = map[string]any{}
+	unknownToolVerification, err := invariants.VerifySignedManifest(unknownToolField)
+	if err != nil {
+		t.Fatalf("VerifySignedManifest returned error for unknown tool field: %v", err)
+	}
+	if unknownToolVerification.StructureValid {
+		t.Fatalf("unknown tool field must be structurally invalid")
+	}
+
+	unknownPricingField := pricedSignedManifest()
+	unknownPricingField["manifest"].(map[string]any)["tools"].([]any)[0].(map[string]any)["pricing"].(map[string]any)["experimental_discount"] = 10
+	unknownPricingVerification, err := invariants.VerifySignedManifest(unknownPricingField)
+	if err != nil {
+		t.Fatalf("VerifySignedManifest returned error for unknown pricing field: %v", err)
+	}
+	if unknownPricingVerification.StructureValid {
+		t.Fatalf("unknown pricing field must be structurally invalid")
+	}
+}
+
+func TestManifestStructureValidatesServerToolsAndLatencyHintValues(t *testing.T) {
+	valid := pricedSignedManifest()
+	valid["manifest"].(map[string]any)["server_tools"] = []any{"bash", "text_editor"}
+	valid["manifest"].(map[string]any)["tools"].([]any)[0].(map[string]any)["latency_hint"] = "fast"
+	validVerification, err := invariants.VerifySignedManifest(valid)
+	if err != nil {
+		t.Fatalf("VerifySignedManifest returned error for valid server_tools: %v", err)
+	}
+	if !validVerification.StructureValid {
+		t.Fatalf("valid server_tools and latency_hint must be structurally valid")
+	}
+
+	duplicateServerTool := pricedSignedManifest()
+	duplicateServerTool["manifest"].(map[string]any)["server_tools"] = []any{"bash", "bash"}
+	duplicateVerification, err := invariants.VerifySignedManifest(duplicateServerTool)
+	if err != nil {
+		t.Fatalf("VerifySignedManifest returned error for duplicate server_tools: %v", err)
+	}
+	if duplicateVerification.StructureValid {
+		t.Fatalf("duplicate server_tools must be structurally invalid")
+	}
+
+	unknownServerTool := pricedSignedManifest()
+	unknownServerTool["manifest"].(map[string]any)["server_tools"] = []any{"database"}
+	unknownVerification, err := invariants.VerifySignedManifest(unknownServerTool)
+	if err != nil {
+		t.Fatalf("VerifySignedManifest returned error for unknown server_tool: %v", err)
+	}
+	if unknownVerification.StructureValid {
+		t.Fatalf("unknown server_tool must be structurally invalid")
+	}
+
+	invalidLatencyHint := pricedSignedManifest()
+	invalidLatencyHint["manifest"].(map[string]any)["tools"].([]any)[0].(map[string]any)["latency_hint"] = "immediate"
+	invalidLatencyVerification, err := invariants.VerifySignedManifest(invalidLatencyHint)
+	if err != nil {
+		t.Fatalf("VerifySignedManifest returned error for invalid latency_hint: %v", err)
+	}
+	if invalidLatencyVerification.StructureValid {
+		t.Fatalf("invalid latency_hint must be structurally invalid")
 	}
 }

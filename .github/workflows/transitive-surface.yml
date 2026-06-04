@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/transitive-surface.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/chio-bindings-ffi/**"
+      - "crates/chio-binding-helpers/**"
       - "crates/chio-core-types/**"
       - "crates/chio-core/**"
       - "crates/chio-kernel-core/**"
@@ -27,10 +31,16 @@ on:
       - "crates/chio-ag-ui-proxy/**"
       - "examples/**"
       - "sdks/**"
+      - "tests/abi/**"
+      - "scripts/check-chio-cpp.sh"
       - "scripts/check-transitive-surface.sh"
   pull_request:
     paths:
       - ".github/workflows/transitive-surface.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/chio-bindings-ffi/**"
+      - "crates/chio-binding-helpers/**"
       - "crates/chio-core-types/**"
       - "crates/chio-core/**"
       - "crates/chio-kernel-core/**"
@@ -53,6 +63,8 @@ on:
       - "crates/chio-ag-ui-proxy/**"
       - "examples/**"
       - "sdks/**"
+      - "tests/abi/**"
+      - "scripts/check-chio-cpp.sh"
       - "scripts/check-transitive-surface.sh"
 
 permissions:

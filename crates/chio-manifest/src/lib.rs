@@ -417,6 +417,28 @@ mod tests {
     }
 
     #[test]
+    fn validate_rejects_manifest_identity_control_characters() {
+        let mut m = sample_manifest();
+        m.server_id = "srv-hello\nbad".into();
+
+        assert!(matches!(
+            validate_manifest(&m),
+            Err(ManifestError::InvalidManifestField("server_id"))
+        ));
+    }
+
+    #[test]
+    fn validate_rejects_tool_name_control_characters() {
+        let mut m = sample_manifest();
+        m.tools[0].name = "greet\nbad".into();
+
+        assert!(matches!(
+            validate_manifest(&m),
+            Err(ManifestError::InvalidToolName(_))
+        ));
+    }
+
+    #[test]
     fn validate_rejects_non_object_input_schema() {
         let mut m = sample_manifest();
         m.tools[0].input_schema = serde_json::json!(["not", "an", "object"]);
@@ -473,6 +495,25 @@ mod tests {
                 field: "required_permissions.network_hosts",
                 value,
             }) if value == "api.example.com"
+        ));
+    }
+
+    #[test]
+    fn validate_rejects_required_permission_control_characters() {
+        let mut m = sample_manifest();
+        m.required_permissions = Some(RequiredPermissions {
+            read_paths: Some(vec!["/tmp/in\nbad".into()]),
+            write_paths: None,
+            network_hosts: None,
+            environment_variables: None,
+        });
+
+        assert!(matches!(
+            validate_manifest(&m),
+            Err(ManifestError::InvalidRequiredPermission {
+                field: "required_permissions.read_paths",
+                ..
+            })
         ));
     }
 

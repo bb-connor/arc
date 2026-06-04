@@ -207,15 +207,7 @@ impl A2aAdapter {
     ) -> Result<(), AdapterError> {
         if let Err(error) = registry.record_from_value_classified(response, context) {
             match error {
-                A2aTaskRegistryRecordError::RebindConflict(error) => {
-                    tracing::warn!(
-                        target: "chio_a2a_adapter",
-                        tool_name = context.tool_name,
-                        source = context.source,
-                        error = %error,
-                        "skipping A2A task registry persistence"
-                    );
-                }
+                A2aTaskRegistryRecordError::RebindConflict(error) => return Err(error),
                 A2aTaskRegistryRecordError::Fatal(error) => return Err(error),
             }
         }

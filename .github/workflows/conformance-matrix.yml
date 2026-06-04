@@ -13,6 +13,13 @@
 name: conformance-matrix
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/conformance-matrix.yml"
+      - "crates/chio-conformance/**"
+      - "crates/chio-cli/**"
+      - "tests/conformance/**"
+      - "docs/conformance.md"
   schedule:
     # 07:00 UTC nightly. Off the cron-storm minute and separate from
     # nightly.yml (04:23 UTC) and cflite_batch.yml (02:17 UTC) so the

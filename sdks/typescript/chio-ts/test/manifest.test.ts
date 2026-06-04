@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { verifySignedManifest } from "../src/index.ts";
+import {
+  signJsonStringEd25519,
+  verifySignedManifest,
+  verifySignedManifestJson,
+} from "../src/index.ts";
 import type { SignedManifest } from "../src/index.ts";
 
 function pricedSignedManifest(): SignedManifest {
@@ -63,6 +67,7 @@ test("manifest structure rejects empty or padded identity fields", () => {
     ["server_id", ""],
     ["server_id", " srv-priced"],
     ["server_id", "srv-priced "],
+    ["server_id", "srv\npriced"],
     ["name", ""],
     ["name", " Priced Server"],
     ["name", "Priced Server "],
@@ -212,6 +217,7 @@ test("manifest structure rejects invalid required permissions", () => {
     ["write_paths", [" /tmp/out"]],
     ["network_hosts", ["api.example.com "]],
     ["environment_variables", ["TOKEN", "TOKEN"]],
+    ["read_paths", ["/tmp/in\nbad"]],
     ["read_paths", [123]],
   ] as const) {
     const signedManifest = pricedSignedManifest();
@@ -241,4 +247,83 @@ test("manifest structure rejects malformed required permissions object", () => {
     read_paths: "/tmp",
   };
   assert.equal(verifySignedManifest(nonArrayValues).structure_valid, false);
+});
+
+test("signed manifest JSON verification is fail-soft for malformed envelopes", () => {
+  for (const input of [
+    "{}",
+    "{\"manifest\":null,\"signature\":\"\",\"signer_key\":\"\"}",
+  ]) {
+    const verification = verifySignedManifestJson(input);
+
+    assert.equal(verification.structure_valid, false);
+    assert.equal(verification.signature_valid, false);
+    assert.equal(verification.embedded_public_key_valid, false);
+    assert.equal(verification.embedded_public_key_matches_signer, false);
+  }
+});
+
+test("manifest structure rejects missing required tool fields and nested unknown fields", () => {
+  const missingDescription = pricedSignedManifest();
+  delete (missingDescription.manifest.tools[0] as { description?: unknown }).description;
+  assert.equal(verifySignedManifest(missingDescription).structure_valid, false);
+
+  const missingSideEffects = pricedSignedManifest();
+  delete (missingSideEffects.manifest.tools[0] as { has_side_effects?: unknown }).has_side_effects;
+  assert.equal(verifySignedManifest(missingSideEffects).structure_valid, false);
+
+  const unknownManifestField = pricedSignedManifest();
+  (unknownManifestField.manifest as { unsigned_policy_hint?: unknown }).unsigned_policy_hint = true;
+  assert.equal(verifySignedManifest(unknownManifestField).structure_valid, false);
+
+  const unknownToolField = pricedSignedManifest();
+  (unknownToolField.manifest.tools[0] as { annotations?: unknown }).annotations = {};
+  assert.equal(verifySignedManifest(unknownToolField).structure_valid, false);
+
+  const unknownPricingField = pricedSignedManifest();
+  (
+    unknownPricingField.manifest.tools[0].pricing as {
+      experimental_discount?: unknown;
+    }
+  ).experimental_discount = 10;
+  assert.equal(verifySignedManifest(unknownPricingField).structure_valid, false);
+});
+
+test("manifest structure validates server_tools and latency_hint enum values", () => {
+  const valid = pricedSignedManifest();
+  (valid.manifest as { server_tools?: string[] }).server_tools = ["bash", "text_editor"];
+  valid.manifest.tools[0].latency_hint = "fast";
+  assert.equal(verifySignedManifest(valid).structure_valid, true);
+
+  const duplicateServerTool = pricedSignedManifest();
+  (duplicateServerTool.manifest as { server_tools?: string[] }).server_tools = ["bash", "bash"];
+  assert.equal(verifySignedManifest(duplicateServerTool).structure_valid, false);
+
+  const unknownServerTool = pricedSignedManifest();
+  (unknownServerTool.manifest as { server_tools?: string[] }).server_tools = ["database"];
+  assert.equal(verifySignedManifest(unknownServerTool).structure_valid, false);
+
+  const invalidLatencyHint = pricedSignedManifest();
+  (invalidLatencyHint.manifest.tools[0] as { latency_hint?: string }).latency_hint = "immediate";
+  assert.equal(verifySignedManifest(invalidLatencyHint).structure_valid, false);
+});
+
+test("signed manifest JSON verification preserves raw large integer tokens", () => {
+  const seedHex = "01".repeat(32);
+  const publicKeyHex = signJsonStringEd25519("{}", seedHex).public_key_hex;
+  const rawManifest =
+    `{"schema":"chio.manifest.v1","server_id":"srv-large-u64","name":"Large U64","version":"1.0.0","tools":[{"name":"price","description":"Returns price","input_schema":{"type":"object"},"pricing":{"pricing_model":"per_invocation","unit_price":{"units":9223372036854775808,"currency":"USD"},"billing_unit":"invocation"},"has_side_effects":false}],"public_key":"${publicKeyHex}"}`;
+  const signed = signJsonStringEd25519(rawManifest, seedHex);
+  const signedManifestJson =
+    `{"manifest":${rawManifest},"signature":"${signed.signature_hex}","signer_key":"${signed.public_key_hex}"}`;
+
+  const jsonVerification = verifySignedManifestJson(signedManifestJson);
+  assert.equal(jsonVerification.structure_valid, true);
+  assert.equal(jsonVerification.signature_valid, true);
+  assert.equal(jsonVerification.embedded_public_key_valid, true);
+  assert.equal(jsonVerification.embedded_public_key_matches_signer, true);
+
+  const objectVerification = verifySignedManifest(JSON.parse(signedManifestJson));
+  assert.equal(objectVerification.structure_valid, true);
+  assert.equal(objectVerification.signature_valid, false);
 });

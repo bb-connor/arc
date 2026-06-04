@@ -5,6 +5,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 var requiredPermissionFields = map[string]struct{}{
@@ -25,6 +26,48 @@ var signedManifestFields = map[string]struct{}{
 	"manifest":   {},
 	"signature":  {},
 	"signer_key": {},
+}
+
+var manifestFields = map[string]struct{}{
+	"schema":               {},
+	"server_id":            {},
+	"name":                 {},
+	"description":          {},
+	"version":              {},
+	"tools":                {},
+	"server_tools":         {},
+	"required_permissions": {},
+	"public_key":           {},
+}
+
+var toolFields = map[string]struct{}{
+	"name":             {},
+	"description":      {},
+	"input_schema":     {},
+	"output_schema":    {},
+	"pricing":          {},
+	"has_side_effects": {},
+	"latency_hint":     {},
+}
+
+var pricingFields = map[string]struct{}{
+	"pricing_model": {},
+	"base_price":    {},
+	"unit_price":    {},
+	"billing_unit":  {},
+}
+
+var serverTools = map[string]struct{}{
+	"computer_use": {},
+	"bash":         {},
+	"text_editor":  {},
+}
+
+var latencyHints = map[string]struct{}{
+	"instant":  {},
+	"fast":     {},
+	"moderate": {},
+	"slow":     {},
 }
 
 const maxUint64ExclusiveAsFloat = 18446744073709551616.0
@@ -58,34 +101,21 @@ func SignedManifestBodyCanonicalJSON(signedManifest map[string]any) (string, err
 
 func VerifySignedManifest(signedManifest map[string]any) (ManifestVerification, error) {
 	envelopeValid := validateSignedManifestEnvelope(signedManifest)
-	manifest, err := mapField(signedManifest, "manifest")
-	if err != nil {
-		return ManifestVerification{}, err
-	}
-	signature, err := stringField(signedManifest, "signature")
-	if err != nil {
-		return ManifestVerification{}, err
-	}
-	signerKey, err := stringField(signedManifest, "signer_key")
-	if err != nil {
-		return ManifestVerification{}, err
-	}
-	body, err := SignedManifestBodyCanonicalJSON(signedManifest)
-	if err != nil {
-		return ManifestVerification{}, err
-	}
-	signatureValid, err := VerifyUTF8MessageEd25519(body, signerKey, signature)
-	if err != nil {
-		return ManifestVerification{}, err
-	}
-	embeddedPublicKey, err := stringField(manifest, "public_key")
-	if err != nil {
-		return ManifestVerification{}, err
-	}
+	manifest, manifestValid := signedManifest["manifest"].(map[string]any)
+	signature, signatureValidShape := signedManifest["signature"].(string)
+	signerKey, signerKeyValidShape := signedManifest["signer_key"].(string)
+	embeddedPublicKey, embeddedPublicKeyShapeValid := manifest["public_key"].(string)
 	embeddedPublicKeyValid := IsValidEd25519PublicKeyHex(embeddedPublicKey)
+	signatureValid := false
+	if envelopeValid && manifestValid && signatureValidShape && signerKeyValidShape {
+		body, err := CanonicalizeJSON(manifest)
+		if err == nil {
+			signatureValid, _ = VerifyUTF8MessageEd25519(body, signerKey, signature)
+		}
+	}
 	return ManifestVerification{
-		EmbeddedPublicKeyMatchesSigner: embeddedPublicKeyValid && PublicKeyHexMatches(embeddedPublicKey, signerKey),
-		EmbeddedPublicKeyValid:         embeddedPublicKeyValid,
+		EmbeddedPublicKeyMatchesSigner: embeddedPublicKeyValid && signerKeyValidShape && PublicKeyHexMatches(embeddedPublicKey, signerKey),
+		EmbeddedPublicKeyValid:         embeddedPublicKeyShapeValid && embeddedPublicKeyValid,
 		SignatureValid:                 signatureValid,
 		StructureValid:                 envelopeValid && validateManifestStructure(manifest),
 	}, nil
@@ -100,6 +130,9 @@ func VerifySignedManifestJSON(input string) (ManifestVerification, error) {
 }
 
 func validateManifestStructure(manifest map[string]any) bool {
+	if !hasOnlyKnownKeys(manifest, manifestFields) {
+		return false
+	}
 	schema, ok := manifest["schema"].(string)
 	if !ok || schema != "chio.manifest.v1" {
 		return false
@@ -113,10 +146,19 @@ func validateManifestStructure(manifest map[string]any) bool {
 	if !ok || len(tools) == 0 {
 		return false
 	}
+	if _, ok := manifest["public_key"].(string); !ok {
+		return false
+	}
+	if !validateServerTools(manifest["server_tools"]) {
+		return false
+	}
 	seen := make(map[string]struct{}, len(tools))
 	for _, entry := range tools {
 		tool, ok := entry.(map[string]any)
 		if !ok {
+			return false
+		}
+		if !hasOnlyKnownKeys(tool, toolFields) {
 			return false
 		}
 		name, ok := tool["name"].(string)
@@ -130,22 +172,52 @@ func validateManifestStructure(manifest map[string]any) bool {
 		if !isJSONObject(tool["input_schema"]) {
 			return false
 		}
+		if _, ok := tool["description"].(string); !ok {
+			return false
+		}
+		if _, ok := tool["has_side_effects"].(bool); !ok {
+			return false
+		}
 		if outputSchema, exists := tool["output_schema"]; exists && outputSchema != nil && !isJSONObject(outputSchema) {
 			return false
 		}
 		if !validateToolPricing(tool["pricing"]) {
 			return false
 		}
+		if latencyHint, exists := tool["latency_hint"]; exists && latencyHint != nil {
+			text, ok := latencyHint.(string)
+			if !ok {
+				return false
+			}
+			if _, ok := latencyHints[text]; !ok {
+				return false
+			}
+		}
 	}
 	return validateRequiredPermissions(manifest["required_permissions"])
 }
 
 func validateSignedManifestEnvelope(signedManifest map[string]any) bool {
+	if signedManifest == nil {
+		return false
+	}
 	if len(signedManifest) != len(signedManifestFields) {
 		return false
 	}
 	for field := range signedManifest {
 		if _, ok := signedManifestFields[field]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func hasOnlyKnownKeys(value map[string]any, knownKeys map[string]struct{}) bool {
+	if value == nil {
+		return false
+	}
+	for field := range value {
+		if _, ok := knownKeys[field]; !ok {
 			return false
 		}
 	}
@@ -158,7 +230,7 @@ func isValidManifestTextField(value any) bool {
 		return false
 	}
 	trimmed := strings.TrimSpace(text)
-	return trimmed != "" && trimmed == text
+	return trimmed != "" && trimmed == text && !strings.ContainsFunc(text, unicode.IsControl)
 }
 
 func isValidToolName(name string) bool {
@@ -176,6 +248,9 @@ func validateToolPricing(value any) bool {
 	}
 	pricing, ok := value.(map[string]any)
 	if !ok {
+		return false
+	}
+	if !hasOnlyKnownKeys(pricing, pricingFields) {
 		return false
 	}
 	model, ok := pricing["pricing_model"].(string)
@@ -210,6 +285,31 @@ func validateToolPricing(value any) bool {
 	}
 	if billingUnit, exists := pricing["billing_unit"]; exists && billingUnit != nil && !isValidManifestTextField(billingUnit) {
 		return false
+	}
+	return true
+}
+
+func validateServerTools(value any) bool {
+	if value == nil {
+		return true
+	}
+	values, ok := value.([]any)
+	if !ok {
+		return false
+	}
+	seen := make(map[string]struct{}, len(values))
+	for _, entry := range values {
+		text, ok := entry.(string)
+		if !ok {
+			return false
+		}
+		if _, ok := serverTools[text]; !ok {
+			return false
+		}
+		if _, exists := seen[text]; exists {
+			return false
+		}
+		seen[text] = struct{}{}
 	}
 	return true
 }

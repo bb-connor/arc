@@ -1700,6 +1700,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn build_manifest_rejects_when_no_skills_are_projectable() {
+        let mut adapter = local_test_adapter(
+            A2aAgentCapabilities::default(),
+            A2aProtocolBinding::JsonRpc,
+            None,
+        );
+        adapter.agent_card.skills[0].input_modes = Some(vec!["image/png".to_string()]);
+
+        let error = build_manifest(
+            "tenant-test",
+            "0.1.0",
+            &Keypair::generate().public_key().to_hex(),
+            &adapter.agent_card,
+            &A2aProtocolBinding::JsonRpc,
+        )
+        .expect_err("non-projectable skills should fail manifest construction");
+
+        assert!(matches!(error, AdapterError::NoProjectableSkillsAdvertised));
+        assert!(error
+            .to_string()
+            .contains("none expose a Chio-projectable input mode"));
+    }
+
+    #[tokio::test]
     async fn invoke_rejects_raw_skill_filtered_from_manifest() {
         let mut adapter = local_test_adapter(
             A2aAgentCapabilities::default(),
@@ -2185,7 +2209,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn adapter_blocking_registry_conflict_does_not_abort_valid_task_response() {
+    async fn adapter_blocking_registry_conflict_rejects_rebound_task_response() {
         let registry_path = unique_path("chio-a2a-http-blocking-conflict", ".json");
         let Some(server) = FakeA2aServer::spawn_http_json() else {
             return;
@@ -2199,7 +2223,7 @@ mod tests {
         .expect("discover HTTP+JSON adapter");
         seed_a2a_task(&adapter, "clinical_search", "task-1");
 
-        let result = adapter
+        let error = adapter
             .invoke(
                 "research",
                 json!({
@@ -2208,12 +2232,11 @@ mod tests {
                 }),
                 None,
             )
-            .await;
+            .await
+            .expect_err("registry conflict should fail the blocking response");
         server.join();
 
-        let result = result.expect("valid blocking response should not fail on registry conflict");
-        assert_eq!(result["task"]["id"], "task-1");
-        assert_eq!(result["task"]["status"]["state"], "TASK_STATE_COMPLETED");
+        assert!(error.to_string().contains("attempted to rebind"));
         assert!(
             adapter
                 .validate_task_binding("research", "task-1", "test_follow_up")
@@ -2225,7 +2248,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn adapter_streaming_registry_conflict_does_not_abort_valid_stream() {
+    async fn adapter_streaming_registry_conflict_rejects_rebound_stream() {
         let registry_path = unique_path("chio-a2a-jsonrpc-stream-conflict", ".json");
         let Some(server) = FakeA2aServer::spawn_jsonrpc_streaming_complete() else {
             return;
@@ -2239,7 +2262,7 @@ mod tests {
         .expect("discover JSONRPC adapter");
         seed_a2a_task(&adapter, "clinical_search", "task-1");
 
-        let stream_result = adapter
+        let error = adapter
             .invoke_stream(
                 "research",
                 json!({
@@ -2248,16 +2271,11 @@ mod tests {
                 }),
                 None,
             )
-            .await;
+            .await
+            .expect_err("registry conflict should fail the stream response");
         server.join();
 
-        let stream = stream_result
-            .expect("valid stream should not fail on registry conflict")
-            .expect("stream result");
-        let ToolServerStreamResult::Complete(stream) = stream else {
-            panic!("expected complete stream");
-        };
-        assert_eq!(stream.chunk_count(), 3);
+        assert!(error.to_string().contains("attempted to rebind"));
         assert!(
             adapter
                 .validate_task_binding("research", "task-1", "test_follow_up")

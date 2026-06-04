@@ -414,6 +414,7 @@ mod tests {
                     "operationId": "createPet",
                     "summary": "Create a pet",
                     "requestBody": {
+                        "required": true,
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -510,6 +511,33 @@ mod tests {
                                 "schema": { "type": "integer" }
                             }
                         ],
+                        "responses": { "200": { "description": "OK" } }
+                    }
+                }
+            }
+        }"#
+    }
+
+    fn optional_request_body_spec() -> &'static str {
+        r#"{
+            "openapi": "3.0.3",
+            "info": { "title": "Optional Body API", "version": "1.0.0" },
+            "paths": {
+                "/optional-body": {
+                    "post": {
+                        "operationId": "optionalBody",
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "name": { "type": "string" }
+                                        }
+                                    }
+                                }
+                            }
+                        },
                         "responses": { "200": { "description": "OK" } }
                     }
                 }
@@ -1050,6 +1078,30 @@ mod tests {
             .unwrap_err();
 
         assert!(format!("{error}").contains("missing required request body `body`"));
+    }
+
+    #[test]
+    fn bridge_dispatcher_allows_missing_optional_request_body() {
+        let mut bridge = OpenApiMcpBridge::from_spec(
+            optional_request_body_spec(),
+            petstore_config_with_egress(),
+        )
+        .unwrap();
+        bridge.set_dispatcher(Box::new(|method, url, args| {
+            assert_eq!(method, "POST");
+            assert_eq!(url, "https://93.184.216.34/optional-body");
+            assert!(args.get("body").is_none());
+            Ok(BridgedResponse {
+                status: 200,
+                body: json!({"ok": true}),
+                observed_body_bytes: Some(11),
+                is_error: false,
+            })
+        }));
+
+        let result = bridge.invoke_tool("optionalBody", json!({})).unwrap();
+
+        assert_eq!(result["structuredContent"]["body"]["ok"], true);
     }
 
     #[test]
