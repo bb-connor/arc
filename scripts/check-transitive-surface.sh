@@ -49,9 +49,9 @@ npm_prepare() {
     return
   fi
   if [[ -f "${repo_root}/${dir}/package-lock.json" ]]; then
-    run_in "${dir}" npm ci --no-fund --no-audit
+    run_in "${dir}" npm ci --workspaces=false --no-fund --no-audit
   else
-    run_in "${dir}" npm install --no-fund --no-audit
+    run_in "${dir}" npm install --workspaces=false --no-fund --no-audit
   fi
 }
 
