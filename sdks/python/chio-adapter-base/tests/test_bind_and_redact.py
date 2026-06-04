@@ -691,6 +691,45 @@ def test_keyword_only_alias_for_protected_field_redacts_via_canonical() -> None:
     }
 
 
+def test_pure_forwarder_redacts_all_overflow_positionals_for_kwarg_filled_slot() -> None:
+    """Multiple overflow positionals targeting a kwarg-filled protected slot.
+
+    ``proxy('/tmp/x', 'SECRET_ONE', 'SECRET_TWO', content='KW_SECRET')``
+    for ``chio_file_write`` must redact every overflow positional under
+    the canonical ``content`` slot, not just the first one.
+    """
+
+    def proxy(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+
+    args, kwargs = bind_and_redact(
+        proxy,
+        ("/tmp/x", "SECRET_ONE", "SECRET_TWO"),
+        {"content": "KW_SECRET"},
+        tool_name="chio_file_write",
+    )
+    assert args[0] == "/tmp/x"
+    assert args[1] == {"omitted": True, "byte_count": len(b"SECRET_ONE")}
+    assert args[2] == {"omitted": True, "byte_count": len(b"SECRET_TWO")}
+    assert kwargs == {
+        "content": {"omitted": True, "byte_count": len(b"KW_SECRET")}
+    }
+
+    # Same shape via fn=None (the other table-fallback entry).
+    args, kwargs = bind_and_redact(
+        None,
+        ("/tmp/x", "SECRET_ONE", "SECRET_TWO"),
+        {"content": "KW_SECRET"},
+        tool_name="chio_file_write",
+    )
+    assert args[0] == "/tmp/x"
+    assert args[1] == {"omitted": True, "byte_count": len(b"SECRET_ONE")}
+    assert args[2] == {"omitted": True, "byte_count": len(b"SECRET_TWO")}
+    assert kwargs == {
+        "content": {"omitted": True, "byte_count": len(b"KW_SECRET")}
+    }
+
+
 def test_pure_forwarder_redacts_both_positional_and_kwarg_for_same_slot() -> None:
     """A pure-forwarding wrapper that receives
     the protected slot both positionally and as a kwarg must redact both

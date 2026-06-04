@@ -1349,11 +1349,23 @@ def _table_fallback_redact(
     # Mirror the fixed-signature merge-conflict semantics: redact both
     # the positional value and the kwarg value independently.
     overflow_pos_idx = 0
-    overflow_slots = (
+    kwarg_filled_overflow_base = (
         [slot for slot in positional_names if slot in filled_by_kwarg]
         if skip_kwarg_filled_slots
         else []
     )
+    overflow_count = max(0, len(args) - len(slot_sequence))
+    if kwarg_filled_overflow_base and overflow_count > 0:
+        # Each overflow positional may duplicate a kwarg-filled protected
+        # slot (merge-conflict semantics). Cycle the filled slots so
+        # ``proxy('/tmp', 'S1', 'S2', content='KW')`` redacts both S1
+        # and S2 under ``content``, not just the first overflow.
+        overflow_slots = [
+            kwarg_filled_overflow_base[i % len(kwarg_filled_overflow_base)]
+            for i in range(overflow_count)
+        ]
+    else:
+        overflow_slots = []
     # Track which canonicals have already been claimed by a non-sentinel
     # named_from_positional entry. Two distinct wrapper slot names can
     # collide on the same canonical (e.g. ``def write_file(label, body,
