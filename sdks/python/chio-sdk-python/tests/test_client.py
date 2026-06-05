@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-import json
-
 import httpx
 import pytest
 import respx
 
-from chio_sdk._generated.receipt import TrustLevel
 from chio_sdk.client import ChioClient, _canonical_json, _sha256_hex
 from chio_sdk.errors import (
-    ChioConnectionError,
     ChioDeniedError,
     ChioError,
 )
@@ -20,14 +16,10 @@ from chio_sdk.models import (
     ChioScope,
     CallerIdentity,
     CapabilityToken,
-    Decision,
     EvaluateResponse,
-    GuardEvidence,
     HttpReceipt,
     Operation,
-    ToolCallAction,
     ToolGrant,
-    Verdict,
 )
 
 
@@ -341,7 +333,7 @@ class TestEvaluateToolCall:
             assert exc_info.value.code == "INVALID_RECEIPT"
 
     @respx.mock
-    async def test_evaluate_accepts_advisory_receipt_integrity(self) -> None:
+    async def test_evaluate_rejects_advisory_receipt_integrity(self) -> None:
         advisory = _make_receipt_dict()
         advisory["trust_level"] = "advisory"
         advisory["receipt_kind"] = "advisory_evaluation"
@@ -369,13 +361,13 @@ class TestEvaluateToolCall:
             )
         )
         async with ChioClient(BASE) as client:
-            receipt = await client.evaluate_tool_call(
-                capability_id="cap-1",
-                tool_server="srv",
-                tool_name="read",
-                parameters={"path": "/tmp"},
-            )
-            assert receipt.trust_level == TrustLevel.advisory
+            with pytest.raises(ChioDeniedError, match="advisory receipt"):
+                await client.evaluate_tool_call(
+                    capability_id="cap-1",
+                    tool_server="srv",
+                    tool_name="read",
+                    parameters={"path": "/tmp"},
+                )
 
     @respx.mock
     async def test_evaluate_rejects_advisory_dropped(self) -> None:

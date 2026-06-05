@@ -9508,7 +9508,7 @@ fn nested_payment_authorization_denial_releases_delegated_sibling_budget() {
     let fixture = make_sibling_sum_monetary_fixture("nested-delegated-payment-deny-budget");
     let mut kernel = fixture.kernel;
     kernel.set_payment_adapter(Box::new(DecliningPaymentAdapter));
-    let session_id = kernel.open_session("nested-parent-agent".to_string(), Vec::new());
+    let session_id = kernel.open_session("nested-parent-agent".to_string(), Vec::new()).unwrap();
     kernel.activate_session(&session_id).unwrap();
     let parent_context = make_operation_context(
         &session_id,

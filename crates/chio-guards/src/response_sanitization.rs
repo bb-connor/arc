@@ -899,7 +899,12 @@ impl Default for OutputSanitizer {
 
 impl Clone for OutputSanitizer {
     fn clone(&self) -> Self {
-        self.clone_with_fresh_vault()
+        Self {
+            config: self.config.clone(),
+            allowlist_patterns: self.allowlist_patterns.clone(),
+            denylist_patterns: self.denylist_patterns.clone(),
+            token_vault: self.token_vault.clone(),
+        }
     }
 }
 
@@ -1701,6 +1706,33 @@ mod tests {
         assert!(is_luhn_valid_card_number("4111 1111 1111 1111"));
         // One digit flipped: no longer valid.
         assert!(!is_luhn_valid_card_number("4111 1111 1111 1112"));
+    }
+
+    #[test]
+    fn output_sanitizer_clone_preserves_token_vault() {
+        let mut config = OutputSanitizerConfig::default();
+        config
+            .redaction_strategies
+            .insert(SensitiveCategory::Pii, RedactionStrategy::Tokenize);
+        let sanitizer = OutputSanitizer::with_config(config).unwrap();
+        let cloned = sanitizer.clone();
+
+        let result = cloned.sanitize_text("Contact john@example.com for access");
+        let token = result
+            .redactions
+            .iter()
+            .find_map(|redaction| {
+                redaction
+                    .replacement
+                    .strip_prefix("[TOKEN:")
+                    .and_then(|value| value.strip_suffix(']'))
+            })
+            .unwrap();
+
+        assert_eq!(
+            sanitizer.token_vault().get(token).as_deref(),
+            Some("john@example.com")
+        );
     }
 
     #[test]

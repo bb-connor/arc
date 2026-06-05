@@ -444,7 +444,10 @@ class ChioClient:
                 raise ChioDeniedError(
                     "Chio sidecar advisory evaluation refused the tool call"
                 )
-            return receipt
+            raise ChioDeniedError(
+                "Chio sidecar returned an advisory receipt, not an "
+                "authoritative authorization decision"
+            )
         if not await self.verify_receipt(receipt):
             raise ChioError(
                 "Chio sidecar returned an unverified receipt",
