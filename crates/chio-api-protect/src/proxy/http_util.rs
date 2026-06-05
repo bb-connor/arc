@@ -107,7 +107,16 @@ pub(crate) fn sidecar_advisory_tool_call_evaluate_response(receipt: ChioReceipt)
         .header("content-type", "application/json")
         .header(CHIO_TRUST_LEVEL_HEADER, TrustLevel::Advisory.as_str())
         .body(Body::from(body))
-        .unwrap_or_else(|_| (StatusCode::OK, axum::Json(receipt)).into_response())
+        .unwrap_or_else(|_| sidecar_advisory_tool_call_evaluate_json_response(receipt))
+}
+
+pub(crate) fn sidecar_advisory_tool_call_evaluate_json_response(receipt: ChioReceipt) -> Response {
+    let mut response = (StatusCode::OK, axum::Json(receipt)).into_response();
+    response.headers_mut().insert(
+        CHIO_TRUST_LEVEL_HEADER,
+        axum::http::HeaderValue::from_static("advisory"),
+    );
+    response
 }
 
 pub(crate) fn sidecar_not_implemented_route_response(
