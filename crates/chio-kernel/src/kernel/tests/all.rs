@@ -5890,7 +5890,7 @@ fn make_sibling_sum_invocation_fixture(prefix: &str) -> SiblingSumInvocationFixt
         .record_capability_snapshot(&parent, None)
         .unwrap();
     drop(seed_store);
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
+    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
     kernel
         .register_budget_parent(parent.id.clone(), 5_000)
         .unwrap();
