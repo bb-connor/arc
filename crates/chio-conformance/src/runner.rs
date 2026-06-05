@@ -150,6 +150,7 @@ fn apply_conformance_auth_env(
             command.env("CHIO_AUTH_TOKEN", &options.auth_token);
         }
         ConformanceAuthMode::LocalOAuth => {
+            command.env_remove("CHIO_AUTH_TOKEN");
             command.env("CHIO_ADMIN_TOKEN", &options.admin_token);
         }
     }
@@ -610,10 +611,24 @@ pub fn unique_run_dir(prefix: &str) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::conformance_fixture_root_from_manifest_dir;
+    use super::{
+        apply_conformance_auth_env, conformance_fixture_root_from_manifest_dir,
+        default_run_options, ConformanceAuthMode,
+    };
+    use std::ffi::OsStr;
     use std::fs;
     use std::path::Path;
+    use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn command_env(command: &Command, key: &str) -> Option<Option<String>> {
+        command.get_envs().find_map(|(name, value)| {
+            if name == OsStr::new(key) {
+                return Some(value.map(|raw| raw.to_string_lossy().into_owned()));
+            }
+            None
+        })
+    }
 
     fn unique_test_dir(label: &str) -> std::path::PathBuf {
         let nanos = SystemTime::now()
@@ -671,5 +686,31 @@ mod tests {
         );
 
         let _ = fs::remove_dir_all(package_root);
+    }
+
+    #[test]
+    fn local_oauth_child_env_removes_inherited_static_bearer_token() {
+        let mut options = default_run_options();
+        options.auth_mode = ConformanceAuthMode::LocalOAuth;
+        options.auth_token = "local-auth-token".to_string();
+        options.admin_token = "local-admin-token".to_string();
+        let mut command = Command::new("chio");
+        command.env("CHIO_AUTH_TOKEN", "parent-static-token");
+
+        apply_conformance_auth_env(&mut command, &options, options.auth_mode);
+
+        assert_eq!(command_env(&command, "CHIO_AUTH_TOKEN"), Some(None));
+        assert_eq!(
+            command_env(&command, "CHIO_ADMIN_TOKEN"),
+            Some(Some("local-admin-token".to_string()))
+        );
+        assert_eq!(
+            command_env(&command, "CHIO_CONFORMANCE_AUTH_TOKEN"),
+            Some(Some("local-auth-token".to_string()))
+        );
+        assert_eq!(
+            command_env(&command, "CHIO_CONFORMANCE_ADMIN_TOKEN"),
+            Some(Some("local-admin-token".to_string()))
+        );
     }
 }
