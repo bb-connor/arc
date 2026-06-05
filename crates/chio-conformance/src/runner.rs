@@ -150,7 +150,10 @@ fn apply_conformance_auth_env(
             command.env("CHIO_AUTH_TOKEN", &options.auth_token);
         }
         ConformanceAuthMode::LocalOAuth => {
-            command.env_remove("CHIO_AUTH_TOKEN");
+            command
+                .env_remove("CHIO_AUTH_TOKEN")
+                .env_remove("CHIO_MCP_AUTH_TOKEN")
+                .env_remove("CHIO_MCP_ADMIN_TOKEN");
             command.env("CHIO_ADMIN_TOKEN", &options.admin_token);
         }
     }
@@ -696,10 +699,14 @@ mod tests {
         options.admin_token = "local-admin-token".to_string();
         let mut command = Command::new("chio");
         command.env("CHIO_AUTH_TOKEN", "parent-static-token");
+        command.env("CHIO_MCP_AUTH_TOKEN", "parent-mcp-static-token");
+        command.env("CHIO_MCP_ADMIN_TOKEN", "parent-mcp-admin-token");
 
         apply_conformance_auth_env(&mut command, &options, options.auth_mode);
 
         assert_eq!(command_env(&command, "CHIO_AUTH_TOKEN"), Some(None));
+        assert_eq!(command_env(&command, "CHIO_MCP_AUTH_TOKEN"), Some(None));
+        assert_eq!(command_env(&command, "CHIO_MCP_ADMIN_TOKEN"), Some(None));
         assert_eq!(
             command_env(&command, "CHIO_ADMIN_TOKEN"),
             Some(Some("local-admin-token".to_string()))
