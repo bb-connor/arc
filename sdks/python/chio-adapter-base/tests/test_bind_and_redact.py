@@ -216,13 +216,12 @@ def test_bind_and_redact_var_positional_extras_unredacted() -> None:
 
 
 def test_var_positional_extras_redacted_via_positional_table() -> None:
-    """``def fn(path, *rest)`` -- rest[0] binds to the next free table slot.
+    """``def fn(path, *rest)`` uses each free table slot once.
 
     For ``chio_file_write`` the table is ``("path", "content")``; the
     fixed positional fills slot 0 (``path``), so ``rest[0]`` matches the
-    next free slot ``content`` and is redacted. Mirrors the prefect
-    local-helper fix (cba84f66c) for the chio-adapter-base helper that
-    chio-ray and other sibling adapters consume.
+    next free slot ``content`` and is redacted. Later ``rest`` values
+    have no table slot and remain raw.
     """
 
     def chio_file_write(path: str, *rest: object) -> None:
@@ -230,12 +229,13 @@ def test_var_positional_extras_redacted_via_positional_table() -> None:
 
     args, kwargs = bind_and_redact(
         chio_file_write,
-        ("/tmp/x", "PROD_SECRET"),
+        ("/tmp/x", "PROD_SECRET", True),
         {},
         tool_name="chio_file_write",
     )
     assert args[0] == "/tmp/x"
     assert args[1] == {"omitted": True, "byte_count": len(b"PROD_SECRET")}
+    assert args[2] is True
     assert kwargs == {}
 
 
@@ -1631,15 +1631,13 @@ def test_typeerror_fallback_protected_var_positional_distinct_byte_counts() -> N
     assert kwargs["path"] == "/tmp/x"
 
 
-def test_typeerror_fallback_unprotected_var_positional_redacts_all_overflow() -> None:
+def test_unprotected_var_positional_redacts_first_free_slot_only() -> None:
     """Regression:
 
     ``def write_file(path, *rest, body)`` invoked with multiple
-    positionals and no ``body`` kwarg. ``bind_partial`` raises TypeError,
-    but receipts are emitted before the wrapped fn runs. Every positional
-    past the fixed ``path`` slot must redact under a protected canonical,
-    not only the first overflow value when ``*rest`` is unrelated to the
-    protected field name.
+    positionals and no ``body`` kwarg. The first value past fixed
+    ``path`` fills the free protected ``content`` table slot. Later
+    ``*rest`` values have no free table slot and stay raw.
     """
 
     def write_file(path: str, *rest: object, body: str) -> None:
@@ -1656,10 +1654,7 @@ def test_typeerror_fallback_unprotected_var_positional_redacts_all_overflow() ->
         "omitted": True,
         "byte_count": len(b"SECRET_ONE"),
     }
-    assert args[2] == {
-        "omitted": True,
-        "byte_count": len(b"SECRET_TWO"),
-    }
+    assert args[2] == "SECRET_TWO"
     assert kwargs == {}
 
 

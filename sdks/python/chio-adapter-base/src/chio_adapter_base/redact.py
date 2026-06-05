@@ -1110,24 +1110,12 @@ def bind_and_redact(
             and slot in protected_fields_for_tool
         ]
         overflow_iter = iter(overflow_protected_slots)
-        protected_overflow_cycle = list(protected_fields_for_tool)
-        protected_overflow_idx = 0
-        may_cycle_unmatched_var_positional = (
-            allow_ambiguous_cycling
-            and bool(protected_overflow_cycle)
-            and fixed_positional_cardinality < len(table_slots)
-        )
         for idx, value in enumerate(bind_args):
             if idx < fixed_positional_cardinality:
                 continue
             slot_name = next(free_slot_iter, None)
             if slot_name is None:
                 slot_name = next(overflow_iter, None)
-            if slot_name is None and may_cycle_unmatched_var_positional:
-                slot_name = protected_overflow_cycle[
-                    protected_overflow_idx % len(protected_overflow_cycle)
-                ]
-                protected_overflow_idx += 1
             if slot_name is None:
                 break
             redacted_extra = _redact_named(
