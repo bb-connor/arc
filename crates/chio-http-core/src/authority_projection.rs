@@ -56,20 +56,13 @@ pub(crate) fn capability_binding(
             server_id,
             tool_name,
         } => {
-            if input.policy != HttpAuthorityPolicy::DenyByDefault
-                || matches!(
-                    (input.requested_tool_server, input.requested_tool_name),
-                    (Some(_), Some(_))
-                )
-            {
-                return CapabilityBinding {
-                    requested_tool_server: Some(server_id),
-                    requested_tool_name: Some(tool_name),
-                    requested_arguments: input.requested_arguments.cloned(),
-                    invalid_reason: None,
-                    policy: HttpAuthorityPolicy::DenyByDefault,
-                };
-            }
+            return CapabilityBinding {
+                requested_tool_server: Some(server_id),
+                requested_tool_name: Some(tool_name),
+                requested_arguments: input.requested_arguments.cloned(),
+                invalid_reason: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            };
         }
         ChioToolsPathIdentity::Malformed => {
             return CapabilityBinding {
