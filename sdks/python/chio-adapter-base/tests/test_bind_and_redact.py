@@ -730,6 +730,34 @@ def test_pure_forwarder_redacts_all_overflow_positionals_for_kwarg_filled_slot()
     }
 
 
+def test_pure_forwarder_overflow_cycles_only_protected_kwarg_slots() -> None:
+    """A kwarg-filled path slot must not take overflow turns.
+
+    ``path`` is not a protected slot for ``chio_file_write``. When both
+    ``path=`` and ``content=`` arrive as kwargs, every overflow
+    positional must still redact under ``content`` rather than
+    alternating between raw ``path`` and protected ``content``.
+    """
+
+    def proxy(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+
+    args, kwargs = bind_and_redact(
+        proxy,
+        ("S1", "S2", "S3"),
+        {"path": "/tmp/x", "content": "KW_SECRET"},
+        tool_name="chio_file_write",
+    )
+    assert args[0] == {"omitted": True, "byte_count": len(b"S1")}
+    assert args[1] == {"omitted": True, "byte_count": len(b"S2")}
+    assert args[2] == {"omitted": True, "byte_count": len(b"S3")}
+    assert kwargs["path"] == "/tmp/x"
+    assert kwargs["content"] == {
+        "omitted": True,
+        "byte_count": len(b"KW_SECRET"),
+    }
+
+
 def test_pure_forwarder_redacts_both_positional_and_kwarg_for_same_slot() -> None:
     """A pure-forwarding wrapper that receives
     the protected slot both positionally and as a kwarg must redact both
@@ -1656,6 +1684,24 @@ def test_unprotected_var_positional_redacts_first_free_slot_only() -> None:
     }
     assert args[2] == "SECRET_TWO"
     assert kwargs == {}
+
+
+def test_typeerror_fallback_unrelated_var_positional_keeps_later_rest_raw() -> None:
+    """Unexpected kwargs must not turn unrelated ``*rest`` into body chunks."""
+
+    def write_file(path: str, *rest: object, body: str) -> None:
+        del path, rest, body
+
+    args, kwargs = bind_and_redact(
+        write_file,
+        ("/tmp/x", "S1", "S2"),
+        {"oops": 1},
+        tool_name="chio_file_write",
+    )
+    assert args[0] == "/tmp/x"
+    assert args[1] == {"omitted": True, "byte_count": len(b"S1")}
+    assert args[2] == "S2"
+    assert kwargs == {"oops": 1}
 
 
 def test_signature_path_kwonly_body_with_unrelated_var_positional() -> None:

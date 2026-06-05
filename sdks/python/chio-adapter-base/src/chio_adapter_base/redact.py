@@ -587,13 +587,14 @@ def bind_and_redact(
                     kwonly_protected_set.add(p.name)
 
             var_positional_protected_slot: str | None = None
+            has_unrelated_var_positional = False
             for p in sig.parameters.values():
-                if (
-                    p.kind is inspect.Parameter.VAR_POSITIONAL
-                    and p.name in protected_fields_for_tool_pre
-                ):
+                if p.kind is not inspect.Parameter.VAR_POSITIONAL:
+                    continue
+                if p.name in protected_fields_for_tool_pre:
                     var_positional_protected_slot = p.name
                     break
+                has_unrelated_var_positional = True
 
             extended_positional_list = list(sig_positional_names)
             table_slots_for_tool_pre = tuple(table.get(tool_name, ()))
@@ -631,6 +632,33 @@ def bind_and_redact(
 
             if (
                 var_positional_protected_slot is None
+                and has_unrelated_var_positional
+                and table_slots_for_tool_pre
+                and len(bind_args) > len(extended_positional_names)
+            ):
+                base_alias = build_alias_map(
+                    extended_positional_names,
+                    table_slots_for_tool_pre,
+                    protected_fields_for_tool_pre,
+                    allow_ambiguous_cycling=allow_ambiguous_cycling,
+                )
+                represented_slots = {
+                    base_alias.get(slot, slot)
+                    for slot in extended_positional_names
+                }
+                for table_slot in table_slots_for_tool_pre:
+                    if len(extended_positional_names) >= len(bind_args):
+                        break
+                    if table_slot in represented_slots:
+                        continue
+                    extended_positional_names = extended_positional_names + (
+                        table_slot,
+                    )
+                    represented_slots.add(table_slot)
+
+            if (
+                var_positional_protected_slot is None
+                and not has_unrelated_var_positional
                 and allow_ambiguous_cycling
                 and protected_fields_for_tool_pre
                 and extended_positional_names
@@ -1332,6 +1360,7 @@ def _table_fallback_redact(
     def _slot_canonical(slot_name: str) -> str:
         return _to_canonical(slot_name)
 
+    protected_fields_for_tool = policy.body_fields.get(tool_name) or ()
     named_from_positional: dict[str, Any] = {}
     positional_to_slot: list[str | None] = []
     # Track wrapper-slot-name -> canonical so the redact pass keys by
@@ -1347,7 +1376,12 @@ def _table_fallback_redact(
     # the positional value and the kwarg value independently.
     overflow_pos_idx = 0
     kwarg_filled_overflow_base = (
-        [slot for slot in positional_names if slot in filled_by_kwarg]
+        [
+            slot
+            for slot in positional_names
+            if slot in filled_by_kwarg
+            and _slot_canonical(slot) in protected_fields_for_tool
+        ]
         if skip_kwarg_filled_slots
         else []
     )
