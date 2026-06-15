@@ -9,38 +9,56 @@ trap 'rm -f "${registry}" "${observed}"' EXIT
 
 cut -d'|' -f1 crates/observability/chio-metrics-spec/metrics.snapshot | sort -u > "${registry}"
 
-if ! command -v rg >/dev/null 2>&1; then
-  echo "check-sre-metrics-registry.sh: rg is required" >&2
-  exit 127
-fi
-
 # Scope includes the edge crates that consume the registry plus
-# `chio-wasm-guards`. The grep is anchored at `crates/<name>/src` to avoid
+# `chio-wasm-guards`. The scan is anchored at `crates/<name>/src` to avoid
 # pulling matches out of `target/` artifacts.
-set +e
-rg -P --no-filename -o '(?<![A-Za-z0-9_])chio_[a-z0-9_]*(seconds|total|depth|bytes|ready|size)(?![A-Za-z0-9_])' \
-  crates/observability/chio-metrics-spec \
-  crates/kernel/chio-kernel/src \
-  crates/protocol/chio-mcp-edge/src \
-  crates/protocol/chio-acp-edge/src \
-  crates/protocol/chio-a2a-edge/src \
-  crates/platform/chio-http-core/src \
-  crates/economy/chio-anchor/src \
-  crates/trust/chio-federation/src \
-  crates/trust/chio-pheromone-relay/src \
-  crates/guards/chio-wasm-guards/src \
-  crates/observability/chio-siem \
-  deploy/prometheus \
-  .github/workflows \
-  scripts \
-  docs/operator-runbook \
-  | sort -u > "${observed}"
-scan_status=("${PIPESTATUS[@]}")
-set -e
-if [[ "${scan_status[0]}" -gt 1 || "${scan_status[1]}" -ne 0 ]]; then
-  echo "check-sre-metrics-registry.sh: metric scan failed" >&2
-  exit 1
-fi
+python3 - "${observed}" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+out_path = Path(sys.argv[1])
+roots = [
+    "crates/observability/chio-metrics-spec",
+    "crates/kernel/chio-kernel/src",
+    "crates/protocol/chio-mcp-edge/src",
+    "crates/protocol/chio-acp-edge/src",
+    "crates/protocol/chio-a2a-edge/src",
+    "crates/platform/chio-http-core/src",
+    "crates/economy/chio-anchor/src",
+    "crates/trust/chio-federation/src",
+    "crates/trust/chio-pheromone-relay/src",
+    "crates/guards/chio-wasm-guards/src",
+    "crates/observability/chio-siem",
+    "deploy/prometheus",
+    ".github/workflows",
+    "scripts",
+    "docs/operator-runbook",
+]
+metric_re = re.compile(
+    r"(?<![A-Za-z0-9_])"
+    r"chio_[a-z0-9_]*(?:seconds|total|depth|bytes|ready|size)"
+    r"(?![A-Za-z0-9_])"
+)
+metrics: set[str] = set()
+
+for root in roots:
+    path = Path(root)
+    if not path.exists():
+        raise SystemExit(f"check-sre-metrics-registry.sh: scan path missing: {root}")
+    files = [path] if path.is_file() else (item for item in path.rglob("*") if item.is_file())
+    for file_path in files:
+        try:
+            text = file_path.read_text(encoding="utf-8", errors="ignore")
+        except OSError as error:
+            raise SystemExit(
+                f"check-sre-metrics-registry.sh: failed to read {file_path}: {error}"
+            ) from error
+        metrics.update(metric_re.findall(text))
+
+body = "\n".join(sorted(metrics))
+out_path.write_text(f"{body}\n" if body else "", encoding="utf-8")
+PY
 
 failed=0
 while IFS= read -r metric; do
