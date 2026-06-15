@@ -11,6 +11,15 @@ export type VerifyReceiptResultJson = ReturnType<typeof verify_receipt>;
 
 // Convenience helper: parses an envelope from a hex string.
 export function verifyReceiptHex(envelopeHex: string, trustedIssuers?: string | string[]): unknown {
-  const bytes = Uint8Array.from(envelopeHex.match(/.{1,2}/g)!.map(b => parseInt(b, 16)));
+  const normalized = envelopeHex.startsWith('0x') ? envelopeHex.slice(2) : envelopeHex;
+  if (normalized.length % 2 !== 0) {
+    throw new Error('receipt hex must have an even number of characters');
+  }
+  if (!/^[0-9a-fA-F]*$/.test(normalized)) {
+    throw new Error('receipt hex must contain only hexadecimal characters');
+  }
+
+  const pairs = normalized.match(/.{2}/g) ?? [];
+  const bytes = Uint8Array.from(pairs.map(byte => Number.parseInt(byte, 16)));
   return verify_receipt(bytes, trustedIssuers);
 }

@@ -9,9 +9,15 @@ trap 'rm -f "${registry}" "${observed}"' EXIT
 
 cut -d'|' -f1 crates/observability/chio-metrics-spec/metrics.snapshot | sort -u > "${registry}"
 
+if ! command -v rg >/dev/null 2>&1; then
+  echo "check-sre-metrics-registry.sh: rg is required" >&2
+  exit 127
+fi
+
 # Scope includes the edge crates that consume the registry plus
 # `chio-wasm-guards`. The grep is anchored at `crates/<name>/src` to avoid
 # pulling matches out of `target/` artifacts.
+set +e
 rg -P --no-filename -o '(?<![A-Za-z0-9_])chio_[a-z0-9_]*(seconds|total|depth|bytes|ready|size)(?![A-Za-z0-9_])' \
   crates/observability/chio-metrics-spec \
   crates/kernel/chio-kernel/src \
@@ -28,7 +34,13 @@ rg -P --no-filename -o '(?<![A-Za-z0-9_])chio_[a-z0-9_]*(seconds|total|depth|byt
   .github/workflows \
   scripts \
   docs/operator-runbook \
-  | sort -u > "${observed}" || true
+  | sort -u > "${observed}"
+scan_status=("${PIPESTATUS[@]}")
+set -e
+if [[ "${scan_status[0]}" -gt 1 || "${scan_status[1]}" -ne 0 ]]; then
+  echo "check-sre-metrics-registry.sh: metric scan failed" >&2
+  exit 1
+fi
 
 failed=0
 while IFS= read -r metric; do

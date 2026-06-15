@@ -13,6 +13,7 @@ import json
 import time
 import uuid
 from typing import Any, Callable, Awaitable
+from urllib.parse import unquote_plus
 
 from chio_sdk.client import ChioClient
 from chio_sdk.errors import ChioConnectionError, ChioError, ChioTimeoutError
@@ -234,8 +235,9 @@ def _extract_capability_token(scope: Scope) -> str | None:
     # Try query string
     qs = scope.get("query_string", b"").decode("latin-1")
     for param in qs.split("&"):
-        if param.startswith("chio_capability="):
-            return param.split("=", 1)[1]
+        key, _, value = param.partition("=")
+        if unquote_plus(key) == "chio_capability":
+            return unquote_plus(value)
     return None
 
 
@@ -261,11 +263,8 @@ def _query_params(scope: Scope) -> dict[str, str]:
     for param in qs.split("&"):
         if not param:
             continue
-        if "=" in param:
-            key, value = param.split("=", 1)
-        else:
-            key, value = param, ""
-        params[key] = value
+        key, _, value = param.partition("=")
+        params[unquote_plus(key)] = unquote_plus(value)
     return params
 
 
