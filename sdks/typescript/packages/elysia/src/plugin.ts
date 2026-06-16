@@ -75,7 +75,8 @@ export function chio(config: ChioElysiaConfig = {}) {
         chioResult: undefined as EvaluateResponse | undefined,
       };
     })
-    .onBeforeHandle({ as: "global" }, async ({ request, set }) => {
+    .onBeforeHandle({ as: "global" }, async (context) => {
+      const { request, set } = context;
       const url = new URL(request.url);
       const path = url.pathname;
 
@@ -125,8 +126,12 @@ export function chio(config: ChioElysiaConfig = {}) {
           if (bodyLength > 0) {
             bodyHash = createHash("sha256").update(bodyBytes).digest("hex");
           }
-        } catch {
-          // Body may not be readable; continue without hash
+        } catch (error) {
+          set.status = 400;
+          return {
+            error: CHIO_ERROR_CODES.EVALUATION_FAILED,
+            message: `request body could not be read for Chio evaluation: ${error instanceof Error ? error.message : String(error)}`,
+          };
         }
       }
 
@@ -154,7 +159,7 @@ export function chio(config: ChioElysiaConfig = {}) {
       });
 
       try {
-      const result = await resolved.client.evaluate(chioReq, rawHeaders["x-chio-capability"] ?? undefined);
+        const result = await resolved.client.evaluate(chioReq, rawHeaders["x-chio-capability"] ?? undefined);
 
         if (!isAllowed(result.verdict) || !isAuthorizedHttpReceipt(result.receipt)) {
           set.status = verdictStatus(result.verdict);
@@ -178,6 +183,7 @@ export function chio(config: ChioElysiaConfig = {}) {
 
         // Set receipt header after authorization and receipt verification.
         set.headers["X-Chio-Receipt-Id"] = result.receipt.id;
+        (context as { chioResult?: EvaluateResponse }).chioResult = result;
 
         // Allow the request to proceed
         return undefined;

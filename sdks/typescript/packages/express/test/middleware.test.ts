@@ -125,6 +125,49 @@ async function startMockSidecar(): Promise<{ server: http.Server; url: string }>
   };
 }
 
+async function startRecordingSidecar(): Promise<{
+  server: http.Server;
+  url: string;
+  evaluateBodies: Array<Record<string, unknown>>;
+}> {
+  const evaluateBodies: Array<Record<string, unknown>> = [];
+  const server = http.createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => {
+      if (req.method === "POST" && req.url === "/chio/evaluate") {
+        evaluateBodies.push(
+          JSON.parse(Buffer.concat(chunks).toString("utf-8")) as Record<string, unknown>,
+        );
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(allowResponse()));
+        return;
+      }
+
+      if (req.method === "POST" && req.url === "/chio/verify") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(verifyResponse()));
+        return;
+      }
+
+      res.writeHead(404);
+      res.end();
+    });
+  });
+
+  await new Promise<void>((resolve) => server.listen(0, resolve));
+  const addr = server.address();
+  if (addr == null || typeof addr === "string") {
+    throw new Error("sidecar not listening");
+  }
+
+  return {
+    server,
+    url: `http://127.0.0.1:${addr.port}`,
+    evaluateBodies,
+  };
+}
+
 describe("chio() middleware", () => {
   it("exports chio as a function", () => {
     expect(typeof chio).toBe("function");
@@ -246,6 +289,62 @@ describe("chio() middleware", () => {
         parsed: { hello: "world", count: 2 },
         hasRawBody: true,
       });
+    } finally {
+      server.close();
+      sidecar.server.close();
+    }
+  });
+
+  it("preserves request bodies for downstream async iteration", async () => {
+    const sidecar = await startMockSidecar();
+    const app = express();
+    app.use(chio({ sidecarUrl: sidecar.url }));
+    app.post("/echo", async (req, res) => {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req as unknown as AsyncIterable<Buffer>) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      res.type("text/plain").send(Buffer.concat(chunks).toString("utf-8"));
+    });
+
+    const server = http.createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+
+    try {
+      const payload = "hello async iterator";
+      const resp = await request(
+        server,
+        "POST",
+        "/echo",
+        {
+          "content-type": "text/plain",
+          "content-length": Buffer.byteLength(payload).toString(),
+        },
+        payload,
+      );
+      expect(resp.status).toBe(200);
+      expect(resp.body).toBe(payload);
+    } finally {
+      server.close();
+      sidecar.server.close();
+    }
+  });
+
+  it("projects route-level Express patterns without mutating shared config", async () => {
+    const sidecar = await startRecordingSidecar();
+    const app = express();
+    app.post("/users/:id", chio({ sidecarUrl: sidecar.url }), (_req, res) => {
+      res.json({ ok: true });
+    });
+
+    const server = http.createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+
+    try {
+      const resp = await request(server, "POST", "/users/123");
+      expect(resp.status).toBe(200);
+      expect(sidecar.evaluateBodies).toHaveLength(1);
+      expect(sidecar.evaluateBodies[0]?.["route_pattern"]).toBe("/users/:id");
     } finally {
       server.close();
       sidecar.server.close();

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from typing import Any, Awaitable, Callable
 from unittest.mock import AsyncMock, patch
 
@@ -53,6 +54,26 @@ def _make_receive(body: bytes = b"") -> Receive:
         if not sent:
             sent = True
             return {"type": "http.request", "body": body, "more_body": False}
+        return {"type": "http.disconnect"}
+
+    return receive
+
+
+def _make_chunked_receive(chunks: list[bytes]) -> Receive:
+    messages = [
+        {
+            "type": "http.request",
+            "body": chunk,
+            "more_body": index < len(chunks) - 1,
+        }
+        for index, chunk in enumerate(chunks)
+    ]
+    if not messages:
+        messages.append({"type": "http.request", "body": b"", "more_body": False})
+
+    async def receive() -> dict[str, Any]:
+        if messages:
+            return messages.pop(0)
         return {"type": "http.disconnect"}
 
     return receive
@@ -140,6 +161,24 @@ async def _echo_app(scope: Scope, receive: Receive, send: Send) -> None:
     })
 
 
+async def _body_echo_app(scope: Scope, receive: Receive, send: Send) -> None:
+    chunks: list[bytes] = []
+    while True:
+        message = await receive()
+        if message.get("type") != "http.request":
+            break
+        chunks.append(message.get("body", b""))
+        if not message.get("more_body", False):
+            break
+    body = b"".join(chunks)
+    await send({
+        "type": "http.response.start",
+        "status": 200,
+        "headers": [(b"content-length", str(len(body)).encode("latin-1"))],
+    })
+    await send({"type": "http.response.body", "body": body})
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -209,6 +248,71 @@ class TestAllowedRequest:
             header_dict = dict(start_msg.get("headers", []))
             assert b"x-chio-receipt" in header_dict
             assert header_dict[b"x-chio-receipt"] == b"r-allow"
+
+    async def test_hashes_and_replays_full_chunked_body(self) -> None:
+        evaluation = _make_evaluation(allowed=True, receipt_id="r-chunked")
+        chunks = [b'{"a":', b'"b"}']
+        expected_body = b"".join(chunks)
+
+        with patch(
+            "chio_asgi.middleware.ChioClient", autospec=True
+        ) as MockClient:
+            instance = MockClient.return_value
+            instance.evaluate_http_request = AsyncMock(return_value=evaluation)
+            instance.verify_http_receipt = AsyncMock(return_value=_make_verification())
+
+            config = ChioASGIConfig(sidecar_url="http://mock:9090")
+            mw = ChioASGIMiddleware(_body_echo_app, config=config)
+
+            scope = _make_scope(method="POST")
+            send, messages = _make_send()
+            await mw(scope, _make_chunked_receive(chunks), send)
+
+            instance.evaluate_http_request.assert_awaited_once()
+            kwargs = instance.evaluate_http_request.await_args.kwargs
+            assert kwargs["body_hash"] == hashlib.sha256(expected_body).hexdigest()
+            assert kwargs["body_length"] == len(expected_body)
+
+            body_msg = next(
+                m for m in messages if m.get("type") == "http.response.body"
+            )
+            assert body_msg["body"] == expected_body
+
+    async def test_rejects_duplicate_policy_headers_before_evaluation(self) -> None:
+        with patch(
+            "chio_asgi.middleware.ChioClient", autospec=True
+        ) as MockClient:
+            scope = _make_scope()
+            scope["headers"] = [
+                (b"content-type", b"application/json"),
+                (b"Content-Type", b"text/plain"),
+            ]
+            mw = ChioASGIMiddleware(_echo_app)
+            send, messages = _make_send()
+
+            await mw(scope, _make_receive(), send)
+
+            MockClient.return_value.evaluate_http_request.assert_not_called()
+            start_msg = next(
+                m for m in messages if m.get("type") == "http.response.start"
+            )
+            assert start_msg["status"] == 400
+
+    async def test_rejects_duplicate_query_parameters_before_evaluation(self) -> None:
+        with patch(
+            "chio_asgi.middleware.ChioClient", autospec=True
+        ) as MockClient:
+            scope = _make_scope(query_string="tenant=a&tenant=b")
+            mw = ChioASGIMiddleware(_echo_app)
+            send, messages = _make_send()
+
+            await mw(scope, _make_receive(), send)
+
+            MockClient.return_value.evaluate_http_request.assert_not_called()
+            start_msg = next(
+                m for m in messages if m.get("type") == "http.response.start"
+            )
+            assert start_msg["status"] == 400
 
 
 class TestDeniedRequest:
@@ -349,6 +453,10 @@ class TestCapabilityIdExtraction:
     def test_from_query_string(self) -> None:
         scope = _make_scope(query_string="chio_capability=cap-456&other=val")
         assert _extract_capability_token(scope) == "cap-456"
+
+    def test_query_string_value_is_url_decoded(self) -> None:
+        scope = _make_scope(query_string="chio_capability=cap%2B456%3D")
+        assert _extract_capability_token(scope) == "cap+456="
 
     def test_none_when_missing(self) -> None:
         scope = _make_scope()
