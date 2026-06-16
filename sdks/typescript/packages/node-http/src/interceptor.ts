@@ -59,16 +59,9 @@ function parseQueryString(url: string): Record<string, string> {
   const qIndex = url.indexOf("?");
   if (qIndex === -1) return query;
   const qs = url.slice(qIndex + 1);
-  for (const pair of qs.split("&")) {
-    const eqIndex = pair.indexOf("=");
-    if (eqIndex === -1) {
-      query[decodeURIComponent(pair)] = "";
-    } else {
-      const key = decodeURIComponent(pair.slice(0, eqIndex));
-      const value = decodeURIComponent(pair.slice(eqIndex + 1));
-      query[key] = value;
-    }
-  }
+  new URLSearchParams(qs).forEach((value, key) => {
+    query[key] = value;
+  });
   return query;
 }
 
@@ -504,6 +497,10 @@ async function getNodeRequestBody(req: IncomingMessage): Promise<Buffer> {
 }
 
 function readBody(req: IncomingMessage): Promise<Buffer> {
+  if (req.readableEnded || req.complete) {
+    return Promise.resolve(Buffer.alloc(0));
+  }
+
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     req.on("data", (chunk: Buffer) => chunks.push(chunk));

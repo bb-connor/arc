@@ -69,12 +69,13 @@ export function chio(config: ChioExpressConfig = {}): RequestHandler {
     // Use Express route pattern if available
     const routePattern = extractRoutePattern(req);
     if (routePattern != null) {
-      const saved = resolved.routePatternResolver;
-      resolved.routePatternResolver = () => routePattern;
-
       try {
         const rawBody = await ensureExpressBufferedBody(req as ChioRequest);
-        const outcome = await interceptNodeRequest(req, res, resolved);
+        const requestResolved: ResolvedConfig = {
+          ...resolved,
+          routePatternResolver: () => routePattern,
+        };
+        const outcome = await interceptNodeRequest(req, res, requestResolved);
         if (!outcome.responseSent) {
           hydrateExpressBody(req as ChioRequest, rawBody);
           if (outcome.result != null) {
@@ -87,8 +88,6 @@ export function chio(config: ChioExpressConfig = {}): RequestHandler {
         }
       } catch (error) {
         next(error);
-      } finally {
-        resolved.routePatternResolver = saved;
       }
       return;
     }
@@ -219,6 +218,8 @@ function replayExpressRequestBody(req: ChioRequest, rawBody: Buffer): void {
       replayable[method] = impl.bind(replay) as unknown;
     }
   }
+
+  replayable[Symbol.asyncIterator] = replay[Symbol.asyncIterator].bind(replay) as unknown;
 
   Object.defineProperty(replayable, "_readableState", {
     configurable: true,

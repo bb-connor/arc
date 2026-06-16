@@ -135,15 +135,9 @@ const chioPlugin: FastifyPluginAsync<ChioFastifyConfig> = async (
     const qIndex = request.url.indexOf("?");
     if (qIndex !== -1) {
       const qs = request.url.slice(qIndex + 1);
-      for (const pair of qs.split("&")) {
-        const eqIndex = pair.indexOf("=");
-        if (eqIndex === -1) {
-          query[decodeURIComponent(pair)] = "";
-        } else {
-          query[decodeURIComponent(pair.slice(0, eqIndex))] =
-            decodeURIComponent(pair.slice(eqIndex + 1));
-        }
-      }
+      new URLSearchParams(qs).forEach((value, key) => {
+        query[key] = value;
+      });
     }
 
     // Compute body hash from the raw request bytes captured in preParsing.
