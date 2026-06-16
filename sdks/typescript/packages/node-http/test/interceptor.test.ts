@@ -208,6 +208,35 @@ describe("buildChioHttpRequest", () => {
     expect(req.body_length).toBe(42);
     expect(req.capability_id).toBe("cap-123");
   });
+
+  it("uses configured forward headers when provided", () => {
+    const opts: BuildRequestOptions = {
+      method: "GET",
+      path: "/tenant",
+      query: {},
+      headers: {
+        "content-type": "application/json",
+        "x-tenant-id": "tenant-a",
+        authorization: "Bearer secret",
+      },
+      caller: {
+        subject: "anonymous",
+        auth_method: { method: "anonymous" },
+        verified: false,
+      },
+      bodyHash: undefined,
+      bodyLength: 0,
+      routePattern: "/tenant",
+      capabilityId: undefined,
+      forwardHeaders: ["content-type", "x-tenant-id"],
+    };
+
+    const req = buildChioHttpRequest(opts);
+
+    expect(req.headers["content-type"]).toBe("application/json");
+    expect(req.headers["x-tenant-id"]).toBe("tenant-a");
+    expect(req.headers["authorization"]).toBeUndefined();
+  });
 });
 
 describe("resolveConfig", () => {
@@ -297,6 +326,32 @@ describe("request body preservation", () => {
         createHash("sha256").update(Buffer.from("hello web", "utf-8")).digest("hex"),
       );
     } finally {
+      sidecar.server.close();
+    }
+  });
+
+  it("decodes plus signs in Node query strings as form spaces", async () => {
+    let lastQuery: Record<string, string> | undefined;
+    const sidecar = await startMockSidecar((body) => {
+      lastQuery = JSON.parse(body).query as Record<string, string>;
+    });
+    const resolved = resolveConfig({ sidecarUrl: sidecar.url });
+
+    const server = http.createServer(async (req, res) => {
+      const outcome = await interceptNodeRequest(req, res, resolved);
+      if (!outcome.responseSent) {
+        res.writeHead(200);
+        res.end("ok");
+      }
+    });
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+
+    try {
+      const response = await request(server, "GET", "/search?tag=a+b&encoded=a%2Bb");
+      expect(response.status).toBe(200);
+      expect(lastQuery).toEqual({ tag: "a b", encoded: "a+b" });
+    } finally {
+      server.close();
       sidecar.server.close();
     }
   });

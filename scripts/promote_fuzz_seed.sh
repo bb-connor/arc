@@ -317,7 +317,7 @@ use ${CRATE_UNDERSCORED}::fuzz::${FUZZ_FN};
 fn regression_${TARGET_IDENT}_${SHA16}() {
     let seed: &[u8] = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../fuzz/corpus/$TARGET/$SHA.bin",
+        "/../../../fuzz/corpus/$TARGET/$SHA.bin",
     ));
     // The fuzz entry point swallows recoverable errors and only panics on
     // invariant breaks; calling it directly is the stable surface.
@@ -342,7 +342,7 @@ use proptest::prelude::*;
 fn regression_${TARGET_IDENT}_${SHA16}() {
     let seed: &[u8] = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../fuzz/corpus/$TARGET/$SHA.bin",
+        "/../../../fuzz/corpus/$TARGET/$SHA.bin",
     ));
     ${FUZZ_FN}(seed);
 }
@@ -374,7 +374,7 @@ use ${CRATE_UNDERSCORED}::fuzz::${FUZZ_FN};
 fn regression_${TARGET_IDENT}_${SHA16}() {
     let seed: &[u8] = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../fuzz/corpus/$TARGET/$SHA.bin",
+        "/../../../fuzz/corpus/$TARGET/$SHA.bin",
     ));
     ${FUZZ_FN}(seed);
 }

@@ -33,6 +33,7 @@ done
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
 
+set +e
 rg -n --hidden \
   --glob '!target/**' \
   --glob '!audits/**' \
@@ -47,9 +48,16 @@ rg -n --hidden \
   --glob '!**/runtime-trace/**' \
   --glob '!docs/superpowers/**' \
   "$pattern" \
-  crates spec sdks scripts docs formal xtask >"$tmp" || true
+  crates spec sdks scripts docs formal xtask >"$tmp"
+rg_status=$?
+set -e
+if ((rg_status > 1)); then
+  echo "ripgrep failed while scanning Chio-owned version remnants" >&2
+  exit "$rg_status"
+fi
 
 if ((${#existing_normative_roots[@]})); then
+  set +e
   rg -n --hidden \
     --glob '*.md' \
     --glob '!target/**' \
@@ -60,7 +68,13 @@ if ((${#existing_normative_roots[@]})); then
     --glob '!**/node_modules/**' \
     --glob '!**/.git/**' \
     "$normative_claim_pattern" \
-    "${existing_normative_roots[@]}" >>"$tmp" || true
+    "${existing_normative_roots[@]}" >>"$tmp"
+  rg_status=$?
+  set -e
+  if ((rg_status > 1)); then
+    echo "ripgrep failed while scanning normative version claims" >&2
+    exit "$rg_status"
+  fi
 fi
 
 failures=()

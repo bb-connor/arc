@@ -31,6 +31,7 @@ import {
 } from "./types.js";
 
 const bufferedNodeBodies = new WeakMap<IncomingMessage, Buffer>();
+const defaultForwardHeaders = ["content-type", "content-length"];
 
 // -- Helpers --
 
@@ -59,16 +60,9 @@ function parseQueryString(url: string): Record<string, string> {
   const qIndex = url.indexOf("?");
   if (qIndex === -1) return query;
   const qs = url.slice(qIndex + 1);
-  for (const pair of qs.split("&")) {
-    const eqIndex = pair.indexOf("=");
-    if (eqIndex === -1) {
-      query[decodeURIComponent(pair)] = "";
-    } else {
-      const key = decodeURIComponent(pair.slice(0, eqIndex));
-      const value = decodeURIComponent(pair.slice(eqIndex + 1));
-      query[key] = value;
-    }
-  }
+  new URLSearchParams(qs).forEach((value, key) => {
+    query[key] = value;
+  });
   return query;
 }
 
@@ -109,7 +103,7 @@ export function resolveConfig(config: ChioConfig): ResolvedConfig {
     routePatternResolver: config.routePatternResolver ?? defaultRoutePatternResolver,
     onSidecarError: "deny",
     timeoutMs: config.timeoutMs ?? 5000,
-    forwardHeaders: config.forwardHeaders ?? ["content-type", "content-length"],
+    forwardHeaders: config.forwardHeaders ?? defaultForwardHeaders,
     client,
   };
 }
@@ -137,6 +131,7 @@ export interface BuildRequestOptions {
   /** Optional structured arguments forwarded with synthetic tool calls. */
   toolArguments?: unknown;
   modelMetadata?: ChioHttpRequest["model_metadata"] | undefined;
+  forwardHeaders?: string[] | undefined;
 }
 
 export function getBufferedNodeRequestBody(req: IncomingMessage): Buffer | undefined {
@@ -175,7 +170,7 @@ export function buildChioHttpRequest(opts: BuildRequestOptions): ChioHttpRequest
     route_pattern: opts.routePattern,
     path: opts.path,
     query: opts.query,
-    headers: filterHeaders(opts.headers, ["content-type", "content-length"]),
+    headers: filterHeaders(opts.headers, opts.forwardHeaders ?? defaultForwardHeaders),
     caller: opts.caller,
     body_hash: opts.bodyHash,
     body_length: opts.bodyLength,
@@ -252,16 +247,17 @@ export async function interceptNodeRequest(
     bodyLength,
     routePattern,
     capabilityId,
+    forwardHeaders: resolved.forwardHeaders,
   });
 
   try {
     const result = await resolved.client.evaluate(chioReq, rawHeaders["x-chio-capability"] ?? undefined);
 
-    if (!isAllowed(result.verdict) || !isAuthorizedHttpReceipt(result.receipt)) {
+    if (!isAllowed(result.verdict) || result.receipt == null || !isAuthorizedHttpReceipt(result.receipt)) {
       sendJsonResponse(res, verdictStatus(result.verdict), {
         error: CHIO_ERROR_CODES.ACCESS_DENIED,
         message: verdictReason(result.verdict),
-        receipt_id: result.receipt.id,
+        receipt_id: result.receipt?.id,
         suggestion: "provide a valid capability token in the X-Chio-Capability header or chio_capability query parameter",
       });
       return { responseSent: true, result, passthrough: null };
@@ -351,16 +347,17 @@ export async function interceptWebRequest(
     bodyLength,
     routePattern,
     capabilityId,
+    forwardHeaders: resolved.forwardHeaders,
   });
 
   try {
     const evalResult = await resolved.client.evaluate(chioReq, rawHeaders["x-chio-capability"] ?? undefined);
 
-    if (!isAllowed(evalResult.verdict) || !isAuthorizedHttpReceipt(evalResult.receipt)) {
+    if (!isAllowed(evalResult.verdict) || evalResult.receipt == null || !isAuthorizedHttpReceipt(evalResult.receipt)) {
       const resp = jsonResponse(verdictStatus(evalResult.verdict), {
         error: CHIO_ERROR_CODES.ACCESS_DENIED,
         message: verdictReason(evalResult.verdict),
-        receipt_id: evalResult.receipt.id,
+        receipt_id: evalResult.receipt?.id,
         suggestion: "provide a valid capability token in the X-Chio-Capability header or chio_capability query parameter",
       });
       return { response: resp, result: evalResult, passthrough: null };
