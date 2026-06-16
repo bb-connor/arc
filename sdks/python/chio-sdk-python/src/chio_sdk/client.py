@@ -774,7 +774,18 @@ class ChioClient:
     @staticmethod
     def _handle_response(resp: httpx.Response) -> dict[str, Any]:
         if resp.status_code == 403:
-            data = resp.json()
+            try:
+                data = resp.json()
+            except Exception as exc:
+                raise ChioError(
+                    "Chio sidecar returned malformed 403 response",
+                    code="INVALID_RESPONSE",
+                ) from exc
+            if not isinstance(data, dict):
+                raise ChioError(
+                    f"Chio sidecar returned invalid 403 response: {data!r}",
+                    code="INVALID_RESPONSE",
+                )
             raise ChioDeniedError(
                 data.get("message", "denied"),
                 guard=data.get("guard"),
@@ -790,4 +801,16 @@ class ChioClient:
                 f"Chio sidecar returned {resp.status_code}: {detail}",
                 code=f"HTTP_{resp.status_code}",
             )
-        return resp.json()  # type: ignore[no-any-return]
+        try:
+            data = resp.json()
+        except Exception as exc:
+            raise ChioError(
+                "Chio sidecar returned malformed JSON response",
+                code="INVALID_RESPONSE",
+            ) from exc
+        if not isinstance(data, dict):
+            raise ChioError(
+                f"Chio sidecar returned invalid JSON response: {data!r}",
+                code="INVALID_RESPONSE",
+            )
+        return data

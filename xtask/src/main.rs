@@ -25,8 +25,8 @@
 //! `$schema` URI but fail to resolve are treated as a hard failure rather
 //! than a SKIP, so a typo in the URI cannot silently bypass validation.
 //! Prints a per-scenario `PASS|FAIL|SKIP` line and exits non-zero on any
-//! FAIL. If the scenarios directory is missing or contains no JSON files,
-//! it prints `no scenarios found` and exits 0.
+//! FAIL. If the scenarios directory or schema root is missing, or no JSON
+//! scenarios are present, validation fails closed.
 //!
 //! `freeze-vectors` walks `tests/bindings/vectors/**/*.json`, computes a
 //! sha256 digest per file, and writes
@@ -139,8 +139,10 @@ pub(crate) fn validate_scenarios(args: Vec<String>) -> Result<(), XtaskError> {
 
     let scenarios = collect_scenario_files(&scenarios_dir)?;
     if scenarios.is_empty() {
-        println!("no scenarios found under {}", display_path(&scenarios_dir));
-        return Ok(());
+        return Err(XtaskError::Validation(format!(
+            "no scenarios found under {}",
+            display_path(&scenarios_dir)
+        )));
     }
 
     // Build a `$id` URI -> schema-path index by scanning every
@@ -223,7 +225,10 @@ type SchemaIndex = BTreeMap<String, PathBuf>;
 fn build_schema_index(schemas_root: &Path) -> Result<SchemaIndex, XtaskError> {
     let mut index: SchemaIndex = SchemaIndex::new();
     if !schemas_root.exists() {
-        return Ok(index);
+        return Err(XtaskError::Validation(format!(
+            "schema root is missing: {}",
+            display_path(schemas_root)
+        )));
     }
     let mut schema_files: Vec<PathBuf> = Vec::new();
     walk_schema_json(schemas_root, &mut schema_files)?;
@@ -290,7 +295,10 @@ fn schema_path_is_file_under_root(path: &Path, schemas_root: &Path) -> bool {
 fn collect_scenario_files(scenarios_dir: &Path) -> Result<Vec<PathBuf>, XtaskError> {
     let mut out: Vec<PathBuf> = Vec::new();
     if !scenarios_dir.exists() {
-        return Ok(out);
+        return Err(XtaskError::Validation(format!(
+            "scenarios directory is missing: {}",
+            display_path(scenarios_dir)
+        )));
     }
     walk_json(scenarios_dir, &mut out)?;
     out.sort();

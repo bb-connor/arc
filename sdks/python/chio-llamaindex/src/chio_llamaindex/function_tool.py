@@ -130,6 +130,7 @@ class ChioFunctionTool(FunctionTool):
         self._chio_client = chio_client
         self._scope = scope
         self._raise_on_deny = bool(raise_on_deny)
+        self._tool_callable: Callable[..., Any] | None = fn or async_fn
         self._redaction_policy = (
             redaction_policy
             if redaction_policy is not None
@@ -212,14 +213,15 @@ class ChioFunctionTool(FunctionTool):
         parent :meth:`FunctionTool.acall` so default schema handling,
         callbacks, and :class:`ToolOutput` construction match upstream.
         """
-        parameters = _materialise_parameters(args, kwargs)
         # Redact body fields (e.g. chio_file_write.content) before they
         # cross into the sidecar so the receipt log never carries the raw
         # secret bytes. The underlying function still receives the real
         # args via ``super().acall(*args, **kwargs)`` below.
-        recorded_parameters = redact_args(
-            self.metadata.name,
-            parameters,
+        recorded_parameters = _materialise_parameters(
+            self._tool_callable,
+            args,
+            kwargs,
+            tool_name=self.metadata.name,
             policy=self._redaction_policy,
         )
         receipt = await self._evaluate(recorded_parameters)
@@ -329,21 +331,29 @@ def _build_metadata(
 
 
 def _materialise_parameters(
+    fn: Callable[..., Any] | None,
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
+    *,
+    tool_name: str | None,
+    policy: RedactionPolicy,
 ) -> dict[str, Any]:
-    """Collapse ``(*args, **kwargs)`` into a kwargs dict for evaluation.
+    """Collapse ``(*args, **kwargs)`` into a redacted evaluation payload.
 
     LlamaIndex planners call tools with keyword arguments parsed from
-    the LLM's JSON output, so positional arguments are rare. We still
-    preserve them under a synthetic ``_args`` key so the sidecar's
-    parameter hash reflects every value the tool saw.
+    the LLM's JSON output, so positional arguments are rare. When they
+    appear, bind them to the wrapped callable's signature first so
+    protected fields such as ``content`` are still redacted.
     """
-    if not args:
-        return dict(kwargs)
-    merged: dict[str, Any] = dict(kwargs)
-    merged["_args"] = list(args)
-    return merged
+    if args and fn is not None:
+        try:
+            bound = inspect.signature(fn).bind_partial(*args, **kwargs)
+        except (TypeError, ValueError):
+            merged: dict[str, Any] = dict(kwargs)
+            merged["_args"] = list(args)
+            return redact_args(tool_name, merged, policy=policy)
+        return redact_args(tool_name, dict(bound.arguments), policy=policy)
+    return redact_args(tool_name, kwargs, policy=policy)
 
 
 __all__ = [

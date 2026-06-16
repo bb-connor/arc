@@ -594,6 +594,31 @@ class TestErrorHandling:
             assert exc_info.value.guard == "TimeGuard"
 
     @respx.mock
+    async def test_malformed_403_raises_typed_chio_error(self) -> None:
+        respx.post(f"{BASE}/v1/evaluate/advisory").mock(
+            return_value=httpx.Response(403, text="not json")
+        )
+        async with ChioClient(BASE) as client:
+            with pytest.raises(ChioError) as exc_info:
+                await client.evaluate_tool_call(
+                    capability_id="cap-1",
+                    tool_server="srv",
+                    tool_name="t",
+                    parameters={},
+                )
+            assert exc_info.value.code == "INVALID_RESPONSE"
+
+    @respx.mock
+    async def test_malformed_success_raises_typed_chio_error(self) -> None:
+        respx.get(f"{BASE}/chio/health").mock(
+            return_value=httpx.Response(200, text="not json")
+        )
+        async with ChioClient(BASE) as client:
+            with pytest.raises(ChioError) as exc_info:
+                await client.health()
+            assert exc_info.value.code == "INVALID_RESPONSE"
+
+    @respx.mock
     async def test_server_error(self) -> None:
         respx.get(f"{BASE}/chio/health").mock(
             return_value=httpx.Response(500, json={"error": "internal"})
