@@ -4,6 +4,10 @@ use std::sync::Mutex;
 
 use alloy_primitives::{keccak256, Address, B256, U256};
 use alloy_sol_types::SolValue;
+use chio_core::capability::governance::{
+    GovernedApprovalDecision, GovernedApprovalToken, GovernedTransactionIntent,
+};
+use chio_core::crypto::PublicKey;
 use chio_core::hashing::sha256;
 use chio_core::web3::settlement::Web3SettlementDispatchArtifact;
 use serde::{Deserialize, Serialize};
@@ -152,6 +156,93 @@ pub fn build_x402_payment_requirements(
     })
 }
 
+/// Build x402 payment requirements bound to a verified governing approval
+/// (C2 / BAC-541).
+///
+/// The x402 lane advertises `governed_authorization_required` as a bare
+/// bool; on its own that flag is unenforced. This entry point closes the
+/// loop: it asserts the live dispatch's chain / payee / amount / token
+/// against the `approval.binding()` produced by [`verify_governed_approval`],
+/// so the requirements can only be built when a real, verified
+/// [`GovernedApprovalToken`] authorized exactly this spend. The token check
+/// requires the approval-bound token symbol to appear in `accepted_tokens`,
+/// so x402 cannot offer to settle a governed spend in a token the approval
+/// never authorized. Any mismatch fails closed.
+///
+/// `chain_eip155_id` is the numeric EIP-155 chain id the caller resolved
+/// for the dispatch's `chain_id` string (e.g. `8453` for `"eip155:8453"`);
+/// it is what the approval binds, since the binding carries a numeric chain
+/// id while the dispatch carries the namespaced string.
+pub fn build_x402_payment_requirements_with_verified_approval(
+    dispatch: &Web3SettlementDispatchArtifact,
+    facilitator_url: &str,
+    resource: &str,
+    accepted_tokens: Vec<String>,
+    settlement_mode: X402SettlementMode,
+    chain_eip155_id: u64,
+    approval: &VerifiedApproval,
+) -> Result<X402PaymentRequirements, SettlementError> {
+    let binding = approval.binding();
+
+    // Chain: the caller-resolved numeric chain id for this dispatch must be
+    // the chain the approval authorized.
+    if chain_eip155_id != binding.chain_id {
+        return Err(SettlementError::InvalidBinding(format!(
+            "x402 chain mismatch: dispatch chain {chain_eip155_id} != approval-bound chain {}",
+            binding.chain_id
+        )));
+    }
+
+    // Payee: the dispatch beneficiary must be the approval-bound payee
+    // (case-insensitive hex / checksum).
+    let dispatch_payee =
+        Address::from_str(dispatch.beneficiary_address.trim()).map_err(|error| {
+            SettlementError::InvalidBinding(format!(
+                "x402 dispatch beneficiary address invalid: {error}"
+            ))
+        })?;
+    let bound_payee = Address::from_str(binding.payee_address.trim()).map_err(|error| {
+        SettlementError::InvalidBinding(format!("approval-bound payee address invalid: {error}"))
+    })?;
+    if dispatch_payee != bound_payee {
+        return Err(SettlementError::InvalidBinding(
+            "x402 payee mismatch: dispatch beneficiary is not the approval-bound payee".to_string(),
+        ));
+    }
+
+    // Amount: the dispatch settlement amount must equal the approval-bound
+    // amount. The dispatch carries u64 minor units; widen to compare.
+    if u128::from(dispatch.settlement_amount.units) != binding.amount_minor_units {
+        return Err(SettlementError::InvalidBinding(format!(
+            "x402 amount mismatch: dispatch amount {} != approval-bound amount {}",
+            dispatch.settlement_amount.units, binding.amount_minor_units
+        )));
+    }
+
+    // Token: the approval-bound token must be one the x402 requirements will
+    // actually accept. Otherwise the requirements could offer to settle this
+    // governed spend in a token the approval never authorized. Compared
+    // case-insensitively after trimming.
+    if !accepted_tokens.iter().any(|token| {
+        token
+            .trim()
+            .eq_ignore_ascii_case(binding.token_symbol.trim())
+    }) {
+        return Err(SettlementError::InvalidBinding(format!(
+            "x402 token mismatch: approval-bound token {:?} is not in the accepted tokens {:?}",
+            binding.token_symbol, accepted_tokens
+        )));
+    }
+
+    build_x402_payment_requirements(
+        dispatch,
+        facilitator_url,
+        resource,
+        accepted_tokens,
+        settlement_mode,
+    )
+}
+
 fn validate_x402_field(label: &str, value: &str) -> Result<(), SettlementError> {
     if value.trim().is_empty() {
         return Err(SettlementError::InvalidInput(format!(
@@ -257,6 +348,188 @@ impl ApprovalBinding {
         }
         Ok(())
     }
+}
+
+// ---------------------------------------------------------------------------
+// C2 (BAC-541): verify a real GovernedApprovalToken and DERIVE the binding
+// from the verified token before any lane settles.
+// ---------------------------------------------------------------------------
+//
+// THE TRUST PATH (read this before changing it)
+// =============================================
+//
+// A `GovernedApprovalToken` does NOT carry discrete amount/payee/chain
+// fields. It commits to the *whole* governed intent via a single
+// `governed_intent_hash` (the canonical-JSON sha256 of the
+// `GovernedTransactionIntent`). So the settlement layer cannot read the
+// authorized amount/payee/chain off the token directly. Instead the gate
+// below establishes trust in three independent steps and only then trusts
+// the caller-resolved [`ApprovalBinding`]:
+//
+//   1. Ed25519 signature over the canonical token body
+//      (`token.verify_signature()`), the approval decision is `Approved`,
+//      and the validity window (`token.validate_time(now)`). Any failure
+//      aborts settlement (fail-closed): a forged, denied, expired, or
+//      not-yet-valid token never reaches a lane.
+//   2. The token's `approver` public key equals the *expected principal*
+//      the operator configured for this settlement. A validly-signed token
+//      from the wrong approver is rejected: signature validity alone does
+//      not establish authority.
+//   3. The token actually covers THIS settlement. The caller supplies the
+//      `GovernedTransactionIntent`; we recompute `intent.binding_hash()`
+//      and assert it equals `token.governed_intent_hash`. This is the link
+//      that ties the abstract approval to the concrete spend; without it a
+//      validly-signed approval for intent A could be replayed to authorize
+//      settlement B.
+//
+// Only after (1)-(3) pass do we treat the [`ApprovalBinding`] the caller
+// resolved from that same intent as authoritative. The lanes then assert
+// their lane-specific facts (chain id / payee / amount / currency) against
+// the binding inside this [`VerifiedApproval`]; any lane-level mismatch
+// still fails closed. The caller MUST resolve the `ApprovalBinding` from
+// the SAME intent it passes here: `verify_governed_approval` cannot police
+// that the binding numerically reflects the intent (the intent binds
+// chain/amount/payee only indirectly through the hash), so each lane's
+// assertion against the dispatch is the second, independent check that the
+// approved economics match what is actually being broadcast.
+
+/// A governing approval whose signature, decision, validity window, approver
+/// identity, and intent-coverage have all been verified by
+/// [`verify_governed_approval`].
+///
+/// This type can only be constructed by the verification gate, so a value of
+/// this type is a capability witness: holding one means a real
+/// [`GovernedApprovalToken`] authorized the carried [`ApprovalBinding`] for
+/// the settlement identified by `governed_intent_hash`. The per-lane
+/// `*_with_verified_approval` entry points take this by reference and assert
+/// the dispatch/authorization against `binding`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedApproval {
+    /// The intent hash the verified token committed to (== the recomputed
+    /// `binding_hash()` of the intent the caller passed in).
+    governed_intent_hash: String,
+    /// The approval token id, retained for receipts / audit.
+    approval_id: String,
+    /// The binding the caller resolved from the verified intent. Trusted
+    /// only because every check in [`verify_governed_approval`] passed.
+    binding: ApprovalBinding,
+}
+
+impl VerifiedApproval {
+    /// The intent hash the verified approval token committed to.
+    #[must_use]
+    pub fn governed_intent_hash(&self) -> &str {
+        &self.governed_intent_hash
+    }
+
+    /// The verified approval token id (for receipts / audit trails).
+    #[must_use]
+    pub fn approval_id(&self) -> &str {
+        &self.approval_id
+    }
+
+    /// The approval-authorized settlement binding. Only trustworthy because
+    /// this value could only be produced by the verification gate.
+    #[must_use]
+    pub fn binding(&self) -> &ApprovalBinding {
+        &self.binding
+    }
+}
+
+/// Verify a [`GovernedApprovalToken`] and derive the trusted settlement
+/// [`ApprovalBinding`] from it. This is the single C2 (BAC-541) gate every
+/// settlement lane funnels through before it will bind a spend.
+///
+/// Fail-closed checks, in order:
+///
+/// 1. **Signature.** `token.verify_signature()` must succeed AND return
+///    `true`. A malformed or forged signature aborts settlement.
+/// 2. **Decision.** `token.decision` must be
+///    [`GovernedApprovalDecision::Approved`]; a `Denied` (or any
+///    non-approval) token aborts settlement.
+/// 3. **Validity window.** `token.validate_time(now)` must pass; expired or
+///    not-yet-valid tokens abort settlement.
+/// 4. **Approver identity.** `token.approver` must equal `expected_approver`,
+///    the principal the operator expects to have signed this approval. A
+///    valid signature from an unexpected approver is rejected.
+/// 5. **Intent coverage.** `intent.binding_hash()` must equal
+///    `token.governed_intent_hash`, proving the approval covers THIS
+///    settlement and not some other intent.
+///
+/// `binding` is the chain/payee/amount the caller resolved from `intent`.
+/// It is returned inside the [`VerifiedApproval`] for the lanes to assert
+/// against, but note (see module trust-path docs) that the binding's
+/// numeric agreement with the intent cannot be enforced here; the lanes'
+/// own assertions against the live dispatch are the second, independent
+/// economic check.
+pub fn verify_governed_approval(
+    token: &GovernedApprovalToken,
+    intent: &GovernedTransactionIntent,
+    expected_approver: &PublicKey,
+    binding: ApprovalBinding,
+    now_unix_seconds: u64,
+) -> Result<VerifiedApproval, SettlementError> {
+    // (1) Signature over the canonical token body. `verify_signature`
+    // returns Ok(false) for a well-formed-but-wrong signature and Err for a
+    // malformed one; both fail closed.
+    let signature_ok = token.verify_signature().map_err(|error| {
+        SettlementError::Verification(format!(
+            "governed approval token signature could not be verified: {error}"
+        ))
+    })?;
+    if !signature_ok {
+        return Err(SettlementError::Verification(
+            "governed approval token signature is invalid".to_string(),
+        ));
+    }
+
+    // (2) Decision must be an explicit approval. A denied token that is
+    // otherwise valid must never authorize a spend.
+    if token.decision != GovernedApprovalDecision::Approved {
+        return Err(SettlementError::Verification(
+            "governed approval token does not encode an approval decision".to_string(),
+        ));
+    }
+
+    // (3) Validity window vs. now. `validate_time` returns
+    // CapabilityNotYetValid / CapabilityExpired which we surface as
+    // verification failures.
+    token.validate_time(now_unix_seconds).map_err(|error| {
+        SettlementError::Verification(format!(
+            "governed approval token is outside its validity window: {error}"
+        ))
+    })?;
+
+    // (4) Approver identity. A valid signature only proves the holder of
+    // `token.approver`'s key signed it; we still require that key to be the
+    // principal the operator expects for this settlement.
+    if &token.approver != expected_approver {
+        return Err(SettlementError::Verification(
+            "governed approval token approver is not the expected principal".to_string(),
+        ));
+    }
+
+    // (5) Intent coverage. Recompute the canonical intent hash and compare
+    // to what the token committed to. This binds the abstract approval to
+    // THIS concrete settlement intent, defeating cross-intent replay of an
+    // otherwise-valid approval.
+    let recomputed_intent_hash = intent.binding_hash().map_err(|error| {
+        SettlementError::Verification(format!(
+            "failed to recompute governed intent binding hash: {error}"
+        ))
+    })?;
+    if recomputed_intent_hash != token.governed_intent_hash {
+        return Err(SettlementError::Verification(
+            "governed approval token does not cover this settlement intent (intent hash mismatch)"
+                .to_string(),
+        ));
+    }
+
+    Ok(VerifiedApproval {
+        governed_intent_hash: token.governed_intent_hash.clone(),
+        approval_id: token.id.clone(),
+        binding,
+    })
 }
 
 /// Outcome of a [`Eip3009NonceStore::record_if_fresh`] call.
@@ -678,6 +951,34 @@ pub fn prepare_transfer_with_authorization(
     })
 }
 
+/// Prepare an EIP-3009 authorization digest bound to a *verified* governing
+/// approval (C2 / BAC-541).
+///
+/// This is the C2-strengthened entry point: rather than trusting a
+/// caller-supplied [`ApprovalBinding`] (the C3 / BAC-542 seam), it derives
+/// the binding from a [`VerifiedApproval`] that
+/// [`verify_governed_approval`] could only have produced after checking the
+/// token's signature, decision, validity window, approver identity, and
+/// intent coverage. The lane-level chain / payee / amount / nonce / window
+/// assertions in [`prepare_transfer_with_authorization`] then run exactly as
+/// before against that trusted binding, so a captured authorization still
+/// cannot be redirected, inflated, replayed, or re-chained.
+pub fn prepare_transfer_with_verified_approval(
+    domain: Eip3009Domain,
+    authorization: TransferWithAuthorizationInput,
+    approval: &VerifiedApproval,
+    now_unix_seconds: u64,
+    nonce_store: &dyn Eip3009NonceStore,
+) -> Result<PreparedTransferWithAuthorization, SettlementError> {
+    prepare_transfer_with_authorization(
+        domain,
+        authorization,
+        approval.binding(),
+        now_unix_seconds,
+        nonce_store,
+    )
+}
+
 pub fn evaluate_circle_nanopayment(
     dispatch: &Web3SettlementDispatchArtifact,
     policy: &CircleNanopaymentPolicy,
@@ -728,6 +1029,70 @@ pub fn evaluate_circle_nanopayment(
     }))
 }
 
+/// Evaluate a Circle nanopayment candidate bound to a *verified* governing
+/// approval (C2 / BAC-541).
+///
+/// The Circle lane otherwise prepares an operator-custodied payout straight
+/// off the dispatch with no approval check. This entry point asserts the
+/// dispatch's chain / payee / amount / token against the `approval.binding()`
+/// derived by [`verify_governed_approval`] BEFORE delegating to
+/// [`evaluate_circle_nanopayment`]. The token check compares the dispatch's
+/// `settlement_amount.currency` (the symbol Circle settles in) against the
+/// approval-bound token, so a captured approval cannot be redirected to a
+/// different token. A mismatch fails closed (it is a hard error, distinct
+/// from the policy-driven `Ok(None)` "not a candidate" outcome, since an
+/// approval-bound spend that disagrees with the dispatch must never be
+/// silently dropped).
+///
+/// `chain_eip155_id` is the numeric EIP-155 chain id the caller resolved for
+/// the dispatch's namespaced `chain_id` string, matching what the approval
+/// binds.
+pub fn evaluate_circle_nanopayment_with_verified_approval(
+    dispatch: &Web3SettlementDispatchArtifact,
+    policy: &CircleNanopaymentPolicy,
+    chain_eip155_id: u64,
+    approval: &VerifiedApproval,
+) -> Result<Option<PreparedCircleNanopayment>, SettlementError> {
+    let binding = approval.binding();
+
+    if chain_eip155_id != binding.chain_id {
+        return Err(SettlementError::InvalidBinding(format!(
+            "Circle chain mismatch: dispatch chain {chain_eip155_id} != approval-bound chain {}",
+            binding.chain_id
+        )));
+    }
+
+    let dispatch_payee =
+        Address::from_str(dispatch.beneficiary_address.trim()).map_err(|error| {
+            SettlementError::InvalidBinding(format!(
+                "Circle dispatch beneficiary address invalid: {error}"
+            ))
+        })?;
+    let bound_payee = Address::from_str(binding.payee_address.trim()).map_err(|error| {
+        SettlementError::InvalidBinding(format!("approval-bound payee address invalid: {error}"))
+    })?;
+    if dispatch_payee != bound_payee {
+        return Err(SettlementError::InvalidBinding(
+            "Circle payee mismatch: dispatch beneficiary is not the approval-bound payee"
+                .to_string(),
+        ));
+    }
+
+    if u128::from(dispatch.settlement_amount.units) != binding.amount_minor_units {
+        return Err(SettlementError::InvalidBinding(format!(
+            "Circle amount mismatch: dispatch amount {} != approval-bound amount {}",
+            dispatch.settlement_amount.units, binding.amount_minor_units
+        )));
+    }
+
+    // Token: the dispatch currency Circle would settle in must be the
+    // approval-bound token, so a captured approval cannot be redirected to a
+    // different token symbol.
+    binding.assert_token_symbol("Circle", &dispatch.settlement_amount.currency)?;
+
+    evaluate_circle_nanopayment(dispatch, policy)
+}
+
 pub fn prepare_paymaster_compatibility(
     dispatch: &Web3SettlementDispatchArtifact,
     policy: &Erc4337PaymasterPolicy,
@@ -775,15 +1140,104 @@ pub fn prepare_paymaster_compatibility(
 #[cfg(test)]
 mod tests {
     use super::{
-        build_x402_payment_requirements, evaluate_circle_nanopayment,
-        prepare_paymaster_compatibility, prepare_transfer_with_authorization, ApprovalBinding,
+        build_x402_payment_requirements, build_x402_payment_requirements_with_verified_approval,
+        evaluate_circle_nanopayment, evaluate_circle_nanopayment_with_verified_approval,
+        prepare_paymaster_compatibility, prepare_transfer_with_authorization,
+        prepare_transfer_with_verified_approval, verify_governed_approval, ApprovalBinding,
         CircleNanopaymentPolicy, Eip3009Domain, Eip3009NonceStore, Erc4337PaymasterPolicy,
-        InMemoryEip3009NonceStore, NonceOutcome, TransferWithAuthorizationInput,
+        InMemoryEip3009NonceStore, NonceOutcome, TransferWithAuthorizationInput, VerifiedApproval,
         X402SettlementMode,
     };
+    use chio_core::capability::governance::{
+        GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+        GovernedTransactionIntent,
+    };
+    use chio_core::crypto::Keypair;
     use chio_core::web3::settlement::Web3SettlementDispatchArtifact;
 
     use chio_test_support::prelude::*;
+
+    /// EIP-155 chain id of the sample dispatch (`"eip155:8453"`).
+    const DISPATCH_CHAIN_ID: u64 = 8453;
+    /// Beneficiary in `CHIO_WEB3_SETTLEMENT_DISPATCH_EXAMPLE.json`.
+    const DISPATCH_PAYEE: &str = "0x2222222222222222222222222222222222222222";
+    /// Settlement amount (minor units) in the example dispatch.
+    const DISPATCH_AMOUNT: u128 = 150;
+    /// Token/currency symbol of the example dispatch (`settlement_amount.currency`).
+    const DISPATCH_TOKEN_SYMBOL: &str = "USD";
+    /// A `now` inside any token window built by `approval_window`.
+    const APPROVAL_NOW: u64 = 1_744_000_300;
+
+    /// Build a minimal governed intent. Its canonical hash is what the
+    /// approval token commits to; the discrete chain/amount/payee live in
+    /// the separately-resolved `ApprovalBinding`.
+    fn sample_intent(id: &str) -> GovernedTransactionIntent {
+        GovernedTransactionIntent {
+            id: id.to_string(),
+            server_id: "settlement-server".to_string(),
+            tool_name: "transfer_funds".to_string(),
+            purpose: "C2 settlement binding test".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: None,
+        }
+    }
+
+    /// Mint a signed, approved token over `intent`'s binding hash using
+    /// `approver`, valid across `APPROVAL_NOW`.
+    fn signed_approval(
+        approver: &Keypair,
+        subject: &Keypair,
+        intent: &GovernedTransactionIntent,
+    ) -> GovernedApprovalToken {
+        let body = GovernedApprovalTokenBody {
+            id: "approval-1".to_string(),
+            approver: approver.public_key(),
+            subject: subject.public_key(),
+            governed_intent_hash: intent.binding_hash().test_unwrap(),
+            request_id: "req-1".to_string(),
+            issued_at: APPROVAL_NOW - 100,
+            expires_at: APPROVAL_NOW + 100,
+            decision: GovernedApprovalDecision::Approved,
+        };
+        GovernedApprovalToken::sign(body, approver).test_unwrap()
+    }
+
+    /// A binding that matches the sample dispatch's chain/payee/amount/token.
+    fn dispatch_binding() -> ApprovalBinding {
+        ApprovalBinding {
+            chain_id: DISPATCH_CHAIN_ID,
+            payee_address: DISPATCH_PAYEE.to_string(),
+            amount_minor_units: DISPATCH_AMOUNT,
+            token_symbol: DISPATCH_TOKEN_SYMBOL.to_string(),
+            // The dispatch lanes identify their token by symbol, not by a
+            // contract address, so no contract is pinned here.
+            token_contract: None,
+            // Matches the `signed_approval` window so the EIP-3009 expiry
+            // bound never trips for dispatch-derived bindings.
+            approval_expires_at: APPROVAL_NOW + 100,
+        }
+    }
+
+    /// Verify a fresh approval for `binding`, returning the witness.
+    fn verified_for(binding: ApprovalBinding) -> VerifiedApproval {
+        let approver = Keypair::generate();
+        let subject = Keypair::generate();
+        let intent = sample_intent("intent-dispatch");
+        let token = signed_approval(&approver, &subject, &intent);
+        verify_governed_approval(
+            &token,
+            &intent,
+            &approver.public_key(),
+            binding,
+            APPROVAL_NOW,
+        )
+        .test_unwrap()
+    }
 
     fn sample_dispatch() -> Web3SettlementDispatchArtifact {
         serde_json::from_str(include_str!(
@@ -1398,5 +1852,420 @@ mod tests {
 
         assert!(prepared.allowed);
         assert!(prepared.rejection_reason.is_none());
+    }
+
+    // -----------------------------------------------------------------
+    // C2 (BAC-541): GovernedApprovalToken verification gate.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn verify_governed_approval_accepts_a_valid_token() {
+        let approver = Keypair::generate();
+        let subject = Keypair::generate();
+        let intent = sample_intent("intent-ok");
+        let token = signed_approval(&approver, &subject, &intent);
+
+        let verified = verify_governed_approval(
+            &token,
+            &intent,
+            &approver.public_key(),
+            dispatch_binding(),
+            APPROVAL_NOW,
+        )
+        .test_unwrap();
+
+        assert_eq!(verified.approval_id(), "approval-1");
+        assert_eq!(verified.governed_intent_hash(), token.governed_intent_hash);
+        assert_eq!(verified.binding(), &dispatch_binding());
+    }
+
+    #[test]
+    fn verify_governed_approval_rejects_a_bad_signature() {
+        // A token whose signature does not match its body (forged / tampered)
+        // must fail closed regardless of every other field being well-formed.
+        let approver = Keypair::generate();
+        let subject = Keypair::generate();
+        let intent = sample_intent("intent-badsig");
+        let mut token = signed_approval(&approver, &subject, &intent);
+
+        // Tamper with the body AFTER signing so the signature no longer
+        // covers it.
+        token.request_id = "req-tampered".to_string();
+
+        let error = verify_governed_approval(
+            &token,
+            &intent,
+            &approver.public_key(),
+            dispatch_binding(),
+            APPROVAL_NOW,
+        )
+        .test_unwrap_err();
+        assert!(
+            error.to_string().contains("signature is invalid"),
+            "tampered token must be rejected on signature, got: {error}"
+        );
+    }
+
+    #[test]
+    fn verify_governed_approval_rejects_an_expired_token() {
+        let approver = Keypair::generate();
+        let subject = Keypair::generate();
+        let intent = sample_intent("intent-expired");
+        let token = signed_approval(&approver, &subject, &intent);
+
+        // now == expires_at is outside the window (validate_time requires
+        // now < expires_at).
+        let error = verify_governed_approval(
+            &token,
+            &intent,
+            &approver.public_key(),
+            dispatch_binding(),
+            token.expires_at,
+        )
+        .test_unwrap_err();
+        assert!(
+            error.to_string().contains("validity window"),
+            "an expired approval must be rejected, got: {error}"
+        );
+    }
+
+    #[test]
+    fn verify_governed_approval_rejects_a_denied_decision() {
+        let approver = Keypair::generate();
+        let subject = Keypair::generate();
+        let intent = sample_intent("intent-denied");
+        // Sign a DENIED token so the signature is valid but the decision is
+        // not an approval.
+        let body = GovernedApprovalTokenBody {
+            id: "approval-denied".to_string(),
+            approver: approver.public_key(),
+            subject: subject.public_key(),
+            governed_intent_hash: intent.binding_hash().test_unwrap(),
+            request_id: "req-denied".to_string(),
+            issued_at: APPROVAL_NOW - 100,
+            expires_at: APPROVAL_NOW + 100,
+            decision: GovernedApprovalDecision::Denied,
+        };
+        let token = GovernedApprovalToken::sign(body, &approver).test_unwrap();
+
+        let error = verify_governed_approval(
+            &token,
+            &intent,
+            &approver.public_key(),
+            dispatch_binding(),
+            APPROVAL_NOW,
+        )
+        .test_unwrap_err();
+        assert!(
+            error.to_string().contains("approval decision"),
+            "a denied token must be rejected, got: {error}"
+        );
+    }
+
+    #[test]
+    fn verify_governed_approval_rejects_an_unexpected_approver() {
+        // A validly-signed token from the wrong approver key is rejected:
+        // signature validity alone does not establish authority.
+        let approver = Keypair::generate();
+        let subject = Keypair::generate();
+        let intent = sample_intent("intent-wrong-approver");
+        let token = signed_approval(&approver, &subject, &intent);
+
+        let unexpected = Keypair::generate();
+        let error = verify_governed_approval(
+            &token,
+            &intent,
+            &unexpected.public_key(),
+            dispatch_binding(),
+            APPROVAL_NOW,
+        )
+        .test_unwrap_err();
+        assert!(
+            error.to_string().contains("expected principal"),
+            "an unexpected approver must be rejected, got: {error}"
+        );
+    }
+
+    #[test]
+    fn verify_governed_approval_rejects_intent_not_covered_by_the_token() {
+        // The token commits to intent A's hash; presenting a different
+        // intent B (whose hash differs) must be rejected. This defeats
+        // cross-intent replay of an otherwise-valid approval.
+        let approver = Keypair::generate();
+        let subject = Keypair::generate();
+        let approved_intent = sample_intent("intent-A");
+        let token = signed_approval(&approver, &subject, &approved_intent);
+
+        let other_intent = sample_intent("intent-B");
+        let error = verify_governed_approval(
+            &token,
+            &other_intent,
+            &approver.public_key(),
+            dispatch_binding(),
+            APPROVAL_NOW,
+        )
+        .test_unwrap_err();
+        assert!(
+            error.to_string().contains("intent hash mismatch"),
+            "an approval that does not cover this intent must be rejected, got: {error}"
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // C2: x402 lane binds against the verified approval.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn x402_with_verified_approval_authorizes_a_matching_dispatch() {
+        let dispatch = sample_dispatch();
+        let approval = verified_for(dispatch_binding());
+
+        let requirements = build_x402_payment_requirements_with_verified_approval(
+            &dispatch,
+            "https://facilitator.example/x402",
+            "https://tool.example/v1/run",
+            // The approval-bound token (DISPATCH_TOKEN_SYMBOL) must be among
+            // the accepted tokens.
+            vec![DISPATCH_TOKEN_SYMBOL.to_string(), "USDC".to_string()],
+            X402SettlementMode::PrepaidAuthorization,
+            DISPATCH_CHAIN_ID,
+            &approval,
+        )
+        .test_unwrap();
+
+        assert!(requirements.governed_authorization_required);
+        assert_eq!(requirements.dispatch_id, dispatch.dispatch_id);
+    }
+
+    #[test]
+    fn x402_with_verified_approval_rejects_a_token_not_accepted() {
+        // The approval is bound to DISPATCH_TOKEN_SYMBOL, but the x402
+        // requirements would only accept a different token. Offering to
+        // settle a governed spend in an unapproved token must fail closed.
+        let dispatch = sample_dispatch();
+        let error = build_x402_payment_requirements_with_verified_approval(
+            &dispatch,
+            "https://facilitator.example/x402",
+            "https://tool.example/v1/run",
+            vec!["USDC".to_string(), "EURC".to_string()],
+            X402SettlementMode::PrepaidAuthorization,
+            DISPATCH_CHAIN_ID,
+            &verified_for(dispatch_binding()),
+        )
+        .test_unwrap_err();
+        assert!(error.to_string().contains("token mismatch"), "got: {error}");
+    }
+
+    #[test]
+    fn x402_with_verified_approval_rejects_binding_mismatches() {
+        let dispatch = sample_dispatch();
+
+        // Chain mismatch: caller-resolved dispatch chain != approval-bound.
+        let error = build_x402_payment_requirements_with_verified_approval(
+            &dispatch,
+            "https://facilitator.example/x402",
+            "https://tool.example/v1/run",
+            vec!["USDC".to_string()],
+            X402SettlementMode::PrepaidAuthorization,
+            1,
+            &verified_for(dispatch_binding()),
+        )
+        .test_unwrap_err();
+        assert!(error.to_string().contains("chain mismatch"), "got: {error}");
+
+        // Payee mismatch: approval bound to a different payee than the
+        // dispatch beneficiary.
+        let mut wrong_payee = dispatch_binding();
+        wrong_payee.payee_address = "0x3333333333333333333333333333333333333333".to_string();
+        let error = build_x402_payment_requirements_with_verified_approval(
+            &dispatch,
+            "https://facilitator.example/x402",
+            "https://tool.example/v1/run",
+            vec!["USDC".to_string()],
+            X402SettlementMode::PrepaidAuthorization,
+            DISPATCH_CHAIN_ID,
+            &verified_for(wrong_payee),
+        )
+        .test_unwrap_err();
+        assert!(error.to_string().contains("payee mismatch"), "got: {error}");
+
+        // Amount mismatch: approval bound to a different amount.
+        let mut wrong_amount = dispatch_binding();
+        wrong_amount.amount_minor_units = DISPATCH_AMOUNT + 1;
+        let error = build_x402_payment_requirements_with_verified_approval(
+            &dispatch,
+            "https://facilitator.example/x402",
+            "https://tool.example/v1/run",
+            vec!["USDC".to_string()],
+            X402SettlementMode::PrepaidAuthorization,
+            DISPATCH_CHAIN_ID,
+            &verified_for(wrong_amount),
+        )
+        .test_unwrap_err();
+        assert!(
+            error.to_string().contains("amount mismatch"),
+            "got: {error}"
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // C2: EIP-3009 lane binds against the verified approval.
+    // -----------------------------------------------------------------
+
+    /// A verified approval whose binding matches `sample_authorization`.
+    fn verified_for_eip3009_authorization() -> VerifiedApproval {
+        verified_for(ApprovalBinding {
+            chain_id: SAMPLE_CHAIN_ID,
+            payee_address: SAMPLE_PAYEE.to_string(),
+            amount_minor_units: SAMPLE_VALUE,
+            token_symbol: SAMPLE_TOKEN_SYMBOL.to_string(),
+            token_contract: Some(SAMPLE_TOKEN_CONTRACT.to_string()),
+            approval_expires_at: SAMPLE_VALID_BEFORE,
+        })
+    }
+
+    #[test]
+    fn eip3009_with_verified_approval_authorizes_a_matching_authorization() {
+        let store = InMemoryEip3009NonceStore::new();
+        let prepared = prepare_transfer_with_verified_approval(
+            sample_domain(),
+            sample_authorization(),
+            &verified_for_eip3009_authorization(),
+            SAMPLE_NOW,
+            &store,
+        )
+        .test_unwrap();
+        assert!(prepared.authorization_digest.starts_with("0x"));
+        assert_eq!(prepared.authorization_digest.len(), 66);
+    }
+
+    #[test]
+    fn eip3009_with_verified_approval_rejects_a_payee_mismatch() {
+        // The verified approval authorizes a DIFFERENT payee than the
+        // EIP-3009 authorization's `to`. Binding assertion fails closed and
+        // the nonce is not consumed.
+        let store = InMemoryEip3009NonceStore::new();
+        let approval = verified_for(ApprovalBinding {
+            chain_id: SAMPLE_CHAIN_ID,
+            payee_address: "0x1000000000000000000000000000000000000009".to_string(),
+            amount_minor_units: SAMPLE_VALUE,
+            token_symbol: SAMPLE_TOKEN_SYMBOL.to_string(),
+            token_contract: Some(SAMPLE_TOKEN_CONTRACT.to_string()),
+            approval_expires_at: SAMPLE_VALID_BEFORE,
+        });
+        let error = prepare_transfer_with_verified_approval(
+            sample_domain(),
+            sample_authorization(),
+            &approval,
+            SAMPLE_NOW,
+            &store,
+        )
+        .test_unwrap_err();
+        assert!(error.to_string().contains("payee mismatch"), "got: {error}");
+        assert!(
+            store.is_empty().test_unwrap(),
+            "a binding-mismatch rejection must not consume the nonce"
+        );
+    }
+
+    #[test]
+    fn eip3009_with_verified_approval_rejects_an_expired_authorization() {
+        // The verified approval is fine, but the EIP-3009 authorization
+        // window is closed: the lane still fails closed.
+        let store = InMemoryEip3009NonceStore::new();
+        let error = prepare_transfer_with_verified_approval(
+            sample_domain(),
+            sample_authorization(),
+            &verified_for_eip3009_authorization(),
+            SAMPLE_VALID_BEFORE,
+            &store,
+        )
+        .test_unwrap_err();
+        assert!(error.to_string().contains("expired"), "got: {error}");
+    }
+
+    // -----------------------------------------------------------------
+    // C2: Circle lane binds against the verified approval.
+    // -----------------------------------------------------------------
+
+    fn sample_circle_policy() -> CircleNanopaymentPolicy {
+        CircleNanopaymentPolicy {
+            enabled: true,
+            managed_balance_id: "bal_123".to_string(),
+            supported_chain_ids: vec!["eip155:8453".to_string()],
+            supported_token_symbols: vec!["USD".to_string()],
+            max_amount_minor_units: 200,
+            operator_managed_custody_explicit: true,
+        }
+    }
+
+    #[test]
+    fn circle_with_verified_approval_authorizes_a_matching_dispatch() {
+        let dispatch = sample_dispatch();
+        let prepared = evaluate_circle_nanopayment_with_verified_approval(
+            &dispatch,
+            &sample_circle_policy(),
+            DISPATCH_CHAIN_ID,
+            &verified_for(dispatch_binding()),
+        )
+        .test_unwrap()
+        .test_unwrap();
+        assert_eq!(prepared.dispatch_id, dispatch.dispatch_id);
+    }
+
+    #[test]
+    fn circle_with_verified_approval_rejects_binding_mismatches() {
+        let dispatch = sample_dispatch();
+
+        // Chain mismatch.
+        let error = evaluate_circle_nanopayment_with_verified_approval(
+            &dispatch,
+            &sample_circle_policy(),
+            1,
+            &verified_for(dispatch_binding()),
+        )
+        .test_unwrap_err();
+        assert!(error.to_string().contains("chain mismatch"), "got: {error}");
+
+        // Payee mismatch.
+        let mut wrong_payee = dispatch_binding();
+        wrong_payee.payee_address = "0x3333333333333333333333333333333333333333".to_string();
+        let error = evaluate_circle_nanopayment_with_verified_approval(
+            &dispatch,
+            &sample_circle_policy(),
+            DISPATCH_CHAIN_ID,
+            &verified_for(wrong_payee),
+        )
+        .test_unwrap_err();
+        assert!(error.to_string().contains("payee mismatch"), "got: {error}");
+
+        // Amount mismatch.
+        let mut wrong_amount = dispatch_binding();
+        wrong_amount.amount_minor_units = DISPATCH_AMOUNT + 1;
+        let error = evaluate_circle_nanopayment_with_verified_approval(
+            &dispatch,
+            &sample_circle_policy(),
+            DISPATCH_CHAIN_ID,
+            &verified_for(wrong_amount),
+        )
+        .test_unwrap_err();
+        assert!(
+            error.to_string().contains("amount mismatch"),
+            "got: {error}"
+        );
+
+        // Token mismatch: approval bound to a different token than the
+        // dispatch settles in. Redirecting a governed spend to another token
+        // must fail closed.
+        let mut wrong_token = dispatch_binding();
+        wrong_token.token_symbol = "EURC".to_string();
+        let error = evaluate_circle_nanopayment_with_verified_approval(
+            &dispatch,
+            &sample_circle_policy(),
+            DISPATCH_CHAIN_ID,
+            &verified_for(wrong_token),
+        )
+        .test_unwrap_err();
+        assert!(error.to_string().contains("token mismatch"), "got: {error}");
     }
 }
