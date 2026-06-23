@@ -68,11 +68,14 @@ pub use ops::{
     SettlementRuntimeReport, SettlementRuntimeStatus, CHIO_SETTLE_RUNTIME_REPORT_SCHEMA,
 };
 pub use payments::{
-    build_x402_payment_requirements, evaluate_circle_nanopayment, prepare_paymaster_compatibility,
-    prepare_transfer_with_authorization, ApprovalBinding, CircleNanopaymentPolicy, Eip3009Domain,
-    Eip3009NonceStore, Erc4337PaymasterPolicy, InMemoryEip3009NonceStore, NonceOutcome,
-    PreparedCircleNanopayment, PreparedPaymasterCompatibility, PreparedTransferWithAuthorization,
-    TransferWithAuthorizationInput, X402PaymentRequirements, X402SettlementMode,
+    build_x402_payment_requirements, build_x402_payment_requirements_with_verified_approval,
+    evaluate_circle_nanopayment, evaluate_circle_nanopayment_with_verified_approval,
+    prepare_paymaster_compatibility, prepare_transfer_with_authorization,
+    prepare_transfer_with_verified_approval, verify_governed_approval, ApprovalBinding,
+    CircleNanopaymentPolicy, Eip3009Domain, Eip3009NonceStore, Erc4337PaymasterPolicy,
+    InMemoryEip3009NonceStore, NonceOutcome, PreparedCircleNanopayment,
+    PreparedPaymasterCompatibility, PreparedTransferWithAuthorization,
+    TransferWithAuthorizationInput, VerifiedApproval, X402PaymentRequirements, X402SettlementMode,
     DEFAULT_MAX_EIP3009_NONCE_ENTRIES,
 };
 pub use retry::{
