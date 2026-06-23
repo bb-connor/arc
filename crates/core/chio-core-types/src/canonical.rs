@@ -11,17 +11,27 @@
 //! - Strings: minimal escaping (only required characters)
 //! - No whitespace between tokens
 
+use alloc::collections::BTreeMap;
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use core::cmp::Ordering;
+use core::fmt;
 use core::marker::PhantomData;
 
+use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::Serialize;
 use serde_json::{Map, Value};
 
 use crate::error::{Error, Result};
+
+/// Largest integer that round-trips losslessly through an IEEE-754 double
+/// (`2^53`). RFC 7493 (I-JSON) §2.2 requires integers used for interoperable
+/// exchange to fall within `[-(2^53 - 1), 2^53 - 1]`; larger magnitudes cannot
+/// be represented exactly by every conforming consumer and so must be rejected
+/// before signing rather than silently coerced.
+const I_JSON_MAX_SAFE_INTEGER: u64 = 1 << 53;
 
 /// Type-level witness for bytes produced by the canonical JSON serializer.
 ///
@@ -113,6 +123,37 @@ pub fn canonical_json_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>> {
 pub fn canonical_json_string<T: Serialize>(value: &T) -> Result<String> {
     let json_value = serde_json::to_value(value)?;
     canonicalize(&json_value)
+}
+
+/// Strictly parse raw JSON text and canonicalize it to RFC 8785 bytes.
+///
+/// Unlike [`canonical_json_bytes`], which canonicalizes an already-typed Rust
+/// value, this entry point validates *untrusted JSON text* before signing. It
+/// enforces I-JSON / RFC 8785 input constraints that a plain
+/// `serde_json::Value` round-trip would silently paper over:
+///
+/// - **Duplicate object keys are rejected.** `serde_json::Value` collapses
+///   them with last-wins semantics, which lets two distinct payloads
+///   canonicalize to the same bytes (a render-A / sign-B vector). Here a
+///   repeated key is a hard error.
+/// - **Non-I-JSON numbers are rejected.** Integer literals outside the safe
+///   range `[-(2^53 - 1), 2^53 - 1]` cannot be represented losslessly by every
+///   conforming consumer; rather than coerce them to a precision-losing `f64`,
+///   canonicalization fails.
+///
+/// Well-formed I-JSON input canonicalizes byte-identically to the typed path.
+pub fn canonical_json_bytes_from_str(input: &str) -> Result<Vec<u8>> {
+    canonical_json_string_from_str(input).map(String::into_bytes)
+}
+
+/// Strictly parse raw JSON text and canonicalize it to an RFC 8785 string.
+///
+/// See [`canonical_json_bytes_from_str`] for the validation contract.
+pub fn canonical_json_string_from_str(input: &str) -> Result<String> {
+    let value = StrictJson::from_str(input)?;
+    let mut out = String::new();
+    value.write_canonical(&mut out)?;
+    Ok(out)
 }
 
 /// Canonicalize a `serde_json::Value` to an RFC 8785 string.
@@ -400,6 +441,192 @@ fn escape_json_string(s: &str) -> String {
     result
 }
 
+/// A strictly-validated JSON value tree used by the text-parsing entry points.
+///
+/// It is deserialized directly from JSON tokens (never through
+/// `serde_json::Value`) so that:
+/// - duplicate object keys can be detected and rejected, and
+/// - number literals can be checked against the I-JSON safe range without first
+///   being coerced to a lossy `f64`.
+///
+/// Key insertion order is preserved during parsing; the canonical writer sorts
+/// keys by UTF-16 code unit at emit time, matching the typed path exactly.
+enum StrictJson {
+    Null,
+    Bool(bool),
+    /// An integer literal within the I-JSON safe range, preserved exactly.
+    Int(i64),
+    /// A fractional / exponent number literal, validated as finite.
+    Float(f64),
+    Str(String),
+    Array(Vec<StrictJson>),
+    /// Object entries in insertion order; keys are guaranteed unique.
+    Object(Vec<(String, StrictJson)>),
+}
+
+impl StrictJson {
+    fn from_str(input: &str) -> Result<Self> {
+        let mut de = serde_json::Deserializer::from_str(input);
+        let value = StrictJson::deserialize(&mut de)
+            .map_err(|err| Error::CanonicalJson(format!("invalid I-JSON input: {err}")))?;
+        de.end()
+            .map_err(|err| Error::CanonicalJson(format!("trailing JSON data: {err}")))?;
+        Ok(value)
+    }
+
+    fn write_canonical(&self, out: &mut String) -> Result<()> {
+        match self {
+            StrictJson::Null => out.push_str("null"),
+            StrictJson::Bool(true) => out.push_str("true"),
+            StrictJson::Bool(false) => out.push_str("false"),
+            StrictJson::Int(i) => out.push_str(&i.to_string()),
+            StrictJson::Float(f) => out.push_str(&canonicalize_f64(*f)?),
+            StrictJson::Str(s) => {
+                out.push('"');
+                out.push_str(&escape_json_string(s));
+                out.push('"');
+            }
+            StrictJson::Array(items) => {
+                out.push('[');
+                for (idx, item) in items.iter().enumerate() {
+                    if idx > 0 {
+                        out.push(',');
+                    }
+                    item.write_canonical(out)?;
+                }
+                out.push(']');
+            }
+            StrictJson::Object(entries) => {
+                // RFC 8785: sort object keys by UTF-16 code unit comparison.
+                let mut sorted: Vec<&(String, StrictJson)> = entries.iter().collect();
+                sorted.sort_by(|(a, _), (b, _)| cmp_utf16_code_units(a.as_str(), b.as_str()));
+                out.push('{');
+                for (idx, (key, value)) in sorted.into_iter().enumerate() {
+                    if idx > 0 {
+                        out.push(',');
+                    }
+                    out.push('"');
+                    out.push_str(&escape_json_string(key));
+                    out.push_str("\":");
+                    value.write_canonical(out)?;
+                }
+                out.push('}');
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<'de> Deserialize<'de> for StrictJson {
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_any(StrictJsonVisitor)
+    }
+}
+
+struct StrictJsonVisitor;
+
+impl<'de> Visitor<'de> for StrictJsonVisitor {
+    type Value = StrictJson;
+
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("a valid I-JSON value")
+    }
+
+    fn visit_bool<E>(self, v: bool) -> core::result::Result<StrictJson, E> {
+        Ok(StrictJson::Bool(v))
+    }
+
+    fn visit_i64<E>(self, v: i64) -> core::result::Result<StrictJson, E>
+    where
+        E: de::Error,
+    {
+        if v.unsigned_abs() > I_JSON_MAX_SAFE_INTEGER {
+            return Err(de::Error::custom(format!(
+                "integer {v} outside I-JSON safe range [-(2^53-1), 2^53-1]"
+            )));
+        }
+        Ok(StrictJson::Int(v))
+    }
+
+    fn visit_u64<E>(self, v: u64) -> core::result::Result<StrictJson, E>
+    where
+        E: de::Error,
+    {
+        if v > I_JSON_MAX_SAFE_INTEGER {
+            return Err(de::Error::custom(format!(
+                "integer {v} outside I-JSON safe range [-(2^53-1), 2^53-1]"
+            )));
+        }
+        // Safe: v <= 2^53 < i64::MAX.
+        Ok(StrictJson::Int(v as i64))
+    }
+
+    fn visit_f64<E>(self, v: f64) -> core::result::Result<StrictJson, E>
+    where
+        E: de::Error,
+    {
+        if !v.is_finite() {
+            return Err(de::Error::custom("non-finite numbers are not valid JSON"));
+        }
+        // A number literal that overflows i64/u64 (e.g. an integer too large to
+        // represent exactly) is delivered here as an already-lossy f64. If it is
+        // integer-valued and beyond the safe range, the original literal could
+        // not have round-tripped losslessly, so reject it as non-I-JSON.
+        if v.fract() == 0.0 && v.abs() >= I_JSON_MAX_SAFE_INTEGER as f64 {
+            return Err(de::Error::custom(format!(
+                "number {v} is not a lossless I-JSON integer (outside +/-2^53)"
+            )));
+        }
+        Ok(StrictJson::Float(v))
+    }
+
+    fn visit_str<E>(self, v: &str) -> core::result::Result<StrictJson, E> {
+        Ok(StrictJson::Str(v.to_string()))
+    }
+
+    fn visit_string<E>(self, v: String) -> core::result::Result<StrictJson, E> {
+        Ok(StrictJson::Str(v))
+    }
+
+    fn visit_none<E>(self) -> core::result::Result<StrictJson, E> {
+        Ok(StrictJson::Null)
+    }
+
+    fn visit_unit<E>(self) -> core::result::Result<StrictJson, E> {
+        Ok(StrictJson::Null)
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> core::result::Result<StrictJson, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        let mut items = Vec::new();
+        while let Some(item) = seq.next_element()? {
+            items.push(item);
+        }
+        Ok(StrictJson::Array(items))
+    }
+
+    fn visit_map<A>(self, mut map: A) -> core::result::Result<StrictJson, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        let mut entries: Vec<(String, StrictJson)> = Vec::new();
+        // Track seen keys to reject duplicates instead of silently de-duping.
+        let mut seen: BTreeMap<String, ()> = BTreeMap::new();
+        while let Some((key, value)) = map.next_entry::<String, StrictJson>()? {
+            if seen.insert(key.clone(), ()).is_some() {
+                return Err(de::Error::custom(format!("duplicate object key: {key:?}")));
+            }
+            entries.push((key, value));
+        }
+        Ok(StrictJson::Object(entries))
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
@@ -676,5 +903,146 @@ mod tests {
         // The canonical form has no whitespace.
         assert!(!canonical.contains(' '));
         assert!(!canonical.contains('\n'));
+    }
+
+    // --- BAC-555: strict input validation (duplicate keys / non-I-JSON) ---
+
+    #[test]
+    fn strict_rejects_duplicate_keys() {
+        // serde_json::Value would silently keep the last value ("last-wins");
+        // the strict path must reject the input outright.
+        let err = canonical_json_string_from_str(r#"{"a":1,"a":2}"#).unwrap_err();
+        match err {
+            Error::CanonicalJson(msg) => assert!(
+                msg.contains("duplicate object key"),
+                "unexpected message: {msg}"
+            ),
+            other => panic!("expected CanonicalJson error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn strict_rejects_duplicate_keys_nested() {
+        let err = canonical_json_string_from_str(r#"{"outer":{"x":1,"x":2}}"#).unwrap_err();
+        assert!(matches!(err, Error::CanonicalJson(_)));
+    }
+
+    #[test]
+    fn strict_rejects_duplicate_keys_last_wins_collapse_proof() {
+        // Demonstrates the render-A/sign-B vector: two distinct payloads that
+        // collapse to identical bytes via serde_json::Value, both rejected.
+        let payload_a = r#"{"amount":1,"amount":1000000}"#;
+        let collapsed: Value = serde_json::from_str(payload_a).unwrap();
+        // serde_json keeps the last value (1000000), losing the first.
+        assert_eq!(collapsed["amount"], serde_json::json!(1_000_000));
+        // The strict path refuses to canonicalize the ambiguous input.
+        assert!(canonical_json_string_from_str(payload_a).is_err());
+    }
+
+    #[test]
+    fn strict_rejects_integer_literal_beyond_safe_range() {
+        // 2^53 + 1 cannot be represented exactly by an IEEE-754 double; rather
+        // than coerce it to a precision-losing value, reject it.
+        let err = canonical_json_string_from_str("9007199254740993").unwrap_err();
+        assert!(matches!(err, Error::CanonicalJson(_)), "got {err:?}");
+    }
+
+    #[test]
+    fn strict_rejects_huge_integer_literal_that_overflows_u64() {
+        // 184467440737095516160 > u64::MAX, so serde_json delivers it as a lossy
+        // f64. It is integer-valued and far beyond 2^53, so it is rejected.
+        let err = canonical_json_string_from_str("184467440737095516160").unwrap_err();
+        assert!(matches!(err, Error::CanonicalJson(_)), "got {err:?}");
+    }
+
+    #[test]
+    fn strict_rejects_negative_integer_literal_beyond_safe_range() {
+        let err = canonical_json_string_from_str("-9007199254740993").unwrap_err();
+        assert!(matches!(err, Error::CanonicalJson(_)), "got {err:?}");
+    }
+
+    #[test]
+    fn strict_rejects_non_finite_via_overflow() {
+        // 1e400 overflows to +Infinity, which is not valid JSON.
+        let err = canonical_json_string_from_str("1e400").unwrap_err();
+        assert!(matches!(err, Error::CanonicalJson(_)), "got {err:?}");
+    }
+
+    #[test]
+    fn strict_rejects_trailing_data() {
+        let err = canonical_json_string_from_str(r#"{"a":1} garbage"#).unwrap_err();
+        assert!(matches!(err, Error::CanonicalJson(_)), "got {err:?}");
+    }
+
+    #[test]
+    fn strict_accepts_safe_range_boundary() {
+        // 2^53 - 1 is the largest safe integer and must be accepted.
+        assert_eq!(
+            canonical_json_string_from_str("9007199254740991").unwrap(),
+            "9007199254740991"
+        );
+        // 2^53 itself is the boundary constant; accepted as an exact integer.
+        assert_eq!(
+            canonical_json_string_from_str("9007199254740992").unwrap(),
+            "9007199254740992"
+        );
+    }
+
+    #[test]
+    fn strict_matches_typed_path_for_wellformed_ijson() {
+        // For well-formed I-JSON, the strict text path must produce byte-identical
+        // output to the existing typed (serde_json::Value) canonicalizer.
+        let cases = [
+            r#"{"z":1,"a":2,"m":3}"#,
+            r#"{"2":"b","10":"a","a":0}"#,
+            r#"{"outer":{"inner":"value"}}"#,
+            r#"[1,2,3]"#,
+            r#"{"a":{"b":{"c":[1,{"d":true}]}}}"#,
+            r#"{"flag":true,"none":null,"neg":-42,"frac":1.5}"#,
+            r#"{}"#,
+            r#"[]"#,
+            r#""hello \" \\ \n world""#,
+            "null",
+            "true",
+            "3.14159",
+        ];
+        for case in cases {
+            let typed: Value = serde_json::from_str(case).unwrap();
+            let typed_canonical = canonicalize(&typed).unwrap();
+            let strict_canonical = canonical_json_string_from_str(case).unwrap();
+            assert_eq!(
+                strict_canonical, typed_canonical,
+                "strict path diverged from typed path for input: {case}"
+            );
+        }
+    }
+
+    #[test]
+    fn strict_bytes_match_string() {
+        let input = r#"{"z":1,"a":[2,3]}"#;
+        let bytes = canonical_json_bytes_from_str(input).unwrap();
+        let string = canonical_json_string_from_str(input).unwrap();
+        assert_eq!(bytes, string.as_bytes());
+    }
+
+    #[test]
+    fn strict_roundtrips_losslessly() {
+        // A valid typed value canonicalizes deterministically and the canonical
+        // form parses back to the same logical value.
+        let input = r#"{"action":"file_read","path":"/etc/hosts","ts":1710000000,"ok":true}"#;
+        let canonical = canonical_json_string_from_str(input).unwrap();
+        let reparsed: Value = serde_json::from_str(&canonical).unwrap();
+        let original: Value = serde_json::from_str(input).unwrap();
+        assert_eq!(reparsed, original);
+        // Deterministic across repeated calls.
+        assert_eq!(canonical, canonical_json_string_from_str(input).unwrap());
+    }
+
+    #[test]
+    fn strict_preserves_unicode_key_ordering() {
+        // Same UTF-16 code-unit ordering guarantee as the typed path.
+        let input = "{\"\u{e000}\":1,\"\u{10437}\":2}";
+        let strict = canonical_json_string_from_str(input).unwrap();
+        assert_eq!(strict, "{\"\u{10437}\":2,\"\u{e000}\":1}");
     }
 }
