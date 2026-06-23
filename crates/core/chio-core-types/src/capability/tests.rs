@@ -1984,6 +1984,7 @@ fn delegate_rejects_extending_expiry() {
     let attenuation = crate::delegation_receipt::ScopeAttenuation {
         steps: vec![],
         child_expires_at: Some(3000), // > parent.expires_at
+        budget_share_bps: None,
     };
     let err = delegate(
         &parent,
@@ -2006,6 +2007,7 @@ fn delegate_rejects_extending_expiry() {
         ScopeAttenuation {
             steps: vec![],
             child_expires_at: Some(1800),
+            budget_share_bps: None,
         },
         1500,
         [0_u8; 16],
@@ -2381,4 +2383,291 @@ fn bac573_continuation_token_verify_at_bad_signature_fails_first() {
     let (_signer, mut token) = bac573_continuation_token(1000, 2000);
     token.subject = Keypair::generate().public_key(); // breaks the signature
     assert!(!token.verify_signature_at(9999).unwrap());
+}
+
+// ---------------------------------------------------------------------------
+// BAC-548: attenuation-step narrowing + parent-relative budget_share_bps.
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "delegation")]
+fn capped_grant(
+    server: &str,
+    tool: &str,
+    ops: Vec<Operation>,
+    max_invocations: Option<u32>,
+    max_total_cost: Option<MonetaryAmount>,
+) -> ToolGrant {
+    ToolGrant {
+        server_id: server.to_string(),
+        tool_name: tool.to_string(),
+        operations: ops,
+        constraints: vec![],
+        max_invocations,
+        max_cost_per_invocation: None,
+        max_total_cost,
+        dpop_required: None,
+    }
+}
+
+/// A valid narrowing step (reduce max_invocations below the parent cap) is
+/// accepted and rides onto the signed link.
+#[cfg(feature = "delegation")]
+#[test]
+fn delegate_accepts_valid_narrowing_step() {
+    use crate::delegation_receipt::ScopeAttenuation;
+
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let delegatee = Keypair::generate();
+
+    let parent_scope = make_scope(vec![capped_grant(
+        "srv-a",
+        "tool-x",
+        vec![Operation::Invoke, Operation::Delegate],
+        Some(10),
+        None,
+    )]);
+    let parent = delegate_parent_token(&issuer, &subject, parent_scope, 1000, 2000);
+
+    // Child scope narrows max_invocations 10 -> 4; the step mirrors that.
+    let child_scope = make_scope(vec![capped_grant(
+        "srv-a",
+        "tool-x",
+        vec![Operation::Invoke],
+        Some(4),
+        None,
+    )]);
+    let attenuation = ScopeAttenuation::from_steps(vec![Attenuation::ReduceBudget {
+        server_id: "srv-a".to_string(),
+        tool_name: "tool-x".to_string(),
+        max_invocations: 4,
+    }]);
+
+    let receipt = delegate(
+        &parent,
+        &child_scope,
+        &subject,
+        &delegatee.public_key(),
+        attenuation,
+        1500,
+        [9_u8; 16],
+    )
+    .unwrap();
+    assert!(receipt.link.verify_signature().unwrap());
+    assert_eq!(receipt.link.attenuations.len(), 1);
+}
+
+/// A widening step (raise max_invocations above the parent cap) is rejected
+/// fail-closed even though the child *scope* itself is a subset.
+#[cfg(feature = "delegation")]
+#[test]
+fn delegate_rejects_widening_step() {
+    use crate::delegation_receipt::ScopeAttenuation;
+
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let delegatee = Keypair::generate();
+
+    let parent_scope = make_scope(vec![capped_grant(
+        "srv-a",
+        "tool-x",
+        vec![Operation::Invoke, Operation::Delegate],
+        Some(10),
+        None,
+    )]);
+    let parent = delegate_parent_token(&issuer, &subject, parent_scope, 1000, 2000);
+
+    // Child scope is a valid subset (max 5 <= 10), so subset validation passes,
+    // but the step claims a budget of 50 invocations -- a widening.
+    let child_scope = make_scope(vec![capped_grant(
+        "srv-a",
+        "tool-x",
+        vec![Operation::Invoke],
+        Some(5),
+        None,
+    )]);
+    let attenuation = ScopeAttenuation::from_steps(vec![Attenuation::ReduceBudget {
+        server_id: "srv-a".to_string(),
+        tool_name: "tool-x".to_string(),
+        max_invocations: 50, // > parent cap 10
+    }]);
+
+    let err = delegate(
+        &parent,
+        &child_scope,
+        &subject,
+        &delegatee.public_key(),
+        attenuation,
+        1500,
+        [0_u8; 16],
+    )
+    .unwrap_err();
+    assert!(matches!(err, Error::AttenuationViolation { .. }));
+}
+
+/// A step targeting a tool the parent never held is a widening and rejected.
+#[cfg(feature = "delegation")]
+#[test]
+fn delegate_rejects_step_for_unknown_tool() {
+    use crate::delegation_receipt::ScopeAttenuation;
+
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let delegatee = Keypair::generate();
+
+    let parent_scope = make_scope(vec![make_grant(
+        "srv-a",
+        "tool-x",
+        vec![Operation::Invoke, Operation::Delegate],
+    )]);
+    let parent = delegate_parent_token(&issuer, &subject, parent_scope, 1000, 2000);
+    let child_scope = make_scope(vec![make_grant("srv-a", "tool-x", vec![Operation::Invoke])]);
+
+    let attenuation = ScopeAttenuation::from_steps(vec![Attenuation::AddConstraint {
+        server_id: "srv-a".to_string(),
+        tool_name: "tool-NOT-IN-PARENT".to_string(),
+        constraint: Constraint::MaxLength(8),
+    }]);
+
+    let err = delegate(
+        &parent,
+        &child_scope,
+        &subject,
+        &delegatee.public_key(),
+        attenuation,
+        1500,
+        [0_u8; 16],
+    )
+    .unwrap_err();
+    assert!(matches!(err, Error::AttenuationViolation { .. }));
+}
+
+/// A monetary cost step in a different currency than the parent's cap is
+/// rejected (same currency required for a meaningful narrowing comparison).
+#[cfg(feature = "delegation")]
+#[test]
+fn delegate_rejects_cost_step_currency_switch() {
+    use crate::delegation_receipt::ScopeAttenuation;
+
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let delegatee = Keypair::generate();
+
+    let parent_scope = make_scope(vec![capped_grant(
+        "srv-a",
+        "tool-x",
+        vec![Operation::Invoke, Operation::Delegate],
+        None,
+        Some(MonetaryAmount {
+            units: 1_000,
+            currency: "USD".to_string(),
+        }),
+    )]);
+    let parent = delegate_parent_token(&issuer, &subject, parent_scope, 1000, 2000);
+    let child_scope = make_scope(vec![capped_grant(
+        "srv-a",
+        "tool-x",
+        vec![Operation::Invoke],
+        None,
+        Some(MonetaryAmount {
+            units: 500,
+            currency: "USD".to_string(),
+        }),
+    )]);
+
+    let attenuation = ScopeAttenuation::from_steps(vec![Attenuation::ReduceTotalCost {
+        server_id: "srv-a".to_string(),
+        tool_name: "tool-x".to_string(),
+        // Lower number but different currency: not a valid narrowing.
+        max_total_cost: MonetaryAmount {
+            units: 1,
+            currency: "EUR".to_string(),
+        },
+    }]);
+
+    let err = delegate(
+        &parent,
+        &child_scope,
+        &subject,
+        &delegatee.public_key(),
+        attenuation,
+        1500,
+        [0_u8; 16],
+    )
+    .unwrap_err();
+    assert!(matches!(err, Error::AttenuationViolation { .. }));
+}
+
+/// A child budget_share_bps within the parent's share is accepted; one that
+/// exceeds the parent's share is rejected parent-relative.
+#[cfg(feature = "delegation")]
+#[test]
+fn delegate_enforces_parent_relative_budget_share() {
+    use crate::delegation_receipt::ScopeAttenuation;
+
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let delegatee = Keypair::generate();
+
+    let parent_scope = make_scope(vec![make_grant(
+        "srv-a",
+        "tool-x",
+        vec![Operation::Invoke, Operation::Delegate],
+    )]);
+    // Parent only holds 30% of the budget; re-sign as an attenuated token so the
+    // budget_share_bps is covered by the signature and verify_signature() passes.
+    let plain = delegate_parent_token(&issuer, &subject, parent_scope, 1000, 2000);
+    let attenuated_parent = CapabilityToken::sign_attenuated(
+        CapabilityTokenAttenuationBody {
+            body: plain.body(),
+            caveats: vec![],
+            scope_attenuations: vec![],
+            attenuation_proof: AttenuationProof {
+                parent_scope_hash: scope_hash(&plain.scope).unwrap(),
+                child_scope_hash: scope_hash(&plain.scope).unwrap(),
+                normalized_subset_proof: compute_attenuation_witness(&plain.scope, &plain.scope)
+                    .unwrap(),
+            },
+            budget_share_bps: Some(3_000),
+        },
+        &issuer,
+    )
+    .unwrap();
+    assert!(attenuated_parent.verify_signature().unwrap());
+    let child_scope = make_scope(vec![make_grant("srv-a", "tool-x", vec![Operation::Invoke])]);
+
+    // A child claiming 50% exceeds the parent's 30% -> reject.
+    let over = ScopeAttenuation {
+        steps: vec![],
+        child_expires_at: None,
+        budget_share_bps: Some(5_000),
+    };
+    let err = delegate(
+        &attenuated_parent,
+        &child_scope,
+        &subject,
+        &delegatee.public_key(),
+        over,
+        1500,
+        [0_u8; 16],
+    )
+    .unwrap_err();
+    assert!(matches!(err, Error::AttenuationViolation { .. }));
+
+    // A child claiming 20% is within the parent's 30% -> accept.
+    let within = ScopeAttenuation {
+        steps: vec![],
+        child_expires_at: None,
+        budget_share_bps: Some(2_000),
+    };
+    let ok = delegate(
+        &attenuated_parent,
+        &child_scope,
+        &subject,
+        &delegatee.public_key(),
+        within,
+        1500,
+        [1_u8; 16],
+    );
+    assert!(ok.is_ok());
 }

@@ -12,6 +12,7 @@ use crate::signer_binding::ensure_keypair_matches_embedded_key;
 use super::caveat::GrantSubsetRelation;
 use super::scope::{ChioScope, Constraint, MonetaryAmount, Operation};
 use super::token::CapabilityToken;
+use super::validation::validate_parent_relative_budget_share_bps;
 
 /// Hash of a canonicalized scope, encoded as lowercase SHA-256 hex.
 pub type ScopeHash = String;
@@ -290,6 +291,179 @@ pub fn validate_delegation_chain_with_trust_root(
     Ok(())
 }
 
+/// Locate the parent tool grant that an attenuation step targets.
+///
+/// Steps are addressed by `(server_id, tool_name)`. A step that references a
+/// grant the parent never held is itself a widening (it asserts authority over
+/// a tool outside the parent's scope) and must be rejected fail-closed.
+fn find_parent_tool_grant<'a>(
+    parent: &'a ChioScope,
+    server_id: &str,
+    tool_name: &str,
+) -> Result<&'a super::scope::ToolGrant> {
+    parent
+        .grants
+        .iter()
+        .find(|grant| grant.server_id == server_id && grant.tool_name == tool_name)
+        .ok_or_else(|| Error::AttenuationViolation {
+            reason: format!(
+                "attenuation step targets tool {server_id}:{tool_name} not present in parent scope"
+            ),
+        })
+}
+
+/// Validate that a single attenuation step is a TRUE narrowing of the parent.
+///
+/// Each step is checked reduce-only against the parent capability's scope and
+/// expiry. A step that would widen the parent (raise a cap, target a tool the
+/// parent never held, or extend expiry) is rejected with
+/// [`Error::AttenuationViolation`]. Removing tools, removing operations, and
+/// adding constraints are narrowings by construction, but the targeted grant
+/// must still exist in the parent so a step cannot smuggle in fresh authority.
+fn validate_attenuation_step(
+    parent_scope: &ChioScope,
+    parent_expires_at: u64,
+    step: &Attenuation,
+) -> Result<()> {
+    match step {
+        Attenuation::RemoveTool {
+            server_id,
+            tool_name,
+        }
+        | Attenuation::AddConstraint {
+            server_id,
+            tool_name,
+            ..
+        } => {
+            // Removing a tool or adding a constraint is a narrowing; the grant
+            // must exist in the parent so the step cannot fabricate authority.
+            find_parent_tool_grant(parent_scope, server_id, tool_name)?;
+            Ok(())
+        }
+        Attenuation::RemoveOperation {
+            server_id,
+            tool_name,
+            operation,
+        } => {
+            let grant = find_parent_tool_grant(parent_scope, server_id, tool_name)?;
+            if !grant.operations.contains(operation) {
+                return Err(Error::AttenuationViolation {
+                    reason: format!(
+                        "attenuation step removes operation {operation:?} from {server_id}:{tool_name} but the parent grant does not hold it"
+                    ),
+                });
+            }
+            Ok(())
+        }
+        Attenuation::ReduceBudget {
+            server_id,
+            tool_name,
+            max_invocations,
+        } => {
+            let grant = find_parent_tool_grant(parent_scope, server_id, tool_name)?;
+            if let Some(parent_max) = grant.max_invocations {
+                if *max_invocations > parent_max {
+                    return Err(Error::AttenuationViolation {
+                        reason: format!(
+                            "attenuation step raises max_invocations for {server_id}:{tool_name} to {max_invocations}, above parent cap {parent_max}"
+                        ),
+                    });
+                }
+            }
+            // Parent uncapped (None) accepts any finite child cap: that narrows.
+            Ok(())
+        }
+        Attenuation::ReduceCostPerInvocation {
+            server_id,
+            tool_name,
+            max_cost_per_invocation,
+        } => {
+            let grant = find_parent_tool_grant(parent_scope, server_id, tool_name)?;
+            validate_cost_narrowing(
+                grant.max_cost_per_invocation.as_ref(),
+                max_cost_per_invocation,
+                server_id,
+                tool_name,
+                "max_cost_per_invocation",
+            )
+        }
+        Attenuation::ReduceTotalCost {
+            server_id,
+            tool_name,
+            max_total_cost,
+        } => {
+            let grant = find_parent_tool_grant(parent_scope, server_id, tool_name)?;
+            validate_cost_narrowing(
+                grant.max_total_cost.as_ref(),
+                max_total_cost,
+                server_id,
+                tool_name,
+                "max_total_cost",
+            )
+        }
+        Attenuation::ShortenExpiry { new_expires_at } => {
+            if *new_expires_at > parent_expires_at {
+                return Err(Error::AttenuationViolation {
+                    reason: format!(
+                        "attenuation step extends expiry to {new_expires_at}, beyond parent expires_at {parent_expires_at}"
+                    ),
+                });
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Shared reduce-only check for the two monetary-cost attenuation steps.
+///
+/// A cost cap narrows only when it is denominated in the same currency as the
+/// parent's cap and does not exceed it. A parent with no cap (`None`) accepts
+/// any child cap as a narrowing.
+fn validate_cost_narrowing(
+    parent_cap: Option<&MonetaryAmount>,
+    child_cap: &MonetaryAmount,
+    server_id: &str,
+    tool_name: &str,
+    field: &str,
+) -> Result<()> {
+    let Some(parent_cap) = parent_cap else {
+        // Parent uncapped: introducing any finite cap is a narrowing.
+        return Ok(());
+    };
+    if child_cap.currency != parent_cap.currency {
+        return Err(Error::AttenuationViolation {
+            reason: format!(
+                "attenuation step changes {field} currency for {server_id}:{tool_name} from {} to {}; same currency required",
+                parent_cap.currency, child_cap.currency
+            ),
+        });
+    }
+    if child_cap.units > parent_cap.units {
+        return Err(Error::AttenuationViolation {
+            reason: format!(
+                "attenuation step raises {field} for {server_id}:{tool_name} to {} {}, above parent cap {} {}",
+                child_cap.units, child_cap.currency, parent_cap.units, parent_cap.currency
+            ),
+        });
+    }
+    Ok(())
+}
+
+/// Validate every attenuation step against the parent capability, fail-closed.
+///
+/// Returns `Ok(())` only when all steps are true narrowings. The first
+/// widening step short-circuits with an [`Error::AttenuationViolation`].
+fn validate_attenuation_steps(
+    parent_scope: &ChioScope,
+    parent_expires_at: u64,
+    steps: &[Attenuation],
+) -> Result<()> {
+    for step in steps {
+        validate_attenuation_step(parent_scope, parent_expires_at, step)?;
+    }
+    Ok(())
+}
+
 /// Validate that a child scope is a valid attenuation of a parent scope.
 ///
 /// Returns Ok(()) if child is a subset of parent. Returns an error otherwise.
@@ -531,6 +705,12 @@ fn validate_delegable_child_scope(parent: &ChioScope, child: &ChioScope) -> Resu
 ///   [`Operation::Delegate`].
 /// * The proposed `child_scope` is not a subset of the parent token's
 ///   scope (rejected by [`validate_attenuation`]).
+/// * Any `attenuation.steps` entry is not a true narrowing of the parent
+///   (raises a cap, targets a tool outside the parent scope, or extends
+///   expiry). Steps are validated reduce-only rather than copied verbatim.
+/// * `attenuation.budget_share_bps` exceeds the parent's share. The share is
+///   parent-relative: a child can never claim a larger fraction of the budget
+///   than the parent holds (an absent parent share is treated as 100%).
 /// * The requested `child_expires_at` is greater than the parent's
 ///   `expires_at` (rejected as an [`Error::AttenuationViolation`]).
 /// * `delegator_keypair.public_key() != parent.subject` (the mint helper
@@ -572,6 +752,18 @@ pub fn delegate(
 
     validate_attenuation(&parent.scope, child_scope)?;
     validate_delegable_child_scope(&parent.scope, child_scope)?;
+
+    // Each attenuation step must be a TRUE narrowing of the parent: previously
+    // the steps were copied onto the signed link verbatim, so a widening step
+    // (raise a cap, target a tool outside the parent, extend expiry) could ride
+    // through unchecked. Validate reduce-only, fail-closed.
+    validate_attenuation_steps(&parent.scope, parent.expires_at, &attenuation.steps)?;
+
+    // `budget_share_bps` is parent-relative: a delegated share is a fraction of
+    // the parent's remaining/granted budget and can never widen it.
+    if let Some(child_share) = attenuation.budget_share_bps {
+        validate_parent_relative_budget_share_bps(parent.budget_share_bps, child_share)?;
+    }
 
     let child_expires_at = attenuation.child_expires_at.unwrap_or(parent.expires_at);
     if child_expires_at > parent.expires_at {
