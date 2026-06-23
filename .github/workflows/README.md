@@ -1,5 +1,62 @@
 # GitHub Actions workflows
 
+## The PR build/lint/test gate lives in `ci.yml` (BAC-609)
+
+The required gate that catches workspace-wide compile breakage is the
+`check` job ("Build, lint, test") in [`ci.yml`](./ci.yml). It runs on
+`pull_request` and `push` to `main`, on the toolchain pinned by the
+repo-root `rust-toolchain.toml` (1.93.0), with `Swatinem/rust-cache` for the
+cargo registry/target cache. The four gate steps are:
+
+| Gate | Step in `ci.yml` | Command |
+| ---- | ---------------- | ------- |
+| Format | "Workspace format" | `cargo fmt --all -- --check` |
+| Lint | "Workspace clippy" | `cargo clippy --workspace --lib --bins --examples -- -D warnings` |
+| **Workspace build** | "Workspace build" | `cargo build --workspace` |
+| Tests | "Workspace tests" + "Wasm guards library tests" | `cargo test --workspace --exclude chio-wasm-guards`, then `cargo test -p chio-wasm-guards --lib` |
+
+### Why the build step MUST stay `--workspace`, not per-crate (`-p`)
+
+BAC-539 was a class of break a per-crate scoped gate misses: a new enum
+variant compiles fine in its own crate but breaks an exhaustive `match` in a
+*downstream* crate. A `-p <crate>` build only compiles that crate's tree, so
+cross-crate breakage slips through; `cargo build --workspace` compiles every
+member's `src/`, so the downstream non-exhaustive `match` fails the build.
+
+Do not narrow the "Workspace build" step to `-p`/path-scoped invocations, and
+do not delete it in favor of relying on clippy alone (clippy here is scoped to
+`--lib --bins --examples` and likewise does not compile test/bench targets).
+Keeping the unscoped `cargo build --workspace` step is the invariant that
+closes the BAC-539 gap.
+
+### The test lane: workspace-wide except a separate wasm-guards lib lane
+
+The tests run in two steps, not one, and they do *not* uniformly cover
+integration-test targets:
+
+- "Workspace tests" runs `cargo test --workspace --exclude chio-wasm-guards`.
+  Across every other workspace member this compiles and runs `#[cfg(test)]`
+  unit tests *and* the `tests/` integration targets, extending the
+  build-breakage guarantee above to test code. `chio-wasm-guards` is excluded
+  here because its `tests/` integration suite needs a wasm-capable harness and
+  cannot run in this plain `cargo test` lane.
+- "Wasm guards library tests" then runs `cargo test -p chio-wasm-guards --lib`.
+  `--lib` is "test only this package's library", so this lane compiles and runs
+  only `chio-wasm-guards`'s in-crate unit tests. The many integration targets
+  under `crates/chio-wasm-guards/tests/` are **not** compiled or run by this
+  gate.
+
+So the wasm-guards carveout is deliberate but partial: the crate's library code
+is gated, while its integration-test targets are not exercised by `ci.yml` and
+rely on the dedicated wasm/conformance workflows instead. Do not "fix" this by
+folding `chio-wasm-guards` back into the `--workspace` test step (it will fail
+in the plain lane), and do not assume a green `ci.yml` run covered the
+wasm-guards integration tests.
+
+> Note (firmware/console): the arc workspace is Rust-only; the firmware and
+> console build pipelines referenced by BAC-609 live in their own repos and
+> are out of scope for this workflow.
+
 ## The `chio-pheromone-*` gate family is kept as separate files
 
 The 15 `chio-pheromone-*.yml` workflows look like near-duplicates but must not be
