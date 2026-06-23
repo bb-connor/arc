@@ -107,7 +107,12 @@ chio-federation = { workspace = true, features = ["demo"] }
 # evaluate_with_crypto_floor_and_budgets via chio-kernel-core directly.
 # Portable verifier surface for negotiated-floor capability tests.
 chio-kernel-core = { workspace = true }
-chio-custody-hw = { workspace = true }
+# `dev-fixtures` exposes the synthetic App Attest compact-map shape and the
+# Play Integrity signer/JWKS helpers that the mobile-attestation threat tests
+# use to mint deterministic adversarial inputs. These bypasses are compiled
+# out of production builds of chio-custody-hw; the threat suite is a
+# test-only consumer, so it opts in here.
+chio-custody-hw = { workspace = true, features = ["dev-fixtures"] }
 chio-http-core = { workspace = true }
 chio-http-session = { workspace = true }
 chio-guards = { workspace = true }

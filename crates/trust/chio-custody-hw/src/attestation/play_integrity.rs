@@ -2,9 +2,18 @@
 //!
 //! # Trust contract
 //!
-//! The verifier takes the current Google JWKS document from the caller,
-//! selects the JWK by token `kid`, validates the JWS under ES256/P-256
-//! key material, and then enforces the Play Integrity
+//! The verifier validates the JWS against a **pinned** Google JWKS rather
+//! than a caller-supplied one: a malicious or compromised caller cannot
+//! swap in its own verification key. The pinned key material lives in
+//! [`super::google_root`]. A caller-supplied JWKS is only honoured when the
+//! crate is built with the `dev-fixtures` feature (or under `cfg(test)`)
+//! and the caller explicitly opts in via
+//! [`PlayIntegrityVerificationInput::allow_caller_supplied_jwks`]; in a
+//! production build that flag has no effect and the pinned JWKS is always
+//! used.
+//!
+//! The verifier selects the JWK by token `kid`, validates the JWS under
+//! ES256/P-256 key material, and then enforces the Play Integrity
 //! claim contract:
 //!
 //! - `aud` must match `expected_audience`.
@@ -20,7 +29,7 @@ use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 
 use super::errors::AttestationError;
-use super::google_root::GOOGLE_PLAY_INTEGRITY_ISSUER;
+use super::google_root::{play_integrity_pinned_jwks_json, GOOGLE_PLAY_INTEGRITY_ISSUER};
 
 pub const PLAY_RECOGNIZED: &str = "PLAY_RECOGNIZED";
 pub const MEETS_DEVICE_INTEGRITY: &str = "MEETS_DEVICE_INTEGRITY";
@@ -31,7 +40,13 @@ pub struct PlayIntegrityVerificationInput<'a> {
     pub expected_nonce: &'a str,
     pub expected_package_name: &'a str,
     pub expected_audience: &'a str,
+    /// Caller-supplied JWKS. Ignored in production: the verifier uses the
+    /// pinned Google JWKS unless the crate is built with `dev-fixtures`
+    /// (or `cfg(test)`) and `allow_caller_supplied_jwks` is `true`.
     pub jwks_json: &'a str,
+    /// Opt-in to verifying against `jwks_json` instead of the pinned JWKS.
+    /// Has no effect in a production build (the pinned JWKS is always used).
+    pub allow_caller_supplied_jwks: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,7 +107,8 @@ pub fn verify_play_integrity(
     let kid = header.kid.as_deref().ok_or_else(|| {
         AttestationError::PlayIntegrityInvalidToken("token header is missing kid".to_string())
     })?;
-    let jwks: JwkSet = serde_json::from_str(input.jwks_json)
+    let jwks_source = select_jwks(&input);
+    let jwks: JwkSet = serde_json::from_str(&jwks_source)
         .map_err(|error| AttestationError::PlayIntegrityInvalidToken(format!("JWKS: {error}")))?;
     let jwk = jwks.find(kid).ok_or_else(|| {
         AttestationError::PlayIntegrityInvalidToken(format!("JWKS has no key for kid {kid}"))
@@ -142,6 +158,26 @@ pub fn verify_play_integrity(
         app_recognition_verdict: claims.app_integrity.app_recognition_verdict,
         device_recognition_verdict: claims.device_integrity.device_recognition_verdict,
     })
+}
+
+/// Choose which JWKS to verify against.
+///
+/// Production builds always return the pinned Google JWKS, ignoring any
+/// caller-supplied document. Test/`dev-fixtures` builds may honour a
+/// caller-supplied JWKS when the caller opts in, so deterministic tests can
+/// drive negative cases (symmetric keys, wrong curve, etc.).
+#[cfg(any(test, feature = "dev-fixtures"))]
+fn select_jwks(input: &PlayIntegrityVerificationInput<'_>) -> String {
+    if input.allow_caller_supplied_jwks {
+        input.jwks_json.to_string()
+    } else {
+        play_integrity_pinned_jwks_json()
+    }
+}
+
+#[cfg(not(any(test, feature = "dev-fixtures")))]
+fn select_jwks(_input: &PlayIntegrityVerificationInput<'_>) -> String {
+    play_integrity_pinned_jwks_json()
 }
 
 fn claim_nonce(claims: &PlayIntegrityClaims) -> Result<&str, AttestationError> {
