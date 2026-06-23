@@ -14,12 +14,14 @@ use chio_core_types::capability::{
     token::{CapabilityToken, CapabilityTokenAttenuationBody, CapabilityTokenBody},
 };
 use chio_core_types::crypto::Keypair;
+use chio_core_types::receipt::signing::ReceiptSigningHandle;
 use chio_core_types::receipt::{
     body::ChioReceiptBody, decision::Decision, decision::ToolCallAction, kinds::TrustLevel,
 };
 use chio_kernel_core::{
-    evaluate, sign_receipt, verify_capability, CapabilityError, EvaluateInput, FixedClock, Guard,
-    GuardContext, KernelCoreError, PortableToolCallRequest, Verdict,
+    evaluate, sign_receipt, sign_receipt_with_handle, verify_capability, CapabilityError,
+    EvaluateInput, FixedClock, Guard, GuardContext, KernelCoreError, PortableToolCallRequest,
+    ReceiptSigningError, Verdict,
 };
 use serde_json::json;
 
@@ -771,4 +773,123 @@ fn sign_receipt_signature_changes_when_economic_authorization_changes() {
     assert!(original.verify_signature().unwrap());
     assert!(changed.verify_signature().unwrap());
     assert_ne!(original.signature.to_hex(), changed.signature.to_hex());
+}
+
+/// Build a money-touching receipt body whose `content_hash` field is set
+/// independently of any specific content, so a test can assert the signer
+/// either accepts (matching hash) or refuses (mismatched hash) it.
+fn wysiwys_body(keypair: &Keypair, content_hash: String) -> ChioReceiptBody {
+    ChioReceiptBody {
+        id: "rcpt-wysiwys-1".to_string(),
+        timestamp: ISSUED_AT,
+        capability_id: "cap-wysiwys-1".to_string(),
+        tool_server: "srv-pay".to_string(),
+        tool_name: "charge".to_string(),
+        action: ToolCallAction::from_parameters(json!({"invoice_id": "inv-99"})).unwrap(),
+        decision: Some(Decision::Allow),
+        receipt_kind: Default::default(),
+        boundary_class: Default::default(),
+        observation_outcome: None,
+        tool_origin: Default::default(),
+        redaction_mode: Default::default(),
+        actor_chain: Vec::new(),
+        content_hash,
+        policy_hash: "0".repeat(64),
+        evidence: vec![],
+        metadata: None,
+        trust_level: TrustLevel::Mediated,
+        tenant_id: None,
+        kernel_key: keypair.public_key(),
+        bbs_projection_version: None,
+    }
+}
+
+/// BAC-539 regression: the render-A / sign-B forgery is rejected.
+///
+/// A caller evaluates and renders content `A` to a human (so the human "sees"
+/// the hash of `A`), but submits a receipt body claiming the hash of a
+/// different content `B`. The signing handle is bound to `A`; the signer must
+/// recompute `content_hash` over `A` and refuse, because the body claims `B`.
+#[test]
+fn sign_receipt_with_handle_rejects_render_a_sign_b() {
+    let keypair = Keypair::generate();
+    let backend = chio_core_types::crypto::Ed25519Backend::new(keypair.clone());
+
+    // Content A is what was actually evaluated and shown to the human.
+    let content_a = json!({"transfer": {"to": "alice", "amount": 5}});
+    // Content B is what the attacker wants the signature to silently cover.
+    let content_b = json!({"transfer": {"to": "mallory", "amount": 5000}});
+
+    // The handle is bound to A (the trust boundary recomputes its hash).
+    let handle = ReceiptSigningHandle::from_content(&content_a).unwrap();
+
+    // The caller submits a body claiming the hash of B (render-A / sign-B).
+    let hash_b = chio_core_types::crypto::sha256_hex(
+        &chio_core_types::canonical::canonical_json_bytes(&content_b).unwrap(),
+    );
+    let body = wysiwys_body(&keypair, hash_b.clone());
+
+    let error = sign_receipt_with_handle(body, &backend, handle).unwrap_err();
+    match error {
+        ReceiptSigningError::ContentHashMismatch {
+            recomputed,
+            claimed,
+        } => {
+            // The signer recomputed the hash of A and refused the claimed B.
+            let hash_a = chio_core_types::crypto::sha256_hex(
+                &chio_core_types::canonical::canonical_json_bytes(&content_a).unwrap(),
+            );
+            assert_eq!(recomputed, hash_a);
+            assert_eq!(claimed, hash_b);
+            assert_ne!(recomputed, claimed);
+        }
+        other => panic!("expected ContentHashMismatch, got {other:?}"),
+    }
+}
+
+/// BAC-539: signing succeeds when the body's claimed `content_hash` matches the
+/// hash recomputed over the handle's canonical content, and the signed bytes
+/// correspond to that recomputed content.
+#[test]
+fn sign_receipt_with_handle_accepts_matching_content_and_binds_recomputed_hash() {
+    let keypair = Keypair::generate();
+    let backend = chio_core_types::crypto::Ed25519Backend::new(keypair.clone());
+
+    let content = json!({"transfer": {"to": "alice", "amount": 5}});
+    let handle = ReceiptSigningHandle::from_content(&content).unwrap();
+    let recomputed = handle.content_hash().to_string();
+
+    // Honest caller: the body's content_hash is the hash of the real content.
+    let body = wysiwys_body(&keypair, recomputed.clone());
+
+    let receipt = sign_receipt_with_handle(body, &backend, handle).unwrap();
+
+    // The signature verifies and the signed receipt carries exactly the
+    // recomputed hash -- the signed bytes correspond to the canonical content.
+    assert!(receipt.verify_signature().unwrap());
+    assert_eq!(receipt.content_hash, recomputed);
+    let expected = chio_core_types::crypto::sha256_hex(
+        &chio_core_types::canonical::canonical_json_bytes(&content).unwrap(),
+    );
+    assert_eq!(receipt.content_hash, expected);
+}
+
+/// BAC-539: the recompute gate runs before the kernel-key check and before any
+/// signing work, so a hash mismatch fails closed even with a valid backend.
+#[test]
+fn sign_receipt_with_handle_is_fail_closed_on_any_mismatch() {
+    let keypair = Keypair::generate();
+    let backend = chio_core_types::crypto::Ed25519Backend::new(keypair.clone());
+
+    let content = json!({"ok": true});
+    let handle = ReceiptSigningHandle::from_content(&content).unwrap();
+
+    // Body claims an all-zero hash that does not match the real content.
+    let body = wysiwys_body(&keypair, "0".repeat(64));
+
+    let error = sign_receipt_with_handle(body, &backend, handle).unwrap_err();
+    assert!(matches!(
+        error,
+        ReceiptSigningError::ContentHashMismatch { .. }
+    ));
 }
