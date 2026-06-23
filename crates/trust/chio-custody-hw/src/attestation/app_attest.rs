@@ -50,6 +50,14 @@ pub struct AppAttestVerificationInput<'a> {
     /// sandbox and development AAGUIDs are rejected. Shipped callers set
     /// this so a sandbox-attested key cannot be presented as production
     /// custody evidence.
+    ///
+    /// SECURITY (BAC-601, should-fix): this is a *runtime-only* switch with no
+    /// `cfg` backstop. A prod binary that constructs this input with
+    /// `production: false` re-enables the sandbox/development AAGUIDs at
+    /// runtime — there is no compile-time guarantee that shipped callers pass
+    /// `true`. Production entry points should hard-code `production: true` (or
+    /// wrap construction in a hardened constructor) rather than threading the
+    /// flag through from request data. Tracked for hardening under BAC-601.
     pub production: bool,
     /// Opt-in for the synthetic development-fixture compact-map shape.
     /// This only has any effect when the crate is compiled with the

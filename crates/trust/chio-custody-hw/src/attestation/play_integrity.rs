@@ -177,6 +177,17 @@ fn select_jwks(input: &PlayIntegrityVerificationInput<'_>) -> String {
 
 #[cfg(not(any(test, feature = "dev-fixtures")))]
 fn select_jwks(_input: &PlayIntegrityVerificationInput<'_>) -> String {
+    // SECURITY / PLACEHOLDER (BAC-601): the production path pins this JWKS. While
+    // it is still the committed synthetic fixture key, fail loudly in debug
+    // builds so the fixture key cannot silently ship. Release builds rely on the
+    // `assert_play_integrity_root_is_production_ready()` startup guard, which
+    // production entry points MUST call. Neither check is reachable from the
+    // test/`dev-fixtures` path (this fn is compiled only in prod builds).
+    debug_assert!(
+        super::google_root::assert_play_integrity_root_is_production_ready().is_ok(),
+        "Play Integrity root is the committed SYNTHETIC FIXTURE key; \
+         replace it with Google's real verification keys before production (BAC-601)"
+    );
     play_integrity_pinned_jwks_json()
 }
 
