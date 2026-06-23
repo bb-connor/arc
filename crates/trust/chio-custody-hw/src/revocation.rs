@@ -525,6 +525,43 @@ mod sqlite {
                 CustodyError::Encoding(format!("sqlite revocation cache mutex poisoned: {err}"))
             })
         }
+
+        /// Test-only fault injection: drop the leaves table so the NEXT leaf
+        /// insert fails while the edges table still accepts writes. Lets the
+        /// atomicity test force a failure mid-`persist_edge_and_leaves` (edge
+        /// insert succeeds, leaf insert fails) to prove the whole batch rolls
+        /// back rather than leaving the edge stranded on disk.
+        #[cfg(test)]
+        fn drop_leaves_table_for_test(&self) -> Result<(), CustodyError> {
+            let conn = self.lock_conn()?;
+            conn.execute_batch("DROP TABLE chio_custody_revocation_leaves")
+                .map_err(|err| CustodyError::Encoding(format!("drop leaves: {err}")))
+        }
+
+        /// Test-only: count persisted edges matching `(parent, dependent)`.
+        #[cfg(test)]
+        fn persisted_edge_count(&self, parent: &str, dependent: &str) -> i64 {
+            let conn = self.lock_conn().expect("lock conn");
+            conn.query_row(
+                "SELECT COUNT(*) FROM chio_custody_revocation_edges
+                 WHERE parent = ?1 AND dependent = ?2",
+                rusqlite::params![parent, dependent],
+                |row| row.get::<_, i64>(0),
+            )
+            .expect("count edges")
+        }
+
+        /// Test-only: count persisted leaves for `subject`.
+        #[cfg(test)]
+        fn persisted_leaf_count(&self, subject: &str) -> i64 {
+            let conn = self.lock_conn().expect("lock conn");
+            conn.query_row(
+                "SELECT COUNT(*) FROM chio_custody_revocation_leaves WHERE subject = ?1",
+                rusqlite::params![subject],
+                |row| row.get::<_, i64>(0),
+            )
+            .expect("count leaves")
+        }
     }
 
     impl CredentialRevocationOracle for SqliteCredentialRevocationOracle {
@@ -542,7 +579,9 @@ mod sqlite {
             let mut cache = self.lock_cache()?;
 
             // Stage the (possibly empty) immediate cascade the new edge
-            // triggers when the parent is already revoked.
+            // triggers when the parent is already revoked. Staging mutates
+            // nothing durable; it only computes the scratch oracle + the new
+            // leaf set so the commit below is a single atomic write.
             let already_revoked_parent = cache.oracle.contains(&key_for(parent));
             let staged = if already_revoked_parent {
                 Some(cache.stage_cascade(dependent, 0)?)
@@ -550,22 +589,31 @@ mod sqlite {
                 None
             };
 
-            // Persist the edge (and any newly-revoked leaves) in one
-            // transaction. If anything fails the transaction rolls back and
-            // the in-RAM cache is left untouched, so the durable store and
-            // cache stay consistent.
-            conn.execute(
-                "INSERT OR IGNORE INTO chio_custody_revocation_edges (parent, dependent)
-                 VALUES (?1, ?2)",
-                params![parent, dependent],
-            )
-            .map_err(|err| CustodyError::Encoding(format!("sqlite insert edge: {err}")))?;
+            // Persist the edge AND any newly-revoked cascade leaves inside a
+            // SINGLE `BEGIN IMMEDIATE` transaction so the edge and the leaves
+            // commit together or not at all. Previously the edge ran in its
+            // own autocommit statement and the leaves opened a separate
+            // transaction; a leaf-persist failure after the edge committed
+            // left the edge durably on disk with no matching cascade leaf,
+            // and `rebuild_cache` does NOT re-run the late-child cascade on
+            // reopen (it only replays persisted leaves), so a child
+            // registered after its parent was revoked could silently outlive
+            // the revoked parent (fail-open on the kill switch). Wrapping
+            // both writes in one transaction — mirroring the single-txn
+            // staging used by `revoke_credential` — closes that gap. The
+            // in-RAM cache is mutated ONLY after COMMIT succeeds, so on any
+            // error the rollback leaves the durable store and the cache
+            // byte-identical to their pre-call state.
+            let staged_subjects: &[String] = match &staged {
+                Some((_, new_subjects)) => new_subjects,
+                None => &[],
+            };
+            persist_edge_and_leaves(&conn, parent, dependent, staged_subjects, 0)?;
 
-            if let Some((staged_oracle, new_subjects)) = staged {
-                persist_new_leaves(&conn, &new_subjects, 0)?;
+            // Commit succeeded: now (and only now) advance the in-RAM cache.
+            if let Some((staged_oracle, _)) = staged {
                 cache.oracle = staged_oracle;
             }
-
             cache
                 .dependents
                 .entry(parent.to_string())
@@ -603,6 +651,63 @@ mod sqlite {
         fn current_epoch_root(&self) -> Result<EpochRoot, CustodyError> {
             Ok(self.lock_cache()?.oracle.epoch_root())
         }
+    }
+
+    /// Persist a dependency `edge` AND any `new_subjects` cascade leaves it
+    /// triggers inside ONE `BEGIN IMMEDIATE` transaction so the edge and the
+    /// leaves advance together or not at all. On any statement error the
+    /// whole batch rolls back, leaving neither the edge nor the leaves on
+    /// disk; the caller therefore mutates the in-RAM cache only after this
+    /// returns `Ok(())`. This is the durable analogue of the single-txn
+    /// staging used by `revoke_credential`: it closes the atomicity gap
+    /// where an edge committed in its own autocommit statement could outlive
+    /// a failed leaf persist and silently fail open on the kill switch
+    /// (`rebuild_cache` replays only persisted leaves and does NOT re-run
+    /// the late-child cascade on reopen).
+    fn persist_edge_and_leaves(
+        conn: &Connection,
+        parent: &str,
+        dependent: &str,
+        new_subjects: &[String],
+        now_unix_ms: u64,
+    ) -> Result<(), CustodyError> {
+        let now_unix_ms = i64::try_from(now_unix_ms)
+            .map_err(|err| CustodyError::Encoding(format!("now_unix_ms overflow: {err}")))?;
+        conn.execute_batch("BEGIN IMMEDIATE")
+            .map_err(|err| CustodyError::Encoding(format!("sqlite begin: {err}")))?;
+
+        // Edge first, then the cascade leaves; either everything in this
+        // transaction lands or nothing does. A closure lets us roll back on
+        // the first error without repeating the cleanup at every `?`.
+        let result = (|| -> Result<(), CustodyError> {
+            conn.execute(
+                "INSERT OR IGNORE INTO chio_custody_revocation_edges (parent, dependent)
+                 VALUES (?1, ?2)",
+                params![parent, dependent],
+            )
+            .map_err(|err| CustodyError::Encoding(format!("sqlite insert edge: {err}")))?;
+
+            for subject in new_subjects {
+                conn.execute(
+                    "INSERT OR IGNORE INTO chio_custody_revocation_leaves (subject, now_unix_ms)
+                     VALUES (?1, ?2)",
+                    params![subject, now_unix_ms],
+                )
+                .map_err(|err| CustodyError::Encoding(format!("sqlite insert leaf: {err}")))?;
+            }
+            Ok(())
+        })();
+
+        if let Err(err) = result {
+            // Roll back the whole batch on any error so neither the edge nor
+            // any partial leaf is persisted.
+            let _ = conn.execute_batch("ROLLBACK");
+            return Err(err);
+        }
+
+        conn.execute_batch("COMMIT")
+            .map_err(|err| CustodyError::Encoding(format!("sqlite commit: {err}")))?;
+        Ok(())
     }
 
     /// Persist `subjects` as new revocation leaves inside one SQLite
@@ -794,6 +899,103 @@ mod sqlite {
                 r1, r2,
                 "double revoke must be epoch-stable in the durable store"
             );
+        }
+
+        #[test]
+        fn durable_register_dependency_is_atomic_on_midpersist_failure() {
+            // Regression for the kill-switch atomicity bug: when a late child
+            // is registered under an ALREADY-revoked parent, the edge insert
+            // and the cascade-leaf insert MUST commit together or not at all.
+            // Previously the edge ran in its own autocommit statement and the
+            // leaves opened a separate transaction; a leaf-persist failure
+            // after the edge committed left the edge durably on disk with no
+            // matching cascade leaf. On reopen `rebuild_cache` replays only
+            // persisted leaves and does NOT re-run the late-child cascade, so
+            // the child would silently outlive its revoked parent (fail-open).
+            //
+            // We force a failure MID-`persist_edge_and_leaves` (edge insert
+            // succeeds, leaf insert fails) by dropping the leaves table after
+            // the parent is revoked, then assert NO partial edge/leaf landed
+            // on disk and the in-RAM cache is consistent.
+            let path = unique_db_path("chio-custody-rev-atomic");
+            let path_str = match path.to_str() {
+                Some(s) => s.to_string(),
+                None => panic!("temp path not utf-8"),
+            };
+
+            let oracle = match SqliteCredentialRevocationOracle::open(&path_str) {
+                Ok(o) => o,
+                Err(e) => panic!("open: {e}"),
+            };
+            if let Err(e) = oracle.revoke_credential("parent", 1_000) {
+                panic!("revoke parent: {e}");
+            }
+
+            // Fault injection: drop the leaves table so the cascade leaf for
+            // the late child cannot persist, while the edges table still
+            // accepts the edge insert. This reproduces the exact ordering the
+            // bug depended on (edge OK, leaf fails).
+            if let Err(e) = oracle.drop_leaves_table_for_test() {
+                panic!("drop leaves: {e}");
+            }
+
+            let res = oracle.register_dependency("parent", "late-child");
+            assert!(
+                matches!(res, Err(CustodyError::Encoding(_))),
+                "a leaf-persist failure must fail register_dependency"
+            );
+
+            // On-disk atomicity: the edge must have rolled back with the leaf,
+            // so NO partial edge is persisted (the edges table is intact).
+            assert_eq!(
+                oracle.persisted_edge_count("parent", "late-child"),
+                0,
+                "the edge must roll back with the failed leaf insert: no partial edge on disk"
+            );
+
+            // In-RAM consistency: the cache must not have advanced (the late
+            // child is not revoked and the dependents edge is not recorded),
+            // because the cache is mutated only after COMMIT.
+            match oracle.is_revoked("late-child") {
+                Ok(b) => assert!(
+                    !b,
+                    "late-child must not be revoked in RAM after a rolled-back register"
+                ),
+                Err(e) => panic!("is_revoked late-child: {e}"),
+            }
+
+            drop(oracle);
+
+            // Reopen from disk: the late child must NOT be revoked, proving no
+            // stranded edge replays a cascade and that the kill switch did not
+            // fail open across a restart. (The dropped leaves table is
+            // re-created empty on open; we assert on the edge, which is the
+            // durable artifact whose orphaning caused the fail-open.)
+            let reopened = match SqliteCredentialRevocationOracle::open(&path_str) {
+                Ok(o) => o,
+                Err(e) => panic!("reopen: {e}"),
+            };
+            assert_eq!(
+                reopened.persisted_edge_count("parent", "late-child"),
+                0,
+                "no orphan edge may survive the reopen"
+            );
+            assert_eq!(
+                reopened.persisted_leaf_count("late-child"),
+                0,
+                "no orphan leaf may survive the reopen"
+            );
+            match reopened.is_revoked("late-child") {
+                Ok(b) => assert!(
+                    !b,
+                    "late-child must not be revoked after reopen (kill switch must not fail open)"
+                ),
+                Err(e) => panic!("is_revoked late-child after reopen: {e}"),
+            }
+
+            let _ = std::fs::remove_file(&path);
+            let _ = std::fs::remove_file(format!("{path_str}-wal"));
+            let _ = std::fs::remove_file(format!("{path_str}-shm"));
         }
     }
 }

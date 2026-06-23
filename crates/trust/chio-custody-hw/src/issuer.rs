@@ -100,6 +100,25 @@ pub struct MintResponse {
 /// not wired the corresponding check is skipped; the rate limiter is
 /// wired by default (see [`Self::with_signer`]) so a freshly-constructed
 /// issuer is rate-limited out of the box.
+///
+/// # FAIL-OPEN DEFAULT — read before constructing a production issuer
+///
+/// The revocation cascade and the replay nonce store are **NOT wired by
+/// default**: a bare [`Self::with_signer`] issuer skips BOTH checks and
+/// will therefore mint for a *revoked* credential and accept a *replayed*
+/// `(credential_id, challenge_nonce)`. The "wired-by-default" guarantee is
+/// feature-level only — it exists once you call [`Self::with_durable_stores`]
+/// (production) or [`Self::with_revocation_oracle`] /
+/// [`Self::with_nonce_store`] (tests / single-process). Construct a
+/// production issuer with [`Self::with_durable_stores`] (or wire both
+/// stores explicitly); a `with_signer`-only issuer is for tests and any
+/// deployment that has *deliberately* moved revocation/replay enforcement
+/// upstream. A deployment that wants the fail-open posture to be an
+/// explicit, fail-closed decision can chain
+/// [`Self::enforce_revocation_replay`] as the final builder step: it
+/// returns [`CustodyError`] (no issuer) unless BOTH gates are wired, so an
+/// accidental fail-open issuer fails loudly at construction instead of
+/// silently minting without revocation/replay enforcement.
 pub struct IssuerService {
     audience: String,
     signer: Arc<dyn SigningBackend>,
@@ -240,6 +259,41 @@ impl IssuerService {
         Ok(self
             .with_revocation_oracle(Arc::new(revocation))
             .with_nonce_store(Arc::new(nonces)))
+    }
+
+    /// Make the FAIL-OPEN DEFAULT an explicit, fail-closed decision at
+    /// construction: assert that BOTH the revocation cascade and the replay
+    /// nonce store are wired, returning [`CustodyError`] (no issuer) if
+    /// either is missing.
+    ///
+    /// A bare [`Self::with_signer`] issuer skips both checks (see the
+    /// type-level "FAIL-OPEN DEFAULT" note); minting against it admits a
+    /// revoked credential and a replayed nonce. Production wiring should be
+    /// [`Self::with_durable_stores`], but a deployment that builds the issuer
+    /// by hand can chain `.enforce_revocation_replay()?` as the final builder
+    /// step to turn an accidental fail-open posture into a loud, fail-closed
+    /// construction error rather than a silent runtime gap. This is purely
+    /// additive — existing call sites that deliberately run a minimal issuer
+    /// (tests, deployments that enforce revocation/replay upstream) are
+    /// unaffected unless they opt in to this guard.
+    pub fn enforce_revocation_replay(self) -> Result<Self, CustodyError> {
+        if self.revocation.is_none() {
+            return Err(CustodyError::Encoding(
+                "IssuerService::enforce_revocation_replay: no revocation oracle wired — \
+                 minting would fail open on revocation; wire with_durable_stores or \
+                 with_revocation_oracle"
+                    .into(),
+            ));
+        }
+        if self.nonce_store.is_none() {
+            return Err(CustodyError::Encoding(
+                "IssuerService::enforce_revocation_replay: no replay nonce store wired — \
+                 minting would fail open on replay; wire with_durable_stores or \
+                 with_nonce_store"
+                    .into(),
+            ));
+        }
+        Ok(self)
     }
 
     /// Configured audience pin for inspection.
@@ -549,5 +603,33 @@ mod tests {
             other => panic!("expected RateLimited, got {other:?}"),
         }
         assert_eq!(err.urn(), "urn:chio:error:custody:rate-limited");
+    }
+
+    #[test]
+    fn enforce_revocation_replay_rejects_a_fail_open_issuer() {
+        // The fail-open default is explicit: a bare with_signer issuer that
+        // opts in to the guard must be rejected fail-closed at construction
+        // rather than silently minting without revocation/replay checks.
+        let bare = IssuerService::with_signer("urn:chio:audience:kernel", signer(7));
+        assert!(
+            matches!(
+                bare.enforce_revocation_replay(),
+                Err(CustodyError::Encoding(_))
+            ),
+            "an issuer with neither gate wired must be rejected by the guard"
+        );
+
+        // Wiring both gates lets the guard pass.
+        let wired = IssuerService::with_signer("urn:chio:audience:kernel", signer(7))
+            .with_revocation_oracle(Arc::new(
+                crate::revocation::InMemoryCredentialRevocationOracle::new(),
+            ))
+            .with_nonce_store(Arc::new(
+                crate::nonce_store::InMemoryPasskeyNonceStore::new(),
+            ));
+        assert!(
+            wired.enforce_revocation_replay().is_ok(),
+            "an issuer with both gates wired must pass the guard"
+        );
     }
 }
