@@ -206,6 +206,42 @@ impl IssuerService {
         self
     }
 
+    /// Wire the DURABLE, default-posture stores: a SQLite-backed
+    /// revocation oracle and replay nonce store, both persisted under
+    /// `dir`. This is the wired-by-default path for a production issuer:
+    /// the revocation cascade and the replay-detection state survive an
+    /// issuer restart instead of resetting to empty (which would silently
+    /// re-admit a previously-revoked credential or a previously-seen
+    /// replay nonce after a crash).
+    ///
+    /// Builder-style: returns the issuer with both durable stores wired.
+    /// The two stores live in sibling files under `dir`
+    /// (`revocation.sqlite3` and `nonces.sqlite3`). Tests and
+    /// single-process deployments can instead wire the in-memory stores via
+    /// [`Self::with_revocation_oracle`] / [`Self::with_nonce_store`].
+    ///
+    /// Fail-closed: if either durable store cannot be opened (I/O fault,
+    /// permission error, corrupt schema), this returns
+    /// [`CustodyError`] and NO issuer is produced, so a deployment never
+    /// silently falls back to a non-durable posture.
+    #[cfg(feature = "sqlite-store")]
+    pub fn with_durable_stores(self, dir: &std::path::Path) -> Result<Self, CustodyError> {
+        let revocation_path = dir.join("revocation.sqlite3");
+        let nonce_path = dir.join("nonces.sqlite3");
+        let revocation_path = revocation_path.to_str().ok_or_else(|| {
+            CustodyError::Encoding("durable revocation store path is not valid UTF-8".into())
+        })?;
+        let nonce_path = nonce_path.to_str().ok_or_else(|| {
+            CustodyError::Encoding("durable nonce store path is not valid UTF-8".into())
+        })?;
+        let revocation =
+            crate::revocation::SqliteCredentialRevocationOracle::open(revocation_path)?;
+        let nonces = crate::nonce_store::SqlitePasskeyNonceStore::open(nonce_path)?;
+        Ok(self
+            .with_revocation_oracle(Arc::new(revocation))
+            .with_nonce_store(Arc::new(nonces)))
+    }
+
     /// Configured audience pin for inspection.
     #[must_use]
     pub fn audience(&self) -> &str {
