@@ -26,7 +26,7 @@ use crate::guard::PortableToolCallRequest;
 use crate::normalized::{NormalizedOperation, NormalizedScope, NormalizedToolGrant};
 use crate::receipts::ReceiptSigningError;
 use crate::scope::resolve_matching_grants;
-use crate::{evaluate, sign_receipt, verify_capability, Verdict};
+use crate::{evaluate, sign_receipt_relaying_trusted_body, verify_capability, Verdict};
 
 fn public_key(seed: u8) -> PublicKey {
     let mut bytes = [seed; 65];
@@ -362,7 +362,10 @@ pub fn public_sign_receipt_rejects_kernel_key_mismatch_before_signing() {
     };
     let body = receipt_body(p384_public_key(11));
 
-    let result = sign_receipt(body, &backend);
+    // Models the body-only relay primitive's kernel-key fast-fail (no content
+    // preimage available to recompute). The production WYSIWYS recompute gate is
+    // proved by the `sign_receipt`/handle tests in `tests/portable_build.rs`.
+    let result = sign_receipt_relaying_trusted_body(body, &backend);
     let rejected = matches!(&result, Err(ReceiptSigningError::KernelKeyMismatch));
     core::mem::forget(result);
     core::mem::forget(backend);
@@ -377,8 +380,8 @@ pub fn public_sign_receipt_accepts_matching_kernel_key() {
     };
     let body = receipt_body(key);
 
-    let receipt =
-        sign_receipt(body, &backend).unwrap_or_else(|_| unreachable!("matching key signs"));
+    let receipt = sign_receipt_relaying_trusted_body(body, &backend)
+        .unwrap_or_else(|_| unreachable!("matching key signs"));
     assert_eq!(receipt.id, "rcpt-public-kani");
     assert_eq!(receipt.algorithm, Some(SigningAlgorithm::Ed25519));
     assert_eq!(receipt.signature, Signature::from_bytes(&[0; 64]));

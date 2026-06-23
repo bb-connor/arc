@@ -263,7 +263,13 @@ impl From<ContentHashMismatch> for Error {
 /// follow-up, because the signer never trusts the caller's `content_hash`.
 #[derive(Debug)]
 pub struct ReceiptSigningHandle {
-    canonical_content: CanonicalBytes<CanonicalJsonWitness>,
+    /// The exact byte preimage the `content_hash` is defined over. For a
+    /// canonical-JSON artifact this is the RFC 8785 serialization; for a
+    /// stream receipt it is the concatenated per-chunk digest preimage the
+    /// kernel hashes (see `chio-kernel`'s `stream_receipt_content`). The
+    /// handle never trusts a caller-asserted hash: `content_hash` below is
+    /// always recomputed from these bytes at construction.
+    content_preimage: Vec<u8>,
     content_hash: String,
 }
 
@@ -294,9 +300,27 @@ impl ReceiptSigningHandle {
     /// never a caller-asserted value.
     #[must_use]
     pub fn from_canonical_bytes(canonical_content: CanonicalBytes<CanonicalJsonWitness>) -> Self {
-        let content_hash = sha256_hex(canonical_content.as_bytes());
+        Self::from_content_preimage(canonical_content.into_vec())
+    }
+
+    /// Build a handle from the exact byte preimage the receipt `content_hash`
+    /// is defined over, recomputing the hash here.
+    ///
+    /// Use this on the production kernel signing path, where `content_hash` is
+    /// not always `sha256_hex(canonical_json(value))`: stream receipts hash a
+    /// concatenation of per-chunk digests, and the empty-output receipt hashes
+    /// the literal `null` canonicalization. In every case the kernel already
+    /// holds the exact bytes it hashed; passing them here lets the signer
+    /// recompute the same digest independently and refuse to sign when the
+    /// body's claimed `content_hash` does not match (WYSIWYS, fail-closed).
+    ///
+    /// The hash is recomputed from `preimage` regardless of its shape, so the
+    /// resulting hash is always the signer's own, never a caller assertion.
+    #[must_use]
+    pub fn from_content_preimage(preimage: Vec<u8>) -> Self {
+        let content_hash = sha256_hex(&preimage);
         Self {
-            canonical_content,
+            content_preimage: preimage,
             content_hash,
         }
     }
@@ -312,7 +336,7 @@ impl ReceiptSigningHandle {
     /// Borrow the immutable canonical content bytes bound to this handle.
     #[must_use]
     pub fn canonical_content(&self) -> &[u8] {
-        self.canonical_content.as_bytes()
+        &self.content_preimage
     }
 
     /// Fail-closed check that the body's claimed `content_hash` matches the
@@ -343,6 +367,6 @@ impl ReceiptSigningHandle {
     /// reused to back another signature.
     #[must_use]
     pub fn into_parts(self) -> (String, Vec<u8>) {
-        (self.content_hash, self.canonical_content.into_vec())
+        (self.content_hash, self.content_preimage)
     }
 }

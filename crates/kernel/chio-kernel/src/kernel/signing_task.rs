@@ -73,6 +73,14 @@ fn record_signing_queue_block() {
     SIGNING_QUEUE_BLOCK_TOTAL.fetch_add(1, Ordering::Relaxed);
 }
 
+/// Result of a non-blocking [`SigningTaskHandle::try_sign`]: either the oneshot
+/// receiver for the signed receipt, or -- when the channel is at capacity or
+/// closed -- the `(body, canonical_content)` pair returned so the caller can
+/// retry without reconstructing them.
+#[allow(dead_code)]
+type TrySignOutcome =
+    Result<oneshot::Receiver<Result<ChioReceipt, KernelError>>, (ChioReceiptBody, Vec<u8>)>;
+
 /// One unit of work submitted to the signing task.
 ///
 /// Carries the constructed receipt body and a oneshot reply channel for
@@ -86,6 +94,13 @@ pub(crate) struct SignRequest {
     /// (`build_and_sign_receipt` and friends) so the task only owns the
     /// pure cryptographic step.
     pub(crate) body: ChioReceiptBody,
+
+    /// The exact byte preimage `body.content_hash` was derived from. The task
+    /// recomputes `sha256_hex(canonical_content)` at the signing boundary and
+    /// refuses to sign on mismatch (WYSIWYS, BAC-539), so this async funnel is
+    /// byte-identical *and* equally fail-closed to the inline
+    /// `build_and_sign_receipt` path.
+    pub(crate) canonical_content: Vec<u8>,
 
     /// Oneshot channel for the signed receipt or signing error. The task
     /// uses `send` and ignores `Err(_)` (dropped receiver).
@@ -249,7 +264,11 @@ impl SigningTaskHandle {
     /// already shut down (channel closed) or if the task replied that
     /// signing failed. Producers wait on bounded backpressure, never on
     /// a mutex.
-    pub(crate) async fn sign(&self, body: ChioReceiptBody) -> Result<ChioReceipt, KernelError> {
+    pub(crate) async fn sign(
+        &self,
+        body: ChioReceiptBody,
+        canonical_content: Vec<u8>,
+    ) -> Result<ChioReceipt, KernelError> {
         let inner = self.ensure_spawned()?;
         let sender = inner.sender_clone().ok_or_else(|| {
             KernelError::Internal("receipt signing task already shut down".to_string())
@@ -258,6 +277,7 @@ impl SigningTaskHandle {
         let (reply_tx, reply_rx) = oneshot::channel();
         let request = SignRequest {
             body,
+            canonical_content,
             reply: reply_tx,
         };
 
@@ -286,39 +306,45 @@ impl SigningTaskHandle {
 
     /// Try to submit a signing request without blocking on backpressure.
     ///
-    /// Returns `Err(body)` immediately when the channel is at capacity
-    /// (the body is returned so the caller can retry without
-    /// reconstructing it). The returned future still `.await`s on the
+    /// Returns `Err((body, canonical_content))` immediately when the channel is
+    /// at capacity (the inputs are returned so the caller can retry without
+    /// reconstructing them). The returned future still `.await`s on the
     /// oneshot reply when the send succeeds. Used by tests that want to
     /// assert backpressure behaviour deterministically and by
     /// crash-recovery harnesses.
     ///
-    /// The Err-variant carries the full receipt body (~544 bytes today)
-    /// because retry-on-backpressure callers want the body back without
-    /// allocating; boxing it would force a heap allocation on every
-    /// successful send. The lint is silenced because the size is a
+    /// The Err-variant carries the full receipt body (~544 bytes today) plus
+    /// its content preimage because retry-on-backpressure callers want them
+    /// back without re-allocating; boxing would force a heap allocation on
+    /// every successful send. The lint is silenced because the size is a
     /// deliberate trade-off.
     #[allow(dead_code, clippy::result_large_err)]
     pub(crate) fn try_sign(
         &self,
         body: ChioReceiptBody,
-    ) -> Result<oneshot::Receiver<Result<ChioReceipt, KernelError>>, ChioReceiptBody> {
+        canonical_content: Vec<u8>,
+    ) -> TrySignOutcome {
         let inner = match self.ensure_spawned() {
             Ok(inner) => inner,
-            Err(_) => return Err(body),
+            Err(_) => return Err((body, canonical_content)),
         };
         let Some(sender) = inner.sender_clone() else {
-            return Err(body);
+            return Err((body, canonical_content));
         };
         let (reply_tx, reply_rx) = oneshot::channel();
         let request = SignRequest {
             body,
+            canonical_content,
             reply: reply_tx,
         };
         match sender.try_send(request) {
             Ok(()) => Ok(reply_rx),
-            Err(mpsc::error::TrySendError::Full(rejected)) => Err(rejected.body),
-            Err(mpsc::error::TrySendError::Closed(rejected)) => Err(rejected.body),
+            Err(mpsc::error::TrySendError::Full(rejected)) => {
+                Err((rejected.body, rejected.canonical_content))
+            }
+            Err(mpsc::error::TrySendError::Closed(rejected)) => {
+                Err((rejected.body, rejected.canonical_content))
+            }
         }
     }
 
@@ -459,8 +485,12 @@ impl Drop for SigningTaskHandle {
 async fn run_signing_task(keypair: Keypair, mut receiver: mpsc::Receiver<SignRequest>) {
     debug!("signing task started");
     while let Some(request) = receiver.recv().await {
-        let SignRequest { body, reply } = request;
-        let result = sign_one(&keypair, body);
+        let SignRequest {
+            body,
+            canonical_content,
+            reply,
+        } = request;
+        let result = sign_one(&keypair, body, canonical_content);
         // A dropped receiver is not an error: the producer either timed
         // out or was cancelled. Discard the signed receipt silently
         // rather than poisoning the task; signing is a pure function so
@@ -473,36 +503,54 @@ async fn run_signing_task(keypair: Keypair, mut receiver: mpsc::Receiver<SignReq
 /// Pure signing step: matches the inline path in `responses.rs` so
 /// receipts produced via the channel are byte-identical to receipts
 /// produced via `build_and_sign_receipt`.
-fn sign_one(keypair: &Keypair, body: ChioReceiptBody) -> Result<ChioReceipt, KernelError> {
+fn sign_one(
+    keypair: &Keypair,
+    body: ChioReceiptBody,
+    canonical_content: Vec<u8>,
+) -> Result<ChioReceipt, KernelError> {
     let backend = Ed25519Backend::new(keypair.clone());
-    sign_one_with_backend(body, &backend)
+    sign_one_with_backend(body, &backend, canonical_content)
 }
 
 fn sign_one_with_backend(
     body: ChioReceiptBody,
     backend: &dyn SigningBackend,
+    canonical_content: Vec<u8>,
 ) -> Result<ChioReceipt, KernelError> {
-    // Delegate to the canonical signing primitive
-    // `chio_kernel_core::sign_receipt`, the same function the inline builders
-    // reach through `receipt_support::sign_receipt_body_with_backend` (a thin
-    // error-mapping wrapper over this call). The primitive routes through
-    // `ChioReceipt::sign_with_backend`, which performs the authoritative
-    // signing sequence: validate semantics, bind the
+    // Delegate to the single canonical signing primitive
+    // `chio_kernel_core::sign_receipt_with_handle`, the same WYSIWYS primitive
+    // the inline `build_and_sign_receipt` path uses. The primitive recomputes
+    // `sha256_hex(canonical_content)` inside the trust boundary and refuses to
+    // sign when it disagrees with `body.content_hash` (fail-closed, BAC-539),
+    // then routes through `ChioReceipt::sign_with_backend`, which performs the
+    // authoritative signing sequence: validate semantics, bind the
     // `chio_receipt_signing_nonce` metadata key to the pre-nonce receipt id,
     // compute the content-addressed id, build the `ChioReceiptSigningBody`
-    // wrapper, and sign. The kernel-core function is called directly (rather
-    // than the `crate::receipt_support` wrapper) because this module is
+    // wrapper, and sign. Routing the mpsc task through the same primitive means
+    // there is exactly one signing implementation, so the inline and async
+    // funnels are byte-identical *and* equally fail-closed by construction
+    // rather than by hand synchronization. The mpsc task still owns the keypair
+    // and channel plumbing; only the pure crypto step is delegated. We call the
+    // portable kernel-core function directly (rather than the
+    // `crate::receipt_support` wrapper) because this module is also
     // `#[path]`-included by the crash/backpressure integration tests, whose
-    // crate root does not carry the `receipt_support` module; `chio_kernel_core`
-    // is reachable in both contexts. The error mapping mirrors
-    // `sign_receipt_body_with_backend` so the surfaced `KernelError` is
-    // identical on both funnels.
-    chio_kernel_core::sign_receipt(body, backend).map_err(|error| {
+    // crate root does not carry the `receipt_support` module;
+    // `chio_kernel_core` is reachable in both contexts.
+    let handle =
+        chio_core::receipt::signing::ReceiptSigningHandle::from_content_preimage(canonical_content);
+    chio_kernel_core::sign_receipt_with_handle(body, backend, handle).map_err(|error| {
         use chio_kernel_core::ReceiptSigningError;
         let message = match error {
             ReceiptSigningError::KernelKeyMismatch => {
                 "kernel signing key does not match receipt body kernel_key".to_string()
             }
+            ReceiptSigningError::ContentHashMismatch {
+                recomputed,
+                claimed,
+            } => format!(
+                "receipt content_hash mismatch: body claimed {claimed} but signer \
+                 recomputed {recomputed} over the canonical content (WYSIWYS refused)"
+            ),
             ReceiptSigningError::SigningFailed(reason) => reason,
         };
         KernelError::ReceiptSigningFailed(message)

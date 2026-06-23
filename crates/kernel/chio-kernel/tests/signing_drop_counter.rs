@@ -49,14 +49,18 @@ fn make_keypair() -> Keypair {
     Keypair::from_seed(&KERNEL_SEED)
 }
 
-fn make_body(n: usize, kernel_key: &Keypair) -> Result<ChioReceiptBody, String> {
+/// Returns a signable body together with the exact canonical-content preimage
+/// its `content_hash` was derived from, so the signing-task WYSIWYS recompute
+/// (BAC-539) accepts it.
+fn make_body(n: usize, kernel_key: &Keypair) -> Result<(ChioReceiptBody, Vec<u8>), String> {
     let nonce = format!("block-counter-{n:04}");
     let action = ToolCallAction::from_parameters(json!({
         "n": n,
         "label": nonce,
     }))
     .map_err(|error| format!("payload canonicalisation failed: {error}"))?;
-    let content_hash = sha256_hex(action.parameter_hash.as_bytes());
+    let canonical_content = action.parameter_hash.as_bytes().to_vec();
+    let content_hash = sha256_hex(&canonical_content);
     let policy_hash = sha256_hex(format!("policy:{nonce}").as_bytes());
     // The input body carries the producer's pre-binding id.
     // `sign_one_with_backend` (via `chio_kernel_core::sign_receipt`) binds the
@@ -89,7 +93,7 @@ fn make_body(n: usize, kernel_key: &Keypair) -> Result<ChioReceiptBody, String> 
     };
     body.id =
         chio_receipt_id(&body).map_err(|error| format!("canonical receipt id failed: {error}"))?;
-    Ok(body)
+    Ok((body, canonical_content))
 }
 
 /// Bind the `chio_receipt_signing_nonce` metadata key to the pre-binding
@@ -146,20 +150,20 @@ async fn full_signing_queue_increments_block_counter_without_dropping() -> Resul
     let keypair = make_keypair();
     let handle = signing_task::SigningTaskHandle::with_capacity(keypair.clone(), 1);
 
-    let queued_body = make_body(1, &keypair)?;
+    let (queued_body, queued_content) = make_body(1, &keypair)?;
     // The signer binds the signing nonce and recomputes the id before
     // signing, so capture the expected post-binding id (not `body.id`) for the
     // post-sign assertions below. This keeps the test from hardcoding the
     // SHA-256 hash of the fixture.
     let queued_expected_id = expected_signed_id(&queued_body)?;
     let queued = handle
-        .try_sign(queued_body)
+        .try_sign(queued_body, queued_content)
         .map_err(|_| "first request should queue before spawned task runs".to_string())?;
     let before = rendered_signing_queue_block_total()?;
 
-    let blocked_body = make_body(2, &keypair)?;
+    let (blocked_body, blocked_content) = make_body(2, &keypair)?;
     let blocked_expected_id = expected_signed_id(&blocked_body)?;
-    let mut blocked = Box::pin(handle.sign(blocked_body));
+    let mut blocked = Box::pin(handle.sign(blocked_body, blocked_content));
     let waker = noop_waker();
     let mut context = Context::from_waker(&waker);
     assert!(

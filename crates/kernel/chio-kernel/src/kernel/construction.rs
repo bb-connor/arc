@@ -326,11 +326,18 @@ impl ChioKernel {
     /// inside a tokio runtime; every kernel-internal call site already
     /// does (the `ToolEvaluator` trait methods are async, and so is
     /// the public `evaluate_tool_call` entrypoint).
+    ///
+    /// `canonical_content` is the exact byte preimage `body.content_hash` was
+    /// derived from. The signing task recomputes `sha256_hex(canonical_content)`
+    /// inside the trust boundary and refuses to sign on mismatch (WYSIWYS,
+    /// BAC-539), so this channel path is as fail-closed as the inline
+    /// `build_and_sign_receipt` path.
     pub async fn sign_receipt_via_channel(
         &self,
         body: ChioReceiptBody,
+        canonical_content: Vec<u8>,
     ) -> Result<ChioReceipt, KernelError> {
-        self.signing_task.sign(body).await
+        self.signing_task.sign(body, canonical_content).await
     }
 
     /// Drain the in-flight signing-task queue and join the task. After this

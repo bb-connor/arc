@@ -6,9 +6,10 @@ use chio_core_types::capability::{attenuation::ScopeHash, features::CapabilityNe
 use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey, SigningBackend};
 use chio_core_types::receipt::{body::chio_receipt_id, body::ChioReceipt, decision::Decision};
 use chio_kernel_core::{
-    evaluate_with_full_floor as core_evaluate_with_full_floor, sign_receipt as core_sign_receipt,
-    verify_capability_full, BudgetRegistry, BudgetSplitError, EvaluateInput,
-    InMemoryBudgetRegistry, PortableToolCallRequest,
+    evaluate_with_full_floor as core_evaluate_with_full_floor,
+    sign_receipt_relaying_trusted_body as core_sign_receipt, verify_capability_full,
+    BudgetRegistry, BudgetSplitError, EvaluateInput, InMemoryBudgetRegistry,
+    PortableToolCallRequest,
 };
 
 use crate::wire::{
@@ -115,8 +116,11 @@ pub fn evaluate_pure(
 }
 
 /// Pure receipt-signing helper. Builds an `Ed25519Backend` from the
-/// supplied seed (which the wasm binding mints via Web Crypto) and
-/// delegates to `chio_kernel_core::sign_receipt`.
+/// supplied seed (which the wasm binding mints via Web Crypto) and relays the
+/// already-minted body via `chio_kernel_core::sign_receipt_relaying_trusted_body`.
+/// The content preimage does not cross the wasm-bindgen boundary, so the
+/// production recompute-and-refuse gate runs upstream in the kernel
+/// (`sign_receipt` / `sign_receipt_with_handle`); see BAC-601.
 pub fn sign_receipt_pure(
     input: SignReceiptRequestJson,
     signing_seed: &[u8; 32],
@@ -321,6 +325,23 @@ fn format_signing(error: &chio_kernel_core::ReceiptSigningError) -> String {
     match error {
         chio_kernel_core::ReceiptSigningError::KernelKeyMismatch => {
             "receipt body kernel_key does not match the signing backend".to_string()
+        }
+        // WYSIWYS mismatch (BAC-539). The browser/WASM `sign_receipt_pure` path
+        // relays an already-minted body via `sign_receipt_relaying_trusted_body`,
+        // which does not recompute `content_hash` (the content preimage does not
+        // cross the wasm-bindgen boundary; see BAC-601), so this variant is not
+        // produced on this path today. The production recompute-and-refuse gate
+        // runs upstream in the kernel (`sign_receipt` / `sign_receipt_with_handle`).
+        // Handled explicitly rather than via a wildcard so a future
+        // content-bearing wasm signing path surfaces a distinct, fail-closed
+        // error string.
+        chio_kernel_core::ReceiptSigningError::ContentHashMismatch {
+            recomputed,
+            claimed,
+        } => {
+            format!(
+                "receipt content_hash mismatch: body claimed {claimed} but signer recomputed {recomputed} over the canonical content (WYSIWYS refused)"
+            )
         }
         chio_kernel_core::ReceiptSigningError::SigningFailed(reason) => {
             let mut out = String::from("receipt signing failed: ");

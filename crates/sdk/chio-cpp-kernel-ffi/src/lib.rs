@@ -20,9 +20,10 @@ use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey};
 use chio_core_types::receipt::body::ChioReceiptBody;
 use chio_kernel_core::passport_verify::{verify_passport as core_verify_passport, VerifyError};
 use chio_kernel_core::{
-    evaluate_with_full_floor, sign_receipt as core_sign_receipt, verify_capability_full,
-    BudgetRegistry, BudgetSplitError, CapabilityError, Clock, EvaluateInput, FixedClock, Guard,
-    InMemoryBudgetRegistry, PortableToolCallRequest, ReceiptSigningError, Verdict,
+    evaluate_with_full_floor, sign_receipt_relaying_trusted_body as core_sign_receipt,
+    verify_capability_full, BudgetRegistry, BudgetSplitError, CapabilityError, Clock,
+    EvaluateInput, FixedClock, Guard, InMemoryBudgetRegistry, PortableToolCallRequest,
+    ReceiptSigningError, Verdict,
 };
 use serde::{Deserialize, Serialize};
 
@@ -458,6 +459,19 @@ fn sign_receipt_json_str(
             "receipt body kernel_key does not match the public key derived from the signing seed"
                 .to_string(),
         ),
+        // WYSIWYS mismatch (BAC-539). This FFI relays an already-minted body
+        // across the C ABI via `sign_receipt_relaying_trusted_body`, which does
+        // not recompute `content_hash` (the content preimage does not cross the C
+        // ABI; see BAC-601), so this variant is not produced on this path today.
+        // The production recompute-and-refuse gate runs upstream in the kernel
+        // (`sign_receipt` / `sign_receipt_with_handle`). Handled explicitly rather
+        // than via a wildcard so a future content-bearing FFI signing path
+        // surfaces the refusal as a distinct, fail-closed error.
+        ReceiptSigningError::ContentHashMismatch { recomputed, claimed } => {
+            KernelFfiError::SigningFailed(format!(
+                "receipt content_hash mismatch: body claimed {claimed} but signer recomputed {recomputed} over the canonical content (WYSIWYS refused)"
+            ))
+        }
         ReceiptSigningError::SigningFailed(message) => KernelFfiError::SigningFailed(message),
     })?;
 

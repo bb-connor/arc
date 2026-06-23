@@ -58,12 +58,17 @@ impl KernelCryptoFloor {
     }
 }
 
-/// Sign a [`ChioReceiptBody`] with an arbitrary [`SigningBackend`].
+/// Sign an already-assembled [`ChioReceiptBody`] with an arbitrary
+/// [`SigningBackend`], trusting the caller-supplied `content_hash`.
 ///
-/// Delegates to `chio_kernel_core::sign_receipt` (the portable signing
-/// kernel) so receipts produced via the hybrid path are byte-identical to
-/// receipts produced via the inline classical path when the same backend
-/// is used. Maps the portable error surface onto [`KernelError`].
+/// Delegates to `chio_kernel_core::sign_receipt_relaying_trusted_body` (the
+/// body-only relay) so receipts produced via the hybrid path are byte-identical
+/// to receipts produced via the inline classical path when the same backend is
+/// used. This wrapper does **not** hold the content preimage, so it cannot
+/// recompute `content_hash`; the production recompute-and-refuse gate runs on
+/// the live kernel path (`build_and_sign_receipt` / the mpsc signing task) via
+/// `chio_kernel_core::sign_receipt` / `sign_receipt_with_handle` before any body
+/// reaches this wrapper. Maps the portable error surface onto [`KernelError`].
 ///
 /// # Errors
 ///
@@ -74,12 +79,25 @@ pub fn sign_receipt_body_with_backend(
     body: ChioReceiptBody,
     backend: &dyn chio_core::crypto::SigningBackend,
 ) -> Result<ChioReceipt, KernelError> {
-    chio_kernel_core::sign_receipt(body, backend).map_err(|error| {
+    chio_kernel_core::sign_receipt_relaying_trusted_body(body, backend).map_err(|error| {
         use chio_kernel_core::ReceiptSigningError;
         let message = match error {
             ReceiptSigningError::KernelKeyMismatch => {
                 "kernel signing key does not match receipt body kernel_key".to_string()
             }
+            // WYSIWYS mismatch (BAC-539). This body-only wrapper relays via
+            // `sign_receipt_relaying_trusted_body`, which does not recompute
+            // `content_hash`, so this variant is not produced on this path; the
+            // production gate runs upstream on the live kernel path. Handled
+            // explicitly rather than via a wildcard so the variant is surfaced
+            // fail-closed if a content-bearing path adopts it.
+            ReceiptSigningError::ContentHashMismatch {
+                recomputed,
+                claimed,
+            } => format!(
+                "receipt content_hash mismatch: body claimed {claimed} but signer \
+                 recomputed {recomputed} over the canonical content (WYSIWYS refused)"
+            ),
             ReceiptSigningError::SigningFailed(reason) => reason,
         };
         KernelError::ReceiptSigningFailed(message)
