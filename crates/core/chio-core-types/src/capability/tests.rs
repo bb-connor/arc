@@ -2969,3 +2969,107 @@ fn delegate_rejects_step_not_reflected_in_child() {
     .unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
 }
+
+/// Round-3 review regression (Codex P2, attenuation correctness): a wildcard
+/// step TARGET must cover concrete child grants when checking that a declared
+/// removal is reflected in the child.
+///
+/// A `*:*` parent delegates a concrete `srv-a:tool-x` child while declaring
+/// `RemoveOperation { server_id: "*", tool_name: "*", operation: Invoke }`. The
+/// parent-side step check accepts this (the `*:*` parent grant holds Invoke),
+/// but the child still grants Invoke on the concrete tool, so the declared
+/// removal is NOT truly reflected. Before the fix the reflection check used a
+/// one-way matcher that only matched when the GRANT was wildcard, so the
+/// concrete child grant never matched the wildcard step target and the
+/// under-declared link was signed. With the child-side matcher the wildcard
+/// step target covers the concrete child grant and the link is rejected
+/// fail-closed.
+#[cfg(feature = "delegation")]
+#[test]
+fn delegate_rejects_wildcard_remove_operation_step_not_reflected_in_concrete_child() {
+    use crate::delegation_receipt::ScopeAttenuation;
+
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let delegatee = Keypair::generate();
+
+    // Parent grants every server and tool via `*:*` and authorizes delegation.
+    let parent_scope = make_scope(vec![make_grant(
+        "*",
+        "*",
+        vec![Operation::Invoke, Operation::Delegate],
+    )]);
+    let parent = delegate_parent_token(&issuer, &subject, parent_scope, 1000, 2000);
+
+    // Child is concrete and STILL holds Invoke on srv-a:tool-x.
+    let child_scope = make_scope(vec![make_grant("srv-a", "tool-x", vec![Operation::Invoke])]);
+
+    // The step declares a wildcard removal of Invoke, but the concrete child
+    // grant still holds Invoke -> the declared removal is not reflected.
+    let attenuation = ScopeAttenuation::from_steps(vec![Attenuation::RemoveOperation {
+        server_id: "*".to_string(),
+        tool_name: "*".to_string(),
+        operation: Operation::Invoke,
+    }]);
+
+    let err = delegate(
+        &parent,
+        &child_scope,
+        &subject,
+        &delegatee.public_key(),
+        attenuation,
+        1500,
+        [9_u8; 16],
+    )
+    .unwrap_err();
+    assert!(matches!(err, Error::AttenuationViolation { .. }));
+}
+
+/// Companion to the regression above: a wildcard step TARGET that IS truly
+/// reflected in the concrete child must be accepted. Here the parent `*:*` grant
+/// holds `ReadResult`, the step declares its wildcard removal, and the concrete
+/// child drops `ReadResult` (keeps Invoke), so the removal is genuinely
+/// reflected. This proves the child-side matcher does not over-reject valid
+/// wildcard-removal narrowings.
+#[cfg(feature = "delegation")]
+#[test]
+fn delegate_accepts_wildcard_remove_operation_step_reflected_in_concrete_child() {
+    use crate::delegation_receipt::ScopeAttenuation;
+
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let delegatee = Keypair::generate();
+
+    let parent_scope = make_scope(vec![make_grant(
+        "*",
+        "*",
+        vec![
+            Operation::Invoke,
+            Operation::Delegate,
+            Operation::ReadResult,
+        ],
+    )]);
+    let parent = delegate_parent_token(&issuer, &subject, parent_scope, 1000, 2000);
+
+    // Concrete child keeps Invoke but drops ReadResult, so the wildcard removal
+    // of ReadResult is genuinely reflected.
+    let child_scope = make_scope(vec![make_grant("srv-a", "tool-x", vec![Operation::Invoke])]);
+    let attenuation = ScopeAttenuation::from_steps(vec![Attenuation::RemoveOperation {
+        server_id: "*".to_string(),
+        tool_name: "*".to_string(),
+        operation: Operation::ReadResult,
+    }]);
+
+    let receipt = delegate(
+        &parent,
+        &child_scope,
+        &subject,
+        &delegatee.public_key(),
+        attenuation,
+        1500,
+        [10_u8; 16],
+    )
+    .unwrap();
+    assert!(receipt.link.verify_signature().unwrap());
+    assert_eq!(receipt.link.attenuations.len(), 1);
+}

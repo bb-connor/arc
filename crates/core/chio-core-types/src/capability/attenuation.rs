@@ -308,6 +308,31 @@ fn parent_grant_covers_target(
         && (grant.tool_name == "*" || grant.tool_name == tool_name)
 }
 
+/// Returns whether an attenuation step's `(server_id, tool_name)` target covers
+/// a concrete (or wildcard) child tool grant.
+///
+/// This is the child-side dual of [`parent_grant_covers_target`]. There the
+/// wildcard lives on the GRANT and the target is concrete; here the wildcard
+/// can live on the STEP TARGET and the grant is typically concrete. A step
+/// target of `"*"` for either field therefore covers any child grant value,
+/// while a concrete step field must match the child grant exactly.
+///
+/// Using [`parent_grant_covers_target`] for the child-reflection check is a
+/// one-way matcher: it only matches when the GRANT is wildcard, so a wildcard
+/// step target (for example `RemoveOperation { server_id: "*", tool_name: "*" }`)
+/// against a concrete `srv-a:tool-x` child grant would never match, and the
+/// declared removal would silently go unenforced (an under-declared link). This
+/// matcher closes that gap so wildcard step targets correctly cover concrete
+/// child grants and the reflection check stays fail-closed.
+fn step_target_covers_child_grant(
+    grant: &super::scope::ToolGrant,
+    step_server_id: &str,
+    step_tool_name: &str,
+) -> bool {
+    (step_server_id == "*" || step_server_id == grant.server_id)
+        && (step_tool_name == "*" || step_tool_name == grant.tool_name)
+}
+
 /// Iterate over every parent tool grant that covers an attenuation step's
 /// `(server_id, tool_name)` address.
 ///
@@ -553,7 +578,7 @@ fn validate_steps_reflected_in_child(
                 if child_scope
                     .grants
                     .iter()
-                    .any(|grant| parent_grant_covers_target(grant, server_id, tool_name))
+                    .any(|grant| step_target_covers_child_grant(grant, server_id, tool_name))
                 {
                     return Err(Error::AttenuationViolation {
                         reason: format!(
@@ -568,7 +593,7 @@ fn validate_steps_reflected_in_child(
                 operation,
             } => {
                 if child_scope.grants.iter().any(|grant| {
-                    parent_grant_covers_target(grant, server_id, tool_name)
+                    step_target_covers_child_grant(grant, server_id, tool_name)
                         && grant.operations.contains(operation)
                 }) {
                     return Err(Error::AttenuationViolation {
@@ -584,7 +609,7 @@ fn validate_steps_reflected_in_child(
                 constraint,
             } => {
                 if child_scope.grants.iter().any(|grant| {
-                    parent_grant_covers_target(grant, server_id, tool_name)
+                    step_target_covers_child_grant(grant, server_id, tool_name)
                         && !grant.constraints.contains(constraint)
                 }) {
                     return Err(Error::AttenuationViolation {
@@ -600,7 +625,7 @@ fn validate_steps_reflected_in_child(
                 max_invocations,
             } => {
                 if child_scope.grants.iter().any(|grant| {
-                    parent_grant_covers_target(grant, server_id, tool_name)
+                    step_target_covers_child_grant(grant, server_id, tool_name)
                         && grant
                             .max_invocations
                             .is_none_or(|cap| cap > *max_invocations)
@@ -618,7 +643,7 @@ fn validate_steps_reflected_in_child(
                 max_cost_per_invocation,
             } => {
                 if child_scope.grants.iter().any(|grant| {
-                    parent_grant_covers_target(grant, server_id, tool_name)
+                    step_target_covers_child_grant(grant, server_id, tool_name)
                         && !child_cost_within(
                             grant.max_cost_per_invocation.as_ref(),
                             max_cost_per_invocation,
@@ -637,7 +662,7 @@ fn validate_steps_reflected_in_child(
                 max_total_cost,
             } => {
                 if child_scope.grants.iter().any(|grant| {
-                    parent_grant_covers_target(grant, server_id, tool_name)
+                    step_target_covers_child_grant(grant, server_id, tool_name)
                         && !child_cost_within(grant.max_total_cost.as_ref(), max_total_cost)
                 }) {
                     return Err(Error::AttenuationViolation {
