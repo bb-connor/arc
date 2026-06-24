@@ -59,38 +59,51 @@ impl KernelCryptoFloor {
 }
 
 /// Sign an already-assembled [`ChioReceiptBody`] with an arbitrary
-/// [`SigningBackend`], trusting the caller-supplied `content_hash`.
+/// [`SigningBackend`] (classical, hybrid, or PQ), recomputing `content_hash`
+/// inside the trust boundary (WYSIWYS, BAC-539).
 ///
-/// Delegates to `chio_kernel_core::sign_receipt_relaying_trusted_body` (the
-/// body-only relay) so receipts produced via the hybrid path are byte-identical
-/// to receipts produced via the inline classical path when the same backend is
-/// used. This wrapper does **not** hold the content preimage, so it cannot
-/// recompute `content_hash`; the production recompute-and-refuse gate runs on
-/// the live kernel path (`build_and_sign_receipt` / the mpsc signing task) via
-/// `chio_kernel_core::sign_receipt` / `sign_receipt_with_handle` before any body
-/// reaches this wrapper. Maps the portable error surface onto [`KernelError`].
+/// Delegates to `chio_kernel_core::sign_receipt`, the production
+/// recompute-and-refuse primitive, so the hybrid signing path is held to the
+/// same WYSIWYS contract as the inline classical path and the mpsc signing
+/// task. `canonical_content` is the exact byte preimage the body's
+/// `content_hash` was derived from (for a value output the RFC 8785 canonical
+/// JSON; for a stream receipt the concatenated per-chunk digest preimage; for an
+/// empty output the literal `null` canonicalization). The signer recomputes
+/// `sha256_hex(canonical_content)` and refuses to sign when it disagrees with
+/// `body.content_hash`, closing the render-A / sign-B forgery on the hybrid path
+/// too rather than leaving it as a caller-hash-trust seam. Receipts produced via
+/// this wrapper are byte-identical to receipts produced via the inline classical
+/// path when the same backend and content are used.
+///
+/// Callers that genuinely cannot carry the content preimage (the thin transport
+/// adapters relaying an already-minted body across an FFI/WASM boundary) must
+/// use `chio_kernel_core::sign_receipt_relaying_trusted_body` directly, which is
+/// the explicit, auditable trusted-relay seam tracked under BAC-601; this
+/// content-bearing kernel wrapper is not that seam.
 ///
 /// # Errors
 ///
-/// Returns [`KernelError::ReceiptSigningFailed`] if the body's `kernel_key`
-/// does not match the backend's public key (fail-closed: the signing path
-/// refuses to issue a signature that would not verify).
+/// Returns [`KernelError::ReceiptSigningFailed`] when:
+/// - the body's claimed `content_hash` does not match
+///   `sha256_hex(canonical_content)` (fail-closed: render-A / sign-B refused), OR
+/// - the body's `kernel_key` does not match the backend's public key
+///   (fail-closed: the signing path refuses to issue a signature that would not
+///   verify), OR
+/// - canonical signing fails.
 pub fn sign_receipt_body_with_backend(
     body: ChioReceiptBody,
     backend: &dyn chio_core::crypto::SigningBackend,
+    canonical_content: &[u8],
 ) -> Result<ChioReceipt, KernelError> {
-    chio_kernel_core::sign_receipt_relaying_trusted_body(body, backend).map_err(|error| {
+    chio_kernel_core::sign_receipt(body, backend, canonical_content).map_err(|error| {
         use chio_kernel_core::ReceiptSigningError;
         let message = match error {
             ReceiptSigningError::KernelKeyMismatch => {
                 "kernel signing key does not match receipt body kernel_key".to_string()
             }
-            // WYSIWYS mismatch (BAC-539). This body-only wrapper relays via
-            // `sign_receipt_relaying_trusted_body`, which does not recompute
-            // `content_hash`, so this variant is not produced on this path; the
-            // production gate runs upstream on the live kernel path. Handled
-            // explicitly rather than via a wildcard so the variant is surfaced
-            // fail-closed if a content-bearing path adopts it.
+            // WYSIWYS mismatch (BAC-539): the body claimed a `content_hash` the
+            // signer could not reproduce from `canonical_content`, so the
+            // signature is refused fail-closed.
             ReceiptSigningError::ContentHashMismatch {
                 recomputed,
                 claimed,

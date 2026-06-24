@@ -822,7 +822,11 @@ impl ChioKernel {
     /// Receipt body construction continues to flow through the existing
     /// inline path (`build_and_sign_receipt`); callers that opt in to
     /// hybrid signing pass the returned backend through
-    /// [`crate::sign_receipt_body_with_backend`] before persistence.
+    /// [`crate::sign_receipt_body_with_backend`] (along with the canonical
+    /// content preimage the body's `content_hash` was derived from) before
+    /// persistence, so the hybrid path recomputes `content_hash` inside the
+    /// trust boundary and is WYSIWYS fail-closed (BAC-539) just like the inline
+    /// classical path.
     ///
     /// # Errors
     ///

@@ -82,12 +82,20 @@ pub fn sign_receipt(
     // the producer evaluated), never the caller's asserted `content_hash`.
     let recomputed = chio_core_types::crypto::sha256_hex(canonical_content);
     if recomputed != body.content_hash {
+        // Capture the claimed hash for the error payload BEFORE forgetting the
+        // body. Under `--cfg kani` we `mem::forget(body)` to avoid symbolically
+        // executing the body's Drop, but that moves the whole `body`; reading
+        // `body.content_hash` afterwards would be a use-after-move that fails to
+        // type-check on the formal-verification build. Clone the claimed hash
+        // into a local first so the error is built from owned data on both the
+        // normal and kani cfg paths.
+        let claimed = body.content_hash.clone();
         #[cfg(kani)]
         core::mem::forget(body);
 
         return Err(ReceiptSigningError::ContentHashMismatch {
             recomputed,
-            claimed: body.content_hash,
+            claimed,
         });
     }
 

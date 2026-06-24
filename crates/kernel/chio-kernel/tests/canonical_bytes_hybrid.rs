@@ -71,6 +71,12 @@ fn fixture_pq_seed() -> [u8; 32] {
     out
 }
 
+/// Canonical content preimage the test bodies bind their `content_hash` to.
+/// `sign_receipt_body_with_backend` recomputes `sha256_hex` over these bytes and
+/// refuses to sign on mismatch (WYSIWYS, BAC-539), so the body built by
+/// [`build_body`] carries exactly `sha256_hex(FIXTURE_CANONICAL_CONTENT)`.
+const FIXTURE_CANONICAL_CONTENT: &[u8] = br#"{"q":"canonical"}"#;
+
 fn build_body(kernel_key: PublicKey) -> ChioReceiptBody {
     ChioReceiptBody {
         id: "rcpt-canonical-bytes-hybrid".to_string(),
@@ -86,8 +92,7 @@ fn build_body(kernel_key: PublicKey) -> ChioReceiptBody {
         tool_origin: Default::default(),
         redaction_mode: Default::default(),
         actor_chain: Vec::new(),
-        content_hash: "2222222222222222222222222222222222222222222222222222222222222222"
-            .to_string(),
+        content_hash: chio_core::crypto::sha256_hex(FIXTURE_CANONICAL_CONTENT),
         policy_hash: "policy-canon".to_string(),
         evidence: Vec::new(),
         metadata: None,
@@ -114,7 +119,8 @@ fn shared_canonical_bytes_match_classical_signing_path() {
     // into `ChioReceiptSigningBody`, canonicalize). The bare body
     // bytes are NOT what either path signs; the wrapper is.
     let wrapper_bytes = canonical_signing_wrapper_bytes(&body);
-    let legacy_receipt = sign_receipt_body_with_backend(body.clone(), &backend).unwrap();
+    let legacy_receipt =
+        sign_receipt_body_with_backend(body.clone(), &backend, FIXTURE_CANONICAL_CONTENT).unwrap();
 
     // New path: consume the SharedCanonicalBytes newtype.
     let SignedHybridReceipt { receipt, canonical } =
@@ -267,7 +273,8 @@ fn hybrid_canonical_and_classical_paths_sign_identical_bytes_under_ed25519() {
     let body = build_body(kp.public_key());
 
     // Sign through both entrypoints.
-    let classical_receipt = sign_receipt_body_with_backend(body.clone(), &backend).unwrap();
+    let classical_receipt =
+        sign_receipt_body_with_backend(body.clone(), &backend, FIXTURE_CANONICAL_CONTENT).unwrap();
     let SignedHybridReceipt {
         receipt: hybrid_receipt,
         canonical,
