@@ -58,11 +58,14 @@
 //! module's reach. The intended seam is for the control-plane operator
 //! that drives [`CredentialRevocationOracle::revoke_credential`] to also
 //! signal the settlement engine to cancel any in-flight settlement keyed
-//! on the revoked subject(s); the cascade already returns the full
-//! revoked closure (via the post-commit epoch root and the dependency
-//! adjacency) so that signal can fan out transitively. Wiring that
-//! cancellation call is left to the settlement crate; this module owns
-//! only the deny-the-next-mint half of the contract.
+//! on the revoked subject(s). The full revoked closure is exposed for
+//! exactly this fan-out via
+//! [`CredentialRevocationOracle::revoked_closure`], which returns the root
+//! subject plus every transitively-dependent subject the revocation covers
+//! (not just the root the operator passed in), so the cancellation signal
+//! can reach the whole subtree. Wiring that cancellation call is left to
+//! the settlement crate; this module owns only the deny-the-next-mint half
+//! of the contract.
 //!
 //! # Trust contract
 //!
@@ -150,6 +153,22 @@ pub trait CredentialRevocationOracle: Send + Sync {
     /// never mints while the revocation state is unknown.
     fn is_revoked(&self, credential_id: &str) -> Result<bool, CustodyError>;
 
+    /// Return the full revoked closure of `credential_id`: the root subject
+    /// plus every dependent reachable from it through the registered
+    /// adjacency (transitively, cycle-safe). This is the seam the
+    /// in-flight-settlement cancellation contract documents: a control-plane
+    /// operator that drives [`Self::revoke_credential`] can call this to
+    /// enumerate every subject the revocation covers and fan a settlement
+    /// cancellation out across the whole subtree, not just the root it
+    /// passed in.
+    ///
+    /// The closure is independent of whether the subjects are already
+    /// revoked, so it can be queried before OR after `revoke_credential`.
+    /// Each subject appears at most once; the root is always included.
+    ///
+    /// Fail-closed: lock/evaluation failures surface as `Err(_)`.
+    fn revoked_closure(&self, credential_id: &str) -> Result<Vec<String>, CustodyError>;
+
     /// Snapshot the current oracle epoch root. Surfaced for observability.
     fn current_epoch_root(&self) -> Result<EpochRoot, CustodyError>;
 }
@@ -175,6 +194,26 @@ fn key_for(credential_id: &str) -> RevocationKey {
         SubjectId::from(credential_id),
         credential_revocation_nonce(),
     )
+}
+
+/// Reject a subject the sparse-Merkle oracle would later refuse, BEFORE it
+/// is staged into the cascade or recorded as a dependency edge.
+///
+/// The oracle's leaf insert rejects a subject id that is empty,
+/// whitespace-only, or surrounded by whitespace (see
+/// `RevocationOracle::insert` / its `validate_key`). Catching the same rule
+/// up-front means `register_dependency` fails fast and clean on a bad
+/// `parent`/`dependent` instead of recording an edge that wedges a later
+/// `revoke_credential` cascade: because there is no edge-removal API, one
+/// un-revocable edge would otherwise permanently block the kill switch for
+/// that subtree. Mirrors the oracle rule exactly so the two never disagree.
+fn validate_subject(label: &str, subject: &str) -> Result<(), CustodyError> {
+    if subject.trim().is_empty() || subject.trim() != subject {
+        return Err(CustodyError::Encoding(format!(
+            "revocation {label} subject must be non-empty and unpadded"
+        )));
+    }
+    Ok(())
 }
 
 impl CascadeState {
@@ -222,6 +261,35 @@ impl CascadeState {
         }
 
         to_revoke
+    }
+
+    /// Compute the FULL transitive closure of `root_subject` through the
+    /// dependency adjacency, regardless of current revoked status. Unlike
+    /// [`Self::plan_cascade`] (which skips already-revoked leaves because it
+    /// drives the insert batch), this returns every reachable subject so a
+    /// caller can enumerate the whole revoked closure for fan-out (e.g.
+    /// in-flight settlement cancellation). Cycle-safe via a visited set; the
+    /// root is always included and each subject appears at most once.
+    fn closure(&self, root_subject: &str) -> Vec<String> {
+        let mut visited: HashSet<String> = HashSet::new();
+        let mut order: Vec<String> = Vec::new();
+        let mut stack: Vec<String> = vec![root_subject.to_string()];
+
+        while let Some(subject) = stack.pop() {
+            if !visited.insert(subject.clone()) {
+                continue;
+            }
+            order.push(subject.clone());
+            if let Some(children) = self.dependents.get(&subject) {
+                for child in children {
+                    if !visited.contains(child) {
+                        stack.push(child.clone());
+                    }
+                }
+            }
+        }
+
+        order
     }
 
     /// Stage the transitive closure of `root_subject` against a SCRATCH
@@ -308,6 +376,13 @@ impl InMemoryCredentialRevocationOracle {
 
 impl CredentialRevocationOracle for InMemoryCredentialRevocationOracle {
     fn register_dependency(&self, parent: &str, dependent: &str) -> Result<(), CustodyError> {
+        // Reject subjects the oracle would later refuse BEFORE staging or
+        // recording the edge: an un-revocable subject staged into an edge
+        // here would wedge a future revoke_credential cascade with no way to
+        // remove the edge (no edge-removal API), permanently blocking the
+        // kill switch for that subtree.
+        validate_subject("dependency parent", parent)?;
+        validate_subject("dependency dependent", dependent)?;
         if parent == dependent {
             // A subject cannot depend on itself; reject so the adjacency
             // never contains a degenerate self-edge.
@@ -357,6 +432,10 @@ impl CredentialRevocationOracle for InMemoryCredentialRevocationOracle {
         Ok(guard.oracle.contains(&key_for(credential_id)))
     }
 
+    fn revoked_closure(&self, credential_id: &str) -> Result<Vec<String>, CustodyError> {
+        Ok(self.lock()?.closure(credential_id))
+    }
+
     fn current_epoch_root(&self) -> Result<EpochRoot, CustodyError> {
         Ok(self.lock()?.oracle.epoch_root())
     }
@@ -394,7 +473,7 @@ mod sqlite {
     use chio_revocation_oracle::RevocationOracle;
     use rusqlite::{params, Connection, OpenFlags};
 
-    use super::{key_for, CascadeState, CredentialRevocationOracle, EpochRoot};
+    use super::{key_for, validate_subject, CascadeState, CredentialRevocationOracle, EpochRoot};
     use crate::error::CustodyError;
 
     /// Durable [`CredentialRevocationOracle`] backed by a single SQLite
@@ -539,33 +618,56 @@ mod sqlite {
         }
 
         /// Test-only: count persisted edges matching `(parent, dependent)`.
+        ///
+        /// Uses explicit `match`/`panic!` rather than `expect`: the crate
+        /// forbids `clippy::expect_used` crate-wide (test config included).
         #[cfg(test)]
         fn persisted_edge_count(&self, parent: &str, dependent: &str) -> i64 {
-            let conn = self.lock_conn().expect("lock conn");
-            conn.query_row(
+            let conn = match self.lock_conn() {
+                Ok(c) => c,
+                Err(e) => panic!("lock conn: {e}"),
+            };
+            match conn.query_row(
                 "SELECT COUNT(*) FROM chio_custody_revocation_edges
                  WHERE parent = ?1 AND dependent = ?2",
                 rusqlite::params![parent, dependent],
                 |row| row.get::<_, i64>(0),
-            )
-            .expect("count edges")
+            ) {
+                Ok(n) => n,
+                Err(e) => panic!("count edges: {e}"),
+            }
         }
 
         /// Test-only: count persisted leaves for `subject`.
+        ///
+        /// Uses explicit `match`/`panic!` rather than `expect`: the crate
+        /// forbids `clippy::expect_used` crate-wide (test config included).
         #[cfg(test)]
         fn persisted_leaf_count(&self, subject: &str) -> i64 {
-            let conn = self.lock_conn().expect("lock conn");
-            conn.query_row(
+            let conn = match self.lock_conn() {
+                Ok(c) => c,
+                Err(e) => panic!("lock conn: {e}"),
+            };
+            match conn.query_row(
                 "SELECT COUNT(*) FROM chio_custody_revocation_leaves WHERE subject = ?1",
                 rusqlite::params![subject],
                 |row| row.get::<_, i64>(0),
-            )
-            .expect("count leaves")
+            ) {
+                Ok(n) => n,
+                Err(e) => panic!("count leaves: {e}"),
+            }
         }
     }
 
     impl CredentialRevocationOracle for SqliteCredentialRevocationOracle {
         fn register_dependency(&self, parent: &str, dependent: &str) -> Result<(), CustodyError> {
+            // Reject subjects the oracle would later refuse BEFORE staging or
+            // persisting the edge: an un-revocable subject would otherwise be
+            // recorded durably and wedge a future revoke_credential cascade
+            // with no edge-removal API to undo it (permanently blocking the
+            // kill switch for that subtree).
+            validate_subject("dependency parent", parent)?;
+            validate_subject("dependency dependent", dependent)?;
             if parent == dependent {
                 return Err(CustodyError::Encoding(
                     "revocation dependency parent and dependent must differ".into(),
@@ -599,8 +701,8 @@ mod sqlite {
             // reopen (it only replays persisted leaves), so a child
             // registered after its parent was revoked could silently outlive
             // the revoked parent (fail-open on the kill switch). Wrapping
-            // both writes in one transaction — mirroring the single-txn
-            // staging used by `revoke_credential` — closes that gap. The
+            // both writes in one transaction (mirroring the single-txn
+            // staging used by `revoke_credential`) closes that gap. The
             // in-RAM cache is mutated ONLY after COMMIT succeeds, so on any
             // error the rollback leaves the durable store and the cache
             // byte-identical to their pre-call state.
@@ -646,6 +748,10 @@ mod sqlite {
 
         fn is_revoked(&self, credential_id: &str) -> Result<bool, CustodyError> {
             Ok(self.lock_cache()?.oracle.contains(&key_for(credential_id)))
+        }
+
+        fn revoked_closure(&self, credential_id: &str) -> Result<Vec<String>, CustodyError> {
+            Ok(self.lock_cache()?.closure(credential_id))
         }
 
         fn current_epoch_root(&self) -> Result<EpochRoot, CustodyError> {
@@ -848,11 +954,11 @@ mod sqlite {
         }
 
         #[test]
-        fn durable_cascade_rolls_back_on_partial_failure() {
-            // The durable backend must honour the all-or-nothing contract:
-            // a leaf that cannot be staged ( " " is structurally invalid )
-            // must leave neither the root nor the good sibling revoked, in
-            // RAM and on disk.
+        fn durable_register_dependency_rejects_invalid_subject_before_staging() {
+            // An un-revocable subject (" " is structurally invalid for the
+            // sparse-Merkle oracle) must be rejected at registration BEFORE it
+            // is persisted as an edge, so it can never wedge a later durable
+            // cascade. A clean sibling edge plus the root must still revoke.
             let oracle = match SqliteCredentialRevocationOracle::open_in_memory() {
                 Ok(o) => o,
                 Err(e) => panic!("open mem: {e}"),
@@ -860,23 +966,23 @@ mod sqlite {
             if let Err(e) = oracle.register_dependency("root", "good") {
                 panic!("register good: {e}");
             }
-            if let Err(e) = oracle.register_dependency("root", " ") {
-                panic!("register bad edge: {e}");
-            }
-            let res = oracle.revoke_credential("root", 1_000);
+            let bad = oracle.register_dependency("root", " ");
             assert!(
-                matches!(res, Err(CustodyError::Encoding(_))),
-                "an un-stageable leaf must fail the whole durable cascade"
+                matches!(bad, Err(CustodyError::Encoding(_))),
+                "an un-revocable dependent must be rejected before staging"
             );
+
+            // No bad edge was recorded, so the root cascade still commits and
+            // is observable for the good sibling.
+            if let Err(e) = oracle.revoke_credential("root", 1_000) {
+                panic!("revoke root after rejected edge must succeed: {e}");
+            }
             match oracle.is_revoked("root") {
-                Ok(b) => assert!(
-                    !b,
-                    "root must not be revoked after a rolled-back durable cascade"
-                ),
+                Ok(b) => assert!(b, "root must be revocable after the bad edge was rejected"),
                 Err(e) => panic!("is_revoked root: {e}"),
             }
             match oracle.is_revoked("good") {
-                Ok(b) => assert!(!b, "the good sibling must not be revoked after rollback"),
+                Ok(b) => assert!(b, "the good sibling must cascade after a clean revoke"),
                 Err(e) => panic!("is_revoked good: {e}"),
             }
         }
@@ -1156,42 +1262,41 @@ mod tests {
     }
 
     #[test]
-    fn cascade_rolls_back_on_partial_failure_no_partial_state() {
+    fn invalid_dependent_is_rejected_so_the_root_cascade_stays_clean() {
         // A dependent with an un-insertable subject id (the sparse-Merkle
-        // oracle rejects whitespace-only subjects) must abort the WHOLE
-        // cascade: neither the root nor any sibling dependent may be left
-        // revoked, otherwise the all-or-nothing contract is violated.
+        // oracle rejects whitespace-only subjects) is rejected at
+        // registration BEFORE it is staged, so it can never poison a later
+        // cascade. The good sibling and the root must still revoke cleanly.
         let oracle = InMemoryCredentialRevocationOracle::new();
         if let Err(e) = oracle.register_dependency("root", "good-child") {
             panic!("register good child: {e}");
         }
         // " " is a structurally-invalid subject for the sparse-Merkle
-        // oracle, so staging this leaf fails and the transaction rolls back.
-        if let Err(e) = oracle.register_dependency("root", " ") {
-            panic!("register bad child edge: {e}");
-        }
+        // oracle, so the edge is rejected up-front and never recorded.
+        let bad = oracle.register_dependency("root", " ");
+        assert!(
+            matches!(bad, Err(CustodyError::Encoding(_))),
+            "a leaf that the oracle would reject must be refused before staging"
+        );
 
         let root_before = match oracle.current_epoch_root() {
             Ok(r) => r,
             Err(e) => panic!("epoch root before: {e}"),
         };
 
-        let res = oracle.revoke_credential("root", 1_000);
-        assert!(
-            matches!(res, Err(CustodyError::Encoding(_))),
-            "a leaf that cannot be staged must fail the whole cascade"
-        );
+        // The bad edge was never recorded, so the cascade commits cleanly.
+        if let Err(e) = oracle.revoke_credential("root", 1_000) {
+            panic!("revoke root after rejected edge must succeed: {e}");
+        }
 
-        // No partial state: the root and the good child must BOTH be
-        // un-revoked, and the epoch root must be byte-identical to before.
         match oracle.is_revoked("root") {
-            Ok(b) => assert!(!b, "root must not be revoked after a rolled-back cascade"),
+            Ok(b) => assert!(b, "root must be revoked after a clean cascade"),
             Err(e) => panic!("is_revoked root: {e}"),
         }
         match oracle.is_revoked("good-child") {
             Ok(b) => assert!(
-                !b,
-                "the good sibling must not be revoked after a rolled-back cascade"
+                b,
+                "the good sibling must cascade once the bad edge is rejected"
             ),
             Err(e) => panic!("is_revoked good-child: {e}"),
         }
@@ -1199,35 +1304,147 @@ mod tests {
             Ok(r) => r,
             Err(e) => panic!("epoch root after: {e}"),
         };
-        assert_eq!(
+        assert_ne!(
             root_before, root_after,
+            "a clean cascade must advance the epoch root"
+        );
+    }
+
+    #[test]
+    fn cascade_rolls_back_when_a_subject_becomes_unstageable() {
+        // Defense in depth: even though register_dependency now validates
+        // subjects up-front, the staging path itself must still be
+        // all-or-nothing. A subject that the oracle rejects at insert time
+        // aborts the WHOLE staged batch, leaving neither the root nor any
+        // good sibling revoked and the epoch root unchanged.
+        let mut state = CascadeState::empty();
+        // Inject a degenerate edge directly so the registration guard does
+        // not intercept it; this exercises the stage_cascade rollback in
+        // isolation.
+        state
+            .dependents
+            .entry("root".to_string())
+            .or_default()
+            .insert("good-child".to_string());
+        state
+            .dependents
+            .entry("root".to_string())
+            .or_default()
+            .insert(" ".to_string());
+
+        let root_before = state.oracle.epoch_root();
+        let res = state.cascade_revoke("root", 1_000);
+        assert!(
+            matches!(res, Err(CustodyError::Encoding(_))),
+            "an un-stageable leaf must fail the whole staged cascade"
+        );
+
+        assert!(
+            !state.oracle.contains(&key_for("root")),
+            "root must not be revoked after a rolled-back cascade"
+        );
+        assert!(
+            !state.oracle.contains(&key_for("good-child")),
+            "the good sibling must not be revoked after a rolled-back cascade"
+        );
+        assert_eq!(
+            root_before,
+            state.oracle.epoch_root(),
             "a rolled-back cascade must leave the epoch root unchanged"
         );
     }
 
     #[test]
-    fn rolled_back_cascade_can_succeed_after_the_bad_edge_is_avoided() {
-        // After a rollback, revoking a DIFFERENT, clean subtree must still
-        // succeed: the rollback left no latent corruption in the oracle.
-        let oracle = InMemoryCredentialRevocationOracle::new();
-        if let Err(e) = oracle.register_dependency("bad-root", " ") {
-            panic!("register bad edge: {e}");
-        }
-        let res = oracle.revoke_credential("bad-root", 1_000);
+    fn clean_revoke_succeeds_after_an_unstageable_cascade_rolls_back() {
+        // After a staged cascade rolls back, an unrelated clean revocation
+        // must still commit: the rollback left no latent corruption.
+        let mut state = CascadeState::empty();
+        state
+            .dependents
+            .entry("bad-root".to_string())
+            .or_default()
+            .insert(" ".to_string());
+
+        let res = state.cascade_revoke("bad-root", 1_000);
         assert!(matches!(res, Err(CustodyError::Encoding(_))));
 
         // A clean revocation on an unrelated subject still commits.
-        if let Err(e) = oracle.revoke_credential("clean", 2_000) {
+        if let Err(e) = state.cascade_revoke("clean", 2_000) {
             panic!("clean revoke after rollback must succeed: {e}");
         }
-        match oracle.is_revoked("clean") {
-            Ok(b) => assert!(b, "clean revoke must commit after a prior rollback"),
-            Err(e) => panic!("is_revoked clean: {e}"),
+        assert!(
+            state.oracle.contains(&key_for("clean")),
+            "clean revoke must commit after a prior rollback"
+        );
+        assert!(
+            !state.oracle.contains(&key_for("bad-root")),
+            "bad-root must remain un-revoked"
+        );
+    }
+
+    #[test]
+    fn revoked_closure_enumerates_the_transitive_subtree() {
+        // The settlement-cancellation seam needs the FULL closure (root plus
+        // every transitive dependent), independent of revoked status, so a
+        // cancellation can fan out across the whole subtree.
+        let oracle = InMemoryCredentialRevocationOracle::new();
+        if let Err(e) = oracle.register_dependency("a", "b") {
+            panic!("register a->b: {e}");
         }
-        // The bad root remains un-revoked (its cascade never committed).
-        match oracle.is_revoked("bad-root") {
-            Ok(b) => assert!(!b, "bad-root must remain un-revoked"),
-            Err(e) => panic!("is_revoked bad-root: {e}"),
+        if let Err(e) = oracle.register_dependency("b", "c") {
+            panic!("register b->c: {e}");
+        }
+        let mut closure = match oracle.revoked_closure("a") {
+            Ok(c) => c,
+            Err(e) => panic!("revoked_closure: {e}"),
+        };
+        closure.sort();
+        assert_eq!(
+            closure,
+            vec!["a".to_string(), "b".to_string(), "c".to_string()],
+            "the closure must contain the root and every transitive dependent"
+        );
+
+        // Queryable before any revocation, and the root is always included
+        // even with no dependents.
+        match oracle.revoked_closure("standalone") {
+            Ok(c) => assert_eq!(c, vec!["standalone".to_string()]),
+            Err(e) => panic!("revoked_closure standalone: {e}"),
+        }
+    }
+
+    #[test]
+    fn register_dependency_rejects_invalid_subjects_before_staging() {
+        // An un-revocable subject (whitespace-only / padded) must be rejected
+        // up-front so it never wedges a later revoke_credential cascade: there
+        // is no edge-removal API, so a bad edge would permanently block the
+        // kill switch for that subtree.
+        let oracle = InMemoryCredentialRevocationOracle::new();
+
+        let bad_dependent = oracle.register_dependency("root", " ");
+        assert!(
+            matches!(bad_dependent, Err(CustodyError::Encoding(_))),
+            "a whitespace-only dependent must be rejected before staging"
+        );
+        let bad_parent = oracle.register_dependency(" ", "child");
+        assert!(
+            matches!(bad_parent, Err(CustodyError::Encoding(_))),
+            "a whitespace-only parent must be rejected before staging"
+        );
+        let padded = oracle.register_dependency("root", "padded ");
+        assert!(
+            matches!(padded, Err(CustodyError::Encoding(_))),
+            "a padded dependent must be rejected before staging"
+        );
+
+        // The bad edges were never recorded, so revoking the root still
+        // succeeds and is observable (the kill switch is not wedged).
+        if let Err(e) = oracle.revoke_credential("root", 1_000) {
+            panic!("revoke root after rejected edges must succeed: {e}");
+        }
+        match oracle.is_revoked("root") {
+            Ok(b) => assert!(b, "root must be revocable after bad edges were rejected"),
+            Err(e) => panic!("is_revoked root: {e}"),
         }
     }
 
