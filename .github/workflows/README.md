@@ -15,10 +15,18 @@ cargo registry/target cache. The four gate steps are:
 | **Workspace build** | "Workspace build" | `cargo build --workspace` |
 | Tests | "Workspace tests" + "Wasm guards library tests" | `cargo test --workspace --exclude chio-wasm-guards`, then `cargo test -p chio-wasm-guards --lib` |
 
-Two further required checks run alongside the four steps above: a "Tokio console
-smoke" step in the same `check` job (see the test-lane section below), and a
-separate "MSRV build and test" job that builds and tests the workspace on the
-pinned MSRV toolchain.
+The full set of required check contexts (the `name:` values GitHub branch
+rulesets match on) is four jobs, not one:
+
+- "Build, lint, test" (the `check` job, containing the four steps above)
+- "MSRV build and test" (the `msrv` job; see below for its coverage caveats)
+- "cargo-vet (locked supply-chain audit)" (the `cargo-vet` job)
+- "cargo-deny (supply-chain bans/advisories/licenses)" (the `cargo-deny` job)
+
+All four are required; cargo-vet and cargo-deny are not optional. The "Tokio
+console smoke" check is *not* a separate required context: it is a step inside
+the "Build, lint, test" job (see the test-lane section below), so it surfaces
+under that job's context rather than as its own check.
 
 ### Why the build step MUST stay `--workspace`, not per-crate (`-p`)
 
@@ -80,6 +88,30 @@ dedicated wasm integration-test lane is added. Until then, do not "fix" the
 carveout by folding `chio-wasm-guards` back into the `--workspace` test step
 (it will fail in the plain lane), and do not assume a green `ci.yml` run covered
 the wasm-guards integration tests.
+
+### The MSRV job does not fully test the workspace
+
+The "MSRV build and test" job (`msrv` in `ci.yml`) runs `cargo build
+--workspace` on the pinned MSRV toolchain, but its test command does **not**
+cover the whole workspace. It runs:
+
+```
+cargo test --workspace --exclude chio-conformance --exclude chio-wasm-guards --exclude chio-formal-diff-tests
+cargo test -p chio-formal-diff-tests --no-run
+cargo test -p chio-wasm-guards --lib
+```
+
+So MSRV test coverage is uneven:
+
+- `chio-conformance` is **not tested on MSRV** at all (excluded from the
+  workspace test run and never re-added).
+- `chio-formal-diff-tests` gets only `--no-run`: its tests are compiled on MSRV
+  but not executed.
+- `chio-wasm-guards` gets only `--lib`: its in-crate unit tests run on MSRV, but
+  its `tests/` integration targets do not.
+
+Do not describe the MSRV job as testing the full workspace; it builds the full
+workspace and tests it with the carveouts above.
 
 > Note (firmware/console): the arc workspace is Rust-only; the firmware and
 > console build pipelines referenced by BAC-609 live in their own repos and
