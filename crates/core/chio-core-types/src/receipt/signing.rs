@@ -261,7 +261,15 @@ impl From<ContentHashMismatch> for Error {
 /// (BAC-539 seam). The hash-recompute + refuse-on-mismatch guarantee in this
 /// type already closes the render-A / sign-B regression regardless of that
 /// follow-up, because the signer never trusts the caller's `content_hash`.
-#[derive(Debug)]
+///
+/// # Debug redaction
+///
+/// `Debug` is implemented by hand (not derived) so the raw `content_preimage`
+/// -- which for a value receipt is the exact canonical tool output and can carry
+/// user data or secrets -- never reaches a log line, a `debug_assert!` panic, or
+/// a `{:?}` format. The custom impl prints the recomputed `content_hash` (a
+/// non-secret digest) and the preimage *length* in place of the bytes
+/// themselves. See the `debug_redacts_preimage` test.
 pub struct ReceiptSigningHandle {
     /// The exact byte preimage the `content_hash` is defined over. For a
     /// canonical-JSON artifact this is the RFC 8785 serialization; for a
@@ -271,6 +279,21 @@ pub struct ReceiptSigningHandle {
     /// always recomputed from these bytes at construction.
     content_preimage: Vec<u8>,
     content_hash: String,
+}
+
+impl core::fmt::Debug for ReceiptSigningHandle {
+    /// Redacted formatter: prints the recomputed `content_hash` (non-secret)
+    /// and the preimage byte length, but NEVER the preimage bytes. The raw
+    /// preimage is the canonical tool output for value receipts and may carry
+    /// user data or secrets, so it must not leak into logs or panic messages.
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("ReceiptSigningHandle")
+            .field("content_hash", &self.content_hash)
+            .field("content_preimage_len", &self.content_preimage.len())
+            .field("content_preimage", &"<redacted>")
+            .finish()
+    }
 }
 
 impl ReceiptSigningHandle {

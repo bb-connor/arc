@@ -61,6 +61,24 @@ use crate::{ChioReceipt, ChioReceiptBody, KernelError, Keypair};
 /// signing-task stall before producer memory grows unbounded. Operators
 /// can override via [`SigningTaskHandle::with_capacity`].
 pub const DEFAULT_SIGNING_CHANNEL_CAPACITY: usize = 256;
+
+/// Per-request byte cap on the queued canonical-content preimage.
+///
+/// Each queued [`SignRequest`] owns the full `canonical_content` preimage. With
+/// a bounded channel of [`DEFAULT_SIGNING_CHANNEL_CAPACITY`] requests, the queue
+/// is bounded by *count* but not by *bytes*: under signer stall / backpressure a
+/// burst of large value or stream receipts could retain hundreds of full output
+/// preimages in memory at once. This cap bounds the bytes any single request may
+/// enqueue so the worst-case retained memory is `capacity * MAX_SIGNING_CONTENT_BYTES`
+/// rather than unbounded. Oversized requests are rejected fail-closed
+/// ([`KernelError::ReceiptSigningFailed`]) rather than silently truncated, since
+/// truncating the preimage would break the WYSIWYS recompute (BAC-539).
+///
+/// 1 MiB comfortably covers normal value/stream receipt content (the queue was
+/// originally sized for sub-1 KiB requests) while still capping pathological
+/// payloads. Operators with legitimately larger receipts should sign those
+/// inline rather than funnelling them through the async queue.
+pub const MAX_SIGNING_CONTENT_BYTES: usize = 1024 * 1024;
 #[cfg_attr(test, allow(unused_imports))]
 pub use chio_metrics_spec::CHIO_SIGNING_QUEUE_BLOCK_TOTAL as METRIC_CHIO_SIGNING_QUEUE_BLOCK_TOTAL;
 static SIGNING_QUEUE_BLOCK_TOTAL: AtomicU64 = AtomicU64::new(0);
@@ -214,6 +232,17 @@ impl SigningTaskHandle {
         KernelError::Internal("receipt signing task already shut down".to_string())
     }
 
+    /// Fail-closed error for a request whose canonical-content preimage exceeds
+    /// [`MAX_SIGNING_CONTENT_BYTES`]. Refused before the request is enqueued so
+    /// the bounded queue cannot retain an oversized buffer.
+    fn oversized_content_error(len: usize) -> KernelError {
+        KernelError::ReceiptSigningFailed(format!(
+            "receipt signing refused: canonical content is {len} bytes, over the \
+             {MAX_SIGNING_CONTENT_BYTES}-byte per-request queue cap (sign oversized \
+             receipts inline rather than through the async queue)"
+        ))
+    }
+
     /// Lazily spawn the signing task and return a reference to the
     /// resulting [`SigningTaskInner`]. Idempotent: every caller after
     /// the first observes the existing task without spawning.
@@ -269,6 +298,12 @@ impl SigningTaskHandle {
         body: ChioReceiptBody,
         canonical_content: Vec<u8>,
     ) -> Result<ChioReceipt, KernelError> {
+        // Byte-bound the queue: refuse an oversized preimage BEFORE enqueueing
+        // so the bounded channel never retains it. Fail-closed (BAC-539: never
+        // truncate, which would break the WYSIWYS recompute).
+        if canonical_content.len() > MAX_SIGNING_CONTENT_BYTES {
+            return Err(Self::oversized_content_error(canonical_content.len()));
+        }
         let inner = self.ensure_spawned()?;
         let sender = inner.sender_clone().ok_or_else(|| {
             KernelError::Internal("receipt signing task already shut down".to_string())
@@ -324,6 +359,12 @@ impl SigningTaskHandle {
         body: ChioReceiptBody,
         canonical_content: Vec<u8>,
     ) -> TrySignOutcome {
+        // Byte-bound the queue here too: an oversized preimage is returned
+        // unsent (the Err variant means "not enqueued"). It is non-retryable,
+        // but the bounded queue never holds it, which is the property we need.
+        if canonical_content.len() > MAX_SIGNING_CONTENT_BYTES {
+            return Err((body, canonical_content));
+        }
         let inner = match self.ensure_spawned() {
             Ok(inner) => inner,
             Err(_) => return Err((body, canonical_content)),

@@ -124,7 +124,7 @@ fn shared_canonical_bytes_match_classical_signing_path() {
 
     // New path: consume the SharedCanonicalBytes newtype.
     let SignedHybridReceipt { receipt, canonical } =
-        sign_receipt_body_hybrid_canonical(body, &backend).unwrap();
+        sign_receipt_body_hybrid_canonical(body, &backend, FIXTURE_CANONICAL_CONTENT).unwrap();
 
     // The shared buffer matches the authoritative signing-wrapper
     // bytes byte-for-byte. This pins the contract that
@@ -168,7 +168,7 @@ fn hybrid_signing_consumes_shared_canonical_bytes_and_verifies() {
 
     let body = build_body(hybrid.public_key());
     let SignedHybridReceipt { receipt, canonical } =
-        sign_receipt_body_hybrid_canonical(body, &hybrid).unwrap();
+        sign_receipt_body_hybrid_canonical(body, &hybrid, FIXTURE_CANONICAL_CONTENT).unwrap();
 
     assert_eq!(receipt.signature.algorithm(), SigningAlgorithm::Hybrid);
 
@@ -194,7 +194,8 @@ fn shared_canonical_bytes_are_arc_shareable_without_recanonicalization() {
     let hybrid = HybridBackend::new(Box::new(classical_backend), pq).unwrap();
     let body = build_body(hybrid.public_key());
 
-    let signed = sign_receipt_body_hybrid_canonical(body, &hybrid).unwrap();
+    let signed =
+        sign_receipt_body_hybrid_canonical(body, &hybrid, FIXTURE_CANONICAL_CONTENT).unwrap();
     let shared: SharedCanonicalBytes = signed.canonical.clone();
 
     // Two Arc handles to the same allocation (Arc::strong_count >= 2).
@@ -222,7 +223,7 @@ fn kernel_key_mismatch_fails_closed_before_canonicalization() {
     // kp_a -- a misconfiguration the helper MUST reject.
     let body = build_body(kp_b.public_key());
 
-    let result = sign_receipt_body_hybrid_canonical(body, &backend);
+    let result = sign_receipt_body_hybrid_canonical(body, &backend, FIXTURE_CANONICAL_CONTENT);
     let err = match result {
         Ok(_) => panic!("kernel-key mismatch MUST fail-closed"),
         Err(err) => err,
@@ -231,6 +232,32 @@ fn kernel_key_mismatch_fails_closed_before_canonicalization() {
     assert!(
         msg.contains("kernel signing key does not match"),
         "expected kernel-key mismatch diagnostic, got {msg}"
+    );
+}
+
+#[test]
+fn content_hash_mismatch_fails_closed_render_a_sign_b() {
+    // WYSIWYS (BAC-539): the shared-canonical hybrid path must refuse to sign
+    // a body whose claimed `content_hash` does not match the canonical content
+    // preimage handed to the signer (render content A, sign hash B). The refusal
+    // happens before any cryptographic work.
+    let kp = Keypair::from_seed(&fixture_classical_seed());
+    let backend = Ed25519Backend::new(kp.clone());
+    // `build_body` binds `content_hash = sha256_hex(FIXTURE_CANONICAL_CONTENT)`,
+    // but we hand the signer a DIFFERENT preimage. The recompute must disagree
+    // with the body's claim and refuse.
+    let body = build_body(kp.public_key());
+    let attacker_preimage = br#"{"q":"a-different-thing"}"#;
+
+    let result = sign_receipt_body_hybrid_canonical(body, &backend, attacker_preimage);
+    let err = match result {
+        Ok(_) => panic!("render-A/sign-B MUST fail-closed on the hybrid-canonical path"),
+        Err(err) => err,
+    };
+    let msg = format!("{err:?}");
+    assert!(
+        msg.contains("content_hash mismatch") && msg.contains("WYSIWYS refused"),
+        "expected WYSIWYS content-hash mismatch diagnostic, got {msg}"
     );
 }
 
@@ -247,7 +274,9 @@ fn shared_bytes_round_trip_through_serde_after_signing() {
     let hybrid = HybridBackend::new(Box::new(classical_backend), pq).unwrap();
     let body = build_body(hybrid.public_key());
 
-    let signed = sign_receipt_body_hybrid_canonical(body.clone(), &hybrid).unwrap();
+    let signed =
+        sign_receipt_body_hybrid_canonical(body.clone(), &hybrid, FIXTURE_CANONICAL_CONTENT)
+            .unwrap();
     // The shared buffer matches the authoritative
     // `ChioReceiptSigningBody` wrapper bytes, NOT the bare body bytes.
     let wrapper_bytes = canonical_signing_wrapper_bytes(&body);
@@ -278,7 +307,8 @@ fn hybrid_canonical_and_classical_paths_sign_identical_bytes_under_ed25519() {
     let SignedHybridReceipt {
         receipt: hybrid_receipt,
         canonical,
-    } = sign_receipt_body_hybrid_canonical(body.clone(), &backend).unwrap();
+    } = sign_receipt_body_hybrid_canonical(body.clone(), &backend, FIXTURE_CANONICAL_CONTENT)
+        .unwrap();
 
     // The receipt id is content-addressed and identical across paths.
     assert_eq!(

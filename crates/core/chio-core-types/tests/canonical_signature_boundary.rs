@@ -112,6 +112,48 @@ fn signing_handle_recomputes_content_hash_over_canonical_content() {
 }
 
 #[test]
+fn debug_redacts_preimage() {
+    // The preimage carries the canonical tool output, which for value receipts
+    // can contain user data or secrets. `Debug` MUST NOT print the raw bytes;
+    // it prints the recomputed hash and the length only.
+    let secret = json!({"password": "hunter2-super-secret-value", "ssn": "078-05-1120"});
+    let handle = ReceiptSigningHandle::from_content(&secret).test_unwrap("build handle");
+
+    // Confirm the secret really lives inside the handle's canonical content so
+    // the assertions below are non-tautological.
+    let canonical = String::from_utf8(handle.canonical_content().to_vec())
+        .test_unwrap("canonical content is utf8");
+    assert!(canonical.contains("hunter2-super-secret-value"));
+    assert!(canonical.contains("078-05-1120"));
+
+    let debug_output = format!("{handle:?}");
+
+    // No fragment of the preimage may appear in the Debug rendering.
+    assert!(
+        !debug_output.contains("hunter2-super-secret-value"),
+        "Debug leaked the preimage password: {debug_output}"
+    );
+    assert!(
+        !debug_output.contains("078-05-1120"),
+        "Debug leaked the preimage ssn: {debug_output}"
+    );
+    assert!(
+        !debug_output.contains("password"),
+        "Debug leaked a preimage field name: {debug_output}"
+    );
+    // The non-secret hash and a redaction marker should still be present for
+    // diagnostics.
+    assert!(
+        debug_output.contains(handle.content_hash()),
+        "Debug should surface the non-secret content_hash: {debug_output}"
+    );
+    assert!(
+        debug_output.contains("<redacted>"),
+        "Debug should mark the preimage as redacted: {debug_output}"
+    );
+}
+
+#[test]
 fn sign_with_handle_rejects_render_a_sign_b() {
     let keypair = Keypair::from_seed(&[11; 32]);
 

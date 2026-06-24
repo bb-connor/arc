@@ -176,6 +176,21 @@ impl EvaluationVerdictJson {
 pub struct SignReceiptRequestJson {
     /// The receipt body to sign.
     pub body: ChioReceiptBody,
+
+    /// The exact canonical content preimage `body.content_hash` was derived
+    /// from, carried across the wasm-bindgen boundary as raw bytes (a JSON
+    /// array of `u8`).
+    ///
+    /// WYSIWYS (BAC-539): when present, `sign_receipt_pure` recomputes
+    /// `sha256_hex(canonical_content)` inside the signer and refuses to sign
+    /// when it disagrees with `body.content_hash`, so a browser/mobile caller
+    /// can no longer render content A while signing a body claiming hash(B).
+    /// When absent (`None`), the binding falls back to the explicit
+    /// trusted-body relay seam (`sign_receipt_relaying_trusted_body`) for
+    /// callers that only forward an upstream-minted body and do not hold the
+    /// preimage; content-bearing browser callers SHOULD always populate this.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canonical_content: Option<Vec<u8>>,
 }
 
 /// Wire shape for [`crate::verify_capability_pure`] inputs.

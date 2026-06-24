@@ -163,6 +163,24 @@ pub struct SignedHybridReceipt {
 /// shared by every downstream consumer (storage, lineage anchor, federation
 /// cosign).
 ///
+/// # WYSIWYS recompute (BAC-539)
+///
+/// `canonical_content` is the exact byte preimage the body's `content_hash` was
+/// derived from (the same preimage the classical sibling
+/// [`sign_receipt_body_with_backend`] takes). Before any cryptographic work this
+/// helper recomputes `sha256_hex(canonical_content)` inside the trust boundary
+/// and refuses to sign when it disagrees with `body.content_hash`
+/// ([`KernelError::ReceiptSigningFailed`], fail-closed). The check reuses the
+/// canonical WYSIWYS gate ([`ReceiptSigningHandle`]) so this shared-canonical
+/// hybrid/PQ path is held to the same recompute-and-refuse contract as the
+/// inline classical path, the mpsc signing task, and `sign_receipt_body_with_backend`.
+/// This closes the render-A / sign-B forgery on the shared-canonical entrypoint
+/// rather than leaving it as a caller-hash-trust seam. Callers that genuinely
+/// cannot carry the content preimage must use
+/// `chio_kernel_core::sign_receipt_relaying_trusted_body` (the explicit
+/// trusted-relay seam, BAC-601); this content-bearing kernel wrapper is not that
+/// seam.
+///
 /// # Authoritative signing input
 ///
 /// The bytes signed are the canonical JSON encoding of the
@@ -195,6 +213,8 @@ pub struct SignedHybridReceipt {
 /// # Errors
 ///
 /// Returns [`KernelError::ReceiptSigningFailed`] when:
+/// - the body's claimed `content_hash` does not match
+///   `sha256_hex(canonical_content)` (fail-closed: render-A / sign-B refused), OR
 /// - `body.kernel_key` does not match the backend's public key, OR
 /// - `body` fails semantic validation (see
 ///   [`chio_core::receipt::body::ChioReceiptBody::validate_signable_semantics`]),
@@ -206,13 +226,33 @@ pub struct SignedHybridReceipt {
 pub fn sign_receipt_body_hybrid_canonical(
     body: ChioReceiptBody,
     backend: &dyn chio_core::crypto::SigningBackend,
+    canonical_content: &[u8],
 ) -> Result<SignedHybridReceipt, KernelError> {
     use chio_core::crypto::{
         canonical_json_shared_bytes, sign_shared_canonical_with_backend, PublicKey,
     };
     use chio_core::receipt::{
-        body::chio_receipt_id, signing::bind_receipt_signing_nonce, signing::ChioReceiptSigningBody,
+        body::chio_receipt_id, signing::bind_receipt_signing_nonce,
+        signing::ChioReceiptSigningBody, signing::ReceiptSigningHandle,
     };
+
+    // WYSIWYS recompute-and-refuse FIRST, inside the trust boundary, before any
+    // kernel-key check or cryptographic work (BAC-539). The handle recomputes
+    // `sha256_hex(canonical_content)` and we refuse to sign when it disagrees
+    // with the caller-supplied `body.content_hash`. This is the same
+    // recompute-and-refuse gate `chio_kernel_core::sign_receipt` applies, so the
+    // shared-canonical hybrid/PQ path can no longer render content A while
+    // signing a body claiming the hash of content B.
+    let wysiwys_handle = ReceiptSigningHandle::from_content_preimage(canonical_content.to_vec());
+    wysiwys_handle
+        .ensure_body_matches(&body)
+        .map_err(|mismatch| {
+            KernelError::ReceiptSigningFailed(format!(
+                "receipt content_hash mismatch: body claimed {} but signer recomputed {} \
+             over the canonical content (WYSIWYS refused)",
+                mismatch.claimed, mismatch.recomputed
+            ))
+        })?;
 
     // Fail-closed kernel-key match BEFORE any cryptographic work. Mirrors
     // `chio_kernel_core::sign_receipt` so the byte-identity contract holds

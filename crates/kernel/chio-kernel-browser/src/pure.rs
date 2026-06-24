@@ -6,8 +6,8 @@ use chio_core_types::capability::{attenuation::ScopeHash, features::CapabilityNe
 use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey, SigningBackend};
 use chio_core_types::receipt::{body::chio_receipt_id, body::ChioReceipt, decision::Decision};
 use chio_kernel_core::{
-    evaluate_with_full_floor as core_evaluate_with_full_floor,
-    sign_receipt_relaying_trusted_body as core_sign_receipt, verify_capability_full,
+    evaluate_with_full_floor as core_evaluate_with_full_floor, sign_receipt as core_sign_receipt,
+    sign_receipt_relaying_trusted_body as core_relay_trusted_body, verify_capability_full,
     BudgetRegistry, BudgetSplitError, EvaluateInput, InMemoryBudgetRegistry,
     PortableToolCallRequest,
 };
@@ -115,12 +115,24 @@ pub fn evaluate_pure(
     Ok(EvaluationVerdictJson::from_core(verdict))
 }
 
-/// Pure receipt-signing helper. Builds an `Ed25519Backend` from the
-/// supplied seed (which the wasm binding mints via Web Crypto) and relays the
-/// already-minted body via `chio_kernel_core::sign_receipt_relaying_trusted_body`.
-/// The content preimage does not cross the wasm-bindgen boundary, so the
-/// production recompute-and-refuse gate runs upstream in the kernel
-/// (`sign_receipt` / `sign_receipt_with_handle`); see BAC-601.
+/// Pure receipt-signing helper. Builds an `Ed25519Backend` from the supplied
+/// seed (which the wasm binding mints via Web Crypto) and signs the body.
+///
+/// WYSIWYS (BAC-539): when the caller carries the canonical content preimage
+/// across the wasm-bindgen boundary (`SignReceiptRequestJson::canonical_content`),
+/// this routes through the production recompute-and-refuse primitive
+/// `chio_kernel_core::sign_receipt`, which recomputes
+/// `sha256_hex(canonical_content)` *inside the signer* and refuses to sign when
+/// it disagrees with `body.content_hash`. That closes the render-A / sign-B
+/// forgery at the browser boundary: a caller can no longer show content A while
+/// putting hash(B) in the body.
+///
+/// When the preimage is absent (`None`), the binding falls back to the explicit
+/// trusted-body relay seam `chio_kernel_core::sign_receipt_relaying_trusted_body`
+/// for callers that only forward an already-minted upstream body and genuinely
+/// cannot carry the preimage (the FFI/WASM relay seam tracked under BAC-601).
+/// Content-bearing browser callers that construct receipts at the boundary
+/// SHOULD always populate `canonical_content` so the recompute gate runs.
 pub fn sign_receipt_pure(
     input: SignReceiptRequestJson,
     signing_seed: &[u8; 32],
@@ -138,8 +150,17 @@ pub fn sign_receipt_pure(
     let mut body = input.body;
     body.kernel_key = backend.public_key();
 
-    core_sign_receipt(body, &backend)
-        .map_err(|error| BindingError::new("receipt_signing_failed", format_signing(&error)))
+    match input.canonical_content {
+        // WYSIWYS recompute path: the caller carried the preimage, so we
+        // recompute the hash inside the signer and refuse on mismatch.
+        Some(canonical_content) => core_sign_receipt(body, &backend, &canonical_content),
+        // Trusted-body relay seam: the caller did not carry the preimage. This
+        // is the explicit, auditable trusted-relay path (BAC-601); it trusts the
+        // caller-supplied `content_hash` and is intended only for forwarding an
+        // upstream-minted body.
+        None => core_relay_trusted_body(body, &backend),
+    }
+    .map_err(|error| BindingError::new("receipt_signing_failed", format_signing(&error)))
 }
 
 /// Pure capability-verification helper.
@@ -326,15 +347,13 @@ fn format_signing(error: &chio_kernel_core::ReceiptSigningError) -> String {
         chio_kernel_core::ReceiptSigningError::KernelKeyMismatch => {
             "receipt body kernel_key does not match the signing backend".to_string()
         }
-        // WYSIWYS mismatch (BAC-539). The browser/WASM `sign_receipt_pure` path
-        // relays an already-minted body via `sign_receipt_relaying_trusted_body`,
-        // which does not recompute `content_hash` (the content preimage does not
-        // cross the wasm-bindgen boundary; see BAC-601), so this variant is not
-        // produced on this path today. The production recompute-and-refuse gate
-        // runs upstream in the kernel (`sign_receipt` / `sign_receipt_with_handle`).
-        // Handled explicitly rather than via a wildcard so a future
-        // content-bearing wasm signing path surfaces a distinct, fail-closed
-        // error string.
+        // WYSIWYS mismatch (BAC-539). When the browser caller carries the
+        // canonical content preimage (`SignReceiptRequestJson::canonical_content`),
+        // `sign_receipt_pure` routes through `chio_kernel_core::sign_receipt`,
+        // which recomputes `content_hash` inside the signer and produces this
+        // variant on a render-A / sign-B mismatch. Surfaced as a distinct,
+        // fail-closed error string. Callers using the trusted-relay seam with no
+        // preimage will never reach this arm.
         chio_kernel_core::ReceiptSigningError::ContentHashMismatch {
             recomputed,
             claimed,
