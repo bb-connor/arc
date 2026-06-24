@@ -43,15 +43,21 @@ integration-test targets:
 - "Wasm guards library tests" then runs `cargo test -p chio-wasm-guards --lib`.
   `--lib` is "test only this package's library", so this lane compiles and runs
   only `chio-wasm-guards`'s in-crate unit tests. The many integration targets
-  under `crates/chio-wasm-guards/tests/` are **not** compiled or run by this
-  gate.
+  under `crates/guards/chio-wasm-guards/tests/` are **not** compiled or run by
+  this gate.
 
 So the wasm-guards carveout is deliberate but partial: the crate's library code
-is gated, while its integration-test targets are not exercised by `ci.yml` and
-rely on the dedicated wasm/conformance workflows instead. Do not "fix" this by
-folding `chio-wasm-guards` back into the `--workspace` test step (it will fail
-in the plain lane), and do not assume a green `ci.yml` run covered the
-wasm-guards integration tests.
+is gated, while its `tests/` integration targets are **not exercised by any PR
+gate**. No workflow currently compiles or runs
+`crates/guards/chio-wasm-guards/tests/*` — the other wasm/conformance workflows
+build browser SDK artifacts, run conformance peers, or run benches
+(`cargo bench`), none of which invoke these integration targets. Do not assume
+those tests are covered elsewhere: editing or adding a test under
+`crates/guards/chio-wasm-guards/tests/` will not be exercised by CI until a
+dedicated wasm integration-test lane is added. Until then, do not "fix" the
+carveout by folding `chio-wasm-guards` back into the `--workspace` test step
+(it will fail in the plain lane), and do not assume a green `ci.yml` run covered
+the wasm-guards integration tests.
 
 > Note (firmware/console): the arc workspace is Rust-only; the firmware and
 > console build pipelines referenced by BAC-609 live in their own repos and
