@@ -308,29 +308,37 @@ fn parent_grant_covers_target(
         && (grant.tool_name == "*" || grant.tool_name == tool_name)
 }
 
-/// Returns whether an attenuation step's `(server_id, tool_name)` target covers
-/// a concrete (or wildcard) child tool grant.
+/// Returns whether an attenuation step's `(server_id, tool_name)` target and a
+/// child tool grant address the same authority, honoring wildcards on EITHER
+/// side.
 ///
-/// This is the child-side dual of [`parent_grant_covers_target`]. There the
-/// wildcard lives on the GRANT and the target is concrete; here the wildcard
-/// can live on the STEP TARGET and the grant is typically concrete. A step
-/// target of `"*"` for either field therefore covers any child grant value,
-/// while a concrete step field must match the child grant exactly.
+/// The reflection check must catch two symmetric under-declaration shapes:
 ///
-/// Using [`parent_grant_covers_target`] for the child-reflection check is a
-/// one-way matcher: it only matches when the GRANT is wildcard, so a wildcard
-/// step target (for example `RemoveOperation { server_id: "*", tool_name: "*" }`)
-/// against a concrete `srv-a:tool-x` child grant would never match, and the
-/// declared removal would silently go unenforced (an under-declared link). This
-/// matcher closes that gap so wildcard step targets correctly cover concrete
-/// child grants and the reflection check stays fail-closed.
+/// * Wildcard STEP TARGET vs concrete child grant. A `*:*` parent delegates a
+///   concrete `srv-a:tool-x` child while declaring
+///   `RemoveOperation { server_id: "*", tool_name: "*" }`; the concrete child
+///   grant must still be inspected so an un-reflected removal is rejected.
+/// * Concrete STEP TARGET vs wildcard child grant. A `*:*` parent delegates a
+///   `*:*` child while declaring a concrete `srv-a:tool-x` removal; the child
+///   retains that concrete authority through its wildcard grant, so the
+///   wildcard child grant must still be inspected. Otherwise `delegate` signs
+///   the link, yet chio-kernel's declared-attenuation check rejects the token
+///   later (mint and kernel disagree).
+///
+/// A one-directional matcher (matching only when one specific side is wildcard)
+/// misses the other shape and lets an under-declared link through. This matcher
+/// is therefore bidirectional: for each field it matches when EITHER the step
+/// target OR the child grant is `"*"`, or when the two concrete values are
+/// equal. That mirrors the wildcard coverage semantics of
+/// [`super::scope::ToolGrant::is_subset_of`] while keeping the reflection check
+/// fail-closed in both directions.
 fn step_target_covers_child_grant(
     grant: &super::scope::ToolGrant,
     step_server_id: &str,
     step_tool_name: &str,
 ) -> bool {
-    (step_server_id == "*" || step_server_id == grant.server_id)
-        && (step_tool_name == "*" || step_tool_name == grant.tool_name)
+    (step_server_id == "*" || grant.server_id == "*" || step_server_id == grant.server_id)
+        && (step_tool_name == "*" || grant.tool_name == "*" || step_tool_name == grant.tool_name)
 }
 
 /// Iterate over every parent tool grant that covers an attenuation step's

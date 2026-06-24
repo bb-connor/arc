@@ -3073,3 +3073,62 @@ fn delegate_accepts_wildcard_remove_operation_step_reflected_in_concrete_child()
     assert!(receipt.link.verify_signature().unwrap());
     assert_eq!(receipt.link.attenuations.len(), 1);
 }
+
+/// Round-4 review regression (Codex P2, attenuation correctness): the mirror of
+/// the round-3 case. A CONCRETE step TARGET must cover a WILDCARD child grant
+/// when checking that a declared removal is reflected in the child.
+///
+/// A `*:*` parent delegates a wildcard `*:*` child while declaring
+/// `RemoveOperation { server_id: "srv-a", tool_name: "tool-x", operation: Invoke }`.
+/// The parent-side step check accepts this (the `*:*` parent grant holds
+/// Invoke), but the wildcard child grant STILL holds Invoke on srv-a:tool-x
+/// through its asterisk, so the declared removal is NOT truly reflected. Before
+/// the bidirectional matcher the reflection check matched only when the STEP
+/// target was wildcard, so the concrete step never matched the wildcard child
+/// grant and the under-declared link was signed; chio-kernel's
+/// declared-attenuation check would then reject the minted token (mint and
+/// kernel disagree). With the bidirectional matcher the concrete step target
+/// covers the wildcard child grant and the link is rejected fail-closed.
+#[cfg(feature = "delegation")]
+#[test]
+fn delegate_rejects_concrete_remove_operation_step_not_reflected_in_wildcard_child() {
+    use crate::delegation_receipt::ScopeAttenuation;
+
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let delegatee = Keypair::generate();
+
+    let parent_scope = make_scope(vec![make_grant(
+        "*",
+        "*",
+        vec![Operation::Invoke, Operation::Delegate],
+    )]);
+    let parent = delegate_parent_token(&issuer, &subject, parent_scope, 1000, 2000);
+
+    // Child is wildcard and STILL holds Invoke on srv-a:tool-x via its asterisk.
+    let child_scope = make_scope(vec![make_grant(
+        "*",
+        "*",
+        vec![Operation::Invoke, Operation::Delegate],
+    )]);
+
+    // The step declares a concrete removal of Invoke, but the wildcard child
+    // grant still holds Invoke on the targeted tool -> not reflected.
+    let attenuation = ScopeAttenuation::from_steps(vec![Attenuation::RemoveOperation {
+        server_id: "srv-a".to_string(),
+        tool_name: "tool-x".to_string(),
+        operation: Operation::Invoke,
+    }]);
+
+    let err = delegate(
+        &parent,
+        &child_scope,
+        &subject,
+        &delegatee.public_key(),
+        attenuation,
+        1500,
+        [11_u8; 16],
+    )
+    .unwrap_err();
+    assert!(matches!(err, Error::AttenuationViolation { .. }));
+}
