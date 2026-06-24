@@ -15,6 +15,11 @@ cargo registry/target cache. The four gate steps are:
 | **Workspace build** | "Workspace build" | `cargo build --workspace` |
 | Tests | "Workspace tests" + "Wasm guards library tests" | `cargo test --workspace --exclude chio-wasm-guards`, then `cargo test -p chio-wasm-guards --lib` |
 
+Two further required checks run alongside the four steps above: a "Tokio console
+smoke" step in the same `check` job (see the test-lane section below), and a
+separate "MSRV build and test" job that builds and tests the workspace on the
+pinned MSRV toolchain.
+
 ### Why the build step MUST stay `--workspace`, not per-crate (`-p`)
 
 BAC-539 was a class of break a per-crate scoped gate misses: a new enum
@@ -47,12 +52,16 @@ integration-test targets:
   unit tests *and* the `tests/` integration targets, extending the
   build-breakage guarantee above to test code. Note this lane does not pass
   `--all-features`/`--features`, so it only exercises default-feature code:
-  Cargo skips any `[[test]]` target whose `required-features` are not selected
-  (for example `crates/kernel/chio-kernel` gates integration tests behind `pq`
-  and `tokio-console-smoke`), and those feature-gated integration tests are not
-  run by this lane. `chio-wasm-guards` is excluded
-  here because its `tests/` integration suite needs a wasm-capable harness and
-  cannot run in this plain `cargo test` lane.
+  Cargo skips any `[[test]]` target whose `required-features` are not selected.
+  For example `crates/kernel/chio-kernel` gates the `hybrid_receipt_sign`,
+  `compliance_certificate_hybrid`, and `canonical_bytes_hybrid` integration
+  targets behind the `pq` feature, and no PR lane selects `pq`, so those targets
+  are not compiled or run by any gate. (The one feature-gated integration target
+  that *is* covered is `tokio_console_smoke`: the separate "Tokio console smoke"
+  step in `ci.yml` runs `cargo test -p chio-kernel --features tokio-console-smoke
+  --test tokio_console_smoke`.) `chio-wasm-guards` is excluded here because its
+  `tests/` integration suite needs a wasm-capable harness and cannot run in this
+  plain `cargo test` lane.
 - "Wasm guards library tests" then runs `cargo test -p chio-wasm-guards --lib`.
   `--lib` is "test only this package's library", so this lane compiles and runs
   only `chio-wasm-guards`'s in-crate unit tests. The many integration targets
