@@ -2671,3 +2671,125 @@ fn delegate_enforces_parent_relative_budget_share() {
     );
     assert!(ok.is_ok());
 }
+
+/// When the parent is budget-attenuated (holds a reduced `budget_share_bps`), a
+/// child that omits its own `budget_share_bps` is rejected fail-closed:
+/// downstream admission treats a missing child share as the full 100% ceiling,
+/// so omission would silently widen the parent's reduced share. A child that
+/// states an explicit share `<=` the parent's is accepted.
+#[cfg(feature = "delegation")]
+#[test]
+fn delegate_requires_child_share_under_attenuated_parent() {
+    use crate::delegation_receipt::ScopeAttenuation;
+
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let delegatee = Keypair::generate();
+
+    let parent_scope = make_scope(vec![make_grant(
+        "srv-a",
+        "tool-x",
+        vec![Operation::Invoke, Operation::Delegate],
+    )]);
+    // Parent only holds 30% of the budget; re-sign as an attenuated token so the
+    // budget_share_bps is covered by the signature and verify_signature() passes.
+    let plain = delegate_parent_token(&issuer, &subject, parent_scope, 1000, 2000);
+    let attenuated_parent = CapabilityToken::sign_attenuated(
+        CapabilityTokenAttenuationBody {
+            body: plain.body(),
+            caveats: vec![],
+            scope_attenuations: vec![],
+            attenuation_proof: AttenuationProof {
+                parent_scope_hash: scope_hash(&plain.scope).unwrap(),
+                child_scope_hash: scope_hash(&plain.scope).unwrap(),
+                normalized_subset_proof: compute_attenuation_witness(&plain.scope, &plain.scope)
+                    .unwrap(),
+            },
+            budget_share_bps: Some(3_000),
+        },
+        &issuer,
+    )
+    .unwrap();
+    assert!(attenuated_parent.verify_signature().unwrap());
+    let child_scope = make_scope(vec![make_grant("srv-a", "tool-x", vec![Operation::Invoke])]);
+
+    // Child OMITS budget_share_bps while the parent holds a reduced 30% share ->
+    // reject: an absent child share would widen to the full budget downstream.
+    let omitted = ScopeAttenuation {
+        steps: vec![],
+        child_expires_at: None,
+        budget_share_bps: None,
+    };
+    let err = delegate(
+        &attenuated_parent,
+        &child_scope,
+        &subject,
+        &delegatee.public_key(),
+        omitted,
+        1500,
+        [0_u8; 16],
+    )
+    .unwrap_err();
+    assert!(matches!(err, Error::AttenuationViolation { .. }));
+
+    // Child states an explicit share within the parent's 30% -> accept.
+    let within = ScopeAttenuation {
+        steps: vec![],
+        child_expires_at: None,
+        budget_share_bps: Some(2_500),
+    };
+    let ok = delegate(
+        &attenuated_parent,
+        &child_scope,
+        &subject,
+        &delegatee.public_key(),
+        within,
+        1500,
+        [2_u8; 16],
+    );
+    assert!(ok.is_ok());
+}
+
+/// A wildcard parent grant (`*:*`) covers a concrete child step. Step
+/// validation honors wildcard parent grants the same way scope subset
+/// validation does, so a legitimate concrete-child step is accepted rather
+/// than falsely rejected as targeting a tool outside the parent scope.
+#[cfg(feature = "delegation")]
+#[test]
+fn delegate_honors_wildcard_parent_grant_in_step_validation() {
+    use crate::delegation_receipt::ScopeAttenuation;
+
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let delegatee = Keypair::generate();
+
+    // Parent grants every server and tool via `*:*` and authorizes delegation.
+    let parent_scope = make_scope(vec![make_grant(
+        "*",
+        "*",
+        vec![Operation::Invoke, Operation::Delegate],
+    )]);
+    let parent = delegate_parent_token(&issuer, &subject, parent_scope, 1000, 2000);
+
+    // Child narrows to a single concrete tool; the step targets that concrete
+    // tool, which the `*:*` parent grant covers.
+    let child_scope = make_scope(vec![make_grant("srv-a", "tool-x", vec![Operation::Invoke])]);
+    let attenuation = ScopeAttenuation::from_steps(vec![Attenuation::AddConstraint {
+        server_id: "srv-a".to_string(),
+        tool_name: "tool-x".to_string(),
+        constraint: Constraint::MaxLength(8),
+    }]);
+
+    let receipt = delegate(
+        &parent,
+        &child_scope,
+        &subject,
+        &delegatee.public_key(),
+        attenuation,
+        1500,
+        [3_u8; 16],
+    )
+    .unwrap();
+    assert!(receipt.link.verify_signature().unwrap());
+    assert_eq!(receipt.link.attenuations.len(), 1);
+}

@@ -296,6 +296,12 @@ pub fn validate_delegation_chain_with_trust_root(
 /// Steps are addressed by `(server_id, tool_name)`. A step that references a
 /// grant the parent never held is itself a widening (it asserts authority over
 /// a tool outside the parent's scope) and must be rejected fail-closed.
+///
+/// Wildcard parent grants are honored with the same coverage semantics as
+/// [`super::scope::ToolGrant::is_subset_of`]: a parent grant whose
+/// `server_id` or `tool_name` is `"*"` covers a concrete child step. A
+/// concrete-child step against a `*:*` parent grant is therefore a legitimate
+/// narrowing, not a widening.
 fn find_parent_tool_grant<'a>(
     parent: &'a ChioScope,
     server_id: &str,
@@ -304,7 +310,10 @@ fn find_parent_tool_grant<'a>(
     parent
         .grants
         .iter()
-        .find(|grant| grant.server_id == server_id && grant.tool_name == tool_name)
+        .find(|grant| {
+            (grant.server_id == "*" || grant.server_id == server_id)
+                && (grant.tool_name == "*" || grant.tool_name == tool_name)
+        })
         .ok_or_else(|| Error::AttenuationViolation {
             reason: format!(
                 "attenuation step targets tool {server_id}:{tool_name} not present in parent scope"
@@ -710,7 +719,10 @@ fn validate_delegable_child_scope(parent: &ChioScope, child: &ChioScope) -> Resu
 ///   expiry). Steps are validated reduce-only rather than copied verbatim.
 /// * `attenuation.budget_share_bps` exceeds the parent's share. The share is
 ///   parent-relative: a child can never claim a larger fraction of the budget
-///   than the parent holds (an absent parent share is treated as 100%).
+///   than the parent holds (an absent parent share is treated as 100%). When
+///   the parent itself holds a reduced share, the child MUST state an explicit
+///   `budget_share_bps`: omission is rejected fail-closed because downstream
+///   admission treats a missing share as the full budget (a widening).
 /// * The requested `child_expires_at` is greater than the parent's
 ///   `expires_at` (rejected as an [`Error::AttenuationViolation`]).
 /// * `delegator_keypair.public_key() != parent.subject` (the mint helper
@@ -761,8 +773,27 @@ pub fn delegate(
 
     // `budget_share_bps` is parent-relative: a delegated share is a fraction of
     // the parent's remaining/granted budget and can never widen it.
-    if let Some(child_share) = attenuation.budget_share_bps {
-        validate_parent_relative_budget_share_bps(parent.budget_share_bps, child_share)?;
+    //
+    // Fail-closed on omission when the parent is budget-attenuated. Downstream
+    // delegated-budget admission treats a missing child share as the full
+    // ceiling (MAX_BUDGET_SHARE_BPS, 100%). If the parent already holds a
+    // reduced share, a child that omits its own share would therefore inherit
+    // an unrestricted (effectively 100%) share, a widening. Require the child
+    // to state an explicit share that is `<=` the parent's whenever the parent
+    // carries a reduced share.
+    match attenuation.budget_share_bps {
+        Some(child_share) => {
+            validate_parent_relative_budget_share_bps(parent.budget_share_bps, child_share)?;
+        }
+        None => {
+            if let Some(parent_share) = parent.budget_share_bps {
+                return Err(Error::AttenuationViolation {
+                    reason: alloc::format!(
+                        "parent holds a reduced budget_share_bps {parent_share}; the child must state an explicit budget_share_bps <= {parent_share} (an omitted share would widen to the full budget)"
+                    ),
+                });
+            }
+        }
     }
 
     let child_expires_at = attenuation.child_expires_at.unwrap_or(parent.expires_at);
