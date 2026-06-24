@@ -26,12 +26,15 @@ use serde_json::{Map, Value};
 
 use crate::error::{Error, Result};
 
-/// Largest integer that round-trips losslessly through an IEEE-754 double
-/// (`2^53`). RFC 7493 (I-JSON) §2.2 requires integers used for interoperable
-/// exchange to fall within `[-(2^53 - 1), 2^53 - 1]`; larger magnitudes cannot
-/// be represented exactly by every conforming consumer and so must be rejected
-/// before signing rather than silently coerced.
-const I_JSON_MAX_SAFE_INTEGER: u64 = 1 << 53;
+/// Largest integer magnitude permitted for interoperable JSON exchange
+/// (`2^53 - 1`). RFC 7493 (I-JSON) §2.2 requires integers to fall within
+/// `[-(2^53 - 1), 2^53 - 1]`: although `2^53` itself round-trips through an
+/// IEEE-754 double, it is excluded from the safe range because it shares its
+/// representation with `2^53 + 1`, so consumers cannot distinguish the two.
+/// Magnitudes above this bound cannot be represented exactly by every
+/// conforming consumer and so must be rejected before signing rather than
+/// silently coerced.
+const I_JSON_MAX_SAFE_INTEGER: u64 = (1 << 53) - 1;
 
 /// Type-level witness for bytes produced by the canonical JSON serializer.
 ///
@@ -139,9 +142,18 @@ pub fn canonical_json_string<T: Serialize>(value: &T) -> Result<String> {
 /// - **Non-I-JSON numbers are rejected.** Integer literals outside the safe
 ///   range `[-(2^53 - 1), 2^53 - 1]` cannot be represented losslessly by every
 ///   conforming consumer; rather than coerce them to a precision-losing `f64`,
-///   canonicalization fails.
+///   canonicalization fails. Any number token that parses to an integer-valued
+///   `f64` is also rejected: such a token never arrives through serde_json's
+///   exact integer path, so it is either a fractional literal the parser rounded
+///   onto an integer (for example `9007199254740991.1`) or an integer written in
+///   float form (`1.0`, `1e2`). Because the original lexeme cannot be recovered
+///   without serde_json's std-only `raw_value` feature, both are refused so the
+///   signed bytes always reflect the value actually submitted. Integers must be
+///   sent as integer tokens (`100`, not `100.0`).
 ///
-/// Well-formed I-JSON input canonicalizes byte-identically to the typed path.
+/// Well-formed I-JSON input canonicalizes byte-identically to the typed path,
+/// with the sole exception of integer-valued float tokens, which the typed path
+/// accepts but this stricter entry point rejects for the reason above.
 pub fn canonical_json_bytes_from_str(input: &str) -> Result<Vec<u8>> {
     canonical_json_string_from_str(input).map(String::into_bytes)
 }
@@ -560,7 +572,7 @@ impl<'de> Visitor<'de> for StrictJsonVisitor {
                 "integer {v} outside I-JSON safe range [-(2^53-1), 2^53-1]"
             )));
         }
-        // Safe: v <= 2^53 < i64::MAX.
+        // Safe: v <= 2^53 - 1 < i64::MAX.
         Ok(StrictJson::Int(v as i64))
     }
 
@@ -571,13 +583,34 @@ impl<'de> Visitor<'de> for StrictJsonVisitor {
         if !v.is_finite() {
             return Err(de::Error::custom("non-finite numbers are not valid JSON"));
         }
-        // A number literal that overflows i64/u64 (e.g. an integer too large to
-        // represent exactly) is delivered here as an already-lossy f64. If it is
-        // integer-valued and beyond the safe range, the original literal could
-        // not have round-tripped losslessly, so reject it as non-I-JSON.
-        if v.fract() == 0.0 && v.abs() >= I_JSON_MAX_SAFE_INTEGER as f64 {
+        // Reject any integer-valued f64. serde_json hands genuine integer
+        // literals (no decimal point or exponent) to visit_i64/visit_u64 via its
+        // exact integer path, so a value arriving here with a zero fractional
+        // part did not come from a faithful integer token. It is one of:
+        //   * a fractional literal whose fractional digits the parser rounded
+        //     away (e.g. 9007199254740991.1 -> 9007199254740991.0, or even a
+        //     small magnitude with enough fraction digits like 140737488355328.01
+        //     -> 140737488355328.0), or
+        //   * an integer literal too large for i64/u64, delivered as an
+        //     already-lossy f64 (e.g. 184467440737095516160), or
+        //   * an integer written in float form (e.g. 1.0, 1e2), which is
+        //     ambiguous with the rounded-fractional case above and could equally
+        //     be a rounded 1.0000...1.
+        // Signing any of these would emit a value the submitter may not have
+        // written (the render-A / sign-B class this API exists to prevent).
+        // Because serde_json (without the std-only `raw_value` feature, which
+        // this no_std + alloc crate cannot enable) exposes no way to recover the
+        // original lexeme, and because the magnitude at which a fractional
+        // collapses to an integer shrinks without bound as the fraction shrinks
+        // (`x.01` collapses near 2^47, `x.0001` lower still), there is no safe
+        // magnitude floor. Rejecting every integer-valued f64 is the only
+        // closure that admits no precision-losing input. Callers that need an
+        // integer must send an integer token (e.g. `100`, not `100.0`/`1e2`).
+        if v.fract() == 0.0 {
             return Err(de::Error::custom(format!(
-                "number {v} is not a lossless I-JSON integer (outside +/-2^53)"
+                "number {v} cannot be signed: an integer-valued f64 may be a \
+                 rounded fractional or out-of-range integer literal; send an \
+                 integer token (within +/-(2^53-1)) instead"
             )));
         }
         Ok(StrictJson::Float(v))
@@ -976,16 +1009,80 @@ mod tests {
 
     #[test]
     fn strict_accepts_safe_range_boundary() {
-        // 2^53 - 1 is the largest safe integer and must be accepted.
+        // 2^53 - 1 is the largest I-JSON safe integer (RFC 7493 §2.2) and must
+        // be accepted.
         assert_eq!(
             canonical_json_string_from_str("9007199254740991").unwrap(),
             "9007199254740991"
         );
-        // 2^53 itself is the boundary constant; accepted as an exact integer.
         assert_eq!(
-            canonical_json_string_from_str("9007199254740992").unwrap(),
-            "9007199254740992"
+            canonical_json_string_from_str("-9007199254740991").unwrap(),
+            "-9007199254740991"
         );
+    }
+
+    #[test]
+    fn strict_rejects_safe_range_boundary_plus_one() {
+        // 2^53 itself is excluded from the I-JSON safe range: although it round-
+        // trips through an f64, it shares that representation with 2^53 + 1, so a
+        // conforming consumer cannot distinguish them. It must be rejected.
+        let err = canonical_json_string_from_str("9007199254740992").unwrap_err();
+        assert!(matches!(err, Error::CanonicalJson(_)), "got {err:?}");
+        // The negative boundary mirrors it.
+        let err = canonical_json_string_from_str("-9007199254740992").unwrap_err();
+        assert!(matches!(err, Error::CanonicalJson(_)), "got {err:?}");
+    }
+
+    #[test]
+    fn strict_rejects_rounded_fractional_f64() {
+        // serde_json (float_roundtrip) rounds a fractional lexeme near the
+        // precision boundary onto an integer-valued f64: 9007199254740991.1 is
+        // delivered to visit_f64 as 9007199254740991.0. Without rejection it would
+        // canonicalize as the integer 9007199254740991, signing a value the
+        // submitter never wrote (render-A / sign-B). It must be rejected.
+        let err = canonical_json_string_from_str("9007199254740991.1").unwrap_err();
+        assert!(matches!(err, Error::CanonicalJson(_)), "got {err:?}");
+
+        // The collapse is not confined to the 2^53 boundary: with enough
+        // fractional digits a much smaller magnitude also rounds to an integer.
+        // 140737488355328.01 (2^47 + .01) is delivered as 140737488355328.0.
+        let err = canonical_json_string_from_str("140737488355328.01").unwrap_err();
+        assert!(matches!(err, Error::CanonicalJson(_)), "got {err:?}");
+    }
+
+    #[test]
+    fn strict_rejects_integer_valued_float_form() {
+        // An integer written in float form (decimal point or exponent) reaches
+        // visit_f64 as an integer-valued f64, indistinguishable from a rounded
+        // fractional, so it is rejected. Callers must send an integer token.
+        for input in ["1.0", "100.0", "1e2", "0.0", "-5.0", "2.5e1"] {
+            let err = canonical_json_string_from_str(input).unwrap_err();
+            assert!(
+                matches!(err, Error::CanonicalJson(_)),
+                "expected {input} to be rejected, got {err:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn strict_accepts_genuine_fractionals() {
+        // Numbers with a real fractional part keep a non-zero fract() and are
+        // accepted, canonicalized exactly as the typed path would.
+        for input in [
+            "999999999.5",
+            "2251799813685247.5",
+            "1.5",
+            "3.14159",
+            "-0.25",
+        ] {
+            let typed: Value = serde_json::from_str(input).unwrap();
+            let typed_canonical = canonicalize(&typed).unwrap();
+            assert_eq!(
+                canonical_json_string_from_str(input).unwrap(),
+                typed_canonical,
+                "strict path diverged from typed path for {input}"
+            );
+        }
     }
 
     #[test]
