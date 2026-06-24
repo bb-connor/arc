@@ -112,7 +112,10 @@ chio-kernel-core = { workspace = true }
 # use to mint deterministic adversarial inputs. These bypasses are compiled
 # out of production builds of chio-custody-hw; the threat suite is a
 # test-only consumer, so it opts in here.
-chio-custody-hw = { workspace = true, features = ["dev-fixtures"] }
+# `default-features = false` so conformance fixtures do not pull the
+# `default = ["passkey"]` WebAuthn/OpenSSL graph the threat tests never use;
+# only `dev-fixtures` is requested.
+chio-custody-hw = { workspace = true, default-features = false, features = ["dev-fixtures"] }
 chio-http-core = { workspace = true }
 chio-http-session = { workspace = true }
 chio-guards = { workspace = true }

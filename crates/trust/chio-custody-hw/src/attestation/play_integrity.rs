@@ -12,6 +12,11 @@
 //! production build that flag has no effect and the pinned JWKS is always
 //! used.
 //!
+//! While the pinned root is still the committed synthetic fixture key
+//! (BAC-601), the production verification path fails CLOSED: it rejects every
+//! token rather than trusting the fixture signer. See `production_pinned_jwks`
+//! and [`super::google_root::assert_play_integrity_root_is_production_ready`].
+//!
 //! The verifier selects the JWK by token `kid`, validates the JWS under
 //! ES256/P-256 key material, and then enforces the Play Integrity
 //! claim contract:
@@ -107,7 +112,7 @@ pub fn verify_play_integrity(
     let kid = header.kid.as_deref().ok_or_else(|| {
         AttestationError::PlayIntegrityInvalidToken("token header is missing kid".to_string())
     })?;
-    let jwks_source = select_jwks(&input);
+    let jwks_source = select_jwks(&input)?;
     let jwks: JwkSet = serde_json::from_str(&jwks_source)
         .map_err(|error| AttestationError::PlayIntegrityInvalidToken(format!("JWKS: {error}")))?;
     let jwk = jwks.find(kid).ok_or_else(|| {
@@ -167,28 +172,46 @@ pub fn verify_play_integrity(
 /// caller-supplied JWKS when the caller opts in, so deterministic tests can
 /// drive negative cases (symmetric keys, wrong curve, etc.).
 #[cfg(any(test, feature = "dev-fixtures"))]
-fn select_jwks(input: &PlayIntegrityVerificationInput<'_>) -> String {
+fn select_jwks(input: &PlayIntegrityVerificationInput<'_>) -> Result<String, AttestationError> {
+    // Test/`dev-fixtures` builds legitimately pin the synthetic fixture key, so
+    // the production-readiness guard is intentionally NOT enforced here: the
+    // fixture signer is the trust anchor these builds exercise.
     if input.allow_caller_supplied_jwks {
-        input.jwks_json.to_string()
+        Ok(input.jwks_json.to_string())
     } else {
-        play_integrity_pinned_jwks_json()
+        Ok(play_integrity_pinned_jwks_json())
     }
 }
 
 #[cfg(not(any(test, feature = "dev-fixtures")))]
-fn select_jwks(_input: &PlayIntegrityVerificationInput<'_>) -> String {
-    // SECURITY / PLACEHOLDER (BAC-601): the production path pins this JWKS. While
-    // it is still the committed synthetic fixture key, fail loudly in debug
-    // builds so the fixture key cannot silently ship. Release builds rely on the
-    // `assert_play_integrity_root_is_production_ready()` startup guard, which
-    // production entry points MUST call. Neither check is reachable from the
-    // test/`dev-fixtures` path (this fn is compiled only in prod builds).
-    debug_assert!(
-        super::google_root::assert_play_integrity_root_is_production_ready().is_ok(),
-        "Play Integrity root is the committed SYNTHETIC FIXTURE key; \
-         replace it with Google's real verification keys before production (BAC-601)"
-    );
-    play_integrity_pinned_jwks_json()
+fn select_jwks(_input: &PlayIntegrityVerificationInput<'_>) -> Result<String, AttestationError> {
+    // SECURITY / PLACEHOLDER (BAC-601): the production path pins this JWKS, and
+    // `production_pinned_jwks` fails CLOSED while the committed synthetic fixture
+    // key is still pinned. The earlier `debug_assert!` only fired in debug builds
+    // and was stripped from release, so a release binary would have accepted
+    // tokens minted with the committed fixture private key. This branch is
+    // compiled only in prod builds, so the test/`dev-fixtures` signing path is
+    // unaffected.
+    production_pinned_jwks()
+}
+
+/// Production trust anchor for Play Integrity: the pinned Google JWKS, gated by
+/// the production-readiness guard.
+///
+/// Fails CLOSED (returns [`AttestationError::PlayIntegrityInvalidToken`]) while
+/// the pinned root is still the committed SYNTHETIC FIXTURE key, so a release
+/// build cannot silently trust the fixture signer (BAC-601). Once the real
+/// Google root is provisioned, this returns the pinned JWKS.
+///
+/// This helper is compiled both in production builds (where `select_jwks` calls
+/// it) and under `cfg(test)` (where the fail-closed unit test calls it
+/// directly), so the contract is verifiable without a separate prod-only build.
+#[cfg(any(test, not(feature = "dev-fixtures")))]
+fn production_pinned_jwks() -> Result<String, AttestationError> {
+    if let Err(reason) = super::google_root::assert_play_integrity_root_is_production_ready() {
+        return Err(AttestationError::PlayIntegrityInvalidToken(reason));
+    }
+    Ok(play_integrity_pinned_jwks_json())
 }
 
 fn claim_nonce(claims: &PlayIntegrityClaims) -> Result<&str, AttestationError> {
@@ -232,5 +255,38 @@ fn jwk_algorithm(jwk: &Jwk) -> Result<Algorithm, AttestationError> {
         _ => Err(AttestationError::PlayIntegrityInvalidToken(
             "Play Integrity JWKS key must be an ES256 P-256 EC key".to_string(),
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn production_path_fails_closed_while_fixture_root_is_pinned() {
+        // SECURITY / PLACEHOLDER (BAC-601): the production trust anchor must
+        // REJECT (not silently trust the fixture signer) while the committed
+        // synthetic fixture key is still pinned. The earlier guard was a
+        // `debug_assert!` stripped from release builds, so this proves the
+        // fail-closed behaviour holds in both debug and release. When the real
+        // Google root is provisioned (kid rotated off the `*-fixture-root`
+        // sentinel) this test needs updating, which is the intended forcing
+        // function.
+        assert!(
+            super::super::google_root::play_integrity_root_is_placeholder(),
+            "pinned root is still the committed fixture key"
+        );
+        let Err(error) = production_pinned_jwks() else {
+            panic!("production path must reject while the fixture root is pinned");
+        };
+        match error {
+            AttestationError::PlayIntegrityInvalidToken(reason) => {
+                assert!(
+                    reason.contains("BAC-601"),
+                    "rejection must reference BAC-601: {reason}"
+                );
+            }
+            other => panic!("expected PlayIntegrityInvalidToken, got {other:?}"),
+        }
     }
 }

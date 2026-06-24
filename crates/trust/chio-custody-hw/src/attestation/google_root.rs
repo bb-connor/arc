@@ -34,14 +34,14 @@ use jsonwebtoken::EncodingKey;
 // the matching PRIVATE KEY is committed in this very file
 // (`PLAY_INTEGRITY_FIXTURE_PRIVATE_KEY_PEM`). Because the production verification
 // path pins exactly this key set, a binary built today would "trust" a key whose
-// private half lives in version control — i.e. anyone with repo access could mint
+// private half lives in version control - i.e. anyone with repo access could mint
 // Play Integrity tokens the verifier accepts.
 //
 // BEFORE ANY PRODUCTION DEPLOYMENT (tracked by BAC-601):
 //   1. REPLACE the pinned coordinates + kid below with Google's real Play
 //      Integrity public verification keys (rotate `GOOGLE_PLAY_INTEGRITY_ROOT_KID`
 //      off the `*-fixture-root` placeholder value).
-//   2. REMOVE / ROTATE the committed fixture private key — it must never coexist
+//   2. REMOVE / ROTATE the committed fixture private key - it must never coexist
 //      with a real pinned root, and the fixture signer must stay test/dev-only.
 //   3. The [`assert_play_integrity_root_is_production_ready`] runtime guard below
 //      MUST pass (it fails loudly while the placeholder kid is still pinned).
@@ -65,7 +65,7 @@ use jsonwebtoken::EncodingKey;
 ///
 /// SECURITY / PLACEHOLDER (BAC-601): this committed key is the private half of
 /// the pinned public coordinates below. It MUST be removed/rotated before the
-/// real Google root is pinned — a real pinned root and a committed private key
+/// real Google root is pinned - a real pinned root and a committed private key
 /// must never coexist.
 #[cfg(any(test, feature = "dev-fixtures"))]
 const PLAY_INTEGRITY_FIXTURE_PRIVATE_KEY_PEM: &[u8] = br#"-----BEGIN PRIVATE KEY-----
@@ -106,6 +106,20 @@ pub const GOOGLE_PLAY_INTEGRITY_ISSUER: &str = "https://playintegrity.googleapis
 /// real Google root rotates `GOOGLE_PLAY_INTEGRITY_ROOT_KID` off this value.
 pub const PLAY_INTEGRITY_PLACEHOLDER_ROOT_KID: &str = "chio-play-integrity-fixture-root";
 
+/// Sentinel public-key coordinates that mark the pinned root as the committed
+/// SYNTHETIC FIXTURE key.
+///
+/// SECURITY / PLACEHOLDER (BAC-601): these are byte-identical to the fixture
+/// public coordinates whose private half is committed in this file. The
+/// readiness guard compares the live pinned coordinates against these sentinels
+/// so a kid-only edit (rotating `GOOGLE_PLAY_INTEGRITY_ROOT_KID` off the
+/// sentinel while leaving the fixture key bytes in place) cannot accidentally
+/// bless production. Provisioning the real Google root replaces the pinned
+/// coordinates above with real key bytes, so they no longer match these
+/// sentinels.
+const PLAY_INTEGRITY_FIXTURE_X_B64: &str = "w7JAoU_gJbZJvV-zCOvU9yFJq0FNC_edCMRM78P8eQQ";
+const PLAY_INTEGRITY_FIXTURE_Y_B64: &str = "wQg1EytcsEmGrM70Gb53oluoDbVhCZ3Uq3hHMslHVb4";
+
 /// Whether the pinned Play Integrity root is still the committed SYNTHETIC
 /// FIXTURE placeholder (i.e. NOT a real Google verification key).
 ///
@@ -113,14 +127,24 @@ pub const PLAY_INTEGRITY_PLACEHOLDER_ROOT_KID: &str = "chio-play-integrity-fixtu
 /// replaced with Google's real keys (which also rotates the kid off
 /// [`PLAY_INTEGRITY_PLACEHOLDER_ROOT_KID`]). Production startup paths use
 /// [`assert_play_integrity_root_is_production_ready`], which keys off this flag.
+///
+/// The check is tied to BOTH the kid AND the pinned key coordinate bytes: it
+/// returns `true` if the kid still equals the sentinel OR the pinned
+/// coordinates still equal the committed fixture coordinates. This way, swapping
+/// the kid off the sentinel without also installing real key bytes (the BAC-601
+/// provisioning footgun) still reports the root as a placeholder and keeps the
+/// guard failing.
 #[must_use]
 pub const fn play_integrity_root_is_placeholder() -> bool {
-    // `const` byte comparison (no external deps): the pinned kid still equals
-    // the fixture sentinel, so the pinned key is the committed fixture key.
+    // `const` byte comparison (no external deps). The root is a placeholder
+    // while EITHER the pinned kid still equals the fixture sentinel OR the
+    // pinned coordinates still equal the committed fixture public key, so a
+    // kid-only edit cannot bless the fixture key bytes as production-ready.
     const_str_eq(
         GOOGLE_PLAY_INTEGRITY_ROOT_KID,
         PLAY_INTEGRITY_PLACEHOLDER_ROOT_KID,
-    )
+    ) || const_str_eq(PLAY_INTEGRITY_PINNED_X_B64, PLAY_INTEGRITY_FIXTURE_X_B64)
+        || const_str_eq(PLAY_INTEGRITY_PINNED_Y_B64, PLAY_INTEGRITY_FIXTURE_Y_B64)
 }
 
 /// `const`-evaluable byte-wise string equality (stable-Rust friendly).
@@ -158,7 +182,7 @@ const fn const_str_eq(a: &str, b: &str) -> bool {
 /// legitimately needs to compile today: CI builds `chio-custody-hw` with
 /// default features, and other workspace crates depend on it while the real key
 /// is being provisioned under BAC-601. So the placeholder is enforced at
-/// startup instead — loud and hard to miss, without breaking the build or the
+/// startup instead - loud and hard to miss, without breaking the build or the
 /// test/`dev-fixtures` signing path.
 ///
 /// # Errors
@@ -273,6 +297,37 @@ mod tests {
         assert!(
             err.contains(PLAY_INTEGRITY_PLACEHOLDER_ROOT_KID),
             "guard must name the placeholder kid: {err}"
+        );
+    }
+
+    #[test]
+    fn readiness_guard_is_tied_to_pinned_key_bytes() {
+        // SECURITY / PLACEHOLDER (BAC-601): the pinned coordinates are still the
+        // committed fixture public key, so the readiness guard must treat the
+        // root as a placeholder regardless of the kid. This proves the guard is
+        // tied to the key bytes, not just the kid string, so a kid-only edit
+        // cannot bless the fixture key.
+        assert_eq!(
+            PLAY_INTEGRITY_PINNED_X_B64, PLAY_INTEGRITY_FIXTURE_X_B64,
+            "pinned x coordinate must still match the fixture sentinel"
+        );
+        assert_eq!(
+            PLAY_INTEGRITY_PINNED_Y_B64, PLAY_INTEGRITY_FIXTURE_Y_B64,
+            "pinned y coordinate must still match the fixture sentinel"
+        );
+
+        // Replicate the placeholder predicate with a NON-sentinel kid but the
+        // committed fixture coordinates: a kid-only rotation must still report
+        // the root as a placeholder via the coordinate-byte tie.
+        let kid_only_rotation_still_placeholder =
+            const_str_eq(
+                "real-google-kid-but-fixture-bytes",
+                PLAY_INTEGRITY_PLACEHOLDER_ROOT_KID,
+            ) || const_str_eq(PLAY_INTEGRITY_PINNED_X_B64, PLAY_INTEGRITY_FIXTURE_X_B64)
+                || const_str_eq(PLAY_INTEGRITY_PINNED_Y_B64, PLAY_INTEGRITY_FIXTURE_Y_B64);
+        assert!(
+            kid_only_rotation_still_placeholder,
+            "kid-only rotation with fixture key bytes must still be flagged as placeholder"
         );
     }
 

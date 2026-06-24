@@ -54,7 +54,7 @@ pub struct AppAttestVerificationInput<'a> {
     /// SECURITY (BAC-601, should-fix): this is a *runtime-only* switch with no
     /// `cfg` backstop. A prod binary that constructs this input with
     /// `production: false` re-enables the sandbox/development AAGUIDs at
-    /// runtime — there is no compile-time guarantee that shipped callers pass
+    /// runtime - there is no compile-time guarantee that shipped callers pass
     /// `true`. Production entry points should hard-code `production: true` (or
     /// wrap construction in a hardened constructor) rather than threading the
     /// flag through from request data. Tracked for hardening under BAC-601.
