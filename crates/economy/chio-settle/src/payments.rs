@@ -183,8 +183,8 @@ fn validate_x402_field(label: &str, value: &str) -> Result<(), SettlementError> 
 /// [`prepare_transfer_with_authorization`]. Either way the bound values
 /// are asserted against the authorization and any mismatch fails closed.
 ///
-/// The `GovernedApprovalToken` itself does not carry chain/amount/payee as
-/// discrete fields — they are folded into its `governed_intent_hash` — so
+/// The `GovernedApprovalToken` itself does not carry chain/amount/payee/token
+/// as discrete fields (they are folded into its `governed_intent_hash`), so
 /// this layer cannot re-derive them from the token alone; it asserts the
 /// explicitly-bound values the caller resolved from the verified intent.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -199,6 +199,60 @@ pub struct ApprovalBinding {
     /// Amount in token minor units the governing approval authorized. Must
     /// equal the EIP-3009 authorization `value`.
     pub amount_minor_units: u128,
+    /// Token/currency symbol the governing approval authorized (for example
+    /// `"USDC"`). The chain id alone does not pin the token: a captured
+    /// authorization for one token contract can otherwise be redirected to a
+    /// different token on the same chain with the same payee and numeric
+    /// amount. Each lane asserts its lane-specific token identity against
+    /// this symbol (x402 accepted tokens, Circle token symbol). Compared
+    /// case-insensitively after trimming.
+    pub token_symbol: String,
+    /// Optional token contract address the governing approval authorized
+    /// (for example the USDC contract on the target chain). When present it
+    /// is asserted against the EIP-3009 domain `verifying_contract`, which
+    /// is the contract the signed transfer actually targets, so a captured
+    /// authorization cannot be redirected to a different token contract on
+    /// the same chain. Compared as parsed `Address` bytes so checksum vs
+    /// lowercase hex compare equal. `None` skips the contract-level check
+    /// (lanes that have no contract to compare against still enforce the
+    /// `token_symbol`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token_contract: Option<String>,
+    /// Approval expiry as a Unix timestamp in seconds. The prepared
+    /// authorization MUST NOT outlive the governing approval: when an
+    /// EIP-3009 `valid_before` would let a signed transfer stay broadcastable
+    /// past this instant, preparation fails closed. Binds the off-chain
+    /// authorization window to the approval window so a captured signature
+    /// cannot be broadcast after the approval that governs it has expired.
+    pub approval_expires_at: u64,
+}
+
+impl ApprovalBinding {
+    /// Assert that a lane's token symbol matches the approval-bound token.
+    ///
+    /// Comparison is case-insensitive after trimming so `"usdc"`, `" USDC "`,
+    /// and `"USDC"` are treated as the same token. Used by lanes that
+    /// identify their token by symbol rather than by contract address (the
+    /// x402 accepted-token list and the Circle token symbol). Fails closed
+    /// on any mismatch so a captured authorization for one token cannot be
+    /// redirected to a different token the approval never authorized.
+    pub fn assert_token_symbol(
+        &self,
+        lane: &str,
+        lane_token_symbol: &str,
+    ) -> Result<(), SettlementError> {
+        if !lane_token_symbol
+            .trim()
+            .eq_ignore_ascii_case(self.token_symbol.trim())
+        {
+            return Err(SettlementError::InvalidBinding(format!(
+                "{lane} token mismatch: lane token {lane_token_symbol:?} is not the \
+                 approval-bound token {:?}",
+                self.token_symbol
+            )));
+        }
+        Ok(())
+    }
 }
 
 /// Outcome of a [`Eip3009NonceStore::record_if_fresh`] call.
@@ -234,6 +288,12 @@ pub const DEFAULT_MAX_EIP3009_NONCE_ENTRIES: usize = 65_536;
 /// contract itself consumes on-chain. Recording the pair here makes the
 /// off-chain preparation path single-use as well, closing the replay
 /// window before a signature is ever broadcast.
+///
+/// [`prepare_transfer_with_authorization`] keys the store on the canonical
+/// `0x` lowercase hex of the PARSED `from`/`nonce` bytes, so a re-prefixed
+/// or re-cased submission of the same authorization maps to the same entry.
+/// Implementations additionally lowercase the supplied key defensively, so
+/// direct callers cannot evade detection through casing either.
 ///
 /// Implementations are `Send + Sync` so callers can hold them in an
 /// `Arc<dyn Eip3009NonceStore>`. The contract intentionally mirrors
@@ -276,9 +336,23 @@ pub trait Eip3009NonceStore: Send + Sync {
 
 /// Internal map keyed on `(from_address, nonce)` whose value is the
 /// Unix-seconds retention bound past which the entry is GC-able. Keys are
-/// normalized to lowercase so checksum-cased and lowercase hex map to the
-/// same entry.
+/// canonicalized (optional `0x` prefix stripped, then lowercased) so that
+/// checksum-cased, lowercase, and `0x`-prefixed-vs-bare hex all map to the
+/// same entry and cannot evade replay detection.
 type Eip3009NonceMap = HashMap<(String, String), u64>;
+
+/// Canonicalize a hex key component for the nonce store: strip an optional
+/// `0x`/`0X` prefix and lowercase. This makes `"0xABC"`, `"0xabc"`, and
+/// `"abc"` collapse to the same key so prefix/casing formatting cannot be
+/// used to replay a previously-seen `(from, nonce)` pair as `Fresh`.
+fn canonicalize_nonce_key_component(value: &str) -> String {
+    let trimmed = value.trim();
+    let without_prefix = trimmed
+        .strip_prefix("0x")
+        .or_else(|| trimmed.strip_prefix("0X"))
+        .unwrap_or(trimmed);
+    without_prefix.to_ascii_lowercase()
+}
 
 /// Process-local single-use EIP-3009 nonce store.
 ///
@@ -328,8 +402,8 @@ impl Eip3009NonceStore for InMemoryEip3009NonceStore {
         retain_until_unix_seconds: u64,
     ) -> Result<NonceOutcome, SettlementError> {
         let key = (
-            from_address.to_ascii_lowercase(),
-            nonce.to_ascii_lowercase(),
+            canonicalize_nonce_key_component(from_address),
+            canonicalize_nonce_key_component(nonce),
         );
         let mut guard = self.lock()?;
 
@@ -372,14 +446,21 @@ impl Eip3009NonceStore for InMemoryEip3009NonceStore {
 /// 2. **Time window vs. now.** The authorization is accepted only when
 ///    `valid_before > now_unix_seconds > valid_after`; an expired or
 ///    not-yet-valid window fails closed.
-/// 3. **Approval binding.** The domain `chain_id`, authorization `to`
-///    (payee) and `value` (amount) are asserted against `binding`; any
-///    mismatch fails closed. The caller resolves `binding` from the
-///    verified governing approval (seam to C2/BAC-541).
+/// 3. **Authorization must not outlive the approval.** The EIP-3009
+///    `valid_before` must not exceed `binding.approval_expires_at`. A signed
+///    transfer stays broadcastable on-chain until `valid_before`, so an
+///    authorization whose window outlasts the governing approval is rejected
+///    to keep the off-chain spend bounded by the approval window.
+/// 4. **Approval binding.** The domain `chain_id`, authorization `to`
+///    (payee), `value` (amount), and token identity (the domain
+///    `verifying_contract` against `binding.token_contract` when present) are
+///    asserted against `binding`; any mismatch fails closed. The caller
+///    resolves `binding` from the verified governing approval (seam to
+///    C2/BAC-541).
 ///
-/// All three checks fail closed. The nonce is recorded only after the
-/// time-window and binding checks pass, so a rejected authorization does
-/// not burn its nonce.
+/// All checks fail closed. The nonce is recorded only after the time-window,
+/// expiry, and binding checks pass, so a rejected authorization does not burn
+/// its nonce.
 pub fn prepare_transfer_with_authorization(
     domain: Eip3009Domain,
     authorization: TransferWithAuthorizationInput,
@@ -435,7 +516,19 @@ pub fn prepare_transfer_with_authorization(
         )));
     }
 
-    // (3) Approval binding: chain / payee / amount must match the
+    // (3) Authorization must not outlive the governing approval. A signed
+    // transfer remains broadcastable on-chain until valid_before, so reject
+    // any authorization whose window outlasts approval_expires_at. Fail
+    // closed so a captured signature cannot be broadcast after the approval
+    // that governs it has expired.
+    if authorization.valid_before > binding.approval_expires_at {
+        return Err(SettlementError::InvalidBinding(format!(
+            "EIP-3009 authorization outlives approval: validBefore {} > approval expiry {}",
+            authorization.valid_before, binding.approval_expires_at
+        )));
+    }
+
+    // (4) Approval binding: chain / payee / amount / token must match the
     // governing approval. Parse the bound payee through the same address
     // codec so checksum vs. lowercase hex compare equal. Fail closed on
     // any mismatch.
@@ -460,14 +553,44 @@ pub fn prepare_transfer_with_authorization(
             authorization.value_minor_units, binding.amount_minor_units
         )));
     }
+    // Token contract: the domain `verifying_contract` selects the token the
+    // signed transfer actually moves. When the approval pins a token
+    // contract, it must equal the domain contract so a captured
+    // authorization cannot be redirected to a different token on the same
+    // chain. Compare parsed Address bytes so checksum vs lowercase hex
+    // compare equal. (`verifying_contract` was already parsed above.)
+    if let Some(bound_token_contract) = binding.token_contract.as_deref() {
+        let bound_contract = Address::from_str(bound_token_contract.trim()).map_err(|error| {
+            SettlementError::InvalidBinding(format!(
+                "approval-bound token contract address invalid: {error}"
+            ))
+        })?;
+        if verifying_contract != bound_contract {
+            return Err(SettlementError::InvalidBinding(
+                "EIP-3009 token contract mismatch: domain verifyingContract is not the \
+                 approval-bound token contract"
+                    .to_string(),
+            ));
+        }
+    }
 
     // (1) Single-use nonce: record AFTER the cheap fail-closed checks so a
     // rejected authorization does not consume its nonce, but BEFORE
     // returning a broadcastable digest so the first successful preparation
     // is the only one. Retain until the authorization's own expiry.
+    //
+    // Key the store on the PARSED canonical bytes (`from` Address, `nonce`
+    // B256) rendered as their canonical lowercase `0x` hex, not on the
+    // caller's raw text. `Address::from_str`/`B256::from_str` accept both
+    // `0x`-prefixed and bare hex and either casing, so two submissions that
+    // differ only in prefix/casing would otherwise lowercase to DIFFERENT
+    // raw keys and the second would be treated as Fresh, evading replay
+    // detection. Canonicalizing here closes that gap.
+    let canonical_from = format!("0x{}", hex::encode(from.as_slice()));
+    let canonical_nonce = format!("0x{}", hex::encode(nonce.as_slice()));
     match nonce_store.record_if_fresh(
-        &authorization.from_address,
-        &authorization.nonce,
+        &canonical_from,
+        &canonical_nonce,
         authorization.valid_before,
     )? {
         NonceOutcome::Fresh => {}
@@ -643,13 +766,18 @@ mod tests {
     /// A `now` strictly inside `(validAfter, validBefore)`.
     const SAMPLE_NOW: u64 = 1_744_000_300;
     const SAMPLE_NONCE: &str = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    /// The token symbol the sample approval authorizes.
+    const SAMPLE_TOKEN_SYMBOL: &str = "USDC";
+    /// The token contract the sample EIP-3009 domain targets; the sample
+    /// binding pins this so the contract-level check passes by default.
+    const SAMPLE_TOKEN_CONTRACT: &str = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
     fn sample_domain() -> Eip3009Domain {
         Eip3009Domain {
             name: "USD Coin".to_string(),
             version: "2".to_string(),
             chain_id: SAMPLE_CHAIN_ID,
-            verifying_contract: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913".to_string(),
+            verifying_contract: SAMPLE_TOKEN_CONTRACT.to_string(),
         }
     }
 
@@ -669,6 +797,11 @@ mod tests {
             chain_id: SAMPLE_CHAIN_ID,
             payee_address: SAMPLE_PAYEE.to_string(),
             amount_minor_units: SAMPLE_VALUE,
+            token_symbol: SAMPLE_TOKEN_SYMBOL.to_string(),
+            token_contract: Some(SAMPLE_TOKEN_CONTRACT.to_string()),
+            // Approval expiry at least as late as the authorization window so
+            // the default sample does not trip the outlives-approval check.
+            approval_expires_at: SAMPLE_VALID_BEFORE,
         }
     }
 
@@ -910,6 +1043,202 @@ mod tests {
         assert_eq!(
             store.record_if_fresh("0xabc", "0xdef", 0).test_unwrap(),
             NonceOutcome::Replayed
+        );
+    }
+
+    #[test]
+    fn nonce_store_canonicalizes_prefix_and_casing() {
+        // The store must collapse `0x`-prefixed vs bare and checksum vs
+        // lowercase keys so none of those formatting differences can present
+        // the same (from, nonce) pair as Fresh twice.
+        let store = InMemoryEip3009NonceStore::new();
+        assert_eq!(
+            store.record_if_fresh("0xABC", "0xDEF", 0).test_unwrap(),
+            NonceOutcome::Fresh
+        );
+        // Same bytes, prefix stripped and lowercased: must be a replay.
+        assert_eq!(
+            store.record_if_fresh("abc", "def", 0).test_unwrap(),
+            NonceOutcome::Replayed,
+            "bare-hex form of an already-recorded 0x-prefixed key must replay"
+        );
+        // Same bytes, re-cased with prefix: must also replay.
+        assert_eq!(
+            store.record_if_fresh("0xAbC", "0xDeF", 0).test_unwrap(),
+            NonceOutcome::Replayed,
+            "re-cased form of an already-recorded key must replay"
+        );
+    }
+
+    #[test]
+    fn replay_is_detected_across_prefixed_and_bare_authorization_forms() {
+        // End-to-end: the SAME authorization submitted once with 0x-prefixed
+        // from/nonce and again WITHOUT the prefix parses to identical
+        // Address/B256 bytes. Keying the store on the parsed canonical bytes
+        // means the second submission is a replay, not Fresh.
+        let store = InMemoryEip3009NonceStore::new();
+        let _ = prepare_transfer_with_authorization(
+            sample_domain(),
+            sample_authorization(),
+            &sample_binding(),
+            SAMPLE_NOW,
+            &store,
+        )
+        .test_unwrap();
+
+        // Strip the `0x` prefix from from/nonce; Address/B256 parse both.
+        let mut bare = sample_authorization();
+        bare.from_address = bare
+            .from_address
+            .strip_prefix("0x")
+            .unwrap_or(&bare.from_address)
+            .to_string();
+        bare.nonce = bare
+            .nonce
+            .strip_prefix("0x")
+            .unwrap_or(&bare.nonce)
+            .to_string();
+
+        let replay = prepare_transfer_with_authorization(
+            sample_domain(),
+            bare,
+            &sample_binding(),
+            SAMPLE_NOW,
+            &store,
+        );
+        assert!(
+            replay.test_unwrap_err().to_string().contains("replay"),
+            "the unprefixed form of an already-prepared authorization must be a replay"
+        );
+    }
+
+    #[test]
+    fn authorization_outliving_approval_is_rejected() {
+        // The EIP-3009 window is open and well-bound, but valid_before runs
+        // past the approval's expiry: the signed transfer would stay
+        // broadcastable after the approval lapses, so it must fail closed and
+        // not consume the nonce.
+        let store = InMemoryEip3009NonceStore::new();
+        let mut short_approval = sample_binding();
+        short_approval.approval_expires_at = SAMPLE_VALID_BEFORE - 1;
+        let error = prepare_transfer_with_authorization(
+            sample_domain(),
+            sample_authorization(),
+            &short_approval,
+            SAMPLE_NOW,
+            &store,
+        )
+        .test_unwrap_err();
+        assert!(
+            error.to_string().contains("outlives approval"),
+            "an authorization that outlives its approval must be rejected, got: {error}"
+        );
+        assert!(
+            store.is_empty().test_unwrap(),
+            "an authorization rejected for outliving its approval must not consume its nonce"
+        );
+    }
+
+    #[test]
+    fn authorization_ending_exactly_at_approval_expiry_is_accepted() {
+        // valid_before == approval_expires_at is the boundary the approval
+        // still covers; it must be accepted.
+        let store = InMemoryEip3009NonceStore::new();
+        let mut binding = sample_binding();
+        binding.approval_expires_at = SAMPLE_VALID_BEFORE;
+        let prepared = prepare_transfer_with_authorization(
+            sample_domain(),
+            sample_authorization(),
+            &binding,
+            SAMPLE_NOW,
+            &store,
+        );
+        assert!(
+            prepared.is_ok(),
+            "valid_before == approval_expires_at must be within the approval window"
+        );
+    }
+
+    #[test]
+    fn token_contract_mismatch_is_rejected() {
+        // The approval is bound to a DIFFERENT token contract than the
+        // EIP-3009 domain targets. Even with matching chain, payee, and
+        // amount, redirecting to another token on the same chain must fail
+        // closed and not consume the nonce.
+        let store = InMemoryEip3009NonceStore::new();
+        let mut wrong_token = sample_binding();
+        wrong_token.token_contract = Some("0x4444444444444444444444444444444444444444".to_string());
+        let error = prepare_transfer_with_authorization(
+            sample_domain(),
+            sample_authorization(),
+            &wrong_token,
+            SAMPLE_NOW,
+            &store,
+        )
+        .test_unwrap_err();
+        assert!(
+            error.to_string().contains("token contract mismatch"),
+            "a different token contract on the same chain must be rejected, got: {error}"
+        );
+        assert!(
+            store.is_empty().test_unwrap(),
+            "a token-contract-mismatch rejection must not consume the nonce"
+        );
+    }
+
+    #[test]
+    fn token_contract_binding_accepts_checksum_vs_lowercase_hex() {
+        // The bound token contract may be cased differently from the domain
+        // verifyingContract; they must compare equal as parsed addresses.
+        let store = InMemoryEip3009NonceStore::new();
+        let mut binding = sample_binding();
+        binding.token_contract = Some(SAMPLE_TOKEN_CONTRACT.to_lowercase());
+        let prepared = prepare_transfer_with_authorization(
+            sample_domain(),
+            sample_authorization(),
+            &binding,
+            SAMPLE_NOW,
+            &store,
+        );
+        assert!(
+            prepared.is_ok(),
+            "checksum vs lowercase token contract hex must be the same address"
+        );
+    }
+
+    #[test]
+    fn absent_token_contract_skips_the_contract_check() {
+        // With no bound contract the symbol-level check still applies, but
+        // the contract-level assertion is skipped so the lane prepares.
+        let store = InMemoryEip3009NonceStore::new();
+        let mut binding = sample_binding();
+        binding.token_contract = None;
+        let prepared = prepare_transfer_with_authorization(
+            sample_domain(),
+            sample_authorization(),
+            &binding,
+            SAMPLE_NOW,
+            &store,
+        );
+        assert!(
+            prepared.is_ok(),
+            "a None token_contract must skip the contract-level check"
+        );
+    }
+
+    #[test]
+    fn assert_token_symbol_is_case_insensitive_and_fails_closed() {
+        let binding = sample_binding();
+        // Case and surrounding whitespace must not matter.
+        assert!(binding.assert_token_symbol("x402", " usdc ").is_ok());
+        assert!(binding.assert_token_symbol("circle", "USDC").is_ok());
+        // A genuinely different token must be rejected.
+        let error = binding
+            .assert_token_symbol("x402", "EURC")
+            .test_unwrap_err();
+        assert!(
+            error.to_string().contains("token mismatch"),
+            "a different token symbol must be rejected, got: {error}"
         );
     }
 
