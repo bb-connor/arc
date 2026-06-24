@@ -207,15 +207,19 @@ pub struct ApprovalBinding {
     /// this symbol (x402 accepted tokens, Circle token symbol). Compared
     /// case-insensitively after trimming.
     pub token_symbol: String,
-    /// Optional token contract address the governing approval authorized
-    /// (for example the USDC contract on the target chain). When present it
-    /// is asserted against the EIP-3009 domain `verifying_contract`, which
-    /// is the contract the signed transfer actually targets, so a captured
-    /// authorization cannot be redirected to a different token contract on
-    /// the same chain. Compared as parsed `Address` bytes so checksum vs
-    /// lowercase hex compare equal. `None` skips the contract-level check
-    /// (lanes that have no contract to compare against still enforce the
-    /// `token_symbol`).
+    /// Token contract address the governing approval authorized (for example
+    /// the USDC contract on the target chain). It is asserted against the
+    /// EIP-3009 domain `verifying_contract`, which is the contract the signed
+    /// transfer actually targets, so a captured authorization cannot be
+    /// redirected to a different token contract on the same chain. Compared as
+    /// parsed `Address` bytes so checksum vs lowercase hex compare equal.
+    ///
+    /// REQUIRED for the EIP-3009 lane: [`prepare_transfer_with_authorization`]
+    /// fails closed when this is `None`, because a symbol alone cannot pin the
+    /// on-chain token. The field stays `Option` only because lanes that
+    /// identify their token by symbol and have no contract to compare against
+    /// (the x402 accepted-token list and the Circle token symbol) still bind
+    /// via `token_symbol` and legitimately leave this `None`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub token_contract: Option<String>,
     /// Approval expiry as a Unix timestamp in seconds. The prepared
@@ -283,17 +287,22 @@ pub const DEFAULT_MAX_EIP3009_NONCE_ENTRIES: usize = 65_536;
 ///
 /// This is the trust-boundary surface settlement consults BEFORE
 /// preparing a transfer. The store is keyed on the EIP-3009 authorizer
-/// (`from` address) and the 32-byte authorization `nonce`: per EIP-3009
-/// the `(from, nonce)` pair is unique per spend and is what the token
-/// contract itself consumes on-chain. Recording the pair here makes the
-/// off-chain preparation path single-use as well, closing the replay
-/// window before a signature is ever broadcast.
+/// (`from` address) and a nonce key that scopes the 32-byte authorization
+/// `nonce` to its EIP-712 domain (chain id + verifying contract): per
+/// EIP-3009 the `(from, nonce)` pair is consumed on-chain by a SPECIFIC
+/// token contract, so the same nonce value is an independent spend on a
+/// different token or chain. Recording the domain-scoped pair here makes
+/// the off-chain preparation path single-use per token contract as well,
+/// closing the replay window before a signature is ever broadcast without
+/// rejecting a legitimate reuse of the same nonce on a different contract.
 ///
 /// [`prepare_transfer_with_authorization`] keys the store on the canonical
-/// `0x` lowercase hex of the PARSED `from`/`nonce` bytes, so a re-prefixed
-/// or re-cased submission of the same authorization maps to the same entry.
-/// Implementations additionally lowercase the supplied key defensively, so
-/// direct callers cannot evade detection through casing either.
+/// `0x` lowercase hex of the PARSED `from`/`nonce` bytes (with the chain id
+/// and verifying contract folded into the nonce key), so a re-prefixed or
+/// re-cased submission of the same authorization on the same domain maps to
+/// the same entry. Implementations additionally lowercase the supplied key
+/// defensively, so direct callers cannot evade detection through casing
+/// either.
 ///
 /// Implementations are `Send + Sync` so callers can hold them in an
 /// `Arc<dyn Eip3009NonceStore>`. The contract intentionally mirrors
@@ -453,10 +462,10 @@ impl Eip3009NonceStore for InMemoryEip3009NonceStore {
 ///    to keep the off-chain spend bounded by the approval window.
 /// 4. **Approval binding.** The domain `chain_id`, authorization `to`
 ///    (payee), `value` (amount), and token identity (the domain
-///    `verifying_contract` against `binding.token_contract` when present) are
-///    asserted against `binding`; any mismatch fails closed. The caller
-///    resolves `binding` from the verified governing approval (seam to
-///    C2/BAC-541).
+///    `verifying_contract` against the REQUIRED `binding.token_contract`) are
+///    asserted against `binding`; any mismatch (or an absent token contract)
+///    fails closed. The caller resolves `binding` from the verified governing
+///    approval (seam to C2/BAC-541).
 ///
 /// All checks fail closed. The nonce is recorded only after the time-window,
 /// expiry, and binding checks pass, so a rejected authorization does not burn
@@ -554,24 +563,32 @@ pub fn prepare_transfer_with_authorization(
         )));
     }
     // Token contract: the domain `verifying_contract` selects the token the
-    // signed transfer actually moves. When the approval pins a token
-    // contract, it must equal the domain contract so a captured
-    // authorization cannot be redirected to a different token on the same
-    // chain. Compare parsed Address bytes so checksum vs lowercase hex
-    // compare equal. (`verifying_contract` was already parsed above.)
-    if let Some(bound_token_contract) = binding.token_contract.as_deref() {
-        let bound_contract = Address::from_str(bound_token_contract.trim()).map_err(|error| {
-            SettlementError::InvalidBinding(format!(
-                "approval-bound token contract address invalid: {error}"
-            ))
-        })?;
-        if verifying_contract != bound_contract {
-            return Err(SettlementError::InvalidBinding(
-                "EIP-3009 token contract mismatch: domain verifyingContract is not the \
-                 approval-bound token contract"
-                    .to_string(),
-            ));
-        }
+    // signed transfer actually moves. The EIP-3009 lane REQUIRES the approval
+    // to pin a token contract: a symbol alone does not identify the on-chain
+    // token, so a captured authorization could otherwise be redirected to a
+    // different token contract on the same chain with the same payee and
+    // numeric amount. Fail closed when the binding carries no contract, then
+    // assert the domain contract equals it. Compare parsed Address bytes so
+    // checksum vs lowercase hex compare equal. (`verifying_contract` was
+    // already parsed above.)
+    let bound_token_contract = binding.token_contract.as_deref().ok_or_else(|| {
+        SettlementError::InvalidBinding(
+            "EIP-3009 requires an approval-bound token contract: a symbol alone cannot pin \
+             the on-chain token the signed transfer targets"
+                .to_string(),
+        )
+    })?;
+    let bound_contract = Address::from_str(bound_token_contract.trim()).map_err(|error| {
+        SettlementError::InvalidBinding(format!(
+            "approval-bound token contract address invalid: {error}"
+        ))
+    })?;
+    if verifying_contract != bound_contract {
+        return Err(SettlementError::InvalidBinding(
+            "EIP-3009 token contract mismatch: domain verifyingContract is not the \
+             approval-bound token contract"
+                .to_string(),
+        ));
     }
 
     // (1) Single-use nonce: record AFTER the cheap fail-closed checks so a
@@ -586,8 +603,25 @@ pub fn prepare_transfer_with_authorization(
     // differ only in prefix/casing would otherwise lowercase to DIFFERENT
     // raw keys and the second would be treated as Fresh, evading replay
     // detection. Canonicalizing here closes that gap.
+    //
+    // Scope the nonce by the EIP-712 domain (chain id + verifying contract)
+    // as well. Per EIP-3009 the same random `(from, nonce)` is an independent
+    // authorization on each token contract (and chain): the on-chain nonce
+    // state lives in the token contract, and the domain separator already
+    // distinguishes the signatures. Keying only on `(from, nonce)` would
+    // reject a legitimate second authorization that reuses the same nonce
+    // value for a different token (for example USDC vs EURC) or chain. Folding
+    // the chain id and canonical verifying-contract bytes into the nonce key
+    // keeps each (chain, contract, from, nonce) tuple distinct while still
+    // canonicalizing the parsed bytes.
     let canonical_from = format!("0x{}", hex::encode(from.as_slice()));
-    let canonical_nonce = format!("0x{}", hex::encode(nonce.as_slice()));
+    let canonical_contract = format!("0x{}", hex::encode(verifying_contract.as_slice()));
+    let canonical_nonce = format!(
+        "{}:{}:0x{}",
+        domain.chain_id,
+        canonical_contract,
+        hex::encode(nonce.as_slice())
+    );
     match nonce_store.record_if_fresh(
         &canonical_from,
         &canonical_nonce,
@@ -1207,22 +1241,103 @@ mod tests {
     }
 
     #[test]
-    fn absent_token_contract_skips_the_contract_check() {
-        // With no bound contract the symbol-level check still applies, but
-        // the contract-level assertion is skipped so the lane prepares.
+    fn absent_token_contract_is_rejected_for_eip3009() {
+        // The EIP-3009 lane REQUIRES a bound token contract: a symbol alone
+        // cannot pin the on-chain token, so a captured authorization could be
+        // redirected to a different token contract on the same chain. With no
+        // bound contract the lane must fail closed and not consume the nonce.
         let store = InMemoryEip3009NonceStore::new();
         let mut binding = sample_binding();
         binding.token_contract = None;
-        let prepared = prepare_transfer_with_authorization(
+        let error = prepare_transfer_with_authorization(
             sample_domain(),
             sample_authorization(),
             &binding,
             SAMPLE_NOW,
             &store,
+        )
+        .test_unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("requires an approval-bound token contract"),
+            "an EIP-3009 binding with no token contract must be rejected, got: {error}"
         );
         assert!(
-            prepared.is_ok(),
-            "a None token_contract must skip the contract-level check"
+            store.is_empty().test_unwrap(),
+            "a binding rejected for an absent token contract must not consume the nonce"
+        );
+    }
+
+    #[test]
+    fn same_nonce_on_a_different_token_contract_is_not_a_replay() {
+        // Per EIP-3009 the same `(from, nonce)` is an independent spend on a
+        // different token contract: the on-chain nonce state lives in the token
+        // contract and the EIP-712 domain separates the signatures. The
+        // off-chain store keys the nonce by its domain (chain + verifying
+        // contract), so reusing the same nonce value against a different token
+        // contract must still be Fresh, not a replay.
+        let store = InMemoryEip3009NonceStore::new();
+        let first = prepare_transfer_with_authorization(
+            sample_domain(),
+            sample_authorization(),
+            &sample_binding(),
+            SAMPLE_NOW,
+            &store,
+        );
+        assert!(first.is_ok(), "first use of a fresh nonce must succeed");
+
+        // A different token contract on the same chain, with a binding that
+        // pins that contract. Same from + nonce value, different domain.
+        const OTHER_TOKEN_CONTRACT: &str = "0x4444444444444444444444444444444444444444";
+        let mut other_domain = sample_domain();
+        other_domain.verifying_contract = OTHER_TOKEN_CONTRACT.to_string();
+        let mut other_binding = sample_binding();
+        other_binding.token_contract = Some(OTHER_TOKEN_CONTRACT.to_string());
+
+        let second = prepare_transfer_with_authorization(
+            other_domain,
+            sample_authorization(),
+            &other_binding,
+            SAMPLE_NOW,
+            &store,
+        );
+        assert!(
+            second.is_ok(),
+            "the same nonce on a DIFFERENT token contract must not be a replay, got: {second:?}"
+        );
+        assert_eq!(
+            store.len().test_unwrap(),
+            2,
+            "each (chain, contract, from, nonce) tuple must record a distinct nonce entry"
+        );
+    }
+
+    #[test]
+    fn same_nonce_on_the_same_token_contract_is_a_replay() {
+        // Sibling to the cross-contract test: with the SAME domain (chain +
+        // verifying contract) the same `(from, nonce)` must still be a replay,
+        // so folding the contract into the key does not weaken replay
+        // detection on the contract that actually consumes the nonce.
+        let store = InMemoryEip3009NonceStore::new();
+        let _ = prepare_transfer_with_authorization(
+            sample_domain(),
+            sample_authorization(),
+            &sample_binding(),
+            SAMPLE_NOW,
+            &store,
+        )
+        .test_unwrap();
+        let replay = prepare_transfer_with_authorization(
+            sample_domain(),
+            sample_authorization(),
+            &sample_binding(),
+            SAMPLE_NOW,
+            &store,
+        );
+        assert!(
+            replay.test_unwrap_err().to_string().contains("replay"),
+            "the same nonce on the same token contract must still be a replay"
         );
     }
 
