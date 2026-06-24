@@ -141,19 +141,36 @@ impl ChioKernel {
         // so `ChioKernel::new` remains constructible from sync contexts; by the
         // time any caller reaches `sign`, a tokio runtime is necessarily active.
         let signing_keypair = config.keypair.clone();
-        // Align the async signer's per-request byte budget to this kernel's
-        // configured stream/output max (BAC-539). The async path is the
-        // documented off-critical-path signer, so a fixed 1 MiB hard-reject
-        // would refuse legitimate large async receipts that `max_stream_total_bytes`
-        // otherwise admits. The budget stays BOUNDED: it is exactly the
-        // configured max (saturating into `usize`), never unbounded.
-        let signing_content_budget =
+        // BAC-539 round-5: the async signer admits exactly what the inline
+        // signer admits, then bounds queue memory by an AGGREGATE byte budget.
+        //
+        // - Per-request cap = 0 (unlimited). The inline `build_and_sign_receipt`
+        //   path applies NO preimage cap, and `max_stream_total_bytes` limits
+        //   *raw stream bytes*, a different unit from the *preimage bytes* a
+        //   queued request holds (a stream receipt's preimage is the
+        //   concatenation of 64-char per-chunk digests, not the raw payload).
+        //   Comparing a preimage length against `max_stream_total_bytes` would
+        //   falsely reject stream receipts the inline signer accepts (issue 3),
+        //   and a `max_stream_total_bytes == 0` ("unlimited") config must not
+        //   collapse to a 1-byte cap (issue 2). So we disable the per-request
+        //   cap and let the aggregate budget bound memory instead.
+        // - Aggregate budget tracks the configured stream/output max (saturating
+        //   into `usize`), with a non-zero floor so a `0` ("unlimited") stream
+        //   config still bounds queued memory at the documented default rather
+        //   than growing unbounded (issue 1). Always BOUNDED.
+        let configured_stream_max =
             usize::try_from(config.max_stream_total_bytes).unwrap_or(usize::MAX);
+        let signing_queued_budget = if configured_stream_max == 0 {
+            signing_task::DEFAULT_MAX_SIGNING_QUEUED_BYTES
+        } else {
+            configured_stream_max
+        };
         let signing_task = std::sync::Arc::new(
-            signing_task::SigningTaskHandle::with_capacity_and_max_content_bytes(
+            signing_task::SigningTaskHandle::with_capacity_max_content_and_queued_bytes(
                 signing_keypair,
                 signing_task::DEFAULT_SIGNING_CHANNEL_CAPACITY,
-                signing_content_budget,
+                /* per-request cap */ 0,
+                signing_queued_budget,
             ),
         );
         Self {

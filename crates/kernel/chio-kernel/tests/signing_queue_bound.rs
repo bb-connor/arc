@@ -187,3 +187,100 @@ async fn default_budget_admits_large_async_receipts_above_one_mib() {
 
     handle.shutdown().await;
 }
+
+#[tokio::test(flavor = "current_thread")]
+async fn zero_per_request_cap_admits_large_receipts_unlimited() {
+    // BAC-539 round-5 (issue 2): a per-request cap of 0 means UNLIMITED (matching
+    // the inline signer), NOT a 1-byte cap. The kernel wires a `0` cap when
+    // `max_stream_total_bytes == 0` ("unlimited stream") flows through, so the
+    // async path must admit a large receipt rather than rejecting it as "1 byte
+    // over". Without the fix, `max_content_bytes.max(1)` turned 0 into 1 and this
+    // 64 KiB preimage would be refused fail-closed.
+    let keypair = Keypair::from_seed(&KERNEL_SEED);
+    // Per-request cap = 0 (unlimited); aggregate budget large enough to admit the
+    // single request so we isolate the per-request-cap behaviour.
+    let handle = SigningTaskHandle::with_capacity_max_content_and_queued_bytes(
+        keypair.clone(),
+        /* capacity */ 256,
+        /* per-request cap */ 0,
+        /* aggregate budget */ 1024 * 1024,
+    );
+
+    // A preimage far larger than the retired 1-byte cap the `max(1)` bug imposed.
+    let content = vec![0x5Au8; 64 * 1024];
+    let body = body_for_content(&keypair, &content);
+
+    let receipt = handle.sign(body, content).await.expect(
+        "a 0 (unlimited) per-request cap must admit a 64 KiB receipt, not reject as 1-over",
+    );
+    assert!(receipt.verify_signature().expect("signature verifies"));
+
+    handle.shutdown().await;
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn aggregate_byte_budget_backpressures_even_with_channel_room() {
+    // BAC-539 round-5 (issue 1): the AGGREGATE byte budget bounds the SUM of
+    // in-flight queued preimage bytes independently of channel COUNT capacity.
+    // On a current-thread runtime the spawned signing task does not run until we
+    // `.await` it, so permits acquired by `try_sign` stay held; this lets us
+    // assert deterministically that a second request is refused purely by the
+    // aggregate byte budget while the channel still has count capacity.
+    let keypair = Keypair::from_seed(&KERNEL_SEED);
+    // Generous channel capacity (count) but a tiny 4-byte aggregate budget. Per
+    // request cap is unlimited so the ONLY thing that can block the second send
+    // is the aggregate byte budget.
+    let handle = SigningTaskHandle::with_capacity_max_content_and_queued_bytes(
+        keypair.clone(),
+        /* capacity */ 256,
+        /* per-request cap */ 0,
+        /* aggregate budget */ 4,
+    );
+
+    // First request consumes the whole 4-byte aggregate budget and enqueues
+    // (channel has plenty of count capacity). The task has not run yet, so the
+    // permit is still held.
+    let first_content = vec![0x11u8; 4];
+    let first_body = body_for_content(&keypair, &first_content);
+    let first = handle.try_sign(first_body, first_content);
+    let first_rx = match first {
+        Ok(rx) => rx,
+        Err(_) => panic!("first request must enqueue: budget and channel both have room"),
+    };
+
+    // Second request: 1 byte. The channel still has count capacity, but the
+    // aggregate byte budget is exhausted, so it MUST be refused (returned unsent)
+    // rather than enqueued. This proves total queued bytes are bounded by the
+    // aggregate budget, not just by channel count.
+    let second_content = vec![0x22u8; 1];
+    let second_body = body_for_content(&keypair, &second_content);
+    match handle.try_sign(second_body, second_content) {
+        Err((_body, returned)) => {
+            assert_eq!(
+                returned.len(),
+                1,
+                "second request returned unsent by aggregate byte budget backpressure"
+            );
+        }
+        Ok(_) => panic!("aggregate byte budget exhausted: second request must not enqueue"),
+    }
+
+    // Drain: signing the first request releases its permit, so after shutdown the
+    // task processes it and the first reply resolves. This also proves the budget
+    // is RELEASED (not leaked) once a request is signed.
+    drop(first_rx);
+    handle.shutdown().await;
+
+    // After the budget frees, a fresh request fits again, confirming the budget
+    // is a recoverable bound, not a one-shot exhaustion.
+    let handle =
+        SigningTaskHandle::with_capacity_max_content_and_queued_bytes(keypair.clone(), 256, 0, 4);
+    let content = vec![0x33u8; 4];
+    let body = body_for_content(&keypair, &content);
+    let receipt = handle
+        .sign(body, content)
+        .await
+        .expect("a request within the aggregate budget signs");
+    assert!(receipt.verify_signature().expect("signature verifies"));
+    handle.shutdown().await;
+}

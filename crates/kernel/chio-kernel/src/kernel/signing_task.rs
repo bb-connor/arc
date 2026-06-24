@@ -42,12 +42,12 @@
 //! backpressure deterministically via [`SigningTaskHandle::with_capacity`].
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use chio_core::crypto::{Ed25519Backend, SigningBackend};
 use chio_log_redact::redacted;
 use tokio::runtime::Handle;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, OwnedSemaphorePermit, Semaphore};
 use tokio::task::JoinHandle;
 use tracing::{debug, warn};
 
@@ -62,28 +62,31 @@ use crate::{ChioReceipt, ChioReceiptBody, KernelError, Keypair, DEFAULT_MAX_STRE
 /// can override via [`SigningTaskHandle::with_capacity`].
 pub const DEFAULT_SIGNING_CHANNEL_CAPACITY: usize = 256;
 
-/// Default per-request byte budget on the queued canonical-content preimage.
+/// Default *per-request* byte budget on a single queued canonical-content
+/// preimage.
 ///
-/// Each queued [`SignRequest`] owns the full `canonical_content` preimage. With
-/// a bounded channel of [`DEFAULT_SIGNING_CHANNEL_CAPACITY`] requests, the queue
-/// is bounded by *count* but not by *bytes*: under signer stall / backpressure a
-/// burst of large value or stream receipts could retain hundreds of full output
-/// preimages in memory at once. The per-handle budget
-/// ([`SigningTaskHandle::max_content_bytes`]) bounds the bytes any single
-/// request may enqueue so the worst-case retained memory is
-/// `capacity * max_content_bytes` rather than unbounded. Oversized requests are
-/// rejected fail-closed ([`KernelError::ReceiptSigningFailed`]) rather than
-/// silently truncated, since truncating the preimage would break the WYSIWYS
-/// recompute (BAC-539).
+/// This is an OPTIONAL safety valve that bounds the bytes any **single** request
+/// may enqueue. `0` means *no per-request cap* (see
+/// [`SigningTaskHandle::with_capacity_and_max_content_bytes`]); a non-zero value
+/// fail-closed refuses ([`KernelError::ReceiptSigningFailed`]) a preimage over
+/// the cap rather than silently truncating it, since truncating would break the
+/// WYSIWYS recompute (BAC-539).
 ///
-/// The default budget is aligned to the kernel's configured stream/output max
-/// ([`crate::DEFAULT_MAX_STREAM_TOTAL_BYTES`], 256 MiB). The async signing task
-/// is the documented off-critical-path signer, so a fixed 1 MiB hard-reject
-/// would refuse legitimate large async receipts that the configured stream max
-/// otherwise permits. The budget is always BOUNDED (never unbounded); operators
-/// override it per kernel via [`SigningTaskHandle::with_capacity_and_max_content_bytes`]
-/// (the kernel wires `KernelConfig::max_stream_total_bytes` through on
-/// construction).
+/// The default is aligned to the kernel's configured stream/output max
+/// ([`crate::DEFAULT_MAX_STREAM_TOTAL_BYTES`], 256 MiB) for the convenience
+/// constructors. The async signing task is the documented off-critical-path
+/// signer, so a fixed 1 MiB hard-reject would refuse legitimate large async
+/// receipts. The budget is always BOUNDED.
+///
+/// Note the kernel itself wires the per-request cap to **0 (unlimited)** so the
+/// async path admits exactly what the inline signer admits: the inline path
+/// applies no preimage cap, and `max_stream_total_bytes` limits *raw stream
+/// bytes*, which is a different unit from the *preimage bytes* a queued request
+/// holds (a stream receipt's preimage is the concatenation of 64-char per-chunk
+/// digests, not the raw payload). Comparing a preimage length against
+/// `max_stream_total_bytes` would falsely reject stream receipts the inline
+/// signer accepts. Queue memory is instead bounded by the AGGREGATE byte budget
+/// ([`DEFAULT_MAX_SIGNING_QUEUED_BYTES`]) below.
 ///
 /// Referenced inside the crate only via [`SigningTaskHandle::with_capacity`]
 /// (itself reached only from the `#[path]`-included signing-task test modules),
@@ -92,6 +95,51 @@ pub const DEFAULT_SIGNING_CHANNEL_CAPACITY: usize = 256;
 #[allow(dead_code)]
 pub const DEFAULT_MAX_SIGNING_CONTENT_BYTES: usize =
     clamp_u64_to_usize(DEFAULT_MAX_STREAM_TOTAL_BYTES);
+
+/// Sentinel: a per-request `max_content_bytes` of `0` means *no per-request
+/// cap* (unlimited), matching the inline signer which applies no preimage cap.
+/// Used so the kernel can wire `KernelConfig::max_stream_total_bytes == 0`
+/// (operator "unlimited stream") straight through to "no async per-request cap"
+/// instead of the old `max(1)` that turned 0 into a 1-byte cap rejecting almost
+/// every receipt (BAC-539 round-5, issue 2).
+const PER_REQUEST_BUDGET_UNLIMITED: usize = 0;
+
+/// Default AGGREGATE byte budget across ALL in-flight queued preimages.
+///
+/// A bounded channel of [`DEFAULT_SIGNING_CHANNEL_CAPACITY`] (256) requests
+/// bounds the queue by *count* but not by *bytes*: with a 256 MiB per-request
+/// budget that is up to ~64 GiB of preimage bytes retained before count-based
+/// backpressure even engages (BAC-539 round-5, issue 1). This aggregate budget
+/// is the real memory bound: producers acquire `preimage_len` permits from a
+/// shared [`Semaphore`] before enqueueing and release them once the signing task
+/// finishes the request, so the *sum* of queued preimage bytes is held under the
+/// budget. When the aggregate is exhausted producers `.await` (backpressure),
+/// never reject, so a receipt the inline signer would accept is never refused by
+/// the async path.
+///
+/// Defaulted to the configured stream/output max (256 MiB). Always BOUNDED.
+pub(crate) const DEFAULT_MAX_SIGNING_QUEUED_BYTES: usize =
+    clamp_u64_to_usize(DEFAULT_MAX_STREAM_TOTAL_BYTES);
+
+/// Clamp an aggregate-budget byte count into the permit range a
+/// [`Semaphore`] can vend in a single `acquire_many` call.
+///
+/// `Semaphore::acquire_many*` takes a `u32`, so the aggregate budget (and any
+/// single acquire derived from it) must fit in `u32`. An operator-configured
+/// budget larger than `u32::MAX` is clamped down to a still-bounded value; the
+/// aggregate stays a memory bound, never unbounded. A zero budget collapses to 1
+/// so the semaphore can always vend at least one permit (the request then
+/// acquires `min(len, budget)` permits, so a single oversized request still
+/// makes progress without deadlock).
+const fn clamp_aggregate_permits(budget: usize) -> u32 {
+    let ceiling = u32::MAX as usize;
+    let clamped = if budget > ceiling { ceiling } else { budget };
+    if clamped == 0 {
+        1
+    } else {
+        clamped as u32
+    }
+}
 
 /// Saturating `u64 -> usize` conversion, usable in a `const` context.
 ///
@@ -150,6 +198,16 @@ pub(crate) struct SignRequest {
     /// Oneshot channel for the signed receipt or signing error. The task
     /// uses `send` and ignores `Err(_)` (dropped receiver).
     pub(crate) reply: oneshot::Sender<Result<ChioReceipt, KernelError>>,
+
+    /// Aggregate byte-budget permit held for the lifetime of this queued
+    /// request. Acquired (sized to the preimage) before the request is
+    /// enqueued and dropped by the signing task once `sign_one` returns, which
+    /// releases the permits back to the shared [`Semaphore`] so the *sum* of
+    /// queued preimage bytes stays under the aggregate budget (BAC-539 round-5,
+    /// issue 1). `None` only on the `#[path]`-included test/crash binaries that
+    /// build `SignRequest` directly without an aggregate budget; the lib path
+    /// always carries a permit.
+    pub(crate) _aggregate_permit: Option<OwnedSemaphorePermit>,
 }
 
 /// Inner state shared between the kernel-side handle and the signing
@@ -214,10 +272,26 @@ pub(crate) struct SigningTaskHandle {
     /// Configured channel capacity. Exposed for diagnostics and tests.
     capacity: usize,
 
-    /// Per-request byte budget on the queued canonical-content preimage.
-    /// Defaults to [`DEFAULT_MAX_SIGNING_CONTENT_BYTES`] (the configured
-    /// stream/output max). Always bounded.
+    /// Optional per-request byte cap on a single queued canonical-content
+    /// preimage. `0` ([`PER_REQUEST_BUDGET_UNLIMITED`]) means *no per-request
+    /// cap* (matching the inline signer). A non-zero value fail-closed refuses
+    /// an oversized single preimage. The kernel wires this to `0` so the async
+    /// path admits exactly what the inline path admits; tests configure a small
+    /// non-zero cap to exercise the fail-closed boundary.
     max_content_bytes: usize,
+
+    /// Shared AGGREGATE byte budget across all in-flight queued preimages.
+    /// Producers acquire `preimage_len` permits before enqueueing and release
+    /// them once the request is signed, bounding the *sum* of queued preimage
+    /// bytes (BAC-539 round-5, issue 1). Always bounded; the semaphore size is
+    /// [`Self::aggregate_budget_permits`].
+    aggregate_byte_budget: Arc<Semaphore>,
+
+    /// Permit count the [`Self::aggregate_byte_budget`] semaphore was built
+    /// with. A single request acquires `min(preimage_len, this)` permits, so an
+    /// oversized request still makes progress (acquires the whole budget) once
+    /// the queue drains, without deadlock.
+    aggregate_budget_permits: u32,
 
     /// Serializes lazy spawn against shutdown so a shutdown request cannot
     /// race between the closed-state check and task creation.
@@ -263,26 +337,68 @@ impl SigningTaskHandle {
         )
     }
 
-    /// Build a handle with a caller-chosen channel capacity and a caller-chosen
-    /// per-request byte budget. The kernel wires `KernelConfig::max_stream_total_bytes`
-    /// through here so the async signer's bound tracks the configured stream/output
-    /// max instead of a fixed 1 MiB hard-reject.
+    /// Build a handle with a caller-chosen channel capacity and per-request
+    /// byte cap, deriving the aggregate byte budget from the per-request cap.
     ///
-    /// `max_content_bytes` is clamped to `>= 1` so the budget stays bounded and
-    /// non-zero (a zero budget would reject every receipt, including the
-    /// empty-preimage stream receipt).
+    /// `max_content_bytes` is the OPTIONAL per-request preimage cap: `0` means
+    /// *no per-request cap* (unlimited, matching the inline signer) and is NOT
+    /// turned into `max(1)` (BAC-539 round-5, issue 2: the old `max(1)` turned a
+    /// `max_stream_total_bytes == 0` "unlimited" config into a 1-byte cap that
+    /// rejected almost every receipt). A non-zero value fail-closed refuses a
+    /// single preimage over the cap.
+    ///
+    /// The aggregate byte budget (the real queue-memory bound) is derived from
+    /// the per-request cap: a non-zero cap budgets the aggregate at the cap; an
+    /// unlimited (`0`) cap budgets the aggregate at
+    /// [`DEFAULT_MAX_SIGNING_QUEUED_BYTES`] so queued memory stays BOUNDED even
+    /// when the per-request cap is disabled.
     pub(crate) fn with_capacity_and_max_content_bytes(
         keypair: Keypair,
         capacity: usize,
         max_content_bytes: usize,
     ) -> Self {
+        Self::with_capacity_max_content_and_queued_bytes(
+            keypair,
+            capacity,
+            max_content_bytes,
+            // Derive the aggregate budget from the per-request cap so callers
+            // that only know one budget still get a bounded queue.
+            if max_content_bytes == PER_REQUEST_BUDGET_UNLIMITED {
+                DEFAULT_MAX_SIGNING_QUEUED_BYTES
+            } else {
+                max_content_bytes
+            },
+        )
+    }
+
+    /// Build a handle with an explicit aggregate (queue-wide) byte budget in
+    /// addition to the per-request cap. The aggregate budget bounds the *sum* of
+    /// in-flight queued preimage bytes (BAC-539 round-5, issue 1); producers
+    /// `.await` on it (backpressure) rather than being rejected, so the async
+    /// path admits exactly what the inline signer admits while keeping queue
+    /// memory BOUNDED.
+    ///
+    /// Reached from the lib path via
+    /// [`Self::with_capacity_and_max_content_bytes`] and directly from the
+    /// aggregate-backpressure tests; `#[allow(dead_code)]` keeps it available to
+    /// the `#[path]`-included test binaries that do not exercise it.
+    #[allow(dead_code)]
+    pub(crate) fn with_capacity_max_content_and_queued_bytes(
+        keypair: Keypair,
+        capacity: usize,
+        max_content_bytes: usize,
+        max_queued_bytes: usize,
+    ) -> Self {
         let capacity = capacity.max(1);
-        let max_content_bytes = max_content_bytes.max(1);
+        // Do NOT `max(1)`: 0 is the explicit "no per-request cap" sentinel.
+        let aggregate_budget_permits = clamp_aggregate_permits(max_queued_bytes);
         Self {
             inner: OnceLock::new(),
             keypair,
             capacity,
             max_content_bytes,
+            aggregate_byte_budget: Arc::new(Semaphore::new(aggregate_budget_permits as usize)),
+            aggregate_budget_permits,
             spawn_gate: Mutex::new(()),
             closed: AtomicBool::new(false),
         }
@@ -310,6 +426,49 @@ impl SigningTaskHandle {
              {budget}-byte per-request queue budget (sign oversized \
              receipts inline rather than through the async queue)"
         ))
+    }
+
+    /// Whether `len` exceeds the per-request cap. `0`
+    /// ([`PER_REQUEST_BUDGET_UNLIMITED`]) means no cap, so nothing is ever
+    /// oversized; this is what makes a `max_stream_total_bytes == 0` config (or
+    /// the kernel's default of an unlimited per-request cap) admit large
+    /// receipts on the async path, matching the inline signer (BAC-539 round-5,
+    /// issues 2 and 3).
+    fn exceeds_per_request_cap(&self, len: usize) -> bool {
+        self.max_content_bytes != PER_REQUEST_BUDGET_UNLIMITED && len > self.max_content_bytes
+    }
+
+    /// Number of aggregate-budget permits a preimage of `len` bytes must hold
+    /// while queued. Clamped to the semaphore's total capacity so a single
+    /// oversized preimage acquires the whole budget (and thus still makes
+    /// progress once the queue drains) instead of deadlocking on a request that
+    /// can never be satisfied.
+    fn permits_for(&self, len: usize) -> u32 {
+        let ceiling = self.aggregate_budget_permits as usize;
+        let clamped = if len > ceiling { ceiling } else { len };
+        clamped as u32
+    }
+
+    /// Acquire the aggregate byte-budget permit for a `len`-byte preimage,
+    /// `.await`-ing (backpressure) when the aggregate budget is exhausted. The
+    /// returned [`OwnedSemaphorePermit`] is held for the lifetime of the queued
+    /// request and released by the signing task once `sign_one` returns, so the
+    /// sum of queued preimage bytes stays under the budget. Returns `Err` only
+    /// when the semaphore has been closed (it never is for the lifetime of the
+    /// handle), surfaced fail-closed.
+    async fn acquire_aggregate_permit(
+        &self,
+        len: usize,
+    ) -> Result<OwnedSemaphorePermit, KernelError> {
+        let permits = self.permits_for(len);
+        Arc::clone(&self.aggregate_byte_budget)
+            .acquire_many_owned(permits)
+            .await
+            .map_err(|_| {
+                KernelError::Internal(
+                    "receipt signing aggregate byte budget is no longer available".to_string(),
+                )
+            })
     }
 
     /// Lazily spawn the signing task and return a reference to the
@@ -367,10 +526,12 @@ impl SigningTaskHandle {
         body: ChioReceiptBody,
         canonical_content: Vec<u8>,
     ) -> Result<ChioReceipt, KernelError> {
-        // Byte-bound the queue: refuse an oversized preimage BEFORE enqueueing
-        // so the bounded channel never retains it. Fail-closed (BAC-539: never
-        // truncate, which would break the WYSIWYS recompute).
-        if canonical_content.len() > self.max_content_bytes {
+        // Per-request cap (OPTIONAL): refuse an oversized single preimage BEFORE
+        // enqueueing so the bounded channel never retains it. Fail-closed
+        // (BAC-539: never truncate, which would break the WYSIWYS recompute).
+        // A `0` cap is unlimited (matches the inline signer); the aggregate
+        // budget below still bounds queue memory in that case.
+        if self.exceeds_per_request_cap(canonical_content.len()) {
             return Err(self.oversized_content_error(canonical_content.len()));
         }
         let inner = self.ensure_spawned()?;
@@ -378,11 +539,23 @@ impl SigningTaskHandle {
             KernelError::Internal("receipt signing task already shut down".to_string())
         })?;
 
+        // Aggregate byte budget: acquire `preimage_len` permits, `.await`-ing
+        // (backpressure) when the sum of in-flight queued preimage bytes is
+        // already at the budget. Held until the task finishes signing, which
+        // releases them. This bounds total queued memory regardless of channel
+        // count (BAC-539 round-5, issue 1). Acquired AFTER `ensure_spawned` so
+        // the budget is only consumed once the request is actually about to be
+        // enqueued.
+        let permit = self
+            .acquire_aggregate_permit(canonical_content.len())
+            .await?;
+
         let (reply_tx, reply_rx) = oneshot::channel();
         let request = SignRequest {
             body,
             canonical_content,
             reply: reply_tx,
+            _aggregate_permit: Some(permit),
         };
 
         match sender.try_send(request) {
@@ -428,10 +601,11 @@ impl SigningTaskHandle {
         body: ChioReceiptBody,
         canonical_content: Vec<u8>,
     ) -> TrySignOutcome {
-        // Byte-bound the queue here too: an oversized preimage is returned
-        // unsent (the Err variant means "not enqueued"). It is non-retryable,
-        // but the bounded queue never holds it, which is the property we need.
-        if canonical_content.len() > self.max_content_bytes {
+        // Per-request cap here too: an oversized preimage is returned unsent (the
+        // Err variant means "not enqueued"). It is non-retryable, but the bounded
+        // queue never holds it. A `0` cap is unlimited (matches the inline
+        // signer).
+        if self.exceeds_per_request_cap(canonical_content.len()) {
             return Err((body, canonical_content));
         }
         let inner = match self.ensure_spawned() {
@@ -441,11 +615,21 @@ impl SigningTaskHandle {
         let Some(sender) = inner.sender_clone() else {
             return Err((body, canonical_content));
         };
+        // Aggregate byte budget: non-blocking acquire. When the budget is
+        // exhausted the request is returned unsent (same "not enqueued"
+        // contract as a full channel) rather than `.await`-ing, since this is
+        // the non-blocking entrypoint.
+        let permits = self.permits_for(canonical_content.len());
+        let permit = match Arc::clone(&self.aggregate_byte_budget).try_acquire_many_owned(permits) {
+            Ok(permit) => permit,
+            Err(_) => return Err((body, canonical_content)),
+        };
         let (reply_tx, reply_rx) = oneshot::channel();
         let request = SignRequest {
             body,
             canonical_content,
             reply: reply_tx,
+            _aggregate_permit: Some(permit),
         };
         match sender.try_send(request) {
             Ok(()) => Ok(reply_rx),
@@ -599,8 +783,15 @@ async fn run_signing_task(keypair: Keypair, mut receiver: mpsc::Receiver<SignReq
             body,
             canonical_content,
             reply,
+            _aggregate_permit,
         } = request;
         let result = sign_one(&keypair, body, canonical_content);
+        // Release the aggregate byte-budget permit only AFTER `sign_one` has
+        // consumed `canonical_content` (the preimage is no longer retained), so
+        // the budget reflects bytes actually held in memory (BAC-539 round-5,
+        // issue 1). Dropping the permit returns its bytes to the shared
+        // semaphore, unblocking a producer waiting on backpressure.
+        drop(_aggregate_permit);
         // A dropped receiver is not an error: the producer either timed
         // out or was cancelled. Discard the signed receipt silently
         // rather than poisoning the task; signing is a pure function so

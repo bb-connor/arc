@@ -232,27 +232,32 @@ pub fn sign_receipt_body_hybrid_canonical(
         canonical_json_shared_bytes, sign_shared_canonical_with_backend, PublicKey,
     };
     use chio_core::receipt::{
-        body::chio_receipt_id, signing::bind_receipt_signing_nonce,
-        signing::ChioReceiptSigningBody, signing::ReceiptSigningHandle,
+        body::chio_receipt_id, signing::bind_receipt_signing_nonce, signing::ChioReceiptSigningBody,
     };
 
     // WYSIWYS recompute-and-refuse FIRST, inside the trust boundary, before any
-    // kernel-key check or cryptographic work (BAC-539). The handle recomputes
-    // `sha256_hex(canonical_content)` and we refuse to sign when it disagrees
-    // with the caller-supplied `body.content_hash`. This is the same
-    // recompute-and-refuse gate `chio_kernel_core::sign_receipt` applies, so the
-    // shared-canonical hybrid/PQ path can no longer render content A while
-    // signing a body claiming the hash of content B.
-    let wysiwys_handle = ReceiptSigningHandle::from_content_preimage(canonical_content.to_vec());
-    wysiwys_handle
-        .ensure_body_matches(&body)
-        .map_err(|mismatch| {
-            KernelError::ReceiptSigningFailed(format!(
-                "receipt content_hash mismatch: body claimed {} but signer recomputed {} \
+    // kernel-key check or cryptographic work (BAC-539). We recompute
+    // `sha256_hex(canonical_content)` over the BORROWED preimage and refuse to
+    // sign when it disagrees with the caller-supplied `body.content_hash`. This
+    // is the same recompute-and-refuse gate `chio_kernel_core::sign_receipt`
+    // applies (also from the borrowed slice), so the shared-canonical hybrid/PQ
+    // path can no longer render content A while signing a body claiming the hash
+    // of content B.
+    //
+    // BAC-539 round-5 (issue 4): hash the borrowed slice directly instead of
+    // cloning it into a `ReceiptSigningHandle` via `to_vec()`. The preimage can
+    // be up to the configured stream/output max (256 MiB); a transient clone
+    // here doubled peak memory for no benefit, since the handle's only role on
+    // this path is the recompute-and-compare the borrowed-slice form does
+    // identically.
+    let recomputed = chio_core::crypto::sha256_hex(canonical_content);
+    if recomputed != body.content_hash {
+        return Err(KernelError::ReceiptSigningFailed(format!(
+            "receipt content_hash mismatch: body claimed {} but signer recomputed {} \
              over the canonical content (WYSIWYS refused)",
-                mismatch.claimed, mismatch.recomputed
-            ))
-        })?;
+            body.content_hash, recomputed
+        )));
+    }
 
     // Fail-closed kernel-key match BEFORE any cryptographic work. Mirrors
     // `chio_kernel_core::sign_receipt` so the byte-identity contract holds
@@ -447,4 +452,102 @@ pub fn kernel_signing_backend(
         });
     }
     Ok(Box::new(Ed25519Backend::new(classical_keypair)))
+}
+
+#[cfg(test)]
+mod borrowed_preimage_tests {
+    //! BAC-539 round-5 (issue 4): the hybrid/PQ shared-canonical path recomputes
+    //! `sha256_hex(canonical_content)` from the BORROWED preimage slice (no
+    //! `to_vec()` clone) before any signing work, so render-A / sign-B is still
+    //! refused fail-closed. These run under a classical Ed25519 backend so they
+    //! exercise the borrowed-slice recompute without the `pq` feature (the
+    //! helper accepts any `SigningBackend`).
+    use chio_core::crypto::{Ed25519Backend, Keypair};
+    use chio_core::receipt::body::ChioReceiptBody;
+    use chio_core::receipt::decision::{Decision, ToolCallAction};
+    use chio_core::receipt::kinds::TrustLevel;
+
+    use super::sign_receipt_body_hybrid_canonical;
+    use crate::KernelError;
+
+    const PREIMAGE: &[u8] = br#"{"q":"borrowed-preimage"}"#;
+
+    fn seed() -> [u8; 32] {
+        let raw = b"chio-borrowed-preimage-test-seed";
+        let mut out = [0u8; 32];
+        out.copy_from_slice(raw);
+        out
+    }
+
+    fn body_for(kernel_key: chio_core::crypto::PublicKey, content_hash: String) -> ChioReceiptBody {
+        ChioReceiptBody {
+            id: "rcpt-borrowed-preimage".to_string(),
+            timestamp: 1_700_000_010,
+            capability_id: "cap-borrowed".to_string(),
+            tool_server: "audit-server".to_string(),
+            tool_name: "report".to_string(),
+            action: ToolCallAction::from_parameters(serde_json::json!({"q": "borrowed-preimage"}))
+                .expect("action canonicalises"),
+            decision: Some(Decision::Allow),
+            receipt_kind: Default::default(),
+            boundary_class: Default::default(),
+            observation_outcome: None,
+            tool_origin: Default::default(),
+            redaction_mode: Default::default(),
+            actor_chain: Vec::new(),
+            content_hash,
+            policy_hash: "policy-borrowed".to_string(),
+            evidence: Vec::new(),
+            metadata: None,
+            trust_level: TrustLevel::Mediated,
+            tenant_id: None,
+            kernel_key,
+            bbs_projection_version: None,
+        }
+    }
+
+    #[test]
+    fn borrowed_hash_path_signs_matching_body() {
+        // A body whose claimed `content_hash` matches the borrowed preimage must
+        // sign: the borrowed-slice recompute agrees, so the (previously cloned)
+        // hash check still admits the legitimate receipt.
+        let kp = Keypair::from_seed(&seed());
+        let backend = Ed25519Backend::new(kp.clone());
+        let body = body_for(kp.public_key(), chio_core::crypto::sha256_hex(PREIMAGE));
+
+        let signed = sign_receipt_body_hybrid_canonical(body, &backend, PREIMAGE)
+            .expect("matching body must sign through the borrowed-slice recompute path");
+        assert!(
+            signed
+                .receipt
+                .kernel_key
+                .verify(signed.canonical.as_bytes(), &signed.receipt.signature),
+            "produced signature must verify over the exact signed bytes"
+        );
+    }
+
+    #[test]
+    fn borrowed_hash_path_refuses_render_a_sign_b() {
+        // WYSIWYS (BAC-539): the body binds `content_hash` to PREIMAGE but the
+        // signer is handed a DIFFERENT preimage. The borrowed-slice recompute
+        // must disagree and refuse, proving the clone-free hash check still
+        // recomputes-and-refuses (issue 4 must not weaken the gate).
+        let kp = Keypair::from_seed(&seed());
+        let backend = Ed25519Backend::new(kp.clone());
+        let body = body_for(kp.public_key(), chio_core::crypto::sha256_hex(PREIMAGE));
+        let attacker_preimage = br#"{"q":"a-different-thing"}"#;
+
+        let err = sign_receipt_body_hybrid_canonical(body, &backend, attacker_preimage)
+            .expect_err("render-A / sign-B must fail closed on the borrowed-slice path");
+        match err {
+            KernelError::ReceiptSigningFailed(message) => {
+                assert!(
+                    message.contains("content_hash mismatch")
+                        && message.contains("WYSIWYS refused"),
+                    "expected WYSIWYS content-hash mismatch diagnostic, got {message}"
+                );
+            }
+            other => panic!("expected ReceiptSigningFailed, got {other:?}"),
+        }
+    }
 }
