@@ -24,7 +24,7 @@ use jsonwebtoken::DecodingKey;
 use jsonwebtoken::EncodingKey;
 
 // =============================================================================
-// SECURITY / PLACEHOLDER (BAC-601) — READ BEFORE ANY PRODUCTION DEPLOYMENT
+// SECURITY / PLACEHOLDER (BAC-601) - READ BEFORE ANY PRODUCTION DEPLOYMENT
 // =============================================================================
 //
 // The `PLAY_INTEGRITY_PINNED_X_B64` / `PLAY_INTEGRITY_PINNED_Y_B64` coordinates
