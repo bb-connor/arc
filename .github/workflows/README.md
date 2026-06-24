@@ -23,6 +23,14 @@ variant compiles fine in its own crate but breaks an exhaustive `match` in a
 cross-crate breakage slips through; `cargo build --workspace` compiles every
 member's `src/`, so the downstream non-exhaustive `match` fails the build.
 
+Note this step does not pass `--all-features`, so it only compiles
+default-feature source. Modules behind non-default features are not compiled
+(for example provider-adapter-gated modules in
+`crates/protocol/chio-openai-adapter/src/lib.rs`), so a BAC-539-style break that
+lives behind an optional feature can still slip through this lane. Full
+coverage of feature-gated source would require a separate all-feature build
+lane.
+
 Do not narrow the "Workspace build" step to `-p`/path-scoped invocations, and
 do not delete it in favor of relying on clippy alone (clippy here is scoped to
 `--lib --bins --examples` and likewise does not compile test/bench targets).
@@ -37,7 +45,12 @@ integration-test targets:
 - "Workspace tests" runs `cargo test --workspace --exclude chio-wasm-guards`.
   Across every other workspace member this compiles and runs `#[cfg(test)]`
   unit tests *and* the `tests/` integration targets, extending the
-  build-breakage guarantee above to test code. `chio-wasm-guards` is excluded
+  build-breakage guarantee above to test code. Note this lane does not pass
+  `--all-features`/`--features`, so it only exercises default-feature code:
+  Cargo skips any `[[test]]` target whose `required-features` are not selected
+  (for example `crates/kernel/chio-kernel` gates integration tests behind `pq`
+  and `tokio-console-smoke`), and those feature-gated integration tests are not
+  run by this lane. `chio-wasm-guards` is excluded
   here because its `tests/` integration suite needs a wasm-capable harness and
   cannot run in this plain `cargo test` lane.
 - "Wasm guards library tests" then runs `cargo test -p chio-wasm-guards --lib`.
@@ -49,9 +62,9 @@ integration-test targets:
 So the wasm-guards carveout is deliberate but partial: the crate's library code
 is gated, while its `tests/` integration targets are **not exercised by any PR
 gate**. No workflow currently compiles or runs
-`crates/guards/chio-wasm-guards/tests/*` — the other wasm/conformance workflows
+`crates/guards/chio-wasm-guards/tests/*` (the other wasm/conformance workflows
 build browser SDK artifacts, run conformance peers, or run benches
-(`cargo bench`), none of which invoke these integration targets. Do not assume
+via `cargo bench`, none of which invoke these integration targets). Do not assume
 those tests are covered elsewhere: editing or adding a test under
 `crates/guards/chio-wasm-guards/tests/` will not be exercised by CI until a
 dedicated wasm integration-test lane is added. Until then, do not "fix" the
