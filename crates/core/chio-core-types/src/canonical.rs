@@ -328,14 +328,21 @@ fn canonicalize_f64(v: f64) -> Result<String> {
     Ok(format!("{sign}{mantissa}e{exp_sign}{sci_exp}"))
 }
 
-/// Reject a fractional number token that loses precision when parsed to `f64`.
+/// Reject a fractional number token that is not already in shortest canonical form.
 ///
 /// Integer-valued tokens (no fractional part, or a `.0`/exponent that resolves to
 /// a whole number) are handled by `visit_f64`'s `fract() == 0.0` guard, so this
 /// only inspects tokens whose value has a genuine fractional component. Such a
-/// token is over-precise when it carries more significant digits than the
-/// shortest decimal that round-trips to its `f64` (the form the canonical writer
-/// emits via `ryu`); those surplus digits were silently rounded away on parse.
+/// token is canonical only when its significant digits are *exactly* the
+/// significant digits of the shortest decimal that round-trips to its `f64` (the
+/// form the canonical writer emits via `ryu`). Any other token either carries
+/// surplus digits the parser silently rounded away, or sits at the same digit
+/// count yet a different value than the shortest rendering (for example
+/// `0.12345678901234567`, which parses to the f64 whose shortest form is
+/// `0.12345678901234566`: identical 17-digit count, different digits). Comparing
+/// only the digit *count* would admit the latter and then sign the rounded value
+/// (render-A / sign-B). Comparing the digit *sequence* fails closed: the token is
+/// accepted only when it is already the shortest round-tripping decimal.
 fn reject_if_over_precise_fractional(token: &str) -> Result<()> {
     let value: f64 = token
         .parse()
@@ -349,27 +356,37 @@ fn reject_if_over_precise_fractional(token: &str) -> Result<()> {
 
     let mut buf = ryu::Buffer::new();
     let shortest = buf.format_finite(value.abs());
-    if significant_digit_count(token) > significant_digit_count(shortest) {
+    // The token and the ryu rendering describe the same f64 (the former parsed to
+    // it, the latter rendered from it), so they share magnitude; the only degree
+    // of freedom is the significant-digit sequence. Equal sequences mean the
+    // submitted token is already the shortest round-tripping decimal; any
+    // divergence means precision was lost (or shifted) on parse and the input is
+    // refused fail-closed.
+    if significant_digits(token) != significant_digits(shortest) {
         return Err(Error::CanonicalJson(format!(
-            "number {token} cannot be signed: it carries more precision than an \
-             f64 can hold and would be silently rounded to {shortest}; submit a \
-             value representable exactly as a double"
+            "number {token} cannot be signed: it is not the shortest decimal that \
+             round-trips through an f64 and would be silently rounded to {shortest}; \
+             submit the value in its exact shortest double representation"
         )));
     }
     Ok(())
 }
 
-/// Count the significant decimal digits in a JSON number token.
+/// Extract the significant decimal digits of a JSON number token, in order.
 ///
 /// Only the mantissa (the portion before any `e`/`E`) contributes; leading and
 /// trailing zeros are not significant, so they are stripped. An all-zero or
-/// integer-zero mantissa has zero significant digits. The exponent and sign are
-/// ignored because they shift magnitude without adding precision.
-fn significant_digit_count(token: &str) -> usize {
+/// integer-zero mantissa yields an empty string. The exponent and sign are
+/// ignored because they shift magnitude without adding precision. Comparing the
+/// returned sequences (not merely their lengths) detects tokens whose digit
+/// *count* matches the shortest rendering but whose digit *values* differ.
+fn significant_digits(token: &str) -> String {
     let mantissa = token.split(['e', 'E']).next().unwrap_or(token);
     let digits: String = mantissa.chars().filter(|c| c.is_ascii_digit()).collect();
-    let trimmed = digits.trim_start_matches('0').trim_end_matches('0');
-    trimmed.len()
+    digits
+        .trim_start_matches('0')
+        .trim_end_matches('0')
+        .to_string()
 }
 
 /// Parse a float string (as formatted by ryu) into (significant digits, exponent).
@@ -1199,7 +1216,7 @@ mod tests {
         let err = canonical_json_string_from_str(r#"{"x":0.123456789012345678901}"#).unwrap_err();
         match err {
             Error::CanonicalJson(msg) => assert!(
-                msg.contains("more precision than an f64"),
+                msg.contains("shortest decimal that round-trips"),
                 "unexpected message: {msg}"
             ),
             other => panic!("expected CanonicalJson error, got {other:?}"),
@@ -1224,6 +1241,65 @@ mod tests {
             assert!(
                 canonical_json_string_from_str(input).is_err(),
                 "expected {input} to be rejected as over-precise"
+            );
+        }
+    }
+
+    #[test]
+    fn strict_rejects_same_digit_count_different_value() {
+        // Round-3 Codex P2: the prior check compared only the *count* of
+        // significant digits, so a token whose digit count equals the ryu
+        // shortest rendering but whose digit *value* differs slipped through and
+        // got signed as the rounded form (render-A / sign-B). 0.12345678901234567
+        // parses to the f64 whose shortest decimal is 0.12345678901234566; both
+        // have 17 significant digits. The token is not the shortest round-tripping
+        // decimal, so it must be REJECTED.
+        let err = canonical_json_string_from_str("0.12345678901234567").unwrap_err();
+        match err {
+            Error::CanonicalJson(msg) => assert!(
+                msg.contains("shortest decimal that round-trips"),
+                "unexpected message: {msg}"
+            ),
+            other => panic!("expected CanonicalJson error, got {other:?}"),
+        }
+
+        // The f64's own shortest decimal (...566) IS canonical and is ACCEPTED,
+        // canonicalizing to itself.
+        assert_eq!(
+            canonical_json_string_from_str("0.12345678901234566").unwrap(),
+            "0.12345678901234566"
+        );
+
+        // A couple more cases that the digit-COUNT comparison would have wrongly
+        // accepted. Each token's significant-digit sequence differs from its f64's
+        // shortest rendering, so each must be rejected fail-closed:
+        //   * 0.12345678901234567 -> shortest 0.12345678901234566 (same 17-digit
+        //     count, last digit differs): the canonical render-A/sign-B vector.
+        //   * 0.10000000000000001 -> shortest 0.1 (different count, trailing run
+        //     of zeros the parser folded away).
+        // The first is asserted above; assert the second here as a same-mechanism
+        // (over-precise, diverging digits) companion.
+        for input in ["0.12345678901234567", "0.10000000000000001"] {
+            let err = canonical_json_string_from_str(input).unwrap_err();
+            assert!(
+                matches!(err, Error::CanonicalJson(_)),
+                "expected {input} rejected, got {err:?}"
+            );
+        }
+
+        // Sanity floor: tokens that already equal their shortest form (even though
+        // they look long) stay ACCEPTED, so the fix does not over-reject genuine
+        // canonical doubles.
+        for input in [
+            "0.30000000000000004",
+            "9.999999999999999e-1",
+            "2251799813685247.5",
+        ] {
+            let typed: Value = serde_json::from_str(input).unwrap();
+            assert_eq!(
+                canonical_json_string_from_str(input).unwrap(),
+                canonicalize(&typed).unwrap(),
+                "expected {input} accepted as already-shortest"
             );
         }
     }
