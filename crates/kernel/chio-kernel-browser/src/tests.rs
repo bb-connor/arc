@@ -365,9 +365,60 @@ fn verify_capability_pure_rejects_oversubscribed_delegated_sibling() {
 
 #[test]
 fn sign_receipt_pure_round_trip() {
+    // The PUBLIC signer is fail-closed and requires the canonical content
+    // preimage; supply one whose hash matches `content_hash` so the recompute
+    // gate passes and the receipt round-trips.
     let seed = [1u8; 32];
+    let canonical_content = br#"{"shown":"round-trip"}"#.to_vec();
+    let content_hash = chio_core_types::crypto::sha256_hex(&canonical_content);
     let body = ChioReceiptBody {
         id: "rcpt-1".to_string(),
+        timestamp: ISSUED_AT,
+        capability_id: "cap-1".to_string(),
+        tool_server: "srv-a".to_string(),
+        tool_name: "echo".to_string(),
+        action: ToolCallAction::from_parameters(serde_json::json!({"msg": "hi"})).unwrap(),
+        decision: Some(Decision::Allow),
+        receipt_kind: ReceiptKind::MediatedDecision,
+        boundary_class: BoundaryClass::Prevent,
+        observation_outcome: None,
+        tool_origin: ToolOrigin::CallerExecuted,
+        redaction_mode: RedactionMode::None,
+        actor_chain: std::vec![],
+        content_hash,
+        policy_hash: "0".repeat(64),
+        evidence: std::vec![],
+        metadata: None,
+        trust_level: TrustLevel::Mediated,
+        tenant_id: None,
+        // Placeholder; sign_receipt_pure replaces this with the seed's public key.
+        kernel_key: Keypair::generate().public_key(),
+        bbs_projection_version: None,
+    };
+
+    let receipt = sign_receipt_pure(
+        SignReceiptRequestJson {
+            body,
+            canonical_content: Some(canonical_content),
+        },
+        &seed,
+    )
+    .expect("sign_receipt_pure");
+    assert!(receipt.verify_signature().unwrap());
+
+    let seed_pubkey = Keypair::from_seed(&seed).public_key();
+    assert_eq!(receipt.kernel_key, seed_pubkey);
+}
+
+#[test]
+fn sign_receipt_pure_refuses_without_canonical_content() {
+    // WYSIWYS (BAC-539 round-3): the PUBLIC browser signer must NOT silently
+    // relay a trusted body. With no canonical content preimage it fails closed
+    // so a caller cannot render content A while signing a body claiming hash(B)
+    // and slip past the recompute gate by simply omitting the preimage.
+    let seed = [9u8; 32];
+    let body = ChioReceiptBody {
+        id: "rcpt-no-preimage".to_string(),
         timestamp: ISSUED_AT,
         capability_id: "cap-1".to_string(),
         tool_server: "srv-a".to_string(),
@@ -386,23 +437,59 @@ fn sign_receipt_pure_round_trip() {
         metadata: None,
         trust_level: TrustLevel::Mediated,
         tenant_id: None,
-        // Placeholder; sign_receipt_pure replaces this with the seed's public key.
         kernel_key: Keypair::generate().public_key(),
         bbs_projection_version: None,
     };
 
-    let receipt = sign_receipt_pure(
+    let err = sign_receipt_pure(
         SignReceiptRequestJson {
             body,
             canonical_content: None,
         },
         &seed,
     )
-    .expect("sign_receipt_pure");
-    assert!(receipt.verify_signature().unwrap());
+    .expect_err("public signer must refuse without canonical content");
+    assert_eq!(err.code, "canonical_content_required");
+}
 
-    let seed_pubkey = Keypair::from_seed(&seed).public_key();
-    assert_eq!(receipt.kernel_key, seed_pubkey);
+#[test]
+fn sign_receipt_relaying_trusted_body_pure_relays_without_preimage() {
+    // The explicitly named relay seam (BAC-601) is the ONLY path that forwards a
+    // trusted body without a preimage. It trusts `content_hash` and signs.
+    let seed = [10u8; 32];
+    let body = ChioReceiptBody {
+        id: "rcpt-relay".to_string(),
+        timestamp: ISSUED_AT,
+        capability_id: "cap-1".to_string(),
+        tool_server: "srv-a".to_string(),
+        tool_name: "echo".to_string(),
+        action: ToolCallAction::from_parameters(serde_json::json!({"msg": "hi"})).unwrap(),
+        decision: Some(Decision::Allow),
+        receipt_kind: ReceiptKind::MediatedDecision,
+        boundary_class: BoundaryClass::Prevent,
+        observation_outcome: None,
+        tool_origin: ToolOrigin::CallerExecuted,
+        redaction_mode: RedactionMode::None,
+        actor_chain: std::vec![],
+        content_hash: "0".repeat(64),
+        policy_hash: "0".repeat(64),
+        evidence: std::vec![],
+        metadata: None,
+        trust_level: TrustLevel::Mediated,
+        tenant_id: None,
+        kernel_key: Keypair::generate().public_key(),
+        bbs_projection_version: None,
+    };
+
+    let receipt = sign_receipt_relaying_trusted_body_pure(
+        SignReceiptRequestJson {
+            body,
+            canonical_content: None,
+        },
+        &seed,
+    )
+    .expect("relay seam signs an upstream-trusted body");
+    assert!(receipt.verify_signature().unwrap());
 }
 
 #[test]
@@ -596,7 +683,10 @@ fn make_signed_receipt(seed: [u8; 32]) -> chio_core_types::receipt::body::ChioRe
         kernel_key: Keypair::generate().public_key(),
         bbs_projection_version: None,
     };
-    sign_receipt_pure(
+    // Verify-receipt tests only need a validly signed envelope, not a WYSIWYS
+    // proof, so route through the relay seam which accepts a body without a
+    // canonical content preimage.
+    sign_receipt_relaying_trusted_body_pure(
         SignReceiptRequestJson {
             body,
             canonical_content: None,
