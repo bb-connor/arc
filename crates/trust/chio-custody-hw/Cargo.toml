@@ -80,7 +80,10 @@ rusqlite = { workspace = true }
 # library, so the development-fixture helpers would otherwise be compiled
 # out; this self dev-dependency turns them on under `cargo test` only,
 # without making `dev-fixtures` a default feature of the shipped crate.
-chio-custody-hw = { path = ".", features = ["dev-fixtures"] }
+# `default-features = false` so a `--no-default-features` (mobile/staticlib)
+# test profile is not silently re-enabled with `default = ["passkey"]` (and the
+# OpenSSL-backed webauthn-rs graph) via feature unification on this self edge.
+chio-custody-hw = { path = ".", default-features = false, features = ["dev-fixtures"] }
 
 [lints]
 workspace = true
