@@ -150,6 +150,14 @@ pub fn canonical_json_string<T: Serialize>(value: &T) -> Result<String> {
 ///   without serde_json's std-only `raw_value` feature, both are refused so the
 ///   signed bytes always reflect the value actually submitted. Integers must be
 ///   sent as integer tokens (`100`, not `100.0`).
+/// - **Over-precise fractional numbers are rejected.** A decimal literal that
+///   carries more significant digits than an `f64` can hold (for example
+///   `0.123456789012345678901`) is silently rounded by serde_json onto the
+///   nearest double, which canonicalizes to the same bytes as a different,
+///   shorter literal (`0.12345678901234568`). Signing the rounded value would
+///   resurrect the render-A / sign-B class this API exists to prevent, so any
+///   fractional token whose value does not round-trip exactly through the
+///   strict path is refused. See [`StrictJson::reject_over_precise_numbers`].
 ///
 /// Well-formed I-JSON input canonicalizes byte-identically to the typed path,
 /// with the sole exception of integer-valued float tokens, which the typed path
@@ -163,6 +171,10 @@ pub fn canonical_json_bytes_from_str(input: &str) -> Result<Vec<u8>> {
 /// See [`canonical_json_bytes_from_str`] for the validation contract.
 pub fn canonical_json_string_from_str(input: &str) -> Result<String> {
     let value = StrictJson::from_str(input)?;
+    // `StrictJson::from_str` has already proven `input` is well-formed I-JSON, so
+    // the source text can be scanned for over-precise fractional literals (whose
+    // discarded digits are invisible once parsed to `f64`) before signing.
+    StrictJson::reject_over_precise_numbers(input)?;
     let mut out = String::new();
     value.write_canonical(&mut out)?;
     Ok(out)
@@ -314,6 +326,50 @@ fn canonicalize_f64(v: f64) -> Result<String> {
     };
     let exp_sign = if sci_exp >= 0 { "+" } else { "" };
     Ok(format!("{sign}{mantissa}e{exp_sign}{sci_exp}"))
+}
+
+/// Reject a fractional number token that loses precision when parsed to `f64`.
+///
+/// Integer-valued tokens (no fractional part, or a `.0`/exponent that resolves to
+/// a whole number) are handled by `visit_f64`'s `fract() == 0.0` guard, so this
+/// only inspects tokens whose value has a genuine fractional component. Such a
+/// token is over-precise when it carries more significant digits than the
+/// shortest decimal that round-trips to its `f64` (the form the canonical writer
+/// emits via `ryu`); those surplus digits were silently rounded away on parse.
+fn reject_if_over_precise_fractional(token: &str) -> Result<()> {
+    let value: f64 = token
+        .parse()
+        .map_err(|_| Error::CanonicalJson(format!("invalid number token: {token}")))?;
+    // Integer-valued doubles never reach the canonical float path (visit_f64
+    // already refuses them); skip them here so this check is solely about
+    // fractional precision.
+    if !value.is_finite() || value.fract() == 0.0 {
+        return Ok(());
+    }
+
+    let mut buf = ryu::Buffer::new();
+    let shortest = buf.format_finite(value.abs());
+    if significant_digit_count(token) > significant_digit_count(shortest) {
+        return Err(Error::CanonicalJson(format!(
+            "number {token} cannot be signed: it carries more precision than an \
+             f64 can hold and would be silently rounded to {shortest}; submit a \
+             value representable exactly as a double"
+        )));
+    }
+    Ok(())
+}
+
+/// Count the significant decimal digits in a JSON number token.
+///
+/// Only the mantissa (the portion before any `e`/`E`) contributes; leading and
+/// trailing zeros are not significant, so they are stripped. An all-zero or
+/// integer-zero mantissa has zero significant digits. The exponent and sign are
+/// ignored because they shift magnitude without adding precision.
+fn significant_digit_count(token: &str) -> usize {
+    let mantissa = token.split(['e', 'E']).next().unwrap_or(token);
+    let digits: String = mantissa.chars().filter(|c| c.is_ascii_digit()).collect();
+    let trimmed = digits.trim_start_matches('0').trim_end_matches('0');
+    trimmed.len()
 }
 
 /// Parse a float string (as formatted by ryu) into (significant digits, exponent).
@@ -484,6 +540,75 @@ impl StrictJson {
         de.end()
             .map_err(|err| Error::CanonicalJson(format!("trailing JSON data: {err}")))?;
         Ok(value)
+    }
+
+    /// Reject fractional number literals carrying more precision than an `f64`.
+    ///
+    /// `visit_f64` only ever sees the already-parsed double, so an over-precise
+    /// fractional lexeme (for example `0.123456789012345678901`) is
+    /// indistinguishable there from the shorter literal it rounds to
+    /// (`0.12345678901234568`): both arrive as the same non-integer `f64` and
+    /// canonicalize to identical bytes. Signing the rounded value would reopen
+    /// the render-A / sign-B class this API exists to close, and serde_json
+    /// exposes no raw lexeme without its std-only `raw_value` feature (which this
+    /// `no_std + alloc` crate cannot enable).
+    ///
+    /// This scans the already-validated source text directly. For every fractional
+    /// number token it parses the value to `f64`, renders that double back to its
+    /// shortest decimal (the form the canonical writer emits via `ryu`), and
+    /// rejects the token when it carries more significant digits than the shortest
+    /// form. Because `ryu` produces the shortest decimal that round-trips to the
+    /// double, any token with extra significant digits necessarily lost precision
+    /// during parsing; a token with the same count round-trips exactly. This is
+    /// the conservative closure: it admits only fractional literals that survive
+    /// the strict path unchanged. The caller invokes it after [`Self::from_str`]
+    /// succeeds, so the input here is guaranteed to be well-formed JSON.
+    fn reject_over_precise_numbers(input: &str) -> Result<()> {
+        let bytes = input.as_bytes();
+        let len = bytes.len();
+        let mut idx = 0;
+        while idx < len {
+            let ch = bytes[idx];
+            if ch == b'"' {
+                // Skip a string literal so digits inside it are never treated as
+                // a number token. Backslash escapes the following byte (including
+                // an escaped quote), so step over the pair.
+                idx += 1;
+                while idx < len {
+                    match bytes[idx] {
+                        b'\\' => idx += 2,
+                        b'"' => {
+                            idx += 1;
+                            break;
+                        }
+                        _ => idx += 1,
+                    }
+                }
+                continue;
+            }
+
+            let starts_number = ch.is_ascii_digit()
+                || (ch == b'-' && idx + 1 < len && bytes[idx + 1].is_ascii_digit());
+            if !starts_number {
+                idx += 1;
+                continue;
+            }
+
+            let start = idx;
+            if ch == b'-' {
+                idx += 1;
+            }
+            while idx < len {
+                match bytes[idx] {
+                    b'0'..=b'9' | b'.' | b'e' | b'E' | b'+' | b'-' => idx += 1,
+                    _ => break,
+                }
+            }
+            // `start..idx` is ASCII, so slicing the original `&str` is valid UTF-8.
+            let token = &input[start..idx];
+            reject_if_over_precise_fractional(token)?;
+        }
+        Ok(())
     }
 
     fn write_canonical(&self, out: &mut String) -> Result<()> {
@@ -1062,6 +1187,60 @@ mod tests {
                 "expected {input} to be rejected, got {err:?}"
             );
         }
+    }
+
+    #[test]
+    fn strict_rejects_over_precise_fractional() {
+        // 0.123456789012345678901 carries more significant digits than an f64 can
+        // hold; serde_json silently rounds it onto the same double as the shorter
+        // 0.12345678901234568, so both would canonicalize to identical bytes. The
+        // strict path must reject the over-precise lexeme so signing reflects only
+        // values that survive the round trip exactly (render-A / sign-B closure).
+        let err = canonical_json_string_from_str(r#"{"x":0.123456789012345678901}"#).unwrap_err();
+        match err {
+            Error::CanonicalJson(msg) => assert!(
+                msg.contains("more precision than an f64"),
+                "unexpected message: {msg}"
+            ),
+            other => panic!("expected CanonicalJson error, got {other:?}"),
+        }
+
+        // The collapse target itself (the f64's own shortest decimal) is exactly
+        // representable and is still accepted, canonicalizing to the same value.
+        assert_eq!(
+            canonical_json_string_from_str(r#"{"x":0.12345678901234568}"#).unwrap(),
+            r#"{"x":0.12345678901234568}"#
+        );
+
+        // A bare over-precise token (not wrapped in an object) is rejected too,
+        // including pi written past double precision and an over-precise value in
+        // exponential form. Each stays fractional after parsing, so it exercises
+        // the over-precision scan rather than the integer-valued-f64 guard.
+        for input in [
+            "0.123456789012345678901",
+            "3.141592653589793238462643383279",
+            "1.234567890123456789e-3",
+        ] {
+            assert!(
+                canonical_json_string_from_str(input).is_err(),
+                "expected {input} to be rejected as over-precise"
+            );
+        }
+    }
+
+    #[test]
+    fn strict_accepts_exactly_representable_fractional() {
+        // A normal fractional whose decimal literal is already the shortest form
+        // that round-trips through an f64 loses no precision and must be accepted,
+        // matching the typed path byte-for-byte. Numbers inside string values must
+        // not be mistaken for over-precise number tokens by the source scan.
+        let input = r#"{"ratio":3.14159,"note":"pi is 3.14159265358979311599796346854"}"#;
+        let typed: Value = serde_json::from_str(input).unwrap();
+        let typed_canonical = canonicalize(&typed).unwrap();
+        assert_eq!(
+            canonical_json_string_from_str(input).unwrap(),
+            typed_canonical
+        );
     }
 
     #[test]
