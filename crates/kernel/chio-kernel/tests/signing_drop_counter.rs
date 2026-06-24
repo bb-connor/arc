@@ -15,7 +15,9 @@ use chio_core::receipt::{
     body::chio_receipt_id, body::ChioReceipt, body::ChioReceiptBody, decision::Decision,
     decision::ToolCallAction, kinds::TrustLevel, signing::CHIO_RECEIPT_SIGNING_NONCE_METADATA_KEY,
 };
-use chio_kernel::KernelError;
+// `DEFAULT_MAX_STREAM_TOTAL_BYTES` is consumed by the `#[path]`-included
+// `signing_task.rs` via `crate::DEFAULT_MAX_STREAM_TOTAL_BYTES`.
+use chio_kernel::{KernelError, DEFAULT_MAX_STREAM_TOTAL_BYTES};
 use serde_json::json;
 
 #[allow(dead_code)]

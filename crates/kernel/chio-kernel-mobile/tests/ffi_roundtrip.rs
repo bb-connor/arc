@@ -336,6 +336,26 @@ fn sign_receipt_roundtrip_and_verifies() {
 }
 
 #[test]
+fn sign_receipt_accepts_empty_preimage_stream_receipt() {
+    // BAC-539: a zero-chunk stream receipt has an empty-byte canonical preimage,
+    // which encodes to the empty hex string. The public mobile signer must NOT
+    // reject the empty preimage: `body.content_hash` is sha256 of those empty
+    // bytes, so the WYSIWYS recompute gate passes and the receipt signs.
+    let keypair = Keypair::generate();
+    let canonical_content: Vec<u8> = Vec::new();
+    let content_hash = chio_core_types::crypto::sha256_hex(&canonical_content);
+    let body = make_receipt_body_with_content_hash(&keypair, content_hash);
+    let body_json = serde_json::to_string(&body).unwrap();
+
+    // Empty preimage -> empty canonical-content hex string.
+    let signed_json = sign_receipt(body_json, String::new(), keypair.seed_hex())
+        .expect("empty-preimage stream receipt must sign");
+    let receipt: ChioReceipt = serde_json::from_str(&signed_json).expect("parse signed receipt");
+    assert!(receipt.verify_signature().unwrap());
+    assert_eq!(receipt.kernel_key, keypair.public_key());
+}
+
+#[test]
 fn sign_receipt_refuses_render_a_sign_b() {
     // WYSIWYS render-A/sign-B regression (BAC-539 / C1): the body claims
     // hash(B) while the canonical content handed to the public signer is A.

@@ -230,6 +230,22 @@ fn decode_hex_argument(label: &str, value: &str) -> Result<Vec<u8>, ChioMobileEr
     })
 }
 
+/// Decode the canonical-content preimage for WYSIWYS signing.
+///
+/// Unlike [`decode_hex_argument`], an empty hex string (or a bare `0x`) decodes
+/// to an empty `Vec<u8>` rather than being rejected. A zero-chunk stream receipt
+/// has an empty-byte canonical preimage, which encodes to the empty hex string;
+/// rejecting it would make valid empty-stream receipts fail closed at the mobile
+/// signer even though their `content_hash` is the sha256 of the empty preimage.
+/// All non-empty values still go through the strict hex decode.
+fn decode_canonical_content_hex(value: &str) -> Result<Vec<u8>, ChioMobileError> {
+    let trimmed = value.strip_prefix("0x").unwrap_or(value);
+    if trimmed.is_empty() {
+        return Ok(Vec::new());
+    }
+    decode_hex_argument("canonical content", value)
+}
+
 fn map_attestation_error(error: AttestationError) -> ChioMobileError {
     ChioMobileError::AttestationRejected {
         message: format!("{}: {error}", error.urn()),
@@ -465,7 +481,7 @@ pub fn sign_receipt(
             message: format!("receipt body: {error}"),
         })?;
 
-    let canonical_content = decode_hex_argument("canonical content", &canonical_content_hex)?;
+    let canonical_content = decode_canonical_content_hex(&canonical_content_hex)?;
     let backend = backend_from_seed_hex(&signing_seed_hex)?;
 
     let receipt =

@@ -27,7 +27,15 @@ use chio_kernel_core::{
 };
 use serde::{Deserialize, Serialize};
 
-pub const CHIO_CPP_KERNEL_FFI_ABI_VERSION: u32 = 1;
+/// C ABI version of this kernel FFI surface.
+///
+/// Bumped 1 -> 2 in BAC-539: `chio_kernel_sign_receipt_json` gained a third
+/// pointer argument (`canonical_content_hex`, the WYSIWYS preimage). The symbol
+/// name is unchanged, so an old 2-arg client linked against v1 would call the
+/// 3-arg symbol with a missing third pointer (undefined behavior). Clients that
+/// gate on `chio_kernel_ffi_abi_version()` now fail closed against this v2
+/// surface instead of invoking the signer with a dangling argument.
+pub const CHIO_CPP_KERNEL_FFI_ABI_VERSION: u32 = 2;
 
 pub const CHIO_KERNEL_FFI_STATUS_OK: i32 = 0;
 pub const CHIO_KERNEL_FFI_STATUS_ERROR: i32 = 1;

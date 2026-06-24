@@ -18,7 +18,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#define CHIO_CPP_KERNEL_FFI_ABI_VERSION 1
+#define CHIO_CPP_KERNEL_FFI_ABI_VERSION 2
 
 #define CHIO_KERNEL_FFI_STATUS_OK 0
 

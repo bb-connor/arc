@@ -51,7 +51,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tracing::{debug, warn};
 
-use crate::{ChioReceipt, ChioReceiptBody, KernelError, Keypair};
+use crate::{ChioReceipt, ChioReceiptBody, KernelError, Keypair, DEFAULT_MAX_STREAM_TOTAL_BYTES};
 
 /// Default bounded capacity for the signing-task mpsc channel.
 ///
@@ -62,23 +62,50 @@ use crate::{ChioReceipt, ChioReceiptBody, KernelError, Keypair};
 /// can override via [`SigningTaskHandle::with_capacity`].
 pub const DEFAULT_SIGNING_CHANNEL_CAPACITY: usize = 256;
 
-/// Per-request byte cap on the queued canonical-content preimage.
+/// Default per-request byte budget on the queued canonical-content preimage.
 ///
 /// Each queued [`SignRequest`] owns the full `canonical_content` preimage. With
 /// a bounded channel of [`DEFAULT_SIGNING_CHANNEL_CAPACITY`] requests, the queue
 /// is bounded by *count* but not by *bytes*: under signer stall / backpressure a
 /// burst of large value or stream receipts could retain hundreds of full output
-/// preimages in memory at once. This cap bounds the bytes any single request may
-/// enqueue so the worst-case retained memory is `capacity * MAX_SIGNING_CONTENT_BYTES`
-/// rather than unbounded. Oversized requests are rejected fail-closed
-/// ([`KernelError::ReceiptSigningFailed`]) rather than silently truncated, since
-/// truncating the preimage would break the WYSIWYS recompute (BAC-539).
+/// preimages in memory at once. The per-handle budget
+/// ([`SigningTaskHandle::max_content_bytes`]) bounds the bytes any single
+/// request may enqueue so the worst-case retained memory is
+/// `capacity * max_content_bytes` rather than unbounded. Oversized requests are
+/// rejected fail-closed ([`KernelError::ReceiptSigningFailed`]) rather than
+/// silently truncated, since truncating the preimage would break the WYSIWYS
+/// recompute (BAC-539).
 ///
-/// 1 MiB comfortably covers normal value/stream receipt content (the queue was
-/// originally sized for sub-1 KiB requests) while still capping pathological
-/// payloads. Operators with legitimately larger receipts should sign those
-/// inline rather than funnelling them through the async queue.
-pub const MAX_SIGNING_CONTENT_BYTES: usize = 1024 * 1024;
+/// The default budget is aligned to the kernel's configured stream/output max
+/// ([`crate::DEFAULT_MAX_STREAM_TOTAL_BYTES`], 256 MiB). The async signing task
+/// is the documented off-critical-path signer, so a fixed 1 MiB hard-reject
+/// would refuse legitimate large async receipts that the configured stream max
+/// otherwise permits. The budget is always BOUNDED (never unbounded); operators
+/// override it per kernel via [`SigningTaskHandle::with_capacity_and_max_content_bytes`]
+/// (the kernel wires `KernelConfig::max_stream_total_bytes` through on
+/// construction).
+///
+/// Referenced inside the crate only via [`SigningTaskHandle::with_capacity`]
+/// (itself reached only from the `#[path]`-included signing-task test modules),
+/// so the lib build sees it as dead; the `#[allow(dead_code)]` keeps the symbol
+/// available to those test binaries without a clippy warning.
+#[allow(dead_code)]
+pub const DEFAULT_MAX_SIGNING_CONTENT_BYTES: usize =
+    clamp_u64_to_usize(DEFAULT_MAX_STREAM_TOTAL_BYTES);
+
+/// Saturating `u64 -> usize` conversion, usable in a `const` context.
+///
+/// On a 32-bit target a 256 MiB `u64` budget still fits in `usize`, but the
+/// generic conversion saturates at `usize::MAX` so an operator-configured budget
+/// larger than the address space clamps to a representable, still-bounded value.
+#[allow(dead_code)]
+const fn clamp_u64_to_usize(value: u64) -> usize {
+    if value > usize::MAX as u64 {
+        usize::MAX
+    } else {
+        value as usize
+    }
+}
 #[cfg_attr(test, allow(unused_imports))]
 pub use chio_metrics_spec::CHIO_SIGNING_QUEUE_BLOCK_TOTAL as METRIC_CHIO_SIGNING_QUEUE_BLOCK_TOTAL;
 static SIGNING_QUEUE_BLOCK_TOTAL: AtomicU64 = AtomicU64::new(0);
@@ -187,6 +214,11 @@ pub(crate) struct SigningTaskHandle {
     /// Configured channel capacity. Exposed for diagnostics and tests.
     capacity: usize,
 
+    /// Per-request byte budget on the queued canonical-content preimage.
+    /// Defaults to [`DEFAULT_MAX_SIGNING_CONTENT_BYTES`] (the configured
+    /// stream/output max). Always bounded.
+    max_content_bytes: usize,
+
     /// Serializes lazy spawn against shutdown so a shutdown request cannot
     /// race between the closed-state check and task creation.
     spawn_gate: Mutex<()>,
@@ -199,23 +231,58 @@ impl SigningTaskHandle {
     /// Build a handle that will spawn the signing task lazily on first
     /// [`Self::sign`] call, with the default channel capacity
     /// ([`DEFAULT_SIGNING_CHANNEL_CAPACITY`]).
+    ///
+    /// The kernel itself now constructs via
+    /// [`Self::with_capacity_and_max_content_bytes`] to wire the configured
+    /// stream/output max through, so this convenience constructor is reached
+    /// only from the `#[path]`-included signing-task test modules; the
+    /// `#[allow(dead_code)]` keeps it available to those binaries.
+    #[allow(dead_code)]
     pub(crate) fn spawn(keypair: Keypair) -> Self {
         Self::with_capacity(keypair, DEFAULT_SIGNING_CHANNEL_CAPACITY)
     }
 
-    /// Build a handle with a caller-chosen channel capacity. The task
+    /// Build a handle with a caller-chosen channel capacity and the default
+    /// per-request byte budget ([`DEFAULT_MAX_SIGNING_CONTENT_BYTES`]). The task
     /// is spawned lazily on first [`Self::sign`] call.
     ///
     /// `capacity` must be `>= 1`; a zero capacity collapses to 1 to
     /// preserve the `send().await` semantics callers rely on (a
     /// rendezvous channel still surfaces backpressure but blocks on
     /// every send, which the default bounded capacity avoids).
+    ///
+    /// Reached only from the `#[path]`-included signing-task test modules now
+    /// that the kernel passes an explicit byte budget; `#[allow(dead_code)]`
+    /// keeps it available to those binaries.
+    #[allow(dead_code)]
     pub(crate) fn with_capacity(keypair: Keypair, capacity: usize) -> Self {
+        Self::with_capacity_and_max_content_bytes(
+            keypair,
+            capacity,
+            DEFAULT_MAX_SIGNING_CONTENT_BYTES,
+        )
+    }
+
+    /// Build a handle with a caller-chosen channel capacity and a caller-chosen
+    /// per-request byte budget. The kernel wires `KernelConfig::max_stream_total_bytes`
+    /// through here so the async signer's bound tracks the configured stream/output
+    /// max instead of a fixed 1 MiB hard-reject.
+    ///
+    /// `max_content_bytes` is clamped to `>= 1` so the budget stays bounded and
+    /// non-zero (a zero budget would reject every receipt, including the
+    /// empty-preimage stream receipt).
+    pub(crate) fn with_capacity_and_max_content_bytes(
+        keypair: Keypair,
+        capacity: usize,
+        max_content_bytes: usize,
+    ) -> Self {
         let capacity = capacity.max(1);
+        let max_content_bytes = max_content_bytes.max(1);
         Self {
             inner: OnceLock::new(),
             keypair,
             capacity,
+            max_content_bytes,
             spawn_gate: Mutex::new(()),
             closed: AtomicBool::new(false),
         }
@@ -233,12 +300,14 @@ impl SigningTaskHandle {
     }
 
     /// Fail-closed error for a request whose canonical-content preimage exceeds
-    /// [`MAX_SIGNING_CONTENT_BYTES`]. Refused before the request is enqueued so
-    /// the bounded queue cannot retain an oversized buffer.
-    fn oversized_content_error(len: usize) -> KernelError {
+    /// the per-handle budget ([`Self::max_content_bytes`]). Refused before the
+    /// request is enqueued so the bounded queue cannot retain an oversized
+    /// buffer.
+    fn oversized_content_error(&self, len: usize) -> KernelError {
+        let budget = self.max_content_bytes;
         KernelError::ReceiptSigningFailed(format!(
             "receipt signing refused: canonical content is {len} bytes, over the \
-             {MAX_SIGNING_CONTENT_BYTES}-byte per-request queue cap (sign oversized \
+             {budget}-byte per-request queue budget (sign oversized \
              receipts inline rather than through the async queue)"
         ))
     }
@@ -301,8 +370,8 @@ impl SigningTaskHandle {
         // Byte-bound the queue: refuse an oversized preimage BEFORE enqueueing
         // so the bounded channel never retains it. Fail-closed (BAC-539: never
         // truncate, which would break the WYSIWYS recompute).
-        if canonical_content.len() > MAX_SIGNING_CONTENT_BYTES {
-            return Err(Self::oversized_content_error(canonical_content.len()));
+        if canonical_content.len() > self.max_content_bytes {
+            return Err(self.oversized_content_error(canonical_content.len()));
         }
         let inner = self.ensure_spawned()?;
         let sender = inner.sender_clone().ok_or_else(|| {
@@ -362,7 +431,7 @@ impl SigningTaskHandle {
         // Byte-bound the queue here too: an oversized preimage is returned
         // unsent (the Err variant means "not enqueued"). It is non-retryable,
         // but the bounded queue never holds it, which is the property we need.
-        if canonical_content.len() > MAX_SIGNING_CONTENT_BYTES {
+        if canonical_content.len() > self.max_content_bytes {
             return Err((body, canonical_content));
         }
         let inner = match self.ensure_spawned() {

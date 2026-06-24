@@ -18,14 +18,21 @@ use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     kinds::TrustLevel,
 };
-use chio_kernel::KernelError;
+// `signing_task.rs` is included below via `#[path]`; its `use crate::{...}`
+// resolves against this test binary's crate root, so re-export the symbols it
+// needs (including `DEFAULT_MAX_STREAM_TOTAL_BYTES`) here.
+use chio_kernel::{KernelError, DEFAULT_MAX_STREAM_TOTAL_BYTES};
 use serde_json::json;
 
 #[allow(dead_code)]
 #[path = "../src/kernel/signing_task.rs"]
 mod signing_task;
 
-use signing_task::{SigningTaskHandle, MAX_SIGNING_CONTENT_BYTES};
+use signing_task::{SigningTaskHandle, DEFAULT_MAX_SIGNING_CONTENT_BYTES};
+
+/// Small explicit byte budget for the cap-enforcement tests so they exercise the
+/// fail-closed boundary without allocating the 256 MiB default budget.
+const TEST_BUDGET: usize = 4 * 1024;
 
 const KERNEL_SEED: [u8; 32] = [
     0x77, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
@@ -62,19 +69,29 @@ fn body_for_content(kernel_key: &Keypair, canonical_content: &[u8]) -> ChioRecei
     }
 }
 
-#[tokio::test(flavor = "current_thread")]
-async fn sign_accepts_content_at_the_byte_cap() {
-    let keypair = Keypair::from_seed(&KERNEL_SEED);
-    let handle = SigningTaskHandle::spawn(keypair.clone());
+/// Build a handle whose per-request byte budget is the small [`TEST_BUDGET`] so
+/// the cap-enforcement tests stay cheap.
+fn small_budget_handle(keypair: &Keypair) -> SigningTaskHandle {
+    SigningTaskHandle::with_capacity_and_max_content_bytes(
+        keypair.clone(),
+        /* capacity */ 256,
+        TEST_BUDGET,
+    )
+}
 
-    // Exactly at the cap must be accepted.
-    let content = vec![0xABu8; MAX_SIGNING_CONTENT_BYTES];
+#[tokio::test(flavor = "current_thread")]
+async fn sign_accepts_content_at_the_byte_budget() {
+    let keypair = Keypair::from_seed(&KERNEL_SEED);
+    let handle = small_budget_handle(&keypair);
+
+    // Exactly at the budget must be accepted.
+    let content = vec![0xABu8; TEST_BUDGET];
     let body = body_for_content(&keypair, &content);
 
     let receipt = handle
         .sign(body, content)
         .await
-        .expect("content at the cap should sign");
+        .expect("content at the budget should sign");
     assert!(receipt.verify_signature().expect("signature verifies"));
 
     handle.shutdown().await;
@@ -83,10 +100,10 @@ async fn sign_accepts_content_at_the_byte_cap() {
 #[tokio::test(flavor = "current_thread")]
 async fn sign_refuses_oversized_content_fail_closed() {
     let keypair = Keypair::from_seed(&KERNEL_SEED);
-    let handle = SigningTaskHandle::spawn(keypair.clone());
+    let handle = small_budget_handle(&keypair);
 
-    // One byte over the cap must be refused before it is ever enqueued.
-    let content = vec![0xABu8; MAX_SIGNING_CONTENT_BYTES + 1];
+    // One byte over the budget must be refused before it is ever enqueued.
+    let content = vec![0xABu8; TEST_BUDGET + 1];
     let body = body_for_content(&keypair, &content);
 
     let err = handle
@@ -97,7 +114,7 @@ async fn sign_refuses_oversized_content_fail_closed() {
         KernelError::ReceiptSigningFailed(message) => {
             assert!(
                 message.contains("over the"),
-                "error should explain the queue byte cap: {message}"
+                "error should explain the queue byte budget: {message}"
             );
         }
         other => panic!("expected ReceiptSigningFailed, got {other:?}"),
@@ -118,9 +135,9 @@ async fn sign_refuses_oversized_content_fail_closed() {
 #[tokio::test(flavor = "current_thread")]
 async fn try_sign_returns_oversized_content_unsent() {
     let keypair = Keypair::from_seed(&KERNEL_SEED);
-    let handle = SigningTaskHandle::spawn(keypair.clone());
+    let handle = small_budget_handle(&keypair);
 
-    let content = vec![0xABu8; MAX_SIGNING_CONTENT_BYTES + 1];
+    let content = vec![0xABu8; TEST_BUDGET + 1];
     let body = body_for_content(&keypair, &content);
 
     let outcome = handle.try_sign(body, content.clone());
@@ -134,6 +151,39 @@ async fn try_sign_returns_oversized_content_unsent() {
         }
         Ok(_) => panic!("oversized content must not be enqueued"),
     }
+
+    handle.shutdown().await;
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn default_budget_admits_large_async_receipts_above_one_mib() {
+    // BAC-539 round-4: the default per-request budget is aligned to the kernel's
+    // configured stream/output max (256 MiB), not a fixed 1 MiB hard-reject. A
+    // legitimate large async receipt above 1 MiB must sign through the async
+    // queue, since it is the documented off-critical-path signer. The budget is
+    // still BOUNDED: it equals the configured stream max.
+    assert_eq!(
+        DEFAULT_MAX_SIGNING_CONTENT_BYTES,
+        usize::try_from(DEFAULT_MAX_STREAM_TOTAL_BYTES).unwrap(),
+        "default signing budget must track the configured stream/output max"
+    );
+    assert!(
+        DEFAULT_MAX_SIGNING_CONTENT_BYTES > 1024 * 1024,
+        "default budget must exceed the old 1 MiB hard-reject"
+    );
+
+    let keypair = Keypair::from_seed(&KERNEL_SEED);
+    let handle = SigningTaskHandle::spawn(keypair.clone());
+
+    // 2 MiB: comfortably over the retired 1 MiB cap, well under the default budget.
+    let content = vec![0xCDu8; 2 * 1024 * 1024];
+    let body = body_for_content(&keypair, &content);
+
+    let receipt = handle
+        .sign(body, content)
+        .await
+        .expect("a 2 MiB async receipt must sign under the configured-stream-max budget");
+    assert!(receipt.verify_signature().expect("signature verifies"));
 
     handle.shutdown().await;
 }

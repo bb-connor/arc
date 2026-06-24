@@ -517,3 +517,20 @@ fn ffi_sign_receipt_relay_signs_without_preimage() {
     assert!(receipt.verify_signature().unwrap());
     assert_eq!(receipt.kernel_key, keypair.public_key());
 }
+
+#[test]
+fn ffi_abi_version_is_two_so_two_arg_clients_fail_closed() {
+    // BAC-539: `chio_kernel_sign_receipt_json` gained a third pointer arg
+    // (`canonical_content_hex`). The ABI version MUST advance from 1 to 2 so an
+    // old 2-arg client that gates on `chio_kernel_ffi_abi_version()` refuses to
+    // link instead of calling the 3-arg symbol with a missing third pointer.
+    assert_eq!(CHIO_CPP_KERNEL_FFI_ABI_VERSION, 2);
+    assert_eq!(chio_kernel_ffi_abi_version(), 2);
+
+    let result = chio_kernel_build_info();
+    assert_eq!(result.status, CHIO_KERNEL_FFI_STATUS_OK);
+    let info = take_result_string(&result);
+    chio_kernel_buffer_free(result.data);
+    let value: serde_json::Value = serde_json::from_str(&info).unwrap();
+    assert_eq!(value["abi_version"], 2);
+}

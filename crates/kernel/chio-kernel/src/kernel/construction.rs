@@ -141,8 +141,21 @@ impl ChioKernel {
         // so `ChioKernel::new` remains constructible from sync contexts; by the
         // time any caller reaches `sign`, a tokio runtime is necessarily active.
         let signing_keypair = config.keypair.clone();
-        let signing_task =
-            std::sync::Arc::new(signing_task::SigningTaskHandle::spawn(signing_keypair));
+        // Align the async signer's per-request byte budget to this kernel's
+        // configured stream/output max (BAC-539). The async path is the
+        // documented off-critical-path signer, so a fixed 1 MiB hard-reject
+        // would refuse legitimate large async receipts that `max_stream_total_bytes`
+        // otherwise admits. The budget stays BOUNDED: it is exactly the
+        // configured max (saturating into `usize`), never unbounded.
+        let signing_content_budget =
+            usize::try_from(config.max_stream_total_bytes).unwrap_or(usize::MAX);
+        let signing_task = std::sync::Arc::new(
+            signing_task::SigningTaskHandle::with_capacity_and_max_content_bytes(
+                signing_keypair,
+                signing_task::DEFAULT_SIGNING_CHANNEL_CAPACITY,
+                signing_content_budget,
+            ),
+        );
         Self {
             config,
             guards: Vec::new(),
