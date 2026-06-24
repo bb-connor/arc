@@ -2772,8 +2772,19 @@ fn delegate_honors_wildcard_parent_grant_in_step_validation() {
     let parent = delegate_parent_token(&issuer, &subject, parent_scope, 1000, 2000);
 
     // Child narrows to a single concrete tool; the step targets that concrete
-    // tool, which the `*:*` parent grant covers.
-    let child_scope = make_scope(vec![make_grant("srv-a", "tool-x", vec![Operation::Invoke])]);
+    // tool, which the `*:*` parent grant covers. The declared AddConstraint step
+    // must also be reflected in the child grant, so the child carries the
+    // MaxLength(8) constraint the step adds.
+    let child_scope = make_scope(vec![ToolGrant {
+        server_id: "srv-a".to_string(),
+        tool_name: "tool-x".to_string(),
+        operations: vec![Operation::Invoke],
+        constraints: vec![Constraint::MaxLength(8)],
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost: None,
+        dpop_required: None,
+    }]);
     let attenuation = ScopeAttenuation::from_steps(vec![Attenuation::AddConstraint {
         server_id: "srv-a".to_string(),
         tool_name: "tool-x".to_string(),
@@ -2792,4 +2803,169 @@ fn delegate_honors_wildcard_parent_grant_in_step_validation() {
     .unwrap();
     assert!(receipt.link.verify_signature().unwrap());
     assert_eq!(receipt.link.attenuations.len(), 1);
+}
+
+/// Re-sign a plain token as an attenuated token carrying an explicit
+/// `budget_share_bps`, so the share is covered by the signature.
+#[cfg(feature = "delegation")]
+fn attenuated_share_parent(
+    issuer: &Keypair,
+    plain: &CapabilityToken,
+    budget_share_bps: u16,
+) -> CapabilityToken {
+    CapabilityToken::sign_attenuated(
+        CapabilityTokenAttenuationBody {
+            body: plain.body(),
+            caveats: vec![],
+            scope_attenuations: vec![],
+            attenuation_proof: AttenuationProof {
+                parent_scope_hash: scope_hash(&plain.scope).unwrap(),
+                child_scope_hash: scope_hash(&plain.scope).unwrap(),
+                normalized_subset_proof: compute_attenuation_witness(&plain.scope, &plain.scope)
+                    .unwrap(),
+            },
+            budget_share_bps: Some(budget_share_bps),
+        },
+        issuer,
+    )
+    .unwrap()
+}
+
+/// A parent that explicitly carries the FULL share (`Some(10_000)`) is not
+/// actually budget-attenuated: omitting the child share is a no-op (downstream
+/// admission treats a missing share as the same full ceiling). Such a
+/// delegation must be ACCEPTED rather than rejected as if the parent held a
+/// reduced share.
+#[cfg(feature = "delegation")]
+#[test]
+fn delegate_allows_omitted_share_for_full_share_parent() {
+    use crate::delegation_receipt::ScopeAttenuation;
+
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let delegatee = Keypair::generate();
+
+    let parent_scope = make_scope(vec![make_grant(
+        "srv-a",
+        "tool-x",
+        vec![Operation::Invoke, Operation::Delegate],
+    )]);
+    let plain = delegate_parent_token(&issuer, &subject, parent_scope, 1000, 2000);
+    let full_share_parent = attenuated_share_parent(&issuer, &plain, 10_000);
+    assert!(full_share_parent.verify_signature().unwrap());
+    let child_scope = make_scope(vec![make_grant("srv-a", "tool-x", vec![Operation::Invoke])]);
+
+    // Child OMITS budget_share_bps; the parent holds the full 100% share, so the
+    // omission does not widen anything -> accept.
+    let omitted = ScopeAttenuation {
+        steps: vec![],
+        child_expires_at: None,
+        budget_share_bps: None,
+    };
+    let ok = delegate(
+        &full_share_parent,
+        &child_scope,
+        &subject,
+        &delegatee.public_key(),
+        omitted,
+        1500,
+        [7_u8; 16],
+    );
+    assert!(ok.is_ok());
+}
+
+/// Overlapping parent grants must be order-independent: a broad `*:*` grant that
+/// lacks the targeted operation must not mask a later concrete grant that holds
+/// it. A `RemoveOperation(ReadResult)` step is a valid narrowing because the
+/// concrete `srv-a:tool-x` grant holds `ReadResult`, even though the leading
+/// `*:*` grant only holds `Invoke`.
+#[cfg(feature = "delegation")]
+#[test]
+fn delegate_searches_all_matching_grants_for_step_narrowing() {
+    use crate::delegation_receipt::ScopeAttenuation;
+
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let delegatee = Keypair::generate();
+
+    // Parent has a broad `*:*` grant (Invoke + Delegate only) FIRST, then a
+    // concrete grant that additionally holds ReadResult. The step targets
+    // ReadResult, which only the second (concrete) grant satisfies.
+    let parent_scope = make_scope(vec![
+        make_grant("*", "*", vec![Operation::Invoke, Operation::Delegate]),
+        make_grant(
+            "srv-a",
+            "tool-x",
+            vec![
+                Operation::Invoke,
+                Operation::Delegate,
+                Operation::ReadResult,
+            ],
+        ),
+    ]);
+    let parent = delegate_parent_token(&issuer, &subject, parent_scope, 1000, 2000);
+
+    // Child drops ReadResult (keeps Invoke); the declared RemoveOperation step is
+    // reflected because no covering child grant still holds ReadResult.
+    let child_scope = make_scope(vec![make_grant("srv-a", "tool-x", vec![Operation::Invoke])]);
+    let attenuation = ScopeAttenuation::from_steps(vec![Attenuation::RemoveOperation {
+        server_id: "srv-a".to_string(),
+        tool_name: "tool-x".to_string(),
+        operation: Operation::ReadResult,
+    }]);
+
+    let receipt = delegate(
+        &parent,
+        &child_scope,
+        &subject,
+        &delegatee.public_key(),
+        attenuation,
+        1500,
+        [8_u8; 16],
+    )
+    .unwrap();
+    assert!(receipt.link.verify_signature().unwrap());
+    assert_eq!(receipt.link.attenuations.len(), 1);
+}
+
+/// A declared step that is reduce-only against the parent but NOT reflected in
+/// the child scope is rejected at mint time, so the helper never emits a receipt
+/// that chio-kernel's declared-attenuation validation would later reject. Here
+/// the step declares an added constraint the child grant does not carry.
+#[cfg(feature = "delegation")]
+#[test]
+fn delegate_rejects_step_not_reflected_in_child() {
+    use crate::delegation_receipt::ScopeAttenuation;
+
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let delegatee = Keypair::generate();
+
+    let parent_scope = make_scope(vec![make_grant(
+        "srv-a",
+        "tool-x",
+        vec![Operation::Invoke, Operation::Delegate],
+    )]);
+    let parent = delegate_parent_token(&issuer, &subject, parent_scope, 1000, 2000);
+
+    // Child has NO constraint, but the step declares AddConstraint -> the
+    // declared attenuation is not reflected in the child -> reject.
+    let child_scope = make_scope(vec![make_grant("srv-a", "tool-x", vec![Operation::Invoke])]);
+    let attenuation = ScopeAttenuation::from_steps(vec![Attenuation::AddConstraint {
+        server_id: "srv-a".to_string(),
+        tool_name: "tool-x".to_string(),
+        constraint: Constraint::MaxLength(8),
+    }]);
+
+    let err = delegate(
+        &parent,
+        &child_scope,
+        &subject,
+        &delegatee.public_key(),
+        attenuation,
+        1500,
+        [0_u8; 16],
+    )
+    .unwrap_err();
+    assert!(matches!(err, Error::AttenuationViolation { .. }));
 }

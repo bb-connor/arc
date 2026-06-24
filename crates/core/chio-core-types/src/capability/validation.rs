@@ -3,7 +3,7 @@ use alloc::format;
 use crate::error::{Error, Result};
 
 /// Absolute basis-point ceiling for a budget share. 10000 bps == 100%.
-const MAX_BUDGET_SHARE_BPS: u16 = 10_000;
+pub(crate) const MAX_BUDGET_SHARE_BPS: u16 = 10_000;
 
 /// Validate a `budget_share_bps` value against the absolute 100% ceiling.
 ///
