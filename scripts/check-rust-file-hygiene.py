@@ -85,6 +85,11 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "existing oversized A2A edge aggregate test suite; capped to current size until split",
         max_lines=2_702,
     ),
+    "crates/economy/chio-settle/src/payments.rs": allow(
+        "2026-07-31",
+        "settlement lane payment preparation grown by BAC-542/BAC-541 verified-approval binding; capped until split",
+        max_lines=2_300,
+    ),
     "crates/products/chio-cli/tests/federated_issue.rs": allow(
         "2026-07-31",
         "existing oversized CLI federated issue integration suite; capped to current size until split",
