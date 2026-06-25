@@ -115,9 +115,12 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "C2 (BAC-541) money-keystone witness test suite; grown by the round-6 per-property "
         "fail-closed regressions (cross-call replay via shared store, single-use witness, "
         "unbounded-intent rejection, caller-substituted chain/payee/token, lane-use expiry "
-        "across all three lanes, x402 accepted-token filtering) plus the round-5 regressions; "
-        "capped to current size until the lane tests are split from the gate tests",
-        max_lines=2_045,
+        "across all three lanes, x402 accepted-token filtering) plus the round-5 regressions, "
+        "and by the round-7 binding regressions (max_amount-only rejected, uncommitted/"
+        "substituted EIP-3009 token contract rejected, approval lifetime cap, x402 rail token "
+        "vs fiat settlement currency separation); capped to current size until the lane tests "
+        "are split from the gate tests",
+        max_lines=2_295,
     ),
 }
 

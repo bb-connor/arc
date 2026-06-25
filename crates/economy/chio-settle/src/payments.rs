@@ -19,6 +19,18 @@ use crate::approval_witness::{
 };
 use crate::SettlementError;
 
+/// Maximum lifetime (in seconds) permitted on a single governed approval
+/// token at the settlement layer.
+///
+/// Mirrors `chio_kernel::MAX_APPROVAL_TTL_SECS`
+/// (`crates/kernel/chio-kernel/src/approval.rs`): a token whose
+/// `(expires_at - issued_at)` exceeds this cap is rejected so no token can
+/// outlive the single-use replay registry's eviction window. The constant is
+/// duplicated rather than imported because `chio-kernel` depends on
+/// `chio-settle`, so a runtime dependency the other way would be a cycle; the
+/// value is pinned to the kernel's documented HITL-protocol cap.
+pub const MAX_APPROVAL_TTL_SECS: u64 = 3600;
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum X402SettlementMode {
@@ -174,13 +186,18 @@ pub(crate) fn build_x402_payment_requirements(
 ///
 /// The x402 lane advertises `governed_authorization_required` as a bare
 /// bool; on its own that flag is unenforced. This entry point closes the
-/// loop: it asserts the live dispatch's chain / payee / amount / token
-/// against the `approval.binding()` produced by [`verify_governed_approval`],
-/// so the requirements can only be built when a real, verified
-/// [`GovernedApprovalToken`] authorized exactly this spend. The token check
-/// requires the approval-bound token symbol to appear in `accepted_tokens`,
-/// so x402 cannot offer to settle a governed spend in a token the approval
-/// never authorized. Any mismatch fails closed.
+/// loop: it asserts the live dispatch's chain / payee / amount against the
+/// `approval.binding()` produced by [`verify_governed_approval`], so the
+/// requirements can only be built when a real, verified
+/// [`GovernedApprovalToken`] authorized exactly this spend. For the token, the
+/// approval binds the on-chain RAIL token (the symbol the facilitator pulls,
+/// for example `"USDC"`), which x402 keeps SEPARATE from the fiat
+/// `settlement_amount.currency` (for example `"USD"`); the check therefore
+/// requires the approval-bound token to appear in `accepted_tokens` and filters
+/// that list down to it, rather than comparing it to the fiat settlement
+/// currency. So x402 cannot offer to settle a governed spend in a rail token the
+/// approval never authorized, while a normal Base/USDC spend whose fiat currency
+/// is USD is still accepted. Any mismatch fails closed.
 ///
 /// The numeric EIP-155 chain id the approval binds is derived from the
 /// dispatch's namespaced `chain_id` string (e.g. `8453` for `"eip155:8453"`)
@@ -249,22 +266,26 @@ pub fn build_x402_payment_requirements_with_verified_approval(
         )));
     }
 
-    // Currency: the dispatch's own settlement currency (the symbol x402 will
-    // actually settle in) must be the approval-bound token. Asserting only
-    // that the bound token is among `accepted_tokens` is not enough: the
-    // dispatch could carry a different `settlement_amount.currency` than the
-    // approval authorized. Fail closed on a currency mismatch.
-    binding.assert_token_symbol("x402", &dispatch.settlement_amount.currency)?;
-
-    // Token: the approval-bound token must also be one the x402 requirements
-    // will actually accept. Otherwise the requirements could offer to settle
-    // this governed spend in a token the approval never authorized. Compared
-    // case-insensitively after trimming. A membership check alone is not
-    // enough: it proves the bound token is somewhere in `accepted_tokens` but
-    // still returns the WHOLE list, so `[approved, other]` would keep
-    // advertising `other` to the facilitator. Filter the list down to the
-    // approval-bound token(s) so the requirements only ever advertise the
-    // approved token, and fail closed when the bound token is absent.
+    // Token: x402 keeps the ACCEPTED (rail) token it settles in SEPARATE from
+    // the fiat settlement currency. `dispatch.settlement_amount.currency` is the
+    // fiat amount's currency (for example `"USD"`), while `accepted_tokens` is
+    // the on-chain rail token the facilitator pulls (for example `"USDC"` /
+    // `"EURC"`); see docs/standards/CHIO_X402_REQUIREMENTS_EXAMPLE.json. The
+    // approval binds the RAIL token, so it must be compared to the accepted-token
+    // list, NOT to the fiat settlement currency: asserting the bound token equals
+    // the fiat currency would wrongly reject a normal Base/USDC spend whose fiat
+    // settlement currency is USD. The fiat currency stays a separate amount field
+    // on the requirements (carried through unchanged by the inner builder).
+    //
+    // The approval-bound token must be one the x402 requirements will actually
+    // accept, otherwise the requirements could offer to settle this governed
+    // spend in a token the approval never authorized. Compared case-insensitively
+    // after trimming. A membership check alone is not enough: it proves the bound
+    // token is somewhere in `accepted_tokens` but still returns the WHOLE list,
+    // so `[approved, other]` would keep advertising `other` to the facilitator.
+    // Filter the list down to the approval-bound token(s) so the requirements
+    // only ever advertise the approved token, and fail closed when the bound
+    // token is absent.
     let filtered_tokens: Vec<String> = accepted_tokens
         .into_iter()
         .filter(|token| {
@@ -554,18 +575,25 @@ impl VerifiedApproval {
 ///    / token / amount from what the approver actually signed, so the witness
 ///    cannot carry a caller-chosen chain, payee, or token contract the
 ///    approval never authorized.
-/// 8. **Monetary bound required.** The intent must carry a monetary bound:
-///    either an explicit `max_amount` or an equivalent committed settlement
-///    binding (step 7). An intent with NEITHER pins no ceiling on the spend, so
-///    no witness is issued for it (fail-closed). When `max_amount` is set the
-///    resolved `binding` must not exceed it (amount `<=` maximum, matching
-///    currency).
+/// 8. **Committed settlement binding required.** The intent MUST commit a
+///    concrete `chioSettlementBinding` (step 7). The `max_amount`-only mode
+///    pins amount/currency but NO chain / payee / token / contract, so a
+///    settlement witness built from it would leave chain / payee / token
+///    caller-chosen; the value lanes require those to be signature-pinned, so a
+///    witness is issued only when a committed binding is present (fail-closed).
+///    When `max_amount` is ALSO set the resolved `binding` must not exceed it
+///    (amount `<=` maximum, matching currency).
 /// 9. **Expiry clamp.** `binding.approval_expires_at` must not be later than
 ///    `token.expires_at`. The binding is derived from the token, so an
 ///    EIP-3009 `valid_before` clamped to the binding expiry cannot outlive
 ///    the token; rejecting a longer binding expiry keeps the off-chain spend
 ///    window bounded by the token.
-/// 10. **Single-use replay.** `(token.request_id, intent_hash)` is recorded in
+/// 10. **Lifetime cap.** `(token.expires_at - token.issued_at)` must not exceed
+///     [`MAX_APPROVAL_TTL_SECS`] (mirroring the kernel cap), so a token cannot
+///     mint a witness that outlives the replay registry's eviction window. The
+///     cap is checked BEFORE the replay entry is recorded, so a rejected
+///     over-long token does not burn its replay slot.
+/// 11. **Single-use replay.** `(token.request_id, intent_hash)` is recorded in
 ///     `replay_store` (mirroring the kernel `approval_replay_store`). A second
 ///     presentation of the same approval is rejected before the witness is
 ///     issued; the entry is recorded ONLY after every other check passes, so a
@@ -673,16 +701,22 @@ pub fn verify_governed_approval(
         assert_binding_matches_intent_commitment(committed, &binding)?;
     }
 
-    // (8) Monetary bound required. An intent with neither an explicit
-    // `max_amount` nor a committed settlement binding pins no monetary ceiling
-    // on the spend, so issuing a witness would let an arbitrary caller-supplied
-    // amount through. Fail closed: refuse the witness unless the intent carries
-    // an explicit monetary bound. When `max_amount` is set, also clamp the
-    // resolved binding to it (amount <= maximum, matching currency).
-    if intent.max_amount.is_none() && committed_binding.is_none() {
+    // (8) Committed settlement binding REQUIRED. A `max_amount`-only intent
+    // pins an amount/currency ceiling but commits NO chain / payee / token /
+    // contract, so a witness built from it would let the caller choose any
+    // chain, payee, or EIP-3009 token contract while only the amount and
+    // currency are constrained. The settlement lanes (x402 / EIP-3009 / Circle)
+    // are value lanes: chain / payee / token must ALWAYS be signature-pinned, so
+    // the witness this gate issues is settlement-capable only when the intent
+    // commits a concrete `chioSettlementBinding`. Fail closed when no committed
+    // binding is present; a non-settlement use that needs `max_amount`-only must
+    // not route through this gate (it would not produce a settlement-capable
+    // witness anyway). When `max_amount` is ALSO set, the resolved binding is
+    // additionally clamped to it (amount <= maximum, matching currency) below.
+    if committed_binding.is_none() {
         return Err(SettlementError::Verification(
-            "governed intent carries no monetary bound: neither an explicit max_amount nor a \
-             committed settlement binding, so no witness can be issued"
+            "governed intent commits no chioSettlementBinding: a settlement witness requires a \
+             signed chain/payee/token binding, so the max_amount-only mode cannot produce one"
                 .to_string(),
         ));
     }
@@ -699,7 +733,21 @@ pub fn verify_governed_approval(
         )));
     }
 
-    // (10) Single-use replay. Record AFTER every other check so a rejected
+    // (10) Lifetime cap. The verifier only checks now-in-window, so a token
+    // with `expires_at` far past `issued_at` would mint a long-lived witness
+    // that could outlive the single-use replay entry's eviction window. Mirror
+    // the kernel cap (`MAX_APPROVAL_TTL_SECS`): reject any token whose
+    // `(expires_at - issued_at)` exceeds it BEFORE recording the replay entry,
+    // so a rejected over-long token never burns its replay slot. Fail closed.
+    let token_lifetime = token.expires_at.saturating_sub(token.issued_at);
+    if token_lifetime > MAX_APPROVAL_TTL_SECS {
+        return Err(SettlementError::Verification(format!(
+            "governed approval token lifetime ({token_lifetime}s) exceeds the maximum \
+             ({MAX_APPROVAL_TTL_SECS}s)"
+        )));
+    }
+
+    // (11) Single-use replay. Record AFTER every other check so a rejected
     // approval does not burn its replay slot, but BEFORE issuing the witness
     // so the first successful verification is the only one. Keyed on
     // `(request_id, intent_hash)`, mirroring the kernel replay store. Retain
@@ -736,6 +784,11 @@ pub fn verify_governed_approval(
 /// Addresses are compared as parsed [`Address`] bytes so checksum vs lowercase
 /// hex compare equal; the token symbol is compared case-insensitively after
 /// trimming.
+///
+/// The token contract is treated as a SIGNED field: a binding that carries a
+/// `token_contract` the intent never committed is rejected (not just one that
+/// disagrees with a committed contract), so the EIP-3009 lane can never target
+/// a contract the approver did not sign.
 fn assert_binding_matches_intent_commitment(
     committed: &IntentSettlementBinding,
     binding: &ApprovalBinding,
@@ -777,37 +830,60 @@ fn assert_binding_matches_intent_commitment(
         )));
     }
 
-    // Token contract: only assert when the intent committed one. Compare as
-    // parsed Address bytes so casing differences do not matter. A binding that
-    // omits the contract while the intent commits one is rejected, and a
-    // binding contract that disagrees with the committed one is rejected, so a
-    // captured approval cannot be redirected to a different token contract.
-    if let Some(committed_contract) = committed.token_contract.as_deref() {
-        let committed_contract = Address::from_str(committed_contract.trim()).map_err(|error| {
-            SettlementError::Verification(format!(
-                "intent-committed token contract address invalid: {error}"
-            ))
-        })?;
-        let bound_contract = binding
-            .token_contract
-            .as_deref()
-            .ok_or_else(|| {
-                SettlementError::Verification(
-                    "approval binding omits the token contract the intent committed".to_string(),
-                )
-            })
-            .and_then(|raw| {
-                Address::from_str(raw.trim()).map_err(|error| {
+    // Token contract: the contract the EIP-3009 lane targets MUST have been
+    // signed. Compare as parsed Address bytes so casing differences do not
+    // matter. Three fail-closed cases:
+    //
+    //   - intent commits a contract, binding matches it: accept.
+    //   - intent commits a contract, binding omits or substitutes it: reject
+    //     (the captured approval cannot be redirected to a different contract).
+    //   - intent commits NO contract, binding carries one: reject. A symbol
+    //     alone does not pin the on-chain token, so a caller that introduces a
+    //     `token_contract` the approver never signed could redirect the
+    //     EIP-3009 lane to an attacker-chosen contract (the lane only checks
+    //     `domain.verifyingContract == binding.token_contract`, and BOTH are
+    //     caller-supplied). Refusing an uncommitted contract here guarantees
+    //     that whenever the EIP-3009 lane uses a contract, that contract was
+    //     committed by the signed intent.
+    match committed.token_contract.as_deref() {
+        Some(committed_contract) => {
+            let committed_contract =
+                Address::from_str(committed_contract.trim()).map_err(|error| {
                     SettlementError::Verification(format!(
-                        "approval binding token contract address invalid: {error}"
+                        "intent-committed token contract address invalid: {error}"
                     ))
+                })?;
+            let bound_contract = binding
+                .token_contract
+                .as_deref()
+                .ok_or_else(|| {
+                    SettlementError::Verification(
+                        "approval binding omits the token contract the intent committed"
+                            .to_string(),
+                    )
                 })
-            })?;
-        if bound_contract != committed_contract {
-            return Err(SettlementError::Verification(
-                "approval binding token contract does not match the intent-committed contract"
-                    .to_string(),
-            ));
+                .and_then(|raw| {
+                    Address::from_str(raw.trim()).map_err(|error| {
+                        SettlementError::Verification(format!(
+                            "approval binding token contract address invalid: {error}"
+                        ))
+                    })
+                })?;
+            if bound_contract != committed_contract {
+                return Err(SettlementError::Verification(
+                    "approval binding token contract does not match the intent-committed contract"
+                        .to_string(),
+                ));
+            }
+        }
+        None => {
+            if binding.token_contract.is_some() {
+                return Err(SettlementError::Verification(
+                    "approval binding carries a token contract the intent never committed: the \
+                     EIP-3009 token contract must be signed, not caller-substituted"
+                        .to_string(),
+                ));
+            }
         }
     }
 

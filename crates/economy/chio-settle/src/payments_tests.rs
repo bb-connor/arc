@@ -1183,12 +1183,20 @@ fn verify_governed_approval_accepts_binding_expiry_equal_to_token_expiry() {
     assert_eq!(verified.binding().approval_expires_at, token.expires_at);
 }
 
-/// Build an intent with an explicit `max_amount` of `units`/`currency` and NO
-/// committed settlement binding, so the max_amount clamp is the only monetary
-/// bound being exercised (the committed-binding check stays out of the way of
-/// the amount/currency-clamp regressions).
-fn intent_with_max_amount(id: &str, units: u64, currency: &str) -> GovernedTransactionIntent {
-    let mut intent = unbounded_intent(id);
+/// Build an intent that COMMITS `binding`'s chain/payee/amount/token AND pins
+/// an explicit `max_amount` of `units`/`currency`. A settlement witness now
+/// REQUIRES a committed `chioSettlementBinding` (the max_amount-only mode no
+/// longer yields a settlement-capable witness), so the max_amount-clamp
+/// regressions commit a binding the caller-resolved binding matches (so the
+/// commitment check passes) while the separate `max_amount` is what the clamp
+/// exercises.
+fn intent_committing_with_max_amount(
+    id: &str,
+    binding: &ApprovalBinding,
+    units: u64,
+    currency: &str,
+) -> GovernedTransactionIntent {
+    let mut intent = intent_committing_binding(id, binding);
     intent.max_amount = Some(MonetaryAmount {
         units,
         currency: currency.to_string(),
@@ -1199,18 +1207,22 @@ fn intent_with_max_amount(id: &str, units: u64, currency: &str) -> GovernedTrans
 #[test]
 fn verify_governed_approval_rejects_a_binding_over_intent_max_amount() {
     // (4) Intent amount clamp. When the intent pins max_amount, a binding
-    // whose amount exceeds it must be rejected before any witness exists.
+    // whose amount exceeds it must be rejected before any witness exists. The
+    // intent commits the same over-max binding (so the commitment check passes
+    // and only the max_amount clamp can reject): an intent whose committed
+    // amount exceeds its own max_amount is self-inconsistent and fails closed.
     let approver = Keypair::generate();
     let subject = Keypair::generate();
-    let intent = intent_with_max_amount(
+    let mut binding = dispatch_binding();
+    binding.amount_minor_units = DISPATCH_AMOUNT + 1; // one over the approved max
+    let intent = intent_committing_with_max_amount(
         "intent-overamount",
+        &binding,
         DISPATCH_AMOUNT as u64,
         DISPATCH_TOKEN_SYMBOL,
     );
     let token = signed_approval(&approver, &subject, &intent);
 
-    let mut binding = dispatch_binding();
-    binding.amount_minor_units = DISPATCH_AMOUNT + 1; // one over the approved max
     let error =
         verify_gate(&token, &intent, &approver, &subject, binding, APPROVAL_NOW).test_unwrap_err();
     assert!(
@@ -1224,18 +1236,22 @@ fn verify_governed_approval_rejects_a_binding_over_intent_max_amount() {
 #[test]
 fn verify_governed_approval_rejects_a_binding_with_wrong_intent_currency() {
     // (4) Intent currency clamp. With max_amount set, a binding whose
-    // token symbol differs from the approved currency must be rejected.
+    // token symbol differs from the approved currency must be rejected. The
+    // intent commits a binding whose token is "EUR" (matching the caller
+    // binding, so the commitment check passes) while max_amount approves
+    // DISPATCH_TOKEN_SYMBOL, so only the currency clamp can reject.
     let approver = Keypair::generate();
     let subject = Keypair::generate();
-    let intent = intent_with_max_amount(
+    let mut binding = dispatch_binding();
+    binding.token_symbol = "EUR".to_string();
+    let intent = intent_committing_with_max_amount(
         "intent-wrongccy",
+        &binding,
         DISPATCH_AMOUNT as u64,
         DISPATCH_TOKEN_SYMBOL,
     );
     let token = signed_approval(&approver, &subject, &intent);
 
-    let mut binding = dispatch_binding();
-    binding.token_symbol = "EUR".to_string();
     let error =
         verify_gate(&token, &intent, &approver, &subject, binding, APPROVAL_NOW).test_unwrap_err();
     assert!(
@@ -1249,11 +1265,14 @@ fn verify_governed_approval_rejects_a_binding_with_wrong_intent_currency() {
 #[test]
 fn verify_governed_approval_accepts_a_binding_at_intent_max_amount() {
     // Boundary: amount == max and matching currency is within the
-    // approved ceiling and must verify.
+    // approved ceiling and must verify. The intent commits the dispatch
+    // binding (the settlement witness requirement) AND pins a matching
+    // max_amount.
     let approver = Keypair::generate();
     let subject = Keypair::generate();
-    let intent = intent_with_max_amount(
+    let intent = intent_committing_with_max_amount(
         "intent-atmax",
+        &dispatch_binding(),
         DISPATCH_AMOUNT as u64,
         DISPATCH_TOKEN_SYMBOL,
     );
@@ -1277,11 +1296,11 @@ fn verify_governed_approval_accepts_a_binding_at_intent_max_amount() {
 
 #[test]
 fn verify_governed_approval_rejects_an_unbounded_intent() {
-    // (3) Monetary bound required. An intent with neither an explicit
-    // `max_amount` nor a committed settlement binding pins no ceiling on the
-    // spend, so the gate must refuse to issue a witness for it. Without this
-    // fail-closed check an arbitrary caller-supplied ApprovalBinding (any
-    // amount) would be accepted for an unbounded intent.
+    // (8) Committed settlement binding required. An intent that commits no
+    // `chioSettlementBinding` pins no chain/payee/token, so the gate must
+    // refuse to issue a settlement witness for it. Without this fail-closed
+    // check an arbitrary caller-supplied ApprovalBinding (any chain/payee/
+    // token) would be accepted for an unbounded intent.
     let approver = Keypair::generate();
     let subject = Keypair::generate();
     let intent = unbounded_intent("intent-unbounded");
@@ -1297,8 +1316,45 @@ fn verify_governed_approval_rejects_an_unbounded_intent() {
     )
     .test_unwrap_err();
     assert!(
-        error.to_string().contains("carries no monetary bound"),
-        "an intent with no monetary bound must not yield a witness, got: {error}"
+        error
+            .to_string()
+            .contains("commits no chioSettlementBinding"),
+        "an intent with no committed settlement binding must not yield a witness, got: {error}"
+    );
+}
+
+#[test]
+fn verify_governed_approval_rejects_a_max_amount_only_intent() {
+    // (8) P1 round-7: the max_amount-only mode must NOT produce a settlement
+    // witness. An intent that pins a `max_amount` ceiling but commits no
+    // `chioSettlementBinding` leaves chain/payee/token caller-chosen, so the
+    // value lanes (x402/EIP-3009/Circle) could settle on any chain to any payee
+    // in any token. The gate fails closed: a settlement-capable witness requires
+    // a signed binding, so the max_amount-only intent is rejected even though it
+    // carries an amount ceiling.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let mut intent = unbounded_intent("intent-max-only");
+    intent.max_amount = Some(MonetaryAmount {
+        units: DISPATCH_AMOUNT as u64,
+        currency: DISPATCH_TOKEN_SYMBOL.to_string(),
+    });
+    let token = signed_approval(&approver, &subject, &intent);
+
+    let error = verify_gate(
+        &token,
+        &intent,
+        &approver,
+        &subject,
+        dispatch_binding(),
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("commits no chioSettlementBinding"),
+        "a max_amount-only intent must not yield a settlement witness, got: {error}"
     );
 }
 
@@ -1425,6 +1481,50 @@ fn verify_governed_approval_rejects_a_caller_substituted_token_contract() {
 }
 
 #[test]
+fn verify_governed_approval_rejects_an_uncommitted_token_contract() {
+    // (P1 round-7) The EIP-3009 token contract must be SIGNED, not
+    // caller-substituted. When the intent commits NO token_contract, a caller
+    // that introduces one in its resolved binding could redirect the EIP-3009
+    // lane (which only checks domain.verifyingContract == binding.token_contract,
+    // both caller-supplied) to an attacker-chosen contract the approver never
+    // signed. The gate fails closed: a binding that carries a contract the intent
+    // never committed is rejected.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    // The committed binding pins chain/payee/amount/token but NO contract.
+    let committed = ApprovalBinding {
+        chain_id: SAMPLE_CHAIN_ID,
+        payee_address: SAMPLE_PAYEE.to_string(),
+        amount_minor_units: SAMPLE_VALUE,
+        token_symbol: SAMPLE_TOKEN_SYMBOL.to_string(),
+        token_contract: None,
+        approval_expires_at: APPROVAL_NOW + 100,
+    };
+    let intent = intent_committing_binding("intent-no-committed-contract", &committed);
+    let token = signed_approval(&approver, &subject, &intent);
+
+    // The caller resolves a binding that SUBSTITUTES a token contract the
+    // intent never committed.
+    let mut substituted = committed.clone();
+    substituted.token_contract = Some(SAMPLE_TOKEN_CONTRACT.to_string());
+    let error = verify_gate(
+        &token,
+        &intent,
+        &approver,
+        &subject,
+        substituted,
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("carries a token contract the intent never committed"),
+        "a token contract the intent never signed must be rejected, got: {error}"
+    );
+}
+
+#[test]
 fn verify_governed_approval_accepts_a_binding_matching_the_committed_intent() {
     // Happy path for (3)/(4): an intent that commits the settlement binding
     // and a caller binding that matches it verifies, with no separate
@@ -1444,6 +1544,88 @@ fn verify_governed_approval_accepts_a_binding_matching_the_committed_intent() {
     )
     .test_unwrap();
     assert_eq!(verified.binding(), &dispatch_binding());
+}
+
+#[test]
+fn verify_governed_approval_rejects_a_token_over_the_lifetime_cap() {
+    // (10) P1 round-7: lifetime cap. The verifier otherwise only checks
+    // now-in-window, so a token whose `expires_at` is far past `issued_at`
+    // would mint a long-lived witness that could outlive the single-use replay
+    // entry. Mirror the kernel cap (MAX_APPROVAL_TTL_SECS = 3600s): a token
+    // whose `(expires_at - issued_at)` exceeds the cap is rejected even though
+    // `APPROVAL_NOW` is inside its window. The replay slot must NOT be burned by
+    // the rejection.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let intent = intent_committing_binding("intent-overlong", &dispatch_binding());
+    // Lifetime 4100s (> 3600s cap) with APPROVAL_NOW strictly inside the window.
+    let body = GovernedApprovalTokenBody {
+        id: "approval-overlong".to_string(),
+        approver: approver.public_key(),
+        subject: subject.public_key(),
+        governed_intent_hash: intent.binding_hash().test_unwrap(),
+        request_id: APPROVAL_REQUEST_ID.to_string(),
+        issued_at: APPROVAL_NOW - 100,
+        expires_at: APPROVAL_NOW + 4_000,
+        decision: GovernedApprovalDecision::Approved,
+    };
+    let token = GovernedApprovalToken::sign(body, &approver).test_unwrap();
+
+    let store = InMemoryApprovalReplayStore::new();
+    let error = verify_governed_approval(
+        &token,
+        &intent,
+        &approver.public_key(),
+        &subject.public_key(),
+        APPROVAL_REQUEST_ID,
+        dispatch_binding(),
+        APPROVAL_NOW,
+        &store,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("lifetime") && error.to_string().contains("exceeds the maximum"),
+        "a token whose lifetime exceeds the cap must be rejected, got: {error}"
+    );
+    // The over-long token must not have consumed its replay slot.
+    assert!(
+        store.is_empty().test_unwrap(),
+        "a lifetime-cap rejection must not burn the replay slot"
+    );
+}
+
+#[test]
+fn verify_governed_approval_accepts_a_token_at_the_lifetime_cap() {
+    // Boundary: a token whose lifetime is EXACTLY the cap (3600s) is accepted.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let intent = intent_committing_binding("intent-atcap", &dispatch_binding());
+    let body = GovernedApprovalTokenBody {
+        id: "approval-atcap".to_string(),
+        approver: approver.public_key(),
+        subject: subject.public_key(),
+        governed_intent_hash: intent.binding_hash().test_unwrap(),
+        request_id: APPROVAL_REQUEST_ID.to_string(),
+        issued_at: APPROVAL_NOW - 100,
+        // issued_at + 3600 == exactly the cap.
+        expires_at: APPROVAL_NOW - 100 + 3_600,
+        decision: GovernedApprovalDecision::Approved,
+    };
+    let token = GovernedApprovalToken::sign(body, &approver).test_unwrap();
+
+    let store = InMemoryApprovalReplayStore::new();
+    let verified = verify_governed_approval(
+        &token,
+        &intent,
+        &approver.public_key(),
+        &subject.public_key(),
+        APPROVAL_REQUEST_ID,
+        dispatch_binding(),
+        APPROVAL_NOW,
+        &store,
+    )
+    .test_unwrap();
+    assert_eq!(verified.approval_id(), "approval-atcap");
 }
 
 #[test]
@@ -1671,33 +1853,108 @@ fn x402_with_verified_approval_rejects_binding_mismatches() {
     );
 }
 
+/// A binding over the sample dispatch's chain/payee/amount but bound to the
+/// on-chain RAIL token `token_symbol` (for example `"USDC"`), distinct from the
+/// dispatch's fiat settlement currency (`"USD"`). Used by the P2 round-7 x402
+/// regressions that separate the rail token from the fiat currency.
+fn dispatch_binding_with_rail_token(token_symbol: &str) -> ApprovalBinding {
+    let mut binding = dispatch_binding();
+    binding.token_symbol = token_symbol.to_string();
+    binding
+}
+
 #[test]
-fn x402_with_verified_approval_rejects_a_dispatch_currency_mismatch() {
-    // (5) x402 dispatch currency. The dispatch's own settlement currency
-    // must be the approval-bound token, not merely a member of
-    // accepted_tokens. Bind the approval to a token that is NOT the
-    // dispatch currency (the dispatch settles in DISPATCH_TOKEN_SYMBOL),
-    // but DO list that bound token in accepted_tokens so the membership
-    // check would pass: the currency assertion must still fail closed.
+fn x402_with_verified_approval_accepts_a_base_usdc_dispatch_with_fiat_usd() {
+    // (P2 round-7) x402 keeps the on-chain RAIL token SEPARATE from the fiat
+    // settlement currency. The sample dispatch settles a fiat amount in USD
+    // (settlement_amount.currency == "USD") while the rail token is USDC. A
+    // normal Base/USDC approval binds the RAIL token USDC, and accepted_tokens
+    // advertises USDC. This MUST be accepted: the round-6 code wrongly compared
+    // the bound token to the fiat currency ("USDC" != "USD") and rejected it.
+    // The fiat settlement currency stays a separate amount field unchanged.
     let dispatch = sample_dispatch();
-    let mut wrong_currency = dispatch_binding();
-    wrong_currency.token_symbol = "EURC".to_string();
+    assert_eq!(
+        dispatch.settlement_amount.currency, "USD",
+        "the sample dispatch's fiat settlement currency is USD"
+    );
+    let approval = verified_for(dispatch_binding_with_rail_token("USDC"));
+
+    let requirements = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        // The rail token the facilitator pulls, distinct from the fiat USD.
+        vec!["USDC".to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        approval,
+        APPROVAL_NOW,
+    )
+    .test_unwrap();
+
+    assert_eq!(
+        requirements.accepted_tokens,
+        vec!["USDC".to_string()],
+        "x402 must advertise the approval-bound rail token"
+    );
+    // The fiat settlement currency is carried through unchanged as a SEPARATE
+    // amount field; it is NOT asserted to equal the rail token.
+    assert_eq!(
+        requirements.currency, "USD",
+        "the fiat settlement currency stays separate from the rail token"
+    );
+    assert_eq!(
+        requirements.amount_minor_units,
+        dispatch.settlement_amount.units
+    );
+}
+
+#[test]
+fn x402_with_verified_approval_rejects_a_non_bound_accepted_token() {
+    // (P2 round-7) A normal Base/USDC approval (rail token USDC, fiat currency
+    // USD) must still REJECT an accepted-token list that does not contain the
+    // bound rail token: offering to settle in EURC when the approval bound USDC
+    // must fail closed, even though the dispatch's fiat currency is USD and so
+    // never appears in accepted_tokens.
+    let dispatch = sample_dispatch();
     let error = build_x402_payment_requirements_with_verified_approval(
         &dispatch,
         "https://facilitator.example/x402",
         "https://tool.example/v1/run",
-        // The bound token IS accepted, so only the dispatch-currency check
-        // can reject this.
-        vec!["EURC".to_string(), DISPATCH_TOKEN_SYMBOL.to_string()],
+        vec!["EURC".to_string()],
         X402SettlementMode::PrepaidAuthorization,
-        verified_for(wrong_currency),
+        verified_for(dispatch_binding_with_rail_token("USDC")),
         APPROVAL_NOW,
     )
     .test_unwrap_err();
     assert!(
         error.to_string().contains("token mismatch"),
-        "a dispatch currency that is not the approval-bound token must be rejected, got: {error}"
+        "an accepted-token list without the bound rail token must be rejected, got: {error}"
     );
+}
+
+#[test]
+fn x402_with_verified_approval_filters_a_non_bound_accepted_token() {
+    // (P2 round-7) When accepted_tokens lists BOTH the bound rail token and a
+    // non-bound one (USDC bound, [USDC, EURC] offered), the lane must filter the
+    // list down to the bound token so EURC is never advertised to the
+    // facilitator, while the fiat USD settlement currency stays separate.
+    let dispatch = sample_dispatch();
+    let requirements = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec!["USDC".to_string(), "EURC".to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        verified_for(dispatch_binding_with_rail_token("USDC")),
+        APPROVAL_NOW,
+    )
+    .test_unwrap();
+    assert_eq!(
+        requirements.accepted_tokens,
+        vec!["USDC".to_string()],
+        "the non-bound EURC must be filtered out"
+    );
+    assert_eq!(requirements.currency, "USD");
 }
 
 #[test]
