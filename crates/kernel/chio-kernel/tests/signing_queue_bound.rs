@@ -10,6 +10,21 @@
 //! - an oversized request is refused before it is enqueued (never truncated,
 //!   which would break the WYSIWYS recompute), via both the awaiting [`sign`]
 //!   path and the non-blocking [`try_sign`] path.
+//!
+//! BAC-539 round-7 hardens the aggregate admission model with three regressions:
+//!
+//! - a preimage larger than the aggregate budget inline-signs instead of being
+//!   clamp-and-enqueued (hole 1), so one oversized request never exceeds the
+//!   queue memory bound;
+//! - a producer that cannot enqueue under backpressure inline-signs instead of
+//!   parking while holding the preimage (hole 2), so many blocked producers
+//!   retain no more than the configured budget; and
+//! - a request that had not reached the channel when shutdown began is rejected,
+//!   never enqueued after shutdown (hole 3), with the closed-check and enqueue
+//!   made atomic under the spawn gate.
+//!
+//! Every inline fallback still recomputes-and-refuses (WYSIWYS): a
+//! render-A/sign-B attempt through the fallback is rejected too.
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
@@ -286,26 +301,13 @@ async fn aggregate_byte_budget_backpressures_even_with_channel_room() {
 }
 
 #[tokio::test(flavor = "current_thread")]
-async fn shutdown_during_permit_wait_rejects_stalled_request() {
-    // BAC-539 round-6: a producer stalled on the aggregate-permit `.await` when
-    // `shutdown()` runs MUST be rejected, not enqueued. The fix is that `sign`
-    // does NOT hold a sender clone across the permit wait; it re-clones the
-    // sender (and re-checks the `closed` flag) AFTER the await. Without the fix,
-    // the stalled producer's pre-await sender clone would keep the receiver open
-    // while shutdown drained queued work, then enqueue a request that had not
-    // reached the channel before shutdown began -- which shutdown would then
-    // sign/await.
-    //
-    // Determinism: a tiny 4-byte aggregate budget on a current-thread runtime.
-    // The first request is enqueued via `try_sign`, which holds the whole budget
-    // and does not run the signing task. A second request submitted via `sign`
-    // therefore parks on `acquire_aggregate_permit`. We drive that `sign` future
-    // to its park point by polling it DIRECTLY (via `poll_fn`) rather than
-    // `yield_now`/`spawn`, so the signing task never gets a scheduler slot to
-    // drain the first request early and release the budget before shutdown.
-    // `shutdown` then latches `closed`, drops the canonical sender, and joins the
-    // task; joining drains the first request, releases the budget, and wakes the
-    // stalled producer, whose post-await re-check observes `closed` and rejects.
+async fn backpressure_under_exhausted_budget_signs_inline_without_parking() {
+    // BAC-539 round-7 (hole 2): a producer that cannot enqueue because the
+    // aggregate budget is exhausted MUST NOT park while holding the preimage; it
+    // signs INLINE through the same WYSIWYS primitive instead. We prove the
+    // `sign` future completes in a SINGLE poll (no Pending park) even though the
+    // budget is fully held by a queued request, so a would-be waiter retains no
+    // preimage outside the accounting.
     use std::future::poll_fn;
     use std::future::Future;
     use std::pin::pin;
@@ -319,58 +321,235 @@ async fn shutdown_during_permit_wait_rejects_stalled_request() {
         /* aggregate budget */ 4,
     );
 
-    // First request consumes the entire 4-byte aggregate budget and enqueues
-    // (channel has count capacity). The task has not run, so the permit is held.
+    // First request consumes the entire 4-byte aggregate budget and enqueues. The
+    // task has not run (current-thread runtime), so the permit stays held.
     let first_content = vec![0x11u8; 4];
     let first_body = body_for_content(&keypair, &first_content);
     let _first_rx = handle
         .try_sign(first_body, first_content)
         .expect("first request enqueues and holds the whole aggregate budget");
 
-    // Second request: build the `sign` future and poll it directly until it parks
-    // on the exhausted aggregate budget. Polling directly (no scheduler yield)
-    // guarantees the signing task does not drain the first request and release
-    // the budget before shutdown.
+    // Second request: with the budget exhausted, `sign` must resolve to a signed
+    // receipt via the inline fallback on the FIRST poll (no park).
     let second_content = vec![0x22u8; 1];
     let second_body = body_for_content(&keypair, &second_content);
     let mut sign_future = pin!(handle.sign(second_body, second_content));
-    poll_fn(|cx| {
-        // One poll is enough to reach the parked `acquire_aggregate_permit`
-        // await; it must be Pending because the budget is exhausted.
-        match sign_future.as_mut().poll(cx) {
-            Poll::Pending => Poll::Ready(()),
-            Poll::Ready(other) => {
-                panic!("sign must park on the exhausted aggregate budget, got {other:?}")
-            }
+    let receipt = poll_fn(|cx| match sign_future.as_mut().poll(cx) {
+        Poll::Ready(result) => Poll::Ready(result),
+        Poll::Pending => {
+            panic!("sign must inline-sign under backpressure, not park holding the preimage")
         }
     })
-    .await;
+    .await
+    .expect("backpressure must inline-sign, not error");
+    assert!(receipt
+        .verify_signature()
+        .expect("inline-signed receipt verifies"));
 
-    // Shutdown while the producer is parked on the permit, then resume the
-    // parked `sign` future. With the fix, shutdown's join drains the first queued
-    // request (the parked producer holds no sender clone, so the channel closes),
-    // the budget frees, the producer's permit acquisition succeeds, and its
-    // post-await re-check observes `closed` and rejects. Without the fix, the
-    // parked producer's pre-await sender clone keeps the channel open, so
-    // shutdown's join would hang; the timeout converts that regression into a
-    // deterministic failure instead of a hung suite.
-    let result = tokio::time::timeout(std::time::Duration::from_secs(5), async {
-        handle.shutdown().await;
-        sign_future.await
+    handle.shutdown().await;
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn oversized_preimage_signs_inline_without_exceeding_queue_bound() {
+    // BAC-539 round-7 (hole 1): a single preimage LARGER than the aggregate byte
+    // budget must NOT be enqueued (the old code clamped the permit count to the
+    // whole budget but still moved the full Vec into the queue, so one oversized
+    // request retained more bytes than the advertised bound). It must inline-sign
+    // instead. We prove (a) it signs and verifies, and (b) the queue never held
+    // it: the whole aggregate budget is still free afterwards, so a budget-filling
+    // request still enqueues via the non-blocking `try_sign`.
+    let keypair = Keypair::from_seed(&KERNEL_SEED);
+    // Tiny 4-byte aggregate budget, unlimited per-request cap so ONLY the
+    // aggregate bound governs admission.
+    let handle = SigningTaskHandle::with_capacity_max_content_and_queued_bytes(
+        keypair.clone(),
+        /* capacity */ 256,
+        /* per-request cap */ 0,
+        /* aggregate budget */ 4,
+    );
+
+    // 64 bytes: an order of magnitude over the 4-byte aggregate budget.
+    let oversized = vec![0xABu8; 64];
+    let body = body_for_content(&keypair, &oversized);
+    let receipt = handle
+        .sign(body, oversized)
+        .await
+        .expect("an oversized preimage must inline-sign, never clamp-and-enqueue");
+    assert!(receipt
+        .verify_signature()
+        .expect("oversized inline-signed receipt verifies"));
+
+    // The oversized request was never queued, so the full 4-byte budget is still
+    // available: a 4-byte request enqueues successfully via the non-blocking path.
+    let fits = vec![0x33u8; 4];
+    let fits_body = body_for_content(&keypair, &fits);
+    handle
+        .try_sign(fits_body, fits)
+        .expect("aggregate budget was never consumed by the oversized request");
+
+    handle.shutdown().await;
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn oversized_inline_fallback_still_refuses_render_a_sign_b() {
+    // BAC-539 round-7 (hole 1 + WYSIWYS): the oversized inline fallback routes
+    // through the SAME content-recompute primitive as the queue path, so a body
+    // whose `content_hash` does not match the canonical-content preimage (a
+    // render-A / sign-B attempt) is refused on the inline path too. Memory stays
+    // bounded AND the fail-closed contract is preserved.
+    let keypair = Keypair::from_seed(&KERNEL_SEED);
+    let handle = SigningTaskHandle::with_capacity_max_content_and_queued_bytes(
+        keypair.clone(),
+        /* capacity */ 256,
+        /* per-request cap */ 0,
+        /* aggregate budget */ 4,
+    );
+
+    // Body hashes content-A, but we hand the signer content-B (both oversized so
+    // they route through the inline fallback).
+    let content_a = vec![0xA1u8; 64];
+    let content_b = vec![0xB2u8; 64];
+    let body = body_for_content(&keypair, &content_a);
+
+    let err = handle
+        .sign(body, content_b)
+        .await
+        .expect_err("render-A/sign-B through the inline fallback must be refused (WYSIWYS)");
+    match err {
+        KernelError::ReceiptSigningFailed(message) => {
+            assert!(
+                message.contains("content_hash mismatch") || message.contains("WYSIWYS"),
+                "oversized inline fallback must fail closed on content mismatch: {message}"
+            );
+        }
+        other => panic!("expected a WYSIWYS content-mismatch refusal, got {other:?}"),
+    }
+
+    handle.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn many_blocked_producers_do_not_retain_more_than_budget() {
+    // BAC-539 round-7 (hole 2): under a tiny aggregate budget, a burst of
+    // concurrent producers must NOT each park holding a full preimage outside the
+    // semaphore accounting (the old `acquire_aggregate_permit().await` retained a
+    // preimage per blocked future, so memory grew with the waiter count). With the
+    // inline fallback, every producer that cannot enqueue signs off-queue and
+    // completes, so retained memory is bounded by the budget, not by the number of
+    // in-flight producers. All 64 requests must complete (no hang, no unbounded
+    // park) and every receipt must verify.
+    let keypair = Keypair::from_seed(&KERNEL_SEED);
+    // 4 KiB aggregate budget; 64 producers each submitting a 1 KiB preimage. The
+    // sum (64 KiB) is 16x the budget, so most producers hit backpressure and take
+    // the inline fallback rather than parking.
+    let handle = std::sync::Arc::new(
+        SigningTaskHandle::with_capacity_max_content_and_queued_bytes(
+            keypair.clone(),
+            /* capacity */ 8,
+            /* per-request cap */ 0,
+            /* aggregate budget */ 4 * 1024,
+        ),
+    );
+
+    let mut tasks = Vec::new();
+    for i in 0..64u8 {
+        let handle = std::sync::Arc::clone(&handle);
+        let keypair = keypair.clone();
+        tasks.push(tokio::spawn(async move {
+            let content = vec![i; 1024];
+            let body = body_for_content(&keypair, &content);
+            handle.sign(body, content).await
+        }));
+    }
+
+    let results = tokio::time::timeout(std::time::Duration::from_secs(20), async {
+        let mut receipts = Vec::with_capacity(tasks.len());
+        for task in tasks {
+            receipts.push(task.await.expect("producer task joins"));
+        }
+        receipts
     })
     .await
-    .expect("shutdown + resume must not hang (a hang means a stalled sender clone kept the channel open)");
-    match result {
+    .expect("all producers must complete (a hang means producers parked unbounded)");
+
+    for result in results {
+        let receipt = result.expect("every producer signs (inline fallback or queued)");
+        assert!(receipt
+            .verify_signature()
+            .expect("each signed receipt verifies"));
+    }
+
+    handle.shutdown().await;
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn shutdown_before_send_rejects_request_no_post_shutdown_enqueue() {
+    // BAC-539 round-7 (hole 3): when `shutdown()` begins before a request reaches
+    // the channel, that request MUST be rejected, never enqueued onto a draining
+    // channel and never inline-signed. The fix makes the closed-check and the
+    // `try_send` a single atomic step under the spawn gate, closing the
+    // clone-then-send window where a sender clone survived the canonical sender
+    // drop and let a producer enqueue post-shutdown work that shutdown would then
+    // sign/await.
+    //
+    // Determinism: spawn the task with one signing call, then `shutdown()` to
+    // latch `closed` and drop the canonical sender. A subsequent `sign` reaches
+    // `try_enqueue_if_open`, observes `closed` under the gate, and rejects. This
+    // covers BOTH the would-enqueue and the would-inline-fallback paths: no work
+    // is admitted after shutdown began.
+    let keypair = Keypair::from_seed(&KERNEL_SEED);
+    let handle = SigningTaskHandle::with_capacity_max_content_and_queued_bytes(
+        keypair.clone(),
+        /* capacity */ 256,
+        /* per-request cap */ 0,
+        /* aggregate budget */ 4 * 1024,
+    );
+
+    // Spawn the task with a first, normal signing call so `inner` is populated
+    // (the clone-then-send window only exists once a task and sender exist).
+    let warmup = vec![0x01u8; 8];
+    let warmup_body = body_for_content(&keypair, &warmup);
+    handle
+        .sign(warmup_body, warmup)
+        .await
+        .expect("warmup request signs and spawns the task");
+
+    // Shutdown latches `closed` and drops the canonical sender.
+    handle.shutdown().await;
+
+    // A request submitted after shutdown began must be rejected. It is small
+    // enough to fit the budget and the channel, so the ONLY thing that can refuse
+    // it is the post-shutdown closed-check inside the atomic enqueue. It must not
+    // be enqueued and must not fall through to an inline signature.
+    let late = vec![0x02u8; 8];
+    let late_body = body_for_content(&keypair, &late);
+    match handle.sign(late_body, late).await {
         Err(KernelError::Internal(message)) => {
             assert!(
                 message.contains("already shut down"),
-                "stalled request must be rejected as shut down, got: {message}"
+                "a request arriving after shutdown must be rejected as shut down, got: {message}"
             );
         }
-        Err(other) => panic!("expected shut-down rejection, got {other:?}"),
+        Err(other) => panic!("expected a shut-down rejection, got {other:?}"),
         Ok(_) => panic!(
-            "a request stalled on the permit when shutdown began must be rejected, \
-             not signed (it had not reached the channel before shutdown)"
+            "a request that had not reached the channel before shutdown began must be \
+             rejected, never enqueued or inline-signed after shutdown"
         ),
+    }
+
+    // An oversized request after shutdown must also be refused (the oversized
+    // inline fallback honours the same shutdown exclusion), proving hole-1's
+    // fallback does not become a post-shutdown bypass.
+    let late_oversized = vec![0x03u8; 8 * 1024];
+    let late_oversized_body = body_for_content(&keypair, &late_oversized);
+    match handle.sign(late_oversized_body, late_oversized).await {
+        Err(KernelError::Internal(message)) => {
+            assert!(
+                message.contains("already shut down"),
+                "an oversized request after shutdown must also be refused, got: {message}"
+            );
+        }
+        Err(other) => panic!("expected a shut-down rejection, got {other:?}"),
+        Ok(_) => panic!("the oversized inline fallback must not bypass shutdown exclusion"),
     }
 }

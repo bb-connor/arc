@@ -3,12 +3,17 @@
 //! The signing channel remains bounded and backpressured. This test asserts
 //! that a producer attempting to submit while the queue is full increments
 //! `chio_signing_queue_block_total` rather than dropping the request.
+//!
+//! BAC-539 round-7 (hole 2): a producer that hits a full queue no longer PARKS
+//! holding the preimage; it signs INLINE through the same WYSIWYS primitive and
+//! completes immediately. The block counter still increments (the queue bound was
+//! hit), but the request is neither dropped nor blocked: it is served off-queue,
+//! so retained memory stays bounded.
 
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll, Wake, Waker};
-use std::time::Duration;
 
 use chio_core::crypto::{sha256_hex, Keypair};
 use chio_core::receipt::{
@@ -168,28 +173,41 @@ async fn full_signing_queue_increments_block_counter_without_dropping() -> Resul
     let mut blocked = Box::pin(handle.sign(blocked_body, blocked_content));
     let waker = noop_waker();
     let mut context = Context::from_waker(&waker);
-    assert!(
-        matches!(Pin::new(&mut blocked).poll(&mut context), Poll::Pending),
-        "producer should wait when the bounded signing queue is full"
+    // BAC-539 round-7 (hole 2): a full queue routes the producer to the INLINE
+    // fallback instead of parking. The future therefore resolves on the FIRST
+    // poll (Ready) rather than returning Pending. The request is served off-queue,
+    // so it neither blocks holding the preimage nor is dropped.
+    let inline_signed = match Pin::new(&mut blocked).poll(&mut context) {
+        Poll::Ready(result) => {
+            result.map_err(|error| format!("full-queue inline fallback failed: {error}"))?
+        }
+        Poll::Pending => {
+            return Err(
+                "producer must inline-sign when the bounded queue is full, not park".to_string(),
+            )
+        }
+    };
+    assert_eq!(
+        inline_signed.id, blocked_expected_id,
+        "inline-served request emits the same authoritative id as the queued path",
     );
+    assert!(inline_signed
+        .verify_signature()
+        .map_err(|error| format!("inline-served signature check failed: {error}"))?);
 
     assert_eq!(
         rendered_signing_queue_block_total()?,
         before + 1,
-        "rendered Prometheus metrics should expose chio_signing_queue_block_total increment"
+        "a full queue still increments chio_signing_queue_block_total (the bound was hit)",
     );
 
+    // The queued request still drains and signs normally; the inline fallback did
+    // not disturb the in-flight queued request.
     let signed = queued
         .await
         .map_err(|error| format!("queued signer reply channel closed: {error}"))?
         .map_err(|error| format!("queued request failed to sign: {error}"))?;
     assert_eq!(signed.id, queued_expected_id);
-
-    let blocked_signed = tokio::time::timeout(Duration::from_secs(1), &mut blocked)
-        .await
-        .map_err(|_| "blocked producer did not finish after queue capacity freed".to_string())?
-        .map_err(|error| format!("blocked request failed to sign: {error}"))?;
-    assert_eq!(blocked_signed.id, blocked_expected_id);
 
     handle.shutdown().await;
     Ok(())
