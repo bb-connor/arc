@@ -99,6 +99,20 @@ farmers cannot time mass-registration.
 - Per-namespace pheromone concentration scoping, anchoring cadence/batching policy, and a richer
   multi-tool genuine-use floor are deferred (see open questions).
 
+Grounding to shipped commerce primitives (IN scope, hard requirements, not deferrals):
+- POOL-TERM NAMESPACE ISOLATION (required). The synthetic `freetier:global:<window_ym>` budget term shares
+  the `(capability_id, grant_index)` budget store with real capability/commerce holds, so it MUST be
+  namespace-isolated by its `freetier:global:` prefix and NEVER counted as a real capability/commerce budget
+  by aggregate budget projections or the `chio.risk.comptroller-report.v1` reserve view. It is a Sybil-ceiling
+  accounting term, not capital; fail-closed exclusion from every reserve/aggregate projection is the rule.
+- SCHEMA DISCIPLINE. `chio.pass.v1` is a VC credential family, NOT a signed-artifact-registry member, so it
+  correctly need NOT register in `spec/schemas/registry.json` / `KNOWN_SIGNED_ARTIFACT_SCHEMAS` (mirroring
+  `chio.agent-passport.v1`). The reused anchor schemas (`chio.anchor-inclusion-proof.v1` /
+  `chio.anchor-proof-bundle.v1`) are ALREADY registered (R-T05-16 closed at HEAD); the Pass adds no new
+  signed-artifact schema or claim.
+- PROOF-ROOM EVIDENCE PANEL. Pass issuance/revocation inclusion renders as a `chio-proof-room` sealed evidence
+  panel with asserted/observed/verified evidence classes (Section 8.3), not an offline-only assertion.
+
 ---
 
 ## 2. Canonical shared types (single source of truth)
@@ -440,12 +454,24 @@ rejects `revoked_at == 0` up front; builds a `PassportLifecycleRecord` with `sta
 
 Issued and revoked Pass artifact ids (`chio_pass_artifact_id`) are the Merkle leaves. Build off-chain with
 `build_anchor_batch_body` (`chio-anchor/batch.rs:119`: canonical-JSON each leaf, `MerkleTree::from_leaves`,
-capture `tree_root`, one `AnchorBatchInclusion` per leaf), sign with `AnchorBatch::sign`. Commit via
-`IChioRootRegistry::publishRoot` / `publishRootBatch` (`prepare_root_publication` `evm.rs:119`,
-`publish_root` `evm.rs:212`, `confirm_root_publication` `evm.rs:262`). Prove single-Pass membership with
-`verifyInclusionDetailed` via `verify_inclusion_onchain` (`evm.rs:431`, on-chain call at ~`evm.rs:462`).
-`ChioRootRegistry` stays read-only and value-free; no value moves on-chain. Anchoring CADENCE owner is
-assigned in Section 6.6 (or explicitly deferred).
+capture `tree_root`, one `AnchorBatchInclusion` per leaf), sign with `AnchorBatch::sign`. The Pass anchoring
+is the SAME RFC6962 substrate the transaction/settlement passports use, not a duplicate lane; the Pass is a
+SUBJECT/identity leaf set and is NEVER a transaction-passport root.
+
+API-PATH CORRECTION (the flow below, matching `prepare_root_publication` at `chio-anchor/src/evm.rs:119`; the
+prior bare `publishRoot(tree_root)` form would not compile against it). The `AnchorBatch` `tree_root` is NOT
+committed directly: wrap it in a `KernelCheckpoint` carrying a strictly-increasing per-operator
+`checkpoint_seq`, and obtain a `SignedWeb3IdentityBinding` whose `purpose == Web3KeyBindingPurpose::Anchor`
+(under a Pass-specific anchor purpose label, e.g. `chio.pass.anchor.v1`), whose `chain_scope` names the target
+chain, and whose `settlement_address == operator_address`. `prepare_root_publication` then drives
+`IChioRootRegistry::publishRoot` / `publishRootBatch` (`publish_root` `evm.rs:212`, `confirm_root_publication`
+`evm.rs:262`). Prove single-Pass membership with `verifyInclusionDetailed` via `verify_inclusion_onchain`
+(`evm.rs:431`, on-chain call at ~`evm.rs:462`). The reused anchor schemas (`chio.anchor-inclusion-proof.v1` /
+`chio.anchor-proof-bundle.v1` / `chio.checkpoint_statement.v1`) are already registered; the Pass introduces no
+new anchor schema. `ChioRootRegistry` stays read-only and value-free; no value moves on-chain. This API fix is
+NON-BLOCKING for M0: anchoring is explicitly deferred per Section 6.6 (the metered fail-closed gate does not
+depend on it), but the path must be wired this way when scheduled. Anchoring CADENCE owner is assigned in
+Section 6.6 (or explicitly deferred).
 
 ### 3.5 Fail-closed summary (credential layer)
 
@@ -708,11 +734,16 @@ Genuine use in `window_n` is, per receipt, ALL of: (1) `capability_id == prior_c
 `since` MUST be present, see B9); (5) the receipt DEBITED the XCC allotment, detected by reading the
 existing `CostMetadata` Custom dimension under `metadata["cost"].dimensions[]` with
 `name == CHIO_PASS_ALLOTMENT_COST_NAME` and `value > 0` (NOT an invented `metadata.metering.allotment_debit`);
-(6) `verify_signature()? == true` AND `receipt.kernel_key` is in a caller-supplied
+(6) `verify_signature()? == true` AND `receipt.kernel_key` is in a pinned
 `accepted_kernel_keys: &[PublicKey]` allowlist. Point (6) is the security fix: `verify_signature` only proves
 internal self-consistency against the receipt's OWN `kernel_key`; the allowlist is what makes it "a trusted
-kernel signed it". Deny/Cancelled/exhaustion-`cost_charged:0` receipts and pure free-read activity never
-count.
+kernel signed it". PROVENANCE (not an ad-hoc caller config): `accepted_kernel_keys` is the EXISTING pinned
+authority-key set - the kernel signing keys that emit the metered receipts and/or the trust-market pinned
+market-authority registry (RR2-TM-01) - loaded fail-closed from the one board-approved `ChioPassConfig`
+surface (Section 6.4 / Open Question 3), never a value passed in per request. Rotation reuses the
+market-authority registry's pinned-key rotation: a retired key stays accepted for receipts dated before its
+rotation epoch, so in-flight windows do not silently fail genuine-use. Deny/Cancelled/exhaustion-`cost_charged:0`
+receipts and pure free-read activity never count.
 
 ```rust
 fn is_genuine_use_receipt(
@@ -877,6 +908,19 @@ neither object nor null, returns `Err(PassRedactionFailed)` so the row is denied
 data leaked. (The CONTROL 3 genuine-use scan reads the STORED receipt directly, so stripping `"cost"` from
 the served VIEW does not affect the scan.)
 
+DISCLOSURE BINDING (grounding to the shipped privacy layer). The 3-key `project_pass_stream_view` strip is
+an INTERNAL selection/redaction step, NOT the gift boundary. The own-receipts/own-lineage gift MUST be served
+through the SHIPPED disclosure-lineage export, `chio-disclosure-lineage::verify_disclosure_lineage_bundle`
+(or `chio-selective-disclosure`): a pinned-key signed lineage subgraph (signatures verify only against
+`TRUSTED_LINEAGE_SIGNER_PUBLIC_KEYS`, `verifier.rs:22,412`), bound to a `transaction_passport_ref`, carrying a
+verifier privacy profile, a MANDATORY `DisclosureLeakageLedger` (`validate_leakage_ledger`, `verifier.rs:664`,
+required even when empty), hashed identifiers (tenant/seller/capability via sha256), and the accounted derived
+facts `issuer_status`/`revocation_freshness`/`presentation_timing` (`REQUIRED_DISCLOSURE_DERIVED_FACTS`,
+`verifier.rs:54`). A bare `serde_json::Value` 3-key strip is weaker than the layer mandates; excess disclosure
+is a fail-closed privacy failure even when the credential signature verifies. Raw full-evidence exports
+(`receipts.ndjson` / full capability snapshots) stay admin-only (`admin_full_evidence_v1`) and are never the
+Pass gift boundary.
+
 ### 5.4 Serving gates and own-tenant backstop
 
 `pass_authorizes_read(cap, uri)` / `pass_authorizes_subscription(cap, uri)` deny-list FIRST
@@ -884,9 +928,12 @@ the served VIEW does not affect the scan.)
 module, so a tier_0 newcomer and a Premier holder get byte-identical decisions across all five streams. Own
 receipts also flow through `ReceiptReadContext::authenticated_tenant(subject_tenant)` (`include_null_tenant = false`)
 -> `ReceiptQuery::effective_read_scope` (no-widening guard at `receipt_query.rs:177`) -> SQL
-`(r.tenant_id = ?12)`, an independent second denial behind the uri binding. Own lineage pre-filters the
-`LineageGraph` seeds/window by `LineageNode/Edge.tenant_id` before `forward`/`reverse`. The aggregate
-`query_deposits` (origin-identifying) is deny-listed and unreachable.
+`(r.tenant_id = ?12)`, an independent second denial behind the uri binding. Own lineage MUST constrain the
+`LineageGraph` `forward`/`reverse` traversal itself to IN-TENANT nodes (not merely a seed/window prefilter,
+which can still surface cross-tenant `LineageNode/Edge.tenant_id` checkpoint-metadata one hop out); the
+disclosure-export wrapper of Section 5.3 records any cross-tenant checkpoint-metadata leakage in the
+mandatory `DisclosureLeakageLedger` and emits a tenant disclosure notice rather than silently widening the
+view. The aggregate `query_deposits` (origin-identifying) is deny-listed and unreachable.
 
 OPEN (resolve before build): confirm the issuance `tenant_id` equals the raw `did:chio` used verbatim in
 `chio://receipts/tenant/<tenant>/*`, since the SQL guard compares `r.tenant_id = ?12`; any
@@ -920,6 +967,19 @@ Mirrors the pheromone admission contract (`token_capacity` at `chio-pheromone/li
 `validation.rs:393`; `bucket_count >= token_capacity` at `validation.rs:201`). `active_population` is sourced
 from the revocation-oracle LIVE set (non-revoked, non-expired Passes), pinned so the cap cannot be
 undercounted under concurrency (C5).
+
+ATTESTED-IDENTITY BINDING (reuse, do not duplicate). The `TrustTier` and snapshot/population-cap admission
+inputs (`ChioPassCandidate.tier`, the `ChioPassSnapshot` attested set) bind to the SHIPPED provider-admission
+substrate in `chio-trust-market-context/src/artifacts.rs`, not a re-derivation from `chio-reputation/tier.rs`
++ `chio-federation` alone: eligibility flows from `validate_reputation_import` (trusted issuer, accepted
+`import_verdict`, `subject_binding_ref`, capped `local_weight`) plus discovery-snapshot membership and a signed
+`ProviderSelectionReport`/`TrustScorecardSnapshot` (`ProviderDiscoverySnapshot -> ProviderSelectionReport ->
+TrustScorecardSnapshot`). The attested `TrustTier` MUST reconcile with the scorecard `computed_score` so the
+two tier notions cannot fork. This REUSES the self-declared `issuer_independence_group_id`
+(`chio-federation/reputation.rs:201`) as the bounded M0 input; it does not duplicate or re-implement it (the
+bond-anchored fix stays Phase 2, Section 6.5). Fail-closed posture, stated: portable reputation CANNOT prove
+collateral or solvency, so the Pass tier governs allotment SIZE/refill only and is NEVER marketed or wired as
+a bond/coverage/premium discount (that capital path is the risk-comptroller facility model, out of M0).
 
 ### 6.2 Retroactive unpredictable snapshot
 
@@ -1018,11 +1078,16 @@ gate does not depend on anchoring.
 
 ## 7. End-to-end flow
 
-1. ATTEST. A `did:chio` is attested to a coarse `TrustTier` (step function, no discretionary oracle). The
-   issuer freezes the attested set at an unannounced instant `S` -> `ChioPassSnapshot`.
+1. ATTEST. A `did:chio` is attested to a coarse `TrustTier` (step function, no discretionary oracle) sourced
+   from the shipped `chio-trust-market-context` substrate (`validate_reputation_import` + a signed
+   `TrustScorecardSnapshot`; the `TrustTier` reconciles with the scorecard `computed_score`), NOT a fresh
+   `chio-reputation`/`chio-federation` derivation. The issuer freezes the attested set at an unannounced
+   instant `S` -> `ChioPassSnapshot`. Portable reputation cannot prove collateral or solvency, so the tier is
+   never a bond/coverage discount (Section 6.1).
 2. DISTRIBUTE (anti-farm). `select_snapshot_admissions` orders by `(attested_at, did)` and admits via
-   `evaluate_pass_admission` until `window_token_capacity` OR `active_population_cap` is hit (fail-closed).
-   `active_population` is the revocation-oracle live set.
+   `evaluate_pass_admission` until `window_token_capacity` OR `active_population_cap` is hit (fail-closed),
+   with candidate membership bound to a `ProviderDiscoverySnapshot`/`ProviderSelectionReport` rather than a
+   re-derived gate. `active_population` is the revocation-oracle live set.
 3. WINDOW. `attestation_window_containing(now)` -> `AttestationWindowId { window_ym, since, until }`.
 4. ENTITLEMENTS. `snapshot_chio_pass_entitlements(tier, window, is_first_window = true, genuine_use = true, &cfg)`
    -> tier + 5 baseline read_scopes + XCC allotment sized by the Section 2.5 table (floor unconditional).
@@ -1130,8 +1195,21 @@ on the SAME `window_ym`; no value moves on-chain; immutable contracts untouched.
    `redaction: "summary"`; a non-object body -> `Err(PassRedactionFailed)`.
 5. DORMANT STOPS DRAWING. A `WithheldDormant` next-window token (`max_total_cost.units == 0`) denies its first
    metered charge with `cost_charged == 0`; baseline reads still succeed.
-6. ANCHORING ROUND-TRIP (read-only). Build a batch over issued + revoked Pass artifact ids, publish a root in
-   a mock `ChioRootRegistry`, prove single-Pass membership via `verifyInclusionDetailed` with no value transfer.
+6. ANCHORING ROUND-TRIP (read-only). Build a batch over issued + revoked Pass artifact ids, wrap the
+   `AnchorBatch` `tree_root` in a `KernelCheckpoint` (strictly-increasing `checkpoint_seq`) under a
+   `SignedWeb3IdentityBinding` (`Web3KeyBindingPurpose::Anchor`, Pass anchor purpose, `chain_scope` set,
+   `settlement_address == operator_address`; Section 3.4), publish a root in a mock `ChioRootRegistry`, prove
+   single-Pass membership via `verifyInclusionDetailed` with no value transfer.
+7. PROOF-ROOM SEALED VERDICT + NAMESPACE ISOLATION. The Pass issuance/revocation inclusion proof
+   (`verifyInclusionDetailed` over the anchored root) renders as a `chio-proof-room` (`chio proof verify`)
+   evidence panel with asserted/observed/verified classes and a SEALED verdict, backed by a fixture on the
+   proof-room spine (mirroring the already-registered `chio.anchor-inclusion-proof.v1` /
+   `chio.anchor-proof-bundle.v1`; the Pass adds no new signed-artifact schema). Assert that aggregate budget
+   projections and the `chio.risk.comptroller-report.v1` reserve view EXCLUDE every `freetier:global:<m>` row
+   (namespace isolation, Section 1.2 / 4.2), so a Sybil-ceiling term is never counted as a real
+   capability/commerce budget hold. The new free-tier user-facing copy passes
+   `check-chio-proof-room-release-truth.sh` (no "passport" naming overload; the Pass is a
+   reputation-credential, not an AgentPassport/transaction-passport).
 
 ### 8.4 Workspace gate
 
@@ -1241,9 +1319,14 @@ T10 - Anchoring job (read-only) (C6).
 2. HA POSTURE: is single-node `budget_store_lock` the committed M0 deployment model? If multi-process shares
    one SQLite file, the pool ceiling is SOFT (overrun bounded by `max_cost_per_invocation x node_count`); size
    POOL below the runway (e.g. 95%) and state the tolerance.
-3. `accepted_kernel_keys` PROVENANCE: who pins the trusted-kernel-key allowlist used by the genuine-use scan,
-   and how is it rotated? Without it, a self-signed receipt under an attacker-chosen `kernel_key` passes
-   `verify_signature` (which only proves self-consistency).
+3. `accepted_kernel_keys` PROVENANCE (RESOLVED, posture stated): the trusted-kernel-key allowlist used by the
+   genuine-use scan is the EXISTING pinned authority-key set - the kernel signing keys that emit the metered
+   receipts and/or the trust-market pinned market-authority registry (RR2-TM-01) - loaded fail-closed from the
+   single board-approved `ChioPassConfig` (Section 4.3 / 6.4), NOT an ad-hoc per-request caller config. Without
+   this pin, a self-signed receipt under an attacker-chosen `kernel_key` passes `verify_signature` (which only
+   proves self-consistency). Rotation reuses the market-authority registry's pinned-key rotation: a retired key
+   remains accepted for receipts dated before its rotation epoch so in-flight windows do not silently fail.
+   Remaining sign-off: the exact key list and rotation epochs are board/registry inputs, not a code default.
 4. TENANT-ID DERIVATION (blocking the own-stream gate): confirm issuance writes `tenant_id` as the raw
    `did:chio` used verbatim in `chio://receipts/tenant/<tenant>/*`; any normalization/hashing mismatch against
    the SQL `r.tenant_id = ?12` silently denies all own-stream reads.

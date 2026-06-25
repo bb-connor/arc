@@ -11,6 +11,17 @@ This doc RECONCILES with `docs/brainstorm/CHIO-TOKEN-AND-CONTRACTS-PLAN.md` (the
 Where the benevolent framing revises that roadmap it says so explicitly (Section 6); where
 it agrees it references the roadmap rather than repeating it.
 
+This doc is GROUNDED by `docs/brainstorm/CHIO-TOKEN-COMMERCE-ALIGNMENT.md` (the
+shipped-architecture reconciliation) and is implemented by
+`docs/brainstorm/CHIO-PASS-M0-SPEC.md` (the implementation-grade Pass spec). ONE redaction
+posture governs own-data gifting across both this doc and the M0 spec: the
+disclosure-lineage-bundle posture (a pinned-key signed `DisclosureLineageBundle` with a
+mandatory leakage ledger, verifier privacy profile, hashed tenant, and accounted
+`issuer_status` / `revocation_freshness` / `presentation_timing` derived facts; Sections 2 and
+7). It SUPERSEDES both this doc's earlier "full `SiemEvent` when owned" framing and the M0
+spec's `project_pass_stream_view` 3-key strip; where those diverge, the disclosure-bundle
+posture wins (fail-closed: excess disclosure is a privacy failure even when crypto verifies).
+
 ---
 
 ## 1. Recommendation
@@ -63,12 +74,28 @@ zero. Gifted streams, named from the real surfaces (see `frame:data-streams`):
 - **Pheromone aggregate-concentration feed** (`crates/trust/chio-pheromone/substrate.rs`
   `query_concentration`). Aggregate trust concentration only, never raw `query_deposits`
   (which carry origin-agent identity). Gifted at tier_0.
-- **Own-tenant signed receipt / SIEM stream** (`crates/observability/chio-siem` `SiemEvent`
-  via `ReceiptReadContext::authenticated_tenant`, `include_null_tenant=false`, financial
-  metadata redacted unless owned). This is the user's OWN data returned legible and
-  offline-verifiable. Always-free baseline right (see below), never gated.
-- **Own-tenant lineage/provenance DAG views** (`crates/observability/chio-lineage/query.rs`,
-  strictly the caller's own tenant subgraph, never cross-tenant). Same always-free posture.
+- **Own-tenant signed receipt stream, disclosed as a signed disclosure-lineage bundle** (the
+  GIFT BOUNDARY). `crates/observability/chio-siem` `SiemEvent` (selected via
+  `ReceiptReadContext::authenticated_tenant`, `include_null_tenant=false`) is an INTERNAL
+  SELECTION step only, NOT the disclosed artifact: `SiemEvent` embeds the full `ChioReceipt`
+  (financial metadata NOT redacted for owned data), which is a full-evidence export reserved
+  for `admin_full_evidence_v1`. The actual gift is a `DisclosureLineageBundle` emitted through
+  `crates/trust/chio-disclosure-lineage` `verify_disclosure_lineage_bundle`: a pinned-key
+  (`TRUSTED_LINEAGE_SIGNER_PUBLIC_KEYS`) signed subgraph bound to a `transaction_passport_ref`,
+  with a mandatory `DisclosureLeakageLedger` (present even when empty), a verifier privacy
+  profile, a hashed `tenant_hash` (sha256, never plaintext tenant), and accounted
+  `issuer_status` / `revocation_freshness` / `presentation_timing` derived facts. This is the
+  user's OWN data returned legible and offline-verifiable. Always-free baseline right (see
+  below), never gated. Fail-closed: excess disclosure is a privacy failure even when the crypto
+  verifies.
+- **Own-tenant lineage/provenance DAG views, same disclosure-bundle boundary.**
+  `crates/observability/chio-lineage/query.rs` (strictly the caller's own tenant subgraph,
+  never cross-tenant) is the operator/admin query layer that emits unsigned plaintext-tenant
+  `LineageNode`s with no leakage ledger and no privacy profile; it is an INTERNAL SELECTION
+  step, NEVER the gift surface. The lineage gift is the same signed `DisclosureLineageBundle`
+  export above, with `LineageGraph` traversal constrained to in-tenant nodes and any
+  cross-tenant checkpoint-metadata leakage recorded in the `DisclosureLeakageLedger` plus a
+  tenant disclosure notice. Same always-free posture.
 
 Correction grafted from the tournament (D2/D3 mission critiques): own-tenant receipts and
 lineage are the data subject's OWN footprint. They are a permanent Tier-0 baseline right,
@@ -124,9 +151,12 @@ The vehicle does real protocol work; it is not a badge.
 - **Own-tenant audit / compliance.** The gifted own receipt + lineage streams give the holder
   incident forensics, revocation-impact tracing, and SOC2-style evidence export for their own
   activity.
-- **Portable reputation passport.** The Pass is a kernel-verifiable, offline-verifiable
+- **Portable reputation credential.** The Pass is a kernel-verifiable, offline-verifiable
   credential other Chio operators can verify to extend trust. (Note the load-bearing
-  regulatory caveat in Section 5: we do NOT advertise this as a future "bond discount".)
+  regulatory caveat in Section 5: we do NOT advertise this as a future "bond discount".) The
+  Pass is an `agent_passport`-class / reputation-credential SUBJECT node, eligible as a
+  `subjectRef` in `chio.transaction.evidence-graph.v1` transaction/settlement evidence graphs;
+  it is NEVER the transaction-passport root and carries no settlement authority.
 
 Three NEW, additive utility/sustainability mechanisms the tournament proved are required.
 All are inside the existing fail-closed kernel philosophy, zero new immutable contracts:
@@ -173,6 +203,20 @@ presents the Pass (native or OID4VCI projection); the kernel mints the window-sc
 `CapabilityToken`. Issuance and revocation digests are anchored as a Merkle root in
 `ChioRootRegistry` (`publishRoot` / `publishRootBatch`) so any verifier can prove
 issuance/revocation offline via `verifyInclusionDetailed`.
+
+**Eligibility binds to the shipped attested-identity substrate, not a re-derivation.** Pass
+issuance and portable-reputation eligibility are verified through
+`crates/platform/chio-trust-market-context::validate_reputation_import` (trusted issuer,
+accepted `import_verdict`, `subject_binding_ref`, `privacy_profile_ref` / `decay_policy_ref`,
+capped `local_weight`) and against the folded provider admission registry chain
+(`ProviderDiscoverySnapshot -> ProviderSelectionReport -> TrustScorecardSnapshot`,
+`chio-trust-market-context/src/artifacts.rs`), REUSING that attested-identity anti-farm
+substrate rather than re-deriving the gate from `chio-reputation/tier.rs` + `chio-federation`
+alone. The Pass `TrustTier` reconciles to the scorecard `computed_score` so two tier notions
+cannot fork. This enforces the regulatory line at the verifier layer: `validate_reputation_import`
+mandates that portable reputation CANNOT prove collateral or solvency, so eligibility can never
+imply a bond/coverage discount (Section 5). The `chio-reputation`/`chio-federation` checks below
+remain valid corroborating inputs, but the binding authority is the trust-market substrate.
 
 ### Anti-farm gating (with the tournament's verified hardening)
 
@@ -267,8 +311,8 @@ Phase placement of the benevolent vehicle:
 - **Phase 1: money-backed usage graduates** onto escrow-socketed prepaid, partner issuer-of-
   record. The Pass is the credential the gifted usage attaches to.
 - **Phase 2: bonding economics** (USDC self-restitution bonds, then the new slashable vault)
-  harden issuer independence for the costly allotment. The Pass remains a portable passport,
-  but bond-discount linkage is NOT advertised as a Pass feature.
+  harden issuer independence for the costly allotment. The Pass remains a portable reputation
+  credential, but bond-discount linkage is NOT advertised as a Pass feature.
 - **Phase 3: at most a soulbound-then-conditionally-transferable governance credential**, with
   no retroactive Pass entitlement.
 
@@ -293,7 +337,7 @@ Roadmap milestone changes (stated explicitly):
   fees can fund the cohort.
 - **M3 (clarifies, does not change gate): de-couple the Pass from bond marketing.** Self-
   restitution USDC bonds proceed as in the roadmap. New constraint: the Pass / reputation
-  passport must NOT be marketed as lowering bonds (securities seam). Underwriting may quietly
+  credential must NOT be marketed as lowering bonds (securities seam). Underwriting may quietly
   price bonded operators favorably; it is never a Pass-holder entitlement.
 - **M4 (extends): the new `ChioSlashableBondVault` also anchors issuer independence.** Beyond
   involuntary restitution, the slashable vault gives corroborating issuers slashable skin, which
@@ -321,7 +365,15 @@ deployments alongside the spine (never edits to the immutable four).
 
 - **`ChioRootRegistry.sol` (IMMUTABLE, read-only compliance use):** `publishRoot` /
   `publishRootBatch` anchor a Merkle root of issued and revoked Pass digests;
-  `verifyInclusionDetailed` gives offline proof a Pass is valid/revoked. No value moves.
+  `verifyInclusionDetailed` gives offline proof a Pass is valid/revoked. No value moves. Pass
+  anchoring REUSES the already-registered anchor-batch family (`chio.anchor-inclusion-proof.v1`
+  / `chio.anchor-proof-bundle.v1`, registered in `spec/schemas/registry.json` +
+  `KNOWN_SIGNED_ARTIFACT_SCHEMAS`, R-T05-16 closed at HEAD) and introduces NO new
+  signed-artifact schema or claim; the VC credential family (`chio.agent-passport.v1` /
+  `chio.pass.v1`) correctly need not register there. The inclusion proof
+  (`verifyInclusionDetailed` over the anchored Merkle root) renders as a Proof Room
+  (`chio proof verify`) sealed evidence panel with normalized asserted/observed/verified
+  evidence classes, not an offline-only assertion.
 - **`ChioIdentityRegistry.sol` (the ONE mutable contract, admin = multisig+timelock):**
   optional advisory anchoring of Pass-issuer authority via `registerOperator` /
   `registerDelegate`; in Phase 2+ the registry operator graph is what anchors issuer
@@ -375,7 +427,16 @@ deployments alongside the spine (never edits to the immutable four).
 - **`crates/economy/chio-listing/discovery.rs`:** the gifted listing/pricing feed and raised
   result caps.
 - **`crates/observability/chio-siem` and `crates/observability/chio-lineage/query.rs`:**
-  own-tenant receipt and lineage streams with financial redaction.
+  INTERNAL selection steps only (own-tenant receipt/lineage row selection). They are NOT the
+  disclosed artifact and MUST NOT be the gift boundary: `SiemEvent` carries the full
+  `ChioReceipt` (admin-only `admin_full_evidence_v1` export) and `query.rs` emits unsigned
+  plaintext-tenant `LineageNode`s. The disclosed gift artifact is a signed
+  `DisclosureLineageBundle` emitted via `crates/trust/chio-disclosure-lineage`
+  `verify_disclosure_lineage_bundle` (pinned `TRUSTED_LINEAGE_SIGNER_PUBLIC_KEYS` signed
+  subgraph, mandatory `DisclosureLeakageLedger`, verifier privacy profile, hashed
+  `tenant_hash`, accounted `issuer_status` / `revocation_freshness` / `presentation_timing`),
+  constrained to in-tenant nodes with cross-tenant leakage ledgered. Fail-closed: excess
+  disclosure is a privacy failure even when crypto verifies.
 - **`crates/economy/chio-settle/src/payments.rs`:** Phase-1 `X402SettlementMode::EscrowBacked`
   re-sockets the money-backed half onto escrow. `chio-credit/src/hook.rs` left untouched
   (`IouEnvelopeBody` is post-consumption, cannot mint a prepayment).

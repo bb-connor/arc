@@ -62,10 +62,12 @@ prototype behind a gate), watch (track, do not build yet), avoid (explicit do-no
    audited reference: EigenLayer Redistributable Slashing (ELIP-006, mainnet 22 Jul 2025).
    Stance: ADOPT (the mechanics, into a standalone USDC vault), WATCH (depending on EigenLayer
    at runtime). The Cap Protocol pattern (slashed operator stake redistributed to protect
-   stablecoin holders instead of burned) is exactly the M4 flow. Copy the mechanics
-   (immutable `redistributionRecipient`, permissionless clear-and-route, safety-delay window,
-   reputation-based veto committee) into `ChioSlashableBondVault`; do not bet custody on
-   EigenLayer itself, whose US-accessibility for an EIGEN-staking US founder is `unclear`.
+   stablecoin holders instead of burned) is exactly the M4 flow. Copy the redistribution SHAPE
+   (immutable `redistributionRecipient`, safety-delay window, reputation-based veto committee) into
+   `ChioSlashableBondVault`, routing the slash through the SHIPPED `chio.risk.comptroller-report.v1`
+   sanction / reserve ledger (a comptroller-bound prepare-only route, NOT permissionless
+   clear-and-route; see Section 3.3); do not bet custody on EigenLayer itself, whose
+   US-accessibility for an EIGEN-staking US founder is `unclear`.
 
 4. Issue the Chio Pass on Solana as a Token-2022 NonTransferable (soulbound) credential via
    the Solana Attestation Service, OR keep it on EVM as an EAS / ERC-8004 attestation. Stance:
@@ -376,7 +378,8 @@ reward regulatory status is genuinely ambiguous and EIGEN token programs have ha
 Symbiotic (US-accessible: `yes`): a thin, immutable, permissionless shared-security layer around
 Vaults; Slashing Insurance Vaults (SIVs, published 31 Jul 2025 with Re-Squared, confirmed)
 structure capital into junior / mezzanine / senior tranches with ordered first-loss, coupons
-versus premiums, priced by expected excess loss, explicitly modeled on MBS tranching and Lloyd's
+versus premiums (Symbiotic prices these by expected excess loss; Chio does NOT import that actuarial framing,
+see the Chio mapping below), explicitly modeled on MBS tranching and Lloyd's
 syndicates. Funding: Pantera LED the $29M Series A (23 Apr 2025) with Coinbase Ventures
 participating (correction: not "co-led"); the "~$1.7B restaked" figure is `[needs-verification]`
 (only ">$1B / 14 networks" confirmed at raise time).
@@ -387,17 +390,34 @@ source of slashable security.
 
 Chio mapping:
 - `ChioSlashableBondVault` has a now-proven, US-accessible blueprint in EigenLayer Redistributable
-  Slashing. Copy the mechanics (immutable `redistributionRecipient`, permissionless clear-and-route,
-  safety-delay window, reputation-based veto committee) into a standalone USDC-denominated vault
-  rather than depending on EigenLayer at runtime, so custody / principal-of-record stays with the
-  licensed partner. This validates roadmap research items 6/7 and the federation-gated slasher
+  Slashing. Copy the redistribution SHAPE (immutable `redistributionRecipient`, safety-delay window,
+  reputation-based veto committee) into a standalone USDC-denominated vault rather than depending on
+  EigenLayer at runtime, so custody / principal-of-record stays with the licensed partner. Crucially,
+  do NOT copy EigenLayer's permissionless clear-and-route. In Chio the slash binds through the SHIPPED
+  `chio.risk.comptroller-report.v1` sanction / reserve ledger as `SlashInstruction -> signed
+  transfer_funds capital instruction (intended_state=pending_execution / reconciled_state=not_observed,
+  no observed_execution_ref) -> vault impair as the on-chain OBSERVED-execution leg ->
+  RiskSanctionReserveLedgerEntry (lane market_slash) bound by a RiskSanctionBridge`, passing
+  `validate_risk_sanction_reserve_ledger` and the double-consumption guard
+  (`chio-risk-comptroller/src/lib.rs:964` pre-observed gate; `ledger.rs:61`). The relayer is
+  prepare-only, executed ONLY by the licensed-partner signer (a permissionless atomic route is an
+  OBSERVED execution by a non-partner caller, which the pre-observed gate fails closed on). Enforce
+  claim-payout-priority over punitive slash and open-appeal holds via the realized `RiskClaimAppeal`,
+  and bind the veto committee to the existing claim-appeal / reserve-control-appeal layer, not a
+  free-standing role. This validates roadmap research items 6/7 and the federation-gated slasher
   (`FederatedSybilControl` min_independent_issuers >= 2). Note the self-slash-only limit of the
   immutable `ChioBondVault` (confirmed `impairBondDetailed` requires `msg.sender == operator`,
   ChioBondVault.sol:134) is the SAME constraint EigenLayer / Symbiotic engineered around: a new
   audited vault with an external corroboration-gated slasher is required.
-- The underwriting pool should adopt Symbiotic's SIV tranching for `chio-underwriting`'s ReserveBook
-  and the `bond_depth` premium hook. This gives the AIUC / Lloyd's-style partner a
-  capital-markets-legible structure.
+- The underwriting pool MAY adopt Symbiotic's SIV tranching for `chio-underwriting`'s ReserveBook
+  and the `bond_depth` premium hook ONLY behind doc-06 Phase 6 (the multi-source senior / first-loss /
+  insurer / reinsurer / custodian role model), on the licensed partner's separate book. It must NOT be
+  enabled while the SHIPPED capital book still fails closed on more than one live facility / bond plus
+  mixed currency. Reframe `bond_depth -> base_rate_cents` as a deterministic compliance-score
+  pricing-band input that does NOT bypass `validate_risk_actuarial_limits`
+  (`chio-risk-comptroller/src/lib.rs:764`); posted-bond depth and SIV tranching cannot imply reserve
+  adequacy or actuarial pricing until a passing `chio.risk.actuarial-backtest` artifact exists. Once
+  Phase 6 lands this still gives the AIUC / Lloyd's-style partner a capital-markets-legible structure.
 - Do NOT depend on restaking for a US founder; keep self-slash-only `ChioBondVault` as the launch
   primitive and treat EigenCloud as a Phase-3 watch, US-jurisdiction permitting.
 
@@ -448,7 +468,13 @@ Chio mapping: their model (standard + audit + insurance) parallels Chio's receip
 + bond structure, so a bonded, attested Chio operator is a natural risk to underwrite. They are the
 concrete candidates to answer roadmap research item 5: do underwriters price premiums against a
 POSTED USDC bond, or against receipts + tiers alone? Validate this before building the slashable
-vault. Stance: PILOT (engage AIUC / Armilla / Testudo to validate posted-bond pricing).
+vault. Binding to shipped primitives: the `CapitalBookSourceKind::ReserveBook` insurance / restitution
+source (`crates/economy/chio-credit/src/credit/capital_and_execution.rs:10`) stays gated behind doc-06
+Phase 6 and on the licensed partner's separate book; premium pricing is a deterministic compliance-score
+band, NOT actuarial adequacy, until a passing `chio.risk.actuarial-backtest` exists
+(`validate_risk_actuarial_limits`, `chio-risk-comptroller/src/lib.rs:764`), so posted-bond pricing
+cannot imply reserve adequacy. Stance: PILOT (engage AIUC / Armilla / Testudo to validate posted-bond
+pricing).
 
 ### 3.5 The token-kill confirmation
 
@@ -487,7 +513,15 @@ Do not design any Pass or credit feature that depends on confidential balances.
 Chio mapping: issue the Chio Pass as a Token-2022 NonTransferable credential (Solana variant), with
 Metadata for credential fields and optional PermanentDelegate for issuer revocation. Model the
 day-zero free-compute allotment as a soulbound Token-2022 balance or an in-attestation metered
-counter, NEVER a tradeable SPL token (keeps the gift unfarmable and un-poolable). Stance: PILOT
+counter, NEVER a tradeable SPL token (keeps the gift unfarmable and un-poolable).
+
+Binding to shipped primitives: the Token-2022 Pass is a PROJECTION of the canonical `chio-credentials`
+Pass, carried via the `chio.agent-web-proof-envelope.v1` portable-trust VC / SD-JWT path; it introduces
+NO new credential schema family. Anchoring still reuses `ChioRootRegistry` per CHIO-PASS-M0-SPEC Sec 3.4
+(`prepare_root_publication`); any new anchor schema must land in `spec/schemas/registry.json` +
+`KNOWN_SIGNED_ARTIFACT_SCHEMAS`. The Solana mint is a display / issuance surface, not an authority: a
+Solana SAS attestation has NO verifier-owned readback lane today, so it never substitutes for the EVM
+`did:chio` credential or the Chio recompute lane. Stance: PILOT
 (Solana issuance, on devnet first, since Chio's canonical credential is EVM / `did:chio` today),
 ADOPT (model gifted credits as soulbound / non-tradeable regardless of chain), AVOID (any
 confidential-transfer dependency).
@@ -509,7 +543,11 @@ solid.
 
 Chio mapping: combining the tokenized-attestation path with the NonTransferable extension yields a
 soulbound, revocable, schema-typed on-chain credential, essentially a turnkey Pass issuance rail.
-Bind it to `did:chio` via a mapping. Stance: PILOT.
+Bind it to `did:chio` via a mapping. Binding to shipped primitives: treat the SAS attestation as a
+PROJECTION of the canonical `chio-credentials` Pass carried via the `chio.agent-web-proof-envelope.v1`
+portable-trust VC / SD-JWT path (no new credential schema family), not an authoritative credential; it
+has NO verifier-owned readback lane today, so the Chio verifier never reads the SAS record as proof, and
+anchoring reuses `ChioRootRegistry` per CHIO-PASS-M0-SPEC Sec 3.4. Stance: PILOT.
 
 ### 4.3 Solana settlement for micropayments
 
@@ -611,7 +649,17 @@ contexts that happen to share a number; do not conflate them. HYPE itself is hig
 Chio mapping: expose an x402-facilitator-compatible verify endpoint so a Chio financial receipt is
 the "settled proof" attachable to any 402-paid call, while a licensed facilitator (Coinbase CDP)
 moves money and Chio signs / proves. This makes Chio the verifier ABOVE x402 / ACP / AP2 rather than
-a competing rail, preserving the custody-neutral, prepare-only posture. Stance: ADOPT.
+a competing rail, preserving the custody-neutral, prepare-only posture.
+
+Binding to shipped primitives: carry every x402 / ACP / AP2 object as a `chio.agent-web-proof-envelope.v1`
+detached, digest-bound projection and reuse the SHIPPED `CHIO_PAYMENT_INTEROP_PROFILE.md` (plus
+`CHIO_X402_REQUIREMENTS_EXAMPLE.json` / `CHIO_CIRCLE_NANOPAYMENT_EXAMPLE.json`) and the
+`chio-commerce-order` mandate ledger (`mandate.rs`: `x402_payment_requirements_hash` /
+`ap2_*_mandate_hash` / `acp_delegated_payment_token_hash`; allowlist `ap2` / `acp-commerce` / `x402` /
+`chio`), NOT a parallel facilitator endpoint. The envelope is a projection that never replaces receipt
+authority: verify the source Chio receipt FIRST, and an x402 settlement receipt satisfies the payment
+precondition ONLY and never implies tool authorization (payment-success does not imply authorization).
+Fail closed on unknown schema / issuer / hash. Stance: ADOPT.
 
 ### 5.2 Other agent-payment rails (context, not dependencies)
 
@@ -673,7 +721,16 @@ across Base + Arbitrum, but not yet load-bearing for v1. Stance: WATCH.
 Chio mapping: do NOT reinvent the attestation registry. Publish Chio receipt-batch roots as EAS
 (Base) and / or Verax attestations to inherit explorers, SDKs, and revocation semantics, while
 keeping the signed receipt log as the immutable source of truth. Position `ChioRootRegistry` as a
-domain-specific anchor that interoperates with EAS / Verax / SAS, not a rival standard. Stance: ADOPT.
+domain-specific anchor that interoperates with EAS / Verax / SAS, not a rival standard.
+
+Binding to shipped primitives: EAS / Verax / SAS attestations are NON-AUTHORITATIVE display / interop
+projections carried via `chio.agent-web-proof-envelope.v1`, never read as anchoring proof. An attestation
+record is producer / issuer-asserted on-chain state, so registry-visibility never implies authorization.
+The Chio public verifier MUST recompute chain state via `ChioRootRegistry.getRoot` /
+`verifyInclusionDetailed` (settlement-passport draft 05 recompute invariant: producer / witnessed state
+is insufficient); the attestation is a detached digest-bound projection, never a second
+anchoring-readback lane. A Solana SAS substrate has NO verifier-owned readback lane today, so it stays
+display-only. Fail closed on unknown schema / issuer / hash. Stance: ADOPT.
 
 ### 5.6 ERC-8004 Trustless Agents (the most direct trust-layer comparator)
 
@@ -689,7 +746,17 @@ Chio mapping: register the Chio Pass / agents in ERC-8004 Identity + Reputation 
 third-party-verifiable without a Chio node, and the gifted "trust-feed reads" map onto reading a
 Reputation registry. Position Chio receipts (signed, replayable, policy-hash-bound) as a Validation-
 Registry evidence type: a concrete distribution path for the receipt primitive. Soulbound + benevolent
-framing differentiates Chio from transferable agent NFTs. Stance: PILOT (registration), WATCH
+framing differentiates Chio from transferable agent NFTs.
+
+Binding to shipped primitives: position Chio receipts as ERC-8004 Validation-Registry evidence via the
+per-transaction `chio.transaction.passport.v1` / `chio.transaction.evidence-graph.v1` root and
+`chio.public-settlement-verifier-report.v1`, carried via `chio.agent-web-proof-envelope.v1`, NOT a
+re-derived loose receipt; ERC-8004 registry-visibility is a non-authoritative projection and never
+implies authorization. Naming disambiguation (PR-937 copy-lint): the "Chio Pass" is a soulbound
+`agent_passport`-class SUBJECT credential and is DISTINCT from the AgentPassport, the
+`chio.transaction.passport.v1` (transaction passport), the settlement passport, and the `order-passport`;
+the Pass is eligible as a `subjectRef` in those evidence graphs but is NEVER a transaction / settlement /
+order passport root. Stance: PILOT (registration), WATCH
 (Validation Registry, still under revision).
 
 ### 5.7 AVS / TEE verifiable compute (the compute-provenance complement)
@@ -851,18 +918,18 @@ farm-to-death pattern and the quid-pro-quo the carve-out excludes).
 |---|------|--------|----------------|
 | 1 | Retroactive, receipt-weighted, sybil-filtered, opaque-formula, push-not-claim soulbound Pass issuance, Merkle-anchored in `ChioRootRegistry` | adopt | The single most-praised Hyperliquid mechanic, fully inside the no-token / no-money-leg posture; reuses existing receipts + `chio-reputation` + FederatedSybilControl. |
 | 2 | Auto-route FLAT USDC fees through `ChioTreasury` / `FeeRouter` into community sinks (underwriting reserve + free-compute for Pass holders) with a keyless sink pattern; NO token buyback | adopt | Captures the Assistance Fund's auto-routing + provable neutrality while terminating value in utility, not a Howey-triggering token bid. |
-| 3 | Anchor Chio receipt-batch Merkle roots to EAS (Base) / Verax; keep `ChioRootRegistry` canonical | adopt | EAS Private Data attestations are byte-for-byte Chio's model; inherit explorers / SDKs / revocation for free. |
-| 4 | x402-facilitator-compatible verify path; Chio as verifier above x402 / ACP / AP2 | adopt | x402 uses the exact EIP-3009 leg Chio chose; a licensed facilitator moves money, preserving custody-neutrality. |
+| 3 | Publish Chio receipt-batch roots as EAS (Base) / Verax attestations as NON-AUTHORITATIVE display / interop projections carried via `chio.agent-web-proof-envelope.v1`; keep `ChioRootRegistry` canonical | adopt | EAS Private Data attestations are byte-for-byte Chio's model; inherit explorers / SDKs / revocation. The Chio verifier MUST still recompute via `ChioRootRegistry.getRoot` / `verifyInclusionDetailed` (draft 05); the attestation is never read as anchoring proof, and registry-visibility never implies authorization. |
+| 4 | x402-facilitator-compatible verify path; Chio as verifier above x402 / ACP / AP2, carried via `chio.agent-web-proof-envelope.v1` + `CHIO_PAYMENT_INTEROP_PROFILE.md` | adopt | x402 uses the exact EIP-3009 leg Chio chose; a licensed facilitator moves money, preserving custody-neutrality. Reuse the `chio-commerce-order` mandate ledger, NOT a parallel endpoint; verify the source receipt FIRST, and an x402 settlement satisfies the payment precondition ONLY (payment-success never implies authorization). |
 | 5 | ERC-4626 for simple pooled positions; ERC-7540 async for slashable / insurance vaults | adopt | Mature US-accessible standards; 7540 request-then-claim matches Chio's non-atomic slash-then-revoke. |
-| 6 | Copy EigenLayer Redistributable-Slashing mechanics into a standalone USDC `ChioSlashableBondVault` | adopt | Live (22 Jul 2025), US-accessible, audited reference for involuntary-slash-to-restitution; resolves the immutable self-slash-only gap. |
+| 6 | Copy the EigenLayer Redistributable-Slashing SHAPE (immutable recipient, safety-delay, veto) into a standalone USDC `ChioSlashableBondVault`, routed through the `chio.risk.comptroller-report.v1` sanction / reserve ledger (prepare-only relayer, licensed-partner signer) | adopt | Live (22 Jul 2025), US-accessible, audited reference for involuntary-slash-to-restitution; resolves the immutable self-slash-only gap. Bind as `SlashInstruction -> capital instruction (pending_execution / not_observed) -> vault impair (observed) -> market_slash reserve entry`, claim-payout-priority + appeal holds; NO permissionless clear-and-route. |
 | 7 | Model gifted day-zero compute credits as soulbound (NonTransferable) / non-tradeable, never an SPL/ERC-20 token | adopt | Keeps the gift unfarmable and un-poolable; upholds "access, not asset" and the tax / securities posture. |
-| 8 | HLP-style ERC-4626 USDC community insurance / underwriting vault, premium AND losses pro-rata, withdrawal lockup, behind Phase 2 with licensed insurer as principal of record | pilot | HLP proves community capital backs a risk book if PnL is shared transparently; only ships behind the Phase 2 gate. |
-| 9 | Issue the Pass as a Token-2022 NonTransferable credential via SAS (devnet first) | pilot | Protocol-enforced soulbinding is fail-closed and un-poolable; new non-EVM surface needs a `did:chio` bridge. |
+| 8 | HLP-style ERC-4626 USDC community insurance / underwriting vault, premium AND losses pro-rata, withdrawal lockup, behind Phase 2 with licensed insurer as principal of record | pilot | HLP proves community capital backs a risk book if PnL is shared transparently; ships behind the Phase 2 gate AND doc-06 Phase 6 multi-source role model on the partner's separate book. The `CapitalBookSourceKind::ReserveBook` source must NOT be enabled while the capital book fails closed on >1 live facility / bond; pricing is a deterministic compliance-score band, not actuarial adequacy. |
+| 9 | Issue the Pass as a Token-2022 NonTransferable credential via SAS (devnet first) | pilot | Protocol-enforced soulbinding is fail-closed and un-poolable; new non-EVM surface needs a `did:chio` bridge. The Token-2022 / SAS Pass is a PROJECTION of the canonical `chio-credentials` Pass via the `chio.agent-web-proof-envelope.v1` VC / SD-JWT path (no new credential schema); anchoring reuses `ChioRootRegistry`; a SAS attestation has no verifier-owned readback lane today. |
 | 10 | Add Solana as a second USDC settlement rail (USDC leg only), receipt log canonical on EVM, CCTP V2 for treasury | pilot | Best-in-class micropayment venue (400ms, sub-cent, native USDC); introduces a parallel runtime, so scope it. |
 | 11 | Permissionless, capped, FLAT integrator / referrer codes via the receipt envelope + `FeeRouter`, no approval committee | pilot | Builder codes drove $40M+ to builders by removing gatekeeping; could bootstrap agent front-ends on Chio's rail. |
-| 12 | Symbiotic SIV tranching (junior / mezzanine / senior) for the `chio-underwriting` ReserveBook + `bond_depth` hook | pilot | Capital-markets-legible underwriting structure modeled on Lloyd's / MBS; gives the insurer partner a known shape. |
+| 12 | Symbiotic SIV tranching (junior / mezzanine / senior) for the `chio-underwriting` ReserveBook + `bond_depth` hook | pilot | Capital-markets-legible underwriting structure modeled on Lloyd's / MBS; gives the insurer partner a known shape. GATED behind doc-06 Phase 6 (capital book fails closed on >1 live facility / bond); `bond_depth -> base_rate_cents` is a deterministic compliance-score band that does NOT bypass `validate_risk_actuarial_limits` (`lib.rs:764`); drop "priced by expected excess loss" until a `chio.risk.actuarial-backtest` exists. |
 | 13 | Engage AIUC / Armilla / Testudo as principal-of-record; validate posted-USDC-bond premium pricing (research item 5) | pilot | US-accessible Lloyd's-rooted AI insurers whose standard+audit+insurance model parallels Chio's tiers+bond. |
-| 14 | Register Pass / agents in ERC-8004 Identity + Reputation; position receipts as Validation-Registry evidence | pilot | Live audited registries (29 Jan 2026); third-party verifiability without a Chio node; Validation Registry still in revision. |
+| 14 | Register Pass / agents in ERC-8004 Identity + Reputation; position receipts as Validation-Registry evidence via the `chio.transaction.passport.v1` / evidence-graph root + `chio.public-settlement-verifier-report.v1`, carried via `chio.agent-web-proof-envelope.v1` | pilot | Live audited registries (29 Jan 2026); third-party verifiability without a Chio node; Validation Registry still in revision. Registry-visibility never implies authorization; "Chio Pass" is an `agent_passport`-class SUBJECT, distinct from transaction / settlement / order passports. |
 | 15 | Meter on top of EIP-7702 / Coinbase Spend-Permission wallets rather than build a wallet | pilot | Wallet-level caps already exist; Chio's wedge is the out-of-agent fail-closed kernel above the cap. |
 | 16 | Anchor costly-allotment issuer-independence to an external sybil layer (World ID and / or Human Passport + Trusta) | pilot | Fixes the two-free-text-string weakness; production-grade US-accessible corroborators; note World ID BIPA exposure. |
 | 17 | Operator "copy-underwriting" vaults (skin-in-the-game rules) behind the Phase 2 licensed-partner gate | watch | Excellent alignment rules, but pooling third-party capital behind an operator carries securities / custody surface. |
@@ -887,15 +954,25 @@ farm-to-death pattern and the quid-pro-quo the carve-out excludes).
    is the metric to beat).
 
 3. Token-2022 / SAS Pass issuance prototype on Solana devnet. Mint a NonTransferable Pass via SAS with
-   Metadata + PermanentDelegate, map it to a `did:chio`, and confirm it is un-poolable on an Orca
-   devnet pool. Decision output: whether the soulbinding-as-protocol-property benefit justifies the
-   second non-EVM issuance surface.
+   Metadata + PermanentDelegate, map it to a `did:chio` (as a PROJECTION of the canonical
+   `chio-credentials` Pass carried via the `chio.agent-web-proof-envelope.v1` portable-trust VC / SD-JWT
+   path, NOT a new credential schema family; anchoring reuses `ChioRootRegistry` per CHIO-PASS-M0-SPEC
+   Sec 3.4), and confirm it is un-poolable on an Orca devnet pool. Note a Solana SAS attestation has no
+   verifier-owned readback lane today, so the prototype is a display / issuance surface only. Decision
+   output: whether the soulbinding-as-protocol-property benefit justifies the second non-EVM issuance
+   surface.
 
 4. ERC-7540 slashable-vault spike on a Base testnet. Implement the request-then-claim entry / exit gate
-   around a mock adjudication window, copying the redistribution mechanics (immutable
-   `redistributionRecipient`, permissionless clear-and-route, safety-delay, reputation veto). Confirm
-   it cannot be front-run around a pending slash. This is the de-risking spike for `ChioSlashableBondVault`
-   (roadmap M4).
+   around a mock adjudication window, copying the redistribution SHAPE (immutable
+   `redistributionRecipient`, safety-delay, reputation veto) but routing the slash through the
+   `chio.risk.comptroller-report.v1` sanction / reserve ledger as `SlashInstruction -> signed capital
+   instruction (pending_execution / not_observed) -> vault impair (observed execution) -> market_slash
+   RiskSanctionReserveLedgerEntry bound by a RiskSanctionBridge` (`lib.rs:964` pre-observed gate;
+   `ledger.rs:61`), with a prepare-only relayer executed ONLY by the licensed-partner signer (NOT
+   permissionless clear-and-route), claim-payout-priority over punitive slash, and open-appeal holds via
+   `RiskClaimAppeal` (veto committee bound to the existing claim-appeal / reserve-control-appeal layer).
+   Confirm it cannot be front-run around a pending slash. This is the de-risking spike for
+   `ChioSlashableBondVault` (roadmap M4).
 
 5. x402 verify-endpoint integration. Stand up an x402-facilitator-compatible verify path so a Chio
    financial receipt attaches to a 402-paid call settled by Coinbase CDP. Validate the custody-neutral
