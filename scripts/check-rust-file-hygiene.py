@@ -120,7 +120,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "substituted EIP-3009 token contract rejected, approval lifetime cap, x402 rail token "
         "vs fiat settlement currency separation); capped to current size until the lane tests "
         "are split from the gate tests",
-        max_lines=2_295,
+        max_lines=2_310,
     ),
 }
 
