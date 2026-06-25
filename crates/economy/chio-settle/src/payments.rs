@@ -167,18 +167,29 @@ pub(crate) fn build_x402_payment_requirements(
         pay_to: dispatch.beneficiary_address.clone(),
         accepted_tokens,
         dispatch_id: dispatch.dispatch_id.clone(),
-        capability_id: dispatch
-            .capital_instruction
-            .body
-            .query
-            .capability_id
-            .clone()
-            .unwrap_or_else(|| dispatch.dispatch_id.clone()),
+        capability_id: resolve_x402_capability_id(dispatch),
         amount_minor_units: dispatch.settlement_amount.units,
         currency: dispatch.settlement_amount.currency.clone(),
         settlement_mode,
         governed_authorization_required: true,
     })
+}
+
+/// Resolve the `capability_id` the x402 requirements echo for `dispatch`.
+///
+/// The dispatch's capital instruction may carry an explicit `capability_id`;
+/// when absent the `dispatch_id` stands in. Extracted so the witness wrapper
+/// asserts the SAME resolved value against the approval-bound capability id
+/// that the inner builder writes into the requirements, leaving no gap between
+/// what is pinned and what is advertised.
+fn resolve_x402_capability_id(dispatch: &Web3SettlementDispatchArtifact) -> String {
+    dispatch
+        .capital_instruction
+        .body
+        .query
+        .capability_id
+        .clone()
+        .unwrap_or_else(|| dispatch.dispatch_id.clone())
 }
 
 /// Build x402 payment requirements bound to a verified governing approval
@@ -264,6 +275,35 @@ pub fn build_x402_payment_requirements_with_verified_approval(
             "x402 amount mismatch: dispatch amount {} != approval-bound amount {}",
             dispatch.settlement_amount.units, binding.amount_minor_units
         )));
+    }
+
+    // Dispatch identity: the requirements echo `dispatch.dispatch_id` and a
+    // `capability_id` resolved from this dispatch. The approval economics alone
+    // (chain / payee / amount / token) do NOT pin WHICH dispatch the witness may
+    // settle, so without this a verified approval could be paired with a
+    // DIFFERENT dispatch carrying the same economics and produce x402 artifacts
+    // for that other dispatch. The witness gate signature-pins `dispatch_id` and
+    // `capability_id`, so asserting the live dispatch's identity against them
+    // ties the witness to the approved dispatch. Both must match; a dispatch
+    // with the same economics but a different `dispatch_id` / `capability_id`
+    // fails closed.
+    binding.assert_dispatch_id("x402", &dispatch.dispatch_id)?;
+    binding.assert_capability_id("x402", &resolve_x402_capability_id(dispatch))?;
+
+    // Contract-pinned approvals cannot be honored by the symbol-only lane.
+    // When the approver signed a concrete `token_contract`, the verifier proved
+    // that exact contract was approved. The x402 lane identifies its token by
+    // SYMBOL only (`accepted_tokens` carries no contract identity), so a
+    // facilitator resolving that symbol to a DIFFERENT contract would settle an
+    // unapproved token contract. Fail closed: a contract-pinned approval must be
+    // honored by a contract-aware lane (EIP-3009), not by this symbol-only one.
+    if binding.token_contract.is_some() {
+        return Err(SettlementError::InvalidBinding(
+            "x402 cannot honor a contract-pinned approval: the approval pins a token contract but \
+             the x402 lane identifies its token by symbol only, so the resolved contract is \
+             unverified"
+                .to_string(),
+        ));
     }
 
     // Token: x402 keeps the ACCEPTED (rail) token it settles in SEPARATE from
@@ -380,6 +420,39 @@ pub struct ApprovalBinding {
     /// via `token_symbol` and legitimately leave this `None`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub token_contract: Option<String>,
+    /// Fiat settlement currency the governing approval authorized (for example
+    /// `"USD"`), distinct from the rail [`Self::token_symbol`] on the x402 lane.
+    ///
+    /// x402 settles a fiat-denominated amount (`"USD"`) in an on-chain rail
+    /// token (`"USDC"`); the two are different strings. When the intent ALSO
+    /// pins a `max_amount`, the gate clamps `max_amount.currency` against THIS
+    /// fiat currency (via [`Self::settlement_currency`]), NOT the rail token, so
+    /// a valid USDC/USD x402 approval carrying a fiat `max_amount` is no longer
+    /// wrongly rejected. `None` means the rail token doubles as the settlement
+    /// currency (Circle / EIP-3009, where they coincide). When the intent
+    /// commits a `settlement_currency` this must equal it (signature-pinned).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settlement_currency: Option<String>,
+    /// Settlement-dispatch id the governing approval authorized.
+    ///
+    /// The dispatch-bearing lanes (x402 / Circle) assert the live
+    /// `dispatch.dispatch_id` against this value, so a verified witness cannot
+    /// be paired with a DIFFERENT dispatch that carries the same economics. It
+    /// is signature-pinned: the gate requires the intent to commit the same
+    /// `dispatch_id` and rejects a binding that carries one the intent never
+    /// committed. The EIP-3009 lane settles off a `domain` + `authorization`
+    /// (no dispatch) and leaves this `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dispatch_id: Option<String>,
+    /// Capability id the governing approval authorized.
+    ///
+    /// The x402 requirements echo a `capability_id` resolved from the live
+    /// dispatch; this lane asserts that resolved value against the
+    /// signature-pinned id here, so a verified witness cannot be paired with a
+    /// dispatch whose capability id differs. Signature-pinned the same way as
+    /// [`Self::dispatch_id`]. `None` for lanes with no capability identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capability_id: Option<String>,
     /// Approval expiry as a Unix timestamp in seconds. The prepared
     /// authorization MUST NOT outlive the governing approval: when an
     /// EIP-3009 `valid_before` would let a signed transfer stay broadcastable
@@ -435,6 +508,77 @@ impl ApprovalBinding {
             return Err(SettlementError::InvalidBinding(format!(
                 "{lane} approval expired: now {now_unix_seconds} >= approval expiry {}",
                 self.approval_expires_at
+            )));
+        }
+        Ok(())
+    }
+
+    /// The fiat settlement currency the approval authorized.
+    ///
+    /// Returns the explicit [`Self::settlement_currency`] when present (the
+    /// x402 fiat currency, distinct from the rail [`Self::token_symbol`]), else
+    /// falls back to the rail token symbol (Circle / EIP-3009, where the rail
+    /// token and the settlement currency coincide). This is the field the
+    /// `max_amount` currency clamp compares against, so a USDC-rail / USD-fiat
+    /// x402 approval clamps correctly.
+    #[must_use]
+    pub fn settlement_currency(&self) -> &str {
+        self.settlement_currency
+            .as_deref()
+            .unwrap_or(&self.token_symbol)
+    }
+
+    /// Assert the live dispatch id is the one the approval signature pinned.
+    ///
+    /// The dispatch-bearing lanes (x402 / Circle) copy `dispatch.dispatch_id`
+    /// into the settlement artifacts they produce. Without this a verified
+    /// witness for one dispatch could be paired with a DIFFERENT dispatch that
+    /// carries the same chain / payee / amount / token and produce artifacts
+    /// for that other dispatch. The witness gate signature-pins
+    /// [`Self::dispatch_id`] (it must equal the intent-committed value), so
+    /// asserting the live dispatch id against it here ties the witness to the
+    /// approved dispatch. Fails closed when the binding pins no dispatch id (a
+    /// dispatch-bearing lane requires a signed one) or when it disagrees with
+    /// the live dispatch.
+    pub fn assert_dispatch_id(&self, lane: &str, dispatch_id: &str) -> Result<(), SettlementError> {
+        let Some(bound) = self.dispatch_id.as_deref() else {
+            return Err(SettlementError::InvalidBinding(format!(
+                "{lane} dispatch identity unbound: the approval pins no dispatch id, so the \
+                 witness cannot be tied to this dispatch"
+            )));
+        };
+        if bound != dispatch_id {
+            return Err(SettlementError::InvalidBinding(format!(
+                "{lane} dispatch mismatch: dispatch id {dispatch_id:?} is not the approval-bound \
+                 dispatch {bound:?}"
+            )));
+        }
+        Ok(())
+    }
+
+    /// Assert the live capability id is the one the approval signature pinned.
+    ///
+    /// The x402 requirements echo a `capability_id` resolved from the live
+    /// dispatch. As with [`Self::assert_dispatch_id`], a witness for one
+    /// dispatch could otherwise be paired with a dispatch whose capability id
+    /// differs. The gate signature-pins [`Self::capability_id`], so asserting
+    /// the resolved capability id against it ties the witness to the approved
+    /// capability. Fails closed when unbound or on any mismatch.
+    pub fn assert_capability_id(
+        &self,
+        lane: &str,
+        capability_id: &str,
+    ) -> Result<(), SettlementError> {
+        let Some(bound) = self.capability_id.as_deref() else {
+            return Err(SettlementError::InvalidBinding(format!(
+                "{lane} capability identity unbound: the approval pins no capability id, so the \
+                 witness cannot be tied to this dispatch's capability"
+            )));
+        };
+        if bound != capability_id {
+            return Err(SettlementError::InvalidBinding(format!(
+                "{lane} capability mismatch: capability id {capability_id:?} is not the \
+                 approval-bound capability {bound:?}"
             )));
         }
         Ok(())
@@ -887,7 +1031,83 @@ fn assert_binding_matches_intent_commitment(
         }
     }
 
+    // Fiat settlement currency, dispatch id, and capability id are signed the
+    // same fail-closed way as the token contract: when the intent commits one,
+    // the resolved binding must match it; when the intent commits none, the
+    // resolved binding must NOT carry one. This guarantees that whenever a lane
+    // clamps against the fiat currency or pins a dispatch / capability identity,
+    // that value was committed by the signed intent rather than caller-chosen.
+    assert_signed_optional_identity(
+        "settlement currency",
+        committed.settlement_currency.as_deref(),
+        binding.settlement_currency.as_deref(),
+        IdentityMatch::CaseInsensitive,
+    )?;
+    assert_signed_optional_identity(
+        "dispatch id",
+        committed.dispatch_id.as_deref(),
+        binding.dispatch_id.as_deref(),
+        IdentityMatch::Exact,
+    )?;
+    assert_signed_optional_identity(
+        "capability id",
+        committed.capability_id.as_deref(),
+        binding.capability_id.as_deref(),
+        IdentityMatch::Exact,
+    )?;
+
     Ok(())
+}
+
+/// How [`assert_signed_optional_identity`] compares a committed value against a
+/// resolved one.
+#[derive(Debug, Clone, Copy)]
+enum IdentityMatch {
+    /// Compared case-insensitively after trimming (currency symbols).
+    CaseInsensitive,
+    /// Compared verbatim after trimming (opaque identifiers).
+    Exact,
+}
+
+/// Assert an optional signed identity field on the resolved binding agrees with
+/// the intent commitment, fail-closed in both directions.
+///
+/// Mirrors the `token_contract` pinning: when the intent commits a value the
+/// resolved binding must match it; when the intent commits none the resolved
+/// binding must omit it (so a caller cannot introduce a field the approver
+/// never signed). `CaseInsensitive` is for currency symbols; `Exact` is for
+/// opaque identifiers (dispatch / capability ids).
+fn assert_signed_optional_identity(
+    label: &str,
+    committed: Option<&str>,
+    bound: Option<&str>,
+    mode: IdentityMatch,
+) -> Result<(), SettlementError> {
+    match (committed, bound) {
+        (Some(committed_value), Some(bound_value)) => {
+            let matches = match mode {
+                IdentityMatch::CaseInsensitive => bound_value
+                    .trim()
+                    .eq_ignore_ascii_case(committed_value.trim()),
+                IdentityMatch::Exact => bound_value.trim() == committed_value.trim(),
+            };
+            if !matches {
+                return Err(SettlementError::Verification(format!(
+                    "approval binding {label} {bound_value:?} does not match the intent-committed \
+                     {label} {committed_value:?}"
+                )));
+            }
+            Ok(())
+        }
+        (Some(_), None) => Err(SettlementError::Verification(format!(
+            "approval binding omits the {label} the intent committed"
+        ))),
+        (None, Some(_)) => Err(SettlementError::Verification(format!(
+            "approval binding carries a {label} the intent never committed: it must be signed, \
+             not caller-substituted"
+        ))),
+        (None, None) => Ok(()),
+    }
 }
 
 /// Assert a resolved [`ApprovalBinding`] does not exceed an intent's approved
@@ -896,10 +1116,19 @@ fn assert_binding_matches_intent_commitment(
 /// When `max_amount` is `None` the intent pins no monetary ceiling and the
 /// binding is unconstrained here (the lanes still assert chain/payee/amount
 /// against the live dispatch). When it is `Some`, the bound amount must be
-/// `<=` the maximum and the bound currency must match the approved currency
-/// (case-insensitive after trimming), so a witness can never authorize a
-/// spend larger than, or in a different currency than, what the intent
-/// approved. Fails closed on any breach.
+/// `<=` the maximum and the bound FIAT settlement currency must match the
+/// approved currency (case-insensitive after trimming), so a witness can never
+/// authorize a spend larger than, or in a different currency than, what the
+/// intent approved. Fails closed on any breach.
+///
+/// The clamp compares `max_amount.currency` against
+/// [`ApprovalBinding::settlement_currency`] (the FIAT currency), NOT the rail
+/// [`ApprovalBinding::token_symbol`]. On the x402 lane the rail token (`USDC`)
+/// and the fiat settlement currency (`USD`) differ; comparing the rail token to
+/// the fiat `max_amount.currency` would wrongly reject a valid USDC/USD x402
+/// approval that also carries a fiat `max_amount`. `settlement_currency()`
+/// falls back to the rail token symbol on the Circle / EIP-3009 lanes, where
+/// the two coincide, so their existing currency clamp is unchanged.
 fn assert_binding_within_intent_max_amount(
     max_amount: Option<&MonetaryAmount>,
     binding: &ApprovalBinding,
@@ -913,14 +1142,15 @@ fn assert_binding_within_intent_max_amount(
             binding.amount_minor_units, max_amount.units
         )));
     }
-    if !binding
-        .token_symbol
+    let settlement_currency = binding.settlement_currency();
+    if !settlement_currency
         .trim()
         .eq_ignore_ascii_case(max_amount.currency.trim())
     {
         return Err(SettlementError::Verification(format!(
-            "approval binding currency {:?} does not match the intent-approved currency {:?}",
-            binding.token_symbol, max_amount.currency
+            "approval binding currency {settlement_currency:?} does not match the intent-approved \
+             currency {:?}",
+            max_amount.currency
         )));
     }
     Ok(())
@@ -1523,6 +1753,16 @@ pub fn evaluate_circle_nanopayment_with_verified_approval(
     // approval-bound token, so a captured approval cannot be redirected to a
     // different token symbol.
     binding.assert_token_symbol("Circle", &dispatch.settlement_amount.currency)?;
+
+    // Dispatch identity: the prepared payout copies `dispatch.dispatch_id`. As
+    // on the x402 lane, the approval economics do not pin WHICH dispatch the
+    // witness may settle, so without this a verified approval could be paired
+    // with a DIFFERENT dispatch carrying the same economics and produce a payout
+    // for that other dispatch. The witness gate signature-pins `dispatch_id`, so
+    // asserting the live dispatch id against it ties the witness to the approved
+    // dispatch. A dispatch with the same economics but a different `dispatch_id`
+    // fails closed.
+    binding.assert_dispatch_id("Circle", &dispatch.dispatch_id)?;
 
     evaluate_circle_nanopayment(dispatch, policy)
 }

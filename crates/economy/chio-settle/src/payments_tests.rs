@@ -81,6 +81,19 @@ fn intent_committing_binding(id: &str, binding: &ApprovalBinding) -> GovernedTra
     if let Some(contract) = binding.token_contract.as_ref() {
         commitment["token_contract"] = json!(contract);
     }
+    // Commit the optional fiat / dispatch / capability identity fields too, so
+    // the signed commitment matches the resolved binding the gate asserts
+    // against (the gate signature-pins these: a resolved field absent from the
+    // commitment, or vice versa, fails closed).
+    if let Some(currency) = binding.settlement_currency.as_ref() {
+        commitment["settlement_currency"] = json!(currency);
+    }
+    if let Some(dispatch_id) = binding.dispatch_id.as_ref() {
+        commitment["dispatch_id"] = json!(dispatch_id);
+    }
+    if let Some(capability_id) = binding.capability_id.as_ref() {
+        commitment["capability_id"] = json!(capability_id);
+    }
     let mut intent = unbounded_intent(id);
     intent.context = Some(json!({ CHIO_SETTLEMENT_BINDING_CONTEXT_KEY: commitment }));
     intent
@@ -113,7 +126,17 @@ fn signed_approval(
     GovernedApprovalToken::sign(body, approver).test_unwrap()
 }
 
-/// A binding that matches the sample dispatch's chain/payee/amount/token.
+/// The dispatch id of `sample_dispatch` (CHIO_WEB3_SETTLEMENT_DISPATCH_EXAMPLE).
+const DISPATCH_ID: &str = "dispatch-web3-1";
+/// The capability id the x402 requirements resolve for `sample_dispatch`: the
+/// example dispatch carries no explicit `capability_id`, so the resolver falls
+/// back to the `dispatch_id`.
+const DISPATCH_CAPABILITY_ID: &str = DISPATCH_ID;
+
+/// A binding that matches the sample dispatch's chain/payee/amount/token AND
+/// its dispatch / capability identity. The dispatch-bearing lanes (x402 /
+/// Circle) now require the binding to pin the dispatch identity, so the
+/// dispatch-derived bindings carry it.
 fn dispatch_binding() -> ApprovalBinding {
     ApprovalBinding {
         chain_id: DISPATCH_CHAIN_ID,
@@ -123,6 +146,12 @@ fn dispatch_binding() -> ApprovalBinding {
         // The dispatch lanes identify their token by symbol, not by a
         // contract address, so no contract is pinned here.
         token_contract: None,
+        // The sample dispatch settles a fiat amount whose currency equals the
+        // token symbol here (both `USD`), so no separate fiat currency is
+        // pinned; the round-7 rail-token helper overrides the rail token only.
+        settlement_currency: None,
+        dispatch_id: Some(DISPATCH_ID.to_string()),
+        capability_id: Some(DISPATCH_CAPABILITY_ID.to_string()),
         // Matches the `signed_approval` window so the EIP-3009 expiry
         // bound never trips for dispatch-derived bindings.
         approval_expires_at: APPROVAL_NOW + 100,
@@ -227,6 +256,11 @@ fn sample_binding() -> ApprovalBinding {
         amount_minor_units: SAMPLE_VALUE,
         token_symbol: SAMPLE_TOKEN_SYMBOL.to_string(),
         token_contract: Some(SAMPLE_TOKEN_CONTRACT.to_string()),
+        // The EIP-3009 lane settles off a domain + authorization with no
+        // dispatch, so it pins no fiat currency / dispatch / capability id.
+        settlement_currency: None,
+        dispatch_id: None,
+        capability_id: None,
         // Approval expiry at least as late as the authorization window so
         // the default sample does not trip the outlives-approval check.
         approval_expires_at: SAMPLE_VALID_BEFORE,
@@ -1443,6 +1477,9 @@ fn verify_governed_approval_rejects_a_caller_substituted_token_contract() {
         amount_minor_units: SAMPLE_VALUE,
         token_symbol: SAMPLE_TOKEN_SYMBOL.to_string(),
         token_contract: Some(SAMPLE_TOKEN_CONTRACT.to_string()),
+        settlement_currency: None,
+        dispatch_id: None,
+        capability_id: None,
         approval_expires_at: APPROVAL_NOW + 100,
     };
     let intent = intent_committing_binding("intent-committed-contract", &committed);
@@ -1498,6 +1535,9 @@ fn verify_governed_approval_rejects_an_uncommitted_token_contract() {
         amount_minor_units: SAMPLE_VALUE,
         token_symbol: SAMPLE_TOKEN_SYMBOL.to_string(),
         token_contract: None,
+        settlement_currency: None,
+        dispatch_id: None,
+        capability_id: None,
         approval_expires_at: APPROVAL_NOW + 100,
     };
     let intent = intent_committing_binding("intent-no-committed-contract", &committed);
@@ -1996,6 +2036,9 @@ fn verified_for_eip3009_authorization() -> VerifiedApproval {
             amount_minor_units: SAMPLE_VALUE,
             token_symbol: SAMPLE_TOKEN_SYMBOL.to_string(),
             token_contract: Some(SAMPLE_TOKEN_CONTRACT.to_string()),
+            settlement_currency: None,
+            dispatch_id: None,
+            capability_id: None,
             approval_expires_at: SAMPLE_VALID_BEFORE,
         },
         SAMPLE_VALID_BEFORE,
@@ -2030,6 +2073,9 @@ fn eip3009_with_verified_approval_rejects_a_payee_mismatch() {
             amount_minor_units: SAMPLE_VALUE,
             token_symbol: SAMPLE_TOKEN_SYMBOL.to_string(),
             token_contract: Some(SAMPLE_TOKEN_CONTRACT.to_string()),
+            settlement_currency: None,
+            dispatch_id: None,
+            capability_id: None,
             approval_expires_at: SAMPLE_VALID_BEFORE,
         },
         SAMPLE_VALID_BEFORE,
@@ -2298,5 +2344,279 @@ fn a_consumed_witness_cannot_authorize_a_second_transfer() {
     assert!(
         second.is_ok(),
         "a second spend must be authorized by its OWN witness, not a reused one: {second:?}"
+    );
+}
+
+// -----------------------------------------------------------------
+// C2 round-8 (P2): fiat-currency max_amount clamp, dispatch identity
+// binding, and contract-pinned approvals on the symbol-only x402 lane.
+// -----------------------------------------------------------------
+
+/// An x402 binding over the sample dispatch's chain/payee/amount/identity but
+/// bound to the on-chain RAIL token `rail` (for example `"USDC"`) while the
+/// dispatch settles a fiat amount in `fiat` (for example `"USD"`). The fiat
+/// settlement currency is pinned via `settlement_currency`, so a committed
+/// `max_amount` clamp compares against the fiat currency, not the rail token.
+fn dispatch_binding_with_rail_and_fiat(rail: &str, fiat: &str) -> ApprovalBinding {
+    let mut binding = dispatch_binding();
+    binding.token_symbol = rail.to_string();
+    binding.settlement_currency = Some(fiat.to_string());
+    binding
+}
+
+/// Build an intent that commits `binding` (rail token + fiat settlement
+/// currency + dispatch identity) AND pins an explicit fiat `max_amount`, then
+/// mint the matching approved token. Models a real USDC/USD x402 approval that
+/// also carries a budget clamp.
+fn intent_and_token_for_x402_with_fiat_max(
+    approver: &Keypair,
+    subject: &Keypair,
+    binding: &ApprovalBinding,
+    max_units: u64,
+    max_currency: &str,
+) -> (GovernedTransactionIntent, GovernedApprovalToken) {
+    let mut intent = intent_committing_binding("intent-x402-fiat-max", binding);
+    intent.max_amount = Some(MonetaryAmount {
+        units: max_units,
+        currency: max_currency.to_string(),
+    });
+    let token = signed_approval(approver, subject, &intent);
+    (intent, token)
+}
+
+#[test]
+fn x402_witness_with_fiat_max_amount_and_usdc_rail_is_accepted_and_still_clamps() {
+    // (P2 round-8) A valid Base/USDC x402 approval binds the RAIL token USDC but
+    // settles a fiat amount in USD, and ALSO carries a fiat `max_amount` (USD)
+    // as a budget clamp. The round-7 clamp compared the rail token (USDC) to
+    // `max_amount.currency` (USD) and wrongly rejected the witness, forcing
+    // callers to DROP `max_amount` to use the path (losing the budget clamp).
+    // The clamp must compare `max_amount` against the FIAT settlement currency,
+    // so this verifies AND the x402 lane advertises the rail token.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let binding = dispatch_binding_with_rail_and_fiat("USDC", "USD");
+    let (intent, token) = intent_and_token_for_x402_with_fiat_max(
+        &approver,
+        &subject,
+        &binding,
+        // A fiat ceiling at or above the dispatch amount, denominated in USD.
+        DISPATCH_AMOUNT as u64,
+        "USD",
+    );
+
+    // The witness verifies even though it carries a fiat max_amount: the clamp
+    // compares USD (fiat) vs USD (max_amount.currency), not USDC vs USD.
+    let approval =
+        verify_gate(&token, &intent, &approver, &subject, binding, APPROVAL_NOW).test_unwrap();
+
+    let dispatch = sample_dispatch();
+    let requirements = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec!["USDC".to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        approval,
+        APPROVAL_NOW,
+    )
+    .test_unwrap();
+    assert_eq!(
+        requirements.accepted_tokens,
+        vec!["USDC".to_string()],
+        "the USDC/USD x402 witness with a fiat max_amount must be accepted and advertise USDC"
+    );
+    // The fiat settlement currency stays separate from the rail token.
+    assert_eq!(requirements.currency, "USD");
+}
+
+#[test]
+fn x402_fiat_max_amount_still_clamps_an_over_budget_binding() {
+    // (P2 round-8) The fiat clamp is not weakened: a binding whose amount
+    // exceeds the intent's fiat `max_amount` (both in USD) must still be
+    // rejected at verification, even though the rail token is USDC. This proves
+    // the clamp now exercises the fiat currency rather than being silently
+    // dropped.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let mut binding = dispatch_binding_with_rail_and_fiat("USDC", "USD");
+    binding.amount_minor_units = DISPATCH_AMOUNT + 1; // one over the fiat max
+    let (intent, token) = intent_and_token_for_x402_with_fiat_max(
+        &approver,
+        &subject,
+        &binding,
+        DISPATCH_AMOUNT as u64,
+        "USD",
+    );
+    let error =
+        verify_gate(&token, &intent, &approver, &subject, binding, APPROVAL_NOW).test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("exceeds the intent-approved maximum"),
+        "the fiat max_amount must still clamp an over-budget binding, got: {error}"
+    );
+}
+
+#[test]
+fn x402_fiat_max_amount_rejects_a_mismatched_fiat_currency() {
+    // (P2 round-8) The currency half of the clamp now compares against the FIAT
+    // settlement currency. A binding whose fiat settlement currency is EUR while
+    // the intent's max_amount approves USD must be rejected: the clamp must not
+    // silently accept a different fiat currency just because the rail token
+    // happens to differ from both.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let binding = dispatch_binding_with_rail_and_fiat("USDC", "EUR");
+    let (intent, token) = intent_and_token_for_x402_with_fiat_max(
+        &approver,
+        &subject,
+        &binding,
+        DISPATCH_AMOUNT as u64,
+        "USD",
+    );
+    let error =
+        verify_gate(&token, &intent, &approver, &subject, binding, APPROVAL_NOW).test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("does not match the intent-approved currency"),
+        "a fiat-currency mismatch must be rejected, got: {error}"
+    );
+}
+
+/// A clone of the sample dispatch with the SAME economics (chain / payee /
+/// amount / currency) but a DIFFERENT `dispatch_id`. Models an attacker pairing
+/// a verified approval with a different dispatch that has identical economics.
+fn sample_dispatch_with_other_dispatch_id() -> Web3SettlementDispatchArtifact {
+    let mut dispatch = sample_dispatch();
+    dispatch.dispatch_id = "dispatch-web3-OTHER".to_string();
+    dispatch
+}
+
+#[test]
+fn x402_rejects_a_witness_paired_with_a_different_dispatch_id() {
+    // (P2 round-8) The witness is bound to the canonical dispatch identity
+    // (dispatch-web3-1), but the caller presents a DIFFERENT dispatch with the
+    // same chain/payee/amount/token and a different `dispatch_id`. Without the
+    // dispatch-identity binding the x402 wrapper would happily produce
+    // requirements echoing the OTHER dispatch's id. It must fail closed.
+    let other = sample_dispatch_with_other_dispatch_id();
+    let error = build_x402_payment_requirements_with_verified_approval(
+        &other,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        verified_for(dispatch_binding()),
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("dispatch mismatch"),
+        "an approval paired with a different dispatch_id must be rejected, got: {error}"
+    );
+}
+
+#[test]
+fn circle_rejects_a_witness_paired_with_a_different_dispatch_id() {
+    // (P2 round-8) Same scenario on the Circle lane: the prepared payout copies
+    // `dispatch.dispatch_id`, so a witness bound to dispatch-web3-1 must not
+    // produce a payout for a different dispatch carrying the same economics.
+    let other = sample_dispatch_with_other_dispatch_id();
+    let error = evaluate_circle_nanopayment_with_verified_approval(
+        &other,
+        &sample_circle_policy(),
+        verified_for(dispatch_binding()),
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("dispatch mismatch"),
+        "Circle must reject an approval paired with a different dispatch_id, got: {error}"
+    );
+}
+
+#[test]
+fn x402_rejects_a_witness_paired_with_a_different_capability_id() {
+    // (P2 round-8) The x402 requirements echo a capability id resolved from the
+    // dispatch. A witness whose signed binding pins a DIFFERENT capability id
+    // (modeling an approval issued for another dispatch's capability with the
+    // same economics) must fail closed against the live dispatch's resolved
+    // capability id, so settlement artifacts cannot be produced for the wrong
+    // capability.
+    let mut binding = dispatch_binding();
+    binding.capability_id = Some("cap-other".to_string());
+    // The intent commits the same (wrong) capability id, so the gate's
+    // signature-pinning check passes; only the lane assertion against the live
+    // dispatch can reject.
+    let approval = verified_for(binding);
+
+    let dispatch = sample_dispatch();
+    let error = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        approval,
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("capability mismatch"),
+        "an approval paired with a different capability_id must be rejected, got: {error}"
+    );
+}
+
+#[test]
+fn x402_rejects_a_witness_with_no_bound_dispatch_identity() {
+    // (P2 round-8) Defense in depth: the dispatch-bearing lane requires a
+    // SIGNED dispatch identity. A witness whose binding pins no dispatch id (for
+    // example one resolved for a non-x402 use) must not settle on the x402 lane.
+    let mut binding = dispatch_binding();
+    binding.dispatch_id = None;
+    binding.capability_id = None;
+    let dispatch = sample_dispatch();
+    let error = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        verified_for(binding),
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("dispatch identity unbound"),
+        "an x402 witness with no bound dispatch identity must be rejected, got: {error}"
+    );
+}
+
+#[test]
+fn x402_rejects_a_contract_pinned_approval_on_the_symbol_only_lane() {
+    // (P2 round-8) When the signed binding pins a concrete `token_contract`, the
+    // verifier proved THAT contract was approved. The x402 lane identifies its
+    // token by SYMBOL only and returns requirements with no contract identity,
+    // so a facilitator resolving the symbol to a DIFFERENT contract could settle
+    // an unapproved token contract. A contract-pinned approval must fail closed
+    // on the symbol-only x402 lane.
+    let mut binding = dispatch_binding();
+    binding.token_contract = Some(SAMPLE_TOKEN_CONTRACT.to_string());
+    let dispatch = sample_dispatch();
+    let error = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        verified_for(binding),
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("contract-pinned approval"),
+        "a contract-pinned approval must be rejected on the symbol-only x402 lane, got: {error}"
     );
 }

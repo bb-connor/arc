@@ -52,12 +52,51 @@ pub struct IntentSettlementBinding {
     /// Amount in token minor units the approver signed.
     pub amount_minor_units: u128,
     /// Token / currency symbol the approver signed (for example `"USDC"`).
+    ///
+    /// On the x402 lane this is the on-chain RAIL token the facilitator pulls
+    /// (for example `"USDC"`), which is DISTINCT from the fiat
+    /// [`Self::settlement_currency`] the amount is denominated in (for example
+    /// `"USD"`). On the Circle / EIP-3009 lanes the rail token and the
+    /// settlement currency coincide.
     pub token_symbol: String,
     /// Optional token contract address the approver signed. When present it is
     /// asserted against the caller binding's contract so a captured approval
     /// cannot be redirected to a different token contract on the same chain.
     #[serde(default)]
     pub token_contract: Option<String>,
+    /// Optional fiat settlement currency the approver signed (for example
+    /// `"USD"`).
+    ///
+    /// x402 keeps the on-chain rail token ([`Self::token_symbol`], e.g.
+    /// `"USDC"`) SEPARATE from the fiat currency the `amount_minor_units` is
+    /// denominated in (e.g. `"USD"`). When the intent ALSO pins a `max_amount`,
+    /// the clamp must compare `max_amount.currency` against THIS fiat currency,
+    /// not the rail token symbol; otherwise a valid USDC/USD x402 approval is
+    /// wrongly rejected. When absent the rail token doubles as the settlement
+    /// currency (Circle / EIP-3009, where the two coincide).
+    #[serde(default)]
+    pub settlement_currency: Option<String>,
+    /// Optional settlement-dispatch id the approver signed.
+    ///
+    /// A `GovernedApprovalToken` commits only the spend economics; it does not
+    /// otherwise pin WHICH dispatch the witness may settle. Folding the
+    /// `dispatch_id` into the signed commitment lets the dispatch-bearing lanes
+    /// (x402 / Circle) assert the live `dispatch.dispatch_id` against a signed
+    /// value, so a verified approval cannot be paired with a DIFFERENT dispatch
+    /// that happens to carry the same chain / payee / amount / token. The
+    /// EIP-3009 lane settles off a `domain` + `authorization` (no dispatch) and
+    /// legitimately leaves this `None`.
+    #[serde(default)]
+    pub dispatch_id: Option<String>,
+    /// Optional capability id the approver signed.
+    ///
+    /// The x402 requirements echo a `capability_id` resolved from the caller
+    /// dispatch. Committing it here lets the x402 lane assert that resolved
+    /// capability id against a signed value, so a verified approval cannot be
+    /// paired with a dispatch whose capability id differs. Lanes that do not
+    /// carry a capability identity leave this `None`.
+    #[serde(default)]
+    pub capability_id: Option<String>,
 }
 
 /// Parse the [`IntentSettlementBinding`] committed by an intent, if any.
@@ -426,8 +465,37 @@ mod tests {
                 amount_minor_units: 150,
                 token_symbol: "USDC".to_string(),
                 token_contract: Some("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913".to_string()),
+                settlement_currency: None,
+                dispatch_id: None,
+                capability_id: None,
             }
         );
+    }
+
+    #[test]
+    fn parses_the_optional_fiat_and_dispatch_identity_fields() {
+        // The settlement-currency / dispatch-id / capability-id commitments are
+        // covered by `binding_hash()`, so a verifier can derive the fiat
+        // currency the max_amount clamp uses and the dispatch identity the
+        // lanes pin from what the approver actually signed.
+        let intent = intent_with_context(Some(json!({
+            CHIO_SETTLEMENT_BINDING_CONTEXT_KEY: {
+                "chain_id": 8453,
+                "payee_address": "0x2222222222222222222222222222222222222222",
+                "amount_minor_units": 150,
+                "token_symbol": "USDC",
+                "settlement_currency": "USD",
+                "dispatch_id": "dispatch-web3-1",
+                "capability_id": "cap-7",
+            }
+        })));
+        let parsed = parse_intent_settlement_binding(&intent)
+            .test_unwrap()
+            .test_unwrap();
+        assert_eq!(parsed.settlement_currency.as_deref(), Some("USD"));
+        assert_eq!(parsed.dispatch_id.as_deref(), Some("dispatch-web3-1"));
+        assert_eq!(parsed.capability_id.as_deref(), Some("cap-7"));
+        assert_eq!(parsed.token_contract, None);
     }
 
     #[test]
