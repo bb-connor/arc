@@ -14,7 +14,83 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+use chio_core::capability::governance::GovernedTransactionIntent;
+use serde::Deserialize;
+
 use crate::SettlementError;
+
+/// Reserved key inside [`GovernedTransactionIntent::context`] that commits the
+/// concrete settlement economics (chain / payee / token / amount) the approver
+/// signed over.
+///
+/// A `GovernedTransactionIntent` carries no discrete chain / payee / token
+/// fields, so without this the witness layer would have to trust a
+/// caller-supplied chain / payee / token that the signed intent never bound:
+/// a captured approval could then be redirected to a different chain, payee, or
+/// token contract. Folding these values into the intent's `context` means
+/// `intent.binding_hash()` (the canonical-JSON sha256 the approval token
+/// commits to) covers them, so the verifier can DERIVE the settlement identity
+/// from what the approver actually signed and reject any caller-supplied
+/// binding that disagrees.
+pub const CHIO_SETTLEMENT_BINDING_CONTEXT_KEY: &str = "chioSettlementBinding";
+
+/// The concrete settlement economics committed by a [`GovernedTransactionIntent`]
+/// via [`CHIO_SETTLEMENT_BINDING_CONTEXT_KEY`].
+///
+/// Because the intent's `binding_hash()` covers `context`, every field here is
+/// part of what the approval token's signature commits to. The witness gate
+/// asserts the caller-resolved settlement binding against these values so the
+/// witness chain / payee / token / amount are the SIGNED ones, not
+/// caller-chosen.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IntentSettlementBinding {
+    /// EIP-155 chain id the approver signed the spend on.
+    pub chain_id: u64,
+    /// Payee address the approver signed (case-insensitive hex / checksum).
+    pub payee_address: String,
+    /// Amount in token minor units the approver signed.
+    pub amount_minor_units: u128,
+    /// Token / currency symbol the approver signed (for example `"USDC"`).
+    pub token_symbol: String,
+    /// Optional token contract address the approver signed. When present it is
+    /// asserted against the caller binding's contract so a captured approval
+    /// cannot be redirected to a different token contract on the same chain.
+    #[serde(default)]
+    pub token_contract: Option<String>,
+}
+
+/// Parse the [`IntentSettlementBinding`] committed by an intent, if any.
+///
+/// Returns `Ok(None)` when the intent carries no `context` object or no
+/// settlement-binding key (such an intent must then rely on `max_amount` for
+/// its monetary bound, enforced by the witness gate). Returns an error when the
+/// key IS present but malformed, so a corrupt commitment fails closed rather
+/// than being silently ignored.
+pub fn parse_intent_settlement_binding(
+    intent: &GovernedTransactionIntent,
+) -> Result<Option<IntentSettlementBinding>, SettlementError> {
+    let Some(context) = intent.context.as_ref() else {
+        return Ok(None);
+    };
+    let Some(object) = context.as_object() else {
+        return Ok(None);
+    };
+    let Some(value) = object.get(CHIO_SETTLEMENT_BINDING_CONTEXT_KEY) else {
+        return Ok(None);
+    };
+    if value.is_null() {
+        return Ok(None);
+    }
+    let parsed: IntentSettlementBinding =
+        serde_json::from_value(value.clone()).map_err(|error| {
+            SettlementError::Verification(format!(
+                "governed intent carries a malformed {CHIO_SETTLEMENT_BINDING_CONTEXT_KEY} \
+                 settlement commitment: {error}"
+            ))
+        })?;
+    Ok(Some(parsed))
+}
 
 /// Outcome of [`ApprovalReplayStore::record_if_fresh`].
 ///
@@ -199,11 +275,31 @@ pub fn parse_eip155_chain_id(dispatch_chain_id: &str) -> Result<u64, SettlementE
 #[cfg(test)]
 mod tests {
     use super::{
-        parse_eip155_chain_id, ApprovalReplayOutcome, ApprovalReplayStore,
-        InMemoryApprovalReplayStore,
+        parse_eip155_chain_id, parse_intent_settlement_binding, ApprovalReplayOutcome,
+        ApprovalReplayStore, InMemoryApprovalReplayStore, IntentSettlementBinding,
+        CHIO_SETTLEMENT_BINDING_CONTEXT_KEY,
     };
 
+    use chio_core::capability::governance::GovernedTransactionIntent;
     use chio_test_support::prelude::*;
+    use serde_json::json;
+
+    /// A minimal intent with the given `context` (or none).
+    fn intent_with_context(context: Option<serde_json::Value>) -> GovernedTransactionIntent {
+        GovernedTransactionIntent {
+            id: "intent-1".to_string(),
+            server_id: "settlement-server".to_string(),
+            tool_name: "transfer_funds".to_string(),
+            purpose: "settlement-binding parse test".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context,
+        }
+    }
 
     #[test]
     fn replay_store_records_a_fresh_pair_once() {
@@ -305,6 +401,65 @@ mod tests {
         assert!(
             error.to_string().contains("surrounding whitespace"),
             "got: {error}"
+        );
+    }
+
+    #[test]
+    fn parses_a_committed_settlement_binding() {
+        let intent = intent_with_context(Some(json!({
+            CHIO_SETTLEMENT_BINDING_CONTEXT_KEY: {
+                "chain_id": 8453,
+                "payee_address": "0x2222222222222222222222222222222222222222",
+                "amount_minor_units": 150,
+                "token_symbol": "USDC",
+                "token_contract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            }
+        })));
+        let parsed = parse_intent_settlement_binding(&intent)
+            .test_unwrap()
+            .test_unwrap();
+        assert_eq!(
+            parsed,
+            IntentSettlementBinding {
+                chain_id: 8453,
+                payee_address: "0x2222222222222222222222222222222222222222".to_string(),
+                amount_minor_units: 150,
+                token_symbol: "USDC".to_string(),
+                token_contract: Some("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913".to_string()),
+            }
+        );
+    }
+
+    #[test]
+    fn returns_none_when_no_settlement_binding_is_committed() {
+        // No context at all.
+        assert!(parse_intent_settlement_binding(&intent_with_context(None))
+            .test_unwrap()
+            .is_none());
+        // A context object without the reserved key.
+        let other = intent_with_context(Some(json!({ "unrelated": true })));
+        assert!(parse_intent_settlement_binding(&other)
+            .test_unwrap()
+            .is_none());
+        // An explicit null under the key.
+        let null_key =
+            intent_with_context(Some(json!({ CHIO_SETTLEMENT_BINDING_CONTEXT_KEY: null })));
+        assert!(parse_intent_settlement_binding(&null_key)
+            .test_unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn rejects_a_malformed_settlement_binding() {
+        // The key IS present but the value is missing required fields: this
+        // must fail closed, not be silently ignored.
+        let intent = intent_with_context(Some(json!({
+            CHIO_SETTLEMENT_BINDING_CONTEXT_KEY: { "chain_id": 8453 }
+        })));
+        let error = parse_intent_settlement_binding(&intent).test_unwrap_err();
+        assert!(
+            error.to_string().contains("malformed"),
+            "a malformed settlement commitment must fail closed, got: {error}"
         );
     }
 }

@@ -110,6 +110,15 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "existing oversized remote MCP test suite; capped to current size until split",
         max_lines=2_008,
     ),
+    "crates/economy/chio-settle/src/payments_tests.rs": allow(
+        "2026-07-31",
+        "C2 (BAC-541) money-keystone witness test suite; grown by the round-6 per-property "
+        "fail-closed regressions (cross-call replay via shared store, single-use witness, "
+        "unbounded-intent rejection, caller-substituted chain/payee/token, lane-use expiry "
+        "across all three lanes, x402 accepted-token filtering) plus the round-5 regressions; "
+        "capped to current size until the lane tests are split from the gate tests",
+        max_lines=2_045,
+    ),
 }
 
 

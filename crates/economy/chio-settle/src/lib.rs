@@ -24,8 +24,9 @@ use chio_core::capability::scope::MonetaryAmount;
 use serde::{Deserialize, Serialize};
 
 pub use approval_witness::{
-    parse_eip155_chain_id, ApprovalReplayOutcome, ApprovalReplayStore, InMemoryApprovalReplayStore,
-    DEFAULT_MAX_APPROVAL_REPLAY_ENTRIES,
+    parse_eip155_chain_id, parse_intent_settlement_binding, ApprovalReplayOutcome,
+    ApprovalReplayStore, InMemoryApprovalReplayStore, IntentSettlementBinding,
+    CHIO_SETTLEMENT_BINDING_CONTEXT_KEY, DEFAULT_MAX_APPROVAL_REPLAY_ENTRIES,
 };
 pub use automation::{
     assess_watchdog_execution, build_bond_watchdog_job, build_settlement_watchdog_job,
@@ -75,12 +76,12 @@ pub use ops::{
 pub use payments::{
     build_x402_payment_requirements_with_verified_approval,
     evaluate_circle_nanopayment_with_verified_approval, prepare_paymaster_compatibility,
-    prepare_transfer_with_verified_approval, verify_governed_approval,
-    verify_governed_approval_with_default_replay_store, ApprovalBinding, CircleNanopaymentPolicy,
-    Eip3009Domain, Eip3009NonceStore, Erc4337PaymasterPolicy, InMemoryEip3009NonceStore,
-    NonceOutcome, PreparedCircleNanopayment, PreparedPaymasterCompatibility,
-    PreparedTransferWithAuthorization, TransferWithAuthorizationInput, VerifiedApproval,
-    X402PaymentRequirements, X402SettlementMode, DEFAULT_MAX_EIP3009_NONCE_ENTRIES,
+    prepare_transfer_with_verified_approval, verify_governed_approval, ApprovalBinding,
+    CircleNanopaymentPolicy, Eip3009Domain, Eip3009NonceStore, Erc4337PaymasterPolicy,
+    InMemoryEip3009NonceStore, NonceOutcome, PreparedCircleNanopayment,
+    PreparedPaymasterCompatibility, PreparedTransferWithAuthorization,
+    TransferWithAuthorizationInput, VerifiedApproval, X402PaymentRequirements, X402SettlementMode,
+    DEFAULT_MAX_EIP3009_NONCE_ENTRIES,
 };
 pub use retry::{
     classify_attempt, DeadLetterRecord, RetryDecision, RetryPolicy, DEFAULT_BACKOFF_CAP_MS,

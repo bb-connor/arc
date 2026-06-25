@@ -14,7 +14,8 @@ use chio_core::web3::settlement::Web3SettlementDispatchArtifact;
 use serde::{Deserialize, Serialize};
 
 use crate::approval_witness::{
-    parse_eip155_chain_id, ApprovalReplayOutcome, ApprovalReplayStore, InMemoryApprovalReplayStore,
+    parse_eip155_chain_id, parse_intent_settlement_binding, ApprovalReplayOutcome,
+    ApprovalReplayStore, IntentSettlementBinding,
 };
 use crate::SettlementError;
 
@@ -186,15 +187,30 @@ pub(crate) fn build_x402_payment_requirements(
 /// INSIDE the verifier via [`parse_eip155_chain_id`], so a caller cannot
 /// supply a chain that disagrees with the dispatch. A dispatch whose chain
 /// does not match the approval-bound chain fails closed.
+///
+/// The `VerifiedApproval` witness is CONSUMED by value: a single witness
+/// authorizes a single lane use, so it cannot be reused to advertise multiple
+/// sets of requirements. `now_unix_seconds` is the lane-use clock: the
+/// approval's `approval_expires_at` is re-checked here, so a witness verified
+/// just before expiry and held cannot authorize settlement artifacts built
+/// after it lapses. The returned `accepted_tokens` are filtered down to the
+/// approval-bound token, so the requirements never advertise a token the
+/// approval did not authorize even if the caller passed extras.
 pub fn build_x402_payment_requirements_with_verified_approval(
     dispatch: &Web3SettlementDispatchArtifact,
     facilitator_url: &str,
     resource: &str,
     accepted_tokens: Vec<String>,
     settlement_mode: X402SettlementMode,
-    approval: &VerifiedApproval,
+    approval: VerifiedApproval,
+    now_unix_seconds: u64,
 ) -> Result<X402PaymentRequirements, SettlementError> {
     let binding = approval.binding();
+
+    // Lane-use expiry: re-check the approval window against the lane-use clock.
+    // The witness may have been verified just before expiry and held; an
+    // approval that has lapsed by lane use must not authorize settlement.
+    binding.assert_not_expired_at("x402", now_unix_seconds)?;
 
     // Chain: derive the numeric chain id from the dispatch itself and require
     // it to be the chain the approval authorized. The dispatch carries the
@@ -243,15 +259,24 @@ pub fn build_x402_payment_requirements_with_verified_approval(
     // Token: the approval-bound token must also be one the x402 requirements
     // will actually accept. Otherwise the requirements could offer to settle
     // this governed spend in a token the approval never authorized. Compared
-    // case-insensitively after trimming.
-    if !accepted_tokens.iter().any(|token| {
-        token
-            .trim()
-            .eq_ignore_ascii_case(binding.token_symbol.trim())
-    }) {
+    // case-insensitively after trimming. A membership check alone is not
+    // enough: it proves the bound token is somewhere in `accepted_tokens` but
+    // still returns the WHOLE list, so `[approved, other]` would keep
+    // advertising `other` to the facilitator. Filter the list down to the
+    // approval-bound token(s) so the requirements only ever advertise the
+    // approved token, and fail closed when the bound token is absent.
+    let filtered_tokens: Vec<String> = accepted_tokens
+        .into_iter()
+        .filter(|token| {
+            token
+                .trim()
+                .eq_ignore_ascii_case(binding.token_symbol.trim())
+        })
+        .collect();
+    if filtered_tokens.is_empty() {
         return Err(SettlementError::InvalidBinding(format!(
-            "x402 token mismatch: approval-bound token {:?} is not in the accepted tokens {:?}",
-            binding.token_symbol, accepted_tokens
+            "x402 token mismatch: approval-bound token {:?} is not in the accepted tokens",
+            binding.token_symbol
         )));
     }
 
@@ -259,7 +284,7 @@ pub fn build_x402_payment_requirements_with_verified_approval(
         dispatch,
         facilitator_url,
         resource,
-        accepted_tokens,
+        filtered_tokens,
         settlement_mode,
     )
 }
@@ -369,6 +394,30 @@ impl ApprovalBinding {
         }
         Ok(())
     }
+
+    /// Assert the governing approval has not expired as of the lane-use clock.
+    ///
+    /// The witness verification gate checks the approval window once, at verify
+    /// time. A caller can verify just before `approval_expires_at`, hold the
+    /// witness, and try to build settlement artifacts later. Each lane entry
+    /// point re-checks this at lane use so an approval that has lapsed by the
+    /// time the lane runs cannot authorize a later spend. The boundary instant
+    /// `now == approval_expires_at` is treated as expired (the approval covers
+    /// `[_, approval_expires_at)`), matching the EIP-3009 `valid_before`
+    /// half-open window. Fails closed.
+    pub fn assert_not_expired_at(
+        &self,
+        lane: &str,
+        now_unix_seconds: u64,
+    ) -> Result<(), SettlementError> {
+        if now_unix_seconds >= self.approval_expires_at {
+            return Err(SettlementError::InvalidBinding(format!(
+                "{lane} approval expired: now {now_unix_seconds} >= approval expiry {}",
+                self.approval_expires_at
+            )));
+        }
+        Ok(())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -422,9 +471,14 @@ impl ApprovalBinding {
 /// this type is a capability witness: holding one means a real
 /// [`GovernedApprovalToken`] authorized the carried [`ApprovalBinding`] for
 /// the settlement identified by `governed_intent_hash`. The per-lane
-/// `*_with_verified_approval` entry points take this by reference and assert
-/// the dispatch/authorization against `binding`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// `*_with_verified_approval` entry points take this BY VALUE and assert the
+/// dispatch/authorization against `binding`, consuming the witness so it cannot
+/// authorize a second settlement.
+///
+/// It deliberately does NOT derive `Clone`: a single-use capability witness
+/// that could be duplicated would not be single-use, so a caller cannot keep a
+/// copy to reuse with a fresh EIP-3009 nonce after a lane has consumed it.
+#[derive(Debug)]
 pub struct VerifiedApproval {
     /// The intent hash the verified token committed to (== the recomputed
     /// `binding_hash()` of the intent the caller passed in).
@@ -492,21 +546,30 @@ impl VerifiedApproval {
 /// 6. **Intent coverage.** `intent.binding_hash()` must equal
 ///    `token.governed_intent_hash`, proving the approval covers THIS
 ///    settlement and not some other intent.
-/// 7. **Intent amount / currency clamp.** When `intent.max_amount` is set,
-///    the resolved `binding` must not exceed the approved maximum: the bound
-///    amount must be `<=` the maximum and the bound currency must match. A
-///    binding that overspends or settles in an unapproved currency is
-///    rejected before any witness is issued.
-/// 8. **Expiry clamp.** `binding.approval_expires_at` must not be later than
+/// 7. **Intent settlement binding.** When the intent commits a concrete
+///    settlement binding (chain / payee / token / amount) via its
+///    [`crate::approval_witness::CHIO_SETTLEMENT_BINDING_CONTEXT_KEY`] context
+///    commitment, the caller-resolved `binding` must match it exactly. Because
+///    `intent.binding_hash()` covers `context`, this DERIVES the chain / payee
+///    / token / amount from what the approver actually signed, so the witness
+///    cannot carry a caller-chosen chain, payee, or token contract the
+///    approval never authorized.
+/// 8. **Monetary bound required.** The intent must carry a monetary bound:
+///    either an explicit `max_amount` or an equivalent committed settlement
+///    binding (step 7). An intent with NEITHER pins no ceiling on the spend, so
+///    no witness is issued for it (fail-closed). When `max_amount` is set the
+///    resolved `binding` must not exceed it (amount `<=` maximum, matching
+///    currency).
+/// 9. **Expiry clamp.** `binding.approval_expires_at` must not be later than
 ///    `token.expires_at`. The binding is derived from the token, so an
 ///    EIP-3009 `valid_before` clamped to the binding expiry cannot outlive
 ///    the token; rejecting a longer binding expiry keeps the off-chain spend
 ///    window bounded by the token.
-/// 9. **Single-use replay.** `(token.request_id, intent_hash)` is recorded in
-///    `replay_store` (mirroring the kernel `approval_replay_store`). A second
-///    presentation of the same approval is rejected before the witness is
-///    issued; the entry is recorded ONLY after every other check passes, so a
-///    rejected approval does not burn its replay slot.
+/// 10. **Single-use replay.** `(token.request_id, intent_hash)` is recorded in
+///     `replay_store` (mirroring the kernel `approval_replay_store`). A second
+///     presentation of the same approval is rejected before the witness is
+///     issued; the entry is recorded ONLY after every other check passes, so a
+///     rejected approval does not burn its replay slot.
 ///
 /// `binding` is the chain/payee/amount the caller resolved from `intent`.
 /// It is returned inside the [`VerifiedApproval`] for the lanes to assert
@@ -599,12 +662,33 @@ pub fn verify_governed_approval(
         ));
     }
 
-    // (7) Intent amount / currency clamp. When the approved intent pins a
-    // maximum amount, the binding must stay within it: an over-amount or
-    // wrong-currency binding must never be turned into a witness.
+    // (7) Intent settlement binding. When the approver signed a concrete
+    // chain / payee / token / amount commitment into the intent context, the
+    // caller-resolved binding must match it exactly. This DERIVES the witness
+    // chain / payee / token from what `intent.binding_hash()` (and therefore
+    // the approval signature) commits, so a caller cannot substitute a payee,
+    // chain, or token contract the approval never authorized.
+    let committed_binding = parse_intent_settlement_binding(intent)?;
+    if let Some(committed) = committed_binding.as_ref() {
+        assert_binding_matches_intent_commitment(committed, &binding)?;
+    }
+
+    // (8) Monetary bound required. An intent with neither an explicit
+    // `max_amount` nor a committed settlement binding pins no monetary ceiling
+    // on the spend, so issuing a witness would let an arbitrary caller-supplied
+    // amount through. Fail closed: refuse the witness unless the intent carries
+    // an explicit monetary bound. When `max_amount` is set, also clamp the
+    // resolved binding to it (amount <= maximum, matching currency).
+    if intent.max_amount.is_none() && committed_binding.is_none() {
+        return Err(SettlementError::Verification(
+            "governed intent carries no monetary bound: neither an explicit max_amount nor a \
+             committed settlement binding, so no witness can be issued"
+                .to_string(),
+        ));
+    }
     assert_binding_within_intent_max_amount(intent.max_amount.as_ref(), &binding)?;
 
-    // (8) Expiry clamp. The binding is derived from the token, so its expiry
+    // (9) Expiry clamp. The binding is derived from the token, so its expiry
     // must not outlast the token; otherwise an EIP-3009 `valid_before` clamped
     // to the binding could keep a signed transfer broadcastable past the token
     // that governs it.
@@ -615,7 +699,7 @@ pub fn verify_governed_approval(
         )));
     }
 
-    // (9) Single-use replay. Record AFTER every other check so a rejected
+    // (10) Single-use replay. Record AFTER every other check so a rejected
     // approval does not burn its replay slot, but BEFORE issuing the witness
     // so the first successful verification is the only one. Keyed on
     // `(request_id, intent_hash)`, mirroring the kernel replay store. Retain
@@ -641,39 +725,93 @@ pub fn verify_governed_approval(
     })
 }
 
-/// Verify a [`GovernedApprovalToken`] on the exported settlement path with a
-/// process-local single-use replay store wired ON BY DEFAULT.
+/// Assert a caller-resolved [`ApprovalBinding`] matches the settlement
+/// commitment the approver signed into the intent.
 ///
-/// This is the entry point operators use when they do not supply their own
-/// durable [`ApprovalReplayStore`]. It constructs a fresh
-/// [`InMemoryApprovalReplayStore`] per call, so it is only single-use within
-/// that call; deployments that must reject replays ACROSS calls hold a shared
-/// store (durable SQLite seam, or a long-lived `InMemoryApprovalReplayStore`)
-/// and call [`verify_governed_approval`] directly with it. Either way the
-/// replay check is never skipped: the witness cannot be produced without a
-/// store, so C2 single-use is enforced by the API surface rather than caller
-/// discipline.
-#[allow(clippy::too_many_arguments)]
-pub fn verify_governed_approval_with_default_replay_store(
-    token: &GovernedApprovalToken,
-    intent: &GovernedTransactionIntent,
-    expected_approver: &PublicKey,
-    expected_subject: &PublicKey,
-    expected_request_id: &str,
-    binding: ApprovalBinding,
-    now_unix_seconds: u64,
-) -> Result<VerifiedApproval, SettlementError> {
-    let replay_store = InMemoryApprovalReplayStore::new();
-    verify_governed_approval(
-        token,
-        intent,
-        expected_approver,
-        expected_subject,
-        expected_request_id,
-        binding,
-        now_unix_seconds,
-        &replay_store,
-    )
+/// Every field of `committed` is covered by `intent.binding_hash()` (the
+/// canonical-JSON sha256 the approval token signs), so matching against it
+/// DERIVES the chain / payee / token / amount from the SIGNED intent. A
+/// caller-substituted chain, payee, token contract, or amount that disagrees
+/// with what the approver authorized is rejected before any witness is issued.
+/// Addresses are compared as parsed [`Address`] bytes so checksum vs lowercase
+/// hex compare equal; the token symbol is compared case-insensitively after
+/// trimming.
+fn assert_binding_matches_intent_commitment(
+    committed: &IntentSettlementBinding,
+    binding: &ApprovalBinding,
+) -> Result<(), SettlementError> {
+    if binding.chain_id != committed.chain_id {
+        return Err(SettlementError::Verification(format!(
+            "approval binding chain {} does not match the intent-committed chain {}",
+            binding.chain_id, committed.chain_id
+        )));
+    }
+
+    let bound_payee = Address::from_str(binding.payee_address.trim()).map_err(|error| {
+        SettlementError::Verification(format!("approval binding payee address invalid: {error}"))
+    })?;
+    let committed_payee = Address::from_str(committed.payee_address.trim()).map_err(|error| {
+        SettlementError::Verification(format!("intent-committed payee address invalid: {error}"))
+    })?;
+    if bound_payee != committed_payee {
+        return Err(SettlementError::Verification(
+            "approval binding payee does not match the intent-committed payee".to_string(),
+        ));
+    }
+
+    if binding.amount_minor_units != committed.amount_minor_units {
+        return Err(SettlementError::Verification(format!(
+            "approval binding amount {} does not match the intent-committed amount {}",
+            binding.amount_minor_units, committed.amount_minor_units
+        )));
+    }
+
+    if !binding
+        .token_symbol
+        .trim()
+        .eq_ignore_ascii_case(committed.token_symbol.trim())
+    {
+        return Err(SettlementError::Verification(format!(
+            "approval binding token {:?} does not match the intent-committed token {:?}",
+            binding.token_symbol, committed.token_symbol
+        )));
+    }
+
+    // Token contract: only assert when the intent committed one. Compare as
+    // parsed Address bytes so casing differences do not matter. A binding that
+    // omits the contract while the intent commits one is rejected, and a
+    // binding contract that disagrees with the committed one is rejected, so a
+    // captured approval cannot be redirected to a different token contract.
+    if let Some(committed_contract) = committed.token_contract.as_deref() {
+        let committed_contract = Address::from_str(committed_contract.trim()).map_err(|error| {
+            SettlementError::Verification(format!(
+                "intent-committed token contract address invalid: {error}"
+            ))
+        })?;
+        let bound_contract = binding
+            .token_contract
+            .as_deref()
+            .ok_or_else(|| {
+                SettlementError::Verification(
+                    "approval binding omits the token contract the intent committed".to_string(),
+                )
+            })
+            .and_then(|raw| {
+                Address::from_str(raw.trim()).map_err(|error| {
+                    SettlementError::Verification(format!(
+                        "approval binding token contract address invalid: {error}"
+                    ))
+                })
+            })?;
+        if bound_contract != committed_contract {
+            return Err(SettlementError::Verification(
+                "approval binding token contract does not match the intent-committed contract"
+                    .to_string(),
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 /// Assert a resolved [`ApprovalBinding`] does not exceed an intent's approved
@@ -1148,17 +1286,32 @@ pub(crate) fn prepare_transfer_with_authorization(
 /// assertions in [`prepare_transfer_with_authorization`] then run exactly as
 /// before against that trusted binding, so a captured authorization still
 /// cannot be redirected, inflated, replayed, or re-chained.
+///
+/// The `VerifiedApproval` witness is CONSUMED by value, so a single witness
+/// prepares a single transfer and cannot be reused with a fresh EIP-3009 nonce
+/// to prepare another. `now_unix_seconds` is the lane-use clock: the approval's
+/// `approval_expires_at` is re-checked here before any digest is built, so an
+/// approval verified just before expiry and held cannot authorize a transfer
+/// prepared after it lapses.
 pub fn prepare_transfer_with_verified_approval(
     domain: Eip3009Domain,
     authorization: TransferWithAuthorizationInput,
-    approval: &VerifiedApproval,
+    approval: VerifiedApproval,
     now_unix_seconds: u64,
     nonce_store: &dyn Eip3009NonceStore,
 ) -> Result<PreparedTransferWithAuthorization, SettlementError> {
+    let binding = approval.binding();
+    // Lane-use expiry: re-check the approval window against the lane-use clock
+    // before binding. `prepare_transfer_with_authorization` already rejects an
+    // authorization whose `valid_before` outlives `approval_expires_at`, but it
+    // is the EIP-3009 window (not the approval window) it checks against `now`;
+    // re-check the approval window itself here so a held witness cannot prepare
+    // a transfer after the approval has lapsed.
+    binding.assert_not_expired_at("EIP-3009", now_unix_seconds)?;
     prepare_transfer_with_authorization(
         domain,
         authorization,
-        approval.binding(),
+        binding,
         now_unix_seconds,
         nonce_store,
     )
@@ -1241,12 +1394,23 @@ pub(crate) fn evaluate_circle_nanopayment(
 /// `chain_id` string INSIDE the wrapper via [`parse_eip155_chain_id`], so a
 /// caller cannot supply a chain that disagrees with the dispatch; a dispatch
 /// whose chain does not match the approval-bound chain fails closed.
+///
+/// The `VerifiedApproval` witness is CONSUMED by value so a single witness
+/// evaluates a single Circle candidate and cannot be reused. `now_unix_seconds`
+/// is the lane-use clock: the approval's `approval_expires_at` is re-checked
+/// here, so a witness verified just before expiry and held cannot authorize a
+/// Circle payout prepared after it lapses.
 pub fn evaluate_circle_nanopayment_with_verified_approval(
     dispatch: &Web3SettlementDispatchArtifact,
     policy: &CircleNanopaymentPolicy,
-    approval: &VerifiedApproval,
+    approval: VerifiedApproval,
+    now_unix_seconds: u64,
 ) -> Result<Option<PreparedCircleNanopayment>, SettlementError> {
     let binding = approval.binding();
+
+    // Lane-use expiry: re-check the approval window against the lane-use clock
+    // so a held witness cannot authorize a payout after the approval lapses.
+    binding.assert_not_expired_at("Circle", now_unix_seconds)?;
 
     let dispatch_chain_id = parse_eip155_chain_id(&dispatch.chain_id)?;
     if dispatch_chain_id != binding.chain_id {
