@@ -49,6 +49,9 @@ pub enum Error {
     #[cfg_attr(feature = "std", error("scope mismatch: {reason}"))]
     ScopeMismatch { reason: String },
 
+    #[cfg_attr(feature = "std", error("invalid attestation window: {reason}"))]
+    InvalidAttestationWindow { reason: String },
+
     #[cfg_attr(feature = "std", error("signature verification failed"))]
     SignatureVerificationFailed,
 
@@ -110,6 +113,9 @@ impl core::fmt::Display for Error {
                 write!(f, "attenuation violation: {reason}")
             }
             Error::ScopeMismatch { reason } => write!(f, "scope mismatch: {reason}"),
+            Error::InvalidAttestationWindow { reason } => {
+                write!(f, "invalid attestation window: {reason}")
+            }
             Error::SignatureVerificationFailed => write!(f, "signature verification failed"),
             Error::DelegationDepthExceeded { depth, max } => {
                 write!(f, "delegation depth {depth} exceeds maximum {max}")
