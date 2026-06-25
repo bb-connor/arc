@@ -403,6 +403,44 @@ impl ChioReceipt {
         ))
     }
 
+    /// WYSIWYS BBS receipt signing: recompute `content_hash` inside the trust
+    /// boundary and refuse to sign if the prepared body's claimed hash differs.
+    ///
+    /// This is the BBS/selective-disclosure analogue of
+    /// [`ChioReceipt::sign_with_handle`]. The classical and backend handle
+    /// signers already recompute `content_hash` over a one-time
+    /// [`ReceiptSigningHandle`] and refuse on mismatch; the BBS path
+    /// ([`ChioReceipt::sign_prepared_with_bbs`]) historically bypassed that
+    /// gate, so a BBS receipt could render content `A` while binding a body
+    /// whose `content_hash` claimed `B`. This entrypoint closes that gap.
+    ///
+    /// The `handle` is bound to the exact canonical content the producer
+    /// evaluated. The signer recomputes `content_hash` over that content and
+    /// consumes the handle by value, so a BBS signature produced here
+    /// corresponds to *that* content, not an arbitrary caller-supplied
+    /// `content_hash`. `prepare_receipt_body_for_signing` does not mutate
+    /// `content_hash` (it only binds the nonce and computes the id), so the
+    /// gate runs identically whether the body is checked before or after
+    /// preparation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error (fail-closed) when the body's `content_hash` does not
+    /// equal the hash recomputed over the handle's content, or for any error
+    /// surfaced by [`ChioReceipt::sign_prepared_with_bbs`].
+    pub fn sign_prepared_with_bbs_using_handle(
+        body: ChioReceiptBody,
+        keypair: &Keypair,
+        bbs_signature: BbsReceiptSignature,
+        handle: ReceiptSigningHandle,
+    ) -> Result<Self> {
+        // Recompute-and-refuse FIRST, before any signing work, so a hash
+        // mismatch can never produce a BBS-bound signature. `handle` is moved
+        // in and not used afterwards, enforcing one-time consumption.
+        handle.ensure_body_matches(&body)?;
+        Self::sign_prepared_with_bbs(body, keypair, bbs_signature)
+    }
+
     /// Extract the body for re-verification.
     #[must_use]
     pub fn body(&self) -> ChioReceiptBody {

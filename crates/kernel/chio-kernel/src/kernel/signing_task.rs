@@ -515,6 +515,33 @@ impl SigningTaskHandle {
         }
     }
 
+    /// Re-clone the active sender while serializing against
+    /// [`Self::shutdown`], rejecting when shutdown has begun.
+    ///
+    /// `shutdown` latches `closed` AND drops the canonical sender while holding
+    /// the [`Self::spawn_gate`]; taking the same gate here makes the
+    /// closed-check and the sender clone a single atomic step relative to
+    /// shutdown. A caller that observes `Some(sender)` is therefore guaranteed
+    /// that shutdown had NOT yet taken the canonical sender at that instant, so
+    /// the sender it holds is not merely a stale clone keeping a doomed channel
+    /// alive.
+    ///
+    /// This is the post-permit-wait re-check that closes the shutdown race
+    /// (BAC-539 round-6): a producer must not hold a sender clone across the
+    /// aggregate-permit `.await`, because while it is stalled `shutdown` can
+    /// drop the canonical sender and start joining. The stalled clone would keep
+    /// the receiver open, let the task drain queued work (releasing permits),
+    /// and then enqueue a request that had not reached the channel before
+    /// shutdown began -- which `shutdown` would then sign/await. Re-cloning here
+    /// (and rejecting when `closed`) guarantees such a request is refused.
+    fn sender_clone_if_open(&self) -> Option<mpsc::Sender<SignRequest>> {
+        let _spawn_guard = self.lock_spawn_gate();
+        if self.closed.load(Ordering::Acquire) {
+            return None;
+        }
+        self.inner.get().and_then(SigningTaskInner::sender_clone)
+    }
+
     /// Submit a signing request and `.await` the signed receipt.
     ///
     /// Returns `Err(KernelError::Internal)` if the signing task has
@@ -534,10 +561,12 @@ impl SigningTaskHandle {
         if self.exceeds_per_request_cap(canonical_content.len()) {
             return Err(self.oversized_content_error(canonical_content.len()));
         }
-        let inner = self.ensure_spawned()?;
-        let sender = inner.sender_clone().ok_or_else(|| {
-            KernelError::Internal("receipt signing task already shut down".to_string())
-        })?;
+        // Spawn the task (and surface a pre-spawn shutdown) before acquiring the
+        // budget. We deliberately do NOT clone the sender here: holding a sender
+        // clone across the permit `.await` below is exactly the shutdown race
+        // this fix closes (BAC-539 round-6). The sender is (re)cloned AFTER the
+        // await via `sender_clone_if_open`, which re-checks the closed flag.
+        self.ensure_spawned()?;
 
         // Aggregate byte budget: acquire `preimage_len` permits, `.await`-ing
         // (backpressure) when the sum of in-flight queued preimage bytes is
@@ -549,6 +578,19 @@ impl SigningTaskHandle {
         let permit = self
             .acquire_aggregate_permit(canonical_content.len())
             .await?;
+
+        // Re-acquire the sender AFTER the permit wait and re-check `closed`. If
+        // `shutdown` ran (or started) while we were stalled on the permit, this
+        // observes the closed state (or the taken sender) and rejects, so a
+        // request that had not reached the channel before shutdown began is
+        // refused rather than enqueued onto a channel shutdown is already
+        // draining (BAC-539 round-6). Dropping `permit` here returns its bytes
+        // to the aggregate budget.
+        let Some(sender) = self.sender_clone_if_open() else {
+            return Err(KernelError::Internal(
+                "receipt signing task already shut down".to_string(),
+            ));
+        };
 
         let (reply_tx, reply_rx) = oneshot::channel();
         let request = SignRequest {

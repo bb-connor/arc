@@ -284,3 +284,93 @@ async fn aggregate_byte_budget_backpressures_even_with_channel_room() {
     assert!(receipt.verify_signature().expect("signature verifies"));
     handle.shutdown().await;
 }
+
+#[tokio::test(flavor = "current_thread")]
+async fn shutdown_during_permit_wait_rejects_stalled_request() {
+    // BAC-539 round-6: a producer stalled on the aggregate-permit `.await` when
+    // `shutdown()` runs MUST be rejected, not enqueued. The fix is that `sign`
+    // does NOT hold a sender clone across the permit wait; it re-clones the
+    // sender (and re-checks the `closed` flag) AFTER the await. Without the fix,
+    // the stalled producer's pre-await sender clone would keep the receiver open
+    // while shutdown drained queued work, then enqueue a request that had not
+    // reached the channel before shutdown began -- which shutdown would then
+    // sign/await.
+    //
+    // Determinism: a tiny 4-byte aggregate budget on a current-thread runtime.
+    // The first request is enqueued via `try_sign`, which holds the whole budget
+    // and does not run the signing task. A second request submitted via `sign`
+    // therefore parks on `acquire_aggregate_permit`. We drive that `sign` future
+    // to its park point by polling it DIRECTLY (via `poll_fn`) rather than
+    // `yield_now`/`spawn`, so the signing task never gets a scheduler slot to
+    // drain the first request early and release the budget before shutdown.
+    // `shutdown` then latches `closed`, drops the canonical sender, and joins the
+    // task; joining drains the first request, releases the budget, and wakes the
+    // stalled producer, whose post-await re-check observes `closed` and rejects.
+    use std::future::poll_fn;
+    use std::future::Future;
+    use std::pin::pin;
+    use std::task::Poll;
+
+    let keypair = Keypair::from_seed(&KERNEL_SEED);
+    let handle = SigningTaskHandle::with_capacity_max_content_and_queued_bytes(
+        keypair.clone(),
+        /* capacity */ 256,
+        /* per-request cap */ 0,
+        /* aggregate budget */ 4,
+    );
+
+    // First request consumes the entire 4-byte aggregate budget and enqueues
+    // (channel has count capacity). The task has not run, so the permit is held.
+    let first_content = vec![0x11u8; 4];
+    let first_body = body_for_content(&keypair, &first_content);
+    let _first_rx = handle
+        .try_sign(first_body, first_content)
+        .expect("first request enqueues and holds the whole aggregate budget");
+
+    // Second request: build the `sign` future and poll it directly until it parks
+    // on the exhausted aggregate budget. Polling directly (no scheduler yield)
+    // guarantees the signing task does not drain the first request and release
+    // the budget before shutdown.
+    let second_content = vec![0x22u8; 1];
+    let second_body = body_for_content(&keypair, &second_content);
+    let mut sign_future = pin!(handle.sign(second_body, second_content));
+    poll_fn(|cx| {
+        // One poll is enough to reach the parked `acquire_aggregate_permit`
+        // await; it must be Pending because the budget is exhausted.
+        match sign_future.as_mut().poll(cx) {
+            Poll::Pending => Poll::Ready(()),
+            Poll::Ready(other) => {
+                panic!("sign must park on the exhausted aggregate budget, got {other:?}")
+            }
+        }
+    })
+    .await;
+
+    // Shutdown while the producer is parked on the permit, then resume the
+    // parked `sign` future. With the fix, shutdown's join drains the first queued
+    // request (the parked producer holds no sender clone, so the channel closes),
+    // the budget frees, the producer's permit acquisition succeeds, and its
+    // post-await re-check observes `closed` and rejects. Without the fix, the
+    // parked producer's pre-await sender clone keeps the channel open, so
+    // shutdown's join would hang; the timeout converts that regression into a
+    // deterministic failure instead of a hung suite.
+    let result = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        handle.shutdown().await;
+        sign_future.await
+    })
+    .await
+    .expect("shutdown + resume must not hang (a hang means a stalled sender clone kept the channel open)");
+    match result {
+        Err(KernelError::Internal(message)) => {
+            assert!(
+                message.contains("already shut down"),
+                "stalled request must be rejected as shut down, got: {message}"
+            );
+        }
+        Err(other) => panic!("expected shut-down rejection, got {other:?}"),
+        Ok(_) => panic!(
+            "a request stalled on the permit when shutdown began must be rejected, \
+             not signed (it had not reached the channel before shutdown)"
+        ),
+    }
+}
