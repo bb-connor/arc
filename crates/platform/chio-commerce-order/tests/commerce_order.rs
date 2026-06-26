@@ -1556,3 +1556,271 @@ fn commerce_order_replay_rejects_refund_before_completion() {
         .to_string()
         .contains("unresolved payment recovery state"));
 }
+
+// === M1-18 (EVIDENCE, Gate G9): order-passport replay GREEN with the escrow
+// digest pinned into CommerceOrderContext.
+//
+// The escrow accept IS the settlement-packet-assembly transition: it locks the
+// single-ledger two-leg swap, derives the escrow ledger digest, and pins it into
+// the order context. The order-passport replay (`verify_commerce_order`) then
+// aggregates that escrow digest into the passport's canonical order-context
+// digest, so the escrow ledger is bound into the order-passport digest chain.
+
+fn escrow_offer_token(
+    issuer: &Keypair,
+    subject: &PublicKey,
+    units: u64,
+    currency: &str,
+) -> chio_core_types::capability::token::CapabilityToken {
+    use chio_core_types::capability::scope::{ChioScope, MonetaryAmount, Operation, ToolGrant};
+    use chio_core_types::capability::token::{CapabilityToken, CapabilityTokenBody};
+
+    let body = CapabilityTokenBody {
+        id: "offer-token-m1-18".to_string(),
+        issuer: issuer.public_key(),
+        subject: subject.clone(),
+        scope: ChioScope {
+            grants: vec![ToolGrant {
+                server_id: "demo-server".to_string(),
+                tool_name: "search".to_string(),
+                operations: vec![Operation::Invoke],
+                constraints: Vec::new(),
+                max_invocations: Some(10),
+                max_cost_per_invocation: Some(MonetaryAmount {
+                    units: units / 10,
+                    currency: currency.to_string(),
+                }),
+                max_total_cost: Some(MonetaryAmount {
+                    units,
+                    currency: currency.to_string(),
+                }),
+                dpop_required: None,
+            }],
+            resource_grants: Vec::new(),
+            prompt_grants: Vec::new(),
+        },
+        issued_at: 100,
+        expires_at: 10_000,
+        delegation_chain: Vec::new(),
+    };
+    CapabilityToken::sign(body, issuer).test_expect("offer token signs")
+}
+
+/// Rewrite the offline-psp fixture event log so it replays to
+/// `settlement_packet_assembled`: keep the prefix through `fulfillment_attested`
+/// and append the escrow-bound settlement-packet-assembly event. `mutate_event_log`
+/// reseals every event and re-derives the event-log digest and authority receipts.
+fn assemble_settlement_packet_event_log(
+    bundle: &mut chio_commerce_order::CommerceOrderVerificationBundle,
+) {
+    mutate_event_log(bundle, |event_log| {
+        let events = event_log["events"]
+            .as_array_mut()
+            .test_expect("event log events array");
+        let fulfillment_index = events
+            .iter()
+            .position(|event| event["next_state"] == "fulfillment_attested")
+            .test_expect("fulfillment attested event exists");
+        events.truncate(fulfillment_index + 1);
+        events.push(serde_json::json!({
+            "actor": "agent:single-call-authority",
+            "authority_receipt_ref": "receipt-settlement-assemble-commerce-001",
+            "event_id": "event-commerce-001-settlement-assemble",
+            "evidence_refs": ["settlement-packet-commerce-001"],
+            "idempotency_key": "idem-event-commerce-001-settlement-assemble",
+            "next_state": "settlement_packet_assembled",
+            "occurred_at": "2026-06-10T00:05:30Z",
+            "order_id": "order-commerce-001",
+            "prior_state": "fulfillment_attested",
+            "transition": "assemble_settlement_packet"
+        }));
+    });
+    bundle.order_context.current_state = "settlement_packet_assembled".to_string();
+}
+
+/// Run the M1-15 escrow `accept()` against the order at `fulfillment_attested`,
+/// then pin the resulting escrow digest and the advanced state back onto the
+/// bundle's order context. Returns the pinned escrow digest.
+fn pin_escrow_digest_via_accept(
+    bundle: &mut chio_commerce_order::CommerceOrderVerificationBundle,
+) -> String {
+    use chio_core_types::capability::scope::MonetaryAmount;
+
+    let issuer = Keypair::from_seed(&[41u8; 32]);
+    let subject = Keypair::from_seed(&[42u8; 32]);
+    let acceptor = subject.public_key();
+    let settlement_authority = Keypair::from_seed(&[43u8; 32]);
+    let token = escrow_offer_token(&issuer, &acceptor, 4200, "USD");
+    let reservation = MonetaryAmount {
+        units: 4200,
+        currency: "USD".to_string(),
+    };
+
+    // accept() requires the order at a settlement-assembly prior state; it then
+    // advances the context to settlement_packet_assembled with the escrow digest
+    // pinned. Every other context field (including the re-derived artifact
+    // digests load_bundle/assemble produced) is carried through unchanged.
+    let mut escrow_context = bundle.order_context.clone();
+    escrow_context.current_state = "fulfillment_attested".to_string();
+    escrow_context.escrow_digest = None;
+
+    let acceptance =
+        chio_commerce_order::accept(chio_commerce_order::CommerceEscrowAcceptRequest {
+            order_context: &escrow_context,
+            token_offer: &token,
+            acceptor: &acceptor,
+            reserved_amount: &reservation,
+            depositor_account: "buyer:demo-cafe-customer".to_string(),
+            beneficiary_account: "merchant:stripe:coffee-shop".to_string(),
+            settlement: chio_commerce_order::CommerceSettlementDispatch {
+                issued_at: "2026-06-10T00:05:30Z".to_string(),
+                psp: "stripe".to_string(),
+                payment_intent_id: "pi_commerce_001".to_string(),
+                settlement_rail: "ach".to_string(),
+                settlement_account_ref: "acct-commerce-001".to_string(),
+                dispatch_receipt_ref: "dispatch-commerce-001".to_string(),
+                status: "dispatched".to_string(),
+            },
+            settlement_authority: &settlement_authority,
+        })
+        .test_expect("escrow accept locks the ledger and pins the escrow digest");
+
+    assert_eq!(
+        acceptance.next_state,
+        chio_commerce_order::OrderState::SettlementPacketAssembled
+    );
+    assert_eq!(
+        acceptance.updated_context.escrow_digest.as_deref(),
+        Some(acceptance.escrow_digest.as_str())
+    );
+
+    bundle.order_context = acceptance.updated_context;
+    acceptance.escrow_digest
+}
+
+#[test]
+fn order_passport_replay_green_with_escrow_digest_pinned() {
+    let mut bundle = load_bundle("offline-psp-valid");
+    assemble_settlement_packet_event_log(&mut bundle);
+    let escrow_digest = pin_escrow_digest_via_accept(&mut bundle);
+
+    // The escrow digest is pinned into the order context the passport replays.
+    assert_eq!(
+        bundle.order_context.escrow_digest.as_deref(),
+        Some(escrow_digest.as_str())
+    );
+
+    let report = chio_commerce_order::verify_commerce_order(&bundle)
+        .test_expect("order-passport replays GREEN with the escrow digest pinned");
+
+    // GREEN: verified verdict, replayed to the escrow-bound assembly state.
+    assert_eq!(report.verdict, "verified");
+    assert_eq!(report.current_state, "settlement_packet_assembled");
+    assert!(report
+        .verified_claims
+        .contains(&"claim.commerce.order_replay_consistent".to_string()));
+    assert!(report
+        .verified_claims
+        .contains(&"claim.commerce.settlement_lifecycle_bound".to_string()));
+
+    // The replay digest chain aggregates the escrow digest: the passport's
+    // order-context digest is the canonical digest over the whole context, with
+    // the escrow digest included.
+    assert_eq!(
+        report.artifact_digests.order_context_sha256,
+        canonical_context_sha256(&bundle.order_context)
+    );
+
+    // Proof the escrow digest is genuinely folded into the order-passport digest
+    // chain: dropping it changes the aggregated order-context digest.
+    let mut without_escrow = bundle.order_context.clone();
+    without_escrow.escrow_digest = None;
+    assert_ne!(
+        report.artifact_digests.order_context_sha256,
+        canonical_context_sha256(&without_escrow)
+    );
+}
+
+#[test]
+fn order_passport_replay_with_escrow_digest_is_deterministic() {
+    let mut bundle_a = load_bundle("offline-psp-valid");
+    assemble_settlement_packet_event_log(&mut bundle_a);
+    let escrow_digest_a = pin_escrow_digest_via_accept(&mut bundle_a);
+
+    let mut bundle_b = load_bundle("offline-psp-valid");
+    assemble_settlement_packet_event_log(&mut bundle_b);
+    let escrow_digest_b = pin_escrow_digest_via_accept(&mut bundle_b);
+
+    // The escrow ledger digest is deterministic across independent accepts.
+    assert_eq!(escrow_digest_a, escrow_digest_b);
+
+    let report_a = chio_commerce_order::verify_commerce_order(&bundle_a)
+        .test_expect("first order-passport replay is GREEN");
+    let report_b = chio_commerce_order::verify_commerce_order(&bundle_b)
+        .test_expect("second order-passport replay is GREEN");
+
+    // Byte-identical order-passport digests across replays.
+    assert_eq!(
+        report_a.artifact_digests.order_context_sha256,
+        report_b.artifact_digests.order_context_sha256
+    );
+    let bytes_a = chio_core_types::canonical_json_bytes(&report_a)
+        .test_expect("first order-passport canonicalizes");
+    let bytes_b = chio_core_types::canonical_json_bytes(&report_b)
+        .test_expect("second order-passport canonicalizes");
+    assert_eq!(bytes_a, bytes_b);
+}
+
+#[test]
+fn order_passport_replay_fails_closed_on_escrow_digest_tamper() {
+    let mut bundle = load_bundle("offline-psp-valid");
+    assemble_settlement_packet_event_log(&mut bundle);
+    let escrow_digest = pin_escrow_digest_via_accept(&mut bundle);
+
+    // Baseline: the untampered order-passport replays GREEN.
+    let green = chio_commerce_order::verify_commerce_order(&bundle)
+        .test_expect("baseline order-passport replays GREEN");
+    let green_order_context_sha256 = green.artifact_digests.order_context_sha256.clone();
+
+    // Tamper 1 (escrow digest): a corrupt (non-hex) pinned escrow digest fails
+    // the order-context shape gate closed.
+    let mut corrupt = bundle.clone();
+    corrupt.order_context.escrow_digest = Some("not-a-valid-sha256-escrow-digest".to_string());
+    let corrupt_error = chio_commerce_order::verify_commerce_order(&corrupt)
+        .test_expect_err("a corrupt escrow digest must fail the replay closed");
+    assert!(
+        corrupt_error.to_string().contains("invalid escrow_digest"),
+        "{corrupt_error}"
+    );
+
+    // Tamper 2 (escrow digest, still well-formed): flipping one hex nibble of the
+    // pinned escrow digest re-types but diverges the aggregated order-context
+    // digest in the passport. The escrow digest is tamper-evident in the chain.
+    let mut flipped_chars: Vec<char> = escrow_digest.chars().collect();
+    flipped_chars[0] = if flipped_chars[0] == 'a' { 'b' } else { 'a' };
+    let flipped_digest: String = flipped_chars.into_iter().collect();
+    assert_ne!(flipped_digest, escrow_digest);
+    let mut flipped = bundle.clone();
+    flipped.order_context.escrow_digest = Some(flipped_digest);
+    let flipped_report = chio_commerce_order::verify_commerce_order(&flipped)
+        .test_expect("a well-formed but different escrow digest still type-checks");
+    assert_ne!(
+        flipped_report.artifact_digests.order_context_sha256,
+        green_order_context_sha256
+    );
+
+    // Tamper 3 (chained digest): corrupting a chained artifact in the
+    // order-passport chain (the settlement packet bytes its digest binds) fails
+    // the replay closed.
+    let mut chained = bundle.clone();
+    chained.settlement_packet_bytes =
+        br#"{"schema":"chio.commerce.settlement-packet.v1"}"#.to_vec();
+    let chained_error = chio_commerce_order::verify_commerce_order(&chained)
+        .test_expect_err("a corrupt chained digest must fail the replay closed");
+    assert!(
+        chained_error
+            .to_string()
+            .contains("settlement packet digest mismatch"),
+        "{chained_error}"
+    );
+}
