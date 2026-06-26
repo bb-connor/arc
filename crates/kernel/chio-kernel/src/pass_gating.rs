@@ -532,9 +532,10 @@ pub enum PassStreamSelection<'a> {
 /// # Errors
 ///
 /// Returns [`KernelError::PassOwnDataGiftInvalid`] when an OWN stream is not
-/// emitted as a verified bundle (or the bundle/tenant binding is invalid), and
-/// [`KernelError::PassRedactionFailed`] on an aggregate-view redaction failure or
-/// a bundle supplied for an aggregate stream.
+/// emitted as a verified bundle (or the bundle/tenant binding is invalid),
+/// [`KernelError::PassTenantBindingInvalid`] when `subject_tenant` is empty,
+/// wildcarded, or path-delimited, and [`KernelError::PassRedactionFailed`] on an
+/// aggregate-view redaction failure or a bundle supplied for an aggregate stream.
 pub fn emit_pass_stream_gift(
     stream: ChioPassStream,
     subject_tenant: &str,
