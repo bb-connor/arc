@@ -167,6 +167,12 @@ chio-anchor = { workspace = true }
 # `verify_anchor_inclusion_proof` readback lane directly to prove an external
 # EAS/SAS attestation is not admissible as an anchoring inclusion proof.
 chio-web3 = { workspace = true }
+# M2-7 (WS-CL-SLASH-LANE-GATE) single-slash-lane conformance harness
+# (slash_routes_only_through_comptroller.rs) drives the comptroller
+# adjudication surface (`validate_risk_report`) directly to prove a slash
+# routes only through the comptroller and that there is no second slash lane.
+chio-risk-comptroller = { workspace = true }
+chio-transaction-passport = { workspace = true }
 async-trait = "0.1"
 # Negative conformance test: anchor_batch_witness_impersonation_rejected.rs
 # forges a Rekor SET
