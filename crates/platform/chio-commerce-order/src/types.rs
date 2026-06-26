@@ -85,6 +85,13 @@ pub struct CommerceOrderContext {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trust_market_requirement: Option<CommerceTrustMarketRequirement>,
     pub current_state: String,
+    /// Digest (sha256 hex) of the custodial offer-safety escrow ledger bound to
+    /// this order once `escrow::accept` has locked the single-ledger two-leg
+    /// swap. Additive and optional: orders assembled before the escrow was
+    /// wired, and every committed fixture, omit it, so the field is skipped on
+    /// the wire and the canonical order-context serialization is unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub escrow_digest: Option<String>,
 }
 
 impl CommerceOrderContext {
@@ -182,6 +189,14 @@ impl CommerceOrderContext {
             if requirement.required {
                 validate_trust_market_requirement_shape(requirement)?;
             }
+        }
+        if let Some(escrow_digest) = &self.escrow_digest {
+            validate_sha256_hex(escrow_digest).map_err(|_| {
+                CommerceOrderError::InvalidArtifact {
+                    field: "order context",
+                    message: format!("invalid escrow_digest: {escrow_digest}"),
+                }
+            })?;
         }
         Ok(())
     }
@@ -362,24 +377,30 @@ pub(super) struct CommercePaymentLifecycle {
     pub(super) signature: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+/// Settlement packet bound to a commerce order. The field layout and serde
+/// attributes are unchanged from the original deserialize-only shape: the
+/// `Serialize` derive and the wider visibility were added by M1-15 so the
+/// escrow path can emit this struct as the body of a `SignedExportEnvelope`,
+/// but the canonical serialization of any existing settlement-packet fixture is
+/// byte-identical.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
-pub(super) struct CommerceSettlementPacket {
-    pub(super) schema: String,
-    pub(super) id: String,
-    pub(super) issued_at: String,
-    pub(super) order_id: String,
-    pub(super) merchant_subject: String,
-    pub(super) psp: String,
-    pub(super) payment_intent_id: String,
-    pub(super) amount_minor: u64,
-    pub(super) currency: String,
-    pub(super) quote_sha256: String,
-    pub(super) settlement_rail: String,
-    pub(super) settlement_account_ref: String,
-    pub(super) dispatch_receipt_ref: String,
-    pub(super) reconciliation_ref: String,
-    pub(super) status: String,
+pub struct CommerceSettlementPacket {
+    pub schema: String,
+    pub id: String,
+    pub issued_at: String,
+    pub order_id: String,
+    pub merchant_subject: String,
+    pub psp: String,
+    pub payment_intent_id: String,
+    pub amount_minor: u64,
+    pub currency: String,
+    pub quote_sha256: String,
+    pub settlement_rail: String,
+    pub settlement_account_ref: String,
+    pub dispatch_receipt_ref: String,
+    pub reconciliation_ref: String,
+    pub status: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
