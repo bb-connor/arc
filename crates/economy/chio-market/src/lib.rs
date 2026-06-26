@@ -12,6 +12,9 @@
 //! # Modules
 //!
 //! - [`insurance_flow`] -- quote/bind and claim-settlement flow.
+//! - verifiability -- deterministic, monotone verifiability grade
+//!   ([`VerifiabilityGrade`]) plus a last-look [`GradedQuoteOption`] that fails
+//!   closed once its expiry passes.
 
 #![forbid(unsafe_code)]
 
@@ -69,6 +72,7 @@ mod placement;
 mod provider;
 mod quote;
 mod settlement;
+mod verifiability;
 mod workflow;
 
 pub use claim::*;
@@ -76,6 +80,7 @@ pub use placement::*;
 pub use provider::*;
 pub use quote::*;
 pub use settlement::*;
+pub use verifiability::*;
 pub use workflow::*;
 
 fn liability_claim_adjudication_payable_amount(
