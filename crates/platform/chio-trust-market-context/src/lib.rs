@@ -9,9 +9,15 @@ use chio_transaction_passport::{
 };
 
 mod artifacts;
+mod authority_registry;
 mod claims;
 mod evidence;
 mod policy;
+
+pub use authority_registry::{
+    resolve_rr2_tm_01_kernel_keys, MarketAuthorityRegistry, MarketAuthorityRegistryError,
+    MarketAuthorityRotationEpoch, RR2_TM_01_REGISTRY_REF,
+};
 
 use artifacts::{
     validate_collateral_guarantee, validate_discovery, validate_jurisdiction,
