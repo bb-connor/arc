@@ -1107,8 +1107,10 @@ gate does not depend on anchoring.
    per-Pass hold in-closure -> `BudgetExhausted` -> Deny receipt `cost_charged = 0`, `budget_remaining = 0`.
    Liability = `min(N x allotment, POOL)`, fail-closed.
 9. READ GIFTED FEED. Read/Subscribe the 5 streams -> `pass_authorizes_read/subscription` deny-lists first,
-   then the unchanged matcher; own receipts/lineage are tenant-bound; `project_pass_stream_view` strips the
-   economic envelope keys and stamps `redaction: "summary"`. No tier predicate gates reads.
+   then the unchanged matcher; own receipts/lineage are tenant-bound. The three aggregate streams strip the
+   economic envelope keys via `project_pass_stream_view` and stamp `redaction: "summary"`; the two own streams
+   are emitted as a VERIFIED `DisclosureLineageBundle` (`emit_own_data_gift_bundle`, M1-13) and never as a raw
+   stream or 3-key strip. No tier predicate gates reads.
 10. ROLLOVER = MONTHLY RESET. At `now >= until` the token is expired (`CapabilityExpired`). The holder
     re-attests via a fresh presentation challenge; `count_genuine_use` scans the prior window's own-tenant
     metered Allow receipts; `chio_pass_refresh_decision` -> `Granted` (tier-sized) | `WithheldDormant`
@@ -1191,8 +1193,19 @@ on the SAME `window_ym`; no value moves on-chain; immutable contracts untouched.
    both across all five streams; `pass_gating.rs` contains no `TrustTier` symbol. Cross-tenant: tenant A's
    Pass denies a Read of tenant B's receipts via BOTH the uri binding and the no-widening read-scope guard;
    the prefix-collision case (`did:chioabcd` vs `did:chioabcde`) denies because of the mandatory `/`.
-   Redaction: `project_pass_stream_view` strips `financial`/`budget_authority`/`cost` and stamps
-   `redaction: "summary"`; a non-object body -> `Err(PassRedactionFailed)`.
+   Aggregate-stream redaction (streams 0..=2 only): `project_pass_stream_view` strips
+   `financial`/`budget_authority`/`cost` and stamps `redaction: "summary"`; a non-object body ->
+   `Err(PassRedactionFailed)`.
+   Own-data emission (streams 3..=4, M1-13, alignment C2 WINS over the spec-8.3 3-key strip): own receipts and
+   own lineage are emitted as a VERIFIED `DisclosureLineageBundle` via
+   `emit_own_data_gift_bundle`/`emit_pass_stream_gift`, routed only through
+   `chio-disclosure-lineage::verify_disclosure_lineage_bundle` (pinned-key `TRUSTED_LINEAGE_SIGNER_PUBLIC_KEYS`
+   signed subgraph bound to a `transaction_passport_ref`, verifier privacy profile, a MANDATORY
+   `DisclosureLeakageLedger` present even when empty, a sha256 `tenant_hash` never the plaintext tenant, and
+   the accounted `issuer_status`/`revocation_freshness`/`presentation_timing` derived facts which the kernel
+   requires unconditionally for the own-data gift). A raw `SiemEvent` stream or 3-key-strip emission for these
+   two streams now FAILS fail-closed (`Err(PassOwnDataGiftInvalid)`); the raw receipt stream and any plaintext
+   lineage walk are INTERNAL selection steps only, never the emitted artifact.
 5. DORMANT STOPS DRAWING. A `WithheldDormant` next-window token (`max_total_cost.units == 0`) denies its first
    metered charge with `cost_charged == 0`; baseline reads still succeed.
 6. ANCHORING ROUND-TRIP (read-only). Build a batch over issued + revoked Pass artifact ids, wrap the
@@ -1269,6 +1282,15 @@ T5 - Data-stream gating module.
 - Acceptance: launch gate 4 + scope-inflation (grants/prompt_grants/resource exact-equality) + redaction
   whitelist + prefix-collision tests.
 - Deps: T1, T2 (CapabilityToken import path).
+- M1-13 addendum (own-data gift = verified `DisclosureLineageBundle`, alignment C2 WINS): `chio-kernel`
+  takes a dependency on `chio-disclosure-lineage` (permissible: it pulls only `chio-core-types`/serde/thiserror,
+  so neither `chio-credentials` nor `chio-did` is added, and the kernel already depends on trust-layer crates
+  such as `chio-federation`/`chio-governance`/`chio-weights`). New symbols in `pass_gating.rs`:
+  `emit_pass_stream_gift`, `emit_own_data_gift_bundle`, `PassStreamGift`, `PassStreamSelection`,
+  `PASS_OWN_DATA_REQUIRED_DERIVED_FACTS`; new `kernel/error.rs` variant `PassOwnDataGiftInvalid`. The two own
+  streams (3..=4) emit ONLY through `verify_disclosure_lineage_bundle` plus the kernel's tenant-hash binding,
+  mandatory-leakage-ledger, and accounted-derived-facts checks; a raw-stream or 3-key-strip emission for these
+  two streams now fails (`PassOwnDataGiftInvalid`). Streams 0..=2 keep `project_pass_stream_view` unchanged.
 
 T6 - B7 kernel admission assertion.
 - Files: the Pass admission boundary in the control plane (presentation path) + a kernel-side check that a

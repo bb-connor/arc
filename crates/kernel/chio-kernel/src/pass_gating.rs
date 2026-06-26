@@ -23,16 +23,26 @@
 //!
 //! GIFT-BOUNDARY POSTURE (own receipts / own lineage). The read grants this
 //! module mints are the SCOPE boundary. They are NOT the disclosed-artifact
-//! boundary for the holder's own data. Per the disclosure binding, the
-//! own-receipts/own-lineage gift MUST be served through the shipped
-//! disclosure-lineage export
-//! (`chio-disclosure-lineage::verify_disclosure_lineage_bundle`): a pinned-key
-//! signed lineage subgraph bound to a transaction-passport ref, a verifier
-//! privacy profile, a mandatory leakage ledger (required even when empty), and
-//! hashed identifiers. [`project_pass_stream_view`] in this module is only an
-//! INTERNAL whitelist-by-removal redaction step; it is deliberately weaker than
-//! that disclosure layer mandates and is never the gift boundary on its own. The
-//! orchestrator that wires the disclosure-lineage bundle lives outside T5.
+//! boundary for the holder's own data. Per the fail-closed authority rule the
+//! disclosure binding (alignment C2) WINS over the spec-8.3 3-key strip: the
+//! own-receipts/own-lineage gift (streams `3..=4`) MUST be emitted as a verified
+//! [`DisclosureLineageBundle`], routed ONLY through
+//! [`chio_disclosure_lineage::verify_disclosure_lineage_bundle`]. That artifact
+//! is a pinned-key (`TRUSTED_LINEAGE_SIGNER_PUBLIC_KEYS`) signed lineage subgraph
+//! bound to a transaction-passport ref, a verifier privacy profile, a MANDATORY
+//! leakage ledger (present even when empty), a sha256 `tenant_hash` (never the
+//! plaintext tenant), and accounted issuer-status / revocation-freshness /
+//! presentation-timing derived facts. [`emit_own_data_gift_bundle`] is that
+//! emission boundary; [`emit_pass_stream_gift`] is the per-stream dispatcher that
+//! routes the two own streams through it and the three aggregate streams through
+//! the redacted view.
+//!
+//! The raw `SiemEvent` receipt stream and any plaintext lineage walk are INTERNAL
+//! selection steps only, never the emitted artifact. [`project_pass_stream_view`]
+//! is likewise an INTERNAL whitelist-by-removal redaction step used ONLY for the
+//! three aggregate streams; it is deliberately weaker than the disclosure layer
+//! mandates and a raw-stream or 3-key-strip emission for the two own streams now
+//! fails fail-closed.
 //!
 //! Naming note: `ChioPassStream` here is the gated data stream, distinct from the
 //! `ChioPass` soulbound credential in `chio-credentials`.
@@ -43,6 +53,10 @@ use chio_core_types::capability::token::{
     CHIO_PASS_CAPABILITY_ID_PREFIX,
 };
 use chio_core_types::crypto::SigningAlgorithm;
+use chio_disclosure_lineage::{
+    verify_disclosure_lineage_bundle, DisclosureLeakageLedger, DisclosureLineageBundle,
+    DisclosureLineageVerifierReport,
+};
 
 use crate::kernel::KernelError;
 use crate::receipt_query::ReceiptReadContext;
@@ -467,6 +481,177 @@ pub fn project_pass_stream_view(
         serde_json::Value::String("summary".to_string()),
     );
     Ok(serde_json::Value::Object(redacted))
+}
+
+/// The crypto-context derived facts the own-data gift MUST account in its leakage
+/// ledger, even when the holder discloses no receipt field. These bind issuer
+/// status, revocation freshness, and presentation timing into the emitted
+/// artifact. The kernel enforces all three UNCONDITIONALLY; the upstream verifier
+/// only requires them when the bundle discloses a field or hidden predicate, so
+/// this is a deliberate strengthening for the always-on own-data gift.
+pub const PASS_OWN_DATA_REQUIRED_DERIVED_FACTS: [&str; 3] = [
+    "derived.crypto.issuer_status",
+    "derived.crypto.revocation_freshness",
+    "derived.crypto.presentation_timing",
+];
+
+/// The emitted artifact for one gifted Pass stream.
+///
+/// The three aggregate streams emit a redacted summary VIEW (the internal 3-key
+/// strip). The two OWN streams emit the verifier report of a verified
+/// [`DisclosureLineageBundle`] and NOTHING weaker.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PassStreamGift {
+    /// Streams `0..=2` (reputation tier, marketplace listings, pheromone
+    /// concentration): a redacted summary view.
+    AggregateView(serde_json::Value),
+    /// Streams `3..=4` (own receipts, own lineage): the verifier report from a
+    /// verified disclosure-lineage bundle.
+    OwnDataBundle(Box<DisclosureLineageVerifierReport>),
+}
+
+/// The INTERNAL selection that feeds a Pass stream emission.
+///
+/// For aggregate streams it is the served receipt/listing VIEW body; for OWN
+/// streams it is the verified disclosure-lineage bundle. Supplying an aggregate
+/// body for an OWN stream (the raw `SiemEvent` stream or the weaker 3-key strip)
+/// is rejected fail-closed: the OWN gift boundary is the bundle and nothing
+/// weaker.
+pub enum PassStreamSelection<'a> {
+    /// A served receipt/listing VIEW body (aggregate streams only).
+    AggregateBody(&'a serde_json::Value),
+    /// A verified disclosure-lineage bundle (OWN streams only).
+    OwnDataBundle(&'a DisclosureLineageBundle),
+}
+
+/// Per-stream emission dispatcher (M1-13). Routes the two OWN streams through the
+/// verified [`DisclosureLineageBundle`] boundary and the three aggregate streams
+/// through the redacted view. Fail-closed: an OWN stream fed a raw/3-key-strip
+/// body is denied, and an aggregate stream fed a bundle is denied.
+///
+/// # Errors
+///
+/// Returns [`KernelError::PassOwnDataGiftInvalid`] when an OWN stream is not
+/// emitted as a verified bundle (or the bundle/tenant binding is invalid), and
+/// [`KernelError::PassRedactionFailed`] on an aggregate-view redaction failure or
+/// a bundle supplied for an aggregate stream.
+pub fn emit_pass_stream_gift(
+    stream: ChioPassStream,
+    subject_tenant: &str,
+    selection: PassStreamSelection<'_>,
+) -> Result<PassStreamGift, KernelError> {
+    match (stream.is_own_tenant(), selection) {
+        (true, PassStreamSelection::OwnDataBundle(bundle)) => {
+            let report = emit_own_data_gift_bundle(stream, subject_tenant, bundle)?;
+            Ok(PassStreamGift::OwnDataBundle(Box::new(report)))
+        }
+        (true, PassStreamSelection::AggregateBody(_)) => Err(KernelError::PassOwnDataGiftInvalid(
+            "own receipts and own lineage must be emitted as a verified \
+                 DisclosureLineageBundle, never the raw stream or the 3-key strip view"
+                .to_string(),
+        )),
+        (false, PassStreamSelection::AggregateBody(body)) => Ok(PassStreamGift::AggregateView(
+            project_pass_stream_view(body)?,
+        )),
+        (false, PassStreamSelection::OwnDataBundle(_)) => Err(KernelError::PassRedactionFailed(
+            "aggregate streams are not emitted as disclosure-lineage bundles".to_string(),
+        )),
+    }
+}
+
+/// Emit the OWN-data gift (streams `3..=4`) as a verified [`DisclosureLineageBundle`].
+///
+/// This is the disclosed-artifact boundary for the holder's own receipts and own
+/// lineage. The bundle is routed ONLY through
+/// [`chio_disclosure_lineage::verify_disclosure_lineage_bundle`] (a pinned-key
+/// `TRUSTED_LINEAGE_SIGNER_PUBLIC_KEYS` signed subgraph bound to a
+/// transaction-passport ref, a verifier privacy profile, and a mandatory leakage
+/// ledger). On TOP of the verifier, the kernel binds, fail-closed:
+///
+/// 1. the stream is one of the two OWN streams (receipts, lineage);
+/// 2. the holder tenant is carried ONLY as a sha256 `tenant_hash`: every lineage
+///    node's `tenant_hash` equals `sha256(subject_tenant)` and the plaintext
+///    tenant appears nowhere in the emitted bundle;
+/// 3. the mandatory leakage ledger is present and accepted; and
+/// 4. the three [`PASS_OWN_DATA_REQUIRED_DERIVED_FACTS`] (issuer status,
+///    revocation freshness, presentation timing) are accounted in that ledger,
+///    even when the bundle discloses no receipt field.
+///
+/// # Errors
+///
+/// Returns [`KernelError::PassOwnDataGiftInvalid`] on any verifier failure or
+/// missing/invalid binding, and [`KernelError::PassTenantBindingInvalid`] when
+/// `subject_tenant` is empty, wildcarded, or path-delimited. It never panics.
+pub fn emit_own_data_gift_bundle(
+    stream: ChioPassStream,
+    subject_tenant: &str,
+    bundle: &DisclosureLineageBundle,
+) -> Result<DisclosureLineageVerifierReport, KernelError> {
+    if !stream.is_own_tenant() {
+        return Err(KernelError::PassOwnDataGiftInvalid(
+            "the verified-bundle gift boundary is only for own receipts and own lineage"
+                .to_string(),
+        ));
+    }
+    let tenant = validated_tenant(subject_tenant)?;
+    // The pinned-key signed subgraph, verifier privacy profile, leakage ledger,
+    // and crypto-context report are all verified here. Any failure denies.
+    let report = verify_disclosure_lineage_bundle(bundle)
+        .map_err(|error| KernelError::PassOwnDataGiftInvalid(error.to_string()))?;
+    bind_own_data_bundle_to_tenant(bundle, tenant)?;
+    require_own_data_leakage_ledger(&bundle.leakage_ledger)?;
+    Ok(report)
+}
+
+/// Binds the verified bundle to the holder by hashed tenant, fail-closed. Every
+/// lineage node MUST carry `sha256(tenant)` as its `tenant_hash`, and the
+/// plaintext tenant MUST appear nowhere in the serialized bundle.
+fn bind_own_data_bundle_to_tenant(
+    bundle: &DisclosureLineageBundle,
+    tenant: &str,
+) -> Result<(), KernelError> {
+    let expected_tenant_hash = chio_core_types::sha256_hex(tenant.as_bytes());
+    for node in &bundle.lineage.nodes {
+        if node.tenant_hash != expected_tenant_hash {
+            return Err(KernelError::PassOwnDataGiftInvalid(format!(
+                "own-data lineage node {} is not bound to the holder tenant hash",
+                node.id
+            )));
+        }
+    }
+    let serialized = serde_json::to_string(bundle).map_err(|error| {
+        KernelError::PassOwnDataGiftInvalid(format!("own-data bundle is not serializable: {error}"))
+    })?;
+    if serialized.contains(tenant) {
+        return Err(KernelError::PassOwnDataGiftInvalid(
+            "own-data bundle leaks the plaintext tenant; only the sha256 tenant hash may appear"
+                .to_string(),
+        ));
+    }
+    Ok(())
+}
+
+/// Affirms the MANDATORY leakage ledger and its accounted runtime-assurance
+/// facts, fail-closed. The ledger struct is structurally mandatory; this also
+/// requires it accepted and the three [`PASS_OWN_DATA_REQUIRED_DERIVED_FACTS`]
+/// accounted even when nothing is disclosed.
+fn require_own_data_leakage_ledger(ledger: &DisclosureLeakageLedger) -> Result<(), KernelError> {
+    if !ledger.accepted {
+        return Err(KernelError::PassOwnDataGiftInvalid(
+            "own-data leakage ledger is not accepted by policy".to_string(),
+        ));
+    }
+    for fact in PASS_OWN_DATA_REQUIRED_DERIVED_FACTS {
+        let accounted = ledger.entries.iter().any(|entry| {
+            entry.field == fact && entry.leakage_kind == "derived_fact" && entry.allowed_by_profile
+        });
+        if !accounted {
+            return Err(KernelError::PassOwnDataGiftInvalid(format!(
+                "own-data leakage ledger is missing the accounted derived fact: {fact}"
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Serving gate for a Read against a gifted stream. Deny-list FIRST, then defer
@@ -952,5 +1137,478 @@ mod tests {
             200,
         );
         assert!(assert_pass_capability_id_deterministic(&token).is_ok());
+    }
+
+    // -- M1-13: own-data gift as a verified DisclosureLineageBundle ------------
+
+    use chio_core_types::sha256_hex;
+    use chio_disclosure_lineage::{
+        compute_signed_lineage_subgraph_digest, sign_crypto_context_report, sign_lineage_subgraph,
+        DisclosureCapsule, DisclosureContextVerdict, DisclosureCryptoContextReport,
+        DisclosureHiddenPredicate, DisclosureLeakageLedgerEntry, DisclosureProfileLeakageBudget,
+        DisclosureSensitivityClass, DisclosureSignedLineageEdge, DisclosureSignedLineageNode,
+        DisclosureSignedLineageRedaction, DisclosureVerifierPrivacyProfile, SignedLineageSubgraph,
+        TransparencyState, DISCLOSURE_CAPSULE_SCHEMA_V1,
+        DISCLOSURE_CRYPTO_CONTEXT_REPORT_SCHEMA_V1, DISCLOSURE_LEAKAGE_LEDGER_SCHEMA_V1,
+        DISCLOSURE_VERIFIER_PRIVACY_PROFILE_SCHEMA_V1, LINEAGE_SIGNED_SUBGRAPH_SCHEMA_V1,
+    };
+
+    /// The pinned `TRUSTED_LINEAGE_SIGNER_PUBLIC_KEYS` keypair (seed `[29u8; 32]`).
+    fn lineage_signer() -> Keypair {
+        Keypair::from_seed(&[29u8; 32])
+    }
+
+    fn digest(value: &str) -> String {
+        sha256_hex(value.as_bytes())
+    }
+
+    fn lineage_frontier_digest(node_id: &str, artifact_sha256: &str, depth: u32) -> String {
+        digest(&format!("{node_id}:{artifact_sha256}:{depth}"))
+    }
+
+    fn leakage_entry(
+        entry_id: &str,
+        field: &str,
+        leakage_kind: &str,
+        sensitivity_class: &str,
+        score: u32,
+        residual_inference_note: Option<&str>,
+    ) -> DisclosureLeakageLedgerEntry {
+        DisclosureLeakageLedgerEntry {
+            entry_id: entry_id.to_string(),
+            source: "disclosure-capsule".to_string(),
+            field: field.to_string(),
+            leakage_kind: leakage_kind.to_string(),
+            disclosure_kind: leakage_kind.to_string(),
+            sensitivity_class: sensitivity_class.to_string(),
+            value_class: "identifier_or_predicate".to_string(),
+            reason: "required by disclosure profile".to_string(),
+            policy_rule: "profile.allowed_disclosure".to_string(),
+            derived_inferences: Vec::new(),
+            cross_tenant_risk: false,
+            mitigation: None,
+            score,
+            allowed_by_profile: true,
+            residual_inference_note: residual_inference_note.map(str::to_string),
+        }
+    }
+
+    fn amount_cap_hidden_predicate() -> DisclosureHiddenPredicate {
+        DisclosureHiddenPredicate {
+            predicate_id: "amount_lte_100".to_string(),
+            kind: "amount_cap".to_string(),
+            field: "amount".to_string(),
+            operator: "<=".to_string(),
+            operand: "100".to_string(),
+            unit: "USD".to_string(),
+            result: true,
+            proof_ref: "selective-disclosure-proof".to_string(),
+            projection_slot: 2,
+        }
+    }
+
+    /// The three runtime-assurance leakage entries every own-data ledger accounts.
+    fn runtime_assurance_entries() -> Vec<DisclosureLeakageLedgerEntry> {
+        vec![
+            leakage_entry(
+                "leakage-derived-issuer-status",
+                "derived.crypto.issuer_status",
+                "derived_fact",
+                "runtime_assurance",
+                1,
+                None,
+            ),
+            leakage_entry(
+                "leakage-derived-revocation-freshness",
+                "derived.crypto.revocation_freshness",
+                "derived_fact",
+                "runtime_assurance",
+                1,
+                None,
+            ),
+            leakage_entry(
+                "leakage-derived-presentation-timing",
+                "derived.crypto.presentation_timing",
+                "derived_fact",
+                "timing",
+                1,
+                None,
+            ),
+        ]
+    }
+
+    /// A fully-valid own-data [`DisclosureLineageBundle`] whose lineage nodes are
+    /// bound to `tenant` by its sha256 `tenant_hash` (never the plaintext tenant).
+    /// Modeled on the shipped disclosure-lineage fixture and signed with the
+    /// pinned trusted lineage signer.
+    fn own_data_bundle(tenant: &str) -> DisclosureLineageBundle {
+        let tenant_hash = sha256_hex(tenant.as_bytes());
+        let capsule = DisclosureCapsule {
+            schema: DISCLOSURE_CAPSULE_SCHEMA_V1.to_string(),
+            id: "disclosure-capsule-own".to_string(),
+            transaction_passport_ref: "passport-own-data".to_string(),
+            crypto_context_report_ref: "crypto-context-report-own".to_string(),
+            projection_manifest_ref: "bbs-projection-manifest-own".to_string(),
+            privacy_profile_ref: "privacy-profile-own".to_string(),
+            lineage_subgraph_ref: "lineage-subgraph-own".to_string(),
+            leakage_ledger_ref: "leakage-ledger-own".to_string(),
+            disclosed_fields: vec!["capability_id".to_string(), "tool_name".to_string()],
+            hidden_predicates: vec![amount_cap_hidden_predicate()],
+        };
+        let privacy_profile = DisclosureVerifierPrivacyProfile {
+            schema: DISCLOSURE_VERIFIER_PRIVACY_PROFILE_SCHEMA_V1.to_string(),
+            profile_id: "privacy-profile-own".to_string(),
+            allowed_proof_mechanisms: vec!["bbs".to_string()],
+            required_holder_binding: Some("holder:own-data-agent".to_string()),
+            transaction_passport_ref: "passport-own-data".to_string(),
+            leakage_budget: DisclosureProfileLeakageBudget {
+                max_disclosed_fields: 2,
+                max_hidden_predicates: 1,
+            },
+            sensitivity_classes: vec![
+                DisclosureSensitivityClass {
+                    class_id: "capability_identifier".to_string(),
+                    fields: vec!["capability_id".to_string()],
+                },
+                DisclosureSensitivityClass {
+                    class_id: "tool_identity".to_string(),
+                    fields: vec!["tool_name".to_string()],
+                },
+                DisclosureSensitivityClass {
+                    class_id: "amount_or_budget".to_string(),
+                    fields: vec!["amount_lte_100".to_string()],
+                },
+                DisclosureSensitivityClass {
+                    class_id: "runtime_assurance".to_string(),
+                    fields: vec![
+                        "derived.crypto.issuer_status".to_string(),
+                        "derived.crypto.revocation_freshness".to_string(),
+                    ],
+                },
+                DisclosureSensitivityClass {
+                    class_id: "timing".to_string(),
+                    fields: vec!["derived.crypto.presentation_timing".to_string()],
+                },
+            ],
+            allowed_issuer_keys: vec![
+                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string(),
+            ],
+            required_key_epoch_min: 7,
+            forbidden_key_epochs: vec![9],
+            required_status_freshness_seconds: 300,
+            required_audience: "https://auditor.example/chio".to_string(),
+            nonce_policy: "no_replay".to_string(),
+            allowed_algorithms: vec!["bbs-bls12381-sha256".to_string()],
+            forbidden_algorithms: vec!["rsa-pkcs1v15-sha1".to_string()],
+            required_transparency_state: TransparencyState::Anchored,
+            max_presentation_age_seconds: 600,
+            allowed_disclosed_fields: vec!["capability_id".to_string(), "tool_name".to_string()],
+            forbidden_disclosed_fields: vec!["customer_email".to_string()],
+            allowed_hidden_predicates: vec!["amount_lte_100".to_string()],
+            forbidden_hidden_predicates: vec!["raw_amount".to_string()],
+        };
+        let frontier_sha256 = lineage_frontier_digest("receipt-child", &digest("receipt-child"), 1);
+        let checkpoint_ref = "checkpoint-own-data".to_string();
+        let mut lineage = SignedLineageSubgraph {
+            schema: LINEAGE_SIGNED_SUBGRAPH_SCHEMA_V1.to_string(),
+            id: "lineage-subgraph-own".to_string(),
+            transaction_passport_ref: "passport-own-data".to_string(),
+            policy_profile_id: "privacy-profile-own".to_string(),
+            generated_at: "2026-06-10T00:00:00Z".to_string(),
+            audience: "https://auditor.example/chio".to_string(),
+            challenge_nonce: "own-data-fixture-nonce".to_string(),
+            frontier_sha256: frontier_sha256.clone(),
+            checkpoint_ref: checkpoint_ref.clone(),
+            checkpoint_inclusion_sha256: digest(&format!("{checkpoint_ref}|{frontier_sha256}")),
+            max_depth: 1,
+            required_evidence_class: "observed".to_string(),
+            lineage_anchor_ref: "lineage-anchor-own-fixture".to_string(),
+            redaction_map_sha256: digest("receipt-child|privacy_profile"),
+            leakage_ledger_sha256: digest("leakage-ledger-own"),
+            projection_manifest_sha256: digest("bbs-projection-manifest-own"),
+            root_receipt_ids: vec!["receipt-root".to_string()],
+            nodes: vec![
+                DisclosureSignedLineageNode {
+                    id: "receipt-root".to_string(),
+                    kind: "receipt".to_string(),
+                    receipt_ref: "receipt-root".to_string(),
+                    artifact_sha256: digest("receipt-root"),
+                    artifact_schema: "chio.receipt.v1".to_string(),
+                    evidence_class: "observed".to_string(),
+                    tenant_hash: tenant_hash.clone(),
+                    source_table: "receipts".to_string(),
+                    source_id_hash: digest("receipt-root"),
+                    depth: 0,
+                    parent_ids: Vec::new(),
+                    disclosure_state: "disclosed".to_string(),
+                },
+                DisclosureSignedLineageNode {
+                    id: "receipt-child".to_string(),
+                    kind: "receipt_lineage_statement".to_string(),
+                    receipt_ref: "receipt-child".to_string(),
+                    artifact_sha256: digest("receipt-child"),
+                    artifact_schema: "chio.receipt-lineage-statement.v1".to_string(),
+                    evidence_class: "derived".to_string(),
+                    tenant_hash: tenant_hash.clone(),
+                    source_table: "receipt_lineage_statements".to_string(),
+                    source_id_hash: digest("receipt-child"),
+                    depth: 1,
+                    parent_ids: vec!["receipt-root".to_string()],
+                    disclosure_state: "redacted".to_string(),
+                },
+            ],
+            edges: vec![DisclosureSignedLineageEdge {
+                edge_id: "edge-receipt-root-receipt-child".to_string(),
+                from: "receipt-root".to_string(),
+                to: "receipt-child".to_string(),
+                relation: "continued".to_string(),
+                kind: "continued_by".to_string(),
+                evidence_class: "observed".to_string(),
+                source_artifact_sha256: digest("edge-receipt-root-receipt-child"),
+                statement_sha256: digest("receipt-root|receipt-child|continued_by"),
+                disclosure_state: "disclosed".to_string(),
+            }],
+            redactions: vec![DisclosureSignedLineageRedaction {
+                node_id: "receipt-child".to_string(),
+                reason: "privacy_profile".to_string(),
+            }],
+            subgraph_sha256: String::new(),
+            signature: String::new(),
+        };
+        lineage.subgraph_sha256 =
+            compute_signed_lineage_subgraph_digest(&lineage).expect("subgraph digest");
+        lineage.signature =
+            sign_lineage_subgraph(&lineage, &lineage_signer()).expect("lineage signature");
+        let mut entries = vec![
+            leakage_entry(
+                "leakage-capability-id",
+                "capability_id",
+                "disclosed_field",
+                "capability_identifier",
+                1,
+                None,
+            ),
+            leakage_entry(
+                "leakage-tool-name",
+                "tool_name",
+                "disclosed_field",
+                "tool_identity",
+                1,
+                None,
+            ),
+            leakage_entry(
+                "leakage-amount-cap",
+                "amount_lte_100",
+                "hidden_predicate",
+                "amount_or_budget",
+                2,
+                Some("predicate reveals capped amount band"),
+            ),
+        ];
+        entries.extend(runtime_assurance_entries());
+        let leakage_ledger = DisclosureLeakageLedger {
+            schema: DISCLOSURE_LEAKAGE_LEDGER_SCHEMA_V1.to_string(),
+            id: "leakage-ledger-own".to_string(),
+            transaction_passport_ref: "passport-own-data".to_string(),
+            privacy_profile_ref: "privacy-profile-own".to_string(),
+            policy_profile_id: "privacy-profile-own".to_string(),
+            subject_artifact_sha256: digest("disclosure-capsule-own"),
+            generated_at: "2026-06-10T00:00:00Z".to_string(),
+            audience: "https://auditor.example/chio".to_string(),
+            total_leakage_score: 7,
+            max_allowed_leakage_score: 7,
+            tenant_leakage_notice_ref: "tenant-leakage-notice-none".to_string(),
+            accepted: true,
+            entries,
+        };
+        let mut crypto_context_report = DisclosureCryptoContextReport {
+            schema: DISCLOSURE_CRYPTO_CONTEXT_REPORT_SCHEMA_V1.to_string(),
+            id: "crypto-context-report-own".to_string(),
+            context_id: "crypto-context-own".to_string(),
+            artifact_ref: "disclosure-capsule-own".to_string(),
+            projection_manifest_ref: "bbs-projection-manifest-own".to_string(),
+            verdict: DisclosureContextVerdict::Verified,
+            evidence_class: "verifier_context".to_string(),
+            cryptographic_proof_verified: true,
+            verified_claims: vec![
+                "claim.disclosure.crypto_context_bound".to_string(),
+                "claim.disclosure.profile_context_policy_enforced".to_string(),
+            ],
+            rejected_checks: Vec::new(),
+            disclosed_fields: vec!["capability_id".to_string(), "tool_name".to_string()],
+            signature: None,
+        };
+        crypto_context_report.signature = Some(
+            sign_crypto_context_report(&crypto_context_report, &lineage_signer()).expect("sig"),
+        );
+        DisclosureLineageBundle {
+            capsule,
+            privacy_profile,
+            lineage,
+            leakage_ledger,
+            crypto_context_report: Some(crypto_context_report),
+        }
+    }
+
+    #[test]
+    fn own_data_gift_emits_verified_bundle_for_both_own_streams() {
+        let bundle = own_data_bundle(TENANT);
+        for stream in [ChioPassStream::OwnReceipts, ChioPassStream::OwnLineage] {
+            let report =
+                emit_own_data_gift_bundle(stream, TENANT, &bundle).expect("own-data gift verifies");
+            assert_eq!(report.verdict, "verified");
+            assert_eq!(report.transaction_passport_ref, "passport-own-data");
+
+            // Routed through the per-stream dispatcher it yields the bundle gift.
+            let gift =
+                emit_pass_stream_gift(stream, TENANT, PassStreamSelection::OwnDataBundle(&bundle))
+                    .expect("dispatcher emits bundle");
+            assert!(matches!(gift, PassStreamGift::OwnDataBundle(_)));
+        }
+    }
+
+    #[test]
+    fn own_data_raw_stream_or_three_key_strip_emission_fails() {
+        // The raw SiemEvent receipt body and the 3-key strip view are INTERNAL
+        // selection steps only: feeding either as the emission for an own stream
+        // must fail fail-closed.
+        let raw_receipt = serde_json::json!({
+            "capability_id": "chiopass:test",
+            "metadata": { "financial": { "cost_charged": 42 } }
+        });
+        for stream in [ChioPassStream::OwnReceipts, ChioPassStream::OwnLineage] {
+            assert!(matches!(
+                emit_pass_stream_gift(
+                    stream,
+                    TENANT,
+                    PassStreamSelection::AggregateBody(&raw_receipt)
+                ),
+                Err(KernelError::PassOwnDataGiftInvalid(_))
+            ));
+            // The weaker 3-key strip is not the own-stream gift boundary either.
+            let stripped = project_pass_stream_view(&raw_receipt).expect("strip view");
+            assert!(matches!(
+                emit_pass_stream_gift(
+                    stream,
+                    TENANT,
+                    PassStreamSelection::AggregateBody(&stripped)
+                ),
+                Err(KernelError::PassOwnDataGiftInvalid(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn aggregate_streams_keep_redacted_view_emission_unchanged() {
+        let body = serde_json::json!({
+            "capability_id": "chiopass:test",
+            "metadata": { "cost": { "dimensions": [] }, "trust_level": "mediated" }
+        });
+        for stream in [
+            ChioPassStream::ReputationTier,
+            ChioPassStream::MarketplaceListings,
+            ChioPassStream::PheromoneConcentration,
+        ] {
+            let gift =
+                emit_pass_stream_gift(stream, TENANT, PassStreamSelection::AggregateBody(&body))
+                    .expect("aggregate view");
+            let PassStreamGift::AggregateView(view) = gift else {
+                panic!("aggregate stream must emit a redacted view");
+            };
+            assert_eq!(
+                view.get("redaction").and_then(|v| v.as_str()),
+                Some("summary")
+            );
+            // A disclosure bundle is never an aggregate-stream emission.
+            let bundle = own_data_bundle(TENANT);
+            assert!(matches!(
+                emit_pass_stream_gift(stream, TENANT, PassStreamSelection::OwnDataBundle(&bundle)),
+                Err(KernelError::PassRedactionFailed(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn own_data_gift_rejects_wrong_tenant_hash_binding() {
+        // A bundle whose lineage nodes are bound to a different tenant must not be
+        // served as this holder's own-data gift.
+        let bundle = own_data_bundle("did:chioother");
+        assert!(matches!(
+            emit_own_data_gift_bundle(ChioPassStream::OwnReceipts, TENANT, &bundle),
+            Err(KernelError::PassOwnDataGiftInvalid(_))
+        ));
+    }
+
+    #[test]
+    fn own_data_gift_rejects_plaintext_tenant_leak() {
+        // The verifier still accepts the bundle (required_holder_binding is not
+        // digest-bound), but the kernel denies because the plaintext tenant leaks
+        // into the emitted artifact: only the sha256 tenant hash may appear.
+        let mut bundle = own_data_bundle(TENANT);
+        bundle.privacy_profile.required_holder_binding = Some(format!("holder:{TENANT}"));
+        assert!(verify_disclosure_lineage_bundle(&bundle).is_ok());
+        assert!(matches!(
+            emit_own_data_gift_bundle(ChioPassStream::OwnReceipts, TENANT, &bundle),
+            Err(KernelError::PassOwnDataGiftInvalid(_))
+        ));
+    }
+
+    #[test]
+    fn own_data_gift_rejects_non_own_stream() {
+        let bundle = own_data_bundle(TENANT);
+        for stream in [
+            ChioPassStream::ReputationTier,
+            ChioPassStream::MarketplaceListings,
+            ChioPassStream::PheromoneConcentration,
+        ] {
+            assert!(matches!(
+                emit_own_data_gift_bundle(stream, TENANT, &bundle),
+                Err(KernelError::PassOwnDataGiftInvalid(_))
+            ));
+        }
+    }
+
+    fn own_data_ledger(
+        entries: Vec<DisclosureLeakageLedgerEntry>,
+        accepted: bool,
+    ) -> DisclosureLeakageLedger {
+        let total = entries.iter().map(|entry| entry.score).sum();
+        DisclosureLeakageLedger {
+            schema: DISCLOSURE_LEAKAGE_LEDGER_SCHEMA_V1.to_string(),
+            id: "leakage-ledger-own".to_string(),
+            transaction_passport_ref: "passport-own-data".to_string(),
+            privacy_profile_ref: "privacy-profile-own".to_string(),
+            policy_profile_id: "privacy-profile-own".to_string(),
+            subject_artifact_sha256: digest("disclosure-capsule-own"),
+            generated_at: "2026-06-10T00:00:00Z".to_string(),
+            audience: "https://auditor.example/chio".to_string(),
+            total_leakage_score: total,
+            max_allowed_leakage_score: total,
+            tenant_leakage_notice_ref: "tenant-leakage-notice-none".to_string(),
+            accepted,
+            entries,
+        }
+    }
+
+    #[test]
+    fn own_data_leakage_ledger_requires_accounted_runtime_assurance_even_when_empty() {
+        // A ledger with no disclosed-field entries (the "empty" gift) still MUST
+        // account the three runtime-assurance derived facts; the upstream verifier
+        // does not require them when nothing is disclosed, so this is the kernel's
+        // own strengthening.
+        let empty = own_data_ledger(Vec::new(), true);
+        assert!(matches!(
+            require_own_data_leakage_ledger(&empty),
+            Err(KernelError::PassOwnDataGiftInvalid(_))
+        ));
+        // Present even when empty of disclosed fields: just the three derived facts.
+        let runtime_only = own_data_ledger(runtime_assurance_entries(), true);
+        assert!(require_own_data_leakage_ledger(&runtime_only).is_ok());
+        // Not accepted by policy denies.
+        let rejected = own_data_ledger(runtime_assurance_entries(), false);
+        assert!(matches!(
+            require_own_data_leakage_ledger(&rejected),
+            Err(KernelError::PassOwnDataGiftInvalid(_))
+        ));
     }
 }

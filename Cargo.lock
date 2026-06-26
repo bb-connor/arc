@@ -3628,6 +3628,7 @@ dependencies = [
  "chio-core-types",
  "chio-credit",
  "chio-custody-hw",
+ "chio-disclosure-lineage",
  "chio-federation",
  "chio-governance",
  "chio-kernel-core",

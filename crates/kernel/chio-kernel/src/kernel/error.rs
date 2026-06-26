@@ -69,6 +69,9 @@ pub enum KernelError {
     #[error("Chio Pass stream redaction failed: {0}")]
     PassRedactionFailed(String),
 
+    #[error("Chio Pass own-data gift is not a verified DisclosureLineageBundle: {0}")]
+    PassOwnDataGiftInvalid(String),
+
     #[error("Chio Pass capability id is not the deterministic window-scoped id: {0}")]
     PassCapabilityIdNotDeterministic(String),
 
@@ -299,6 +302,11 @@ impl KernelError {
                 "CHIO-KERNEL-PASS-REDACTION-FAILED",
                 serde_json::json!({ "reason": reason }),
                 "Serve the free-read view only from a JSON-object receipt body whose metadata is an object or null so the economic envelope keys can be stripped fail-closed.",
+            ),
+            Self::PassOwnDataGiftInvalid(reason) => self.report_with_context(
+                "CHIO-KERNEL-PASS-OWN-DATA-GIFT-INVALID",
+                serde_json::json!({ "reason": reason }),
+                "Emit the own-receipts/own-lineage gift as a verified DisclosureLineageBundle: a pinned-key signed lineage subgraph bound to the transaction passport, a mandatory leakage ledger with the issuer-status/revocation-freshness/presentation-timing facts accounted, and the holder tenant carried only as a sha256 tenant hash.",
             ),
             Self::PassCapabilityIdNotDeterministic(reason) => self.report_with_context(
                 "CHIO-KERNEL-PASS-CAPABILITY-ID-NOT-DETERMINISTIC",
