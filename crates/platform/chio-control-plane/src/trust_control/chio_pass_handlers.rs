@@ -29,6 +29,16 @@
 //! - [`issue_chio_pass_command`] is the issuance command: it admits the candidate
 //!   against the distribution throttle, then mints the soulbound credential and
 //!   the window-scoped kernel capability.
+//! - [`prepare_pass_anchor_publication`] is the C6 read-only anchoring job (task
+//!   T10, spec Sections 3.4 / 6.6): it folds the committed `chio_pass_artifact_id`
+//!   leaves of the issued + revoked Passes into an RFC6962 [`AnchorBatch`]
+//!   (Merkle `tree_root` plus one inclusion proof per Pass digest), wraps that root
+//!   in a [`KernelCheckpoint`] under a strictly-increasing per-operator
+//!   `checkpoint_seq`, and binds it to an anchor-purpose
+//!   [`SignedWeb3IdentityBinding`] via the committed `prepare_root_publication`. It
+//!   is prepare-only: it reuses the already-registered anchor schemas (it adds NO
+//!   new signed-artifact schema), it moves NO value on-chain, and the on-chain
+//!   `publishRoot` / `verifyInclusionDetailed` side stays out of scope.
 //!
 //! Naming note: this is the soulbound `ChioPass` reputation credential, distinct
 //! from the `AgentPassport`/`PassportLifecycleRecord` transaction-passport bundle.
@@ -37,22 +47,29 @@
 //! new Pass is minted; a dormant identity therefore defaults to a `0` ceiling and
 //! denies fail-closed on its first metered charge.
 
+use chio_anchor::{
+    build_anchor_batch_body, prepare_root_publication, AnchorBatch, AnchorBatchWitness,
+    EvmAnchorTarget, PreparedEvmRootPublication,
+};
+use chio_core::canonical_json_bytes;
 use chio_core::capability::scope::{ChioScope, MonetaryAmount, Operation, ToolGrant};
 use chio_core::capability::token::{
     window_scoped_capability_id, AttestationWindowId, CapabilityToken,
 };
 use chio_core::crypto::{Keypair, PublicKey};
+use chio_core::web3::identity::SignedWeb3IdentityBinding;
 use chio_credentials::{
-    attestation_window_containing, chio_pass_refresh_decision, evaluate_pass_admission,
-    is_genuine_use_receipt, issue_chio_pass, snapshot_chio_pass_entitlements, ChioPass,
-    ChioPassAdmissionDecision, ChioPassAdmissionPolicy, ChioPassRefreshDecision,
-    ChioPassRefreshOutcome, TierAllotmentTable, TrustTier, CHIO_PASS_ALLOTMENT_UNIT,
-    MIN_GENUINE_USE_RECEIPTS,
+    attestation_window_containing, chio_pass_artifact_id, chio_pass_refresh_decision,
+    evaluate_pass_admission, is_genuine_use_receipt, issue_chio_pass,
+    snapshot_chio_pass_entitlements, ChioPass, ChioPassAdmissionDecision, ChioPassAdmissionPolicy,
+    ChioPassRefreshDecision, ChioPassRefreshOutcome, PassportLifecycleRecord, TierAllotmentTable,
+    TrustTier, CHIO_PASS_ALLOTMENT_UNIT, MIN_GENUINE_USE_RECEIPTS,
 };
 use chio_did::DidChio;
 use chio_kernel::pass_gating::{pass_baseline_resource_grants, PASS_COMPUTE_SERVER_ID};
 use chio_kernel::{
-    CapabilityAuthority, FreeTierPoolConfig, ReceiptQuery, ReceiptReadContext, MAX_QUERY_LIMIT,
+    build_checkpoint_with_previous, CapabilityAuthority, FreeTierPoolConfig, KernelCheckpoint,
+    ReceiptQuery, ReceiptReadContext, MAX_QUERY_LIMIT,
 };
 use chio_store_sqlite::SqliteReceiptStore;
 
@@ -528,17 +545,170 @@ pub fn refresh_chio_pass_window<A: CapabilityAuthority + ?Sized>(
     }
 }
 
+/// The prepared (un-broadcast) product of the read-only Pass anchoring job (task
+/// T10, spec Sections 3.4 / 6.6).
+///
+/// Every field is an off-chain artifact: nothing here moves value on-chain. The
+/// [`AnchorBatch`] carries the Merkle `tree_root` over the anchored Pass digests
+/// plus one inclusion proof per digest; the [`KernelCheckpoint`] re-commits that
+/// same root under the operator's strictly-increasing `checkpoint_seq`; and the
+/// [`PreparedEvmRootPublication`] is the prepared (not sent) `publishRoot` call
+/// data bound to the anchor-purpose identity binding. The on-chain `publishRoot` /
+/// `verifyInclusionDetailed` calls remain the caller's separate, out-of-scope step.
+#[derive(Debug, Clone)]
+pub struct PreparedPassAnchorPublication {
+    /// The ordered Pass artifact-id digests that became the Merkle leaves: the
+    /// issued-Pass digests first (input order), then the revoked-record digests.
+    pub anchored_digests: Vec<String>,
+    /// The signed RFC6962 anchor batch: `body.tree_root` is the anchorable root and
+    /// `body.inclusions` carries one Merkle inclusion proof per anchored digest.
+    pub batch: AnchorBatch,
+    /// The kernel checkpoint wrapping `batch.body.tree_root`. Its `merkle_root`
+    /// equals `batch.body.tree_root` and its `checkpoint_seq` strictly exceeds the
+    /// supplied previous checkpoint's seq (genesis is `0`).
+    pub checkpoint: KernelCheckpoint,
+    /// The prepared (un-broadcast) EVM root-publication call bound to the
+    /// anchor-purpose identity binding. Read-only: no value moves on-chain.
+    pub publication: PreparedEvmRootPublication,
+}
+
+/// The read-only Chio Pass anchoring job (C6, task T10; spec Sections 3.4 / 6.6).
+///
+/// Folds the issued + revoked Pass digests into one anchorable Merkle root and the
+/// matching inclusion-proof artifacts, then prepares (does NOT send) the on-chain
+/// root publication. The pipeline binds only committed primitives:
+///
+/// 1. Leaves: `chio_pass_artifact_id(pass)` for each issued [`ChioPass`], then the
+///    `passport_id` digest of each revoked [`PassportLifecycleRecord`] (which the
+///    committed `revoke_chio_pass_record` already set to the Pass artifact id). The
+///    Pass is a subject/identity leaf set, never a transaction-passport root.
+/// 2. Batch: `build_anchor_batch_body` + `AnchorBatch::sign` capture the `tree_root`
+///    and one `AnchorBatchInclusion` per digest over the SAME RFC6962 substrate the
+///    transaction/settlement passports use. This reuses the already-registered
+///    anchor schemas and introduces NO new signed-artifact schema.
+/// 3. Checkpoint: `build_checkpoint_with_previous` wraps that root in a
+///    [`KernelCheckpoint`] whose `checkpoint_seq` is `previous_checkpoint.seq + 1`
+///    (or `0` for the genesis batch), so the per-operator sequence strictly
+///    increases and chains to the prior checkpoint body.
+/// 4. Publication: `prepare_root_publication` produces the prepared
+///    `IChioRootRegistry::publishRoot` call. It fails closed unless `binding`'s
+///    certificate carries [`Web3KeyBindingPurpose::Anchor`], its `chain_scope`
+///    covers `target.chain_id`, and its `settlement_address == operator_address`.
+///
+/// The job is prepare-only and value-free: `ChioRootRegistry` stays read-only and
+/// no on-chain value moves. The actual `publishRoot` broadcast and
+/// `verifyInclusionDetailed` membership check are the caller's separate step.
+///
+/// # Errors
+///
+/// Fails closed with a [`CliError`] when the digest set is empty, when an artifact
+/// id cannot be derived, when the batch/checkpoint cannot be built or signed, when
+/// the per-operator `checkpoint_seq` would overflow, when the wrapped root would
+/// disagree with the batch root, or when the identity binding does not authorize
+/// anchoring on the target chain.
+#[allow(clippy::too_many_arguments)]
+pub fn prepare_pass_anchor_publication(
+    operator_keypair: &Keypair,
+    binding: &SignedWeb3IdentityBinding,
+    target: &EvmAnchorTarget,
+    issued_passes: &[ChioPass],
+    revoked_records: &[PassportLifecycleRecord],
+    witness: AnchorBatchWitness,
+    issued_at: u64,
+    previous_checkpoint: Option<&KernelCheckpoint>,
+) -> Result<PreparedPassAnchorPublication, CliError> {
+    // 1. Collect the issued + revoked Pass digests as the ordered Merkle leaves.
+    let mut anchored_digests =
+        Vec::with_capacity(issued_passes.len().saturating_add(revoked_records.len()));
+    for pass in issued_passes {
+        anchored_digests.push(chio_pass_artifact_id(pass)?);
+    }
+    for record in revoked_records {
+        anchored_digests.push(record.passport_id.clone());
+    }
+    if anchored_digests.is_empty() {
+        // Fail closed: an empty anchor batch commits nothing and would also be
+        // rejected by `build_anchor_batch_body`; surface a Pass-specific message.
+        return Err(CliError::Other(
+            "Pass anchor batch requires at least one issued or revoked Pass digest".to_string(),
+        ));
+    }
+
+    // 2. Build + sign the RFC6962 anchor batch over the digests. `build_anchor_batch_body`
+    // canonical-JSON-encodes each digest leaf; reproduce those exact leaf bytes so the
+    // checkpoint in step 3 commits the byte-identical Merkle root.
+    let leaves = anchored_digests
+        .iter()
+        .map(canonical_json_bytes)
+        .collect::<Result<Vec<_>, _>>()?;
+    let batch_body = build_anchor_batch_body(
+        anchored_digests.clone(),
+        witness,
+        issued_at,
+        operator_keypair.public_key(),
+    )
+    .map_err(|error| CliError::Other(format!("Pass anchor batch build failed: {error}")))?;
+    let batch = AnchorBatch::sign(batch_body, operator_keypair)
+        .map_err(|error| CliError::Other(format!("Pass anchor batch sign failed: {error}")))?;
+
+    // 3. Wrap the batch root in a kernel checkpoint under a strictly-increasing
+    // per-operator checkpoint_seq (genesis = 0), chaining to the prior checkpoint.
+    let leaf_count = u64::try_from(leaves.len())
+        .map_err(|_| CliError::Other("anchor leaf count overflow".to_string()))?;
+    let checkpoint_seq =
+        match previous_checkpoint {
+            None => 0,
+            Some(previous) => previous.body.checkpoint_seq.checked_add(1).ok_or_else(|| {
+                CliError::Other("per-operator checkpoint_seq overflow".to_string())
+            })?,
+        };
+    let checkpoint = build_checkpoint_with_previous(
+        checkpoint_seq,
+        0,
+        leaf_count,
+        &leaves,
+        operator_keypair,
+        previous_checkpoint,
+    )?;
+    // Defense-in-depth: the checkpoint must re-commit the batch's tree root exactly.
+    if checkpoint.body.merkle_root != batch.body.tree_root {
+        return Err(CliError::Other(
+            "Pass anchor checkpoint root does not match the anchor batch tree root".to_string(),
+        ));
+    }
+
+    // 4. Prepare (do NOT broadcast) the on-chain publishRoot call. This fails closed
+    // unless the binding authorizes anchoring on the target chain for the operator.
+    let publication = prepare_root_publication(target, &checkpoint, binding).map_err(|error| {
+        CliError::Other(format!(
+            "Pass anchor root publication prepare failed: {error}"
+        ))
+    })?;
+
+    Ok(PreparedPassAnchorPublication {
+        anchored_digests,
+        batch,
+        checkpoint,
+        publication,
+    })
+}
+
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    use chio_anchor::{verify_anchor_batch, AnchorBatchWitnessKind};
+    use chio_core::hashing::Hash;
     use chio_core::receipt::body::{ChioReceipt, ChioReceiptBody};
     use chio_core::receipt::decision::{Decision, ToolCallAction};
     use chio_core::receipt::kinds::{
         BoundaryClass, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel,
     };
-    use chio_credentials::CHIO_PASS_ALLOTMENT_COST_NAME;
+    use chio_core::web3::identity::{
+        Web3IdentityBindingCertificate, Web3KeyBindingPurpose, CHIO_KEY_BINDING_CERTIFICATE_SCHEMA,
+    };
+    use chio_credentials::{revoke_chio_pass_record, CHIO_PASS_ALLOTMENT_COST_NAME};
     use chio_kernel::{LocalCapabilityAuthority, ReceiptStore};
 
     use super::*;
@@ -929,5 +1099,241 @@ mod tests {
         let mut no_board = config_with_keys(vec![key]);
         no_board.board_approval_ref.clear();
         assert!(no_board.validate().is_err());
+    }
+
+    // ---- T10 read-only anchoring job (spec Sections 3.4 / 6.6, launch gate 6) ----
+
+    const EVM_CHAIN_ID: &str = "eip155:8453";
+    const EVM_CONTRACT_ADDRESS: &str = "0x1000000000000000000000000000000000000001";
+    const EVM_OPERATOR_ADDRESS: &str = "0x1000000000000000000000000000000000000002";
+
+    fn anchor_target() -> EvmAnchorTarget {
+        EvmAnchorTarget {
+            chain_id: EVM_CHAIN_ID.to_string(),
+            rpc_url: "https://rpc.example".to_string(),
+            contract_address: EVM_CONTRACT_ADDRESS.to_string(),
+            operator_address: EVM_OPERATOR_ADDRESS.to_string(),
+            publisher_address: EVM_OPERATOR_ADDRESS.to_string(),
+        }
+    }
+
+    /// Anchor-purpose identity binding for `operator`. `settlement_address` is the
+    /// target operator address and `chain_scope` covers the target chain, so
+    /// `prepare_root_publication` admits it for `purpose`.
+    fn operator_binding(
+        operator: &Keypair,
+        purpose: Vec<Web3KeyBindingPurpose>,
+    ) -> SignedWeb3IdentityBinding {
+        let certificate = Web3IdentityBindingCertificate {
+            schema: CHIO_KEY_BINDING_CERTIFICATE_SCHEMA.to_string(),
+            chio_identity: "did:chio:pass-anchor-operator".to_string(),
+            chio_public_key: operator.public_key(),
+            chain_scope: vec![EVM_CHAIN_ID.to_string()],
+            purpose,
+            settlement_address: EVM_OPERATOR_ADDRESS.to_string(),
+            issued_at: 1_775_100_000,
+            expires_at: 1_775_200_000,
+            nonce: "pass-anchor-bind-001".to_string(),
+        };
+        let signature = operator
+            .sign_canonical(&certificate)
+            .expect("binding signature")
+            .0;
+        SignedWeb3IdentityBinding {
+            certificate,
+            signature,
+        }
+    }
+
+    /// A placeholder public-witness descriptor; the prepare-only job leaves the
+    /// witness state pending (no live lane). `build_anchor_batch_body` overwrites
+    /// `root` with the computed tree root.
+    fn pending_witness() -> AnchorBatchWitness {
+        AnchorBatchWitness {
+            kind: AnchorBatchWitnessKind::Rekor,
+            witness_id: "rekor:pass-anchor".to_string(),
+            root: Hash::zero(),
+            observed_at: None,
+        }
+    }
+
+    fn issue_first_window_pass(subject: &Keypair, tier: TrustTier) -> ChioPass {
+        let issuer = Keypair::generate();
+        let authority = LocalCapabilityAuthority::new(Keypair::generate());
+        let config = config_with_keys(vec![Keypair::generate().public_key()]);
+        issue_chio_pass_command(
+            &config,
+            &authority,
+            &issuer,
+            &subject.public_key(),
+            tier,
+            MID_JUNE_2026,
+            0,
+            0,
+        )
+        .expect("issue first-window pass")
+        .pass
+    }
+
+    #[test]
+    fn prepare_pass_anchor_publication_builds_root_and_inclusions() {
+        let operator = Keypair::generate();
+        let pass_a = issue_first_window_pass(&Keypair::generate(), TrustTier::Attested);
+        let pass_b = issue_first_window_pass(&Keypair::generate(), TrustTier::Verified);
+        // The revocation record's digest is the committed Pass artifact id.
+        let revoked = revoke_chio_pass_record(&pass_b, MID_JUNE_2026 + 5, "superseded".to_string())
+            .expect("revoke pass_b");
+
+        let binding = operator_binding(&operator, vec![Web3KeyBindingPurpose::Anchor]);
+        let prepared = prepare_pass_anchor_publication(
+            &operator,
+            &binding,
+            &anchor_target(),
+            &[pass_a.clone()],
+            &[revoked.clone()],
+            pending_witness(),
+            MID_JUNE_2026,
+            None,
+        )
+        .expect("prepare anchor publication");
+
+        // Leaves are the issued digest then the revoked digest, in order.
+        let issued_digest = chio_pass_artifact_id(&pass_a).expect("issued digest");
+        assert_eq!(
+            prepared.anchored_digests,
+            vec![issued_digest.clone(), revoked.passport_id.clone()]
+        );
+
+        // The signed batch self-verifies: the Merkle root, every per-leaf inclusion
+        // proof (single-Pass membership), and the signature. This is the read-only
+        // membership check; no on-chain call is made.
+        verify_anchor_batch(&prepared.batch).expect("anchor batch verifies");
+        assert_eq!(prepared.batch.body.inclusions.len(), 2);
+        assert_eq!(
+            prepared.batch.body.inclusions[0].checkpoint_id,
+            issued_digest
+        );
+        assert_eq!(
+            prepared.batch.body.inclusions[1].checkpoint_id,
+            revoked.passport_id
+        );
+
+        // The checkpoint re-commits the SAME root and the prepared publication
+        // carries it; nothing here moves value on-chain.
+        assert_eq!(
+            prepared.checkpoint.body.merkle_root,
+            prepared.batch.body.tree_root
+        );
+        assert_eq!(
+            prepared.publication.merkle_root,
+            prepared.batch.body.tree_root
+        );
+        assert_eq!(prepared.checkpoint.body.tree_size, 2);
+        assert_eq!(prepared.publication.tree_size, 2);
+        assert_eq!(prepared.publication.operator_address, EVM_OPERATOR_ADDRESS);
+        assert_eq!(prepared.publication.chain_id, EVM_CHAIN_ID);
+    }
+
+    #[test]
+    fn prepare_pass_anchor_publication_empty_set_fails_closed() {
+        let operator = Keypair::generate();
+        let binding = operator_binding(&operator, vec![Web3KeyBindingPurpose::Anchor]);
+        let result = prepare_pass_anchor_publication(
+            &operator,
+            &binding,
+            &anchor_target(),
+            &[],
+            &[],
+            pending_witness(),
+            MID_JUNE_2026,
+            None,
+        );
+        assert!(
+            result.is_err(),
+            "an empty issued + revoked digest set must fail closed"
+        );
+    }
+
+    #[test]
+    fn prepare_pass_anchor_publication_checkpoint_seq_strictly_increases() {
+        let operator = Keypair::generate();
+        let pass = issue_first_window_pass(&Keypair::generate(), TrustTier::Attested);
+        let binding = operator_binding(&operator, vec![Web3KeyBindingPurpose::Anchor]);
+
+        let genesis = prepare_pass_anchor_publication(
+            &operator,
+            &binding,
+            &anchor_target(),
+            &[pass.clone()],
+            &[],
+            pending_witness(),
+            MID_JUNE_2026,
+            None,
+        )
+        .expect("genesis anchor publication");
+        assert_eq!(genesis.checkpoint.body.checkpoint_seq, 0);
+        assert!(genesis.checkpoint.body.previous_checkpoint_sha256.is_none());
+
+        let next = prepare_pass_anchor_publication(
+            &operator,
+            &binding,
+            &anchor_target(),
+            &[pass],
+            &[],
+            pending_witness(),
+            MID_JUNE_2026 + 1,
+            Some(&genesis.checkpoint),
+        )
+        .expect("next anchor publication");
+        assert!(
+            next.checkpoint.body.checkpoint_seq > genesis.checkpoint.body.checkpoint_seq,
+            "per-operator checkpoint_seq must strictly increase"
+        );
+        assert_eq!(next.checkpoint.body.checkpoint_seq, 1);
+        assert_eq!(next.publication.checkpoint_seq, 1);
+        // The next checkpoint chains to the prior checkpoint body (per-operator continuity).
+        assert!(next.checkpoint.body.previous_checkpoint_sha256.is_some());
+    }
+
+    #[test]
+    fn prepare_pass_anchor_publication_requires_anchor_binding_purpose() {
+        let operator = Keypair::generate();
+        let pass = issue_first_window_pass(&Keypair::generate(), TrustTier::Attested);
+
+        // An anchor-purpose binding carries Web3KeyBindingPurpose::Anchor and the
+        // prepared publication binds it (prepare_root_publication admits it).
+        let anchor = operator_binding(&operator, vec![Web3KeyBindingPurpose::Anchor]);
+        assert!(anchor
+            .certificate
+            .purpose
+            .contains(&Web3KeyBindingPurpose::Anchor));
+        prepare_pass_anchor_publication(
+            &operator,
+            &anchor,
+            &anchor_target(),
+            &[pass.clone()],
+            &[],
+            pending_witness(),
+            MID_JUNE_2026,
+            None,
+        )
+        .expect("anchor-purpose binding prepares");
+
+        // A Settle-only binding (no Anchor purpose) is rejected fail-closed.
+        let settle_only = operator_binding(&operator, vec![Web3KeyBindingPurpose::Settle]);
+        let denied = prepare_pass_anchor_publication(
+            &operator,
+            &settle_only,
+            &anchor_target(),
+            &[pass],
+            &[],
+            pending_witness(),
+            MID_JUNE_2026,
+            None,
+        );
+        assert!(
+            denied.is_err(),
+            "a binding without the Anchor purpose must be rejected"
+        );
     }
 }

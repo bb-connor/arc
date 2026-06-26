@@ -21,6 +21,7 @@ pq = ["chio-core/pq", "chio-kernel/pq", "chio-store-sqlite/pq"]
 
 [dependencies]
 chio-agent-web-interop = { workspace = true }
+chio-anchor = { workspace = true }
 chio-appraisal = { workspace = true }
 chio-commerce-order = { workspace = true }
 chio-core = { workspace = true }
@@ -66,7 +67,6 @@ x509-cert = "0.2"
 url = "2"
 
 [dev-dependencies]
-chio-anchor = { workspace = true }
 chio-link = { workspace = true }
 chio-test-support = { workspace = true }
 chio-settle = { workspace = true }
