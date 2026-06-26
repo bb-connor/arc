@@ -13,6 +13,8 @@
 //! - [`local_account`] -- in-memory account that signs IOU envelopes.
 //! - [`netting`] -- off-chain single-denomination netting collapse (read-only
 //!   projection; flips no support-boundary flag).
+//! - [`prepaid`] -- escrow-socketed closed-loop prepaid credit view (read-only
+//!   projection; non-transferable; refundable to the original funder only).
 //! - [`risk_reports`] -- loss-lifecycle, backtest, and provider-risk reports.
 //! - [`store_binding`] -- durable-store trait for persisting IOU envelopes.
 
@@ -25,6 +27,7 @@ pub use chio_underwriting as underwriting;
 pub mod hook;
 pub mod local_account;
 pub mod netting;
+pub mod prepaid;
 pub mod risk_reports;
 pub mod store_binding;
 
@@ -37,6 +40,12 @@ pub use netting::{
     ExposureLedgerNettedView, ExposureLedgerNettingError, ExposureLedgerNettingRates,
     SingleDenominationNettingBenefit, CANONICAL_NETTING_CURRENCY,
     EXPOSURE_LEDGER_NETTED_VIEW_SCHEMA,
+};
+pub use prepaid::{
+    project_closed_loop_prepaid, ClosedLoopPrepaidView, EscrowPrepaidSocket,
+    PrepaidCreditLifecycle, PrepaidCreditSupportBoundary, PrepaidCreditViewError,
+    PrepaidRefundDenied, PrepaidRefundDisposition, PrepaidTransferDenied,
+    PREPAID_CREDIT_CANONICAL_CURRENCY, PREPAID_CREDIT_VIEW_SCHEMA,
 };
 pub use risk_reports::{
     CreditBacktestQuery, CreditBacktestReasonCode, CreditBacktestReport, CreditBacktestSummary,
