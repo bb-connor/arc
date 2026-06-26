@@ -1073,6 +1073,55 @@ fn public_settlement_proof_emits_verifier_report() {
         .contains(&CLAIM_PUBLIC_SETTLEMENT_PUBLIC_WITNESS_VERIFIED.to_string()));
 }
 
+/// M2-2 (WS-CL-RECOMPUTE-GATE) fail-closed negative: a fully verified x402
+/// settlement RECEIPT binds settlement and payment claims ONLY. It never
+/// authorizes a tool call. Payment success is not authorization; tool-call
+/// authority belongs to the capability/governance lane, so a "verified"
+/// settlement verdict must not leak any capability grant or tool-call claim.
+#[test]
+fn verified_x402_settlement_receipt_does_not_authorize_tool_call() {
+    // A settlement proof the recompute lane accepts: payment settled and
+    // every settlement claim recomputes from the kernel-signed anchor.
+    let bundle = sample_public_settlement_proof_bundle();
+    let report = verify_sample_public_settlement_proof(&bundle).unwrap();
+    assert_eq!(report.verdict, "verified");
+    assert_eq!(report.recomputed_settlement_state, "settled");
+
+    // Every claim a verified settlement proof can emit lives on the
+    // settlement/payment axis (`claim.public_settlement.*`). None of them
+    // grants capability or tool-call authority.
+    let settlement_claims: BTreeSet<&str> = BTreeSet::from([
+        CLAIM_PUBLIC_SETTLEMENT_ORDER_BINDING_VERIFIED,
+        CLAIM_PUBLIC_SETTLEMENT_CHAIN_CONTEXT_VERIFIED,
+        CLAIM_PUBLIC_SETTLEMENT_FINALITY_VERIFIED,
+        CLAIM_PUBLIC_SETTLEMENT_ORACLE_CONVERSION_BOUND,
+        CLAIM_PUBLIC_SETTLEMENT_DISPUTE_POSTURE_BOUND,
+        CLAIM_PUBLIC_SETTLEMENT_TRUST_MARKET_REFS_BOUND,
+        CLAIM_PUBLIC_SETTLEMENT_PUBLIC_WITNESS_VERIFIED,
+    ]);
+    assert!(!report.verified_claims.is_empty());
+    for claim in &report.verified_claims {
+        assert!(
+            claim.starts_with("claim.public_settlement."),
+            "settlement proof emitted a non-settlement claim: {claim}"
+        );
+        assert!(
+            settlement_claims.contains(claim.as_str()),
+            "settlement proof emitted an unexpected claim: {claim}"
+        );
+        for forbidden in ["tool_call", "capability", "authoriz", "invoke"] {
+            assert!(
+                !claim.contains(forbidden),
+                "settlement claim must not carry tool-call authority: {claim}"
+            );
+        }
+    }
+
+    // The verifier report speaks only to settlement: there is no
+    // authorization verdict and no capability grant to be mistaken for one.
+    assert_ne!(report.verdict, "authorized");
+}
+
 #[test]
 fn public_settlement_proof_rejects_missing_trusted_oracle_keys() {
     let bundle = sample_public_settlement_proof_bundle();

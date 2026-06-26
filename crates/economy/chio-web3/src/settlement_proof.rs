@@ -311,6 +311,27 @@ pub struct PublicSettlementTrustMarketContext {
     pub slash_authority_ref: String,
 }
 
+/// Verify a public settlement proof bundle through the recompute lane.
+///
+/// Settlement state is recomputed from the kernel-signed checkpoint anchor
+/// and the chain snapshot, not trusted from any producer-asserted or
+/// witnessed on-chain value: the public witness must agree with the
+/// recomputed `chain_anchor` (root, checkpoint sequence, anchor tx), and the
+/// snapshot registry root must equal the anchored Merkle root. The returned
+/// [`PublicSettlementVerifierReport`] binds settlement and payment claims
+/// ONLY (`claim.public_settlement.*`). A "verified" verdict here means the
+/// payment settled and the settlement evidence recomputes; it does NOT
+/// authorize a tool call. Payment success is not authorization: tool-call
+/// authority comes from the capability/governance lane, never from a
+/// settlement receipt, so this report carries no capability grant and emits
+/// no tool-call authorization claim.
+///
+/// # Errors
+///
+/// Returns [`Web3ContractError`] when the bundle fails header, trust,
+/// verifier-policy, provenance, order-binding, chain-binding, snapshot,
+/// independent-head, finality, dispute, trust-market, or public-witness
+/// validation, or when any carried signature fails to verify.
 pub fn verify_public_settlement_proof(
     bundle: &PublicSettlementProofBundle,
     trust: &PublicSettlementVerifierTrust,
