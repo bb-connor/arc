@@ -38,7 +38,11 @@
 //! `ChioPass` soulbound credential in `chio-credentials`.
 
 use chio_core_types::capability::scope::{ChioScope, Operation, ResourceGrant, ToolGrant};
-use chio_core_types::capability::token::CapabilityToken;
+use chio_core_types::capability::token::{
+    window_scoped_capability_id, AttestationWindowId, CapabilityToken,
+    CHIO_PASS_CAPABILITY_ID_PREFIX,
+};
+use chio_core_types::crypto::SigningAlgorithm;
 
 use crate::kernel::KernelError;
 use crate::receipt_query::ReceiptReadContext;
@@ -271,6 +275,141 @@ pub fn validate_pass_scope_is_baseline(
         if uri_is_pass_denied(&grant.uri_pattern) {
             return Err(KernelError::PassScopeInflation(grant.uri_pattern.clone()));
         }
+    }
+    Ok(())
+}
+
+/// Build the [`KernelError::PassCapabilityIdNotDeterministic`] denial.
+fn pass_id_not_deterministic(reason: &str) -> KernelError {
+    KernelError::PassCapabilityIdNotDeterministic(reason.to_string())
+}
+
+/// True if any tool grant in `scope` is denominated in the private-use Pass
+/// allotment unit ([`PASS_ALLOTMENT_UNIT`], `"XCC"`). This is the scope-shaped
+/// Pass signal: a token carrying the XCC metered grant is a free-tier Pass even
+/// when a non-canonical mint site stamped it with a UUIDv7 id.
+fn scope_carries_xcc_metered_grant(scope: &ChioScope) -> bool {
+    scope.grants.iter().any(|grant| {
+        grant
+            .max_cost_per_invocation
+            .as_ref()
+            .is_some_and(|amount| amount.currency == PASS_ALLOTMENT_UNIT)
+            || grant
+                .max_total_cost
+                .as_ref()
+                .is_some_and(|amount| amount.currency == PASS_ALLOTMENT_UNIT)
+    })
+}
+
+/// The UTC calendar-month attestation window containing `issued_at`.
+///
+/// This mirrors `chio_credentials::attestation_window_containing` byte-for-byte
+/// (same `window_ym`, `since`, and `until`) so the kernel admission assertion and
+/// the credential-layer `verify_window_scoped_capability_id` recompute the same
+/// id. The kernel must NOT depend on `chio-credentials`, so the derivation is
+/// reproduced here against the same `chrono` primitives instead of being shared.
+///
+/// # Errors
+///
+/// Returns [`KernelError::PassCapabilityIdNotDeterministic`], fail-closed, on an
+/// out-of-range timestamp or a month overflow.
+fn pass_attestation_window(issued_at: u64) -> Result<AttestationWindowId, KernelError> {
+    use chrono::{DateTime, Datelike, Months, TimeZone, Utc};
+
+    let secs = i64::try_from(issued_at)
+        .map_err(|_| pass_id_not_deterministic("issued_at is out of range"))?;
+    let dt = DateTime::from_timestamp(secs, 0)
+        .ok_or_else(|| pass_id_not_deterministic("issued_at is not a representable timestamp"))?;
+    let month_start_naive = dt
+        .date_naive()
+        .with_day(1)
+        .and_then(|day| day.and_hms_opt(0, 0, 0))
+        .ok_or_else(|| pass_id_not_deterministic("attestation month start is not representable"))?;
+    let month_start = Utc.from_utc_datetime(&month_start_naive);
+    let next_month = month_start
+        .checked_add_months(Months::new(1))
+        .ok_or_else(|| pass_id_not_deterministic("attestation month overflowed"))?;
+    let since = u64::try_from(month_start.timestamp())
+        .map_err(|_| pass_id_not_deterministic("window since is out of range"))?;
+    let until = u64::try_from(next_month.timestamp())
+        .map_err(|_| pass_id_not_deterministic("window until is out of range"))?;
+    Ok(AttestationWindowId {
+        window_ym: month_start.format("%Y-%m").to_string(),
+        since,
+        until,
+    })
+}
+
+/// Kernel admission assertion (B7, M0 T6): a Pass-shaped capability MUST carry the
+/// deterministic, window-scoped `chiopass:<hash>` id.
+///
+/// A capability is Pass-shaped when EITHER its id carries the
+/// [`CHIO_PASS_CAPABILITY_ID_PREFIX`] OR its scope carries the XCC metered grant
+/// (the free-tier compute allotment). For any Pass-shaped capability this asserts,
+/// fail-closed, that:
+///
+/// 1. the id carries the `chiopass:` prefix (so a token whose scope is Pass-shaped
+///    but whose id is a UUIDv7 is rejected, closing the three other UUIDv7 mint
+///    sites at `chio-kernel`, `chio-store-sqlite`, and `chio-http-core`);
+/// 2. the subject is an ed25519 `did:chio` key (the only key the canonical id
+///    derives from);
+/// 3. `issued_at`/`expires_at` are pinned to the attestation-window boundaries
+///    derived from `issued_at`; and
+/// 4. the id equals the canonical [`window_scoped_capability_id`] recomputed from
+///    the token's OWN subject DID and that window.
+///
+/// This closes the loophole where another mint site could stamp a non-canonical id
+/// on a Pass-shaped capability and so open a fresh `(capability_id, 0)` budget row
+/// that resets the free-tier counter. The recompute mirrors the credential-layer
+/// `chio_credentials::verify_window_scoped_capability_id`; because the kernel
+/// cannot depend on `chio-credentials`, it derives the canonical `did:chio` as
+/// `did:chio:<subject hex>` (identical to `DidChio::from_public_key(..).to_string()`)
+/// and the window from `issued_at`, against the same shared
+/// [`window_scoped_capability_id`] formula, so both layers agree byte-for-byte.
+/// A capability that is NOT Pass-shaped is admitted unchanged.
+///
+/// # Errors
+///
+/// Returns [`KernelError::PassCapabilityIdNotDeterministic`] on any mismatch.
+pub fn assert_pass_capability_id_deterministic(cap: &CapabilityToken) -> Result<(), KernelError> {
+    let id_is_pass_shaped = cap.id.starts_with(CHIO_PASS_CAPABILITY_ID_PREFIX);
+    let scope_is_pass_shaped = scope_carries_xcc_metered_grant(&cap.scope);
+    if !id_is_pass_shaped && !scope_is_pass_shaped {
+        // Not a Pass capability: existing admission behavior is unchanged.
+        return Ok(());
+    }
+
+    if !id_is_pass_shaped {
+        return Err(pass_id_not_deterministic(
+            "a capability carrying the XCC metered grant must use the deterministic chiopass: id",
+        ));
+    }
+
+    if cap.subject.algorithm() != SigningAlgorithm::Ed25519 {
+        return Err(pass_id_not_deterministic(
+            "Pass capability subject must be an ed25519 did:chio key",
+        ));
+    }
+    let subject_did = format!("did:chio:{}", cap.subject.to_hex());
+
+    let window = pass_attestation_window(cap.issued_at)?;
+    if cap.issued_at != window.since {
+        return Err(pass_id_not_deterministic(
+            "Pass issued_at is not pinned to its attestation-window start",
+        ));
+    }
+    if cap.expires_at != window.until {
+        return Err(pass_id_not_deterministic(
+            "Pass expires_at is not pinned to its attestation-window boundary",
+        ));
+    }
+
+    let expected = window_scoped_capability_id(&subject_did, &window)
+        .map_err(|error| KernelError::PassCapabilityIdNotDeterministic(error.to_string()))?;
+    if cap.id != expected {
+        return Err(pass_id_not_deterministic(
+            "Pass capability id is not the canonical window-scoped id",
+        ));
     }
     Ok(())
 }
@@ -673,5 +812,145 @@ mod tests {
     fn receipt_read_context_is_tenant_scoped_without_null_tenant() {
         let ctx = pass_receipt_read_context(TENANT).expect("ctx");
         assert!(!ctx.include_null_tenant);
+    }
+
+    // 2026-06-01T00:00:00Z and 2026-07-01T00:00:00Z (real UTC month boundaries),
+    // matching the credential-layer window so the recomputed id agrees.
+    const JUNE_SINCE: u64 = 1_780_272_000;
+    const JULY_SINCE: u64 = 1_782_864_000;
+
+    fn june_window() -> AttestationWindowId {
+        AttestationWindowId {
+            window_ym: "2026-06".to_string(),
+            since: JUNE_SINCE,
+            until: JULY_SINCE,
+        }
+    }
+
+    fn signed_token(
+        id: String,
+        subject: &Keypair,
+        scope: ChioScope,
+        issued_at: u64,
+        expires_at: u64,
+    ) -> CapabilityToken {
+        let issuer = Keypair::generate();
+        CapabilityToken::sign(
+            CapabilityTokenBody {
+                id,
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope,
+                issued_at,
+                expires_at,
+                delegation_chain: Vec::new(),
+            },
+            &issuer,
+        )
+        .expect("sign capability")
+    }
+
+    #[test]
+    fn admission_accepts_canonical_window_scoped_pass_id() {
+        let subject = Keypair::generate();
+        let subject_did = format!("did:chio:{}", subject.public_key().to_hex());
+        let window = june_window();
+        let id = window_scoped_capability_id(&subject_did, &window).expect("id");
+        let token = signed_token(
+            id,
+            &subject,
+            baseline_scope(TENANT),
+            window.since,
+            window.until,
+        );
+        assert!(assert_pass_capability_id_deterministic(&token).is_ok());
+    }
+
+    #[test]
+    fn admission_rejects_chiopass_id_that_is_not_canonical() {
+        let subject = Keypair::generate();
+        let window = june_window();
+        let token = signed_token(
+            "chiopass:0000".to_string(),
+            &subject,
+            baseline_scope(TENANT),
+            window.since,
+            window.until,
+        );
+        assert!(matches!(
+            assert_pass_capability_id_deterministic(&token),
+            Err(KernelError::PassCapabilityIdNotDeterministic(_))
+        ));
+    }
+
+    #[test]
+    fn admission_rejects_uuid_id_bearing_the_xcc_metered_grant() {
+        // B7: a non-canonical (UUIDv7) mint site stamped an XCC Pass scope. The
+        // missing chiopass: prefix is rejected at admission, closing the three
+        // other mint sites (chio-kernel/chio-store-sqlite/chio-http-core).
+        let subject = Keypair::generate();
+        let window = june_window();
+        let token = signed_token(
+            "cap-018f-7a3c-uuidv7".to_string(),
+            &subject,
+            baseline_scope(TENANT),
+            window.since,
+            window.until,
+        );
+        assert!(matches!(
+            assert_pass_capability_id_deterministic(&token),
+            Err(KernelError::PassCapabilityIdNotDeterministic(_))
+        ));
+    }
+
+    #[test]
+    fn admission_rejects_window_boundary_drift() {
+        let subject = Keypair::generate();
+        let subject_did = format!("did:chio:{}", subject.public_key().to_hex());
+        let window = june_window();
+        let id = window_scoped_capability_id(&subject_did, &window).expect("id");
+        // expires_at is not pinned to the attestation-window boundary.
+        let token = signed_token(
+            id,
+            &subject,
+            baseline_scope(TENANT),
+            window.since,
+            window.until + 1,
+        );
+        assert!(matches!(
+            assert_pass_capability_id_deterministic(&token),
+            Err(KernelError::PassCapabilityIdNotDeterministic(_))
+        ));
+    }
+
+    #[test]
+    fn admission_leaves_non_pass_capability_unaffected() {
+        // A USD tool grant under a UUIDv7 id: Pass-shaped by neither id nor scope.
+        let subject = Keypair::generate();
+        let usd_scope = ChioScope {
+            grants: vec![ToolGrant {
+                server_id: "svc".to_string(),
+                tool_name: "*".to_string(),
+                operations: vec![Operation::Invoke],
+                constraints: Vec::new(),
+                max_invocations: None,
+                max_cost_per_invocation: Some(MonetaryAmount {
+                    units: 1,
+                    currency: "USD".to_string(),
+                }),
+                max_total_cost: None,
+                dpop_required: None,
+            }],
+            resource_grants: Vec::new(),
+            prompt_grants: Vec::new(),
+        };
+        let token = signed_token(
+            "cap-018f-7a3c-uuidv7".to_string(),
+            &subject,
+            usd_scope,
+            100,
+            200,
+        );
+        assert!(assert_pass_capability_id_deterministic(&token).is_ok());
     }
 }

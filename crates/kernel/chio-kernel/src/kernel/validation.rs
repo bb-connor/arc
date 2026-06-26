@@ -290,8 +290,22 @@ impl ChioKernel {
             &trust_resolver,
             &mut budgets,
         )
-        .map(|_| ())
-        .map_err(|error| chio_kernel_core::KernelCoreError::InvalidCapability(error).deny_reason())
+        .map_err(|error| {
+            chio_kernel_core::KernelCoreError::InvalidCapability(error).deny_reason()
+        })?;
+
+        // B7 (M0 T6): a Pass-shaped capability (a `chiopass:` id OR an XCC metered
+        // grant) must carry the deterministic window-scoped id recomputed from its
+        // OWN subject DID and its issued_at-aligned attestation window, with
+        // issued_at/expires_at pinned to the window boundaries. This is an additive,
+        // fail-closed admission assertion: it closes the loophole where another
+        // (UUIDv7) mint site stamps a non-canonical id on a Pass-shaped capability
+        // and so resets the free-tier budget row. Non-Pass capabilities are
+        // unaffected (the assertion returns Ok for them).
+        crate::pass_gating::assert_pass_capability_id_deterministic(cap)
+            .map_err(|error| error.to_string())?;
+
+        Ok(())
     }
 
     /// The hosted `evaluate_tool_call_*` paths route the full chain
