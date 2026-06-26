@@ -93,10 +93,10 @@ pub(super) struct TrustScorecardSnapshot {
     sla_performance_refs: Vec<String>,
     negative_event_refs: Vec<String>,
     freshness_window: FreshnessWindow,
-    score_floor: u64,
-    score_ceiling: u64,
-    computed_score: u64,
-    downgrade_reasons: Vec<String>,
+    pub(super) score_floor: u64,
+    pub(super) score_ceiling: u64,
+    pub(super) computed_score: u64,
+    pub(super) downgrade_reasons: Vec<String>,
     signature: String,
 }
 
@@ -125,7 +125,7 @@ pub(super) struct ReputationImportReport {
     subject_binding_ref: String,
     privacy_profile_ref: String,
     decay_policy_ref: String,
-    local_weight: u64,
+    pub(super) local_weight: u64,
     import_verdict: String,
     usage: String,
     signature: String,

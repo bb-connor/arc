@@ -4552,6 +4552,7 @@ name = "chio-trust-market-context"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-credentials",
  "chio-risk-comptroller",
  "chio-test-support",
  "chio-transaction-passport",

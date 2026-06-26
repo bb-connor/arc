@@ -7,8 +7,9 @@ use serde_json::{json, Value};
 use chio_core_types::PublicKey;
 use chio_transaction_passport::TransactionPassport;
 use chio_trust_market_context::{
+    evaluate_pass_eligibility, reconcile_claimed_pass_trust_tier, reconcile_pass_trust_tier,
     resolve_rr2_tm_01_kernel_keys, verify_trust_market_context, MarketAuthorityRegistry,
-    MarketAuthorityRegistryError, MarketAuthorityRotationEpoch, TrustMarketBundle,
+    MarketAuthorityRegistryError, MarketAuthorityRotationEpoch, TrustMarketBundle, TrustTier,
     RR2_TM_01_REGISTRY_REF,
 };
 
@@ -42,6 +43,10 @@ enum TrustMarketCase {
     GlobalScorecardScope,
     ScoreRecomputeMismatch,
     ReputationImportOverweight,
+    ReputationImportClaimsSolvency,
+    SelectionPassportMismatch,
+    SelectionOrderMismatch,
+    SelectionDiscoveryMismatch,
     ScorecardPortableReputationOverweight,
     SlaWrongOrder,
     SlaPerformanceMetricMismatch,
@@ -403,6 +408,13 @@ fn trust_market_bundle(case: TrustMarketCase) -> TrustMarketBundle {
         scorecard,
     );
 
+    // ELIGIBILITY != SOLVENCY: a reputation import that declares a
+    // collateral/solvency usage must be refused by the substrate gate; portable
+    // reputation may only ever be a scoring input.
+    let reputation_usage = match case {
+        TrustMarketCase::ReputationImportClaimsSolvency => "collateral_attestation",
+        _ => "scoring_input",
+    };
     let reputation_import = signed_market_artifact_bytes(json!({
         "schema": "chio.trust.reputation-import-report.v1",
         "id": "reputation-import-trust-market-valid",
@@ -422,7 +434,7 @@ fn trust_market_bundle(case: TrustMarketCase) -> TrustMarketBundle {
             30
         },
         "import_verdict": "accepted",
-        "usage": "scoring_input",
+        "usage": reputation_usage,
         "signature": "sig-reputation-import-valid"
     }));
     push_artifact(
@@ -1006,13 +1018,28 @@ fn trust_market_bundle(case: TrustMarketCase) -> TrustMarketBundle {
             }
         ]),
     };
+    // Selection binds three substrate ids: passport_id, order_id and
+    // discovery_snapshot_ref. Each can be desynchronised independently to prove the
+    // binding is enforced fail-closed.
+    let selection_passport_id = match case {
+        TrustMarketCase::SelectionPassportMismatch => "passport-trust-market-other".to_string(),
+        _ => passport.id.clone(),
+    };
+    let selection_order_id = match case {
+        TrustMarketCase::SelectionOrderMismatch => "order-commerce-other",
+        _ => "order-commerce-001",
+    };
+    let selection_discovery_ref = match case {
+        TrustMarketCase::SelectionDiscoveryMismatch => "discovery-trust-market-other",
+        _ => "discovery-trust-market-valid",
+    };
     let selection = signed_market_artifact_bytes(json!({
         "schema": "chio.commerce.provider-selection-report.v1",
         "id": "selection-trust-market-valid",
         "issued_at": selection_issued_at,
-        "passport_id": passport.id,
-        "order_id": "order-commerce-001",
-        "discovery_snapshot_ref": "discovery-trust-market-valid",
+        "passport_id": selection_passport_id,
+        "order_id": selection_order_id,
+        "discovery_snapshot_ref": selection_discovery_ref,
         "selected_provider_subject": absent_selected_provider,
         "ranking_policy_ref": "ranking-policy-market-valid",
         "scorecard_ref": "scorecard-trust-market-valid",
@@ -2231,4 +2258,203 @@ fn trust_market_rejects_tampered_provider_assertion_digest() {
             "{path}: {error}"
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// Pass portable-reputation eligibility + trust-tier reconciliation (M1-16)
+//
+// Pass eligibility is bound to the SAME provider-admission substrate the
+// marketplace verifies: it routes through validate_reputation_import (no parallel
+// admission path, no second authority) and reconciles the coarse Pass TrustTier
+// from the same scorecard computed_score that selection binds into the order
+// context. Portable reputation can never become a collateral/solvency claim.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn pass_eligibility_routes_through_substrate_and_carries_no_solvency() {
+    // The valid fixture is a trusted issuer's accepted import at the policy weight
+    // cap (the highest portable reputation the policy admits). Eligibility is
+    // granted only because validate_reputation_import passed inside the single
+    // verification spine, and it exposes the capped weight + reconciled tier -
+    // structurally never any capital, collateral or solvency field.
+    let eligibility = evaluate_pass_eligibility(&trust_market_bundle(TrustMarketCase::Valid))
+        .test_expect("valid fixture yields Pass eligibility");
+
+    assert_eq!(eligibility.subject, "did:chio:provider-alpha");
+    // Eligibility is bound to the same three selection ids verified by the chain.
+    assert_eq!(eligibility.order_id, "order-commerce-001");
+    assert_eq!(
+        eligibility.discovery_snapshot_ref,
+        "discovery-trust-market-valid"
+    );
+    assert_eq!(
+        eligibility.selection_report_ref,
+        "selection-trust-market-valid"
+    );
+    // The weight is the policy-capped portable-reputation weight (30), never a
+    // capital amount.
+    assert_eq!(eligibility.capped_local_weight, 30);
+    // computed_score 92 over [0,100] projects to 920 on the 0..=1000 compliance
+    // scale, which is Premier with no behavioral anomaly.
+    assert_eq!(eligibility.reconciled_trust_tier, TrustTier::Premier);
+}
+
+#[test]
+fn pass_eligibility_rejects_reputation_import_claiming_solvency() {
+    // ELIGIBILITY != SOLVENCY. A reputation import that declares a
+    // collateral/solvency usage is refused by the shipped substrate gate, so even
+    // a top-reputation subject cannot turn portable reputation into a solvency
+    // claim. Both the eligibility entry and the full chain reject it fail-closed.
+    let eligibility_error = evaluate_pass_eligibility(&trust_market_bundle(
+        TrustMarketCase::ReputationImportClaimsSolvency,
+    ))
+    .test_expect_err("portable reputation must not confer a solvency claim");
+    assert!(
+        eligibility_error
+            .to_string()
+            .contains("reputation import cannot prove collateral or solvency"),
+        "{eligibility_error}"
+    );
+
+    let chain_error = verify_trust_market_context(&trust_market_bundle(
+        TrustMarketCase::ReputationImportClaimsSolvency,
+    ))
+    .test_expect_err("the trust-market chain must also reject a solvency-claiming import");
+    assert!(
+        chain_error
+            .to_string()
+            .contains("reputation import cannot prove collateral or solvency"),
+        "{chain_error}"
+    );
+}
+
+#[test]
+fn pass_eligibility_routes_through_reputation_weight_cap() {
+    // Proves eligibility is gated by validate_reputation_import: an over-cap
+    // portable-reputation weight is rejected through the eligibility entry, not
+    // only through the marketplace chain.
+    let error = evaluate_pass_eligibility(&trust_market_bundle(
+        TrustMarketCase::ReputationImportOverweight,
+    ))
+    .test_expect_err("an over-cap reputation weight must deny eligibility");
+    assert!(
+        error
+            .to_string()
+            .contains("reputation import local weight exceeds policy"),
+        "{error}"
+    );
+}
+
+#[test]
+fn pass_trust_tier_reconciles_each_computed_score_band() {
+    // Over [0,100], computed_score projects onto the 0..=1000 Pass compliance
+    // scale and reuses the canonical synthesize_trust_tier, so each band maps to
+    // the expected Pass tier deterministically (the two tier notions cannot fork).
+    assert_eq!(
+        reconcile_pass_trust_tier(20, 0, 100, false).test_expect("Unverified band reconciles"),
+        TrustTier::Unverified
+    );
+    assert_eq!(
+        reconcile_pass_trust_tier(50, 0, 100, false).test_expect("Attested band reconciles"),
+        TrustTier::Attested
+    );
+    assert_eq!(
+        reconcile_pass_trust_tier(80, 0, 100, false).test_expect("Verified band reconciles"),
+        TrustTier::Verified
+    );
+    assert_eq!(
+        reconcile_pass_trust_tier(95, 0, 100, false).test_expect("Premier band reconciles"),
+        TrustTier::Premier
+    );
+    // A behavioral anomaly blocks the jump to Premier even at a top score.
+    assert_eq!(
+        reconcile_pass_trust_tier(95, 0, 100, true).test_expect("anomaly blocks Premier"),
+        TrustTier::Verified
+    );
+}
+
+#[test]
+fn pass_trust_tier_reconciliation_rejects_forked_claim_fail_closed() {
+    // computed_score 50 over [0,100] reconciles to Attested; a matching claim is
+    // honoured.
+    let reconciled = reconcile_claimed_pass_trust_tier(50, 0, 100, false, TrustTier::Attested)
+        .test_expect("a matching tier claim reconciles");
+    assert_eq!(reconciled, TrustTier::Attested);
+
+    // A Pass that claims Premier on a score that only supports Attested forks the
+    // scorecard and is rejected fail-closed.
+    let error = reconcile_claimed_pass_trust_tier(50, 0, 100, false, TrustTier::Premier)
+        .test_expect_err("a forked tier claim must be rejected fail-closed");
+    assert!(
+        error.to_string().contains("forks scorecard computed score"),
+        "{error}"
+    );
+}
+
+#[test]
+fn pass_trust_tier_reconciliation_rejects_out_of_range_score() {
+    let error = reconcile_pass_trust_tier(101, 0, 100, false)
+        .test_expect_err("a score outside the scorecard range must fail closed");
+    assert!(error.to_string().contains("outside range"), "{error}");
+
+    let degenerate = reconcile_pass_trust_tier(0, 100, 100, false)
+        .test_expect_err("a degenerate scorecard range must fail closed");
+    assert!(
+        degenerate.to_string().contains("range is invalid"),
+        "{degenerate}"
+    );
+}
+
+#[test]
+fn trust_market_selection_binds_passport_order_discovery_ids() {
+    // The accepted selection binds all three substrate ids; the verified report
+    // surfaces the selection together with its discovery/order context.
+    let report = verify_trust_market_context(&trust_market_bundle(TrustMarketCase::Valid))
+        .test_expect("valid selection binds the three ids");
+
+    assert_eq!(report.passport_id, "passport-trust-market-valid");
+    assert_eq!(
+        report.trust_market_sections.provider_discovery_snapshot_ref,
+        "discovery-trust-market-valid"
+    );
+    assert_eq!(
+        report.trust_market_sections.provider_selection_report_ref,
+        "selection-trust-market-valid"
+    );
+}
+
+#[test]
+fn trust_market_rejects_selection_passport_id_mismatch() {
+    let error = verify_trust_market_context(&trust_market_bundle(
+        TrustMarketCase::SelectionPassportMismatch,
+    ))
+    .test_expect_err("selection passport id must match the bundle passport");
+    assert!(
+        error.to_string().contains("selection passport mismatch"),
+        "{error}"
+    );
+}
+
+#[test]
+fn trust_market_rejects_selection_order_id_mismatch() {
+    let error = verify_trust_market_context(&trust_market_bundle(
+        TrustMarketCase::SelectionOrderMismatch,
+    ))
+    .test_expect_err("selection order id must match the discovery order");
+    assert!(
+        error.to_string().contains("selection order mismatch"),
+        "{error}"
+    );
+}
+
+#[test]
+fn trust_market_rejects_selection_discovery_ref_mismatch() {
+    let error = verify_trust_market_context(&trust_market_bundle(
+        TrustMarketCase::SelectionDiscoveryMismatch,
+    ))
+    .test_expect_err("selection discovery ref must match the discovery snapshot id");
+    assert!(
+        error.to_string().contains("selection discovery mismatch"),
+        "{error}"
+    );
 }
