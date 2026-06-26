@@ -68,10 +68,15 @@ pub use identity_registry_bindings::IChioIdentityRegistry;
 pub use price_resolver_bindings::IChioPriceResolver;
 pub use root_registry_bindings::IChioRootRegistry;
 
+/// Rust-native Merkle inclusion proof mirroring the Solidity `ChioMerkle.Proof`
+/// tuple, with `From` conversions into each contract binding's proof type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChioMerkleProof {
+    /// Sibling hashes along the audit path from the leaf to the root.
     pub audit_path: Vec<B256>,
+    /// Zero-based index of the proven leaf within the tree.
     pub leaf_index: U256,
+    /// Total number of leaves in the tree the proof is drawn from.
     pub tree_size: U256,
 }
 

@@ -1,3 +1,12 @@
+//! Fail-closed evaluation of open-market penalties.
+//!
+//! Given a bundle of signed governance and economics artifacts, the
+//! evaluator verifies their signatures and authority bindings, checks that
+//! the fee schedule, charter, case, and penalty all govern the same listing
+//! and namespace, and resolves the penalty into an effective state. Signature
+//! or authority problems are not raised as errors: they are returned as
+//! successful evaluations carrying an [`OpenMarketFinding`] so that callers
+//! always receive a decision they can act on.
 use serde::{Deserialize, Serialize};
 
 use crate::authority::{
@@ -24,6 +33,8 @@ use crate::penalty::{
     SignedOpenMarketPenalty,
 };
 
+/// Bundle of signed governance and economics artifacts evaluated together to
+/// resolve an open-market penalty against a listing.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenMarketPenaltyEvaluationRequest {
@@ -42,6 +53,13 @@ pub struct OpenMarketPenaltyEvaluationRequest {
 }
 
 impl OpenMarketPenaltyEvaluationRequest {
+    /// Validate the structural invariants of the bundled listing and current
+    /// publisher.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error string propagated by the listing body's validation
+    /// or by the current publisher's validation.
     pub fn validate(&self) -> Result<(), String> {
         self.listing.body.validate()?;
         self.current_publisher.validate()?;
@@ -49,6 +67,9 @@ impl OpenMarketPenaltyEvaluationRequest {
     }
 }
 
+/// Resolved outcome of evaluating an open-market penalty, including the
+/// effective state, applicable fees, bond requirement, and any findings that
+/// blocked a clean enforcement.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenMarketPenaltyEvaluation {
@@ -76,6 +97,17 @@ pub struct OpenMarketPenaltyEvaluation {
     pub findings: Vec<OpenMarketFinding>,
 }
 
+/// Evaluate an open-market penalty trusting a single local operator signer.
+///
+/// Convenience wrapper over
+/// [`evaluate_open_market_penalty_with_trusted_signers`].
+///
+/// # Errors
+///
+/// Returns the request validation error string when the bundled listing or
+/// current publisher is structurally invalid. Signature, authority, scope,
+/// and policy failures are reported within the returned evaluation as
+/// findings rather than as errors.
 pub fn evaluate_open_market_penalty(
     request: &OpenMarketPenaltyEvaluationRequest,
     now: u64,
@@ -88,6 +120,16 @@ pub fn evaluate_open_market_penalty(
     )
 }
 
+/// Evaluate an open-market penalty trusting any of the supplied local
+/// operator signers.
+///
+/// # Errors
+///
+/// Returns the request validation error string when
+/// [`OpenMarketPenaltyEvaluationRequest::validate`] fails. All later
+/// signature, authority, scope, expiry, bond, and action checks are
+/// fail-closed but surfaced inside the returned evaluation as an
+/// [`OpenMarketFinding`], so they do not produce an `Err`.
 pub fn evaluate_open_market_penalty_with_trusted_signers(
     request: &OpenMarketPenaltyEvaluationRequest,
     now: u64,
