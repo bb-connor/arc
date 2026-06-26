@@ -538,7 +538,7 @@ fn validate_event_digest(event: &CommerceOrderEvent) -> Result<(), CommerceOrder
     Ok(())
 }
 
-fn is_allowed_transition(prior_state: &str, next_state: &str, transition: &str) -> bool {
+pub(crate) fn is_allowed_transition(prior_state: &str, next_state: &str, transition: &str) -> bool {
     matches!(
         (prior_state, next_state, transition),
         ("none", "intent_recorded", "record_intent")
