@@ -92,4 +92,5 @@ include!("oid4vp.rs");
 include!("discovery.rs");
 include!("portable_reputation.rs");
 include!("chio_pass.rs");
+include!("chio_pass_antifarm.rs");
 include!("tests.rs");
