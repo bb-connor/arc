@@ -1611,4 +1611,129 @@ mod tests {
             Err(KernelError::PassOwnDataGiftInvalid(_))
         ));
     }
+
+    // -- M1-14: five-stream day-zero gift parity + Gate 4 hardening -------------
+
+    #[test]
+    fn day_zero_tier0_gifts_all_five_streams_at_pinned_indices() {
+        // Day-zero (tier_0) gifting: the five streams are minted at their pinned
+        // 0..=4 indices with the canonical URIs, each Read+Subscribe only. The
+        // builder takes no tier input, so a tier_0 newcomer is gifted exactly this
+        // set on day zero.
+        let grants = pass_baseline_resource_grants(TENANT).expect("grants");
+        let expected: [(usize, &str); 5] = [
+            (0, "chio://trust/reputation/tier/*"),
+            (1, "chio://marketplace/listings*"),
+            (2, "chio://trust/pheromone/concentration/*"),
+            (3, "chio://receipts/tenant/did:chioabcd/*"),
+            (4, "chio://lineage/tenant/did:chioabcd/*"),
+        ];
+        assert_eq!(grants.len(), 5);
+        for (index, uri) in expected {
+            assert_eq!(
+                grants[index].uri_pattern, uri,
+                "stream {index} URI is pinned"
+            );
+            assert_eq!(
+                grants[index].operations,
+                vec![Operation::Read, Operation::Subscribe],
+                "stream {index} is Read+Subscribe only",
+            );
+        }
+        // Streams 3/4 are the OWN tenant-bound rights; 0/1/2 are aggregate feeds.
+        assert!(
+            ChioPassStream::ALL[3].is_own_tenant() && ChioPassStream::ALL[4].is_own_tenant(),
+            "streams 3 and 4 are the own-data baseline rights",
+        );
+        assert!(
+            !ChioPassStream::ALL[0].is_own_tenant()
+                && !ChioPassStream::ALL[1].is_own_tenant()
+                && !ChioPassStream::ALL[2].is_own_tenant(),
+            "streams 0..=2 are tenant-independent aggregates",
+        );
+    }
+
+    #[test]
+    fn gifted_resource_grants_are_byte_identical_across_tiers() {
+        // pass_baseline_resource_grants takes NO TrustTier: the own-data gift is a
+        // permanent baseline RIGHT, never tier-gated. Building the set the way a
+        // tier_0 mint and a Premier mint both do (same tenant, same builder) yields
+        // a byte-identical ResourceGrant set. The end-to-end cross-tier proof
+        // through build_pass_scope lives in chio-control-plane.
+        let as_tier0 = pass_baseline_resource_grants(TENANT).expect("tier0 grants");
+        let as_premier = pass_baseline_resource_grants(TENANT).expect("premier grants");
+        assert_eq!(as_tier0, as_premier);
+        assert_eq!(
+            serde_json::to_vec(&as_tier0).expect("ser tier0"),
+            serde_json::to_vec(&as_premier).expect("ser premier"),
+            "the gifted grant set must be byte-identical regardless of tier",
+        );
+    }
+
+    #[test]
+    fn pheromone_stream_serves_aggregate_concentration_not_raw_deposits() {
+        // Stream 2 is the collapsed-origin aggregate concentration view, never the
+        // origin-identifying raw deposits (query_deposits) surface.
+        let concentration =
+            pass_stream_uri(ChioPassStream::PheromoneConcentration, TENANT).expect("uri");
+        assert_eq!(concentration, "chio://trust/pheromone/concentration/*");
+        // The concentration aggregate is gifted (not deny-listed).
+        assert!(!uri_is_pass_denied(
+            "chio://trust/pheromone/concentration/ns"
+        ));
+        // The raw deposits surface is deny-listed and appears in NO baseline grant.
+        assert!(uri_is_pass_denied(PASS_DENY_PHEROMONE_DEPOSITS));
+        let grants = pass_baseline_resource_grants(TENANT).expect("grants");
+        assert!(
+            grants
+                .iter()
+                .all(|g| !g.uri_pattern.starts_with(PASS_DENY_PHEROMONE_DEPOSITS)),
+            "no gifted grant may reach the raw query_deposits surface",
+        );
+        // The serving gate authorizes concentration but denies raw deposits.
+        let cap = pass_capability(baseline_scope(TENANT));
+        assert!(
+            pass_authorizes_read(&cap, "chio://trust/pheromone/concentration/ns").expect("read")
+        );
+        assert!(
+            !pass_authorizes_read(&cap, "chio://trust/pheromone/deposits/origin/abc")
+                .expect("deny raw deposits read")
+        );
+        assert!(
+            !pass_authorizes_subscription(&cap, "chio://trust/pheromone/deposits")
+                .expect("deny raw deposits subscribe")
+        );
+    }
+
+    #[test]
+    fn pass_for_short_tenant_cannot_read_longer_sibling_via_mandatory_delimiter() {
+        // Prefix-collision: did:chioabcd (short) vs did:chioabcde (longer sibling).
+        // The mandatory `/` delimiter before the trailing `*` means the short
+        // tenant's Pass never prefix-matches the longer tenant's stream.
+        const SHORT: &str = "did:chioabcd";
+        const LONG: &str = "did:chioabcde";
+        let cap = pass_capability(baseline_scope(SHORT));
+        // The short tenant reads its OWN receipts/lineage.
+        assert!(
+            pass_authorizes_read(&cap, &format!("chio://receipts/tenant/{SHORT}/r1"))
+                .expect("own receipts")
+        );
+        assert!(
+            pass_authorizes_read(&cap, &format!("chio://lineage/tenant/{SHORT}/n1"))
+                .expect("own lineage")
+        );
+        // It MUST NOT read the longer sibling tenant's receipts or lineage.
+        assert!(
+            !pass_authorizes_read(&cap, &format!("chio://receipts/tenant/{LONG}/r1"))
+                .expect("deny sibling receipts")
+        );
+        assert!(
+            !pass_authorizes_read(&cap, &format!("chio://lineage/tenant/{LONG}/n1"))
+                .expect("deny sibling lineage")
+        );
+        assert!(
+            !pass_authorizes_subscription(&cap, &format!("chio://receipts/tenant/{LONG}/r1"))
+                .expect("deny sibling subscribe")
+        );
+    }
 }

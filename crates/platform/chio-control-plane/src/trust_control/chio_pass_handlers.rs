@@ -782,6 +782,7 @@ mod tests {
     use chio_credentials::{revoke_chio_pass_record, CHIO_PASS_ALLOTMENT_COST_NAME};
     use chio_kernel::pass_gating::{
         assert_pass_capability_id_deterministic, pass_authorizes_read, pass_baseline_read_uris,
+        pass_receipt_read_context, pass_stream_uri, ChioPassStream,
     };
     use chio_kernel::{
         BudgetStore, ChioKernel, InMemoryBudgetStore, KernelConfig, LocalCapabilityAuthority,
@@ -1844,5 +1845,199 @@ mod tests {
             denied.is_err(),
             "a binding without the Anchor purpose must be rejected"
         );
+    }
+
+    // -- M1-14: Gate 4 cross-tenant + byte-identity hardening ------------------
+
+    /// Issue a first-window Pass for `subject` at `tier`, returning the full
+    /// issuance (the soulbound Pass plus its minted window-scoped capability).
+    fn issue_first_window_issuance(subject: &Keypair, tier: TrustTier) -> ChioPassIssuance {
+        let issuer = Keypair::generate();
+        let authority = LocalCapabilityAuthority::new(Keypair::generate());
+        let config = config_with_keys(vec![Keypair::generate().public_key()]);
+        issue_chio_pass_command(
+            &config,
+            &authority,
+            &issuer,
+            &subject.public_key(),
+            tier,
+            MID_JUNE_2026,
+            0,
+            0,
+        )
+        .expect("issue first-window pass")
+    }
+
+    #[test]
+    fn build_pass_scope_resource_grants_are_byte_identical_unverified_vs_premier() {
+        // Own-data is a permanent baseline RIGHT, never TrustTier-gated. The SAME
+        // subject minted at tier_0 (Unverified) and at Premier must produce a
+        // byte-identical gifted ResourceGrant set; only the metered allotment
+        // (window_units) is tier-sized.
+        let subject = Keypair::generate();
+        let did = DidChio::from_public_key(subject.public_key())
+            .expect("did:chio")
+            .to_string();
+
+        let pass_tier0 = issue_first_window_pass(&subject, TrustTier::Unverified);
+        let pass_premier = issue_first_window_pass(&subject, TrustTier::Premier);
+
+        let scope_tier0 = build_pass_scope(&pass_tier0, &did).expect("tier0 scope");
+        let scope_premier = build_pass_scope(&pass_premier, &did).expect("premier scope");
+
+        // Five gifted grants, byte-identical across tiers.
+        assert_eq!(scope_tier0.resource_grants.len(), 5);
+        assert_eq!(scope_tier0.resource_grants, scope_premier.resource_grants);
+        assert_eq!(
+            serde_json::to_vec(&scope_tier0.resource_grants).expect("ser tier0"),
+            serde_json::to_vec(&scope_premier.resource_grants).expect("ser premier"),
+            "gifted ResourceGrant set must be byte-identical across tiers",
+        );
+        assert!(
+            scope_tier0.prompt_grants.is_empty() && scope_premier.prompt_grants.is_empty(),
+            "no prompt grants at any tier",
+        );
+
+        // The metered allotment IS tier-sized, proving tier still governs the
+        // metered leg (1000 XCC for Unverified vs 5000 for Premier), just never the
+        // baseline read right.
+        let units_tier0 = scope_tier0.grants[0]
+            .max_total_cost
+            .as_ref()
+            .expect("tier0 total")
+            .units;
+        let units_premier = scope_premier.grants[0]
+            .max_total_cost
+            .as_ref()
+            .expect("premier total")
+            .units;
+        assert_eq!(units_tier0, 1000);
+        assert_eq!(units_premier, 5000);
+        assert_ne!(
+            units_tier0, units_premier,
+            "tier governs the metered allotment, not the gifted streams",
+        );
+    }
+
+    #[test]
+    fn cross_tenant_read_denied_by_uri_binding_and_sql_guard() {
+        // Two distinct subjects => two distinct canonical did:chio tenants.
+        let subject_a = Keypair::generate();
+        let subject_b = Keypair::generate();
+        let did_a = DidChio::from_public_key(subject_a.public_key())
+            .expect("did a")
+            .to_string();
+        let did_b = DidChio::from_public_key(subject_b.public_key())
+            .expect("did b")
+            .to_string();
+        assert_ne!(did_a, did_b);
+
+        // Mint tenant A's Pass; its own-receipts grant binds tenant A only.
+        let issuance_a = issue_first_window_issuance(&subject_a, TrustTier::Unverified);
+        let cap_a = &issuance_a.capability;
+        let own_pattern = pass_stream_uri(ChioPassStream::OwnReceipts, &did_a).expect("uri a");
+        assert_eq!(own_pattern, format!("chio://receipts/tenant/{did_a}/*"));
+
+        // -- Layer (a): the URI tenant binding denies, no store involved. --
+        // A reads its OWN receipts/lineage.
+        assert!(
+            pass_authorizes_read(cap_a, &format!("chio://receipts/tenant/{did_a}/r1"))
+                .expect("read own receipts")
+        );
+        assert!(
+            pass_authorizes_read(cap_a, &format!("chio://lineage/tenant/{did_a}/n1"))
+                .expect("read own lineage")
+        );
+        // A is DENIED tenant B's receipts/lineage purely by the capability/URI
+        // binding (independent of any store).
+        assert!(
+            !pass_authorizes_read(cap_a, &format!("chio://receipts/tenant/{did_b}/r1"))
+                .expect("deny B receipts")
+        );
+        assert!(
+            !pass_authorizes_read(cap_a, &format!("chio://lineage/tenant/{did_b}/n1"))
+                .expect("deny B lineage")
+        );
+
+        // -- Layer (b): the store no-widening SQL guard r.tenant_id = ?12 denies. --
+        let path = unique_db_path("cross-tenant");
+        let store = SqliteReceiptStore::open(&path).expect("open store");
+        assert!(
+            store.strict_tenant_isolation_enabled(),
+            "strict tenant isolation must be on by default",
+        );
+        let kernel_kp = Keypair::generate();
+        // Tenant B and tenant A each write one receipt into the SAME store.
+        store
+            .append_chio_receipt(&metered_receipt(
+                &kernel_kp,
+                "cap-b",
+                &subject_b.public_key().to_hex(),
+                &did_b,
+                MID_JUNE_2026,
+                Some(1),
+                "rcpt-b",
+            ))
+            .expect("append B receipt");
+        store
+            .append_chio_receipt(&metered_receipt(
+                &kernel_kp,
+                "cap-a",
+                &subject_a.public_key().to_hex(),
+                &did_a,
+                MID_JUNE_2026,
+                Some(1),
+                "rcpt-a",
+            ))
+            .expect("append A receipt");
+
+        // A's own-receipts read context is tenant-scoped to did_a with no NULL
+        // fallback: this is the second, independent denial behind the URI binding.
+        let ctx_a = pass_receipt_read_context(&did_a).expect("ctx a");
+        assert!(!ctx_a.include_null_tenant);
+        let query_a = ReceiptQuery {
+            limit: MAX_QUERY_LIMIT,
+            tenant_filter: Some(did_a.clone()),
+            read_context: Some(ctx_a),
+            ..ReceiptQuery::default()
+        };
+        let page_a = store.query_receipts(&query_a).expect("query A");
+        // Tenant B's row is physically present in the store, yet the SQL guard binds
+        // ?12 = did_a so ONLY tenant A's row returns; tenant B's row is filtered out.
+        assert_eq!(page_a.total_count, 1, "only tenant A's own row is visible");
+        assert!(
+            page_a
+                .receipts
+                .iter()
+                .all(|r| r.receipt.tenant_id.as_deref() == Some(did_a.as_str())),
+            "tenant A query must return only tenant A rows",
+        );
+        assert!(
+            !page_a
+                .receipts
+                .iter()
+                .any(|r| r.receipt.tenant_id.as_deref() == Some(did_b.as_str())),
+            "the r.tenant_id = ?12 guard must hide tenant B's receipt from tenant A",
+        );
+
+        // And the read-context layer rejects any attempt to WIDEN tenant A's scope
+        // to tenant B before SQL even runs: a Pass for A cannot form a B query.
+        let widen_attempt = ReceiptQuery {
+            limit: MAX_QUERY_LIMIT,
+            tenant_filter: Some(did_b.clone()),
+            read_context: Some(pass_receipt_read_context(&did_a).expect("ctx a")),
+            ..ReceiptQuery::default()
+        };
+        let err = store
+            .query_receipts(&widen_attempt)
+            .expect_err("widening A's scope to B must fail closed");
+        assert!(
+            err.to_string().contains("cannot widen"),
+            "no-widening guard must reject A->B widening, got: {err}",
+        );
+
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(format!("{}-wal", path.display()));
+        let _ = std::fs::remove_file(format!("{}-shm", path.display()));
     }
 }
