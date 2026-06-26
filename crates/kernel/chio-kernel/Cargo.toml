@@ -51,6 +51,11 @@ chio-weights = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 chio-kernel-core = { workspace = true }
 chio-credit = { workspace = true }
+# Own-data Pass gift boundary (M1-13): the kernel emits the holder's own
+# receipts/own lineage ONLY as a verified DisclosureLineageBundle. This crate
+# depends solely on chio-core-types/serde/thiserror, so it pulls neither
+# chio-credentials nor chio-did and keeps the kernel trust boundary intact.
+chio-disclosure-lineage = { workspace = true }
 chio-federation = { workspace = true }
 chio-governance = { workspace = true }
 chio-link = { path = "../../economy/chio-link", default-features = false }

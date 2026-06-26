@@ -85,7 +85,7 @@ Per-task scope, verification, and exit-gate detail are carried in the workflow s
 - Gate 1 aggregate-pool-denies-fail-closed: TODO via M1-10 (mechanism coded in M0).
 - Gate 2 re-mint-reset-closed: TODO via M1-12 (determinism + B7 done in M0).
 - Gate 3 soulbinding-holds: DONE in M0.
-- Gate 4 five-stream parity + own-data-never-tier-gated + cross-tenant denied: TODO via M1-13/M1-14 (core done in M0).
+- Gate 4 five-stream parity + own-data-never-tier-gated + cross-tenant denied: own-data DisclosureLineageBundle emission DONE in M1-13 (`emit_own_data_gift_bundle`/`emit_pass_stream_gift`, raw/3-key-strip now fails); five-stream-parity evidence run TODO via M1-14 (core done in M0).
 - Gate 5 dormant-stops-drawing: TODO via M1-12 (decision tested in M0).
 - Gate 6 anchoring round-trip read-only: TODO via M1-20 (prepare half done in M0; in-cut per M1-3).
 - Gate 7 namespace-isolation + copy: TODO via M1-9 (code gap) + M1-19 (copy). Sealed proof-room panel deferred to M2.
