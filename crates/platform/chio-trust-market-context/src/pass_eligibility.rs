@@ -101,7 +101,13 @@ pub fn reconcile_pass_trust_tier(
     let span = score_ceiling - score_floor;
     let offset = computed_score - score_floor;
     // offset <= span, so the projected value never exceeds PASS_COMPLIANCE_SCALE_MAX.
-    let compliance_score = offset.saturating_mul(PASS_COMPLIANCE_SCALE_MAX) / span;
+    // Widen to u128 before multiplying: for a wide scorecard span `offset *
+    // PASS_COMPLIANCE_SCALE_MAX` can exceed u64::MAX, where a u64 saturating_mul
+    // would clamp to u64::MAX and then divide by the large span, projecting the
+    // score (and therefore the tier) DOWNWARD. u128 removes that saturation path
+    // entirely while preserving the floor-division rounding for normal ranges.
+    let compliance_score =
+        u128::from(offset) * u128::from(PASS_COMPLIANCE_SCALE_MAX) / u128::from(span);
     let compliance_score = u32::try_from(compliance_score).map_err(|_| {
         claim_failed("projected compliance score overflows the Pass trust-tier scale")
     })?;
@@ -194,4 +200,62 @@ pub(super) fn evaluate_pass_reputation_eligibility(
 
 fn claim_failed(message: impl Into<String>) -> TransactionPassportError {
     TransactionPassportError::TrustMarketClaimFailed(message.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A deliberately WIDE scorecard range whose top-of-range score must reconcile
+    /// to `Premier`. With `score_floor = 0`, `score_ceiling = 2^55` and
+    /// `computed_score = score_ceiling`, the offset equals the span (2^55), so
+    /// `offset * PASS_COMPLIANCE_SCALE_MAX` (2^55 * 1000) overflows `u64::MAX`.
+    ///
+    /// The pre-fix u64 `saturating_mul` clamped that product to `u64::MAX` and then
+    /// divided by the large span, collapsing the true projection of 1000 down to
+    /// 511 and mis-projecting a top-of-range provider DOWN from `Premier` to
+    /// `Attested`. The u128 widening projects the full-range score correctly and is
+    /// asserted against the full-precision u128 math.
+    #[test]
+    fn wide_scorecard_span_does_not_saturate_tier_downward() {
+        let score_floor: u64 = 0;
+        let score_ceiling: u64 = 1u64 << 55;
+        let computed_score: u64 = score_ceiling; // top of range -> max compliance
+        let span = score_ceiling - score_floor;
+        let offset = computed_score - score_floor;
+
+        // Ground truth: the full-precision u128 projection is exactly the full scale.
+        let expected_compliance =
+            u128::from(offset) * u128::from(PASS_COMPLIANCE_SCALE_MAX) / u128::from(span);
+        assert_eq!(expected_compliance, u128::from(PASS_COMPLIANCE_SCALE_MAX));
+
+        // The pre-fix u64 saturating path clamped and divided low (to 511), which
+        // `synthesize_trust_tier` would have downgraded from Premier to Attested.
+        let saturated = offset.saturating_mul(PASS_COMPLIANCE_SCALE_MAX) / span;
+        assert_eq!(saturated, 511);
+        assert_eq!(synthesize_trust_tier(511, false), TrustTier::Attested);
+
+        // The fixed reconciliation projects the full-range score and keeps Premier,
+        // matching the full-precision u128 math above and never saturating downward.
+        match reconcile_pass_trust_tier(computed_score, score_floor, score_ceiling, false) {
+            Ok(tier) => assert_eq!(tier, TrustTier::Premier),
+            Err(error) => panic!("wide-range reconciliation must succeed: {error:?}"),
+        }
+    }
+
+    /// Normal (narrow) ranges keep their existing floor-division semantics: the
+    /// u128 widening must not change projection for values that never saturate.
+    #[test]
+    fn narrow_scorecard_range_preserves_rounding() {
+        // floor=0, ceiling=1000 makes the projection an identity on the scale.
+        match reconcile_pass_trust_tier(845, 0, 1000, false) {
+            Ok(tier) => assert_eq!(tier, TrustTier::Verified),
+            Err(error) => panic!("narrow-range reconciliation must succeed: {error:?}"),
+        }
+        // floor=0, ceiling=2000, score=1800 -> 1800*1000/2000 = 900 -> Premier.
+        match reconcile_pass_trust_tier(1800, 0, 2000, false) {
+            Ok(tier) => assert_eq!(tier, TrustTier::Premier),
+            Err(error) => panic!("narrow-range reconciliation must succeed: {error:?}"),
+        }
+    }
 }
