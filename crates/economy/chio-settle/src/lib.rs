@@ -86,8 +86,17 @@ pub use solana::{
     SolanaSettlementRequest, SOLANA_ED25519_PROGRAM_ID,
 };
 
+/// Row-id prefix that binds a settlement commitment to its economic
+/// completion-flow record. See [`settlement_completion_flow_row_id`] and
+/// [`settlement_completion_flow_receipt_id`].
 pub const SETTLEMENT_COMPLETION_FLOW_ROW_ID_PREFIX: &str = "economic-completion-flow:";
 
+/// Canonical commitment a settlement carries onto the web3 contract family.
+///
+/// Binds the target chain and lane, the capability and receipt being settled,
+/// the operator identity, and the monetary amount. Serialization is
+/// signed-body and feeds canonical-JSON digests, so field order and serde
+/// attributes are load-bearing.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct SettlementCommitment {
@@ -99,6 +108,13 @@ pub struct SettlementCommitment {
     pub settlement_amount: MonetaryAmount,
 }
 
+/// Build the completion-flow row id for a settlement receipt by prefixing it
+/// with [`SETTLEMENT_COMPLETION_FLOW_ROW_ID_PREFIX`].
+///
+/// # Errors
+///
+/// Returns [`SettlementError::InvalidInput`] when `receipt_id` is empty (after
+/// trimming), or when it carries surrounding whitespace.
 pub fn settlement_completion_flow_row_id(receipt_id: &str) -> Result<String, SettlementError> {
     if receipt_id.trim().is_empty() {
         return Err(SettlementError::invalid_input(
@@ -115,6 +131,14 @@ pub fn settlement_completion_flow_row_id(receipt_id: &str) -> Result<String, Set
     ))
 }
 
+/// Recover the receipt id from a completion-flow row id by stripping
+/// [`SETTLEMENT_COMPLETION_FLOW_ROW_ID_PREFIX`].
+///
+/// # Errors
+///
+/// Returns [`SettlementError::InvalidInput`] when `row_id` does not carry the
+/// expected prefix, when the recovered receipt id is empty, or when it carries
+/// surrounding whitespace.
 pub fn settlement_completion_flow_receipt_id(row_id: &str) -> Result<&str, SettlementError> {
     let receipt_id = row_id
         .strip_prefix(SETTLEMENT_COMPLETION_FLOW_ROW_ID_PREFIX)
@@ -136,6 +160,9 @@ pub fn settlement_completion_flow_receipt_id(row_id: &str) -> Result<&str, Settl
     Ok(receipt_id)
 }
 
+/// Error surface for the settlement runtime: rejected inputs, dispatch and
+/// binding faults, unsupported operations, and RPC, serialization, signature,
+/// or verification failures.
 #[derive(Debug, thiserror::Error)]
 pub enum SettlementError {
     #[error("invalid input: {0}")]
