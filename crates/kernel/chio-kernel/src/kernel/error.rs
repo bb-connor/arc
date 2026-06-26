@@ -60,6 +60,18 @@ pub enum KernelError {
     #[error("invalid free-tier pool config: {0}")]
     InvalidFreeTierPoolConfig(String),
 
+    #[error("Chio Pass scope inflation: {0}")]
+    PassScopeInflation(String),
+
+    #[error("Chio Pass tenant binding invalid: {0}")]
+    PassTenantBindingInvalid(String),
+
+    #[error("Chio Pass stream redaction failed: {0}")]
+    PassRedactionFailed(String),
+
+    #[error("Chio Pass capability id is not the deterministic window-scoped id: {0}")]
+    PassCapabilityIdNotDeterministic(String),
+
     #[error("requested tool {tool} on server {server} is not in capability scope")]
     OutOfScope { tool: String, server: String },
 
@@ -272,6 +284,26 @@ impl KernelError {
                 "CHIO-KERNEL-INVALID-FREE-TIER-POOL-CONFIG",
                 serde_json::json!({ "reason": reason }),
                 "Provide a non-zero monthly_pool_units, a 3-uppercase-letter allotment_unit, and a non-empty board_approval_ref.",
+            ),
+            Self::PassScopeInflation(reason) => self.report_with_context(
+                "CHIO-KERNEL-PASS-SCOPE-INFLATION",
+                serde_json::json!({ "reason": reason }),
+                "Mint the Pass with exactly the canonical baseline scope (one XCC metered grant, the five Read/Subscribe baseline resource grants, and no prompt grants).",
+            ),
+            Self::PassTenantBindingInvalid(reason) => self.report_with_context(
+                "CHIO-KERNEL-PASS-TENANT-BINDING-INVALID",
+                serde_json::json!({ "reason": reason }),
+                "Bind the Pass own-stream grants to a non-empty tenant identifier that carries no path delimiter or wildcard.",
+            ),
+            Self::PassRedactionFailed(reason) => self.report_with_context(
+                "CHIO-KERNEL-PASS-REDACTION-FAILED",
+                serde_json::json!({ "reason": reason }),
+                "Serve the free-read view only from a JSON-object receipt body whose metadata is an object or null so the economic envelope keys can be stripped fail-closed.",
+            ),
+            Self::PassCapabilityIdNotDeterministic(reason) => self.report_with_context(
+                "CHIO-KERNEL-PASS-CAPABILITY-ID-NOT-DETERMINISTIC",
+                serde_json::json!({ "reason": reason }),
+                "Mint the Pass through the window-scoped capability authority so its id is the deterministic chiopass: window-scoped id.",
             ),
             Self::OutOfScope { tool, server } => self.report_with_context(
                 "CHIO-KERNEL-OUT-OF-SCOPE-TOOL",
