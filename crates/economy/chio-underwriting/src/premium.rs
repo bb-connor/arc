@@ -623,3 +623,67 @@ mod tests {
         assert!(err.contains("since <= until"));
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod do_not_weaken {
+    //! DO-NOT-WEAKEN regression suite (M1-7).
+    //!
+    //! Premium currency codes must remain ISO 4217-style: exactly three
+    //! ASCII-uppercase letters. A CHIO-flavoured code such as
+    //! "CHIOCREDIT" (length 10) or any lowercase code must be rejected
+    //! by `PremiumInputs::validate` and fail closed to a decline, never
+    //! be accepted as a premium currency. Loosening the length or case
+    //! check would weaken this; do not do it.
+    use super::*;
+
+    fn window() -> LookbackWindow {
+        LookbackWindow::new(1_000_000, 1_000_600).unwrap()
+    }
+
+    #[test]
+    fn overlong_chio_currency_is_rejected_by_validation() {
+        let inputs = PremiumInputs::new(Some(950), None, 1_000, "CHIOCREDIT");
+        let error = inputs
+            .validate()
+            .expect_err("CHIOCREDIT must be rejected by premium validation");
+        assert!(
+            error.contains("three-letter uppercase"),
+            "unexpected rejection message: {error}"
+        );
+    }
+
+    #[test]
+    fn lowercase_currency_is_rejected_by_validation() {
+        let inputs = PremiumInputs::new(Some(950), None, 1_000, "usd");
+        assert!(
+            inputs.validate().is_err(),
+            "a lowercase currency code must be rejected"
+        );
+    }
+
+    #[test]
+    fn three_letter_uppercase_currency_passes_validation() {
+        // Positive control: the canonical ISO shape stays accepted.
+        let inputs = PremiumInputs::new(Some(950), None, 1_000, "USD");
+        assert!(inputs.validate().is_ok());
+    }
+
+    #[test]
+    fn chio_currency_fails_closed_to_invalid_inputs_decline() {
+        // Deliberate injection: pricing a premium in a CHIO-flavoured
+        // currency must fail closed to a decline, not a silent quote.
+        let inputs = PremiumInputs::new(Some(950), None, 1_000, "CHIOCREDIT");
+        let quote = price_premium("agent-chio", "tool:exec", window(), &inputs);
+        assert!(
+            matches!(
+                quote,
+                PremiumQuote::Declined {
+                    reason: PremiumDeclineReason::InvalidInputs,
+                    ..
+                }
+            ),
+            "expected a fail-closed decline, got {quote:?}"
+        );
+    }
+}

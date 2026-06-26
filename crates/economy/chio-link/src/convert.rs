@@ -152,3 +152,87 @@ mod tests {
         assert_eq!(converted, 300);
     }
 }
+
+#[cfg(test)]
+mod do_not_weaken {
+    //! DO-NOT-WEAKEN regression suite (M1-7).
+    //!
+    //! The pinned minor-unit table in `minor_units_for_currency` lists
+    //! exactly USD, EUR, GBP, JPY, USDC, USDT, BTC, ETH, and LINK. CHIO
+    //! is deliberately ABSENT: the protocol pins no native minor-unit
+    //! scale for a Chio token, so any attempt to resolve or convert a
+    //! "CHIO" amount must fail closed rather than invent a scale. Adding
+    //! a CHIO arm here would weaken budget conversion; do not do it.
+    use crate::test_support::TestUnwrap;
+    use crate::{ExchangeRate, PriceOracleError};
+
+    use super::{convert_supported_units, minor_units_for_currency};
+
+    const PINNED_CURRENCIES: [&str; 9] = [
+        "USD", "EUR", "GBP", "JPY", "USDC", "USDT", "BTC", "ETH", "LINK",
+    ];
+
+    fn rate_for(base: &str, quote: &str) -> ExchangeRate {
+        ExchangeRate {
+            base: base.to_string(),
+            quote: quote.to_string(),
+            rate_numerator: 1,
+            rate_denominator: 1,
+            updated_at: 1_743_292_740,
+            fetched_at: 1_743_292_785,
+            source: "chainlink".to_string(),
+            feed_reference: "0xfeed".to_string(),
+            max_age_seconds: 600,
+            conversion_margin_bps: 0,
+            confidence_numerator: None,
+            confidence_denominator: None,
+        }
+    }
+
+    #[test]
+    fn pinned_currencies_resolve_and_chio_is_not_pinned() {
+        for currency in PINNED_CURRENCIES {
+            let scale = minor_units_for_currency(currency).test_unwrap("pinned currency resolves");
+            assert!(
+                scale > 0,
+                "pinned currency {currency} must resolve to a non-zero scale"
+            );
+        }
+        assert!(
+            !PINNED_CURRENCIES.contains(&"CHIO"),
+            "CHIO must never be added to the pinned currency table"
+        );
+    }
+
+    #[test]
+    fn chio_lookup_fails_closed() {
+        // Deliberate injection: every spelling of CHIO must fail closed.
+        for candidate in ["CHIO", "chio", "Chio", " CHIO "] {
+            match minor_units_for_currency(candidate) {
+                Err(PriceOracleError::InvalidConfiguration(message)) => {
+                    assert!(
+                        message.contains("CHIO"),
+                        "expected the CHIO rejection to name the currency, got {message:?}"
+                    );
+                }
+                other => panic!("expected CHIO lookup to fail closed, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn converting_a_chio_denominated_rate_fails_closed() {
+        // Deliberate injection: a rate naming CHIO on either leg must be
+        // rejected before any conversion arithmetic runs.
+        let base_chio = convert_supported_units(1_000, &rate_for("CHIO", "USD"), 0);
+        assert!(
+            matches!(base_chio, Err(PriceOracleError::InvalidConfiguration(_))),
+            "CHIO base leg must fail closed, got {base_chio:?}"
+        );
+        let quote_chio = convert_supported_units(1_000, &rate_for("USD", "CHIO"), 0);
+        assert!(
+            matches!(quote_chio, Err(PriceOracleError::InvalidConfiguration(_))),
+            "CHIO quote leg must fail closed, got {quote_chio:?}"
+        );
+    }
+}
