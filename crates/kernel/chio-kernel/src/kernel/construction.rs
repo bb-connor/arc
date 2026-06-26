@@ -149,6 +149,7 @@ impl ChioKernel {
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
             budget_store: Arc::new(InMemoryBudgetStore::new()),
             budget_store_lock: Mutex::new(()),
+            free_tier_pool: None,
             revocation_store: Arc::new(InMemoryRevocationStore::new()),
             capability_authority: Box::new(LocalCapabilityAuthority::new(authority_keypair)),
             tool_servers: HashMap::new(),

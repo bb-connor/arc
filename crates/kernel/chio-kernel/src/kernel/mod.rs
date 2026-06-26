@@ -1010,6 +1010,42 @@ mod free_tier_pool_config_tests {
     }
 }
 
+/// Grant index of the single aggregate free-tier pool budget row. All free-tier
+/// charges in a month share `(freetier:global:<YYYY-MM>, 0)`.
+pub(crate) const FREETIER_GLOBAL_GRANT_INDEX: usize = 0;
+
+/// A hold taken against the aggregate free-tier pool alongside a per-Pass hold.
+/// Carried on [`BudgetChargeResult`] so the pool exposure is reversed and
+/// reconciled symmetrically with the per-Pass hold (no stale pool leak).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FreeTierPoolHold {
+    /// The `freetier:global:<YYYY-MM>` budget term this hold debits.
+    pub term_id: String,
+    /// Unique id of this pool hold, for symmetric reverse/reconcile.
+    pub hold_id: String,
+    /// Exposure units held against the pool (worst-case per-invocation cost).
+    pub units: u64,
+}
+
+impl ChioKernel {
+    /// Install the board-approved free-tier pool config. Fallible so misconfig is
+    /// rejected at install time while `ChioKernel::new` stays infallible.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`KernelError::InvalidFreeTierPoolConfig`] when the config fails
+    /// [`FreeTierPoolConfig::validate`].
+    pub fn with_free_tier_pool(mut self, config: FreeTierPoolConfig) -> Result<Self, KernelError> {
+        config.validate()?;
+        self.free_tier_pool = Some(config);
+        Ok(self)
+    }
+
+    pub(crate) fn free_tier_pool_config(&self) -> Option<&FreeTierPoolConfig> {
+        self.free_tier_pool.as_ref()
+    }
+}
+
 /// The Chio Runtime Kernel.
 ///
 /// This is the central component of the Chio protocol. It validates capabilities,
@@ -1023,6 +1059,11 @@ pub struct ChioKernel {
     post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline,
     budget_store: Arc<dyn BudgetStore>,
     budget_store_lock: Mutex<()>,
+    /// Optional Phase-0 free-tier compute pool (M0 Pass CONTROL 1). When set,
+    /// every private-use (free-tier) per-Pass charge also debits one aggregate
+    /// `freetier:global:<YYYY-MM>` budget row, capping liability at
+    /// `min(N x allotment, pool)`. `None` keeps the kernel pool-free.
+    free_tier_pool: Option<FreeTierPoolConfig>,
     revocation_store: Arc<dyn RevocationStore>,
     capability_authority: Box<dyn CapabilityAuthority>,
     tool_servers: HashMap<ServerId, Box<dyn ToolServerConnection>>,
@@ -1169,6 +1210,10 @@ pub(crate) struct BudgetChargeResult {
     new_committed_cost_units: u64,
     budget_hold_id: String,
     authorize_metadata: BudgetCommitMetadata,
+    /// Set when this was a free-tier charge that also debited the aggregate pool.
+    /// Reversed and reconciled symmetrically with the per-Pass hold. Boxed to keep
+    /// the common (non-free-tier) `BudgetChargeResult` small.
+    free_tier_pool_hold: Option<Box<FreeTierPoolHold>>,
 }
 
 impl BudgetChargeResult {

@@ -9,10 +9,21 @@ use chio_log_redact::redacted;
 use self::responses::FinalizeToolOutputCostContext;
 use super::*;
 use crate::budget_store::{
-    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetEventAuthority,
-    BudgetHoldMutationDecision, BudgetReconcileHoldDecision, BudgetReconcileHoldRequest,
-    BudgetReverseHoldDecision, BudgetReverseHoldRequest,
+    AuthorizedBudgetHold, BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
+    BudgetEventAuthority, BudgetHoldMutationDecision, BudgetReconcileHoldDecision,
+    BudgetReconcileHoldRequest, BudgetReverseHoldDecision, BudgetReverseHoldRequest,
 };
+
+/// Outcome of the atomic per-Pass + free-tier-pool charge closure. The per-Pass
+/// hold is taken first (tighter), the aggregate pool hold second, and both run
+/// under a single `with_budget_store` lock so a concurrent interleave cannot
+/// overrun the pool ceiling. On pool denial the per-Pass hold is reversed inside
+/// the same closure.
+enum PoolGuardedCharge {
+    Authorized(Box<AuthorizedBudgetHold>, Option<Box<FreeTierPoolHold>>),
+    PerPassDenied,
+    PoolDenied,
+}
 
 impl ChioKernel {
     /// Issue a new capability for an agent.
@@ -781,8 +792,18 @@ impl ChioKernel {
                 let authorize_event_id = format!("{budget_hold_id}:authorize");
                 let authority = self.local_budget_event_authority();
 
-                let decision = self.with_budget_store(|store| {
-                    Ok(store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
+                // A private-use unit is exactly three uppercase letters AND unpinned by
+                // chio-link (XCC qualifies; USD/ETH are pinned and do not). Fail-closed:
+                // anything else takes the unchanged non-pool path.
+                let is_private_use = currency.len() == 3
+                    && currency.bytes().all(|b| b.is_ascii_uppercase())
+                    && chio_link::convert::minor_units_for_currency(&currency).is_err();
+
+                // Per-Pass hold FIRST (tighter), aggregate pool hold SECOND, and the
+                // compensating reversal all run under ONE budget-store lock so a
+                // concurrent interleave cannot overrun the pool ceiling.
+                let outcome = self.with_budget_store(|store| {
+                    let per_pass = store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
                         capability_id: cap.id.clone(),
                         grant_index: matching.index,
                         max_invocations: grant.max_invocations,
@@ -790,12 +811,74 @@ impl ChioKernel {
                         max_cost_per_invocation: max_per,
                         max_total_cost_units: max_total,
                         hold_id: Some(budget_hold_id.clone()),
-                        event_id: Some(authorize_event_id),
+                        event_id: Some(authorize_event_id.clone()),
                         authority: Some(authority.clone()),
-                    })?)
+                    })?;
+                    let authorized = match per_pass {
+                        BudgetAuthorizeHoldDecision::Authorized(a) => a,
+                        BudgetAuthorizeHoldDecision::Denied(_) => {
+                            return Ok(PoolGuardedCharge::PerPassDenied);
+                        }
+                    };
+                    if !is_private_use {
+                        return Ok(PoolGuardedCharge::Authorized(Box::new(authorized), None));
+                    }
+                    // Free-tier charge: reverse the per-Pass hold and deny fail-closed if
+                    // there is no pool, the unit is not the allotment unit, the cost is
+                    // zero, or the pool is exhausted.
+                    let reverse_per_pass = |store: &dyn BudgetStore| -> Result<(), KernelError> {
+                        store.reverse_budget_hold(BudgetReverseHoldRequest {
+                            capability_id: cap.id.clone(),
+                            grant_index: matching.index,
+                            reversed_exposure_units: cost_units,
+                            hold_id: Some(budget_hold_id.clone()),
+                            event_id: Some(format!("{budget_hold_id}:reverse")),
+                            authority: Some(authority.clone()),
+                        })?;
+                        Ok(())
+                    };
+                    let Some(pool) = self.free_tier_pool_config() else {
+                        reverse_per_pass(store)?;
+                        return Ok(PoolGuardedCharge::PoolDenied);
+                    };
+                    if currency != pool.allotment_unit || cost_units == 0 {
+                        reverse_per_pass(store)?;
+                        return Ok(PoolGuardedCharge::PoolDenied);
+                    }
+                    let term_id = FreeTierPoolConfig::window_ym_from_issued_at(cap.issued_at)?;
+                    let pool_hold_id = format!("freetier-pool-hold:{request_id}:{term_id}");
+                    let pool_decision =
+                        store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
+                            capability_id: term_id.clone(),
+                            grant_index: FREETIER_GLOBAL_GRANT_INDEX,
+                            max_invocations: None,
+                            requested_exposure_units: cost_units,
+                            max_cost_per_invocation: None,
+                            max_total_cost_units: Some(pool.monthly_pool_units),
+                            hold_id: Some(pool_hold_id.clone()),
+                            event_id: Some(format!("{pool_hold_id}:authorize")),
+                            authority: Some(authority.clone()),
+                        })?;
+                    match pool_decision {
+                        BudgetAuthorizeHoldDecision::Authorized(_) => {
+                            Ok(PoolGuardedCharge::Authorized(
+                                Box::new(authorized),
+                                Some(Box::new(FreeTierPoolHold {
+                                    term_id,
+                                    hold_id: pool_hold_id,
+                                    units: cost_units,
+                                })),
+                            ))
+                        }
+                        BudgetAuthorizeHoldDecision::Denied(_) => {
+                            reverse_per_pass(store)?;
+                            Ok(PoolGuardedCharge::PoolDenied)
+                        }
+                    }
                 })?;
-                match decision {
-                    BudgetAuthorizeHoldDecision::Authorized(authorized) => {
+                match outcome {
+                    PoolGuardedCharge::Authorized(authorized, pool_hold) => {
+                        let authorized = *authorized;
                         let charge = BudgetChargeResult {
                             grant_index: matching.index,
                             cost_charged: cost_units,
@@ -806,10 +889,11 @@ impl ChioKernel {
                                 .hold_id
                                 .unwrap_or_else(|| budget_hold_id.clone()),
                             authorize_metadata: authorized.metadata,
+                            free_tier_pool_hold: pool_hold,
                         };
                         return Ok((matching.index, PreExecutionBudgetMutation::Charge(charge)));
                     }
-                    BudgetAuthorizeHoldDecision::Denied(_) => {
+                    PoolGuardedCharge::PerPassDenied | PoolGuardedCharge::PoolDenied => {
                         saw_exhausted_budget = true;
                     }
                 }
@@ -848,14 +932,28 @@ impl ChioKernel {
     ) -> Result<BudgetReverseHoldDecision, KernelError> {
         let authority = charge.authorize_metadata.authority.clone();
         self.with_budget_store(|store| {
-            Ok(store.reverse_budget_hold(BudgetReverseHoldRequest {
+            let decision = store.reverse_budget_hold(BudgetReverseHoldRequest {
                 capability_id: capability_id.to_string(),
                 grant_index: charge.grant_index,
                 reversed_exposure_units: charge.cost_charged,
                 hold_id: Some(charge.budget_hold_id.clone()),
                 event_id: Some(charge.reverse_event_id()),
-                authority,
-            })?)
+                authority: authority.clone(),
+            })?;
+            // Symmetric pool reversal: if this was a free-tier charge, release its
+            // aggregate-pool hold in the SAME closure so a cancellation cannot leave
+            // stale pool exposure (which would exhaust the pool prematurely).
+            if let Some(pool_hold) = charge.free_tier_pool_hold.as_ref() {
+                store.reverse_budget_hold(BudgetReverseHoldRequest {
+                    capability_id: pool_hold.term_id.clone(),
+                    grant_index: FREETIER_GLOBAL_GRANT_INDEX,
+                    reversed_exposure_units: pool_hold.units,
+                    hold_id: Some(pool_hold.hold_id.clone()),
+                    event_id: Some(format!("{}:reverse", pool_hold.hold_id)),
+                    authority,
+                })?;
+            }
+            Ok(decision)
         })
     }
 
@@ -886,15 +984,29 @@ impl ChioKernel {
     ) -> Result<BudgetReconcileHoldDecision, KernelError> {
         let authority = charge.authorize_metadata.authority.clone();
         self.with_budget_store(|store| {
-            Ok(store.reconcile_budget_hold(BudgetReconcileHoldRequest {
+            let decision = store.reconcile_budget_hold(BudgetReconcileHoldRequest {
                 capability_id: capability_id.to_string(),
                 grant_index: charge.grant_index,
                 exposed_cost_units: charge.cost_charged,
                 realized_spend_units: realized_cost_units.min(charge.cost_charged),
                 hold_id: Some(charge.budget_hold_id.clone()),
                 event_id: Some(charge.reconcile_event_id()),
-                authority,
-            })?)
+                authority: authority.clone(),
+            })?;
+            // Symmetric pool reconcile-to-realized in the SAME closure, mirroring the
+            // per-Pass hold so the aggregate pool tracks realized free-tier spend.
+            if let Some(pool_hold) = charge.free_tier_pool_hold.as_ref() {
+                store.reconcile_budget_hold(BudgetReconcileHoldRequest {
+                    capability_id: pool_hold.term_id.clone(),
+                    grant_index: FREETIER_GLOBAL_GRANT_INDEX,
+                    exposed_cost_units: pool_hold.units,
+                    realized_spend_units: realized_cost_units.min(pool_hold.units),
+                    hold_id: Some(pool_hold.hold_id.clone()),
+                    event_id: Some(format!("{}:reconcile", pool_hold.hold_id)),
+                    authority,
+                })?;
+            }
+            Ok(decision)
         })
     }
 
