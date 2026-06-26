@@ -966,7 +966,7 @@ include!("credit/capital_and_execution.rs");
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod do_not_weaken {
-    //! DO-NOT-WEAKEN regression suite (M1-7).
+    //! DO-NOT-WEAKEN regression suite (M1-7, extended M2-5).
     //!
     //! Three credit invariants are frozen here:
     //!
@@ -976,12 +976,22 @@ mod do_not_weaken {
     //! 2. `CreditScorecardSupportBoundary` defaults
     //!    `capital_allocation_supported` to `false` (and likewise does
     //!    not net cross-currency). Scorecards never allocate capital.
-    //! 3. IOUs only arise from a strictly non-zero charged cost. A
+    //! 3. `CapitalBookSupportBoundary` defaults
+    //!    `mixed_currency_netting_supported` to `false`. The capital
+    //!    book never nets across currencies on its own authority.
+    //! 4. IOUs only arise from a strictly non-zero charged cost. A
     //!    zero-cost allow receipt mints no IOU. Flipping any flag to
     //!    `true`, or minting on a zero cost, would weaken the obligation
     //!    surface; do not do it.
+    //!
+    //! (M2-5) The third prudential netting flag is now directly locked
+    //! here. Previously it was only asserted indirectly through the
+    //! off-chain collapse equality check; a direct default lock closes
+    //! the gap so a future weakening of the capital-book default is
+    //! caught without having to run the collapse.
     use super::{
-        CreditScorecardSupportBoundary, ExposureLedgerSupportBoundary, LocalCreditAccount,
+        CapitalBookSupportBoundary, CreditScorecardSupportBoundary, ExposureLedgerSupportBoundary,
+        LocalCreditAccount,
     };
     use crate::crypto::{sha256_hex, Ed25519Backend, Keypair};
     use crate::hook::CreditEvaluatorHook;
@@ -1010,6 +1020,18 @@ mod do_not_weaken {
         assert!(
             !boundary.cross_currency_netting_supported,
             "cross-currency netting must stay unsupported on the scorecard"
+        );
+    }
+
+    #[test]
+    fn capital_book_boundary_does_not_support_mixed_currency_netting() {
+        // (M2-5) Direct default lock on the third prudential netting flag.
+        // The capital book never nets across currencies on its own authority;
+        // per-currency fail-closed accounting is the prudential safeguard.
+        let boundary = CapitalBookSupportBoundary::default();
+        assert!(
+            !boundary.mixed_currency_netting_supported,
+            "mixed-currency netting must stay unsupported on the capital book"
         );
     }
 

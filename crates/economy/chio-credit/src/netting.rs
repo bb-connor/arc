@@ -365,6 +365,102 @@ impl ExposureLedgerReport {
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
+mod do_not_weaken {
+    //! DO-NOT-WEAKEN regression suite (M2-5).
+    //!
+    //! The off-chain single-denomination collapse is a projection, not an
+    //! authority: it must carry the three prudential netting flags straight
+    //! off their fail-closed defaults, mark itself read-only, and require no
+    //! on-chain instrument or new contract. These locks freeze that posture at
+    //! the default level so a future weakening (flipping a flag to `true`,
+    //! clearing a projection marker, or repointing the canonical currency) is
+    //! caught without having to exercise the collapse.
+    use super::*;
+
+    /// The three prudential netting flags on the netted-view boundary stay
+    /// `false` at the default level, matching the prudential defaults.
+    #[test]
+    fn netted_view_boundary_carries_prudential_flag_defaults_false() {
+        let boundary = ExposureLedgerNettedSupportBoundary::default();
+        assert!(
+            !boundary.cross_currency_netting_supported,
+            "cross-currency netting must stay unsupported on the netted view"
+        );
+        assert!(
+            !boundary.capital_allocation_supported,
+            "capital allocation must stay unsupported on the netted view"
+        );
+        assert!(
+            !boundary.mixed_currency_netting_supported,
+            "mixed-currency netting must stay unsupported on the netted view"
+        );
+        // The netted-view flags are carried straight off the prudential
+        // defaults: weakening a prudential default surfaces here.
+        assert_eq!(
+            boundary.cross_currency_netting_supported,
+            ExposureLedgerSupportBoundary::default().cross_currency_netting_supported
+        );
+        assert_eq!(
+            boundary.capital_allocation_supported,
+            CreditScorecardSupportBoundary::default().capital_allocation_supported
+        );
+        assert_eq!(
+            boundary.mixed_currency_netting_supported,
+            CapitalBookSupportBoundary::default().mixed_currency_netting_supported
+        );
+    }
+
+    /// The projection markers: the collapse is a read-only projection that
+    /// leaves the prudential book untouched and requires no on-chain
+    /// instrument or new contract.
+    #[test]
+    fn netted_view_boundary_marks_read_only_and_no_instrument() {
+        let boundary = ExposureLedgerNettedSupportBoundary::default();
+        assert!(
+            boundary.read_only_projection,
+            "the netted view must stay a read-only projection"
+        );
+        assert!(
+            boundary.prudential_book_unchanged,
+            "the netted view must not change the prudential book"
+        );
+        assert!(
+            !boundary.on_chain_instrument_required,
+            "the netted view must not require an on-chain instrument"
+        );
+        assert!(
+            !boundary.new_contract_required,
+            "the netted view must not require a new contract"
+        );
+    }
+
+    /// The canonical netting currency is pinned USD/USDC. Repointing it would
+    /// silently change which parity the collapse assumes.
+    #[test]
+    fn canonical_netting_currency_is_pinned_usdc() {
+        assert_eq!(
+            CANONICAL_NETTING_CURRENCY, "USDC",
+            "the canonical netting currency must stay USDC (the USD/USDC pin)"
+        );
+        // USD and the canonical currency convert one-to-one by default.
+        let rates = ExposureLedgerNettingRates::default();
+        assert_eq!(
+            rates.rate_for("USD").unwrap().convert(1_234).unwrap(),
+            1_234
+        );
+        assert_eq!(
+            rates
+                .rate_for(CANONICAL_NETTING_CURRENCY)
+                .unwrap()
+                .convert(1_234)
+                .unwrap(),
+            1_234
+        );
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use crate::{ExposureLedgerQuery, ExposureLedgerSummary, EXPOSURE_LEDGER_SCHEMA};
