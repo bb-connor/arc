@@ -19,6 +19,9 @@ use std::str::FromStr;
 use chio_core::capability::token::{
     window_scoped_capability_id, AttestationWindowId, CapabilityToken,
 };
+use chio_core::receipt::body::ChioReceipt;
+use chio_core::receipt::decision::Decision;
+use chio_core::receipt::kinds::{ReceiptKind, TrustLevel};
 use chio_core::{
     canonical_json_bytes,
     session::{ChioIdentityAssertion, EnterpriseFederationMethod, EnterpriseIdentityContext},
