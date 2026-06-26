@@ -57,6 +57,12 @@ use sequencer::{read_sequencer_status, SequencerAvailability};
 pub type OracleFuture<'a> =
     Pin<Box<dyn Future<Output = Result<ExchangeRate, PriceOracleError>> + Send + 'a>>;
 
+/// A resolved cross-currency rate with provenance and freshness metadata.
+///
+/// The rate is carried as a numerator/denominator pair alongside the source
+/// feed reference, the timestamps for when it was last updated and fetched, the
+/// maximum tolerated age, the conversion margin, and an optional backend
+/// confidence interval.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExchangeRate {
     pub base: String,
@@ -101,6 +107,13 @@ impl ExchangeRate {
         now.saturating_sub(self.fetched_at)
     }
 
+    /// Validates that the rate is usable at `now`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PriceOracleError::InvalidFeed`] when the rate denominator is zero
+    /// or the `updated_at` timestamp is in the future, and
+    /// [`PriceOracleError::Stale`] when the rate's age exceeds `max_age_seconds`.
     pub fn ensure_fresh(&self, now: u64) -> Result<(), PriceOracleError> {
         if self.rate_denominator == 0 {
             return Err(PriceOracleError::InvalidFeed(format!(
@@ -147,6 +160,14 @@ impl ExchangeRate {
         self
     }
 
+    /// Builds signed-ready conversion evidence binding this rate to a budget conversion.
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`PriceOracleError::Stale`] or [`PriceOracleError::InvalidFeed`]
+    /// from the freshness check, and returns
+    /// [`PriceOracleError::ArithmeticOverflow`] when the rate numerator or
+    /// denominator does not fit the `u64` receipt contract.
     pub fn to_conversion_evidence(
         &self,
         original_cost_units: u64,
@@ -188,6 +209,7 @@ impl ExchangeRate {
     }
 }
 
+/// Failure modes when resolving, validating, or converting an oracle price.
 #[derive(Debug, thiserror::Error, Clone)]
 pub enum PriceOracleError {
     #[error("no feed configured for {base}/{quote}")]
@@ -243,18 +265,22 @@ impl PriceOracleError {
     }
 }
 
+/// Read interface for resolving exchange rates between currency pairs.
 pub trait PriceOracle: Send + Sync {
     fn get_rate<'a>(&'a self, base: &'a str, quote: &'a str) -> OracleFuture<'a>;
 
     fn supported_pairs(&self) -> Vec<String>;
 }
 
+/// Pluggable price source (Chainlink, Pyth) that reads a raw rate for a pair.
 pub trait OracleBackend: Send + Sync {
     fn kind(&self) -> OracleBackendKind;
 
     fn read_rate<'a>(&'a self, pair: &'a PairConfig, now: u64) -> OracleFuture<'a>;
 }
 
+/// Oracle runtime that resolves rates through primary and fallback backends,
+/// applying caching, operator controls, and divergence circuit breaking.
 pub struct ChioLinkOracle {
     config: PriceOracleConfig,
     primary: Arc<dyn OracleBackend>,
@@ -264,6 +290,15 @@ pub struct ChioLinkOracle {
 }
 
 impl ChioLinkOracle {
+    /// Builds an oracle from configuration, constructing the primary and optional fallback backends.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PriceOracleError::InvalidConfiguration`] when the configuration
+    /// fails validation, [`PriceOracleError::UnsupportedBackend`] when a requested
+    /// backend cannot be built (for example Chainlink without the `web3` feature),
+    /// and [`PriceOracleError::Unavailable`] when backend construction fails (for
+    /// example building the Pyth Hermes HTTP client).
     pub fn new(config: PriceOracleConfig) -> Result<Self, PriceOracleError> {
         config.validate()?;
         let primary = build_backend(config.primary, &config)?;
@@ -378,6 +413,15 @@ impl ChioLinkOracle {
         Ok(())
     }
 
+    /// Returns the cached rate for a pair when a fresh (or degraded-mode) entry exists.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PriceOracleError::NoPairAvailable`] when no feed is configured for
+    /// the pair, and propagates operator-control failures
+    /// ([`PriceOracleError::OperatorPaused`], [`PriceOracleError::ChainDisabled`],
+    /// [`PriceOracleError::SequencerDown`], [`PriceOracleError::SequencerRecovering`])
+    /// and cache freshness errors ([`PriceOracleError::Stale`]).
     pub async fn cached_rate(
         &self,
         base: &str,
@@ -394,6 +438,14 @@ impl ChioLinkOracle {
         self.resolve_cached_rate(&pair, now, &operator).await
     }
 
+    /// Forces a fresh backend fetch, records it in the cache, and returns the new rate.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PriceOracleError::NoPairAvailable`] when no feed is configured for
+    /// the pair, and propagates operator-control, backend, and validation failures
+    /// (including [`PriceOracleError::CircuitBreakerTripped`]) encountered while
+    /// fetching and caching the rate.
     pub async fn refresh_pair(
         &self,
         base: &str,

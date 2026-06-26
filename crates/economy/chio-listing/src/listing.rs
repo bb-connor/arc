@@ -62,6 +62,7 @@ pub enum GenericListingFreshnessState {
     Divergent,
 }
 
+/// Safety invariant for generic listings: visibility-only, with no automatic trust admission.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct GenericListingBoundary {
@@ -81,6 +82,12 @@ impl Default for GenericListingBoundary {
 }
 
 impl GenericListingBoundary {
+    /// Enforce the visibility-only listing boundary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error string when the boundary is not visibility-only, does not
+    /// require explicit trust activation, or permits automatic trust admission.
     pub fn validate(&self) -> Result<(), String> {
         if !self.visibility_only {
             return Err("generic listings must remain visibility-only".to_string());
@@ -147,6 +154,7 @@ impl GenericRegistryPublisher {
     }
 }
 
+/// A namespace-ownership record binding a namespace to its owner and signing key.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct GenericNamespaceArtifact {
@@ -158,6 +166,12 @@ pub struct GenericNamespaceArtifact {
 }
 
 impl GenericNamespaceArtifact {
+    /// Validate the namespace artifact schema, identifier, ownership, and boundary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error string when the schema is unsupported, the namespace id is
+    /// empty, or the embedded ownership or boundary fails validation.
     pub fn validate(&self) -> Result<(), String> {
         if self.schema != GENERIC_NAMESPACE_ARTIFACT_SCHEMA {
             return Err(format!(
@@ -219,6 +233,7 @@ impl GenericListingSubject {
     }
 }
 
+/// The generic listing artifact: a discoverable, visibility-only marketplace entry.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct GenericListingArtifact {
@@ -236,6 +251,14 @@ pub struct GenericListingArtifact {
 }
 
 impl GenericListingArtifact {
+    /// Validate the listing schema, identifiers, namespace binding, expiry, and nested records.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error string when the schema is unsupported, the listing id or
+    /// namespace is empty, the namespace does not match the embedded ownership,
+    /// the expiry is not greater than `published_at`, or any nested record
+    /// (ownership, subject, compatibility, boundary) fails validation.
     pub fn validate(&self) -> Result<(), String> {
         if self.schema != GENERIC_LISTING_ARTIFACT_SCHEMA {
             return Err(format!(

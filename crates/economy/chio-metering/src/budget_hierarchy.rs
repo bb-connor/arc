@@ -449,10 +449,14 @@ impl BudgetTree {
 
     /// Insert a node into the tree.
     ///
+    /// # Errors
+    ///
     /// Returns [`BudgetError::Duplicate`] if `node.id` already exists,
     /// [`BudgetError::MissingParent`] if the node references a parent that
     /// is not present, and [`BudgetError::Cycle`] if the new parent edge
-    /// would make `node.id` its own ancestor.
+    /// would make `node.id` its own ancestor. It also returns
+    /// [`BudgetError::InvalidLimits`] when the node sets a spend limit without a
+    /// non-empty currency.
     pub fn insert(&mut self, node: BudgetNode) -> Result<(), BudgetError> {
         if self.nodes.contains_key(&node.id) {
             return Err(BudgetError::Duplicate {
@@ -500,6 +504,13 @@ impl BudgetTree {
 
     /// Validate the tree: every referenced parent must exist and the
     /// parent graph must be acyclic.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BudgetError::InvalidLimits`] when a node sets a spend limit
+    /// without a non-empty currency, [`BudgetError::MissingParent`] when a node
+    /// references a parent absent from the tree, and [`BudgetError::Cycle`] when
+    /// the parent graph contains a cycle.
     pub fn validate(&self) -> Result<(), BudgetError> {
         for node in self.nodes.values() {
             validate_limits(node)?;
@@ -695,6 +706,13 @@ impl BudgetTree {
     /// Deserialize a tree from its JSON encoding. Validates structure on
     /// the way in so the returned tree is guaranteed cycle-free with
     /// every referenced parent present.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BudgetError::InvalidSerialization`] when the JSON does not decode
+    /// to the tree encoding, and propagates [`BudgetError::Duplicate`],
+    /// [`BudgetError::MissingParent`], [`BudgetError::Cycle`], or
+    /// [`BudgetError::InvalidLimits`] surfaced while inserting and validating nodes.
     pub fn deserialize(v: serde_json::Value) -> Result<Self, BudgetError> {
         #[derive(Deserialize)]
         struct Encoded {
