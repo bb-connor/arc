@@ -31,6 +31,7 @@ pub enum ErrorCode {
     DuplicateRequiredPermission,
     UnsupportedSchema,
     ManifestVerificationFailed,
+    InvalidAttestationWindow,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -102,6 +103,7 @@ fn core_error_code(error: &chio_core::Error) -> ErrorCode {
         chio_core::Error::MerkleProofFailed => ErrorCode::MerkleProofFailed,
         chio_core::Error::EmptyTree => ErrorCode::EmptyTree,
         chio_core::Error::InvalidProofIndex { .. } => ErrorCode::InvalidProofIndex,
+        chio_core::Error::InvalidAttestationWindow { .. } => ErrorCode::InvalidAttestationWindow,
     }
 }
 
