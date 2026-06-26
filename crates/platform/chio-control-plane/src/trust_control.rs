@@ -273,6 +273,8 @@ mod budget_handlers;
 mod capital_and_liability;
 #[path = "trust_control/certification_handlers.rs"]
 mod certification_handlers;
+#[path = "trust_control/chio_pass_handlers.rs"]
+pub mod chio_pass_handlers;
 #[path = "trust_control/cluster.rs"]
 pub mod cluster;
 #[path = "trust_control/cluster_and_reports.rs"]
