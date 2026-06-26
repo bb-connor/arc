@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use chio_core_types::capability::token::is_freetier_global_pool_id;
 use chio_core_types::{PublicKey, Signature};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -320,6 +321,10 @@ pub fn validate_risk_portfolio_reports(
     let mut terminal_consumption_by_reserve_claim = BTreeSet::<(&str, &str)>::new();
     let mut reserve_receipt_refs = BTreeSet::<&str>::new();
     for report in reports {
+        // Fail closed before any capital/reserve aggregation: the Sybil-ceiling
+        // pool term is never real capital and must never inflate a portfolio
+        // reserve/aggregate projection.
+        ensure_not_freetier_global_pool(&report.facility.reserve_ref, "portfolio_reserve_ref")?;
         let key = (
             report.subject.clone(),
             report.facility.capital_currency.clone(),
@@ -365,6 +370,11 @@ pub fn validate_risk_portfolio_reports(
             .checked_add(report.reconciliation.consumed_reserve_units)
             .ok_or_else(|| claim_failed("risk portfolio reserve overflow"))?;
         for entry in &report.reserve_ledger {
+            ensure_not_freetier_global_pool(&entry.claim_id, "portfolio_reserve_ledger_claim_id")?;
+            ensure_not_freetier_global_pool(
+                &entry.reserve_ref,
+                "portfolio_reserve_ledger_reserve_ref",
+            )?;
             if !reserve_receipt_refs.insert(entry.receipt_ref.as_str()) {
                 return Err(claim_failed(
                     "risk portfolio reserve ledger duplicate receipt",
@@ -507,6 +517,7 @@ fn validate_risk_facility_state(
     ] {
         require_non_empty(value, field)?;
     }
+    ensure_not_freetier_global_pool(&facility.reserve_ref, "reserve_ref")?;
     if !is_supported_risk_facility_state(&facility.state) {
         return Err(claim_failed("risk facility state unsupported"));
     }
@@ -942,6 +953,9 @@ fn validate_risk_capital_instruction(
     ] {
         require_non_empty(value, field)?;
     }
+    ensure_not_freetier_global_pool(&instruction.claim_id, "capital_instruction_claim_id")?;
+    ensure_not_freetier_global_pool(&instruction.order_id, "capital_instruction_order_id")?;
+    ensure_not_freetier_global_pool(&instruction.reserve_ref, "capital_instruction_reserve_ref")?;
     if instruction.units == 0 {
         return Err(claim_failed("risk capital instruction units missing"));
     }
@@ -1168,6 +1182,24 @@ fn parse_rfc3339_utc(
     DateTime::parse_from_rfc3339(value)
         .map(|timestamp| timestamp.with_timezone(&Utc))
         .map_err(|_| claim_failed(format!("invalid risk timestamp: {field}")))
+}
+
+/// Fail closed when `id` references the aggregate free-tier pool budget-term
+/// namespace (`freetier:global:<YYYY-MM>`, the current window or any retained
+/// prior-month window). The pool is a Sybil-ceiling accounting term, never
+/// capital, so it must never be admitted into the single-report reserve view or
+/// aggregated as real capital/reserve by the portfolio projection. Matching is
+/// by the canonical shared prefix, so it is robust to the `<YYYY-MM>` suffix.
+fn ensure_not_freetier_global_pool(
+    id: &str,
+    field: &'static str,
+) -> Result<(), TransactionPassportError> {
+    if is_freetier_global_pool_id(id) {
+        return Err(claim_failed(format!(
+            "{field} must not reference the freetier:global pool namespace"
+        )));
+    }
+    Ok(())
 }
 
 fn claim_failed(message: impl Into<String>) -> TransactionPassportError {

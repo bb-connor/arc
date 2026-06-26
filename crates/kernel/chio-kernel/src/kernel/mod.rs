@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 use arc_swap::ArcSwap;
 use chio_appraisal::VerifiedRuntimeAttestationRecord;
 use chio_core::receipt::metadata::GuardEvidence;
+use chio_core_types::capability::token::FREETIER_GLOBAL_POOL_ID_PREFIX;
 use chio_log_redact::redacted;
 use dashmap::DashMap;
 
@@ -950,7 +951,13 @@ impl FreeTierPoolConfig {
         let dt = chrono::DateTime::from_timestamp(secs, 0).ok_or_else(|| {
             KernelError::InvalidFreeTierPoolConfig("issued_at not representable".to_string())
         })?;
-        Ok(format!("freetier:global:{}", dt.format("%Y-%m")))
+        // Build the term from the canonical shared prefix so the kernel's
+        // derivation and every fail-closed pool-exclusion filter agree on one
+        // namespace (no drifting literal).
+        Ok(format!(
+            "{FREETIER_GLOBAL_POOL_ID_PREFIX}{}",
+            dt.format("%Y-%m")
+        ))
     }
 }
 
@@ -1007,6 +1014,20 @@ mod free_tier_pool_config_tests {
         );
         let term = FreeTierPoolConfig::window_ym_from_issued_at(1_780_704_000).unwrap();
         assert!(term.starts_with("freetier:global:2026-"), "got {term}");
+    }
+
+    #[test]
+    fn derived_pool_term_is_recognized_by_shared_predicate() {
+        // The kernel's term derivation and the canonical fail-closed predicate
+        // must never drift: every derived term is recognized as a pool id.
+        use chio_core_types::capability::token::{
+            is_freetier_global_pool_id, FREETIER_GLOBAL_POOL_ID_PREFIX,
+        };
+        let epoch = FreeTierPoolConfig::window_ym_from_issued_at(0).unwrap();
+        let live = FreeTierPoolConfig::window_ym_from_issued_at(1_780_704_000).unwrap();
+        assert!(is_freetier_global_pool_id(&epoch));
+        assert!(is_freetier_global_pool_id(&live));
+        assert!(epoch.starts_with(FREETIER_GLOBAL_POOL_ID_PREFIX));
     }
 }
 

@@ -36,6 +36,30 @@ pub const CHIO_PASS_CAPABILITY_ID_DOMAIN: &str = "chio.pass.capability.id.v1";
 /// UUIDv7 token ids and from the `freetier:global:<window_ym>` pool key.
 pub const CHIO_PASS_CAPABILITY_ID_PREFIX: &str = "chiopass:";
 
+/// Namespace prefix of the aggregate free-tier pool budget-term id
+/// `freetier:global:<window_ym>` (CONTROL 1). The std kernel derives each
+/// per-month term by appending the `"%Y-%m"` window to this prefix (see
+/// `FreeTierPoolConfig::window_ym_from_issued_at`), so this constant is the
+/// single source of truth for the pool namespace and the only string callers
+/// should match against.
+///
+/// The pool is a Sybil-ceiling accounting term, never capital. Every id under
+/// this prefix (the current window and any retained prior-month window) MUST be
+/// excluded from any reserve view or aggregate budget/capital projection, and a
+/// custodial-escrow leg MUST never co-debit it.
+pub const FREETIER_GLOBAL_POOL_ID_PREFIX: &str = "freetier:global:";
+
+/// Returns `true` when `capability_id` is an aggregate free-tier pool budget-term
+/// id (`freetier:global:<window_ym>`), for the current window or any retained
+/// prior-month window. Fail-closed callers use this to keep the Sybil-ceiling
+/// pool term out of capital, reserve, and aggregate budget accounting; matching
+/// is by the canonical [`FREETIER_GLOBAL_POOL_ID_PREFIX`] so it is robust to the
+/// `<YYYY-MM>` suffix.
+#[must_use]
+pub fn is_freetier_global_pool_id(capability_id: &str) -> bool {
+    capability_id.starts_with(FREETIER_GLOBAL_POOL_ID_PREFIX)
+}
+
 /// Window identifier shared by the std kernel and the credential layer without
 /// pulling a chrono or DID dependency into this `no_std + alloc` crate.
 ///
@@ -816,5 +840,27 @@ mod m0_pass_capability_id_tests {
             w.validate(),
             Err(Error::InvalidAttestationWindow { .. })
         ));
+    }
+
+    #[test]
+    fn freetier_global_pool_id_matches_current_and_prior_windows() {
+        // Both the live window and any retained prior-month window are caught by
+        // the canonical prefix, robust to the `<YYYY-MM>` suffix.
+        assert!(is_freetier_global_pool_id("freetier:global:2026-06"));
+        assert!(is_freetier_global_pool_id("freetier:global:2026-05"));
+        assert!(is_freetier_global_pool_id(FREETIER_GLOBAL_POOL_ID_PREFIX));
+    }
+
+    #[test]
+    fn freetier_global_pool_id_rejects_unrelated_and_lookalike_ids() {
+        // A Pass-minted capability id, a UUID-style id, and a near-miss prefix
+        // (no trailing colon) must never be misread as the pool term.
+        let pass_id = window_scoped_capability_id("did:chio:alice", &window()).unwrap();
+        assert!(!is_freetier_global_pool_id(&pass_id));
+        assert!(!is_freetier_global_pool_id(
+            "0192f0a0-0000-7000-8000-000000000000"
+        ));
+        assert!(!is_freetier_global_pool_id("freetier:globalish:2026-06"));
+        assert!(!is_freetier_global_pool_id(""));
     }
 }
