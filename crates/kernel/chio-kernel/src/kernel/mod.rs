@@ -884,6 +884,132 @@ pub const DEFAULT_CHECKPOINT_BATCH_SIZE: u64 = 100;
 pub const DEFAULT_RETENTION_DAYS: u64 = 90;
 pub const DEFAULT_MAX_SIZE_BYTES: u64 = 10_737_418_240;
 
+/// Board-approved configuration for the Phase-0 free-tier compute pool (M0 Pass
+/// CONTROL 1). It bounds aggregate free-tier liability to a hard monthly ceiling
+/// so the gift degrades to "the pool shrinks", never "the treasury drains": when
+/// the aggregate term is exhausted the kernel denies fail-closed.
+///
+/// The config travels via the fallible [`ChioKernel::with_free_tier_pool`]
+/// builder rather than `KernelConfig`, so `ChioKernel::new` stays infallible and
+/// misconfiguration is rejected at install time.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FreeTierPoolConfig {
+    /// Hard monthly ceiling, in allotment units, on aggregate free-tier spend
+    /// across every Pass holder. Liability becomes `min(N x allotment, pool)`.
+    pub monthly_pool_units: u64,
+    /// The 3-uppercase-letter allotment unit (for example "XCC"). It must be a
+    /// private-use code that carries no money leg.
+    pub allotment_unit: String,
+    /// Audit-only reference to the board approval that funded this pool. It never
+    /// participates in any arithmetic; it only records provenance.
+    pub board_approval_ref: String,
+}
+
+impl FreeTierPoolConfig {
+    /// Validate the config fail-closed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`KernelError::InvalidFreeTierPoolConfig`] when `monthly_pool_units`
+    /// is zero, `allotment_unit` is not exactly three uppercase ASCII letters, or
+    /// `board_approval_ref` is empty.
+    pub fn validate(&self) -> Result<(), KernelError> {
+        if self.monthly_pool_units == 0 {
+            return Err(KernelError::InvalidFreeTierPoolConfig(
+                "monthly_pool_units must be non-zero".to_string(),
+            ));
+        }
+        let unit_ok = self.allotment_unit.len() == 3
+            && self.allotment_unit.bytes().all(|b| b.is_ascii_uppercase());
+        if !unit_ok {
+            return Err(KernelError::InvalidFreeTierPoolConfig(
+                "allotment_unit must be 3 uppercase ASCII letters".to_string(),
+            ));
+        }
+        if self.board_approval_ref.is_empty() {
+            return Err(KernelError::InvalidFreeTierPoolConfig(
+                "board_approval_ref must be present".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Derive the aggregate pool budget-term id `"freetier:global:<YYYY-MM>"` from
+    /// a Pass capability's `issued_at` (which is pinned to the first second of its
+    /// active month, so the term is the same for every Pass in that month). The id
+    /// is what keys the single shared `(term, grant_index 0)` budget row.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`KernelError::InvalidFreeTierPoolConfig`] when `issued_at` is not a
+    /// representable unix timestamp.
+    pub fn window_ym_from_issued_at(issued_at: u64) -> Result<String, KernelError> {
+        let secs = i64::try_from(issued_at).map_err(|_| {
+            KernelError::InvalidFreeTierPoolConfig("issued_at out of range".to_string())
+        })?;
+        let dt = chrono::DateTime::from_timestamp(secs, 0).ok_or_else(|| {
+            KernelError::InvalidFreeTierPoolConfig("issued_at not representable".to_string())
+        })?;
+        Ok(format!("freetier:global:{}", dt.format("%Y-%m")))
+    }
+}
+
+#[cfg(test)]
+mod free_tier_pool_config_tests {
+    use super::FreeTierPoolConfig;
+
+    fn cfg() -> FreeTierPoolConfig {
+        FreeTierPoolConfig {
+            monthly_pool_units: 1_000_000,
+            allotment_unit: "XCC".to_string(),
+            board_approval_ref: "board-2026-06-001".to_string(),
+        }
+    }
+
+    #[test]
+    fn validate_accepts_well_formed_config() {
+        assert!(cfg().validate().is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_zero_pool() {
+        let mut c = cfg();
+        c.monthly_pool_units = 0;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_malformed_unit() {
+        // 3 uppercase letters is the shape rule (the private-use / no-money-leg
+        // check lives in the charge path, not here), so "USD" is shape-valid.
+        for bad in ["xcc", "XC", "XCCX", "X1C", ""] {
+            let mut c = cfg();
+            c.allotment_unit = bad.to_string();
+            assert!(c.validate().is_err(), "unit `{bad}` must be rejected");
+        }
+        let mut usd = cfg();
+        usd.allotment_unit = "USD".to_string();
+        assert!(usd.validate().is_ok(), "3 uppercase letters is shape-valid");
+    }
+
+    #[test]
+    fn validate_rejects_empty_board_ref() {
+        let mut c = cfg();
+        c.board_approval_ref = String::new();
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn window_term_id_is_month_scoped() {
+        assert_eq!(
+            FreeTierPoolConfig::window_ym_from_issued_at(0).unwrap(),
+            "freetier:global:1970-01"
+        );
+        let term = FreeTierPoolConfig::window_ym_from_issued_at(1_780_704_000).unwrap();
+        assert!(term.starts_with("freetier:global:2026-"), "got {term}");
+    }
+}
+
 /// The Chio Runtime Kernel.
 ///
 /// This is the central component of the Chio protocol. It validates capabilities,

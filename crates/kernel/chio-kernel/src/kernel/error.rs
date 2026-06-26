@@ -57,6 +57,9 @@ pub enum KernelError {
     #[error("capability issuance denied: {0}")]
     CapabilityIssuanceDenied(String),
 
+    #[error("invalid free-tier pool config: {0}")]
+    InvalidFreeTierPoolConfig(String),
+
     #[error("requested tool {tool} on server {server} is not in capability scope")]
     OutOfScope { tool: String, server: String },
 
@@ -264,6 +267,11 @@ impl KernelError {
                 "CHIO-KERNEL-CAPABILITY-ISSUANCE-DENIED",
                 serde_json::json!({ "reason": reason }),
                 "Adjust the issuance request so it satisfies the policy, score, or trust requirements enforced by the authority.",
+            ),
+            Self::InvalidFreeTierPoolConfig(reason) => self.report_with_context(
+                "CHIO-KERNEL-INVALID-FREE-TIER-POOL-CONFIG",
+                serde_json::json!({ "reason": reason }),
+                "Provide a non-zero monthly_pool_units, a 3-uppercase-letter allotment_unit, and a non-empty board_approval_ref.",
             ),
             Self::OutOfScope { tool, server } => self.report_with_context(
                 "CHIO-KERNEL-OUT-OF-SCOPE-TOOL",
