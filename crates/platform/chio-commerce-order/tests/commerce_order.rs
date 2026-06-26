@@ -1669,6 +1669,7 @@ fn pin_escrow_digest_via_accept(
             order_context: &escrow_context,
             token_offer: &token,
             acceptor: &acceptor,
+            accepted_at: 500,
             reserved_amount: &reservation,
             depositor_account: "buyer:demo-cafe-customer".to_string(),
             beneficiary_account: "merchant:stripe:coffee-shop".to_string(),
