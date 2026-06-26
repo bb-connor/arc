@@ -166,6 +166,15 @@ impl ExposureLedgerQuery {
         normalized
     }
 
+    /// Validate the structural invariants of an exposure ledger query.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error string when any supplied filter is empty or padded
+    /// with surrounding whitespace, when none of `--capability`,
+    /// `--agent-subject`, or `--tool-server` is provided, when `--tool-name`
+    /// is supplied without `--tool-server`, or when `--since` is greater than
+    /// `--until`.
     pub fn validate(&self) -> Result<(), String> {
         validate_optional_query_filter(&self.capability_id, "--capability")?;
         validate_optional_query_filter(&self.agent_subject, "--agent-subject")?;
@@ -329,6 +338,9 @@ pub struct ExposureLedgerSummary {
     pub truncated_decisions: bool,
 }
 
+/// Subject-scoped exposure ledger: the per-currency positions, matching
+/// receipts, and underwriting decisions resolved for an
+/// [`ExposureLedgerQuery`], with a summary and support boundary.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ExposureLedgerReport {
