@@ -84,6 +84,15 @@ use crate::CliError;
 /// free tier. In particular it is the PROVENANCE of `accepted_kernel_keys`: the
 /// pinned trusted-kernel-key allowlist the genuine-use scan checks every receipt
 /// against, never an ad-hoc per-request caller value.
+///
+/// Tenant binding: the `tenant_id` every served receipt and own-stream read is
+/// scoped by is the raw canonical `did:chio` written VERBATIM (it is never
+/// re-derived, hashed, or re-encoded). It MUST match the
+/// `chio://receipts/tenant/<tenant>/*` SQL read guard byte-for-byte; any
+/// derivation mismatch silently denies ALL of the holder's own-stream reads
+/// (fail-closed, but invisibly), so the canonical DID string flows unchanged from
+/// issuance (`mint_chio_pass` derives it once from the subject key) through the
+/// genuine-use scan and the served read scopes.
 #[derive(Debug, Clone)]
 pub struct ChioPassConfig {
     /// CONTROL 1 aggregate pool ceiling. Its `allotment_unit` MUST be the Pass XCC
@@ -133,6 +142,65 @@ impl ChioPassConfig {
             active_population_cap: 100_000,
             min_genuine_use_receipts: MIN_GENUINE_USE_RECEIPTS,
             board_approval_ref,
+            accepted_kernel_keys,
+        }
+    }
+
+    /// The single board-approved M1 launch defaults (task M1-1).
+    ///
+    /// Returns ONE fail-closed [`ChioPassConfig`] pinned to the M1 launch numbers.
+    /// Unlike [`Self::m0_placeholder`] (kept intact for the existing T9/T10 wiring
+    /// tests), the board-approved governance numbers are pinned HERE; the only
+    /// caller-supplied input is `accepted_kernel_keys`, because the trusted-kernel
+    /// allowlist is sourced from the trust-market market-authority registry
+    /// RR2-TM-01 and its membership rotates per rotation epoch, so it is loaded from
+    /// that registry at install time, never hard-coded into this binary. The
+    /// returned surface still loads fail-closed: [`Self::validate`] rejects it when
+    /// the supplied `accepted_kernel_keys` is empty.
+    ///
+    /// Pinned launch defaults:
+    /// - tier -> units 1000 / 1000 / 2500 / 5000 (unverified / attested / verified /
+    ///   premier): the committed [`TierAllotmentTable`] launch table. The floor is
+    ///   unconditional; the tier scales allotment SIZE only, never existence.
+    /// - allotment unit XCC ([`CHIO_PASS_ALLOTMENT_UNIT`]); the per-invocation XCC
+    ///   cost is the committed positive floor, so the metered grant's
+    ///   `max_cost_per_invocation.units > 0` always holds and the CONTROL 1 pool
+    ///   co-debit bounds spend (it can never request zero units).
+    /// - `window_token_capacity` / `active_population_cap`: anti-farm throttle
+    ///   placeholders (Section 6.1).
+    /// - `min_genuine_use_receipts`: the committed spec floor.
+    #[must_use]
+    pub fn m1_launch_default(accepted_kernel_keys: Vec<PublicKey>) -> Self {
+        // BOARD-PENDING: replace with the ratified launch governance reference once
+        // the board vote lands. This audit-only ref records provenance and never
+        // enters any arithmetic; it is non-empty so `validate` accepts the surface.
+        let board_approval_ref = "board-approval-pending/chio-pass-M1-launch".to_string();
+        // BOARD-PENDING: monthly aggregate free-tier POOL ceiling, in XCC. Documented
+        // launch default = active_population_cap (100_000) x the attested tier floor
+        // (1_000 XCC). CONTROL 1 makes liability min(N x allotment, pool), so the
+        // gift degrades to "the pool shrinks", never "the treasury drains".
+        let monthly_pool_units: u64 = 100_000_000;
+        Self {
+            free_tier_pool: FreeTierPoolConfig {
+                monthly_pool_units,
+                allotment_unit: CHIO_PASS_ALLOTMENT_UNIT.to_string(),
+                board_approval_ref: board_approval_ref.clone(),
+            },
+            // tier -> units 1000 / 1000 / 2500 / 5000 (unverified/attested/verified/
+            // premier): the committed M1 launch allotment table.
+            tier_allotment_table: TierAllotmentTable::default(),
+            window_token_capacity: 10_000,  // placeholder
+            active_population_cap: 100_000, // placeholder
+            // The committed spec genuine-use floor. Whether the launch floor is the
+            // >= 1 default or a stricter >= 3 is board-decidable (Open Questions 1/5);
+            // both are honored by `refresh_chio_pass_window` without touching the
+            // const inside `chio_pass_refresh_decision`.
+            min_genuine_use_receipts: MIN_GENUINE_USE_RECEIPTS,
+            board_approval_ref,
+            // Non-empty by contract: the launch trusted-kernel-key allowlist is
+            // sourced from the trust-market market-authority registry RR2-TM-01 and
+            // rotates per rotation epoch. `validate` rejects an empty set fail-closed
+            // (an empty allowlist would silently force every identity dormant).
             accepted_kernel_keys,
         }
     }
@@ -1099,6 +1167,43 @@ mod tests {
         let mut no_board = config_with_keys(vec![key]);
         no_board.board_approval_ref.clear();
         assert!(no_board.validate().is_err());
+    }
+
+    #[test]
+    fn m1_launch_default_validates_and_rejects_empty_keys() {
+        // The single board-approved M1 launch surface validates fail-closed when the
+        // registry RR2-TM-01 trusted-kernel key set is non-empty.
+        let key = Keypair::generate().public_key();
+        let config = ChioPassConfig::m1_launch_default(vec![key]);
+        config
+            .validate()
+            .expect("m1 launch default validates fail-closed");
+
+        // Pinned launch defaults: tier -> units 1000 / 1000 / 2500 / 5000 in XCC.
+        assert_eq!(config.tier_allotment_table.unverified, 1000);
+        assert_eq!(config.tier_allotment_table.attested, 1000);
+        assert_eq!(config.tier_allotment_table.verified, 2500);
+        assert_eq!(config.tier_allotment_table.premier, 5000);
+        assert_eq!(
+            config.free_tier_pool.allotment_unit,
+            CHIO_PASS_ALLOTMENT_UNIT
+        );
+        assert_eq!(config.window_token_capacity, 10_000);
+        assert_eq!(config.active_population_cap, 100_000);
+        assert_eq!(config.min_genuine_use_receipts, MIN_GENUINE_USE_RECEIPTS);
+        assert!(
+            !config.board_approval_ref.is_empty(),
+            "board_approval_ref placeholder must be present so the surface validates"
+        );
+
+        // An empty accepted_kernel_keys set is rejected fail-closed: an empty
+        // allowlist would silently force every identity dormant.
+        let mut empty_keys = config.clone();
+        empty_keys.accepted_kernel_keys.clear();
+        assert!(
+            empty_keys.validate().is_err(),
+            "empty accepted_kernel_keys must reject"
+        );
     }
 
     // ---- T10 read-only anchoring job (spec Sections 3.4 / 6.6, launch gate 6) ----
