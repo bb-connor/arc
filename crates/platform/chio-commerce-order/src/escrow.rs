@@ -8,10 +8,18 @@
 //! ONLY against a capital execution observation reconciled as
 //! [`CapitalExecutionReconciledState::Matched`].
 //!
-//! Two fail-closed seams hold:
+//! Three fail-closed seams hold:
 //!
-//! - The reservation must fully collateralize the offer liability and the
-//!   acceptor must be the offer subject, or [`accept`] denies.
+//! - The offered capability token is authenticated BEFORE any custodial
+//!   liability is derived from it: its signature must verify against its
+//!   issuer key, it must be inside its validity window at the accept
+//!   observation time, and it must be issued by a counterparty distinct from
+//!   the acceptor/subject. `subject`/`issuer` are attacker-settable public
+//!   fields, so the acceptor==subject guard is only meaningful once the token
+//!   itself is proven authentic.
+//! - The reservation must fully collateralize the offer liability, the locked
+//!   amount must equal the signed quote, and the acceptor must be the offer
+//!   subject, or [`accept`] denies.
 //! - Seam A: the freetier:global Sybil-ceiling pool ledger and the escrow
 //!   ledger are hard-isolated. No escrow leg, in either direction, may name a
 //!   `freetier:global:<window>` row (see [`is_freetier_global_pool_id`]).
@@ -401,6 +409,11 @@ pub struct CommerceEscrowAcceptRequest<'a> {
     pub token_offer: &'a CapabilityToken,
     /// The key accepting the offer.
     pub acceptor: &'a PublicKey,
+    /// Observation time (unix seconds) the accept is evaluated at. The offer
+    /// token's validity window is enforced against this clock; the accept fails
+    /// closed when the token is not-yet-valid or expired at this time. Mirrors
+    /// the open-market accept `accepted_at` parameter.
+    pub accepted_at: u64,
     /// The funds the reservation has locked for this offer.
     pub reserved_amount: &'a MonetaryAmount,
     /// The depositor (buyer) custodial account debited by the lock leg.
@@ -443,7 +456,11 @@ pub struct CommerceEscrowRelease {
 ///
 /// Fails closed when:
 ///
+/// - the offer token signature does not verify against its issuer key;
+/// - the offer token is not-yet-valid or expired at `accepted_at`;
+/// - the offer token issuer is not a counterparty distinct from the subject;
 /// - the reservation under-collateralizes the offer liability;
+/// - the locked offer liability does not equal the signed quote amount;
 /// - the acceptor is not the offer subject;
 /// - the order context's current state is not a settlement-assembly state;
 /// - any escrow account is a freetier:global pool row (Seam A).
@@ -473,6 +490,56 @@ pub fn accept(
         )));
     }
 
+    // ESCROW-1: authenticate the offered capability token BEFORE deriving any
+    // custodial liability from it. `subject` and `issuer` are attacker-settable
+    // public fields, so the acceptor==subject guard below is hollow until the
+    // token itself is proven authentic. This mirrors the open-market accept
+    // (`chio_open_market::bidding::accept`): verify the offer signature, enforce
+    // the validity window, then bind the issuer.
+
+    // (1) The offer token signature MUST verify against its declared issuer
+    // key. Fail closed on a forged/unsigned token (Ok(false)) or any
+    // verification error (Err). The signature is checked FIRST so an expired
+    // forgery is reported as a bad signature, never as merely "expired".
+    match request.token_offer.verify_signature() {
+        Ok(true) => {}
+        _ => {
+            return Err(CommerceOrderError::SettlementFailed(
+                "escrow accept denied: offer token signature is invalid".to_string(),
+            ))
+        }
+    }
+
+    // (2) The offer token MUST be inside its validity window at the accept
+    // observation time. Fail closed on a not-yet-valid or expired token.
+    request
+        .token_offer
+        .validate_time(request.accepted_at)
+        .map_err(|error| {
+            CommerceOrderError::SettlementFailed(format!(
+                "escrow accept denied: offer token is outside its validity window: {error}"
+            ))
+        })?;
+
+    // (3) Issuer provenance. The open-market accept pins
+    // `token_offer.issuer == ask.signer_key` against the signed ask. The
+    // commerce `CommerceOrderContext` is a byte-stable signed-body wire type
+    // that carries NO merchant/offer-issuer public key, so the offer issuer
+    // cannot yet be cryptographically pinned to the order's merchant identity.
+    // The available fail-closed binding is structural: the offer MUST be issued
+    // by a counterparty distinct from the acceptor/subject. A self-issued,
+    // self-accepted offer has no real counterparty and is a forge, so it is
+    // denied here. RESIDUAL: binding `token_offer.issuer` to a merchant key
+    // carried by the order context is the remaining step; it requires adding
+    // that key to the `CommerceOrderContext` wire format and is deferred so this
+    // change stays byte-stable.
+    if request.token_offer.issuer == request.token_offer.subject {
+        return Err(CommerceOrderError::SettlementFailed(
+            "escrow accept denied: offer issuer is not a counterparty distinct from the subject"
+                .to_string(),
+        ));
+    }
+
     let liability = token_offer_total_liability(request.token_offer)?;
 
     // Fail closed: only the offer subject may accept.
@@ -493,6 +560,17 @@ pub fn accept(
     if request.reserved_amount.currency != liability.currency {
         return Err(CommerceOrderError::SettlementFailed(
             "escrow accept denied: reservation currency does not match the offer liability"
+                .to_string(),
+        ));
+    }
+    // C1: the amount locked in custody is the offer collateral cap
+    // (`liability.units`), but the settlement packet and the release leg are
+    // settled against the signed quote (`quote_amount_minor`). When the cap
+    // differs from the quote the custody hold and the settled amount disagree,
+    // so fail closed: the locked amount MUST equal the signed quote.
+    if liability.units != request.order_context.quote_amount_minor {
+        return Err(CommerceOrderError::SettlementFailed(
+            "escrow accept denied: offer liability does not equal the signed quote amount"
                 .to_string(),
         ));
     }
@@ -795,6 +873,7 @@ mod tests {
             order_context: context,
             token_offer: token,
             acceptor,
+            accepted_at: 500,
             reserved_amount: reservation,
             depositor_account: depositor.to_string(),
             beneficiary_account: beneficiary.to_string(),
@@ -1050,5 +1129,445 @@ mod tests {
         released
             .assert_conservation()
             .test_expect("released conservation holds");
+    }
+
+    /// Build an offer token with arbitrary grants, signed by `issuer`, in the
+    /// `[100, 10_000)` validity window used by the other escrow tests.
+    fn token_with_grants(
+        issuer: &Keypair,
+        subject: &PublicKey,
+        grants: Vec<ToolGrant>,
+    ) -> CapabilityToken {
+        let body = CapabilityTokenBody {
+            id: "offer-token-custom".to_string(),
+            issuer: issuer.public_key(),
+            subject: subject.clone(),
+            scope: ChioScope {
+                grants,
+                resource_grants: Vec::new(),
+                prompt_grants: Vec::new(),
+            },
+            issued_at: 100,
+            expires_at: 10_000,
+            delegation_chain: Vec::new(),
+        };
+        CapabilityToken::sign(body, issuer).test_expect("sign custom offer token")
+    }
+
+    /// A single tool grant carrying `units` (or no cap when `units` is `None`)
+    /// in `currency`.
+    fn grant(units: Option<u64>, currency: &str) -> ToolGrant {
+        ToolGrant {
+            server_id: "demo-server".to_string(),
+            tool_name: "search".to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: Vec::new(),
+            max_invocations: Some(10),
+            max_cost_per_invocation: None,
+            max_total_cost: units.map(|units| MonetaryAmount {
+                units,
+                currency: currency.to_string(),
+            }),
+            dpop_required: None,
+        }
+    }
+
+    // ESCROW-1: a forged/unsigned offer token is denied before any custodial
+    // liability is derived from it.
+    #[test]
+    fn accept_fails_closed_on_forged_offer_token() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        // Validly sign, then tamper a signed field so the signature no longer
+        // matches the body. expires_at stays past accepted_at, so only the
+        // signature check can fire.
+        let mut token = token_offer(&issuer, &acceptor, 4200, "USD");
+        token.expires_at += 1;
+        let context = order_context("fulfillment_attested");
+        let reservation = reserved(4200, "USD");
+
+        let error = accept(accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            &authority,
+            "buyer:alice",
+            "merchant:stripe:coffee-shop",
+        ))
+        .test_expect_err("forged offer token is denied");
+
+        assert!(matches!(
+            error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("offer token signature is invalid")
+        ));
+    }
+
+    // ESCROW-1: an offer token issued by the acceptor to itself (issuer ==
+    // subject) carries no real counterparty and is denied.
+    #[test]
+    fn accept_fails_closed_on_self_issued_offer_token() {
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        // issuer == subject == acceptor: a self-dealing forge.
+        let token = token_offer(&subject, &acceptor, 4200, "USD");
+        let context = order_context("fulfillment_attested");
+        let reservation = reserved(4200, "USD");
+
+        let error = accept(accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            &authority,
+            "buyer:alice",
+            "merchant:stripe:coffee-shop",
+        ))
+        .test_expect_err("self-issued offer token is denied");
+
+        assert!(matches!(
+            error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("offer issuer is not a counterparty distinct from the subject")
+        ));
+    }
+
+    // ESCROW-1: an offer token outside its validity window is denied in both
+    // directions (not-yet-valid and expired).
+    #[test]
+    fn accept_fails_closed_on_offer_token_outside_validity_window() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let context = order_context("fulfillment_attested");
+        let reservation = reserved(4200, "USD");
+
+        // Not-yet-valid: accepted_at precedes the token issued_at (100).
+        let mut not_yet = accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            &authority,
+            "buyer:alice",
+            "merchant:stripe:coffee-shop",
+        );
+        not_yet.accepted_at = 50;
+        let not_yet_error = accept(not_yet).test_expect_err("not-yet-valid offer token is denied");
+        assert!(matches!(
+            not_yet_error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("offer token is outside its validity window")
+        ));
+
+        // Expired: accepted_at reaches the token expires_at (10_000).
+        let mut expired = accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            &authority,
+            "buyer:alice",
+            "merchant:stripe:coffee-shop",
+        );
+        expired.accepted_at = 10_000;
+        let expired_error = accept(expired).test_expect_err("expired offer token is denied");
+        assert!(matches!(
+            expired_error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("offer token is outside its validity window")
+        ));
+    }
+
+    // C1: the locked offer collateral cap must equal the signed quote amount.
+    #[test]
+    fn accept_fails_closed_when_liability_cap_differs_from_quote() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        // Cap 5000 over a 4200 quote. The reservation covers the cap, currencies
+        // all match, so only the cap-vs-quote binding can fire.
+        let token = token_offer(&issuer, &acceptor, 5000, "USD");
+        let context = order_context("fulfillment_attested");
+        assert_eq!(context.quote_amount_minor, 4200);
+        let reservation = reserved(5000, "USD");
+
+        let error = accept(accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            &authority,
+            "buyer:alice",
+            "merchant:stripe:coffee-shop",
+        ))
+        .test_expect_err("cap that differs from the quote is denied");
+
+        assert!(matches!(
+            error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("offer liability does not equal the signed quote amount")
+        ));
+    }
+
+    // TC-4: accept currency mismatches are each denied with their own message.
+    #[test]
+    fn accept_fails_closed_on_currency_mismatches() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let context = order_context("fulfillment_attested");
+
+        // Liability currency (EUR) != order quote currency (USD).
+        let eur_token = token_offer(&issuer, &acceptor, 4200, "EUR");
+        let eur_reservation = reserved(4200, "EUR");
+        let liability_error = accept(accept_request(
+            &context,
+            &eur_token,
+            &acceptor,
+            &eur_reservation,
+            &authority,
+            "buyer:alice",
+            "merchant:stripe:coffee-shop",
+        ))
+        .test_expect_err("liability currency mismatch is denied");
+        assert!(matches!(
+            liability_error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("offer liability currency does not match the order quote")
+        ));
+
+        // Reservation currency (EUR) != offer liability currency (USD).
+        let usd_token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let mismatched_reservation = reserved(4200, "EUR");
+        let reservation_error = accept(accept_request(
+            &context,
+            &usd_token,
+            &acceptor,
+            &mismatched_reservation,
+            &authority,
+            "buyer:alice",
+            "merchant:stripe:coffee-shop",
+        ))
+        .test_expect_err("reservation currency mismatch is denied");
+        assert!(matches!(
+            reservation_error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("reservation currency does not match the offer liability")
+        ));
+    }
+
+    // TC-1: release against a Matched observation whose amount or currency does
+    // not match the locked ledger is denied, and the ledger stays Locked.
+    #[test]
+    fn release_fails_closed_on_amount_or_currency_mismatch() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let context = order_context("fulfillment_attested");
+        let reservation = reserved(4200, "USD");
+
+        let acceptance = accept(accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            &authority,
+            "buyer:alice",
+            "merchant:stripe:coffee-shop",
+        ))
+        .test_expect("accept locks the ledger");
+        assert_eq!(acceptance.ledger.status, CommerceEscrowStatus::Locked);
+
+        let mismatches = [
+            MonetaryAmount {
+                units: 4201,
+                currency: "USD".to_string(),
+            },
+            MonetaryAmount {
+                units: 4199,
+                currency: "USD".to_string(),
+            },
+            MonetaryAmount {
+                units: 4200,
+                currency: "EUR".to_string(),
+            },
+        ];
+        for amount in mismatches {
+            let observation = CapitalExecutionObservation {
+                observed_at: 1_700_000_000,
+                external_reference_id: "exec-ref-1".to_string(),
+                amount,
+            };
+            let denied = release(
+                &acceptance,
+                &observation,
+                CapitalExecutionReconciledState::Matched,
+                OrderState::SettlementObserved,
+            )
+            .test_expect_err("mismatched observation is denied");
+            assert!(matches!(
+                denied,
+                CommerceOrderError::SettlementFailed(message)
+                    if message.contains("observed execution does not match the locked amount")
+            ));
+            // Custody is never drained: the locked ledger is untouched.
+            assert_eq!(acceptance.ledger.status, CommerceEscrowStatus::Locked);
+            assert_eq!(acceptance.ledger.legs.len(), 1);
+        }
+    }
+
+    // TC-2: accept from a non-assembly state and release from a
+    // non-reconciliation state are each denied on the shipped spine.
+    #[test]
+    fn accept_and_release_fail_closed_on_wrong_lifecycle_state() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let reservation = reserved(4200, "USD");
+
+        // accept from a state the spine does not allow to assemble.
+        let non_assembly = order_context("intent_recorded");
+        let accept_error = accept(accept_request(
+            &non_assembly,
+            &token,
+            &acceptor,
+            &reservation,
+            &authority,
+            "buyer:alice",
+            "merchant:stripe:coffee-shop",
+        ))
+        .test_expect_err("accept from a non-assembly state is denied");
+        assert!(matches!(
+            accept_error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("is not a settlement-assembly state")
+        ));
+
+        // release from a non-reconciliation prior state.
+        let context = order_context("fulfillment_attested");
+        let acceptance = accept(accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            &authority,
+            "buyer:alice",
+            "merchant:stripe:coffee-shop",
+        ))
+        .test_expect("accept locks the ledger");
+        let observation = CapitalExecutionObservation {
+            observed_at: 1_700_000_000,
+            external_reference_id: "exec-ref-1".to_string(),
+            amount: MonetaryAmount {
+                units: 4200,
+                currency: "USD".to_string(),
+            },
+        };
+        let release_error = release(
+            &acceptance,
+            &observation,
+            CapitalExecutionReconciledState::Matched,
+            OrderState::IntentRecorded,
+        )
+        .test_expect_err("release from a non-reconciliation state is denied");
+        assert!(matches!(
+            release_error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("is not a settlement-reconciliation state")
+        ));
+        // Custody stays locked.
+        assert_eq!(acceptance.ledger.status, CommerceEscrowStatus::Locked);
+    }
+
+    // TC-3: token_offer_total_liability fail-closed branches.
+    #[test]
+    fn token_offer_total_liability_fail_closed_branches() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+
+        // Unbounded grant (no cap) is denied.
+        let unbounded = token_with_grants(&issuer, &acceptor, vec![grant(None, "USD")]);
+        let unbounded_error = token_offer_total_liability(&unbounded)
+            .test_expect_err("unbounded liability is denied");
+        assert!(matches!(
+            unbounded_error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("missing max_total_cost")
+        ));
+
+        // Mixed currencies across grants is denied.
+        let mixed = token_with_grants(
+            &issuer,
+            &acceptor,
+            vec![grant(Some(1000), "USD"), grant(Some(2000), "EUR")],
+        );
+        let mixed_error = token_offer_total_liability(&mixed)
+            .test_expect_err("mixed-currency liability is denied");
+        assert!(matches!(
+            mixed_error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("mix currencies")
+        ));
+
+        // Two same-currency grants sum to the combined liability.
+        let summed = token_with_grants(
+            &issuer,
+            &acceptor,
+            vec![grant(Some(1000), "USD"), grant(Some(2000), "USD")],
+        );
+        let liability =
+            token_offer_total_liability(&summed).test_expect("summed liability is computed");
+        assert_eq!(liability.units, 3000);
+        assert_eq!(liability.currency, "USD");
+
+        // A zero-units grant yields a zero liability, which is denied.
+        let zero = token_with_grants(&issuer, &acceptor, vec![grant(Some(0), "USD")]);
+        let zero_error =
+            token_offer_total_liability(&zero).test_expect_err("zero liability is denied");
+        assert!(matches!(
+            zero_error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("offer liability is zero")
+        ));
+    }
+
+    // TC-5: CommerceSettlementDispatch::validate fail-closed branches.
+    #[test]
+    fn settlement_dispatch_validate_fail_closed_branches() {
+        // Blank required field (psp) is denied.
+        let mut blank = dispatch();
+        blank.psp = "  ".to_string();
+        let blank_error = blank.validate().test_expect_err("blank psp is denied");
+        assert!(matches!(
+            blank_error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("psp must not be empty")
+        ));
+
+        // Unsupported status is denied.
+        let mut bad_status = dispatch();
+        bad_status.status = "bogus".to_string();
+        let status_error = bad_status
+            .validate()
+            .test_expect_err("unsupported status is denied");
+        assert!(matches!(
+            status_error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("unsupported escrow settlement status")
+        ));
     }
 }
