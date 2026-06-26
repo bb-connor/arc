@@ -84,6 +84,8 @@ fn validate_optional_underwriting_filter(value: Option<&str>, field: &str) -> Re
     Ok(())
 }
 
+/// Ordered risk taxonomy a signal can be classified into, from
+/// `Baseline` (lowest concern) up to `Critical`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum UnderwritingRiskClass {
@@ -93,6 +95,8 @@ pub enum UnderwritingRiskClass {
     Critical,
 }
 
+/// Stable reason code explaining why a risk signal was raised, drawn from the
+/// frozen underwriting reason taxonomy.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum UnderwritingReasonCode {
@@ -111,6 +115,8 @@ pub enum UnderwritingReasonCode {
     SharedEvidenceProofRequired,
 }
 
+/// Category of evidence an [`UnderwritingEvidenceReference`] points at, such
+/// as a receipt, reputation inspection, or certification artifact.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum UnderwritingEvidenceKind {
@@ -123,6 +129,8 @@ pub enum UnderwritingEvidenceKind {
     SharedEvidenceReference,
 }
 
+/// Pointer to a piece of evidence backing a signal: its kind, a reference id,
+/// and optional observation time, digest, and locator.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct UnderwritingEvidenceReference {
@@ -136,6 +144,8 @@ pub struct UnderwritingEvidenceReference {
     pub locator: Option<String>,
 }
 
+/// A single risk observation: its [`UnderwritingRiskClass`], reason code, a
+/// human-readable description, and any supporting evidence references.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct UnderwritingSignal {
@@ -156,6 +166,8 @@ pub enum UnderwritingCertificationState {
     Unavailable,
 }
 
+/// Frozen catalogue of the risk classes and reason codes the underwriting
+/// policy understands, versioned by [`UNDERWRITING_RISK_TAXONOMY_VERSION`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct UnderwritingRiskTaxonomy {
@@ -325,6 +337,15 @@ impl UnderwritingPolicyInputQuery {
         normalized
     }
 
+    /// Check the query carries at least one usable anchor and consistent
+    /// bounds before it drives evidence collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error string when any provided filter is empty or carries
+    /// surrounding whitespace, when none of `capability_id`, `agent_subject`,
+    /// or `tool_server` is set, when `tool_name` is set without `tool_server`,
+    /// or when `since` is greater than `until`.
     pub fn validate(&self) -> Result<(), String> {
         validate_optional_underwriting_filter(self.capability_id.as_deref(), "capability_id")?;
         validate_optional_underwriting_filter(self.agent_subject.as_deref(), "agent_subject")?;
@@ -351,6 +372,9 @@ impl UnderwritingPolicyInputQuery {
     }
 }
 
+/// Complete signed evidence bundle handed to the underwriting evaluator:
+/// taxonomy, receipt aggregates, and optional reputation, certification,
+/// runtime-assurance, compliance, and ad-hoc signal evidence.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct UnderwritingPolicyInput {
