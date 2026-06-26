@@ -776,8 +776,19 @@ mod tests {
     use chio_core::web3::identity::{
         Web3IdentityBindingCertificate, Web3KeyBindingPurpose, CHIO_KEY_BINDING_CERTIFICATE_SCHEMA,
     };
+    use std::sync::Arc;
+
+    use chio_core::capability::token::CapabilityTokenBody;
     use chio_credentials::{revoke_chio_pass_record, CHIO_PASS_ALLOTMENT_COST_NAME};
-    use chio_kernel::{LocalCapabilityAuthority, ReceiptStore};
+    use chio_kernel::pass_gating::{
+        assert_pass_capability_id_deterministic, pass_authorizes_read, pass_baseline_read_uris,
+    };
+    use chio_kernel::{
+        BudgetStore, ChioKernel, InMemoryBudgetStore, KernelConfig, LocalCapabilityAuthority,
+        ReceiptStore, ToolCallRequest, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE,
+        DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    };
+    use chio_mcp_adapter::native::{NativeChioServiceBuilder, NativeTool};
 
     use super::*;
 
@@ -870,6 +881,399 @@ mod tests {
         let window = june_window();
         let capability_id = window_scoped_capability_id(&did, &window).expect("cap id");
         (did, key_hex, window, capability_id)
+    }
+
+    // ---- M1-12 launch evidence: e2e Pass issue -> mint -> charge -> read ->
+    //      rollover + dormant (spec Section 8.3 launch Gates 2 and 5). ----
+    //
+    // The metered XCC grant is charged through the PUBLIC
+    // `evaluate_tool_call_blocking` pipeline. That is the only public charge
+    // surface (the lower-level `check_and_increment_budget` is crate-private to
+    // chio-kernel), and it is the faithful "REAL kernel charge": the call runs
+    // the full admission path (the B7 deterministic-id gate at
+    // `assert_pass_capability_id_deterministic`), the per-Pass `(cap.id, 0)`
+    // budget row, AND the CONTROL-1 `freetier:global:<YYYY-MM>` pool co-debit.
+    // The deterministic `chiopass:<hash>` id minted by `LocalCapabilityAuthority`
+    // is what lets the Pass clear B7 (a naive XCC-bearing capability is rejected
+    // at admission). Budget rows are read back through the installed `BudgetStore`
+    // handle. The current attestation window is June 2026, so a June Pass is
+    // time-valid at the wall clock the pipeline reads.
+
+    /// Build a kernel wired exactly as the Pass free-tier path needs it: the
+    /// CONTROL-1 pool installed, a caller-held `BudgetStore` handle (so the test
+    /// can read `(cap.id, 0)` and `freetier:global:*` rows back), and a
+    /// `chio.pass.compute` tool server so an admitted metered charge dispatches
+    /// and commits. `ca_public_keys` pins the trusted capability issuers so the
+    /// `LocalCapabilityAuthority`-minted Pass clears signature admission.
+    fn wired_pass_kernel(
+        ca_public_keys: Vec<PublicKey>,
+        pool_units: u64,
+    ) -> (ChioKernel, Arc<dyn BudgetStore>) {
+        let budget_store: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let config = KernelConfig {
+            keypair: Keypair::generate(),
+            ca_public_keys,
+            max_delegation_depth: 5,
+            policy_hash: "m1-12-e2e-policy".to_string(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            allow_ephemeral_receipt_log: true,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+        };
+        let pool = FreeTierPoolConfig {
+            monthly_pool_units: pool_units,
+            allotment_unit: CHIO_PASS_ALLOTMENT_UNIT.to_string(),
+            board_approval_ref: "board-2026-06-m1-12".to_string(),
+        };
+        let mut kernel = ChioKernel::new(config)
+            .with_free_tier_pool(pool)
+            .expect("install free-tier pool");
+        kernel.set_budget_store_handle(budget_store.clone());
+        let service = NativeChioServiceBuilder::new(PASS_COMPUTE_SERVER_ID, "m1-12-pass-compute")
+            .tool(
+                NativeTool::new("run", "metered pass compute", serde_json::json!({})),
+                |arguments| Ok(serde_json::json!({ "echo": arguments })),
+            )
+            .build()
+            .expect("build pass-compute tool server");
+        kernel.register_tool_server(Box::new(service));
+        (kernel, budget_store)
+    }
+
+    fn pass_tool_request(
+        request_id: &str,
+        capability: &CapabilityToken,
+        subject: &PublicKey,
+    ) -> ToolCallRequest {
+        ToolCallRequest {
+            request_id: request_id.to_string(),
+            capability: capability.clone(),
+            tool_name: "run".to_string(),
+            server_id: PASS_COMPUTE_SERVER_ID.to_string(),
+            agent_id: subject.to_hex(),
+            arguments: serde_json::json!({}),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        }
+    }
+
+    /// Committed (held + realized) cost units on the `(capability_id, grant 0)`
+    /// budget row. Both the per-Pass row and the aggregate pool row key off grant
+    /// index 0. A missing row reads as zero.
+    fn committed_units_in(store: &Arc<dyn BudgetStore>, capability_id: &str) -> u64 {
+        store
+            .get_usage(capability_id, 0)
+            .expect("budget usage lookup")
+            .map(|record| record.committed_cost_units().expect("committed cost units"))
+            .unwrap_or(0)
+    }
+
+    /// How many distinct budget rows exist for a capability id. The re-mint test
+    /// asserts this is exactly ONE (the deterministic id never opens a second row).
+    fn per_pass_row_count(store: &Arc<dyn BudgetStore>, capability_id: &str) -> usize {
+        store
+            .list_usages(4096, None)
+            .expect("list budget usages")
+            .into_iter()
+            .filter(|record| record.capability_id == capability_id)
+            .count()
+    }
+
+    /// `cost_charged` rendered onto the signed receipt's financial metadata. A deny
+    /// that never charges (or a deny built before the financial leg) reads as zero.
+    fn receipt_cost_charged(receipt: &ChioReceipt) -> u64 {
+        receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get("financial"))
+            .and_then(|financial| financial.get("cost_charged"))
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(0)
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn e2e_pass_issue_charge_rollover_dormant_gates_2_and_5() {
+        let issuer = Keypair::generate();
+        let authority_key = Keypair::generate();
+        let authority_pub = authority_key.public_key();
+        let authority = LocalCapabilityAuthority::new(authority_key);
+        // The genuine-use-scan trust anchor is independent of the kernel CA trust;
+        // any non-empty allowlist keeps the orchestrator config fail-closed valid.
+        let config = config_with_keys(vec![Keypair::generate().public_key()]);
+
+        // A dedicated trusted signer for the B7 negative token below, so its
+        // pipeline denial is attributable to the B7 gate, not an untrusted issuer.
+        let b7_signer = Keypair::generate();
+        let (kernel, store) =
+            wired_pass_kernel(vec![authority_pub, b7_signer.public_key()], 1_000_000);
+
+        // ================================================================
+        // GATE 2 (re-mint-reset-closed): a deterministic id maps to ONE row.
+        // ================================================================
+        let subject = Keypair::generate();
+        let (did, _key_hex, window, expected_cap_id) = subject_context(&subject);
+        let june_pool_term =
+            FreeTierPoolConfig::window_ym_from_issued_at(window.since).expect("june pool term");
+
+        // (2a) Two Passes minted for the SAME subject+window are byte-identical.
+        let pass_a = issue_chio_pass_command(
+            &config,
+            &authority,
+            &issuer,
+            &subject.public_key(),
+            TrustTier::Attested,
+            MID_JUNE_2026,
+            0,
+            0,
+        )
+        .expect("mint Pass A");
+        let pass_b = issue_chio_pass_command(
+            &config,
+            &authority,
+            &issuer,
+            &subject.public_key(),
+            TrustTier::Attested,
+            MID_JUNE_2026,
+            1,
+            1,
+        )
+        .expect("mint Pass B");
+        assert_eq!(pass_a.capability.id, expected_cap_id);
+        assert_eq!(
+            pass_a.capability.id.as_bytes(),
+            pass_b.capability.id.as_bytes(),
+            "a re-mint in the same window yields a byte-identical capability id"
+        );
+
+        // (2b) Charge BOTH through the real kernel; they land on ONE per-Pass row.
+        let resp_a = kernel
+            .evaluate_tool_call_blocking(&pass_tool_request(
+                "g2-a",
+                &pass_a.capability,
+                &subject.public_key(),
+            ))
+            .expect("charge Pass A");
+        assert_eq!(
+            resp_a.verdict,
+            Verdict::Allow,
+            "first metered charge admitted"
+        );
+        assert_eq!(receipt_cost_charged(&resp_a.receipt), 1);
+        assert_eq!(committed_units_in(&store, &expected_cap_id), 1);
+        let resp_b = kernel
+            .evaluate_tool_call_blocking(&pass_tool_request(
+                "g2-b",
+                &pass_b.capability,
+                &subject.public_key(),
+            ))
+            .expect("charge Pass B");
+        assert_eq!(
+            resp_b.verdict,
+            Verdict::Allow,
+            "second metered charge admitted"
+        );
+        assert_eq!(
+            committed_units_in(&store, &expected_cap_id),
+            2,
+            "the re-minted Pass accumulates onto the SAME row (the counter is not reset)"
+        );
+        assert_eq!(
+            per_pass_row_count(&store, &expected_cap_id),
+            1,
+            "exactly ONE per-Pass budget row exists for the deterministic id, not two"
+        );
+        assert_eq!(
+            committed_units_in(&store, &june_pool_term),
+            2,
+            "both charges co-debit the SAME freetier:global pool row for the window"
+        );
+
+        // (2c) Past `until` the old token is denied; the next window is a FRESH row.
+        assert!(
+            pass_a.capability.validate_time(MID_JUNE_2026).is_ok(),
+            "the token is valid inside its window"
+        );
+        assert!(
+            pass_a.capability.validate_time(window.until).is_err(),
+            "validate_time denies the old token at the window boundary (until is exclusive)"
+        );
+        assert!(
+            pass_a
+                .capability
+                .validate_time(window.until.saturating_add(86_400))
+                .is_err(),
+            "validate_time denies the old token past until"
+        );
+        let next_window = july_window();
+        assert_eq!(
+            window.until, next_window.since,
+            "contiguous monthly rollover"
+        );
+        let next_cap_id =
+            window_scoped_capability_id(&did, &next_window).expect("next-window cap id");
+        assert_ne!(
+            next_cap_id, expected_cap_id,
+            "the next window has a different deterministic id"
+        );
+        assert_eq!(
+            committed_units_in(&store, &next_cap_id),
+            0,
+            "the next window opens a FRESH zero per-Pass usage row"
+        );
+        let next_pool_term = FreeTierPoolConfig::window_ym_from_issued_at(next_window.since)
+            .expect("next pool term");
+        assert_ne!(
+            next_pool_term, june_pool_term,
+            "the next window has its own pool term"
+        );
+        assert_eq!(
+            committed_units_in(&store, &next_pool_term),
+            0,
+            "the next window opens a FRESH freetier:global pool row (the monthly reset is a clean slate)"
+        );
+
+        // (2d) B7: a non-deterministic (UUIDv7-style) id carrying the XCC metered
+        //      grant is rejected at admission.
+        let b7_subject = Keypair::generate();
+        let xcc_scope = build_pass_scope(&pass_a.pass, &did).expect("xcc metered scope");
+        let nondeterministic = CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "cap-018f9b2c-7e3a-7c91-a0b2-uuidv7nonpassid".to_string(),
+                issuer: b7_signer.public_key(),
+                subject: b7_subject.public_key(),
+                scope: xcc_scope,
+                issued_at: window.since,
+                expires_at: window.until,
+                delegation_chain: vec![],
+            },
+            &b7_signer,
+        )
+        .expect("sign non-deterministic Pass-shaped token");
+        assert!(
+            assert_pass_capability_id_deterministic(&nondeterministic).is_err(),
+            "B7: a UUIDv7-id token carrying the XCC metered grant must be rejected"
+        );
+        let b7_resp = kernel
+            .evaluate_tool_call_blocking(&pass_tool_request(
+                "g2-b7",
+                &nondeterministic,
+                &b7_subject.public_key(),
+            ))
+            .expect("B7 admission evaluation");
+        assert_eq!(
+            b7_resp.verdict,
+            Verdict::Deny,
+            "B7 denies the non-deterministic Pass-shaped capability at admission"
+        );
+        assert_eq!(
+            receipt_cost_charged(&b7_resp.receipt),
+            0,
+            "a B7-denied call charges nothing"
+        );
+
+        // ================================================================
+        // GATE 5 (dormant-stops-drawing): a 0-ceiling metered draw denies
+        // fail-closed, but the five gifted streams stay readable.
+        // ================================================================
+        let dormant_subject = Keypair::generate();
+        let dormant_did = DidChio::from_public_key(dormant_subject.public_key())
+            .expect("dormant did")
+            .to_string();
+        // A genuinely empty prior window => no genuine use => WithheldDormant. The
+        // dormant window is the CURRENT (June) window so the token is time-valid.
+        let prior_window = attestation_window_containing(1_778_000_000).expect("may window");
+        assert_eq!(
+            prior_window.until, window.since,
+            "contiguous May -> June rollover"
+        );
+        let empty_store = {
+            let path = unique_db_path("m1-12-dormant");
+            SqliteReceiptStore::open(&path).expect("open empty receipt store")
+        };
+        let refresh = refresh_chio_pass_window(
+            &config,
+            &empty_store,
+            &authority,
+            &issuer,
+            &dormant_subject.public_key(),
+            TrustTier::Attested,
+            &prior_window,
+            &window,
+            true,
+        )
+        .expect("dormant refresh");
+        let dormant = match refresh {
+            ChioPassRefreshResult::Dormant { decision, issuance } => {
+                assert_eq!(decision.outcome, ChioPassRefreshOutcome::WithheldDormant);
+                assert_eq!(decision.next_allotment_units, 0, "dormant ceiling is 0");
+                issuance
+            }
+            other => panic!("expected WithheldDormant, got {other:?}"),
+        };
+        let dormant_scope = build_pass_scope(&dormant.pass, &dormant_did).expect("dormant scope");
+        assert_eq!(
+            dormant_scope.grants[0]
+                .max_total_cost
+                .as_ref()
+                .expect("dormant ceiling")
+                .units,
+            0,
+            "the dormant metered grant carries a 0 ceiling"
+        );
+
+        // (5a) The metered draw denies fail-closed: BudgetExhausted -> cost_charged == 0.
+        let dormant_resp = kernel
+            .evaluate_tool_call_blocking(&pass_tool_request(
+                "g5-draw",
+                &dormant.capability,
+                &dormant_subject.public_key(),
+            ))
+            .expect("dormant metered charge");
+        assert_eq!(
+            dormant_resp.verdict,
+            Verdict::Deny,
+            "the dormant 0-ceiling metered draw is denied"
+        );
+        let reason = dormant_resp.reason.clone().unwrap_or_default();
+        assert!(
+            reason.contains("budget") && reason.contains("exhausted"),
+            "the deny is a budget-exhaustion deny, got {reason:?}"
+        );
+        assert_eq!(
+            receipt_cost_charged(&dormant_resp.receipt),
+            0,
+            "the deny renders cost_charged == 0"
+        );
+        assert_eq!(
+            committed_units_in(&store, &dormant.capability.id),
+            0,
+            "nothing stuck to the dormant Pass row (the per-Pass hold was reversed)"
+        );
+
+        // (5b) Every one of the five gifted streams STILL authorizes a read for the
+        //      SAME dormant token: dormant stops the metered draw, never the gift.
+        let gifted_uris = pass_baseline_read_uris(&dormant_did).expect("baseline read uris");
+        assert_eq!(
+            gifted_uris.len(),
+            5,
+            "the Pass gifts exactly five baseline streams"
+        );
+        for uri in &gifted_uris {
+            assert!(
+                pass_authorizes_read(&dormant.capability, uri).expect("read authorization"),
+                "dormant token must still authorize the gifted read: {uri}"
+            );
+        }
     }
 
     #[test]
@@ -1294,8 +1698,8 @@ mod tests {
             &operator,
             &binding,
             &anchor_target(),
-            &[pass_a.clone()],
-            &[revoked.clone()],
+            std::slice::from_ref(&pass_a),
+            std::slice::from_ref(&revoked),
             pending_witness(),
             MID_JUNE_2026,
             None,
@@ -1369,7 +1773,7 @@ mod tests {
             &operator,
             &binding,
             &anchor_target(),
-            &[pass.clone()],
+            std::slice::from_ref(&pass),
             &[],
             pending_witness(),
             MID_JUNE_2026,
@@ -1416,7 +1820,7 @@ mod tests {
             &operator,
             &anchor,
             &anchor_target(),
-            &[pass.clone()],
+            std::slice::from_ref(&pass),
             &[],
             pending_witness(),
             MID_JUNE_2026,
