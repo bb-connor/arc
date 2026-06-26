@@ -1,0 +1,698 @@
+//! Off-chain single-denomination netting collapse for the exposure ledger.
+//!
+//! The token theses claimed that an on-chain credit instrument is required to
+//! net per-currency credit exposure into a single denomination and free the
+//! capital that per-currency segregation locks up. This module realizes that
+//! exact benefit as a READ-ONLY off-chain projection over the already-signed
+//! per-currency [`ExposureLedgerCurrencyPosition`] entries, with ZERO on-chain
+//! instrument and ZERO new contract. It is the kill-evidence against any
+//! on-chain credit token: the single-denomination netting and capital-allocation
+//! benefit is computable off-chain from Chio truth that already exists.
+//!
+//! # Fail-closed invariants
+//!
+//! The collapse is a projection, not an authority. It does NOT flip any
+//! support-boundary flag and does NOT change the prudential per-currency book:
+//!
+//! - [`ExposureLedgerSupportBoundary::cross_currency_netting_supported`] stays
+//!   `false`.
+//! - [`CreditScorecardSupportBoundary::capital_allocation_supported`] stays
+//!   `false`.
+//! - [`CapitalBookSupportBoundary::mixed_currency_netting_supported`] stays
+//!   `false`.
+//!
+//! The netted view carries those three flags straight off the prudential
+//! defaults, so any future weakening of a default is visible in the projection
+//! (and caught by the regression locks). A missing or zero-denominator FX rate
+//! fails closed with an error rather than silently understating exposure.
+
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+use std::fmt;
+
+use crate::{
+    CapitalBookSupportBoundary, CreditScorecardSupportBoundary, ExposureLedgerCurrencyPosition,
+    ExposureLedgerReport, ExposureLedgerSupportBoundary,
+};
+
+/// Canonical settlement denomination for the netted off-chain view. IOUs are
+/// pinned USD/USDC; the collapse projects every position into this single
+/// USDC-canonical denomination.
+pub const CANONICAL_NETTING_CURRENCY: &str = "USDC";
+
+/// Schema tag for the off-chain netted-view projection.
+pub const EXPOSURE_LEDGER_NETTED_VIEW_SCHEMA: &str = "chio.credit.exposure-ledger-netted-view.v1";
+
+/// Reason a single-denomination collapse fails closed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExposureLedgerNettingError {
+    /// No conversion rate into the canonical denomination was supplied for a
+    /// non-canonical currency. The collapse refuses to guess a rate.
+    MissingRate { currency: String },
+    /// A supplied conversion rate had a zero denominator. The collapse refuses
+    /// to divide by zero or understate exposure.
+    ZeroDenominator { currency: String },
+}
+
+impl fmt::Display for ExposureLedgerNettingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingRate { currency } => write!(
+                f,
+                "exposure ledger netting is missing a canonical conversion rate for currency `{currency}`"
+            ),
+            Self::ZeroDenominator { currency } => write!(
+                f,
+                "exposure ledger netting rejected a zero-denominator conversion rate for currency `{currency}`"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for ExposureLedgerNettingError {}
+
+/// A rational conversion rate from a source currency into the canonical
+/// denomination. Kept as an integer numerator/denominator so the projection is
+/// exact and deterministic; conversions round UP so the netted view never
+/// understates exposure.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CanonicalConversionRate {
+    pub currency: String,
+    pub numerator: u64,
+    pub denominator: u64,
+}
+
+impl CanonicalConversionRate {
+    /// A one-to-one rate for a currency already at canonical parity.
+    #[must_use]
+    pub fn identity(currency: &str) -> Self {
+        Self {
+            currency: currency.to_string(),
+            numerator: 1,
+            denominator: 1,
+        }
+    }
+
+    /// Convert `units` of the source currency into canonical units, rounding up.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ExposureLedgerNettingError::ZeroDenominator`] when the rate
+    /// denominator is zero.
+    pub fn convert(&self, units: u64) -> Result<u64, ExposureLedgerNettingError> {
+        if self.denominator == 0 {
+            return Err(ExposureLedgerNettingError::ZeroDenominator {
+                currency: self.currency.clone(),
+            });
+        }
+        if units == 0 {
+            return Ok(0);
+        }
+        let scaled = u128::from(units).saturating_mul(u128::from(self.numerator));
+        let converted = scaled.div_ceil(u128::from(self.denominator));
+        Ok(converted.min(u128::from(u64::MAX)) as u64)
+    }
+}
+
+/// Conversion rates into the canonical denomination. USD and the canonical
+/// currency itself convert one-to-one by default (the USD/USDC pin); any other
+/// currency must be supplied explicitly or the collapse fails closed.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExposureLedgerNettingRates {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rates: Vec<CanonicalConversionRate>,
+}
+
+impl ExposureLedgerNettingRates {
+    /// Build a rate table from explicit conversion rates.
+    #[must_use]
+    pub fn new(rates: Vec<CanonicalConversionRate>) -> Self {
+        Self { rates }
+    }
+
+    /// Resolve the conversion rate for a source currency.
+    ///
+    /// An explicit rate wins. Absent that, the canonical currency and USD
+    /// resolve to one-to-one parity. Any other currency fails closed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ExposureLedgerNettingError::MissingRate`] when no rate is known
+    /// for a non-parity currency.
+    pub fn rate_for(
+        &self,
+        currency: &str,
+    ) -> Result<CanonicalConversionRate, ExposureLedgerNettingError> {
+        if let Some(rate) = self.rates.iter().find(|rate| rate.currency == currency) {
+            return Ok(rate.clone());
+        }
+        if currency == CANONICAL_NETTING_CURRENCY || currency == "USD" {
+            return Ok(CanonicalConversionRate::identity(currency));
+        }
+        Err(ExposureLedgerNettingError::MissingRate {
+            currency: currency.to_string(),
+        })
+    }
+}
+
+/// The single-denomination netting benefit: the capital that per-currency
+/// segregation locks up but a single canonical denomination frees, realized as
+/// an off-chain projection.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SingleDenominationNettingBenefit {
+    /// Outstanding capital requirement when each currency is held in its own
+    /// segregated prudential book (the fail-closed status quo): the sum of each
+    /// currency's outstanding requirement, converted to canonical units.
+    pub segregated_outstanding_units: u64,
+    /// Outstanding capital requirement under a single canonical denomination,
+    /// where the exposure channels net at the aggregate level.
+    pub netted_outstanding_units: u64,
+    /// Capital freed by the single-denomination collapse:
+    /// `segregated_outstanding_units - netted_outstanding_units`. Always
+    /// non-negative; strictly positive only when a mixed-currency book lets the
+    /// channels offset.
+    pub capital_freed_units: u64,
+}
+
+/// Support boundary for the netted view. The three prudential netting flags are
+/// carried straight off their defaults, proving the projection does not flip
+/// them; the projection markers record that it is read-only and needs no
+/// on-chain instrument or new contract.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExposureLedgerNettedSupportBoundary {
+    pub read_only_projection: bool,
+    pub prudential_book_unchanged: bool,
+    pub cross_currency_netting_supported: bool,
+    pub capital_allocation_supported: bool,
+    pub mixed_currency_netting_supported: bool,
+    pub on_chain_instrument_required: bool,
+    pub new_contract_required: bool,
+}
+
+impl Default for ExposureLedgerNettedSupportBoundary {
+    fn default() -> Self {
+        // Carry the three prudential netting flags straight off their fail-closed
+        // defaults. The collapse reads them; it never sets them.
+        let exposure = ExposureLedgerSupportBoundary::default();
+        let scorecard = CreditScorecardSupportBoundary::default();
+        let capital = CapitalBookSupportBoundary::default();
+        Self {
+            read_only_projection: true,
+            prudential_book_unchanged: true,
+            cross_currency_netting_supported: exposure.cross_currency_netting_supported,
+            capital_allocation_supported: scorecard.capital_allocation_supported,
+            mixed_currency_netting_supported: capital.mixed_currency_netting_supported,
+            on_chain_instrument_required: false,
+            new_contract_required: false,
+        }
+    }
+}
+
+/// A read-only off-chain projection that collapses the per-currency exposure
+/// positions into a single canonical-denomination netted position and reports
+/// the single-denomination netting benefit.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExposureLedgerNettedView {
+    pub schema: String,
+    pub canonical_currency: String,
+    pub source_currencies: Vec<String>,
+    pub mixed_currency_book: bool,
+    pub support_boundary: ExposureLedgerNettedSupportBoundary,
+    pub netted_position: ExposureLedgerCurrencyPosition,
+    pub benefit: SingleDenominationNettingBenefit,
+}
+
+fn empty_canonical_position() -> ExposureLedgerCurrencyPosition {
+    ExposureLedgerCurrencyPosition {
+        currency: CANONICAL_NETTING_CURRENCY.to_string(),
+        governed_max_exposure_units: 0,
+        reserved_units: 0,
+        settled_units: 0,
+        pending_units: 0,
+        failed_units: 0,
+        provisional_loss_units: 0,
+        recovered_units: 0,
+        quoted_premium_units: 0,
+        active_quoted_premium_units: 0,
+    }
+}
+
+fn convert_position(
+    position: &ExposureLedgerCurrencyPosition,
+    rate: &CanonicalConversionRate,
+) -> Result<ExposureLedgerCurrencyPosition, ExposureLedgerNettingError> {
+    Ok(ExposureLedgerCurrencyPosition {
+        currency: CANONICAL_NETTING_CURRENCY.to_string(),
+        governed_max_exposure_units: rate.convert(position.governed_max_exposure_units)?,
+        reserved_units: rate.convert(position.reserved_units)?,
+        settled_units: rate.convert(position.settled_units)?,
+        pending_units: rate.convert(position.pending_units)?,
+        failed_units: rate.convert(position.failed_units)?,
+        provisional_loss_units: rate.convert(position.provisional_loss_units)?,
+        recovered_units: rate.convert(position.recovered_units)?,
+        quoted_premium_units: rate.convert(position.quoted_premium_units)?,
+        active_quoted_premium_units: rate.convert(position.active_quoted_premium_units)?,
+    })
+}
+
+fn add_into_canonical(
+    accumulator: &mut ExposureLedgerCurrencyPosition,
+    converted: &ExposureLedgerCurrencyPosition,
+) {
+    accumulator.governed_max_exposure_units = accumulator
+        .governed_max_exposure_units
+        .saturating_add(converted.governed_max_exposure_units);
+    accumulator.reserved_units = accumulator
+        .reserved_units
+        .saturating_add(converted.reserved_units);
+    accumulator.settled_units = accumulator
+        .settled_units
+        .saturating_add(converted.settled_units);
+    accumulator.pending_units = accumulator
+        .pending_units
+        .saturating_add(converted.pending_units);
+    accumulator.failed_units = accumulator
+        .failed_units
+        .saturating_add(converted.failed_units);
+    accumulator.provisional_loss_units = accumulator
+        .provisional_loss_units
+        .saturating_add(converted.provisional_loss_units);
+    accumulator.recovered_units = accumulator
+        .recovered_units
+        .saturating_add(converted.recovered_units);
+    accumulator.quoted_premium_units = accumulator
+        .quoted_premium_units
+        .saturating_add(converted.quoted_premium_units);
+    accumulator.active_quoted_premium_units = accumulator
+        .active_quoted_premium_units
+        .saturating_add(converted.active_quoted_premium_units);
+}
+
+/// Collapse per-currency exposure positions into a single canonical-denomination
+/// netted off-chain view.
+///
+/// Each position is converted into canonical units (rounding up so exposure is
+/// never understated), summed component-wise into one netted position, and the
+/// single-denomination netting benefit is computed as the difference between
+/// segregated (per-currency) and netted (single-denomination) outstanding
+/// capital requirements.
+///
+/// This is a pure, read-only projection. It does not mutate the input, mint any
+/// IOU, write any ledger, or flip any support-boundary flag.
+///
+/// # Errors
+///
+/// Returns [`ExposureLedgerNettingError`] when any non-parity currency lacks a
+/// conversion rate or a supplied rate has a zero denominator.
+pub fn collapse_positions_to_canonical(
+    positions: &[ExposureLedgerCurrencyPosition],
+    rates: &ExposureLedgerNettingRates,
+) -> Result<ExposureLedgerNettedView, ExposureLedgerNettingError> {
+    let mut netted_position = empty_canonical_position();
+    let mut segregated_outstanding_units = 0_u64;
+    let mut source_currencies = Vec::with_capacity(positions.len());
+    let mut distinct_currencies = BTreeSet::new();
+
+    for position in positions {
+        let rate = rates.rate_for(&position.currency)?;
+        let converted = convert_position(position, &rate)?;
+        segregated_outstanding_units =
+            segregated_outstanding_units.saturating_add(converted.outstanding_exposure_units());
+        add_into_canonical(&mut netted_position, &converted);
+        source_currencies.push(position.currency.clone());
+        distinct_currencies.insert(position.currency.clone());
+    }
+
+    let netted_outstanding_units = netted_position.outstanding_exposure_units();
+    let capital_freed_units = segregated_outstanding_units.saturating_sub(netted_outstanding_units);
+
+    Ok(ExposureLedgerNettedView {
+        schema: EXPOSURE_LEDGER_NETTED_VIEW_SCHEMA.to_string(),
+        canonical_currency: CANONICAL_NETTING_CURRENCY.to_string(),
+        source_currencies,
+        mixed_currency_book: distinct_currencies.len() > 1,
+        support_boundary: ExposureLedgerNettedSupportBoundary::default(),
+        netted_position,
+        benefit: SingleDenominationNettingBenefit {
+            segregated_outstanding_units,
+            netted_outstanding_units,
+            capital_freed_units,
+        },
+    })
+}
+
+impl ExposureLedgerReport {
+    /// Collapse this report's per-currency positions into a single
+    /// canonical-denomination netted off-chain view. See
+    /// [`collapse_positions_to_canonical`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ExposureLedgerNettingError`] when a non-parity currency lacks a
+    /// conversion rate or a supplied rate has a zero denominator.
+    pub fn collapse_to_canonical(
+        &self,
+        rates: &ExposureLedgerNettingRates,
+    ) -> Result<ExposureLedgerNettedView, ExposureLedgerNettingError> {
+        collapse_positions_to_canonical(&self.positions, rates)
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+    use crate::{ExposureLedgerQuery, ExposureLedgerSummary, EXPOSURE_LEDGER_SCHEMA};
+
+    fn position(currency: &str) -> ExposureLedgerCurrencyPosition {
+        ExposureLedgerCurrencyPosition {
+            currency: currency.to_string(),
+            governed_max_exposure_units: 0,
+            reserved_units: 0,
+            settled_units: 0,
+            pending_units: 0,
+            failed_units: 0,
+            provisional_loss_units: 0,
+            recovered_units: 0,
+            quoted_premium_units: 0,
+            active_quoted_premium_units: 0,
+        }
+    }
+
+    fn eur_at_1_1() -> ExposureLedgerNettingRates {
+        ExposureLedgerNettingRates::new(vec![CanonicalConversionRate {
+            currency: "EUR".to_string(),
+            numerator: 11,
+            denominator: 10,
+        }])
+    }
+
+    /// Mixed-currency book collapses to a single USDC-canonical denomination,
+    /// summing every channel of every converted position.
+    #[test]
+    fn netting_collapses_mixed_currency_book_to_single_usdc_denomination() {
+        let usd = ExposureLedgerCurrencyPosition {
+            reserved_units: 100,
+            pending_units: 80,
+            settled_units: 40,
+            ..position("USD")
+        };
+        let eur = ExposureLedgerCurrencyPosition {
+            reserved_units: 400,
+            pending_units: 0,
+            settled_units: 100,
+            ..position("EUR")
+        };
+
+        let view = collapse_positions_to_canonical(&[usd, eur], &eur_at_1_1()).unwrap();
+
+        assert_eq!(view.schema, EXPOSURE_LEDGER_NETTED_VIEW_SCHEMA);
+        assert_eq!(view.canonical_currency, "USDC");
+        assert_eq!(view.netted_position.currency, "USDC");
+        assert_eq!(view.source_currencies, vec!["USD", "EUR"]);
+        assert!(view.mixed_currency_book);
+        // EUR 400 -> 440, EUR 100 -> 110 (rate 1.1, exact).
+        assert_eq!(view.netted_position.reserved_units, 100 + 440);
+        assert_eq!(view.netted_position.pending_units, 80);
+        assert_eq!(view.netted_position.settled_units, 40 + 110);
+    }
+
+    /// The single-denomination collapse frees the capital that per-currency
+    /// segregation locks up: segregated requirement (sum of per-currency maxes)
+    /// exceeds the netted requirement (max of the summed channels).
+    #[test]
+    fn single_denomination_benefit_frees_capital_on_mixed_book() {
+        let usd = ExposureLedgerCurrencyPosition {
+            pending_units: 300,
+            ..position("USD")
+        };
+        let eur = ExposureLedgerCurrencyPosition {
+            reserved_units: 400,
+            ..position("EUR")
+        };
+
+        let view = collapse_positions_to_canonical(&[usd, eur], &eur_at_1_1()).unwrap();
+
+        // Segregated: USD outstanding = max(0,300,0) = 300; EUR outstanding =
+        // max(440,0,0) = 440; total = 740.
+        assert_eq!(view.benefit.segregated_outstanding_units, 740);
+        // Netted: reserved channel 440, unsettled channel 300; max = 440.
+        assert_eq!(view.benefit.netted_outstanding_units, 440);
+        // Capital freed by the off-chain single-denomination collapse.
+        assert_eq!(view.benefit.capital_freed_units, 300);
+        assert_eq!(
+            view.benefit.capital_freed_units,
+            view.benefit.segregated_outstanding_units - view.benefit.netted_outstanding_units
+        );
+    }
+
+    /// KILL-EVIDENCE: all three prudential netting flags read false after the
+    /// collapse, and the projection requires no on-chain instrument or contract.
+    #[test]
+    fn netted_view_support_boundary_flags_stay_false() {
+        let usd = ExposureLedgerCurrencyPosition {
+            reserved_units: 100,
+            ..position("USD")
+        };
+        let eur = ExposureLedgerCurrencyPosition {
+            reserved_units: 200,
+            ..position("EUR")
+        };
+
+        let view = collapse_positions_to_canonical(&[usd, eur], &eur_at_1_1()).unwrap();
+        let boundary = &view.support_boundary;
+
+        assert!(
+            !boundary.cross_currency_netting_supported,
+            "cross-currency netting must stay unsupported after the off-chain collapse"
+        );
+        assert!(
+            !boundary.capital_allocation_supported,
+            "capital allocation must stay unsupported after the off-chain collapse"
+        );
+        assert!(
+            !boundary.mixed_currency_netting_supported,
+            "mixed-currency netting must stay unsupported after the off-chain collapse"
+        );
+        assert!(!boundary.on_chain_instrument_required);
+        assert!(!boundary.new_contract_required);
+        assert!(boundary.read_only_projection);
+        assert!(boundary.prudential_book_unchanged);
+
+        // The netted-view flags are carried straight off the prudential defaults,
+        // proving the collapse never flipped them.
+        assert_eq!(
+            boundary.cross_currency_netting_supported,
+            ExposureLedgerSupportBoundary::default().cross_currency_netting_supported
+        );
+        assert_eq!(
+            boundary.capital_allocation_supported,
+            CreditScorecardSupportBoundary::default().capital_allocation_supported
+        );
+        assert_eq!(
+            boundary.mixed_currency_netting_supported,
+            CapitalBookSupportBoundary::default().mixed_currency_netting_supported
+        );
+    }
+
+    /// The collapse is read-only: it never mutates the input positions.
+    #[test]
+    fn netting_is_read_only_and_does_not_mutate_positions() {
+        let positions = vec![
+            ExposureLedgerCurrencyPosition {
+                reserved_units: 100,
+                pending_units: 50,
+                ..position("USD")
+            },
+            ExposureLedgerCurrencyPosition {
+                reserved_units: 200,
+                ..position("EUR")
+            },
+        ];
+        let snapshot = positions.clone();
+
+        let _view = collapse_positions_to_canonical(&positions, &eur_at_1_1()).unwrap();
+
+        assert_eq!(
+            positions, snapshot,
+            "collapse must not mutate the input book"
+        );
+    }
+
+    /// A single-currency book has nothing to net: the benefit is zero.
+    #[test]
+    fn single_currency_book_has_zero_netting_benefit() {
+        let usd = ExposureLedgerCurrencyPosition {
+            reserved_units: 100,
+            pending_units: 300,
+            ..position("USD")
+        };
+
+        let view = collapse_positions_to_canonical(&[usd], &ExposureLedgerNettingRates::default())
+            .unwrap();
+
+        assert!(!view.mixed_currency_book);
+        assert_eq!(view.benefit.segregated_outstanding_units, 300);
+        assert_eq!(view.benefit.netted_outstanding_units, 300);
+        assert_eq!(view.benefit.capital_freed_units, 0);
+    }
+
+    /// USD and USDC convert one-to-one by default (the USD/USDC pin).
+    #[test]
+    fn usd_and_usdc_convert_at_parity_by_default() {
+        let rates = ExposureLedgerNettingRates::default();
+        assert_eq!(
+            rates.rate_for("USD").unwrap().convert(1_234).unwrap(),
+            1_234
+        );
+        assert_eq!(
+            rates.rate_for("USDC").unwrap().convert(1_234).unwrap(),
+            1_234
+        );
+    }
+
+    /// A non-parity currency without a supplied rate fails closed.
+    #[test]
+    fn netting_missing_rate_fails_closed() {
+        let eur = ExposureLedgerCurrencyPosition {
+            reserved_units: 100,
+            ..position("EUR")
+        };
+        let error = collapse_positions_to_canonical(&[eur], &ExposureLedgerNettingRates::default())
+            .unwrap_err();
+        assert_eq!(
+            error,
+            ExposureLedgerNettingError::MissingRate {
+                currency: "EUR".to_string()
+            }
+        );
+    }
+
+    /// A zero-denominator rate fails closed rather than dividing by zero.
+    #[test]
+    fn netting_zero_denominator_fails_closed() {
+        let rates = ExposureLedgerNettingRates::new(vec![CanonicalConversionRate {
+            currency: "EUR".to_string(),
+            numerator: 11,
+            denominator: 0,
+        }]);
+        let eur = ExposureLedgerCurrencyPosition {
+            reserved_units: 100,
+            ..position("EUR")
+        };
+        let error = collapse_positions_to_canonical(&[eur], &rates).unwrap_err();
+        assert_eq!(
+            error,
+            ExposureLedgerNettingError::ZeroDenominator {
+                currency: "EUR".to_string()
+            }
+        );
+    }
+
+    /// Conversions round up so the projection never understates exposure.
+    #[test]
+    fn conversion_rounds_up_to_avoid_understating_exposure() {
+        let rate = CanonicalConversionRate {
+            currency: "EUR".to_string(),
+            numerator: 11,
+            denominator: 10,
+        };
+        // 401 * 11 / 10 = 441.1 -> 442.
+        assert_eq!(rate.convert(401).unwrap(), 442);
+        assert_eq!(rate.convert(0).unwrap(), 0);
+    }
+
+    /// The outstanding-exposure formula takes the worst channel.
+    #[test]
+    fn outstanding_exposure_units_takes_worst_channel() {
+        let reserved_dominant = ExposureLedgerCurrencyPosition {
+            reserved_units: 500,
+            pending_units: 100,
+            provisional_loss_units: 50,
+            ..position("USD")
+        };
+        assert_eq!(reserved_dominant.outstanding_exposure_units(), 500);
+
+        let loss_dominant = ExposureLedgerCurrencyPosition {
+            reserved_units: 100,
+            provisional_loss_units: 900,
+            recovered_units: 200,
+            ..position("USD")
+        };
+        // net provisional loss = 900 - 200 = 700.
+        assert_eq!(loss_dominant.outstanding_exposure_units(), 700);
+    }
+
+    /// The report convenience method collapses its own positions.
+    #[test]
+    fn exposure_ledger_report_collapse_matches_free_function() {
+        let positions = vec![
+            ExposureLedgerCurrencyPosition {
+                reserved_units: 100,
+                pending_units: 300,
+                ..position("USD")
+            },
+            ExposureLedgerCurrencyPosition {
+                reserved_units: 400,
+                ..position("EUR")
+            },
+        ];
+        let report = ExposureLedgerReport {
+            schema: EXPOSURE_LEDGER_SCHEMA.to_string(),
+            generated_at: 1,
+            filters: ExposureLedgerQuery {
+                agent_subject: Some("subject-1".to_string()),
+                ..ExposureLedgerQuery::default()
+            },
+            support_boundary: ExposureLedgerSupportBoundary::default(),
+            summary: ExposureLedgerSummary {
+                matching_receipts: 2,
+                returned_receipts: 2,
+                matching_decisions: 0,
+                returned_decisions: 0,
+                active_decisions: 0,
+                superseded_decisions: 0,
+                actionable_receipts: 0,
+                pending_settlement_receipts: 1,
+                failed_settlement_receipts: 0,
+                currencies: vec!["EUR".to_string(), "USD".to_string()],
+                mixed_currency_book: true,
+                truncated_receipts: false,
+                truncated_decisions: false,
+            },
+            positions: positions.clone(),
+            receipts: Vec::new(),
+            decisions: Vec::new(),
+        };
+
+        let rates = eur_at_1_1();
+        let via_method = report.collapse_to_canonical(&rates).unwrap();
+        let via_function = collapse_positions_to_canonical(&positions, &rates).unwrap();
+        assert_eq!(via_method, via_function);
+        // Mixed book frees capital, and the prudential book is untouched.
+        assert!(via_method.benefit.capital_freed_units > 0);
+        assert!(!report.support_boundary.cross_currency_netting_supported);
+    }
+
+    /// The netted view round-trips through canonical JSON.
+    #[test]
+    fn netted_view_round_trips_through_json() {
+        let usd = ExposureLedgerCurrencyPosition {
+            reserved_units: 100,
+            ..position("USD")
+        };
+        let eur = ExposureLedgerCurrencyPosition {
+            reserved_units: 200,
+            ..position("EUR")
+        };
+        let view = collapse_positions_to_canonical(&[usd, eur], &eur_at_1_1()).unwrap();
+        let encoded = serde_json::to_string(&view).unwrap();
+        let decoded: ExposureLedgerNettedView = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(view, decoded);
+    }
+}
