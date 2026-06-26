@@ -1847,6 +1847,364 @@ mod tests {
         );
     }
 
+    // -- M1-20: mock ChioRootRegistry publishRoot + verifyInclusionDetailed ----
+    //
+    // A value-free, in-memory mirror of the on-chain `ChioRootRegistry`
+    // (contracts/src/ChioRootRegistry.sol). It reproduces exactly the two calls
+    // the read-only Pass-anchor round-trip needs:
+    //
+    //   * `publishRoot`: store the checkpoint's Merkle root under a per-operator
+    //     STRICTLY-INCREASING `checkpointSeq` (the on-chain
+    //     `if (checkpointSeq <= latestSeq[operator]) revert` rule), reject a zero
+    //     root and a degenerate batch range, and record the root as published.
+    //   * `verifyInclusionDetailed`: a read-only RFC6962 inclusion check that
+    //     first gates on `publishedRoots[operator][root]` and only then verifies
+    //     the audit path, mirroring the Solidity `verifyInclusionDetailed`.
+    //
+    // No method moves value: there is no balance, mint, or transfer surface here
+    // (nor on the contract path these mirror); the round-trip is pure evidence.
+
+    use std::collections::{HashMap, HashSet};
+
+    /// Stored root entry, mirroring `IChioRootRegistry.RootEntry`.
+    #[derive(Debug, Clone)]
+    struct MockRootEntry {
+        merkle_root: Hash,
+        checkpoint_seq: u64,
+        batch_start_seq: u64,
+        batch_end_seq: u64,
+        tree_size: u64,
+        operator_key_hash: String,
+    }
+
+    /// The fail-closed reverts the mirrored `publishRoot` can raise (the
+    /// Solidity `InvalidMerkleRoot` / `InvalidBatchRange` /
+    /// `InvalidCheckpointSequence` reverts).
+    #[derive(Debug, PartialEq, Eq)]
+    enum MockRegistryError {
+        ZeroMerkleRoot,
+        DegenerateBatchRange,
+        NonMonotonicCheckpointSeq,
+    }
+
+    /// In-memory mirror of the on-chain `ChioRootRegistry`. Value-free: it stores
+    /// roots and runs the RFC6962 inclusion check exactly as the contract does,
+    /// with no balance/mint/transfer surface anywhere.
+    #[derive(Debug, Default)]
+    struct MockChioRootRegistry {
+        latest_seq: HashMap<String, u64>,
+        roots: HashMap<String, HashMap<u64, MockRootEntry>>,
+        published_roots: HashSet<(String, Hash)>,
+    }
+
+    impl MockChioRootRegistry {
+        /// Mirror of `publishRoot`: fail-closed on a zero root or a degenerate
+        /// batch range, enforce a strictly-increasing per-operator
+        /// `checkpointSeq`, then store the entry and mark the root published.
+        fn publish_root(
+            &mut self,
+            publication: &PreparedEvmRootPublication,
+        ) -> Result<(), MockRegistryError> {
+            if publication.merkle_root == Hash::zero() {
+                return Err(MockRegistryError::ZeroMerkleRoot);
+            }
+            if publication.batch_start_seq > publication.batch_end_seq || publication.tree_size == 0
+            {
+                return Err(MockRegistryError::DegenerateBatchRange);
+            }
+            let operator = publication.operator_address.clone();
+            let latest = self.latest_seq.get(&operator).copied().unwrap_or(0);
+            if publication.checkpoint_seq <= latest {
+                return Err(MockRegistryError::NonMonotonicCheckpointSeq);
+            }
+            let entry = MockRootEntry {
+                merkle_root: publication.merkle_root,
+                checkpoint_seq: publication.checkpoint_seq,
+                batch_start_seq: publication.batch_start_seq,
+                batch_end_seq: publication.batch_end_seq,
+                tree_size: publication.tree_size,
+                operator_key_hash: publication.operator_key_hash.clone(),
+            };
+            self.roots
+                .entry(operator.clone())
+                .or_default()
+                .insert(publication.checkpoint_seq, entry);
+            self.latest_seq
+                .insert(operator.clone(), publication.checkpoint_seq);
+            self.published_roots
+                .insert((operator, publication.merkle_root));
+            Ok(())
+        }
+
+        /// Mirror of `getLatestSeq`.
+        fn latest_seq(&self, operator: &str) -> u64 {
+            self.latest_seq.get(operator).copied().unwrap_or(0)
+        }
+
+        /// Mirror of `getRoot`.
+        fn get_root(&self, operator: &str, checkpoint_seq: u64) -> Option<&MockRootEntry> {
+            self.roots
+                .get(operator)
+                .and_then(|seqs| seqs.get(&checkpoint_seq))
+        }
+
+        /// Mirror of `verifyInclusionDetailed`: read-only. Returns false unless
+        /// the root was published for `operator`, then runs the RFC6962 audit
+        /// path. No value moves.
+        fn verify_inclusion_detailed(
+            &self,
+            proof: &chio_core::merkle::MerkleProof,
+            root: &Hash,
+            leaf: Hash,
+            operator: &str,
+        ) -> bool {
+            if !self
+                .published_roots
+                .contains(&(operator.to_string(), *root))
+            {
+                return false;
+            }
+            proof.verify_hash(leaf, root)
+        }
+    }
+
+    #[test]
+    fn mock_chio_root_registry_pass_anchor_publish_and_verify_inclusion_roundtrip() {
+        use chio_core::is_supported_signed_artifact_schema;
+        use chio_core::merkle::leaf_hash;
+        use chio_core::signed_artifact::{
+            CHIO_ANCHOR_BATCH_V1_SCHEMA, CHIO_ANCHOR_INCLUSION_PROOF_V1_SCHEMA,
+            CHIO_ANCHOR_PROOF_BUNDLE_V1_SCHEMA,
+        };
+
+        let operator = Keypair::generate();
+        let binding = operator_binding(&operator, vec![Web3KeyBindingPurpose::Anchor]);
+        let target = anchor_target();
+
+        // Anchored Pass set: two issued Passes plus one revoked Pass (whose
+        // revocation digest is the committed Pass artifact id). A fourth Pass is
+        // NEVER anchored; its id must fail the inclusion check.
+        let pass_a = issue_first_window_pass(&Keypair::generate(), TrustTier::Attested);
+        let pass_b = issue_first_window_pass(&Keypair::generate(), TrustTier::Verified);
+        let pass_c = issue_first_window_pass(&Keypair::generate(), TrustTier::Attested);
+        let revoked_c =
+            revoke_chio_pass_record(&pass_c, MID_JUNE_2026 + 5, "superseded".to_string())
+                .expect("revoke pass_c");
+        let pass_excluded = issue_first_window_pass(&Keypair::generate(), TrustTier::Premier);
+
+        let issued = [pass_a.clone(), pass_b.clone()];
+        let revoked = [revoked_c.clone()];
+
+        // (1) Build the anchor batch + strictly-increasing kernel checkpoints
+        // under the Anchor-purpose binding. The on-chain registry rejects
+        // checkpoint_seq 0 (its `latestSeq` defaults to 0), so the kernel genesis
+        // checkpoint is local-only and the first published root is the seq-1
+        // checkpoint chained onto it; seq-2 chains onto seq-1.
+        let genesis = prepare_pass_anchor_publication(
+            &operator,
+            &binding,
+            &target,
+            &issued,
+            &revoked,
+            pending_witness(),
+            MID_JUNE_2026,
+            None,
+        )
+        .expect("genesis prepare");
+        assert_eq!(genesis.checkpoint.body.checkpoint_seq, 0);
+
+        let published1 = prepare_pass_anchor_publication(
+            &operator,
+            &binding,
+            &target,
+            &issued,
+            &revoked,
+            pending_witness(),
+            MID_JUNE_2026 + 1,
+            Some(&genesis.checkpoint),
+        )
+        .expect("seq-1 prepare");
+        let published2 = prepare_pass_anchor_publication(
+            &operator,
+            &binding,
+            &target,
+            &issued,
+            &revoked,
+            pending_witness(),
+            MID_JUNE_2026 + 2,
+            Some(&published1.checkpoint),
+        )
+        .expect("seq-2 prepare");
+        assert_eq!(published1.publication.checkpoint_seq, 1);
+        assert_eq!(published2.publication.checkpoint_seq, 2);
+        assert!(published2.publication.checkpoint_seq > published1.publication.checkpoint_seq);
+        assert_eq!(
+            published1.publication.operator_address,
+            target.operator_address
+        );
+
+        // (4) No NEW signed-artifact schema: the only signed artifact the
+        // pipeline produces is the already-registered anchor batch
+        // (`chio.anchor_batch.v1`). Its schema, and the two registered
+        // anchor-family schemas the task names, are all known to this verifier
+        // build; nothing here introduces a fresh schema id. The mock signs
+        // nothing (it stores raw hashes only).
+        assert_eq!(published1.batch.body.schema, CHIO_ANCHOR_BATCH_V1_SCHEMA);
+        assert!(is_supported_signed_artifact_schema(
+            &published1.batch.body.schema
+        ));
+        assert!(is_supported_signed_artifact_schema(
+            CHIO_ANCHOR_INCLUSION_PROOF_V1_SCHEMA
+        ));
+        assert!(is_supported_signed_artifact_schema(
+            CHIO_ANCHOR_PROOF_BUNDLE_V1_SCHEMA
+        ));
+        // The batch self-verifies read-only (root, every per-leaf proof, and the
+        // signature) before any registry call; no on-chain value moves.
+        verify_anchor_batch(&published1.batch).expect("anchor batch verifies");
+
+        // (2) Publish into the mock registry. The genesis (seq 0) is rejected by
+        // the same monotonic rule the contract enforces; the seq-1 and seq-2
+        // roots publish in strictly-increasing order. NO value moves.
+        let mut registry = MockChioRootRegistry::default();
+        assert_eq!(
+            registry.publish_root(&genesis.publication),
+            Err(MockRegistryError::NonMonotonicCheckpointSeq),
+            "kernel genesis seq 0 cannot be the first published root"
+        );
+        registry
+            .publish_root(&published1.publication)
+            .expect("publish seq-1 root");
+        registry
+            .publish_root(&published2.publication)
+            .expect("publish seq-2 root");
+        assert_eq!(registry.latest_seq(&target.operator_address), 2);
+        // Re-publishing an already-anchored (now stale) seq fails closed.
+        assert_eq!(
+            registry.publish_root(&published1.publication),
+            Err(MockRegistryError::NonMonotonicCheckpointSeq),
+            "a stale checkpoint_seq must not re-publish"
+        );
+
+        // The stored entry mirrors the published checkpoint exactly.
+        let stored = registry
+            .get_root(&target.operator_address, 1)
+            .expect("seq-1 entry stored");
+        assert_eq!(stored.merkle_root, published1.publication.merkle_root);
+        assert_eq!(stored.checkpoint_seq, 1);
+        assert_eq!(
+            stored.batch_start_seq,
+            published1.publication.batch_start_seq
+        );
+        assert_eq!(stored.batch_end_seq, published1.publication.batch_end_seq);
+        assert_eq!(stored.tree_size, published1.publication.tree_size);
+        assert_eq!(
+            stored.operator_key_hash,
+            published1.publication.operator_key_hash
+        );
+
+        // Fail-closed parity with the contract reverts: a zero root and a
+        // degenerate batch range are rejected (still value-free).
+        let mut zero_root = published2.publication.clone();
+        zero_root.checkpoint_seq = 3;
+        zero_root.merkle_root = Hash::zero();
+        assert_eq!(
+            registry.publish_root(&zero_root),
+            Err(MockRegistryError::ZeroMerkleRoot)
+        );
+        let mut bad_range = published2.publication.clone();
+        bad_range.checkpoint_seq = 3;
+        bad_range.batch_start_seq = 5;
+        bad_range.batch_end_seq = 4;
+        assert_eq!(
+            registry.publish_root(&bad_range),
+            Err(MockRegistryError::DegenerateBatchRange)
+        );
+
+        // (3) Prove single-Pass membership via verifyInclusionDetailed for each
+        // anchored Pass id, against the published seq-1 root. Read-only.
+        let root = published1.publication.merkle_root;
+        assert_eq!(root, published1.batch.body.tree_root);
+        let included_ids = [
+            chio_pass_artifact_id(&pass_a).expect("pass_a id"),
+            chio_pass_artifact_id(&pass_b).expect("pass_b id"),
+            revoked_c.passport_id.clone(),
+        ];
+        assert_eq!(published1.batch.body.inclusions.len(), included_ids.len());
+        for inclusion in &published1.batch.body.inclusions {
+            assert!(
+                registry.verify_inclusion_detailed(
+                    &inclusion.proof,
+                    &root,
+                    inclusion.leaf_hash,
+                    &target.operator_address,
+                ),
+                "anchored Pass id {} must verify inclusion",
+                inclusion.checkpoint_id
+            );
+            assert!(included_ids.contains(&inclusion.checkpoint_id));
+        }
+
+        // A non-included Pass id FAILS: its leaf is not in the tree, so the
+        // RFC6962 check rejects it even reusing a real (sibling) audit path.
+        let excluded_id = chio_pass_artifact_id(&pass_excluded).expect("excluded id");
+        assert!(!included_ids.contains(&excluded_id));
+        let excluded_leaf =
+            leaf_hash(&canonical_json_bytes(&excluded_id).expect("excluded leaf bytes"));
+        assert!(
+            !registry.verify_inclusion_detailed(
+                &published1.batch.body.inclusions[0].proof,
+                &root,
+                excluded_leaf,
+                &target.operator_address,
+            ),
+            "a non-anchored Pass id must fail the inclusion check"
+        );
+
+        // The published-root gate fails closed: a fully valid leaf + audit path
+        // verified against a root that was NEVER published returns false.
+        let unpublished = prepare_pass_anchor_publication(
+            &operator,
+            &binding,
+            &target,
+            std::slice::from_ref(&pass_excluded),
+            &[],
+            pending_witness(),
+            MID_JUNE_2026 + 3,
+            Some(&published2.checkpoint),
+        )
+        .expect("unpublished prepare");
+        let unpublished_inclusion = &unpublished.batch.body.inclusions[0];
+        assert!(
+            unpublished_inclusion.proof.verify_hash(
+                unpublished_inclusion.leaf_hash,
+                &unpublished.batch.body.tree_root
+            ),
+            "the unpublished proof is internally valid"
+        );
+        assert!(
+            !registry.verify_inclusion_detailed(
+                &unpublished_inclusion.proof,
+                &unpublished.batch.body.tree_root,
+                unpublished_inclusion.leaf_hash,
+                &target.operator_address,
+            ),
+            "an unpublished root must fail the inclusion gate"
+        );
+
+        // The per-operator gate fails closed: the published root verified under a
+        // different operator address returns false.
+        assert!(
+            !registry.verify_inclusion_detailed(
+                &published1.batch.body.inclusions[0].proof,
+                &root,
+                published1.batch.body.inclusions[0].leaf_hash,
+                EVM_CONTRACT_ADDRESS,
+            ),
+            "a non-publishing operator must fail the inclusion gate"
+        );
+    }
+
     // -- M1-14: Gate 4 cross-tenant + byte-identity hardening ------------------
 
     /// Issue a first-window Pass for `subject` at `tier`, returning the full
