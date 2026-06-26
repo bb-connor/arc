@@ -5,6 +5,10 @@ const BPS_DENOMINATOR: u128 = 10_000;
 pub fn minor_units_for_currency(currency: &str) -> Result<u64, PriceOracleError> {
     match currency.trim().to_ascii_uppercase().as_str() {
         "USD" | "EUR" | "GBP" => Ok(100),
+        // Private-use credit code (ISO 4217 user-assigned range). Mirrors
+        // USD with 2 minor-unit decimals so netting can settle Chio credit
+        // amounts without inventing a fresh scale.
+        "XCC" => Ok(100),
         "JPY" => Ok(1),
         "USDC" | "USDT" => Ok(1_000_000),
         "BTC" => Ok(100_000_000),
@@ -150,6 +154,27 @@ mod tests {
         let converted = convert_supported_units(1_000_000_000_000_000, &sample_rate(), 0)
             .test_unwrap("converted");
         assert_eq!(converted, 300);
+    }
+
+    #[test]
+    fn resolves_xcc_private_use_credit_code() {
+        // XCC is the private-use credit code; it mirrors USD with 2
+        // minor-unit decimals (100 minor units per whole unit).
+        assert_eq!(minor_units_for_currency("XCC").test_unwrap("xcc"), 100);
+        assert_eq!(
+            minor_units_for_currency(" xcc ").test_unwrap("xcc trimmed/lowercased"),
+            100
+        );
+    }
+
+    #[test]
+    fn rejects_non_three_letter_credit_code() {
+        // A non-3-letter code such as "CHIOCREDIT" is not pinned and must
+        // fail closed through the catch-all guard rather than resolve.
+        assert!(matches!(
+            minor_units_for_currency("CHIOCREDIT"),
+            Err(crate::PriceOracleError::InvalidConfiguration(_))
+        ));
     }
 }
 
