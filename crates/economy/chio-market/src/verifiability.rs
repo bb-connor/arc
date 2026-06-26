@@ -664,3 +664,291 @@ mod tests {
         }
     }
 }
+
+/// Property tests for [`VerifiabilityGrade`] (M2-11).
+///
+/// `proptest` is not a dev-dependency of this crate, so rather than add a new
+/// dependency these tests enumerate the *entire* powerset of the evidence
+/// requirements. With seven requirements that is `1 << 7 == 128` distinct
+/// subsets, so every `(required, verified)` pair is one of `128 * 128 == 16_384`
+/// generated input sets. Exhaustive enumeration is the strongest form of a
+/// property test here: a property that holds for every pair holds universally.
+#[cfg(test)]
+mod property_tests {
+    use super::*;
+
+    /// Every evidence requirement, indexed so a bitmask can address each one.
+    const ALL_EVIDENCE: [LiabilityEvidenceRequirement; 7] = [
+        LiabilityEvidenceRequirement::BehavioralFeed,
+        LiabilityEvidenceRequirement::UnderwritingDecision,
+        LiabilityEvidenceRequirement::CreditProviderRiskPackage,
+        LiabilityEvidenceRequirement::RuntimeAttestationAppraisal,
+        LiabilityEvidenceRequirement::CertificationArtifact,
+        LiabilityEvidenceRequirement::CreditBond,
+        LiabilityEvidenceRequirement::AuthorizationReviewPack,
+    ];
+
+    /// Number of distinct evidence requirements. The powerset enumerated by the
+    /// properties below has `1 << EVIDENCE_COUNT` members.
+    const EVIDENCE_COUNT: u8 = 7;
+
+    /// Exclusive upper bound for a subset bitmask: one past the last subset.
+    const SUBSET_COUNT: u16 = 1 << EVIDENCE_COUNT;
+
+    /// Materialise the subset of [`ALL_EVIDENCE`] selected by `mask`, in index
+    /// order, as a `Vec`.
+    fn subset_vec(mask: u8) -> Vec<LiabilityEvidenceRequirement> {
+        (0..EVIDENCE_COUNT)
+            .filter(|bit| mask & (1u8 << bit) != 0)
+            .map(|bit| ALL_EVIDENCE[usize::from(bit)])
+            .collect()
+    }
+
+    /// Materialise the subset of [`ALL_EVIDENCE`] selected by `mask` as a set.
+    fn subset_set(mask: u8) -> BTreeSet<LiabilityEvidenceRequirement> {
+        subset_vec(mask).into_iter().collect()
+    }
+
+    /// Reorder and duplicate `items` deterministically from `seed`, returning a
+    /// slice whose canonical set is identical but whose order and multiplicity
+    /// differ. Used to prove that grading ignores input ordering and duplicates.
+    fn reorder_with_duplicates(
+        items: &[LiabilityEvidenceRequirement],
+        seed: u8,
+    ) -> Vec<LiabilityEvidenceRequirement> {
+        if items.is_empty() {
+            return Vec::new();
+        }
+        let rotate = usize::from(seed) % items.len();
+        let mut mangled = Vec::new();
+        // A rotated copy: same elements, different starting point.
+        for offset in 0..items.len() {
+            mangled.push(items[(offset + rotate) % items.len()]);
+        }
+        // A reversed copy appended, so every element now appears at least twice.
+        for item in items.iter().rev() {
+            mangled.push(*item);
+        }
+        // A seed-dependent number of extra duplicates of the first element.
+        for _ in 0..usize::from(seed % 3) {
+            mangled.push(items[0]);
+        }
+        mangled
+    }
+
+    /// DETERMINISM: `grade(required, verified)` is a pure function of its two
+    /// sets. Re-evaluating with identical inputs, grading the same sets through
+    /// `from_slices`, and grading reordered/duplicated slices all yield an
+    /// identical grade. The emitted `missing_evidence` is itself deterministic
+    /// and sorted.
+    #[test]
+    fn property_grade_is_deterministic_over_powerset() {
+        for required_mask_wide in 0..SUBSET_COUNT {
+            let required_mask = required_mask_wide as u8;
+            let required = subset_set(required_mask);
+            let required_vec = subset_vec(required_mask);
+            for verified_mask_wide in 0..SUBSET_COUNT {
+                let verified_mask = verified_mask_wide as u8;
+                let verified = subset_set(verified_mask);
+                let verified_vec = subset_vec(verified_mask);
+
+                let baseline = VerifiabilityGrade::grade(&required, &verified);
+
+                // Re-evaluating the same inputs is identical.
+                assert_eq!(
+                    baseline,
+                    VerifiabilityGrade::grade(&required, &verified),
+                    "grade must be a pure function of its inputs"
+                );
+
+                // Grading the same sets via the slice entry point is identical.
+                assert_eq!(
+                    baseline,
+                    VerifiabilityGrade::from_slices(&required_vec, &verified_vec),
+                    "from_slices must agree with grade on the same sets"
+                );
+
+                // Reordered and duplicated inputs grade identically.
+                let seed = required_mask ^ verified_mask;
+                let mangled_required = reorder_with_duplicates(&required_vec, seed);
+                let mangled_verified = reorder_with_duplicates(&verified_vec, seed.rotate_left(3));
+                let reordered =
+                    VerifiabilityGrade::from_slices(&mangled_required, &mangled_verified);
+                assert_eq!(
+                    baseline, reordered,
+                    "ordering and duplicates must not change the grade \
+                     (required {required_mask:#010b}, verified {verified_mask:#010b})"
+                );
+
+                // Missing evidence is emitted in deterministic sorted order.
+                let mut sorted_missing = baseline.missing_evidence.clone();
+                sorted_missing.sort();
+                assert_eq!(
+                    baseline.missing_evidence, sorted_missing,
+                    "missing evidence must be deterministic and sorted"
+                );
+            }
+        }
+    }
+
+    /// STRICT-LOWER MONOTONICITY (removal): dropping a verified item that is also
+    /// required yields a strictly lower grade. The verified score falls by
+    /// exactly that item's weight, the dropped item resurfaces as missing
+    /// evidence, and the band can never rise.
+    #[test]
+    fn property_removing_required_verified_item_strictly_lowers_grade() {
+        for required_mask_wide in 1..SUBSET_COUNT {
+            let required_mask = required_mask_wide as u8;
+            let required = subset_set(required_mask);
+            for verified_mask_wide in 0..SUBSET_COUNT {
+                let verified_mask = verified_mask_wide as u8;
+                let verified = subset_set(verified_mask);
+                let fuller = VerifiabilityGrade::grade(&required, &verified);
+
+                for bit in 0..EVIDENCE_COUNT {
+                    let item_mask = 1u8 << bit;
+                    let in_required = required_mask & item_mask != 0;
+                    let in_verified = verified_mask & item_mask != 0;
+                    // Only items that are both required and verified are eligible
+                    // to be dropped: those are the ones contributing to the score.
+                    if !(in_required && in_verified) {
+                        continue;
+                    }
+                    let removed = ALL_EVIDENCE[usize::from(bit)];
+                    let lesser_set = subset_set(verified_mask & !item_mask);
+                    let lesser = VerifiabilityGrade::grade(&required, &lesser_set);
+
+                    assert!(
+                        lesser < fuller,
+                        "dropping required+verified {removed:?} must strictly lower \
+                         the grade: {lesser:?} !< {fuller:?}"
+                    );
+                    assert!(
+                        lesser.verified_score < fuller.verified_score,
+                        "dropping {removed:?} must strictly lower the verified score"
+                    );
+                    assert_eq!(
+                        fuller.verified_score - lesser.verified_score,
+                        evidence_weight(removed),
+                        "the verified score must fall by exactly the removed weight"
+                    );
+                    assert!(
+                        lesser.missing_evidence.contains(&removed),
+                        "the dropped item must resurface as missing evidence"
+                    );
+                    assert!(
+                        lesser.band <= fuller.band,
+                        "removing verification can never raise the band"
+                    );
+                    assert_eq!(
+                        lesser.required_score, fuller.required_score,
+                        "the requirement set is unchanged, so required_score holds"
+                    );
+                }
+            }
+        }
+    }
+
+    /// MONOTONICITY (addition): adding a verified item never lowers the grade.
+    /// Adding a *required* item strictly raises it; adding a non-required item
+    /// leaves the grade untouched. The band and verified score are likewise
+    /// non-decreasing.
+    #[test]
+    fn property_adding_verified_item_never_lowers_grade() {
+        for required_mask_wide in 0..SUBSET_COUNT {
+            let required_mask = required_mask_wide as u8;
+            let required = subset_set(required_mask);
+            for verified_mask_wide in 0..SUBSET_COUNT {
+                let verified_mask = verified_mask_wide as u8;
+                let verified = subset_set(verified_mask);
+                let base = VerifiabilityGrade::grade(&required, &verified);
+
+                for bit in 0..EVIDENCE_COUNT {
+                    let item_mask = 1u8 << bit;
+                    if verified_mask & item_mask != 0 {
+                        continue; // already verified
+                    }
+                    let added = ALL_EVIDENCE[usize::from(bit)];
+                    let richer_set = subset_set(verified_mask | item_mask);
+                    let richer = VerifiabilityGrade::grade(&required, &richer_set);
+
+                    assert!(
+                        richer >= base,
+                        "adding verified {added:?} must never lower the grade: \
+                         {richer:?} < {base:?}"
+                    );
+                    assert!(
+                        richer.verified_score >= base.verified_score,
+                        "adding verified evidence must never lower the verified score"
+                    );
+                    assert!(
+                        richer.band >= base.band,
+                        "adding verified evidence must never lower the band"
+                    );
+
+                    if required_mask & item_mask != 0 {
+                        assert!(
+                            richer > base,
+                            "adding a required+verified item must strictly raise \
+                             the grade: {richer:?} !> {base:?}"
+                        );
+                    } else {
+                        assert_eq!(
+                            richer, base,
+                            "adding non-required evidence must not change the grade"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// DOMINANCE: full verification strictly dominates every partial
+    /// verification of the same requirement set. A verification is full exactly
+    /// when it covers every required item; every other verification grades
+    /// strictly lower than the fully verified grade.
+    #[test]
+    fn property_full_verification_strictly_dominates_every_partial() {
+        for required_mask_wide in 1..SUBSET_COUNT {
+            let required_mask = required_mask_wide as u8;
+            let required = subset_set(required_mask);
+
+            // Full verification: every required item is verified.
+            let full = VerifiabilityGrade::grade(&required, &required);
+            assert!(full.is_fully_verified());
+            assert_eq!(full.band, VerifiabilityBand::Full);
+            assert!(full.missing_evidence.is_empty());
+            assert_eq!(full.verified_score, full.required_score);
+
+            for verified_mask_wide in 0..SUBSET_COUNT {
+                let verified_mask = verified_mask_wide as u8;
+                // `verified` is a full verification exactly when it covers every
+                // required item; skip those and test only genuine partials.
+                let covers_all_required = required_mask & verified_mask == required_mask;
+                if covers_all_required {
+                    continue;
+                }
+                let verified = subset_set(verified_mask);
+                let partial = VerifiabilityGrade::grade(&required, &verified);
+
+                assert!(
+                    partial < full,
+                    "full verification must strictly dominate partial: \
+                     {partial:?} !< {full:?}"
+                );
+                assert!(
+                    !partial.is_fully_verified(),
+                    "a verification missing required evidence is not full"
+                );
+                assert!(
+                    partial.verified_score < full.verified_score,
+                    "partial verification must score strictly below full"
+                );
+                assert!(
+                    !partial.missing_evidence.is_empty(),
+                    "a partial verification must report missing evidence"
+                );
+            }
+        }
+    }
+}
