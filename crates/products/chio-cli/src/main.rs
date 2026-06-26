@@ -27,6 +27,7 @@ mod guard;
 mod guards;
 mod lineage;
 mod market;
+mod pass;
 mod passport;
 mod policies;
 mod scaffold;
@@ -152,7 +153,7 @@ mod cli_entrypoint_tests {
     /// The release binary parses argv on the process main thread, whose
     /// default stack is 8 MiB. The libtest harness runs each `#[test]` on a
     /// worker thread with a ~2 MiB default stack, and the monomorphised clap
-    /// parser for the 24-variant `Commands` enum needs more than that to
+    /// parser for the 25-variant `Commands` enum needs more than that to
     /// build, overflowing the worker stack with a SIGABRT. Driving the parse
     /// through an explicit 8 MiB worker mirrors the production main-thread
     /// stack so the tests exercise the same parser the binary does without

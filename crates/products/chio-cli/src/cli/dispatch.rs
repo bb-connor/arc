@@ -97,6 +97,13 @@ pub(crate) fn run() {
         Commands::Certify { command } => dispatch_certify(command, json_output, control_url, control_token),
         Commands::Did { command } => dispatch_did(command, json_output),
         Commands::Passport { command } => dispatch_passport(command, json_output, receipt_db, budget_db, control_url, control_token),
+        Commands::Pass { command } => crate::pass::dispatch_pass(
+            command,
+            json_output,
+            receipt_db.as_deref(),
+            revocation_db.as_deref(),
+            authority_seed_file.as_deref(),
+        ),
         Commands::Proof { command } => dispatch_proof(command, json_output),
         Commands::Workflow { command } => dispatch_workflow(command, json_output),
         Commands::Cert { command } => dispatch_cert(command, json_output, authority_seed_file),

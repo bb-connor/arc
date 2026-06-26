@@ -119,7 +119,7 @@ mod cli_env_tests {
     ///
     /// The release binary parses argv on the process main thread (8 MiB
     /// stack); the libtest harness runs each test on a worker thread with a
-    /// ~2 MiB stack, which the monomorphised clap parser for the 24-variant
+    /// ~2 MiB stack, which the monomorphised clap parser for the 25-variant
     /// `Commands` enum overflows. Driving the parse through an 8 MiB worker
     /// mirrors the production main-thread stack without changing the CLI
     /// surface. Process env vars are shared across threads, so clap's `env`
@@ -364,6 +364,25 @@ pub(crate) enum Commands {
         command: PassportCommands,
     },
 
+    /// Issue, refresh, and anchor the portable Chio Pass reputation credential.
+    ///
+    /// The Chio Pass is a soulbound, portable reputation credential (NOT a
+    /// passport): it gifts a metered free-tier allotment plus baseline gifted
+    /// stream reads to one attested `did:chio`. These subcommands drive the
+    /// board-approved control-plane orchestrator (the M1 launch governance
+    /// surface) end to end:
+    ///
+    /// - `issue` mints the first-window credential and its deterministic
+    ///   `chiopass:<hash>` window-scoped capability.
+    /// - `refresh` sizes the next monthly window from the prior window's
+    ///   genuine-use scan (renew / dormant / not-reattested).
+    /// - `anchor` folds issued and revoked Pass digests into a prepared
+    ///   (un-broadcast) read-only on-chain root publication.
+    Pass {
+        #[command(subcommand)]
+        command: PassCommands,
+    },
+
     /// Verify proof bundles and Transaction Passport artifacts.
     Proof {
         #[command(subcommand)]
@@ -575,6 +594,109 @@ pub(crate) enum Commands {
         /// the banner short.
         #[arg(long, default_value_t = false)]
         print_config: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum PassCommands {
+    /// Mint the first-window Chio Pass reputation credential for one subject.
+    ///
+    /// Loads the board-approved M1 launch governance surface
+    /// (`ChioPassConfig::m1_launch_default`) and calls the control-plane
+    /// issuance entrypoint. The minted capability id is the deterministic
+    /// `chiopass:<hash>` window-scoped id (subject + window only), so the same
+    /// subject re-minted inside the same monthly window maps to a single budget
+    /// row. The per-window distribution counters are sourced from the revocation
+    /// oracle (`--revocation-db`), never recomputed at the entrypoint.
+    Issue {
+        /// Subject Ed25519 public key in hex. The Pass is soulbound to the
+        /// `did:chio` derived from this key.
+        #[arg(long)]
+        subject_public_key: String,
+
+        /// Attested trust tier governing the allotment SIZE only (never
+        /// existence): one of unverified, attested, verified, premier.
+        #[arg(long, default_value = "attested")]
+        tier: String,
+
+        /// UTC instant (Unix seconds) selecting the monthly attestation window.
+        /// Defaults to now.
+        #[arg(long)]
+        now: Option<u64>,
+
+        /// Trusted kernel signing key (hex) pinned into the genuine-use
+        /// allowlist (registry RR2-TM-01). Repeatable. When omitted, the local
+        /// authority key is used as the trust anchor.
+        #[arg(long = "accepted-kernel-key")]
+        accepted_kernel_key: Vec<String>,
+    },
+
+    /// Roll a Pass forward into its next monthly window from genuine use.
+    ///
+    /// Scans the prior window's genuine-use receipts (`--receipt-db`) via the
+    /// control-plane refresh entrypoint and sizes the next window: renewed at
+    /// tier size, withheld-dormant (zero allotment, baseline reads persist), or
+    /// not-reattested (nothing minted).
+    Refresh {
+        /// Subject Ed25519 public key in hex.
+        #[arg(long)]
+        subject_public_key: String,
+
+        /// Attested trust tier governing the next-window allotment SIZE.
+        #[arg(long, default_value = "attested")]
+        tier: String,
+
+        /// UTC instant (Unix seconds) inside the PRIOR window. The next window is
+        /// the contiguous monthly rollover. Defaults to now.
+        #[arg(long)]
+        now: Option<u64>,
+
+        /// The verified verdict of a fresh rollover presentation challenge. When
+        /// absent, the refresh denies (no fresh re-attestation, nothing minted).
+        #[arg(long, default_value_t = false)]
+        reattested: bool,
+
+        /// Trusted kernel signing key (hex) pinned into the genuine-use
+        /// allowlist (registry RR2-TM-01). Repeatable. When omitted, the local
+        /// authority key is used as the trust anchor.
+        #[arg(long = "accepted-kernel-key")]
+        accepted_kernel_key: Vec<String>,
+    },
+
+    /// Prepare (do NOT broadcast) the read-only Pass anchoring root publication.
+    ///
+    /// Folds the issued and revoked Pass digests into one anchorable Merkle root
+    /// plus inclusion proofs, wraps it in a kernel checkpoint, and prepares the
+    /// on-chain root-publication call data. Value-free: nothing moves on-chain.
+    Anchor {
+        /// Issued Chio Pass credential JSON file. Repeatable.
+        #[arg(long = "issued-pass")]
+        issued_pass: Vec<PathBuf>,
+
+        /// Revoked Pass lifecycle-record JSON file. Repeatable.
+        #[arg(long = "revoked-record")]
+        revoked_record: Vec<PathBuf>,
+
+        /// Anchor-purpose signed Web3 identity binding JSON file.
+        #[arg(long)]
+        binding: PathBuf,
+
+        /// EVM anchor target JSON file (chain id, contract, operator addresses).
+        #[arg(long)]
+        target: PathBuf,
+
+        /// Public-witness descriptor JSON file for the anchor batch.
+        #[arg(long)]
+        witness: PathBuf,
+
+        /// Batch issuance timestamp in Unix seconds. Defaults to now.
+        #[arg(long)]
+        issued_at: Option<u64>,
+
+        /// Optional previous kernel-checkpoint JSON file for the per-operator
+        /// sequence chain. Omit for the genesis batch (checkpoint_seq 0).
+        #[arg(long = "previous-checkpoint")]
+        previous_checkpoint: Option<PathBuf>,
     },
 }
 

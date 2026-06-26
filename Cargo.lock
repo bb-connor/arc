@@ -2862,6 +2862,7 @@ dependencies = [
  "axum 0.8.8",
  "base64 0.22.1",
  "chio-acp-proxy",
+ "chio-anchor",
  "chio-api-protect",
  "chio-appraisal",
  "chio-arena",
