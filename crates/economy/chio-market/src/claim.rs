@@ -10,6 +10,8 @@ use crate::receipt::lineage::SignedExportEnvelope;
 
 use crate::{validate_positive_money, verify_signed_artifact, SignedLiabilityBoundCoverage};
 
+/// Category of supporting evidence a claim artifact can reference, such as the
+/// bound coverage, exposure ledger, credit bond, loss lifecycle, or a receipt.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LiabilityClaimEvidenceKind {
@@ -33,6 +35,8 @@ pub struct LiabilityClaimEvidenceReference {
     pub locator: Option<String>,
 }
 
+/// Provider's disposition of a filed claim: merely `Acknowledged`, `Accepted`
+/// (with a covered amount), or `Denied` (with a reason).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LiabilityClaimResponseDisposition {
@@ -41,6 +45,8 @@ pub enum LiabilityClaimResponseDisposition {
     Denied,
 }
 
+/// Adjudicator's resolution of a disputed claim: `ClaimUpheld` or
+/// `PartialSettlement` (both award an amount) or `ProviderUpheld`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LiabilityClaimAdjudicationOutcome {
@@ -49,6 +55,9 @@ pub enum LiabilityClaimAdjudicationOutcome {
     PartialSettlement,
 }
 
+/// A filed claim bundling the signed bound coverage, exposure ledger, credit
+/// bond, and loss event, plus the claimant, amount, narrative, and the
+/// receipts and evidence references the claim rests on.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityClaimPackageArtifact {
@@ -71,6 +80,18 @@ pub struct LiabilityClaimPackageArtifact {
 }
 
 impl LiabilityClaimPackageArtifact {
+    /// Verify the embedded signed evidence and the claim's internal
+    /// consistency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error string when any embedded artifact signature fails to
+    /// verify, the claimant or narrative is empty, the receipt list is empty
+    /// or contains empty or duplicate ids, the claim amount is non-positive,
+    /// its currency does not match or its units exceed the bound coverage, the
+    /// claim event falls outside the coverage window, the exposure evidence is
+    /// mixed-currency, or the exposure, bond, or loss evidence does not match
+    /// the covered subject or bond.
     pub fn validate(&self) -> Result<(), String> {
         verify_signed_artifact(&self.bound_coverage, "claim package bound_coverage")?;
         verify_signed_artifact(&self.exposure, "claim package exposure")?;
@@ -170,6 +191,8 @@ impl LiabilityClaimPackageArtifact {
 
 pub type SignedLiabilityClaimPackage = SignedExportEnvelope<LiabilityClaimPackageArtifact>;
 
+/// The provider's response to a claim package, recording the disposition and,
+/// where applicable, the covered amount or denial reason.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityClaimResponseArtifact {
@@ -190,6 +213,17 @@ pub struct LiabilityClaimResponseArtifact {
 }
 
 impl LiabilityClaimResponseArtifact {
+    /// Verify the embedded claim and that the disposition's fields are
+    /// well-formed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error string when the embedded claim fails verification or
+    /// validation, the provider response reference is empty, an acknowledged
+    /// or denied response carries a covered amount (or acknowledged/accepted
+    /// carries a denial reason), an accepted response omits a covered amount
+    /// or that amount is non-positive, mismatched in currency, or exceeds the
+    /// claim amount, or a denied response omits a denial reason.
     pub fn validate(&self) -> Result<(), String> {
         verify_signed_artifact(&self.claim, "claim response claim")?;
         self.claim.body.validate()?;
@@ -246,6 +280,8 @@ impl LiabilityClaimResponseArtifact {
 
 pub type SignedLiabilityClaimResponse = SignedExportEnvelope<LiabilityClaimResponseArtifact>;
 
+/// A dispute opened against a provider's claim response, carrying who opened
+/// it, the reason, and supporting evidence.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityClaimDisputeArtifact {
@@ -262,6 +298,14 @@ pub struct LiabilityClaimDisputeArtifact {
 }
 
 impl LiabilityClaimDisputeArtifact {
+    /// Verify the embedded provider response and that it is one a dispute may
+    /// challenge.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error string when the embedded provider response fails
+    /// verification or validation, `opened_by` or `reason` is empty, or the
+    /// provider response was neither denied nor only partially accepted.
     pub fn validate(&self) -> Result<(), String> {
         verify_signed_artifact(&self.provider_response, "claim dispute provider_response")?;
         self.provider_response.body.validate()?;
@@ -295,6 +339,8 @@ impl LiabilityClaimDisputeArtifact {
 
 pub type SignedLiabilityClaimDispute = SignedExportEnvelope<LiabilityClaimDisputeArtifact>;
 
+/// The adjudicator's resolution of a dispute, recording the outcome and any
+/// awarded amount.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LiabilityClaimAdjudicationArtifact {
@@ -313,6 +359,17 @@ pub struct LiabilityClaimAdjudicationArtifact {
 }
 
 impl LiabilityClaimAdjudicationArtifact {
+    /// Verify the embedded dispute and that the awarded amount matches the
+    /// outcome.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error string when the embedded dispute fails verification or
+    /// validation, the adjudicator is empty, a `provider_upheld` outcome
+    /// carries an awarded amount, or an upheld or partial-settlement outcome
+    /// omits the awarded amount or that amount is non-positive, mismatched in
+    /// currency, or (for partial settlement) not strictly less than the claim
+    /// amount (and otherwise exceeds it).
     pub fn validate(&self) -> Result<(), String> {
         verify_signed_artifact(&self.dispute, "claim adjudication dispute")?;
         self.dispute.body.validate()?;
