@@ -708,6 +708,13 @@ pub fn evaluate_imported_runtime_attestation_appraisal(
     }
 }
 
+/// Derive an accepted appraisal artifact from runtime attestation evidence by
+/// dispatching on the evidence schema to the matching verifier family.
+///
+/// # Errors
+///
+/// Returns [`RuntimeAttestationAppraisalError::UnsupportedSchema`] when the
+/// evidence schema does not match a recognized attestation verifier family.
 pub fn derive_runtime_attestation_appraisal(
     evidence: &RuntimeAttestationEvidence,
 ) -> Result<RuntimeAttestationAppraisal, RuntimeAttestationAppraisalError> {
@@ -750,6 +757,14 @@ pub fn derive_runtime_attestation_appraisal(
     }
 }
 
+/// Verify attestation evidence end to end, returning a record that bundles the
+/// derived appraisal, provenance, subject, and trust-policy outcome.
+///
+/// # Errors
+///
+/// Returns a [`RuntimeAttestationVerificationError`] when the evidence schema is
+/// unsupported, when the workload identity cannot be normalized, or when
+/// trust-policy verification fails.
 pub fn verify_runtime_attestation_record(
     evidence: &RuntimeAttestationEvidence,
     trust_policy: Option<&AttestationTrustPolicy>,

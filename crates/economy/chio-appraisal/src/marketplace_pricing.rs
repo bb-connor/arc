@@ -67,6 +67,11 @@ impl MarketplacePricingContext {
     }
 
     /// Build and validate a pricing context for fail-closed callers.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MarketplacePricingError::EmptyTenantId`] when the tenant id is
+    /// empty or carries surrounding whitespace.
     pub fn try_new(
         tenant_id: impl Into<String>,
         reputation_tier: MarketplaceReputationTier,
@@ -77,6 +82,11 @@ impl MarketplacePricingContext {
     }
 
     /// Validate fields required by settlement-grade pricing consumers.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MarketplacePricingError::EmptyTenantId`] when the tenant id is
+    /// empty or carries surrounding whitespace.
     pub fn validate(&self) -> Result<(), MarketplacePricingError> {
         if self.tenant_id.trim().is_empty() || self.tenant_id.trim() != self.tenant_id {
             return Err(MarketplacePricingError::EmptyTenantId);
@@ -107,6 +117,11 @@ impl MarketplaceBasePrice {
     }
 
     /// Build and validate a base price for fail-closed callers.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MarketplacePricingError::InvalidCurrency`] when the currency is
+    /// not a three-letter uppercase ISO 4217 code.
     pub fn try_new(
         units: u64,
         currency: impl Into<String>,
@@ -117,6 +132,11 @@ impl MarketplaceBasePrice {
     }
 
     /// Validate fields required by settlement-grade pricing consumers.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MarketplacePricingError::InvalidCurrency`] when the currency is
+    /// not a three-letter uppercase ISO 4217 code.
     pub fn validate(&self) -> Result<(), MarketplacePricingError> {
         validate_currency_code(&self.currency)
     }
@@ -184,6 +204,13 @@ pub fn compute_marketplace_invocation_price(
 
 /// Validate inputs and compute the per-invocation price for
 /// settlement-facing marketplace consumers.
+///
+/// # Errors
+///
+/// Returns [`MarketplacePricingError::InvalidCurrency`] when the base price
+/// currency is not a three-letter uppercase ISO 4217 code, and
+/// [`MarketplacePricingError::EmptyTenantId`] when the context tenant id is
+/// empty or carries surrounding whitespace.
 pub fn compute_checked_marketplace_invocation_price(
     base: &MarketplaceBasePrice,
     ctx: &MarketplacePricingContext,
