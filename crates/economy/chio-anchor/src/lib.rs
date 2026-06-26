@@ -111,6 +111,8 @@ pub use witness::{
     VerifiedWitnessCache, WitnessPolicy, WitnessPolicyError, WitnessReceipt, WitnessState,
 };
 
+/// Errors surfaced by the anchoring runtime across the EVM, Bitcoin, and
+/// Solana lanes and the multi-lane proof verifier.
 #[derive(Debug, thiserror::Error)]
 pub enum AnchorError {
     #[error("invalid anchor input: {0}")]
@@ -136,6 +138,8 @@ pub enum AnchorError {
     SyncRouteRequiresAdvisoryPolicy,
 }
 
+/// Operator-supplied configuration enumerating the EVM targets, OTS
+/// calendars, and optional Solana cluster the anchoring service publishes to.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AnchorServiceConfig {
@@ -186,6 +190,14 @@ pub fn receipt_inclusion_from_kernel(proof: &ReceiptInclusionProof) -> Web3Recei
     }
 }
 
+/// Assemble an [`AnchorInclusionProof`] from kernel receipt, inclusion, and
+/// checkpoint material, then validate and verify it before returning.
+///
+/// # Errors
+///
+/// Returns [`AnchorError::Verification`] when the assembled proof fails
+/// structural validation or when its cryptographic verification against the
+/// receipt, inclusion proof, and checkpoint statement fails.
 pub fn build_anchor_inclusion_proof(
     receipt: chio_core::receipt::body::ChioReceipt,
     inclusion: &ReceiptInclusionProof,
@@ -210,6 +222,17 @@ pub fn build_anchor_inclusion_proof(
     Ok(proof)
 }
 
+/// Select the unique receipt, inclusion proof, and checkpoint for
+/// `receipt_id` from a canonical evidence bundle and build its anchor
+/// inclusion proof.
+///
+/// # Errors
+///
+/// Returns [`AnchorError::Verification`] when the receipt is listed among the
+/// bundle's uncheckpointed receipts, when the receipt, its inclusion proof,
+/// or its checkpoint is missing from or duplicated in the bundle, or when the
+/// assembled proof fails validation or verification (propagated from
+/// [`build_anchor_inclusion_proof`]).
 pub fn build_anchor_inclusion_proof_from_evidence_bundle(
     bundle: &EvidenceExportBundle,
     receipt_id: &str,
