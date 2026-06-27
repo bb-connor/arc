@@ -71,6 +71,71 @@ pub const PASS_COMPUTE_SERVER_ID: &str = "chio.pass.compute";
 /// intentionally never priced, so it carries no money leg.
 pub const PASS_ALLOTMENT_UNIT: &str = "XCC";
 
+/// Metering cost-metadata schema id stamped on free-tier receipts. Mirrors
+/// `chio_metering::cost::COST_METADATA_SCHEMA`; the kernel must not depend on the
+/// metering crate, so the literal is reproduced here (and cross-checked by tests).
+pub const PASS_COST_METADATA_SCHEMA: &str = "chio.cost-metadata.v1";
+
+/// Custom cost-dimension name the free-tier XCC allotment debit is recorded under
+/// on served receipts. This MUST stay byte-identical to
+/// `chio_credentials::CHIO_PASS_ALLOTMENT_COST_NAME` so the CONTROL 3 genuine-use
+/// scan (which reads `metadata["cost"].dimensions[].name`) recognizes a real
+/// metered Pass debit. The kernel cannot depend on `chio-credentials`, so the two
+/// literals are kept in lockstep.
+pub const PASS_ALLOTMENT_COST_NAME: &str = "chio.pass.allotment.v1";
+
+/// Stamp the free-tier XCC allotment debit onto a served receipt's `metadata`.
+///
+/// CONTROL 3 binding: the genuine-use scan recognizes a real metered Pass debit by
+/// a `metadata["cost"].dimensions[]` entry whose `name == PASS_ALLOTMENT_COST_NAME`
+/// and `value > 0`. A normal Pass invocation does not inject a custom `cost` block,
+/// so without this the kernel-charged XCC debit would scan as non-genuine and the
+/// refresh would withhold the next allotment despite actual usage. The allotment
+/// dimension is APPENDED to an existing `cost.dimensions` array when present (never
+/// clobbering tool-provided dimensions) and otherwise the `cost` block is created.
+///
+/// Fail-closed: a non-object `metadata`, or a `cost`/`dimensions` of the wrong JSON
+/// shape, is replaced so the metadata still carries the allotment dimension; the
+/// genuine-use signal is never silently dropped.
+#[must_use]
+pub fn stamp_pass_allotment_cost_dimension(
+    metadata: Option<serde_json::Value>,
+    allotment_units: u64,
+) -> serde_json::Value {
+    let dimension = serde_json::json!({
+        "dimension": "custom",
+        "name": PASS_ALLOTMENT_COST_NAME,
+        "value": allotment_units,
+        "unit": PASS_ALLOTMENT_UNIT,
+    });
+    let mut root = match metadata {
+        Some(serde_json::Value::Object(map)) => map,
+        _ => serde_json::Map::new(),
+    };
+    let cost = root.entry("cost".to_string()).or_insert_with(
+        || serde_json::json!({ "schema": PASS_COST_METADATA_SCHEMA, "dimensions": [] }),
+    );
+    if let Some(cost_obj) = cost.as_object_mut() {
+        cost_obj
+            .entry("schema".to_string())
+            .or_insert_with(|| serde_json::Value::String(PASS_COST_METADATA_SCHEMA.to_string()));
+        let dimensions = cost_obj
+            .entry("dimensions".to_string())
+            .or_insert_with(|| serde_json::Value::Array(Vec::new()));
+        if let Some(array) = dimensions.as_array_mut() {
+            array.push(dimension);
+        } else {
+            *dimensions = serde_json::Value::Array(vec![dimension]);
+        }
+    } else {
+        *cost = serde_json::json!({
+            "schema": PASS_COST_METADATA_SCHEMA,
+            "dimensions": [dimension],
+        });
+    }
+    serde_json::Value::Object(root)
+}
+
 /// Deny-listed raw pheromone deposit surface (origin-identifying); only the
 /// collapsed aggregate `concentration` feed is gifted.
 pub const PASS_DENY_PHEROMONE_DEPOSITS: &str = "chio://trust/pheromone/deposits";
@@ -1107,6 +1172,78 @@ mod tests {
             assert_pass_capability_id_deterministic(&token),
             Err(KernelError::PassCapabilityIdNotDeterministic(_))
         ));
+    }
+
+    #[test]
+    fn allotment_cost_name_matches_credential_layer_literal() {
+        // PR957 codex P1: the kernel-stamped dimension name MUST stay byte-identical
+        // to the credential-layer constant the genuine-use scan keys on.
+        assert_eq!(PASS_ALLOTMENT_COST_NAME, "chio.pass.allotment.v1");
+        assert_eq!(PASS_COST_METADATA_SCHEMA, "chio.cost-metadata.v1");
+    }
+
+    #[test]
+    fn stamp_allotment_dimension_creates_cost_block_when_absent() {
+        // PR957 codex P1: a normal Pass invocation carries no custom `cost` block;
+        // the stamp must create one so the genuine-use scan recognizes the debit.
+        let stamped = stamp_pass_allotment_cost_dimension(None, 7);
+        let dimensions = stamped
+            .get("cost")
+            .and_then(|cost| cost.get("dimensions"))
+            .and_then(serde_json::Value::as_array)
+            .expect("cost.dimensions array");
+        assert_eq!(dimensions.len(), 1);
+        let dim = &dimensions[0];
+        assert_eq!(
+            dim.get("name").and_then(serde_json::Value::as_str),
+            Some(PASS_ALLOTMENT_COST_NAME)
+        );
+        assert_eq!(
+            dim.get("value").and_then(serde_json::Value::as_u64),
+            Some(7)
+        );
+        assert_eq!(
+            dim.get("unit").and_then(serde_json::Value::as_str),
+            Some(PASS_ALLOTMENT_UNIT)
+        );
+        assert_eq!(
+            dim.get("dimension").and_then(serde_json::Value::as_str),
+            Some("custom")
+        );
+    }
+
+    #[test]
+    fn stamp_allotment_dimension_appends_without_clobbering_existing() {
+        // An existing financial block and a pre-existing cost dimension must both
+        // survive: the allotment dimension is appended, not overwritten.
+        let existing = serde_json::json!({
+            "financial": { "cost_charged": 0, "currency": "XCC" },
+            "cost": {
+                "schema": PASS_COST_METADATA_SCHEMA,
+                "dimensions": [
+                    { "dimension": "custom", "name": "other.metric.v1", "value": 3, "unit": "x" }
+                ]
+            }
+        });
+        let stamped = stamp_pass_allotment_cost_dimension(Some(existing), 5);
+        assert!(stamped.get("financial").is_some(), "financial preserved");
+        let dimensions = stamped
+            .get("cost")
+            .and_then(|cost| cost.get("dimensions"))
+            .and_then(serde_json::Value::as_array)
+            .expect("cost.dimensions array");
+        assert_eq!(
+            dimensions.len(),
+            2,
+            "existing dimension preserved, allotment appended"
+        );
+        assert!(dimensions.iter().any(|dim| {
+            dim.get("name").and_then(serde_json::Value::as_str) == Some("other.metric.v1")
+        }));
+        assert!(dimensions.iter().any(|dim| {
+            dim.get("name").and_then(serde_json::Value::as_str) == Some(PASS_ALLOTMENT_COST_NAME)
+                && dim.get("value").and_then(serde_json::Value::as_u64) == Some(5)
+        }));
     }
 
     #[test]

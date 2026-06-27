@@ -837,9 +837,9 @@ impl ChioKernel {
                     if !is_private_use {
                         return Ok(PoolGuardedCharge::Authorized(Box::new(authorized), None));
                     }
-                    // Free-tier charge: reverse the per-Pass hold and deny fail-closed if
-                    // there is no pool, the unit is not the allotment unit, the cost is
-                    // zero, or the pool is exhausted.
+                    // Only the configured pool allotment unit (the genuine Pass XCC
+                    // charge) co-debits the aggregate pool. The reversal here is used
+                    // by the fail-closed deny branches below.
                     let reverse_per_pass = |store: &dyn BudgetStore| -> Result<(), KernelError> {
                         store.reverse_budget_hold(BudgetReverseHoldRequest {
                             capability_id: cap.id.clone(),
@@ -851,11 +851,24 @@ impl ChioKernel {
                         })?;
                         Ok(())
                     };
+                    // No pool configured: a genuine Pass charge cannot co-debit the
+                    // aggregate ceiling, so deny fail-closed (this must NOT widen the
+                    // XCC-must-co-debit invariant by silently authorizing).
                     let Some(pool) = self.free_tier_pool_config() else {
                         reverse_per_pass(store)?;
                         return Ok(PoolGuardedCharge::PoolDenied);
                     };
-                    if currency != pool.allotment_unit || cost_units == 0 {
+                    // A non-Pass private-use unit (for example a custom "ABC" budget)
+                    // is NOT the Pass allotment unit, so it never co-debits the
+                    // aggregate pool. Leave it on the normal budget path with its
+                    // per-Pass hold intact: installing the Pass pool must not break
+                    // unrelated private-unit budgets.
+                    if currency != pool.allotment_unit {
+                        return Ok(PoolGuardedCharge::Authorized(Box::new(authorized), None));
+                    }
+                    // Genuine Pass XCC: a zero co-debit cannot bound pool spend, so
+                    // deny fail-closed.
+                    if cost_units == 0 {
                         reverse_per_pass(store)?;
                         return Ok(PoolGuardedCharge::PoolDenied);
                     }
@@ -1266,6 +1279,21 @@ impl ChioKernel {
             self.merge_budget_receipt_metadata(extra_metadata, budget_metadata);
         let financial_json = Some(serde_json::json!({ "financial": financial_meta }));
         let merged_extra_metadata = merge_metadata_objects(financial_json, merged_extra_metadata);
+
+        // CONTROL 3 genuine-use binding: a genuine Pass (free-tier XCC) charge co-
+        // debited the aggregate pool, so stamp the allotment cost dimension on the
+        // served receipt. Without it, a normal Pass invocation (whose tool injects
+        // no custom `cost` block) would scan as non-genuine and the refresh would
+        // withhold the next allotment despite real usage. Gated on the free-tier
+        // pool hold, so non-Pass receipts are byte-identical to before.
+        let merged_extra_metadata = if charge.free_tier_pool_hold.is_some() {
+            Some(crate::pass_gating::stamp_pass_allotment_cost_dimension(
+                merged_extra_metadata,
+                charge.cost_charged,
+            ))
+        } else {
+            merged_extra_metadata
+        };
 
         match limited_output {
             ToolServerOutput::Value(_)
