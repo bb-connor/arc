@@ -207,6 +207,16 @@ pub enum QuoteOptionError {
         /// Expiry time supplied to the constructor.
         expires_at: u64,
     },
+    /// The last-look window has not opened yet: the option is being exercised
+    /// before its issuance time. Exercise fails closed before issuance so a
+    /// caller cannot bind a quote before it exists or before its validity starts.
+    #[error("quote option not yet issued: now {now} is before issued_at {issued_at}")]
+    NotYetIssued {
+        /// The exercise time presented by the caller.
+        now: u64,
+        /// The option's issuance time.
+        issued_at: u64,
+    },
     /// The last-look window has closed: the option is being exercised at or
     /// after its expiry. Exercise fails closed on expiry.
     #[error("quote option expired: now {now} is at or after expires_at {expires_at}")]
@@ -330,16 +340,24 @@ impl GradedQuoteOption {
 
     /// Exercise the option at `now`, binding the graded price.
     ///
-    /// Fails closed when the option has expired (`now` at or after
+    /// Fails closed when the option is exercised before its issuance time
+    /// (`now` below `issued_at`), when the option has expired (`now` at or after
     /// `expires_at`), and when the quote's verifiability band is below the
     /// option's bound minimum.
     ///
     /// # Errors
     ///
-    /// Returns [`QuoteOptionError::Expired`] once the last-look window has
-    /// closed, and [`QuoteOptionError::InsufficientVerifiability`] when the
-    /// graded band is below `minimum_band`.
+    /// Returns [`QuoteOptionError::NotYetIssued`] before the last-look window
+    /// opens, [`QuoteOptionError::Expired`] once it has closed, and
+    /// [`QuoteOptionError::InsufficientVerifiability`] when the graded band is
+    /// below `minimum_band`.
     pub fn exercise(&self, now: u64) -> Result<ExercisedQuote, QuoteOptionError> {
+        if now < self.issued_at {
+            return Err(QuoteOptionError::NotYetIssued {
+                now,
+                issued_at: self.issued_at,
+            });
+        }
         if self.is_expired(now) {
             return Err(QuoteOptionError::Expired {
                 now,
@@ -575,6 +593,38 @@ mod tests {
                 assert_eq!(expires_at, 200);
             }
             other => panic!("exercise after expiry must be denied, got {other:?}"),
+        }
+    }
+
+    /// PR959 codex P2: exercising before the option's issuance time fails closed,
+    /// so a caller cannot bind a quote before it exists or before its validity
+    /// window opens. The lower bound is checked alongside the expiry upper bound.
+    #[test]
+    fn exercise_before_issuance_is_denied() {
+        let grade = VerifiabilityGrade::from_slices(&ALL_EVIDENCE, &ALL_EVIDENCE);
+        let option = match GradedQuoteOption::try_new(
+            "quote-1",
+            usd(1_000),
+            grade,
+            VerifiabilityBand::Unverified,
+            100,
+            200,
+        ) {
+            Ok(option) => option,
+            Err(error) => panic!("option should build: {error}"),
+        };
+        // Before issuance: fail closed (the window has not opened yet).
+        match option.exercise(50) {
+            Err(QuoteOptionError::NotYetIssued { now, issued_at }) => {
+                assert_eq!(now, 50);
+                assert_eq!(issued_at, 100);
+            }
+            other => panic!("exercise before issuance must be denied, got {other:?}"),
+        }
+        // At the issuance boundary: the window is open, so exercise succeeds.
+        match option.exercise(100) {
+            Ok(exercised) => assert_eq!(exercised.exercised_at, 100),
+            Err(error) => panic!("exercise at issuance should succeed: {error}"),
         }
     }
 
