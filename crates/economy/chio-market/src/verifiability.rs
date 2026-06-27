@@ -388,26 +388,29 @@ impl GradedQuoteOption {
     /// fails closed with [`QuoteOptionError::PriceOverflow`] rather than binding
     /// a capped, UNDER-charged price.
     ///
-    /// This is the fail-closed price-binding path, so it FIRST rejects an
-    /// internally inconsistent grade. [`Self`] derives `Deserialize` and exposes
-    /// public fields, so a hand-built or decoded option can carry a grade whose
-    /// `verified_score` exceeds `required_score` (or whose band/score disagree)
-    /// without ever passing through [`Self::try_new`]. Such a grade makes the
-    /// missing-evidence term `required_score - verified_score` saturate to zero,
-    /// which would silently drop the surcharge and bind the BASE price (an
-    /// undercharge). A direct caller that does not route through [`Self::exercise`]
-    /// (which validates first) would otherwise undercharge, so the consistency
-    /// check is enforced here too.
+    /// This is the fail-closed price-binding path, so it FIRST re-runs every
+    /// constructor invariant via [`Self::validate_for_exercise`]. [`Self`] derives
+    /// `Deserialize` and exposes public fields, so a hand-built or decoded option
+    /// can reach this public binding-price path WITHOUT ever passing through
+    /// [`Self::try_new`] (or [`Self::exercise`], which validates first): it could
+    /// carry a non-canonical (lowercase or padded) `base_price.currency`, an empty
+    /// `quote_id`, an inverted last-look window, or a grade whose `verified_score`
+    /// exceeds `required_score`. An inconsistent grade makes the missing-evidence
+    /// term `required_score - verified_score` saturate to zero, silently dropping
+    /// the surcharge and binding the BASE price (an undercharge); a non-canonical
+    /// currency would bind a price `try_new`/`exercise` would reject. Re-validating
+    /// the same fields the constructor checks fails closed so the binding price is
+    /// never computed over a body the constructor would refuse.
     ///
     /// # Errors
     ///
-    /// Returns [`QuoteOptionError::InconsistentGrade`] when the option's grade is
+    /// Returns [`QuoteOptionError::EmptyQuoteId`], [`QuoteOptionError::InvalidCurrency`],
+    /// or [`QuoteOptionError::InvalidWindow`] when a constructor field invariant was
+    /// bypassed, [`QuoteOptionError::InconsistentGrade`] when the option's grade is
     /// not internally consistent, and [`QuoteOptionError::PriceOverflow`] when the
     /// graded price exceeds `u64::MAX`.
     pub fn checked_graded_price(&self) -> Result<MonetaryAmount, QuoteOptionError> {
-        if !self.grade.is_internally_consistent() {
-            return Err(QuoteOptionError::InconsistentGrade);
-        }
+        self.validate_for_exercise()?;
         let surcharge: u128 = if self.grade.required_score == 0 {
             0
         } else {
@@ -983,6 +986,35 @@ mod tests {
             other => {
                 panic!("an inconsistent grade must fail closed, not bind a price, got {other:?}")
             }
+        }
+    }
+
+    /// PR959 codex P2 (6th re-review): `checked_graded_price` is the public
+    /// fail-closed binding-price path, so it must re-run EVERY constructor field
+    /// invariant - not just the grade-consistency check the 5th re-review added. A
+    /// hand-built/decoded option can carry a non-canonical (lowercase) currency
+    /// `try_new`/`exercise` would reject; the binding path must reject it too rather
+    /// than bind a price in a non-canonical currency.
+    #[test]
+    fn checked_graded_price_rejects_non_canonical_currency() {
+        let grade = VerifiabilityGrade::from_slices(&ALL_EVIDENCE, &ALL_EVIDENCE);
+        assert!(grade.is_internally_consistent());
+        let option = GradedQuoteOption {
+            quote_id: "quote-1".to_string(),
+            base_price: MonetaryAmount {
+                units: 1_000,
+                currency: "usd".to_string(),
+            },
+            grade,
+            minimum_band: VerifiabilityBand::Unverified,
+            issued_at: 100,
+            expires_at: 200,
+        };
+        match option.checked_graded_price() {
+            Err(QuoteOptionError::InvalidCurrency { currency }) => assert_eq!(currency, "usd"),
+            other => panic!(
+                "a non-canonical base_price currency must fail closed at checked_graded_price, got {other:?}"
+            ),
         }
     }
 }
