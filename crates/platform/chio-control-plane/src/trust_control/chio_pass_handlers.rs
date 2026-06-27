@@ -711,6 +711,21 @@ pub fn prepare_pass_anchor_publication(
             "Pass anchor batch requires at least one issued or revoked Pass digest".to_string(),
         ));
     }
+    // Fail closed on a duplicate digest across the issued + revoked sets (PR959
+    // codex P2). A Pass artifact id and its revocation record share the same
+    // `chio_pass_artifact_id` digest, so a Pass present in both `issued_passes`
+    // and `revoked_records` would anchor one digest twice and let the proof
+    // panel seal while showing the SAME Pass as both Issued and Revoked -
+    // contradictory live/revoked status for a single digest. Reject the batch
+    // before it can publish that contradiction.
+    let mut seen_digests = std::collections::BTreeSet::new();
+    for digest in &anchored_digests {
+        if !seen_digests.insert(digest.as_str()) {
+            return Err(CliError::Other(format!(
+                "Pass anchor batch rejects a duplicate Pass digest across the issued and revoked sets: {digest}"
+            )));
+        }
+    }
 
     // 2. Build + sign the RFC6962 anchor batch over the digests. `build_anchor_batch_body`
     // canonical-JSON-encodes each digest leaf; reproduce those exact leaf bytes so the
@@ -2113,6 +2128,39 @@ mod tests {
         )
         .expect("issue first-window pass")
         .pass
+    }
+
+    /// PR959 codex P2: the same Pass present as both issued and revoked anchors
+    /// the identical artifact digest twice, which would let the proof panel seal
+    /// while showing one digest as Issued and the same digest as Revoked. The
+    /// prepared publication fails closed on the duplicate instead.
+    #[test]
+    fn prepare_pass_anchor_publication_rejects_duplicate_digest_across_sets() {
+        let operator = Keypair::generate();
+        let pass = issue_first_window_pass(&Keypair::generate(), TrustTier::Verified);
+        // The same Pass appears as issued AND as a revocation record: both carry
+        // the identical `chio_pass_artifact_id` digest.
+        let revoked = revoke_chio_pass_record(&pass, MID_JUNE_2026 + 5, "superseded".to_string())
+            .expect("revoke pass");
+        let binding = operator_binding(&operator, vec![Web3KeyBindingPurpose::Anchor]);
+        let error = prepare_pass_anchor_publication(
+            &operator,
+            &binding,
+            &anchor_target(),
+            std::slice::from_ref(&pass),
+            std::slice::from_ref(&revoked),
+            pending_witness(),
+            MID_JUNE_2026,
+            None,
+        )
+        .expect_err("duplicate digest across issued/revoked must fail closed");
+        match error {
+            CliError::Other(message) => assert!(
+                message.contains("duplicate Pass digest"),
+                "unexpected error: {message}"
+            ),
+            other => panic!("expected duplicate-digest rejection, got {other:?}"),
+        }
     }
 
     #[test]

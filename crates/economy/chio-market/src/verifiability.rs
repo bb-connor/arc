@@ -133,6 +133,36 @@ impl VerifiabilityGrade {
     pub fn is_fully_verified(&self) -> bool {
         matches!(self.band, VerifiabilityBand::Full)
     }
+
+    /// Whether this grade is internally consistent with what [`Self::grade`]
+    /// produces from some (required, verified) evidence pair.
+    ///
+    /// A grade that did not come from [`Self::grade`] (hand-built, deserialized,
+    /// or otherwise externally constructed) can carry an arbitrary `band` and
+    /// scores. This re-derives the invariants the grader guarantees and rejects
+    /// any grade that violates them:
+    ///
+    /// - the verified score never exceeds the required score;
+    /// - the `band` matches the band the scores imply (so `band = Full` with
+    ///   `required_score = 0`, or any other band/score mismatch, is rejected);
+    /// - the missing-evidence weights exactly account for the unverified portion
+    ///   (`verified_score + sum(missing weights) == required_score`), which also
+    ///   rejects duplicated or padded missing-evidence lists.
+    ///
+    /// It cannot prove the scores reflect genuinely verified evidence (that
+    /// needs the original evidence sets), but it does close the inconsistent-shape
+    /// bypass where a fabricated grade claims a band its scores do not support.
+    #[must_use]
+    pub fn is_internally_consistent(&self) -> bool {
+        if self.verified_score > self.required_score {
+            return false;
+        }
+        if self.band != band_for(self.verified_score, self.required_score) {
+            return false;
+        }
+        let missing_weight = sum_weights(self.missing_evidence.iter().copied());
+        self.verified_score.checked_add(missing_weight) == Some(self.required_score)
+    }
 }
 
 /// Sum evidence weights with saturating arithmetic so the grade can never panic
@@ -236,6 +266,20 @@ pub enum QuoteOptionError {
         /// The minimum band the option requires to be exercised.
         minimum: VerifiabilityBand,
     },
+    /// The carried [`VerifiabilityGrade`] is not internally consistent with what
+    /// [`VerifiabilityGrade::grade`] produces: its band does not match its
+    /// scores, or its missing-evidence weights do not account for the gap
+    /// between the verified and required scores. A grade that was hand-built or
+    /// deserialized into an inconsistent shape (for example `band = Full` with
+    /// `required_score = 0`) is rejected before it can bind a price.
+    #[error("quote option grade is internally inconsistent and cannot bind a price")]
+    InconsistentGrade,
+    /// The exercised graded price (base price plus verifiability surcharge)
+    /// exceeds `u64::MAX`. The option fails closed rather than saturating to
+    /// `u64::MAX`, which would silently UNDERcharge a bound quote whose intended
+    /// price is larger.
+    #[error("quote option graded price overflows u64 and cannot bind a price")]
+    PriceOverflow,
 }
 
 /// A graded price bound to a last-look window.
@@ -322,6 +366,10 @@ impl GradedQuoteOption {
     /// The graded price: base price plus the verifiability surcharge for the
     /// option's grade. Currency is carried through from the base price and the
     /// addition saturates rather than wrapping.
+    ///
+    /// This saturating form is for DISPLAY only. Binding a price goes through
+    /// [`Self::checked_graded_price`], which fails closed on overflow instead of
+    /// silently capping (and undercharging) at `u64::MAX`.
     #[must_use]
     pub fn graded_price(&self) -> MonetaryAmount {
         let surcharge = verifiability_surcharge_minor(self.base_price.units, &self.grade);
@@ -329,6 +377,71 @@ impl GradedQuoteOption {
             units: self.base_price.units.saturating_add(surcharge),
             currency: self.base_price.currency.clone(),
         }
+    }
+
+    /// The graded price computed fail-closed: base price plus the verifiability
+    /// surcharge, rejecting an overflow rather than saturating.
+    ///
+    /// The surcharge and total are computed in `u128` (a `u64` base times a
+    /// small `u32` weight gap can never overflow `u128`), then the total is
+    /// narrowed back to `u64`. If the true total exceeds `u64::MAX` the option
+    /// fails closed with [`QuoteOptionError::PriceOverflow`] rather than binding
+    /// a capped, UNDER-charged price.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`QuoteOptionError::PriceOverflow`] when the graded price exceeds
+    /// `u64::MAX`.
+    pub fn checked_graded_price(&self) -> Result<MonetaryAmount, QuoteOptionError> {
+        let surcharge: u128 = if self.grade.required_score == 0 {
+            0
+        } else {
+            let missing = u128::from(
+                self.grade
+                    .required_score
+                    .saturating_sub(self.grade.verified_score),
+            );
+            u128::from(self.base_price.units).saturating_mul(missing)
+                / u128::from(self.grade.required_score)
+        };
+        let total = u128::from(self.base_price.units)
+            .checked_add(surcharge)
+            .ok_or(QuoteOptionError::PriceOverflow)?;
+        let units = u64::try_from(total).map_err(|_| QuoteOptionError::PriceOverflow)?;
+        Ok(MonetaryAmount {
+            units,
+            currency: self.base_price.currency.clone(),
+        })
+    }
+
+    /// Re-run the constructor's fail-closed checks against this option's current
+    /// fields, plus a grade-consistency check.
+    ///
+    /// [`Self`] derives `Deserialize` and exposes public fields, so an option
+    /// can reach [`Self::exercise`] without ever passing through [`Self::try_new`]
+    /// (for example decoded from JSON with a lowercase currency, an empty
+    /// `quote_id`, an inverted window, or a hand-built inconsistent grade).
+    /// Exercise calls this first so those bypassed invariants are enforced before
+    /// any price binds.
+    fn validate_for_exercise(&self) -> Result<(), QuoteOptionError> {
+        if self.quote_id.trim().is_empty() {
+            return Err(QuoteOptionError::EmptyQuoteId);
+        }
+        if !is_canonical_currency(&self.base_price.currency) {
+            return Err(QuoteOptionError::InvalidCurrency {
+                currency: self.base_price.currency.clone(),
+            });
+        }
+        if self.expires_at <= self.issued_at {
+            return Err(QuoteOptionError::InvalidWindow {
+                issued_at: self.issued_at,
+                expires_at: self.expires_at,
+            });
+        }
+        if !self.grade.is_internally_consistent() {
+            return Err(QuoteOptionError::InconsistentGrade);
+        }
+        Ok(())
     }
 
     /// Whether the last-look window has closed at `now`. The option is expired
@@ -340,18 +453,26 @@ impl GradedQuoteOption {
 
     /// Exercise the option at `now`, binding the graded price.
     ///
-    /// Fails closed when the option is exercised before its issuance time
-    /// (`now` below `issued_at`), when the option has expired (`now` at or after
-    /// `expires_at`), and when the quote's verifiability band is below the
-    /// option's bound minimum.
+    /// Fails closed when the option's own fields are invalid (bypassing
+    /// [`Self::try_new`] via deserialization or direct construction), when the
+    /// carried grade is internally inconsistent, when the option is exercised
+    /// before its issuance time (`now` below `issued_at`), when the option has
+    /// expired (`now` at or after `expires_at`), when the quote's verifiability
+    /// band is below the option's bound minimum, and when the graded price would
+    /// overflow `u64`.
     ///
     /// # Errors
     ///
-    /// Returns [`QuoteOptionError::NotYetIssued`] before the last-look window
-    /// opens, [`QuoteOptionError::Expired`] once it has closed, and
+    /// Returns [`QuoteOptionError::EmptyQuoteId`], [`QuoteOptionError::InvalidCurrency`],
+    /// or [`QuoteOptionError::InvalidWindow`] when a constructor invariant was
+    /// bypassed, [`QuoteOptionError::InconsistentGrade`] when the grade is not
+    /// internally consistent, [`QuoteOptionError::NotYetIssued`] before the
+    /// last-look window opens, [`QuoteOptionError::Expired`] once it has closed,
     /// [`QuoteOptionError::InsufficientVerifiability`] when the graded band is
-    /// below `minimum_band`.
+    /// below `minimum_band`, and [`QuoteOptionError::PriceOverflow`] when the
+    /// graded price exceeds `u64::MAX`.
     pub fn exercise(&self, now: u64) -> Result<ExercisedQuote, QuoteOptionError> {
+        self.validate_for_exercise()?;
         if now < self.issued_at {
             return Err(QuoteOptionError::NotYetIssued {
                 now,
@@ -370,9 +491,10 @@ impl GradedQuoteOption {
                 minimum: self.minimum_band,
             });
         }
+        let price = self.checked_graded_price()?;
         Ok(ExercisedQuote {
             quote_id: self.quote_id.clone(),
-            price: self.graded_price(),
+            price,
             grade: self.grade.clone(),
             exercised_at: now,
         })
@@ -711,6 +833,104 @@ mod tests {
                 evidence_weight(requirement) > 0,
                 "every evidence weight must be positive for strict monotonicity"
             );
+        }
+    }
+
+    /// PR959 codex P2: an option deserialized (or directly built) past
+    /// `try_new`'s checks - here with an empty `quote_id` and a lowercase
+    /// currency - is rejected at exercise rather than binding a price.
+    #[test]
+    fn exercise_revalidates_bypassed_constructor_invariants() {
+        let grade = VerifiabilityGrade::from_slices(&ALL_EVIDENCE, &ALL_EVIDENCE);
+        let bad_currency = GradedQuoteOption {
+            quote_id: "quote-1".to_string(),
+            base_price: MonetaryAmount {
+                units: 1_000,
+                currency: "usd".to_string(),
+            },
+            grade: grade.clone(),
+            minimum_band: VerifiabilityBand::Unverified,
+            issued_at: 100,
+            expires_at: 200,
+        };
+        match bad_currency.exercise(150) {
+            Err(QuoteOptionError::InvalidCurrency { currency }) => assert_eq!(currency, "usd"),
+            other => panic!("non-canonical currency must be rejected at exercise, got {other:?}"),
+        }
+        let empty_id = GradedQuoteOption {
+            quote_id: "  ".to_string(),
+            base_price: usd(1_000),
+            grade,
+            minimum_band: VerifiabilityBand::Unverified,
+            issued_at: 100,
+            expires_at: 200,
+        };
+        match empty_id.exercise(150) {
+            Err(QuoteOptionError::EmptyQuoteId) => {}
+            other => panic!("empty quote id must be rejected at exercise, got {other:?}"),
+        }
+    }
+
+    /// PR959 codex P2: a hand-built grade that claims `band = Full` with
+    /// `required_score = 0` (no evidence required, none verified) is internally
+    /// inconsistent and cannot bind a price - exercise fails closed instead of
+    /// charging the unsurcharged base at a Full minimum.
+    #[test]
+    fn exercise_rejects_inconsistent_grade() {
+        let fabricated = VerifiabilityGrade {
+            band: VerifiabilityBand::Full,
+            verified_score: 0,
+            required_score: 0,
+            missing_evidence: Vec::new(),
+        };
+        assert!(!fabricated.is_internally_consistent());
+        let option = GradedQuoteOption {
+            quote_id: "quote-1".to_string(),
+            base_price: usd(1_000),
+            grade: fabricated,
+            minimum_band: VerifiabilityBand::Full,
+            issued_at: 100,
+            expires_at: 200,
+        };
+        match option.exercise(150) {
+            Err(QuoteOptionError::InconsistentGrade) => {}
+            other => panic!("an inconsistent grade must be rejected, got {other:?}"),
+        }
+        // A genuine grade from the grader stays exercisable.
+        let real = VerifiabilityGrade::from_slices(&ALL_EVIDENCE, &ALL_EVIDENCE);
+        assert!(real.is_internally_consistent());
+    }
+
+    /// PR959 codex P2: a graded price that would exceed `u64::MAX` fails closed
+    /// rather than saturating to `u64::MAX` and UNDER-charging the bound quote.
+    #[test]
+    fn exercise_rejects_overflowing_graded_price() {
+        // Partial verification leaves a positive surcharge on a u64::MAX base, so
+        // base + surcharge overflows u64.
+        let required = [
+            LiabilityEvidenceRequirement::UnderwritingDecision,
+            LiabilityEvidenceRequirement::CreditProviderRiskPackage,
+        ];
+        let verified = [LiabilityEvidenceRequirement::UnderwritingDecision];
+        let grade = VerifiabilityGrade::from_slices(&required, &verified);
+        let option = match GradedQuoteOption::try_new(
+            "quote-1",
+            usd(u64::MAX),
+            grade,
+            VerifiabilityBand::Partial,
+            100,
+            200,
+        ) {
+            Ok(option) => option,
+            Err(error) => panic!("option should build: {error}"),
+        };
+        match option.checked_graded_price() {
+            Err(QuoteOptionError::PriceOverflow) => {}
+            other => panic!("overflowing checked price must fail closed, got {other:?}"),
+        }
+        match option.exercise(150) {
+            Err(QuoteOptionError::PriceOverflow) => {}
+            other => panic!("overflowing graded price must fail closed at exercise, got {other:?}"),
         }
     }
 }

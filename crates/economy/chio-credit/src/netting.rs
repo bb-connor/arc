@@ -52,6 +52,12 @@ pub enum ExposureLedgerNettingError {
     /// A supplied conversion rate had a zero denominator. The collapse refuses
     /// to divide by zero or understate exposure.
     ZeroDenominator { currency: String },
+    /// A supplied conversion rate had a zero numerator. A zero numerator maps
+    /// every positive exposure to zero canonical units, silently collapsing a
+    /// non-canonical position to nothing. The collapse refuses it (fail-closed)
+    /// rather than understate the netted view, exactly as it refuses a zero
+    /// denominator.
+    ZeroNumerator { currency: String },
     /// A conversion into the canonical denomination exceeded `u64::MAX`. The
     /// collapse refuses to cap or saturate the result, because a capped figure
     /// understates outstanding exposure and would publish a lower-than-true
@@ -84,6 +90,10 @@ impl fmt::Display for ExposureLedgerNettingError {
             Self::ZeroDenominator { currency } => write!(
                 f,
                 "exposure ledger netting rejected a zero-denominator conversion rate for currency `{currency}`"
+            ),
+            Self::ZeroNumerator { currency } => write!(
+                f,
+                "exposure ledger netting rejected a zero-numerator conversion rate for currency `{currency}`"
             ),
             Self::ConversionOverflow { currency } => write!(
                 f,
@@ -142,12 +152,19 @@ impl CanonicalConversionRate {
     /// # Errors
     ///
     /// Returns [`ExposureLedgerNettingError::ZeroDenominator`] when the rate
-    /// denominator is zero, and [`ExposureLedgerNettingError::ConversionOverflow`]
-    /// when the converted figure exceeds `u64::MAX` (the collapse fails closed
-    /// rather than capping, since a capped figure understates exposure).
+    /// denominator is zero, [`ExposureLedgerNettingError::ZeroNumerator`] when
+    /// the rate numerator is zero (which would collapse a positive exposure to
+    /// nothing), and [`ExposureLedgerNettingError::ConversionOverflow`] when the
+    /// converted figure exceeds `u64::MAX` (the collapse fails closed rather than
+    /// capping, since a capped figure understates exposure).
     pub fn convert(&self, units: u64) -> Result<u64, ExposureLedgerNettingError> {
         if self.denominator == 0 {
             return Err(ExposureLedgerNettingError::ZeroDenominator {
+                currency: self.currency.clone(),
+            });
+        }
+        if self.numerator == 0 {
+            return Err(ExposureLedgerNettingError::ZeroNumerator {
                 currency: self.currency.clone(),
             });
         }
@@ -174,11 +191,18 @@ impl CanonicalConversionRate {
     /// # Errors
     ///
     /// Returns [`ExposureLedgerNettingError::ZeroDenominator`] when the rate
-    /// denominator is zero, and [`ExposureLedgerNettingError::ConversionOverflow`]
-    /// when the converted figure exceeds `u64::MAX`.
+    /// denominator is zero, [`ExposureLedgerNettingError::ZeroNumerator`] when
+    /// the rate numerator is zero, and
+    /// [`ExposureLedgerNettingError::ConversionOverflow`] when the converted
+    /// figure exceeds `u64::MAX`.
     pub fn convert_floor(&self, units: u64) -> Result<u64, ExposureLedgerNettingError> {
         if self.denominator == 0 {
             return Err(ExposureLedgerNettingError::ZeroDenominator {
+                currency: self.currency.clone(),
+            });
+        }
+        if self.numerator == 0 {
+            return Err(ExposureLedgerNettingError::ZeroNumerator {
                 currency: self.currency.clone(),
             });
         }
@@ -820,6 +844,46 @@ mod tests {
         assert_eq!(
             error,
             ExposureLedgerNettingError::ZeroDenominator {
+                currency: "EUR".to_string()
+            }
+        );
+    }
+
+    /// PR959 codex P2: a zero-numerator rate fails closed rather than collapsing
+    /// a positive exposure to zero canonical units.
+    #[test]
+    fn netting_zero_numerator_fails_closed() {
+        let rates = ExposureLedgerNettingRates::new(vec![CanonicalConversionRate {
+            currency: "EUR".to_string(),
+            numerator: 0,
+            denominator: 10,
+        }]);
+        let eur = ExposureLedgerCurrencyPosition {
+            reserved_units: 100,
+            ..position("EUR")
+        };
+        let error = collapse_positions_to_canonical(&[eur], &rates).unwrap_err();
+        assert_eq!(
+            error,
+            ExposureLedgerNettingError::ZeroNumerator {
+                currency: "EUR".to_string()
+            }
+        );
+        // The direct conversion path fails closed too (both round-up and floor).
+        let rate = CanonicalConversionRate {
+            currency: "EUR".to_string(),
+            numerator: 0,
+            denominator: 10,
+        };
+        assert_eq!(
+            rate.convert(100).unwrap_err(),
+            ExposureLedgerNettingError::ZeroNumerator {
+                currency: "EUR".to_string()
+            }
+        );
+        assert_eq!(
+            rate.convert_floor(100).unwrap_err(),
+            ExposureLedgerNettingError::ZeroNumerator {
                 currency: "EUR".to_string()
             }
         );
