@@ -2137,10 +2137,10 @@ mod tests {
         let revoked = [revoked_c.clone()];
 
         // (1) Build the anchor batch + strictly-increasing kernel checkpoints
-        // under the Anchor-purpose binding. The on-chain registry rejects
-        // checkpoint_seq 0 (its `latestSeq` defaults to 0), so the kernel genesis
-        // checkpoint is local-only and the first published root is the seq-1
-        // checkpoint chained onto it; seq-2 chains onto seq-1.
+        // under the Anchor-purpose binding. The kernel genesis checkpoint is
+        // `checkpoint_seq` 1 (validate_checkpoint rejects seq 0), which the
+        // on-chain registry accepts as the first published root (its `latestSeq`
+        // defaults to 0); the seq-2 root chains onto it and seq-3 onto seq-2.
         let genesis = prepare_pass_anchor_publication(
             &operator,
             &binding,
@@ -2152,7 +2152,7 @@ mod tests {
             None,
         )
         .expect("genesis prepare");
-        assert_eq!(genesis.checkpoint.body.checkpoint_seq, 0);
+        assert_eq!(genesis.checkpoint.body.checkpoint_seq, 1);
 
         let published1 = prepare_pass_anchor_publication(
             &operator,
@@ -2176,8 +2176,8 @@ mod tests {
             Some(&published1.checkpoint),
         )
         .expect("seq-2 prepare");
-        assert_eq!(published1.publication.checkpoint_seq, 1);
-        assert_eq!(published2.publication.checkpoint_seq, 2);
+        assert_eq!(published1.publication.checkpoint_seq, 2);
+        assert_eq!(published2.publication.checkpoint_seq, 3);
         assert!(published2.publication.checkpoint_seq > published1.publication.checkpoint_seq);
         assert_eq!(
             published1.publication.operator_address,
@@ -2204,22 +2204,21 @@ mod tests {
         // signature) before any registry call; no on-chain value moves.
         verify_anchor_batch(&published1.batch).expect("anchor batch verifies");
 
-        // (2) Publish into the mock registry. The genesis (seq 0) is rejected by
-        // the same monotonic rule the contract enforces; the seq-1 and seq-2
-        // roots publish in strictly-increasing order. NO value moves.
+        // (2) Publish into the mock registry. The genesis is now `checkpoint_seq`
+        // 1, so it is the first published root; the seq-2 and seq-3 roots publish
+        // in strictly-increasing order under the same monotonic rule the contract
+        // enforces. NO value moves.
         let mut registry = MockChioRootRegistry::default();
-        assert_eq!(
-            registry.publish_root(&genesis.publication),
-            Err(MockRegistryError::NonMonotonicCheckpointSeq),
-            "kernel genesis seq 0 cannot be the first published root"
-        );
+        registry
+            .publish_root(&genesis.publication)
+            .expect("publish genesis seq-1 root");
         registry
             .publish_root(&published1.publication)
-            .expect("publish seq-1 root");
+            .expect("publish seq-2 root");
         registry
             .publish_root(&published2.publication)
-            .expect("publish seq-2 root");
-        assert_eq!(registry.latest_seq(&target.operator_address), 2);
+            .expect("publish seq-3 root");
+        assert_eq!(registry.latest_seq(&target.operator_address), 3);
         // Re-publishing an already-anchored (now stale) seq fails closed.
         assert_eq!(
             registry.publish_root(&published1.publication),
@@ -2229,10 +2228,10 @@ mod tests {
 
         // The stored entry mirrors the published checkpoint exactly.
         let stored = registry
-            .get_root(&target.operator_address, 1)
-            .expect("seq-1 entry stored");
+            .get_root(&target.operator_address, 2)
+            .expect("seq-2 entry stored");
         assert_eq!(stored.merkle_root, published1.publication.merkle_root);
-        assert_eq!(stored.checkpoint_seq, 1);
+        assert_eq!(stored.checkpoint_seq, 2);
         assert_eq!(
             stored.batch_start_seq,
             published1.publication.batch_start_seq
@@ -2247,14 +2246,14 @@ mod tests {
         // Fail-closed parity with the contract reverts: a zero root and a
         // degenerate batch range are rejected (still value-free).
         let mut zero_root = published2.publication.clone();
-        zero_root.checkpoint_seq = 3;
+        zero_root.checkpoint_seq = 4;
         zero_root.merkle_root = Hash::zero();
         assert_eq!(
             registry.publish_root(&zero_root),
             Err(MockRegistryError::ZeroMerkleRoot)
         );
         let mut bad_range = published2.publication.clone();
-        bad_range.checkpoint_seq = 3;
+        bad_range.checkpoint_seq = 4;
         bad_range.batch_start_seq = 5;
         bad_range.batch_end_seq = 4;
         assert_eq!(
@@ -2263,7 +2262,7 @@ mod tests {
         );
 
         // (3) Prove single-Pass membership via verifyInclusionDetailed for each
-        // anchored Pass id, against the published seq-1 root. Read-only.
+        // anchored Pass id, against the published seq-2 root. Read-only.
         let root = published1.publication.merkle_root;
         assert_eq!(root, published1.batch.body.tree_root);
         let included_ids = [
