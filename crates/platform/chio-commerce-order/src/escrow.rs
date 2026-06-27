@@ -8,7 +8,7 @@
 //! ONLY against a capital execution observation reconciled as
 //! [`CapitalExecutionReconciledState::Matched`].
 //!
-//! Three fail-closed seams hold:
+//! Four fail-closed seams hold:
 //!
 //! - The offered capability token is authenticated BEFORE any custodial
 //!   liability is derived from it: its signature must verify against its
@@ -25,6 +25,11 @@
 //!   reservation must fully collateralize the offer liability, the locked amount
 //!   must equal the signed quote, and the acceptor must be the offer subject, or
 //!   [`accept`] denies.
+//! - The custodial depositor/beneficiary accounts are bound to the order
+//!   parties: they are derived from the order context's verified
+//!   `buyer_subject` / `merchant_subject`, never caller-supplied, so custody can
+//!   never be redirected to a third account while the settlement packet names
+//!   the order merchant.
 //! - Seam A: the freetier:global Sybil-ceiling pool ledger and the escrow
 //!   ledger are hard-isolated. No escrow leg, in either direction, may name a
 //!   `freetier:global:<window>` row (see [`is_freetier_global_pool_id`]).
@@ -559,10 +564,6 @@ pub struct CommerceEscrowAcceptRequest<'a> {
     /// The pinned settlement reservation authority key the reservation witness
     /// MUST be signed by.
     pub reservation_authority: PublicKey,
-    /// The depositor (buyer) custodial account debited by the lock leg.
-    pub depositor_account: String,
-    /// The beneficiary (merchant) account credited by the release leg.
-    pub beneficiary_account: String,
     /// Off-context settlement dispatch fields for the settlement packet body.
     pub settlement: CommerceSettlementDispatch,
     /// Authority that signs the emitted settlement packet body.
@@ -740,13 +741,22 @@ pub fn accept(
         ));
     }
 
+    // ESCROW-3: bind the custodial accounts to the actual order parties. The
+    // depositor (buyer) and beneficiary (merchant) accounts are NOT
+    // caller-supplied; they are derived from the order context's verified
+    // `buyer_subject` / `merchant_subject`. A caller can therefore never redirect
+    // custody to a third account while the settlement packet still names the
+    // order merchant. `validate_shape` above already proved both are non-empty.
+    let depositor_account = request.order_context.buyer_subject.clone();
+    let beneficiary_account = request.order_context.merchant_subject.clone();
+
     // Single-ledger custodial escrow: the lock leg debits the depositor (buyer)
     // and credits the custody account. Seam A is enforced inside `lock`.
     let ledger = CommerceEscrowLedger::lock(
         request.order_context.order_id.clone(),
         liability.currency.clone(),
-        request.depositor_account.clone(),
-        request.beneficiary_account.clone(),
+        depositor_account,
+        beneficiary_account,
         liability.units,
     )?;
 
@@ -1045,7 +1055,6 @@ mod tests {
         SignedExportEnvelope::sign(body, authority).test_expect("sign reservation receipt")
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn accept_request<'a>(
         context: &'a CommerceOrderContext,
         token: &'a CapabilityToken,
@@ -1053,8 +1062,6 @@ mod tests {
         reservation: &'a SignedCommerceReservationReceipt,
         reservation_authority: PublicKey,
         authority: &'a Keypair,
-        depositor: &str,
-        beneficiary: &str,
     ) -> CommerceEscrowAcceptRequest<'a> {
         CommerceEscrowAcceptRequest {
             order_context: context,
@@ -1063,8 +1070,6 @@ mod tests {
             accepted_at: 500,
             reservation,
             reservation_authority,
-            depositor_account: depositor.to_string(),
-            beneficiary_account: beneficiary.to_string(),
             settlement: dispatch(),
             settlement_authority: authority,
         }
@@ -1088,8 +1093,6 @@ mod tests {
             &reservation,
             res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect("accept succeeds");
 
@@ -1146,8 +1149,6 @@ mod tests {
             &reservation,
             res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("under-collateralized accept is denied");
 
@@ -1177,8 +1178,6 @@ mod tests {
             &reservation,
             res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("wrong acceptor is denied");
 
@@ -1207,8 +1206,6 @@ mod tests {
             &reservation,
             res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect("accept succeeds");
 
@@ -1266,22 +1263,22 @@ mod tests {
         let acceptor = subject.public_key();
         let authority = keypair(7);
         let token = token_offer(&issuer, &acceptor, 4200, "USD");
-        let context = order_context("fulfillment_attested");
         let res_auth = reservation_authority();
-        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
         let pool_id = "freetier:global:2026-06";
         assert!(is_freetier_global_pool_id(pool_id));
 
-        // Debit direction: depositor is a freetier:global pool row.
+        // Debit direction: the order's buyer_subject (the derived depositor) is a
+        // freetier:global pool row.
+        let mut debit_context = order_context("fulfillment_attested");
+        debit_context.buyer_subject = pool_id.to_string();
+        let reservation = signed_reservation(&debit_context, &token, 4200, "USD", &res_auth);
         let debit_error = accept(accept_request(
-            &context,
+            &debit_context,
             &token,
             &acceptor,
             &reservation,
             res_auth.public_key(),
             &authority,
-            pool_id,
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("escrow may not debit a freetier:global pool row");
         assert!(matches!(
@@ -1290,16 +1287,18 @@ mod tests {
                 if message.contains("isolation violation") && message.contains(pool_id)
         ));
 
-        // Credit direction: beneficiary is a freetier:global pool row.
+        // Credit direction: the order's merchant_subject (the derived
+        // beneficiary) is a freetier:global pool row.
+        let mut credit_context = order_context("fulfillment_attested");
+        credit_context.merchant_subject = pool_id.to_string();
+        let reservation = signed_reservation(&credit_context, &token, 4200, "USD", &res_auth);
         let credit_error = accept(accept_request(
-            &context,
+            &credit_context,
             &token,
             &acceptor,
             &reservation,
             res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            pool_id,
         ))
         .test_expect_err("escrow may not credit a freetier:global pool row");
         assert!(matches!(
@@ -1307,6 +1306,51 @@ mod tests {
             CommerceOrderError::SettlementFailed(message)
                 if message.contains("isolation violation") && message.contains(pool_id)
         ));
+    }
+
+    // ESCROW-3: the locked ledger's depositor/beneficiary are bound to the order
+    // parties (buyer_subject / merchant_subject), never caller-supplied, so
+    // custody can never be redirected to a third account while the settlement
+    // packet still names the order merchant.
+    #[test]
+    fn accept_binds_escrow_accounts_to_order_parties() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let mut context = order_context("fulfillment_attested");
+        context.buyer_subject = "buyer:distinct-party".to_string();
+        context.merchant_subject = "merchant:distinct-party".to_string();
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
+
+        let acceptance = accept(accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            res_auth.public_key(),
+            &authority,
+        ))
+        .test_expect("accept succeeds");
+
+        // The ledger custody flows are bound to the order parties.
+        assert_eq!(acceptance.ledger.depositor_account, "buyer:distinct-party");
+        assert_eq!(
+            acceptance.ledger.beneficiary_account,
+            "merchant:distinct-party"
+        );
+        assert_eq!(
+            acceptance.ledger.legs[0].from_account,
+            "buyer:distinct-party"
+        );
+        // The settlement packet names the SAME merchant as the ledger
+        // beneficiary, so settlement routing and custody release cannot diverge.
+        assert_eq!(
+            acceptance.settlement_packet.body.merchant_subject,
+            acceptance.ledger.beneficiary_account
+        );
     }
 
     #[test]
@@ -1395,8 +1439,6 @@ mod tests {
             &reservation,
             res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("forged offer token is denied");
 
@@ -1427,8 +1469,6 @@ mod tests {
             &reservation,
             res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("self-issued offer token is denied");
 
@@ -1460,8 +1500,6 @@ mod tests {
             &reservation,
             res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         );
         not_yet.accepted_at = 50;
         let not_yet_error = accept(not_yet).test_expect_err("not-yet-valid offer token is denied");
@@ -1479,8 +1517,6 @@ mod tests {
             &reservation,
             res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         );
         expired.accepted_at = 10_000;
         let expired_error = accept(expired).test_expect_err("expired offer token is denied");
@@ -1513,8 +1549,6 @@ mod tests {
             &reservation,
             res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("cap that differs from the quote is denied");
 
@@ -1545,8 +1579,6 @@ mod tests {
             &eur_reservation,
             res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("liability currency mismatch is denied");
         assert!(matches!(
@@ -1566,8 +1598,6 @@ mod tests {
             &mismatched_reservation,
             res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("reservation currency mismatch is denied");
         assert!(matches!(
@@ -1597,8 +1627,6 @@ mod tests {
             &reservation,
             res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect("accept locks the ledger");
         assert_eq!(acceptance.ledger.status, CommerceEscrowStatus::Locked);
@@ -1664,8 +1692,6 @@ mod tests {
             &reservation,
             res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("accept from a non-assembly state is denied");
         assert!(matches!(
@@ -1683,8 +1709,6 @@ mod tests {
             &reservation,
             res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect("accept locks the ledger");
         let observation = CapitalExecutionObservation {
@@ -1813,8 +1837,6 @@ mod tests {
             &reservation,
             res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("tampered reservation witness is denied");
         assert!(matches!(
@@ -1849,8 +1871,6 @@ mod tests {
             &reservation,
             res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("reservation bound to the wrong order is denied");
         assert!(matches!(
@@ -1882,8 +1902,6 @@ mod tests {
             &reservation,
             reservation_authority().public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("reservation from an unexpected authority is denied");
         assert!(matches!(

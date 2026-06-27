@@ -1691,8 +1691,6 @@ fn pin_escrow_digest_via_accept(
             accepted_at: 500,
             reservation: &reservation,
             reservation_authority: reservation_authority.public_key(),
-            depositor_account: "buyer:demo-cafe-customer".to_string(),
-            beneficiary_account: "merchant:stripe:coffee-shop".to_string(),
             settlement: chio_commerce_order::CommerceSettlementDispatch {
                 issued_at: "2026-06-10T00:05:30Z".to_string(),
                 psp: "stripe".to_string(),
