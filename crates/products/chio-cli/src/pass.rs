@@ -21,16 +21,17 @@
 
 use std::fs;
 use std::path::Path;
+use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_anchor::{AnchorBatchWitness, EvmAnchorTarget};
 use chio_core::capability::token::AttestationWindowId;
 use chio_core::web3::identity::SignedWeb3IdentityBinding;
-use chio_core::PublicKey;
+use chio_core::{canonical_json_bytes, PublicKey, Signature};
 use chio_did::DidChio;
 use chio_credentials::{
-    attestation_window_containing, verify_chio_pass, ChioPass, PassportLifecycleRecord,
-    PassportLifecycleState, TierAllotmentTable, TrustTier,
+    attestation_window_containing, chio_pass_artifact_id, verify_chio_pass, ChioPass,
+    PassportLifecycleRecord, PassportLifecycleState, TierAllotmentTable, TrustTier,
 };
 use chio_kernel::{verify_checkpoint_signature, KernelCheckpoint, LocalCapabilityAuthority};
 use chio_store_sqlite::{PassIssuanceAdmission, SqliteReceiptStore, SqliteRevocationStore};
@@ -333,33 +334,97 @@ fn verify_reattestation_proof(
     Ok(true)
 }
 
-/// Derive the (expiring prior, minted next) attestation window pair for a refresh
-/// run at `now`.
+/// The early-span guard (seconds) at the START of an attestation window within
+/// which the EXPIRING window a refresh renews is ambiguous from the wall clock
+/// alone. A refresh fired inside this span (e.g. a rollover cron running just
+/// after the month boundary) could mean "renew the window that just ended" OR
+/// "renew the window that just opened", so the operator MUST pin the expiring
+/// window explicitly with `--prior-window-at`. One day is comfortably larger than
+/// any rollover-job skew yet far smaller than a monthly window, so an interior
+/// refresh is never misclassified.
+const REFRESH_ROLLOVER_GRACE_SECS: u64 = 86_400;
+
+/// Derive the (expiring prior, minted next) attestation window pair for a refresh.
 ///
-/// The genuine-use scan runs over the EXPIRING window and the next contiguous
-/// window is minted. When `now` lands exactly on a month boundary (the first
-/// instant of a new window) the window that JUST ended is the one being refreshed,
-/// so the prior window is the previous month and the next window is the window
-/// containing `now`. Otherwise the prior window is the one containing `now` and the
-/// next window is the contiguous rollover.
+/// A refresh renews an EXPIRING Pass into the contiguous next monthly window. The
+/// wall-clock `now` alone cannot identify the expiring window across a month
+/// boundary: at the rollover instant AND just after it (e.g. 2026-07-01T00:00:01Z)
+/// `now` already lands in the NEW window, so deriving the prior window from `now`
+/// would scan the brand-new (empty) window and mint a month too far ahead (scan
+/// July, mint August instead of scan June, mint July). The round-2 fix only handled
+/// the exact instant `now == since`; a run one second later still mis-derived.
 ///
-/// Without the boundary case a refresh run at the rollover instant would treat the
-/// brand-new (empty) window as the prior window, miss the expiring window's
-/// genuine-use receipts, and mint for the wrong month (e.g. on 2026-07-01 it would
-/// scan July and mint August instead of scanning June and minting July).
+/// The expiring window is therefore pinned EXPLICITLY by `prior_window_at` (a unix
+/// instant INSIDE the expiring Pass's window) whenever it is supplied; the minted
+/// next window is its contiguous rollover. When it is omitted the prior window is
+/// derived from `now` ONLY when `now` sits comfortably inside a window's interior
+/// (past the `REFRESH_ROLLOVER_GRACE_SECS` early span); a run within that early
+/// span fails closed and demands `--prior-window-at`, so the refresh never silently
+/// scans the wrong window at the boundary.
 fn refresh_windows(
     now: u64,
+    prior_window_at: Option<u64>,
 ) -> Result<(AttestationWindowId, AttestationWindowId), CliError> {
+    if let Some(prior_at) = prior_window_at {
+        // Explicit: the operator pinned a timestamp inside the EXPIRING window, so
+        // the expiring window is unambiguous regardless of the wall clock.
+        let prior = attestation_window_containing(prior_at)?;
+        let next = attestation_window_containing(prior.until)?;
+        return Ok((prior, next));
+    }
     let current = attestation_window_containing(now)?;
-    if now == current.since {
-        // Rollover instant: refresh the just-expired previous window into the
-        // window that now contains `now`.
-        let prior = attestation_window_containing(current.since.saturating_sub(1))?;
-        Ok((prior, current))
-    } else {
-        // Mid-window: refresh the current window into the contiguous next month.
-        let next = attestation_window_containing(current.until)?;
-        Ok((current, next))
+    // Fail closed inside the rollover early span: the expiring window is ambiguous
+    // there (the just-ended window for a rollover cron, or the current window for an
+    // interior refresh), so the operator MUST pin it with --prior-window-at.
+    if now.saturating_sub(current.since) < REFRESH_ROLLOVER_GRACE_SECS {
+        return Err(CliError::Other(
+            "refresh near a window rollover is ambiguous: pass --prior-window-at with a unix \
+             instant inside the EXPIRING window so the genuine-use scan targets the window being \
+             renewed (not the brand-new window)"
+                .to_string(),
+        ));
+    }
+    // Interior: `now` is unambiguously inside the expiring window; mint the next.
+    let next = attestation_window_containing(current.until)?;
+    Ok((current, next))
+}
+
+/// Persist a renewed/dormant next-window issuance into the anti-farm roster
+/// through the SAME atomic count/check/insert cap transaction `issue` uses, so a
+/// refresh cannot fill the next window past the distribution or population caps
+/// before any first-window `issue` denies (the round-2 refresh persisted via plain
+/// `record_pass_issuance`, bypassing the caps). The deterministic next-window
+/// `chiopass:<hash>` id is the roster key, so re-refreshing the SAME subject/window
+/// is an idempotent re-record admitted even at the cap (it adds no population).
+/// Fail-closed: a cap-full denial returns Err so the in-memory mint is discarded
+/// and never surfaced.
+fn record_refreshed_issuance_under_caps(
+    oracle: &SqliteRevocationStore,
+    capability_id: &str,
+    next_window: &AttestationWindowId,
+    now: u64,
+    window_token_capacity: u64,
+    active_population_cap: u64,
+) -> Result<(), CliError> {
+    let valid_from = i64::try_from(next_window.since).unwrap_or(0);
+    let expires_at = i64::try_from(next_window.until).unwrap_or(i64::MAX);
+    let now_secs = i64::try_from(now).unwrap_or(i64::MAX);
+    match oracle.try_record_pass_issuance_under_caps(
+        capability_id,
+        &next_window.window_ym,
+        valid_from,
+        expires_at,
+        now_secs,
+        window_token_capacity,
+        active_population_cap,
+    )? {
+        PassIssuanceAdmission::Admitted => Ok(()),
+        PassIssuanceAdmission::DeniedWindowExhausted => Err(CliError::Other(
+            "Pass refresh denied: next-window distribution cap reached".to_string(),
+        )),
+        PassIssuanceAdmission::DeniedPopulationCap => Err(CliError::Other(
+            "Pass refresh denied: active population cap reached".to_string(),
+        )),
     }
 }
 
@@ -370,6 +435,7 @@ fn pass_refresh(
     subject_public_key_hex: &str,
     tier: TrustTier,
     now: u64,
+    prior_window_at: Option<u64>,
     reattested: bool,
     reattestation_proof: Option<&Path>,
     reattestation_challenge: Option<&Path>,
@@ -404,9 +470,10 @@ fn pass_refresh(
 
     // The genuine-use scan reads the receipt store the CLI already has.
     let store = SqliteReceiptStore::open(receipt_db_path)?;
-    // Derive the expiring (prior) and minted (next) windows fail-closed at the
-    // rollover boundary so the scan never misses the expiring window's receipts.
-    let (prior_window, next_window) = refresh_windows(now)?;
+    // Derive the expiring (prior) and minted (next) windows. At/near a rollover the
+    // wall-clock `now` cannot identify the expiring window, so it is pinned with
+    // `prior_window_at` (fail-closed when omitted inside the rollover early span).
+    let (prior_window, next_window) = refresh_windows(now, prior_window_at)?;
 
     let result = refresh_chio_pass_window(
         &config,
@@ -421,22 +488,24 @@ fn pass_refresh(
     )?;
 
     // Persist any renewed/dormant next-window issuance into the anti-farm roster
-    // so `count_active_passes` does not undercount live refreshed Passes. The
-    // deterministic next-window `chiopass:<hash>` id is the roster key, so this
-    // supersedes the prior window's row rather than inflating the population.
-    // Fail-closed: a store IO fault denies after the in-memory mint, which is
+    // through the SAME atomic cap transaction `issue` uses, so a refresh cannot
+    // fill the next window past `window_token_capacity`/`active_population_cap`
+    // before any first-window `issue` denies. The deterministic next-window
+    // `chiopass:<hash>` id is the roster key, so this supersedes the prior window's
+    // row (idempotent re-record) rather than inflating the population. Fail-closed:
+    // a cap-full denial or store IO fault denies after the in-memory mint, which is
     // never surfaced.
     if let ChioPassRefreshResult::Renewed { issuance, .. }
     | ChioPassRefreshResult::Dormant { issuance, .. } = &result
     {
         let oracle = SqliteRevocationStore::open(revocation_db_path)?;
-        let valid_from = i64::try_from(next_window.since).unwrap_or(0);
-        let expires_at = i64::try_from(next_window.until).unwrap_or(i64::MAX);
-        oracle.record_pass_issuance(
+        record_refreshed_issuance_under_caps(
+            &oracle,
             &issuance.capability.id,
-            &next_window.window_ym,
-            valid_from,
-            expires_at,
+            &next_window,
+            now,
+            config.window_token_capacity,
+            config.active_population_cap,
         )?;
     }
 
@@ -466,36 +535,144 @@ fn write_refresh_artifacts(
     Ok(())
 }
 
-/// Read and validate the revoked-Pass lifecycle records for an anchor batch.
+/// Verify a revoked Pass's ORIGINAL signed credential is authentic and was issued
+/// by a trusted Pass authority, WITHOUT the time window.
 ///
-/// FAIL-CLOSED: the anchor batch treats every entry in this slice as a revoked
-/// Pass digest, so each record MUST be a structurally valid AND actually-revoked
-/// (`status == Revoked`) lifecycle record. A stale Active/Superseded export can
-/// therefore no longer be published into the revoked input set.
+/// FAIL-CLOSED: a revoked Pass is exactly the kind that may legitimately be
+/// EXPIRED, so the time-windowed [`verify_chio_pass`] cannot be reused (it would
+/// reject the expired original). Instead the issuer signature is checked directly
+/// over `canonical_json_bytes(&pass.unsigned)`, the proof method is bound to the
+/// embedded issuer, and the issuer MUST be a member of the trusted-issuer set so a
+/// foreign/self-issued Pass can never mint a revoked leaf.
+fn verify_revoked_pass_authenticity(
+    pass: &ChioPass,
+    trusted_issuer_dids: &[String],
+) -> Result<(), CliError> {
+    let issuer = DidChio::from_str(&pass.unsigned.issuer)
+        .map_err(|error| CliError::Other(format!("revoked Pass issuer DID is invalid: {error}")))?;
+    if pass.proof.verification_method != issuer.verification_method_id() {
+        return Err(CliError::Other(
+            "revoked Pass proof verification method does not match its embedded issuer".to_string(),
+        ));
+    }
+    if !trusted_issuer_dids.contains(&pass.unsigned.issuer) {
+        return Err(CliError::Other(format!(
+            "revoked Pass issuer {} is not a trusted Pass authority for this anchor batch",
+            pass.unsigned.issuer
+        )));
+    }
+    let signature = Signature::from_hex(&pass.proof.proof_value).map_err(|error| {
+        CliError::Other(format!("revoked Pass signature is malformed: {error}"))
+    })?;
+    let unsigned_bytes = canonical_json_bytes(&pass.unsigned).map_err(|error| {
+        CliError::Other(format!("revoked Pass canonicalization failed: {error}"))
+    })?;
+    if !issuer.public_key().verify(&unsigned_bytes, &signature) {
+        return Err(CliError::Other(
+            "revoked Pass signature does not verify against its issuer".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+/// Read and PROVE the revoked-Pass lifecycle records for an anchor batch.
+///
+/// FAIL-CLOSED: the anchor batch folds each record's `passport_id` directly into a
+/// PUBLIC membership root as a revoked leaf, and the lifecycle record carries NO
+/// signature of its own, so a structurally valid `Revoked` record with an arbitrary
+/// `passport_id` could otherwise be published unproven. Each record is therefore
+/// PAIRED BY POSITION with the ORIGINAL signed Pass it revokes: the original Pass
+/// must verify against a trusted issuer, and the record's `passport_id` MUST equal
+/// the recomputed [`chio_pass_artifact_id`] of that Pass. A hand-written record with
+/// a fabricated `passport_id` is rejected because no genuine signed Pass recomputes
+/// to it. Records must also be actually-revoked (`status == Revoked`).
 fn read_revoked_records(
     revoked_record_paths: &[std::path::PathBuf],
+    revoked_pass_paths: &[std::path::PathBuf],
+    trusted_issuer_dids: &[String],
 ) -> Result<Vec<PassportLifecycleRecord>, CliError> {
+    if revoked_record_paths.len() != revoked_pass_paths.len() {
+        return Err(CliError::Other(format!(
+            "each --revoked-record must be paired by position with the original --revoked-pass it \
+             revokes: got {} records and {} passes",
+            revoked_record_paths.len(),
+            revoked_pass_paths.len()
+        )));
+    }
     revoked_record_paths
         .iter()
-        .map(|path| {
-            let record: PassportLifecycleRecord = read_json_artifact(path)?;
+        .zip(revoked_pass_paths.iter())
+        .map(|(record_path, pass_path)| {
+            let record: PassportLifecycleRecord = read_json_artifact(record_path)?;
             record.validate().map_err(|error| {
                 CliError::Other(format!(
                     "revoked Pass lifecycle record {} is invalid: {error}",
-                    path.display()
+                    record_path.display()
                 ))
             })?;
             if record.status != PassportLifecycleState::Revoked {
                 return Err(CliError::Other(format!(
                     "revoked Pass anchor input {} is not a revoked lifecycle record (status: {}); \
                      only Revoked records may be anchored as revoked Pass digests",
-                    path.display(),
+                    record_path.display(),
                     record.status.label()
+                )));
+            }
+            // Prove the revoked leaf against the ORIGINAL signed Pass it revokes.
+            let pass: ChioPass = read_json_artifact(pass_path)?;
+            verify_revoked_pass_authenticity(&pass, trusted_issuer_dids)?;
+            let artifact_id = chio_pass_artifact_id(&pass).map_err(|error| {
+                CliError::Other(format!(
+                    "revoked Pass original {} artifact id could not be derived: {error}",
+                    pass_path.display()
+                ))
+            })?;
+            if artifact_id != record.passport_id {
+                return Err(CliError::Other(format!(
+                    "revoked Pass record {} passport_id does not match the original Pass artifact \
+                     id from {}; the revoked leaf is unprovable",
+                    record_path.display(),
+                    pass_path.display()
+                )));
+            }
+            // Defense in depth: the record's subject must name the same holder as
+            // the proven original Pass.
+            if record.subject != pass.unsigned.credential_subject.id {
+                return Err(CliError::Other(format!(
+                    "revoked Pass record {} subject does not match the original Pass subject",
+                    record_path.display()
                 )));
             }
             Ok(record)
         })
         .collect()
+}
+
+/// Build the set of Pass-issuer DIDs an anchor batch trusts. The operator key that
+/// signs the batch is ALWAYS a trusted issuer (the self-anchoring case); any
+/// explicitly pinned registry issuer DIDs are added too. Each supplied value is
+/// validated as a `did:chio`, fail-closed.
+fn resolve_trusted_pass_issuers(
+    operator_public_key: &PublicKey,
+    extra_issuer_dids: &[String],
+) -> Result<Vec<String>, CliError> {
+    let operator_did = DidChio::from_public_key(operator_public_key.clone())
+        .map_err(|error| {
+            CliError::Other(format!("operator issuer DID derivation failed: {error}"))
+        })?
+        .to_string();
+    let mut trusted = vec![operator_did];
+    for did in extra_issuer_dids {
+        let parsed = DidChio::from_str(did)
+            .map_err(|error| {
+                CliError::Other(format!("invalid --trusted-pass-issuer DID {did}: {error}"))
+            })?
+            .to_string();
+        if !trusted.contains(&parsed) {
+            trusted.push(parsed);
+        }
+    }
+    Ok(trusted)
 }
 
 /// Read and CRYPTOGRAPHICALLY verify the issued Chio Pass credentials for an
@@ -507,9 +684,16 @@ fn read_revoked_records(
 /// `now`) before its artifact id may be anchored. An unsigned, tampered, or
 /// malformed Pass is rejected here, before it can reach the public batch as
 /// membership evidence.
+///
+/// The signature in [`verify_chio_pass`] only proves the Pass is internally
+/// consistent against its OWN embedded issuer, not that the issuer is the operator
+/// publishing the batch. Each Pass's issuer is therefore additionally bound to the
+/// trusted-issuer set, so an operator cannot fold a foreign or self-issued Pass
+/// into its membership root.
 fn read_issued_passes(
     issued_pass_paths: &[std::path::PathBuf],
     now: u64,
+    trusted_issuer_dids: &[String],
 ) -> Result<Vec<ChioPass>, CliError> {
     // The launch entitlement-shape table the credential was minted against
     // (`ChioPassConfig::m1_launch_default` pins `TierAllotmentTable::default()`).
@@ -524,6 +708,15 @@ fn read_issued_passes(
                     path.display()
                 ))
             })?;
+            if !trusted_issuer_dids.contains(&pass.unsigned.issuer) {
+                return Err(CliError::Other(format!(
+                    "issued Pass {} was issued by {}, which is not a trusted Pass authority for \
+                     this anchor batch; the operator may only anchor Passes it (or an explicitly \
+                     pinned issuer) issued",
+                    path.display(),
+                    pass.unsigned.issuer
+                )));
+            }
             Ok(pass)
         })
         .collect()
@@ -564,6 +757,8 @@ fn validate_previous_checkpoint(
 fn pass_anchor(
     issued_pass_paths: &[std::path::PathBuf],
     revoked_record_paths: &[std::path::PathBuf],
+    revoked_pass_paths: &[std::path::PathBuf],
+    trusted_pass_issuer_dids: &[String],
     binding_path: &Path,
     target_path: &Path,
     witness_path: &Path,
@@ -579,10 +774,19 @@ fn pass_anchor(
     let target: EvmAnchorTarget = read_json_artifact(target_path)?;
     let witness: AnchorBatchWitness = read_json_artifact(witness_path)?;
 
-    // Verify each issued Pass's signature and entitlement shape BEFORE its
-    // artifact id is folded into the public anchor batch (fail-closed).
-    let issued_passes = read_issued_passes(issued_pass_paths, issued_at)?;
-    let revoked_records = read_revoked_records(revoked_record_paths)?;
+    // The operator key that signs this batch is always a trusted Pass issuer; any
+    // explicitly pinned registry issuers are added too. Every issued and revoked
+    // Pass folded into the public membership root MUST be issued by a member of
+    // this set, so the operator cannot anchor foreign/self-issued Passes.
+    let trusted_issuer_dids =
+        resolve_trusted_pass_issuers(&operator_keypair.public_key(), trusted_pass_issuer_dids)?;
+
+    // Verify each issued Pass's signature, entitlement shape, AND trusted issuer
+    // BEFORE its artifact id is folded into the public anchor batch (fail-closed).
+    let issued_passes = read_issued_passes(issued_pass_paths, issued_at, &trusted_issuer_dids)?;
+    // Each revoked leaf is PROVEN against the original signed Pass it revokes.
+    let revoked_records =
+        read_revoked_records(revoked_record_paths, revoked_pass_paths, &trusted_issuer_dids)?;
 
     let previous_checkpoint = previous_checkpoint_path
         .map(read_json_artifact::<KernelCheckpoint>)
@@ -684,6 +888,7 @@ pub(crate) fn dispatch_pass(
             subject_public_key,
             tier,
             now,
+            prior_window_at,
             reattested,
             reattestation_proof,
             reattestation_challenge,
@@ -701,6 +906,7 @@ pub(crate) fn dispatch_pass(
                 &subject_public_key,
                 tier,
                 now,
+                prior_window_at,
                 reattested,
                 reattestation_proof.as_deref(),
                 reattestation_challenge.as_deref(),
@@ -746,6 +952,8 @@ pub(crate) fn dispatch_pass(
         PassCommands::Anchor {
             issued_pass,
             revoked_record,
+            revoked_pass,
+            trusted_pass_issuer,
             binding,
             target,
             witness,
@@ -759,6 +967,8 @@ pub(crate) fn dispatch_pass(
             let prepared = pass_anchor(
                 &issued_pass,
                 &revoked_record,
+                &revoked_pass,
+                &trusted_pass_issuer,
                 &binding,
                 &target,
                 &witness,
@@ -1090,33 +1300,90 @@ mod tests {
         }
     }
 
-    /// 311: only actually-revoked lifecycle records may be anchored as revoked
-    /// Pass digests; a stale Active export is denied fail-closed.
+    /// 311 + Finding 5: only actually-revoked lifecycle records whose `passport_id`
+    /// is PROVEN by the paired original signed Pass may be anchored as revoked
+    /// digests. A genuine record verifies; a stale Active export, a hand-written
+    /// record with a fabricated `passport_id`, and an unpaired record are all denied.
     #[test]
-    fn read_revoked_records_requires_revoked_status() {
+    fn read_revoked_records_proves_passport_id_and_status() {
         let dir = temp_dir("revoked-records");
+        let revocation_db = dir.join("revocations.sqlite3");
+        let authority_seed = dir.join("authority.seed");
+        let subject = Keypair::generate().public_key().to_hex();
+        let kernel_keys = vec![Keypair::generate().public_key().to_hex()];
 
-        let revoked_path = dir.join("revoked.json");
-        write_json_artifact(
-            &revoked_path,
-            &lifecycle_record(PassportLifecycleState::Revoked),
+        // A genuine signed Pass and its revocation record, keyed by the real
+        // artifact id; the operator's own issuer DID is the trusted issuer.
+        let (issuance, _) = pass_issue(
+            &subject,
+            TrustTier::Attested,
+            MID_JUNE_2026,
+            &revocation_db,
+            Some(authority_seed.as_path()),
+            &kernel_keys,
         )
-        .expect("write revoked record");
-        let records = read_revoked_records(&[revoked_path]).expect("revoked record is accepted");
+        .expect("issuance");
+        let trusted = vec![issuance.pass.unsigned.issuer.clone()];
+        let genuine_record = chio_credentials::revoke_chio_pass_record(
+            &issuance.pass,
+            1_781_600_000,
+            "key-compromise".to_string(),
+        )
+        .expect("genuine revocation record");
+
+        let record_path = dir.join("revoked.json");
+        write_json_artifact(&record_path, &genuine_record).expect("write revoked record");
+        let pass_path = dir.join("revoked-pass.json");
+        write_json_artifact(&pass_path, &issuance.pass).expect("write revoked pass");
+
+        // A proven revoked record (passport_id == artifact id of the paired Pass).
+        let records = read_revoked_records(
+            std::slice::from_ref(&record_path),
+            std::slice::from_ref(&pass_path),
+            &trusted,
+        )
+        .expect("a proven revoked record is accepted");
         assert_eq!(records.len(), 1);
         assert_eq!(records[0].status, PassportLifecycleState::Revoked);
 
+        // Finding 5: a hand-written record with a FABRICATED passport_id, paired
+        // with the genuine Pass, is rejected: no genuine signed Pass recomputes to
+        // it, so the revoked leaf is unprovable.
+        let mut fabricated = genuine_record.clone();
+        fabricated.passport_id = "chiopass:deadbeefdeadbeefdeadbeefdeadbeef".to_string();
+        let fabricated_path = dir.join("fabricated.json");
+        write_json_artifact(&fabricated_path, &fabricated).expect("write fabricated record");
+        let denied_fabricated =
+            read_revoked_records(&[fabricated_path], std::slice::from_ref(&pass_path), &trusted)
+                .expect_err("a fabricated passport_id is denied");
+        assert!(matches!(
+            denied_fabricated,
+            CliError::Other(message)
+                if message.contains("does not match the original Pass artifact id")
+        ));
+
+        // An Active record (paired with the genuine Pass) is denied on status.
         let active_path = dir.join("active.json");
         write_json_artifact(
             &active_path,
             &lifecycle_record(PassportLifecycleState::Active),
         )
         .expect("write active record");
-        let denied =
-            read_revoked_records(&[active_path]).expect_err("a non-revoked record is denied");
+        let denied_status =
+            read_revoked_records(&[active_path], std::slice::from_ref(&pass_path), &trusted)
+                .expect_err("a non-revoked record is denied");
         assert!(matches!(
-            denied,
+            denied_status,
             CliError::Other(message) if message.contains("not a revoked lifecycle record")
+        ));
+
+        // Mismatched record/pass counts (an unpaired record) are denied: the leaf
+        // cannot be proven without its original Pass.
+        let denied_counts = read_revoked_records(&[record_path], &[], &trusted)
+            .expect_err("an unpaired revoked record is denied");
+        assert!(matches!(
+            denied_counts,
+            CliError::Other(message) if message.contains("paired by position")
         ));
     }
 
@@ -1194,6 +1461,7 @@ mod tests {
             &subject,
             TrustTier::Attested,
             MID_JUNE_2026,
+            None,
             true,
             None,
             None,
@@ -1229,6 +1497,7 @@ mod tests {
             &subject,
             TrustTier::Attested,
             MID_JUNE_2026,
+            None,
             true,
             Some(proof_path.as_path()),
             None,
@@ -1253,6 +1522,7 @@ mod tests {
                 subject_public_key: Keypair::generate().public_key().to_hex(),
                 tier: "attested".to_string(),
                 now: Some(MID_JUNE_2026),
+                prior_window_at: None,
                 reattested: false,
                 reattestation_proof: None,
                 reattestation_challenge: None,
@@ -1271,29 +1541,124 @@ mod tests {
         );
     }
 
-    /// Finding 6: at the first instant of a new window the refresh scans the
-    /// EXPIRING (previous month) window, not the brand-new current window, and
-    /// mints the contiguous current window. Mid-window it scans the current window
-    /// and mints the next month.
+    /// Finding 1: a refresh run at OR JUST AFTER a window rollover scans the
+    /// EXPIRING window pinned by `prior_window_at` and mints the contiguous next
+    /// window. The round-2 fix only handled the exact instant `now == since`; a run
+    /// one second later (2026-07-01T00:00:01Z) silently scanned July and minted
+    /// August. With the expiring window pinned, June is scanned and July is minted.
     #[test]
-    fn refresh_windows_scan_the_expiring_window_at_rollover() {
+    fn refresh_windows_scan_the_expiring_window_with_explicit_prior() {
         const JULY_2026_START: u64 = 1_782_864_000; // 2026-07-01T00:00:00Z
+        const JULY_2026_PLUS_1S: u64 = 1_782_864_001; // 2026-07-01T00:00:01Z
 
-        // Rollover instant: scan June (expiring), mint July (current).
-        let (prior, next) = refresh_windows(JULY_2026_START).expect("rollover windows");
+        // The finding's scenario: a refresh at 2026-07-01T00:00:01Z of a June Pass
+        // (expiring window pinned to a June instant) scans June and mints July.
+        let (prior, next) =
+            refresh_windows(JULY_2026_PLUS_1S, Some(MID_JUNE_2026)).expect("rollover windows");
         assert_eq!(
             prior.window_ym, "2026-06",
-            "at the first instant of July the expiring June window must be scanned"
+            "the pinned expiring June window must be scanned, not the brand-new July window"
         );
-        assert_eq!(next.window_ym, "2026-07", "the current July window is minted");
-        // The minted window is the contiguous rollover of the scanned window.
+        assert_eq!(next.window_ym, "2026-07", "the contiguous July window is minted");
         assert_eq!(prior.until, next.since);
 
-        // Mid-window: scan June (current), mint July (next month).
-        let (prior_mid, next_mid) = refresh_windows(MID_JUNE_2026).expect("mid-window windows");
+        // The exact rollover instant with the expiring window pinned behaves the same.
+        let (prior_exact, next_exact) =
+            refresh_windows(JULY_2026_START, Some(MID_JUNE_2026)).expect("exact rollover windows");
+        assert_eq!(prior_exact.window_ym, "2026-06");
+        assert_eq!(next_exact.window_ym, "2026-07");
+
+        // Interior (mid-window) with no explicit prior: `now` is unambiguously inside
+        // the expiring window, so June is scanned and July is minted.
+        let (prior_mid, next_mid) =
+            refresh_windows(MID_JUNE_2026, None).expect("mid-window windows");
         assert_eq!(prior_mid.window_ym, "2026-06");
         assert_eq!(next_mid.window_ym, "2026-07");
         assert_eq!(prior_mid.until, next_mid.since);
+    }
+
+    /// Finding 1: a refresh fired INSIDE the rollover early span with NO explicit
+    /// `prior_window_at` is ambiguous (the just-ended window or the brand-new one),
+    /// so it fails closed and demands the operator pin the expiring window rather
+    /// than silently scanning the wrong month.
+    #[test]
+    fn refresh_windows_fail_closed_in_rollover_span_without_explicit_prior() {
+        const JULY_2026_PLUS_1S: u64 = 1_782_864_001; // 2026-07-01T00:00:01Z
+        let denied = refresh_windows(JULY_2026_PLUS_1S, None)
+            .expect_err("an ambiguous rollover refresh without --prior-window-at is denied");
+        assert!(matches!(
+            denied,
+            CliError::Other(message) if message.contains("--prior-window-at")
+        ));
+    }
+
+    /// Finding 2: a renewed/dormant refresh persists through the SAME atomic
+    /// count/check/insert cap transaction `issue` uses, so a refresh cannot fill
+    /// the next window past `window_token_capacity` (or the population cap) before
+    /// any first-window `issue` denies. The round-2 refresh persisted via plain
+    /// `record_pass_issuance`, bypassing the caps.
+    #[test]
+    fn refresh_persists_under_caps_and_denies_when_window_full() {
+        let dir = temp_dir("refresh-caps");
+        let revocation_db = dir.join("revocations.sqlite3");
+        let oracle = SqliteRevocationStore::open(&revocation_db).expect("open oracle");
+        let next_window = attestation_window_containing(MID_JUNE_2026).expect("next window");
+
+        // Fill the next window to a capacity of 1 with the first refreshed Pass.
+        record_refreshed_issuance_under_caps(
+            &oracle,
+            "chiopass:first",
+            &next_window,
+            MID_JUNE_2026,
+            1,
+            100,
+        )
+        .expect("first refreshed issuance is admitted under cap");
+
+        // A DIFFERENT subject's refresh into the now-full window is denied
+        // atomically, before any artifact is surfaced.
+        let denied_window = record_refreshed_issuance_under_caps(
+            &oracle,
+            "chiopass:second",
+            &next_window,
+            MID_JUNE_2026,
+            1,
+            100,
+        )
+        .expect_err("a refresh past the window capacity is denied");
+        assert!(matches!(
+            denied_window,
+            CliError::Other(message) if message.contains("next-window distribution cap reached")
+        ));
+
+        // Re-refreshing the SAME subject/window is idempotent: admitted even at the
+        // cap (the deterministic chiopass id adds no new population).
+        record_refreshed_issuance_under_caps(
+            &oracle,
+            "chiopass:first",
+            &next_window,
+            MID_JUNE_2026,
+            1,
+            100,
+        )
+        .expect("idempotent re-record of the same id is admitted at cap");
+
+        // The population-cap leg is enforced in the SAME transaction: with a live
+        // population of 1 (the first Pass) and an active_population_cap of 1, a NEW
+        // id is denied on population, not just the window cap.
+        let denied_population = record_refreshed_issuance_under_caps(
+            &oracle,
+            "chiopass:third",
+            &next_window,
+            MID_JUNE_2026,
+            100,
+            1,
+        )
+        .expect_err("a refresh past the population cap is denied");
+        assert!(matches!(
+            denied_population,
+            CliError::Other(message) if message.contains("active population cap reached")
+        ));
     }
 
     /// Finding 7: a re-attestation proof supplied WITHOUT an external challenge is
@@ -1336,12 +1701,28 @@ mod tests {
         )
         .expect("issuance");
 
-        // A genuine signed Pass verifies and is accepted into the anchor input set.
+        // The operator's own issuer DID is the trusted issuer for this anchor batch.
+        let trusted = vec![issuance.pass.unsigned.issuer.clone()];
+
+        // A genuine signed Pass from a trusted issuer is accepted into the input set.
         let valid_path = dir.join("issued-valid.json");
         write_json_artifact(&valid_path, &issuance.pass).expect("write valid pass");
-        let accepted = read_issued_passes(&[valid_path], MID_JUNE_2026)
-            .expect("a signed Pass is accepted for anchoring");
+        let accepted = read_issued_passes(std::slice::from_ref(&valid_path), MID_JUNE_2026, &trusted)
+            .expect("a signed Pass from a trusted issuer is accepted for anchoring");
         assert_eq!(accepted.len(), 1);
+
+        // Finding 3: the SAME genuine Pass is rejected when its issuer is NOT a
+        // trusted Pass authority for the batch, so an operator cannot fold a
+        // foreign/self-issued Pass into its public membership root.
+        let foreign_trusted = vec![DidChio::from_public_key(Keypair::generate().public_key())
+            .expect("foreign issuer did")
+            .to_string()];
+        let denied_foreign = read_issued_passes(&[valid_path], MID_JUNE_2026, &foreign_trusted)
+            .expect_err("a Pass from a non-operator issuer is rejected before anchoring");
+        assert!(matches!(
+            denied_foreign,
+            CliError::Other(message) if message.contains("not a trusted Pass authority")
+        ));
 
         // A tampered Pass (signature no longer verifies) is rejected fail-closed.
         let mut tampered = issuance.pass.clone();
@@ -1353,7 +1734,7 @@ mod tests {
         tampered.proof.proof_value = proof_value;
         let tampered_path = dir.join("issued-tampered.json");
         write_json_artifact(&tampered_path, &tampered).expect("write tampered pass");
-        let denied = read_issued_passes(&[tampered_path], MID_JUNE_2026)
+        let denied = read_issued_passes(&[tampered_path], MID_JUNE_2026, &trusted)
             .expect_err("a tampered issued Pass is rejected before anchoring");
         assert!(matches!(
             denied,
