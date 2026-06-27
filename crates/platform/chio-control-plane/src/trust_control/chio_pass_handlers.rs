@@ -66,8 +66,9 @@ use chio_credentials::{
     attestation_window_containing, chio_pass_artifact_id, chio_pass_refresh_decision,
     evaluate_pass_admission, is_genuine_use_receipt, issue_chio_pass,
     snapshot_chio_pass_entitlements, ChioPass, ChioPassAdmissionDecision, ChioPassAdmissionPolicy,
-    ChioPassRefreshDecision, ChioPassRefreshOutcome, PassportLifecycleRecord, TierAllotmentTable,
-    TrustTier, CHIO_PASS_ALLOTMENT_UNIT, MIN_GENUINE_USE_RECEIPTS,
+    ChioPassRefreshDecision, ChioPassRefreshOutcome, PassportLifecycleRecord,
+    PassportLifecycleState, TierAllotmentTable, TrustTier, CHIO_PASS_ALLOTMENT_UNIT,
+    MIN_GENUINE_USE_RECEIPTS,
 };
 use chio_did::DidChio;
 use chio_kernel::pass_gating::{pass_baseline_resource_grants, PASS_COMPUTE_SERVER_ID};
@@ -705,6 +706,19 @@ pub fn prepare_pass_anchor_publication(
         anchored_digests.push(chio_pass_artifact_id(pass)?);
     }
     for record in revoked_records {
+        // Fail closed: the proof panel classifies every leaf past `issued_count` as
+        // `Revoked` purely by POSITION, and `prepare_pass_anchor_publication` is the
+        // sole producer of that boundary. A record placed on the revoked side that
+        // is NOT actually revoked (Active or Superseded lifecycle state) would
+        // anchor a leaf the panel then presents as a (false) revocation proof. The
+        // recompute lane cannot re-derive lifecycle state from the digest set, so
+        // the revoked side must be proven revoked HERE before it is anchored.
+        if record.status != PassportLifecycleState::Revoked {
+            return Err(CliError::Other(format!(
+                "Pass anchor batch revoked record `{}` is not revoked (lifecycle status {:?}); the revoked side requires Revoked lifecycle state",
+                record.passport_id, record.status
+            )));
+        }
         anchored_digests.push(record.passport_id.clone());
     }
     if anchored_digests.is_empty() {
@@ -905,9 +919,19 @@ pub enum PassProofPanelVerdict {
 /// Recompute is the SOLE proof lane: any disagreement flips the verdict to
 /// [`PassProofPanelVerdict::Tampered`] fail-closed. The panel then binds a `seal`
 /// digest over its recomputed body ([`Self::seal_digest`]); because the seal commits
-/// the recomputed rows, roots, and verdict, a tampered proof set produces both a
-/// `Tampered` verdict AND a different seal (tamper-evident). [`Self::verify_seal`]
-/// re-derives that digest from the panel's own body as a self-consistency check.
+/// the recomputed rows, roots, counts, verdict, AND the trusted anchor target the
+/// publication envelope was validated against, a tampered proof set produces both a
+/// `Tampered` verdict AND a different seal (tamper-evident).
+///
+/// The committed target (`chain_id` + root-registry `contract_address`) is the
+/// load-bearing cross-binding for the publication ENVELOPE: the recompute validates
+/// the publication against the `expected_target` supplied to [`Self::project`], but
+/// that target is a caller input. Committing it in the panel body and the seal makes
+/// it tamper-evident AND visible, and [`Self::verify_seal`] takes the trusted,
+/// registered target and rejects a panel sealed against any other target. Without
+/// this, a panel sealed against a caller-supplied target that matched a tampered
+/// publication would be indistinguishable from one sealed against the registered
+/// root-registry target.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct SealedPassProofPanel {
     rows: Vec<PassProofPanelRow>,
@@ -915,6 +939,13 @@ pub struct SealedPassProofPanel {
     batch_root: Hash,
     checkpoint_root: Hash,
     publication_root: Hash,
+    /// The chain id of the trusted anchor target the publication envelope was
+    /// validated against. Committed in the seal so [`Self::verify_seal`] can
+    /// cross-bind it to the registered target.
+    target_chain_id: String,
+    /// The root-registry contract address of that trusted anchor target. Committed
+    /// in the seal alongside [`Self::target_chain_id`].
+    target_contract_address: String,
     issued_count: usize,
     revoked_count: usize,
     verdict: PassProofPanelVerdict,
@@ -951,6 +982,8 @@ impl SealedPassProofPanel {
             &prepared.batch.body.tree_root,
             &prepared.checkpoint.body.merkle_root,
             &prepared.publication.merkle_root,
+            &expected_target.chain_id,
+            &expected_target.contract_address,
             prepared.issued_count,
             recompute.revoked_count,
             &recompute.verdict,
@@ -961,6 +994,8 @@ impl SealedPassProofPanel {
             batch_root: prepared.batch.body.tree_root,
             checkpoint_root: prepared.checkpoint.body.merkle_root,
             publication_root: prepared.publication.merkle_root,
+            target_chain_id: expected_target.chain_id.clone(),
+            target_contract_address: expected_target.contract_address.clone(),
             issued_count: prepared.issued_count,
             revoked_count: recompute.revoked_count,
             verdict: recompute.verdict,
@@ -1010,25 +1045,51 @@ impl SealedPassProofPanel {
         matches!(self.verdict, PassProofPanelVerdict::Sealed)
     }
 
-    /// Tamper-evidence self-check: recompute the seal digest over this panel's own
-    /// recomputed body and confirm it equals the bound seal. Any field altered after
-    /// sealing flips this to `false` (fail-closed).
+    /// The chain id of the trusted anchor target this panel was sealed against.
+    #[must_use]
+    pub fn target_chain_id(&self) -> &str {
+        &self.target_chain_id
+    }
+
+    /// The root-registry contract address this panel was sealed against.
+    #[must_use]
+    pub fn target_contract_address(&self) -> &str {
+        &self.target_contract_address
+    }
+
+    /// Tamper-evidence + target cross-binding check: recompute the seal digest over
+    /// this panel's own recomputed body (rows, roots, counts, verdict, AND the
+    /// committed target) and confirm it equals the bound seal, THEN confirm the
+    /// committed target equals the trusted, registered `expected_target`. Any field
+    /// altered after sealing flips the first check to `false`; a panel sealed against
+    /// any target other than the registered one flips the second. Both fail closed.
+    ///
+    /// Passing the registered root-registry target here is what closes the
+    /// envelope-substitution gap: the recompute in [`Self::project`] only proves the
+    /// publication matched WHATEVER target the (caller-supplied) projection was given,
+    /// so the seal alone cannot attest the target was the registered one. Re-checking
+    /// the committed target against the trusted target at verify time does, and the
+    /// target is committed in the seal so it cannot be swapped after sealing.
     ///
     /// # Errors
     ///
     /// Returns a [`CliError`] only if the seal body cannot be canonical-JSON encoded.
-    pub fn verify_seal(&self) -> Result<bool, CliError> {
+    pub fn verify_seal(&self, expected_target: &EvmAnchorTarget) -> Result<bool, CliError> {
         let recomputed = seal_digest_for(
             &self.rows,
             &self.recomputed_root,
             &self.batch_root,
             &self.checkpoint_root,
             &self.publication_root,
+            &self.target_chain_id,
+            &self.target_contract_address,
             self.issued_count,
             self.revoked_count,
             &self.verdict,
         )?;
-        Ok(recomputed == self.seal)
+        let target_matches = self.target_chain_id == expected_target.chain_id
+            && self.target_contract_address == expected_target.contract_address;
+        Ok(recomputed == self.seal && target_matches)
     }
 }
 
@@ -1254,6 +1315,8 @@ struct PassProofPanelSealBody<'a> {
     batch_root: &'a Hash,
     checkpoint_root: &'a Hash,
     publication_root: &'a Hash,
+    target_chain_id: &'a str,
+    target_contract_address: &'a str,
     issued_count: usize,
     revoked_count: usize,
     rows: &'a [PassProofPanelRow],
@@ -1270,6 +1333,8 @@ fn seal_digest_for(
     batch_root: &Hash,
     checkpoint_root: &Hash,
     publication_root: &Hash,
+    target_chain_id: &str,
+    target_contract_address: &str,
     issued_count: usize,
     revoked_count: usize,
     verdict: &PassProofPanelVerdict,
@@ -1280,6 +1345,8 @@ fn seal_digest_for(
         batch_root,
         checkpoint_root,
         publication_root,
+        target_chain_id,
+        target_contract_address,
         issued_count,
         revoked_count,
         rows,
@@ -2247,6 +2314,42 @@ mod tests {
         }
     }
 
+    /// PR959 codex P2 (6th re-review): the proof panel classifies every leaf past
+    /// `issued_count` as `Revoked` purely by POSITION, so a NON-revoked lifecycle
+    /// record placed on the revoked side would anchor a leaf the panel then presents
+    /// as a (false) revocation proof. `prepare_pass_anchor_publication` now fails
+    /// closed when a revoked-side record is not in `Revoked` lifecycle state.
+    #[test]
+    fn prepare_pass_anchor_publication_rejects_non_revoked_record_on_revoked_side() {
+        let operator = Keypair::generate();
+        let pass = issue_first_window_pass(&Keypair::generate(), TrustTier::Verified);
+        let mut not_revoked =
+            revoke_chio_pass_record(&pass, MID_JUNE_2026 + 5, "superseded".to_string())
+                .expect("revoke pass");
+        // Flip the lifecycle state to a NON-revoked status while leaving the record
+        // on the revoked side of the anchor batch.
+        not_revoked.status = PassportLifecycleState::Superseded;
+        let binding = operator_binding(&operator, vec![Web3KeyBindingPurpose::Anchor]);
+        let error = prepare_pass_anchor_publication(
+            &operator,
+            &binding,
+            &anchor_target(),
+            &[],
+            std::slice::from_ref(&not_revoked),
+            pending_witness(),
+            MID_JUNE_2026,
+            None,
+        )
+        .expect_err("a non-revoked record on the revoked side must fail closed");
+        match error {
+            CliError::Other(message) => assert!(
+                message.contains("is not revoked"),
+                "unexpected error: {message}"
+            ),
+            other => panic!("expected non-revoked rejection, got {other:?}"),
+        }
+    }
+
     #[test]
     fn prepare_pass_anchor_publication_builds_root_and_inclusions() {
         let operator = Keypair::generate();
@@ -3077,8 +3180,8 @@ mod tests {
         assert_eq!(panel.verdict(), &PassProofPanelVerdict::Sealed);
         assert!(panel.is_sealed(), "an untampered proof set seals");
         assert!(
-            panel.verify_seal().expect("verify seal"),
-            "seal self-consistent"
+            panel.verify_seal(&anchor_target()).expect("verify seal"),
+            "seal self-consistent and bound to the registered target"
         );
         assert!(
             !panel.seal_digest().is_empty(),
@@ -3157,8 +3260,11 @@ mod tests {
                 clean_seal,
                 "the tampered seal must differ from the clean seal ({label})"
             );
-            // The seal still faithfully commits the (tampered) recomputed verdict.
-            assert!(panel.verify_seal().expect("verify tampered seal"));
+            // The seal still faithfully commits the (tampered) recomputed verdict and
+            // the registered target it was sealed against.
+            assert!(panel
+                .verify_seal(&anchor_target())
+                .expect("verify tampered seal"));
         };
 
         // (a) Forged anchor batch tree root: the signed-batch recompute rejects it.
@@ -3251,6 +3357,84 @@ mod tests {
         assert_tampered(
             &wrong_rpc,
             "publication broadcasts to a different rpc endpoint",
+        );
+    }
+
+    /// PR959 codex P2 (6th re-review): the seal now commits the trusted anchor
+    /// target (chain id + root-registry contract) the publication envelope was
+    /// validated against, and `verify_seal` cross-binds it. A panel sealed against a
+    /// caller-supplied target that matched a TAMPERED publication is therefore no
+    /// longer indistinguishable from one sealed against the registered root-registry
+    /// target: verify_seal against the registered target fails closed.
+    #[test]
+    fn sealed_pass_proof_panel_binds_target_to_seal() {
+        let prepared = prepared_two_issued_one_revoked();
+        let registered = anchor_target();
+
+        // Sealed against the registered target: verify_seal against that same target
+        // passes (self-consistent AND target-bound).
+        let panel = SealedPassProofPanel::project(&prepared, &registered).expect("project panel");
+        assert!(panel.is_sealed());
+        assert!(
+            panel
+                .verify_seal(&registered)
+                .expect("verify against registered target"),
+            "a panel sealed against the registered target verifies against it",
+        );
+
+        // verify_seal against a DIFFERENT (non-registered) target fails closed even
+        // though the seal is internally self-consistent.
+        let mut other_contract = anchor_target();
+        other_contract.contract_address = "0x000000000000000000000000000000000000dEaD".to_string();
+        assert!(
+            !panel
+                .verify_seal(&other_contract)
+                .expect("verify against non-registered contract"),
+            "a panel must not verify against a target contract it was not sealed against",
+        );
+        let mut other_chain = anchor_target();
+        other_chain.chain_id = "eip155:1".to_string();
+        assert!(
+            !panel
+                .verify_seal(&other_chain)
+                .expect("verify against non-registered chain"),
+            "a panel must not verify against a different chain id",
+        );
+
+        // The envelope-substitution attack: tamper the publication to broadcast to an
+        // attacker contract AND seal against that same attacker target. The recompute
+        // matches (publication == supplied target) so the panel SEALS, but the
+        // committed target records the attacker contract, so verify_seal against the
+        // registered root-registry target fails closed - the substitution is no longer
+        // indistinguishable from a genuine seal.
+        let attacker_contract = "0x000000000000000000000000000000000000bEEF".to_string();
+        let mut tampered = prepared_two_issued_one_revoked();
+        tampered.publication.contract_address = attacker_contract.clone();
+        let mut attacker_target = anchor_target();
+        attacker_target.contract_address = attacker_contract.clone();
+        let substituted = SealedPassProofPanel::project(&tampered, &attacker_target)
+            .expect("project substituted panel");
+        assert!(
+            substituted.is_sealed(),
+            "the publication matches the attacker-supplied target so the recompute seals",
+        );
+        assert_eq!(substituted.target_contract_address(), attacker_contract);
+        assert!(
+            !substituted
+                .verify_seal(&registered)
+                .expect("verify substituted against registered target"),
+            "a panel sealed against a non-registered target fails verify_seal against the registered one",
+        );
+
+        // Post-seal tampering of the committed target also breaks the self-consistency
+        // recompute, because the target is committed in the seal.
+        let mut mutated = panel.clone();
+        mutated.target_contract_address = attacker_contract;
+        assert!(
+            !mutated
+                .verify_seal(&registered)
+                .expect("verify mutated target"),
+            "swapping the committed target after sealing breaks the seal",
         );
     }
 
