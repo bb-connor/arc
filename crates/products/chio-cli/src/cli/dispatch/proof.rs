@@ -2062,6 +2062,7 @@ fn load_commerce_order_bundle_from_graph(
         settlement_packet_bytes,
         mandate_protocol_payloads,
         risk_comptroller_report_bytes,
+        escrow_ledger_bytes: None,
         verified_trust_market_context: verified_trust_market_context.cloned(),
         trusted_event_authority_receipt_kernel_keys:
             trusted_event_authority_receipt_kernel_keys.to_vec(),
