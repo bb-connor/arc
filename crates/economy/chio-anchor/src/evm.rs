@@ -175,6 +175,111 @@ pub fn prepare_root_publication(
     })
 }
 
+/// Re-decode a prepared publication's broadcastable `call_data` and confirm it
+/// would publish EXACTLY the supplied checkpoint's root, sequence, range, and
+/// tree size under that checkpoint's own operator key.
+///
+/// A [`PreparedEvmRootPublication`] carries both display scalar fields
+/// (`merkle_root`, `checkpoint_seq`, ...) AND the ABI-encoded `call_data` that an
+/// operator actually broadcasts. A consumer that trusts only the display scalars
+/// (or only the publication root) can be handed a publication whose `call_data`
+/// encodes a DIFFERENT root, sequence, range, or operator-key-hash, so the
+/// broadcast publishes something other than what was displayed. This re-decodes
+/// the broadcast payload and binds every field it would publish to the trusted,
+/// independently validated `checkpoint` (and re-checks the publication's own
+/// display scalars against that same checkpoint), failing closed on any
+/// disagreement. It performs no network IO and moves no value.
+///
+/// # Errors
+///
+/// Returns [`AnchorError::InvalidInput`] when `call_data` is not a decodable
+/// `publishRoot` call, or when any decoded broadcast field or displayed scalar
+/// disagrees with the checkpoint's root, sequence, range, tree size, operator
+/// address, or operator key hash.
+pub fn validate_publication_call_data_against_checkpoint(
+    publication: &PreparedEvmRootPublication,
+    checkpoint: &KernelCheckpoint,
+) -> Result<(), AnchorError> {
+    let expected_tree_size = u64::try_from(checkpoint.body.tree_size)
+        .map_err(|_| AnchorError::InvalidInput("checkpoint tree_size overflows u64".to_string()))?;
+
+    // (a) The display scalars the panel surfaces must themselves match the
+    // checkpoint, so a tampered display field cannot ride a consistent call_data.
+    if publication.merkle_root != checkpoint.body.merkle_root {
+        return Err(AnchorError::InvalidInput(
+            "prepared publication merkle_root does not match the checkpoint".to_string(),
+        ));
+    }
+    if publication.checkpoint_seq != checkpoint.body.checkpoint_seq
+        || publication.batch_start_seq != checkpoint.body.batch_start_seq
+        || publication.batch_end_seq != checkpoint.body.batch_end_seq
+        || publication.tree_size != expected_tree_size
+    {
+        return Err(AnchorError::InvalidInput(
+            "prepared publication sequence/range/tree-size does not match the checkpoint"
+                .to_string(),
+        ));
+    }
+    let expected_operator_key_hash = keccak256(checkpoint.body.kernel_key.as_bytes());
+    let expected_operator_key_hash_hex =
+        format!("0x{}", hex::encode(expected_operator_key_hash.as_slice()));
+    if publication.operator_key_hash != expected_operator_key_hash_hex {
+        return Err(AnchorError::InvalidInput(
+            "prepared publication operator_key_hash does not match the checkpoint kernel key"
+                .to_string(),
+        ));
+    }
+
+    // (b) Decode the actual broadcast payload and bind every published field to
+    // the checkpoint (the trust anchor), not to the publication's display fields.
+    let hex_body = publication
+        .call_data
+        .strip_prefix("0x")
+        .unwrap_or(&publication.call_data);
+    let raw = hex::decode(hex_body).map_err(|error| {
+        AnchorError::InvalidInput(format!("publication call_data is not valid hex: {error}"))
+    })?;
+    let call = IChioRootRegistry::publishRootCall::abi_decode(&raw).map_err(|error| {
+        AnchorError::InvalidInput(format!(
+            "publication call_data is not a publishRoot call: {error}"
+        ))
+    })?;
+    if call.merkleRoot != hash_to_b256(&checkpoint.body.merkle_root) {
+        return Err(AnchorError::InvalidInput(
+            "publication call_data would publish a root that disagrees with the checkpoint"
+                .to_string(),
+        ));
+    }
+    if call.checkpointSeq != checkpoint.body.checkpoint_seq
+        || call.batchStartSeq != checkpoint.body.batch_start_seq
+        || call.batchEndSeq != checkpoint.body.batch_end_seq
+        || call.treeSize != expected_tree_size
+    {
+        return Err(AnchorError::InvalidInput(
+            "publication call_data would publish a sequence/range/tree-size that disagrees with the checkpoint"
+                .to_string(),
+        ));
+    }
+    if call.operatorKeyHash != expected_operator_key_hash {
+        return Err(AnchorError::InvalidInput(
+            "publication call_data operator key hash does not match the checkpoint kernel key"
+                .to_string(),
+        ));
+    }
+    let operator = Address::from_str(&publication.operator_address).map_err(|error| {
+        AnchorError::InvalidInput(format!(
+            "publication operator_address is not an EVM address: {error}"
+        ))
+    })?;
+    if call.operator != operator {
+        return Err(AnchorError::InvalidInput(
+            "publication call_data operator does not match the publication operator address"
+                .to_string(),
+        ));
+    }
+    Ok(())
+}
+
 pub fn prepare_delegate_registration(
     target: &EvmAnchorTarget,
     delegate_address: &str,

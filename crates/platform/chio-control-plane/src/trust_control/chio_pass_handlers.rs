@@ -48,7 +48,8 @@
 //! denies fail-closed on its first metered charge.
 
 use chio_anchor::{
-    build_anchor_batch_body, prepare_root_publication, verify_anchor_batch, AnchorBatch,
+    build_anchor_batch_body, prepare_root_publication,
+    validate_publication_call_data_against_checkpoint, verify_anchor_batch, AnchorBatch,
     AnchorBatchWitness, EvmAnchorTarget, PreparedEvmRootPublication,
 };
 use chio_core::canonical_json_bytes;
@@ -1120,10 +1121,40 @@ fn recompute_pass_proof_panel(prepared: &PreparedPassAnchorPublication) -> PassP
             "recomputed root does not match the kernel checkpoint root",
         );
     }
+    // The checkpoint root matching the recomputed root is necessary but NOT
+    // sufficient: the checkpoint also carries a kernel signature, an operator
+    // `kernel_key`, a `checkpoint_seq`, and a covered range, none of which the
+    // root comparison above touches. A checkpoint whose signature, key, seq, or
+    // range was altered while the root stayed fixed would still pass the root
+    // cross-check and seal. Re-run the kernel's own `validate_checkpoint` so a
+    // tampered or unsigned checkpoint fails closed before the panel can seal.
+    if let Err(error) = validate_checkpoint(&prepared.checkpoint) {
+        note_tamper(
+            &mut first_tamper,
+            format!("kernel checkpoint failed validation: {error}"),
+        );
+    }
     if recomputed_root != prepared.publication.merkle_root {
         note_tamper(
             &mut first_tamper,
             "recomputed root does not match the prepared publication root",
+        );
+    }
+    // The publication's display `merkle_root` matching the recomputed root is
+    // likewise necessary but NOT sufficient: the broadcastable `call_data` is the
+    // payload an operator actually sends, and it independently encodes the root,
+    // sequence, range, tree size, operator address, and operator key hash. A
+    // proof set can keep `publication.merkle_root` equal to the recomputed root
+    // while its `call_data` would publish a DIFFERENT root/seq/range/operator-key-
+    // hash. Re-decode the broadcast payload and bind every published field to the
+    // (now validated) checkpoint so a divergent broadcast fails closed.
+    if let Err(error) = validate_publication_call_data_against_checkpoint(
+        &prepared.publication,
+        &prepared.checkpoint,
+    ) {
+        note_tamper(
+            &mut first_tamper,
+            format!("prepared publication call_data disagrees with the checkpoint: {error}"),
         );
     }
 
@@ -3137,6 +3168,32 @@ mod tests {
         let mut over_count = prepared_two_issued_one_revoked();
         over_count.issued_count = over_count.anchored_digests.len() + 1;
         assert_tampered(&over_count, "issued_count exceeds digest count");
+
+        // (f) PR959 codex P2 (finding 5): a checkpoint whose SIGNED BODY was altered
+        // (here `issued_at`) while its `merkle_root` stays fixed. The root
+        // cross-check still matches the recomputed root, so the old panel sealed; the
+        // panel now re-runs the kernel's own `validate_checkpoint`, whose signature
+        // re-verification fails closed on the tampered body. `issued_at` is touched
+        // by neither the root cross-check nor the call_data binding, so ONLY
+        // `validate_checkpoint` catches it.
+        let mut tampered_checkpoint = prepared_two_issued_one_revoked();
+        tampered_checkpoint.checkpoint.body.issued_at ^= 1;
+        assert_tampered(
+            &tampered_checkpoint,
+            "checkpoint body tampered, root unchanged",
+        );
+
+        // (g) PR959 codex P2 (finding 6): the publication's display `merkle_root`
+        // still equals the recomputed root, but the broadcastable `call_data` is
+        // swapped for a DIFFERENT prepared product's payload (a different root,
+        // operator key hash, and digest set). The panel decodes the broadcast payload
+        // and binds it to the checkpoint, so a call_data that would publish a
+        // different root than the panel displays fails closed even though the display
+        // root matches.
+        let divergent = prepared_two_issued_one_revoked();
+        let mut wrong_call_data = prepared_two_issued_one_revoked();
+        wrong_call_data.publication.call_data = divergent.publication.call_data.clone();
+        assert_tampered(&wrong_call_data, "call_data publishes a different root");
     }
 
     #[test]

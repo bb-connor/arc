@@ -76,8 +76,9 @@ pub use evm::{
     build_chain_anchor_record, confirm_root_publication, ensure_publication_ready,
     evm_anchor_devnet_rpc_egress_contract, inspect_publication_guard, operator_key_hash_hex,
     prepare_delegate_registration, prepare_root_publication, publish_root,
-    verify_inclusion_onchain, EvmAnchorTarget, EvmPublicationGuard, EvmPublicationReceipt,
-    PreparedDelegateRegistration, PreparedEvmRootPublication,
+    validate_publication_call_data_against_checkpoint, verify_inclusion_onchain, EvmAnchorTarget,
+    EvmPublicationGuard, EvmPublicationReceipt, PreparedDelegateRegistration,
+    PreparedEvmRootPublication,
 };
 pub use functions::{
     assess_functions_verification, prepare_functions_batch_verification, ChainlinkFunctionsTarget,
