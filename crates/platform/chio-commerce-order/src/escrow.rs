@@ -944,6 +944,18 @@ pub fn release(
                 .to_string(),
         ));
     }
+
+    // Bind the locked LEDGER to the accepted ORDER CONTEXT, not merely its pinned
+    // digest. The escrow-digest binding above proves only that the accepted context
+    // pins THIS ledger's digest; it does NOT prove the ledger's order id, economics,
+    // and parties are the order's. `CommerceEscrowAcceptance` is public, so a forged
+    // acceptance could pair a same-value ledger LOCKED FOR A DIFFERENT order or
+    // beneficiary with a context that names this order (setting the context's
+    // `escrow_digest` to that foreign ledger) and drain the wrong custody. Apply the
+    // SAME schema/order/economics/party binding the verifier enforces in
+    // `verify_escrow_digest`, via the shared helper, so this class cannot reopen.
+    bind_escrow_ledger_to_order_context(&acceptance.ledger, &acceptance.updated_context)?;
+
     match acceptance.settlement_packet.verify_signature() {
         Ok(true) => {}
         _ => {
@@ -1079,6 +1091,84 @@ pub fn release(
         next_state: OrderState::SettlementReconciled,
         updated_context,
     })
+}
+
+/// Bind a custodial escrow ledger to the order context it must back. Shared by
+/// the verifier (`verify_escrow_digest`, lib.rs) AND the live custody release
+/// (`release`, above) so the binding can NEVER drift between the two paths.
+///
+/// A digest match plus conservation proves only that SOME conserved escrow ledger
+/// exists; it does NOT prove the ledger covers THIS order's quote between THIS
+/// order's buyer and merchant. Both `CommerceEscrowAcceptance` and the verifier
+/// bundle are public, so a forged caller could otherwise pair a same-value ledger
+/// LOCKED FOR A DIFFERENT order/beneficiary with a context that names this order
+/// and either drain the wrong custody (release) or vouch for it in a verified
+/// passport (verify). Fail closed unless the ledger carries the canonical
+/// escrow-ledger schema and its order id, economics (amount and currency), and
+/// parties (depositor == order buyer, beneficiary == order merchant) all match the
+/// order context exactly. The schema check also rejects a field-matching ledger
+/// whose `schema` is not `COMMERCE_ESCROW_LEDGER_SCHEMA_ID`, so a wrong-schema
+/// ledger whose canonical digest happens to be pinned cannot ride into a verified
+/// passport.
+pub(crate) fn bind_escrow_ledger_to_order_context(
+    ledger: &CommerceEscrowLedger,
+    context: &CommerceOrderContext,
+) -> Result<(), CommerceOrderError> {
+    if ledger.schema != COMMERCE_ESCROW_LEDGER_SCHEMA_ID {
+        return Err(CommerceOrderError::InvalidArtifact {
+            field: "escrow ledger",
+            message: format!(
+                "escrow ledger schema {} is not the canonical commerce escrow-ledger schema {}",
+                ledger.schema, COMMERCE_ESCROW_LEDGER_SCHEMA_ID
+            ),
+        });
+    }
+    if ledger.order_id != context.order_id {
+        return Err(CommerceOrderError::InvalidArtifact {
+            field: "order context",
+            message: format!(
+                "escrow ledger order mismatch: ledger {} vs context {}",
+                ledger.order_id, context.order_id
+            ),
+        });
+    }
+    if ledger.amount_minor != context.quote_amount_minor {
+        return Err(CommerceOrderError::InvalidArtifact {
+            field: "order context",
+            message: format!(
+                "escrow ledger amount {} does not match the order quote amount {}",
+                ledger.amount_minor, context.quote_amount_minor
+            ),
+        });
+    }
+    if ledger.currency != context.quote_currency {
+        return Err(CommerceOrderError::InvalidArtifact {
+            field: "order context",
+            message: format!(
+                "escrow ledger currency {} does not match the order quote currency {}",
+                ledger.currency, context.quote_currency
+            ),
+        });
+    }
+    if ledger.depositor_account != context.buyer_subject {
+        return Err(CommerceOrderError::InvalidArtifact {
+            field: "order context",
+            message: format!(
+                "escrow ledger depositor {} does not match the order buyer {}",
+                ledger.depositor_account, context.buyer_subject
+            ),
+        });
+    }
+    if ledger.beneficiary_account != context.merchant_subject {
+        return Err(CommerceOrderError::InvalidArtifact {
+            field: "order context",
+            message: format!(
+                "escrow ledger beneficiary {} does not match the order merchant {}",
+                ledger.beneficiary_account, context.merchant_subject
+            ),
+        });
+    }
+    Ok(())
 }
 
 /// The aggregate collateral liability of an offered capability token: the sum of
@@ -2712,6 +2802,134 @@ mod tests {
                 if message.contains("settlement packet signature is invalid")
         ));
 
+        assert_eq!(acceptance.ledger.status, CommerceEscrowStatus::Locked);
+    }
+
+    /// Batch 6 / Finding 1: a forged acceptance whose LEDGER is locked for a
+    /// DIFFERENT order or beneficiary (but the same value) than the accepted ORDER
+    /// CONTEXT is denied. The escrow-digest binding alone proves only that the
+    /// context pins THIS ledger's digest; without binding the ledger's order id and
+    /// parties to the context, a public-field forge could pair a same-value ledger
+    /// locked for order B (or one paying a foreign beneficiary) with a context
+    /// naming order A and drain the wrong custody. The shared ledger<->context
+    /// binding denies both.
+    #[test]
+    fn release_fails_closed_on_ledger_bound_to_a_different_order_or_beneficiary() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let context = order_context("fulfillment_attested");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
+
+        let acceptance = accept(accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            res_auth.public_key(),
+            &authority,
+        ))
+        .test_expect("accept locks the ledger");
+        let advanced = advanced_context(&acceptance, "settlement_observed");
+        // The observation matches the locked amount/currency and the order's
+        // reconciliation ref, so it would drain custody if the ledger binding were
+        // missing.
+        let observation = CapitalExecutionObservation {
+            observed_at: 1_700_000_000,
+            external_reference_id: "reconciliation-1".to_string(),
+            amount: MonetaryAmount {
+                units: 4200,
+                currency: "USD".to_string(),
+            },
+        };
+
+        // (a) A same-value ledger locked for a DIFFERENT order. Re-pin the forged
+        // acceptance's escrow digest and both contexts to that foreign ledger so
+        // every digest-binding check the release performs still passes; only the
+        // new ledger<->context order binding can fire.
+        let foreign_order_ledger = CommerceEscrowLedger {
+            schema: COMMERCE_ESCROW_LEDGER_SCHEMA_ID.to_string(),
+            order_id: "order-commerce-foreign".to_string(),
+            currency: "USD".to_string(),
+            depositor_account: "buyer:alice".to_string(),
+            beneficiary_account: acceptance.updated_context.merchant_subject.clone(),
+            custody_account: ESCROW_CUSTODY_ACCOUNT.to_string(),
+            amount_minor: 4200,
+            legs: vec![CommerceEscrowLeg {
+                kind: CommerceEscrowLegKind::Lock,
+                from_account: "buyer:alice".to_string(),
+                to_account: ESCROW_CUSTODY_ACCOUNT.to_string(),
+                amount_minor: 4200,
+            }],
+            status: CommerceEscrowStatus::Locked,
+        };
+        let foreign_digest = foreign_order_ledger
+            .digest()
+            .test_expect("foreign ledger digest");
+        let mut forged_order = acceptance.clone();
+        forged_order.ledger = foreign_order_ledger;
+        forged_order.escrow_digest = foreign_digest.clone();
+        forged_order.updated_context.escrow_digest = Some(foreign_digest.clone());
+        let mut advanced_order = advanced.clone();
+        advanced_order.escrow_digest = Some(foreign_digest);
+        let denied_order = release(
+            &forged_order,
+            &advanced_order,
+            &observation,
+            CapitalExecutionReconciledState::Matched,
+        )
+        .test_expect_err("a ledger locked for a different order is denied");
+        assert!(matches!(
+            denied_order,
+            CommerceOrderError::InvalidArtifact { message, .. }
+                if message.contains("escrow ledger order mismatch")
+        ));
+
+        // (b) Same order id, but the ledger pays a FOREIGN beneficiary (not the
+        // order merchant): the party binding fires.
+        let foreign_beneficiary_ledger = CommerceEscrowLedger {
+            schema: COMMERCE_ESCROW_LEDGER_SCHEMA_ID.to_string(),
+            order_id: acceptance.updated_context.order_id.clone(),
+            currency: "USD".to_string(),
+            depositor_account: "buyer:alice".to_string(),
+            beneficiary_account: "merchant:attacker".to_string(),
+            custody_account: ESCROW_CUSTODY_ACCOUNT.to_string(),
+            amount_minor: 4200,
+            legs: vec![CommerceEscrowLeg {
+                kind: CommerceEscrowLegKind::Lock,
+                from_account: "buyer:alice".to_string(),
+                to_account: ESCROW_CUSTODY_ACCOUNT.to_string(),
+                amount_minor: 4200,
+            }],
+            status: CommerceEscrowStatus::Locked,
+        };
+        let foreign_beneficiary_digest = foreign_beneficiary_ledger
+            .digest()
+            .test_expect("foreign beneficiary ledger digest");
+        let mut forged_beneficiary = acceptance.clone();
+        forged_beneficiary.ledger = foreign_beneficiary_ledger;
+        forged_beneficiary.escrow_digest = foreign_beneficiary_digest.clone();
+        forged_beneficiary.updated_context.escrow_digest = Some(foreign_beneficiary_digest.clone());
+        let mut advanced_beneficiary = advanced.clone();
+        advanced_beneficiary.escrow_digest = Some(foreign_beneficiary_digest);
+        let denied_beneficiary = release(
+            &forged_beneficiary,
+            &advanced_beneficiary,
+            &observation,
+            CapitalExecutionReconciledState::Matched,
+        )
+        .test_expect_err("a ledger paying a foreign beneficiary is denied");
+        assert!(matches!(
+            denied_beneficiary,
+            CommerceOrderError::InvalidArtifact { message, .. }
+                if message.contains("beneficiary")
+                    && message.contains("does not match the order merchant")
+        ));
+
+        // Custody is never drained across either denial.
         assert_eq!(acceptance.ledger.status, CommerceEscrowStatus::Locked);
     }
 
