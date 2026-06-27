@@ -851,12 +851,20 @@ impl ChioKernel {
                         })?;
                         Ok(())
                     };
-                    // No pool configured: a genuine Pass charge cannot co-debit the
-                    // aggregate ceiling, so deny fail-closed (this must NOT widen the
-                    // XCC-must-co-debit invariant by silently authorizing).
+                    // No pool configured. Only the genuine Pass allotment unit fails
+                    // closed here: it MUST co-debit the aggregate ceiling, and without a
+                    // pool it cannot, so deny (this must NOT widen the
+                    // XCC-must-co-debit invariant by silently authorizing). A non-Pass
+                    // custom private-use unit (for example "ABC") was never subject to
+                    // that invariant, so leave it on the normal budget path with its
+                    // per-Pass hold intact rather than breaking unrelated private-unit
+                    // budgets merely because no Pass pool is installed.
                     let Some(pool) = self.free_tier_pool_config() else {
-                        reverse_per_pass(store)?;
-                        return Ok(PoolGuardedCharge::PoolDenied);
+                        if currency == crate::pass_gating::PASS_ALLOTMENT_UNIT {
+                            reverse_per_pass(store)?;
+                            return Ok(PoolGuardedCharge::PoolDenied);
+                        }
+                        return Ok(PoolGuardedCharge::Authorized(Box::new(authorized), None));
                     };
                     // A non-Pass private-use unit (for example a custom "ABC" budget)
                     // is NOT the Pass allotment unit, so it never co-debits the

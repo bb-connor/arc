@@ -95,6 +95,7 @@ pub fn verify_commerce_order(
         &bundle.order_context.settlement_packet_sha256,
         &bundle.settlement_packet_bytes,
     )?;
+    verify_escrow_digest(&bundle.order_context, bundle.escrow_ledger_bytes.as_deref())?;
     let coverage_decision_bound = verify_coverage_requirement(
         &bundle.order_context,
         bundle.risk_comptroller_report_bytes.as_deref(),
@@ -479,4 +480,168 @@ fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
 
     hex::encode(Sha256::digest(bytes))
+}
+
+/// Require proof for the order context's `escrow_digest`. When the context pins
+/// an `escrow_digest`, the bundle MUST carry the canonical escrow-ledger bytes
+/// that produced it; the digest is recomputed from those bytes and the ledger is
+/// bound to this order. Fail-closed: an `escrow_digest` with no backing ledger,
+/// a digest that does not recompute, or a ledger bound to a different order is
+/// rejected, so an arbitrary 64-hex value can never appear in a verified order
+/// passport. When no `escrow_digest` is present there is nothing to prove.
+fn verify_escrow_digest(
+    context: &CommerceOrderContext,
+    escrow_ledger_bytes: Option<&[u8]>,
+) -> Result<(), CommerceOrderError> {
+    let Some(expected) = context.escrow_digest.as_deref() else {
+        return Ok(());
+    };
+    let Some(bytes) = escrow_ledger_bytes else {
+        return Err(CommerceOrderError::InvalidArtifact {
+            field: "order context",
+            message: "escrow_digest is present but the verification bundle carries no escrow \
+                      ledger bytes to prove it"
+                .to_string(),
+        });
+    };
+    verify_digest("escrow ledger", expected, bytes)?;
+    let ledger: CommerceEscrowLedger = parse_json("escrow ledger", bytes)?;
+    if ledger.order_id != context.order_id {
+        return Err(CommerceOrderError::InvalidArtifact {
+            field: "order context",
+            message: format!(
+                "escrow ledger order mismatch: ledger {} vs context {}",
+                ledger.order_id, context.order_id
+            ),
+        });
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod escrow_digest_verification_tests {
+    use super::*;
+    use chio_test_support::prelude::*;
+
+    const HEX64: &str = "1111111111111111111111111111111111111111111111111111111111111111";
+
+    fn order_context(order_id: &str) -> CommerceOrderContext {
+        let value = json!({
+            "schema": ids::COMMERCE_ORDER_CONTEXT_SCHEMA_ID,
+            "id": "ctx-1",
+            "issued_at": "2026-06-25T00:00:00Z",
+            "order_id": order_id,
+            "buyer_subject": "buyer:alice",
+            "agent_subject": "agent:alice",
+            "merchant_subject": "merchant:coffee",
+            "intent_ref": "intent-1",
+            "provider_admission_ref": "admission-1",
+            "provider_passport_ref": "passport-1",
+            "reputation_snapshot_ref": "reputation-1",
+            "federation_trust_bundle_ref": "federation-1",
+            "quote_id": "quote-1",
+            "quote_amount_minor": 4200u64,
+            "quote_currency": "USD",
+            "quote_sha256": HEX64,
+            "settlement_packet_ref": "settlement-packet-1",
+            "reconciliation_ref": "reconciliation-1",
+            "event_log_sha256": HEX64,
+            "event_log_path": "event-log.json",
+            "payment_lifecycle_sha256": HEX64,
+            "payment_lifecycle_path": "payment-lifecycle.json",
+            "mandate_ledger_sha256": HEX64,
+            "mandate_ledger_path": "mandate-ledger.json",
+            "provider_passport_sha256": HEX64,
+            "provider_passport_path": "provider-passport.json",
+            "reputation_snapshot_sha256": HEX64,
+            "reputation_snapshot_path": "reputation-snapshot.json",
+            "federation_trust_bundle_sha256": HEX64,
+            "federation_trust_bundle_path": "federation-trust-bundle.json",
+            "settlement_packet_sha256": HEX64,
+            "settlement_packet_path": "settlement-packet.json",
+            "current_state": "settlement_reconciled",
+        });
+        serde_json::from_value(value).test_expect("order context deserializes")
+    }
+
+    fn ledger(order_id: &str) -> CommerceEscrowLedger {
+        CommerceEscrowLedger {
+            schema: COMMERCE_ESCROW_LEDGER_SCHEMA_ID.to_string(),
+            order_id: order_id.to_string(),
+            currency: "USD".to_string(),
+            depositor_account: "buyer:alice".to_string(),
+            beneficiary_account: "merchant:coffee".to_string(),
+            custody_account: "chio:commerce:escrow:custody".to_string(),
+            amount_minor: 4200,
+            legs: vec![CommerceEscrowLeg {
+                kind: CommerceEscrowLegKind::Lock,
+                from_account: "buyer:alice".to_string(),
+                to_account: "chio:commerce:escrow:custody".to_string(),
+                amount_minor: 4200,
+            }],
+            status: CommerceEscrowStatus::Locked,
+        }
+    }
+
+    fn canonical_ledger_bytes(ledger: &CommerceEscrowLedger) -> Vec<u8> {
+        chio_core_types::canonical_json_bytes(ledger).test_expect("canonical ledger bytes")
+    }
+
+    #[test]
+    fn absent_escrow_digest_needs_no_proof() {
+        let context = order_context("order-commerce-001");
+        assert!(context.escrow_digest.is_none());
+        verify_escrow_digest(&context, None).test_expect("no escrow digest is a no-op");
+    }
+
+    #[test]
+    fn present_escrow_digest_with_matching_ledger_verifies() {
+        let order_id = "order-commerce-001";
+        let ledger = ledger(order_id);
+        let bytes = canonical_ledger_bytes(&ledger);
+        let mut context = order_context(order_id);
+        context.escrow_digest = Some(sha256_hex(&bytes));
+        verify_escrow_digest(&context, Some(&bytes)).test_expect("matching ledger proves digest");
+    }
+
+    #[test]
+    fn present_escrow_digest_without_bytes_is_denied() {
+        let mut context = order_context("order-commerce-001");
+        context.escrow_digest = Some(HEX64.to_string());
+        let error = verify_escrow_digest(&context, None)
+            .test_expect_err("escrow digest with no ledger bytes is denied");
+        assert!(matches!(
+            error,
+            CommerceOrderError::InvalidArtifact { message, .. }
+                if message.contains("no escrow ledger bytes to prove it")
+        ));
+    }
+
+    #[test]
+    fn escrow_digest_that_does_not_recompute_is_denied() {
+        let order_id = "order-commerce-001";
+        let bytes = canonical_ledger_bytes(&ledger(order_id));
+        let mut context = order_context(order_id);
+        // A digest that does not match the supplied ledger bytes.
+        context.escrow_digest = Some(HEX64.to_string());
+        let error = verify_escrow_digest(&context, Some(&bytes))
+            .test_expect_err("non-recomputing escrow digest is denied");
+        assert!(matches!(error, CommerceOrderError::DigestMismatch { .. }));
+    }
+
+    #[test]
+    fn escrow_ledger_bound_to_a_different_order_is_denied() {
+        // The ledger proves a digest but is bound to a foreign order.
+        let foreign_ledger = ledger("order-commerce-foreign");
+        let bytes = canonical_ledger_bytes(&foreign_ledger);
+        let mut context = order_context("order-commerce-001");
+        context.escrow_digest = Some(sha256_hex(&bytes));
+        let error = verify_escrow_digest(&context, Some(&bytes))
+            .test_expect_err("escrow ledger bound to a different order is denied");
+        assert!(matches!(
+            error,
+            CommerceOrderError::InvalidArtifact { message, .. }
+                if message.contains("escrow ledger order mismatch")
+        ));
+    }
 }

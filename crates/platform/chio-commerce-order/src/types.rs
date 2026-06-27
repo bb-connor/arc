@@ -287,6 +287,16 @@ pub struct CommerceOrderVerificationBundle {
     pub settlement_packet_bytes: Vec<u8>,
     pub mandate_protocol_payloads: Vec<CommerceMandateProtocolPayload>,
     pub risk_comptroller_report_bytes: Option<Vec<u8>>,
+    /// Canonical bytes of the custodial escrow ledger that produced
+    /// `order_context.escrow_digest`. Additive and optional: orders assembled
+    /// before the escrow was wired (and every committed fixture) omit it, so the
+    /// field is skipped on the wire and the bundle serialization is unchanged.
+    /// When `order_context.escrow_digest` IS present, `verify_commerce_order`
+    /// requires these bytes and recomputes the digest from them, so an arbitrary
+    /// 64-hex `escrow_digest` can no longer ride into a verified order passport
+    /// without the locked/released escrow ledger that backs it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub escrow_ledger_bytes: Option<Vec<u8>>,
     pub verified_trust_market_context: Option<CommerceVerifiedTrustMarketContext>,
     pub trusted_event_authority_receipt_kernel_keys: Vec<chio_core_types::crypto::PublicKey>,
     pub trusted_payment_signer_keys: Vec<chio_core_types::crypto::PublicKey>,

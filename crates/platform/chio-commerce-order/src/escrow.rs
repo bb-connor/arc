@@ -371,12 +371,16 @@ impl CommerceSettlementDispatch {
                 )));
             }
         }
-        if !matches!(
-            self.status.as_str(),
-            "dispatched" | "reconciled" | "settled"
-        ) {
+        // Accept-time binding: the escrow accept only advances the order to
+        // `settlement_packet_assembled` and locks custody prepare-only. The
+        // emitted packet therefore MUST declare the dispatched/assembled status;
+        // the final `reconciled`/`settled` statuses belong to the reconciliation
+        // path (see `release`) and would otherwise let a merely-locked escrow sign
+        // a packet claiming final settlement. Fail closed on any other status.
+        if self.status.as_str() != "dispatched" {
             return Err(CommerceOrderError::SettlementFailed(format!(
-                "unsupported escrow settlement status: {}",
+                "escrow accept settlement status must be `dispatched`; final \
+                 statuses are reserved for the reconciliation path: {}",
                 self.status
             )));
         }
@@ -771,8 +775,25 @@ pub fn accept(
     let escrow_digest = ledger.digest()?;
     let broadcast = EscrowBroadcastIntent::prepare_only(&ledger)?;
 
+    // Bind the emitted settlement packet to the context digest. The packet body
+    // is built from the dispatch fields, so its canonical digest need not equal
+    // the inbound `settlement_packet_sha256` placeholder. Pin the advanced
+    // context's `settlement_packet_sha256` to the digest of the packet that was
+    // actually signed, so the accepted (context, packet) pair is internally
+    // consistent and `verify_commerce_order`'s settlement-packet digest check
+    // (which hashes the canonical packet body) passes. Fail closed if the packet
+    // cannot be canonicalized.
+    let settlement_packet_sha256 = sha256_hex(
+        &chio_core_types::canonical_json_bytes(&settlement_packet.body).map_err(|error| {
+            CommerceOrderError::SettlementFailed(format!(
+                "escrow accept failed to canonicalize the settlement packet: {error}"
+            ))
+        })?,
+    );
+
     let mut updated_context = request.order_context.clone();
     updated_context.escrow_digest = Some(escrow_digest.clone());
+    updated_context.settlement_packet_sha256 = settlement_packet_sha256;
     updated_context.current_state = OrderState::SettlementPacketAssembled.as_str().to_string();
 
     Ok(CommerceEscrowAcceptance {
@@ -787,18 +808,82 @@ pub fn accept(
 }
 
 /// Release the locked escrow ONLY against a Matched capital execution
-/// observation.
+/// observation, bound to the SEALED acceptance and the ADVANCED order context.
 ///
-/// Fails closed when the reconciled state is not
-/// [`CapitalExecutionReconciledState::Matched`], when `prior_state` is not a
-/// settlement-reconciliation state on the shipped spine, or when the observed
-/// execution does not cover exactly the locked amount and currency.
+/// `acceptance` is the sealed output of [`accept`]. Because its fields are
+/// public, an external caller can fabricate one without going through [`accept`],
+/// so release re-derives its bindings rather than trusting them: it recomputes
+/// the escrow digest from the ledger, requires the accepted context to carry that
+/// pinned digest, and re-verifies the emitted settlement-packet signature.
+///
+/// `advanced_context` is the SAME order advanced (by the out-of-band dispatch and
+/// observe steps) to a settlement-reconciliation predecessor state. The release
+/// spine state is derived from `advanced_context.current_state`, never from a
+/// caller-supplied argument, and the context MUST name the same order and carry
+/// the same pinned escrow digest as the acceptance, so a Matched observation can
+/// never be replayed across orders or escrows.
+///
+/// Fails closed when the acceptance bindings do not re-derive, when the advanced
+/// context is not bound to the locked order/escrow, when the reconciled state is
+/// not [`CapitalExecutionReconciledState::Matched`], when the advanced context is
+/// not a settlement-reconciliation predecessor on the shipped spine, or when the
+/// observed execution does not cover exactly the locked amount and currency.
 pub fn release(
     acceptance: &CommerceEscrowAcceptance,
+    advanced_context: &CommerceOrderContext,
     observation: &CapitalExecutionObservation,
     reconciled_state: CapitalExecutionReconciledState,
-    prior_state: OrderState,
 ) -> Result<CommerceEscrowRelease, CommerceOrderError> {
+    // Re-validate the sealed acceptance (the acceptance fields are public, so a
+    // forged locked acceptance must not be trusted as settlement authority). The
+    // escrow digest MUST re-derive from the ledger, the accepted context MUST be
+    // well-shaped and carry that pinned digest, and the emitted settlement packet
+    // signature MUST still verify.
+    let recomputed_escrow_digest = acceptance.ledger.digest()?;
+    if recomputed_escrow_digest != acceptance.escrow_digest {
+        return Err(CommerceOrderError::SettlementFailed(
+            "escrow release denied: acceptance escrow digest does not re-derive from its ledger"
+                .to_string(),
+        ));
+    }
+    acceptance.updated_context.validate_shape()?;
+    if acceptance.updated_context.escrow_digest.as_deref()
+        != Some(acceptance.escrow_digest.as_str())
+    {
+        return Err(CommerceOrderError::SettlementFailed(
+            "escrow release denied: accepted context is not bound to the locked escrow digest"
+                .to_string(),
+        ));
+    }
+    match acceptance.settlement_packet.verify_signature() {
+        Ok(true) => {}
+        _ => {
+            return Err(CommerceOrderError::SettlementFailed(
+                "escrow release denied: accepted settlement packet signature is invalid"
+                    .to_string(),
+            ))
+        }
+    }
+
+    // Bind the release to the SAME order and escrow the acceptance locked. The
+    // advanced context is the order state the dispatch/observe steps produced; it
+    // MUST name the same order and carry the same pinned (locked) escrow digest,
+    // so an observation reconciled for a DIFFERENT order/escrow cannot drain this
+    // custody (REL-2).
+    advanced_context.validate_shape()?;
+    if advanced_context.order_id != acceptance.updated_context.order_id {
+        return Err(CommerceOrderError::SettlementFailed(
+            "escrow release denied: release order does not match the locked escrow order"
+                .to_string(),
+        ));
+    }
+    if advanced_context.escrow_digest.as_deref() != Some(acceptance.escrow_digest.as_str()) {
+        return Err(CommerceOrderError::SettlementFailed(
+            "escrow release denied: release context is not bound to the locked escrow digest"
+                .to_string(),
+        ));
+    }
+
     // Fail closed: a custodial release fires ONLY against a capital execution
     // observation reconciled as Matched. Any not-yet-matched state keeps the
     // funds locked.
@@ -808,7 +893,12 @@ pub fn release(
         ));
     }
 
-    // Bind to the shipped spine: release IS the settlement reconciliation step.
+    // Derive the spine prior state from the ADVANCED order context, never a
+    // caller-supplied argument. A release driven immediately after accept (the
+    // context still at `settlement_packet_assembled`) is rejected here: that is
+    // not a settlement-reconciliation transition, so the dispatched/observed
+    // steps cannot be skipped while draining custody.
+    let prior_state = OrderState::parse(&advanced_context.current_state)?;
     if !super::replay::is_allowed_transition(
         prior_state.as_str(),
         OrderState::SettlementReconciled.as_str(),
@@ -833,7 +923,9 @@ pub fn release(
     let ledger = acceptance.ledger.released()?;
     let escrow_digest = ledger.digest()?;
 
-    let mut updated_context = acceptance.updated_context.clone();
+    // Advance the order from the verified ADVANCED context (not the frozen accept
+    // context), so the released context reflects the dispatched/observed steps.
+    let mut updated_context = advanced_context.clone();
     updated_context.escrow_digest = Some(escrow_digest.clone());
     updated_context.current_state = OrderState::SettlementReconciled.as_str().to_string();
 
@@ -1055,6 +1147,18 @@ mod tests {
         SignedExportEnvelope::sign(body, authority).test_expect("sign reservation receipt")
     }
 
+    /// Build the order context advanced (by the out-of-band dispatch/observe
+    /// steps) to `state`, carrying the SAME order id and the SAME pinned escrow
+    /// digest the accept locked. This is the legitimate input to `release`.
+    fn advanced_context(
+        acceptance: &CommerceEscrowAcceptance,
+        state: &str,
+    ) -> CommerceOrderContext {
+        let mut context = acceptance.updated_context.clone();
+        context.current_state = state.to_string();
+        context
+    }
+
     fn accept_request<'a>(
         context: &'a CommerceOrderContext,
         token: &'a CapabilityToken,
@@ -1218,12 +1322,17 @@ mod tests {
             },
         };
 
+        // The order has been advanced (by the dispatch/observe steps) to the
+        // settlement-observed reconciliation predecessor, carrying the same order
+        // id and the same pinned escrow digest the accept locked.
+        let advanced = advanced_context(&acceptance, "settlement_observed");
+
         // NotObserved keeps the funds locked.
         let denied = release(
             &acceptance,
+            &advanced,
             &observation,
             CapitalExecutionReconciledState::NotObserved,
-            OrderState::SettlementObserved,
         )
         .test_expect_err("release denied without Matched");
         assert!(matches!(
@@ -1235,9 +1344,9 @@ mod tests {
         // Matched drains custody to the beneficiary and advances the order.
         let released = release(
             &acceptance,
+            &advanced,
             &observation,
             CapitalExecutionReconciledState::Matched,
-            OrderState::SettlementObserved,
         )
         .test_expect("Matched release succeeds");
 
@@ -1645,6 +1754,7 @@ mod tests {
                 currency: "EUR".to_string(),
             },
         ];
+        let advanced = advanced_context(&acceptance, "settlement_observed");
         for amount in mismatches {
             let observation = CapitalExecutionObservation {
                 observed_at: 1_700_000_000,
@@ -1653,9 +1763,9 @@ mod tests {
             };
             let denied = release(
                 &acceptance,
+                &advanced,
                 &observation,
                 CapitalExecutionReconciledState::Matched,
-                OrderState::SettlementObserved,
             )
             .test_expect_err("mismatched observation is denied");
             assert!(matches!(
@@ -1719,11 +1829,15 @@ mod tests {
                 currency: "USD".to_string(),
             },
         };
+        // The advanced context is derived from a non-reconciliation predecessor
+        // state, so the release spine check (derived from the context, not a
+        // caller argument) denies.
+        let advanced = advanced_context(&acceptance, "intent_recorded");
         let release_error = release(
             &acceptance,
+            &advanced,
             &observation,
             CapitalExecutionReconciledState::Matched,
-            OrderState::IntentRecorded,
         )
         .test_expect_err("release from a non-reconciliation state is denied");
         assert!(matches!(
@@ -1810,8 +1924,22 @@ mod tests {
         assert!(matches!(
             status_error,
             CommerceOrderError::SettlementFailed(message)
-                if message.contains("unsupported escrow settlement status")
+                if message.contains("settlement status must be `dispatched`")
         ));
+
+        // The final reconciliation statuses are NOT accept-time dispatch statuses.
+        for final_status in ["reconciled", "settled"] {
+            let mut final_dispatch = dispatch();
+            final_dispatch.status = final_status.to_string();
+            let final_error = final_dispatch
+                .validate()
+                .test_expect_err("final settlement status is denied at accept time");
+            assert!(matches!(
+                final_error,
+                CommerceOrderError::SettlementFailed(message)
+                    if message.contains("settlement status must be `dispatched`")
+            ));
+        }
     }
 
     // ESCROW-2: a tampered (unverifiable) reservation witness is denied; a bare
@@ -1909,5 +2037,267 @@ mod tests {
             CommerceOrderError::SettlementFailed(message)
                 if message.contains("not signed by the expected")
         ));
+    }
+
+    /// 765: the emitted settlement packet is bound to the advanced context's
+    /// `settlement_packet_sha256`, which is pinned to the canonical digest of the
+    /// signed packet body (not the inbound placeholder), so the accepted
+    /// (context, packet) pair is internally consistent and verifiable.
+    #[test]
+    fn accept_binds_settlement_packet_to_context_digest() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let context = order_context("fulfillment_attested");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
+
+        let acceptance = accept(accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            res_auth.public_key(),
+            &authority,
+        ))
+        .test_expect("accept succeeds");
+
+        let packet_digest = sha256_hex(
+            &chio_core_types::canonical_json_bytes(&acceptance.settlement_packet.body)
+                .test_expect("canonical settlement packet"),
+        );
+        // The advanced context pins the digest of the packet that was actually
+        // signed, replacing the inbound placeholder.
+        assert_eq!(
+            acceptance.updated_context.settlement_packet_sha256,
+            packet_digest
+        );
+        assert_ne!(acceptance.updated_context.settlement_packet_sha256, HEX64);
+    }
+
+    /// 377: the accept-time settlement dispatch status is restricted to the
+    /// dispatched/assembled state; a packet claiming a final `reconciled` or
+    /// `settled` status while the escrow is merely locked is denied.
+    #[test]
+    fn accept_fails_closed_on_final_settlement_status() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let context = order_context("fulfillment_attested");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
+
+        for final_status in ["reconciled", "settled"] {
+            let mut request = accept_request(
+                &context,
+                &token,
+                &acceptor,
+                &reservation,
+                res_auth.public_key(),
+                &authority,
+            );
+            request.settlement.status = final_status.to_string();
+            let error = accept(request).test_expect_err("final settlement status is denied");
+            assert!(matches!(
+                error,
+                CommerceOrderError::SettlementFailed(message)
+                    if message.contains("settlement status must be `dispatched`")
+            ));
+        }
+    }
+
+    /// 816: release derives the spine prior state from the ADVANCED order
+    /// context, never a caller-supplied argument. A release driven immediately
+    /// after accept (the context still at `settlement_packet_assembled`) is
+    /// denied even with a Matched observation, so the dispatched/observed steps
+    /// cannot be skipped while draining custody.
+    #[test]
+    fn release_fails_closed_when_context_not_advanced_past_assembly() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let context = order_context("fulfillment_attested");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
+
+        let acceptance = accept(accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            res_auth.public_key(),
+            &authority,
+        ))
+        .test_expect("accept locks the ledger");
+
+        // The accept-frozen context is still at settlement_packet_assembled.
+        let observation = CapitalExecutionObservation {
+            observed_at: 1_700_000_000,
+            external_reference_id: "exec-ref-1".to_string(),
+            amount: MonetaryAmount {
+                units: 4200,
+                currency: "USD".to_string(),
+            },
+        };
+        let denied = release(
+            &acceptance,
+            &acceptance.updated_context,
+            &observation,
+            CapitalExecutionReconciledState::Matched,
+        )
+        .test_expect_err("release on an un-advanced context is denied");
+        assert!(matches!(
+            denied,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("is not a settlement-reconciliation state")
+        ));
+        assert_eq!(acceptance.ledger.status, CommerceEscrowStatus::Locked);
+    }
+
+    /// REL-2: a Matched observation cannot be replayed across orders or escrows.
+    /// A release whose advanced context names a DIFFERENT order, or carries a
+    /// DIFFERENT pinned escrow digest, is denied before custody is drained.
+    #[test]
+    fn release_fails_closed_on_cross_order_observation_reuse() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let context = order_context("fulfillment_attested");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
+
+        let acceptance = accept(accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            res_auth.public_key(),
+            &authority,
+        ))
+        .test_expect("accept locks the ledger");
+
+        let observation = CapitalExecutionObservation {
+            observed_at: 1_700_000_000,
+            external_reference_id: "exec-ref-1".to_string(),
+            amount: MonetaryAmount {
+                units: 4200,
+                currency: "USD".to_string(),
+            },
+        };
+
+        // A Matched observation routed through a DIFFERENT order's context.
+        let mut wrong_order = advanced_context(&acceptance, "settlement_observed");
+        wrong_order.order_id = "order-commerce-foreign".to_string();
+        let denied_order = release(
+            &acceptance,
+            &wrong_order,
+            &observation,
+            CapitalExecutionReconciledState::Matched,
+        )
+        .test_expect_err("cross-order release is denied");
+        assert!(matches!(
+            denied_order,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("release order does not match the locked escrow order")
+        ));
+
+        // A Matched observation routed through a context pinned to a DIFFERENT
+        // escrow digest.
+        let mut wrong_escrow = advanced_context(&acceptance, "settlement_observed");
+        wrong_escrow.escrow_digest = Some(HEX64.to_string());
+        let denied_escrow = release(
+            &acceptance,
+            &wrong_escrow,
+            &observation,
+            CapitalExecutionReconciledState::Matched,
+        )
+        .test_expect_err("cross-escrow release is denied");
+        assert!(matches!(
+            denied_escrow,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("release context is not bound to the locked escrow digest")
+        ));
+
+        // Custody is never drained across either denial.
+        assert_eq!(acceptance.ledger.status, CommerceEscrowStatus::Locked);
+    }
+
+    /// 801: a forged locked acceptance (its fields are public) cannot produce a
+    /// released ledger. Release re-derives the escrow digest from the ledger and
+    /// re-verifies the settlement-packet signature, denying a tampered digest or
+    /// an unsigned/forged packet.
+    #[test]
+    fn release_fails_closed_on_forged_acceptance() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let context = order_context("fulfillment_attested");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
+
+        let acceptance = accept(accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            res_auth.public_key(),
+            &authority,
+        ))
+        .test_expect("accept locks the ledger");
+        let advanced = advanced_context(&acceptance, "settlement_observed");
+        let observation = CapitalExecutionObservation {
+            observed_at: 1_700_000_000,
+            external_reference_id: "exec-ref-1".to_string(),
+            amount: MonetaryAmount {
+                units: 4200,
+                currency: "USD".to_string(),
+            },
+        };
+
+        // Tamper the pinned escrow digest so it no longer re-derives from the
+        // ledger.
+        let mut forged_digest = acceptance.clone();
+        forged_digest.escrow_digest = HEX64.to_string();
+        let denied_digest = release(
+            &forged_digest,
+            &advanced,
+            &observation,
+            CapitalExecutionReconciledState::Matched,
+        )
+        .test_expect_err("forged escrow digest is denied");
+        assert!(matches!(
+            denied_digest,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("does not re-derive from its ledger")
+        ));
+
+        // Tamper the emitted settlement packet body so its signature no longer
+        // verifies.
+        let mut forged_packet = acceptance.clone();
+        forged_packet.settlement_packet.body.amount_minor += 1;
+        let denied_packet = release(
+            &forged_packet,
+            &advanced,
+            &observation,
+            CapitalExecutionReconciledState::Matched,
+        )
+        .test_expect_err("forged settlement packet is denied");
+        assert!(matches!(
+            denied_packet,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("settlement packet signature is invalid")
+        ));
+
+        assert_eq!(acceptance.ledger.status, CommerceEscrowStatus::Locked);
     }
 }

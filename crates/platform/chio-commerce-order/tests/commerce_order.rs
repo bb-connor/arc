@@ -158,6 +158,7 @@ fn load_bundle(case_name: &str) -> chio_commerce_order::CommerceOrderVerificatio
         settlement_packet_bytes: read_fixture(&dir, "settlement-packet.json"),
         mandate_protocol_payloads: mandate_protocol_payloads(),
         risk_comptroller_report_bytes: None,
+        escrow_ledger_bytes: None,
         verified_trust_market_context: None,
         trusted_event_authority_receipt_kernel_keys: vec![commerce_event_authority_receipt_key()],
         trusted_payment_signer_keys: vec![commerce_payment_signer_key()],
@@ -1713,6 +1714,19 @@ fn pin_escrow_digest_via_accept(
         Some(acceptance.escrow_digest.as_str())
     );
 
+    // Supply the canonical escrow-ledger bytes that produced the pinned digest so
+    // `verify_commerce_order` can PROVE the escrow_digest rather than trust an
+    // arbitrary 64-hex value (the digest is recomputed from these bytes).
+    bundle.escrow_ledger_bytes = Some(
+        chio_core_types::canonical_json_bytes(&acceptance.ledger)
+            .test_expect("escrow ledger canonicalizes"),
+    );
+    // accept() binds the emitted (assembly-stage) settlement packet to the
+    // advanced context's settlement_packet_sha256, so the bundle's settlement
+    // artifact is the packet that was actually signed at assembly time.
+    bundle.settlement_packet_bytes =
+        chio_core_types::canonical_json_bytes(&acceptance.settlement_packet.body)
+            .test_expect("emitted settlement packet canonicalizes");
     bundle.order_context = acceptance.updated_context;
     acceptance.escrow_digest
 }
@@ -1797,9 +1811,8 @@ fn order_passport_replay_fails_closed_on_escrow_digest_tamper() {
     let escrow_digest = pin_escrow_digest_via_accept(&mut bundle);
 
     // Baseline: the untampered order-passport replays GREEN.
-    let green = chio_commerce_order::verify_commerce_order(&bundle)
+    chio_commerce_order::verify_commerce_order(&bundle)
         .test_expect("baseline order-passport replays GREEN");
-    let green_order_context_sha256 = green.artifact_digests.order_context_sha256.clone();
 
     // Tamper 1 (escrow digest): a corrupt (non-hex) pinned escrow digest fails
     // the order-context shape gate closed.
@@ -1813,19 +1826,20 @@ fn order_passport_replay_fails_closed_on_escrow_digest_tamper() {
     );
 
     // Tamper 2 (escrow digest, still well-formed): flipping one hex nibble of the
-    // pinned escrow digest re-types but diverges the aggregated order-context
-    // digest in the passport. The escrow digest is tamper-evident in the chain.
+    // pinned escrow digest no longer recomputes from the supplied escrow ledger
+    // bytes, so the replay FAILS CLOSED. An arbitrary well-formed 64-hex value can
+    // no longer ride into a verified order passport without its backing ledger.
     let mut flipped_chars: Vec<char> = escrow_digest.chars().collect();
     flipped_chars[0] = if flipped_chars[0] == 'a' { 'b' } else { 'a' };
     let flipped_digest: String = flipped_chars.into_iter().collect();
     assert_ne!(flipped_digest, escrow_digest);
     let mut flipped = bundle.clone();
     flipped.order_context.escrow_digest = Some(flipped_digest);
-    let flipped_report = chio_commerce_order::verify_commerce_order(&flipped)
-        .test_expect("a well-formed but different escrow digest still type-checks");
-    assert_ne!(
-        flipped_report.artifact_digests.order_context_sha256,
-        green_order_context_sha256
+    let flipped_error = chio_commerce_order::verify_commerce_order(&flipped)
+        .test_expect_err("a well-formed but unbacked escrow digest must fail the replay closed");
+    assert!(
+        flipped_error.to_string().contains("escrow ledger"),
+        "{flipped_error}"
     );
 
     // Tamper 3 (chained digest): corrupting a chained artifact in the

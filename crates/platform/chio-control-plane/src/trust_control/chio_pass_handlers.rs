@@ -71,8 +71,8 @@ use chio_credentials::{
 use chio_did::DidChio;
 use chio_kernel::pass_gating::{pass_baseline_resource_grants, PASS_COMPUTE_SERVER_ID};
 use chio_kernel::{
-    build_checkpoint_with_previous, CapabilityAuthority, FreeTierPoolConfig, KernelCheckpoint,
-    ReceiptQuery, ReceiptReadContext, MAX_QUERY_LIMIT,
+    build_checkpoint_with_previous, validate_checkpoint, CapabilityAuthority, FreeTierPoolConfig,
+    KernelCheckpoint, ReceiptQuery, ReceiptReadContext, MAX_QUERY_LIMIT,
 };
 use chio_store_sqlite::SqliteReceiptStore;
 
@@ -665,8 +665,10 @@ pub struct PreparedPassAnchorPublication {
 ///    anchor schemas and introduces NO new signed-artifact schema.
 /// 3. Checkpoint: `build_checkpoint_with_previous` wraps that root in a
 ///    [`KernelCheckpoint`] whose `checkpoint_seq` is `previous_checkpoint.seq + 1`
-///    (or `0` for the genesis batch), so the per-operator sequence strictly
-///    increases and chains to the prior checkpoint body.
+///    (or `1` for the genesis batch), with a `1`-based `batch_start_seq` that
+///    continues the prior checkpoint's range and a `batch_end_seq` that covers
+///    exactly `tree_size` leaves, so `validate_checkpoint` (and any continuity
+///    consumer) accepts the prepared artifacts.
 /// 4. Publication: `prepare_root_publication` produces the prepared
 ///    `IChioRootRegistry::publishRoot` call. It fails closed unless `binding`'s
 ///    certificate carries [`Web3KeyBindingPurpose::Anchor`], its `chain_scope`
@@ -744,21 +746,36 @@ pub fn prepare_pass_anchor_publication(
     let batch = AnchorBatch::sign(batch_body, operator_keypair)
         .map_err(|error| CliError::Other(format!("Pass anchor batch sign failed: {error}")))?;
 
-    // 3. Wrap the batch root in a kernel checkpoint under a strictly-increasing
-    // per-operator checkpoint_seq (genesis = 0), chaining to the prior checkpoint.
+    // 3. Wrap the batch root in a kernel checkpoint with VALID ranges so any standard
+    // `validate_checkpoint`/continuity consumer accepts the prepared artifacts.
+    // `validate_checkpoint` requires `checkpoint_seq >= 1` (genesis is 1, not 0), a
+    // `1`-based `batch_start_seq` that immediately follows the predecessor's
+    // `batch_end_seq`, and `batch_end_seq == batch_start_seq + tree_size - 1` so the
+    // covered entry count equals the leaf count (never one larger than `tree_size`).
     let leaf_count = u64::try_from(leaves.len())
         .map_err(|_| CliError::Other("anchor leaf count overflow".to_string()))?;
-    let checkpoint_seq =
-        match previous_checkpoint {
-            None => 0,
-            Some(previous) => previous.body.checkpoint_seq.checked_add(1).ok_or_else(|| {
+    let (checkpoint_seq, batch_start_seq) = match previous_checkpoint {
+        None => (1, 1),
+        Some(previous) => {
+            let seq = previous.body.checkpoint_seq.checked_add(1).ok_or_else(|| {
                 CliError::Other("per-operator checkpoint_seq overflow".to_string())
-            })?,
-        };
+            })?;
+            let start = previous.body.batch_end_seq.checked_add(1).ok_or_else(|| {
+                CliError::Other("per-operator batch_start_seq overflow".to_string())
+            })?;
+            (seq, start)
+        }
+    };
+    // `leaf_count >= 1` (the empty digest set was rejected above), so
+    // `batch_end_seq >= batch_start_seq >= 1`.
+    let batch_end_seq = batch_start_seq
+        .checked_add(leaf_count)
+        .and_then(|end| end.checked_sub(1))
+        .ok_or_else(|| CliError::Other("anchor batch_end_seq overflow".to_string()))?;
     let checkpoint = build_checkpoint_with_previous(
         checkpoint_seq,
-        0,
-        leaf_count,
+        batch_start_seq,
+        batch_end_seq,
         &leaves,
         operator_keypair,
         previous_checkpoint,
@@ -767,6 +784,22 @@ pub fn prepare_pass_anchor_publication(
     if checkpoint.body.merkle_root != batch.body.tree_root {
         return Err(CliError::Other(
             "Pass anchor checkpoint root does not match the anchor batch tree root".to_string(),
+        ));
+    }
+    // Defense-in-depth: fail closed unless the prepared checkpoint actually validates,
+    // so a malformed range can never be published or handed to an inclusion verifier.
+    validate_checkpoint(&checkpoint)
+        .map_err(|error| CliError::Other(format!("Pass anchor checkpoint is invalid: {error}")))?;
+    // Bind the prepared publication to the SAME operator identity that signed the
+    // checkpoint. `prepare_root_publication` attributes the on-chain call using
+    // `binding.certificate.chio_public_key` (its `operatorKeyHash`) but only checks the
+    // binding against the EVM target, not against the checkpoint signer. Reject a
+    // binding whose key does not match the checkpoint's `kernel_key` so the anchored
+    // root's advertised operator identity matches its off-chain signer fail-closed.
+    if binding.certificate.chio_public_key != checkpoint.body.kernel_key {
+        return Err(CliError::Other(
+            "Pass anchor binding key does not match the operator key that signed the checkpoint"
+                .to_string(),
         ));
     }
 
@@ -1230,9 +1263,10 @@ mod tests {
         pass_receipt_read_context, pass_stream_uri, ChioPassStream,
     };
     use chio_kernel::{
-        BudgetStore, ChioKernel, InMemoryBudgetStore, KernelConfig, LocalCapabilityAuthority,
-        ReceiptStore, ToolCallRequest, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE,
-        DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+        validate_checkpoint_predecessor, BudgetStore, ChioKernel, InMemoryBudgetStore,
+        KernelConfig, LocalCapabilityAuthority, ReceiptStore, ToolCallRequest, Verdict,
+        DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+        DEFAULT_MAX_STREAM_TOTAL_BYTES,
     };
     use chio_mcp_adapter::native::{NativeChioServiceBuilder, NativeTool};
 
@@ -2259,7 +2293,9 @@ mod tests {
             None,
         )
         .expect("genesis anchor publication");
-        assert_eq!(genesis.checkpoint.body.checkpoint_seq, 0);
+        // PR957 codex P2: the genesis checkpoint_seq is 1, not 0 (validate_checkpoint
+        // rejects seq 0).
+        assert_eq!(genesis.checkpoint.body.checkpoint_seq, 1);
         assert!(genesis.checkpoint.body.previous_checkpoint_sha256.is_none());
 
         let next = prepare_pass_anchor_publication(
@@ -2277,10 +2313,86 @@ mod tests {
             next.checkpoint.body.checkpoint_seq > genesis.checkpoint.body.checkpoint_seq,
             "per-operator checkpoint_seq must strictly increase"
         );
-        assert_eq!(next.checkpoint.body.checkpoint_seq, 1);
-        assert_eq!(next.publication.checkpoint_seq, 1);
+        assert_eq!(next.checkpoint.body.checkpoint_seq, 2);
+        assert_eq!(next.publication.checkpoint_seq, 2);
         // The next checkpoint chains to the prior checkpoint body (per-operator continuity).
         assert!(next.checkpoint.body.previous_checkpoint_sha256.is_some());
+    }
+
+    #[test]
+    fn prepare_pass_anchor_publication_produces_validatable_checkpoints() {
+        // PR957 codex P2: the prepared genesis + successor checkpoints must pass the
+        // standard `validate_checkpoint` and continuity checks (seq >= 1, 1-based
+        // batch ranges, covered entry count == tree_size), otherwise the anchoring
+        // job cannot produce reusable checkpoints.
+        let operator = Keypair::generate();
+        let pass_a = issue_first_window_pass(&Keypair::generate(), TrustTier::Attested);
+        let pass_b = issue_first_window_pass(&Keypair::generate(), TrustTier::Verified);
+        let binding = operator_binding(&operator, vec![Web3KeyBindingPurpose::Anchor]);
+
+        let genesis = prepare_pass_anchor_publication(
+            &operator,
+            &binding,
+            &anchor_target(),
+            std::slice::from_ref(&pass_a),
+            &[],
+            pending_witness(),
+            MID_JUNE_2026,
+            None,
+        )
+        .expect("genesis anchor publication");
+        validate_checkpoint(&genesis.checkpoint).expect("genesis checkpoint validates");
+        assert_eq!(genesis.checkpoint.body.batch_start_seq, 1);
+        assert_eq!(genesis.checkpoint.body.batch_end_seq, 1);
+        assert_eq!(genesis.checkpoint.body.tree_size, 1);
+
+        // A two-leaf successor batch covers [2, 3] (entry count 2 == tree_size 2) and
+        // cleanly extends the genesis checkpoint.
+        let next = prepare_pass_anchor_publication(
+            &operator,
+            &binding,
+            &anchor_target(),
+            &[pass_a, pass_b],
+            &[],
+            pending_witness(),
+            MID_JUNE_2026 + 1,
+            Some(&genesis.checkpoint),
+        )
+        .expect("next anchor publication");
+        validate_checkpoint(&next.checkpoint).expect("next checkpoint validates");
+        assert_eq!(next.checkpoint.body.batch_start_seq, 2);
+        assert_eq!(next.checkpoint.body.batch_end_seq, 3);
+        assert_eq!(next.checkpoint.body.tree_size, 2);
+        validate_checkpoint_predecessor(&genesis.checkpoint, &next.checkpoint)
+            .expect("next cleanly extends genesis");
+    }
+
+    #[test]
+    fn prepare_pass_anchor_publication_rejects_binding_key_mismatch() {
+        // PR957 codex P2: the binding that attributes the on-chain operatorKeyHash must
+        // match the operator key that signed the checkpoint. Passing Alice's binding
+        // with Bob's keypair would anchor a root whose advertised identity (Alice) does
+        // not match its off-chain signer (Bob); reject it fail-closed.
+        let bob = Keypair::generate();
+        let alice = Keypair::generate();
+        let pass = issue_first_window_pass(&Keypair::generate(), TrustTier::Attested);
+        // Alice's binding is otherwise valid (anchor purpose, target chain, settlement),
+        // so only the checkpoint-signer mismatch can reject it.
+        let alice_binding = operator_binding(&alice, vec![Web3KeyBindingPurpose::Anchor]);
+        let denied = prepare_pass_anchor_publication(
+            &bob,
+            &alice_binding,
+            &anchor_target(),
+            &[pass],
+            &[],
+            pending_witness(),
+            MID_JUNE_2026,
+            None,
+        );
+        assert!(
+            denied.is_err(),
+            "a binding key that does not match the checkpoint signer must be rejected"
+        );
     }
 
     #[test]

@@ -563,16 +563,26 @@ pub const PASS_OWN_DATA_REQUIRED_DERIVED_FACTS: [&str; 3] = [
 /// The emitted artifact for one gifted Pass stream.
 ///
 /// The three aggregate streams emit a redacted summary VIEW (the internal 3-key
-/// strip). The two OWN streams emit the verifier report of a verified
-/// [`DisclosureLineageBundle`] and NOTHING weaker.
+/// strip). The two OWN streams emit the VERIFIED [`DisclosureLineageBundle`] (the
+/// gifted own data the holder can actually receive) PLUS its verifier report, and
+/// NOTHING weaker. The report alone carries only refs and counts (not the receipt
+/// or lineage nodes), so a serving path wired through this dispatcher would be
+/// unable to emit the gifted own data from the report alone.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PassStreamGift {
     /// Streams `0..=2` (reputation tier, marketplace listings, pheromone
     /// concentration): a redacted summary view.
     AggregateView(serde_json::Value),
-    /// Streams `3..=4` (own receipts, own lineage): the verifier report from a
-    /// verified disclosure-lineage bundle.
-    OwnDataBundle(Box<DisclosureLineageVerifierReport>),
+    /// Streams `3..=4` (own receipts, own lineage): the verified
+    /// disclosure-lineage bundle the holder receives, paired with its verifier
+    /// report.
+    OwnDataBundle {
+        /// The verified bundle: the pinned-key signed lineage subgraph, privacy
+        /// profile, and mandatory leakage ledger bound to the holder tenant hash.
+        bundle: Box<DisclosureLineageBundle>,
+        /// The verifier report (refs, counts, and accounted derived facts).
+        report: Box<DisclosureLineageVerifierReport>,
+    },
 }
 
 /// The INTERNAL selection that feeds a Pass stream emission.
@@ -609,7 +619,14 @@ pub fn emit_pass_stream_gift(
     match (stream.is_own_tenant(), selection) {
         (true, PassStreamSelection::OwnDataBundle(bundle)) => {
             let report = emit_own_data_gift_bundle(stream, subject_tenant, bundle)?;
-            Ok(PassStreamGift::OwnDataBundle(Box::new(report)))
+            // Return the VERIFIED bundle (the gifted own data the holder receives)
+            // alongside its report, so a serving path wired through this
+            // dispatcher can actually emit the own receipts/lineage rather than
+            // only a refs-and-counts summary.
+            Ok(PassStreamGift::OwnDataBundle {
+                bundle: Box::new(bundle.clone()),
+                report: Box::new(report),
+            })
         }
         (true, PassStreamSelection::AggregateBody(_)) => Err(KernelError::PassOwnDataGiftInvalid(
             "own receipts and own lineage must be emitted as a verified \
@@ -1597,11 +1614,22 @@ mod tests {
             assert_eq!(report.verdict, "verified");
             assert_eq!(report.transaction_passport_ref, "passport-own-data");
 
-            // Routed through the per-stream dispatcher it yields the bundle gift.
+            // Routed through the per-stream dispatcher it yields the bundle gift:
+            // the VERIFIED bundle (the emittable own data) AND its report.
             let gift =
                 emit_pass_stream_gift(stream, TENANT, PassStreamSelection::OwnDataBundle(&bundle))
                     .expect("dispatcher emits bundle");
-            assert!(matches!(gift, PassStreamGift::OwnDataBundle(_)));
+            let PassStreamGift::OwnDataBundle {
+                bundle: emitted_bundle,
+                report: emitted_report,
+            } = gift
+            else {
+                panic!("own streams must emit the verified bundle gift");
+            };
+            // The gift carries the full verified bundle (lineage nodes included),
+            // not only the refs-and-counts report.
+            assert_eq!(*emitted_bundle, bundle);
+            assert_eq!(emitted_report.verdict, "verified");
         }
     }
 
