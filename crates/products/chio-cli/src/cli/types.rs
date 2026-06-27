@@ -691,6 +691,17 @@ pub(crate) enum PassCommands {
         /// authority key is used as the trust anchor.
         #[arg(long = "accepted-kernel-key")]
         accepted_kernel_key: Vec<String>,
+
+        /// Optional path to write the refreshed, signed Chio Pass credential JSON
+        /// to (renewed/dormant outcomes only). The written file is the issued-Pass
+        /// artifact `chio pass anchor` consumes via `--issued-pass`.
+        #[arg(long = "out-pass")]
+        out_pass: Option<PathBuf>,
+
+        /// Optional path to write the refreshed window-scoped capability token JSON
+        /// to (renewed/dormant outcomes only).
+        #[arg(long = "out-capability")]
+        out_capability: Option<PathBuf>,
     },
 
     /// Prepare (do NOT broadcast) the read-only Pass anchoring root publication.
