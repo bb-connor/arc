@@ -83,17 +83,24 @@ fn parse_trust_tier(value: &str) -> Result<TrustTier, CliError> {
 ///
 /// The launch allowlist is sourced from the trust-market market-authority
 /// registry RR2-TM-01 and rotates per epoch, so the operator pins it with the
-/// repeatable `--accepted-kernel-key <hex>` flag. When none is supplied the local
-/// authority public key is used as the trust anchor (mirrors
-/// `cmd_passport_create`'s trusted-kernel anchoring). Real keys are never
-/// hard-coded into the binary. `ChioPassConfig::validate` rejects an empty set
-/// fail-closed.
+/// repeatable `--accepted-kernel-key <hex>` flag. Real keys are never hard-coded
+/// into the binary.
+///
+/// FAIL-CLOSED: when no key is supplied the allowlist is rejected. The local Pass
+/// authority key is NEVER defaulted into the genuine-use allowlist: doing so
+/// would trust any locally-authored receipt as registry-backed kernel provenance
+/// and let a self-minted receipt satisfy the refresh scan. The operator MUST pin
+/// at least one registry-resolved market-authority key.
 fn resolve_accepted_kernel_keys(
     accepted_kernel_keys_hex: &[String],
-    authority_keypair: &Keypair,
 ) -> Result<Vec<PublicKey>, CliError> {
     if accepted_kernel_keys_hex.is_empty() {
-        return Ok(vec![authority_keypair.public_key()]);
+        return Err(CliError::Other(
+            "Pass genuine-use allowlist is empty: pass at least one \
+             --accepted-kernel-key resolved from the RR2-TM-01 market-authority \
+             registry. The local authority key is never trusted as a kernel key."
+                .to_string(),
+        ));
     }
     accepted_kernel_keys_hex
         .iter()
@@ -191,7 +198,7 @@ fn pass_issue(
     let seed_path = authority_seed_path(authority_seed_file);
     let authority_keypair = load_or_create_authority_keypair(&seed_path)?;
     let accepted_kernel_keys =
-        resolve_accepted_kernel_keys(accepted_kernel_keys_hex, &authority_keypair)?;
+        resolve_accepted_kernel_keys(accepted_kernel_keys_hex)?;
 
     // The single board-approved M1 launch governance surface (validated
     // fail-closed inside the entrypoint).
@@ -232,7 +239,7 @@ fn pass_refresh(
     let seed_path = authority_seed_path(authority_seed_file);
     let authority_keypair = load_or_create_authority_keypair(&seed_path)?;
     let accepted_kernel_keys =
-        resolve_accepted_kernel_keys(accepted_kernel_keys_hex, &authority_keypair)?;
+        resolve_accepted_kernel_keys(accepted_kernel_keys_hex)?;
     let config = ChioPassConfig::m1_launch_default(accepted_kernel_keys);
     let authority = LocalCapabilityAuthority::new(authority_keypair.clone());
 
@@ -464,6 +471,9 @@ mod tests {
 
         let subject = Keypair::generate();
         let subject_hex = subject.public_key().to_hex();
+        // A registry-resolved kernel key must be pinned: the empty allowlist is
+        // rejected fail-closed (the local authority key is never defaulted in).
+        let kernel_keys = vec![Keypair::generate().public_key().to_hex()];
 
         let (first, counters) = pass_issue(
             &subject_hex,
@@ -471,7 +481,7 @@ mod tests {
             MID_JUNE_2026,
             &revocation_db,
             Some(authority_seed.as_path()),
-            &[],
+            &kernel_keys,
         )
         .expect("first issuance");
         let (second, _) = pass_issue(
@@ -480,7 +490,7 @@ mod tests {
             MID_JUNE_2026,
             &revocation_db,
             Some(authority_seed.as_path()),
-            &[],
+            &kernel_keys,
         )
         .expect("second issuance");
 
@@ -510,7 +520,7 @@ mod tests {
             MID_JUNE_2026,
             &revocation_db,
             Some(other_seed.as_path()),
-            &[],
+            &kernel_keys,
         )
         .expect("third issuance under a fresh authority");
         assert_eq!(
@@ -526,7 +536,7 @@ mod tests {
             july_2026,
             &revocation_db,
             Some(authority_seed.as_path()),
-            &[],
+            &kernel_keys,
         )
         .expect("july issuance");
         assert_ne!(
@@ -555,6 +565,28 @@ mod tests {
             denied.is_err(),
             "issue must fail closed without a revocation oracle"
         );
+    }
+
+    #[test]
+    fn resolve_accepted_kernel_keys_fails_closed_without_explicit_key() {
+        // FAIL-CLOSED: an empty allowlist is rejected; the local authority key is
+        // never defaulted into the genuine-use trust anchor.
+        let denied = resolve_accepted_kernel_keys(&[])
+            .expect_err("empty accepted-kernel-key allowlist must be denied");
+        assert!(matches!(
+            denied,
+            CliError::Other(message) if message.contains("--accepted-kernel-key")
+        ));
+
+        // A pinned registry-resolved key is accepted and parsed back.
+        let key = Keypair::generate().public_key();
+        let resolved =
+            resolve_accepted_kernel_keys(&[key.to_hex()]).expect("explicit kernel key resolves");
+        assert_eq!(resolved.len(), 1);
+        assert_eq!(resolved[0].to_hex(), key.to_hex());
+
+        // A malformed key is rejected, never defaulted.
+        assert!(resolve_accepted_kernel_keys(&["not-a-key".to_string()]).is_err());
     }
 
     #[test]
