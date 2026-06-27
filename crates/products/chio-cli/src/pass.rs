@@ -26,7 +26,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use chio_anchor::{AnchorBatchWitness, EvmAnchorTarget};
 use chio_core::capability::token::AttestationWindowId;
 use chio_core::web3::identity::SignedWeb3IdentityBinding;
-use chio_core::{Keypair, PublicKey};
+use chio_core::PublicKey;
 use chio_credentials::{
     attestation_window_containing, ChioPass, PassportLifecycleRecord, TrustTier,
 };
@@ -482,6 +482,7 @@ pub(crate) fn dispatch_pass(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chio_core::Keypair;
 
     const MID_JUNE_2026: u64 = 1_781_524_800; // 2026-06-15T12:00:00Z
 
