@@ -1200,14 +1200,15 @@ fn tool_call_authorization_requires_explicit_capability_grant() {
     );
 }
 
-/// PR959 codex P2: a capability whose invocation budget is exhausted authorizes
-/// nothing. A grant that otherwise matches (server, tool, `Invoke`,
-/// unconstrained) but carries `max_invocations = Some(0)` permits zero calls, so
-/// the kernel budget lane would deny every invocation under it. The helper must
-/// not present a no-budget capability as usable: it fails closed to DENY. `None`
-/// (uncapped) and a positive cap remain usable.
+/// PR959 codex P2 (5th re-review, class closure): an INVOCATION cap cannot be
+/// evaluated without the grant's running call count, which lives in the kernel
+/// budget lane, not in this argument-less helper. `max_invocations = Some(0)`
+/// permits zero calls outright, and even a positive cap (`Some(n)`) cannot be
+/// confirmed unexhausted without the usage count, so ANY `Some(_)` fails closed
+/// and must route through the budget lane. Only an uncapped grant (`None`,
+/// bounded elsewhere) is evaluable here.
 #[test]
-fn tool_call_authorization_denies_zero_invocation_budget() {
+fn tool_call_authorization_denies_invocation_capped_grant() {
     let base = ToolGrant {
         server_id: "srv".to_string(),
         tool_name: "tool_a".to_string(),
@@ -1223,14 +1224,15 @@ fn tool_call_authorization_denies_zero_invocation_budget() {
         !ToolCallAuthorization::from_capability_grant(&base, "srv", "tool_a").is_authorized(),
         "a grant that permits zero invocations must not authorize a tool call"
     );
-    // A positive cap is usable.
+    // A positive cap is still unconfirmable without the running usage count, so it
+    // fails closed and must route through the budget lane.
     let one_call = ToolGrant {
         max_invocations: Some(1),
         ..base.clone()
     };
     assert!(
-        ToolCallAuthorization::from_capability_grant(&one_call, "srv", "tool_a").is_authorized(),
-        "a grant with a positive invocation budget authorizes the matching tool call"
+        !ToolCallAuthorization::from_capability_grant(&one_call, "srv", "tool_a").is_authorized(),
+        "an invocation-capped grant must route through the budget lane, not authorize here"
     );
     // An uncapped grant (None) stays usable; the budget lane bounds it elsewhere.
     let uncapped = ToolGrant {
@@ -1240,6 +1242,51 @@ fn tool_call_authorization_denies_zero_invocation_budget() {
     assert!(
         ToolCallAuthorization::from_capability_grant(&uncapped, "srv", "tool_a").is_authorized(),
         "an uncapped grant authorizes the matching tool call"
+    );
+}
+
+/// PR959 codex P2 (5th re-review): a grant that REQUIRES a DPoP proof
+/// (`dpop_required = Some(true)`) cannot be authorized by this argument-less
+/// helper, which holds no proof. The ACP/edge lane denies a DPoP-required grant
+/// without a valid proof, so authorizing it here would advertise a capability the
+/// edge lane would deny: it fails closed. `None`/`Some(false)` require no proof
+/// and stay usable.
+#[test]
+fn tool_call_authorization_denies_dpop_required_grant() {
+    let base = ToolGrant {
+        server_id: "srv".to_string(),
+        tool_name: "tool_a".to_string(),
+        operations: vec![Operation::Invoke],
+        constraints: vec![],
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost: None,
+        dpop_required: None,
+    };
+    // A grant that requires DPoP fails closed: the proof lives in the edge lane.
+    let dpop_required = ToolGrant {
+        dpop_required: Some(true),
+        ..base.clone()
+    };
+    assert!(
+        !ToolCallAuthorization::from_capability_grant(&dpop_required, "srv", "tool_a")
+            .is_authorized(),
+        "a DPoP-required grant must fail closed without a proof, not authorize here"
+    );
+    // Some(false) explicitly does not require a proof and stays usable.
+    let dpop_optional = ToolGrant {
+        dpop_required: Some(false),
+        ..base.clone()
+    };
+    assert!(
+        ToolCallAuthorization::from_capability_grant(&dpop_optional, "srv", "tool_a")
+            .is_authorized(),
+        "a grant that does not require DPoP (Some(false)) authorizes the matching tool call"
+    );
+    // None likewise does not require a proof and stays usable.
+    assert!(
+        ToolCallAuthorization::from_capability_grant(&base, "srv", "tool_a").is_authorized(),
+        "a grant with no DPoP requirement authorizes the matching tool call"
     );
 }
 
@@ -1861,8 +1908,21 @@ fn public_settlement_proof_withholds_finality_without_independent_head() {
             .contains(&CLAIM_PUBLIC_SETTLEMENT_FINALITY_VERIFIED.to_string()),
         "finality must not be claimed without an independent chain head"
     );
+    // PR959 codex P2 (5th re-review): the STATUS field must not assert grounded
+    // finality either. The Settled bundle would read `final`, but without an
+    // independent head it is downgraded so a consumer keying off the status (not
+    // the withheld claim) cannot accept ungrounded finality.
+    assert_ne!(
+        report.finality_decision.status, "final",
+        "the status field must not assert grounded finality without an independent head"
+    );
+    assert_eq!(
+        report.finality_decision.status, "ungrounded",
+        "an affirmative-finality status is downgraded to ungrounded without an independent head"
+    );
 
-    // Supplying a matching independent head restores the finality claim.
+    // Supplying a matching independent head restores the finality claim AND the
+    // grounded `final` status.
     trust.independent_chain_head = Some(sample_matching_independent_chain_head());
     let grounded = sample_public_settlement_proof_bundle();
     let grounded_report =
@@ -1870,6 +1930,10 @@ fn public_settlement_proof_withholds_finality_without_independent_head() {
     assert!(grounded_report
         .verified_claims
         .contains(&CLAIM_PUBLIC_SETTLEMENT_FINALITY_VERIFIED.to_string()));
+    assert_eq!(
+        grounded_report.finality_decision.status, "final",
+        "a head-grounded Settled bundle reports the grounded final status"
+    );
 }
 
 /// PR959 codex P2 (honor grant constraints): the argument-less tool-call

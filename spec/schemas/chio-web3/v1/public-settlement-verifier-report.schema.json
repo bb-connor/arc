@@ -128,7 +128,8 @@
             "timed_out",
             "failed",
             "reorged",
-            "not_final"
+            "not_final",
+            "ungrounded"
           ]
         },
         "required_confirmations": { "type": "integer", "minimum": 1 },

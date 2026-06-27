@@ -53,6 +53,9 @@ pub(crate) const PUBLIC_SETTLEMENT_FINALITY_REPORT_STATUSES: &[&str] = &[
     "failed",
     "reorged",
     "not_final",
+    // RPI-1: emitted in place of an affirmative-finality status when finality is
+    // not independently grounded (no independent chain head).
+    "ungrounded",
 ];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -289,69 +292,88 @@ impl ToolCallAuthorization {
     /// Mint a tool-call authorization from an explicit positive capability
     /// grant. This is the ONLY path to an authorized decision.
     ///
-    /// The decision is authorized only when the capability grant targets this
+    /// DENY-BY-DEFAULT POSTURE. This argument-less helper sees ONLY the static
+    /// grant plus the `(server_id, tool_name)` being invoked. It has NO request
+    /// arguments, NO running usage/budget, NO per-call cost, and NO DPoP/sender
+    /// proof. It may therefore authorize ONLY a grant whose EVERY
+    /// authorization-relevant field is FULLY satisfiable from those static inputs.
+    /// Any field that gates authorization but requires runtime, usage, proof, or
+    /// request context to evaluate MUST fail closed (DENY) here and route through
+    /// the lane that holds that context (the kernel capability/budget lane, the
+    /// edge DPoP lane). This helper has repeatedly grown gaps as `ToolGrant` gained
+    /// new gating fields (a zero invocation cap, monetary caps, a DPoP requirement),
+    /// each silently authorized until patched; the posture below closes that class
+    /// definitively. When a NEW field is added to `ToolGrant`, this helper MUST
+    /// treat it as deny-by-default until it is explicitly proven fully evaluable
+    /// from the static inputs above and added to the positive checks below.
+    ///
+    /// Concretely, the decision is authorized only when the grant targets this
     /// `server_id`/`tool_name` (honoring `*` wildcards), carries the `Invoke`
-    /// operation, carries NO parameter constraints, has a non-zero invocation
-    /// budget (`max_invocations` is not `Some(0)`), AND carries NO monetary cap
-    /// (`max_cost_per_invocation` and `max_total_cost` are both `None`). Every
+    /// operation, carries NO parameter constraints, carries NO invocation cap
+    /// (`max_invocations` is `None`), carries NO monetary cap
+    /// (`max_cost_per_invocation` and `max_total_cost` are both `None`), and does
+    /// NOT require a DPoP proof (`dpop_required` is `None` or `Some(false)`). Every
     /// other case fails closed to DENY.
     ///
-    /// A grant with `max_invocations = Some(0)` permits no calls at all: the
-    /// kernel budget lane would deny every invocation, so this helper must not
-    /// present a zero-budget capability as usable. It fails closed to DENY.
+    /// Why each non-identity field is deny-by-default here:
     ///
-    /// A grant carrying a MONETARY cap (`max_cost_per_invocation` or
-    /// `max_total_cost`) likewise cannot be confirmed satisfied here. This
-    /// argument-less helper has no per-call cost and no running-total usage, so it
-    /// cannot tell whether a non-zero-cost invocation stays within
-    /// `max_cost_per_invocation` or whether `max_total_cost` is already exhausted.
-    /// A `max_cost_per_invocation = Some(0)` cap denies every non-zero-cost call
-    /// outright, and an exhausted `max_total_cost` denies further calls; the kernel
-    /// budget lane (which holds the cost and current usage) is the only lane that
-    /// can evaluate either. Like the constraint lane, a monetary-capped grant
-    /// must route through the budget lane, so it fails closed to DENY here rather
-    /// than advertise a capability the budget lane would deny.
-    ///
-    /// A constrained grant (`grant.constraints` non-empty) narrows the tool's
-    /// input space to a specific path or parameter set, and the kernel's
-    /// `constraints_match` check evaluates those constraints against the actual
-    /// request arguments. This argument-less helper cannot see the request, so
-    /// it CANNOT confirm the constraints are satisfied. Authorizing a
-    /// constrained grant here would let a grant limited to one path or parameter
-    /// set authorize EVERY invocation of the tool, so a constrained grant fails
-    /// closed: the constraint-bearing decision must go through the kernel
-    /// capability lane that has the request in hand.
+    /// - Parameter CONSTRAINTS (`grant.constraints`) narrow the tool's input space,
+    ///   and the kernel's `constraints_match` evaluates them against the actual
+    ///   request arguments. This helper never sees the request, so a constrained
+    ///   grant could authorize EVERY invocation; only an unconstrained grant is
+    ///   evaluable.
+    /// - INVOCATION cap (`max_invocations`) gates on the grant's running call
+    ///   count, which lives in the kernel budget lane, not here. `Some(0)` permits
+    ///   zero calls outright, and even a positive cap (`Some(n)`) cannot be
+    ///   confirmed unexhausted without the usage count, so ANY `Some(_)` fails
+    ///   closed; only an uncapped grant (`None`, bounded by the budget lane
+    ///   elsewhere) is evaluable.
+    /// - MONETARY caps (`max_cost_per_invocation`, `max_total_cost`) gate on the
+    ///   call's cost and the grant's running spend, neither of which this helper
+    ///   holds. `Some(0)` per-invocation denies every non-zero-cost call and an
+    ///   exhausted total denies further calls, and even a positive cap is
+    ///   unconfirmable, so any `Some(_)` fails closed; only `None`/`None` is
+    ///   evaluable.
+    /// - DPoP (`dpop_required`) requires a valid DPoP proof on every invocation
+    ///   when `Some(true)`, and this helper holds no proof. The ACP/edge lane denies
+    ///   a DPoP-required grant without a proof, so authorizing it here would
+    ///   advertise a capability the edge lane would deny; `Some(true)` fails closed.
+    ///   `None`/`Some(false)` require no proof and are evaluable.
     #[must_use]
     pub fn from_capability_grant(grant: &ToolGrant, server_id: &str, tool_name: &str) -> Self {
+        // Identity + operation: fully evaluable from the static inputs.
         let server_ok = grant.server_id == "*" || grant.server_id == server_id;
         let tool_ok = grant.tool_name == "*" || grant.tool_name == tool_name;
         let can_invoke = grant.operations.contains(&Operation::Invoke);
+
+        // Parameter constraints are checked against the request this helper never
+        // sees: only an unconstrained grant is evaluable here.
         let unconstrained = grant.constraints.is_empty();
-        // A capability whose invocation budget is exhausted authorizes NOTHING.
-        // `max_invocations = Some(0)` (the only non-positive cap a `u32` admits)
-        // means the grant permits zero calls: the kernel budget lane would deny
-        // every invocation under it, so presenting it as authorized here would
-        // advertise a capability that cannot actually be exercised. `None` is
-        // uncapped (the budget lane bounds it elsewhere) and remains usable. Fail
-        // closed on a zero-invocation cap so a no-budget grant never mints an
-        // authorized decision.
-        let has_budget = grant.max_invocations != Some(0);
-        // A MONETARY cap cannot be evaluated without the call's cost and the
-        // grant's running usage, neither of which this argument-less helper holds.
-        // `max_cost_per_invocation = Some(0)` denies every non-zero-cost call and
-        // an exhausted `max_total_cost` denies further calls, but even a positive
-        // cap is unconfirmable here. Mirror the constraint lane: a monetary-capped
-        // grant fails closed and must route through the kernel budget lane, so a
-        // grant the budget lane would deny on cost is never minted as authorized.
-        let monetary_uncapped =
-            grant.max_cost_per_invocation.is_none() && grant.max_total_cost.is_none();
+
+        // Budget caps (invocation count + monetary) gate authorization on running
+        // usage and per-call cost that live in the kernel budget lane, not here. A
+        // capped grant (any `Some`) - even a positive one - is unconfirmable from
+        // static inputs, so authorize ONLY an uncapped grant (every cap `None`).
+        let uncapped = grant.max_invocations.is_none()
+            && grant.max_cost_per_invocation.is_none()
+            && grant.max_total_cost.is_none();
+
+        // A grant that requires a DPoP proof cannot be authorized without one, and
+        // this helper holds no proof. `Some(true)` fails closed; `None`/`Some(false)`
+        // require no proof and are evaluable.
+        let dpop_not_required = grant.dpop_required != Some(true);
+
+        // Deny-by-default: authorize ONLY when every authorization-relevant field
+        // above is fully satisfiable from the static inputs. A new gating field
+        // must be added as a fresh `&&` term here, defaulting to DENY until proven
+        // evaluable.
         Self {
             granted: server_ok
                 && tool_ok
                 && can_invoke
                 && unconstrained
-                && has_budget
-                && monetary_uncapped,
+                && uncapped
+                && dpop_not_required,
         }
     }
 
@@ -569,7 +591,17 @@ pub fn verify_public_settlement_proof(
         },
         public_witness,
         finality_decision: PublicSettlementFinalityDecision {
-            status: finality_report_status(bundle).to_string(),
+            // RPI-1 (fail-closed finality grounding): the `status` field must never
+            // ASSERT grounded finality without an independent chain head. The raw
+            // lifecycle-derived status can read `final`/`closed` from the
+            // producer-supplied settlement state and confirmation depth, so a
+            // consumer keying off the STATUS field (rather than the withheld
+            // `finality_verified` claim) could still accept ungrounded finality.
+            // Downgrade those affirmative-finality statuses to `ungrounded` when no
+            // independent head grounds the depth; the non-final dispute/reversal
+            // outcomes are not finality assertions and pass through unchanged.
+            status: grounded_finality_report_status(bundle, trust.independent_chain_head.is_some())
+                .to_string(),
             required_confirmations: bundle.required_confirmations,
             observed_confirmations: bundle.observed_confirmations,
         },
@@ -1606,6 +1638,38 @@ fn finality_report_status(bundle: &PublicSettlementProofBundle) -> &'static str 
         Web3SettlementLifecycleState::PendingDispatch
         | Web3SettlementLifecycleState::EscrowLocked => "not_final",
     }
+}
+
+/// The status the verifier report emits when a finality status that WOULD assert
+/// grounded finality is not independently grounded (no `independent_chain_head`).
+pub(crate) const FINALITY_STATUS_UNGROUNDED: &str = "ungrounded";
+
+/// The finality statuses that affirmatively assert the settlement is final and
+/// confirmed on chain. These derive from the `Settled` lifecycle state and may be
+/// reported ONLY when an INDEPENDENT chain head grounds the confirmation depth
+/// (RPI-1). The remaining statuses (`partially_settled`, the reversal/dispute
+/// outcomes, and `not_final`) are NOT affirmative-finality assertions, so they are
+/// never downgraded.
+const GROUNDED_FINALITY_STATUSES: &[&str] = &["final", "closed"];
+
+/// The report's finality status, downgraded fail-closed when finality is not
+/// independently grounded.
+///
+/// When `independent_head_present` is false the verifier cannot vouch for the
+/// confirmation depth (it is producer-supplied and unsigned), so any status that
+/// would AFFIRM grounded finality is replaced with [`FINALITY_STATUS_UNGROUNDED`].
+/// This keeps the STATUS field from asserting grounded finality on its own, so a
+/// consumer that keys off the status (rather than the withheld `finality_verified`
+/// claim) can never accept ungrounded finality. Non-final outcomes pass through.
+fn grounded_finality_report_status(
+    bundle: &PublicSettlementProofBundle,
+    independent_head_present: bool,
+) -> &'static str {
+    let status = finality_report_status(bundle);
+    if !independent_head_present && GROUNDED_FINALITY_STATUSES.contains(&status) {
+        return FINALITY_STATUS_UNGROUNDED;
+    }
+    status
 }
 
 fn validate_dispute_snapshot(
