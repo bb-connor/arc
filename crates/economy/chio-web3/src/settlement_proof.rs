@@ -291,8 +291,13 @@ impl ToolCallAuthorization {
     ///
     /// The decision is authorized only when the capability grant targets this
     /// `server_id`/`tool_name` (honoring `*` wildcards), carries the `Invoke`
-    /// operation, AND carries NO parameter constraints. Every other case fails
-    /// closed to DENY.
+    /// operation, carries NO parameter constraints, AND has a non-zero invocation
+    /// budget (`max_invocations` is not `Some(0)`). Every other case fails closed
+    /// to DENY.
+    ///
+    /// A grant with `max_invocations = Some(0)` permits no calls at all: the
+    /// kernel budget lane would deny every invocation, so this helper must not
+    /// present a zero-budget capability as usable. It fails closed to DENY.
     ///
     /// A constrained grant (`grant.constraints` non-empty) narrows the tool's
     /// input space to a specific path or parameter set, and the kernel's
@@ -309,8 +314,17 @@ impl ToolCallAuthorization {
         let tool_ok = grant.tool_name == "*" || grant.tool_name == tool_name;
         let can_invoke = grant.operations.contains(&Operation::Invoke);
         let unconstrained = grant.constraints.is_empty();
+        // A capability whose invocation budget is exhausted authorizes NOTHING.
+        // `max_invocations = Some(0)` (the only non-positive cap a `u32` admits)
+        // means the grant permits zero calls: the kernel budget lane would deny
+        // every invocation under it, so presenting it as authorized here would
+        // advertise a capability that cannot actually be exercised. `None` is
+        // uncapped (the budget lane bounds it elsewhere) and remains usable. Fail
+        // closed on a zero-invocation cap so a no-budget grant never mints an
+        // authorized decision.
+        let has_budget = grant.max_invocations != Some(0);
         Self {
-            granted: server_ok && tool_ok && can_invoke && unconstrained,
+            granted: server_ok && tool_ok && can_invoke && unconstrained && has_budget,
         }
     }
 

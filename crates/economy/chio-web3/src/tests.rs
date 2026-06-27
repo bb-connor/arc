@@ -1200,6 +1200,49 @@ fn tool_call_authorization_requires_explicit_capability_grant() {
     );
 }
 
+/// PR959 codex P2: a capability whose invocation budget is exhausted authorizes
+/// nothing. A grant that otherwise matches (server, tool, `Invoke`,
+/// unconstrained) but carries `max_invocations = Some(0)` permits zero calls, so
+/// the kernel budget lane would deny every invocation under it. The helper must
+/// not present a no-budget capability as usable: it fails closed to DENY. `None`
+/// (uncapped) and a positive cap remain usable.
+#[test]
+fn tool_call_authorization_denies_zero_invocation_budget() {
+    let base = ToolGrant {
+        server_id: "srv".to_string(),
+        tool_name: "tool_a".to_string(),
+        operations: vec![Operation::Invoke],
+        constraints: vec![],
+        max_invocations: Some(0),
+        max_cost_per_invocation: None,
+        max_total_cost: None,
+        dpop_required: None,
+    };
+    // A zero-invocation cap fails closed even though every other axis matches.
+    assert!(
+        !ToolCallAuthorization::from_capability_grant(&base, "srv", "tool_a").is_authorized(),
+        "a grant that permits zero invocations must not authorize a tool call"
+    );
+    // A positive cap is usable.
+    let one_call = ToolGrant {
+        max_invocations: Some(1),
+        ..base.clone()
+    };
+    assert!(
+        ToolCallAuthorization::from_capability_grant(&one_call, "srv", "tool_a").is_authorized(),
+        "a grant with a positive invocation budget authorizes the matching tool call"
+    );
+    // An uncapped grant (None) stays usable; the budget lane bounds it elsewhere.
+    let uncapped = ToolGrant {
+        max_invocations: None,
+        ..base
+    };
+    assert!(
+        ToolCallAuthorization::from_capability_grant(&uncapped, "srv", "tool_a").is_authorized(),
+        "an uncapped grant authorizes the matching tool call"
+    );
+}
+
 /// M2-12: a fully verified settlement report NEVER authorizes a tool call, and
 /// this holds STRUCTURALLY rather than as a runtime string check. Even after
 /// forging a `"authorized"` verdict and injecting capability-shaped claims, the
@@ -2295,6 +2338,17 @@ fn sample_testnet_x402_verifier_trust() -> PublicSettlementVerifierTrust {
     let mut trust = sample_public_settlement_verifier_trust();
     trust.allowed_chain_ids = vec![X402_TESTNET_CHAIN_ID.to_string()];
     trust.mainnet_blocked = true;
+    // Ground finality on an independent chain head matching the testnet bundle so
+    // the recompute emits the finality claim the signing path now requires
+    // (RPI-1 follow-on). Without this the report carries no grounded finality and
+    // the kernel must refuse to sign.
+    trust.independent_chain_head = Some(PublicSettlementIndependentChainHead {
+        chain_id: X402_TESTNET_CHAIN_ID.to_string(),
+        observed_block_number: 12_345_678,
+        observed_block_hash: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            .to_string(),
+        latest_block_number: 12_345_701,
+    });
     trust
 }
 
@@ -2495,6 +2549,51 @@ fn x402_prepare_only_signing_rejects_blank_attestation_id() {
             "x402_settlement_attestation.attestation_id"
         ))
     ));
+}
+
+/// PR959 codex P2 (RPI-1 follow-on): the signing path refuses to attest a report
+/// that carries NO grounded finality claim. With a trust config that has no
+/// independent chain head, the recompute lane WITHHOLDS
+/// `claim.public_settlement.finality_verified` (its confirmation depth is then
+/// only producer-asserted), so the kernel must NOT lend its signature to that
+/// report. A bundle that inflates `observed_confirmations` cannot ride a
+/// kernel-signed attestation without an independent head.
+#[test]
+fn x402_prepare_only_signing_requires_grounded_finality_claim() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let mut trust = sample_testnet_x402_verifier_trust();
+    // Strip the independent chain head: finality can no longer be grounded.
+    trust.independent_chain_head = None;
+    let kernel = operator_keypair();
+
+    // Sanity: the recompute still SUCCEEDS (a verified settlement report), it just
+    // does not emit the grounded finality claim.
+    let report = verify_public_settlement_proof(&bundle, &trust).unwrap();
+    assert!(
+        !report.verified_claims.iter().any(
+            |claim| claim == crate::settlement_proof::CLAIM_PUBLIC_SETTLEMENT_FINALITY_VERIFIED
+        ),
+        "without an independent head the finality claim must be withheld"
+    );
+
+    // But signing is DENIED fail-closed: no grounded finality, no attestation.
+    assert!(matches!(
+        sign_x402_settlement_attestation(&bundle, &trust, &kernel, "x402-attestation-1", 1_743_293_900),
+        Err(Web3ContractError::InvalidProof(message))
+            if message.contains("grounded finality claim")
+    ));
+
+    // Re-attaching the independent head restores the grounded path and signing
+    // succeeds, confirming the head (not some unrelated gate) is the control.
+    let grounded = sample_testnet_x402_verifier_trust();
+    sign_x402_settlement_attestation(
+        &bundle,
+        &grounded,
+        &kernel,
+        "x402-attestation-1",
+        1_743_293_900,
+    )
+    .expect("a grounded finality claim permits signing");
 }
 
 /// M2-14: verification is fail-closed on the attesting key. An attestation

@@ -32,7 +32,7 @@ use crate::error::Web3ContractError;
 use crate::settlement_proof::{
     public_settlement_chain_is_mainnet, public_settlement_chain_is_testnet,
     verify_public_settlement_proof, PublicSettlementProofBundle, PublicSettlementVerifierTrust,
-    ToolCallAuthorization,
+    ToolCallAuthorization, CLAIM_PUBLIC_SETTLEMENT_FINALITY_VERIFIED,
 };
 use crate::validation::ensure_non_empty;
 
@@ -321,6 +321,26 @@ pub fn sign_x402_settlement_attestation(
     let report = verify_public_settlement_proof(bundle, trust)?;
     // Defense in depth: the recomputed chain id must remain testnet-gated.
     enforce_x402_prepare_only_testnet_gate(&report.chain_context.chain_id, trust)?;
+    // Fail-closed finality grounding (RPI-1 follow-on): the recompute lane WITHHOLDS
+    // the finality claim unless an INDEPENDENT chain head grounded the confirmation
+    // depth (`verify_public_settlement_proof` emits
+    // `CLAIM_PUBLIC_SETTLEMENT_FINALITY_VERIFIED` only when
+    // `trust.independent_chain_head` is supplied). Without that grounded claim the
+    // report's `observed_confirmations` / snapshot depth are unsigned, producer-
+    // asserted fields a malicious bundle can inflate, so the kernel must NOT sign a
+    // settlement attestation over a report that carries no grounded finality. Refuse
+    // to attest rather than lend the kernel signature to ungrounded finality.
+    if !report
+        .verified_claims
+        .iter()
+        .any(|claim| claim == CLAIM_PUBLIC_SETTLEMENT_FINALITY_VERIFIED)
+    {
+        return Err(Web3ContractError::InvalidProof(
+            "x402 settlement attestation requires a grounded finality claim from an independent \
+             chain head"
+                .to_string(),
+        ));
+    }
 
     let verifier_report_digest = x402_canonical_digest(&report, "x402 settlement verifier report")?;
     let body = X402SettlementAttestationBody {
