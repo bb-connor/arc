@@ -625,10 +625,22 @@ pub(crate) enum PassCommands {
         now: Option<u64>,
 
         /// Trusted kernel signing key (hex) pinned into the genuine-use
-        /// allowlist (registry RR2-TM-01). Repeatable. When omitted, the local
-        /// authority key is used as the trust anchor.
+        /// allowlist (registry RR2-TM-01). Repeatable and REQUIRED: at least one
+        /// must be supplied (the local authority key is never trusted as a
+        /// kernel key).
         #[arg(long = "accepted-kernel-key")]
         accepted_kernel_key: Vec<String>,
+
+        /// Optional path to write the minted, signed Chio Pass credential JSON
+        /// to. The written file is the issued-Pass artifact `chio pass anchor`
+        /// consumes via `--issued-pass`.
+        #[arg(long = "out-pass")]
+        out_pass: Option<PathBuf>,
+
+        /// Optional path to write the minted window-scoped capability token JSON
+        /// to.
+        #[arg(long = "out-capability")]
+        out_capability: Option<PathBuf>,
     },
 
     /// Roll a Pass forward into its next monthly window from genuine use.

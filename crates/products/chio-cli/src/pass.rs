@@ -172,6 +172,15 @@ fn read_json_artifact<T: DeserializeOwned>(path: &Path) -> Result<T, CliError> {
     serde_json::from_slice(&bytes).map_err(CliError::from)
 }
 
+/// Write a signed Pass artifact to `path` as JSON, fail-closed on serialize or
+/// IO. The written file round-trips back through [`read_json_artifact`] so the
+/// issued-Pass artifact can be fed straight into `chio pass anchor`.
+fn write_json_artifact<T: serde::Serialize>(path: &Path, value: &T) -> Result<(), CliError> {
+    let bytes = serde_json::to_vec_pretty(value)?;
+    fs::write(path, bytes)?;
+    Ok(())
+}
+
 fn authority_seed_path(authority_seed_file: Option<&Path>) -> std::path::PathBuf {
     authority_seed_file.map_or_else(
         || std::path::PathBuf::from(DEFAULT_AUTHORITY_SEED_PATH),
@@ -352,6 +361,8 @@ pub(crate) fn dispatch_pass(
             tier,
             now,
             accepted_kernel_key,
+            out_pass,
+            out_capability,
         } => {
             let tier = parse_trust_tier(&tier)?;
             let now = now.unwrap_or_else(unix_now);
@@ -366,6 +377,19 @@ pub(crate) fn dispatch_pass(
                 authority_seed_file,
                 &accepted_kernel_key,
             )?;
+
+            // Surface the minted, signed artifacts so the operator can present
+            // the credential and feed the issued-Pass JSON into `chio pass
+            // anchor`; optionally persist each to a requested file. Fail-closed:
+            // an IO or serialization fault denies.
+            if let Some(path) = out_pass.as_deref() {
+                write_json_artifact(path, &issuance.pass)?;
+            }
+            if let Some(path) = out_capability.as_deref() {
+                write_json_artifact(path, &issuance.capability)?;
+            }
+            let pass_value = serde_json::to_value(&issuance.pass)?;
+            let capability_value = serde_json::to_value(&issuance.capability)?;
             let report = serde_json::json!({
                 "schema": "chio.pass.issue.v1",
                 "credential": "portable-reputation-credential",
@@ -374,6 +398,8 @@ pub(crate) fn dispatch_pass(
                 "windowIssuedCount": counters.window_issued_count,
                 "activePopulation": counters.active_population,
                 "revokedPassRoster": counters.revoked_pass_roster,
+                "pass": pass_value,
+                "capability": capability_value,
             });
             write_report(&report, json_output)
         }
@@ -623,6 +649,8 @@ mod tests {
                 tier: "attested".to_string(),
                 now: Some(MID_JUNE_2026),
                 accepted_kernel_key: vec![],
+                out_pass: None,
+                out_capability: None,
             },
             true,
             None,
@@ -633,6 +661,52 @@ mod tests {
             denied.is_err(),
             "issue must fail closed without a revocation oracle"
         );
+    }
+
+    /// `chio pass issue` surfaces the minted, signed artifacts: with --out-pass /
+    /// --out-capability it writes files that round-trip back to a typed ChioPass
+    /// and the window-scoped CapabilityToken, so the operator can present the
+    /// credential and feed the issued-Pass JSON into `chio pass anchor`.
+    #[test]
+    fn pass_issue_writes_minted_artifacts_to_requested_files() {
+        let dir = temp_dir("artifacts");
+        let revocation_db = dir.join("revocations.sqlite3");
+        let authority_seed = dir.join("authority.seed");
+        let out_pass = dir.join("issued-pass.json");
+        let out_capability = dir.join("capability.json");
+
+        let subject = Keypair::generate().public_key().to_hex();
+        let kernel_key = Keypair::generate().public_key().to_hex();
+
+        dispatch_pass(
+            PassCommands::Issue {
+                subject_public_key: subject,
+                tier: "attested".to_string(),
+                now: Some(MID_JUNE_2026),
+                accepted_kernel_key: vec![kernel_key],
+                out_pass: Some(out_pass.clone()),
+                out_capability: Some(out_capability.clone()),
+            },
+            true,
+            None,
+            Some(revocation_db.as_path()),
+            Some(authority_seed.as_path()),
+        )
+        .expect("issue dispatch succeeds");
+
+        // The minted credential round-trips back to a typed ChioPass (the
+        // issued-Pass artifact `chio pass anchor` consumes).
+        let pass_bytes = std::fs::read(&out_pass).expect("issued-pass file written");
+        let _pass: ChioPass =
+            serde_json::from_slice(&pass_bytes).expect("issued-pass deserializes as ChioPass");
+
+        // The minted capability round-trips and carries the deterministic id.
+        let capability_bytes = std::fs::read(&out_capability).expect("capability file written");
+        let capability: serde_json::Value =
+            serde_json::from_slice(&capability_bytes).expect("capability deserializes");
+        assert!(capability["id"]
+            .as_str()
+            .is_some_and(|id| id.starts_with(CHIO_PASS_CAPABILITY_PREFIX)));
     }
 
     #[test]
