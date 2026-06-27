@@ -972,7 +972,19 @@ fn proof_verify_accepts_trust_market_context_fixture() {
 
 #[test]
 fn proof_verify_accepts_public_settlement_fixture() {
+    // RPI-1: finality is claimed only when grounded on an independent chain head
+    // the verifier observes. Supply the head matching the fixture's snapshot.
+    let independent_head = serde_json::json!({
+        "chain_id": "eip155:8453",
+        "observed_block_number": 12_345_678,
+        "observed_block_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "latest_block_number": 12_345_701
+    });
     let output = chio_with_transaction_fixture_roots()
+        .env(
+            "CHIO_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON",
+            independent_head.to_string(),
+        )
         .arg("proof")
         .arg("verify")
         .arg(public_settlement_fixture_path("valid-offline-finality"))
@@ -1089,7 +1101,18 @@ fn proof_verify_reports_public_settlement_trust_market_refs_without_verified_cla
         ],
     );
 
+    // RPI-1: supply the independent chain head so the finality claim is emitted.
+    let independent_head = serde_json::json!({
+        "chain_id": "eip155:8453",
+        "observed_block_number": 12_345_678,
+        "observed_block_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "latest_block_number": 12_345_701
+    });
     let output = chio_with_transaction_fixture_roots()
+        .env(
+            "CHIO_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON",
+            independent_head.to_string(),
+        )
         .arg("proof")
         .arg("verify")
         .arg(bundle_dir.join("transaction-passport.json"))

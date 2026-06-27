@@ -143,6 +143,14 @@ export CHIO_PUBLIC_SETTLEMENT_TRUSTED_BENEFICIARY_IDENTITY_KEYS="${CHIO_PUBLIC_S
 export CHIO_PUBLIC_SETTLEMENT_TRUSTED_ORACLE_KEYS="${CHIO_PUBLIC_SETTLEMENT_TRUSTED_ORACLE_KEYS:-d9bf2148748a85c89da5aad8ee0b0fc2d105fd39d41a4c796536354f0ae2900c}"
 export CHIO_PUBLIC_SETTLEMENT_ALLOWED_CHAIN_IDS="${CHIO_PUBLIC_SETTLEMENT_ALLOWED_CHAIN_IDS:-eip155:8453,eip155:42161}"
 export CHIO_PUBLIC_SETTLEMENT_MINIMUM_CONFIRMATIONS="${CHIO_PUBLIC_SETTLEMENT_MINIMUM_CONFIRMATIONS:-1}"
+# RPI-1: public-settlement finality is grounded on an INDEPENDENT chain head the
+# verifier observes, never on the producer-supplied (unsigned) chain-snapshot
+# depth. The offline-finality positive fixture's verifier policy requires the
+# `finality_verified` claim, so the verifier must be given the matching
+# independent head (it mirrors that fixture's chain snapshot) or it withholds
+# the claim fail-closed.
+DEFAULT_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD='{"chain_id":"eip155:8453","observed_block_number":12345678,"observed_block_hash":"0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","latest_block_number":12345701}'
+export CHIO_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON="${CHIO_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON:-$DEFAULT_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD}"
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT

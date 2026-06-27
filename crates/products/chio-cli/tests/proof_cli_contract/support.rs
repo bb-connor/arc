@@ -198,6 +198,18 @@ pub(crate) fn chio_command() -> std::process::Command {
                 "eip155:8453,eip155:42161",
             ),
             ("CHIO_PUBLIC_SETTLEMENT_MINIMUM_CONFIRMATIONS", "1"),
+            // RPI-1: finality grounds on an independent chain head; the
+            // contract settlement bundles mirror the offline-finality fixture's
+            // snapshot, so this matching head lets `finality_verified` be
+            // emitted (it is withheld fail-closed without an independent head).
+            (
+                "CHIO_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON",
+                concat!(
+                    "{\"chain_id\":\"eip155:8453\",\"observed_block_number\":12345678,",
+                    "\"observed_block_hash\":\"0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",",
+                    "\"latest_block_number\":12345701}"
+                ),
+            ),
             (
                 "CHIO_PROOF_COLLECT_BUNDLE_SIGNER_SEED_HEX",
                 COLLECT_SIGNATURE_SEED_HEX,

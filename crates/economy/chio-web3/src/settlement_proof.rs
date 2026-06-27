@@ -290,15 +290,27 @@ impl ToolCallAuthorization {
     /// grant. This is the ONLY path to an authorized decision.
     ///
     /// The decision is authorized only when the capability grant targets this
-    /// `server_id`/`tool_name` (honoring `*` wildcards) AND carries the
-    /// `Invoke` operation. Every other case fails closed to DENY.
+    /// `server_id`/`tool_name` (honoring `*` wildcards), carries the `Invoke`
+    /// operation, AND carries NO parameter constraints. Every other case fails
+    /// closed to DENY.
+    ///
+    /// A constrained grant (`grant.constraints` non-empty) narrows the tool's
+    /// input space to a specific path or parameter set, and the kernel's
+    /// `constraints_match` check evaluates those constraints against the actual
+    /// request arguments. This argument-less helper cannot see the request, so
+    /// it CANNOT confirm the constraints are satisfied. Authorizing a
+    /// constrained grant here would let a grant limited to one path or parameter
+    /// set authorize EVERY invocation of the tool, so a constrained grant fails
+    /// closed: the constraint-bearing decision must go through the kernel
+    /// capability lane that has the request in hand.
     #[must_use]
     pub fn from_capability_grant(grant: &ToolGrant, server_id: &str, tool_name: &str) -> Self {
         let server_ok = grant.server_id == "*" || grant.server_id == server_id;
         let tool_ok = grant.tool_name == "*" || grant.tool_name == tool_name;
         let can_invoke = grant.operations.contains(&Operation::Invoke);
+        let unconstrained = grant.constraints.is_empty();
         Self {
-            granted: server_ok && tool_ok && can_invoke,
+            granted: server_ok && tool_ok && can_invoke && unconstrained,
         }
     }
 
@@ -446,10 +458,23 @@ pub fn verify_public_settlement_proof(
         &mut verified_claims,
         CLAIM_PUBLIC_SETTLEMENT_CHAIN_CONTEXT_VERIFIED,
     );
-    push_claim_once(
-        &mut verified_claims,
-        CLAIM_PUBLIC_SETTLEMENT_FINALITY_VERIFIED,
-    );
+    // Fail-closed finality grounding (RPI-1): finality is asserted ONLY when an
+    // INDEPENDENT chain head is supplied. `validate_finality` checks the
+    // producer-supplied `chain_snapshot.latest_block_number` /
+    // `observed_confirmations`, which are UNSIGNED bundle fields a malicious
+    // producer can fabricate to manufacture confirmation depth. Without
+    // `trust.independent_chain_head` (validated above by
+    // `validate_independent_chain_head`) there is no source the verifier
+    // independently observed, so the finality claim is WITHHELD rather than
+    // emitted from producer-asserted depth. Downstream verifier policy that
+    // requires `finality_verified` then fails closed; nothing here vouches for
+    // finality it cannot independently ground.
+    if trust.independent_chain_head.is_some() {
+        push_claim_once(
+            &mut verified_claims,
+            CLAIM_PUBLIC_SETTLEMENT_FINALITY_VERIFIED,
+        );
+    }
     if let Some(oracle_evidence) = &bundle.settlement_receipt.oracle_evidence {
         verify_oracle_conversion_evidence_signature(oracle_evidence, &trust.trusted_oracle_keys)?;
         push_claim_once(

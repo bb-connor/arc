@@ -146,6 +146,18 @@ pub(crate) fn configure_proof_room_fixture_trust() {
         "eip155:8453,eip155:42161",
     );
     std::env::set_var("CHIO_PUBLIC_SETTLEMENT_MINIMUM_CONFIRMATIONS", "1");
+    // RPI-1: finality grounds on the INDEPENDENT chain head the verifier
+    // observes, not the producer-supplied chain-snapshot depth. Supply the head
+    // matching the offline-finality fixture so its `finality_verified` claim is
+    // emitted; without it the verifier fails closed and withholds the claim.
+    std::env::set_var(
+        "CHIO_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON",
+        concat!(
+            "{\"chain_id\":\"eip155:8453\",\"observed_block_number\":12345678,",
+            "\"observed_block_hash\":\"0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",",
+            "\"latest_block_number\":12345701}"
+        ),
+    );
 }
 
 pub(crate) fn proof_room_fixture_trusted_bundle_signer_keys() -> String {

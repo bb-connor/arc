@@ -162,6 +162,17 @@ fn proof_doctor_command() -> std::process::Command {
         "eip155:8453,eip155:42161",
     );
     command.env("CHIO_PUBLIC_SETTLEMENT_MINIMUM_CONFIRMATIONS", "1");
+    // RPI-1: finality grounds on an independent chain head matching the
+    // offline-finality fixture snapshot; without it the verifier withholds the
+    // finality claim fail-closed.
+    command.env(
+        "CHIO_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON",
+        concat!(
+            "{\"chain_id\":\"eip155:8453\",\"observed_block_number\":12345678,",
+            "\"observed_block_hash\":\"0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",",
+            "\"latest_block_number\":12345701}"
+        ),
+    );
     command
 }
 

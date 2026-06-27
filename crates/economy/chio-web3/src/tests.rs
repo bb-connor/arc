@@ -1014,10 +1014,25 @@ fn settlement_receipt_rejects_oracle_grant_currency_mismatch() {
     ));
 }
 
+fn sample_matching_independent_chain_head() -> PublicSettlementIndependentChainHead {
+    // Matches the sample bundle's chain snapshot so finality grounds on an
+    // independent head (RPI-1). Same values the offline-finality fixture pins.
+    PublicSettlementIndependentChainHead {
+        chain_id: "eip155:8453".to_string(),
+        observed_block_number: 12_345_678,
+        observed_block_hash: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            .to_string(),
+        latest_block_number: 12_345_701,
+    }
+}
+
 #[test]
 fn public_settlement_proof_emits_verifier_report() {
     let bundle = sample_public_settlement_proof_bundle();
-    let report = verify_sample_public_settlement_proof(&bundle).unwrap();
+    // RPI-1: the finality claim is grounded on an independent chain head.
+    let mut trust = sample_public_settlement_verifier_trust();
+    trust.independent_chain_head = Some(sample_matching_independent_chain_head());
+    let report = verify_public_settlement_proof(&bundle, &trust).unwrap();
 
     assert_eq!(report.schema, CHIO_PUBLIC_SETTLEMENT_VERIFIER_REPORT_SCHEMA);
     assert_eq!(report.verdict, "verified");
@@ -1706,6 +1721,80 @@ fn public_settlement_proof_accepts_matching_independent_head() {
     });
 
     assert!(verify_public_settlement_proof(&bundle, &trust).is_ok());
+}
+
+/// RPI-1 (fail-closed finality grounding): a bundle whose producer fabricates
+/// the chain-snapshot confirmation depth still verifies structurally, but
+/// WITHOUT an independent chain head the verifier does NOT emit the
+/// `finality_verified` claim. Finality must be grounded on an independent head,
+/// never on the unsigned, producer-supplied `latest_block_number` /
+/// `observed_confirmations`. A downstream policy that requires the finality
+/// claim then fails closed.
+#[test]
+fn public_settlement_proof_withholds_finality_without_independent_head() {
+    // Producer inflates the unsigned chain-snapshot depth and observed
+    // confirmations to manufacture a deep, "final"-looking settlement.
+    let bundle = sample_public_settlement_proof_bundle_with_chain_snapshot(|snapshot| {
+        snapshot["chain_snapshot"]["latest_block_number"] = json!(12_345_700);
+    });
+    let mut bundle = bundle;
+    bundle.observed_confirmations = 23;
+
+    // No independent chain head: the verifier cannot independently observe the
+    // chain tip, so finality is NOT vouched for.
+    let mut trust = sample_public_settlement_verifier_trust();
+    trust.independent_chain_head = None;
+
+    let report = verify_public_settlement_proof(&bundle, &trust)
+        .expect("the bundle still recomputes structurally");
+    assert!(
+        !report
+            .verified_claims
+            .contains(&CLAIM_PUBLIC_SETTLEMENT_FINALITY_VERIFIED.to_string()),
+        "finality must not be claimed without an independent chain head"
+    );
+
+    // Supplying a matching independent head restores the finality claim.
+    trust.independent_chain_head = Some(sample_matching_independent_chain_head());
+    let grounded = sample_public_settlement_proof_bundle();
+    let grounded_report =
+        verify_public_settlement_proof(&grounded, &trust).expect("a head-grounded bundle verifies");
+    assert!(grounded_report
+        .verified_claims
+        .contains(&CLAIM_PUBLIC_SETTLEMENT_FINALITY_VERIFIED.to_string()));
+}
+
+/// PR959 codex P2 (honor grant constraints): the argument-less tool-call
+/// authorization helper cannot evaluate a grant's parameter constraints against
+/// a request it never sees, so a CONSTRAINED grant must fail closed rather than
+/// authorize every invocation of the tool.
+#[test]
+fn tool_call_authorization_denies_constrained_grant() {
+    use crate::capability::scope::Constraint;
+
+    let mut constrained = ToolGrant {
+        server_id: "srv".to_string(),
+        tool_name: "tool_a".to_string(),
+        operations: vec![Operation::Invoke],
+        constraints: vec![Constraint::PathPrefix("/safe".to_string())],
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost: None,
+        dpop_required: None,
+    };
+
+    // A grant narrowed to one parameter set cannot authorize via this helper.
+    assert!(
+        !ToolCallAuthorization::from_capability_grant(&constrained, "srv", "tool_a")
+            .is_authorized(),
+        "a constrained grant must fail closed in the argument-less helper"
+    );
+
+    // Dropping the constraints restores the (otherwise matching) authorization.
+    constrained.constraints.clear();
+    assert!(
+        ToolCallAuthorization::from_capability_grant(&constrained, "srv", "tool_a").is_authorized()
+    );
 }
 
 #[test]
