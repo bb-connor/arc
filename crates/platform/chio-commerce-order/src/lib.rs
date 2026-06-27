@@ -568,61 +568,20 @@ fn verify_escrow_digest(
     // freetier:global pool row (Seam A). A malformed ledger whose canonical digest
     // happens to be the pinned value cannot ride into a verified passport.
     ledger.assert_conservation()?;
-    if ledger.order_id != context.order_id {
-        return Err(CommerceOrderError::InvalidArtifact {
-            field: "order context",
-            message: format!(
-                "escrow ledger order mismatch: ledger {} vs context {}",
-                ledger.order_id, context.order_id
-            ),
-        });
-    }
-    // Bind the ledger's ECONOMICS and PARTIES to the order context. A digest match
-    // plus order-id binding still proves only that SOME conserved ledger names this
-    // order; it does not prove the custody covered the order's quote between the
-    // order's buyer and merchant. Without this, a same-order ledger for 1 USD (or
-    // one paying a different beneficiary) would pass conservation/status and ride
-    // into a verified passport for the real (e.g. 4200 USD) order. Compare the
-    // ledger amount/currency to the signed quote and the depositor/beneficiary to
-    // the order's buyer/merchant (exactly what `escrow::accept` binds), fail-closed
-    // on any mismatch. Composed with the escrow leg-endpoint binding in
+    // Bind the ledger's SCHEMA, ORDER, ECONOMICS, and PARTIES to the order context.
+    // A digest match plus conservation still proves only that SOME conserved ledger
+    // exists; it does not prove the custody covered THIS order's quote between THIS
+    // order's buyer and merchant, nor that the ledger even uses the canonical
+    // escrow-ledger schema. Without this, a same-order ledger for 1 USD (or one
+    // paying a different beneficiary, or one whose `schema` is not the canonical
+    // escrow-ledger schema) would pass conservation/status and ride into a verified
+    // passport for the real (e.g. 4200 USD) order. The shared helper compares the
+    // ledger schema/order/amount/currency to the signed quote and the
+    // depositor/beneficiary to the order's buyer/merchant (exactly what
+    // `escrow::accept` binds and `escrow::release` re-checks), fail-closed on any
+    // mismatch. Composed with the escrow leg-endpoint binding in
     // `assert_conservation`, the ledger is fully bound to the order.
-    if ledger.amount_minor != context.quote_amount_minor {
-        return Err(CommerceOrderError::InvalidArtifact {
-            field: "order context",
-            message: format!(
-                "escrow ledger amount {} does not match the order quote amount {}",
-                ledger.amount_minor, context.quote_amount_minor
-            ),
-        });
-    }
-    if ledger.currency != context.quote_currency {
-        return Err(CommerceOrderError::InvalidArtifact {
-            field: "order context",
-            message: format!(
-                "escrow ledger currency {} does not match the order quote currency {}",
-                ledger.currency, context.quote_currency
-            ),
-        });
-    }
-    if ledger.depositor_account != context.buyer_subject {
-        return Err(CommerceOrderError::InvalidArtifact {
-            field: "order context",
-            message: format!(
-                "escrow ledger depositor {} does not match the order buyer {}",
-                ledger.depositor_account, context.buyer_subject
-            ),
-        });
-    }
-    if ledger.beneficiary_account != context.merchant_subject {
-        return Err(CommerceOrderError::InvalidArtifact {
-            field: "order context",
-            message: format!(
-                "escrow ledger beneficiary {} does not match the order merchant {}",
-                ledger.beneficiary_account, context.merchant_subject
-            ),
-        });
-    }
+    escrow::bind_escrow_ledger_to_order_context(&ledger, context)?;
     // Bind the ledger's lifecycle status to the order's settlement state. A digest
     // match alone proves only that SOME escrow ledger conserves value; it does not
     // prove the custody actually reached the lifecycle the context claims. The
@@ -649,14 +608,26 @@ fn verify_escrow_digest(
 /// pinned. The accept leg locks custody (a `Locked` ledger) and advances the order
 /// to the assembly/dispatch/observe states; the release leg drains custody (a
 /// `Released` ledger) and advances the order to settlement reconciliation and
-/// beyond. Other states impose no escrow-status constraint here (the field is
-/// additive, so legacy/pre-escrow states return `None`).
+/// EVERY state at or after it on the shipped spine.
+///
+/// The post-release spine (see `replay::is_allowed_transition`) continues
+/// `settlement_reconciled -> completed -> disputed -> refunded`, so EVERY one of
+/// those terminal states is reached only AFTER custody was released. They must all
+/// require a `Released` ledger: a `disputed`/`refunded` context that pinned a
+/// still-`Locked` ledger digest would otherwise fall through to `None` and vouch
+/// that custody was merely locked, never released, contradicting the order having
+/// passed through reconciliation. `failed_closed` is deliberately left
+/// unconstrained: it is reachable from BOTH pre-release and post-release states, so
+/// no single status applies. Other states impose no escrow-status constraint here
+/// (the field is additive, so legacy/pre-escrow states return `None`).
 fn required_escrow_status_for_state(current_state: &str) -> Option<CommerceEscrowStatus> {
     match current_state {
         "settlement_packet_assembled" | "settlement_dispatched" | "settlement_observed" => {
             Some(CommerceEscrowStatus::Locked)
         }
-        "settlement_reconciled" | "completed" => Some(CommerceEscrowStatus::Released),
+        "settlement_reconciled" | "completed" | "disputed" | "refunded" => {
+            Some(CommerceEscrowStatus::Released)
+        }
         _ => None,
     }
 }
@@ -1008,5 +979,72 @@ mod escrow_digest_verification_tests {
             CommerceOrderError::InvalidArtifact { message, .. }
                 if message.contains("beneficiary") && message.contains("does not match the order merchant")
         ));
+    }
+
+    /// Batch 6 / Finding 2: a digest-consistent, conserved, same-order ledger whose
+    /// `schema` is NOT the canonical commerce escrow-ledger schema is denied, so a
+    /// wrong-schema artifact can never ride a pinned digest into a verified passport.
+    #[test]
+    fn escrow_ledger_with_wrong_schema_is_denied() {
+        let order_id = "order-commerce-001";
+        let mut wrong_schema = ledger(order_id);
+        // Every other field (order, economics, parties, legs, status) matches the
+        // order context, so only the schema gate can fire.
+        wrong_schema.schema = "chio.commerce.not-the-escrow-ledger.v1".to_string();
+        let bytes = canonical_ledger_bytes(&wrong_schema);
+        let mut context = order_context(order_id);
+        context.escrow_digest = Some(sha256_hex(&bytes));
+        let error = verify_escrow_digest(&context, Some(&bytes))
+            .test_expect_err("a wrong-schema escrow ledger is denied");
+        assert!(matches!(
+            error,
+            CommerceOrderError::InvalidArtifact { message, .. }
+                if message.contains("is not the canonical commerce escrow-ledger schema")
+        ));
+    }
+
+    /// Batch 6 / Finding 3: the post-reconciliation terminal states `disputed` and
+    /// `refunded` are reached only AFTER custody was released, so a context in either
+    /// state that pins a still-`Locked` ledger digest is denied. It would otherwise
+    /// fall through to no status constraint and vouch that custody was merely locked,
+    /// contradicting the order having passed through reconciliation/release.
+    #[test]
+    fn post_release_terminal_state_with_locked_ledger_is_denied() {
+        let order_id = "order-commerce-001";
+        let locked = ledger(order_id);
+        assert_eq!(locked.status, CommerceEscrowStatus::Locked);
+        let bytes = canonical_ledger_bytes(&locked);
+        for state in ["disputed", "refunded"] {
+            let mut context = order_context(order_id);
+            context.current_state = state.to_string();
+            context.escrow_digest = Some(sha256_hex(&bytes));
+            let error = verify_escrow_digest(&context, Some(&bytes))
+                .test_expect_err("a post-release terminal context with a locked ledger is denied");
+            assert!(
+                matches!(
+                    &error,
+                    CommerceOrderError::InvalidArtifact { message, .. }
+                        if message.contains("escrow ledger status mismatch")
+                ),
+                "state {state} must require a released ledger, got {error:?}"
+            );
+        }
+    }
+
+    /// Batch 6 / Finding 3: the consistent post-release pair (a `Released` ledger
+    /// pinned by a `disputed`/`refunded` context) still verifies, so the extended
+    /// status gate only denies the inconsistent lock-while-post-release combination.
+    #[test]
+    fn post_release_terminal_state_with_released_ledger_verifies() {
+        let order_id = "order-commerce-001";
+        let released = released_ledger(order_id);
+        let bytes = canonical_ledger_bytes(&released);
+        for state in ["disputed", "refunded"] {
+            let mut context = order_context(order_id);
+            context.current_state = state.to_string();
+            context.escrow_digest = Some(sha256_hex(&bytes));
+            verify_escrow_digest(&context, Some(&bytes))
+                .test_expect("a post-release terminal context with a released ledger verifies");
+        }
     }
 }
