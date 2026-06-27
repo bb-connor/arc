@@ -27,10 +27,12 @@ use chio_anchor::{AnchorBatchWitness, EvmAnchorTarget};
 use chio_core::capability::token::AttestationWindowId;
 use chio_core::web3::identity::SignedWeb3IdentityBinding;
 use chio_core::PublicKey;
+use chio_did::DidChio;
 use chio_credentials::{
-    attestation_window_containing, ChioPass, PassportLifecycleRecord, TrustTier,
+    attestation_window_containing, ChioPass, PassportLifecycleRecord, PassportLifecycleState,
+    TrustTier,
 };
-use chio_kernel::{KernelCheckpoint, LocalCapabilityAuthority};
+use chio_kernel::{verify_checkpoint_signature, KernelCheckpoint, LocalCapabilityAuthority};
 use chio_store_sqlite::{SqliteReceiptStore, SqliteRevocationStore};
 use serde::de::DeserializeOwned;
 
@@ -242,14 +244,68 @@ fn pass_issue(
     Ok((issuance, counters))
 }
 
+/// Verify a fresh rollover re-attestation presentation proof and derive the
+/// re-attestation verdict from the verified result.
+///
+/// FAIL-CLOSED: the verdict is NEVER trusted from a bare flag. The supplied
+/// presentation response MUST verify (nonce-bound and time-windowed), MUST be
+/// accepted by the verifier policy, and MUST be bound to the refresh subject.
+/// Any failure denies, so the next-window Pass is never renewed without a
+/// genuine, subject-bound re-attestation artifact.
+fn verify_reattestation_proof(
+    proof_path: &Path,
+    challenge_path: Option<&Path>,
+    subject_public_key: &PublicKey,
+    now: u64,
+) -> Result<bool, CliError> {
+    let response: chio_credentials::PassportPresentationResponse = read_json_artifact(proof_path)?;
+    let expected_challenge: Option<chio_credentials::PassportPresentationChallenge> =
+        challenge_path.map(read_json_artifact).transpose()?;
+    let verification = chio_credentials::verify_passport_presentation_response_with_policy(
+        &response,
+        expected_challenge.as_ref(),
+        now,
+        None,
+        None,
+    )
+    .map_err(|error| {
+        CliError::Other(format!(
+            "re-attestation presentation proof failed to verify: {error}"
+        ))
+    })?;
+    if !verification.accepted {
+        return Err(CliError::Other(
+            "re-attestation presentation proof did not pass the verifier policy".to_string(),
+        ));
+    }
+    let expected_subject = DidChio::from_public_key(subject_public_key.clone())
+        .map_err(|error| {
+            CliError::Other(format!(
+                "re-attestation subject DID derivation failed: {error}"
+            ))
+        })?
+        .to_string();
+    if verification.subject != expected_subject {
+        return Err(CliError::Other(format!(
+            "re-attestation proof subject {} does not match the refresh subject {}",
+            verification.subject, expected_subject
+        )));
+    }
+    Ok(true)
+}
+
 /// Roll a Pass forward into its next monthly window from the prior window's
 /// genuine-use scan.
+#[allow(clippy::too_many_arguments)]
 fn pass_refresh(
     subject_public_key_hex: &str,
     tier: TrustTier,
     now: u64,
     reattested: bool,
+    reattestation_proof: Option<&Path>,
+    reattestation_challenge: Option<&Path>,
     receipt_db_path: &Path,
+    revocation_db_path: &Path,
     authority_seed_file: Option<&Path>,
     accepted_kernel_keys_hex: &[String],
 ) -> Result<ChioPassRefreshResult, CliError> {
@@ -261,6 +317,22 @@ fn pass_refresh(
     let config = ChioPassConfig::m1_launch_default(accepted_kernel_keys);
     let authority = LocalCapabilityAuthority::new(authority_keypair.clone());
 
+    // Derive the re-attestation verdict from a verified presentation proof, never
+    // from the bare `--reattested` flag. A flag set without a verifying proof
+    // fails closed so no next-window Pass is renewed without genuine,
+    // subject-bound re-attestation provenance.
+    let reattested_verdict = if let Some(proof_path) = reattestation_proof {
+        verify_reattestation_proof(proof_path, reattestation_challenge, &subject_public_key, now)?
+    } else if reattested {
+        return Err(CliError::Other(
+            "--reattested requires a verified --reattestation-proof presentation artifact; the \
+             bare flag is not trusted as re-attestation provenance"
+                .to_string(),
+        ));
+    } else {
+        false
+    };
+
     // The genuine-use scan reads the receipt store the CLI already has.
     let store = SqliteReceiptStore::open(receipt_db_path)?;
     let prior_window = attestation_window_containing(now)?;
@@ -268,7 +340,7 @@ fn pass_refresh(
     // prior window's `until`).
     let next_window = attestation_window_containing(prior_window.until)?;
 
-    refresh_chio_pass_window(
+    let result = refresh_chio_pass_window(
         &config,
         &store,
         &authority,
@@ -277,8 +349,86 @@ fn pass_refresh(
         tier,
         &prior_window,
         &next_window,
-        reattested,
-    )
+        reattested_verdict,
+    )?;
+
+    // Persist any renewed/dormant next-window issuance into the anti-farm roster
+    // so `count_active_passes` does not undercount live refreshed Passes. The
+    // deterministic next-window `chiopass:<hash>` id is the roster key, so this
+    // supersedes the prior window's row rather than inflating the population.
+    // Fail-closed: a store IO fault denies after the in-memory mint, which is
+    // never surfaced.
+    if let ChioPassRefreshResult::Renewed { issuance, .. }
+    | ChioPassRefreshResult::Dormant { issuance, .. } = &result
+    {
+        let oracle = SqliteRevocationStore::open(revocation_db_path)?;
+        let expires_at = i64::try_from(next_window.until).unwrap_or(i64::MAX);
+        oracle.record_pass_issuance(&issuance.capability.id, &next_window.window_ym, expires_at)?;
+    }
+
+    Ok(result)
+}
+
+/// Read and validate the revoked-Pass lifecycle records for an anchor batch.
+///
+/// FAIL-CLOSED: the anchor batch treats every entry in this slice as a revoked
+/// Pass digest, so each record MUST be a structurally valid AND actually-revoked
+/// (`status == Revoked`) lifecycle record. A stale Active/Superseded export can
+/// therefore no longer be published into the revoked input set.
+fn read_revoked_records(
+    revoked_record_paths: &[std::path::PathBuf],
+) -> Result<Vec<PassportLifecycleRecord>, CliError> {
+    revoked_record_paths
+        .iter()
+        .map(|path| {
+            let record: PassportLifecycleRecord = read_json_artifact(path)?;
+            record.validate().map_err(|error| {
+                CliError::Other(format!(
+                    "revoked Pass lifecycle record {} is invalid: {error}",
+                    path.display()
+                ))
+            })?;
+            if record.status != PassportLifecycleState::Revoked {
+                return Err(CliError::Other(format!(
+                    "revoked Pass anchor input {} is not a revoked lifecycle record (status: {}); \
+                     only Revoked records may be anchored as revoked Pass digests",
+                    path.display(),
+                    record.status.label()
+                )));
+            }
+            Ok(record)
+        })
+        .collect()
+}
+
+/// Validate that a supplied previous checkpoint belongs to THIS operator and is
+/// self-consistent before it chains the new per-operator sequence.
+///
+/// FAIL-CLOSED: the checkpoint builder only hashes the previous body and
+/// increments the sequence, so without this gate the CLI could chain its
+/// per-operator sequence to a foreign operator's checkpoint. Require the previous
+/// checkpoint's `kernel_key` to equal this operator's key AND its signature to
+/// verify.
+fn validate_previous_checkpoint(
+    previous: &KernelCheckpoint,
+    operator_public_key: &PublicKey,
+) -> Result<(), CliError> {
+    if previous.body.kernel_key != *operator_public_key {
+        return Err(CliError::Other(
+            "previous checkpoint was signed by a different operator key; the per-operator \
+             sequence chain may only extend this operator's own checkpoints"
+                .to_string(),
+        ));
+    }
+    match verify_checkpoint_signature(previous) {
+        Ok(true) => Ok(()),
+        Ok(false) => Err(CliError::Other(
+            "previous checkpoint signature does not verify against its operator key".to_string(),
+        )),
+        Err(error) => Err(CliError::Other(format!(
+            "previous checkpoint signature could not be verified: {error}"
+        ))),
+    }
 }
 
 /// Prepare (do NOT broadcast) the read-only Pass anchoring root publication.
@@ -305,14 +455,14 @@ fn pass_anchor(
         .iter()
         .map(|path| read_json_artifact::<ChioPass>(path))
         .collect::<Result<Vec<_>, _>>()?;
-    let revoked_records = revoked_record_paths
-        .iter()
-        .map(|path| read_json_artifact::<PassportLifecycleRecord>(path))
-        .collect::<Result<Vec<_>, _>>()?;
+    let revoked_records = read_revoked_records(revoked_record_paths)?;
 
     let previous_checkpoint = previous_checkpoint_path
         .map(read_json_artifact::<KernelCheckpoint>)
         .transpose()?;
+    if let Some(previous) = previous_checkpoint.as_ref() {
+        validate_previous_checkpoint(previous, &operator_keypair.public_key())?;
+    }
 
     prepare_pass_anchor_publication(
         &operator_keypair,
@@ -408,17 +558,25 @@ pub(crate) fn dispatch_pass(
             tier,
             now,
             reattested,
+            reattestation_proof,
+            reattestation_challenge,
             accepted_kernel_key,
         } => {
             let tier = parse_trust_tier(&tier)?;
             let now = now.unwrap_or_else(unix_now);
             let receipt_db_path = require_receipt_db_path(receipt_db)?;
+            // Fail-closed: the revocation oracle is mandatory so a renewed/dormant
+            // next-window issuance is persisted into the anti-farm roster.
+            let revocation_db_path = require_revocation_db_path(revocation_db)?;
             let result = pass_refresh(
                 &subject_public_key,
                 tier,
                 now,
                 reattested,
+                reattestation_proof.as_deref(),
+                reattestation_challenge.as_deref(),
                 receipt_db_path,
+                revocation_db_path,
                 authority_seed_file,
                 &accepted_kernel_key,
             )?;
@@ -453,6 +611,9 @@ pub(crate) fn dispatch_pass(
             witness,
             issued_at,
             previous_checkpoint,
+            out_batch,
+            out_checkpoint,
+            out_publication,
         } => {
             let issued_at = issued_at.unwrap_or_else(unix_now);
             let prepared = pass_anchor(
@@ -465,6 +626,21 @@ pub(crate) fn dispatch_pass(
                 previous_checkpoint.as_deref(),
                 authority_seed_file,
             )?;
+
+            // Surface the prepared anchoring artifacts so CLI-only use can
+            // broadcast the root and later verify inclusion against it. The
+            // summary alone is not anchorable; optionally persist the signed
+            // batch, the kernel checkpoint, and the prepared publication call
+            // data. Fail-closed: an IO or serialization fault denies.
+            if let Some(path) = out_batch.as_deref() {
+                write_json_artifact(path, &prepared.batch)?;
+            }
+            if let Some(path) = out_checkpoint.as_deref() {
+                write_json_artifact(path, &prepared.checkpoint)?;
+            }
+            if let Some(path) = out_publication.as_deref() {
+                write_json_artifact(path, &prepared.publication)?;
+            }
             let report = serde_json::json!({
                 "schema": "chio.pass.anchor.v1",
                 "anchoredDigests": prepared.anchored_digests,
@@ -743,5 +919,213 @@ mod tests {
             TrustTier::Premier
         );
         assert!(parse_trust_tier("godmode").is_err());
+    }
+
+    /// Build a lifecycle record in `status`, shaped so `validate()` passes.
+    fn lifecycle_record(status: PassportLifecycleState) -> PassportLifecycleRecord {
+        let subject = DidChio::from_public_key(Keypair::generate().public_key())
+            .expect("subject did")
+            .to_string();
+        let issuer = DidChio::from_public_key(Keypair::generate().public_key())
+            .expect("issuer did")
+            .to_string();
+        let (revoked_at, revoked_reason) = if status == PassportLifecycleState::Revoked {
+            (Some(1_781_500_000), Some("key-compromise".to_string()))
+        } else {
+            (None, None)
+        };
+        PassportLifecycleRecord {
+            passport_id: "chiopass:deadbeefdeadbeef".to_string(),
+            subject,
+            issuers: vec![issuer],
+            issuer_count: 1,
+            published_at: 1_781_000_000,
+            updated_at: 1_781_400_000,
+            status,
+            superseded_by: None,
+            revoked_at,
+            revoked_reason,
+            distribution: Default::default(),
+            valid_until: "2026-12-31T00:00:00Z".to_string(),
+        }
+    }
+
+    /// 311: only actually-revoked lifecycle records may be anchored as revoked
+    /// Pass digests; a stale Active export is denied fail-closed.
+    #[test]
+    fn read_revoked_records_requires_revoked_status() {
+        let dir = temp_dir("revoked-records");
+
+        let revoked_path = dir.join("revoked.json");
+        write_json_artifact(
+            &revoked_path,
+            &lifecycle_record(PassportLifecycleState::Revoked),
+        )
+        .expect("write revoked record");
+        let records = read_revoked_records(&[revoked_path]).expect("revoked record is accepted");
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].status, PassportLifecycleState::Revoked);
+
+        let active_path = dir.join("active.json");
+        write_json_artifact(
+            &active_path,
+            &lifecycle_record(PassportLifecycleState::Active),
+        )
+        .expect("write active record");
+        let denied =
+            read_revoked_records(&[active_path]).expect_err("a non-revoked record is denied");
+        assert!(matches!(
+            denied,
+            CliError::Other(message) if message.contains("not a revoked lifecycle record")
+        ));
+    }
+
+    /// 325: a supplied previous checkpoint must belong to THIS operator and carry
+    /// a verifying signature before it chains the per-operator sequence.
+    #[test]
+    fn validate_previous_checkpoint_binds_to_operator() {
+        let operator = Keypair::generate();
+        let foreign = Keypair::generate();
+
+        // This operator's own, well-signed checkpoint validates.
+        let own = chio_kernel::build_checkpoint_with_previous(
+            1,
+            1,
+            1,
+            &[b"leaf".to_vec()],
+            &operator,
+            None,
+        )
+        .expect("build own checkpoint");
+        validate_previous_checkpoint(&own, &operator.public_key())
+            .expect("operator's own checkpoint validates");
+
+        // A checkpoint signed by a DIFFERENT operator is denied.
+        let foreign_cp = chio_kernel::build_checkpoint_with_previous(
+            1,
+            1,
+            1,
+            &[b"leaf".to_vec()],
+            &foreign,
+            None,
+        )
+        .expect("build foreign checkpoint");
+        let denied = validate_previous_checkpoint(&foreign_cp, &operator.public_key())
+            .expect_err("foreign operator's checkpoint is denied");
+        assert!(matches!(
+            denied,
+            CliError::Other(message) if message.contains("different operator key")
+        ));
+
+        // A tampered body (signature no longer verifies) is denied even when it
+        // still names this operator.
+        let mut tampered = chio_kernel::build_checkpoint_with_previous(
+            1,
+            1,
+            1,
+            &[b"leaf".to_vec()],
+            &operator,
+            None,
+        )
+        .expect("build checkpoint to tamper");
+        tampered.body.checkpoint_seq += 1;
+        let denied_sig = validate_previous_checkpoint(&tampered, &operator.public_key())
+            .expect_err("a tampered checkpoint is denied");
+        assert!(matches!(
+            denied_sig,
+            CliError::Other(message) if message.contains("signature does not verify")
+        ));
+    }
+
+    /// 669: the re-attestation verdict is never trusted from the bare flag; a
+    /// `--reattested` set without a verifying presentation proof fails closed.
+    #[test]
+    fn pass_refresh_rejects_bare_reattested_without_proof() {
+        let dir = temp_dir("reattest-deny");
+        let authority_seed = dir.join("authority.seed");
+        let subject = Keypair::generate().public_key().to_hex();
+        let kernel_keys = vec![Keypair::generate().public_key().to_hex()];
+        // The proof gate denies before any store is opened, so these paths are
+        // never touched.
+        let receipt_db = dir.join("receipts.sqlite3");
+        let revocation_db = dir.join("revocations.sqlite3");
+
+        let denied = pass_refresh(
+            &subject,
+            TrustTier::Attested,
+            MID_JUNE_2026,
+            true,
+            None,
+            None,
+            &receipt_db,
+            &revocation_db,
+            Some(authority_seed.as_path()),
+            &kernel_keys,
+        )
+        .expect_err("bare --reattested without a proof is denied");
+        assert!(matches!(
+            denied,
+            CliError::Other(message) if message.contains("bare flag is not trusted")
+        ));
+    }
+
+    /// 669: a supplied re-attestation proof that does not verify (here, an
+    /// undeserializable artifact) is denied fail-closed; the proof is genuinely
+    /// consumed rather than the flag trusted.
+    #[test]
+    fn pass_refresh_rejects_unverifiable_reattestation_proof() {
+        let dir = temp_dir("reattest-bad-proof");
+        let authority_seed = dir.join("authority.seed");
+        let subject = Keypair::generate().public_key().to_hex();
+        let kernel_keys = vec![Keypair::generate().public_key().to_hex()];
+        let receipt_db = dir.join("receipts.sqlite3");
+        let revocation_db = dir.join("revocations.sqlite3");
+
+        let proof_path = dir.join("proof.json");
+        std::fs::write(&proof_path, b"{\"not\":\"a-presentation-response\"}")
+            .expect("write malformed proof");
+
+        let denied = pass_refresh(
+            &subject,
+            TrustTier::Attested,
+            MID_JUNE_2026,
+            true,
+            Some(proof_path.as_path()),
+            None,
+            &receipt_db,
+            &revocation_db,
+            Some(authority_seed.as_path()),
+            &kernel_keys,
+        )
+        .expect_err("an unverifiable re-attestation proof is denied");
+        // The proof path was taken (not the bare-flag rejection).
+        assert!(!format!("{denied:?}").contains("bare flag is not trusted"));
+    }
+
+    /// PASS-1: refresh now persists renewed/dormant issuances into the anti-farm
+    /// roster, so the revocation oracle is mandatory; omitting it fails closed.
+    #[test]
+    fn pass_refresh_dispatch_requires_revocation_oracle() {
+        let dir = temp_dir("refresh-requires-oracle");
+        let receipt_db = dir.join("receipts.sqlite3");
+        let denied = dispatch_pass(
+            PassCommands::Refresh {
+                subject_public_key: Keypair::generate().public_key().to_hex(),
+                tier: "attested".to_string(),
+                now: Some(MID_JUNE_2026),
+                reattested: false,
+                reattestation_proof: None,
+                reattestation_challenge: None,
+                accepted_kernel_key: vec![Keypair::generate().public_key().to_hex()],
+            },
+            true,
+            Some(receipt_db.as_path()),
+            None,
+            None,
+        );
+        assert!(
+            denied.is_err(),
+            "refresh must fail closed without a revocation oracle"
+        );
     }
 }

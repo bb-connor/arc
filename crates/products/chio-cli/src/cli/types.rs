@@ -663,10 +663,28 @@ pub(crate) enum PassCommands {
         #[arg(long)]
         now: Option<u64>,
 
-        /// The verified verdict of a fresh rollover presentation challenge. When
-        /// absent, the refresh denies (no fresh re-attestation, nothing minted).
+        /// Operator intent to re-attest at rollover. The verdict is NOT trusted
+        /// from this flag alone: it is only honored when a fresh nonce-bound
+        /// `--reattestation-proof` presentation response is supplied and verifies
+        /// for this subject. When the flag is set without a verifying proof the
+        /// refresh fails closed.
         #[arg(long, default_value_t = false)]
         reattested: bool,
+
+        /// Signed passport presentation-response JSON file proving a fresh
+        /// rollover re-attestation challenge was answered by this subject. The CLI
+        /// verifies it (nonce-bound, time-windowed, subject-bound) and derives the
+        /// re-attestation verdict from the verified result, never from the bare
+        /// `--reattested` flag.
+        #[arg(long = "reattestation-proof")]
+        reattestation_proof: Option<PathBuf>,
+
+        /// Optional expected presentation-challenge JSON file the
+        /// `--reattestation-proof` MUST answer. When supplied, the response is
+        /// pinned to this exact challenge (nonce binding); when omitted, the
+        /// response's self-contained challenge is verified for freshness.
+        #[arg(long = "reattestation-challenge")]
+        reattestation_challenge: Option<PathBuf>,
 
         /// Trusted kernel signing key (hex) pinned into the genuine-use
         /// allowlist (registry RR2-TM-01). Repeatable. When omitted, the local
@@ -709,6 +727,22 @@ pub(crate) enum PassCommands {
         /// sequence chain. Omit for the genesis batch (checkpoint_seq 0).
         #[arg(long = "previous-checkpoint")]
         previous_checkpoint: Option<PathBuf>,
+
+        /// Optional path to write the signed RFC6962 anchor batch JSON (its
+        /// `tree_root` and one inclusion proof per anchored digest) so the
+        /// prepared root can be broadcast and inclusion later verified.
+        #[arg(long = "out-batch")]
+        out_batch: Option<PathBuf>,
+
+        /// Optional path to write the kernel checkpoint JSON wrapping the anchor
+        /// batch tree root under the operator's checkpoint sequence.
+        #[arg(long = "out-checkpoint")]
+        out_checkpoint: Option<PathBuf>,
+
+        /// Optional path to write the prepared (un-broadcast) EVM root-publication
+        /// call data JSON bound to the anchor-purpose identity binding.
+        #[arg(long = "out-publication")]
+        out_publication: Option<PathBuf>,
     },
 }
 
