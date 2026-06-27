@@ -78,6 +78,15 @@ pub enum ExposureLedgerNettingError {
     /// refuses the override rather than letting it break the USD/USDC pin and
     /// understate the canonical exposure.
     PinnedParityOverride { currency: String },
+    /// The exposure ledger supplied more than one position row for the same
+    /// currency. The segregated (per-currency) baseline sums each row's worst-case
+    /// requirement, so two rows for one currency would inflate the segregated
+    /// outstanding above the netted single-position outstanding and advertise a
+    /// fictitious capital-freed benefit from positions that are NOT actually
+    /// cross-currency. The collapse refuses duplicate-currency rows (fail-closed)
+    /// rather than measure a netting benefit the single-denomination book cannot
+    /// produce; callers must aggregate a currency's positions into one row first.
+    DuplicateCurrency { currency: String },
 }
 
 impl fmt::Display for ExposureLedgerNettingError {
@@ -110,6 +119,10 @@ impl fmt::Display for ExposureLedgerNettingError {
             Self::PinnedParityOverride { currency } => write!(
                 f,
                 "exposure ledger netting rejected a non-parity override rate for pinned currency `{currency}`"
+            ),
+            Self::DuplicateCurrency { currency } => write!(
+                f,
+                "exposure ledger netting rejected duplicate position rows for currency `{currency}`; aggregate a currency's positions into one row before collapsing"
             ),
         }
     }
@@ -475,6 +488,19 @@ pub fn collapse_positions_to_canonical(
     let mut distinct_currencies = BTreeSet::new();
 
     for position in positions {
+        // Fail closed on a repeated currency. The segregated baseline sums the
+        // worst-case requirement of EACH row, so two rows for one currency
+        // (for example reserved=100 and pending=100 USD) would report a segregated
+        // outstanding of 200 against a netted single-position outstanding of 100
+        // and manufacture a phantom `capital_freed = 100` even though
+        // `mixed_currency_book` is false and nothing cross-currency netted. The
+        // single-denomination collapse measures a benefit only across DISTINCT
+        // currencies; duplicate single-currency rows must be aggregated upstream.
+        if !distinct_currencies.insert(position.currency.clone()) {
+            return Err(ExposureLedgerNettingError::DuplicateCurrency {
+                currency: position.currency.clone(),
+            });
+        }
         let rate = rates.rate_for(&position.currency)?;
         let converted = convert_position(position, &rate)?;
         segregated_outstanding_units = checked_aggregate_add(
@@ -484,7 +510,6 @@ pub fn collapse_positions_to_canonical(
         )?;
         add_into_canonical(&mut netted_position, &converted)?;
         source_currencies.push(position.currency.clone());
-        distinct_currencies.insert(position.currency.clone());
     }
 
     let netted_outstanding_units = netted_position.outstanding_exposure_units()?;
@@ -703,6 +728,60 @@ mod tests {
         assert_eq!(
             view.benefit.capital_freed_units,
             view.benefit.segregated_outstanding_units - view.benefit.netted_outstanding_units
+        );
+    }
+
+    /// PR959 codex P2: duplicate same-currency rows are rejected fail-closed and
+    /// produce NO phantom capital-freed benefit. The segregated baseline sums each
+    /// row's worst-case requirement, so two USD rows (reserved=100, pending=100)
+    /// would report segregated=200 against netted=100 and advertise a fictitious
+    /// `capital_freed=100` even though `mixed_currency_book` is false. The collapse
+    /// refuses the duplicate; aggregating the two rows into one position first
+    /// yields the honest single-currency view with no benefit.
+    #[test]
+    fn duplicate_same_currency_rows_are_rejected_and_yield_no_phantom_capital_freed() {
+        let usd_reserved = ExposureLedgerCurrencyPosition {
+            reserved_units: 100,
+            ..position("USD")
+        };
+        let usd_pending = ExposureLedgerCurrencyPosition {
+            pending_units: 100,
+            ..position("USD")
+        };
+
+        // Two rows for the same currency fail closed rather than manufacture a
+        // benefit a single-currency book cannot produce.
+        let err = collapse_positions_to_canonical(
+            &[usd_reserved, usd_pending],
+            &ExposureLedgerNettingRates::default(),
+        )
+        .expect_err("duplicate USD rows must be rejected");
+        assert_eq!(
+            err,
+            ExposureLedgerNettingError::DuplicateCurrency {
+                currency: "USD".to_string()
+            }
+        );
+
+        // Aggregating the duplicate channels into ONE USD row is the honest input:
+        // outstanding = max(reserved 100, unsettled 100) = 100, so segregated and
+        // netted agree and there is exactly zero capital freed.
+        let usd_aggregated = ExposureLedgerCurrencyPosition {
+            reserved_units: 100,
+            pending_units: 100,
+            ..position("USD")
+        };
+        let view = collapse_positions_to_canonical(
+            &[usd_aggregated],
+            &ExposureLedgerNettingRates::default(),
+        )
+        .expect("a single aggregated USD row collapses");
+        assert!(!view.mixed_currency_book);
+        assert_eq!(view.benefit.segregated_outstanding_units, 100);
+        assert_eq!(view.benefit.netted_outstanding_units, 100);
+        assert_eq!(
+            view.benefit.capital_freed_units, 0,
+            "a single-currency book frees no capital"
         );
     }
 
@@ -1078,15 +1157,18 @@ mod tests {
     /// capital-freed view.
     #[test]
     fn aggregate_channel_summation_fails_closed_instead_of_capping() {
-        // Two USD rows each with reserved_units = u64::MAX push the aggregate
-        // outstanding past u64::MAX; the collapse fails closed instead of
-        // publishing a capped reserved_units = u64::MAX.
-        let row = || ExposureLedgerCurrencyPosition {
+        // Two DISTINCT pinned-parity currencies (USD and the canonical USDC), each
+        // with reserved_units = u64::MAX, both convert one-to-one and push the
+        // aggregate outstanding past u64::MAX; the collapse fails closed instead of
+        // publishing a capped reserved_units = u64::MAX. Distinct currencies are
+        // used because duplicate same-currency rows are now rejected before they can
+        // aggregate (PR959 codex P2 finding 3).
+        let reserved_max = |currency: &str| ExposureLedgerCurrencyPosition {
             reserved_units: u64::MAX,
-            ..position("USD")
+            ..position(currency)
         };
         let error = collapse_positions_to_canonical(
-            &[row(), row()],
+            &[reserved_max("USD"), reserved_max("USDC")],
             &ExposureLedgerNettingRates::default(),
         )
         .unwrap_err();
@@ -1098,13 +1180,13 @@ mod tests {
         // Isolate the per-channel aggregate add: quoted_premium does not feed the
         // outstanding-exposure channels, so the segregated accumulator stays 0
         // and the failure surfaces from add_into_canonical's checked channel sum.
-        let premium_row = || ExposureLedgerCurrencyPosition {
+        let premium_max = |currency: &str| ExposureLedgerCurrencyPosition {
             quoted_premium_units: u64::MAX,
-            ..position("USD")
+            ..position(currency)
         };
         assert_eq!(
             collapse_positions_to_canonical(
-                &[premium_row(), premium_row()],
+                &[premium_max("USD"), premium_max("USDC")],
                 &ExposureLedgerNettingRates::default()
             )
             .unwrap_err(),
