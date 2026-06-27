@@ -57,6 +57,16 @@ pub enum ExposureLedgerNettingError {
     /// understates outstanding exposure and would publish a lower-than-true
     /// netted view (fail-closed: oversized books surface as an error).
     ConversionOverflow { currency: String },
+    /// Summing a single position's unsettled channel (`pending + failed`)
+    /// exceeded `u64::MAX`. The per-position capital requirement refuses to cap
+    /// the unsettled exposure, because a capped figure understates the
+    /// outstanding exposure the collapse and capital view publish.
+    UnsettledExposureOverflow { currency: String },
+    /// Summing a converted channel across positions into the aggregate canonical
+    /// book exceeded `u64::MAX`. The collapse refuses to cap the aggregate,
+    /// because a capped figure understates the netted exposure and capital-freed
+    /// view (fail-closed: oversized books surface as an error).
+    AggregateOverflow { channel: String },
     /// A pinned-parity currency (USD or the canonical USDC denomination) was
     /// supplied an explicit conversion rate that is not one-to-one. The collapse
     /// refuses the override rather than letting it break the USD/USDC pin and
@@ -78,6 +88,14 @@ impl fmt::Display for ExposureLedgerNettingError {
             Self::ConversionOverflow { currency } => write!(
                 f,
                 "exposure ledger netting conversion for currency `{currency}` overflowed u64; capping would understate exposure"
+            ),
+            Self::UnsettledExposureOverflow { currency } => write!(
+                f,
+                "exposure ledger netting unsettled exposure (pending + failed) for currency `{currency}` overflowed u64; capping would understate exposure"
+            ),
+            Self::AggregateOverflow { channel } => write!(
+                f,
+                "exposure ledger netting aggregate channel `{channel}` overflowed u64; capping would understate exposure"
             ),
             Self::PinnedParityOverride { currency } => write!(
                 f,
@@ -340,37 +358,71 @@ fn convert_position(
     })
 }
 
+/// Checked aggregate add: summing a converted channel into the canonical book
+/// fails closed on `u64` overflow rather than capping, because a capped
+/// aggregate understates the netted exposure and capital-freed view.
+fn checked_aggregate_add(
+    accumulator: u64,
+    addend: u64,
+    channel: &str,
+) -> Result<u64, ExposureLedgerNettingError> {
+    accumulator
+        .checked_add(addend)
+        .ok_or_else(|| ExposureLedgerNettingError::AggregateOverflow {
+            channel: channel.to_string(),
+        })
+}
+
 fn add_into_canonical(
     accumulator: &mut ExposureLedgerCurrencyPosition,
     converted: &ExposureLedgerCurrencyPosition,
-) {
-    accumulator.governed_max_exposure_units = accumulator
-        .governed_max_exposure_units
-        .saturating_add(converted.governed_max_exposure_units);
-    accumulator.reserved_units = accumulator
-        .reserved_units
-        .saturating_add(converted.reserved_units);
-    accumulator.settled_units = accumulator
-        .settled_units
-        .saturating_add(converted.settled_units);
-    accumulator.pending_units = accumulator
-        .pending_units
-        .saturating_add(converted.pending_units);
-    accumulator.failed_units = accumulator
-        .failed_units
-        .saturating_add(converted.failed_units);
-    accumulator.provisional_loss_units = accumulator
-        .provisional_loss_units
-        .saturating_add(converted.provisional_loss_units);
-    accumulator.recovered_units = accumulator
-        .recovered_units
-        .saturating_add(converted.recovered_units);
-    accumulator.quoted_premium_units = accumulator
-        .quoted_premium_units
-        .saturating_add(converted.quoted_premium_units);
-    accumulator.active_quoted_premium_units = accumulator
-        .active_quoted_premium_units
-        .saturating_add(converted.active_quoted_premium_units);
+) -> Result<(), ExposureLedgerNettingError> {
+    accumulator.governed_max_exposure_units = checked_aggregate_add(
+        accumulator.governed_max_exposure_units,
+        converted.governed_max_exposure_units,
+        "governedMaxExposureUnits",
+    )?;
+    accumulator.reserved_units = checked_aggregate_add(
+        accumulator.reserved_units,
+        converted.reserved_units,
+        "reservedUnits",
+    )?;
+    accumulator.settled_units = checked_aggregate_add(
+        accumulator.settled_units,
+        converted.settled_units,
+        "settledUnits",
+    )?;
+    accumulator.pending_units = checked_aggregate_add(
+        accumulator.pending_units,
+        converted.pending_units,
+        "pendingUnits",
+    )?;
+    accumulator.failed_units = checked_aggregate_add(
+        accumulator.failed_units,
+        converted.failed_units,
+        "failedUnits",
+    )?;
+    accumulator.provisional_loss_units = checked_aggregate_add(
+        accumulator.provisional_loss_units,
+        converted.provisional_loss_units,
+        "provisionalLossUnits",
+    )?;
+    accumulator.recovered_units = checked_aggregate_add(
+        accumulator.recovered_units,
+        converted.recovered_units,
+        "recoveredUnits",
+    )?;
+    accumulator.quoted_premium_units = checked_aggregate_add(
+        accumulator.quoted_premium_units,
+        converted.quoted_premium_units,
+        "quotedPremiumUnits",
+    )?;
+    accumulator.active_quoted_premium_units = checked_aggregate_add(
+        accumulator.active_quoted_premium_units,
+        converted.active_quoted_premium_units,
+        "activeQuotedPremiumUnits",
+    )?;
+    Ok(())
 }
 
 /// Collapse per-currency exposure positions into a single canonical-denomination
@@ -401,14 +453,17 @@ pub fn collapse_positions_to_canonical(
     for position in positions {
         let rate = rates.rate_for(&position.currency)?;
         let converted = convert_position(position, &rate)?;
-        segregated_outstanding_units =
-            segregated_outstanding_units.saturating_add(converted.outstanding_exposure_units());
-        add_into_canonical(&mut netted_position, &converted);
+        segregated_outstanding_units = checked_aggregate_add(
+            segregated_outstanding_units,
+            converted.outstanding_exposure_units()?,
+            "segregatedOutstandingUnits",
+        )?;
+        add_into_canonical(&mut netted_position, &converted)?;
         source_currencies.push(position.currency.clone());
         distinct_currencies.insert(position.currency.clone());
     }
 
-    let netted_outstanding_units = netted_position.outstanding_exposure_units();
+    let netted_outstanding_units = netted_position.outstanding_exposure_units()?;
     let capital_freed_units = segregated_outstanding_units.saturating_sub(netted_outstanding_units);
 
     Ok(ExposureLedgerNettedView {
@@ -792,7 +847,7 @@ mod tests {
             provisional_loss_units: 50,
             ..position("USD")
         };
-        assert_eq!(reserved_dominant.outstanding_exposure_units(), 500);
+        assert_eq!(reserved_dominant.outstanding_exposure_units().unwrap(), 500);
 
         let loss_dominant = ExposureLedgerCurrencyPosition {
             reserved_units: 100,
@@ -801,7 +856,7 @@ mod tests {
             ..position("USD")
         };
         // net provisional loss = 900 - 200 = 700.
-        assert_eq!(loss_dominant.outstanding_exposure_units(), 700);
+        assert_eq!(loss_dominant.outstanding_exposure_units().unwrap(), 700);
     }
 
     /// The report convenience method collapses its own positions.
@@ -914,6 +969,87 @@ mod tests {
         assert_eq!(parity.convert(u64::MAX).unwrap(), u64::MAX);
     }
 
+    /// PR959 codex P1: a single position whose unsettled channel
+    /// (`pending + failed`) exceeds `u64::MAX` fails closed with an
+    /// [`ExposureLedgerNettingError::UnsettledExposureOverflow`] rather than
+    /// saturating, because a capped unsettled figure would understate the
+    /// outstanding exposure the collapse and capital view publish.
+    #[test]
+    fn unsettled_exposure_overflow_fails_closed_instead_of_capping() {
+        // pending = u64::MAX, failed = 1 -> pending + failed overflows u64.
+        let oversized = ExposureLedgerCurrencyPosition {
+            pending_units: u64::MAX,
+            failed_units: 1,
+            ..position("USD")
+        };
+        assert_eq!(
+            oversized.outstanding_exposure_units().unwrap_err(),
+            ExposureLedgerNettingError::UnsettledExposureOverflow {
+                currency: "USD".to_string()
+            }
+        );
+        // The whole collapse propagates the unsettled overflow rather than
+        // publishing a capped, lower-than-true outstanding exposure. The
+        // canonical-converted position carries the canonical currency.
+        assert_eq!(
+            collapse_positions_to_canonical(&[oversized], &ExposureLedgerNettingRates::default())
+                .unwrap_err(),
+            ExposureLedgerNettingError::UnsettledExposureOverflow {
+                currency: CANONICAL_NETTING_CURRENCY.to_string()
+            }
+        );
+        // A single position whose pending channel is exactly u64::MAX with no
+        // failed backlog still succeeds (the add does not overflow).
+        let at_max = ExposureLedgerCurrencyPosition {
+            pending_units: u64::MAX,
+            ..position("USD")
+        };
+        assert_eq!(at_max.outstanding_exposure_units().unwrap(), u64::MAX);
+    }
+
+    /// PR959 codex P1: summing individually valid positions past `u64::MAX` in
+    /// the aggregate canonical book fails closed with an
+    /// [`ExposureLedgerNettingError::AggregateOverflow`] rather than capping,
+    /// because a capped aggregate would understate the netted exposure and
+    /// capital-freed view.
+    #[test]
+    fn aggregate_channel_summation_fails_closed_instead_of_capping() {
+        // Two USD rows each with reserved_units = u64::MAX push the aggregate
+        // outstanding past u64::MAX; the collapse fails closed instead of
+        // publishing a capped reserved_units = u64::MAX.
+        let row = || ExposureLedgerCurrencyPosition {
+            reserved_units: u64::MAX,
+            ..position("USD")
+        };
+        let error = collapse_positions_to_canonical(
+            &[row(), row()],
+            &ExposureLedgerNettingRates::default(),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(error, ExposureLedgerNettingError::AggregateOverflow { .. }),
+            "aggregate past u64::MAX must fail closed, got {error:?}"
+        );
+
+        // Isolate the per-channel aggregate add: quoted_premium does not feed the
+        // outstanding-exposure channels, so the segregated accumulator stays 0
+        // and the failure surfaces from add_into_canonical's checked channel sum.
+        let premium_row = || ExposureLedgerCurrencyPosition {
+            quoted_premium_units: u64::MAX,
+            ..position("USD")
+        };
+        assert_eq!(
+            collapse_positions_to_canonical(
+                &[premium_row(), premium_row()],
+                &ExposureLedgerNettingRates::default()
+            )
+            .unwrap_err(),
+            ExposureLedgerNettingError::AggregateOverflow {
+                channel: "quotedPremiumUnits".to_string()
+            }
+        );
+    }
+
     /// PR959 codex P2: a pinned-parity currency (USD or USDC) supplied a
     /// non-parity explicit override is rejected before the override can halve
     /// canonical exposure; the USD/USDC pin is not negotiable.
@@ -981,7 +1117,10 @@ mod tests {
         // recovery rounds DOWN: floor(1 * 1.1) = floor(1.1) = 1.
         assert_eq!(view.netted_position.recovered_units, 1);
         // net loss = 3 - 1 = 2 (NOT 3 - ceil(1.1) = 1).
-        assert_eq!(view.netted_position.outstanding_exposure_units(), 2);
+        assert_eq!(
+            view.netted_position.outstanding_exposure_units().unwrap(),
+            2
+        );
         assert_eq!(view.benefit.netted_outstanding_units, 2);
         assert_eq!(view.benefit.segregated_outstanding_units, 2);
     }

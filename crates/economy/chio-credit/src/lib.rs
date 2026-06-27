@@ -290,15 +290,30 @@ impl ExposureLedgerCurrencyPosition {
     /// (`provisional_loss - recovered`). This mirrors the prudential
     /// bond-outstanding accounting and is the per-currency figure the
     /// single-denomination netting collapse aggregates and nets.
-    #[must_use]
-    pub fn outstanding_exposure_units(&self) -> u64 {
-        let unsettled_units = self.pending_units.saturating_add(self.failed_units);
+    ///
+    /// # Errors
+    ///
+    /// Returns [`netting::ExposureLedgerNettingError::UnsettledExposureOverflow`]
+    /// when the unsettled channel (`pending + failed`) exceeds `u64::MAX`. The
+    /// helper fails closed rather than saturating, because a capped unsettled
+    /// figure understates the outstanding exposure the collapse and capital view
+    /// publish.
+    pub fn outstanding_exposure_units(&self) -> Result<u64, netting::ExposureLedgerNettingError> {
+        let unsettled_units = self
+            .pending_units
+            .checked_add(self.failed_units)
+            .ok_or_else(
+                || netting::ExposureLedgerNettingError::UnsettledExposureOverflow {
+                    currency: self.currency.clone(),
+                },
+            )?;
         let net_provisional_loss_units = self
             .provisional_loss_units
             .saturating_sub(self.recovered_units);
-        self.reserved_units
+        Ok(self
+            .reserved_units
             .max(unsettled_units)
-            .max(net_provisional_loss_units)
+            .max(net_provisional_loss_units))
     }
 }
 
