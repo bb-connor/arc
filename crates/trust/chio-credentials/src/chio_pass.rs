@@ -296,18 +296,43 @@ pub fn validate_chio_pass_entitlements(
         ));
     }
 
-    if allotment.window_units > 0 {
-        if !evidence.genuine_use_observed {
-            return Err(CredentialError::InvalidChioPassAllotmentGrant(
-                "a non-zero window_units requires genuine_use_observed".to_string(),
-            ));
-        }
-        let expected_units = allotment_units_for_tier(entitlements.tier, table);
+    // Bind the embedded attestation evidence to the entitlement it justifies. The
+    // allotment SIZE is recomputed from `entitlements.tier`, so an issuer or
+    // control-plane bug that signs evidence for a lower tier or a different window
+    // than the entitlement grants must be rejected fail-closed: otherwise the
+    // verified credential would carry attestation evidence that cannot justify it.
+    if evidence.attested_tier != entitlements.tier {
+        return Err(CredentialError::InvalidChioPassAllotmentGrant(
+            "evidence.attested_tier must equal entitlements.tier".to_string(),
+        ));
+    }
+    if evidence.snapshot_window.since != Some(window.since)
+        || evidence.snapshot_window.until != window.until
+    {
+        return Err(CredentialError::InvalidChioPassAllotmentGrant(
+            "evidence.snapshot_window must equal the entitlement window".to_string(),
+        ));
+    }
+
+    // The allotment SIZE is a strict biconditional of `genuine_use_observed`: a
+    // tier-sized ceiling iff genuine use was observed, otherwise exactly `0`.
+    // Recomputing the tier size in BOTH directions closes the gap where
+    // `genuine_use_observed == true` but `window_units == 0` (a zero-ceiling Pass
+    // that would deny the holder's first charged invocation and break the
+    // first-window / genuine-use floor) as well as the reverse (`window_units > 0`
+    // without observed use).
+    let expected_units = allotment_units_for_tier(entitlements.tier, table);
+    if evidence.genuine_use_observed {
         if allotment.window_units != expected_units {
             return Err(CredentialError::InvalidChioPassAllotmentGrant(
-                "window_units must equal the tier-sized allotment".to_string(),
+                "genuine_use_observed requires window_units to equal the tier-sized allotment"
+                    .to_string(),
             ));
         }
+    } else if allotment.window_units != 0 {
+        return Err(CredentialError::InvalidChioPassAllotmentGrant(
+            "a non-zero window_units requires genuine_use_observed".to_string(),
+        ));
     }
     Ok(())
 }
@@ -745,8 +770,9 @@ pub struct ChioPassRefreshDecision {
 /// # Errors
 ///
 /// Returns [`CredentialError::InvalidChioPassRefreshWindow`] when `next_window`
-/// is not the contiguous monthly successor of `prior_window`
-/// (`next_window.since != prior_window.until` or `next_window.until <= prior_window.until`).
+/// is not exactly the single calendar month immediately following `prior_window`
+/// (the canonical [`attestation_window_containing`] of `prior_window.until`), so a
+/// contiguous-but-multi-month window is rejected.
 #[allow(clippy::too_many_arguments)]
 pub fn chio_pass_refresh_decision(
     subject: &DidChio,
@@ -759,10 +785,15 @@ pub fn chio_pass_refresh_decision(
     tier: TrustTier,
     table: &TierAllotmentTable,
 ) -> Result<ChioPassRefreshDecision, CredentialError> {
-    // Contiguous monthly rollover (uses the non-optional AttestationWindowId
-    // bounds): next window must start exactly where the prior one ended and must
-    // extend strictly beyond it.
-    if next_window.since != prior_window.until || next_window.until <= prior_window.until {
+    // Monthly rollover: the next window must be the SINGLE calendar month
+    // immediately following the prior window, not merely a contiguous (and
+    // possibly multi-month) interval. Recompute the canonical month window that
+    // contains `prior_window.until` and require an exact match, so a caller cannot
+    // pass a contiguous but extended window that mints the next Pass and capability
+    // with an `expires_at` past the intended monthly reset.
+    let expected_next = attestation_window_containing(prior_window.until)
+        .map_err(|_| CredentialError::InvalidChioPassRefreshWindow)?;
+    if next_window != &expected_next {
         return Err(CredentialError::InvalidChioPassRefreshWindow);
     }
     let (next_allotment_units, outcome) = if !reattested {
@@ -1036,6 +1067,98 @@ mod chio_pass_tests {
             validate_chio_pass_entitlements(
                 &entitlements,
                 &lying_evidence,
+                window.since,
+                window.until,
+                &subject_did,
+                &table
+            ),
+            Err(CredentialError::InvalidChioPassAllotmentGrant(_))
+        ));
+    }
+
+    #[test]
+    fn validate_rejects_observed_pass_with_zero_window_units() {
+        // PR957 codex P2: genuine_use_observed == true but window_units == 0 must
+        // be rejected. Such a Pass would verify but deny the holder's first charged
+        // invocation, breaking the first-window / genuine-use floor.
+        let subject = Keypair::generate();
+        let subject_did = DidChio::from_public_key(subject.public_key())
+            .expect("ed25519")
+            .to_string();
+        let table = TierAllotmentTable::default();
+        let window = june_window();
+        let (mut entitlements, evidence) = snapshot_chio_pass_entitlements(
+            &subject_did,
+            TrustTier::Attested,
+            &window,
+            true,
+            true,
+            &table,
+        )
+        .expect("snapshot");
+        assert!(evidence.genuine_use_observed);
+        assert!(entitlements.allotment.window_units > 0);
+        // Zero the ceiling while leaving genuine_use_observed == true.
+        entitlements.allotment.window_units = 0;
+        assert!(matches!(
+            validate_chio_pass_entitlements(
+                &entitlements,
+                &evidence,
+                window.since,
+                window.until,
+                &subject_did,
+                &table
+            ),
+            Err(CredentialError::InvalidChioPassAllotmentGrant(_))
+        ));
+    }
+
+    #[test]
+    fn validate_binds_evidence_tier_and_window_to_entitlement() {
+        // PR957 codex P2: evidence.attested_tier and evidence.snapshot_window must
+        // be bound to the entitlement they justify.
+        let subject = Keypair::generate();
+        let subject_did = DidChio::from_public_key(subject.public_key())
+            .expect("ed25519")
+            .to_string();
+        let table = TierAllotmentTable::default();
+        let window = june_window();
+        let (entitlements, evidence) = snapshot_chio_pass_entitlements(
+            &subject_did,
+            TrustTier::Verified,
+            &window,
+            true,
+            true,
+            &table,
+        )
+        .expect("snapshot");
+
+        // Evidence attesting a lower tier than the entitlement grants is rejected.
+        let mut lower_tier_evidence = evidence.clone();
+        lower_tier_evidence.attested_tier = TrustTier::Unverified;
+        assert!(matches!(
+            validate_chio_pass_entitlements(
+                &entitlements,
+                &lower_tier_evidence,
+                window.since,
+                window.until,
+                &subject_did,
+                &table
+            ),
+            Err(CredentialError::InvalidChioPassAllotmentGrant(_))
+        ));
+
+        // Evidence whose snapshot window does not match the entitlement window is
+        // rejected.
+        let mut wrong_window_evidence = evidence;
+        wrong_window_evidence.snapshot_window = AttestationWindow {
+            since: Some(window.since + 1),
+            until: window.until,
+        };
+        assert!(matches!(
+            validate_chio_pass_entitlements(
+                &entitlements,
+                &wrong_window_evidence,
                 window.since,
                 window.until,
                 &subject_did,
@@ -1500,6 +1623,40 @@ mod chio_pass_refresh_tests {
                 &did,
                 &prior,
                 &empty,
+                "p".to_string(),
+                "n".to_string(),
+                MIN_GENUINE_USE_RECEIPTS,
+                true,
+                TrustTier::Verified,
+                &table,
+            ),
+            Err(CredentialError::InvalidChioPassRefreshWindow)
+        ));
+    }
+
+    #[test]
+    fn refresh_rejects_contiguous_multi_month_window() {
+        // PR957 codex P2: a next window that is contiguous (starts exactly at
+        // prior.until and extends beyond it) but spans MORE than the single next
+        // calendar month must be rejected, so the refresh cannot stretch
+        // `expires_at` past the monthly reset.
+        let (did, prior, _next) = refresh_windows();
+        let table = TierAllotmentTable::default();
+        let july = attestation_window_containing(prior.until).expect("july window");
+        let august = attestation_window_containing(july.until).expect("august window");
+        let multi_month = AttestationWindowId {
+            window_ym: july.window_ym.clone(),
+            since: july.since, // contiguous: equals prior.until
+            until: august.until, // but spans July AND August
+        };
+        // Sanity: this passes the old contiguity-only predicate.
+        assert_eq!(multi_month.since, prior.until);
+        assert!(multi_month.until > prior.until);
+        assert!(matches!(
+            chio_pass_refresh_decision(
+                &did,
+                &prior,
+                &multi_month,
                 "p".to_string(),
                 "n".to_string(),
                 MIN_GENUINE_USE_RECEIPTS,
