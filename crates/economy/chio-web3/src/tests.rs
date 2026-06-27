@@ -2592,6 +2592,46 @@ fn x402_attestation_carries_no_value_movement_authority_by_construction() {
     ));
 }
 
+/// PR959 codex P2 (6th re-review): the x402 attestation VERIFIER must re-run the
+/// signed-body field invariants the signer enforces, not just schema + flags +
+/// chain + key + signature. A trusted-kernel-signed body hand-built with an empty
+/// required identifier (here `bundle_id`) passes the signature check but must be
+/// rejected fail-closed before any consumer (e.g. `prepare_x402_broadcast_intent`)
+/// can emit an intent carrying the empty identifier.
+#[test]
+fn x402_verify_rejects_signed_body_with_empty_required_field() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let trust = sample_testnet_x402_verifier_trust();
+    let kernel = operator_keypair();
+    let attestation = sign_x402_settlement_attestation(
+        &bundle,
+        &trust,
+        &kernel,
+        "x402-attestation-1",
+        1_743_293_900,
+    )
+    .unwrap();
+    // Sanity: the genuine recompute-built attestation verifies.
+    verify_x402_settlement_attestation(&attestation, &trust).unwrap();
+
+    // Hand-build a body with an empty required identifier and re-sign it with the
+    // SAME trusted kernel key, so the schema, custody/prepare/testnet flags, chain
+    // gate, trusted-key check, and signature all pass: only the re-run body-field
+    // invariants can catch the empty identifier.
+    let mut body = attestation.body.clone();
+    body.bundle_id = String::new();
+    let (signature, _) = kernel.sign_canonical(&body).unwrap();
+    let forged = crate::x402_signing::X402SignedSettlementAttestation { body, signature };
+    assert!(matches!(
+        verify_x402_settlement_attestation(&forged, &trust),
+        Err(Web3ContractError::MissingField(field)) if field.contains("bundle_id")
+    ));
+    // The downstream broadcast-intent path re-verifies, so it is closed too.
+    assert!(
+        prepare_x402_broadcast_intent(&forged, &trust, "x402-intent-1", 1_743_293_950).is_err()
+    );
+}
+
 /// M2-14: testnet-gated, fail-closed. A mainnet chain (here Base mainnet) is
 /// rejected by the prepare-only signing path even when the proof itself would
 /// recompute and the chain is allow-listed.

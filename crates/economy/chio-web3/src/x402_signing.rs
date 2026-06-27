@@ -261,6 +261,58 @@ fn enforce_x402_prepare_only_testnet_gate(
     Ok(())
 }
 
+/// Re-run the signed-body field invariants `sign_x402_settlement_attestation`
+/// guarantees, fail-closed.
+///
+/// The signer builds the attestation body from a freshly recomputed
+/// [`crate::settlement_proof::PublicSettlementVerifierReport`] whose own invariants
+/// (see `verify_public_settlement_proof`) guarantee the required identifiers are
+/// non-empty. The VERIFIER, however, accepts an externally supplied body and must
+/// NOT trust those invariants to hold: a hand-built body signed by a trusted kernel
+/// key could carry an empty `attestation_id`, `bundle_id`,
+/// `transaction_passport_id`, `settlement_reference`, or `verifier_report_digest`
+/// (and the other recompute-derived identifiers) and still pass schema, flag, chain,
+/// key, and signature checks. [`prepare_x402_broadcast_intent`] would then emit an
+/// intent carrying those empty identifiers. Re-running the field invariants here -
+/// called by BOTH the signer and the verifier - closes that class so the verifier
+/// re-checks the same body-field invariants the signer enforces, not just the
+/// schema and signature.
+fn check_x402_attestation_body_invariants(
+    body: &X402SettlementAttestationBody,
+) -> Result<(), Web3ContractError> {
+    ensure_non_empty(
+        &body.attestation_id,
+        "x402_settlement_attestation.attestation_id",
+    )?;
+    ensure_non_empty(&body.bundle_id, "x402_settlement_attestation.bundle_id")?;
+    ensure_non_empty(
+        &body.transaction_passport_id,
+        "x402_settlement_attestation.transaction_passport_id",
+    )?;
+    ensure_non_empty(
+        &body.commerce_order_id,
+        "x402_settlement_attestation.commerce_order_id",
+    )?;
+    ensure_non_empty(&body.chain_id, "x402_settlement_attestation.chain_id")?;
+    ensure_non_empty(
+        &body.settlement_reference,
+        "x402_settlement_attestation.settlement_reference",
+    )?;
+    ensure_non_empty(
+        &body.registry_root,
+        "x402_settlement_attestation.registry_root",
+    )?;
+    ensure_non_empty(
+        &body.recomputed_settlement_state,
+        "x402_settlement_attestation.recomputed_settlement_state",
+    )?;
+    ensure_non_empty(
+        &body.verifier_report_digest,
+        "x402_settlement_attestation.verifier_report_digest",
+    )?;
+    Ok(())
+}
+
 fn require_trusted_attesting_kernel_key(
     key: &PublicKey,
     trusted_keys: &[PublicKey],
@@ -364,6 +416,10 @@ pub fn sign_x402_settlement_attestation(
         issued_at,
         attesting_kernel_key: kernel_keypair.public_key(),
     };
+    // Defense in depth: re-run the body-field invariants the verifier re-runs, so
+    // the signer never emits a body the verifier would reject (and so the shared
+    // invariant set is exercised on both lanes).
+    check_x402_attestation_body_invariants(&body)?;
     let (signature, _) = kernel_keypair.sign_canonical(&body).map_err(|error| {
         Web3ContractError::InvalidProof(format!(
             "x402 settlement attestation signing failed: {error}"
@@ -432,6 +488,13 @@ pub fn verify_x402_settlement_attestation(
             "x402 settlement attestation signature verification failed".to_string(),
         ));
     }
+    // Re-run the signed-body field invariants the signer enforces. A trusted-kernel
+    // signature over a hand-built body is NOT sufficient: the body must also carry
+    // the non-empty required identifiers the recompute-built body always carries, so
+    // a signed body with an empty `attestation_id`/`bundle_id`/`settlement_reference`
+    // /`verifier_report_digest` (etc.) is rejected before any consumer
+    // (e.g. `prepare_x402_broadcast_intent`) can act on it.
+    check_x402_attestation_body_invariants(body)?;
     Ok(())
 }
 
