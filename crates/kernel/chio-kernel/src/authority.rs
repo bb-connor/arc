@@ -110,8 +110,9 @@ impl CapabilityAuthority for LocalCapabilityAuthority {
     /// # Errors
     ///
     /// Returns [`KernelError::CapabilityIssuanceFailed`], fail-closed at every
-    /// branch, on a malformed window, a scope that does not carry exactly one
-    /// metered grant, a capability-id derivation failure, or a signing failure.
+    /// branch, on a malformed window, a scope that is not the canonical Pass
+    /// baseline (one metered XCC grant, the five baseline resource grants, no
+    /// prompt grants), a capability-id derivation failure, or a signing failure.
     fn issue_window_scoped_capability(
         &self,
         subject: &PublicKey,
@@ -122,11 +123,16 @@ impl CapabilityAuthority for LocalCapabilityAuthority {
         window
             .validate()
             .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
-        if scope.grants.len() != 1 {
-            return Err(KernelError::CapabilityIssuanceFailed(
-                "Pass scope must carry exactly one metered grant pinned at index 0".to_string(),
-            ));
-        }
+        // Reject any noncanonical / inflated scope BEFORE signing. A Pass scope
+        // MUST be exactly the canonical baseline: one metered XCC grant pinned at
+        // index 0, the five canonical baseline resource grants, and zero prompt
+        // grants. Without this choke, a trusted-authority bug or misuse could mint
+        // a Pass carrying `resource_grants: ["*"]` or other inflated scope; the
+        // admission check only re-derives the deterministic `chiopass:` id, so a
+        // generic resource read would still honor whatever resource/prompt grants
+        // were signed.
+        crate::pass_gating::validate_pass_scope_is_baseline(&scope, subject_did)
+            .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
         let id = window_scoped_capability_id(subject_did, window)
             .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
         let body = CapabilityTokenBody {
@@ -194,19 +200,30 @@ mod m0_pass_mint_tests {
         }
     }
 
+    const PASS_SUBJECT_DID: &str = "did:chio:alice";
+
     fn pass_scope() -> ChioScope {
+        use chio_core::capability::scope::{MonetaryAmount, Operation};
         ChioScope {
             grants: vec![ToolGrant {
-                server_id: "chio.pass.compute".to_string(),
-                tool_name: "run".to_string(),
-                operations: vec![],
+                server_id: crate::pass_gating::PASS_COMPUTE_SERVER_ID.to_string(),
+                tool_name: "*".to_string(),
+                operations: vec![Operation::Invoke],
                 constraints: vec![],
                 max_invocations: None,
-                max_cost_per_invocation: None,
-                max_total_cost: None,
+                max_cost_per_invocation: Some(MonetaryAmount {
+                    units: 1,
+                    currency: crate::pass_gating::PASS_ALLOTMENT_UNIT.to_string(),
+                }),
+                max_total_cost: Some(MonetaryAmount {
+                    units: 1000,
+                    currency: crate::pass_gating::PASS_ALLOTMENT_UNIT.to_string(),
+                }),
                 dpop_required: None,
             }],
-            ..ChioScope::default()
+            resource_grants: crate::pass_gating::pass_baseline_resource_grants(PASS_SUBJECT_DID)
+                .expect("canonical baseline resource grants"),
+            prompt_grants: vec![],
         }
     }
 
@@ -255,6 +272,50 @@ mod m0_pass_mint_tests {
                 &window()
             )
             .is_err());
+    }
+
+    #[test]
+    fn rejects_inflated_resource_scope() {
+        // PR957 codex P1: a noncanonical Pass scope (here a wildcard resource grant
+        // instead of the five baseline streams) must be rejected at the mint choke,
+        // not silently signed. Otherwise the admission check would only re-derive
+        // the deterministic id while a generic resource read still honored the
+        // inflated grant.
+        use chio_core::capability::scope::{Operation, ResourceGrant};
+        let authority = LocalCapabilityAuthority::new(Keypair::generate());
+        let subject = Keypair::generate().public_key();
+        let mut inflated = pass_scope();
+        inflated.resource_grants = vec![ResourceGrant {
+            uri_pattern: "*".to_string(),
+            operations: vec![Operation::Read, Operation::Subscribe],
+        }];
+        assert!(matches!(
+            authority.issue_window_scoped_capability(
+                &subject,
+                PASS_SUBJECT_DID,
+                inflated,
+                &window()
+            ),
+            Err(KernelError::CapabilityIssuanceFailed(_))
+        ));
+
+        // A prompt-grant inflation is likewise rejected.
+        let mut prompt_inflated = pass_scope();
+        prompt_inflated
+            .prompt_grants
+            .push(chio_core::capability::scope::PromptGrant {
+                prompt_name: "*".to_string(),
+                operations: vec![Operation::Get],
+            });
+        assert!(matches!(
+            authority.issue_window_scoped_capability(
+                &subject,
+                PASS_SUBJECT_DID,
+                prompt_inflated,
+                &window()
+            ),
+            Err(KernelError::CapabilityIssuanceFailed(_))
+        ));
     }
 
     #[test]
