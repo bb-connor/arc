@@ -30,8 +30,9 @@ use crate::canonical::canonical_json_bytes;
 use crate::crypto::{sha256_hex, Keypair, PublicKey, Signature};
 use crate::error::Web3ContractError;
 use crate::settlement_proof::{
-    public_settlement_chain_is_mainnet, verify_public_settlement_proof,
-    PublicSettlementProofBundle, PublicSettlementVerifierTrust, ToolCallAuthorization,
+    public_settlement_chain_is_mainnet, public_settlement_chain_is_testnet,
+    verify_public_settlement_proof, PublicSettlementProofBundle, PublicSettlementVerifierTrust,
+    ToolCallAuthorization,
 };
 use crate::validation::ensure_non_empty;
 
@@ -209,10 +210,17 @@ impl X402PrepareOnlyBroadcastIntent {
 
 /// Enforce the prepare-only x402 testnet gate, fail-closed.
 ///
-/// The path may only sign for an explicitly allow-listed testnet chain on a
-/// verifier policy that blocks mainnet. Rejects when the policy does not block
-/// mainnet, when the allow-list is empty, when the chain is not allow-listed,
-/// or when the chain is a known mainnet.
+/// The path may only sign for an explicitly allow-listed chain that is a KNOWN
+/// public testnet on a verifier policy that blocks mainnet. Rejects when the
+/// policy does not block mainnet, when the allow-list is empty, when the chain
+/// is not allow-listed, when the chain is a known mainnet, OR when the chain is
+/// not a positively-known testnet.
+///
+/// The positive known-testnet requirement is the load-bearing fail-closed
+/// control: it does NOT rely on the (partial) mainnet deny-list, so an
+/// allow-listed chain that the mainnet detector does not enumerate (an unknown
+/// or unverified chain, including an unenumerated mainnet such as `eip155:100`)
+/// is rejected here rather than being signed for.
 fn enforce_x402_prepare_only_testnet_gate(
     chain_id: &str,
     trust: &PublicSettlementVerifierTrust,
@@ -239,6 +247,15 @@ fn enforce_x402_prepare_only_testnet_gate(
     if public_settlement_chain_is_mainnet(chain_id) {
         return Err(Web3ContractError::InvalidSettlement(
             "x402 prepare-only signing is testnet-gated; mainnet chain rejected".to_string(),
+        ));
+    }
+    // Fail closed on anything the protocol cannot positively confirm is a
+    // testnet. Relying only on the mainnet deny-list would let an allow-listed
+    // chain the detector misses (an unknown/unverified chain) be signed for.
+    if !public_settlement_chain_is_testnet(chain_id) {
+        return Err(Web3ContractError::InvalidSettlement(
+            "x402 prepare-only signing is testnet-gated; only known testnets are allowed"
+                .to_string(),
         ));
     }
     Ok(())

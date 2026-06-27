@@ -2339,6 +2339,27 @@ fn x402_prepare_only_signing_rejects_mainnet_chain() {
     ));
 }
 
+/// PR959 codex P2: the testnet gate does not rely on the partial mainnet
+/// deny-list. An allow-listed chain that the mainnet detector does not enumerate
+/// (here Gnosis mainnet `eip155:100`, which is not a known testnet either) fails
+/// closed instead of being signed for, even on a mainnet-blocked policy.
+#[test]
+fn x402_prepare_only_signing_rejects_unknown_chain_fail_closed() {
+    let mut bundle = sample_testnet_public_settlement_proof_bundle();
+    // A real mainnet the partial deny-list omits; not a known testnet either.
+    bundle.chain_id = "eip155:100".to_string();
+    let mut trust = sample_testnet_x402_verifier_trust();
+    trust.mainnet_blocked = true;
+    trust.allowed_chain_ids = vec!["eip155:100".to_string()];
+    let kernel = operator_keypair();
+
+    assert!(matches!(
+        sign_x402_settlement_attestation(&bundle, &trust, &kernel, "x402-attestation-1", 1_743_293_900),
+        Err(Web3ContractError::InvalidSettlement(message))
+            if message.contains("only known testnets are allowed")
+    ));
+}
+
 /// M2-14: testnet-gated, fail-closed. A chain that is not on the verifier
 /// allow-list is rejected by the prepare-only signing path.
 #[test]

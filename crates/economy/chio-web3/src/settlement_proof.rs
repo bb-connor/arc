@@ -901,6 +901,38 @@ pub(crate) fn public_settlement_chain_is_mainnet(chain_id: &str) -> bool {
     )
 }
 
+/// Whether `chain_id` is a KNOWN public testnet. This is a positive allow-list,
+/// not the inverse of [`public_settlement_chain_is_mainnet`]: an unknown or
+/// unverified chain is NOT a testnet here, so a testnet-gated path that requires
+/// this predicate fails closed for any chain the protocol cannot positively
+/// confirm is a testnet (the mainnet deny-list alone is partial and would let an
+/// unenumerated mainnet through).
+pub(crate) fn public_settlement_chain_is_testnet(chain_id: &str) -> bool {
+    matches!(
+        chain_id,
+        // Ethereum testnets.
+        "eip155:11155111"   // Sepolia
+            | "eip155:17000"    // Holesky
+            // Base / OP-stack testnets.
+            | "eip155:84532"    // Base Sepolia
+            | "eip155:11155420" // OP Sepolia
+            // Arbitrum testnet.
+            | "eip155:421614"   // Arbitrum Sepolia
+            // Polygon testnet.
+            | "eip155:80002"    // Polygon Amoy
+            // Avalanche testnet.
+            | "eip155:43113"    // Fuji
+            // BNB Smart Chain testnet.
+            | "eip155:97"       // BSC testnet
+            // zkSync Era testnet.
+            | "eip155:300"      // zkSync Sepolia
+            // Linea testnet.
+            | "eip155:59141"    // Linea Sepolia
+            // Scroll testnet.
+            | "eip155:534351" // Scroll Sepolia
+    )
+}
+
 fn validate_bundle_header(bundle: &PublicSettlementProofBundle) -> Result<(), Web3ContractError> {
     if bundle.schema != CHIO_WEB3_SETTLEMENT_PROOF_BUNDLE_SCHEMA {
         return Err(Web3ContractError::UnsupportedSchema(bundle.schema.clone()));
