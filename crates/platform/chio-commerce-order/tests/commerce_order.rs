@@ -1436,7 +1436,14 @@ fn commerce_order_replay_rejects_wrong_settlement_packet_ref() {
 #[test]
 fn commerce_order_replay_rejects_settlement_packet_digest_mismatch() {
     let mut bundle = load_bundle("offline-psp-valid");
-    bundle.settlement_packet_bytes = br#"{"schema":"chio.commerce.settlement-packet.v1"}"#.to_vec();
+    // A structurally VALID packet whose canonical content differs from the pinned
+    // canonical digest. The verifier re-canonicalizes the parsed packet, so the
+    // mismatch is caught fail-closed; the pin is left at the untampered value.
+    let mut packet: serde_json::Value = serde_json::from_slice(&bundle.settlement_packet_bytes)
+        .test_expect("settlement packet parses");
+    packet["status"] = serde_json::json!("tampered-settlement-status");
+    bundle.settlement_packet_bytes =
+        serde_json::to_vec(&packet).test_expect("settlement packet serializes");
 
     let error = chio_commerce_order::verify_commerce_order(&bundle)
         .test_expect_err("settlement packet digest must be bound");
@@ -1846,8 +1853,14 @@ fn order_passport_replay_fails_closed_on_escrow_digest_tamper() {
     // order-passport chain (the settlement packet bytes its digest binds) fails
     // the replay closed.
     let mut chained = bundle.clone();
+    // A structurally valid packet whose canonical content differs from the pinned
+    // canonical digest: the re-canonicalizing verifier rejects the chained mismatch.
+    let mut chained_packet: serde_json::Value =
+        serde_json::from_slice(&chained.settlement_packet_bytes)
+            .test_expect("settlement packet parses");
+    chained_packet["status"] = serde_json::json!("tampered-settlement-status");
     chained.settlement_packet_bytes =
-        br#"{"schema":"chio.commerce.settlement-packet.v1"}"#.to_vec();
+        serde_json::to_vec(&chained_packet).test_expect("settlement packet serializes");
     let chained_error = chio_commerce_order::verify_commerce_order(&chained)
         .test_expect_err("a corrupt chained digest must fail the replay closed");
     assert!(

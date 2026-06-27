@@ -25,9 +25,9 @@ use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_anchor::{AnchorBatchWitness, EvmAnchorTarget};
-use chio_core::capability::token::AttestationWindowId;
+use chio_core::capability::token::{window_scoped_capability_id, AttestationWindowId};
 use chio_core::web3::identity::SignedWeb3IdentityBinding;
-use chio_core::PublicKey;
+use chio_core::{Keypair, PublicKey};
 use chio_did::DidChio;
 use chio_credentials::{
     attestation_window_containing, chio_pass_artifact_id, verify_chio_pass, ChioPass,
@@ -218,32 +218,85 @@ fn pass_issue(
     let config = ChioPassConfig::m1_launch_default(accepted_kernel_keys);
     let authority = LocalCapabilityAuthority::new(authority_keypair.clone());
 
-    // Source the distribution counters from the persisted issued-Pass roster; the
-    // entrypoint never recomputes them. The counters are read BEFORE the mint so
-    // the new Pass is not counted against its own cap.
     let oracle = SqliteRevocationStore::open(revocation_db_path)?;
-    let window = attestation_window_containing(now)?;
-    let counters = oracle_distribution_counters(&oracle, &window, now)?;
-
-    let issuance = issue_chio_pass_command(
+    issue_chio_pass_under_caps(
         &config,
         &authority,
         &authority_keypair,
         &subject_public_key,
         tier,
         now,
-        counters.window_issued_count,
-        counters.active_population,
+        &oracle,
+    )
+}
+
+/// Mint and persist a first-window Chio Pass under the anti-farm caps, sourcing the
+/// distribution counters from the persisted issued-Pass roster (never recomputed).
+///
+/// IDEMPOTENT RE-ISSUE AT THE CAP: the deterministic `chiopass:<hash>` id is derived
+/// from `(subject, window)` and looked up on the roster BEFORE the fast pre-mint
+/// admission precheck. When the SAME subject/window is re-issued (e.g. to recover the
+/// `--out-pass` / `--out-capability` artifacts) its id is ALREADY on the roster, so
+/// re-recording it adds NO new population and the authoritative SQLite cap
+/// transaction admits it even at a full cap. The pre-mint precheck counts the roster
+/// EXCLUDING the row being (re-)inserted (matching the transaction's own semantics),
+/// so for an already-present id we pass counts decremented by this subject's own
+/// already-counted row; otherwise a legitimate re-issue exactly at the cap would be
+/// wrongly denied by the precheck before the transaction could admit the no-growth
+/// update. A genuinely NEW subject's id is absent, so its counts are passed unchanged
+/// and the cap is enforced UNWEAKENED.
+fn issue_chio_pass_under_caps(
+    config: &ChioPassConfig,
+    authority: &LocalCapabilityAuthority,
+    authority_keypair: &Keypair,
+    subject_public_key: &PublicKey,
+    tier: TrustTier,
+    now: u64,
+    oracle: &SqliteRevocationStore,
+) -> Result<(ChioPassIssuance, PassDistributionCounters), CliError> {
+    // Read the counters BEFORE the mint so a NEW Pass is not counted against its own
+    // cap.
+    let window = attestation_window_containing(now)?;
+    let counters = oracle_distribution_counters(oracle, &window, now)?;
+
+    // Derive the deterministic roster key the mint will produce and detect an
+    // idempotent re-issue. The id is subject+window derived (never authority
+    // derived), so it matches the id `issue_chio_pass_command` mints below.
+    let subject_did = DidChio::from_public_key(subject_public_key.clone())
+        .map_err(|error| CliError::Other(error.to_string()))?
+        .to_string();
+    let deterministic_capability_id = window_scoped_capability_id(&subject_did, &window)
+        .map_err(|error| CliError::Other(error.to_string()))?;
+    let idempotent_reissue = oracle.pass_issuance_exists(&deterministic_capability_id)?;
+    let (precheck_window_issued, precheck_active_population) = if idempotent_reissue {
+        (
+            counters.window_issued_count.saturating_sub(1),
+            counters.active_population.saturating_sub(1),
+        )
+    } else {
+        (counters.window_issued_count, counters.active_population)
+    };
+
+    let issuance = issue_chio_pass_command(
+        config,
+        authority,
+        authority_keypair,
+        subject_public_key,
+        tier,
+        now,
+        precheck_window_issued,
+        precheck_active_population,
     )?;
 
-    // Atomically admit + persist the issuance under the anti-farm caps. The
-    // pre-mint counters above are a fast pre-check; the AUTHORITATIVE admission is
-    // this single SQLite transaction, which counts + checks + inserts atomically
-    // so two concurrent `chio pass issue` runs (each with its own connection)
-    // cannot both pass a stale read, both mint, and exceed the caps. Fail-closed:
+    // Atomically admit + persist the issuance under the anti-farm caps. The pre-mint
+    // counters above are a fast pre-check; the AUTHORITATIVE admission is this single
+    // SQLite transaction, which counts + checks + inserts atomically so two
+    // concurrent `chio pass issue` runs (each with its own connection) cannot both
+    // pass a stale read, both mint, and exceed the caps. It also admits an
+    // already-present (idempotent) id with NO growth even at a full cap. Fail-closed:
     // a store IO fault or a cap-full denial returns Err; the credential was only
-    // minted in-memory and is never surfaced. `valid_from` is the window start so
-    // the live-population count never trusts a future-window row.
+    // minted in-memory and is never surfaced. `valid_from` is the window start so the
+    // live-population count never trusts a future-window row.
     let valid_from = i64::try_from(window.since).unwrap_or(0);
     let expires_at = i64::try_from(window.until).unwrap_or(i64::MAX);
     let now_secs = i64::try_from(now).unwrap_or(i64::MAX);
@@ -1196,6 +1249,91 @@ mod tests {
         )
         .expect("idempotent re-issuance");
         assert_eq!(counters_again.window_issued_count, 2);
+    }
+
+    /// An idempotent re-issue of the SAME subject/window EXACTLY at the per-window
+    /// cap succeeds (no roster growth), while a genuinely NEW subject at the cap is
+    /// still denied. Regression: the fast pre-mint precheck must not deny an
+    /// already-present id before the authoritative SQLite transaction can admit the
+    /// no-growth idempotent update.
+    #[test]
+    fn idempotent_reissue_at_window_cap_succeeds_new_subject_denied() {
+        let dir = temp_dir("at-cap-idempotent");
+        let revocation_db = dir.join("revocations.sqlite3");
+        let authority_seed = dir.join("authority.seed");
+        let authority_keypair =
+            load_or_create_authority_keypair(&authority_seed).expect("authority keypair");
+        let authority = LocalCapabilityAuthority::new(authority_keypair.clone());
+        let oracle = SqliteRevocationStore::open(&revocation_db).expect("revocation oracle");
+
+        // A tiny per-window cap so a SINGLE issuance fills the window; the population
+        // cap stays large so the WINDOW cap is the binding gate.
+        let kernel_key = Keypair::generate().public_key();
+        let mut config = ChioPassConfig::m1_launch_default(vec![kernel_key]);
+        config.window_token_capacity = 1;
+
+        let window_ym = attestation_window_containing(MID_JUNE_2026)
+            .expect("attestation window")
+            .window_ym;
+
+        // First issuance fills the window to its cap of 1.
+        let subject_a = Keypair::generate().public_key();
+        let (first, _) = issue_chio_pass_under_caps(
+            &config,
+            &authority,
+            &authority_keypair,
+            &subject_a,
+            TrustTier::Attested,
+            MID_JUNE_2026,
+            &oracle,
+        )
+        .expect("first issuance fills the window cap");
+        assert_eq!(
+            oracle.count_window_issuances(&window_ym).expect("count"),
+            1
+        );
+
+        // Idempotent re-issue of the SAME subject AT the cap SUCCEEDS (no growth).
+        let (again, _) = issue_chio_pass_under_caps(
+            &config,
+            &authority,
+            &authority_keypair,
+            &subject_a,
+            TrustTier::Attested,
+            MID_JUNE_2026,
+            &oracle,
+        )
+        .expect("idempotent re-issue at the cap must succeed");
+        assert_eq!(
+            first.capability.id, again.capability.id,
+            "the re-issue must mint the byte-identical deterministic id"
+        );
+        assert_eq!(
+            oracle.count_window_issuances(&window_ym).expect("count"),
+            1,
+            "an idempotent re-issue must not grow the roster"
+        );
+
+        // A genuinely NEW subject at the cap is still DENIED (the cap is unweakened).
+        let subject_b = Keypair::generate().public_key();
+        let denied = issue_chio_pass_under_caps(
+            &config,
+            &authority,
+            &authority_keypair,
+            &subject_b,
+            TrustTier::Attested,
+            MID_JUNE_2026,
+            &oracle,
+        );
+        assert!(
+            denied.is_err(),
+            "a new subject at the window cap must be denied"
+        );
+        assert_eq!(
+            oracle.count_window_issuances(&window_ym).expect("count"),
+            1,
+            "a denied new subject must not be persisted"
+        );
     }
 
     #[test]

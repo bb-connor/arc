@@ -258,6 +258,23 @@ impl SqliteRevocationStore {
         Ok(PassIssuanceAdmission::Admitted)
     }
 
+    /// Whether `capability_id` is already on the issued-Pass roster. The
+    /// deterministic `chiopass:<hash>` id is the roster key, so a `true` result means
+    /// re-recording it is an idempotent NO-GROWTH update that
+    /// [`Self::try_record_pass_issuance_under_caps`] admits even at a full cap. The
+    /// issuance entrypoint uses this to recognise an idempotent re-issue BEFORE its
+    /// fast pre-mint admission precheck, so a legitimate re-issue at the cap is not
+    /// wrongly denied while the authoritative cap transaction still gates genuinely
+    /// new subjects. Sourced from persisted state; fail-closed on a store IO fault.
+    pub fn pass_issuance_exists(&self, capability_id: &str) -> Result<bool, RevocationStoreError> {
+        let exists = self.connection()?.query_row(
+            "SELECT EXISTS(SELECT 1 FROM issued_passes WHERE capability_id = ?1)",
+            params![capability_id],
+            |row| row.get::<_, i64>(0),
+        )? != 0;
+        Ok(exists)
+    }
+
     /// Count the Passes persisted as issued in `window_ym` (the per-window
     /// anti-farm cap leg). Sourced from persisted state, never recomputed.
     pub fn count_window_issuances(&self, window_ym: &str) -> Result<u64, RevocationStoreError> {

@@ -1820,6 +1820,36 @@ fn load_required_graph_bytes_artifact_by_path(
     load_graph_bytes_artifact(bundle_dir, node, expected_schema, label)
 }
 
+fn select_required_graph_node_by_schema<'a>(
+    nodes: &'a [GraphArtifactNode],
+    schema: &str,
+    label: &str,
+) -> Result<&'a GraphArtifactNode, CliError> {
+    let matches: Vec<&GraphArtifactNode> = nodes
+        .iter()
+        .filter(|node| node.schema.as_deref() == Some(schema))
+        .collect();
+    match matches.as_slice() {
+        [node] => Ok(node),
+        [] => Err(CliError::cli_other_error(format!(
+            "proof verify: missing {label} artifact schema: {schema}",
+        ))),
+        _ => Err(CliError::cli_other_error(format!(
+            "proof verify: multiple {label} artifact schemas: {schema}",
+        ))),
+    }
+}
+
+fn load_required_graph_bytes_artifact_by_schema(
+    bundle_dir: &Path,
+    nodes: &[GraphArtifactNode],
+    schema: &str,
+    label: &str,
+) -> Result<Vec<u8>, CliError> {
+    let node = select_required_graph_node_by_schema(nodes, schema, label)?;
+    load_graph_bytes_artifact(bundle_dir, node, schema, label)
+}
+
 fn load_optional_graph_json_artifact<T: for<'de> serde::Deserialize<'de>>(
     bundle_dir: &Path,
     nodes: &[GraphArtifactNode],
@@ -2049,6 +2079,8 @@ fn load_commerce_order_bundle_from_graph(
     } else {
         None
     };
+    let escrow_ledger_bytes =
+        load_commerce_escrow_ledger_bytes(bundle_dir, &graph.nodes, &order_context)?;
 
     Ok(chio_commerce_order::CommerceOrderVerificationBundle {
         order_context,
@@ -2062,7 +2094,7 @@ fn load_commerce_order_bundle_from_graph(
         settlement_packet_bytes,
         mandate_protocol_payloads,
         risk_comptroller_report_bytes,
-        escrow_ledger_bytes: None,
+        escrow_ledger_bytes,
         verified_trust_market_context: verified_trust_market_context.cloned(),
         trusted_event_authority_receipt_kernel_keys:
             trusted_event_authority_receipt_kernel_keys.to_vec(),
@@ -2071,6 +2103,34 @@ fn load_commerce_order_bundle_from_graph(
         trusted_risk_comptroller_signer_keys:
             enterprise_trusted_risk_comptroller_signer_keys_from_env()?,
     })
+}
+
+/// Load the canonical escrow-ledger bytes from the evidence graph when the order
+/// context pins an `escrow_digest`. The order context carries an escrow DIGEST but
+/// no escrow-ledger PATH (the field is digest-only), so the ledger artifact is
+/// selected by its schema id. The loaded bytes are bound to the pinned digest inside
+/// `verify_commerce_order`, which re-canonicalizes the ledger and re-checks its
+/// conservation/order/economics bindings, so a commerce proof produced after
+/// `escrow::accept` (which pins an escrow digest) is verifiable end to end.
+///
+/// Fail-closed: a pinned `escrow_digest` with no escrow-ledger node in the graph (or
+/// more than one) denies; when no digest is pinned there is no ledger to prove and
+/// `None` is returned (the legacy/pre-escrow shape, unchanged).
+fn load_commerce_escrow_ledger_bytes(
+    bundle_dir: &Path,
+    nodes: &[GraphArtifactNode],
+    order_context: &chio_commerce_order::CommerceOrderContext,
+) -> Result<Option<Vec<u8>>, CliError> {
+    if order_context.escrow_digest.is_none() {
+        return Ok(None);
+    }
+    let bytes = load_required_graph_bytes_artifact_by_schema(
+        bundle_dir,
+        nodes,
+        chio_commerce_order::COMMERCE_ESCROW_LEDGER_SCHEMA_ID,
+        "commerce escrow ledger",
+    )?;
+    Ok(Some(bytes))
 }
 
 fn load_commerce_event_authority_receipts(
@@ -3123,4 +3183,145 @@ fn is_graph_cycle_error(message: &str) -> bool {
 fn is_required_claim_missing_error(message: &str) -> bool {
     message.starts_with("claim set missing required claim: ")
         || message.starts_with("claim set required claim was not verified: ")
+}
+
+#[cfg(test)]
+mod escrow_ledger_graph_loader_tests {
+    use super::*;
+
+    fn escrow_ledger_node(path: &str, bytes: &[u8]) -> GraphArtifactNode {
+        GraphArtifactNode {
+            id: Some(format!("node-{path}")),
+            path: path.to_string(),
+            role: "commerce".to_string(),
+            sha256: Some(chio_core::sha256_hex(bytes)),
+            schema: Some(chio_commerce_order::COMMERCE_ESCROW_LEDGER_SCHEMA_ID.to_string()),
+        }
+    }
+
+    /// A graph that carries an escrow-ledger artifact node yields its canonical
+    /// bytes by schema, so a commerce proof produced after `escrow::accept` (which
+    /// pins an `escrow_digest`) can carry the backing ledger into the verification
+    /// bundle. `load_graph_bytes_artifact` also re-checks the node digest, so a
+    /// tampered ledger file would already be rejected here.
+    #[test]
+    fn escrow_ledger_is_loaded_from_the_graph_by_schema() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let ledger_bytes =
+            br#"{"schema":"chio.commerce.escrow-ledger.v1","order_id":"order-commerce-001"}"#;
+        std::fs::write(dir.path().join("escrow-ledger.json"), ledger_bytes).expect("write ledger");
+        let nodes = vec![escrow_ledger_node("escrow-ledger.json", ledger_bytes)];
+
+        let loaded = load_required_graph_bytes_artifact_by_schema(
+            dir.path(),
+            &nodes,
+            chio_commerce_order::COMMERCE_ESCROW_LEDGER_SCHEMA_ID,
+            "commerce escrow ledger",
+        )
+        .expect("escrow ledger loads from the graph by schema");
+        assert_eq!(loaded, ledger_bytes.to_vec());
+    }
+
+    /// Fail-closed: a pinned escrow digest with no escrow-ledger node in the graph
+    /// denies (the bundle cannot prove the pinned digest).
+    #[test]
+    fn missing_escrow_ledger_node_fails_closed() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let nodes: Vec<GraphArtifactNode> = Vec::new();
+        let error = load_required_graph_bytes_artifact_by_schema(
+            dir.path(),
+            &nodes,
+            chio_commerce_order::COMMERCE_ESCROW_LEDGER_SCHEMA_ID,
+            "commerce escrow ledger",
+        )
+        .expect_err("a missing escrow-ledger node must fail closed");
+        assert!(
+            error
+                .to_string()
+                .contains("missing commerce escrow ledger artifact schema"),
+            "{error}"
+        );
+    }
+
+    /// Fail-closed: an ambiguous graph carrying more than one escrow-ledger node
+    /// denies rather than guessing which ledger backs the order.
+    #[test]
+    fn duplicate_escrow_ledger_nodes_fail_closed() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let ledger_bytes = br#"{"schema":"chio.commerce.escrow-ledger.v1"}"#;
+        std::fs::write(dir.path().join("escrow-ledger.json"), ledger_bytes).expect("write ledger");
+        let nodes = vec![
+            escrow_ledger_node("escrow-ledger.json", ledger_bytes),
+            escrow_ledger_node("escrow-ledger.json", ledger_bytes),
+        ];
+        let error = load_required_graph_bytes_artifact_by_schema(
+            dir.path(),
+            &nodes,
+            chio_commerce_order::COMMERCE_ESCROW_LEDGER_SCHEMA_ID,
+            "commerce escrow ledger",
+        )
+        .expect_err("multiple escrow-ledger nodes must fail closed");
+        assert!(
+            error
+                .to_string()
+                .contains("multiple commerce escrow ledger artifact schemas"),
+            "{error}"
+        );
+    }
+
+    /// The escrow-ledger load is gated on a pinned `escrow_digest`: the legacy
+    /// pre-escrow order shape (no digest) carries no ledger bytes, unchanged.
+    #[test]
+    fn absent_escrow_digest_loads_no_ledger() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let context = commerce_order_context_fixture(None);
+        let nodes: Vec<GraphArtifactNode> = Vec::new();
+        let loaded = load_commerce_escrow_ledger_bytes(dir.path(), &nodes, &context)
+            .expect("absent escrow digest is a no-op");
+        assert!(loaded.is_none());
+    }
+
+    fn commerce_order_context_fixture(
+        escrow_digest: Option<String>,
+    ) -> chio_commerce_order::CommerceOrderContext {
+        let mut value = serde_json::json!({
+            "schema": chio_commerce_order::COMMERCE_ORDER_CONTEXT_SCHEMA_ID,
+            "id": "ctx-1",
+            "issued_at": "2026-06-25T00:00:00Z",
+            "order_id": "order-commerce-001",
+            "buyer_subject": "buyer:alice",
+            "agent_subject": "agent:alice",
+            "merchant_subject": "merchant:coffee",
+            "intent_ref": "intent-1",
+            "provider_admission_ref": "admission-1",
+            "provider_passport_ref": "passport-1",
+            "reputation_snapshot_ref": "reputation-1",
+            "federation_trust_bundle_ref": "federation-1",
+            "quote_id": "quote-1",
+            "quote_amount_minor": 4200u64,
+            "quote_currency": "USD",
+            "quote_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "settlement_packet_ref": "settlement-packet-1",
+            "reconciliation_ref": "reconciliation-1",
+            "event_log_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "event_log_path": "event-log.json",
+            "payment_lifecycle_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "payment_lifecycle_path": "payment-lifecycle.json",
+            "mandate_ledger_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "mandate_ledger_path": "mandate-ledger.json",
+            "provider_passport_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "provider_passport_path": "provider-passport.json",
+            "reputation_snapshot_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "reputation_snapshot_path": "reputation-snapshot.json",
+            "federation_trust_bundle_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "federation_trust_bundle_path": "federation-trust-bundle.json",
+            "settlement_packet_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "settlement_packet_path": "settlement-packet.json",
+            "current_state": "settlement_packet_assembled",
+        });
+        if let Some(digest) = escrow_digest {
+            value["escrow_digest"] = serde_json::Value::String(digest);
+        }
+        serde_json::from_value(value).expect("order context deserializes")
+    }
 }

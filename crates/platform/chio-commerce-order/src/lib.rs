@@ -90,11 +90,6 @@ pub fn verify_commerce_order(
         &bundle.order_context.federation_trust_bundle_sha256,
         &bundle.federation_trust_bundle_bytes,
     )?;
-    verify_digest(
-        "settlement packet",
-        &bundle.order_context.settlement_packet_sha256,
-        &bundle.settlement_packet_bytes,
-    )?;
     verify_escrow_digest(&bundle.order_context, bundle.escrow_ledger_bytes.as_deref())?;
     let coverage_decision_bound = verify_coverage_requirement(
         &bundle.order_context,
@@ -119,8 +114,8 @@ pub fn verify_commerce_order(
         "federation trust bundle",
         &bundle.federation_trust_bundle_bytes,
     )?;
-    let settlement: CommerceSettlementPacket =
-        parse_json("settlement packet", &bundle.settlement_packet_bytes)?;
+    let settlement =
+        verify_settlement_packet_digest(&bundle.order_context, &bundle.settlement_packet_bytes)?;
 
     let replay = replay_event_log(
         &event_log,
@@ -422,6 +417,51 @@ fn verify_digest(field: &str, expected: &str, bytes: &[u8]) -> Result<(), Commer
     }
 }
 
+/// Verify the pinned settlement-packet digest with a DUAL binding: the pin matches
+/// EITHER the canonical digest of the parsed packet body OR the raw digest of the
+/// stored artifact bytes. Both bindings prove the packet content; a tampered packet
+/// (different content) matches neither and fails closed.
+///
+/// Two producers pin this field two ways, and a single verifier must accept both:
+/// - `escrow::accept` pins the CANONICAL digest of the signed packet body (the same
+///   way the escrow ledger pins its canonical `digest()`), so an escrow-accepted
+///   order verifies regardless of the byte form its packet is stored in
+///   (pretty-printed, key-reordered, or newline-terminated). This is the
+///   re-canonicalizing check the round-2/round-3 escrow-ledger fix established, and
+///   it is what makes an escrow-backed order verifiable.
+/// - The proof-room fixture pipeline pins the RAW digest of the on-disk artifact
+///   file (`sha256` of the newline-terminated bytes the bundle ships). Dropping this
+///   branch would reject every committed commerce-order fixture pinned that way, so
+///   it is retained for backward compatibility.
+///
+/// The packet is parsed exactly once and returned for the downstream
+/// settlement-lifecycle checks. A structurally invalid artifact fails closed at the
+/// parse step before either digest is considered.
+fn verify_settlement_packet_digest(
+    context: &CommerceOrderContext,
+    settlement_packet_bytes: &[u8],
+) -> Result<CommerceSettlementPacket, CommerceOrderError> {
+    let settlement: CommerceSettlementPacket =
+        parse_json("settlement packet", settlement_packet_bytes)?;
+    let canonical = chio_core_types::canonical_json_bytes(&settlement).map_err(|error| {
+        CommerceOrderError::InvalidArtifact {
+            field: "settlement packet",
+            message: format!("settlement packet canonicalization failed: {error}"),
+        }
+    })?;
+    let canonical_digest = sha256_hex(&canonical);
+    let raw_digest = sha256_hex(settlement_packet_bytes);
+    let expected = &context.settlement_packet_sha256;
+    if &canonical_digest != expected && &raw_digest != expected {
+        return Err(CommerceOrderError::DigestMismatch {
+            field: "settlement packet".to_string(),
+            expected: expected.clone(),
+            actual: canonical_digest,
+        });
+    }
+    Ok(settlement)
+}
+
 fn verify_quote_digest(context: &CommerceOrderContext) -> Result<(), CommerceOrderError> {
     let actual = canonical_quote_sha256(context)?;
     if actual == context.quote_sha256 {
@@ -697,6 +737,65 @@ mod escrow_digest_verification_tests {
         let context = order_context("order-commerce-001");
         assert!(context.escrow_digest.is_none());
         verify_escrow_digest(&context, None).test_expect("no escrow digest is a no-op");
+    }
+
+    #[test]
+    fn settlement_packet_digest_accepts_noncanonical_bytes_and_rejects_tampering() {
+        let mut context = order_context("order-commerce-001");
+        let packet = json!({
+            "schema": ids::COMMERCE_SETTLEMENT_PACKET_SCHEMA_ID,
+            "id": "settlement-packet-1",
+            "issued_at": "2026-06-10T00:08:00Z",
+            "order_id": "order-commerce-001",
+            "merchant_subject": "merchant:coffee",
+            "psp": "stripe",
+            "payment_intent_id": "pi_commerce_001",
+            "amount_minor": 4200u64,
+            "currency": "USD",
+            "quote_sha256": HEX64,
+            "settlement_rail": "ach",
+            "settlement_account_ref": "acct-1",
+            "dispatch_receipt_ref": "receipt-1",
+            "reconciliation_ref": "reconciliation-1",
+            "status": "settled",
+        });
+        // Pin the CANONICAL packet digest, exactly as `escrow::accept` does.
+        let canonical =
+            chio_core_types::canonical_json_bytes(&packet).test_expect("canonical packet bytes");
+        context.settlement_packet_sha256 = sha256_hex(&canonical);
+
+        // The packet is STORED as pretty (non-canonical) JSON. A raw-byte hash of
+        // these bytes would NOT equal the pinned canonical digest, but the verifier
+        // re-canonicalizes, so an escrow-accepted order whose packet is not stored in
+        // canonical byte form still verifies.
+        let pretty = serde_json::to_vec_pretty(&packet).test_expect("pretty packet bytes");
+        assert_ne!(sha256_hex(&pretty), context.settlement_packet_sha256);
+        let parsed = verify_settlement_packet_digest(&context, &pretty)
+            .test_expect("non-canonical packet verifies against the canonical pin");
+        assert_eq!(parsed.order_id, "order-commerce-001");
+
+        // The RAW-digest binding also verifies: a context that pins the raw digest of
+        // the newline-terminated on-disk bytes (the proof-room fixture convention)
+        // accepts those exact bytes, so committed fixtures keep verifying.
+        let mut raw_context = order_context("order-commerce-001");
+        let mut on_disk = serde_json::to_vec(&packet).test_expect("compact packet bytes");
+        on_disk.push(b'\n');
+        raw_context.settlement_packet_sha256 = sha256_hex(&on_disk);
+        assert_ne!(raw_context.settlement_packet_sha256, sha256_hex(&canonical));
+        verify_settlement_packet_digest(&raw_context, &on_disk)
+            .test_expect("raw-pinned newline-terminated packet verifies");
+
+        // A tampered packet (different content) matches NEITHER binding and fails
+        // closed.
+        let mut tampered = packet;
+        tampered["amount_minor"] = json!(4201u64);
+        let tampered_bytes = serde_json::to_vec(&tampered).test_expect("tampered packet bytes");
+        let error = verify_settlement_packet_digest(&context, &tampered_bytes)
+            .test_expect_err("a tampered settlement packet is denied");
+        assert!(matches!(
+            error,
+            CommerceOrderError::DigestMismatch { field, .. } if field == "settlement packet"
+        ));
     }
 
     #[test]
