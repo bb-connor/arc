@@ -266,6 +266,42 @@ impl CommerceEscrowLedger {
     /// consistent with the declared status. Every leg is re-checked against Seam
     /// A so neither direction can touch a freetier:global pool row.
     pub(crate) fn assert_conservation(&self) -> Result<(), CommerceOrderError> {
+        // Bind the leg set to the DECLARED parties and lifecycle status. Net
+        // balance alone (zero net flow, custody not overdrawn) accepts ANY
+        // net-balanced leg set, so a forged ledger funded by a DIFFERENT account
+        // than the declared depositor, or paying a different beneficiary, could
+        // net-balance and pass both `release` and `verify_escrow_digest`. Require
+        // the legs to be EXACTLY the canonical lock (and, for Released, release)
+        // legs over this ledger's depositor -> custody -> beneficiary accounts and
+        // locked amount, the same legs `lock`/`released` emit. A leg with the wrong
+        // kind, endpoints, or amount is denied here, before conservation is even
+        // measured.
+        let lock_leg = CommerceEscrowLeg {
+            kind: CommerceEscrowLegKind::Lock,
+            from_account: self.depositor_account.clone(),
+            to_account: self.custody_account.clone(),
+            amount_minor: self.amount_minor,
+        };
+        let expected_legs = match self.status {
+            CommerceEscrowStatus::Locked => vec![lock_leg],
+            CommerceEscrowStatus::Released => vec![
+                lock_leg,
+                CommerceEscrowLeg {
+                    kind: CommerceEscrowLegKind::Release,
+                    from_account: self.custody_account.clone(),
+                    to_account: self.beneficiary_account.clone(),
+                    amount_minor: self.amount_minor,
+                },
+            ],
+        };
+        if self.legs != expected_legs {
+            return Err(CommerceOrderError::SettlementFailed(
+                "escrow ledger legs do not match the canonical lock/release shape for the \
+                 declared depositor/custody/beneficiary accounts and amount"
+                    .to_string(),
+            ));
+        }
+
         let mut balances: BTreeMap<&str, i128> = BTreeMap::new();
         for leg in &self.legs {
             ensure_pool_escrow_isolation(&leg.from_account)?;
@@ -667,6 +703,16 @@ pub fn accept(
     request: CommerceEscrowAcceptRequest<'_>,
 ) -> Result<CommerceEscrowAcceptance, CommerceOrderError> {
     request.order_context.validate_shape()?;
+
+    // Finding 3: recompute and compare the canonical quote digest BEFORE building
+    // the ledger or locking custody. `validate_shape` only proves `quote_sha256` is
+    // a well-formed 64-hex string, NOT that it matches the canonical quote fields.
+    // Without this gate an arbitrary same-shape `quote_sha256` passes accept, locks
+    // custody, and signs a settlement packet, only for `verify_commerce_order` to
+    // later recompute the quote digest and reject the bundle, leaving custody locked
+    // for an unverifiable quote. Fail closed here so an unverifiable quote can never
+    // lock custody.
+    super::verify_quote_digest(request.order_context)?;
 
     // Bind to the shipped order spine: the escrow accept IS the
     // settlement-packet-assembly transition, so the order's declared current
@@ -1196,7 +1242,21 @@ mod tests {
             "settlement_packet_path": "settlement-packet.json",
             "current_state": current_state,
         });
-        serde_json::from_value(value).test_expect("order context deserializes")
+        let mut context: CommerceOrderContext =
+            serde_json::from_value(value).test_expect("order context deserializes");
+        pin_quote_digest(&mut context);
+        context
+    }
+
+    /// Pin the canonical quote digest into a test context. Finding 3: `accept`
+    /// recomputes the canonical quote digest and denies a context whose pinned
+    /// `quote_sha256` does not match the canonical quote fields, so every test
+    /// context must carry the REAL digest (not the HEX64 placeholder), and any test
+    /// that mutates a quote-binding field (order_id, merchant_subject, or the quote
+    /// amount/currency/id) must re-pin it afterwards.
+    fn pin_quote_digest(context: &mut CommerceOrderContext) {
+        context.quote_sha256 =
+            crate::canonical_quote_sha256(context).test_expect("canonical quote digest");
     }
 
     fn dispatch() -> CommerceSettlementDispatch {
@@ -1558,6 +1618,9 @@ mod tests {
         // beneficiary) is a freetier:global pool row.
         let mut credit_context = order_context("fulfillment_attested");
         credit_context.merchant_subject = pool_id.to_string();
+        // merchant_subject is a quote-binding field; re-pin so the quote-digest gate
+        // passes and the accept reaches the Seam A isolation check (the actual SUT).
+        pin_quote_digest(&mut credit_context);
         let reservation = signed_reservation(&credit_context, &token, 4200, "USD", &res_auth);
         let credit_error = accept(accept_request(
             &credit_context,
@@ -1589,6 +1652,8 @@ mod tests {
         let mut context = order_context("fulfillment_attested");
         context.buyer_subject = "buyer:distinct-party".to_string();
         context.merchant_subject = "merchant:distinct-party".to_string();
+        // merchant_subject is a quote-binding field; re-pin the quote digest.
+        pin_quote_digest(&mut context);
         let res_auth = reservation_authority();
         let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
 
@@ -2177,6 +2242,8 @@ mod tests {
         // Order B: a DIFFERENT order with its own validly-signed settlement packet.
         let mut context_b = order_context("fulfillment_attested");
         context_b.order_id = "order-commerce-002".to_string();
+        // order_id is a quote-binding field; re-pin the quote digest for order B.
+        pin_quote_digest(&mut context_b);
         let reservation_b = signed_reservation(&context_b, &token, 4200, "USD", &res_auth);
         let acceptance_b = accept(accept_request(
             &context_b,
@@ -2646,5 +2713,113 @@ mod tests {
         ));
 
         assert_eq!(acceptance.ledger.status, CommerceEscrowStatus::Locked);
+    }
+
+    /// Finding 1: a net-balanced ledger whose lock leg is funded by a DIFFERENT
+    /// account than the declared depositor is denied. Conservation alone (net flow
+    /// zero, custody holds the full amount) would accept it; binding the leg KINDS,
+    /// ENDPOINTS, and AMOUNTS to the declared depositor/custody/beneficiary catches
+    /// the forgery before it can pass `release` or `verify_escrow_digest`.
+    #[test]
+    fn assert_conservation_denies_legs_with_wrong_endpoints() {
+        // A Locked ledger whose lock leg is funded by `attacker:eve` (not the
+        // declared `buyer:alice`). Net flow is zero and custody holds the full
+        // amount, so the pre-existing conservation checks pass.
+        let forged_lock = CommerceEscrowLedger {
+            schema: COMMERCE_ESCROW_LEDGER_SCHEMA_ID.to_string(),
+            order_id: "order-1".to_string(),
+            currency: "USD".to_string(),
+            depositor_account: "buyer:alice".to_string(),
+            beneficiary_account: "merchant:bob".to_string(),
+            custody_account: ESCROW_CUSTODY_ACCOUNT.to_string(),
+            amount_minor: 4200,
+            legs: vec![CommerceEscrowLeg {
+                kind: CommerceEscrowLegKind::Lock,
+                from_account: "attacker:eve".to_string(),
+                to_account: ESCROW_CUSTODY_ACCOUNT.to_string(),
+                amount_minor: 4200,
+            }],
+            status: CommerceEscrowStatus::Locked,
+        };
+        let error = forged_lock
+            .assert_conservation()
+            .test_expect_err("a lock leg funded by the wrong account is denied");
+        assert!(matches!(
+            error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("do not match the canonical lock/release shape")
+        ));
+
+        // A Released ledger whose release leg pays `merchant:attacker` while custody
+        // is drained from a third account: still net-balanced, but the endpoints do
+        // not match the declared depositor/custody/beneficiary.
+        let forged_release = CommerceEscrowLedger {
+            schema: COMMERCE_ESCROW_LEDGER_SCHEMA_ID.to_string(),
+            order_id: "order-1".to_string(),
+            currency: "USD".to_string(),
+            depositor_account: "buyer:alice".to_string(),
+            beneficiary_account: "merchant:bob".to_string(),
+            custody_account: ESCROW_CUSTODY_ACCOUNT.to_string(),
+            amount_minor: 4200,
+            legs: vec![
+                CommerceEscrowLeg {
+                    kind: CommerceEscrowLegKind::Lock,
+                    from_account: "buyer:alice".to_string(),
+                    to_account: ESCROW_CUSTODY_ACCOUNT.to_string(),
+                    amount_minor: 4200,
+                },
+                CommerceEscrowLeg {
+                    kind: CommerceEscrowLegKind::Release,
+                    from_account: ESCROW_CUSTODY_ACCOUNT.to_string(),
+                    to_account: "merchant:attacker".to_string(),
+                    amount_minor: 4200,
+                },
+            ],
+            status: CommerceEscrowStatus::Released,
+        };
+        let release_error = forged_release
+            .assert_conservation()
+            .test_expect_err("a release leg paying the wrong beneficiary is denied");
+        assert!(matches!(
+            release_error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("do not match the canonical lock/release shape")
+        ));
+    }
+
+    /// Finding 3: `accept` recomputes the canonical quote digest and denies a
+    /// context whose pinned `quote_sha256` does not match the canonical quote fields
+    /// BEFORE it builds the ledger or locks custody, so an unverifiable quote (which
+    /// `verify_commerce_order` would later reject) can never lock custody or sign a
+    /// settlement packet.
+    #[test]
+    fn accept_fails_closed_on_quote_digest_mismatch() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let mut context = order_context("fulfillment_attested");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
+        // Overwrite the pinned canonical digest with an arbitrary 64-hex that does
+        // NOT match the canonical quote fields (it is still a well-formed sha256, so
+        // `validate_shape` passes and only the new quote-digest gate can fire).
+        context.quote_sha256 = HEX64.to_string();
+
+        let error = accept(accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            res_auth.public_key(),
+            &authority,
+        ))
+        .test_expect_err("a non-matching quote_sha256 is denied before locking");
+        assert!(matches!(
+            error,
+            CommerceOrderError::InvalidArtifact { message, .. }
+                if message.contains("quote digest mismatch")
+        ));
     }
 }

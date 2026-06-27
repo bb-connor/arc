@@ -537,6 +537,52 @@ fn verify_escrow_digest(
             ),
         });
     }
+    // Bind the ledger's ECONOMICS and PARTIES to the order context. A digest match
+    // plus order-id binding still proves only that SOME conserved ledger names this
+    // order; it does not prove the custody covered the order's quote between the
+    // order's buyer and merchant. Without this, a same-order ledger for 1 USD (or
+    // one paying a different beneficiary) would pass conservation/status and ride
+    // into a verified passport for the real (e.g. 4200 USD) order. Compare the
+    // ledger amount/currency to the signed quote and the depositor/beneficiary to
+    // the order's buyer/merchant (exactly what `escrow::accept` binds), fail-closed
+    // on any mismatch. Composed with the escrow leg-endpoint binding in
+    // `assert_conservation`, the ledger is fully bound to the order.
+    if ledger.amount_minor != context.quote_amount_minor {
+        return Err(CommerceOrderError::InvalidArtifact {
+            field: "order context",
+            message: format!(
+                "escrow ledger amount {} does not match the order quote amount {}",
+                ledger.amount_minor, context.quote_amount_minor
+            ),
+        });
+    }
+    if ledger.currency != context.quote_currency {
+        return Err(CommerceOrderError::InvalidArtifact {
+            field: "order context",
+            message: format!(
+                "escrow ledger currency {} does not match the order quote currency {}",
+                ledger.currency, context.quote_currency
+            ),
+        });
+    }
+    if ledger.depositor_account != context.buyer_subject {
+        return Err(CommerceOrderError::InvalidArtifact {
+            field: "order context",
+            message: format!(
+                "escrow ledger depositor {} does not match the order buyer {}",
+                ledger.depositor_account, context.buyer_subject
+            ),
+        });
+    }
+    if ledger.beneficiary_account != context.merchant_subject {
+        return Err(CommerceOrderError::InvalidArtifact {
+            field: "order context",
+            message: format!(
+                "escrow ledger beneficiary {} does not match the order merchant {}",
+                ledger.beneficiary_account, context.merchant_subject
+            ),
+        });
+    }
     // Bind the ledger's lifecycle status to the order's settlement state. A digest
     // match alone proves only that SOME escrow ledger conserves value; it does not
     // prove the custody actually reached the lifecycle the context claims. The
@@ -810,5 +856,58 @@ mod escrow_digest_verification_tests {
         context.escrow_digest = Some(sha256_hex(&bytes));
         verify_escrow_digest(&context, Some(&bytes))
             .test_expect("a reconciled context with a released ledger verifies");
+    }
+
+    /// Finding 2: a digest-consistent, conserved, same-order ledger whose AMOUNT
+    /// does not match the order quote is denied, so a 1 USD ledger can never ride
+    /// into a verified passport for a 4200 USD order.
+    #[test]
+    fn escrow_ledger_amount_mismatch_with_order_quote_is_denied() {
+        let order_id = "order-commerce-001";
+        let mut wrong_amount = ledger(order_id);
+        // Re-shape the ledger to a self-consistent 1 USD lock (so conservation and
+        // the leg-endpoint binding both pass); only the order-quote economics gate
+        // can fire.
+        wrong_amount.amount_minor = 1;
+        wrong_amount.legs = vec![CommerceEscrowLeg {
+            kind: CommerceEscrowLegKind::Lock,
+            from_account: "buyer:alice".to_string(),
+            to_account: "chio:commerce:escrow:custody".to_string(),
+            amount_minor: 1,
+        }];
+        let bytes = canonical_ledger_bytes(&wrong_amount);
+        let mut context = order_context(order_id);
+        assert_eq!(context.quote_amount_minor, 4200);
+        context.escrow_digest = Some(sha256_hex(&bytes));
+        let error = verify_escrow_digest(&context, Some(&bytes))
+            .test_expect_err("a same-order ledger for the wrong amount is denied");
+        assert!(matches!(
+            error,
+            CommerceOrderError::InvalidArtifact { message, .. }
+                if message.contains("does not match the order quote amount")
+        ));
+    }
+
+    /// Finding 2: a digest-consistent, conserved, same-order ledger whose
+    /// BENEFICIARY is not the order merchant is denied, so custody can never be
+    /// vouched for paying a third account while the order names its real merchant.
+    #[test]
+    fn escrow_ledger_beneficiary_mismatch_with_order_merchant_is_denied() {
+        let order_id = "order-commerce-001";
+        let mut wrong_beneficiary = ledger(order_id);
+        // The Locked ledger's single lock leg does not name the beneficiary, so the
+        // leg-endpoint binding still passes; only the party-binding gate can fire.
+        wrong_beneficiary.beneficiary_account = "merchant:attacker".to_string();
+        let bytes = canonical_ledger_bytes(&wrong_beneficiary);
+        let mut context = order_context(order_id);
+        assert_eq!(context.merchant_subject, "merchant:coffee");
+        context.escrow_digest = Some(sha256_hex(&bytes));
+        let error = verify_escrow_digest(&context, Some(&bytes))
+            .test_expect_err("a same-order ledger paying a foreign beneficiary is denied");
+        assert!(matches!(
+            error,
+            CommerceOrderError::InvalidArtifact { message, .. }
+                if message.contains("beneficiary") && message.contains("does not match the order merchant")
+        ));
     }
 }

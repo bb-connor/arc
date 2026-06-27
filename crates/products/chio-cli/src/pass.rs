@@ -27,7 +27,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use chio_anchor::{AnchorBatchWitness, EvmAnchorTarget};
 use chio_core::capability::token::AttestationWindowId;
 use chio_core::web3::identity::SignedWeb3IdentityBinding;
-use chio_core::{canonical_json_bytes, PublicKey, Signature};
+use chio_core::PublicKey;
 use chio_did::DidChio;
 use chio_credentials::{
     attestation_window_containing, chio_pass_artifact_id, verify_chio_pass, ChioPass,
@@ -402,19 +402,29 @@ fn record_refreshed_issuance_under_caps(
     oracle: &SqliteRevocationStore,
     capability_id: &str,
     next_window: &AttestationWindowId,
-    now: u64,
     window_token_capacity: u64,
     active_population_cap: u64,
 ) -> Result<(), CliError> {
     let valid_from = i64::try_from(next_window.since).unwrap_or(0);
     let expires_at = i64::try_from(next_window.until).unwrap_or(i64::MAX);
-    let now_secs = i64::try_from(now).unwrap_or(i64::MAX);
+    // Count the active population at the WINDOW BEING FILLED, not the refresh wall
+    // clock. A late-window refresh inserts a next-window row carrying
+    // `valid_from = next_window.since`, which is in the FUTURE relative to the
+    // refresh instant (`now < next_window.since`). Counting the population at `now`
+    // would exclude every prior refresh into this SAME next window (their rows are
+    // also future-dated), so the population cap would never bind and refresh could
+    // over-admit past `active_population_cap`. Evaluating at `next_window.since`
+    // counts exactly the Passes that become live at that boundary: the
+    // next-window rows being filled are included (their `valid_from` equals it) and
+    // the current-window rows have expired by then (`expires_at == next_window.since`,
+    // half-open), so the cap reflects every Pass that goes live in the filled window.
+    let population_eval_at = valid_from;
     match oracle.try_record_pass_issuance_under_caps(
         capability_id,
         &next_window.window_ym,
         valid_from,
         expires_at,
-        now_secs,
+        population_eval_at,
         window_token_capacity,
         active_population_cap,
     )? {
@@ -503,7 +513,6 @@ fn pass_refresh(
             &oracle,
             &issuance.capability.id,
             &next_window,
-            now,
             config.window_token_capacity,
             config.active_population_cap,
         )?;
@@ -535,42 +544,62 @@ fn write_refresh_artifacts(
     Ok(())
 }
 
-/// Verify a revoked Pass's ORIGINAL signed credential is authentic and was issued
-/// by a trusted Pass authority, WITHOUT the time window.
+/// Full Chio Pass shape + signature verification with the validity-window EXPIRY
+/// check neutralized, for ANCHORING (historical membership evidence).
+///
+/// Anchoring an issued or revoked Pass commits HISTORICAL membership, so a Pass
+/// from a just-ended window is legitimately past its expiry at the anchor
+/// publication instant. The time-windowed [`verify_chio_pass`] would reject such a
+/// Pass as expired (forcing operators to backdate `--issued-at`), while skipping
+/// verification entirely would let a malformed-but-trusted-signed credential be
+/// anchored. This mode threads the Pass's OWN issuance instant
+/// (`entitlements.window.since`, which the entitlement-shape check binds to equal
+/// the issuance timestamp and proves strictly less than the expiration) as `now`,
+/// so the half-open expiry check (`now >= expiration`) never fires, while schema,
+/// proof type/purpose, issuer binding, ENTITLEMENT SHAPE, and the Ed25519 signature
+/// are ALL still enforced. A tampered, foreign-shaped, or otherwise malformed Pass
+/// is still rejected. (If the Pass's embedded `window.since` is itself bogus the
+/// entitlement-shape check that binds `window.since == issuance` denies it anyway.)
+fn verify_anchored_pass_shape(pass: &ChioPass) -> Result<(), CliError> {
+    // The launch entitlement-shape table the credential was minted against
+    // (`ChioPassConfig::m1_launch_default` pins `TierAllotmentTable::default()`).
+    let table = TierAllotmentTable::default();
+    let issuance_instant = pass.unsigned.credential_subject.entitlements.window.since;
+    verify_chio_pass(pass, issuance_instant, &table)
+        .map_err(|error| CliError::Other(format!("Pass shape verification failed: {error}")))
+}
+
+/// Verify a revoked Pass's ORIGINAL signed credential is authentic, well-shaped,
+/// and was issued by a trusted Pass authority, WITHOUT the time window.
 ///
 /// FAIL-CLOSED: a revoked Pass is exactly the kind that may legitimately be
-/// EXPIRED, so the time-windowed [`verify_chio_pass`] cannot be reused (it would
-/// reject the expired original). Instead the issuer signature is checked directly
-/// over `canonical_json_bytes(&pass.unsigned)`, the proof method is bound to the
-/// embedded issuer, and the issuer MUST be a member of the trusted-issuer set so a
-/// foreign/self-issued Pass can never mint a revoked leaf.
+/// EXPIRED, so the time-windowed [`verify_chio_pass`] cannot be reused as-is (it
+/// would reject the expired original). It is instead run through
+/// [`verify_anchored_pass_shape`], the SAME full-shape verifier the issued side
+/// uses (schema, proof type/purpose, issuer binding, entitlement shape, signature),
+/// with only expiry neutralized. The prior revoked-leaf path checked just issuer
+/// parsing, the proof method, the issuer allowlist, and the raw signature, so a
+/// malformed-but-trusted-signed credential (e.g. a tampered proof envelope, which
+/// the issuer signature does not cover) could be anchored as a revoked leaf though
+/// it would be rejected as an issued leaf. The issuer is additionally bound to the
+/// trusted-issuer set so a foreign/self-issued Pass can never mint a revoked leaf.
 fn verify_revoked_pass_authenticity(
     pass: &ChioPass,
     trusted_issuer_dids: &[String],
 ) -> Result<(), CliError> {
-    let issuer = DidChio::from_str(&pass.unsigned.issuer)
-        .map_err(|error| CliError::Other(format!("revoked Pass issuer DID is invalid: {error}")))?;
-    if pass.proof.verification_method != issuer.verification_method_id() {
-        return Err(CliError::Other(
-            "revoked Pass proof verification method does not match its embedded issuer".to_string(),
-        ));
-    }
+    // Full shape + signature verification (expiry ignored), identical to the issued
+    // side. Closes the gap where schema, proof type/purpose, and entitlement shape
+    // were skipped for revoked leaves.
+    verify_anchored_pass_shape(pass)?;
+    // Round-3 trusted-issuer binding: `verify_chio_pass` only proves the Pass is
+    // internally consistent against its OWN embedded issuer, not that the issuer is
+    // a Pass authority this anchor batch trusts. A foreign/self-issued Pass can
+    // never mint a revoked leaf.
     if !trusted_issuer_dids.contains(&pass.unsigned.issuer) {
         return Err(CliError::Other(format!(
             "revoked Pass issuer {} is not a trusted Pass authority for this anchor batch",
             pass.unsigned.issuer
         )));
-    }
-    let signature = Signature::from_hex(&pass.proof.proof_value).map_err(|error| {
-        CliError::Other(format!("revoked Pass signature is malformed: {error}"))
-    })?;
-    let unsigned_bytes = canonical_json_bytes(&pass.unsigned).map_err(|error| {
-        CliError::Other(format!("revoked Pass canonicalization failed: {error}"))
-    })?;
-    if !issuer.public_key().verify(&unsigned_bytes, &signature) {
-        return Err(CliError::Other(
-            "revoked Pass signature does not verify against its issuer".to_string(),
-        ));
     }
     Ok(())
 }
@@ -680,10 +709,15 @@ fn resolve_trusted_pass_issuers(
 ///
 /// FAIL-CLOSED: the anchor batch folds each Pass's `chio_pass_artifact_id` into a
 /// PUBLIC membership root, so every issued-Pass file MUST carry a verifying issuer
-/// signature AND a valid entitlement shape (and be inside its validity window at
-/// `now`) before its artifact id may be anchored. An unsigned, tampered, or
-/// malformed Pass is rejected here, before it can reach the public batch as
-/// membership evidence.
+/// signature AND a valid entitlement shape before its artifact id may be anchored.
+/// An unsigned, tampered, or malformed Pass is rejected here, before it can reach
+/// the public batch as membership evidence.
+///
+/// Anchoring is HISTORICAL membership evidence, so the validity-window EXPIRY check
+/// is neutralized (see [`verify_anchored_pass_shape`]): an otherwise-valid issued
+/// Pass from a just-ended window is accepted at rollover rather than rejected as
+/// expired (which would force operators to backdate `--issued-at`). Every other
+/// shape/signature invariant is still enforced.
 ///
 /// The signature in [`verify_chio_pass`] only proves the Pass is internally
 /// consistent against its OWN embedded issuer, not that the issuer is the operator
@@ -692,17 +726,13 @@ fn resolve_trusted_pass_issuers(
 /// into its membership root.
 fn read_issued_passes(
     issued_pass_paths: &[std::path::PathBuf],
-    now: u64,
     trusted_issuer_dids: &[String],
 ) -> Result<Vec<ChioPass>, CliError> {
-    // The launch entitlement-shape table the credential was minted against
-    // (`ChioPassConfig::m1_launch_default` pins `TierAllotmentTable::default()`).
-    let table = TierAllotmentTable::default();
     issued_pass_paths
         .iter()
         .map(|path| {
             let pass: ChioPass = read_json_artifact(path)?;
-            verify_chio_pass(&pass, now, &table).map_err(|error| {
+            verify_anchored_pass_shape(&pass).map_err(|error| {
                 CliError::Other(format!(
                     "issued Pass {} failed verification before anchoring: {error}",
                     path.display()
@@ -783,7 +813,9 @@ fn pass_anchor(
 
     // Verify each issued Pass's signature, entitlement shape, AND trusted issuer
     // BEFORE its artifact id is folded into the public anchor batch (fail-closed).
-    let issued_passes = read_issued_passes(issued_pass_paths, issued_at, &trusted_issuer_dids)?;
+    // Expiry is ignored: anchoring is historical membership evidence, so a Pass from
+    // a just-ended window is anchored rather than rejected as expired at rollover.
+    let issued_passes = read_issued_passes(issued_pass_paths, &trusted_issuer_dids)?;
     // Each revoked leaf is PROVEN against the original signed Pass it revokes.
     let revoked_records =
         read_revoked_records(revoked_record_paths, revoked_pass_paths, &trusted_issuer_dids)?;
@@ -1609,7 +1641,6 @@ mod tests {
             &oracle,
             "chiopass:first",
             &next_window,
-            MID_JUNE_2026,
             1,
             100,
         )
@@ -1621,7 +1652,6 @@ mod tests {
             &oracle,
             "chiopass:second",
             &next_window,
-            MID_JUNE_2026,
             1,
             100,
         )
@@ -1637,7 +1667,6 @@ mod tests {
             &oracle,
             "chiopass:first",
             &next_window,
-            MID_JUNE_2026,
             1,
             100,
         )
@@ -1650,13 +1679,52 @@ mod tests {
             &oracle,
             "chiopass:third",
             &next_window,
-            MID_JUNE_2026,
             100,
             1,
         )
         .expect_err("a refresh past the population cap is denied");
         assert!(matches!(
             denied_population,
+            CliError::Other(message) if message.contains("active population cap reached")
+        ));
+    }
+
+    /// Finding 4: a late-window refresh fills the NEXT window, whose rows carry a
+    /// FUTURE `valid_from = next_window.since`. The population cap must be counted at
+    /// the window being filled, not at the refresh wall clock: otherwise every prior
+    /// refresh into that same future window (all future-dated) is excluded from the
+    /// active-population count and the cap never binds. This test fills a FUTURE
+    /// July window (the refresh fires from a late June rollover, so the wall clock is
+    /// strictly before `next_window.since`) to an `active_population_cap` of 1 and
+    /// asserts a second subject's refresh into it is denied on population.
+    #[test]
+    fn refresh_into_future_window_is_population_capped_at_that_window() {
+        const JULY_2026_START: u64 = 1_782_864_000; // 2026-07-01T00:00:00Z
+        let dir = temp_dir("refresh-future-window-caps");
+        let revocation_db = dir.join("revocations.sqlite3");
+        let oracle = SqliteRevocationStore::open(&revocation_db).expect("open oracle");
+
+        // The window being filled is July 2026; the refresh fires from inside June,
+        // so the refresh wall clock is strictly BEFORE the July rows go live.
+        let next_window = attestation_window_containing(JULY_2026_START).expect("July window");
+        assert_eq!(next_window.window_ym, "2026-07");
+        assert!(
+            MID_JUNE_2026 < next_window.since,
+            "the refresh clock must precede the window being filled"
+        );
+
+        // Fill July to an active-population cap of 1.
+        record_refreshed_issuance_under_caps(&oracle, "chiopass:july-a", &next_window, 100, 1)
+            .expect("first future-window refresh is admitted under the population cap");
+
+        // A DIFFERENT subject's refresh into the SAME future July window is denied on
+        // population. Counting at `next_window.since` (where the July rows are live)
+        // sees july-a; counting at a June wall clock would exclude it as not-yet-live
+        // and wrongly admit july-b.
+        let denied = record_refreshed_issuance_under_caps(&oracle, "chiopass:july-b", &next_window, 100, 1)
+            .expect_err("a second future-window refresh past the population cap is denied");
+        assert!(matches!(
+            denied,
             CliError::Other(message) if message.contains("active population cap reached")
         ));
     }
@@ -1707,7 +1775,7 @@ mod tests {
         // A genuine signed Pass from a trusted issuer is accepted into the input set.
         let valid_path = dir.join("issued-valid.json");
         write_json_artifact(&valid_path, &issuance.pass).expect("write valid pass");
-        let accepted = read_issued_passes(std::slice::from_ref(&valid_path), MID_JUNE_2026, &trusted)
+        let accepted = read_issued_passes(std::slice::from_ref(&valid_path), &trusted)
             .expect("a signed Pass from a trusted issuer is accepted for anchoring");
         assert_eq!(accepted.len(), 1);
 
@@ -1717,7 +1785,7 @@ mod tests {
         let foreign_trusted = vec![DidChio::from_public_key(Keypair::generate().public_key())
             .expect("foreign issuer did")
             .to_string()];
-        let denied_foreign = read_issued_passes(&[valid_path], MID_JUNE_2026, &foreign_trusted)
+        let denied_foreign = read_issued_passes(&[valid_path], &foreign_trusted)
             .expect_err("a Pass from a non-operator issuer is rejected before anchoring");
         assert!(matches!(
             denied_foreign,
@@ -1734,11 +1802,102 @@ mod tests {
         tampered.proof.proof_value = proof_value;
         let tampered_path = dir.join("issued-tampered.json");
         write_json_artifact(&tampered_path, &tampered).expect("write tampered pass");
-        let denied = read_issued_passes(&[tampered_path], MID_JUNE_2026, &trusted)
+        let denied = read_issued_passes(&[tampered_path], &trusted)
             .expect_err("a tampered issued Pass is rejected before anchoring");
         assert!(matches!(
             denied,
             CliError::Other(message) if message.contains("failed verification before anchoring")
+        ));
+    }
+
+    /// Finding 5: `chio pass anchor` must accept an otherwise-valid issued Pass
+    /// whose validity window has already ENDED (anchoring is historical membership
+    /// evidence). The expiry-ignoring shape verifier evaluates the Pass at its OWN
+    /// issuance instant, so a window-expired Pass anchors successfully where the
+    /// time-windowed `verify_chio_pass` would wrongly reject it as expired. A
+    /// tampered Pass still fails the shape/signature checks.
+    #[test]
+    fn anchored_pass_shape_ignores_expiry_but_still_binds_signature() {
+        let dir = temp_dir("anchor-expiry");
+        let revocation_db = dir.join("revocations.sqlite3");
+        let authority_seed = dir.join("authority.seed");
+        let subject = Keypair::generate().public_key().to_hex();
+        let kernel_keys = vec![Keypair::generate().public_key().to_hex()];
+
+        let (issuance, _) = pass_issue(
+            &subject,
+            TrustTier::Attested,
+            MID_JUNE_2026,
+            &revocation_db,
+            Some(authority_seed.as_path()),
+            &kernel_keys,
+        )
+        .expect("issuance");
+        let pass = issuance.pass.clone();
+
+        // An instant AFTER the Pass's window has ended (a rollover anchor run).
+        let after_expiry = pass.unsigned.credential_subject.entitlements.window.until + 1;
+        let table = TierAllotmentTable::default();
+        // The time-windowed verifier rejects the expired-but-valid Pass...
+        assert!(
+            verify_chio_pass(&pass, after_expiry, &table).is_err(),
+            "the time-windowed verifier rejects a window-expired Pass"
+        );
+        // ...but the expiry-ignoring anchor shape verifier accepts it.
+        verify_anchored_pass_shape(&pass)
+            .expect("a window-expired issued Pass anchors successfully");
+
+        // A tampered Pass (signature no longer verifies) still fails the shape checks.
+        let mut tampered = pass.clone();
+        let mut proof_value = tampered.proof.proof_value.clone();
+        let first = proof_value.remove(0);
+        let replacement = if first == '0' { '1' } else { '0' };
+        proof_value.insert(0, replacement);
+        tampered.proof.proof_value = proof_value;
+        verify_anchored_pass_shape(&tampered)
+            .expect_err("a tampered Pass still fails the shape verification before anchoring");
+    }
+
+    /// Finding 6: the revoked-leaf verifier now runs the SAME full Pass shape checks
+    /// as the issued side (schema, proof type/purpose, entitlement shape), ignoring
+    /// only expiry. A credential correctly SIGNED by a trusted issuer but carrying a
+    /// malformed proof envelope (proof_purpose tampered AFTER signing - the proof
+    /// fields are not covered by the issuer signature) passed the old raw-signature
+    /// revoked check yet would be rejected as an issued leaf. It is now rejected
+    /// before it can be anchored as a revoked leaf.
+    #[test]
+    fn verify_revoked_pass_authenticity_rejects_malformed_but_signed_credential() {
+        let dir = temp_dir("revoked-shape");
+        let revocation_db = dir.join("revocations.sqlite3");
+        let authority_seed = dir.join("authority.seed");
+        let subject = Keypair::generate().public_key().to_hex();
+        let kernel_keys = vec![Keypair::generate().public_key().to_hex()];
+
+        let (issuance, _) = pass_issue(
+            &subject,
+            TrustTier::Attested,
+            MID_JUNE_2026,
+            &revocation_db,
+            Some(authority_seed.as_path()),
+            &kernel_keys,
+        )
+        .expect("issuance");
+        let trusted = vec![issuance.pass.unsigned.issuer.clone()];
+
+        // A genuine signed Pass from a trusted issuer is provable as a revoked leaf.
+        verify_revoked_pass_authenticity(&issuance.pass, &trusted)
+            .expect("a genuine revoked leaf is provable");
+
+        // Tamper the proof PURPOSE: the proof envelope is NOT covered by the issuer
+        // signature, so the credential is still validly signed (it passed the old
+        // raw-signature revoked check) yet now carries a malformed proof envelope.
+        let mut malformed = issuance.pass.clone();
+        malformed.proof.proof_purpose = "tampered-purpose".to_string();
+        let denied = verify_revoked_pass_authenticity(&malformed, &trusted)
+            .expect_err("a malformed-but-signed revoked credential is rejected before anchoring");
+        assert!(matches!(
+            denied,
+            CliError::Other(message) if message.contains("shape verification")
         ));
     }
 
