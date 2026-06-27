@@ -1691,7 +1691,7 @@ fn pin_escrow_digest_via_accept(
             acceptor: &acceptor,
             accepted_at: 500,
             reservation: &reservation,
-            reservation_authority: reservation_authority.public_key(),
+            trusted_reservation_authorities: vec![reservation_authority.public_key()],
             settlement: chio_commerce_order::CommerceSettlementDispatch {
                 issued_at: "2026-06-10T00:05:30Z".to_string(),
                 psp: "stripe".to_string(),

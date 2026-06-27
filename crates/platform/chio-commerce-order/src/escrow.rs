@@ -18,8 +18,10 @@
 //!   fields, so the acceptor==subject guard is only meaningful once the token
 //!   itself is proven authentic.
 //! - The reservation MUST be a signed [`CommerceReservationReceipt`] witness:
-//!   its signature verifies against the pinned settlement reservation authority,
-//!   and it is bound to this order id and the exact offer token (token id plus
+//!   its signature verifies against a member of the pinned trusted settlement
+//!   reservation-authority set (sourced from verified launch config, never from
+//!   the receipt under verification), and it is bound to this order id and the
+//!   exact offer token (token id plus
 //!   canonical digest) BEFORE any collateral is trusted. A bare amount can be
 //!   fabricated; a signed witness bound to the order/token cannot. The witnessed
 //!   reservation must fully collateralize the offer liability, the locked amount
@@ -263,7 +265,7 @@ impl CommerceEscrowLedger {
     /// flow is zero, custody is never overdrawn, and the lifecycle balances are
     /// consistent with the declared status. Every leg is re-checked against Seam
     /// A so neither direction can touch a freetier:global pool row.
-    fn assert_conservation(&self) -> Result<(), CommerceOrderError> {
+    pub(crate) fn assert_conservation(&self) -> Result<(), CommerceOrderError> {
         let mut balances: BTreeMap<&str, i128> = BTreeMap::new();
         for leg in &self.legs {
             ensure_pool_escrow_isolation(&leg.from_account)?;
@@ -316,8 +318,11 @@ impl CommerceEscrowLedger {
         Ok(())
     }
 
-    /// sha256 hex over the canonical JSON of the ledger.
-    fn digest(&self) -> Result<String, CommerceOrderError> {
+    /// sha256 hex over the canonical JSON of the ledger. This is the CANONICAL
+    /// digest the accept/release path pins into the order context, so callers
+    /// proving a pinned `escrow_digest` MUST recompute against this (never against
+    /// a raw-wire-byte hash, which would admit a non-canonical encoding).
+    pub(crate) fn digest(&self) -> Result<String, CommerceOrderError> {
         let canonical = chio_core_types::canonical_json_bytes(self).map_err(|error| {
             CommerceOrderError::SettlementFailed(format!(
                 "escrow ledger canonicalization failed: {error}"
@@ -453,17 +458,25 @@ pub struct VerifiedCommerceReservation {
 }
 
 impl VerifiedCommerceReservation {
-    /// Verify a signed reservation receipt against the expected settlement
-    /// reservation authority and bind it to the order and offer token.
+    /// Verify a signed reservation receipt against the pinned set of trusted
+    /// settlement reservation authorities and bind it to the order and offer
+    /// token.
+    ///
+    /// `trusted_reservation_authorities` MUST be sourced from verified, externally
+    /// pinned launch config (the RR2-TM-01 market-authority registry), NEVER
+    /// derived from the receipt under verification. Deriving the expected signer
+    /// from a request field the caller controls (e.g. echoing back the receipt's
+    /// own `signer_key`) would let a holder self-sign a reservation receipt and
+    /// name their own key as the authority, so the witness would prove nothing.
     ///
     /// Fails closed when the receipt schema is unsupported, the receipt id is
-    /// empty, the signer is not the expected reservation authority, the
-    /// signature does not verify, the receipt is not bound to this order id, the
-    /// receipt is not bound to this offer token id or canonical digest, or the
-    /// witnessed amount is zero.
+    /// empty, the trusted-authority set is empty, the signer is not a member of
+    /// the trusted-authority set, the signature does not verify, the receipt is
+    /// not bound to this order id, the receipt is not bound to this offer token id
+    /// or canonical digest, or the witnessed amount is zero.
     pub fn from_signed(
         receipt: &SignedCommerceReservationReceipt,
-        expected_reservation_authority: &PublicKey,
+        trusted_reservation_authorities: &[PublicKey],
         order_context: &CommerceOrderContext,
         token_offer: &CapabilityToken,
     ) -> Result<Self, CommerceOrderError> {
@@ -478,11 +491,21 @@ impl VerifiedCommerceReservation {
                 "escrow accept denied: reservation receipt id must not be empty".to_string(),
             ));
         }
-        // Settlement-authority binding: the witness MUST be signed by the pinned
-        // reservation authority, and the signature MUST verify over the body.
-        if receipt.signer_key != *expected_reservation_authority {
+        // Settlement-authority binding: the witness MUST be signed by a member of
+        // the pinned trusted reservation-authority set, and the signature MUST
+        // verify over the body. Fail closed on an empty pinned set: with no
+        // trusted authority pinned there is no party whose witness can be
+        // trusted, so a caller cannot bypass the binding by supplying nothing.
+        if trusted_reservation_authorities.is_empty() {
             return Err(CommerceOrderError::SettlementFailed(
-                "escrow accept denied: reservation receipt is not signed by the expected \
+                "escrow accept denied: no trusted settlement reservation authority is pinned; \
+                 pin the RR2-TM-01 registry authority set before locking custody"
+                    .to_string(),
+            ));
+        }
+        if !trusted_reservation_authorities.contains(&receipt.signer_key) {
+            return Err(CommerceOrderError::SettlementFailed(
+                "escrow accept denied: reservation receipt is not signed by a pinned trusted \
                  settlement reservation authority"
                     .to_string(),
             ));
@@ -565,9 +588,14 @@ pub struct CommerceEscrowAcceptRequest<'a> {
     /// order/offer. Verified and bound to the order and offer token before any
     /// custody is locked (see [`VerifiedCommerceReservation::from_signed`]).
     pub reservation: &'a SignedCommerceReservationReceipt,
-    /// The pinned settlement reservation authority key the reservation witness
-    /// MUST be signed by.
-    pub reservation_authority: PublicKey,
+    /// The pinned set of trusted settlement reservation-authority keys the
+    /// reservation witness MUST be signed by. This MUST be sourced from verified,
+    /// externally pinned launch config (the RR2-TM-01 market-authority registry),
+    /// NEVER from the receipt under verification: a caller cannot satisfy the
+    /// binding by signing a receipt with their own key and naming that same key
+    /// here, because their key is not a member of the registry-pinned set. Fail
+    /// closed on an empty set.
+    pub trusted_reservation_authorities: Vec<PublicKey>,
     /// Off-context settlement dispatch fields for the settlement packet body.
     pub settlement: CommerceSettlementDispatch,
     /// Authority that signs the emitted settlement packet body.
@@ -607,8 +635,9 @@ pub struct CommerceEscrowRelease {
 /// - the offer token signature does not verify against its issuer key;
 /// - the offer token is not-yet-valid or expired at `accepted_at`;
 /// - the offer token issuer is not a counterparty distinct from the subject;
-/// - the reservation witness is not signed by the expected settlement
-///   reservation authority, or is not bound to this order id and offer token;
+/// - the reservation witness is not signed by a member of the pinned trusted
+///   settlement reservation-authority set, or is not bound to this order id and
+///   offer token;
 /// - the reservation under-collateralizes the offer liability;
 /// - the locked offer liability does not equal the signed quote amount;
 /// - the acceptor is not the offer subject;
@@ -707,7 +736,7 @@ pub fn accept(
     // authentication above.
     let reservation = VerifiedCommerceReservation::from_signed(
         request.reservation,
-        &request.reservation_authority,
+        &request.trusted_reservation_authorities,
         request.order_context,
         request.token_offer,
     )?;
@@ -916,6 +945,27 @@ pub fn release(
     {
         return Err(CommerceOrderError::SettlementFailed(
             "escrow release denied: observed execution does not match the locked amount"
+                .to_string(),
+        ));
+    }
+
+    // REL-3: bind the observed execution to THIS order's reconciliation artifact,
+    // not merely its amount/currency. Amount+currency alone cannot tell two
+    // same-value payments apart, so a Matched execution belonging to a DIFFERENT
+    // payment could otherwise drain this order's custody. The reconciliation ref
+    // is taken from the SIGNED settlement packet (its signature was re-verified
+    // above), so it is the authenticated reconciliation artifact for this order,
+    // not a caller-mutable context field. Fail closed when the observed execution
+    // reference does not match it.
+    let expected_reconciliation_ref = acceptance
+        .settlement_packet
+        .body
+        .reconciliation_ref
+        .as_str();
+    if observation.external_reference_id != expected_reconciliation_ref {
+        return Err(CommerceOrderError::SettlementFailed(
+            "escrow release denied: observed execution reference does not match the order \
+             reconciliation ref"
                 .to_string(),
         ));
     }
@@ -1173,7 +1223,7 @@ mod tests {
             acceptor,
             accepted_at: 500,
             reservation,
-            reservation_authority,
+            trusted_reservation_authorities: vec![reservation_authority],
             settlement: dispatch(),
             settlement_authority: authority,
         }
@@ -1313,9 +1363,11 @@ mod tests {
         ))
         .test_expect("accept succeeds");
 
+        // The observed execution reference MUST match the order's reconciliation
+        // ref (the signed settlement packet carries `reconciliation-1`).
         let observation = CapitalExecutionObservation {
             observed_at: 1_700_000_000,
-            external_reference_id: "exec-ref-1".to_string(),
+            external_reference_id: "reconciliation-1".to_string(),
             amount: MonetaryAmount {
                 units: 4200,
                 currency: "USD".to_string(),
@@ -1357,12 +1409,71 @@ mod tests {
             released.ledger.legs[1].to_account,
             "merchant:stripe:coffee-shop"
         );
-        assert_eq!(released.external_reference_id, "exec-ref-1");
+        assert_eq!(released.external_reference_id, "reconciliation-1");
         assert_eq!(released.next_state, OrderState::SettlementReconciled);
         assert_eq!(
             released.updated_context.current_state,
             "settlement_reconciled"
         );
+    }
+
+    // Finding 2 / REL-3: a Matched observation whose external reference does not
+    // match the order's (signed) reconciliation ref is denied before custody is
+    // drained, even when its amount and currency match the locked ledger exactly.
+    // This stops a same-value execution from a DIFFERENT payment from draining
+    // this order's custody.
+    #[test]
+    fn release_fails_closed_on_reconciliation_reference_mismatch() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let context = order_context("fulfillment_attested");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
+
+        let acceptance = accept(accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            res_auth.public_key(),
+            &authority,
+        ))
+        .test_expect("accept locks the ledger");
+        // The signed settlement packet carries the order reconciliation ref.
+        assert_eq!(
+            acceptance.settlement_packet.body.reconciliation_ref,
+            "reconciliation-1"
+        );
+
+        // A same-value Matched execution from a DIFFERENT payment: exact amount
+        // and currency, but a foreign external reference.
+        let foreign_payment = CapitalExecutionObservation {
+            observed_at: 1_700_000_000,
+            external_reference_id: "reconciliation-other-payment".to_string(),
+            amount: MonetaryAmount {
+                units: 4200,
+                currency: "USD".to_string(),
+            },
+        };
+        let advanced = advanced_context(&acceptance, "settlement_observed");
+        let denied = release(
+            &acceptance,
+            &advanced,
+            &foreign_payment,
+            CapitalExecutionReconciledState::Matched,
+        )
+        .test_expect_err("a foreign-reference execution is denied");
+        assert!(matches!(
+            denied,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("reference does not match the order reconciliation ref")
+        ));
+        // Custody is never drained.
+        assert_eq!(acceptance.ledger.status, CommerceEscrowStatus::Locked);
+        assert_eq!(acceptance.ledger.legs.len(), 1);
     }
 
     #[test]
@@ -2008,8 +2119,11 @@ mod tests {
         ));
     }
 
-    // ESCROW-2: a reservation signed by an authority OTHER than the expected
-    // settlement reservation authority is denied.
+    // Finding 1 / ESCROW-2: a reservation signed by a CALLER-CHOSEN key that is
+    // not a member of the pinned trusted reservation-authority set is denied. The
+    // expected signer is sourced from the pinned set, NEVER echoed from the
+    // receipt, so a holder cannot self-sign a witness and name their own key as
+    // the authority.
     #[test]
     fn accept_fails_closed_on_reservation_from_unexpected_authority() {
         let issuer = keypair(1);
@@ -2018,8 +2132,8 @@ mod tests {
         let authority = keypair(7);
         let token = token_offer(&issuer, &acceptor, 4200, "USD");
         let context = order_context("fulfillment_attested");
-        // Sign the witness with a rogue key, but tell accept to expect the
-        // pinned reservation authority.
+        // Sign the witness with a caller-chosen rogue key, but pin the trusted
+        // reservation authority set to the registry authority only.
         let rogue = keypair(11);
         let reservation = signed_reservation(&context, &token, 4200, "USD", &rogue);
 
@@ -2031,11 +2145,69 @@ mod tests {
             reservation_authority().public_key(),
             &authority,
         ))
-        .test_expect_err("reservation from an unexpected authority is denied");
+        .test_expect_err("reservation from a non-pinned authority is denied");
         assert!(matches!(
             error,
             CommerceOrderError::SettlementFailed(message)
-                if message.contains("not signed by the expected")
+                if message.contains("not signed by a pinned trusted")
+        ));
+
+        // The footgun the finding closes: the caller cannot pin the rogue key as
+        // the trusted authority by echoing the receipt's own signer, because in
+        // production the trusted set is the registry-pinned set, not a
+        // request-derived key. Here we verify that even a self-consistent
+        // rogue-signed receipt is denied when the rogue key is absent from the
+        // pinned set.
+        let mut self_pinned = accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            // The PINNED set deliberately excludes the rogue signer.
+            reservation_authority().public_key(),
+            &authority,
+        );
+        // Sanity: the pinned set is the registry authority, not the rogue key.
+        assert!(!self_pinned
+            .trusted_reservation_authorities
+            .contains(&rogue.public_key()));
+        self_pinned.trusted_reservation_authorities = vec![reservation_authority().public_key()];
+        let self_error = accept(self_pinned)
+            .test_expect_err("rogue-signed receipt is denied off the pinned set");
+        assert!(matches!(
+            self_error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("not signed by a pinned trusted")
+        ));
+    }
+
+    // Finding 1 / ESCROW-2: an empty pinned trusted reservation-authority set
+    // fails closed; with no trusted authority pinned, no witness can lock custody.
+    #[test]
+    fn accept_fails_closed_on_empty_trusted_reservation_authorities() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let context = order_context("fulfillment_attested");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
+
+        let mut request = accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            res_auth.public_key(),
+            &authority,
+        );
+        request.trusted_reservation_authorities = Vec::new();
+        let error = accept(request).test_expect_err("empty pinned trusted-authority set is denied");
+        assert!(matches!(
+            error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("no trusted settlement reservation authority is pinned")
         ));
     }
 
