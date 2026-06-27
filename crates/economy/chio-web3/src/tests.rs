@@ -1243,6 +1243,71 @@ fn tool_call_authorization_denies_zero_invocation_budget() {
     );
 }
 
+/// PR959 codex P2 (re-review): a capability whose MONETARY budget is unusable or
+/// unconfirmable authorizes nothing here. The argument-less helper has no per-call
+/// cost and no running-total usage, so it cannot evaluate a monetary cap: a
+/// `max_cost_per_invocation = Some(0)` cap denies every non-zero-cost call, an
+/// exhausted `max_total_cost` denies further calls, and even a positive cap is
+/// unconfirmable. Like the constraint lane, a monetary-capped grant fails closed
+/// and must route through the kernel budget lane. A grant with no monetary cap
+/// (both `None`) remains usable.
+#[test]
+fn tool_call_authorization_denies_monetary_capped_grant() {
+    let base = ToolGrant {
+        server_id: "srv".to_string(),
+        tool_name: "tool_a".to_string(),
+        operations: vec![Operation::Invoke],
+        constraints: vec![],
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost: None,
+        dpop_required: None,
+    };
+    // A zero per-invocation cost cap denies every non-zero-cost call: fail closed.
+    let zero_cost = ToolGrant {
+        max_cost_per_invocation: Some(MonetaryAmount {
+            units: 0,
+            currency: "USD".to_string(),
+        }),
+        ..base.clone()
+    };
+    assert!(
+        !ToolCallAuthorization::from_capability_grant(&zero_cost, "srv", "tool_a").is_authorized(),
+        "a grant with max_cost_per_invocation Some(0) must not authorize a tool call"
+    );
+    // A positive per-invocation cost cap is still unconfirmable without the call
+    // cost, so it fails closed and must route through the budget lane.
+    let positive_cost = ToolGrant {
+        max_cost_per_invocation: Some(MonetaryAmount {
+            units: 500,
+            currency: "USD".to_string(),
+        }),
+        ..base.clone()
+    };
+    assert!(
+        !ToolCallAuthorization::from_capability_grant(&positive_cost, "srv", "tool_a")
+            .is_authorized(),
+        "a monetary-capped grant must route through the budget lane, not authorize here"
+    );
+    // A total-cost cap is likewise unconfirmable without running usage: fail closed.
+    let total_cap = ToolGrant {
+        max_total_cost: Some(MonetaryAmount {
+            units: 1_000,
+            currency: "USD".to_string(),
+        }),
+        ..base.clone()
+    };
+    assert!(
+        !ToolCallAuthorization::from_capability_grant(&total_cap, "srv", "tool_a").is_authorized(),
+        "a max_total_cost-capped grant must route through the budget lane, not authorize here"
+    );
+    // A grant with no monetary cap (both None) stays usable.
+    assert!(
+        ToolCallAuthorization::from_capability_grant(&base, "srv", "tool_a").is_authorized(),
+        "a grant with no monetary cap authorizes the matching tool call"
+    );
+}
+
 /// M2-12: a fully verified settlement report NEVER authorizes a tool call, and
 /// this holds STRUCTURALLY rather than as a runtime string check. Even after
 /// forging a `"authorized"` verdict and injecting capability-shaped claims, the

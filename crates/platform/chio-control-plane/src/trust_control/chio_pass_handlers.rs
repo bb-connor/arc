@@ -929,11 +929,22 @@ impl SealedPassProofPanel {
     /// `Sealed` verdict). The only error path is the seal canonicalization of the
     /// panel's own well-formed body, which is propagated fail-closed.
     ///
+    /// `expected_target` is the trusted, registered anchor target whose
+    /// `contract_address` is the intended root-registry the publication must
+    /// broadcast to. The prepared publication's broadcast envelope (chain, target
+    /// contract, operator, publisher) rides OUTSIDE every signed artifact, so it is
+    /// bound here to this independently supplied target; a publication tampered to
+    /// broadcast to a different contract or chain flips the verdict to
+    /// [`PassProofPanelVerdict::Tampered`] fail-closed.
+    ///
     /// # Errors
     ///
     /// Returns a [`CliError`] only if the seal body cannot be canonical-JSON encoded.
-    pub fn project(prepared: &PreparedPassAnchorPublication) -> Result<Self, CliError> {
-        let recompute = recompute_pass_proof_panel(prepared);
+    pub fn project(
+        prepared: &PreparedPassAnchorPublication,
+        expected_target: &EvmAnchorTarget,
+    ) -> Result<Self, CliError> {
+        let recompute = recompute_pass_proof_panel(prepared, expected_target);
         let seal = seal_digest_for(
             &recompute.rows,
             &recompute.recomputed_root,
@@ -1042,7 +1053,10 @@ fn note_tamper(slot: &mut Option<String>, reason: impl Into<String>) {
 /// recompute is the sole proof lane: it rebuilds the Merkle root, cross-binds it to
 /// every anchoring artifact, and re-walks every inclusion proof. It never mutates the
 /// input (it borrows it) and never trusts a stored root or verdict.
-fn recompute_pass_proof_panel(prepared: &PreparedPassAnchorPublication) -> PassProofPanelRecompute {
+fn recompute_pass_proof_panel(
+    prepared: &PreparedPassAnchorPublication,
+    expected_target: &EvmAnchorTarget,
+) -> PassProofPanelRecompute {
     let digests = &prepared.anchored_digests;
     let inclusions = &prepared.batch.body.inclusions;
     let digest_count = digests.len();
@@ -1147,10 +1161,15 @@ fn recompute_pass_proof_panel(prepared: &PreparedPassAnchorPublication) -> PassP
     // proof set can keep `publication.merkle_root` equal to the recomputed root
     // while its `call_data` would publish a DIFFERENT root/seq/range/operator-key-
     // hash. Re-decode the broadcast payload and bind every published field to the
-    // (now validated) checkpoint so a divergent broadcast fails closed.
+    // (now validated) checkpoint so a divergent broadcast fails closed. The same
+    // call also binds the broadcast envelope (chain, target contract, operator,
+    // publisher) - which rides outside the ABI payload and every signed artifact -
+    // to the trusted `expected_target`, so a publication tampered to broadcast to a
+    // different contract or chain fails closed here too.
     if let Err(error) = validate_publication_call_data_against_checkpoint(
         &prepared.publication,
         &prepared.checkpoint,
+        expected_target,
     ) {
         note_tamper(
             &mut first_tamper,
@@ -3051,7 +3070,8 @@ mod tests {
         use chio_core::is_supported_signed_artifact_schema;
 
         let prepared = prepared_two_issued_one_revoked();
-        let panel = SealedPassProofPanel::project(&prepared).expect("project panel");
+        let panel =
+            SealedPassProofPanel::project(&prepared, &anchor_target()).expect("project panel");
 
         // The verdict is RECOMPUTED to Sealed for an untampered proof set.
         assert_eq!(panel.verdict(), &PassProofPanelVerdict::Sealed);
@@ -3110,14 +3130,16 @@ mod tests {
     #[test]
     fn sealed_pass_proof_panel_tampered_proof_flips_verdict_fail_closed() {
         let clean_prepared = prepared_two_issued_one_revoked();
-        let clean = SealedPassProofPanel::project(&clean_prepared).expect("project clean panel");
+        let clean = SealedPassProofPanel::project(&clean_prepared, &anchor_target())
+            .expect("project clean panel");
         assert!(clean.is_sealed());
         let clean_seal = clean.seal_digest().to_string();
 
         // A helper that asserts a tampered proof set seals to a Tampered verdict, with
         // a non-empty reason and a seal that differs from the clean reference.
         let assert_tampered = |tampered: &PreparedPassAnchorPublication, label: &str| {
-            let panel = SealedPassProofPanel::project(tampered).expect("project tampered panel");
+            let panel = SealedPassProofPanel::project(tampered, &anchor_target())
+                .expect("project tampered panel");
             assert!(
                 !panel.is_sealed(),
                 "tampered proof set must not seal ({label})"
@@ -3194,6 +3216,27 @@ mod tests {
         let mut wrong_call_data = prepared_two_issued_one_revoked();
         wrong_call_data.publication.call_data = divergent.publication.call_data.clone();
         assert_tampered(&wrong_call_data, "call_data publishes a different root");
+
+        // (h) PR959 codex P2 (re-review): the broadcast TARGET is tampered. The
+        // ABI `call_data`, roots, sequence, and operator key all stay consistent
+        // with the checkpoint, but `contract_address` (the `to` of the broadcast)
+        // is repointed to a DIFFERENT contract. `publish_root` uses that mutable
+        // field as the broadcast target, so without an envelope binding the panel
+        // would seal a publication that never reaches the intended root registry.
+        // The contract address lives outside the ABI payload and every signed
+        // artifact, so only the bind-to-trusted-target check catches it.
+        let mut wrong_target = prepared_two_issued_one_revoked();
+        wrong_target.publication.contract_address =
+            "0x000000000000000000000000000000000000dEaD".to_string();
+        assert_tampered(
+            &wrong_target,
+            "publication broadcasts to a different contract",
+        );
+
+        // (i) PR959 codex P2 (re-review): the broadcast chain id is repointed.
+        let mut wrong_chain = prepared_two_issued_one_revoked();
+        wrong_chain.publication.chain_id = "0xdeadbeef".to_string();
+        assert_tampered(&wrong_chain, "publication broadcasts to a different chain");
     }
 
     #[test]
@@ -3211,8 +3254,10 @@ mod tests {
         let publication_root_before = prepared.publication.merkle_root;
         let inclusions_before = prepared.batch.body.inclusions.len();
 
-        let panel_one = SealedPassProofPanel::project(&prepared).expect("project once");
-        let panel_two = SealedPassProofPanel::project(&prepared).expect("project twice");
+        let panel_one =
+            SealedPassProofPanel::project(&prepared, &anchor_target()).expect("project once");
+        let panel_two =
+            SealedPassProofPanel::project(&prepared, &anchor_target()).expect("project twice");
 
         // Read-only: projecting did not mutate the prepared proof set.
         assert_eq!(prepared.anchored_digests, digests_before);

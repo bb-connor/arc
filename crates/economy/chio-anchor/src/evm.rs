@@ -175,9 +175,39 @@ pub fn prepare_root_publication(
     })
 }
 
+/// Bind a publication envelope EVM address to its expected trusted-target value.
+///
+/// Both sides are parsed to a canonical [`Address`] before comparison so a
+/// checksum-case difference is not a false mismatch, and an unparseable address on
+/// either side fails closed (the publication can never be confirmed against the
+/// trusted target). `field` names the envelope slot for the error message.
+fn bind_evm_address_to_target(
+    actual: &str,
+    expected: &str,
+    field: &str,
+) -> Result<(), AnchorError> {
+    let actual_address = Address::from_str(actual).map_err(|error| {
+        AnchorError::InvalidInput(format!(
+            "prepared publication {field} is not an EVM address: {error}"
+        ))
+    })?;
+    let expected_address = Address::from_str(expected).map_err(|error| {
+        AnchorError::InvalidInput(format!(
+            "expected anchor target {field} is not an EVM address: {error}"
+        ))
+    })?;
+    if actual_address != expected_address {
+        return Err(AnchorError::InvalidInput(format!(
+            "prepared publication {field} does not match the expected anchor target"
+        )));
+    }
+    Ok(())
+}
+
 /// Re-decode a prepared publication's broadcastable `call_data` and confirm it
 /// would publish EXACTLY the supplied checkpoint's root, sequence, range, and
-/// tree size under that checkpoint's own operator key.
+/// tree size under that checkpoint's own operator key, AND that it would broadcast
+/// to the expected, registered root-registry target (`expected_target`).
 ///
 /// A [`PreparedEvmRootPublication`] carries both display scalar fields
 /// (`merkle_root`, `checkpoint_seq`, ...) AND the ABI-encoded `call_data` that an
@@ -190,18 +220,61 @@ pub fn prepare_root_publication(
 /// display scalars against that same checkpoint), failing closed on any
 /// disagreement. It performs no network IO and moves no value.
 ///
+/// The transaction envelope (`chain_id`, `contract_address` = the `to` target,
+/// `operator_address`, `publisher_address` = the `from`) lives OUTSIDE the ABI
+/// `call_data` payload, so a call_data/root-consistent publication can still be
+/// tampered to broadcast to a DIFFERENT contract or chain. `publish_root` uses the
+/// mutable `publication.contract_address` as its broadcast target, so a tampered
+/// target would seal a publication that never reaches the intended root registry.
+/// The expected envelope cannot be derived from the checkpoint (the registry
+/// address is not committed in any signed artifact); it comes from the trusted,
+/// independently supplied `expected_target` (the registered anchor target/binding
+/// config). This binds the publication's envelope to that target, failing closed
+/// on a mismatch or an unparseable address.
+///
 /// # Errors
 ///
 /// Returns [`AnchorError::InvalidInput`] when `call_data` is not a decodable
-/// `publishRoot` call, or when any decoded broadcast field or displayed scalar
+/// `publishRoot` call, when any decoded broadcast field or displayed scalar
 /// disagrees with the checkpoint's root, sequence, range, tree size, operator
-/// address, or operator key hash.
+/// address, or operator key hash, or when the publication's broadcast envelope
+/// (chain, target contract, operator, or publisher) disagrees with
+/// `expected_target` (or is not a parseable EVM address).
 pub fn validate_publication_call_data_against_checkpoint(
     publication: &PreparedEvmRootPublication,
     checkpoint: &KernelCheckpoint,
+    expected_target: &EvmAnchorTarget,
 ) -> Result<(), AnchorError> {
     let expected_tree_size = u64::try_from(checkpoint.body.tree_size)
         .map_err(|_| AnchorError::InvalidInput("checkpoint tree_size overflows u64".to_string()))?;
+
+    // (a0) Bind the broadcast envelope to the trusted, registered target. These
+    // fields ride OUTSIDE the ABI `call_data` payload, so they cannot be bound to
+    // the checkpoint; they are bound here to the independently supplied
+    // `expected_target`. `publish_root` broadcasts to `publication.contract_address`
+    // (the `to`) from `publication.publisher_address` (the `from`) on
+    // `publication.chain_id`, so a tampered target/chain would seal a publication
+    // that never reaches the intended root registry. Fail closed on any mismatch.
+    if publication.chain_id != expected_target.chain_id {
+        return Err(AnchorError::InvalidInput(
+            "prepared publication chain_id does not match the expected anchor target".to_string(),
+        ));
+    }
+    bind_evm_address_to_target(
+        &publication.contract_address,
+        &expected_target.contract_address,
+        "contract_address (broadcast target)",
+    )?;
+    bind_evm_address_to_target(
+        &publication.operator_address,
+        &expected_target.operator_address,
+        "operator_address",
+    )?;
+    bind_evm_address_to_target(
+        &publication.publisher_address,
+        &expected_target.publisher_address,
+        "publisher_address (broadcast sender)",
+    )?;
 
     // (a) The display scalars the panel surfaces must themselves match the
     // checkpoint, so a tampered display field cannot ride a consistent call_data.

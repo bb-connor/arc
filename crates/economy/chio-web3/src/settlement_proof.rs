@@ -291,13 +291,26 @@ impl ToolCallAuthorization {
     ///
     /// The decision is authorized only when the capability grant targets this
     /// `server_id`/`tool_name` (honoring `*` wildcards), carries the `Invoke`
-    /// operation, carries NO parameter constraints, AND has a non-zero invocation
-    /// budget (`max_invocations` is not `Some(0)`). Every other case fails closed
-    /// to DENY.
+    /// operation, carries NO parameter constraints, has a non-zero invocation
+    /// budget (`max_invocations` is not `Some(0)`), AND carries NO monetary cap
+    /// (`max_cost_per_invocation` and `max_total_cost` are both `None`). Every
+    /// other case fails closed to DENY.
     ///
     /// A grant with `max_invocations = Some(0)` permits no calls at all: the
     /// kernel budget lane would deny every invocation, so this helper must not
     /// present a zero-budget capability as usable. It fails closed to DENY.
+    ///
+    /// A grant carrying a MONETARY cap (`max_cost_per_invocation` or
+    /// `max_total_cost`) likewise cannot be confirmed satisfied here. This
+    /// argument-less helper has no per-call cost and no running-total usage, so it
+    /// cannot tell whether a non-zero-cost invocation stays within
+    /// `max_cost_per_invocation` or whether `max_total_cost` is already exhausted.
+    /// A `max_cost_per_invocation = Some(0)` cap denies every non-zero-cost call
+    /// outright, and an exhausted `max_total_cost` denies further calls; the kernel
+    /// budget lane (which holds the cost and current usage) is the only lane that
+    /// can evaluate either. Like the constraint lane, a monetary-capped grant
+    /// must route through the budget lane, so it fails closed to DENY here rather
+    /// than advertise a capability the budget lane would deny.
     ///
     /// A constrained grant (`grant.constraints` non-empty) narrows the tool's
     /// input space to a specific path or parameter set, and the kernel's
@@ -323,8 +336,22 @@ impl ToolCallAuthorization {
         // closed on a zero-invocation cap so a no-budget grant never mints an
         // authorized decision.
         let has_budget = grant.max_invocations != Some(0);
+        // A MONETARY cap cannot be evaluated without the call's cost and the
+        // grant's running usage, neither of which this argument-less helper holds.
+        // `max_cost_per_invocation = Some(0)` denies every non-zero-cost call and
+        // an exhausted `max_total_cost` denies further calls, but even a positive
+        // cap is unconfirmable here. Mirror the constraint lane: a monetary-capped
+        // grant fails closed and must route through the kernel budget lane, so a
+        // grant the budget lane would deny on cost is never minted as authorized.
+        let monetary_uncapped =
+            grant.max_cost_per_invocation.is_none() && grant.max_total_cost.is_none();
         Self {
-            granted: server_ok && tool_ok && can_invoke && unconstrained && has_budget,
+            granted: server_ok
+                && tool_ok
+                && can_invoke
+                && unconstrained
+                && has_budget
+                && monetary_uncapped,
         }
     }
 

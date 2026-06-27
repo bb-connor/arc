@@ -87,6 +87,19 @@ pub enum ExposureLedgerNettingError {
     /// rather than measure a netting benefit the single-denomination book cannot
     /// produce; callers must aggregate a currency's positions into one row first.
     DuplicateCurrency { currency: String },
+    /// The exposure ledger report this collapse would net was produced from a
+    /// PAGINATED query that hit its receipt or decision limit: its `summary`
+    /// flags `truncated_receipts` or `truncated_decisions`, so its per-currency
+    /// `positions` were accumulated from ONLY the returned page, not every
+    /// matching ledger row. Netting those partial positions publishes a netted
+    /// view (and a `capital_freed` benefit) computed against UNDERSTATED
+    /// exposure. The collapse refuses a truncated report (fail-closed); callers
+    /// must collapse a source-complete (unpaginated) report whose summary clears
+    /// both truncation flags.
+    TruncatedSource {
+        truncated_receipts: bool,
+        truncated_decisions: bool,
+    },
 }
 
 impl fmt::Display for ExposureLedgerNettingError {
@@ -123,6 +136,13 @@ impl fmt::Display for ExposureLedgerNettingError {
             Self::DuplicateCurrency { currency } => write!(
                 f,
                 "exposure ledger netting rejected duplicate position rows for currency `{currency}`; aggregate a currency's positions into one row before collapsing"
+            ),
+            Self::TruncatedSource {
+                truncated_receipts,
+                truncated_decisions,
+            } => write!(
+                f,
+                "exposure ledger netting refused a truncated source report (truncated_receipts={truncated_receipts}, truncated_decisions={truncated_decisions}); its positions cover only the returned page and would understate exposure, so collapse a source-complete (unpaginated) report"
             ),
         }
     }
@@ -537,12 +557,28 @@ impl ExposureLedgerReport {
     ///
     /// # Errors
     ///
-    /// Returns [`ExposureLedgerNettingError`] when a non-parity currency lacks a
+    /// Returns [`ExposureLedgerNettingError::TruncatedSource`] when this report's
+    /// summary flags `truncated_receipts` or `truncated_decisions` (its positions
+    /// then cover only the returned page and would understate exposure), or any
+    /// other [`ExposureLedgerNettingError`] when a non-parity currency lacks a
     /// conversion rate or a supplied rate has a zero denominator.
     pub fn collapse_to_canonical(
         &self,
         rates: &ExposureLedgerNettingRates,
     ) -> Result<ExposureLedgerNettedView, ExposureLedgerNettingError> {
+        // Fail closed on a truncated source report. A query that hit its receipt
+        // or decision limit accumulates `positions` from ONLY the returned page,
+        // so the per-currency outstanding (and the segregated baseline the netted
+        // view subtracts from) is understated. Netting partial positions would
+        // publish a netted view and a `capital_freed` benefit against exposure
+        // that is lower than the true matching-row total. Require a source-complete
+        // (unpaginated) report before collapsing.
+        if self.summary.truncated_receipts || self.summary.truncated_decisions {
+            return Err(ExposureLedgerNettingError::TruncatedSource {
+                truncated_receipts: self.summary.truncated_receipts,
+                truncated_decisions: self.summary.truncated_decisions,
+            });
+        }
         collapse_positions_to_canonical(&self.positions, rates)
     }
 }
@@ -1051,6 +1087,86 @@ mod tests {
         // Mixed book frees capital, and the prudential book is untouched.
         assert!(via_method.benefit.capital_freed_units > 0);
         assert!(!report.support_boundary.cross_currency_netting_supported);
+    }
+
+    /// PR959 codex P2 (re-review): a report whose summary flags truncation is
+    /// refused by the collapse. A paginated query that hit its receipt or
+    /// decision limit accumulates `positions` from ONLY the returned page, so its
+    /// per-currency outstanding (and the segregated baseline) is understated.
+    /// Netting those partial positions would publish a netted view computed
+    /// against lower-than-true exposure, so `collapse_to_canonical` fails closed
+    /// rather than collapse a truncated source.
+    #[test]
+    fn truncated_report_is_refused_by_collapse() {
+        let positions = vec![
+            ExposureLedgerCurrencyPosition {
+                reserved_units: 100,
+                pending_units: 300,
+                ..position("USD")
+            },
+            ExposureLedgerCurrencyPosition {
+                reserved_units: 400,
+                ..position("EUR")
+            },
+        ];
+        let mut report = ExposureLedgerReport {
+            schema: EXPOSURE_LEDGER_SCHEMA.to_string(),
+            generated_at: 1,
+            filters: ExposureLedgerQuery {
+                agent_subject: Some("subject-1".to_string()),
+                ..ExposureLedgerQuery::default()
+            },
+            support_boundary: ExposureLedgerSupportBoundary::default(),
+            summary: ExposureLedgerSummary {
+                // The query matched more receipts than it returned: the page is partial.
+                matching_receipts: 9,
+                returned_receipts: 2,
+                matching_decisions: 0,
+                returned_decisions: 0,
+                active_decisions: 0,
+                superseded_decisions: 0,
+                actionable_receipts: 0,
+                pending_settlement_receipts: 1,
+                failed_settlement_receipts: 0,
+                currencies: vec!["EUR".to_string(), "USD".to_string()],
+                mixed_currency_book: true,
+                truncated_receipts: true,
+                truncated_decisions: false,
+            },
+            positions: positions.clone(),
+            receipts: Vec::new(),
+            decisions: Vec::new(),
+        };
+
+        let rates = eur_at_1_1();
+        // A truncated-receipts report is refused: the positions are partial.
+        assert_eq!(
+            report.collapse_to_canonical(&rates).unwrap_err(),
+            ExposureLedgerNettingError::TruncatedSource {
+                truncated_receipts: true,
+                truncated_decisions: false,
+            }
+        );
+
+        // A truncated-decisions report is refused for the same reason.
+        report.summary.truncated_receipts = false;
+        report.summary.truncated_decisions = true;
+        assert_eq!(
+            report.collapse_to_canonical(&rates).unwrap_err(),
+            ExposureLedgerNettingError::TruncatedSource {
+                truncated_receipts: false,
+                truncated_decisions: true,
+            }
+        );
+
+        // A source-complete report (both flags clear) still collapses: the guard
+        // refuses only truncated sources, not every report.
+        report.summary.truncated_decisions = false;
+        let view = report.collapse_to_canonical(&rates).unwrap();
+        assert_eq!(
+            view,
+            collapse_positions_to_canonical(&positions, &rates).unwrap()
+        );
     }
 
     /// The netted view round-trips through canonical JSON.
