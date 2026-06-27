@@ -897,8 +897,10 @@ pub struct FreeTierPoolConfig {
     /// Hard monthly ceiling, in allotment units, on aggregate free-tier spend
     /// across every Pass holder. Liability becomes `min(N x allotment, pool)`.
     pub monthly_pool_units: u64,
-    /// The 3-uppercase-letter allotment unit (for example "XCC"). It must be a
-    /// private-use code that carries no money leg.
+    /// The allotment unit. It MUST be the canonical Pass allotment unit
+    /// `pass_gating::PASS_ALLOTMENT_UNIT` ("XCC"): a 3-uppercase-letter private-use
+    /// code that carries no money leg and matches the unit Pass scopes are minted
+    /// with, so the aggregate co-debit actually fires for real Pass charges.
     pub allotment_unit: String,
     /// Audit-only reference to the board approval that funded this pool. It never
     /// participates in any arithmetic; it only records provenance.
@@ -911,7 +913,7 @@ impl FreeTierPoolConfig {
     /// # Errors
     ///
     /// Returns [`KernelError::InvalidFreeTierPoolConfig`] when `monthly_pool_units`
-    /// is zero, `allotment_unit` is not exactly three uppercase ASCII letters, or
+    /// is zero, `allotment_unit` is not the Pass allotment unit ("XCC"), or
     /// `board_approval_ref` is empty.
     pub fn validate(&self) -> Result<(), KernelError> {
         if self.monthly_pool_units == 0 {
@@ -925,6 +927,20 @@ impl FreeTierPoolConfig {
             return Err(KernelError::InvalidFreeTierPoolConfig(
                 "allotment_unit must be 3 uppercase ASCII letters".to_string(),
             ));
+        }
+        // The pool unit MUST be the canonical Pass allotment unit. Pass scopes are
+        // minted with the fixed XCC unit (`pass_gating::PASS_ALLOTMENT_UNIT`), so a
+        // pool configured with any other (shape-valid) unit such as the pinned `USD`
+        // would never match a real Pass charge: the charge path takes the
+        // `currency != pool.allotment_unit` branch and authorizes WITHOUT the
+        // aggregate co-debit, silently disabling the monthly liability cap this config
+        // exists to enforce. Require an exact match, fail-closed.
+        if self.allotment_unit != crate::pass_gating::PASS_ALLOTMENT_UNIT {
+            return Err(KernelError::InvalidFreeTierPoolConfig(format!(
+                "allotment_unit must be the Pass allotment unit {}, got {}",
+                crate::pass_gating::PASS_ALLOTMENT_UNIT,
+                self.allotment_unit
+            )));
         }
         if self.board_approval_ref.is_empty() {
             return Err(KernelError::InvalidFreeTierPoolConfig(
@@ -980,16 +996,28 @@ mod free_tier_pool_config_tests {
 
     #[test]
     fn validate_rejects_malformed_unit() {
-        // 3 uppercase letters is the shape rule (the private-use / no-money-leg
-        // check lives in the charge path, not here), so "USD" is shape-valid.
         for bad in ["xcc", "XC", "XCCX", "X1C", ""] {
             let mut c = cfg();
             c.allotment_unit = bad.to_string();
             assert!(c.validate().is_err(), "unit `{bad}` must be rejected");
         }
-        let mut usd = cfg();
-        usd.allotment_unit = "USD".to_string();
-        assert!(usd.validate().is_ok(), "3 uppercase letters is shape-valid");
+    }
+
+    #[test]
+    fn validate_rejects_non_xcc_pool_unit() {
+        // PR957 codex P2: the pool unit must be the canonical Pass allotment unit
+        // (XCC). A shape-valid but pinned currency like USD would never match a real
+        // Pass charge, silently disabling the monthly liability cap, so it is rejected
+        // fail-closed even though it is three uppercase letters. Any other private-use
+        // code is likewise rejected: Pass scopes only ever mint XCC.
+        for non_xcc in ["USD", "ABC"] {
+            let mut c = cfg();
+            c.allotment_unit = non_xcc.to_string();
+            assert!(
+                c.validate().is_err(),
+                "a non-XCC pool unit `{non_xcc}` must be rejected"
+            );
+        }
     }
 
     #[test]
