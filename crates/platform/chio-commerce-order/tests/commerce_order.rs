@@ -1651,10 +1651,7 @@ fn pin_escrow_digest_via_accept(
     let acceptor = subject.public_key();
     let settlement_authority = Keypair::from_seed(&[43u8; 32]);
     let token = escrow_offer_token(&issuer, &acceptor, 4200, "USD");
-    let reservation = MonetaryAmount {
-        units: 4200,
-        currency: "USD".to_string(),
-    };
+    let reservation_authority = Keypair::from_seed(&[44u8; 32]);
 
     // accept() requires the order at a settlement-assembly prior state; it then
     // advances the context to settlement_packet_assembled with the escrow digest
@@ -1664,13 +1661,36 @@ fn pin_escrow_digest_via_accept(
     escrow_context.current_state = "fulfillment_attested".to_string();
     escrow_context.escrow_digest = None;
 
+    // The reservation is a signed witness bound to this order and the exact offer
+    // token (id + canonical digest), signed by the settlement reservation
+    // authority.
+    let offer_digest = sha256_hex(
+        &chio_core_types::canonical_json_bytes(&token).test_expect("offer token canonicalizes"),
+    );
+    let reservation = chio_commerce_order::SignedCommerceReservationReceipt::sign(
+        chio_commerce_order::CommerceReservationReceipt {
+            schema: chio_commerce_order::COMMERCE_RESERVATION_RECEIPT_SCHEMA_ID.to_string(),
+            receipt_id: "reservation-commerce-001".to_string(),
+            order_id: escrow_context.order_id.clone(),
+            token_offer_id: token.id.clone(),
+            token_offer_sha256: offer_digest,
+            reserved_amount: MonetaryAmount {
+                units: 4200,
+                currency: "USD".to_string(),
+            },
+        },
+        &reservation_authority,
+    )
+    .test_expect("reservation receipt signs");
+
     let acceptance =
         chio_commerce_order::accept(chio_commerce_order::CommerceEscrowAcceptRequest {
             order_context: &escrow_context,
             token_offer: &token,
             acceptor: &acceptor,
             accepted_at: 500,
-            reserved_amount: &reservation,
+            reservation: &reservation,
+            reservation_authority: reservation_authority.public_key(),
             depositor_account: "buyer:demo-cafe-customer".to_string(),
             beneficiary_account: "merchant:stripe:coffee-shop".to_string(),
             settlement: chio_commerce_order::CommerceSettlementDispatch {
