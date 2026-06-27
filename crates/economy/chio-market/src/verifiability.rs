@@ -388,11 +388,26 @@ impl GradedQuoteOption {
     /// fails closed with [`QuoteOptionError::PriceOverflow`] rather than binding
     /// a capped, UNDER-charged price.
     ///
+    /// This is the fail-closed price-binding path, so it FIRST rejects an
+    /// internally inconsistent grade. [`Self`] derives `Deserialize` and exposes
+    /// public fields, so a hand-built or decoded option can carry a grade whose
+    /// `verified_score` exceeds `required_score` (or whose band/score disagree)
+    /// without ever passing through [`Self::try_new`]. Such a grade makes the
+    /// missing-evidence term `required_score - verified_score` saturate to zero,
+    /// which would silently drop the surcharge and bind the BASE price (an
+    /// undercharge). A direct caller that does not route through [`Self::exercise`]
+    /// (which validates first) would otherwise undercharge, so the consistency
+    /// check is enforced here too.
+    ///
     /// # Errors
     ///
-    /// Returns [`QuoteOptionError::PriceOverflow`] when the graded price exceeds
-    /// `u64::MAX`.
+    /// Returns [`QuoteOptionError::InconsistentGrade`] when the option's grade is
+    /// not internally consistent, and [`QuoteOptionError::PriceOverflow`] when the
+    /// graded price exceeds `u64::MAX`.
     pub fn checked_graded_price(&self) -> Result<MonetaryAmount, QuoteOptionError> {
+        if !self.grade.is_internally_consistent() {
+            return Err(QuoteOptionError::InconsistentGrade);
+        }
         let surcharge: u128 = if self.grade.required_score == 0 {
             0
         } else {
@@ -931,6 +946,43 @@ mod tests {
         match option.exercise(150) {
             Err(QuoteOptionError::PriceOverflow) => {}
             other => panic!("overflowing graded price must fail closed at exercise, got {other:?}"),
+        }
+    }
+
+    /// PR959 codex P2 (5th re-review): `checked_graded_price` is the public
+    /// fail-closed binding-price path, so it must reject an internally inconsistent
+    /// grade rather than silently undercharge. A hand-built/decoded grade with
+    /// `verified_score > required_score` (here required=1, verified=2) makes the
+    /// missing-evidence term saturate to zero, dropping the surcharge and binding
+    /// the BASE price. A direct caller that does not route through `exercise`
+    /// (which validates first) would undercharge; the binding path now fails closed
+    /// on the inconsistency BEFORE computing the surcharge.
+    #[test]
+    fn checked_graded_price_rejects_inconsistent_grade() {
+        let fabricated = VerifiabilityGrade {
+            // band/score are mutually inconsistent; the decisive flaw is
+            // verified_score (2) exceeding required_score (1), which would
+            // saturate the missing-evidence term to zero and drop the surcharge.
+            band: VerifiabilityBand::Full,
+            verified_score: 2,
+            required_score: 1,
+            missing_evidence: Vec::new(),
+        };
+        assert!(!fabricated.is_internally_consistent());
+        let option = GradedQuoteOption {
+            quote_id: "quote-1".to_string(),
+            base_price: usd(1_000),
+            grade: fabricated,
+            minimum_band: VerifiabilityBand::Unverified,
+            issued_at: 100,
+            expires_at: 200,
+        };
+        match option.checked_graded_price() {
+            Err(QuoteOptionError::InconsistentGrade) => {}
+            // Must NOT return Ok(base_price): that is the undercharge this guards.
+            other => {
+                panic!("an inconsistent grade must fail closed, not bind a price, got {other:?}")
+            }
         }
     }
 }
