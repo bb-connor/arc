@@ -52,6 +52,16 @@ pub enum ExposureLedgerNettingError {
     /// A supplied conversion rate had a zero denominator. The collapse refuses
     /// to divide by zero or understate exposure.
     ZeroDenominator { currency: String },
+    /// A conversion into the canonical denomination exceeded `u64::MAX`. The
+    /// collapse refuses to cap or saturate the result, because a capped figure
+    /// understates outstanding exposure and would publish a lower-than-true
+    /// netted view (fail-closed: oversized books surface as an error).
+    ConversionOverflow { currency: String },
+    /// A pinned-parity currency (USD or the canonical USDC denomination) was
+    /// supplied an explicit conversion rate that is not one-to-one. The collapse
+    /// refuses the override rather than letting it break the USD/USDC pin and
+    /// understate the canonical exposure.
+    PinnedParityOverride { currency: String },
 }
 
 impl fmt::Display for ExposureLedgerNettingError {
@@ -64,6 +74,14 @@ impl fmt::Display for ExposureLedgerNettingError {
             Self::ZeroDenominator { currency } => write!(
                 f,
                 "exposure ledger netting rejected a zero-denominator conversion rate for currency `{currency}`"
+            ),
+            Self::ConversionOverflow { currency } => write!(
+                f,
+                "exposure ledger netting conversion for currency `{currency}` overflowed u64; capping would understate exposure"
+            ),
+            Self::PinnedParityOverride { currency } => write!(
+                f,
+                "exposure ledger netting rejected a non-parity override rate for pinned currency `{currency}`"
             ),
         }
     }
@@ -94,12 +112,21 @@ impl CanonicalConversionRate {
         }
     }
 
+    /// Whether this rate converts one-to-one (a parity rate): the numerator and
+    /// denominator are equal and non-zero, so `convert` is the identity.
+    #[must_use]
+    pub fn is_parity(&self) -> bool {
+        self.denominator != 0 && self.numerator == self.denominator
+    }
+
     /// Convert `units` of the source currency into canonical units, rounding up.
     ///
     /// # Errors
     ///
     /// Returns [`ExposureLedgerNettingError::ZeroDenominator`] when the rate
-    /// denominator is zero.
+    /// denominator is zero, and [`ExposureLedgerNettingError::ConversionOverflow`]
+    /// when the converted figure exceeds `u64::MAX` (the collapse fails closed
+    /// rather than capping, since a capped figure understates exposure).
     pub fn convert(&self, units: u64) -> Result<u64, ExposureLedgerNettingError> {
         if self.denominator == 0 {
             return Err(ExposureLedgerNettingError::ZeroDenominator {
@@ -109,9 +136,42 @@ impl CanonicalConversionRate {
         if units == 0 {
             return Ok(0);
         }
+        // `u64` * `u64` always fits in `u128`, so the multiply never saturates;
+        // the only overflow path is the final narrowing back to `u64`.
         let scaled = u128::from(units).saturating_mul(u128::from(self.numerator));
         let converted = scaled.div_ceil(u128::from(self.denominator));
-        Ok(converted.min(u128::from(u64::MAX)) as u64)
+        u64::try_from(converted).map_err(|_| ExposureLedgerNettingError::ConversionOverflow {
+            currency: self.currency.clone(),
+        })
+    }
+
+    /// Convert `units` of the source currency into canonical units, rounding DOWN.
+    ///
+    /// Used for recovery/offset channels: a recovery REDUCES the net loss, so
+    /// rounding a gross recovery UP could shrink the net loss below the true
+    /// figure after subtraction. Rounding the recovery down keeps the net-loss
+    /// channel fail-closed (it never credits more recovery than the rate
+    /// supports), so the netted view never understates exposure.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ExposureLedgerNettingError::ZeroDenominator`] when the rate
+    /// denominator is zero, and [`ExposureLedgerNettingError::ConversionOverflow`]
+    /// when the converted figure exceeds `u64::MAX`.
+    pub fn convert_floor(&self, units: u64) -> Result<u64, ExposureLedgerNettingError> {
+        if self.denominator == 0 {
+            return Err(ExposureLedgerNettingError::ZeroDenominator {
+                currency: self.currency.clone(),
+            });
+        }
+        if units == 0 {
+            return Ok(0);
+        }
+        let scaled = u128::from(units).saturating_mul(u128::from(self.numerator));
+        let converted = scaled / u128::from(self.denominator);
+        u64::try_from(converted).map_err(|_| ExposureLedgerNettingError::ConversionOverflow {
+            currency: self.currency.clone(),
+        })
     }
 }
 
@@ -134,21 +194,36 @@ impl ExposureLedgerNettingRates {
 
     /// Resolve the conversion rate for a source currency.
     ///
-    /// An explicit rate wins. Absent that, the canonical currency and USD
-    /// resolve to one-to-one parity. Any other currency fails closed.
+    /// The canonical currency and USD are pinned one-to-one (the USD/USDC pin):
+    /// for those currencies an explicit override is honored ONLY when it is
+    /// itself a parity rate, otherwise the collapse fails closed rather than let
+    /// a `1/2` (or any non-parity) override halve canonical exposure. For any
+    /// other currency an explicit rate wins; absent that, the collapse fails
+    /// closed.
     ///
     /// # Errors
     ///
-    /// Returns [`ExposureLedgerNettingError::MissingRate`] when no rate is known
-    /// for a non-parity currency.
+    /// Returns [`ExposureLedgerNettingError::PinnedParityOverride`] when a pinned
+    /// currency is given a non-parity override, and
+    /// [`ExposureLedgerNettingError::MissingRate`] when no rate is known for a
+    /// non-parity currency.
     pub fn rate_for(
         &self,
         currency: &str,
     ) -> Result<CanonicalConversionRate, ExposureLedgerNettingError> {
+        let is_pinned_parity = currency == CANONICAL_NETTING_CURRENCY || currency == "USD";
         if let Some(rate) = self.rates.iter().find(|rate| rate.currency == currency) {
+            // The USD/USDC pin takes precedence: a non-parity override for a
+            // pinned currency is rejected before it can understate the netted
+            // view, never accepted ahead of the pinned identity rate.
+            if is_pinned_parity && !rate.is_parity() {
+                return Err(ExposureLedgerNettingError::PinnedParityOverride {
+                    currency: currency.to_string(),
+                });
+            }
             return Ok(rate.clone());
         }
-        if currency == CANONICAL_NETTING_CURRENCY || currency == "USD" {
+        if is_pinned_parity {
             return Ok(CanonicalConversionRate::identity(currency));
         }
         Err(ExposureLedgerNettingError::MissingRate {
@@ -253,8 +328,13 @@ fn convert_position(
         settled_units: rate.convert(position.settled_units)?,
         pending_units: rate.convert(position.pending_units)?,
         failed_units: rate.convert(position.failed_units)?,
+        // The exposure channels round UP so the netted view never understates
+        // them. The recovery channel offsets the provisional-loss channel
+        // (`net loss = provisional_loss - recovered`), so it rounds DOWN: a
+        // recovery rounded up could shrink the net loss below the true figure
+        // after subtraction and understate `outstanding_exposure_units`.
         provisional_loss_units: rate.convert(position.provisional_loss_units)?,
-        recovered_units: rate.convert(position.recovered_units)?,
+        recovered_units: rate.convert_floor(position.recovered_units)?,
         quoted_premium_units: rate.convert(position.quoted_premium_units)?,
         active_quoted_premium_units: rate.convert(position.active_quoted_premium_units)?,
     })
@@ -790,5 +870,119 @@ mod tests {
         let encoded = serde_json::to_string(&view).unwrap();
         let decoded: ExposureLedgerNettedView = serde_json::from_str(&encoded).unwrap();
         assert_eq!(view, decoded);
+    }
+
+    /// PR959 codex P1: a conversion that exceeds `u64::MAX` fails closed with a
+    /// [`ExposureLedgerNettingError::ConversionOverflow`] rather than capping at
+    /// `u64::MAX`, since a capped figure would understate outstanding exposure.
+    #[test]
+    fn oversized_conversion_fails_closed_instead_of_capping() {
+        let rate = CanonicalConversionRate {
+            currency: "EUR".to_string(),
+            numerator: 2,
+            denominator: 1,
+        };
+        // u64::MAX * 2 / 1 overflows u64; capping would publish a lower-than-true
+        // exposure, so the convert fails closed.
+        assert_eq!(
+            rate.convert(u64::MAX).unwrap_err(),
+            ExposureLedgerNettingError::ConversionOverflow {
+                currency: "EUR".to_string()
+            }
+        );
+        // The floor conversion is fail-closed on overflow too.
+        assert_eq!(
+            rate.convert_floor(u64::MAX).unwrap_err(),
+            ExposureLedgerNettingError::ConversionOverflow {
+                currency: "EUR".to_string()
+            }
+        );
+        // The whole collapse propagates the overflow rather than understating.
+        let eur = ExposureLedgerCurrencyPosition {
+            reserved_units: u64::MAX,
+            ..position("EUR")
+        };
+        let rates = ExposureLedgerNettingRates::new(vec![rate]);
+        assert_eq!(
+            collapse_positions_to_canonical(&[eur], &rates).unwrap_err(),
+            ExposureLedgerNettingError::ConversionOverflow {
+                currency: "EUR".to_string()
+            }
+        );
+        // A conversion that lands exactly on u64::MAX still succeeds.
+        let parity = CanonicalConversionRate::identity("USDC");
+        assert_eq!(parity.convert(u64::MAX).unwrap(), u64::MAX);
+    }
+
+    /// PR959 codex P2: a pinned-parity currency (USD or USDC) supplied a
+    /// non-parity explicit override is rejected before the override can halve
+    /// canonical exposure; the USD/USDC pin is not negotiable.
+    #[test]
+    fn pinned_parity_rejects_non_identity_override() {
+        for pinned in ["USDC", "USD"] {
+            let rates = ExposureLedgerNettingRates::new(vec![CanonicalConversionRate {
+                currency: pinned.to_string(),
+                numerator: 1,
+                denominator: 2,
+            }]);
+            assert_eq!(
+                rates.rate_for(pinned).unwrap_err(),
+                ExposureLedgerNettingError::PinnedParityOverride {
+                    currency: pinned.to_string()
+                }
+            );
+            // The collapse fails closed rather than netting at the bogus rate.
+            let pos = ExposureLedgerCurrencyPosition {
+                reserved_units: 1_000,
+                ..position(pinned)
+            };
+            assert_eq!(
+                collapse_positions_to_canonical(&[pos], &rates).unwrap_err(),
+                ExposureLedgerNettingError::PinnedParityOverride {
+                    currency: pinned.to_string()
+                }
+            );
+        }
+        // An explicit parity override for a pinned currency is still honored.
+        let parity_override = ExposureLedgerNettingRates::new(vec![CanonicalConversionRate {
+            currency: "USD".to_string(),
+            numerator: 5,
+            denominator: 5,
+        }]);
+        assert_eq!(
+            parity_override
+                .rate_for("USD")
+                .unwrap()
+                .convert(1_234)
+                .unwrap(),
+            1_234
+        );
+        // A non-pinned currency keeps accepting an explicit non-parity rate.
+        assert_eq!(
+            eur_at_1_1().rate_for("EUR").unwrap().convert(10).unwrap(),
+            11
+        );
+    }
+
+    /// PR959 codex P2: the recovery channel rounds DOWN so the net-loss channel
+    /// is never understated after subtraction. With 2 EUR provisional loss and 1
+    /// EUR recovered at 11/10 the net loss must be 2 USDC, not the 1 USDC that
+    /// rounding the gross recovery up would produce.
+    #[test]
+    fn recovery_rounds_down_so_net_loss_is_not_understated() {
+        let eur = ExposureLedgerCurrencyPosition {
+            provisional_loss_units: 2,
+            recovered_units: 1,
+            ..position("EUR")
+        };
+        let view = collapse_positions_to_canonical(&[eur], &eur_at_1_1()).unwrap();
+        // provisional loss rounds UP: ceil(2 * 1.1) = ceil(2.2) = 3.
+        assert_eq!(view.netted_position.provisional_loss_units, 3);
+        // recovery rounds DOWN: floor(1 * 1.1) = floor(1.1) = 1.
+        assert_eq!(view.netted_position.recovered_units, 1);
+        // net loss = 3 - 1 = 2 (NOT 3 - ceil(1.1) = 1).
+        assert_eq!(view.netted_position.outstanding_exposure_units(), 2);
+        assert_eq!(view.benefit.netted_outstanding_units, 2);
+        assert_eq!(view.benefit.segregated_outstanding_units, 2);
     }
 }
