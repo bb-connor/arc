@@ -886,7 +886,7 @@ fn validate_public_settlement_verifier_policy(
     Ok(())
 }
 
-fn public_settlement_chain_is_mainnet(chain_id: &str) -> bool {
+pub(crate) fn public_settlement_chain_is_mainnet(chain_id: &str) -> bool {
     matches!(
         chain_id,
         "eip155:1"

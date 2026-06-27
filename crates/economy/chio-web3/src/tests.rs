@@ -55,6 +55,12 @@ use crate::trust_profile::{
     Web3FinalityMode, Web3RegulatedRole, Web3RegulatedRoleAssumption, Web3SettlementPath,
     Web3TrustProfile, CHIO_WEB3_TRUST_PROFILE_SCHEMA,
 };
+use crate::x402_signing::{
+    prepare_x402_broadcast_intent, sign_x402_settlement_attestation,
+    verify_x402_settlement_attestation, ValueMovementAuthorization, X402CustodyModel,
+    X402LiveMoneyMovementLeg, CHIO_X402_PREPARE_ONLY_BROADCAST_INTENT_SCHEMA,
+    CHIO_X402_SETTLEMENT_ATTESTATION_SCHEMA,
+};
 use serde_json::json;
 use std::collections::BTreeSet;
 
@@ -2144,4 +2150,362 @@ fn reference_artifacts_parse_and_validate() {
     validate_web3_settlement_dispatch(&dispatch).unwrap();
     validate_web3_settlement_execution_receipt(&receipt).unwrap();
     validate_web3_qualification_matrix(&matrix).unwrap();
+}
+
+// ---------------------------------------------------------------------------
+// M2-14 (WS-CL-X402-VERIFY): custody-neutral, prepare-only x402 signing path.
+// ---------------------------------------------------------------------------
+
+/// Base Sepolia testnet chain id used for the prepare-only x402 signing tests.
+const X402_TESTNET_CHAIN_ID: &str = "eip155:84532";
+
+/// Rebuild the sample public settlement proof bundle on a TESTNET chain
+/// (Base Sepolia), rewriting every chain-id-bearing field and re-signing the
+/// two identity bindings so their `chain_scope` covers the testnet chain. The
+/// kernel-signed checkpoint statement and the receipt Merkle root do not carry
+/// a chain id, so they remain valid unchanged.
+fn sample_testnet_public_settlement_proof_bundle() -> PublicSettlementProofBundle {
+    let mut bundle = sample_public_settlement_proof_bundle();
+    bundle.chain_id = X402_TESTNET_CHAIN_ID.to_string();
+    bundle.order_binding.chain_id = X402_TESTNET_CHAIN_ID.to_string();
+    if let Some(provenance) = bundle.deployment_provenance.as_mut() {
+        provenance.chain_id = X402_TESTNET_CHAIN_ID.to_string();
+    }
+    bundle.chain_snapshot.chain_id = X402_TESTNET_CHAIN_ID.to_string();
+    bundle.settlement_receipt.dispatch.chain_id = X402_TESTNET_CHAIN_ID.to_string();
+    if let Some(anchor_proof) = bundle.settlement_receipt.reconciled_anchor_proof.as_mut() {
+        if let Some(chain_anchor) = anchor_proof.chain_anchor.as_mut() {
+            chain_anchor.chain_id = X402_TESTNET_CHAIN_ID.to_string();
+        }
+        anchor_proof.key_binding_certificate = signed_identity_binding(
+            operator_keypair(),
+            "0x1111111111111111111111111111111111111111",
+            vec![Web3KeyBindingPurpose::Anchor, Web3KeyBindingPurpose::Settle],
+            vec![X402_TESTNET_CHAIN_ID],
+            "0123456789abcdef0123456789abcdef",
+        );
+    }
+    if let Some(witness) = bundle.public_witness.as_mut() {
+        witness.chain_id = X402_TESTNET_CHAIN_ID.to_string();
+        witness.body_hash =
+            public_settlement_witness_body_hash(witness).expect("testnet witness body hashes");
+    }
+    bundle.chain_snapshot.beneficiary_identity_binding = Some(signed_identity_binding(
+        beneficiary_keypair(),
+        "0x2222222222222222222222222222222222222222",
+        vec![Web3KeyBindingPurpose::Settle],
+        vec![X402_TESTNET_CHAIN_ID],
+        "beneficiary-identity-binding-0001",
+    ));
+    bundle
+}
+
+/// Verifier trust for the prepare-only x402 signing path: the testnet chain is
+/// allow-listed and mainnet is blocked.
+fn sample_testnet_x402_verifier_trust() -> PublicSettlementVerifierTrust {
+    let mut trust = sample_public_settlement_verifier_trust();
+    trust.allowed_chain_ids = vec![X402_TESTNET_CHAIN_ID.to_string()];
+    trust.mainnet_blocked = true;
+    trust
+}
+
+/// M2-14: the custody-neutral prepare-only signing path produces a kernel-signed
+/// attestation that explicitly moves NO value on chain. The signed body carries
+/// `value_moved_on_chain = false`, `prepare_only = true`, `testnet_gated = true`,
+/// and the custody-neutral model. The attestation verifies and round-trips
+/// through serde unchanged.
+#[test]
+fn x402_prepare_only_signing_is_value_neutral_and_recompute_bound() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let trust = sample_testnet_x402_verifier_trust();
+    let kernel = operator_keypair();
+
+    let attestation = sign_x402_settlement_attestation(
+        &bundle,
+        &trust,
+        &kernel,
+        "x402-attestation-1",
+        1_743_293_900,
+    )
+    .unwrap();
+
+    assert_eq!(
+        attestation.body.schema,
+        CHIO_X402_SETTLEMENT_ATTESTATION_SCHEMA
+    );
+    assert_eq!(attestation.body.chain_id, X402_TESTNET_CHAIN_ID);
+    assert_eq!(
+        attestation.body.custody_model,
+        X402CustodyModel::CustodyNeutral
+    );
+    // Prepare-only and value-neutral: NO value moves on chain.
+    assert!(!attestation.body.value_moved_on_chain);
+    assert!(!attestation.value_moved_on_chain());
+    assert!(attestation.body.prepare_only);
+    assert!(attestation.body.testnet_gated);
+    // Recompute-bound: the attestation binds the recomputed settlement report.
+    let report = verify_public_settlement_proof(&bundle, &trust).unwrap();
+    assert_eq!(
+        attestation.body.recomputed_settlement_state,
+        report.recomputed_settlement_state
+    );
+    assert_eq!(
+        attestation.body.settlement_reference,
+        report.chain_context.settlement_reference
+    );
+    assert_eq!(
+        attestation.body.verifier_report_digest,
+        sha256_hex(&canonical_json_bytes(&report).unwrap())
+    );
+
+    // The signed attestation verifies, and round-trips through serde unchanged.
+    verify_x402_settlement_attestation(&attestation, &trust).unwrap();
+    let encoded = serde_json::to_vec(&attestation).unwrap();
+    let decoded: crate::x402_signing::X402SignedSettlementAttestation =
+        serde_json::from_slice(&encoded).unwrap();
+    assert_eq!(decoded, attestation);
+    verify_x402_settlement_attestation(&decoded, &trust).unwrap();
+}
+
+/// M2-14: the signing path is custody-neutral. The signed attestation carries NO
+/// value-movement authority and NO tool-call authority; both are fail-closed BY
+/// CONSTRUCTION (composing with M2-12). The signed body has no authority field
+/// at all, and flipping the value-moved flag is rejected fail-closed on verify.
+#[test]
+fn x402_attestation_carries_no_value_movement_authority_by_construction() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let trust = sample_testnet_x402_verifier_trust();
+    let kernel = operator_keypair();
+    let attestation = sign_x402_settlement_attestation(
+        &bundle,
+        &trust,
+        &kernel,
+        "x402-attestation-1",
+        1_743_293_900,
+    )
+    .unwrap();
+
+    // Value-movement and tool-call authority are DENY by construction.
+    assert!(!attestation.authorizes_value_movement());
+    assert_eq!(
+        attestation.value_movement_authorization(),
+        ValueMovementAuthorization::denied()
+    );
+    assert!(!attestation.authorizes_tool_call());
+    assert_eq!(
+        attestation.tool_call_authorization(),
+        ToolCallAuthorization::denied()
+    );
+
+    // The signed body contains no authority field of any kind: it records only
+    // that the proof recomputes and that no value moved.
+    let body_json = String::from_utf8(canonical_json_bytes(&attestation.body).unwrap()).unwrap();
+    assert!(body_json.contains("\"value_moved_on_chain\":false"));
+    assert!(body_json.contains("\"custody_model\":\"custody_neutral\""));
+    for forbidden in ["authoriz", "grant", "tool_call", "value_movement_authoriz"] {
+        assert!(
+            !body_json.contains(forbidden),
+            "x402 attestation body must carry no authority field, found {forbidden}: {body_json}"
+        );
+    }
+
+    // Fail-closed: an attestation that claims value moved on chain is rejected,
+    // before any signature check, so it can never pass as custody-neutral.
+    let mut tampered = attestation.clone();
+    tampered.body.value_moved_on_chain = true;
+    assert!(matches!(
+        verify_x402_settlement_attestation(&tampered, &trust),
+        Err(Web3ContractError::InvalidProof(message))
+            if message.contains("must not move value on chain")
+    ));
+}
+
+/// M2-14: testnet-gated, fail-closed. A mainnet chain (here Base mainnet) is
+/// rejected by the prepare-only signing path even when the proof itself would
+/// recompute and the chain is allow-listed.
+#[test]
+fn x402_prepare_only_signing_rejects_mainnet_chain() {
+    // The default sample bundle settles on Base MAINNET (eip155:8453).
+    let bundle = sample_public_settlement_proof_bundle();
+    let mut trust = sample_public_settlement_verifier_trust();
+    trust.mainnet_blocked = true;
+    trust.allowed_chain_ids = vec!["eip155:8453".to_string()];
+    let kernel = operator_keypair();
+
+    assert!(matches!(
+        sign_x402_settlement_attestation(&bundle, &trust, &kernel, "x402-attestation-1", 1_743_293_900),
+        Err(Web3ContractError::InvalidSettlement(message))
+            if message.contains("testnet-gated; mainnet chain rejected")
+    ));
+}
+
+/// M2-14: testnet-gated, fail-closed. A chain that is not on the verifier
+/// allow-list is rejected by the prepare-only signing path.
+#[test]
+fn x402_prepare_only_signing_rejects_non_allowed_chain() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let mut trust = sample_testnet_x402_verifier_trust();
+    // Allow a DIFFERENT testnet, not the bundle chain.
+    trust.allowed_chain_ids = vec!["eip155:11155111".to_string()];
+    let kernel = operator_keypair();
+
+    assert!(matches!(
+        sign_x402_settlement_attestation(&bundle, &trust, &kernel, "x402-attestation-1", 1_743_293_900),
+        Err(Web3ContractError::InvalidSettlement(message))
+            if message.contains("x402 prepare-only chain id is not allowed")
+    ));
+}
+
+/// M2-14: testnet-gated, fail-closed. The path refuses to sign unless the
+/// verifier policy explicitly blocks mainnet.
+#[test]
+fn x402_prepare_only_signing_requires_mainnet_blocked_policy() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let mut trust = sample_testnet_x402_verifier_trust();
+    trust.mainnet_blocked = false;
+    let kernel = operator_keypair();
+
+    assert!(matches!(
+        sign_x402_settlement_attestation(&bundle, &trust, &kernel, "x402-attestation-1", 1_743_293_900),
+        Err(Web3ContractError::InvalidProof(message))
+            if message.contains("requires a mainnet-blocked verifier policy")
+    ));
+}
+
+/// M2-14: an empty attestation id is rejected fail-closed.
+#[test]
+fn x402_prepare_only_signing_rejects_blank_attestation_id() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let trust = sample_testnet_x402_verifier_trust();
+    let kernel = operator_keypair();
+
+    assert!(matches!(
+        sign_x402_settlement_attestation(&bundle, &trust, &kernel, "  ", 1_743_293_900),
+        Err(Web3ContractError::MissingField(
+            "x402_settlement_attestation.attestation_id"
+        ))
+    ));
+}
+
+/// M2-14: verification is fail-closed on the attesting key. An attestation
+/// signed by a key that is not a trusted kernel key is rejected, even though the
+/// underlying settlement proof recomputes.
+#[test]
+fn x402_verify_rejects_untrusted_kernel_key() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let trust = sample_testnet_x402_verifier_trust();
+    // Sign with a key that is NOT in trusted_anchor_kernel_keys.
+    let attestation = sign_x402_settlement_attestation(
+        &bundle,
+        &trust,
+        &custodian_keypair(),
+        "x402-attestation-1",
+        1_743_293_900,
+    )
+    .unwrap();
+
+    assert!(matches!(
+        verify_x402_settlement_attestation(&attestation, &trust),
+        Err(Web3ContractError::InvalidProof(message))
+            if message.contains("kernel key is not trusted")
+    ));
+}
+
+/// M2-14: a tampered signature is rejected fail-closed by the recompute-and-check
+/// signature verification over the canonical body.
+#[test]
+fn x402_verify_rejects_tampered_signature() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let trust = sample_testnet_x402_verifier_trust();
+    let kernel = operator_keypair();
+    let mut attestation = sign_x402_settlement_attestation(
+        &bundle,
+        &trust,
+        &kernel,
+        "x402-attestation-1",
+        1_743_293_900,
+    )
+    .unwrap();
+    attestation.signature = Signature::from_hex(
+        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    )
+    .unwrap();
+
+    assert!(matches!(
+        verify_x402_settlement_attestation(&attestation, &trust),
+        Err(Web3ContractError::InvalidProof(message))
+            if message.contains("signature verification failed")
+    ));
+}
+
+/// M2-14: the prepare-only broadcast intent moves NO value. It records
+/// `value_moved_on_chain = false`, is prepare-only and testnet-gated, and marks
+/// the live money-movement leg (the CDP leg, M2-16) as out of scope and blocked.
+#[test]
+fn x402_prepare_only_broadcast_intent_moves_no_value() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let trust = sample_testnet_x402_verifier_trust();
+    let kernel = operator_keypair();
+    let attestation = sign_x402_settlement_attestation(
+        &bundle,
+        &trust,
+        &kernel,
+        "x402-attestation-1",
+        1_743_293_900,
+    )
+    .unwrap();
+
+    let intent = prepare_x402_broadcast_intent(
+        &attestation,
+        &trust,
+        "x402-broadcast-intent-1",
+        1_743_293_950,
+    )
+    .unwrap();
+
+    assert_eq!(
+        intent.schema,
+        CHIO_X402_PREPARE_ONLY_BROADCAST_INTENT_SCHEMA
+    );
+    assert_eq!(intent.chain_id, X402_TESTNET_CHAIN_ID);
+    assert_eq!(intent.attestation_id, attestation.body.attestation_id);
+    assert_eq!(
+        intent.attestation_digest,
+        sha256_hex(&canonical_json_bytes(&attestation).unwrap())
+    );
+    // NO value moves: prepare-only, testnet-gated, live leg out of scope/blocked.
+    assert!(!intent.value_moved_on_chain);
+    assert!(!intent.would_move_value());
+    assert!(intent.prepare_only);
+    assert!(intent.testnet_gated);
+    assert_eq!(
+        intent.live_money_movement_leg,
+        X402LiveMoneyMovementLeg::OutOfScopeBlockedPendingPartner
+    );
+}
+
+/// M2-14: building a broadcast intent re-verifies the attestation fail-closed.
+/// A trust context that no longer allows the chain rejects the intent.
+#[test]
+fn x402_prepare_only_broadcast_intent_rejects_unverifiable_attestation() {
+    let bundle = sample_testnet_public_settlement_proof_bundle();
+    let trust = sample_testnet_x402_verifier_trust();
+    let kernel = operator_keypair();
+    let attestation = sign_x402_settlement_attestation(
+        &bundle,
+        &trust,
+        &kernel,
+        "x402-attestation-1",
+        1_743_293_900,
+    )
+    .unwrap();
+
+    let mut hostile_trust = trust.clone();
+    hostile_trust.allowed_chain_ids = vec!["eip155:11155111".to_string()];
+
+    assert!(matches!(
+        prepare_x402_broadcast_intent(&attestation, &hostile_trust, "x402-broadcast-intent-1", 1_743_293_950),
+        Err(Web3ContractError::InvalidSettlement(message))
+            if message.contains("x402 prepare-only chain id is not allowed")
+    ));
 }
