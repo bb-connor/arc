@@ -483,12 +483,17 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 /// Require proof for the order context's `escrow_digest`. When the context pins
-/// an `escrow_digest`, the bundle MUST carry the canonical escrow-ledger bytes
-/// that produced it; the digest is recomputed from those bytes and the ledger is
-/// bound to this order. Fail-closed: an `escrow_digest` with no backing ledger,
-/// a digest that does not recompute, or a ledger bound to a different order is
-/// rejected, so an arbitrary 64-hex value can never appear in a verified order
-/// passport. When no `escrow_digest` is present there is nothing to prove.
+/// an `escrow_digest`, the bundle MUST carry the escrow-ledger bytes that produced
+/// it; the ledger is parsed, its CANONICAL digest (the same `digest()` the
+/// accept/release code path pins) is recomputed and compared to the pinned value,
+/// its conservation/isolation invariants are re-checked, and it is bound to this
+/// order. Fail-closed: an `escrow_digest` with no backing ledger, a pinned digest
+/// that does not equal the ledger's CANONICAL digest (so a non-canonical wire
+/// encoding whose raw-byte hash is self-consistent is rejected), a ledger that
+/// violates conservation/Seam A, or a ledger bound to a different order is all
+/// rejected, so an arbitrary 64-hex value (or a non-canonical ledger encoding)
+/// can never appear in a verified order passport. When no `escrow_digest` is
+/// present there is nothing to prove.
 fn verify_escrow_digest(
     context: &CommerceOrderContext,
     escrow_ledger_bytes: Option<&[u8]>,
@@ -504,8 +509,25 @@ fn verify_escrow_digest(
                 .to_string(),
         });
     };
-    verify_digest("escrow ledger", expected, bytes)?;
+    // Parse the ledger first, then compare the pinned digest to the CANONICAL
+    // digest the escrow code path produces. Hashing the raw wire bytes would
+    // trust a non-canonical encoding (a self-consistent raw-byte hash over
+    // whitespace-padded or reordered JSON), which the accept/release path would
+    // never emit.
     let ledger: CommerceEscrowLedger = parse_json("escrow ledger", bytes)?;
+    let canonical_digest = ledger.digest()?;
+    if expected != canonical_digest {
+        return Err(CommerceOrderError::DigestMismatch {
+            field: "escrow ledger".to_string(),
+            expected: expected.to_string(),
+            actual: canonical_digest,
+        });
+    }
+    // Re-check the ledger invariants a verified order passport must not vouch for
+    // implicitly: value is conserved across all accounts and no leg names a
+    // freetier:global pool row (Seam A). A malformed ledger whose canonical digest
+    // happens to be the pinned value cannot ride into a verified passport.
+    ledger.assert_conservation()?;
     if ledger.order_id != context.order_id {
         return Err(CommerceOrderError::InvalidArtifact {
             field: "order context",
@@ -643,5 +665,47 @@ mod escrow_digest_verification_tests {
             CommerceOrderError::InvalidArtifact { message, .. }
                 if message.contains("escrow ledger order mismatch")
         ));
+    }
+
+    /// Finding 3: a NON-CANONICAL ledger encoding whose raw-byte hash is pinned
+    /// (a self-consistent raw-byte hash) is denied, because the pinned digest is
+    /// now compared to the ledger's CANONICAL `digest()`, not to `sha256(raw wire
+    /// bytes)`. The accept/release path only ever pins the canonical digest, so a
+    /// non-canonical encoding cannot be trusted.
+    #[test]
+    fn non_canonical_ledger_with_self_consistent_raw_hash_is_denied() {
+        let order_id = "order-commerce-001";
+        let ledger = ledger(order_id);
+        // Pretty (whitespace-padded) JSON is a valid but NON-canonical encoding:
+        // its raw-byte hash differs from the canonical digest the escrow path pins.
+        let non_canonical = serde_json::to_vec_pretty(&ledger).test_expect("pretty ledger bytes");
+        let canonical = canonical_ledger_bytes(&ledger);
+        assert_ne!(
+            non_canonical, canonical,
+            "pretty encoding must be non-canonical"
+        );
+
+        let mut context = order_context(order_id);
+        // Self-consistent raw-byte hash over the non-canonical bytes: under the old
+        // `sha256(raw bytes)` check this matched and was trusted.
+        context.escrow_digest = Some(sha256_hex(&non_canonical));
+
+        let error = verify_escrow_digest(&context, Some(&non_canonical))
+            .test_expect_err("a non-canonical ledger encoding is denied");
+        match error {
+            CommerceOrderError::DigestMismatch {
+                field,
+                expected,
+                actual,
+            } => {
+                assert_eq!(field, "escrow ledger");
+                // `expected` is the self-consistent raw-byte hash; `actual` is the
+                // canonical digest the escrow path would have pinned. They differ.
+                assert_eq!(expected, sha256_hex(&non_canonical));
+                assert_eq!(actual, sha256_hex(&canonical));
+                assert_ne!(expected, actual);
+            }
+            other => panic!("expected a DigestMismatch, got {other:?}"),
+        }
     }
 }

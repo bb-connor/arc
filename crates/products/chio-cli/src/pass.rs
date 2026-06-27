@@ -29,11 +29,11 @@ use chio_core::web3::identity::SignedWeb3IdentityBinding;
 use chio_core::PublicKey;
 use chio_did::DidChio;
 use chio_credentials::{
-    attestation_window_containing, ChioPass, PassportLifecycleRecord, PassportLifecycleState,
-    TrustTier,
+    attestation_window_containing, verify_chio_pass, ChioPass, PassportLifecycleRecord,
+    PassportLifecycleState, TierAllotmentTable, TrustTier,
 };
 use chio_kernel::{verify_checkpoint_signature, KernelCheckpoint, LocalCapabilityAuthority};
-use chio_store_sqlite::{SqliteReceiptStore, SqliteRevocationStore};
+use chio_store_sqlite::{PassIssuanceAdmission, SqliteReceiptStore, SqliteRevocationStore};
 use serde::de::DeserializeOwned;
 
 use chio_control_plane::trust_control::chio_pass_handlers::{
@@ -235,12 +235,38 @@ fn pass_issue(
         counters.active_population,
     )?;
 
-    // Persist the new issuance into the roster so the SAME oracle enforces the
-    // per-window and active-population caps on the next invocation. Fail-closed:
-    // a store IO fault denies; the credential was only minted in-memory and is
-    // never surfaced.
+    // Atomically admit + persist the issuance under the anti-farm caps. The
+    // pre-mint counters above are a fast pre-check; the AUTHORITATIVE admission is
+    // this single SQLite transaction, which counts + checks + inserts atomically
+    // so two concurrent `chio pass issue` runs (each with its own connection)
+    // cannot both pass a stale read, both mint, and exceed the caps. Fail-closed:
+    // a store IO fault or a cap-full denial returns Err; the credential was only
+    // minted in-memory and is never surfaced. `valid_from` is the window start so
+    // the live-population count never trusts a future-window row.
+    let valid_from = i64::try_from(window.since).unwrap_or(0);
     let expires_at = i64::try_from(window.until).unwrap_or(i64::MAX);
-    oracle.record_pass_issuance(&issuance.capability.id, &window.window_ym, expires_at)?;
+    let now_secs = i64::try_from(now).unwrap_or(i64::MAX);
+    match oracle.try_record_pass_issuance_under_caps(
+        &issuance.capability.id,
+        &window.window_ym,
+        valid_from,
+        expires_at,
+        now_secs,
+        config.window_token_capacity,
+        config.active_population_cap,
+    )? {
+        PassIssuanceAdmission::Admitted => {}
+        PassIssuanceAdmission::DeniedWindowExhausted => {
+            return Err(CliError::Other(
+                "Pass issuance denied: per-window distribution cap reached".to_string(),
+            ));
+        }
+        PassIssuanceAdmission::DeniedPopulationCap => {
+            return Err(CliError::Other(
+                "Pass issuance denied: active population cap reached".to_string(),
+            ));
+        }
+    }
     Ok((issuance, counters))
 }
 
@@ -249,21 +275,34 @@ fn pass_issue(
 ///
 /// FAIL-CLOSED: the verdict is NEVER trusted from a bare flag. The supplied
 /// presentation response MUST verify (nonce-bound and time-windowed), MUST be
-/// accepted by the verifier policy, and MUST be bound to the refresh subject.
-/// Any failure denies, so the next-window Pass is never renewed without a
-/// genuine, subject-bound re-attestation artifact.
+/// answered against an EXTERNALLY supplied challenge (never only its own embedded
+/// challenge), MUST be accepted by the verifier policy, and MUST be bound to the
+/// refresh subject. Any failure denies, so the next-window Pass is never renewed
+/// without a genuine, subject-bound re-attestation artifact.
 fn verify_reattestation_proof(
     proof_path: &Path,
     challenge_path: Option<&Path>,
     subject_public_key: &PublicKey,
     now: u64,
 ) -> Result<bool, CliError> {
+    // FAIL-CLOSED: a re-attestation proof MUST be pinned to an EXTERNALLY supplied
+    // challenge. With no external challenge only the response's own embedded
+    // (self-chosen) challenge is verified for freshness, so a holder could
+    // self-generate a matching challenge+response and pass the gate. Require the
+    // external challenge before any verdict is derived.
+    let Some(challenge_path) = challenge_path else {
+        return Err(CliError::Other(
+            "re-attestation requires an externally supplied --reattestation-challenge: a proof \
+             carrying only its own embedded challenge is self-issued and is not trusted"
+                .to_string(),
+        ));
+    };
     let response: chio_credentials::PassportPresentationResponse = read_json_artifact(proof_path)?;
-    let expected_challenge: Option<chio_credentials::PassportPresentationChallenge> =
-        challenge_path.map(read_json_artifact).transpose()?;
+    let expected_challenge: chio_credentials::PassportPresentationChallenge =
+        read_json_artifact(challenge_path)?;
     let verification = chio_credentials::verify_passport_presentation_response_with_policy(
         &response,
-        expected_challenge.as_ref(),
+        Some(&expected_challenge),
         now,
         None,
         None,
@@ -292,6 +331,36 @@ fn verify_reattestation_proof(
         )));
     }
     Ok(true)
+}
+
+/// Derive the (expiring prior, minted next) attestation window pair for a refresh
+/// run at `now`.
+///
+/// The genuine-use scan runs over the EXPIRING window and the next contiguous
+/// window is minted. When `now` lands exactly on a month boundary (the first
+/// instant of a new window) the window that JUST ended is the one being refreshed,
+/// so the prior window is the previous month and the next window is the window
+/// containing `now`. Otherwise the prior window is the one containing `now` and the
+/// next window is the contiguous rollover.
+///
+/// Without the boundary case a refresh run at the rollover instant would treat the
+/// brand-new (empty) window as the prior window, miss the expiring window's
+/// genuine-use receipts, and mint for the wrong month (e.g. on 2026-07-01 it would
+/// scan July and mint August instead of scanning June and minting July).
+fn refresh_windows(
+    now: u64,
+) -> Result<(AttestationWindowId, AttestationWindowId), CliError> {
+    let current = attestation_window_containing(now)?;
+    if now == current.since {
+        // Rollover instant: refresh the just-expired previous window into the
+        // window that now contains `now`.
+        let prior = attestation_window_containing(current.since.saturating_sub(1))?;
+        Ok((prior, current))
+    } else {
+        // Mid-window: refresh the current window into the contiguous next month.
+        let next = attestation_window_containing(current.until)?;
+        Ok((current, next))
+    }
 }
 
 /// Roll a Pass forward into its next monthly window from the prior window's
@@ -335,10 +404,9 @@ fn pass_refresh(
 
     // The genuine-use scan reads the receipt store the CLI already has.
     let store = SqliteReceiptStore::open(receipt_db_path)?;
-    let prior_window = attestation_window_containing(now)?;
-    // The next window is the contiguous monthly rollover (its `since` equals the
-    // prior window's `until`).
-    let next_window = attestation_window_containing(prior_window.until)?;
+    // Derive the expiring (prior) and minted (next) windows fail-closed at the
+    // rollover boundary so the scan never misses the expiring window's receipts.
+    let (prior_window, next_window) = refresh_windows(now)?;
 
     let result = refresh_chio_pass_window(
         &config,
@@ -362,11 +430,40 @@ fn pass_refresh(
     | ChioPassRefreshResult::Dormant { issuance, .. } = &result
     {
         let oracle = SqliteRevocationStore::open(revocation_db_path)?;
+        let valid_from = i64::try_from(next_window.since).unwrap_or(0);
         let expires_at = i64::try_from(next_window.until).unwrap_or(i64::MAX);
-        oracle.record_pass_issuance(&issuance.capability.id, &next_window.window_ym, expires_at)?;
+        oracle.record_pass_issuance(
+            &issuance.capability.id,
+            &next_window.window_ym,
+            valid_from,
+            expires_at,
+        )?;
     }
 
     Ok(result)
+}
+
+/// Persist the refreshed, signed artifacts of a renewed/dormant refresh to the
+/// requested output files, mirroring `issue`. A not-reattested refresh mints
+/// nothing, so there is nothing to write. Fail-closed: an IO or serialization
+/// fault denies.
+fn write_refresh_artifacts(
+    result: &ChioPassRefreshResult,
+    out_pass: Option<&Path>,
+    out_capability: Option<&Path>,
+) -> Result<(), CliError> {
+    let issuance = match result {
+        ChioPassRefreshResult::Renewed { issuance, .. }
+        | ChioPassRefreshResult::Dormant { issuance, .. } => issuance,
+        ChioPassRefreshResult::NotReattested { .. } => return Ok(()),
+    };
+    if let Some(path) = out_pass {
+        write_json_artifact(path, &issuance.pass)?;
+    }
+    if let Some(path) = out_capability {
+        write_json_artifact(path, &issuance.capability)?;
+    }
+    Ok(())
 }
 
 /// Read and validate the revoked-Pass lifecycle records for an anchor batch.
@@ -397,6 +494,37 @@ fn read_revoked_records(
                 )));
             }
             Ok(record)
+        })
+        .collect()
+}
+
+/// Read and CRYPTOGRAPHICALLY verify the issued Chio Pass credentials for an
+/// anchor batch.
+///
+/// FAIL-CLOSED: the anchor batch folds each Pass's `chio_pass_artifact_id` into a
+/// PUBLIC membership root, so every issued-Pass file MUST carry a verifying issuer
+/// signature AND a valid entitlement shape (and be inside its validity window at
+/// `now`) before its artifact id may be anchored. An unsigned, tampered, or
+/// malformed Pass is rejected here, before it can reach the public batch as
+/// membership evidence.
+fn read_issued_passes(
+    issued_pass_paths: &[std::path::PathBuf],
+    now: u64,
+) -> Result<Vec<ChioPass>, CliError> {
+    // The launch entitlement-shape table the credential was minted against
+    // (`ChioPassConfig::m1_launch_default` pins `TierAllotmentTable::default()`).
+    let table = TierAllotmentTable::default();
+    issued_pass_paths
+        .iter()
+        .map(|path| {
+            let pass: ChioPass = read_json_artifact(path)?;
+            verify_chio_pass(&pass, now, &table).map_err(|error| {
+                CliError::Other(format!(
+                    "issued Pass {} failed verification before anchoring: {error}",
+                    path.display()
+                ))
+            })?;
+            Ok(pass)
         })
         .collect()
 }
@@ -451,10 +579,9 @@ fn pass_anchor(
     let target: EvmAnchorTarget = read_json_artifact(target_path)?;
     let witness: AnchorBatchWitness = read_json_artifact(witness_path)?;
 
-    let issued_passes = issued_pass_paths
-        .iter()
-        .map(|path| read_json_artifact::<ChioPass>(path))
-        .collect::<Result<Vec<_>, _>>()?;
+    // Verify each issued Pass's signature and entitlement shape BEFORE its
+    // artifact id is folded into the public anchor batch (fail-closed).
+    let issued_passes = read_issued_passes(issued_pass_paths, issued_at)?;
     let revoked_records = read_revoked_records(revoked_record_paths)?;
 
     let previous_checkpoint = previous_checkpoint_path
@@ -561,6 +688,8 @@ pub(crate) fn dispatch_pass(
             reattestation_proof,
             reattestation_challenge,
             accepted_kernel_key,
+            out_pass,
+            out_capability,
         } => {
             let tier = parse_trust_tier(&tier)?;
             let now = now.unwrap_or_else(unix_now);
@@ -580,6 +709,13 @@ pub(crate) fn dispatch_pass(
                 authority_seed_file,
                 &accepted_kernel_key,
             )?;
+
+            // Surface the refreshed, signed artifacts (renewed/dormant outcomes)
+            // so the operator can present the renewed credential and feed the
+            // issued-Pass JSON into `chio pass anchor`, mirroring `issue`;
+            // optionally persist each to a requested file.
+            write_refresh_artifacts(&result, out_pass.as_deref(), out_capability.as_deref())?;
+
             let report = match &result {
                 ChioPassRefreshResult::Renewed { decision, issuance } => serde_json::json!({
                     "schema": "chio.pass.refresh.v1",
@@ -587,6 +723,8 @@ pub(crate) fn dispatch_pass(
                     "capabilityId": issuance.capability.id,
                     "window": window_json(&issuance.window),
                     "nextAllotmentUnits": decision.next_allotment_units,
+                    "pass": serde_json::to_value(&issuance.pass)?,
+                    "capability": serde_json::to_value(&issuance.capability)?,
                 }),
                 ChioPassRefreshResult::Dormant { decision, issuance } => serde_json::json!({
                     "schema": "chio.pass.refresh.v1",
@@ -594,6 +732,8 @@ pub(crate) fn dispatch_pass(
                     "capabilityId": issuance.capability.id,
                     "window": window_json(&issuance.window),
                     "nextAllotmentUnits": decision.next_allotment_units,
+                    "pass": serde_json::to_value(&issuance.pass)?,
+                    "capability": serde_json::to_value(&issuance.capability)?,
                 }),
                 ChioPassRefreshResult::NotReattested { decision } => serde_json::json!({
                     "schema": "chio.pass.refresh.v1",
@@ -1117,6 +1257,8 @@ mod tests {
                 reattestation_proof: None,
                 reattestation_challenge: None,
                 accepted_kernel_key: vec![Keypair::generate().public_key().to_hex()],
+                out_pass: None,
+                out_capability: None,
             },
             true,
             Some(receipt_db.as_path()),
@@ -1127,5 +1269,171 @@ mod tests {
             denied.is_err(),
             "refresh must fail closed without a revocation oracle"
         );
+    }
+
+    /// Finding 6: at the first instant of a new window the refresh scans the
+    /// EXPIRING (previous month) window, not the brand-new current window, and
+    /// mints the contiguous current window. Mid-window it scans the current window
+    /// and mints the next month.
+    #[test]
+    fn refresh_windows_scan_the_expiring_window_at_rollover() {
+        const JULY_2026_START: u64 = 1_782_864_000; // 2026-07-01T00:00:00Z
+
+        // Rollover instant: scan June (expiring), mint July (current).
+        let (prior, next) = refresh_windows(JULY_2026_START).expect("rollover windows");
+        assert_eq!(
+            prior.window_ym, "2026-06",
+            "at the first instant of July the expiring June window must be scanned"
+        );
+        assert_eq!(next.window_ym, "2026-07", "the current July window is minted");
+        // The minted window is the contiguous rollover of the scanned window.
+        assert_eq!(prior.until, next.since);
+
+        // Mid-window: scan June (current), mint July (next month).
+        let (prior_mid, next_mid) = refresh_windows(MID_JUNE_2026).expect("mid-window windows");
+        assert_eq!(prior_mid.window_ym, "2026-06");
+        assert_eq!(next_mid.window_ym, "2026-07");
+        assert_eq!(prior_mid.until, next_mid.since);
+    }
+
+    /// Finding 7: a re-attestation proof supplied WITHOUT an external challenge is
+    /// denied fail-closed; only the response's own embedded challenge would
+    /// otherwise be checked, which a holder can self-generate.
+    #[test]
+    fn verify_reattestation_proof_requires_external_challenge() {
+        let dir = temp_dir("reattest-no-challenge");
+        // The challenge gate denies BEFORE the proof is read, so the proof path
+        // need not exist.
+        let proof_path = dir.join("proof.json");
+        let subject = Keypair::generate().public_key();
+
+        let denied = verify_reattestation_proof(&proof_path, None, &subject, MID_JUNE_2026)
+            .expect_err("a proof with no external challenge is denied");
+        assert!(matches!(
+            denied,
+            CliError::Other(message) if message.contains("externally supplied --reattestation-challenge")
+        ));
+    }
+
+    /// Finding 8: a tampered issued-Pass file (its signature no longer verifies)
+    /// is rejected BEFORE its artifact id can be folded into the public anchor
+    /// batch; a genuine signed Pass is accepted.
+    #[test]
+    fn read_issued_passes_rejects_tampered_pass_before_anchoring() {
+        let dir = temp_dir("anchor-verify");
+        let revocation_db = dir.join("revocations.sqlite3");
+        let authority_seed = dir.join("authority.seed");
+        let subject = Keypair::generate().public_key().to_hex();
+        let kernel_keys = vec![Keypair::generate().public_key().to_hex()];
+
+        let (issuance, _) = pass_issue(
+            &subject,
+            TrustTier::Attested,
+            MID_JUNE_2026,
+            &revocation_db,
+            Some(authority_seed.as_path()),
+            &kernel_keys,
+        )
+        .expect("issuance");
+
+        // A genuine signed Pass verifies and is accepted into the anchor input set.
+        let valid_path = dir.join("issued-valid.json");
+        write_json_artifact(&valid_path, &issuance.pass).expect("write valid pass");
+        let accepted = read_issued_passes(&[valid_path], MID_JUNE_2026)
+            .expect("a signed Pass is accepted for anchoring");
+        assert_eq!(accepted.len(), 1);
+
+        // A tampered Pass (signature no longer verifies) is rejected fail-closed.
+        let mut tampered = issuance.pass.clone();
+        let mut proof_value = tampered.proof.proof_value.clone();
+        let first = proof_value.remove(0);
+        // Flip the first hex nibble so the signature parses but no longer verifies.
+        let replacement = if first == '0' { '1' } else { '0' };
+        proof_value.insert(0, replacement);
+        tampered.proof.proof_value = proof_value;
+        let tampered_path = dir.join("issued-tampered.json");
+        write_json_artifact(&tampered_path, &tampered).expect("write tampered pass");
+        let denied = read_issued_passes(&[tampered_path], MID_JUNE_2026)
+            .expect_err("a tampered issued Pass is rejected before anchoring");
+        assert!(matches!(
+            denied,
+            CliError::Other(message) if message.contains("failed verification before anchoring")
+        ));
+    }
+
+    /// Finding 10: a renewed/dormant refresh persists its full signed artifacts to
+    /// the requested `--out-pass` / `--out-capability` files (mirroring `issue`),
+    /// rather than dropping everything but the capability id.
+    #[test]
+    fn refresh_writes_renewed_artifacts_to_requested_files() {
+        let dir = temp_dir("refresh-artifacts");
+        let revocation_db = dir.join("revocations.sqlite3");
+        let authority_seed = dir.join("authority.seed");
+        let subject = Keypair::generate().public_key().to_hex();
+        let kernel_keys = vec![Keypair::generate().public_key().to_hex()];
+
+        // A real minted issuance stands in for the refresh output.
+        let (issuance, _) = pass_issue(
+            &subject,
+            TrustTier::Attested,
+            MID_JUNE_2026,
+            &revocation_db,
+            Some(authority_seed.as_path()),
+            &kernel_keys,
+        )
+        .expect("issuance");
+        let window = issuance.window.clone();
+        let next_capability_id = issuance.capability.id.clone();
+
+        let decision = chio_credentials::ChioPassRefreshDecision {
+            subject: issuance.pass.unsigned.credential_subject.id.clone(),
+            prior_window: window.clone(),
+            next_window: window.clone(),
+            prior_capability_id: "chiopass:prior".to_string(),
+            next_capability_id,
+            genuine_use_count: 1,
+            reattested: true,
+            tier: TrustTier::Attested,
+            outcome: chio_credentials::ChioPassRefreshOutcome::Granted,
+            next_allotment_units: 1_000,
+        };
+        let result = ChioPassRefreshResult::Renewed { decision, issuance };
+
+        let out_pass = dir.join("refreshed-pass.json");
+        let out_capability = dir.join("refreshed-capability.json");
+        write_refresh_artifacts(&result, Some(out_pass.as_path()), Some(out_capability.as_path()))
+            .expect("refresh artifacts written");
+
+        // The refreshed credential round-trips back to a typed ChioPass.
+        let pass_bytes = std::fs::read(&out_pass).expect("refreshed-pass file written");
+        let _pass: ChioPass =
+            serde_json::from_slice(&pass_bytes).expect("refreshed pass deserializes");
+        // The refreshed capability round-trips and carries the deterministic id.
+        let capability_bytes = std::fs::read(&out_capability).expect("capability file written");
+        let capability: serde_json::Value =
+            serde_json::from_slice(&capability_bytes).expect("capability deserializes");
+        assert!(capability["id"]
+            .as_str()
+            .is_some_and(|id| id.starts_with(CHIO_PASS_CAPABILITY_PREFIX)));
+
+        // A not-reattested refresh mints nothing, so there is nothing to write.
+        let not_reattested = ChioPassRefreshResult::NotReattested {
+            decision: chio_credentials::ChioPassRefreshDecision {
+                subject: "did:chio:none".to_string(),
+                prior_window: window.clone(),
+                next_window: window,
+                prior_capability_id: "chiopass:prior".to_string(),
+                next_capability_id: "chiopass:next".to_string(),
+                genuine_use_count: 0,
+                reattested: false,
+                tier: TrustTier::Attested,
+                outcome: chio_credentials::ChioPassRefreshOutcome::DeniedNoReattestation,
+                next_allotment_units: 0,
+            },
+        };
+        let skip_pass = dir.join("skip-pass.json");
+        write_refresh_artifacts(&not_reattested, Some(skip_pass.as_path()), None)
+            .expect("not-reattested writes nothing");
+        assert!(!skip_pass.exists(), "a not-reattested refresh writes no artifacts");
     }
 }
