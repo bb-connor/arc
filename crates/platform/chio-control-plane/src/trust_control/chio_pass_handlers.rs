@@ -48,8 +48,8 @@
 //! denies fail-closed on its first metered charge.
 
 use chio_anchor::{
-    build_anchor_batch_body, prepare_root_publication, AnchorBatch, AnchorBatchWitness,
-    EvmAnchorTarget, PreparedEvmRootPublication,
+    build_anchor_batch_body, prepare_root_publication, verify_anchor_batch, AnchorBatch,
+    AnchorBatchWitness, EvmAnchorTarget, PreparedEvmRootPublication,
 };
 use chio_core::canonical_json_bytes;
 use chio_core::capability::scope::{ChioScope, MonetaryAmount, Operation, ToolGrant};
@@ -57,6 +57,9 @@ use chio_core::capability::token::{
     window_scoped_capability_id, AttestationWindowId, CapabilityToken,
 };
 use chio_core::crypto::{Keypair, PublicKey};
+use chio_core::hashing::Hash;
+use chio_core::merkle::{leaf_hash, MerkleTree};
+use chio_core::sha256_hex;
 use chio_core::web3::identity::SignedWeb3IdentityBinding;
 use chio_credentials::{
     attestation_window_containing, chio_pass_artifact_id, chio_pass_refresh_decision,
@@ -628,6 +631,12 @@ pub struct PreparedPassAnchorPublication {
     /// The ordered Pass artifact-id digests that became the Merkle leaves: the
     /// issued-Pass digests first (input order), then the revoked-record digests.
     pub anchored_digests: Vec<String>,
+    /// The boundary index splitting issued-Pass leaves from revoked-record leaves
+    /// in [`Self::anchored_digests`]: `anchored_digests[..issued_count]` are issued
+    /// Pass digests and `anchored_digests[issued_count..]` are revoked-record
+    /// digests. This is a row-classification hint for the read-only proof panel; it
+    /// is NOT part of any signed body (this struct is the un-signed prepared product).
+    pub issued_count: usize,
     /// The signed RFC6962 anchor batch: `body.tree_root` is the anchorable root and
     /// `body.inclusions` carries one Merkle inclusion proof per anchored digest.
     pub batch: AnchorBatch,
@@ -686,8 +695,9 @@ pub fn prepare_pass_anchor_publication(
     previous_checkpoint: Option<&KernelCheckpoint>,
 ) -> Result<PreparedPassAnchorPublication, CliError> {
     // 1. Collect the issued + revoked Pass digests as the ordered Merkle leaves.
+    let issued_count = issued_passes.len();
     let mut anchored_digests =
-        Vec::with_capacity(issued_passes.len().saturating_add(revoked_records.len()));
+        Vec::with_capacity(issued_count.saturating_add(revoked_records.len()));
     for pass in issued_passes {
         anchored_digests.push(chio_pass_artifact_id(pass)?);
     }
@@ -755,10 +765,412 @@ pub fn prepare_pass_anchor_publication(
 
     Ok(PreparedPassAnchorPublication {
         anchored_digests,
+        issued_count,
         batch,
         checkpoint,
         publication,
     })
+}
+
+/// The display schema label the sealed Pass proof panel domain-separates its seal
+/// digest under (task M2-18).
+///
+/// This is a DISPLAY-ONLY label, NOT a signed-artifact schema: it is never
+/// registered with `is_supported_signed_artifact_schema`, never signed, and never
+/// written to any on-chain or wire/signed body. It exists only so the panel seal
+/// digest cannot be confused with the digest of any other artifact.
+pub const CHIO_PASS_PROOF_PANEL_SCHEMA: &str = "chio.pass-proof-panel.v1";
+
+/// Whether an anchored Pass leaf is an issuance proof or a revocation proof.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PassProofKind {
+    /// An issued-Pass artifact-id leaf (an issuance/anchoring inclusion proof).
+    Issued,
+    /// A revoked-record leaf (a revocation inclusion proof).
+    Revoked,
+}
+
+/// One read-only row of the sealed Pass proof panel: a single anchored Pass digest,
+/// its kind, the RFC6962 leaf the panel RECOMPUTED for it, and whether that leaf's
+/// inclusion proof re-walked to the recomputed Merkle root. Every field is derived
+/// by recompute; nothing here is trusted from the prepared publication.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct PassProofPanelRow {
+    /// The anchored Pass digest (issued: `chio_pass_artifact_id`; revoked: the
+    /// revocation record's `passport_id`, which is the same committed artifact id).
+    pub digest: String,
+    /// Issuance proof vs revocation proof.
+    pub kind: PassProofKind,
+    /// The RFC6962 leaf hash the panel recomputed from `digest`.
+    pub leaf_hash: Hash,
+    /// Whether this row's inclusion proof re-walked to the recomputed Merkle root.
+    /// A `false` here forces the whole panel verdict to `Tampered` (fail-closed).
+    pub inclusion_recomputed: bool,
+}
+
+/// The RECOMPUTED verdict of a sealed Pass proof panel.
+///
+/// The verdict is never trusted from the prepared proof set: it is the product of
+/// re-deriving the Merkle root from the anchored digests, re-walking every inclusion
+/// proof, and cross-binding that root to the anchor batch, the kernel checkpoint, and
+/// the prepared publication. A tampered proof set can only ever read `Tampered`.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum PassProofPanelVerdict {
+    /// Every anchored Pass digest recomputed its inclusion to the SAME Merkle root
+    /// that the anchor batch, the kernel checkpoint, and the prepared publication all
+    /// commit. The proof set is internally consistent.
+    Sealed,
+    /// At least one recompute disagreed: a forged root, a broken or misordered
+    /// inclusion proof, a leaf-hash mismatch, or a checkpoint/publication root that
+    /// does not match the independently recomputed root. Fail-closed.
+    Tampered {
+        /// The first recompute disagreement encountered, in deterministic check
+        /// order (so the same tampered input always seals the same reason).
+        reason: String,
+    },
+}
+
+/// A sealed, tamper-evident, READ-ONLY projection of an already-produced Chio Pass
+/// proof set (task M2-18, deferred from M1).
+///
+/// This is a VIEW, not a gate: it grants nothing, mutates nothing, authorizes
+/// nothing, and mints nothing. It takes the prepared (un-broadcast) Pass anchoring
+/// product of [`prepare_pass_anchor_publication`] (the issued + revoked anchor
+/// inclusion proofs, their kernel checkpoint, and the prepared root publication) and
+/// assembles a display panel whose verdict is RECOMPUTED, not trusted:
+///
+/// 1. It re-runs `verify_anchor_batch` over the signed batch (recomputes the Merkle
+///    root from the batch's own leaves, re-walks every inclusion proof, and checks
+///    the operator signature).
+/// 2. It INDEPENDENTLY recomputes the Merkle root from the anchored digests (the
+///    panel never trusts the prepared root, it rebuilds it from
+///    `canonical_json_bytes(digest)` leaves).
+/// 3. It cross-binds that recomputed root to the anchor batch `tree_root`, the
+///    kernel checkpoint `merkle_root`, and the prepared publication `merkle_root`,
+///    so the issuance/anchoring binding is part of the verdict.
+/// 4. It re-walks every per-row inclusion proof against the recomputed root and
+///    checks each row's leaf hash and ordered digest.
+///
+/// Recompute is the SOLE proof lane: any disagreement flips the verdict to
+/// [`PassProofPanelVerdict::Tampered`] fail-closed. The panel then binds a `seal`
+/// digest over its recomputed body ([`Self::seal_digest`]); because the seal commits
+/// the recomputed rows, roots, and verdict, a tampered proof set produces both a
+/// `Tampered` verdict AND a different seal (tamper-evident). [`Self::verify_seal`]
+/// re-derives that digest from the panel's own body as a self-consistency check.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct SealedPassProofPanel {
+    rows: Vec<PassProofPanelRow>,
+    recomputed_root: Hash,
+    batch_root: Hash,
+    checkpoint_root: Hash,
+    publication_root: Hash,
+    issued_count: usize,
+    revoked_count: usize,
+    verdict: PassProofPanelVerdict,
+    seal: String,
+}
+
+impl SealedPassProofPanel {
+    /// Project + recompute + seal a read-only panel over the prepared Pass proof set.
+    ///
+    /// Always succeeds with a panel: a tampered proof set yields a panel whose
+    /// `verdict` is [`PassProofPanelVerdict::Tampered`] (never an error and never a
+    /// `Sealed` verdict). The only error path is the seal canonicalization of the
+    /// panel's own well-formed body, which is propagated fail-closed.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`CliError`] only if the seal body cannot be canonical-JSON encoded.
+    pub fn project(prepared: &PreparedPassAnchorPublication) -> Result<Self, CliError> {
+        let recompute = recompute_pass_proof_panel(prepared);
+        let seal = seal_digest_for(
+            &recompute.rows,
+            &recompute.recomputed_root,
+            &prepared.batch.body.tree_root,
+            &prepared.checkpoint.body.merkle_root,
+            &prepared.publication.merkle_root,
+            prepared.issued_count,
+            recompute.revoked_count,
+            &recompute.verdict,
+        )?;
+        Ok(Self {
+            rows: recompute.rows,
+            recomputed_root: recompute.recomputed_root,
+            batch_root: prepared.batch.body.tree_root,
+            checkpoint_root: prepared.checkpoint.body.merkle_root,
+            publication_root: prepared.publication.merkle_root,
+            issued_count: prepared.issued_count,
+            revoked_count: recompute.revoked_count,
+            verdict: recompute.verdict,
+            seal,
+        })
+    }
+
+    /// The recomputed panel verdict (read-only).
+    #[must_use]
+    pub fn verdict(&self) -> &PassProofPanelVerdict {
+        &self.verdict
+    }
+
+    /// The recomputed panel rows (read-only).
+    #[must_use]
+    pub fn rows(&self) -> &[PassProofPanelRow] {
+        &self.rows
+    }
+
+    /// The independently recomputed Merkle root over the anchored digests.
+    #[must_use]
+    pub fn recomputed_root(&self) -> &Hash {
+        &self.recomputed_root
+    }
+
+    /// The tamper-evident seal digest binding the recomputed panel body.
+    #[must_use]
+    pub fn seal_digest(&self) -> &str {
+        &self.seal
+    }
+
+    /// How many panel rows are issuance proofs.
+    #[must_use]
+    pub fn issued_count(&self) -> usize {
+        self.issued_count
+    }
+
+    /// How many panel rows are revocation proofs.
+    #[must_use]
+    pub fn revoked_count(&self) -> usize {
+        self.revoked_count
+    }
+
+    /// Fail-closed convenience: `true` ONLY when the recompute fully agreed.
+    #[must_use]
+    pub fn is_sealed(&self) -> bool {
+        matches!(self.verdict, PassProofPanelVerdict::Sealed)
+    }
+
+    /// Tamper-evidence self-check: recompute the seal digest over this panel's own
+    /// recomputed body and confirm it equals the bound seal. Any field altered after
+    /// sealing flips this to `false` (fail-closed).
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`CliError`] only if the seal body cannot be canonical-JSON encoded.
+    pub fn verify_seal(&self) -> Result<bool, CliError> {
+        let recomputed = seal_digest_for(
+            &self.rows,
+            &self.recomputed_root,
+            &self.batch_root,
+            &self.checkpoint_root,
+            &self.publication_root,
+            self.issued_count,
+            self.revoked_count,
+            &self.verdict,
+        )?;
+        Ok(recomputed == self.seal)
+    }
+}
+
+/// The internal product of a panel recompute: the per-row evidence, the
+/// independently recomputed root, the revoked-row count, and the verdict.
+struct PassProofPanelRecompute {
+    rows: Vec<PassProofPanelRow>,
+    recomputed_root: Hash,
+    revoked_count: usize,
+    verdict: PassProofPanelVerdict,
+}
+
+/// Record the FIRST tamper reason only, so the verdict (and therefore the seal) is
+/// deterministic for a given input regardless of how many checks later disagree.
+fn note_tamper(slot: &mut Option<String>, reason: impl Into<String>) {
+    if slot.is_none() {
+        *slot = Some(reason.into());
+    }
+}
+
+/// Recompute the panel verdict, rows, and root from the prepared proof set. The
+/// recompute is the sole proof lane: it rebuilds the Merkle root, cross-binds it to
+/// every anchoring artifact, and re-walks every inclusion proof. It never mutates the
+/// input (it borrows it) and never trusts a stored root or verdict.
+fn recompute_pass_proof_panel(prepared: &PreparedPassAnchorPublication) -> PassProofPanelRecompute {
+    let digests = &prepared.anchored_digests;
+    let inclusions = &prepared.batch.body.inclusions;
+    let issued_count = prepared.issued_count.min(digests.len());
+    let revoked_count = digests.len().saturating_sub(issued_count);
+
+    let mut first_tamper: Option<String> = None;
+
+    // (a) The signed anchor batch must self-verify: this recomputes the Merkle root
+    // from the batch's own leaves, re-walks every inclusion proof, and checks the
+    // operator signature. A forged stored root, proof, or signature is rejected here.
+    if let Err(error) = verify_anchor_batch(&prepared.batch) {
+        note_tamper(
+            &mut first_tamper,
+            format!("anchor batch recompute failed: {error}"),
+        );
+    }
+
+    // (b) Recompute every leaf from the anchored digest's canonical bytes. A
+    // canonicalization fault is a tamper signal, never a panic.
+    let mut leaf_bytes: Vec<Vec<u8>> = Vec::with_capacity(digests.len());
+    for digest in digests {
+        match canonical_json_bytes(digest) {
+            Ok(bytes) => leaf_bytes.push(bytes),
+            Err(error) => {
+                note_tamper(
+                    &mut first_tamper,
+                    format!("digest leaf canonicalization failed: {error}"),
+                );
+                leaf_bytes.push(Vec::new());
+            }
+        }
+    }
+
+    // (c) Independently recompute the Merkle root from those leaves (the proof lane:
+    // the panel never trusts the prepared root, it rebuilds it).
+    let recomputed_root = match MerkleTree::from_leaves(&leaf_bytes) {
+        Ok(tree) => tree.root(),
+        Err(error) => {
+            note_tamper(
+                &mut first_tamper,
+                format!("merkle recompute failed: {error}"),
+            );
+            Hash::zero()
+        }
+    };
+
+    // (d) Cross-bind the recomputed root to every anchoring artifact (the
+    // issuance/anchoring binding is part of the verdict).
+    if recomputed_root != prepared.batch.body.tree_root {
+        note_tamper(
+            &mut first_tamper,
+            "recomputed root does not match the anchor batch tree root",
+        );
+    }
+    if recomputed_root != prepared.checkpoint.body.merkle_root {
+        note_tamper(
+            &mut first_tamper,
+            "recomputed root does not match the kernel checkpoint root",
+        );
+    }
+    if recomputed_root != prepared.publication.merkle_root {
+        note_tamper(
+            &mut first_tamper,
+            "recomputed root does not match the prepared publication root",
+        );
+    }
+
+    // (e) The inclusion count must match the anchored digest count.
+    if inclusions.len() != digests.len() {
+        note_tamper(
+            &mut first_tamper,
+            "inclusion count does not match anchored digest count",
+        );
+    }
+
+    // (f) Re-walk every per-row inclusion proof against the recomputed root.
+    let mut rows = Vec::with_capacity(digests.len());
+    for (index, (digest, leaf_bytes_i)) in digests.iter().zip(leaf_bytes.iter()).enumerate() {
+        let kind = if index < issued_count {
+            PassProofKind::Issued
+        } else {
+            PassProofKind::Revoked
+        };
+        let leaf = leaf_hash(leaf_bytes_i);
+        let inclusion_recomputed = match inclusions.get(index) {
+            Some(inclusion) => {
+                let mut ok = true;
+                if &inclusion.checkpoint_id != digest {
+                    note_tamper(
+                        &mut first_tamper,
+                        format!("inclusion {index} checkpoint id does not match anchored digest"),
+                    );
+                    ok = false;
+                }
+                if inclusion.leaf_hash != leaf {
+                    note_tamper(
+                        &mut first_tamper,
+                        format!("inclusion {index} leaf hash does not match recomputed leaf"),
+                    );
+                    ok = false;
+                }
+                if !inclusion.proof.verify_hash(leaf, &recomputed_root) {
+                    note_tamper(
+                        &mut first_tamper,
+                        format!("inclusion {index} proof does not re-walk to the recomputed root"),
+                    );
+                    ok = false;
+                }
+                ok
+            }
+            None => {
+                note_tamper(&mut first_tamper, format!("inclusion {index} is missing"));
+                false
+            }
+        };
+        rows.push(PassProofPanelRow {
+            digest: digest.clone(),
+            kind,
+            leaf_hash: leaf,
+            inclusion_recomputed,
+        });
+    }
+
+    let verdict = match first_tamper {
+        None => PassProofPanelVerdict::Sealed,
+        Some(reason) => PassProofPanelVerdict::Tampered { reason },
+    };
+
+    PassProofPanelRecompute {
+        rows,
+        recomputed_root,
+        revoked_count,
+        verdict,
+    }
+}
+
+/// The canonical seal body: the panel's recomputed evidence the seal digest commits.
+#[derive(serde::Serialize)]
+struct PassProofPanelSealBody<'a> {
+    panel_schema: &'a str,
+    recomputed_root: &'a Hash,
+    batch_root: &'a Hash,
+    checkpoint_root: &'a Hash,
+    publication_root: &'a Hash,
+    issued_count: usize,
+    revoked_count: usize,
+    rows: &'a [PassProofPanelRow],
+    verdict: &'a PassProofPanelVerdict,
+}
+
+/// Compute the tamper-evident seal digest over the recomputed panel body. The seal
+/// is a SHA-256 over the canonical JSON of [`PassProofPanelSealBody`]; any change to
+/// the rows, roots, counts, or verdict yields a different digest.
+#[allow(clippy::too_many_arguments)]
+fn seal_digest_for(
+    rows: &[PassProofPanelRow],
+    recomputed_root: &Hash,
+    batch_root: &Hash,
+    checkpoint_root: &Hash,
+    publication_root: &Hash,
+    issued_count: usize,
+    revoked_count: usize,
+    verdict: &PassProofPanelVerdict,
+) -> Result<String, CliError> {
+    let body = PassProofPanelSealBody {
+        panel_schema: CHIO_PASS_PROOF_PANEL_SCHEMA,
+        recomputed_root,
+        batch_root,
+        checkpoint_root,
+        publication_root,
+        issued_count,
+        revoked_count,
+        rows,
+        verdict,
+    };
+    let bytes = canonical_json_bytes(&body)?;
+    Ok(sha256_hex(&bytes))
 }
 
 #[cfg(test)]
@@ -2397,5 +2809,179 @@ mod tests {
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_file(format!("{}-wal", path.display()));
         let _ = std::fs::remove_file(format!("{}-shm", path.display()));
+    }
+
+    // -- M2-18: sealed Chio Pass proof panel (read-only, recompute-bound) ------
+
+    /// Prepare a Pass proof set of two issued Passes plus one revoked Pass (whose
+    /// revocation digest is the committed Pass artifact id), so the panel has both
+    /// issuance and revocation inclusion proofs to seal.
+    fn prepared_two_issued_one_revoked() -> PreparedPassAnchorPublication {
+        let operator = Keypair::generate();
+        let pass_a = issue_first_window_pass(&Keypair::generate(), TrustTier::Attested);
+        let pass_b = issue_first_window_pass(&Keypair::generate(), TrustTier::Verified);
+        let pass_c = issue_first_window_pass(&Keypair::generate(), TrustTier::Attested);
+        let revoked_c =
+            revoke_chio_pass_record(&pass_c, MID_JUNE_2026 + 5, "superseded".to_string())
+                .expect("revoke pass_c");
+        let binding = operator_binding(&operator, vec![Web3KeyBindingPurpose::Anchor]);
+        prepare_pass_anchor_publication(
+            &operator,
+            &binding,
+            &anchor_target(),
+            &[pass_a, pass_b],
+            std::slice::from_ref(&revoked_c),
+            pending_witness(),
+            MID_JUNE_2026,
+            None,
+        )
+        .expect("prepare two-issued one-revoked publication")
+    }
+
+    #[test]
+    fn sealed_pass_proof_panel_recomputes_verdict_and_classifies_rows() {
+        use chio_core::is_supported_signed_artifact_schema;
+
+        let prepared = prepared_two_issued_one_revoked();
+        let panel = SealedPassProofPanel::project(&prepared).expect("project panel");
+
+        // The verdict is RECOMPUTED to Sealed for an untampered proof set.
+        assert_eq!(panel.verdict(), &PassProofPanelVerdict::Sealed);
+        assert!(panel.is_sealed(), "an untampered proof set seals");
+        assert!(
+            panel.verify_seal().expect("verify seal"),
+            "seal self-consistent"
+        );
+        assert!(
+            !panel.seal_digest().is_empty(),
+            "the panel binds a seal digest"
+        );
+
+        // Rows are classified: two issuance proofs then one revocation proof, in the
+        // anchored order, each with a recomputed inclusion proof.
+        assert_eq!(panel.rows().len(), 3);
+        assert_eq!(panel.issued_count(), 2);
+        assert_eq!(panel.revoked_count(), 1);
+        assert_eq!(panel.rows()[0].kind, PassProofKind::Issued);
+        assert_eq!(panel.rows()[1].kind, PassProofKind::Issued);
+        assert_eq!(panel.rows()[2].kind, PassProofKind::Revoked);
+        for row in panel.rows() {
+            assert!(
+                row.inclusion_recomputed,
+                "every anchored Pass digest re-walked to the recomputed root: {}",
+                row.digest
+            );
+        }
+        assert_eq!(
+            panel
+                .rows()
+                .iter()
+                .map(|row| row.digest.clone())
+                .collect::<Vec<_>>(),
+            prepared.anchored_digests,
+            "panel rows mirror the anchored digest order",
+        );
+
+        // The independently recomputed root binds the batch, checkpoint, and
+        // publication roots (the issuance/anchoring binding is part of the verdict).
+        assert_eq!(panel.recomputed_root(), &prepared.batch.body.tree_root);
+        assert_eq!(
+            panel.recomputed_root(),
+            &prepared.checkpoint.body.merkle_root
+        );
+        assert_eq!(panel.recomputed_root(), &prepared.publication.merkle_root);
+
+        // The panel label is DISPLAY-ONLY: it is never a registered signed-artifact
+        // schema (no new signed-artifact schema is introduced).
+        assert!(
+            !is_supported_signed_artifact_schema(CHIO_PASS_PROOF_PANEL_SCHEMA),
+            "the panel schema must not be a signed-artifact schema",
+        );
+    }
+
+    #[test]
+    fn sealed_pass_proof_panel_tampered_proof_flips_verdict_fail_closed() {
+        let clean_prepared = prepared_two_issued_one_revoked();
+        let clean = SealedPassProofPanel::project(&clean_prepared).expect("project clean panel");
+        assert!(clean.is_sealed());
+        let clean_seal = clean.seal_digest().to_string();
+
+        // A helper that asserts a tampered proof set seals to a Tampered verdict, with
+        // a non-empty reason and a seal that differs from the clean reference.
+        let assert_tampered = |tampered: &PreparedPassAnchorPublication, label: &str| {
+            let panel = SealedPassProofPanel::project(tampered).expect("project tampered panel");
+            assert!(
+                !panel.is_sealed(),
+                "tampered proof set must not seal ({label})"
+            );
+            match panel.verdict() {
+                PassProofPanelVerdict::Tampered { reason } => {
+                    assert!(!reason.is_empty(), "tamper reason present ({label})");
+                }
+                PassProofPanelVerdict::Sealed => {
+                    panic!("tampered proof set sealed fail-open ({label})")
+                }
+            }
+            assert_ne!(
+                panel.seal_digest(),
+                clean_seal,
+                "the tampered seal must differ from the clean seal ({label})"
+            );
+            // The seal still faithfully commits the (tampered) recomputed verdict.
+            assert!(panel.verify_seal().expect("verify tampered seal"));
+        };
+
+        // (a) Forged anchor batch tree root: the signed-batch recompute rejects it.
+        let mut forged_root = prepared_two_issued_one_revoked();
+        forged_root.batch.body.tree_root = Hash::zero();
+        assert_tampered(&forged_root, "forged tree root");
+
+        // (b) Misordered inclusion proofs: the per-leaf recompute rejects the swap.
+        let mut swapped = prepared_two_issued_one_revoked();
+        swapped.batch.body.inclusions.swap(0, 1);
+        assert_tampered(&swapped, "swapped inclusions");
+
+        // (c) A tampered anchored digest: the INDEPENDENT root recompute (not just the
+        // signed batch) catches it, because the leaf no longer matches the tree.
+        let mut bad_digest = prepared_two_issued_one_revoked();
+        bad_digest.anchored_digests[0] = "chiopass:forged-digest".to_string();
+        assert_tampered(&bad_digest, "tampered anchored digest");
+
+        // (d) A checkpoint root that disagrees with the recomputed root: the
+        // cross-checkpoint binding catches it even though the batch is intact.
+        let mut bad_checkpoint = prepared_two_issued_one_revoked();
+        bad_checkpoint.checkpoint.body.merkle_root = Hash::zero();
+        assert_tampered(&bad_checkpoint, "checkpoint root mismatch");
+    }
+
+    #[test]
+    fn sealed_pass_proof_panel_is_read_only_and_deterministic() {
+        // The panel projection borrows the proof set immutably and consults no
+        // authority, keypair, capability, or store: its only input is a shared
+        // reference to the already-produced prepared publication. It grants nothing
+        // and mints nothing (there is no capability/token on the panel type).
+        let prepared = prepared_two_issued_one_revoked();
+
+        // Snapshot the observable proof set before projecting.
+        let digests_before = prepared.anchored_digests.clone();
+        let batch_root_before = prepared.batch.body.tree_root;
+        let checkpoint_root_before = prepared.checkpoint.body.merkle_root;
+        let publication_root_before = prepared.publication.merkle_root;
+        let inclusions_before = prepared.batch.body.inclusions.len();
+
+        let panel_one = SealedPassProofPanel::project(&prepared).expect("project once");
+        let panel_two = SealedPassProofPanel::project(&prepared).expect("project twice");
+
+        // Read-only: projecting did not mutate the prepared proof set.
+        assert_eq!(prepared.anchored_digests, digests_before);
+        assert_eq!(prepared.batch.body.tree_root, batch_root_before);
+        assert_eq!(prepared.checkpoint.body.merkle_root, checkpoint_root_before);
+        assert_eq!(prepared.publication.merkle_root, publication_root_before);
+        assert_eq!(prepared.batch.body.inclusions.len(), inclusions_before);
+
+        // Deterministic + pure: the same proof set always seals to the same panel.
+        assert_eq!(panel_one, panel_two);
+        assert_eq!(panel_one.seal_digest(), panel_two.seal_digest());
+        assert!(panel_one.is_sealed());
     }
 }
