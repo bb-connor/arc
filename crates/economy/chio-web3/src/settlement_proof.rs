@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::anchors::verify_oracle_conversion_evidence_signature;
 use crate::canonical::canonical_json_bytes;
+use crate::capability::scope::{Operation, ToolGrant};
 use crate::credit::CapitalBookEvidenceKind;
 use crate::crypto::sha256_hex;
 use crate::crypto::PublicKey;
@@ -253,6 +254,84 @@ pub struct PublicSettlementVerifierReport {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trust_market_context: Option<PublicSettlementTrustMarketContext>,
     pub verified_claims: Vec<String>,
+}
+
+/// A tool-call authorization decision: the type that occupies the
+/// "may this tool call proceed?" position in the kernel capability lane.
+///
+/// This type is fail-closed BY CONSTRUCTION. It carries a single private flag,
+/// so an authorized state is unrepresentable outside this module:
+///
+/// - [`Default`] and [`ToolCallAuthorization::denied`] both yield DENY.
+/// - The only constructor that can yield an authorized decision is
+///   [`ToolCallAuthorization::from_capability_grant`], which requires an
+///   explicit positive capability grant (a [`ToolGrant`] that targets the tool
+///   and carries the `Invoke` operation).
+/// - There is deliberately NO `From`/`Into`, no `Deserialize`, and no other
+///   constructor that maps a settlement or payment verdict (such as a
+///   [`PublicSettlementVerifierReport`]) into this type. Payment success is
+///   therefore STRUCTURALLY incapable of producing a tool-call grant: it is not
+///   a runtime check that could be forgotten or weakened, it is the absence of
+///   any reachable code path from a settlement verdict to a grant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ToolCallAuthorization {
+    /// Private by design: `false` (DENY) unless minted from a capability grant.
+    granted: bool,
+}
+
+impl ToolCallAuthorization {
+    /// The fail-closed default: the tool call is NOT authorized.
+    #[must_use]
+    pub const fn denied() -> Self {
+        Self { granted: false }
+    }
+
+    /// Mint a tool-call authorization from an explicit positive capability
+    /// grant. This is the ONLY path to an authorized decision.
+    ///
+    /// The decision is authorized only when the capability grant targets this
+    /// `server_id`/`tool_name` (honoring `*` wildcards) AND carries the
+    /// `Invoke` operation. Every other case fails closed to DENY.
+    #[must_use]
+    pub fn from_capability_grant(grant: &ToolGrant, server_id: &str, tool_name: &str) -> Self {
+        let server_ok = grant.server_id == "*" || grant.server_id == server_id;
+        let tool_ok = grant.tool_name == "*" || grant.tool_name == tool_name;
+        let can_invoke = grant.operations.contains(&Operation::Invoke);
+        Self {
+            granted: server_ok && tool_ok && can_invoke,
+        }
+    }
+
+    /// Whether this decision authorizes the tool call. `false` for every
+    /// decision except one minted from a matching capability grant.
+    #[must_use]
+    pub const fn is_authorized(&self) -> bool {
+        self.granted
+    }
+}
+
+impl PublicSettlementVerifierReport {
+    /// The tool-call authorization carried by a settlement verifier report:
+    /// always [`ToolCallAuthorization::denied`].
+    ///
+    /// This is STRUCTURAL, not a runtime check. The body returns the
+    /// fail-closed DENY decision without reading any field of the report, so no
+    /// value of `verdict` (not even `"verified"`, nor a forged `"authorized"`),
+    /// no `verified_claims` entry, and no other field can flip it. A verified
+    /// settlement report proves a payment settled and that the settlement
+    /// evidence recomputes; tool-call authority comes ONLY from the
+    /// capability/governance lane via
+    /// [`ToolCallAuthorization::from_capability_grant`].
+    #[must_use]
+    pub const fn tool_call_authorization(&self) -> ToolCallAuthorization {
+        ToolCallAuthorization::denied()
+    }
+
+    /// Convenience guard: `false` for every settlement report, by construction.
+    #[must_use]
+    pub const fn authorizes_tool_call(&self) -> bool {
+        self.tool_call_authorization().is_authorized()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
