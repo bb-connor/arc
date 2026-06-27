@@ -6,7 +6,7 @@ use crate::anchors::{
     CHIO_LINK_ORACLE_AUTHORITY, CHIO_ORACLE_CONVERSION_EVIDENCE_SCHEMA,
 };
 use crate::canonical::canonical_json_bytes;
-use crate::capability::scope::MonetaryAmount;
+use crate::capability::scope::{MonetaryAmount, Operation, ToolGrant};
 use crate::chain::{validate_web3_chain_configuration, Web3ChainConfiguration};
 use crate::contracts::{validate_web3_contract_package, Web3ContractPackage};
 use crate::credit::{
@@ -40,7 +40,8 @@ use crate::settlement_proof::{
     PublicSettlementDeploymentProvenance, PublicSettlementDisputePosture,
     PublicSettlementDisputeSnapshot, PublicSettlementIndependentChainHead,
     PublicSettlementOrderBinding, PublicSettlementProofBundle, PublicSettlementTrustMarketContext,
-    PublicSettlementVerifierTrust, PublicSettlementWitnessMode, PublicSettlementWitnessReport,
+    PublicSettlementVerifierReport, PublicSettlementVerifierTrust, PublicSettlementWitnessMode,
+    PublicSettlementWitnessReport, ToolCallAuthorization,
     CHIO_PUBLIC_SETTLEMENT_VERIFIER_REPORT_SCHEMA, CHIO_WEB3_SETTLEMENT_DISPUTE_SCHEMA,
     CHIO_WEB3_SETTLEMENT_PROOF_BUNDLE_SCHEMA, CLAIM_PUBLIC_SETTLEMENT_CHAIN_CONTEXT_VERIFIED,
     CLAIM_PUBLIC_SETTLEMENT_DISPUTE_POSTURE_BOUND, CLAIM_PUBLIC_SETTLEMENT_FINALITY_VERIFIED,
@@ -1120,6 +1121,113 @@ fn verified_x402_settlement_receipt_does_not_authorize_tool_call() {
     // The verifier report speaks only to settlement: there is no
     // authorization verdict and no capability grant to be mistaken for one.
     assert_ne!(report.verdict, "authorized");
+
+    // M2-12 structural inversion: the report cannot occupy an authorization
+    // position. Its tool-call authorization is the fail-closed DENY decision.
+    assert!(!report.authorizes_tool_call());
+    assert_eq!(
+        report.tool_call_authorization(),
+        ToolCallAuthorization::denied()
+    );
+}
+
+/// M2-12 (WS-CL-X402-VERIFY): a tool-call authorization is fail-closed BY
+/// CONSTRUCTION. Its `Default` and `denied()` are DENY, and an authorized
+/// state is unrepresentable except via an explicit positive capability grant.
+#[test]
+fn tool_call_authorization_defaults_to_denied() {
+    assert!(!ToolCallAuthorization::default().is_authorized());
+    assert!(!ToolCallAuthorization::denied().is_authorized());
+    assert_eq!(
+        ToolCallAuthorization::default(),
+        ToolCallAuthorization::denied()
+    );
+}
+
+/// M2-12: the ONLY path to an authorized decision is an explicit positive
+/// capability grant. A matching grant carrying `Invoke` authorizes; every other
+/// case (wrong tool, no `Invoke` operation) fails closed to DENY.
+#[test]
+fn tool_call_authorization_requires_explicit_capability_grant() {
+    let invoke_grant = ToolGrant {
+        server_id: "srv".to_string(),
+        tool_name: "tool_a".to_string(),
+        operations: vec![Operation::Invoke],
+        constraints: vec![],
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost: None,
+        dpop_required: None,
+    };
+    // A matching grant with Invoke authorizes the tool call.
+    assert!(
+        ToolCallAuthorization::from_capability_grant(&invoke_grant, "srv", "tool_a")
+            .is_authorized()
+    );
+    // Wrong tool fails closed.
+    assert!(
+        !ToolCallAuthorization::from_capability_grant(&invoke_grant, "srv", "tool_b")
+            .is_authorized()
+    );
+    // A grant without the Invoke operation fails closed.
+    let read_only = ToolGrant {
+        operations: vec![Operation::ReadResult],
+        ..invoke_grant.clone()
+    };
+    assert!(
+        !ToolCallAuthorization::from_capability_grant(&read_only, "srv", "tool_a").is_authorized()
+    );
+}
+
+/// M2-12: a fully verified settlement report NEVER authorizes a tool call, and
+/// this holds STRUCTURALLY rather than as a runtime string check. Even after
+/// forging a `"authorized"` verdict and injecting capability-shaped claims, the
+/// decision stays DENY, because `authorizes_tool_call` reads no field of the
+/// report. The settlement lane and the capability lane are disjoint: only the
+/// capability lane can mint a grant.
+#[test]
+fn settlement_report_never_authorizes_tool_call_by_construction() {
+    let bundle = sample_public_settlement_proof_bundle();
+    let mut report: PublicSettlementVerifierReport =
+        verify_sample_public_settlement_proof(&bundle).unwrap();
+    assert_eq!(report.verdict, "verified");
+
+    // Baseline: a verified settlement report denies tool-call authority.
+    assert!(!report.authorizes_tool_call());
+    assert_eq!(
+        report.tool_call_authorization(),
+        ToolCallAuthorization::denied()
+    );
+
+    // Forge the verdict and inject capability-shaped claims. If authorization
+    // were a runtime check over `verdict`/`verified_claims`, this would flip
+    // it. It does not: the guard is structural, so the decision stays DENY.
+    report.verdict = "authorized".to_string();
+    report.verified_claims = vec![
+        "claim.capability.tool_call_authorized".to_string(),
+        "authorized".to_string(),
+    ];
+    assert!(!report.authorizes_tool_call());
+    assert_eq!(
+        report.tool_call_authorization(),
+        ToolCallAuthorization::denied()
+    );
+
+    // The settlement-derived decision is not the GRANT a real capability grant
+    // mints: the two lanes are disjoint and only the capability lane authorizes.
+    let capability_grant = ToolGrant {
+        server_id: "*".to_string(),
+        tool_name: "*".to_string(),
+        operations: vec![Operation::Invoke],
+        constraints: vec![],
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost: None,
+        dpop_required: None,
+    };
+    let granted = ToolCallAuthorization::from_capability_grant(&capability_grant, "srv", "tool_a");
+    assert!(granted.is_authorized());
+    assert_ne!(report.tool_call_authorization(), granted);
 }
 
 #[test]
