@@ -8,7 +8,7 @@
 //! ONLY against a capital execution observation reconciled as
 //! [`CapitalExecutionReconciledState::Matched`].
 //!
-//! Three fail-closed seams hold:
+//! Four fail-closed seams hold:
 //!
 //! - The offered capability token is authenticated BEFORE any custodial
 //!   liability is derived from it: its signature must verify against its
@@ -17,9 +17,19 @@
 //!   the acceptor/subject. `subject`/`issuer` are attacker-settable public
 //!   fields, so the acceptor==subject guard is only meaningful once the token
 //!   itself is proven authentic.
-//! - The reservation must fully collateralize the offer liability, the locked
-//!   amount must equal the signed quote, and the acceptor must be the offer
-//!   subject, or [`accept`] denies.
+//! - The reservation MUST be a signed [`CommerceReservationReceipt`] witness:
+//!   its signature verifies against the pinned settlement reservation authority,
+//!   and it is bound to this order id and the exact offer token (token id plus
+//!   canonical digest) BEFORE any collateral is trusted. A bare amount can be
+//!   fabricated; a signed witness bound to the order/token cannot. The witnessed
+//!   reservation must fully collateralize the offer liability, the locked amount
+//!   must equal the signed quote, and the acceptor must be the offer subject, or
+//!   [`accept`] denies.
+//! - The custodial depositor/beneficiary accounts are bound to the order
+//!   parties: they are derived from the order context's verified
+//!   `buyer_subject` / `merchant_subject`, never caller-supplied, so custody can
+//!   never be redirected to a third account while the settlement packet names
+//!   the order merchant.
 //! - Seam A: the freetier:global Sybil-ceiling pool ledger and the escrow
 //!   ledger are hard-isolated. No escrow leg, in either direction, may name a
 //!   `freetier:global:<window>` row (see [`is_freetier_global_pool_id`]).
@@ -398,6 +408,139 @@ impl EscrowBroadcastIntent {
     }
 }
 
+/// Schema id of the signed commerce reservation receipt body.
+pub const COMMERCE_RESERVATION_RECEIPT_SCHEMA_ID: &str = "chio.commerce.reservation-receipt.v1";
+
+/// The funds-reservation receipt body a settlement reservation authority signs
+/// to witness that collateral was actually reserved for one commerce
+/// order/offer. The body is bound to the order id AND the exact offer token (its
+/// id and canonical digest), so a witness minted for one order/offer can never
+/// be replayed to lock custody under another.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct CommerceReservationReceipt {
+    pub schema: String,
+    /// Opaque, unique reservation receipt id (the settlement authority supplies it).
+    pub receipt_id: String,
+    /// The order this reservation collateralizes; MUST equal `order_context.order_id`.
+    pub order_id: String,
+    /// The offered capability token id this reservation collateralizes; MUST
+    /// equal `token_offer.id`.
+    pub token_offer_id: String,
+    /// sha256 hex over the canonical offer token; binds the witness to the exact
+    /// offer, not merely its id.
+    pub token_offer_sha256: String,
+    /// The funds the settlement authority witnesses as reserved for this offer.
+    pub reserved_amount: MonetaryAmount,
+}
+
+/// A signed [`CommerceReservationReceipt`] (settlement reservation authority over
+/// the canonical body).
+pub type SignedCommerceReservationReceipt = SignedExportEnvelope<CommerceReservationReceipt>;
+
+/// A verified funds-reservation witness bound to one commerce order/offer.
+///
+/// Construct it through [`VerifiedCommerceReservation::from_signed`], which proves
+/// the receipt was signed by the pinned settlement reservation authority and is
+/// bound to the order and the exact offer token before any custody is locked.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedCommerceReservation {
+    reserved_amount: MonetaryAmount,
+}
+
+impl VerifiedCommerceReservation {
+    /// Verify a signed reservation receipt against the expected settlement
+    /// reservation authority and bind it to the order and offer token.
+    ///
+    /// Fails closed when the receipt schema is unsupported, the receipt id is
+    /// empty, the signer is not the expected reservation authority, the
+    /// signature does not verify, the receipt is not bound to this order id, the
+    /// receipt is not bound to this offer token id or canonical digest, or the
+    /// witnessed amount is zero.
+    pub fn from_signed(
+        receipt: &SignedCommerceReservationReceipt,
+        expected_reservation_authority: &PublicKey,
+        order_context: &CommerceOrderContext,
+        token_offer: &CapabilityToken,
+    ) -> Result<Self, CommerceOrderError> {
+        if receipt.body.schema != COMMERCE_RESERVATION_RECEIPT_SCHEMA_ID {
+            return Err(CommerceOrderError::SettlementFailed(format!(
+                "escrow accept denied: unsupported reservation receipt schema: {}",
+                receipt.body.schema
+            )));
+        }
+        if receipt.body.receipt_id.trim().is_empty() {
+            return Err(CommerceOrderError::SettlementFailed(
+                "escrow accept denied: reservation receipt id must not be empty".to_string(),
+            ));
+        }
+        // Settlement-authority binding: the witness MUST be signed by the pinned
+        // reservation authority, and the signature MUST verify over the body.
+        if receipt.signer_key != *expected_reservation_authority {
+            return Err(CommerceOrderError::SettlementFailed(
+                "escrow accept denied: reservation receipt is not signed by the expected \
+                 settlement reservation authority"
+                    .to_string(),
+            ));
+        }
+        match receipt.verify_signature() {
+            Ok(true) => {}
+            _ => {
+                return Err(CommerceOrderError::SettlementFailed(
+                    "escrow accept denied: reservation receipt signature is invalid".to_string(),
+                ))
+            }
+        }
+        // Order binding: a witness minted for a different order cannot lock this one.
+        if receipt.body.order_id != order_context.order_id {
+            return Err(CommerceOrderError::SettlementFailed(
+                "escrow accept denied: reservation receipt is not bound to this order".to_string(),
+            ));
+        }
+        // Offer binding: pin both the offer token id and its canonical digest so
+        // the witness cannot be replayed against a different (or tampered) offer.
+        if receipt.body.token_offer_id != token_offer.id {
+            return Err(CommerceOrderError::SettlementFailed(
+                "escrow accept denied: reservation receipt is not bound to this offer token"
+                    .to_string(),
+            ));
+        }
+        let offer_digest = token_offer_digest(token_offer)?;
+        if receipt.body.token_offer_sha256 != offer_digest {
+            return Err(CommerceOrderError::SettlementFailed(
+                "escrow accept denied: reservation receipt offer digest does not match the offer \
+                 token"
+                    .to_string(),
+            ));
+        }
+        if receipt.body.reserved_amount.units == 0 {
+            return Err(CommerceOrderError::SettlementFailed(
+                "escrow accept denied: reservation witnesses a zero amount".to_string(),
+            ));
+        }
+        Ok(Self {
+            reserved_amount: receipt.body.reserved_amount.clone(),
+        })
+    }
+
+    /// The witnessed reserved amount, trusted only after binding verification.
+    #[must_use]
+    pub fn reserved_amount(&self) -> &MonetaryAmount {
+        &self.reserved_amount
+    }
+}
+
+/// sha256 hex over the canonical JSON of an offered capability token. Binds a
+/// reservation witness to the exact offer (not merely its id).
+fn token_offer_digest(token: &CapabilityToken) -> Result<String, CommerceOrderError> {
+    let canonical = chio_core_types::canonical_json_bytes(token).map_err(|error| {
+        CommerceOrderError::SettlementFailed(format!(
+            "escrow accept denied: offer token canonicalization failed: {error}"
+        ))
+    })?;
+    Ok(sha256_hex(&canonical))
+}
+
 /// Inputs to [`accept`]. Binds a verified offer/reservation pair to a shipped
 /// commerce order.
 pub struct CommerceEscrowAcceptRequest<'a> {
@@ -414,12 +557,13 @@ pub struct CommerceEscrowAcceptRequest<'a> {
     /// closed when the token is not-yet-valid or expired at this time. Mirrors
     /// the open-market accept `accepted_at` parameter.
     pub accepted_at: u64,
-    /// The funds the reservation has locked for this offer.
-    pub reserved_amount: &'a MonetaryAmount,
-    /// The depositor (buyer) custodial account debited by the lock leg.
-    pub depositor_account: String,
-    /// The beneficiary (merchant) account credited by the release leg.
-    pub beneficiary_account: String,
+    /// The signed reservation witness proving collateral was reserved for this
+    /// order/offer. Verified and bound to the order and offer token before any
+    /// custody is locked (see [`VerifiedCommerceReservation::from_signed`]).
+    pub reservation: &'a SignedCommerceReservationReceipt,
+    /// The pinned settlement reservation authority key the reservation witness
+    /// MUST be signed by.
+    pub reservation_authority: PublicKey,
     /// Off-context settlement dispatch fields for the settlement packet body.
     pub settlement: CommerceSettlementDispatch,
     /// Authority that signs the emitted settlement packet body.
@@ -459,6 +603,8 @@ pub struct CommerceEscrowRelease {
 /// - the offer token signature does not verify against its issuer key;
 /// - the offer token is not-yet-valid or expired at `accepted_at`;
 /// - the offer token issuer is not a counterparty distinct from the subject;
+/// - the reservation witness is not signed by the expected settlement
+///   reservation authority, or is not bound to this order id and offer token;
 /// - the reservation under-collateralizes the offer liability;
 /// - the locked offer liability does not equal the signed quote amount;
 /// - the acceptor is not the offer subject;
@@ -549,6 +695,20 @@ pub fn accept(
         ));
     }
 
+    // ESCROW-2: the reservation is a SIGNED witness, never a bare amount. Verify
+    // it against the pinned settlement reservation authority and bind it to this
+    // order id and the exact offer token BEFORE any collateral is trusted. A
+    // fabricated amount cannot satisfy this; only an authority-signed witness
+    // minted for THIS order/offer can. Compose with the ESCROW-1 offer-token
+    // authentication above.
+    let reservation = VerifiedCommerceReservation::from_signed(
+        request.reservation,
+        &request.reservation_authority,
+        request.order_context,
+        request.token_offer,
+    )?;
+    let reserved_amount = reservation.reserved_amount();
+
     // Fail closed: the reservation must fully collateralize the offer liability
     // in the order's currency.
     if liability.currency != request.order_context.quote_currency {
@@ -557,7 +717,7 @@ pub fn accept(
                 .to_string(),
         ));
     }
-    if request.reserved_amount.currency != liability.currency {
+    if reserved_amount.currency != liability.currency {
         return Err(CommerceOrderError::SettlementFailed(
             "escrow accept denied: reservation currency does not match the offer liability"
                 .to_string(),
@@ -574,20 +734,29 @@ pub fn accept(
                 .to_string(),
         ));
     }
-    if request.reserved_amount.units < liability.units {
+    if reserved_amount.units < liability.units {
         return Err(CommerceOrderError::SettlementFailed(
             "escrow accept denied: reservation under-collateralizes the offer liability"
                 .to_string(),
         ));
     }
 
+    // ESCROW-3: bind the custodial accounts to the actual order parties. The
+    // depositor (buyer) and beneficiary (merchant) accounts are NOT
+    // caller-supplied; they are derived from the order context's verified
+    // `buyer_subject` / `merchant_subject`. A caller can therefore never redirect
+    // custody to a third account while the settlement packet still names the
+    // order merchant. `validate_shape` above already proved both are non-empty.
+    let depositor_account = request.order_context.buyer_subject.clone();
+    let beneficiary_account = request.order_context.merchant_subject.clone();
+
     // Single-ledger custodial escrow: the lock leg debits the depositor (buyer)
     // and credits the custody account. Seam A is enforced inside `lock`.
     let ledger = CommerceEscrowLedger::lock(
         request.order_context.order_id.clone(),
         liability.currency.clone(),
-        request.depositor_account.clone(),
-        request.beneficiary_account.clone(),
+        depositor_account,
+        beneficiary_account,
         liability.units,
     )?;
 
@@ -860,23 +1029,47 @@ mod tests {
         }
     }
 
+    /// The pinned settlement reservation authority the escrow tests sign their
+    /// reservation witnesses with.
+    fn reservation_authority() -> Keypair {
+        keypair(9)
+    }
+
+    /// Build a signed reservation witness bound to `context` and `token` for
+    /// `units`/`currency`, signed by `authority`.
+    fn signed_reservation(
+        context: &CommerceOrderContext,
+        token: &CapabilityToken,
+        units: u64,
+        currency: &str,
+        authority: &Keypair,
+    ) -> SignedCommerceReservationReceipt {
+        let body = CommerceReservationReceipt {
+            schema: COMMERCE_RESERVATION_RECEIPT_SCHEMA_ID.to_string(),
+            receipt_id: "reservation-receipt-1".to_string(),
+            order_id: context.order_id.clone(),
+            token_offer_id: token.id.clone(),
+            token_offer_sha256: token_offer_digest(token).test_expect("offer digest"),
+            reserved_amount: reserved(units, currency),
+        };
+        SignedExportEnvelope::sign(body, authority).test_expect("sign reservation receipt")
+    }
+
     fn accept_request<'a>(
         context: &'a CommerceOrderContext,
         token: &'a CapabilityToken,
         acceptor: &'a PublicKey,
-        reservation: &'a MonetaryAmount,
+        reservation: &'a SignedCommerceReservationReceipt,
+        reservation_authority: PublicKey,
         authority: &'a Keypair,
-        depositor: &str,
-        beneficiary: &str,
     ) -> CommerceEscrowAcceptRequest<'a> {
         CommerceEscrowAcceptRequest {
             order_context: context,
             token_offer: token,
             acceptor,
             accepted_at: 500,
-            reserved_amount: reservation,
-            depositor_account: depositor.to_string(),
-            beneficiary_account: beneficiary.to_string(),
+            reservation,
+            reservation_authority,
             settlement: dispatch(),
             settlement_authority: authority,
         }
@@ -890,16 +1083,16 @@ mod tests {
         let authority = keypair(7);
         let token = token_offer(&issuer, &acceptor, 4200, "USD");
         let context = order_context("fulfillment_attested");
-        let reservation = reserved(4200, "USD");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
 
         let acceptance = accept(accept_request(
             &context,
             &token,
             &acceptor,
             &reservation,
+            res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect("accept succeeds");
 
@@ -946,16 +1139,16 @@ mod tests {
         let token = token_offer(&issuer, &acceptor, 4200, "USD");
         let context = order_context("fulfillment_attested");
         // Reserve less than the 4200 liability.
-        let reservation = reserved(4199, "USD");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4199, "USD", &res_auth);
 
         let error = accept(accept_request(
             &context,
             &token,
             &acceptor,
             &reservation,
+            res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("under-collateralized accept is denied");
 
@@ -975,16 +1168,16 @@ mod tests {
         let authority = keypair(7);
         let token = token_offer(&issuer, &offer_subject, 4200, "USD");
         let context = order_context("fulfillment_attested");
-        let reservation = reserved(4200, "USD");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
 
         let error = accept(accept_request(
             &context,
             &token,
             &wrong_acceptor,
             &reservation,
+            res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("wrong acceptor is denied");
 
@@ -1003,16 +1196,16 @@ mod tests {
         let authority = keypair(7);
         let token = token_offer(&issuer, &acceptor, 4200, "USD");
         let context = order_context("fulfillment_attested");
-        let reservation = reserved(4200, "USD");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
 
         let acceptance = accept(accept_request(
             &context,
             &token,
             &acceptor,
             &reservation,
+            res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect("accept succeeds");
 
@@ -1070,20 +1263,22 @@ mod tests {
         let acceptor = subject.public_key();
         let authority = keypair(7);
         let token = token_offer(&issuer, &acceptor, 4200, "USD");
-        let context = order_context("fulfillment_attested");
-        let reservation = reserved(4200, "USD");
+        let res_auth = reservation_authority();
         let pool_id = "freetier:global:2026-06";
         assert!(is_freetier_global_pool_id(pool_id));
 
-        // Debit direction: depositor is a freetier:global pool row.
+        // Debit direction: the order's buyer_subject (the derived depositor) is a
+        // freetier:global pool row.
+        let mut debit_context = order_context("fulfillment_attested");
+        debit_context.buyer_subject = pool_id.to_string();
+        let reservation = signed_reservation(&debit_context, &token, 4200, "USD", &res_auth);
         let debit_error = accept(accept_request(
-            &context,
+            &debit_context,
             &token,
             &acceptor,
             &reservation,
+            res_auth.public_key(),
             &authority,
-            pool_id,
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("escrow may not debit a freetier:global pool row");
         assert!(matches!(
@@ -1092,15 +1287,18 @@ mod tests {
                 if message.contains("isolation violation") && message.contains(pool_id)
         ));
 
-        // Credit direction: beneficiary is a freetier:global pool row.
+        // Credit direction: the order's merchant_subject (the derived
+        // beneficiary) is a freetier:global pool row.
+        let mut credit_context = order_context("fulfillment_attested");
+        credit_context.merchant_subject = pool_id.to_string();
+        let reservation = signed_reservation(&credit_context, &token, 4200, "USD", &res_auth);
         let credit_error = accept(accept_request(
-            &context,
+            &credit_context,
             &token,
             &acceptor,
             &reservation,
+            res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            pool_id,
         ))
         .test_expect_err("escrow may not credit a freetier:global pool row");
         assert!(matches!(
@@ -1108,6 +1306,51 @@ mod tests {
             CommerceOrderError::SettlementFailed(message)
                 if message.contains("isolation violation") && message.contains(pool_id)
         ));
+    }
+
+    // ESCROW-3: the locked ledger's depositor/beneficiary are bound to the order
+    // parties (buyer_subject / merchant_subject), never caller-supplied, so
+    // custody can never be redirected to a third account while the settlement
+    // packet still names the order merchant.
+    #[test]
+    fn accept_binds_escrow_accounts_to_order_parties() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let mut context = order_context("fulfillment_attested");
+        context.buyer_subject = "buyer:distinct-party".to_string();
+        context.merchant_subject = "merchant:distinct-party".to_string();
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
+
+        let acceptance = accept(accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            res_auth.public_key(),
+            &authority,
+        ))
+        .test_expect("accept succeeds");
+
+        // The ledger custody flows are bound to the order parties.
+        assert_eq!(acceptance.ledger.depositor_account, "buyer:distinct-party");
+        assert_eq!(
+            acceptance.ledger.beneficiary_account,
+            "merchant:distinct-party"
+        );
+        assert_eq!(
+            acceptance.ledger.legs[0].from_account,
+            "buyer:distinct-party"
+        );
+        // The settlement packet names the SAME merchant as the ledger
+        // beneficiary, so settlement routing and custody release cannot diverge.
+        assert_eq!(
+            acceptance.settlement_packet.body.merchant_subject,
+            acceptance.ledger.beneficiary_account
+        );
     }
 
     #[test]
@@ -1186,16 +1429,16 @@ mod tests {
         let mut token = token_offer(&issuer, &acceptor, 4200, "USD");
         token.expires_at += 1;
         let context = order_context("fulfillment_attested");
-        let reservation = reserved(4200, "USD");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
 
         let error = accept(accept_request(
             &context,
             &token,
             &acceptor,
             &reservation,
+            res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("forged offer token is denied");
 
@@ -1216,16 +1459,16 @@ mod tests {
         // issuer == subject == acceptor: a self-dealing forge.
         let token = token_offer(&subject, &acceptor, 4200, "USD");
         let context = order_context("fulfillment_attested");
-        let reservation = reserved(4200, "USD");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
 
         let error = accept(accept_request(
             &context,
             &token,
             &acceptor,
             &reservation,
+            res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("self-issued offer token is denied");
 
@@ -1246,7 +1489,8 @@ mod tests {
         let authority = keypair(7);
         let token = token_offer(&issuer, &acceptor, 4200, "USD");
         let context = order_context("fulfillment_attested");
-        let reservation = reserved(4200, "USD");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
 
         // Not-yet-valid: accepted_at precedes the token issued_at (100).
         let mut not_yet = accept_request(
@@ -1254,9 +1498,8 @@ mod tests {
             &token,
             &acceptor,
             &reservation,
+            res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         );
         not_yet.accepted_at = 50;
         let not_yet_error = accept(not_yet).test_expect_err("not-yet-valid offer token is denied");
@@ -1272,9 +1515,8 @@ mod tests {
             &token,
             &acceptor,
             &reservation,
+            res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         );
         expired.accepted_at = 10_000;
         let expired_error = accept(expired).test_expect_err("expired offer token is denied");
@@ -1297,16 +1539,16 @@ mod tests {
         let token = token_offer(&issuer, &acceptor, 5000, "USD");
         let context = order_context("fulfillment_attested");
         assert_eq!(context.quote_amount_minor, 4200);
-        let reservation = reserved(5000, "USD");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 5000, "USD", &res_auth);
 
         let error = accept(accept_request(
             &context,
             &token,
             &acceptor,
             &reservation,
+            res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("cap that differs from the quote is denied");
 
@@ -1325,18 +1567,18 @@ mod tests {
         let acceptor = subject.public_key();
         let authority = keypair(7);
         let context = order_context("fulfillment_attested");
+        let res_auth = reservation_authority();
 
         // Liability currency (EUR) != order quote currency (USD).
         let eur_token = token_offer(&issuer, &acceptor, 4200, "EUR");
-        let eur_reservation = reserved(4200, "EUR");
+        let eur_reservation = signed_reservation(&context, &eur_token, 4200, "EUR", &res_auth);
         let liability_error = accept(accept_request(
             &context,
             &eur_token,
             &acceptor,
             &eur_reservation,
+            res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("liability currency mismatch is denied");
         assert!(matches!(
@@ -1347,15 +1589,15 @@ mod tests {
 
         // Reservation currency (EUR) != offer liability currency (USD).
         let usd_token = token_offer(&issuer, &acceptor, 4200, "USD");
-        let mismatched_reservation = reserved(4200, "EUR");
+        let mismatched_reservation =
+            signed_reservation(&context, &usd_token, 4200, "EUR", &res_auth);
         let reservation_error = accept(accept_request(
             &context,
             &usd_token,
             &acceptor,
             &mismatched_reservation,
+            res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("reservation currency mismatch is denied");
         assert!(matches!(
@@ -1375,16 +1617,16 @@ mod tests {
         let authority = keypair(7);
         let token = token_offer(&issuer, &acceptor, 4200, "USD");
         let context = order_context("fulfillment_attested");
-        let reservation = reserved(4200, "USD");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
 
         let acceptance = accept(accept_request(
             &context,
             &token,
             &acceptor,
             &reservation,
+            res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect("accept locks the ledger");
         assert_eq!(acceptance.ledger.status, CommerceEscrowStatus::Locked);
@@ -1436,18 +1678,20 @@ mod tests {
         let acceptor = subject.public_key();
         let authority = keypair(7);
         let token = token_offer(&issuer, &acceptor, 4200, "USD");
-        let reservation = reserved(4200, "USD");
+        let res_auth = reservation_authority();
 
         // accept from a state the spine does not allow to assemble.
         let non_assembly = order_context("intent_recorded");
+        // The reservation binds to the shared order id, so it witnesses both the
+        // non-assembly and the fulfillment-attested accepts below.
+        let reservation = signed_reservation(&non_assembly, &token, 4200, "USD", &res_auth);
         let accept_error = accept(accept_request(
             &non_assembly,
             &token,
             &acceptor,
             &reservation,
+            res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect_err("accept from a non-assembly state is denied");
         assert!(matches!(
@@ -1463,9 +1707,8 @@ mod tests {
             &token,
             &acceptor,
             &reservation,
+            res_auth.public_key(),
             &authority,
-            "buyer:alice",
-            "merchant:stripe:coffee-shop",
         ))
         .test_expect("accept locks the ledger");
         let observation = CapitalExecutionObservation {
@@ -1568,6 +1811,103 @@ mod tests {
             status_error,
             CommerceOrderError::SettlementFailed(message)
                 if message.contains("unsupported escrow settlement status")
+        ));
+    }
+
+    // ESCROW-2: a tampered (unverifiable) reservation witness is denied; a bare
+    // fabricated amount can never lock custody.
+    #[test]
+    fn accept_fails_closed_on_unsigned_reservation_witness() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let context = order_context("fulfillment_attested");
+        let res_auth = reservation_authority();
+        // Validly sign, then tamper the witnessed amount so the signature no
+        // longer matches the body.
+        let mut reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
+        reservation.body.reserved_amount.units = 1;
+
+        let error = accept(accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            res_auth.public_key(),
+            &authority,
+        ))
+        .test_expect_err("tampered reservation witness is denied");
+        assert!(matches!(
+            error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("reservation receipt signature is invalid")
+        ));
+    }
+
+    // ESCROW-2: a reservation witnessed for a DIFFERENT order cannot lock this
+    // order's custody, even when signed by the expected authority.
+    #[test]
+    fn accept_fails_closed_on_reservation_bound_to_wrong_order() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let context = order_context("fulfillment_attested");
+        let res_auth = reservation_authority();
+        let mut reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
+        // Re-bind the witness to a foreign order and re-sign it: structurally
+        // valid, correctly signed, but bound to the wrong order.
+        reservation.body.order_id = "order-commerce-other".to_string();
+        let reservation = SignedExportEnvelope::sign(reservation.body, &reservation_authority())
+            .test_expect("re-sign reservation");
+
+        let error = accept(accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            res_auth.public_key(),
+            &authority,
+        ))
+        .test_expect_err("reservation bound to the wrong order is denied");
+        assert!(matches!(
+            error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("reservation receipt is not bound to this order")
+        ));
+    }
+
+    // ESCROW-2: a reservation signed by an authority OTHER than the expected
+    // settlement reservation authority is denied.
+    #[test]
+    fn accept_fails_closed_on_reservation_from_unexpected_authority() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let context = order_context("fulfillment_attested");
+        // Sign the witness with a rogue key, but tell accept to expect the
+        // pinned reservation authority.
+        let rogue = keypair(11);
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &rogue);
+
+        let error = accept(accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            reservation_authority().public_key(),
+            &authority,
+        ))
+        .test_expect_err("reservation from an unexpected authority is denied");
+        assert!(matches!(
+            error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("not signed by the expected")
         ));
     }
 }

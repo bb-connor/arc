@@ -13,7 +13,9 @@ pub use error::CommerceOrderError;
 pub use escrow::{
     accept, release, CommerceEscrowAcceptRequest, CommerceEscrowAcceptance, CommerceEscrowLedger,
     CommerceEscrowLeg, CommerceEscrowLegKind, CommerceEscrowRelease, CommerceEscrowStatus,
-    CommerceSettlementDispatch, EscrowBroadcastIntent, OrderState,
+    CommerceReservationReceipt, CommerceSettlementDispatch, EscrowBroadcastIntent, OrderState,
+    SignedCommerceReservationReceipt, VerifiedCommerceReservation,
+    COMMERCE_RESERVATION_RECEIPT_SCHEMA_ID,
 };
 pub use ids::{
     COMMERCE_ESCROW_LEDGER_SCHEMA_ID, COMMERCE_EVENT_LOG_SCHEMA_ID,

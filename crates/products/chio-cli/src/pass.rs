@@ -83,17 +83,24 @@ fn parse_trust_tier(value: &str) -> Result<TrustTier, CliError> {
 ///
 /// The launch allowlist is sourced from the trust-market market-authority
 /// registry RR2-TM-01 and rotates per epoch, so the operator pins it with the
-/// repeatable `--accepted-kernel-key <hex>` flag. When none is supplied the local
-/// authority public key is used as the trust anchor (mirrors
-/// `cmd_passport_create`'s trusted-kernel anchoring). Real keys are never
-/// hard-coded into the binary. `ChioPassConfig::validate` rejects an empty set
-/// fail-closed.
+/// repeatable `--accepted-kernel-key <hex>` flag. Real keys are never hard-coded
+/// into the binary.
+///
+/// FAIL-CLOSED: when no key is supplied the allowlist is rejected. The local Pass
+/// authority key is NEVER defaulted into the genuine-use allowlist: doing so
+/// would trust any locally-authored receipt as registry-backed kernel provenance
+/// and let a self-minted receipt satisfy the refresh scan. The operator MUST pin
+/// at least one registry-resolved market-authority key.
 fn resolve_accepted_kernel_keys(
     accepted_kernel_keys_hex: &[String],
-    authority_keypair: &Keypair,
 ) -> Result<Vec<PublicKey>, CliError> {
     if accepted_kernel_keys_hex.is_empty() {
-        return Ok(vec![authority_keypair.public_key()]);
+        return Err(CliError::Other(
+            "Pass genuine-use allowlist is empty: pass at least one \
+             --accepted-kernel-key resolved from the RR2-TM-01 market-authority \
+             registry. The local authority key is never trusted as a kernel key."
+                .to_string(),
+        ));
     }
     accepted_kernel_keys_hex
         .iter()
@@ -113,29 +120,33 @@ struct PassDistributionCounters {
     revoked_pass_roster: u64,
 }
 
-/// Source the anti-farm distribution counters from the revocation oracle the CLI
-/// already has (`--revocation-db`), so [`issue_chio_pass_command`] consumes them
-/// rather than recomputing the live set at the entrypoint (the orchestrator
-/// docstring is explicit: "the live set is sourced from the revocation oracle,
-/// never recomputed here").
+/// Source the anti-farm distribution counters from the persisted issued-Pass
+/// roster the revocation oracle (`--revocation-db`) carries, so
+/// [`issue_chio_pass_command`] consumes real persisted state rather than a value
+/// recomputed/defaulted at the entrypoint that a caller could understate.
 ///
-/// The revocation oracle records EXITS from the live set (revocations), not
-/// ENTRIES (issuances): the live population it can independently attest is the
-/// issued roster it has on file minus the revoked subset. The M1 launch oracle
-/// ([`SqliteRevocationStore`]) is revocation-only (it persists no issued-Pass
-/// roster), so the issued roster it can attest is the empty set and the live
-/// count it derives is `0`. A fresh oracle therefore yields `(0, 0)`, admitting
-/// the bootstrap issuance under cap; as soon as an issued-Pass roster store is
-/// wired (tracked separately, out of M1-11 scope) the SAME join over this oracle
-/// yields the real live population without changing the entrypoint contract.
-/// CONTROL 1's aggregate pool ceiling remains the hard liability bound regardless.
+/// The oracle persists BOTH the issued-Pass roster (entries) and the revoked set
+/// (exits). The two anti-farm cap legs are sourced directly from that persisted
+/// state:
+///
+/// - `window_issued_count`: the number of Passes persisted as issued in this
+///   monthly window (the deterministic `chiopass:<hash>` id is the roster key, so
+///   re-minting the same subject+window never inflates the count); and
+/// - `active_population`: the number of issued Passes that have not expired and
+///   are not revoked at `now`.
+///
+/// A fresh oracle yields `(0, 0)`, admitting the bootstrap issuance under cap; as
+/// issuances accumulate the SAME store enforces both caps without changing the
+/// entrypoint contract. CONTROL 1's aggregate pool ceiling remains the hard
+/// liability bound regardless.
 ///
 /// Fail-closed: a store IO fault propagates as `Err`, so no Pass is minted.
 fn oracle_distribution_counters(
     oracle: &SqliteRevocationStore,
-    _window: &AttestationWindowId,
+    window: &AttestationWindowId,
+    now: u64,
 ) -> Result<PassDistributionCounters, CliError> {
-    // Consult the oracle's revoked roster (fail-closed: an IO error denies).
+    // Diagnostic revoked-Pass roster (fail-closed: an IO error denies).
     let revoked = oracle.list_revocations(PASS_ORACLE_ROSTER_SCAN_LIMIT, None)?;
     let revoked_pass_count = revoked
         .iter()
@@ -143,13 +154,10 @@ fn oracle_distribution_counters(
         .count();
     let revoked_pass_roster = u64::try_from(revoked_pass_count).unwrap_or(u64::MAX);
 
-    // The oracle records only exits from the live set; with no issued-Pass roster
-    // store wired (M1-11 scope), the issued roster it can attest is the empty set,
-    // so the live count is `issued - revoked = 0`. The window-scoped issuance
-    // counter shares the same store gap.
-    let issued_roster: u64 = 0;
-    let active_population = issued_roster.saturating_sub(revoked_pass_roster);
-    let window_issued_count: u64 = 0;
+    // Both cap legs come from the persisted issued-Pass roster, never hard-coded.
+    let now_secs = i64::try_from(now).unwrap_or(i64::MAX);
+    let window_issued_count = oracle.count_window_issuances(&window.window_ym)?;
+    let active_population = oracle.count_active_passes(now_secs)?;
 
     Ok(PassDistributionCounters {
         window_issued_count,
@@ -162,6 +170,15 @@ fn oracle_distribution_counters(
 fn read_json_artifact<T: DeserializeOwned>(path: &Path) -> Result<T, CliError> {
     let bytes = fs::read(path)?;
     serde_json::from_slice(&bytes).map_err(CliError::from)
+}
+
+/// Write a signed Pass artifact to `path` as JSON, fail-closed on serialize or
+/// IO. The written file round-trips back through [`read_json_artifact`] so the
+/// issued-Pass artifact can be fed straight into `chio pass anchor`.
+fn write_json_artifact<T: serde::Serialize>(path: &Path, value: &T) -> Result<(), CliError> {
+    let bytes = serde_json::to_vec_pretty(value)?;
+    fs::write(path, bytes)?;
+    Ok(())
 }
 
 fn authority_seed_path(authority_seed_file: Option<&Path>) -> std::path::PathBuf {
@@ -191,18 +208,19 @@ fn pass_issue(
     let seed_path = authority_seed_path(authority_seed_file);
     let authority_keypair = load_or_create_authority_keypair(&seed_path)?;
     let accepted_kernel_keys =
-        resolve_accepted_kernel_keys(accepted_kernel_keys_hex, &authority_keypair)?;
+        resolve_accepted_kernel_keys(accepted_kernel_keys_hex)?;
 
     // The single board-approved M1 launch governance surface (validated
     // fail-closed inside the entrypoint).
     let config = ChioPassConfig::m1_launch_default(accepted_kernel_keys);
     let authority = LocalCapabilityAuthority::new(authority_keypair.clone());
 
-    // Source the distribution counters from the revocation oracle; the entrypoint
-    // never recomputes them.
+    // Source the distribution counters from the persisted issued-Pass roster; the
+    // entrypoint never recomputes them. The counters are read BEFORE the mint so
+    // the new Pass is not counted against its own cap.
     let oracle = SqliteRevocationStore::open(revocation_db_path)?;
     let window = attestation_window_containing(now)?;
-    let counters = oracle_distribution_counters(&oracle, &window)?;
+    let counters = oracle_distribution_counters(&oracle, &window, now)?;
 
     let issuance = issue_chio_pass_command(
         &config,
@@ -214,6 +232,13 @@ fn pass_issue(
         counters.window_issued_count,
         counters.active_population,
     )?;
+
+    // Persist the new issuance into the roster so the SAME oracle enforces the
+    // per-window and active-population caps on the next invocation. Fail-closed:
+    // a store IO fault denies; the credential was only minted in-memory and is
+    // never surfaced.
+    let expires_at = i64::try_from(window.until).unwrap_or(i64::MAX);
+    oracle.record_pass_issuance(&issuance.capability.id, &window.window_ym, expires_at)?;
     Ok((issuance, counters))
 }
 
@@ -232,7 +257,7 @@ fn pass_refresh(
     let seed_path = authority_seed_path(authority_seed_file);
     let authority_keypair = load_or_create_authority_keypair(&seed_path)?;
     let accepted_kernel_keys =
-        resolve_accepted_kernel_keys(accepted_kernel_keys_hex, &authority_keypair)?;
+        resolve_accepted_kernel_keys(accepted_kernel_keys_hex)?;
     let config = ChioPassConfig::m1_launch_default(accepted_kernel_keys);
     let authority = LocalCapabilityAuthority::new(authority_keypair.clone());
 
@@ -336,6 +361,8 @@ pub(crate) fn dispatch_pass(
             tier,
             now,
             accepted_kernel_key,
+            out_pass,
+            out_capability,
         } => {
             let tier = parse_trust_tier(&tier)?;
             let now = now.unwrap_or_else(unix_now);
@@ -350,6 +377,19 @@ pub(crate) fn dispatch_pass(
                 authority_seed_file,
                 &accepted_kernel_key,
             )?;
+
+            // Surface the minted, signed artifacts so the operator can present
+            // the credential and feed the issued-Pass JSON into `chio pass
+            // anchor`; optionally persist each to a requested file. Fail-closed:
+            // an IO or serialization fault denies.
+            if let Some(path) = out_pass.as_deref() {
+                write_json_artifact(path, &issuance.pass)?;
+            }
+            if let Some(path) = out_capability.as_deref() {
+                write_json_artifact(path, &issuance.capability)?;
+            }
+            let pass_value = serde_json::to_value(&issuance.pass)?;
+            let capability_value = serde_json::to_value(&issuance.capability)?;
             let report = serde_json::json!({
                 "schema": "chio.pass.issue.v1",
                 "credential": "portable-reputation-credential",
@@ -358,6 +398,8 @@ pub(crate) fn dispatch_pass(
                 "windowIssuedCount": counters.window_issued_count,
                 "activePopulation": counters.active_population,
                 "revokedPassRoster": counters.revoked_pass_roster,
+                "pass": pass_value,
+                "capability": capability_value,
             });
             write_report(&report, json_output)
         }
@@ -464,6 +506,9 @@ mod tests {
 
         let subject = Keypair::generate();
         let subject_hex = subject.public_key().to_hex();
+        // A registry-resolved kernel key must be pinned: the empty allowlist is
+        // rejected fail-closed (the local authority key is never defaulted in).
+        let kernel_keys = vec![Keypair::generate().public_key().to_hex()];
 
         let (first, counters) = pass_issue(
             &subject_hex,
@@ -471,7 +516,7 @@ mod tests {
             MID_JUNE_2026,
             &revocation_db,
             Some(authority_seed.as_path()),
-            &[],
+            &kernel_keys,
         )
         .expect("first issuance");
         let (second, _) = pass_issue(
@@ -480,7 +525,7 @@ mod tests {
             MID_JUNE_2026,
             &revocation_db,
             Some(authority_seed.as_path()),
-            &[],
+            &kernel_keys,
         )
         .expect("second issuance");
 
@@ -510,7 +555,7 @@ mod tests {
             MID_JUNE_2026,
             &revocation_db,
             Some(other_seed.as_path()),
-            &[],
+            &kernel_keys,
         )
         .expect("third issuance under a fresh authority");
         assert_eq!(
@@ -526,13 +571,72 @@ mod tests {
             july_2026,
             &revocation_db,
             Some(authority_seed.as_path()),
-            &[],
+            &kernel_keys,
         )
         .expect("july issuance");
         assert_ne!(
             first.capability.id, july.capability.id,
             "a different attestation window must mint a different chiopass id"
         );
+    }
+
+    /// The anti-farm distribution counters are sourced from the persisted
+    /// issued-Pass roster, never hard-coded at the entrypoint: a second distinct
+    /// subject minted in the same window sees the first subject's issuance.
+    #[test]
+    fn pass_issue_counts_persisted_window_issuances() {
+        let dir = temp_dir("counters");
+        let revocation_db = dir.join("revocations.sqlite3");
+        let authority_seed = dir.join("authority.seed");
+        let kernel_keys = vec![Keypair::generate().public_key().to_hex()];
+
+        let subject_a = Keypair::generate().public_key().to_hex();
+        let (_first, counters_a) = pass_issue(
+            &subject_a,
+            TrustTier::Attested,
+            MID_JUNE_2026,
+            &revocation_db,
+            Some(authority_seed.as_path()),
+            &kernel_keys,
+        )
+        .expect("first issuance");
+        // Bootstrap: an empty roster admits under cap.
+        assert_eq!(counters_a.window_issued_count, 0);
+        assert_eq!(counters_a.active_population, 0);
+
+        // A DISTINCT subject minted in the SAME window observes the persisted
+        // first issuance: the counters are no longer hard-coded 0.
+        let subject_b = Keypair::generate().public_key().to_hex();
+        let (_second, counters_b) = pass_issue(
+            &subject_b,
+            TrustTier::Attested,
+            MID_JUNE_2026,
+            &revocation_db,
+            Some(authority_seed.as_path()),
+            &kernel_keys,
+        )
+        .expect("second issuance");
+        assert_eq!(
+            counters_b.window_issued_count, 1,
+            "the per-window counter must reflect the persisted prior issuance"
+        );
+        assert_eq!(
+            counters_b.active_population, 1,
+            "the live-population counter must reflect the persisted prior issuance"
+        );
+
+        // Re-minting the SAME subject in the SAME window is idempotent (the
+        // deterministic chiopass id is the roster key), so the window count holds.
+        let (_again, counters_again) = pass_issue(
+            &subject_a,
+            TrustTier::Attested,
+            MID_JUNE_2026,
+            &revocation_db,
+            Some(authority_seed.as_path()),
+            &kernel_keys,
+        )
+        .expect("idempotent re-issuance");
+        assert_eq!(counters_again.window_issued_count, 2);
     }
 
     #[test]
@@ -545,6 +649,8 @@ mod tests {
                 tier: "attested".to_string(),
                 now: Some(MID_JUNE_2026),
                 accepted_kernel_key: vec![],
+                out_pass: None,
+                out_capability: None,
             },
             true,
             None,
@@ -555,6 +661,74 @@ mod tests {
             denied.is_err(),
             "issue must fail closed without a revocation oracle"
         );
+    }
+
+    /// `chio pass issue` surfaces the minted, signed artifacts: with --out-pass /
+    /// --out-capability it writes files that round-trip back to a typed ChioPass
+    /// and the window-scoped CapabilityToken, so the operator can present the
+    /// credential and feed the issued-Pass JSON into `chio pass anchor`.
+    #[test]
+    fn pass_issue_writes_minted_artifacts_to_requested_files() {
+        let dir = temp_dir("artifacts");
+        let revocation_db = dir.join("revocations.sqlite3");
+        let authority_seed = dir.join("authority.seed");
+        let out_pass = dir.join("issued-pass.json");
+        let out_capability = dir.join("capability.json");
+
+        let subject = Keypair::generate().public_key().to_hex();
+        let kernel_key = Keypair::generate().public_key().to_hex();
+
+        dispatch_pass(
+            PassCommands::Issue {
+                subject_public_key: subject,
+                tier: "attested".to_string(),
+                now: Some(MID_JUNE_2026),
+                accepted_kernel_key: vec![kernel_key],
+                out_pass: Some(out_pass.clone()),
+                out_capability: Some(out_capability.clone()),
+            },
+            true,
+            None,
+            Some(revocation_db.as_path()),
+            Some(authority_seed.as_path()),
+        )
+        .expect("issue dispatch succeeds");
+
+        // The minted credential round-trips back to a typed ChioPass (the
+        // issued-Pass artifact `chio pass anchor` consumes).
+        let pass_bytes = std::fs::read(&out_pass).expect("issued-pass file written");
+        let _pass: ChioPass =
+            serde_json::from_slice(&pass_bytes).expect("issued-pass deserializes as ChioPass");
+
+        // The minted capability round-trips and carries the deterministic id.
+        let capability_bytes = std::fs::read(&out_capability).expect("capability file written");
+        let capability: serde_json::Value =
+            serde_json::from_slice(&capability_bytes).expect("capability deserializes");
+        assert!(capability["id"]
+            .as_str()
+            .is_some_and(|id| id.starts_with(CHIO_PASS_CAPABILITY_PREFIX)));
+    }
+
+    #[test]
+    fn resolve_accepted_kernel_keys_fails_closed_without_explicit_key() {
+        // FAIL-CLOSED: an empty allowlist is rejected; the local authority key is
+        // never defaulted into the genuine-use trust anchor.
+        let denied = resolve_accepted_kernel_keys(&[])
+            .expect_err("empty accepted-kernel-key allowlist must be denied");
+        assert!(matches!(
+            denied,
+            CliError::Other(message) if message.contains("--accepted-kernel-key")
+        ));
+
+        // A pinned registry-resolved key is accepted and parsed back.
+        let key = Keypair::generate().public_key();
+        let resolved =
+            resolve_accepted_kernel_keys(&[key.to_hex()]).expect("explicit kernel key resolves");
+        assert_eq!(resolved.len(), 1);
+        assert_eq!(resolved[0].to_hex(), key.to_hex());
+
+        // A malformed key is rejected, never defaulted.
+        assert!(resolve_accepted_kernel_keys(&["not-a-key".to_string()]).is_err());
     }
 
     #[test]
