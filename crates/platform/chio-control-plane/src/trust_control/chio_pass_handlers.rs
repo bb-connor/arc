@@ -996,10 +996,28 @@ fn note_tamper(slot: &mut Option<String>, reason: impl Into<String>) {
 fn recompute_pass_proof_panel(prepared: &PreparedPassAnchorPublication) -> PassProofPanelRecompute {
     let digests = &prepared.anchored_digests;
     let inclusions = &prepared.batch.body.inclusions;
-    let issued_count = prepared.issued_count.min(digests.len());
-    let revoked_count = digests.len().saturating_sub(issued_count);
+    let digest_count = digests.len();
 
     let mut first_tamper: Option<String> = None;
+
+    // The issued/revoked boundary is an UNSIGNED positional hint: the recompute
+    // lane cannot derive it from the proof set, so the panel must never absorb a
+    // count it cannot support. An `issued_count` past the anchored digest count
+    // is treated as tampering here rather than being silently clamped, since the
+    // old `min(len)` clamp re-labelled every row as issued and hid the revocation
+    // rows while still sealing (fail-open). The clamp is retained only as a safe
+    // bound for row iteration; the verdict is already `Tampered` in that case.
+    if prepared.issued_count > digest_count {
+        note_tamper(
+            &mut first_tamper,
+            format!(
+                "issued_count {} exceeds anchored digest count {digest_count}",
+                prepared.issued_count
+            ),
+        );
+    }
+    let issued_count = prepared.issued_count.min(digest_count);
+    let revoked_count = digest_count.saturating_sub(issued_count);
 
     // (a) The signed anchor batch must self-verify: this recomputes the Merkle root
     // from the batch's own leaves, re-walks every inclusion proof, and checks the
@@ -2952,6 +2970,14 @@ mod tests {
         let mut bad_checkpoint = prepared_two_issued_one_revoked();
         bad_checkpoint.checkpoint.body.merkle_root = Hash::zero();
         assert_tampered(&bad_checkpoint, "checkpoint root mismatch");
+
+        // (e) PR959 codex P2: an issued_count past the anchored digest count is
+        // tampering. The old clamp silently absorbed it, re-labelled every row as
+        // issued, hid the revocation rows, and still sealed (fail-open); the panel
+        // now fails closed on a count it cannot support.
+        let mut over_count = prepared_two_issued_one_revoked();
+        over_count.issued_count = over_count.anchored_digests.len() + 1;
+        assert_tampered(&over_count, "issued_count exceeds digest count");
     }
 
     #[test]
