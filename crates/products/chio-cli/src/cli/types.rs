@@ -663,6 +663,17 @@ pub(crate) enum PassCommands {
         #[arg(long)]
         now: Option<u64>,
 
+        /// Optional UTC instant (Unix seconds) INSIDE the EXPIRING (prior) window
+        /// the refresh renews. The wall-clock `now` alone cannot identify the
+        /// expiring window at or just after a month boundary (it already lands in
+        /// the NEW window), so pin the expiring window explicitly here; the minted
+        /// next window is its contiguous monthly rollover. When omitted, the prior
+        /// window is derived from `now` only when `now` is unambiguously inside a
+        /// window's interior; a run within the rollover boundary fails closed and
+        /// requires this flag.
+        #[arg(long = "prior-window-at")]
+        prior_window_at: Option<u64>,
+
         /// Operator intent to re-attest at rollover. The verdict is NOT trusted
         /// from this flag alone: it is only honored when a fresh nonce-bound
         /// `--reattestation-proof` presentation response is supplied and verifies
@@ -714,9 +725,29 @@ pub(crate) enum PassCommands {
         #[arg(long = "issued-pass")]
         issued_pass: Vec<PathBuf>,
 
-        /// Revoked Pass lifecycle-record JSON file. Repeatable.
+        /// Revoked Pass lifecycle-record JSON file. Repeatable. Each entry MUST be
+        /// paired BY POSITION with a `--revoked-pass` original credential that
+        /// proves its passport_id.
         #[arg(long = "revoked-record")]
         revoked_record: Vec<PathBuf>,
+
+        /// Original signed Chio Pass credential JSON for a `--revoked-record`
+        /// entry, paired BY POSITION. The revoked leaf's passport_id is proven by
+        /// recomputing the Pass artifact id from this credential (and verifying its
+        /// issuer signature), so a hand-written revoked record carrying a
+        /// fabricated passport_id is rejected before anchoring. Repeatable; the
+        /// count MUST equal the `--revoked-record` count.
+        #[arg(long = "revoked-pass")]
+        revoked_pass: Vec<PathBuf>,
+
+        /// Trusted Pass-issuer DID (`did:chio`) whose issued Passes may be folded
+        /// into the anchor batch. Repeatable. The operator's own DID (derived from
+        /// the signing seed) is ALWAYS trusted; pin additional issuers here to
+        /// anchor Passes issued by a distinct trusted authority. A Pass issued by
+        /// any other DID is rejected before anchoring (fail-closed), so an operator
+        /// cannot publish a membership root over foreign or self-issued Passes.
+        #[arg(long = "trusted-pass-issuer")]
+        trusted_pass_issuer: Vec<String>,
 
         /// Anchor-purpose signed Web3 identity binding JSON file.
         #[arg(long)]

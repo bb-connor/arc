@@ -389,6 +389,20 @@ impl CommerceSettlementDispatch {
                 self.status
             )));
         }
+        // Parse `issued_at` as an RFC3339 UTC timestamp HERE, before `accept`
+        // signs the packet and locks custody. The standard `validate_settlement_packet`
+        // path (the verifier replay) parses `issued_at` the same way and would
+        // otherwise reject the packet a merely-non-empty timestamp produced, so a
+        // malformed timestamp could lock custody and pin a context digest for a
+        // settlement artifact that can never verify. Fail closed on a malformed
+        // timestamp so the accept and the later verifier agree.
+        super::validation::parse_rfc3339_utc(&self.issued_at, "escrow settlement issued_at")
+            .map_err(|_| {
+                CommerceOrderError::SettlementFailed(format!(
+                    "escrow accept settlement issued_at must be an RFC3339 UTC timestamp: {}",
+                    self.issued_at
+                ))
+            })?;
         Ok(())
     }
 }
@@ -892,6 +906,39 @@ pub fn release(
                     .to_string(),
             ))
         }
+    }
+
+    // Bind the SIGNED settlement packet to the accepted context. A valid signature
+    // only proves the packet was signed by SOME settlement authority, not that it
+    // belongs to THIS order. `CommerceEscrowAcceptance` is public, so a forged
+    // acceptance could pair order A's locked ledger/context with any validly-signed
+    // packet for order B and then drain A's custody using B's reconciliation
+    // reference (taken from the packet below). Re-check that the packet body's
+    // canonical digest equals the digest `accept` pinned into the accepted context
+    // AND that the packet names the same order, so the (context, packet) pair is the
+    // one accept sealed. Fail closed on either mismatch.
+    let accepted_packet_digest = sha256_hex(
+        &chio_core_types::canonical_json_bytes(&acceptance.settlement_packet.body).map_err(
+            |error| {
+                CommerceOrderError::SettlementFailed(format!(
+                    "escrow release failed to canonicalize the accepted settlement packet: {error}"
+                ))
+            },
+        )?,
+    );
+    if accepted_packet_digest != acceptance.updated_context.settlement_packet_sha256 {
+        return Err(CommerceOrderError::SettlementFailed(
+            "escrow release denied: accepted settlement packet digest does not match the accepted \
+             context"
+                .to_string(),
+        ));
+    }
+    if acceptance.settlement_packet.body.order_id != acceptance.updated_context.order_id {
+        return Err(CommerceOrderError::SettlementFailed(
+            "escrow release denied: accepted settlement packet order does not match the accepted \
+             context"
+                .to_string(),
+        ));
     }
 
     // Bind the release to the SAME order and escrow the acceptance locked. The
@@ -2051,6 +2098,134 @@ mod tests {
                     if message.contains("settlement status must be `dispatched`")
             ));
         }
+
+        // Finding 7: a non-RFC3339 issued_at is rejected here, before `accept`
+        // signs the packet, so the accept and the later verifier agree.
+        let mut bad_timestamp = dispatch();
+        bad_timestamp.issued_at = "2026-06-25 00:00:00".to_string();
+        let timestamp_error = bad_timestamp
+            .validate()
+            .test_expect_err("a non-RFC3339 issued_at is denied");
+        assert!(matches!(
+            timestamp_error,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("issued_at must be an RFC3339 UTC timestamp")
+        ));
+    }
+
+    /// Finding 7: `accept` parses the settlement `issued_at` as RFC3339 BEFORE it
+    /// signs the packet and locks custody, so a malformed timestamp (which the
+    /// standard `validate_settlement_packet` verifier would later reject) can never
+    /// lock custody or pin a context digest for an unverifiable settlement artifact.
+    #[test]
+    fn accept_fails_closed_on_malformed_settlement_issued_at() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let context = order_context("fulfillment_attested");
+        let res_auth = reservation_authority();
+        let reservation = signed_reservation(&context, &token, 4200, "USD", &res_auth);
+
+        let mut request = accept_request(
+            &context,
+            &token,
+            &acceptor,
+            &reservation,
+            res_auth.public_key(),
+            &authority,
+        );
+        request.settlement.issued_at = "not-an-rfc3339-timestamp".to_string();
+        let denied =
+            accept(request).test_expect_err("a malformed issued_at is denied before locking");
+        assert!(matches!(
+            denied,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("issued_at must be an RFC3339 UTC timestamp")
+        ));
+    }
+
+    /// Finding 4: a release whose acceptance pairs THIS order's locked
+    /// ledger/context with a validly-signed settlement packet from a DIFFERENT
+    /// order is denied. The accepted packet's canonical digest no longer matches
+    /// the accepted context's pinned `settlement_packet_sha256`, so order B's
+    /// reconciliation reference can never drain order A's custody, even though B's
+    /// packet signature verifies and B's observation matches the locked amount.
+    #[test]
+    fn release_fails_closed_on_settlement_packet_from_a_different_order() {
+        let issuer = keypair(1);
+        let subject = keypair(2);
+        let acceptor = subject.public_key();
+        let authority = keypair(7);
+        let token = token_offer(&issuer, &acceptor, 4200, "USD");
+        let res_auth = reservation_authority();
+
+        // Order A: the order whose custody is locked.
+        let context_a = order_context("fulfillment_attested");
+        let reservation_a = signed_reservation(&context_a, &token, 4200, "USD", &res_auth);
+        let acceptance_a = accept(accept_request(
+            &context_a,
+            &token,
+            &acceptor,
+            &reservation_a,
+            res_auth.public_key(),
+            &authority,
+        ))
+        .test_expect("order A accept locks the ledger");
+
+        // Order B: a DIFFERENT order with its own validly-signed settlement packet.
+        let mut context_b = order_context("fulfillment_attested");
+        context_b.order_id = "order-commerce-002".to_string();
+        let reservation_b = signed_reservation(&context_b, &token, 4200, "USD", &res_auth);
+        let acceptance_b = accept(accept_request(
+            &context_b,
+            &token,
+            &acceptor,
+            &reservation_b,
+            res_auth.public_key(),
+            &authority,
+        ))
+        .test_expect("order B accept locks its own ledger");
+        // The two orders produce DIFFERENT signed packets.
+        assert_ne!(
+            acceptance_a.updated_context.settlement_packet_sha256,
+            acceptance_b.updated_context.settlement_packet_sha256
+        );
+
+        // Forge an acceptance: A's sealed ledger/context paired with B's signed
+        // packet (the acceptance fields are public, so this needs no authority).
+        let mut forged = acceptance_a.clone();
+        forged.settlement_packet = acceptance_b.settlement_packet.clone();
+
+        // B's same-value payment observation (B's reconciliation ref).
+        let observation = CapitalExecutionObservation {
+            observed_at: 1_700_000_000,
+            external_reference_id: acceptance_b
+                .settlement_packet
+                .body
+                .reconciliation_ref
+                .clone(),
+            amount: MonetaryAmount {
+                units: 4200,
+                currency: "USD".to_string(),
+            },
+        };
+        let advanced = advanced_context(&acceptance_a, "settlement_observed");
+        let denied = release(
+            &forged,
+            &advanced,
+            &observation,
+            CapitalExecutionReconciledState::Matched,
+        )
+        .test_expect_err("a cross-order settlement packet cannot release this order");
+        assert!(matches!(
+            denied,
+            CommerceOrderError::SettlementFailed(message)
+                if message.contains("settlement packet digest does not match the accepted context")
+        ));
+        // A's custody is never drained.
+        assert_eq!(acceptance_a.ledger.status, CommerceEscrowStatus::Locked);
     }
 
     // ESCROW-2: a tampered (unverifiable) reservation witness is denied; a bare

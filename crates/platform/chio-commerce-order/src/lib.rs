@@ -537,7 +537,42 @@ fn verify_escrow_digest(
             ),
         });
     }
+    // Bind the ledger's lifecycle status to the order's settlement state. A digest
+    // match alone proves only that SOME escrow ledger conserves value; it does not
+    // prove the custody actually reached the lifecycle the context claims. The
+    // release leg appends a second leg and flips the ledger to Released, producing a
+    // DIFFERENT canonical digest, so a context that claims settlement reconciliation
+    // (or later) while pinning a still-`Locked` ledger digest is proving only that
+    // custody was LOCKED, never released. Fail closed when the pinned ledger's
+    // status is not the one the order state requires.
+    if let Some(required) = required_escrow_status_for_state(&context.current_state) {
+        if ledger.status != required {
+            return Err(CommerceOrderError::InvalidArtifact {
+                field: "order context",
+                message: format!(
+                    "escrow ledger status mismatch: order state {} requires a {:?} ledger, got {:?}",
+                    context.current_state, required, ledger.status
+                ),
+            });
+        }
+    }
     Ok(())
+}
+
+/// The escrow-ledger status an order state requires when an `escrow_digest` is
+/// pinned. The accept leg locks custody (a `Locked` ledger) and advances the order
+/// to the assembly/dispatch/observe states; the release leg drains custody (a
+/// `Released` ledger) and advances the order to settlement reconciliation and
+/// beyond. Other states impose no escrow-status constraint here (the field is
+/// additive, so legacy/pre-escrow states return `None`).
+fn required_escrow_status_for_state(current_state: &str) -> Option<CommerceEscrowStatus> {
+    match current_state {
+        "settlement_packet_assembled" | "settlement_dispatched" | "settlement_observed" => {
+            Some(CommerceEscrowStatus::Locked)
+        }
+        "settlement_reconciled" | "completed" => Some(CommerceEscrowStatus::Released),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
@@ -581,7 +616,9 @@ mod escrow_digest_verification_tests {
             "federation_trust_bundle_path": "federation-trust-bundle.json",
             "settlement_packet_sha256": HEX64,
             "settlement_packet_path": "settlement-packet.json",
-            "current_state": "settlement_reconciled",
+            // A locked-phase settlement state, consistent with the `Locked` ledger
+            // these tests pin (the released ledger has a different canonical digest).
+            "current_state": "settlement_packet_assembled",
         });
         serde_json::from_value(value).test_expect("order context deserializes")
     }
@@ -707,5 +744,71 @@ mod escrow_digest_verification_tests {
             }
             other => panic!("expected a DigestMismatch, got {other:?}"),
         }
+    }
+
+    /// A drained (Released) ledger: the lock leg plus the release leg, status
+    /// Released. Its canonical digest differs from the Locked ledger's.
+    fn released_ledger(order_id: &str) -> CommerceEscrowLedger {
+        CommerceEscrowLedger {
+            schema: COMMERCE_ESCROW_LEDGER_SCHEMA_ID.to_string(),
+            order_id: order_id.to_string(),
+            currency: "USD".to_string(),
+            depositor_account: "buyer:alice".to_string(),
+            beneficiary_account: "merchant:coffee".to_string(),
+            custody_account: "chio:commerce:escrow:custody".to_string(),
+            amount_minor: 4200,
+            legs: vec![
+                CommerceEscrowLeg {
+                    kind: CommerceEscrowLegKind::Lock,
+                    from_account: "buyer:alice".to_string(),
+                    to_account: "chio:commerce:escrow:custody".to_string(),
+                    amount_minor: 4200,
+                },
+                CommerceEscrowLeg {
+                    kind: CommerceEscrowLegKind::Release,
+                    from_account: "chio:commerce:escrow:custody".to_string(),
+                    to_account: "merchant:coffee".to_string(),
+                    amount_minor: 4200,
+                },
+            ],
+            status: CommerceEscrowStatus::Released,
+        }
+    }
+
+    /// Finding 6: a context that claims settlement reconciliation while pinning a
+    /// still-`Locked` ledger digest is denied. The release leg drains custody and
+    /// yields a DIFFERENT canonical digest, so a Locked ledger whose digest the
+    /// context pins proves only that custody was locked, never reconciled.
+    #[test]
+    fn reconciled_state_with_locked_ledger_is_denied() {
+        let order_id = "order-commerce-001";
+        let locked = ledger(order_id);
+        assert_eq!(locked.status, CommerceEscrowStatus::Locked);
+        let bytes = canonical_ledger_bytes(&locked);
+        let mut context = order_context(order_id);
+        context.current_state = "settlement_reconciled".to_string();
+        context.escrow_digest = Some(sha256_hex(&bytes));
+        let error = verify_escrow_digest(&context, Some(&bytes))
+            .test_expect_err("a reconciled context with a locked ledger is denied");
+        assert!(matches!(
+            error,
+            CommerceOrderError::InvalidArtifact { message, .. }
+                if message.contains("escrow ledger status mismatch")
+        ));
+    }
+
+    /// Finding 6: the consistent reconciled pair (a `Released` ledger pinned by a
+    /// reconciled context) still verifies, so the status gate only denies the
+    /// inconsistent lock-while-reconciled combination.
+    #[test]
+    fn reconciled_state_with_released_ledger_verifies() {
+        let order_id = "order-commerce-001";
+        let released = released_ledger(order_id);
+        let bytes = canonical_ledger_bytes(&released);
+        let mut context = order_context(order_id);
+        context.current_state = "settlement_reconciled".to_string();
+        context.escrow_digest = Some(sha256_hex(&bytes));
+        verify_escrow_digest(&context, Some(&bytes))
+            .test_expect("a reconciled context with a released ledger verifies");
     }
 }
