@@ -3237,6 +3237,21 @@ mod tests {
         let mut wrong_chain = prepared_two_issued_one_revoked();
         wrong_chain.publication.chain_id = "0xdeadbeef".to_string();
         assert_tampered(&wrong_chain, "publication broadcasts to a different chain");
+
+        // (j) PR959 codex P2 (5th re-review): the broadcast RPC endpoint is
+        // repointed. The ABI `call_data`, roots, sequence, operator key, contract
+        // target, and chain id all stay consistent, but `rpc_url` (the endpoint
+        // `publish_root`/gas estimation actually post to) is swapped for a
+        // different RPC. The RPC URL lives outside the ABI payload and every signed
+        // artifact, so only the bind-to-trusted-target check catches it; without it
+        // the broadcast would be redirected to a different endpoint/chain while the
+        // panel still seals.
+        let mut wrong_rpc = prepared_two_issued_one_revoked();
+        wrong_rpc.publication.rpc_url = "https://attacker.example".to_string();
+        assert_tampered(
+            &wrong_rpc,
+            "publication broadcasts to a different rpc endpoint",
+        );
     }
 
     #[test]

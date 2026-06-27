@@ -220,17 +220,20 @@ fn bind_evm_address_to_target(
 /// display scalars against that same checkpoint), failing closed on any
 /// disagreement. It performs no network IO and moves no value.
 ///
-/// The transaction envelope (`chain_id`, `contract_address` = the `to` target,
-/// `operator_address`, `publisher_address` = the `from`) lives OUTSIDE the ABI
-/// `call_data` payload, so a call_data/root-consistent publication can still be
-/// tampered to broadcast to a DIFFERENT contract or chain. `publish_root` uses the
-/// mutable `publication.contract_address` as its broadcast target, so a tampered
-/// target would seal a publication that never reaches the intended root registry.
-/// The expected envelope cannot be derived from the checkpoint (the registry
-/// address is not committed in any signed artifact); it comes from the trusted,
-/// independently supplied `expected_target` (the registered anchor target/binding
-/// config). This binds the publication's envelope to that target, failing closed
-/// on a mismatch or an unparseable address.
+/// The transaction envelope (`chain_id`, `rpc_url` = the broadcast endpoint,
+/// `contract_address` = the `to` target, `operator_address`, `publisher_address`
+/// = the `from`) lives OUTSIDE the ABI `call_data` payload, so a call_data/root-
+/// consistent publication can still be tampered to broadcast to a DIFFERENT
+/// contract, chain, or RPC endpoint. `publish_root` (and `estimate_publication_gas`)
+/// use the mutable `publication.contract_address` as the broadcast target and post
+/// to the mutable `publication.rpc_url`, so a tampered target/endpoint would seal a
+/// publication that never reaches the intended root registry (or reaches a
+/// different chain via a different RPC). The expected envelope cannot be derived
+/// from the checkpoint (neither the registry address nor the RPC URL is committed
+/// in any signed artifact); it comes from the trusted, independently supplied
+/// `expected_target` (the registered anchor target/binding config). This binds the
+/// publication's envelope to that target, failing closed on a mismatch or an
+/// unparseable address.
 ///
 /// # Errors
 ///
@@ -238,7 +241,7 @@ fn bind_evm_address_to_target(
 /// `publishRoot` call, when any decoded broadcast field or displayed scalar
 /// disagrees with the checkpoint's root, sequence, range, tree size, operator
 /// address, or operator key hash, or when the publication's broadcast envelope
-/// (chain, target contract, operator, or publisher) disagrees with
+/// (chain, RPC endpoint, target contract, operator, or publisher) disagrees with
 /// `expected_target` (or is not a parseable EVM address).
 pub fn validate_publication_call_data_against_checkpoint(
     publication: &PreparedEvmRootPublication,
@@ -253,11 +256,26 @@ pub fn validate_publication_call_data_against_checkpoint(
     // the checkpoint; they are bound here to the independently supplied
     // `expected_target`. `publish_root` broadcasts to `publication.contract_address`
     // (the `to`) from `publication.publisher_address` (the `from`) on
-    // `publication.chain_id`, so a tampered target/chain would seal a publication
-    // that never reaches the intended root registry. Fail closed on any mismatch.
+    // `publication.chain_id`, AND posts that transaction to `publication.rpc_url`
+    // (the actual network endpoint, used by both gas estimation and the broadcast),
+    // so a tampered target/chain/rpc_url would seal a publication that never reaches
+    // the intended root registry (or reaches a different RPC endpoint/chain). Fail
+    // closed on any mismatch.
     if publication.chain_id != expected_target.chain_id {
         return Err(AnchorError::InvalidInput(
             "prepared publication chain_id does not match the expected anchor target".to_string(),
+        ));
+    }
+    // The `rpc_url` is the broadcast/gas-estimation endpoint. It is not committed
+    // in any signed artifact and cannot be derived from the checkpoint, so a
+    // tampered `rpc_url` can redirect the publishRoot broadcast to a different RPC
+    // endpoint (and thus a different chain) while every other field still seals.
+    // Bind it to the trusted target by exact match: the prepared publication's
+    // `rpc_url` is cloned verbatim from the registered target in
+    // `prepare_root_publication`, so any divergence is tampering. Fail closed.
+    if publication.rpc_url != expected_target.rpc_url {
+        return Err(AnchorError::InvalidInput(
+            "prepared publication rpc_url does not match the expected anchor target".to_string(),
         ));
     }
     bind_evm_address_to_target(
