@@ -5,10 +5,14 @@ const BPS_DENOMINATOR: u128 = 10_000;
 pub fn minor_units_for_currency(currency: &str) -> Result<u64, PriceOracleError> {
     match currency.trim().to_ascii_uppercase().as_str() {
         "USD" | "EUR" | "GBP" => Ok(100),
-        // Private-use credit code (ISO 4217 user-assigned range). Mirrors
-        // USD with 2 minor-unit decimals so netting can settle Chio credit
-        // amounts without inventing a fresh scale.
-        "XCC" => Ok(100),
+        // XCC (the Chio Pass free-tier allotment unit) is deliberately ABSENT.
+        // The Pass free-tier pool detector in chio-kernel classifies a unit as
+        // private-use only when `minor_units_for_currency(currency).is_err()`, so
+        // pinning a minor-unit scale here would re-route genuine XCC grants onto
+        // the normal budget path and let Passes bypass the aggregate
+        // `freetier:global` pool ceiling. XCC must stay unpriced (no money leg);
+        // the off-chain credit netting carries its own canonical rate table and
+        // never consults this function for XCC.
         "JPY" => Ok(1),
         "USDC" | "USDT" => Ok(1_000_000),
         "BTC" => Ok(100_000_000),
@@ -157,14 +161,21 @@ mod tests {
     }
 
     #[test]
-    fn resolves_xcc_private_use_credit_code() {
-        // XCC is the private-use credit code; it mirrors USD with 2
-        // minor-unit decimals (100 minor units per whole unit).
-        assert_eq!(minor_units_for_currency("XCC").test_unwrap("xcc"), 100);
-        assert_eq!(
-            minor_units_for_currency(" xcc ").test_unwrap("xcc trimmed/lowercased"),
-            100
-        );
+    fn xcc_stays_unpriced_for_the_pass_pool_gate() {
+        // PR959 codex P1: XCC (the Chio Pass free-tier allotment unit) MUST stay
+        // unpriced. The kernel free-tier pool detector classifies a unit as
+        // private-use only when this lookup fails, so pinning XCC here would
+        // re-route genuine XCC grants onto the normal budget path and bypass the
+        // aggregate pool ceiling. Every spelling must fail closed.
+        for candidate in ["XCC", "xcc", " xcc ", " XCC "] {
+            assert!(
+                matches!(
+                    minor_units_for_currency(candidate),
+                    Err(crate::PriceOracleError::InvalidConfiguration(_))
+                ),
+                "XCC must stay unpriced so the Pass pool gate routes it, got a price for {candidate:?}"
+            );
+        }
     }
 
     #[test]
