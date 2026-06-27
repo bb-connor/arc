@@ -120,29 +120,33 @@ struct PassDistributionCounters {
     revoked_pass_roster: u64,
 }
 
-/// Source the anti-farm distribution counters from the revocation oracle the CLI
-/// already has (`--revocation-db`), so [`issue_chio_pass_command`] consumes them
-/// rather than recomputing the live set at the entrypoint (the orchestrator
-/// docstring is explicit: "the live set is sourced from the revocation oracle,
-/// never recomputed here").
+/// Source the anti-farm distribution counters from the persisted issued-Pass
+/// roster the revocation oracle (`--revocation-db`) carries, so
+/// [`issue_chio_pass_command`] consumes real persisted state rather than a value
+/// recomputed/defaulted at the entrypoint that a caller could understate.
 ///
-/// The revocation oracle records EXITS from the live set (revocations), not
-/// ENTRIES (issuances): the live population it can independently attest is the
-/// issued roster it has on file minus the revoked subset. The M1 launch oracle
-/// ([`SqliteRevocationStore`]) is revocation-only (it persists no issued-Pass
-/// roster), so the issued roster it can attest is the empty set and the live
-/// count it derives is `0`. A fresh oracle therefore yields `(0, 0)`, admitting
-/// the bootstrap issuance under cap; as soon as an issued-Pass roster store is
-/// wired (tracked separately, out of M1-11 scope) the SAME join over this oracle
-/// yields the real live population without changing the entrypoint contract.
-/// CONTROL 1's aggregate pool ceiling remains the hard liability bound regardless.
+/// The oracle persists BOTH the issued-Pass roster (entries) and the revoked set
+/// (exits). The two anti-farm cap legs are sourced directly from that persisted
+/// state:
+///
+/// - `window_issued_count`: the number of Passes persisted as issued in this
+///   monthly window (the deterministic `chiopass:<hash>` id is the roster key, so
+///   re-minting the same subject+window never inflates the count); and
+/// - `active_population`: the number of issued Passes that have not expired and
+///   are not revoked at `now`.
+///
+/// A fresh oracle yields `(0, 0)`, admitting the bootstrap issuance under cap; as
+/// issuances accumulate the SAME store enforces both caps without changing the
+/// entrypoint contract. CONTROL 1's aggregate pool ceiling remains the hard
+/// liability bound regardless.
 ///
 /// Fail-closed: a store IO fault propagates as `Err`, so no Pass is minted.
 fn oracle_distribution_counters(
     oracle: &SqliteRevocationStore,
-    _window: &AttestationWindowId,
+    window: &AttestationWindowId,
+    now: u64,
 ) -> Result<PassDistributionCounters, CliError> {
-    // Consult the oracle's revoked roster (fail-closed: an IO error denies).
+    // Diagnostic revoked-Pass roster (fail-closed: an IO error denies).
     let revoked = oracle.list_revocations(PASS_ORACLE_ROSTER_SCAN_LIMIT, None)?;
     let revoked_pass_count = revoked
         .iter()
@@ -150,13 +154,10 @@ fn oracle_distribution_counters(
         .count();
     let revoked_pass_roster = u64::try_from(revoked_pass_count).unwrap_or(u64::MAX);
 
-    // The oracle records only exits from the live set; with no issued-Pass roster
-    // store wired (M1-11 scope), the issued roster it can attest is the empty set,
-    // so the live count is `issued - revoked = 0`. The window-scoped issuance
-    // counter shares the same store gap.
-    let issued_roster: u64 = 0;
-    let active_population = issued_roster.saturating_sub(revoked_pass_roster);
-    let window_issued_count: u64 = 0;
+    // Both cap legs come from the persisted issued-Pass roster, never hard-coded.
+    let now_secs = i64::try_from(now).unwrap_or(i64::MAX);
+    let window_issued_count = oracle.count_window_issuances(&window.window_ym)?;
+    let active_population = oracle.count_active_passes(now_secs)?;
 
     Ok(PassDistributionCounters {
         window_issued_count,
@@ -205,11 +206,12 @@ fn pass_issue(
     let config = ChioPassConfig::m1_launch_default(accepted_kernel_keys);
     let authority = LocalCapabilityAuthority::new(authority_keypair.clone());
 
-    // Source the distribution counters from the revocation oracle; the entrypoint
-    // never recomputes them.
+    // Source the distribution counters from the persisted issued-Pass roster; the
+    // entrypoint never recomputes them. The counters are read BEFORE the mint so
+    // the new Pass is not counted against its own cap.
     let oracle = SqliteRevocationStore::open(revocation_db_path)?;
     let window = attestation_window_containing(now)?;
-    let counters = oracle_distribution_counters(&oracle, &window)?;
+    let counters = oracle_distribution_counters(&oracle, &window, now)?;
 
     let issuance = issue_chio_pass_command(
         &config,
@@ -221,6 +223,13 @@ fn pass_issue(
         counters.window_issued_count,
         counters.active_population,
     )?;
+
+    // Persist the new issuance into the roster so the SAME oracle enforces the
+    // per-window and active-population caps on the next invocation. Fail-closed:
+    // a store IO fault denies; the credential was only minted in-memory and is
+    // never surfaced.
+    let expires_at = i64::try_from(window.until).unwrap_or(i64::MAX);
+    oracle.record_pass_issuance(&issuance.capability.id, &window.window_ym, expires_at)?;
     Ok((issuance, counters))
 }
 
@@ -543,6 +552,65 @@ mod tests {
             first.capability.id, july.capability.id,
             "a different attestation window must mint a different chiopass id"
         );
+    }
+
+    /// The anti-farm distribution counters are sourced from the persisted
+    /// issued-Pass roster, never hard-coded at the entrypoint: a second distinct
+    /// subject minted in the same window sees the first subject's issuance.
+    #[test]
+    fn pass_issue_counts_persisted_window_issuances() {
+        let dir = temp_dir("counters");
+        let revocation_db = dir.join("revocations.sqlite3");
+        let authority_seed = dir.join("authority.seed");
+        let kernel_keys = vec![Keypair::generate().public_key().to_hex()];
+
+        let subject_a = Keypair::generate().public_key().to_hex();
+        let (_first, counters_a) = pass_issue(
+            &subject_a,
+            TrustTier::Attested,
+            MID_JUNE_2026,
+            &revocation_db,
+            Some(authority_seed.as_path()),
+            &kernel_keys,
+        )
+        .expect("first issuance");
+        // Bootstrap: an empty roster admits under cap.
+        assert_eq!(counters_a.window_issued_count, 0);
+        assert_eq!(counters_a.active_population, 0);
+
+        // A DISTINCT subject minted in the SAME window observes the persisted
+        // first issuance: the counters are no longer hard-coded 0.
+        let subject_b = Keypair::generate().public_key().to_hex();
+        let (_second, counters_b) = pass_issue(
+            &subject_b,
+            TrustTier::Attested,
+            MID_JUNE_2026,
+            &revocation_db,
+            Some(authority_seed.as_path()),
+            &kernel_keys,
+        )
+        .expect("second issuance");
+        assert_eq!(
+            counters_b.window_issued_count, 1,
+            "the per-window counter must reflect the persisted prior issuance"
+        );
+        assert_eq!(
+            counters_b.active_population, 1,
+            "the live-population counter must reflect the persisted prior issuance"
+        );
+
+        // Re-minting the SAME subject in the SAME window is idempotent (the
+        // deterministic chiopass id is the roster key), so the window count holds.
+        let (_again, counters_again) = pass_issue(
+            &subject_a,
+            TrustTier::Attested,
+            MID_JUNE_2026,
+            &revocation_db,
+            Some(authority_seed.as_path()),
+            &kernel_keys,
+        )
+        .expect("idempotent re-issuance");
+        assert_eq!(counters_again.window_issued_count, 2);
     }
 
     #[test]

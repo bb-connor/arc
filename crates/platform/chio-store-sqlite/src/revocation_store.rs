@@ -30,6 +30,15 @@ impl SqliteRevocationStore {
 
             CREATE INDEX IF NOT EXISTS idx_revoked_capabilities_revoked_at
                 ON revoked_capabilities(revoked_at);
+
+            CREATE TABLE IF NOT EXISTS issued_passes (
+                capability_id TEXT PRIMARY KEY,
+                window_ym TEXT NOT NULL,
+                expires_at INTEGER NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_issued_passes_window_ym
+                ON issued_passes(window_ym);
             "#,
         )?;
 
@@ -98,6 +107,62 @@ impl SqliteRevocationStore {
             },
         )?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    /// Record (idempotently) that a Pass capability was issued in `window_ym`,
+    /// expiring at `expires_at` (unix seconds). The capability id is the primary
+    /// key, so re-recording the SAME window-scoped Pass id (the deterministic
+    /// `chiopass:<hash>` is subject+window derived) never double-counts the
+    /// issuance. This is the persisted issued-Pass roster the anti-farm
+    /// distribution counters are sourced from.
+    pub fn record_pass_issuance(
+        &self,
+        capability_id: &str,
+        window_ym: &str,
+        expires_at: i64,
+    ) -> Result<(), RevocationStoreError> {
+        self.connection()?.execute(
+            r#"
+            INSERT INTO issued_passes (capability_id, window_ym, expires_at)
+            VALUES (?1, ?2, ?3)
+            ON CONFLICT(capability_id) DO UPDATE SET
+                window_ym = excluded.window_ym,
+                expires_at = excluded.expires_at
+            "#,
+            params![capability_id, window_ym, expires_at],
+        )?;
+        Ok(())
+    }
+
+    /// Count the Passes persisted as issued in `window_ym` (the per-window
+    /// anti-farm cap leg). Sourced from persisted state, never recomputed.
+    pub fn count_window_issuances(&self, window_ym: &str) -> Result<u64, RevocationStoreError> {
+        let count: i64 = self.connection()?.query_row(
+            "SELECT COUNT(*) FROM issued_passes WHERE window_ym = ?1",
+            params![window_ym],
+            |row| row.get(0),
+        )?;
+        Ok(u64::try_from(count).unwrap_or(u64::MAX))
+    }
+
+    /// Count the LIVE issued Passes at `now` (the active-population cap leg): an
+    /// issued Pass is live when it has not expired (`expires_at > now`) and its
+    /// capability id is not in the revoked set. Sourced from persisted state.
+    pub fn count_active_passes(&self, now: i64) -> Result<u64, RevocationStoreError> {
+        let count: i64 = self.connection()?.query_row(
+            r#"
+            SELECT COUNT(*)
+            FROM issued_passes AS issued
+            WHERE issued.expires_at > ?1
+              AND NOT EXISTS (
+                  SELECT 1 FROM revoked_capabilities AS revoked
+                  WHERE revoked.capability_id = issued.capability_id
+              )
+            "#,
+            params![now],
+            |row| row.get(0),
+        )?;
+        Ok(u64::try_from(count).unwrap_or(u64::MAX))
     }
 
     pub fn upsert_revocation(&self, record: &RevocationRecord) -> Result<(), RevocationStoreError> {
@@ -188,6 +253,52 @@ mod tests {
         let filtered = store.list_revocations(10, Some("cap-1")).unwrap();
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].capability_id, "cap-1");
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn sqlite_revocation_store_counts_persisted_issued_passes() {
+        let path = unique_db_path("chio-issued-passes");
+        let store = SqliteRevocationStore::open(&path).unwrap();
+
+        // Two Passes in window 2026-06, one in 2026-07.
+        store
+            .record_pass_issuance("chiopass:a", "2026-06", 2_000)
+            .unwrap();
+        store
+            .record_pass_issuance("chiopass:b", "2026-06", 2_000)
+            .unwrap();
+        store
+            .record_pass_issuance("chiopass:c", "2026-07", 5_000)
+            .unwrap();
+
+        assert_eq!(store.count_window_issuances("2026-06").unwrap(), 2);
+        assert_eq!(store.count_window_issuances("2026-07").unwrap(), 1);
+        assert_eq!(store.count_window_issuances("2026-08").unwrap(), 0);
+
+        // At now=1000 all three are live (none expired, none revoked).
+        assert_eq!(store.count_active_passes(1_000).unwrap(), 3);
+
+        // Revoking b removes it from the live population.
+        assert!(store.revoke("chiopass:b").unwrap());
+        assert_eq!(store.count_active_passes(1_000).unwrap(), 2);
+
+        // At now=2500, a and b are expired (expires 2000); c (expires 5000) is the
+        // only live, non-revoked Pass.
+        assert_eq!(store.count_active_passes(2_500).unwrap(), 1);
+
+        // Idempotent: re-recording the same window-scoped id does not inflate the
+        // window count.
+        store
+            .record_pass_issuance("chiopass:a", "2026-06", 2_000)
+            .unwrap();
+        assert_eq!(store.count_window_issuances("2026-06").unwrap(), 2);
+
+        // The roster persists across reopen.
+        drop(store);
+        let reopened = SqliteRevocationStore::open(&path).unwrap();
+        assert_eq!(reopened.count_window_issuances("2026-06").unwrap(), 2);
 
         let _ = fs::remove_file(path);
     }
