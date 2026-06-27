@@ -423,6 +423,33 @@ fn refresh_windows(
         // the expiring window is unambiguous regardless of the wall clock.
         let prior = attestation_window_containing(prior_at)?;
         let next = attestation_window_containing(prior.until)?;
+        // FAIL-CLOSED: the explicit prior window MUST be the CURRENT or an
+        // already-expiring window relative to `now`, never a FUTURE month. Pinning
+        // a window that has not begun (e.g. a July instant while running in
+        // mid-June) would scan the brand-new July window and mint/persist an August
+        // Pass, silently reserving a future window with no genuine prior-window use
+        // to renew. Require the prior window to have already started
+        // (`prior.since <= now`); reject a future prior-window.
+        if now < prior.since {
+            return Err(CliError::Other(
+                "refresh --prior-window-at points at a FUTURE window that has not begun relative \
+                 to now: pin the CURRENT or expiring window being renewed, never a future month"
+                    .to_string(),
+            ));
+        }
+        // FAIL-CLOSED: the window being MINTED must not have already fully ended
+        // before `now`. A prior window two-or-more months stale would mint an
+        // already-expired next window (a dead Pass), and is not the
+        // "current-or-expiring" window a renewal targets. Together with the bound
+        // above this admits exactly the current window (mint the upcoming next) or
+        // the just-ended window at a rollover (mint the current), and nothing else.
+        if next.until <= now {
+            return Err(CliError::Other(
+                "refresh --prior-window-at points at a stale window whose renewal target has \
+                 already ended: pin the CURRENT or expiring window being renewed"
+                    .to_string(),
+            ));
+        }
         return Ok((prior, next));
     }
     let current = attestation_window_containing(now)?;
@@ -1760,6 +1787,43 @@ mod tests {
             denied,
             CliError::Other(message) if message.contains("--prior-window-at")
         ));
+    }
+
+    /// Batch 6 / Finding: an explicit `--prior-window-at` that points at a FUTURE
+    /// window (one that has not begun relative to `now`) is denied. Without this
+    /// bound, a refresh run in mid-June with `--prior-window-at` in July would scan
+    /// the brand-new July window and mint/persist an August Pass, silently reserving
+    /// a future window. The CURRENT window and the already-expiring window at a
+    /// rollover are still accepted.
+    #[test]
+    fn refresh_windows_reject_future_explicit_prior() {
+        const JULY_2026_START: u64 = 1_782_864_000; // 2026-07-01T00:00:00Z
+
+        // Running on 2026-06-15 with `--prior-window-at` pinned to a July instant: the
+        // July window has not begun, so scanning it would mint an August Pass two
+        // months ahead. Fail closed.
+        let denied = refresh_windows(MID_JUNE_2026, Some(JULY_2026_START))
+            .expect_err("a future --prior-window-at is denied");
+        assert!(matches!(
+            denied,
+            CliError::Other(message) if message.contains("FUTURE window")
+        ));
+
+        // The CURRENT window (the one containing `now`) is an accepted explicit prior:
+        // June is scanned and the contiguous July window is minted.
+        let (prior, next) = refresh_windows(MID_JUNE_2026, Some(MID_JUNE_2026))
+            .expect("the current window is an accepted explicit prior");
+        assert_eq!(prior.window_ym, "2026-06");
+        assert_eq!(next.window_ym, "2026-07");
+
+        // The already-expiring window at the exact rollover (now in July, prior pinned
+        // to a June instant) is still accepted: June has started and July (the minted
+        // next) contains now.
+        let (prior_rollover, next_rollover) =
+            refresh_windows(JULY_2026_START, Some(MID_JUNE_2026))
+                .expect("the expiring window at rollover is accepted");
+        assert_eq!(prior_rollover.window_ym, "2026-06");
+        assert_eq!(next_rollover.window_ym, "2026-07");
     }
 
     /// Finding 2: a renewed/dormant refresh persists through the SAME atomic
