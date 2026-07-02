@@ -827,9 +827,12 @@ mod tests {
 
     use super::*;
 
-    // 2026-06-15T12:00:00Z (inside June 2026) and the contiguous July window.
+    // 2026-06-15T12:00:00Z: a fixed historical instant for the pure-function
+    // suites below (issuance admission, anchor publication, scope shape) that
+    // inject explicit clocks and never read the wall clock. The e2e pipeline
+    // suite must NOT use it: the kernel charge path reads the REAL clock, so
+    // that suite derives its window dynamically (see `current_window`).
     const MID_JUNE_2026: u64 = 1_781_524_800;
-    const JULY_2026: u64 = 1_782_864_000; // 2026-07-01T00:00:00Z
 
     fn unique_db_path(prefix: &str) -> std::path::PathBuf {
         let nonce = SystemTime::now()
@@ -839,12 +842,35 @@ mod tests {
         std::env::temp_dir().join(format!("chio-pass-t9-{prefix}-{nonce}.sqlite3"))
     }
 
-    fn june_window() -> AttestationWindowId {
-        attestation_window_containing(MID_JUNE_2026).expect("june window")
+    /// The UTC calendar-month attestation window containing the REAL wall
+    /// clock now, computed dynamically so these tests are not wall-clock time
+    /// bombs (mirrors `current_month_window` in the kernel free-tier pool
+    /// tests). The e2e charge below runs through the public kernel pipeline,
+    /// which reads the real clock, so a Pass pinned to an absolute month would
+    /// start failing with CapabilityExpired once that month passed.
+    fn current_window() -> AttestationWindowId {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time before epoch")
+            .as_secs();
+        attestation_window_containing(now).expect("current window")
     }
 
-    fn july_window() -> AttestationWindowId {
-        attestation_window_containing(JULY_2026).expect("july window")
+    /// The contiguous monthly window immediately after `window`, derived from
+    /// its exclusive `until` boundary (no clock read).
+    fn next_window_after(window: &AttestationWindowId) -> AttestationWindowId {
+        attestation_window_containing(window.until).expect("next window")
+    }
+
+    /// The contiguous monthly window immediately before `window`, derived from
+    /// the instant just before `since` (no clock read).
+    fn prior_window_before(window: &AttestationWindowId) -> AttestationWindowId {
+        attestation_window_containing(window.since.saturating_sub(1)).expect("prior window")
+    }
+
+    /// A mint instant in the middle of `window`, far from both boundaries.
+    fn mid_window(window: &AttestationWindowId) -> u64 {
+        window.since + (window.until - window.since) / 2
     }
 
     fn config_with_keys(keys: Vec<PublicKey>) -> ChioPassConfig {
@@ -913,7 +939,7 @@ mod tests {
             .expect("ed25519")
             .to_string();
         let key_hex = subject.public_key().to_hex();
-        let window = june_window();
+        let window = current_window();
         let capability_id = window_scoped_capability_id(&did, &window).expect("cap id");
         (did, key_hex, window, capability_id)
     }
@@ -931,8 +957,9 @@ mod tests {
     // The deterministic `chiopass:<hash>` id minted by `LocalCapabilityAuthority`
     // is what lets the Pass clear B7 (a naive XCC-bearing capability is rejected
     // at admission). Budget rows are read back through the installed `BudgetStore`
-    // handle. The current attestation window is June 2026, so a June Pass is
-    // time-valid at the wall clock the pipeline reads.
+    // handle. The attestation window is derived from the real wall clock (see
+    // `current_window`), so the minted Pass is always time-valid at the wall
+    // clock the pipeline reads, whatever month the suite runs in.
 
     /// Build a kernel wired exactly as the Pass free-tier path needs it: the
     /// CONTROL-1 pool installed, a caller-held `BudgetStore` handle (so the test
@@ -1057,8 +1084,9 @@ mod tests {
         // ================================================================
         let subject = Keypair::generate();
         let (did, _key_hex, window, expected_cap_id) = subject_context(&subject);
-        let june_pool_term =
-            FreeTierPoolConfig::window_ym_from_issued_at(window.since).expect("june pool term");
+        let minted_at = mid_window(&window);
+        let current_pool_term =
+            FreeTierPoolConfig::window_ym_from_issued_at(window.since).expect("current pool term");
 
         // (2a) Two Passes minted for the SAME subject+window are byte-identical.
         let pass_a = issue_chio_pass_command(
@@ -1067,7 +1095,7 @@ mod tests {
             &issuer,
             &subject.public_key(),
             TrustTier::Attested,
-            MID_JUNE_2026,
+            minted_at,
             0,
             0,
         )
@@ -1078,7 +1106,7 @@ mod tests {
             &issuer,
             &subject.public_key(),
             TrustTier::Attested,
-            MID_JUNE_2026,
+            minted_at,
             1,
             1,
         )
@@ -1128,14 +1156,14 @@ mod tests {
             "exactly ONE per-Pass budget row exists for the deterministic id, not two"
         );
         assert_eq!(
-            committed_units_in(&store, &june_pool_term),
+            committed_units_in(&store, &current_pool_term),
             2,
             "both charges co-debit the SAME freetier:global pool row for the window"
         );
 
         // (2c) Past `until` the old token is denied; the next window is a FRESH row.
         assert!(
-            pass_a.capability.validate_time(MID_JUNE_2026).is_ok(),
+            pass_a.capability.validate_time(minted_at).is_ok(),
             "the token is valid inside its window"
         );
         assert!(
@@ -1149,7 +1177,7 @@ mod tests {
                 .is_err(),
             "validate_time denies the old token past until"
         );
-        let next_window = july_window();
+        let next_window = next_window_after(&window);
         assert_eq!(
             window.until, next_window.since,
             "contiguous monthly rollover"
@@ -1168,7 +1196,7 @@ mod tests {
         let next_pool_term = FreeTierPoolConfig::window_ym_from_issued_at(next_window.since)
             .expect("next pool term");
         assert_ne!(
-            next_pool_term, june_pool_term,
+            next_pool_term, current_pool_term,
             "the next window has its own pool term"
         );
         assert_eq!(
@@ -1225,11 +1253,11 @@ mod tests {
             .expect("dormant did")
             .to_string();
         // A genuinely empty prior window => no genuine use => WithheldDormant. The
-        // dormant window is the CURRENT (June) window so the token is time-valid.
-        let prior_window = attestation_window_containing(1_778_000_000).expect("may window");
+        // dormant window is the CURRENT wall-clock window so the token is time-valid.
+        let prior_window = prior_window_before(&window);
         assert_eq!(
             prior_window.until, window.since,
-            "contiguous May -> June rollover"
+            "contiguous prior -> current rollover"
         );
         let empty_store = {
             let path = unique_db_path("m1-12-dormant");
@@ -1444,7 +1472,7 @@ mod tests {
         let trusted = Keypair::generate();
         let subject = Keypair::generate();
         let (did, key_hex, prior_window, prior_cap) = subject_context(&subject);
-        let next_window = july_window();
+        let next_window = next_window_after(&prior_window);
         assert_eq!(prior_window.until, next_window.since, "contiguous rollover");
 
         let config = config_with_keys(vec![trusted.public_key()]);
