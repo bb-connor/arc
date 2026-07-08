@@ -129,15 +129,75 @@ pub struct VelocityGuard {
     invocation_buckets: Mutex<HashMap<(String, usize), TokenBucket>>,
     spend_buckets: Mutex<HashMap<(String, usize), TokenBucket>>,
     config: VelocityConfig,
+    bucket_cap: usize,
+    invocation_inserts_since_sweep: Mutex<usize>,
+    spend_inserts_since_sweep: Mutex<usize>,
 }
 
 impl VelocityGuard {
-    /// Create a new `VelocityGuard` with the given configuration.
+    /// Create a new `VelocityGuard` with the given configuration and the default
+    /// bucket cap (65536).
     pub fn new(config: VelocityConfig) -> Self {
+        Self::with_bucket_cap(config, 65_536)
+    }
+
+    /// Create a `VelocityGuard` with an explicit total-bucket cap so a
+    /// self-minted-leaf flood saturates rather than growing (RFC-0004 F38).
+    pub fn with_bucket_cap(config: VelocityConfig, bucket_cap: usize) -> Self {
         Self {
             invocation_buckets: Mutex::new(HashMap::new()),
             spend_buckets: Mutex::new(HashMap::new()),
             config,
+            bucket_cap: bucket_cap.max(1),
+            invocation_inserts_since_sweep: Mutex::new(0),
+            spend_inserts_since_sweep: Mutex::new(0),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn invocation_bucket_count(&self) -> usize {
+        match self.invocation_buckets.lock() {
+            Ok(g) => g.len(),
+            Err(poisoned) => poisoned.into_inner().len(),
+        }
+    }
+}
+
+/// Sweep buckets idle longer than `window_secs` (a full-and-idle bucket is
+/// semantically a fresh one) and cap total keys with most-idle eviction so a
+/// self-minted-leaf flood saturates instead of growing (RFC-0004 F38).
+fn sweep_and_cap_buckets(
+    buckets: &mut HashMap<(String, usize), TokenBucket>,
+    inserts_since_sweep: &Mutex<usize>,
+    window_secs: u64,
+    bucket_cap: usize,
+) {
+    let do_sweep = {
+        let mut counter = match inserts_since_sweep.lock() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        *counter = counter.saturating_add(1);
+        if *counter >= 256 {
+            *counter = 0;
+            true
+        } else {
+            false
+        }
+    };
+
+    let idle = std::time::Duration::from_secs(window_secs);
+    if do_sweep {
+        buckets.retain(|_, bucket| bucket.last_refill.elapsed() < idle);
+    }
+    if buckets.len() >= bucket_cap {
+        // Evict the most-idle key (largest elapsed since last_refill).
+        if let Some(victim) = buckets
+            .iter()
+            .max_by_key(|(_, b)| b.last_refill.elapsed())
+            .map(|(k, _)| k.clone())
+        {
+            buckets.remove(&victim);
         }
     }
 }
@@ -161,6 +221,12 @@ impl Guard for VelocityGuard {
             let mut buckets = self.invocation_buckets.lock().map_err(|_| {
                 KernelError::Internal("velocity guard invocation lock poisoned".to_string())
             })?;
+            sweep_and_cap_buckets(
+                &mut buckets,
+                &self.invocation_inserts_since_sweep,
+                window_secs,
+                self.bucket_cap,
+            );
             let bucket = buckets
                 .entry(key.clone())
                 .or_insert_with(|| TokenBucket::new(capacity, max_inv as u64, window_secs));
@@ -177,6 +243,12 @@ impl Guard for VelocityGuard {
             let mut buckets = self.spend_buckets.lock().map_err(|_| {
                 KernelError::Internal("velocity guard spend lock poisoned".to_string())
             })?;
+            sweep_and_cap_buckets(
+                &mut buckets,
+                &self.spend_inserts_since_sweep,
+                window_secs,
+                self.bucket_cap,
+            );
             let bucket = buckets
                 .entry(key)
                 .or_insert_with(|| TokenBucket::new(capacity, max_spend, window_secs));
@@ -305,6 +377,33 @@ mod tests {
     fn guard_name_is_velocity() {
         let guard = VelocityGuard::new(VelocityConfig::default());
         assert_eq!(guard.name(), "velocity");
+    }
+
+    #[test]
+    fn idle_buckets_are_swept_and_key_count_is_capped() {
+        // Cap tiny so the flood saturates rather than grows.
+        let config = VelocityConfig {
+            max_invocations_per_window: Some(1000),
+            ..VelocityConfig::default()
+        };
+        let guard = VelocityGuard::with_bucket_cap(config, 8);
+        let kp = Keypair::generate();
+        let agent = kp.public_key().to_hex();
+        let server = "srv".to_string();
+        // Drive many distinct capability ids (the self-minted-leaf flood): each
+        // makes a new bucket, but the cap holds the total.
+        for i in 0..500u64 {
+            let cap = signed_cap(&kp, &format!("cap-{i}"));
+            let scope = ChioScope::default();
+            let request = make_request(&cap, &agent, &server);
+            let ctx = guard_ctx(&request, &scope, &agent, &server, None);
+            let _ = guard.evaluate(&ctx);
+        }
+        assert!(
+            guard.invocation_bucket_count() <= 8,
+            "bucket map grew past cap: {}",
+            guard.invocation_bucket_count()
+        );
     }
 
     #[test]
