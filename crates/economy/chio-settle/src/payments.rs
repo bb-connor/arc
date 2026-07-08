@@ -1712,9 +1712,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn offchain_receipt_validate_binds_digest_to_governed_receipt() {
-        let receipt = OffchainSettlementReceiptArtifact {
+    fn sample_offchain_receipt() -> OffchainSettlementReceiptArtifact {
+        OffchainSettlementReceiptArtifact {
             schema: CHIO_OFFCHAIN_SETTLEMENT_RECEIPT_SCHEMA.to_string(),
             settlement_receipt_id: "osr-1".to_string(),
             issued_at: 1_700_000_000,
@@ -1726,12 +1725,72 @@ mod tests {
             },
             execution_nonce: None,
             note: None,
-        };
+        }
+    }
+
+    #[test]
+    fn offchain_receipt_validate_binds_digest_to_governed_receipt() {
+        let receipt = sample_offchain_receipt();
         validate_offchain_settlement_receipt(&receipt).test_unwrap();
         let mut bad = receipt.clone();
         bad.governed_receipt_id = String::new();
         let error = validate_offchain_settlement_receipt(&bad)
             .test_expect_err("empty governed_receipt_id must fail");
         assert!(matches!(error, SettlementError::InvalidInput(_)));
+    }
+
+    #[test]
+    fn offchain_receipt_schema_constant_is_pinned() {
+        assert_eq!(
+            CHIO_OFFCHAIN_SETTLEMENT_RECEIPT_SCHEMA,
+            "chio.settle.offchain_receipt.v1"
+        );
+    }
+
+    #[test]
+    fn validate_offchain_settlement_receipt_rejects_wrong_schema() {
+        let mut receipt = sample_offchain_receipt();
+        receipt.schema = "chio.settle.offchain_receipt.v2".to_string();
+        let error = validate_offchain_settlement_receipt(&receipt)
+            .test_expect_err("wrong schema version must fail");
+        assert!(
+            matches!(error, SettlementError::InvalidInput(_)),
+            "wrong schema must produce InvalidInput, got: {error}"
+        );
+
+        let mut empty_schema = sample_offchain_receipt();
+        empty_schema.schema = String::new();
+        let error = validate_offchain_settlement_receipt(&empty_schema)
+            .test_expect_err("empty schema must fail");
+        assert!(
+            matches!(error, SettlementError::InvalidInput(_)),
+            "empty schema must produce InvalidInput, got: {error}"
+        );
+    }
+
+    #[test]
+    fn approval_binding_from_governed_rejects_empty_token_contract() {
+        let token = sample_verified_approval_token();
+        let mut rail = sample_rail();
+        rail.token_contract = String::new();
+        let error = approval_binding_from_governed(&token, &rail, 1_000_000, SAMPLE_VALID_BEFORE)
+            .test_unwrap_err();
+        assert!(
+            matches!(error, SettlementError::InvalidInput(_)),
+            "an empty token_contract must produce InvalidInput, got: {error}"
+        );
+    }
+
+    #[test]
+    fn approval_binding_from_governed_rejects_empty_token_symbol() {
+        let token = sample_verified_approval_token();
+        let mut rail = sample_rail();
+        rail.token_symbol = String::new();
+        let error = approval_binding_from_governed(&token, &rail, 1_000_000, SAMPLE_VALID_BEFORE)
+            .test_unwrap_err();
+        assert!(
+            matches!(error, SettlementError::InvalidInput(_)),
+            "an empty token_symbol must produce InvalidInput, got: {error}"
+        );
     }
 }
