@@ -79,6 +79,12 @@ impl SqliteBudgetStore {
 
             CREATE UNIQUE INDEX IF NOT EXISTS idx_budget_mutation_events_event_seq
                 ON budget_mutation_events(event_seq);
+
+            CREATE TABLE IF NOT EXISTS budget_import_floors (
+                authority_id TEXT PRIMARY KEY,
+                floor_seq    INTEGER NOT NULL DEFAULT 0,
+                CHECK (floor_seq >= 0)
+            );
             "#,
         )?;
         connection.execute(
@@ -118,6 +124,92 @@ impl SqliteBudgetStore {
             |row| row.get(0),
         )?;
         Ok(seq.max(0) as u64)
+    }
+
+    /// Per-origin contiguous ack head: the highest event_seq S from an origin
+    /// such that every event in (floor..S] is present with no gap AND the run
+    /// reaches down to the durable trusted floor. NOT MAX(event_seq), NOT
+    /// anchored on MIN(present). Origins whose lowest present row is above
+    /// floor+1 are absent from the result (the caller defaults them to their
+    /// recorded floor). This is fail-safe: under-reporting can only withhold
+    /// quorum, never grant it (RFC-0011 D2, F16).
+    pub fn budget_ack_heads(&self) -> Result<Vec<(String, u64)>, BudgetStoreError> {
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            r#"
+            WITH imported AS (
+                SELECT
+                    bme.authority_id,
+                    bme.event_seq,
+                    bme.event_seq - ROW_NUMBER() OVER (
+                        PARTITION BY bme.authority_id ORDER BY bme.event_seq
+                    ) AS island,
+                    COALESCE(bif.floor_seq, 0) AS floor
+                FROM budget_mutation_events bme
+                LEFT JOIN budget_import_floors bif
+                    ON bif.authority_id = bme.authority_id
+                WHERE bme.authority_id IS NOT NULL AND bme.event_seq IS NOT NULL
+            )
+            SELECT authority_id, MAX(event_seq) AS ack_head
+            FROM imported
+            WHERE island = floor
+            GROUP BY authority_id
+            "#,
+        )?;
+        let rows = statement.query_map([], |row| {
+            let origin: String = row.get(0)?;
+            let head = budget_u64_from_row(row, 1, "ack_head")?;
+            Ok((origin, head))
+        })?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(BudgetStoreError::from)
+    }
+
+    /// The durable trusted floor for one origin (0 when none recorded).
+    pub fn budget_import_floor(&self, authority_id: &str) -> Result<u64, BudgetStoreError> {
+        let connection = self.connection()?;
+        let floor: i64 = connection
+            .query_row(
+                "SELECT floor_seq FROM budget_import_floors WHERE authority_id = ?1",
+                rusqlite::params![authority_id],
+                |row| row.get(0),
+            )
+            .optional()?
+            .unwrap_or(0);
+        Ok(floor.max(0) as u64)
+    }
+
+    /// Raise each origin's trusted floor to (min covered event_seq) - 1 for the
+    /// events in a freshly installed snapshot. Never lowers a floor. A
+    /// puller-introduced gap can never raise the floor because the puller never
+    /// calls this; only snapshot install does (RFC-0011 D2).
+    pub fn record_budget_import_floors(
+        &self,
+        events: &[BudgetMutationRecord],
+    ) -> Result<(), BudgetStoreError> {
+        use std::collections::BTreeMap;
+        let mut min_by_origin: BTreeMap<&str, u64> = BTreeMap::new();
+        for event in events {
+            let Some(authority) = event.authority.as_ref() else {
+                continue;
+            };
+            let entry = min_by_origin
+                .entry(authority.authority_id.as_str())
+                .or_insert(event.event_seq);
+            *entry = (*entry).min(event.event_seq);
+        }
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        for (origin, min_seq) in min_by_origin {
+            let floor = min_seq.saturating_sub(1);
+            transaction.execute(
+                "INSERT INTO budget_import_floors (authority_id, floor_seq) VALUES (?1, ?2) \
+                 ON CONFLICT(authority_id) DO UPDATE SET floor_seq = MAX(floor_seq, excluded.floor_seq)",
+                rusqlite::params![origin, floor as i64],
+            )?;
+        }
+        transaction.commit()?;
+        Ok(())
     }
 
     pub fn upsert_usage(&self, record: &BudgetUsageRecord) -> Result<(), BudgetStoreError> {

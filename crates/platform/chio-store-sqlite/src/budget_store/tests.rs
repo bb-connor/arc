@@ -1506,3 +1506,59 @@ fn max_mutation_event_seq_reports_head() -> Result<(), Box<dyn std::error::Error
     let _ = fs::remove_file(&path);
     Ok(())
 }
+
+#[test]
+fn budget_ack_heads_reports_contiguous_prefix_only() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-ack-heads");
+    let store = SqliteBudgetStore::open(&path)?;
+
+    // Import events {40, 42} for origin O (41 skipped) via the snapshot path,
+    // which is how a peer's log arrives; floor defaults to 0.
+    let event = |seq: u64| BudgetMutationRecord {
+        event_id: format!("evt-{seq}"),
+        hold_id: None,
+        capability_id: "cap-o".to_string(),
+        grant_index: 0,
+        kind: BudgetMutationKind::AuthorizeExposure,
+        allowed: Some(true),
+        recorded_at: seq as i64,
+        event_seq: seq,
+        usage_seq: Some(seq),
+        exposure_units: 1,
+        realized_spend_units: 0,
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost_units: None,
+        invocation_count_after: 1,
+        total_cost_exposed_after: 1,
+        total_cost_realized_spend_after: 0,
+        authority: Some(BudgetEventAuthority {
+            authority_id: "http://origin-o".to_string(),
+            lease_id: "http://origin-o#term-1".to_string(),
+            lease_epoch: 1,
+        }),
+    };
+    // Missing prefix (holds only {42,43}): with floor 0, no row is in the
+    // island=0 group, so the origin is absent -> caller defaults to floor 0.
+    store.import_snapshot_records(&[], &[event(42), event(43)])?;
+    let heads = store.budget_ack_heads()?;
+    assert!(
+        heads.iter().all(|(origin, _)| origin != "http://origin-o"),
+        "a missing prefix must not be laundered into an ack head"
+    );
+
+    // Now add the contiguous prefix 1..=41 for the same origin: the head is
+    // the last contiguous seq before the 42/43 island, i.e. 43 becomes reachable.
+    let contiguous: Vec<_> = (1..=41).map(event).collect();
+    store.import_snapshot_records(&[], &contiguous)?;
+    let heads = store.budget_ack_heads()?;
+    let head = heads
+        .iter()
+        .find(|(origin, _)| origin == "http://origin-o")
+        .map(|(_, seq)| *seq)
+        .ok_or("origin O must now have a contiguous ack head")?;
+    assert_eq!(head, 43, "1..=43 is now gap-free, so the head is 43");
+
+    let _ = fs::remove_file(&path);
+    Ok(())
+}
