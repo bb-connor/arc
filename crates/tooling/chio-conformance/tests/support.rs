@@ -268,3 +268,26 @@ pub fn fake_bound_nonce(
         signer: signer.public_key(),
     }
 }
+
+/// Construct a `FakePresentedNonce` with a caller-specified `nonce_id`.
+///
+/// Enables isolation of individual predicate fragments against a real receipt:
+/// passing a wrong `nonce_id` isolates (d), a wrong binding field isolates (c),
+/// and a `signer` key that differs from the receipt's `kernel_key` isolates (f).
+pub fn fake_nonce_with_id(
+    signer: &Keypair,
+    nonce_id: &str,
+    cap_id: &str,
+    server: &str,
+    tool: &str,
+    parameter_hash: &str,
+) -> FakePresentedNonce {
+    FakePresentedNonce {
+        nonce_id: nonce_id.to_string(),
+        capability_id: cap_id.to_string(),
+        tool_server: server.to_string(),
+        tool_name: tool.to_string(),
+        parameter_hash: parameter_hash.to_string(),
+        signer: signer.public_key(),
+    }
+}
