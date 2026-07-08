@@ -238,9 +238,16 @@ impl BoundedOtlpGrpcIngress {
             .queue
             .lock()
             .map_err(|_| OTelReceiptExportError::Queue("OTEL queue mutex poisoned".to_string()))?;
-        Ok(queue
-            .push_drop_oldest(item, self.config.queue_limits())
-            .into())
+        let summary = queue.push_drop_oldest(item, self.config.queue_limits());
+        // RFC-0009 F75: count every batch dropped by bounded-queue admission
+        // (drop-oldest to make room, or drop-incoming when full), reconciling
+        // with the snapshot's dropped_*_batches fields.
+        let dropped_batches = summary.dropped_oldest_batches + summary.dropped_incoming_batches;
+        if dropped_batches > 0 {
+            chio_metrics_spec::runtime::families::OTEL_INGRESS_DROP
+                .incr_by(&[], dropped_batches as u64);
+        }
+        Ok(summary.into())
     }
 
     fn drain_locked(&self) -> Result<ReceiptStoreSinkSummary, OTelReceiptExportError> {
@@ -299,6 +306,9 @@ impl BoundedOtlpGrpcIngress {
             .lock()
             .map_err(|_| OTelReceiptExportError::Queue("OTEL queue mutex poisoned".to_string()))?;
         queue.record_append_error(spans);
+        // RFC-0009 F75: count a batch dropped before append, reconciling with
+        // the snapshot's append_error_batches field.
+        chio_metrics_spec::runtime::families::OTEL_SINK_DROP.incr(&[]);
         Ok(())
     }
 }
@@ -615,6 +625,36 @@ mod tests {
         assert_eq!(snapshot.appended_spans, 1);
         assert_eq!(recorder.receipt_names()?, vec!["span-1".to_string()]);
 
+        Ok(())
+    }
+
+    #[test]
+    fn ingress_admission_drop_increments_counter() -> Result<(), Box<dyn Error>> {
+        use chio_metrics_spec::runtime::families;
+        let mut before = String::new();
+        families::OTEL_INGRESS_DROP.render(&mut before);
+
+        // Bounded queue of 2 batches; the third enqueue drops the oldest.
+        let recorder = Arc::new(RecordingCanonicalSink::default());
+        let config = OtlpExporterQueueConfig {
+            max_queued_batches: 2,
+            max_queued_spans: 8,
+            max_queued_bytes: 8192,
+            drain_limit: 8,
+        };
+        let ingress = bounded_ingress(recorder, config);
+        let _ = ingress.enqueue(export_with_span("drop-span-1"))?;
+        let _ = ingress.enqueue(export_with_span("drop-span-2"))?;
+        let third = ingress.enqueue(export_with_span("drop-span-3"))?;
+        assert_eq!(third.dropped_oldest_batches, 1);
+
+        let mut after = String::new();
+        families::OTEL_INGRESS_DROP.render(&mut after);
+        assert!(
+            after.contains("chio_otel_ingress_drop_total "),
+            "ingress drop series must exist: {after}"
+        );
+        assert_ne!(before, after, "an admission drop must advance the counter");
         Ok(())
     }
 
