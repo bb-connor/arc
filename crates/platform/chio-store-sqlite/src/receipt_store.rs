@@ -821,9 +821,15 @@ fn maybe_build_checkpoint(
         }
         ensure_checkpoint_transparency_guards(connection)?;
         let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-        insert_checkpoint_incremental_tx(&tx, head.latest_checkpoint.as_ref(), &checkpoint)?;
+        // The insert returns the checkpoint now persisted at this seq: either
+        // the one we just built, or a concurrently committed winner (clock-skew
+        // sibling) it validated and adopted. Catch the cached head up to THAT
+        // checkpoint so a later verify_head_against_latest_checkpoint does not
+        // see our discarded byte-different build diverge from the persisted row.
+        let adopted =
+            insert_checkpoint_incremental_tx(&tx, head.latest_checkpoint.as_ref(), &checkpoint)?;
         tx.commit()?;
-        head.latest_checkpoint = Some(checkpoint);
+        head.latest_checkpoint = Some(adopted);
         built = true;
     }
     Ok(built)
@@ -1049,14 +1055,30 @@ fn verify_head_against_latest_checkpoint(
                 .map_err(checkpoint_error_to_receipt_store)?;
             let cached_digest = chio_kernel::checkpoint::checkpoint_body_sha256(&cached.body)
                 .map_err(checkpoint_error_to_receipt_store)?;
-            if persisted_digest == cached_digest {
-                Ok(())
-            } else {
-                Err(ReceiptStoreError::Conflict(
+            if persisted_digest != cached_digest {
+                return Err(ReceiptStoreError::Conflict(
                     "latest checkpoint diverged from verified head; run `chio receipt audit`"
                         .to_string(),
-                ))
+                ));
             }
+            // Column-tamper catch (codex round 3, finding 3): the body digest
+            // above covers only statement_json, so a persisted `signature` or
+            // `kernel_key` COLUMN corrupted out of band (immutability trigger
+            // bypassed) while statement_json is untouched would pass it. Compare
+            // those already-read columns against the cached head, which was
+            // signature-verified at seed/catch-up time. This is an O(1) byte/
+            // string equality, NOT a per-append Ed25519 re-verify, so F22 holds.
+            // (kernel_key is also inside the signed body, so a column that
+            // disagrees with the cached head is itself proof of tamper.)
+            if row.signature_hex != cached.signature.to_hex()
+                || row.kernel_key_hex != cached.body.kernel_key.to_hex()
+            {
+                return Err(ReceiptStoreError::Conflict(
+                    "latest checkpoint signature or kernel key column diverged from verified head; run `chio receipt audit`"
+                        .to_string(),
+                ));
+            }
+            Ok(())
         }
         Some(row) => catch_up_verified_head_to(connection, head, row.checkpoint_seq),
     }
@@ -1140,6 +1162,22 @@ fn append_receipt_batch(
             Ok(pair) => pair,
             Err(error) => return receipt_batch_error_results(requests.len(), error),
         };
+    // Validate the ADOPTED baseline delta before trusting it (codex round 3,
+    // finding 2). Rows another store instance committed since our last look
+    // (head.claim_log_max_seq + 1 ..= baseline_max) are absorbed as
+    // pre-existing baseline; the removed per-append full validation would have
+    // rejected an out-of-band mismatched/orphan claim_receipt_log_entries row
+    // in that range. Re-validate JUST that bounded delta against the source
+    // receipt tables (O(delta)); the full-log validator is NOT called. In the
+    // single-writer hot path the head is never stale, so pre_delta is 0 and
+    // this is a no-op (zero added cost, F22 intact).
+    if pre_delta > 0 {
+        if let Err(error) =
+            validate_adopted_claim_log_delta(&tx, head.claim_log_max_seq, baseline_max)
+        {
+            return receipt_batch_error_results(requests.len(), error);
+        }
+    }
     let mut results = Vec::with_capacity(requests.len());
     for request in requests {
         #[cfg(test)]

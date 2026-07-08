@@ -553,3 +553,112 @@ fn operator_checkpoint_append_reverifies_chain() -> Result<(), Box<dyn std::erro
     let _ = fs::remove_file(path);
     Ok(())
 }
+
+/// Codex round 3, finding 1: two shared-DB builders stamp different wall-clock
+/// `issued_at`, so the loser can reach `insert_checkpoint_incremental_tx` AFTER
+/// the winner already committed a byte-DIFFERENT (but valid) checkpoint at the
+/// same seq (the race window past the head refresh). Round 2 made a
+/// byte-identical row idempotent; this makes a clock-skew winner ADOPTED
+/// (validated BOUNDED: its signature, predecessor linkage, its own claim-log
+/// range, and its projections - one checkpoint, not the whole chain) instead of
+/// failing the primary-key conflict and reporting the store UNHEALTHY though
+/// the persisted chain is valid. A genuinely INVALID same-seq checkpoint still
+/// fails closed.
+#[test]
+fn concurrent_valid_checkpoint_is_adopted_not_conflicted() -> Result<(), Box<dyn std::error::Error>>
+{
+    let path = unique_db_path("chio-bg-adopt-valid-winner");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    let max_batch = 3;
+    for i in 0..max_batch {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-adopt-valid-{i}"), i + 1, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+
+    // The WINNER: checkpoint 1 (batch 1..=3) persisted through the store.
+    store.create_next_receipt_checkpoint(max_batch, &keypair)?;
+    let winner = store
+        .load_checkpoint_by_seq(1)?
+        .ok_or("winner checkpoint 1 missing")?;
+
+    // The LOSER built the SAME range but with a later wall-clock issued_at, so
+    // its bytes (and thus signature) differ from the persisted winner.
+    let receipt_bytes = canonical_receipt_bytes(&store, 1, max_batch);
+    let mut loser = build_checkpoint(1, 1, max_batch, &receipt_bytes, &keypair)?;
+    loser.body.issued_at = winner.body.issued_at.saturating_add(1_000);
+    let body_bytes = canonical_json_bytes(&loser.body).test_unwrap();
+    loser.signature = keypair.sign(&body_bytes);
+    assert_ne!(loser.body.issued_at, winner.body.issued_at);
+    assert_ne!(loser, winner);
+
+    // The loser inserts: the byte-different but VALID winner is validated and
+    // adopted, and the returned checkpoint is the WINNER (so the caller catches
+    // its head up to the persisted row, not to its discarded build).
+    let adopted = {
+        let mut connection = store.connection()?;
+        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        let adopted = insert_checkpoint_incremental_tx(&tx, None, &loser)?;
+        tx.commit()?;
+        adopted
+    };
+    assert_eq!(
+        adopted, winner,
+        "the loser must adopt the persisted winner, not its own clock-skewed build"
+    );
+
+    // Health stays healthy; no duplicate row; head sits at seq 1.
+    let status = store.receipt_checkpoint_status(Some(max_batch))?;
+    assert!(
+        status.healthy,
+        "adopting a valid clock-skew winner must stay healthy: {status:?}"
+    );
+    assert_eq!(status.latest_checkpoint_seq, Some(1));
+    assert!(
+        store.load_checkpoint_by_seq(2)?.is_none(),
+        "adoption must not add a second checkpoint row"
+    );
+
+    let _ = fs::remove_file(path);
+
+    // Teeth: a GENUINELY INVALID persisted checkpoint at the same seq stays
+    // fail-closed even though the incoming checkpoint is valid. Use a fresh DB
+    // whose seq-1 slot holds a forged checkpoint (its merkle_root is over
+    // unrelated bytes, so it cannot validate against the real claim-log range).
+    let bad_path = unique_db_path("chio-bg-adopt-invalid-winner");
+    let bad_store = SqliteReceiptStore::open(&bad_path)?;
+    for i in 0..max_batch {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-adopt-invalid-{i}"), i + 1, &keypair);
+        bad_store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    bad_store.flush_receipt_writes()?;
+    let bogus_bytes = vec![
+        b"bogus-receipt-a".to_vec(),
+        b"bogus-receipt-b".to_vec(),
+        b"bogus-receipt-c".to_vec(),
+    ];
+    let forged = build_checkpoint(1, 1, max_batch, &bogus_bytes, &keypair)?;
+    assert_ne!(forged.body.merkle_root, winner.body.merkle_root);
+    // Insert the forged row directly, bypassing the store's full validation.
+    insert_checkpoint_row(&bad_store, &forged, forged.body.batch_end_seq);
+    // A VALID loser for the same range arrives and must be rejected because the
+    // persisted checkpoint it would adopt does not validate.
+    let good_bytes = canonical_receipt_bytes(&bad_store, 1, max_batch);
+    let good = build_checkpoint(1, 1, max_batch, &good_bytes, &keypair)?;
+    let mut connection = bad_store.connection()?;
+    let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+    let error = insert_checkpoint_incremental_tx(&tx, None, &good)
+        .err()
+        .ok_or("an invalid persisted checkpoint at the same seq must fail closed")?;
+    assert!(
+        matches!(error, ReceiptStoreError::Conflict(_)),
+        "expected a fail-closed Conflict on an invalid same-seq winner, got {error:?}"
+    );
+    drop(tx);
+    drop(connection);
+    let _ = fs::remove_file(bad_path);
+    Ok(())
+}

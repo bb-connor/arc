@@ -468,12 +468,15 @@ pub(crate) fn create_next_receipt_checkpoint_atomic(
 /// predecessor: validate_checkpoint (one signature), predecessor linkage,
 /// claim-log range check for the new range only, INSERT (projection triggers
 /// populate tree-head/witness/publication rows), read-back equality, and
-/// projection-row validation for the new row. No chain rebuild.
+/// projection-row validation for the new row. No chain rebuild. Returns the
+/// checkpoint now persisted at this seq (the one just inserted, or the
+/// concurrently committed winner that was adopted) so the caller can catch
+/// its cached head up to it.
 pub(crate) fn insert_checkpoint_incremental_tx(
     tx: &rusqlite::Transaction<'_>,
     predecessor: Option<&KernelCheckpoint>,
     checkpoint: &KernelCheckpoint,
-) -> Result<(), ReceiptStoreError> {
+) -> Result<KernelCheckpoint, ReceiptStoreError> {
     chio_kernel::checkpoint::validate_checkpoint(checkpoint)
         .map_err(checkpoint_error_to_receipt_store)?;
     match predecessor {
@@ -488,25 +491,45 @@ pub(crate) fn insert_checkpoint_incremental_tx(
         None => validate_checkpoint_base(checkpoint)?,
     }
     validate_checkpoint_against_claim_log(tx, checkpoint)?;
-    // Idempotent background-checkpoint convergence (RFC-0006): two kernels or
-    // store instances sharing one receipt DB can each build the same due
-    // checkpoint before either head catches up. The loser reaches here after
-    // the winner already committed a byte-identical row at this seq. Adopt it
-    // as success (mirror store_kernel_checkpoint_tx) rather than failing the
-    // raw INSERT on the primary-key conflict, which would record
-    // writer.last_error and report the store UNHEALTHY even though the
-    // persisted chain is valid. A genuinely different checkpoint at the same
-    // seq stays fail-closed.
+    // Idempotent + concurrent-winner background-checkpoint convergence
+    // (RFC-0006; codex round 2 byte-identical case, round 3 clock-skew case).
+    // Two kernels or store instances sharing one receipt DB can each build the
+    // same due checkpoint before either head catches up. The loser reaches
+    // here after the winner already committed a row at this seq. A
+    // byte-identical winner is adopted as-is. A winner that differs only by its
+    // wall-clock `issued_at` (and thus its signature) is still a VALID
+    // checkpoint for the same range, so instead of failing the raw INSERT on
+    // the primary-key conflict (which would record writer.last_error and report
+    // the store UNHEALTHY though the persisted chain is valid) we VALIDATE the
+    // winner BOUNDED and ADOPT it: its signature (via parse_persisted_
+    // checkpoint_row), its predecessor linkage against our cached predecessor,
+    // its own claim-log range (validate_checkpoint_against_claim_log for THAT
+    // one checkpoint's batch range only), and its projection rows. That is one
+    // checkpoint plus its bounded batch range, NOT a full chain rebuild (F22
+    // intact). Only a genuinely invalid or divergent-predecessor winner stays
+    // fail-closed.
     if let Some(existing) = load_persisted_checkpoint_row(tx, checkpoint.body.checkpoint_seq)? {
         let existing_checkpoint = parse_persisted_checkpoint_row(existing.clone())?;
-        if existing_checkpoint == *checkpoint {
-            validate_checkpoint_projection_rows(tx, &existing, checkpoint)?;
-            return Ok(());
+        if existing_checkpoint != *checkpoint {
+            match predecessor {
+                Some(predecessor) => {
+                    chio_kernel::checkpoint::validate_checkpoint_predecessor(
+                        predecessor,
+                        &existing_checkpoint,
+                    )
+                    .map_err(|error| {
+                        ReceiptStoreError::Conflict(format!(
+                            "checkpoint {} already exists with a divergent predecessor linkage: {error}",
+                            checkpoint.body.checkpoint_seq
+                        ))
+                    })?;
+                }
+                None => validate_checkpoint_base(&existing_checkpoint)?,
+            }
+            validate_checkpoint_against_claim_log(tx, &existing_checkpoint)?;
         }
-        return Err(ReceiptStoreError::Conflict(format!(
-            "checkpoint {} already exists with different content",
-            checkpoint.body.checkpoint_seq
-        )));
+        validate_checkpoint_projection_rows(tx, &existing, &existing_checkpoint)?;
+        return Ok(existing_checkpoint);
     }
     let statement_json = serde_json::to_string(&checkpoint.body)?;
     tx.execute(
@@ -544,7 +567,7 @@ pub(crate) fn insert_checkpoint_incremental_tx(
         )));
     }
     validate_checkpoint_projection_rows(tx, &stored, &parsed)?;
-    Ok(())
+    Ok(parsed)
 }
 
 fn store_kernel_checkpoint_tx(
@@ -582,7 +605,7 @@ fn store_kernel_checkpoint_tx(
             checkpoint.body.checkpoint_seq
         )));
     }
-    insert_checkpoint_incremental_tx(tx, predecessor.as_ref(), checkpoint)
+    insert_checkpoint_incremental_tx(tx, predecessor.as_ref(), checkpoint).map(|_| ())
 }
 
 fn validate_checkpoint_claim_log_signer_range(

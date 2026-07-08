@@ -486,3 +486,170 @@ fn writer_routed_fallback_append_catches_uncheckpointed_drift(
     let _ = fs::remove_file(path);
     Ok(())
 }
+
+/// Codex round 3, finding 2: `append_receipt_batch` adopts every
+/// claim_receipt_log_entries row past a STALE actor head as trusted baseline
+/// (the pre_delta), cross-checking only the rows THIS batch inserts. A shared-DB
+/// out-of-band orphan/mismatched row in that adopted range would be trusted; the
+/// removed per-append full validation would have rejected it. The fix validates
+/// JUST that bounded delta range against the source tables. The single-writer
+/// no-stale-head case (empty delta) adds no validation, so F22 holds.
+#[test]
+fn stale_head_validates_adopted_delta_before_trusting() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-stale-head-delta");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    // Three real receipts -> claim-log entries 1..=3.
+    for i in 0..3 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-stale-{i}"), (i + 1) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+
+    // An out-of-band writer commits an ORPHAN claim-log row (no source receipt)
+    // at entry_seq 4. Inserts are not blocked by the reject_update trigger; the
+    // CHECK constraint just requires the tool-receipt columns to be populated.
+    {
+        let connection = store.connection()?;
+        connection.execute(
+            r#"
+            INSERT INTO claim_receipt_log_entries (
+                entry_seq, receipt_id, receipt_kind, source_seq, timestamp,
+                capability_id, tool_server, tool_name, raw_json
+            ) VALUES (4, 'orphan-oob-4', 'tool_receipt', 999, 1, 'cap-oob', 'shell', 'bash', '{}')
+            "#,
+            [],
+        )?;
+    }
+
+    // FAIL-CLOSED: a STALE head (claim_log_max_seq = 3) puts the orphan at
+    // entry_seq 4 inside the adopted pre_delta. The append must be denied.
+    let mut stale_head = VerifiedHead {
+        latest_checkpoint: None,
+        claim_log_count: 3,
+        claim_log_max_seq: 3,
+    };
+    let receipt = sample_receipt_with_keypair("rcpt-stale-append", 10, &keypair);
+    let raw_json = serde_json::to_string(&receipt)?;
+    let (response, _rx) = std::sync::mpsc::sync_channel(1);
+    let requests = vec![ReceiptCommitRequest {
+        receipt,
+        raw_json,
+        ensure_lineage: false,
+        response,
+    }];
+    let results = append_receipt_batch(&store.pool, &mut stale_head, true, &requests);
+    let error = results
+        .into_iter()
+        .next()
+        .ok_or("expected one append result")?
+        .err()
+        .ok_or("stale-head append over an out-of-band orphan row must be denied")?;
+    match &error {
+        ReceiptStoreError::Conflict(message) => {
+            assert!(
+                message.contains("chio receipt audit"),
+                "fail-closed Conflict must point at the audit CLI, got: {message}"
+            );
+        }
+        other => return Err(format!("expected Conflict, got {other}").into()),
+    }
+
+    // NO-OP (F22): a FRESH head whose claim_log_max_seq already covers the
+    // orphan (= 4) has an EMPTY delta, so the range validator does NOT re-scan
+    // the below-floor orphan; appending a brand-new receipt succeeds.
+    let mut fresh_head = VerifiedHead {
+        latest_checkpoint: None,
+        claim_log_count: 4,
+        claim_log_max_seq: 4,
+    };
+    let receipt = sample_receipt_with_keypair("rcpt-stale-fresh", 11, &keypair);
+    let raw_json = serde_json::to_string(&receipt)?;
+    let (response, _rx) = std::sync::mpsc::sync_channel(1);
+    let requests = vec![ReceiptCommitRequest {
+        receipt,
+        raw_json,
+        ensure_lineage: false,
+        response,
+    }];
+    let results = append_receipt_batch(&store.pool, &mut fresh_head, true, &requests);
+    assert!(
+        results.iter().all(|result| result.is_ok()),
+        "empty-delta append must add no validation and succeed: {results:?}"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+/// Codex round 3, finding 3: `verify_head_against_latest_checkpoint` compares
+/// only the RFC 8785 body digest for a same-seq checkpoint (to keep the Ed25519
+/// verify off the per-append hot path, F22). A persisted `signature` COLUMN
+/// corrupted out of band while statement_json is untouched passes that digest
+/// check. The fix also compares the signature/kernel_key COLUMNS against the
+/// signature-verified cached head (O(1) string compare, no crypto), so the
+/// column tamper is caught fail-closed.
+#[test]
+fn tampered_checkpoint_signature_column_denies_append() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-head-sig-column-tamper");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    for i in 0..3 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-sigcol-{i}"), (i + 1) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    store.create_next_receipt_checkpoint(3, &keypair)?;
+    // Prime the actor head so its cached latest_checkpoint is checkpoint 1 with
+    // the ORIGINAL signature (this append forces the head to catch up to seq 1,
+    // so the tamper below lands on the same-seq body-digest branch).
+    store.append_chio_receipt_returning_seq(&sample_receipt_with_keypair(
+        "rcpt-sigcol-prime",
+        4,
+        &keypair,
+    ))?;
+    store.flush_receipt_writes()?;
+
+    // Corrupt ONLY the persisted signature column (statement_json/body intact),
+    // bypassing the immutability trigger. A DIFFERENT but valid-hex Ed25519
+    // signature (over unrelated bytes) keeps the row parseable.
+    let tampered_signature_hex = keypair
+        .sign(b"unrelated-bytes-for-a-different-valid-signature")
+        .to_hex();
+    {
+        let connection = store.connection()?;
+        let original: String = connection.query_row(
+            "SELECT signature FROM kernel_checkpoints WHERE checkpoint_seq = 1",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_ne!(original, tampered_signature_hex);
+        connection.execute_batch("DROP TRIGGER IF EXISTS kernel_checkpoints_reject_update;")?;
+        connection.execute(
+            "UPDATE kernel_checkpoints SET signature = ?1 WHERE checkpoint_seq = 1",
+            rusqlite::params![tampered_signature_hex],
+        )?;
+    }
+
+    // The next append hits the same-seq branch (body digest matches, body was
+    // untouched) and must now fail closed on the signature-column mismatch.
+    let receipt = sample_receipt_with_keypair("rcpt-sigcol-after", 5, &keypair);
+    let error = store
+        .append_chio_receipt_returning_seq(&receipt)
+        .err()
+        .ok_or("append after signature-column tamper must be denied")?;
+    match &error {
+        ReceiptStoreError::Conflict(message) => {
+            assert!(
+                message.contains("chio receipt audit"),
+                "Conflict must point the operator at the audit CLI, got: {message}"
+            );
+        }
+        other => return Err(format!("expected Conflict, got {other}").into()),
+    }
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
