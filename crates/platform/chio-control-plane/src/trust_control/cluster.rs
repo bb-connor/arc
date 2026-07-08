@@ -15,6 +15,8 @@ mod consensus;
 mod deltas;
 #[path = "cluster/partition.rs"]
 mod partition;
+#[path = "cluster/pull_budget.rs"]
+mod pull_budget;
 #[path = "cluster/snapshots.rs"]
 mod snapshots;
 
@@ -39,6 +41,9 @@ pub(crate) use partition::{
     update_peer_failure, update_peer_lineage_seq, update_peer_reachable,
     update_peer_revocation_cursor, update_peer_state, update_peer_success, update_peer_sync_error,
     update_peer_tool_seq,
+};
+pub(crate) use pull_budget::{
+    ensure_revocation_advanced, ensure_seq_advanced, PeerProtocolError, PullError, PullRoundBudget,
 };
 pub(crate) use snapshots::{
     apply_cluster_snapshot, cluster_replication_heads, handle_internal_authority_snapshot,
