@@ -179,6 +179,9 @@ enum ReceiptCommitCommand {
     /// in-flight append batch has committed. The closure receives `Err` when
     /// the actor cannot provide a healthy writer connection (fail-closed).
     Write(WriterClosure),
+    /// Rerun the full verification on the writer connection and, on success,
+    /// adopt the fresh head (clears a poisoned head). Audit-repair path.
+    ReseedHead(mpsc::SyncSender<Result<(), ReceiptStoreError>>),
 }
 
 impl ReceiptCommitActor {
@@ -526,6 +529,36 @@ fn handle_non_append_command(
                     health.store_head_snapshot(head);
                 }
             }
+        }
+        ReceiptCommitCommand::ReseedHead(response) => {
+            let outcome = pool
+                .get()
+                .map_err(|error| ReceiptStoreError::Pool(error.to_string()))
+                .and_then(|connection| {
+                    if incremental_verification {
+                        seed_verified_head(&connection)
+                    } else {
+                        seed_head_snapshot(&connection)
+                    }
+                });
+            let result = match outcome {
+                Ok(head) => {
+                    health.store_head_snapshot(&head);
+                    if let Ok(mut last_error) = health.last_error.lock() {
+                        *last_error = None;
+                    }
+                    *head_state = WriterHeadState::Verified(Box::new(head));
+                    Ok(())
+                }
+                Err(error) => {
+                    if let Ok(mut last_error) = health.last_error.lock() {
+                        *last_error = Some(error.to_string());
+                    }
+                    *head_state = WriterHeadState::Poisoned(error.to_string());
+                    Err(error)
+                }
+            };
+            let _ = response.send(result);
         }
         // Append/Flush are handled by the main loop; reaching here is
         // impossible by construction but must stay fail-safe.
@@ -1136,6 +1169,27 @@ impl SqliteReceiptStore {
         self.receipt_commit_actor.flush()?;
         let wal_checkpoint = Some(self.wal_checkpoint_passive()?);
         self.flush_report(wal_checkpoint)
+    }
+
+    /// Rerun the one-time full verification on the writer connection and
+    /// adopt the resulting head. This is the `chio receipt audit --repair`
+    /// entry point; it is also safe to call on a healthy store.
+    pub fn reseed_verified_head(&self) -> Result<(), ReceiptStoreError> {
+        let (response, result) = mpsc::sync_channel(1);
+        match self
+            .receipt_commit_actor
+            .sender
+            .try_send(ReceiptCommitCommand::ReseedHead(response))
+        {
+            Ok(()) => {}
+            Err(mpsc::TrySendError::Full(_)) => return Err(receipt_actor_saturated_error()),
+            Err(mpsc::TrySendError::Disconnected(_)) => {
+                return Err(receipt_actor_unavailable_error());
+            }
+        }
+        result
+            .recv()
+            .map_err(|_| receipt_actor_unavailable_error())?
     }
 
     pub fn flush_receipt_writes_with_timeout(

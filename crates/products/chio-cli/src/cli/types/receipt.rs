@@ -50,6 +50,14 @@ pub(crate) enum ReceiptCommands {
         #[arg(long, default_value_t = 5000, value_parser = clap::value_parser!(u64).range(1..))]
         timeout_ms: u64,
     },
+    /// Run the full receipt-log audit: claim-log projection validation plus a
+    /// complete checkpoint-chain verification (the RFC-0006 deep check).
+    Audit {
+        /// Reseed the writer's verified head on the writer connection before
+        /// reporting; clears a head poisoned by a failed seed or divergence.
+        #[arg(long, default_value_t = false)]
+        repair: bool,
+    },
     /// Inspect or advance the receipt-checkpoint chain.
     Checkpoint {
         #[command(subcommand)]

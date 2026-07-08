@@ -250,3 +250,62 @@ fn full_verification_fallback_still_catches_projection_drift(
     let _ = fs::remove_file(path);
     Ok(())
 }
+
+#[test]
+fn reseed_clears_a_poisoned_head_after_repairing_the_database(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-head-reseed");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    for i in 0..3 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-reseed-{i}"), (i + 1) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    store.create_next_receipt_checkpoint(3, &keypair)?;
+
+    // Poison: tamper the latest checkpoint, trigger the denial, then repair
+    // the row back to its original bytes and reseed.
+    let connection = store.connection()?;
+    let original: String = connection.query_row(
+        "SELECT statement_json FROM kernel_checkpoints WHERE checkpoint_seq = 1",
+        [],
+        |row| row.get(0),
+    )?;
+    connection.execute_batch("DROP TRIGGER IF EXISTS kernel_checkpoints_reject_update;")?;
+    connection.execute(
+        "UPDATE kernel_checkpoints SET statement_json = replace(statement_json, '\"batch_end_seq\":3', '\"batch_end_seq\":2')",
+        [],
+    )?;
+    drop(connection);
+
+    let receipt = sample_receipt_with_keypair("rcpt-reseed-denied", 50, &keypair);
+    assert!(store.append_chio_receipt_returning_seq(&receipt).is_err());
+
+    // Repair the database out of band, then reseed the head. The denied
+    // append above ran `ensure_checkpoint_transparency_guards` before its
+    // predecessor check failed, silently recreating the immutability
+    // trigger; an out-of-band repair must drop it again before writing,
+    // exactly as the initial tamper did.
+    let connection = store.connection()?;
+    connection.execute_batch("DROP TRIGGER IF EXISTS kernel_checkpoints_reject_update;")?;
+    connection.execute(
+        "UPDATE kernel_checkpoints SET statement_json = ?1 WHERE checkpoint_seq = 1",
+        rusqlite::params![original],
+    )?;
+    drop(connection);
+    store.reseed_verified_head()?;
+
+    // Appends flow again.
+    let receipt = sample_receipt_with_keypair("rcpt-reseed-ok", 51, &keypair);
+    store.append_chio_receipt_returning_seq(&receipt)?;
+    store.flush_receipt_writes()?;
+    let health = store.receipt_store_health()?;
+    assert!(
+        health.writer.last_error.is_none(),
+        "reseed must clear last_error"
+    );
+    let _ = fs::remove_file(path);
+    Ok(())
+}

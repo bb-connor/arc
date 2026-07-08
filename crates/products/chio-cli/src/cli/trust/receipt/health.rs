@@ -121,11 +121,35 @@ pub(crate) fn cmd_receipt_checkpoint_create(
     Ok(())
 }
 
+/// Retained as a documented compatibility alias for `chio receipt audit`
+/// (read-only: never passes `--repair`). Keeps emitting the legacy
+/// `CHIO_CLI_RECEIPT_CHECKPOINT_VERIFY_SCHEMA` envelope so existing
+/// automation parsing that schema does not break.
 pub(crate) fn cmd_receipt_checkpoint_verify(backend: QueryBackend<'_>) -> Result<(), CliError> {
-    let store = local_receipt_store(&backend, "receipt checkpoint verify")?;
+    receipt_audit_with_schema(false, CHIO_CLI_RECEIPT_CHECKPOINT_VERIFY_SCHEMA, backend)
+}
+
+/// `chio receipt audit [--repair]`: the promoted full-verification surface
+/// (RFC-0006 rollout step 3). Runs validate_claim_receipt_log_entries plus a
+/// complete checkpoint-chain verification via receipt_checkpoint_status; with
+/// --repair it first reseeds the writer's verified head on the writer
+/// connection (clearing a poisoned head).
+pub(crate) fn cmd_receipt_audit(repair: bool, backend: QueryBackend<'_>) -> Result<(), CliError> {
+    receipt_audit_with_schema(repair, CHIO_CLI_RECEIPT_AUDIT_SCHEMA, backend)
+}
+
+fn receipt_audit_with_schema(
+    repair: bool,
+    schema: &'static str,
+    backend: QueryBackend<'_>,
+) -> Result<(), CliError> {
+    let store = local_receipt_store(&backend, "receipt audit")?;
+    if repair {
+        store.reseed_verified_head()?;
+    }
     let report = store.receipt_checkpoint_status(Some(1))?;
     if backend.json_output {
-        print_receipt_operator_json(CHIO_CLI_RECEIPT_CHECKPOINT_VERIFY_SCHEMA, &report)?;
+        print_receipt_operator_json(schema, &report)?;
     } else {
         print!("{}", render_receipt_checkpoint_status_human(&report));
     }
@@ -457,6 +481,25 @@ mod receipt_operator_tests {
             !seed_path.exists(),
             "checkpoint create must not create a new kernel seed"
         );
+
+        let _ = std::fs::remove_file(db_path);
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_audit_runs_full_verification_and_repair_reseeds(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let db_path = unique_temp_path("receipt-audit", "sqlite3");
+        let keypair = chio_core::crypto::Keypair::generate();
+        let store = chio_store_sqlite::SqliteReceiptStore::open(&db_path)?;
+        store.append_chio_receipt(&operator_sample_receipt_with_keypair(&keypair)?)?;
+        store.flush_receipt_writes()?;
+        drop(store);
+
+        cmd_receipt_audit(false, backend(Some(&db_path), None))?;
+        cmd_receipt_audit(true, backend(Some(&db_path), None))?;
+
+        assert_remote_unsupported(cmd_receipt_audit(false, backend(None, Some("http://127.0.0.1:9977"))));
 
         let _ = std::fs::remove_file(db_path);
         Ok(())
