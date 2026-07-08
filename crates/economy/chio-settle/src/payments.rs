@@ -1579,6 +1579,34 @@ mod tests {
         .test_unwrap()
     }
 
+    fn sample_denied_approval_token() -> GovernedApprovalToken {
+        let kp = Keypair::generate();
+        GovernedApprovalToken::sign(
+            GovernedApprovalTokenBody {
+                id: "test-approval-bridge-denied".to_string(),
+                approver: kp.public_key(),
+                subject: kp.public_key(),
+                governed_intent_hash: "test-intent-hash".to_string(),
+                request_id: "test-req-denied".to_string(),
+                issued_at: SAMPLE_VALID_AFTER,
+                expires_at: SAMPLE_VALID_BEFORE,
+                decision: GovernedApprovalDecision::Denied,
+            },
+            &kp,
+        )
+        .test_unwrap()
+    }
+
+    fn sample_rail() -> RailBinding {
+        RailBinding {
+            chain_id: SAMPLE_CHAIN_ID,
+            token_contract: SAMPLE_TOKEN_CONTRACT.to_string(),
+            payee_address: SAMPLE_PAYEE.to_string(),
+            token_decimals: 6,
+            token_symbol: SAMPLE_TOKEN_SYMBOL.to_string(),
+        }
+    }
+
     fn sample_authorization_input(binding: &ApprovalBinding) -> TransferWithAuthorizationInput {
         TransferWithAuthorizationInput {
             from_address: "0x1000000000000000000000000000000000000001".to_string(),
@@ -1608,13 +1636,7 @@ mod tests {
     #[test]
     fn bridge_builds_binding_prepare_accepts_happy_path() {
         let token = sample_verified_approval_token();
-        let rail = RailBinding {
-            chain_id: SAMPLE_CHAIN_ID,
-            token_contract: SAMPLE_TOKEN_CONTRACT.to_string(),
-            payee_address: SAMPLE_PAYEE.to_string(),
-            token_decimals: 6,
-            token_symbol: SAMPLE_TOKEN_SYMBOL.to_string(),
-        };
+        let rail = sample_rail();
         let binding = approval_binding_from_governed(&token, &rail, 1_000_000, token.expires_at)
             .test_unwrap();
         let prepared = prepare_transfer_with_authorization(
@@ -1626,6 +1648,42 @@ mod tests {
         )
         .test_unwrap();
         assert!(!prepared.authorization_digest.is_empty());
+    }
+
+    #[test]
+    fn approval_binding_from_governed_rejects_denied_decision() {
+        let token = sample_denied_approval_token();
+        let error =
+            approval_binding_from_governed(&token, &sample_rail(), 1_000_000, SAMPLE_VALID_BEFORE)
+                .test_unwrap_err();
+        assert!(
+            matches!(error, SettlementError::InvalidBinding(_)),
+            "a Denied token must produce InvalidBinding, got: {error}"
+        );
+    }
+
+    #[test]
+    fn approval_binding_from_governed_rejects_empty_payee_address() {
+        let token = sample_verified_approval_token();
+        let mut rail = sample_rail();
+        rail.payee_address = String::new();
+        let error = approval_binding_from_governed(&token, &rail, 1_000_000, SAMPLE_VALID_BEFORE)
+            .test_unwrap_err();
+        assert!(
+            matches!(error, SettlementError::InvalidInput(_)),
+            "an empty payee_address must produce InvalidInput, got: {error}"
+        );
+    }
+
+    #[test]
+    fn approval_binding_from_governed_rejects_zero_amount() {
+        let token = sample_verified_approval_token();
+        let error = approval_binding_from_governed(&token, &sample_rail(), 0, SAMPLE_VALID_BEFORE)
+            .test_unwrap_err();
+        assert!(
+            matches!(error, SettlementError::InvalidInput(_)),
+            "a zero amount must produce InvalidInput, got: {error}"
+        );
     }
 
     #[test]
