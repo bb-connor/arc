@@ -51,18 +51,7 @@ if [[ ${positive_status} -ne 0 ]]; then
   exit 1
 fi
 
-# False-green guard: crates/ dir exists but contains no matching patterns.
-mkdir -p "${work}/empty/crates/some-crate/src"
-printf '// no artifacts here\n' > "${work}/empty/crates/some-crate/src/lib.rs"
-make_choke_point "${work}/empty" "${BODY_VALID}"
-false_green_out=$(CHIO_LIABILITY_ROOT="${work}/empty" \
-                  CHIO_LIABILITY_LIB="${work}/empty/${CHOKE_POINT_REL}" \
-                  bash "${LINT}" 2>&1) && false_green_status=0 || false_green_status=$?
-
-echo "false-green guard: status=${false_green_status} output=${false_green_out}"
-# The script searches ROOT/crates; make empty/crates contain no artifacts.
-# The choke-point IS under crates here, so we create empty crates with only the
-# choke-point content. We need a separate crates root with zero artifacts.
+# False-green guard: zero constructions found must trip the guard.
 mkdir -p "${work}/zero/crates/some-crate/src"
 printf '// nothing here\n' > "${work}/zero/crates/some-crate/src/lib.rs"
 make_choke_point "${work}/zero" '// no constructions'
