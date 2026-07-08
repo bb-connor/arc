@@ -366,6 +366,13 @@ impl PassportStatusRegistry {
         entry.revoked_at = Some(revoked_at);
         entry.updated_at = revoked_at;
         entry.revoked_reason = reason.map(str::to_string);
+        // RFC-0009 F57: observe revocation propagation lag when the revoke
+        // instant is backdated (a remote/propagated revoke applied here). A
+        // local revoke defaults revoked_at to now, giving lag 0.
+        let now = unix_timestamp_now();
+        let lag_seconds = now.saturating_sub(revoked_at) as f64;
+        chio_metrics_spec::runtime::families::CAPABILITY_REVOCATION_LAG
+            .observe(&["control_plane"], lag_seconds);
         Ok(entry.clone())
     }
 
@@ -1526,5 +1533,57 @@ struct KeyId;
 impl KeyId {
     fn generate() -> String {
         chio_core::Keypair::generate().public_key().to_hex()
+    }
+}
+
+#[cfg(test)]
+mod revocation_lag_tests {
+    use super::*;
+
+    /// Insert a minimal active lifecycle record so revoke() finds an entry.
+    fn seed_one_passport(registry: &mut PassportStatusRegistry) -> String {
+        let passport_id = "passport-revocation-lag".to_string();
+        let record = PassportLifecycleRecord {
+            passport_id: passport_id.clone(),
+            subject: "did:example:subject".to_string(),
+            issuers: Vec::new(),
+            issuer_count: 0,
+            published_at: 1_000,
+            updated_at: 1_000,
+            status: PassportLifecycleState::Active,
+            superseded_by: None,
+            revoked_at: None,
+            revoked_reason: None,
+            distribution: PassportStatusDistribution::default(),
+            valid_until: "2099-01-01T00:00:00Z".to_string(),
+        };
+        registry.passports.insert(passport_id.clone(), record);
+        passport_id
+    }
+
+    #[test]
+    fn revoke_with_backdated_instant_observes_revocation_lag() {
+        let mut registry = PassportStatusRegistry::default();
+        let passport_id = seed_one_passport(&mut registry);
+
+        let mut before = String::new();
+        chio_metrics_spec::runtime::families::CAPABILITY_REVOCATION_LAG.render(&mut before);
+
+        // Backdate the revoke instant by 45 seconds relative to now.
+        let now = unix_timestamp_now();
+        let revoked_at = now.saturating_sub(45);
+        let _ = registry
+            .revoke(&passport_id, Some("compromise"), Some(revoked_at))
+            .unwrap_or_else(|error| panic!("revoke succeeds: {error:?}"));
+
+        let mut after = String::new();
+        chio_metrics_spec::runtime::families::CAPABILITY_REVOCATION_LAG.render(&mut after);
+        assert!(
+            after.contains(
+                "chio_capability_revocation_lag_seconds_count{authority=\"control_plane\"} 1"
+            ),
+            "one lag observation expected: {after}"
+        );
+        assert_ne!(before, after, "revoke must observe a lag sample");
     }
 }
