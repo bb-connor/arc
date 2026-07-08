@@ -964,6 +964,23 @@ pub(crate) fn require_receipt_db_path(receipt_db_path: Option<&Path>) -> Result<
     })
 }
 
+pub(crate) fn load_roster_policy(
+    path: &Path,
+) -> Result<trust_control::RosterPolicy, CliError> {
+    let bytes = std::fs::read(path).map_err(|error| {
+        CliError::cli_other_error(format!(
+            "failed to read roster policy file `{}`: {error}",
+            path.display()
+        ))
+    })?;
+    serde_json::from_slice(&bytes).map_err(|error| {
+        CliError::cli_other_error(format!(
+            "failed to parse roster policy file `{}`: {error}",
+            path.display()
+        ))
+    })
+}
+
 pub(crate) fn cmd_trust_serve(
     listen: SocketAddr,
     service_token: &str,
@@ -989,6 +1006,7 @@ pub(crate) fn cmd_trust_serve(
     certification_public_metadata_ttl_seconds: u64,
     peer_urls: &[String],
     cluster_sync_interval_ms: u64,
+    roster_policy_file: Option<&Path>,
 ) -> Result<(), CliError> {
     if service_token.trim().is_empty() {
         return Err(CliError::cli_other_error(
@@ -1009,6 +1027,7 @@ pub(crate) fn cmd_trust_serve(
         .transpose()?
         .map(|loaded| (loaded.issuance_policy, loaded.runtime_assurance_policy))
         .unwrap_or((None, None));
+    let roster_policy = roster_policy_file.map(load_roster_policy).transpose()?;
     trust_control::serve(trust_control::TrustServiceConfig {
         listen,
         service_token: service_token.to_string(),
@@ -1034,7 +1053,7 @@ pub(crate) fn cmd_trust_serve(
         certification_public_metadata_ttl_seconds,
         peer_urls: peer_urls.to_vec(),
         cluster_sync_interval: std::time::Duration::from_millis(cluster_sync_interval_ms.max(50)),
-        roster_policy: None,
+        roster_policy,
     })
 }
 

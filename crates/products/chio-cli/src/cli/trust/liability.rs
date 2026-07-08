@@ -595,23 +595,42 @@ pub(crate) fn cmd_trust_liability_claim_dispute_issue(
 pub(crate) fn cmd_trust_liability_claim_adjudication_issue(
     input_file: &Path,
     json_output: bool,
-    _receipt_db_path: Option<&Path>,
-    _authority_seed_path: Option<&Path>,
-    _authority_db_path: Option<&Path>,
+    receipt_db_path: Option<&Path>,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    roster_policy_file: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
     let request = load_liability_claim_adjudication_issue_request(input_file)?;
     let adjudication = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(url, token)?.issue_liability_claim_adjudication(&request)?
+        trust_control::service_runtime::client::build_client(url, token)?
+            .issue_liability_claim_adjudication(&request)?
     } else {
-        return Err(CliError::cli_other_error(
-            "liability claim adjudication issuance in direct mode requires a configured roster \
-             policy; use --control-url to delegate to a trust-control service with roster_policy \
-             configured"
-                .to_string(),
-        ));
+        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+            CliError::cli_other_error(
+                "liability claim adjudication issuance requires --receipt-db <path> when \
+                 --control-url is not set"
+                    .to_string(),
+            )
+        })?;
+        let policy = roster_policy_file
+            .ok_or_else(|| {
+                CliError::cli_other_error(
+                    "liability claim adjudication issuance requires --roster-policy-file <path> \
+                     when --control-url is not set"
+                        .to_string(),
+                )
+            })
+            .and_then(load_roster_policy)?;
+        trust_control::issue_signed_liability_claim_adjudication(
+            receipt_db_path,
+            authority_seed_path,
+            authority_db_path,
+            &request,
+            &policy,
+        )?
     };
 
     if json_output {
@@ -634,9 +653,10 @@ pub(crate) fn cmd_trust_liability_claim_adjudication_issue(
 pub(crate) fn cmd_trust_liability_claim_payout_instruction_issue(
     input_file: &Path,
     json_output: bool,
-    _receipt_db_path: Option<&Path>,
-    _authority_seed_path: Option<&Path>,
-    _authority_db_path: Option<&Path>,
+    receipt_db_path: Option<&Path>,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    roster_policy_file: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
@@ -646,12 +666,29 @@ pub(crate) fn cmd_trust_liability_claim_payout_instruction_issue(
         trust_control::service_runtime::client::build_client(url, token)?
             .issue_liability_claim_payout_instruction(&request)?
     } else {
-        return Err(CliError::cli_other_error(
-            "liability claim payout instruction issuance in direct mode requires a configured \
-             roster policy; use --control-url to delegate to a trust-control service with \
-             roster_policy configured"
-                .to_string(),
-        ));
+        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+            CliError::cli_other_error(
+                "liability claim payout instruction issuance requires --receipt-db <path> when \
+                 --control-url is not set"
+                    .to_string(),
+            )
+        })?;
+        let policy = roster_policy_file
+            .ok_or_else(|| {
+                CliError::cli_other_error(
+                    "liability claim payout instruction issuance requires --roster-policy-file \
+                     <path> when --control-url is not set"
+                        .to_string(),
+                )
+            })
+            .and_then(load_roster_policy)?;
+        trust_control::issue_signed_liability_claim_payout_instruction(
+            receipt_db_path,
+            authority_seed_path,
+            authority_db_path,
+            &request,
+            &policy,
+        )?
     };
 
     if json_output {
@@ -733,9 +770,10 @@ pub(crate) fn cmd_trust_liability_claim_payout_receipt_issue(
 pub(crate) fn cmd_trust_liability_claim_settlement_instruction_issue(
     input_file: &Path,
     json_output: bool,
-    _receipt_db_path: Option<&Path>,
-    _authority_seed_path: Option<&Path>,
-    _authority_db_path: Option<&Path>,
+    receipt_db_path: Option<&Path>,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    roster_policy_file: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
@@ -745,12 +783,29 @@ pub(crate) fn cmd_trust_liability_claim_settlement_instruction_issue(
         trust_control::service_runtime::client::build_client(url, token)?
             .issue_liability_claim_settlement_instruction(&request)?
     } else {
-        return Err(CliError::cli_other_error(
-            "liability claim settlement instruction issuance in direct mode requires a configured \
-             roster policy; use --control-url to delegate to a trust-control service with \
-             roster_policy configured"
-                .to_string(),
-        ));
+        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+            CliError::cli_other_error(
+                "liability claim settlement instruction issuance requires --receipt-db <path> \
+                 when --control-url is not set"
+                    .to_string(),
+            )
+        })?;
+        let policy = roster_policy_file
+            .ok_or_else(|| {
+                CliError::cli_other_error(
+                    "liability claim settlement instruction issuance requires \
+                     --roster-policy-file <path> when --control-url is not set"
+                        .to_string(),
+                )
+            })
+            .and_then(load_roster_policy)?;
+        trust_control::issue_signed_liability_claim_settlement_instruction(
+            receipt_db_path,
+            authority_seed_path,
+            authority_db_path,
+            &request,
+            &policy,
+        )?
     };
 
     if json_output {

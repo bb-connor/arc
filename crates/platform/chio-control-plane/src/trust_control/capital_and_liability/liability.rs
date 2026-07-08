@@ -7,7 +7,7 @@ use super::*;
 /// `AdjudicationJurisdictionReceipt`). It is recorded on the adjudication so
 /// the audit trail shows which ex-ante roster was applied and the check is not
 /// per-adjudication fabricable.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct RosterPolicy {
     pub roster: Vec<String>,
     pub allowed_decision_rules: Vec<String>,
@@ -1472,6 +1472,13 @@ mod roster_enforcement {
     };
     use chio_test_support::ctx::{TestUnwrap, TestUnwrapErr};
 
+    // Pinned adjudication_id for fixed inputs used in the golden regression test.
+    // If this value changes, verify that the id-fold tuple change was intentional
+    // and update this const. Construction-time goldens change when the tuple fields
+    // change; wire-format signature goldens (Task 2) are unaffected.
+    const ADJUDICATION_ID_GOLDEN_ANCHOR_A: &str =
+        "lca-96d5df5192950bcfbd3d140286c79347d800dce8d945dffd4da9752530e9a038";
+
     fn sign_export<T: serde::Serialize + Clone>(body: T) -> SignedExportEnvelope<T> {
         let kp = Keypair::generate();
         SignedExportEnvelope::sign(body, &kp).test_unwrap("sign export")
@@ -2084,22 +2091,29 @@ mod roster_enforcement {
 
     #[test]
     fn adjudication_id_folds_decision_rule_and_roster_anchor() {
-        // Verifies that changing decision_rule_ref or roster_anchor changes the derived id.
-        // This is a construction-time check, not a wire-format golden.
+        // Verifies that changing decision_rule_ref or roster_anchor changes the derived id,
+        // and pins the id for a fixed input so regressions in the derivation are caught.
         let policy_a = RosterPolicy {
             roster: vec!["arbiter.on-roster".to_string()],
-            allowed_decision_rules: vec!["rule.partial-settlement.v1".to_string()],
+            allowed_decision_rules: vec![
+                "rule.partial-settlement.v1".to_string(),
+                "rule.full-settlement.v1".to_string(),
+            ],
             roster_anchor: "anchor-a".to_string(),
         };
         let policy_b = RosterPolicy {
             roster: vec!["arbiter.on-roster".to_string()],
-            allowed_decision_rules: vec!["rule.partial-settlement.v1".to_string()],
+            allowed_decision_rules: vec![
+                "rule.partial-settlement.v1".to_string(),
+                "rule.full-settlement.v1".to_string(),
+            ],
             roster_anchor: "anchor-b".to_string(),
         };
         let off_roster = sample_signed_off_roster_adjudication();
         // Build a request whose adjudicator IS on the roster so the gate passes.
         let on_roster_dispute = off_roster.body.dispute.clone();
-        let request_a = LiabilityClaimAdjudicationIssueRequest {
+        // request_base uses rule-a; request_rule_b uses rule-b but same anchor.
+        let request_base = LiabilityClaimAdjudicationIssueRequest {
             dispute: on_roster_dispute.clone(),
             adjudicator: "arbiter.on-roster".to_string(),
             outcome: LiabilityClaimAdjudicationOutcome::PartialSettlement,
@@ -2107,18 +2121,46 @@ mod roster_enforcement {
             decision_rule_ref: Some("rule.partial-settlement.v1".to_string()),
             note: None,
         };
-        let request_b = request_a.clone();
-        let artifact_a =
-            build_liability_claim_adjudication_artifact(&request_a, 1_700_010_800, &policy_a)
-                .test_unwrap("build with policy_a");
-        let artifact_b =
-            build_liability_claim_adjudication_artifact(&request_b, 1_700_010_800, &policy_b)
-                .test_unwrap("build with policy_b");
+        let request_rule_b = LiabilityClaimAdjudicationIssueRequest {
+            decision_rule_ref: Some("rule.full-settlement.v1".to_string()),
+            ..request_base.clone()
+        };
+        let artifact_anchor_a =
+            build_liability_claim_adjudication_artifact(&request_base, 1_700_010_800, &policy_a)
+                .test_unwrap("build with anchor-a");
+        let artifact_anchor_b =
+            build_liability_claim_adjudication_artifact(&request_base, 1_700_010_800, &policy_b)
+                .test_unwrap("build with anchor-b");
+        let artifact_rule_b =
+            build_liability_claim_adjudication_artifact(&request_rule_b, 1_700_010_800, &policy_a)
+                .test_unwrap("build with rule-b");
+
+        // Varying roster_anchor must change the id.
         assert_ne!(
-            artifact_a.adjudication_id, artifact_b.adjudication_id,
+            artifact_anchor_a.adjudication_id, artifact_anchor_b.adjudication_id,
             "different roster_anchor must produce different adjudication_id",
         );
-        assert_eq!(artifact_a.roster_anchor_ref.as_deref(), Some("anchor-a"),);
-        assert_eq!(artifact_b.roster_anchor_ref.as_deref(), Some("anchor-b"),);
+        // Varying decision_rule_ref must independently change the id.
+        assert_ne!(
+            artifact_anchor_a.adjudication_id, artifact_rule_b.adjudication_id,
+            "different decision_rule_ref must produce different adjudication_id",
+        );
+        assert_eq!(
+            artifact_anchor_a.roster_anchor_ref.as_deref(),
+            Some("anchor-a")
+        );
+        assert_eq!(
+            artifact_anchor_b.roster_anchor_ref.as_deref(),
+            Some("anchor-b")
+        );
+
+        // Golden: pin the derivation for the fixed-input artifact_anchor_a so any change
+        // to the id-fold tuple is immediately caught.
+        // Construction-time goldens change when the tuple fields change; wire-format
+        // signature goldens (Task 2) are unaffected.
+        assert_eq!(
+            artifact_anchor_a.adjudication_id, ADJUDICATION_ID_GOLDEN_ANCHOR_A,
+            "adjudication_id derivation changed for fixed inputs",
+        );
     }
 }
