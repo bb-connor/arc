@@ -116,6 +116,8 @@ mod attestation;
 mod manifest;
 #[path = "mcp/emit_config.rs"]
 mod emit_config;
+#[path = "mcp/payment_config.rs"]
+pub mod payment_config;
 #[path = "mcp/wrap.rs"]
 mod wrap;
 
