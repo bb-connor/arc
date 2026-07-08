@@ -77,6 +77,10 @@ chio-selective-disclosure = { path = "../../trust/chio-selective-disclosure", de
 chio-workflow = { workspace = true, optional = true }
 
 [[test]]
+name = "authoritative_spend_enforcement"
+path = "tests/authoritative_spend_enforcement.rs"
+
+[[test]]
 name = "verdict_matrix_rust_driver"
 path = "verdict_matrix/tests/verdict_matrix_rust_driver.rs"
 
