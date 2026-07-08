@@ -159,3 +159,37 @@ groups:
         annotations:
           summary: Chio receipt checkpointing has stalled
           runbook: docs/operator-runbook/slo.md
+
+      - alert: ChioFailOpenMetricsMissing
+        expr: absent_over_time(chio_fail_open_suspected_total[10m])
+        for: 5m
+        labels:
+          severity: p1
+          notification_route: pagerduty
+          opsgenie: "true"
+          slo: fail-closed
+        annotations:
+          summary: Chio fail-open detector counter is missing
+          runbook: docs/operator-runbook/slo.md
+
+      - alert: ChioDispatchFailureMetricsMissing
+        expr: absent_over_time(chio_dispatch_failure_total[10m])
+        for: 5m
+        labels:
+          severity: p2
+          notification_route: pagerduty
+          slo: dispatch
+        annotations:
+          summary: Chio dispatch-failure counter is missing
+          runbook: docs/operator-runbook/slo.md
+
+      - alert: ChioRevocationLagMetricsMissing
+        expr: absent_over_time(chio_capability_revocation_lag_seconds_count[10m])
+        for: 5m
+        labels:
+          severity: p2
+          notification_route: pagerduty
+          slo: revocation
+        annotations:
+          summary: Chio revocation-lag histogram is missing
+          runbook: docs/operator-runbook/slo.md
