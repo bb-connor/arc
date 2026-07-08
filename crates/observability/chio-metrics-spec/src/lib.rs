@@ -514,9 +514,9 @@ pub const REGISTRY: &[MetricDescriptor] = &[
     ),
     describe!(
         name = CHIO_SIGNING_QUEUE_BLOCK_TOTAL,
-        help = "Total receipt signing requests blocked by bounded queue capacity.",
+        help = "Total receipt signing requests blocked by bounded queue capacity or byte budget.",
         kind = Counter,
-        labels = []
+        labels = ["reason"]
     ),
     describe!(
         name = CHIO_SOC_EXPORT_LAG_SECONDS,

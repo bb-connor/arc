@@ -29,10 +29,6 @@ use serde_json::json;
 #[path = "../src/kernel/signing_task.rs"]
 pub(crate) mod signing_task;
 
-mod kernel {
-    pub(crate) use crate::signing_task;
-}
-
 #[allow(dead_code)]
 #[path = "../src/observability/metrics.rs"]
 mod metrics;
@@ -140,16 +136,20 @@ fn expected_signed_id(body: &ChioReceiptBody) -> Result<String, String> {
 }
 
 fn rendered_signing_queue_block_total() -> Result<u64, String> {
+    // The signing-queue block counter now carries a `reason` label (RFC-0009
+    // F82); a full bounded channel records reason="channel_full". An absent
+    // series means zero blocks so far (the runtime family only renders series
+    // that exist).
     let body = metrics::render_guard_metrics_prometheus();
-    body.lines()
-        .find_map(|line| {
-            line.strip_prefix("chio_signing_queue_block_total ")
-                .map(str::parse::<u64>)
-        })
-        .ok_or_else(|| {
-            "rendered Prometheus metrics omitted chio_signing_queue_block_total".to_string()
-        })?
-        .map_err(|error| format!("rendered chio_signing_queue_block_total was invalid: {error}"))
+    match body.lines().find_map(|line| {
+        line.strip_prefix("chio_signing_queue_block_total{reason=\"channel_full\"} ")
+            .map(str::parse::<u64>)
+    }) {
+        Some(parsed) => parsed.map_err(|error| {
+            format!("rendered chio_signing_queue_block_total was invalid: {error}")
+        }),
+        None => Ok(0),
+    }
 }
 
 #[tokio::test(flavor = "current_thread")]

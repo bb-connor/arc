@@ -7,8 +7,6 @@ use chio_metrics_spec::{
     GUARD_HOST_CALL_DURATION_BUCKETS_SECONDS,
 };
 
-use crate::kernel::signing_task::signing_queue_block_total;
-
 pub use chio_metrics_spec::MetricKind as PrometheusMetricKind;
 
 pub const GUARD_METRICS_PATH: &str = "/metrics";
@@ -85,12 +83,17 @@ pub const GUARD_METRIC_FAMILIES: &[GuardMetricFamily] = &[
 pub use chio_metrics_spec::CHIO_OTEL_INGRESS_DROP_TOTAL as METRIC_CHIO_OTEL_INGRESS_DROP_TOTAL;
 pub use chio_metrics_spec::CHIO_OTEL_SINK_DROP_TOTAL as METRIC_CHIO_OTEL_SINK_DROP_TOTAL;
 
+// Advertised runtime (non-guard) families the /metrics endpoint renders via the
+// chio-metrics-spec runtime families. Retained as endpoint documentation; the
+// actual samples are produced by render_otel_drop_families and the signing
+// family render, so this table is not iterated by the renderer.
+#[allow(dead_code)]
 const RUNTIME_METRIC_FAMILIES: &[GuardMetricFamily] = &[
     GuardMetricFamily {
         name: CHIO_SIGNING_QUEUE_BLOCK_TOTAL,
-        help: "Total receipt signing requests blocked by bounded queue capacity.",
+        help: "Total receipt signing requests blocked by bounded queue capacity or byte budget.",
         kind: PrometheusMetricKind::Counter,
-        labels: &[],
+        labels: &["reason"],
         buckets: &[],
     },
     GuardMetricFamily {
@@ -129,87 +132,17 @@ pub fn guard_metrics_endpoint(path: &str) -> Option<MetricsEndpointResponse> {
     })
 }
 
+/// Render the kernel `/metrics` body from the chio-metrics-spec runtime
+/// families (RFC-0009 F75). The kernel renders the guard families and the two
+/// OTEL-drop families (whose sole producers are chio-wasm-guards and the OTLP
+/// ingress, which cannot be depended on by the kernel) plus the signing-queue
+/// block family, so every sample is a real, correctly-labeled counter rather
+/// than a hardcoded zero placeholder.
 #[must_use]
 pub fn render_guard_metrics_prometheus() -> String {
     let mut output = String::new();
-    for family in GUARD_METRIC_FAMILIES.iter().chain(RUNTIME_METRIC_FAMILIES) {
-        output.push_str("# HELP ");
-        output.push_str(family.name);
-        output.push(' ');
-        output.push_str(family.help);
-        output.push('\n');
-        output.push_str("# TYPE ");
-        output.push_str(family.name);
-        output.push(' ');
-        output.push_str(family.kind.as_str());
-        output.push('\n');
-        match family.kind {
-            PrometheusMetricKind::Counter | PrometheusMetricKind::Gauge => {
-                render_scalar_family(&mut output, family);
-            }
-            PrometheusMetricKind::Histogram => {
-                render_histogram_family(&mut output, family);
-            }
-        }
-    }
+    chio_metrics_spec::runtime::render_guard_families(&mut output);
+    chio_metrics_spec::runtime::render_otel_drop_families(&mut output);
+    chio_metrics_spec::runtime::families::SIGNING_QUEUE_BLOCK.render(&mut output);
     output
-}
-
-fn render_scalar_family(output: &mut String, family: &GuardMetricFamily) {
-    output.push_str(family.name);
-    output.push_str(&render_empty_labels(family.labels));
-    output.push(' ');
-    output.push_str(&scalar_metric_value(family).to_string());
-    output.push('\n');
-}
-
-fn scalar_metric_value(family: &GuardMetricFamily) -> u64 {
-    match family.name {
-        CHIO_SIGNING_QUEUE_BLOCK_TOTAL => signing_queue_block_total(),
-        _ => 0,
-    }
-}
-
-fn render_histogram_family(output: &mut String, family: &GuardMetricFamily) {
-    for bucket in family.buckets {
-        output.push_str(family.name);
-        output.push_str("_bucket");
-        output.push_str(&render_labels_with_bucket(family.labels, bucket));
-        output.push_str(" 0\n");
-    }
-    output.push_str(family.name);
-    output.push_str("_bucket");
-    output.push_str(&render_labels_with_bucket(family.labels, "+Inf"));
-    output.push_str(" 0\n");
-    output.push_str(family.name);
-    output.push_str("_sum");
-    output.push_str(&render_empty_labels(family.labels));
-    output.push_str(" 0\n");
-    output.push_str(family.name);
-    output.push_str("_count");
-    output.push_str(&render_empty_labels(family.labels));
-    output.push_str(" 0\n");
-}
-
-fn render_empty_labels(labels: &[&str]) -> String {
-    render_labels(labels, None)
-}
-
-fn render_labels_with_bucket(labels: &[&str], bucket: &str) -> String {
-    render_labels(labels, Some(bucket))
-}
-
-fn render_labels(labels: &[&str], bucket: Option<&str>) -> String {
-    if labels.is_empty() && bucket.is_none() {
-        return String::new();
-    }
-
-    let mut parts = Vec::with_capacity(labels.len() + usize::from(bucket.is_some()));
-    for label in labels {
-        parts.push(format!("{label}=\"\""));
-    }
-    if let Some(bucket) = bucket {
-        parts.push(format!("le=\"{bucket}\""));
-    }
-    format!("{{{}}}", parts.join(","))
 }

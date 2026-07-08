@@ -87,68 +87,68 @@ fn descriptors_lock_kinds_labels_and_buckets() {
 }
 
 #[test]
-fn scrape_renders_histogram_buckets_with_locked_bounds() {
-    let body = render_guard_metrics_prometheus();
+fn guard_metrics_report_driven_counts() {
+    use chio_metrics_spec::runtime::families;
+    families::GUARD_VERDICT.incr(&["driven-guard-6", "allow"]);
+    families::GUARD_VERDICT.incr(&["driven-guard-6", "deny"]);
+    families::GUARD_DENY.incr(&["driven-guard-6", "blocking"]);
+    families::GUARD_EVAL_DURATION.observe(&["driven-guard-6", "allow"], 0.002);
 
-    assert!(body.contains(
-        "chio_guard_eval_duration_seconds_bucket{guard_id=\"\",verdict=\"\",le=\"1.0\"} 0"
-    ));
-    assert!(body.contains(
-        "chio_guard_host_call_duration_seconds_bucket{guard_id=\"\",host_fn=\"\",le=\"0.00001\"} 0"
-    ));
-    assert!(body.contains(
-        "chio_guard_host_call_duration_seconds_bucket{guard_id=\"\",host_fn=\"\",le=\"+Inf\"} 0"
-    ));
+    let body = render_guard_metrics_prometheus();
+    assert!(
+        body.contains("chio_guard_verdict_total{guard_id=\"driven-guard-6\",verdict=\"allow\"} 1"),
+        "{body}"
+    );
+    assert!(
+        body.contains("chio_guard_verdict_total{guard_id=\"driven-guard-6\",verdict=\"deny\"} 1"),
+        "{body}"
+    );
+    assert!(
+        body.contains(
+            "chio_guard_deny_total{guard_id=\"driven-guard-6\",reason_class=\"blocking\"} 1"
+        ),
+        "{body}"
+    );
+    assert!(
+        body.contains(
+            "chio_guard_eval_duration_seconds_count{guard_id=\"driven-guard-6\",verdict=\"allow\"} 1"
+        ),
+        "{body}"
+    );
+    // F75: no family renders a hardcoded empty-label zero placeholder anymore.
+    assert!(
+        !body.contains("guard_id=\"\""),
+        "no empty-label placeholder: {body}"
+    );
 }
 
 #[test]
-fn scrape_renders_counter_and_gauge_samples() {
+fn signing_block_counter_reports_reason_label() {
+    use chio_metrics_spec::runtime::families;
+    families::SIGNING_QUEUE_BLOCK.incr(&["byte_budget"]);
     let body = render_guard_metrics_prometheus();
-
-    for sample in [
-        "chio_guard_fuel_consumed_total{guard_id=\"\"} 0",
-        "chio_guard_verdict_total{guard_id=\"\",verdict=\"\"} 0",
-        "chio_guard_deny_total{guard_id=\"\",reason_class=\"\"} 0",
-        "chio_guard_reload_total{guard_id=\"\",outcome=\"\"} 0",
-        "chio_guard_module_bytes{guard_id=\"\",epoch=\"\"} 0",
-    ] {
-        assert!(body.contains(sample), "missing sample {sample}");
-    }
+    assert!(
+        body.contains("chio_signing_queue_block_total{reason=\"byte_budget\"}"),
+        "signing family must render the reason label: {body}"
+    );
+    // The unlabeled placeholder line is gone.
+    assert!(
+        !body.contains("chio_signing_queue_block_total{} 0\n"),
+        "{body}"
+    );
 }
 
 #[test]
-fn scrape_renders_runtime_counter_samples_without_labels() {
-    let body = render_guard_metrics_prometheus();
-
-    for (name, help) in [
-        (
-            "chio_signing_queue_block_total",
-            "Total receipt signing requests blocked by bounded queue capacity.",
-        ),
-        (
-            "chio_otel_ingress_drop_total",
-            "Total OTEL ingress batches dropped by bounded queue admission.",
-        ),
-        (
-            "chio_otel_sink_drop_total",
-            "Total OTEL receipt sink batches dropped before append.",
-        ),
-    ] {
-        assert!(
-            body.contains(&format!("# HELP {name} {help}\n")),
-            "missing HELP for {name}"
-        );
-        assert!(
-            body.contains(&format!("# TYPE {name} counter\n")),
-            "missing TYPE for {name}"
-        );
-        assert!(
-            body.contains(&format!("{name} 0\n")),
-            "missing no-label sample for {name}"
-        );
-        assert!(
-            !body.contains(&format!("{name}{{}} 0\n")),
-            "unexpected empty label block for {name}"
-        );
-    }
+fn metrics_endpoint_serves_prometheus_body() {
+    let response = match guard_metrics_endpoint(GUARD_METRICS_PATH) {
+        Some(response) => response,
+        None => panic!("metrics path serves"),
+    };
+    assert_eq!(response.status, 200);
+    assert!(response
+        .body
+        .contains("# TYPE chio_guard_verdict_total counter"));
+    assert!(response
+        .body
+        .contains("# TYPE chio_signing_queue_block_total counter"));
 }
