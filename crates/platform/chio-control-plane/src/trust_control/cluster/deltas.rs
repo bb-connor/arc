@@ -241,40 +241,68 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
         update_peer_sync_error(state, peer_url, error.to_string());
         return Err(error);
     }
+    let mut round = PullRoundBudget::new();
     let mut delta_records = 0u64;
-    if let Err(error) = sync_peer_revocations(state, &client, peer_url).map(|count| {
-        delta_records = delta_records.saturating_add(count);
-    }) {
-        update_peer_sync_error(state, peer_url, error.to_string());
-        return Err(error);
-    }
-    if let Err(error) = sync_peer_tool_receipts(state, &client, peer_url).map(|count| {
-        delta_records = delta_records.saturating_add(count);
-    }) {
-        update_peer_sync_error(state, peer_url, error.to_string());
-        return Err(error);
-    }
-    if let Err(error) = sync_peer_child_receipts(state, &client, peer_url).map(|count| {
-        delta_records = delta_records.saturating_add(count);
-    }) {
-        update_peer_sync_error(state, peer_url, error.to_string());
-        return Err(error);
-    }
-    if let Err(error) = sync_peer_lineage(state, &client, peer_url).map(|count| {
-        delta_records = delta_records.saturating_add(count);
-    }) {
-        update_peer_sync_error(state, peer_url, error.to_string());
-        return Err(error);
-    }
-    if let Err(error) = sync_peer_budgets(state, &client, peer_url).map(|count| {
-        delta_records = delta_records.saturating_add(count);
-    }) {
-        update_peer_sync_error(state, peer_url, error.to_string());
-        return Err(error);
-    }
+    route_pull(
+        state,
+        peer_url,
+        sync_peer_revocations(state, &client, peer_url, &mut round),
+        &mut delta_records,
+    )?;
+    route_pull(
+        state,
+        peer_url,
+        sync_peer_tool_receipts(state, &client, peer_url, &mut round),
+        &mut delta_records,
+    )?;
+    route_pull(
+        state,
+        peer_url,
+        sync_peer_child_receipts(state, &client, peer_url, &mut round),
+        &mut delta_records,
+    )?;
+    route_pull(
+        state,
+        peer_url,
+        sync_peer_lineage(state, &client, peer_url, &mut round),
+        &mut delta_records,
+    )?;
+    route_pull(
+        state,
+        peer_url,
+        sync_peer_budgets(state, &client, peer_url, &mut round),
+        &mut delta_records,
+    )?;
     update_peer_delta_records(state, peer_url, delta_records);
     update_peer_success(state, peer_url);
     Ok(())
+}
+
+/// Fold one puller's result into the round: on success accumulate the applied
+/// count; on `PullError::Protocol` demote the peer to Unhealthy (fail-closed,
+/// leaves consensus and witness sets); on `PullError::Transient` keep the peer
+/// Healthy but record the error. Both error arms short-circuit the round.
+fn route_pull(
+    state: &TrustServiceState,
+    peer_url: &str,
+    outcome: Result<u64, PullError>,
+    delta_records: &mut u64,
+) -> Result<(), CliError> {
+    match outcome {
+        Ok(count) => {
+            *delta_records = delta_records.saturating_add(count);
+            Ok(())
+        }
+        Err(PullError::Protocol(error)) => {
+            let message = error.to_string();
+            update_peer_failure(state, peer_url, message.clone());
+            Err(CliError::cli_other_error(message))
+        }
+        Err(PullError::Transient(error)) => {
+            update_peer_sync_error(state, peer_url, error.to_string());
+            Err(error)
+        }
+    }
 }
 
 fn sync_peer_authority(
@@ -294,11 +322,12 @@ fn sync_peer_revocations(
     state: &TrustServiceState,
     client: &TrustControlClient,
     peer_url: &str,
-) -> Result<u64, CliError> {
+    round: &mut PullRoundBudget,
+) -> Result<u64, PullError> {
     let Some(path) = state.config.revocation_db_path.as_deref() else {
         return Ok(0);
     };
-    let store = SqliteRevocationStore::open(path)?;
+    let store = SqliteRevocationStore::open(path).map_err(CliError::from)?;
     let mut applied = 0u64;
     loop {
         let cursor = peer_revocation_cursor(state, peer_url);
@@ -310,12 +339,31 @@ fn sync_peer_revocations(
         if response.records.is_empty() {
             break;
         }
+        round.charge_page(response.records.len() as u64)?;
+        let page_max = response
+            .records
+            .iter()
+            .map(|record| RevocationCursor {
+                revoked_at: record.revoked_at,
+                capability_id: record.capability_id.clone(),
+            })
+            .max_by(|a, b| {
+                (a.revoked_at, a.capability_id.as_str())
+                    .cmp(&(b.revoked_at, b.capability_id.as_str()))
+            })
+            .ok_or(PeerProtocolError::NonAdvancingPage {
+                after_seq: 0,
+                page_max_seq: 0,
+            })?;
+        ensure_revocation_advanced(cursor.as_ref(), &page_max)?;
         let mut last_cursor = None;
         for record in response.records {
-            store.upsert_revocation(&RevocationRecord {
-                capability_id: record.capability_id.clone(),
-                revoked_at: record.revoked_at,
-            })?;
+            store
+                .upsert_revocation(&RevocationRecord {
+                    capability_id: record.capability_id.clone(),
+                    revoked_at: record.revoked_at,
+                })
+                .map_err(CliError::from)?;
             applied = applied.saturating_add(1);
             last_cursor = Some(RevocationCursor {
                 revoked_at: record.revoked_at,
@@ -333,11 +381,12 @@ fn sync_peer_tool_receipts(
     state: &TrustServiceState,
     client: &TrustControlClient,
     peer_url: &str,
-) -> Result<u64, CliError> {
+    round: &mut PullRoundBudget,
+) -> Result<u64, PullError> {
     let Some(path) = state.config.receipt_db_path.as_deref() else {
         return Ok(0);
     };
-    let store = SqliteReceiptStore::open(path)?;
+    let store = SqliteReceiptStore::open(path).map_err(CliError::from)?;
     let mut applied = 0u64;
     loop {
         let after_seq = peer_tool_seq(state, peer_url);
@@ -348,11 +397,22 @@ fn sync_peer_tool_receipts(
         if response.records.is_empty() {
             break;
         }
+        round.charge_page(response.records.len() as u64)?;
+        let page_max_seq = response
+            .records
+            .iter()
+            .map(|record| record.seq)
+            .max()
+            .unwrap_or(after_seq);
+        ensure_seq_advanced(after_seq, page_max_seq)?;
         let mut last_seq = after_seq;
         for record in response.records {
-            let receipt: ChioReceipt = serde_json::from_value(record.receipt)?;
-            store.append_chio_receipt(&receipt)?;
-            last_seq = record.seq;
+            let receipt: ChioReceipt =
+                serde_json::from_value(record.receipt).map_err(CliError::from)?;
+            store
+                .append_chio_receipt(&receipt)
+                .map_err(CliError::from)?;
+            last_seq = last_seq.max(record.seq);
             applied = applied.saturating_add(1);
         }
         update_peer_tool_seq(state, peer_url, last_seq);
@@ -364,11 +424,12 @@ fn sync_peer_child_receipts(
     state: &TrustServiceState,
     client: &TrustControlClient,
     peer_url: &str,
-) -> Result<u64, CliError> {
+    round: &mut PullRoundBudget,
+) -> Result<u64, PullError> {
     let Some(path) = state.config.receipt_db_path.as_deref() else {
         return Ok(0);
     };
-    let store = SqliteReceiptStore::open(path)?;
+    let store = SqliteReceiptStore::open(path).map_err(CliError::from)?;
     let mut applied = 0u64;
     loop {
         let after_seq = peer_child_seq(state, peer_url);
@@ -379,11 +440,22 @@ fn sync_peer_child_receipts(
         if response.records.is_empty() {
             break;
         }
+        round.charge_page(response.records.len() as u64)?;
+        let page_max_seq = response
+            .records
+            .iter()
+            .map(|record| record.seq)
+            .max()
+            .unwrap_or(after_seq);
+        ensure_seq_advanced(after_seq, page_max_seq)?;
         let mut last_seq = after_seq;
         for record in response.records {
-            let receipt: ChildRequestReceipt = serde_json::from_value(record.receipt)?;
-            store.append_child_receipt(&receipt)?;
-            last_seq = record.seq;
+            let receipt: ChildRequestReceipt =
+                serde_json::from_value(record.receipt).map_err(CliError::from)?;
+            store
+                .append_child_receipt(&receipt)
+                .map_err(CliError::from)?;
+            last_seq = last_seq.max(record.seq);
             applied = applied.saturating_add(1);
         }
         update_peer_child_seq(state, peer_url, last_seq);
@@ -395,11 +467,12 @@ fn sync_peer_budgets(
     state: &TrustServiceState,
     client: &TrustControlClient,
     peer_url: &str,
-) -> Result<u64, CliError> {
+    round: &mut PullRoundBudget,
+) -> Result<u64, PullError> {
     let Some(path) = state.config.budget_db_path.as_deref() else {
         return Ok(0);
     };
-    let mut store = SqliteBudgetStore::open(path)?;
+    let mut store = SqliteBudgetStore::open(path).map_err(CliError::from)?;
     let mut applied = 0u64;
     loop {
         let cursor = peer_budget_cursor(state, peer_url);
@@ -407,7 +480,7 @@ fn sync_peer_budgets(
             after_seq: cursor.as_ref().map(|value| value.seq),
             limit: Some(MAX_LIST_LIMIT),
         })?;
-        let outcome = import_budget_delta_response(&mut store, &response, cursor)?;
+        let outcome = import_budget_delta_response(&mut store, &response, cursor, round)?;
         applied = applied.saturating_add(outcome.applied_count);
         if let Some(cursor) = outcome.next_cursor {
             update_peer_budget_cursor(state, peer_url, cursor);
@@ -429,7 +502,8 @@ pub(crate) fn import_budget_delta_response(
     store: &mut SqliteBudgetStore,
     response: &BudgetDeltaResponse,
     current_cursor: Option<BudgetCursor>,
-) -> Result<BudgetDeltaImportOutcome, CliError> {
+    round: &mut PullRoundBudget,
+) -> Result<BudgetDeltaImportOutcome, PullError> {
     if response.records.is_empty() && response.mutation_events.is_empty() {
         return Ok(BudgetDeltaImportOutcome {
             applied_count: 0,
@@ -442,10 +516,11 @@ pub(crate) fn import_budget_delta_response(
         .len()
         .saturating_add(response.mutation_events.len());
     if record_count > BUDGET_DELTA_MAX_RECORDS {
-        return Err(CliError::cli_other_error(format!(
+        return Err(PullError::Transient(CliError::cli_other_error(format!(
             "budget delta response contains {record_count} records, maximum is {BUDGET_DELTA_MAX_RECORDS}"
-        )));
+        ))));
     }
+    round.charge_page(record_count as u64)?;
 
     let usage_records = response
         .records
@@ -456,8 +531,10 @@ pub(crate) fn import_budget_delta_response(
         .mutation_events
         .iter()
         .map(budget_mutation_record_from_view)
-        .collect::<Result<Vec<_>, _>>()?;
-    store.import_snapshot_records(&usage_records, &mutation_records)?;
+        .collect::<Result<Vec<_>, CliError>>()?;
+    store
+        .import_snapshot_records(&usage_records, &mutation_records)
+        .map_err(CliError::from)?;
 
     let previous_cursor_seq = current_cursor
         .as_ref()
@@ -481,6 +558,17 @@ pub(crate) fn import_budget_delta_response(
     let cursor_advanced = next_cursor
         .as_ref()
         .is_some_and(|cursor| cursor.seq > previous_cursor_seq);
+    // Fail-closed: a non-empty page (records or mutation events) that does not
+    // advance the merged cursor past the caller's position is a replaying or
+    // buggy peer, not a continuation. Drop the old
+    // `!mutation_events.is_empty()` escape hatch (RFC-0011 D1, F15).
+    if !cursor_advanced {
+        let page_max_seq = next_cursor.as_ref().map(|cursor| cursor.seq).unwrap_or(0);
+        return Err(PullError::Protocol(PeerProtocolError::NonAdvancingPage {
+            after_seq: previous_cursor_seq,
+            page_max_seq,
+        }));
+    }
     let applied_count = if mutation_records.is_empty() {
         usage_records.len()
     } else {
@@ -490,7 +578,7 @@ pub(crate) fn import_budget_delta_response(
     Ok(BudgetDeltaImportOutcome {
         applied_count,
         next_cursor,
-        should_continue: !response.mutation_events.is_empty() || cursor_advanced,
+        should_continue: cursor_advanced,
     })
 }
 
@@ -498,11 +586,12 @@ fn sync_peer_lineage(
     state: &TrustServiceState,
     client: &TrustControlClient,
     peer_url: &str,
-) -> Result<u64, CliError> {
+    round: &mut PullRoundBudget,
+) -> Result<u64, PullError> {
     let Some(path) = state.config.receipt_db_path.as_deref() else {
         return Ok(0);
     };
-    let mut store = SqliteReceiptStore::open(path)?;
+    let mut store = SqliteReceiptStore::open(path).map_err(CliError::from)?;
     let mut applied = 0u64;
     loop {
         let after_seq = peer_lineage_seq(state, peer_url);
@@ -513,12 +602,20 @@ fn sync_peer_lineage(
         if response.records.is_empty() {
             break;
         }
+        round.charge_page(response.records.len() as u64)?;
+        let page_max_seq = response
+            .records
+            .iter()
+            .map(|record| record.seq)
+            .max()
+            .unwrap_or(after_seq);
+        ensure_seq_advanced(after_seq, page_max_seq)?;
         let mut last_seq = after_seq;
         for record in response.records {
             store
                 .upsert_capability_snapshot(&record.snapshot)
                 .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-            last_seq = record.seq;
+            last_seq = last_seq.max(record.seq);
             applied = applied.saturating_add(1);
         }
         update_peer_lineage_seq(state, peer_url, last_seq);

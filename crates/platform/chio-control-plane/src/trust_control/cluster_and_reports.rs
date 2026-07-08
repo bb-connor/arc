@@ -1168,7 +1168,9 @@ mod cluster_and_reports_tests {
             mutation_events: Vec::new(),
         };
 
-        let outcome = import_budget_delta_response(&mut store, &response, None).test_unwrap();
+        let outcome =
+            import_budget_delta_response(&mut store, &response, None, &mut PullRoundBudget::new())
+                .test_unwrap();
         assert_eq!(outcome.applied_count, 1);
         assert!(outcome.should_continue);
         assert_eq!(outcome.next_cursor.test_unwrap().seq, 42);
@@ -1206,11 +1208,60 @@ mod cluster_and_reports_tests {
             mutation_events: Vec::new(),
         };
 
-        let result = import_budget_delta_response(&mut store, &response, None);
-        let Err(error) = result else {
-            panic!("oversized peer budget deltas should fail closed");
+        let result =
+            import_budget_delta_response(&mut store, &response, None, &mut PullRoundBudget::new());
+        let Err(PullError::Transient(error)) = result else {
+            panic!("oversized peer budget deltas should fail closed as a transient error");
         };
         assert!(error.to_string().contains("budget delta response contains"));
+    }
+
+    #[test]
+    fn budget_puller_rejects_non_advancing_page() {
+        let budget_db = unique_temp_path("cluster-non-advancing-budget-delta", "sqlite3");
+        let mut store = SqliteBudgetStore::open(&budget_db).test_unwrap();
+        // A non-empty page whose cursor does not advance past the caller's
+        // current cursor is a peer protocol violation, not a continuation.
+        let cursor = BudgetCursor {
+            seq: 40,
+            updated_at: 10,
+            capability_id: "cap-x".to_string(),
+            grant_index: 0,
+        };
+        let response = BudgetDeltaResponse {
+            records: Vec::new(),
+            mutation_events: vec![BudgetMutationEventView {
+                event_id: "evt-stuck".to_string(),
+                hold_id: None,
+                capability_id: "cap-x".to_string(),
+                grant_index: 0,
+                kind: "authorize_exposure".to_string(),
+                allowed: Some(true),
+                recorded_at: 11,
+                event_seq: 40, // equal to the cursor: does not advance
+                usage_seq: Some(40),
+                exposure_units: 1,
+                realized_spend_units: 0,
+                max_invocations: None,
+                max_cost_per_invocation: None,
+                max_total_cost_units: None,
+                invocation_count_after: 1,
+                total_cost_exposed_after: 1,
+                total_cost_realized_spend_after: 0,
+                authority: None,
+            }],
+        };
+        let mut round = PullRoundBudget::new();
+        let result = import_budget_delta_response(&mut store, &response, Some(cursor), &mut round);
+        assert!(
+            matches!(
+                result,
+                Err(PullError::Protocol(
+                    PeerProtocolError::NonAdvancingPage { .. }
+                ))
+            ),
+            "a non-advancing non-empty budget page must be a protocol violation"
+        );
     }
 
     #[test]
