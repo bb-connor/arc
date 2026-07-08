@@ -29,10 +29,6 @@ use serde_json::json;
 #[path = "../src/kernel/signing_task.rs"]
 pub(crate) mod signing_task;
 
-#[allow(dead_code)]
-#[path = "../src/observability/metrics.rs"]
-mod metrics;
-
 const KERNEL_SEED: [u8; 32] = [
     0x91, 0x82, 0x73, 0x64, 0x55, 0x46, 0x37, 0x28, 0x19, 0x0A, 0xB1, 0xC2, 0xD3, 0xE4, 0xF5, 0x06,
     0x17, 0x28, 0x39, 0x4A, 0x5B, 0x6C, 0x7D, 0x8E, 0x9F, 0xA0, 0xB1, 0xC2, 0xD3, 0xE4, 0xF5, 0x06,
@@ -140,7 +136,7 @@ fn rendered_signing_queue_block_total() -> Result<u64, String> {
     // F82); a full bounded channel records reason="channel_full". An absent
     // series means zero blocks so far (the runtime family only renders series
     // that exist).
-    let body = metrics::render_guard_metrics_prometheus();
+    let body = chio_kernel::render_guard_metrics_prometheus();
     match body.lines().find_map(|line| {
         line.strip_prefix("chio_signing_queue_block_total{reason=\"channel_full\"} ")
             .map(str::parse::<u64>)
