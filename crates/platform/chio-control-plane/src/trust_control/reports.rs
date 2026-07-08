@@ -1,4 +1,5 @@
 use super::*;
+use chio_kernel::operator_report::ComptrollerSurfaceReport;
 
 #[derive(Default)]
 pub(crate) struct ResolvedBudgetGrant {
@@ -51,6 +52,27 @@ pub(crate) fn build_operator_report(
         authorization_context,
         shared_evidence,
     })
+}
+
+/// Compose the unified comptroller surface projection from the operator + exposure read models.
+/// Fail-closed: exposure-builder errors and consistency-validation failures map to 5xx, never 200.
+pub(crate) fn build_comptroller_surface_report(
+    receipt_store: &SqliteReceiptStore,
+    budget_store: &SqliteBudgetStore,
+    query: &OperatorReportQuery,
+) -> Result<ComptrollerSurfaceReport, Response> {
+    let operator = build_operator_report(receipt_store, budget_store, query)?;
+    let exposure = build_exposure_ledger_report(receipt_store, &query.to_exposure_ledger_query())
+        .map_err(|error| error.into_response())?;
+    let report = ComptrollerSurfaceReport::from_parts(&operator, &exposure);
+    report.validate_consistency().map_err(|message| {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            format!("comptroller surface consistency check failed: {message}"),
+        )
+            .into_response()
+    })?;
+    Ok(report)
 }
 
 pub fn build_signed_behavioral_feed(

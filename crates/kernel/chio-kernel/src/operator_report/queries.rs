@@ -75,6 +75,24 @@ impl OperatorReportQuery {
         }
     }
 
+    /// Project the shared operator filters into an exposure-ledger query.
+    ///
+    /// ExposureLedgerQuery has exactly eight fields (verified: chio-credit lib.rs:116);
+    /// construct all of them explicitly so this does not depend on a Default impl.
+    #[must_use]
+    pub fn to_exposure_ledger_query(&self) -> chio_credit::ExposureLedgerQuery {
+        chio_credit::ExposureLedgerQuery {
+            capability_id: self.capability_id.clone(),
+            agent_subject: self.agent_subject.clone(),
+            tool_server: self.tool_server.clone(),
+            tool_name: self.tool_name.clone(),
+            since: self.since,
+            until: self.until,
+            receipt_limit: None,
+            decision_limit: None,
+        }
+    }
+
     #[must_use]
     pub fn to_cost_attribution_query(&self) -> CostAttributionQuery {
         CostAttributionQuery {
@@ -309,5 +327,25 @@ impl SharedEvidenceQuery {
     #[must_use]
     pub fn limit_or_default(&self) -> usize {
         self.limit.unwrap_or(50).clamp(1, MAX_SHARED_EVIDENCE_LIMIT)
+    }
+}
+
+#[cfg(test)]
+mod exposure_query_tests {
+    use super::*;
+
+    #[test]
+    fn to_exposure_ledger_query_threads_shared_filters() {
+        let query = OperatorReportQuery {
+            agent_subject: Some("subject-hex".to_string()),
+            tool_server: Some("shell".to_string()),
+            tool_name: Some("bash".to_string()),
+            since: Some(10),
+            until: Some(99),
+            ..OperatorReportQuery::default()
+        };
+        let exposure = query.to_exposure_ledger_query();
+        assert_eq!(exposure.agent_subject.as_deref(), Some("subject-hex"));
+        assert_eq!(exposure.tool_server.as_deref(), Some("shell"));
     }
 }
