@@ -283,15 +283,12 @@ impl ChioKernel {
             return Ok(());
         };
 
-        // Fail-closed rail-mandate gate (ADR/house rule; Direction C adversarial fix).
         // A governed intent that mandates prepayment must not execute unless a
-        // payment adapter is configured to prepay it. This fires for EVERY
+        // payment adapter is configured to prepay it. The gate fires for every
         // MustPrepay intent regardless of charge_result, so it cannot be bypassed
         // by the charge_result == None early-return in authorize_payment_if_needed.
-        // v1 decision: the gate is charge-independent; the authorized amount stays
-        // charge.cost_charged and the charge currency is already checked below
-        // against quote.quoted_cost.currency. Binding the authorized amount itself
-        // to quote.quoted_cost is a documented deferred refinement.
+        // It is charge-independent: the charge currency is checked below against
+        // quote.quoted_cost.currency.
         if metered.settlement_mode
             == chio_core::capability::governance::MeteredSettlementMode::MustPrepay
             && !payment_adapter_configured
