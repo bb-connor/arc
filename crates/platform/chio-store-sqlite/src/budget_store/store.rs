@@ -107,6 +107,19 @@ impl SqliteBudgetStore {
         })
     }
 
+    /// Highest budget mutation event_seq, or 0 when empty. Mirrors the private
+    /// max_budget_mutation_event_seq helper (replication.rs) but is a public
+    /// head read for the status path (RFC-0011 D4).
+    pub fn max_mutation_event_seq(&self) -> Result<u64, BudgetStoreError> {
+        let connection = self.connection()?;
+        let seq: i64 = connection.query_row(
+            "SELECT COALESCE(MAX(event_seq), 0) FROM budget_mutation_events",
+            [],
+            |row| row.get(0),
+        )?;
+        Ok(seq.max(0) as u64)
+    }
+
     pub fn upsert_usage(&self, record: &BudgetUsageRecord) -> Result<(), BudgetStoreError> {
         let mut connection = self.connection()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;

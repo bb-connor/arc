@@ -1494,3 +1494,15 @@ fn budget_store_zero_cost_invocation_succeeds_and_records_zero_sqlite() {
     assert_usage_totals(&records[0], 0, 0);
     let _ = fs::remove_file(path);
 }
+
+#[test]
+fn max_mutation_event_seq_reports_head() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-budget-head");
+    let store = SqliteBudgetStore::open(&path)?;
+    assert_eq!(store.max_mutation_event_seq()?, 0);
+    // A single authorize charge allocates event_seq 1.
+    store.try_charge_cost("cap-a", 0, Some(5), 3, None, None)?;
+    assert_eq!(store.max_mutation_event_seq()?, 1);
+    let _ = fs::remove_file(&path);
+    Ok(())
+}
