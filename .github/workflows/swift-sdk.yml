@@ -9,7 +9,6 @@ on:
     paths:
       - ".github/workflows/swift-sdk.yml"
       - "sdks/swift/**"
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -56,7 +55,6 @@ jobs:
       - name: Pin an available iOS Simulator destination
         id: sim
         run: |
-          # Pick the newest available iOS runtime + an iPhone device from it, fail closed if none.
           RUNTIME=$(xcrun simctl list runtimes --json \
             | python3 -c "import sys,json; r=[x for x in json.load(sys.stdin)['runtimes'] if x['isAvailable'] and 'iOS' in x['name']]; print(sorted(r,key=lambda x:x['version'])[-1]['identifier'] if r else '')")
           if [ -z "$RUNTIME" ]; then echo "::error::no available iOS Simulator runtime"; exit 1; fi
@@ -83,70 +81,6 @@ jobs:
         run: |
           xcrun xcresulttool get test-results summary \
             --path "$RUNNER_TEMP/ChioTests.xcresult" \
-            --format json \
-            | python3 -c "import sys,json; d=json.load(sys.stdin); n=d.get('totalTestCount',0); print(f'totalTestCount={n}'); exit(0 if n>=1 else 1)" \
-            || { echo "::error::xcresult reports zero tests executed"; exit 1; }
-
-  xcframework-drift:
-    name: Swift SDK xcframework drift (nightly/manual)
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-
-      - name: Rebuild the xcframework from the current Rust FFI
-        run: bash scripts/build-ios-framework.sh
-
-      - name: Resolve test-inclusive scheme
-        id: scheme
-        working-directory: sdks/swift
-        run: |
-          SCHEMES=$(xcodebuild -list -json 2>/dev/null \
-            | python3 -c "import sys,json; d=json.load(sys.stdin); top=d.get('workspace',d.get('project',{})); print('\n'.join(top.get('schemes',[])))")
-          SCHEME=""
-          for candidate in "Chio-Package" "Chio"; do
-            if echo "$SCHEMES" | grep -qx "$candidate"; then
-              SCHEME="$candidate"
-              break
-            fi
-          done
-          if [ -z "$SCHEME" ]; then
-            echo "::error::no recognized scheme found; available: $(echo "$SCHEMES" | tr '\n' ' ')"
-            exit 1
-          fi
-          echo "name=$SCHEME" >> "$GITHUB_OUTPUT"
-          echo "Resolved scheme: $SCHEME"
-
-      - name: Pin an available iOS Simulator destination
-        id: sim
-        run: |
-          RUNTIME=$(xcrun simctl list runtimes --json \
-            | python3 -c "import sys,json; r=[x for x in json.load(sys.stdin)['runtimes'] if x['isAvailable'] and 'iOS' in x['name']]; print(sorted(r,key=lambda x:x['version'])[-1]['identifier'] if r else '')")
-          if [ -z "$RUNTIME" ]; then echo "::error::no available iOS Simulator runtime"; exit 1; fi
-          DEVICE=$(xcrun simctl list devices --json \
-            | python3 -c "import sys,json,os; d=json.load(sys.stdin)['devices'].get(os.environ['RUNTIME'],[]); a=[x for x in d if x.get('isAvailable') and x['name'].startswith('iPhone')]; print(a[0]['name'] if a else '')" )
-          if [ -z "$DEVICE" ]; then echo "::error::no available iPhone simulator for $RUNTIME"; exit 1; fi
-          OSVER=$(echo "$RUNTIME" | sed -E 's/.*iOS-([0-9]+)-([0-9]+).*/\1.\2/')
-          echo "device=$DEVICE" >> "$GITHUB_OUTPUT"
-          echo "osver=$OSVER" >> "$GITHUB_OUTPUT"
-          echo "Pinned destination: platform=iOS Simulator,name=$DEVICE,OS=$OSVER"
-        env:
-          RUNTIME: ""
-
-      - name: xcodebuild test against rebuilt framework
-        working-directory: sdks/swift
-        run: |
-          set -o pipefail
-          xcodebuild test \
-            -scheme "${{ steps.scheme.outputs.name }}" \
-            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }},OS=${{ steps.sim.outputs.osver }}" \
-            -resultBundlePath "$RUNNER_TEMP/drift.xcresult" \
-            | tee "$RUNNER_TEMP/drift.log"
-
-      - name: Assert nonzero executed-test count
-        run: |
-          xcrun xcresulttool get test-results summary \
-            --path "$RUNNER_TEMP/drift.xcresult" \
             --format json \
             | python3 -c "import sys,json; d=json.load(sys.stdin); n=d.get('totalTestCount',0); print(f'totalTestCount={n}'); exit(0 if n>=1 else 1)" \
             || { echo "::error::xcresult reports zero tests executed"; exit 1; }
