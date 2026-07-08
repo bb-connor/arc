@@ -136,6 +136,26 @@ struct ReceiptCommitWriterHealth {
     inflight: AtomicU64,
     last_commit_unix_ms: AtomicU64,
     last_error: Mutex<Option<String>>,
+    // Verified-head snapshot, written only by the actor thread; read by
+    // flush_report / receipt_store_health / kernel counters (RFC-0006).
+    head_checkpoint_seq: AtomicU64,
+    head_checkpointed_entry_seq: AtomicU64,
+    head_claim_log_count: AtomicU64,
+    head_claim_log_max_seq: AtomicU64,
+}
+
+impl ReceiptCommitWriterHealth {
+    #[allow(dead_code)] // wired in the incremental append path (same PR)
+    fn store_head_snapshot(&self, head: &VerifiedHead) {
+        self.head_checkpoint_seq
+            .store(head.checkpoint_seq(), Ordering::SeqCst);
+        self.head_checkpointed_entry_seq
+            .store(head.checkpointed_entry_seq(), Ordering::SeqCst);
+        self.head_claim_log_count
+            .store(head.claim_log_count, Ordering::SeqCst);
+        self.head_claim_log_max_seq
+            .store(head.claim_log_max_seq, Ordering::SeqCst);
+    }
 }
 
 struct ReceiptCommitRequest {
@@ -477,6 +497,168 @@ fn atomic_saturating_sub(value: &AtomicU64, amount: u64) {
             Err(observed) => current = observed,
         }
     }
+}
+
+/// Last verified position of the receipt chain. Owned exclusively by the
+/// commit-actor thread; never shared, never locked (RFC-0006).
+#[derive(Clone, Debug, Default)]
+pub(crate) struct VerifiedHead {
+    /// The newest checkpoint the actor has verified, already parsed and
+    /// signature-checked once. `None` before the first checkpoint.
+    latest_checkpoint: Option<KernelCheckpoint>,
+    /// Row count of `claim_receipt_log_entries` as last verified.
+    claim_log_count: u64,
+    /// MAX(entry_seq) of `claim_receipt_log_entries` as last verified.
+    claim_log_max_seq: u64,
+}
+
+impl VerifiedHead {
+    pub(crate) fn checkpoint_seq(&self) -> u64 {
+        self.latest_checkpoint
+            .as_ref()
+            .map_or(0, |checkpoint| checkpoint.body.checkpoint_seq)
+    }
+
+    pub(crate) fn checkpointed_entry_seq(&self) -> u64 {
+        self.latest_checkpoint
+            .as_ref()
+            .map_or(0, |checkpoint| checkpoint.body.batch_end_seq)
+    }
+}
+
+/// Seed the verified head by running the existing FULL verification exactly
+/// once (the startup path for the O(N) check; also the audit-repair path).
+#[allow(dead_code)] // wired in the incremental append path (same PR)
+fn seed_verified_head(connection: &Connection) -> Result<VerifiedHead, ReceiptStoreError> {
+    validate_claim_receipt_log_entries(connection)?;
+    let latest_checkpoint = verify_checkpoint_chain_integrity(connection)?;
+    let (claim_log_count, claim_log_max_seq) = claim_log_delta_count_and_max_seq(connection, 0)?;
+    Ok(VerifiedHead {
+        latest_checkpoint,
+        claim_log_count,
+        claim_log_max_seq,
+    })
+}
+
+/// Cheap head snapshot for `incremental_verification = false` stores: the
+/// full per-append verification still runs on that path, so seeding only
+/// parses the single latest checkpoint row (one signature check) plus two
+/// aggregates. This keeps a suspect database openable for A/B verification.
+#[allow(dead_code)] // wired in the incremental append path (same PR)
+fn seed_head_snapshot(connection: &Connection) -> Result<VerifiedHead, ReceiptStoreError> {
+    let latest_checkpoint = load_latest_persisted_checkpoint_row(connection)?
+        .map(parse_persisted_checkpoint_row)
+        .transpose()?;
+    let (claim_log_count, claim_log_max_seq) = claim_log_delta_count_and_max_seq(connection, 0)?;
+    Ok(VerifiedHead {
+        latest_checkpoint,
+        claim_log_count,
+        claim_log_max_seq,
+    })
+}
+
+/// COUNT/MAX over `entry_seq > floor_entry_seq`: an indexed range scan over
+/// the delta only (O(b)). An unscoped COUNT(*) would rescan the whole index
+/// and reintroduce O(N). Returns `(delta_count, max_entry_seq)` where the max
+/// falls back to `floor_entry_seq` for an empty delta.
+fn claim_log_delta_count_and_max_seq(
+    connection: &Connection,
+    floor_entry_seq: u64,
+) -> Result<(u64, u64), ReceiptStoreError> {
+    let floor = sqlite_i64(floor_entry_seq, "claim log delta floor entry_seq")?;
+    let (count, max_seq) = connection.query_row(
+        "SELECT COUNT(*), COALESCE(MAX(entry_seq), ?1) FROM claim_receipt_log_entries WHERE entry_seq > ?1",
+        params![floor],
+        |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+    )?;
+    Ok((
+        sqlite_u64(count, "claim log delta count")?,
+        sqlite_u64(max_seq, "claim log delta max entry_seq")?,
+    ))
+}
+
+/// O(1) predecessor check: the persisted latest checkpoint must still match
+/// the verified head (one indexed row read + RFC 8785 canonical body digest
+/// compare). When the persisted chain has moved FORWARD, verify only the new
+/// checkpoints (bounded catch-up); every other divergence is a fail-closed
+/// `Conflict` pointing at `chio receipt audit`.
+#[allow(dead_code)] // wired in the incremental append path (same PR)
+fn verify_head_against_latest_checkpoint(
+    connection: &Connection,
+    head: &mut VerifiedHead,
+) -> Result<(), ReceiptStoreError> {
+    let persisted = load_latest_persisted_checkpoint_row(connection)?;
+    let cached_seq = head.checkpoint_seq();
+    match persisted {
+        None if head.latest_checkpoint.is_none() => Ok(()),
+        None => Err(ReceiptStoreError::Conflict(
+            "latest checkpoint disappeared behind the verified head; run `chio receipt audit`"
+                .to_string(),
+        )),
+        Some(row) if row.checkpoint_seq < cached_seq => Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint chain regressed from verified head {cached_seq} to {}; run `chio receipt audit`",
+            row.checkpoint_seq
+        ))),
+        Some(row) if row.checkpoint_seq == cached_seq => {
+            let Some(cached) = head.latest_checkpoint.as_ref() else {
+                return Err(ReceiptStoreError::Conflict(
+                    "checkpoint presence diverged from verified head; run `chio receipt audit`"
+                        .to_string(),
+                ));
+            };
+            // Body-only deserialize: parse_persisted_checkpoint_row would run
+            // chio_kernel::checkpoint::validate_checkpoint and re-verify the
+            // signature, putting one Ed25519 verify back on every append. The
+            // cached head was signature-checked at seed time.
+            let persisted_body: KernelCheckpointBody = serde_json::from_str(&row.statement_json)?;
+            let persisted_digest = chio_kernel::checkpoint::checkpoint_body_sha256(&persisted_body)
+                .map_err(checkpoint_error_to_receipt_store)?;
+            let cached_digest = chio_kernel::checkpoint::checkpoint_body_sha256(&cached.body)
+                .map_err(checkpoint_error_to_receipt_store)?;
+            if persisted_digest == cached_digest {
+                Ok(())
+            } else {
+                Err(ReceiptStoreError::Conflict(
+                    "latest checkpoint diverged from verified head; run `chio receipt audit`"
+                        .to_string(),
+                ))
+            }
+        }
+        Some(row) => catch_up_verified_head_to(connection, head, row.checkpoint_seq),
+    }
+}
+
+/// Verify and adopt checkpoints `head.checkpoint_seq()+1 ..= latest_seq`.
+/// O(new checkpoints): each row is parsed (one signature check), predecessor-
+/// linked to the cached head, and range-checked against the claim log. Used
+/// when another writer instance (second kernel on the same file, operator
+/// CLI) legitimately extended the chain.
+fn catch_up_verified_head_to(
+    connection: &Connection,
+    head: &mut VerifiedHead,
+    latest_seq: u64,
+) -> Result<(), ReceiptStoreError> {
+    let mut cursor = head.checkpoint_seq();
+    while cursor < latest_seq {
+        let next_seq = cursor.saturating_add(1);
+        let Some(row) = load_persisted_checkpoint_row(connection, next_seq)? else {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "checkpoint chain gap at {next_seq} behind latest {latest_seq}; run `chio receipt audit`"
+            )));
+        };
+        let checkpoint = parse_persisted_checkpoint_row(row)?;
+        match head.latest_checkpoint.as_ref() {
+            Some(predecessor) => {
+                chio_kernel::checkpoint::validate_checkpoint_predecessor(predecessor, &checkpoint)
+                    .map_err(checkpoint_error_to_receipt_store)?;
+            }
+            None => validate_checkpoint_base(&checkpoint)?,
+        }
+        validate_checkpoint_against_claim_log(connection, &checkpoint)?;
+        head.latest_checkpoint = Some(checkpoint);
+        cursor = next_seq;
+    }
+    Ok(())
 }
 
 fn append_receipt_batch(

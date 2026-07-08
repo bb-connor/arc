@@ -321,7 +321,9 @@ pub(crate) fn verify_checkpoint_chain_integrity(
     Ok(latest)
 }
 
-fn validate_checkpoint_base(checkpoint: &KernelCheckpoint) -> Result<(), ReceiptStoreError> {
+pub(crate) fn validate_checkpoint_base(
+    checkpoint: &KernelCheckpoint,
+) -> Result<(), ReceiptStoreError> {
     if checkpoint.body.checkpoint_seq != 1 {
         return Err(ReceiptStoreError::Conflict(format!(
             "first checkpoint in store must have checkpoint_seq 1, got {}",
@@ -685,7 +687,7 @@ fn expected_checkpoint_projection_rows(
     Ok((head, witness, publication))
 }
 
-fn validate_checkpoint_projection_rows(
+pub(crate) fn validate_checkpoint_projection_rows(
     connection: &Connection,
     row: &PersistedCheckpointRow,
     checkpoint: &KernelCheckpoint,

@@ -18,3 +18,5 @@ mod single_writer;
 mod support;
 #[path = "tests/underwriting_credit.rs"]
 mod underwriting_credit;
+#[path = "tests/verified_head.rs"]
+mod verified_head;
