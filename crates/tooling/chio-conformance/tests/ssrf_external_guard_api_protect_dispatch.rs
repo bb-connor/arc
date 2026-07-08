@@ -196,6 +196,11 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_link_local() {
         sidecar_control_token: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        control_url: None,
+        control_token: None,
+        budget_db: None,
+        require_nonce: false,
+        allow_advisory: false,
     };
     let proxy_task = tokio::spawn(async move { ProtectProxy::new(config).run().await });
     let client = reqwest::Client::builder()
@@ -246,6 +251,11 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_loopback_authority() {
         sidecar_control_token: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        control_url: None,
+        control_token: None,
+        budget_db: None,
+        require_nonce: false,
+        allow_advisory: false,
     };
     let proxy_task = tokio::spawn(async move { ProtectProxy::new(config).run().await });
     let client = reqwest::Client::builder()
@@ -300,6 +310,11 @@ async fn api_protect_upstream_proxy_rejects_oversized_response() {
         sidecar_control_token: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        control_url: None,
+        control_token: None,
+        budget_db: None,
+        require_nonce: false,
+        allow_advisory: false,
     };
     let proxy_task = tokio::spawn(async move { ProtectProxy::new(config).run().await });
     let client = reqwest::Client::builder()

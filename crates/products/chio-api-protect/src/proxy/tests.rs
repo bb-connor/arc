@@ -2984,7 +2984,6 @@ async fn advisory_route_is_non_authorizing_when_advisory_disabled() {
     // R5: advisory is off by default; production stops emitting advisory
     // receipts that agents could skip the sidecar with.
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-    // test_state builds allow_advisory=false by default (Step 3).
     let payload = serde_json::json!({
         "capability_id": "cap-x", "tool_server": "fs",
         "tool_name": "read_file", "parameters": {}

@@ -178,6 +178,11 @@ pub(crate) fn cmd_api_protect(
             sidecar_control_token,
             signer_seed_hex,
             trusted_capability_issuers,
+            control_url: None,
+            control_token: None,
+            budget_db: None,
+            require_nonce: false,
+            allow_advisory: false,
         };
         ProtectProxy::new(config).run().await.map_err(|error| {
             CliError::transport_error(format!("failed to start chio api protect: {error}"))
@@ -240,6 +245,11 @@ pub(crate) fn cmd_start(
             sidecar_control_token,
             signer_seed_hex,
             trusted_capability_issuers,
+            control_url: None,
+            control_token: None,
+            budget_db: None,
+            require_nonce: false,
+            allow_advisory: false,
         };
 
         ProtectProxy::new(config)
