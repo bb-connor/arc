@@ -125,7 +125,7 @@ tee-quotes = ["chio-attest-verify/tee-quotes"]
 # RUSTSEC-2026-0194 / 0195 chain, deny.toml:62-71). It does NOT remove iroh from
 # `cargo build --workspace` / `cargo test --workspace`: chio-federation-transport-iroh
 # stays a workspace member (root Cargo.toml:85) and a chio-conformance dev-dep
-# (crates/tooling/chio-conformance/Cargo.toml:189-190). Containment, not removal.
+# (crates/tooling/chio-conformance/Cargo.toml). Containment, not removal.
 iroh = ["dep:chio-federation-transport-iroh", "dep:iroh"]
 
 [lints]

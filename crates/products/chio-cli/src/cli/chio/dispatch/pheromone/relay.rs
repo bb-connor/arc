@@ -480,38 +480,24 @@ pub(crate) fn cmd_chio_pheromone_relay_tick(
             max_batches,
         )?
     } else {
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|error| CliError::cli_other_error(format!("Chio relay runtime: {error}")))?;
-        runtime
-            .block_on(chio_pheromone_relay::deliver_due_batches(
-                &relay_store,
-                peer_directory,
-                keypair,
-                &sender_kernel_id,
-                now_unix_ms,
-                max_batches,
-            ))
-            .map_err(|error| CliError::cli_other_error(format!("Chio relay tick: {error}")))?
+        deliver_http_tick(
+            &relay_store,
+            peer_directory,
+            keypair,
+            &sender_kernel_id,
+            now_unix_ms,
+            max_batches,
+        )?
     };
     #[cfg(not(feature = "iroh"))]
-    let tick_report = {
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|error| CliError::cli_other_error(format!("Chio relay runtime: {error}")))?;
-        runtime
-            .block_on(chio_pheromone_relay::deliver_due_batches(
-                &relay_store,
-                peer_directory,
-                keypair,
-                &sender_kernel_id,
-                now_unix_ms,
-                max_batches,
-            ))
-            .map_err(|error| CliError::cli_other_error(format!("Chio relay tick: {error}")))?
-    };
+    let tick_report = deliver_http_tick(
+        &relay_store,
+        peer_directory,
+        keypair,
+        &sender_kernel_id,
+        now_unix_ms,
+        max_batches,
+    )?;
     let json = serde_json::to_string_pretty(&tick_report)
         .map_err(|error| CliError::cli_other_error(format!("Chio relay report: {error}")))?;
     write_json_string(report, &format!("{json}\n"))?;
@@ -524,6 +510,30 @@ pub(crate) fn cmd_chio_pheromone_relay_tick(
         )?;
     }
     Ok(())
+}
+
+fn deliver_http_tick(
+    relay_store: &chio_pheromone_relay::SqlitePheromoneRelayStore,
+    peer_directory: chio_pheromone_relay::PeerDirectory,
+    keypair: chio_core::crypto::Keypair,
+    sender_kernel_id: &str,
+    now_unix_ms: u64,
+    max_batches: usize,
+) -> Result<chio_pheromone_relay::RelayTickReport, CliError> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| CliError::cli_other_error(format!("Chio relay runtime: {error}")))?;
+    runtime
+        .block_on(chio_pheromone_relay::deliver_due_batches(
+            relay_store,
+            peer_directory,
+            keypair,
+            sender_kernel_id,
+            now_unix_ms,
+            max_batches,
+        ))
+        .map_err(|error| CliError::cli_other_error(format!("Chio relay tick: {error}")))
 }
 
 /// Fail-closed guard for builds without the `iroh` cargo feature. When the operator
