@@ -21,3 +21,4 @@ include!("tests/memory_provenance.rs");
 include!("tests/federation_cosign.rs");
 include!("tests/chio_runtime.rs");
 include!("tests/formal_closure.rs");
+include!("tests/sim_payment.rs");

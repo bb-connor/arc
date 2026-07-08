@@ -1,0 +1,272 @@
+// End-to-end kernel coverage for the sim payment adapter.
+//
+// Included by `src/kernel/tests.rs`; imports resolve through the surrounding
+// `kernel::tests` scope. All helpers from `tests/support.rs` and
+// `tests/support_monetary.rs` are in scope.
+
+use chio_core::capability::governance::{
+    MeteredBillingContext, MeteredBillingQuote, MeteredSettlementMode,
+};
+
+fn make_mustprepay_intent(
+    id: &str,
+    server: &str,
+    tool: &str,
+    max_units: u64,
+    currency: &str,
+) -> GovernedTransactionIntent {
+    let now = current_unix_timestamp();
+    GovernedTransactionIntent {
+        id: id.to_string(),
+        server_id: server.to_string(),
+        tool_name: tool.to_string(),
+        purpose: "prepaid invocation".to_string(),
+        max_amount: Some(MonetaryAmount {
+            units: max_units,
+            currency: currency.to_string(),
+        }),
+        commerce: None,
+        metered_billing: Some(MeteredBillingContext {
+            settlement_mode: MeteredSettlementMode::MustPrepay,
+            quote: MeteredBillingQuote {
+                quote_id: format!("q-{id}"),
+                provider: "billing.chio".to_string(),
+                billing_unit: "1k_tokens".to_string(),
+                quoted_units: 10,
+                quoted_cost: MonetaryAmount {
+                    units: max_units,
+                    currency: currency.to_string(),
+                },
+                issued_at: now.saturating_sub(5),
+                expires_at: Some(now + 300),
+            },
+            max_billed_units: Some(15),
+        }),
+        runtime_attestation: None,
+        call_chain: None,
+        autonomy: None,
+        context: None,
+    }
+}
+
+struct MustPrepayFixture {
+    kernel: ChioKernel,
+    cap: CapabilityToken,
+    agent_kp: Keypair,
+}
+
+fn build_mustprepay_fixture(cost: u64) -> MustPrepayFixture {
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", cost, "USD")));
+    let agent_kp = Keypair::generate();
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50);
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    MustPrepayFixture { kernel, cap, agent_kp }
+}
+
+fn mustprepay_tool_call(
+    request_id: &str,
+    cap: &CapabilityToken,
+    agent_kp: &Keypair,
+    intent: GovernedTransactionIntent,
+    kernel: &ChioKernel,
+) -> ToolCallRequest {
+    let approval_token = make_governed_approval_token(
+        &kernel.config.keypair,
+        &agent_kp.public_key(),
+        &intent,
+        request_id,
+    );
+    ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability: cap.clone(),
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: Some(intent),
+        approval_token: Some(approval_token),
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    }
+}
+
+fn expect_financial_meta(response: &ToolCallResponse) -> &serde_json::Value {
+    response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|m| m.get("financial"))
+        .expect("response must carry financial metadata")
+}
+
+// sim authorize -> capture -> receipt fold stamps a sim-* payment reference.
+#[test]
+fn sim_adapter_settles_governed_mustprepay_onto_receipt() {
+    let MustPrepayFixture { mut kernel, cap, agent_kp } = build_mustprepay_fixture(75);
+    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
+
+    let intent =
+        make_mustprepay_intent("intent-sim-settle", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-sim-settle", &cap, &agent_kp, intent, &kernel);
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    assert_eq!(response.verdict, Verdict::Allow);
+    let financial = expect_financial_meta(&response);
+    let payment_reference = financial["payment_reference"]
+        .as_str()
+        .expect("settled receipt must carry payment_reference");
+    assert!(
+        payment_reference.starts_with("sim-"),
+        "payment_reference must be a sim- id; got {payment_reference}"
+    );
+    let status = financial["settlement_status"].as_str().unwrap_or("");
+    assert!(
+        status == "settled" || status == "pending",
+        "settlement_status must be settled or pending; got {status}"
+    );
+}
+
+// MustPrepay with no adapter configured denies fail-closed.
+#[test]
+fn governed_mustprepay_without_adapter_is_denied_end_to_end() {
+    let MustPrepayFixture { kernel, cap, agent_kp } = build_mustprepay_fixture(75);
+    // no adapter set
+
+    let intent =
+        make_mustprepay_intent("intent-sim-deny", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-sim-deny", &cap, &agent_kp, intent, &kernel);
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    let reason = response.reason.as_deref().unwrap_or("");
+    assert!(
+        reason.contains("MustPrepay"),
+        "denial must mention MustPrepay; got: {reason}"
+    );
+}
+
+// sim authorize -> zero actual cost -> release path; receipt carries sim- reference.
+//
+// The server reports cost=0. The pre-authorized hold is released rather than
+// captured. RailSettlementStatus::Released maps to SettlementStatus::Settled.
+#[test]
+fn sim_adapter_zero_cost_releases_cleanly() {
+    let MustPrepayFixture { mut kernel, cap, agent_kp } = build_mustprepay_fixture(0);
+    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
+
+    let intent =
+        make_mustprepay_intent("intent-sim-zero", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-sim-zero", &cap, &agent_kp, intent, &kernel);
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    assert_eq!(response.verdict, Verdict::Allow);
+    let financial = expect_financial_meta(&response);
+    let payment_reference = financial["payment_reference"]
+        .as_str()
+        .expect("zero-cost receipt must carry payment_reference from authorize");
+    assert!(
+        payment_reference.starts_with("sim-"),
+        "zero-cost payment_reference must be a sim- id; got {payment_reference}"
+    );
+    // Released -> Settled in the kernel's settlement vocabulary.
+    assert_eq!(
+        financial["settlement_status"].as_str().unwrap_or(""),
+        "settled",
+        "zero-cost call must produce settled status after release"
+    );
+    assert_eq!(
+        financial["cost_charged"].as_u64().unwrap_or(u64::MAX),
+        0,
+        "zero-cost call must record cost_charged=0"
+    );
+}
+
+// Abort after monetary admission unwinds the authorization via release.
+//
+// A MustPrepay request admitted past the payment authorization point is
+// aborted mid-tool-execution. unwind_aborted_monetary_invocation must call
+// adapter.release() (authorization not yet settled) and reverse the budget hold.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn sim_adapter_abort_unwinds_authorization() {
+    let started = std::sync::Arc::new(tokio::sync::Notify::new());
+    let payment = TrackingPaymentAdapter::new();
+
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel.register_tool_server(Box::new(PendingMonetaryServer {
+        id: "cost-srv".to_string(),
+        started: std::sync::Arc::clone(&started),
+    }));
+
+    let agent_kp = Keypair::generate();
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50);
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let intent =
+        make_mustprepay_intent("intent-sim-abort", "cost-srv", "compute", 100, "USD");
+    let approval_token = make_governed_approval_token(
+        &kernel.config.keypair,
+        &agent_kp.public_key(),
+        &intent,
+        "req-sim-abort",
+    );
+    let request = ToolCallRequest {
+        request_id: "req-sim-abort".to_string(),
+        capability: cap.clone(),
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: Some(intent),
+        approval_token: Some(approval_token),
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    };
+
+    let kernel = std::sync::Arc::new(kernel);
+    let eval = {
+        let kernel = std::sync::Arc::clone(&kernel);
+        tokio::spawn(async move { kernel.evaluate_tool_call(&request).await })
+    };
+
+    tokio::time::timeout(Duration::from_secs(1), started.notified())
+        .await
+        .expect("pending tool should be invoked before abort");
+    eval.abort();
+    let join = eval.await.expect_err("aborted evaluation should not complete");
+    assert!(join.is_cancelled());
+
+    // Budget hold reversed after abort.
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    assert_eq!(usage.invocation_count, 0);
+    assert_eq!(usage.committed_cost_units().unwrap(), 0);
+
+    // authorize was called once; the unsettled hold was released, not refunded.
+    assert_eq!(
+        payment.authorized.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "adapter.authorize() must have been called once"
+    );
+    assert_eq!(
+        payment.released.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "adapter.release() must have been called to unwind the unsettled authorization"
+    );
+    assert_eq!(
+        payment.refunded.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "adapter.refund() must not be called for an unsettled authorization"
+    );
+}
