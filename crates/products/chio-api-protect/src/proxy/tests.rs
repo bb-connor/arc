@@ -212,6 +212,8 @@ fn test_state_with_receipt_db(
         trusted_capability_issuers,
         trusted_receipt_signers,
         sidecar_control_token: None,
+        budget_store: None,
+        mediation_kernel: None,
     })
 }
 

@@ -1,4 +1,5 @@
 use super::*;
+use super::mediated;
 
 /// Stored receipts for inspection and querying.
 pub(crate) struct ReceiptLog {
@@ -149,6 +150,8 @@ pub(crate) struct ProxyState {
     pub(crate) trusted_capability_issuers: Vec<PublicKey>,
     pub(crate) trusted_receipt_signers: Vec<PublicKey>,
     pub(crate) sidecar_control_token: Option<String>,
+    pub(crate) budget_store: Option<Arc<dyn chio_kernel::budget_store::BudgetStore>>,
+    pub(crate) mediation_kernel: Option<Arc<chio_kernel::ChioKernel>>,
 }
 
 /// The protect proxy.
@@ -285,6 +288,18 @@ impl ProtectProxy {
 
         let egress_contract = default_upstream_egress_contract(&self.config.upstream)?;
         let http_client = client_builder_with_contract(&egress_contract).build()?;
+        let budget_store = build_budget_store(&self.config)?;
+        let mediation_kernel = match budget_store.as_ref() {
+            Some(store) => Some(build_mediation_kernel(
+                &keypair,
+                Arc::clone(store),
+                self.config.require_nonce,
+                vec![Box::new(mediated::MediatedProxyToolServer::new(
+                    self.config.upstream.clone(),
+                ))],
+            )?),
+            None => None,
+        };
         let state = Arc::new(ProxyState {
             evaluator,
             signer_keypair: keypair,
@@ -299,6 +314,8 @@ impl ProtectProxy {
             trusted_capability_issuers,
             trusted_receipt_signers,
             sidecar_control_token: self.config.sidecar_control_token.clone(),
+            budget_store,
+            mediation_kernel,
         });
 
         let app = build_app(Arc::clone(&state));
@@ -313,6 +330,11 @@ impl ProtectProxy {
             ProtectError::Config(format!("cannot resolve bound address: {error}"))
         })?;
 
+        info!(
+            has_budget_store = state.budget_store.is_some(),
+            has_mediation_kernel = state.mediation_kernel.is_some(),
+            "chio api protect: mediation layer ready"
+        );
         info!(
             "chio api protect: proxying {} routes to {} on {}",
             route_count, self.config.upstream, local_addr

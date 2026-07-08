@@ -47,6 +47,8 @@ use crate::spec_discovery::{default_upstream_egress_contract, discover_spec, loa
 
 #[path = "proxy/approval.rs"]
 mod approval;
+#[path = "proxy/mediated.rs"]
+pub(crate) mod mediated;
 #[path = "proxy/attenuation.rs"]
 mod attenuation;
 #[path = "proxy/config.rs"]
@@ -70,6 +72,7 @@ mod state;
 
 pub(crate) use self::approval::*;
 pub(crate) use self::attenuation::*;
+pub(crate) use self::mediated::{build_budget_store, build_mediation_kernel};
 pub(crate) use self::decision::*;
 pub(crate) use self::errors::*;
 pub(crate) use self::http::*;

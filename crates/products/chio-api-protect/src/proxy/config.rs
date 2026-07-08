@@ -18,6 +18,14 @@ pub struct ProtectConfig {
     pub signer_seed_hex: Option<String>,
     /// Explicit capability issuers trusted by the HTTP authority.
     pub trusted_capability_issuers: Vec<PublicKey>,
+    /// Control-plane URL. When set, budget holds go through a `RemoteBudgetStore`.
+    pub control_url: Option<String>,
+    /// Bearer token for the control-plane budget endpoints.
+    pub control_token: Option<String>,
+    /// Local SQLite budget-store path used when no `control_url` is configured.
+    pub budget_db: Option<String>,
+    /// When true, the mediation kernel runs execution-nonce strict mode.
+    pub require_nonce: bool,
 }
 
 impl std::fmt::Debug for ProtectConfig {
@@ -43,6 +51,9 @@ impl std::fmt::Debug for ProtectConfig {
                 "trusted_capability_issuers",
                 &self.trusted_capability_issuers,
             )
+            .field("control_url", &self.control_url)
+            .field("budget_db", &self.budget_db)
+            .field("require_nonce", &self.require_nonce)
             .finish()
     }
 }
