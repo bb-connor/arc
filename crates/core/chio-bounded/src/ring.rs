@@ -9,7 +9,7 @@ use crate::SizeGauge;
 /// `Clone` produces a read-only snapshot sharing the same `SizeGauge` handle;
 /// the clone is never appended to, so the shared gauge is only ever written by
 /// the owning structure.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Ring<T> {
     buf: VecDeque<T>,
     capacity: usize,

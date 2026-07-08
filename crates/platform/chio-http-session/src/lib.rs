@@ -154,31 +154,58 @@ pub struct SessionJournalSnapshot {
 // Session journal (inner, not thread-safe)
 // ---------------------------------------------------------------------------
 
+/// Default entry-ring capacity when a journal is created without an explicit
+/// budget. The `entries` and `tool_sequence` rings are bounded (RFC-0004 F21);
+/// `data_flow` and `tool_counts` remain cumulative.
+const DEFAULT_JOURNAL_ENTRY_CAP: usize = 4096;
+
+/// Fold an evicted entry's hash into the running head hash so the dropped prefix
+/// stays committed after eviction (RFC-0004 F21).
+fn fold_head_hash(prev: Option<&str>, evicted_entry_hash: &str) -> String {
+    let mut hasher = Sha256::new();
+    update_len_prefixed(&mut hasher, prev.unwrap_or(""));
+    update_len_prefixed(&mut hasher, evicted_entry_hash);
+    hex::encode(hasher.finalize())
+}
+
 /// Inner journal state (not thread-safe -- wrapped by `SessionJournal`).
 #[derive(Debug)]
 struct JournalInner {
-    /// The ordered list of entries.
-    entries: Vec<JournalEntry>,
+    /// The capacity-bounded ring of retained entries (RFC-0004 F21).
+    entries: chio_bounded::Ring<JournalEntry>,
+    /// Running fold over the hashes of entries evicted from the ring, so the
+    /// chain stays committed after the prefix is dropped. `None` until the first
+    /// eviction.
+    evicted_head_hash: Option<String>,
+    /// Monotonic sequence counter, independent of the (bounded) ring length so
+    /// sequence numbers never repeat after eviction.
+    next_sequence: u64,
     /// Cumulative data flow stats.
     data_flow: CumulativeDataFlow,
-    /// Tool invocation sequence (tool names in order).
-    tool_sequence: Vec<String>,
-    /// Per-tool invocation counts.
+    /// Tool invocation sequence (tool names in order), bounded to the entry cap.
+    tool_sequence: chio_bounded::Ring<String>,
+    /// Per-tool invocation counts (cumulative).
     tool_counts: HashMap<String, u64>,
 }
 
 impl JournalInner {
-    fn new() -> Self {
+    fn new(entry_cap: usize) -> Self {
         Self {
-            entries: Vec::new(),
+            entries: chio_bounded::Ring::with_capacity(entry_cap, chio_bounded::SizeGauge::new()),
+            evicted_head_hash: None,
+            next_sequence: 0,
             data_flow: CumulativeDataFlow::default(),
-            tool_sequence: Vec::new(),
+            tool_sequence: chio_bounded::Ring::with_capacity(
+                entry_cap,
+                chio_bounded::SizeGauge::new(),
+            ),
             tool_counts: HashMap::new(),
         }
     }
 
     fn last_hash(&self) -> &str {
         self.entries
+            .iter()
             .last()
             .map(|e| e.entry_hash.as_str())
             .unwrap_or(ZERO_HASH)
@@ -190,7 +217,7 @@ impl JournalInner {
             entry_count: self.entries.len(),
             head_hash: self.last_hash().to_string(),
             data_flow: self.data_flow.clone(),
-            tool_sequence: self.tool_sequence.clone(),
+            tool_sequence: self.tool_sequence.iter().cloned().collect(),
             tool_counts: self.tool_counts.clone(),
         }
     }
@@ -243,10 +270,17 @@ impl SessionJournal {
             .map_err(|_| SessionJournalError::LockPoisoned)
     }
 
-    /// Create a new empty journal for the given session.
+    /// Create a new empty journal for the given session (default entry cap).
     pub fn new(session_id: String) -> Self {
+        Self::with_entry_cap(session_id, DEFAULT_JOURNAL_ENTRY_CAP)
+    }
+
+    /// Create a new empty journal with an explicit entry-ring capacity. The
+    /// `entries` and `tool_sequence` rings are bounded to `entry_cap`;
+    /// `data_flow` and `tool_counts` remain cumulative (RFC-0004 F21).
+    pub fn with_entry_cap(session_id: String, entry_cap: usize) -> Self {
         Self {
-            inner: Mutex::new(JournalInner::new()),
+            inner: Mutex::new(JournalInner::new(entry_cap)),
             session_id,
         }
     }
@@ -267,7 +301,8 @@ impl SessionJournal {
 
         let mut inner = self.lock_inner()?;
 
-        let sequence = inner.entries.len() as u64;
+        let sequence = inner.next_sequence;
+        inner.next_sequence = inner.next_sequence.saturating_add(1);
         let prev_hash = inner.last_hash().to_string();
         let timestamp_secs = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -305,12 +340,18 @@ impl SessionJournal {
             .max_delegation_depth
             .max(params.delegation_depth);
 
-        // Update tool sequence and counts.
-        inner.tool_sequence.push(tool_name.clone());
+        // Update tool sequence and counts. tool_sequence is a bounded ring; the
+        // cumulative tool_counts survive eviction.
+        let _ = inner.tool_sequence.push(tool_name.clone());
         let count = inner.tool_counts.entry(tool_name).or_insert(0);
         *count = count.saturating_add(1);
 
-        inner.entries.push(entry);
+        if let Some(evicted) = inner.entries.push(entry) {
+            // Fold the evicted prefix into a running head hash so the chain
+            // remains committed after the prefix is dropped (RFC-0004 F21).
+            let folded = fold_head_hash(inner.evicted_head_hash.as_deref(), &evicted.entry_hash);
+            inner.evicted_head_hash = Some(folded);
+        }
 
         Ok(sequence)
     }
@@ -331,10 +372,10 @@ impl SessionJournal {
         Ok(inner.snapshot(&self.session_id))
     }
 
-    /// Return the ordered tool invocation sequence.
+    /// Return the ordered tool invocation sequence (bounded to the entry cap).
     pub fn tool_sequence(&self) -> Result<Vec<String>, SessionJournalError> {
         let inner = self.lock_inner()?;
-        Ok(inner.tool_sequence.clone())
+        Ok(inner.tool_sequence.iter().cloned().collect())
     }
 
     /// Return per-tool invocation counts.
@@ -354,17 +395,18 @@ impl SessionJournal {
         Ok(self.len()? == 0)
     }
 
-    /// Return a clone of all journal entries.
+    /// Return a clone of the retained journal entries (bounded to the entry cap).
     pub fn entries(&self) -> Result<Vec<JournalEntry>, SessionJournalError> {
         let inner = self.lock_inner()?;
-        Ok(inner.entries.clone())
+        Ok(inner.entries.iter().cloned().collect())
     }
 
-    /// Return the most recent N entries (or all if fewer than N exist).
+    /// Return the most recent N entries (or all retained if fewer than N exist).
     pub fn recent_entries(&self, n: usize) -> Result<Vec<JournalEntry>, SessionJournalError> {
         let inner = self.lock_inner()?;
-        let start = inner.entries.len().saturating_sub(n);
-        Ok(inner.entries[start..].to_vec())
+        let all: Vec<JournalEntry> = inner.entries.iter().cloned().collect();
+        let start = all.len().saturating_sub(n);
+        Ok(all[start..].to_vec())
     }
 
     /// Verify the integrity of the hash chain.
@@ -374,12 +416,21 @@ impl SessionJournal {
     pub fn verify_integrity(&self) -> Result<(), SessionJournalError> {
         let inner = self.lock_inner()?;
 
-        for (index, entry) in inner.entries.iter().enumerate() {
+        let entries: Vec<&JournalEntry> = inner.entries.iter().collect();
+        for (index, entry) in entries.iter().enumerate() {
             // Check prev_hash linkage.
             let expected_prev = if index == 0 {
-                ZERO_HASH
+                if inner.evicted_head_hash.is_some() {
+                    // The oldest retained entry links into the evicted prefix,
+                    // which we no longer hold; that prefix is committed via
+                    // evicted_head_hash. Accept this boundary link and verify only
+                    // the entry hash (RFC-0004 F21).
+                    entry.prev_hash.as_str()
+                } else {
+                    ZERO_HASH
+                }
             } else {
-                inner.entries[index - 1].entry_hash.as_str()
+                entries[index - 1].entry_hash.as_str()
             };
 
             if entry.prev_hash != expected_prev {
@@ -437,6 +488,36 @@ mod tests {
         assert_eq!(journal.len().unwrap(), 0);
         assert!(journal.is_empty().unwrap());
         assert_eq!(journal.head_hash().unwrap(), ZERO_HASH);
+    }
+
+    #[test]
+    fn journal_entries_ring_caps_but_counts_stay_cumulative() {
+        // RFC-0004 F21: the entries ring is bounded, but data_flow / tool_counts
+        // remain cumulative, and the retained window stays hash-verifiable.
+        let journal = SessionJournal::with_entry_cap("sess-cap".to_string(), 4);
+        for i in 0..10u32 {
+            journal
+                .record(test_params(&format!("tool-{}", i % 2)))
+                .unwrap();
+        }
+        assert!(
+            journal.entries().unwrap().len() <= 4,
+            "entries ring not capped"
+        );
+        let counts = journal.tool_counts().unwrap();
+        let total: u64 = counts.values().sum();
+        assert_eq!(total, 10, "cumulative counts must survive eviction");
+        assert_eq!(
+            journal.data_flow().unwrap().total_invocations,
+            10,
+            "cumulative invocation count must survive eviction"
+        );
+        // Sequence numbers keep climbing past the cap (monotonic, not len-based),
+        // and the retained window remains internally verifiable across the
+        // eviction boundary.
+        let entries = journal.entries().unwrap();
+        assert_eq!(entries.last().map(|e| e.sequence), Some(9));
+        journal.verify_integrity().unwrap();
     }
 
     #[test]
