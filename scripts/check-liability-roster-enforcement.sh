@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-LIB="${ROOT}/crates/platform/chio-control-plane/src/trust_control/capital_and_liability/liability.rs"
+ROOT="${CHIO_LIABILITY_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+LIB="${CHIO_LIABILITY_LIB:-${ROOT}/crates/platform/chio-control-plane/src/trust_control/capital_and_liability/liability.rs}"
 
 # 1) Every construction of these artifacts anywhere under crates/ must live in
 #    liability.rs (the known choke-point file). Any other site is a violation.
