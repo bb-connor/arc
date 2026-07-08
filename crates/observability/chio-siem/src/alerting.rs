@@ -765,13 +765,30 @@ impl Exporter for AlertingExporter {
                 let mut any_failure = false;
 
                 for backend in &self.backends {
-                    if let Err(err) = backend.dispatch(&alert).await {
+                    let route = backend.name().to_string();
+                    let started = std::time::Instant::now();
+                    let dispatch_result = backend.dispatch(&alert).await;
+                    let outcome = if dispatch_result.is_ok() {
+                        "success"
+                    } else {
+                        "error"
+                    };
+                    // RFC-0009 F77: record every dispatch outcome and latency so
+                    // the p1 ChioAlertDispatchMetricsMissing backstop and the
+                    // PagerDuty dispatch SLO have a real producer.
+                    self.metrics.record_alert_dispatch(&route, outcome);
+                    self.metrics.observe_alert_dispatch_latency(
+                        &route,
+                        outcome,
+                        started.elapsed().as_secs_f64(),
+                    );
+                    if let Err(err) = dispatch_result {
                         any_failure = true;
                         if first_err.is_none() {
-                            first_err = Some(format!("{}: {}", backend.name(), err));
+                            first_err = Some(format!("{route}: {err}"));
                         }
                         tracing::warn!(
-                            backend = backend.name(),
+                            backend = %route,
                             receipt_id = %event.receipt.id,
                             error = %redact_for_operator_log(&err),
                             "alert backend dispatch failed"
