@@ -1,4 +1,42 @@
+use chio_core::receipt::kinds::TrustLevel;
+
 use super::*;
+
+/// A cost-bearing receipt may claim `TrustLevel::Mediated` only when it carries a
+/// reconciled budget-authority hold. This is the sign-site fail-closed invariant
+/// that turns `Mediated` from a stamp into earned proof.
+pub(crate) fn require_earned_mediated_trust_level(
+    metadata: Option<&serde_json::Value>,
+    trust_level: TrustLevel,
+) -> Result<(), KernelError> {
+    if trust_level != TrustLevel::Mediated {
+        return Ok(());
+    }
+    let Some(metadata) = metadata else {
+        return Ok(());
+    };
+    let cost_bearing = metadata
+        .get("financial")
+        .and_then(|financial| financial.get("cost_charged"))
+        .and_then(serde_json::Value::as_u64)
+        .is_some_and(|cost| cost > 0);
+    if !cost_bearing {
+        return Ok(());
+    }
+    let reconciled = metadata
+        .get("budget_authority")
+        .and_then(|block| block.get("terminal"))
+        .and_then(|terminal| terminal.get("disposition"))
+        .and_then(serde_json::Value::as_str)
+        == Some("reconciled");
+    if reconciled {
+        Ok(())
+    } else {
+        Err(KernelError::ReceiptSigningFailed(
+            "refusing to sign TrustLevel::Mediated for a cost-bearing receipt without a reconciled budget-authority hold".to_string(),
+        ))
+    }
+}
 
 impl ChioKernel {
     /// Build and sign a receipt from a `ReceiptParams` descriptor.
@@ -30,6 +68,7 @@ impl ChioKernel {
             })
         });
         let metadata = merge_metadata_objects(params.metadata, request_metadata);
+        require_earned_mediated_trust_level(metadata.as_ref(), params.trust_level)?;
 
         let mut evidence = current_pre_invocation_guard_evidence();
         evidence.extend(current_post_invocation_guard_evidence());
@@ -265,5 +304,39 @@ impl ChioKernel {
             }
         }
         Ok(latest)
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use chio_core::receipt::kinds::TrustLevel;
+
+    use super::*;
+
+    #[test]
+    fn signing_mediated_for_cost_bearing_grant_without_reconciled_hold_fails_closed() {
+        // R1: refuse to stamp Mediated on a cost-bearing receipt that carries a
+        // financial charge but no reconciled budget-authority hold.
+        let metadata = serde_json::json!({
+            "financial": { "cost_charged": 50, "grant_index": 0, "currency": "USD" }
+            // no budget_authority.terminal.disposition == "reconciled"
+        });
+        let result = require_earned_mediated_trust_level(Some(&metadata), TrustLevel::Mediated);
+        assert!(matches!(result, Err(KernelError::ReceiptSigningFailed(_))));
+    }
+
+    #[test]
+    fn signing_mediated_with_reconciled_hold_is_allowed() {
+        let metadata = serde_json::json!({
+            "financial": { "cost_charged": 50, "grant_index": 0, "currency": "USD" },
+            "budget_authority": { "terminal": { "disposition": "reconciled" } }
+        });
+        assert!(require_earned_mediated_trust_level(Some(&metadata), TrustLevel::Mediated).is_ok());
+    }
+
+    #[test]
+    fn advisory_trust_level_never_requires_a_hold() {
+        assert!(require_earned_mediated_trust_level(None, TrustLevel::Advisory).is_ok());
     }
 }
