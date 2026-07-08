@@ -12,6 +12,8 @@ mod liability;
 mod lineage;
 #[path = "tests/query.rs"]
 mod query;
+#[path = "tests/single_writer.rs"]
+mod single_writer;
 #[path = "tests/support.rs"]
 mod support;
 #[path = "tests/underwriting_credit.rs"]

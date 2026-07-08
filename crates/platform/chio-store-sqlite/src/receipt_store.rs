@@ -934,10 +934,27 @@ impl SqliteReceiptStore {
             })?;
         Ok(ReceiptWalCheckpointReport {
             busy: sqlite_u64(busy, "wal checkpoint busy")?,
-            log_frames: sqlite_u64(log_frames, "wal checkpoint log frames")?,
-            checkpointed_frames: sqlite_u64(checkpointed_frames, "wal checkpointed frames")?,
+            log_frames: wal_checkpoint_frame_count(log_frames, "wal checkpoint log frames")?,
+            checkpointed_frames: wal_checkpoint_frame_count(
+                checkpointed_frames,
+                "wal checkpointed frames",
+            )?,
         })
     }
+}
+
+/// `PRAGMA wal_checkpoint` reports -1 for the log/checkpointed frame columns
+/// when there is nothing to checkpoint (an already-empty WAL). Under
+/// concurrent `flush_receipt_writes()` callers this is routine: one caller's
+/// PASSIVE checkpoint truncates the WAL, and a second caller racing right
+/// behind it observes the now-empty WAL and gets -1/-1 from SQLite even
+/// though `busy` is 0 (success). That is success-with-nothing-to-do, not an
+/// error, so it is normalized to 0 rather than rejected by `sqlite_u64`.
+fn wal_checkpoint_frame_count(value: i64, field: &str) -> Result<u64, ReceiptStoreError> {
+    if value == -1 {
+        return Ok(0);
+    }
+    sqlite_u64(value, field)
 }
 
 fn uncheckpointed_range(checkpointed: u64, committed: u64) -> (Option<u64>, Option<u64>) {
