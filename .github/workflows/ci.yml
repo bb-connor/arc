@@ -176,6 +176,20 @@ jobs:
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: cargo test --workspace --exclude chio-wasm-guards
 
+      - name: chio-cli iroh feature (shipped binary excludes iroh; workspace still compiles it)
+        env:
+          CARGO_BUILD_JOBS: "1"
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+        run: |
+          cargo build -p chio-cli --features iroh
+          cargo clippy -p chio-cli --features iroh -- -D warnings
+
+      - name: chio-cli iroh feature tests (keep the ~17 gated iroh_mount/relay tests alive)
+        env:
+          CARGO_BUILD_JOBS: "1"
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+        run: cargo test -p chio-cli --features iroh
+
       - name: Wasm guards library tests
         env:
           CARGO_BUILD_JOBS: "1"
