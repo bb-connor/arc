@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
 
 use crate::SizeGauge;
@@ -6,20 +6,26 @@ use crate::SizeGauge;
 struct Timestamped<V> {
     value: V,
     last_seen_secs: u64,
+    /// Sequence number of this key's newest insert. `order` entries carry the
+    /// seq they were pushed with, so a stale duplicate left behind by a
+    /// re-insert is distinguishable from the key's live position.
+    seq: u64,
 }
 
 /// Capacity-bounded, optionally TTL-swept map for caches and rate-limit tables.
-/// Eviction order is oldest-insert (approximate LRU: `get` refreshes the idle
-/// timestamp but does not reorder). `insert` returns any (key, value) evicted
-/// for capacity so the caller can persist-before-drop. `capacity == 0` disables
-/// the cache, mirroring `Ring`.
+/// Eviction order is oldest-insert (approximate LRU: a re-insert of an existing
+/// key moves it to newest; `get` refreshes the idle timestamp but does not
+/// reorder). `insert` returns any (key, value) evicted for capacity so the
+/// caller can persist-before-drop. `capacity == 0` disables the cache,
+/// mirroring `Ring`.
 pub struct BoundedMap<K, V> {
     inner: HashMap<K, Timestamped<V>>,
-    order: VecDeque<K>,
+    order: VecDeque<(K, u64)>,
     capacity: usize,
     idle_ttl_secs: u64,
     sweep_interval: usize,
     inserts_since_sweep: usize,
+    next_seq: u64,
     gauge: SizeGauge,
 }
 
@@ -32,6 +38,7 @@ impl<K: Eq + Hash + Clone, V> BoundedMap<K, V> {
             idle_ttl_secs,
             sweep_interval: 256,
             inserts_since_sweep: 0,
+            next_seq: 0,
             gauge,
         }
     }
@@ -49,14 +56,20 @@ impl<K: Eq + Hash + Clone, V> BoundedMap<K, V> {
         if !self.inner.contains_key(&key) && self.inner.len() >= self.capacity {
             evicted = self.evict_oldest();
         }
+        let seq = self.next_seq;
+        self.next_seq = self.next_seq.saturating_add(1);
         self.inner.insert(
             key.clone(),
             Timestamped {
                 value,
                 last_seen_secs: now_secs,
+                seq,
             },
         );
-        self.order.push_back(key);
+        // A re-insert of an existing key leaves its previous (key, old_seq) entry
+        // in `order`; that entry is now stale (its seq no longer matches the
+        // key's live seq) and is skipped by both eviction and compaction.
+        self.order.push_back((key, seq));
         if self.order.len() > self.capacity.saturating_mul(2) {
             self.compact_order();
         }
@@ -86,15 +99,21 @@ impl<K: Eq + Hash + Clone, V> BoundedMap<K, V> {
         self.capacity
     }
 
+    /// True when `(key, seq)` names a live key at its newest insert position.
+    fn is_live_position(&self, key: &K, seq: u64) -> bool {
+        matches!(self.inner.get(key), Some(entry) if entry.seq == seq)
+    }
+
     fn compact_order(&mut self) {
-        let mut seen = HashSet::with_capacity(self.inner.len());
-        let mut compacted = VecDeque::with_capacity(self.inner.len());
-        while let Some(key) = self.order.pop_back() {
-            if self.inner.contains_key(&key) && seen.insert(key.clone()) {
-                compacted.push_front(key);
-            }
-        }
-        self.order = compacted;
+        // Rebuild `order` from the live entries in seq order, dropping every
+        // stale duplicate. O(n log n) but amortized over `capacity` inserts.
+        let mut live: Vec<(K, u64)> = self
+            .inner
+            .iter()
+            .map(|(k, entry)| (k.clone(), entry.seq))
+            .collect();
+        live.sort_by_key(|(_, seq)| *seq);
+        self.order = live.into_iter().collect();
     }
 
     fn sweep_idle(&mut self, now_secs: u64) {
@@ -103,15 +122,22 @@ impl<K: Eq + Hash + Clone, V> BoundedMap<K, V> {
         }
         let floor = now_secs.saturating_sub(self.idle_ttl_secs);
         self.inner.retain(|_, entry| entry.last_seen_secs > floor);
-        self.order.retain(|k| self.inner.contains_key(k));
+        let inner = &self.inner;
+        self.order
+            .retain(|(k, seq)| matches!(inner.get(k), Some(entry) if entry.seq == *seq));
         self.gauge.set(self.inner.len());
     }
 
     fn evict_oldest(&mut self) -> Option<(K, V)> {
-        while let Some(candidate) = self.order.pop_front() {
-            if let Some(entry) = self.inner.remove(&candidate) {
-                self.gauge.set(self.inner.len());
-                return Some((candidate, entry.value));
+        // Skip stale duplicate positions (a key whose live seq is newer than the
+        // popped one) so a recently-refreshed key is never evicted ahead of a
+        // genuinely-older key.
+        while let Some((candidate, seq)) = self.order.pop_front() {
+            if self.is_live_position(&candidate, seq) {
+                if let Some(entry) = self.inner.remove(&candidate) {
+                    self.gauge.set(self.inner.len());
+                    return Some((candidate, entry.value));
+                }
             }
         }
         None
@@ -135,6 +161,48 @@ mod tests {
         assert_eq!(gauge.get(), 2);
         assert_eq!(map.get(&1, 0), None);
         assert_eq!(map.get(&3, 0), Some(&30));
+    }
+
+    #[test]
+    fn reinsert_moves_key_to_newest_so_refreshed_key_survives_eviction() {
+        // Teeth: against a naive stale-duplicate `order`, evict_oldest pops the
+        // front (stale) copy of the refreshed key and deletes its live entry.
+        let gauge = SizeGauge::new();
+        let mut map: BoundedMap<u32, u32> = BoundedMap::new(2, 0, gauge.clone());
+        map.insert(1, 10, 0); // true-oldest so far
+        map.insert(2, 20, 0);
+        // Re-insert (refresh) key 1: it becomes newest, so key 2 is now oldest.
+        map.insert(1, 11, 0);
+        // Insert a new key at capacity: the true-oldest (key 2) must be evicted,
+        // NOT the just-refreshed key 1.
+        assert_eq!(
+            map.insert(3, 30, 0),
+            Some((2, 20)),
+            "the genuinely-oldest key must be evicted, not the refreshed one"
+        );
+        assert_eq!(map.get(&1, 0), Some(&11), "refreshed key must survive");
+        assert_eq!(map.get(&2, 0), None, "true-oldest key must be gone");
+        assert_eq!(map.get(&3, 0), Some(&30));
+        assert_eq!(map.len(), 2);
+        assert_eq!(gauge.get(), 2);
+    }
+
+    #[test]
+    fn many_reinserts_do_not_leak_order_or_breach_capacity() {
+        // Drive far more re-inserts than 2*capacity so compaction runs and stale
+        // duplicates are reclaimed; capacity and gauge must still hold.
+        let gauge = SizeGauge::new();
+        let mut map: BoundedMap<u32, u32> = BoundedMap::new(4, 0, gauge.clone());
+        for round in 0..1000u32 {
+            let key = round % 4; // only 4 distinct keys: all re-inserts
+            let _ = map.insert(key, round, 0);
+            assert!(map.len() <= 4, "capacity breached: {}", map.len());
+            assert_eq!(map.len(), gauge.get(), "gauge desynced from len");
+        }
+        // All four keys present with their latest values.
+        for key in 0..4u32 {
+            assert!(map.get(&key, 0).is_some(), "live key {key} lost");
+        }
     }
 
     #[test]
