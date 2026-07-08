@@ -552,7 +552,7 @@ impl TrustControlClient {
         &self,
         query: &OperatorReportQuery,
     ) -> Result<ComptrollerSurfaceReport, CliError> {
-        self.get_json_with_query(COMPTROLLER_SURFACE_REPORT_PATH, query)
+        self.get_json_with_query(COMPTROLLER_SURFACE_PATH, query)
     }
 
     pub fn behavioral_feed(
