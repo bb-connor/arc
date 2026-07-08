@@ -59,6 +59,8 @@ mod errors;
 mod http;
 #[path = "proxy/mediated.rs"]
 pub(crate) mod mediated;
+#[path = "proxy/nonce_middleware.rs"]
+mod nonce_middleware;
 #[path = "proxy/receipts.rs"]
 mod receipts;
 #[path = "proxy/router.rs"]
