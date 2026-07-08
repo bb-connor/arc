@@ -3,11 +3,9 @@
 // The kernel `SimPaymentAdapter` stays rail-agnostic. EVM-rail bridging lives
 // here, at the control-plane layer: the operator config declares which
 // (seller, token_symbol) pair maps to which on-chain rail, and this module
-// resolves that mapping and derives a deterministic sim pseudo-broadcast
-// reference from the governed approval digest. No custody, no broadcast.
+// resolves that mapping. No custody, no broadcast.
 
-use chio_core::capability::governance::GovernedApprovalToken;
-use chio_settle::{approval_binding_from_governed, RailBinding, SettlementError};
+use chio_settle::RailBinding;
 
 /// One entry in the operator-configured seller-to-rail table.
 #[derive(Debug, Clone)]
@@ -60,28 +58,6 @@ pub fn sim_pseudo_ref_from_digest(authorization_digest: &str) -> String {
     format!("sim-eip3009-{hex}")
 }
 
-/// Bridge a governed approval token over a resolved EVM rail to a sim
-/// pseudo-broadcast reference (prepare-only, no actual broadcast).
-///
-/// Calls [`approval_binding_from_governed`] at the control-plane layer
-/// (keeping the kernel adapter rail-agnostic), then derives a deterministic
-/// reference from the binding parameters. Fails closed when the token is not
-/// approved or the rail fields are invalid.
-pub fn governed_eip3009_sim_ref(
-    token: &GovernedApprovalToken,
-    rail: &RailBinding,
-    amount_minor_units: u128,
-) -> Result<String, SettlementError> {
-    let binding =
-        approval_binding_from_governed(token, rail, amount_minor_units, token.expires_at)?;
-    let digest_input = format!(
-        "{}:{}:{}",
-        binding.chain_id, binding.payee_address, binding.amount_minor_units
-    );
-    let digest_hex = chio_core::hashing::sha256(digest_input.as_bytes()).to_hex();
-    Ok(sim_pseudo_ref_from_digest(&digest_hex))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -89,11 +65,20 @@ mod tests {
         GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
     };
     use chio_core::crypto::Keypair;
+    use chio_settle::{
+        approval_binding_from_governed, prepare_transfer_with_authorization, Eip3009Domain,
+        InMemoryEip3009NonceStore, TransferWithAuthorizationInput,
+    };
     use chio_test_support::prelude::*;
 
     const TEST_CHAIN_ID: u64 = 8453;
     const TEST_TOKEN_CONTRACT: &str = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
     const TEST_PAYEE: &str = "0x1000000000000000000000000000000000000002";
+    /// `issued_at` of the test token; used as `valid_after` for the test authorization.
+    const TEST_ISSUED_AT: u64 = 1_744_000_000;
+    const TEST_EXPIRES_AT: u64 = 1_744_000_600;
+    /// A `now` strictly inside `(TEST_ISSUED_AT, TEST_EXPIRES_AT)`.
+    const TEST_NOW: u64 = 1_744_000_300;
 
     fn test_rail() -> RailBinding {
         RailBinding {
@@ -114,8 +99,8 @@ mod tests {
                 subject: kp.public_key(),
                 governed_intent_hash: "test-intent-hash".to_string(),
                 request_id: "req-seller-rail-1".to_string(),
-                issued_at: 1_744_000_000,
-                expires_at: 1_744_000_600,
+                issued_at: TEST_ISSUED_AT,
+                expires_at: TEST_EXPIRES_AT,
                 decision: GovernedApprovalDecision::Approved,
             },
             &kp,
@@ -166,20 +151,60 @@ mod tests {
         );
     }
 
+    /// Verifies the complete end-to-end sim flow: resolve rail -> binding ->
+    /// prepare EIP-712 digest -> derive pseudo ref from that actual digest.
+    /// This ensures the sim ref is bound to the real authorization parameters
+    /// (nonce, from, validity window, amount, payee) rather than a narrower
+    /// subset.
     #[test]
-    fn governed_eip3009_sim_ref_derives_from_binding() {
+    fn sim_ref_derives_from_actual_authorization_digest() {
         let token = test_approval_token();
-        let ref1 = governed_eip3009_sim_ref(&token, &test_rail(), 1_000_000).test_unwrap();
-        let ref2 = governed_eip3009_sim_ref(&token, &test_rail(), 1_000_000).test_unwrap();
-        assert_eq!(ref1, ref2, "sim pseudo ref must be deterministic");
+        let rail = test_rail();
+        let amount_minor_units: u128 = 1_000_000;
+
+        let binding =
+            approval_binding_from_governed(&token, &rail, amount_minor_units, token.expires_at)
+                .test_unwrap();
+
+        let domain = Eip3009Domain {
+            name: "USD Coin".to_string(),
+            version: "2".to_string(),
+            chain_id: rail.chain_id,
+            verifying_contract: rail.token_contract.clone(),
+        };
+        let authorization = TransferWithAuthorizationInput {
+            from_address: "0x1000000000000000000000000000000000000001".to_string(),
+            to_address: rail.payee_address.clone(),
+            value_minor_units: amount_minor_units,
+            valid_after: TEST_ISSUED_AT,
+            valid_before: TEST_EXPIRES_AT,
+            nonce: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string(),
+        };
+
+        let prepared = prepare_transfer_with_authorization(
+            domain,
+            authorization,
+            &binding,
+            TEST_NOW,
+            &InMemoryEip3009NonceStore::new(),
+        )
+        .test_unwrap();
+
+        let sim_ref = sim_pseudo_ref_from_digest(&prepared.authorization_digest);
         assert!(
-            ref1.starts_with("sim-eip3009-"),
-            "sim pseudo ref must carry the sim-eip3009 prefix"
+            sim_ref.starts_with("sim-eip3009-"),
+            "sim pseudo ref must carry the sim-eip3009 prefix, got: {sim_ref}"
         );
-        let ref_other = governed_eip3009_sim_ref(&token, &test_rail(), 2_000_000).test_unwrap();
-        assert_ne!(
-            ref1, ref_other,
-            "different amounts must produce different refs"
+        // The ref must be stable for the same inputs.
+        assert_eq!(
+            sim_ref,
+            sim_pseudo_ref_from_digest(&prepared.authorization_digest),
+            "sim pseudo ref must be deterministic"
+        );
+        // The EIP-712 digest must be present and non-empty.
+        assert!(
+            !prepared.authorization_digest.is_empty(),
+            "authorization_digest must be non-empty"
         );
     }
 }

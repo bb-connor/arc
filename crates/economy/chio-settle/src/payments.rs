@@ -766,8 +766,8 @@ pub const CHIO_OFFCHAIN_SETTLEMENT_RECEIPT_SCHEMA: &str = "chio.settle.offchain_
 /// Minted after a successful [`prepare_transfer_with_authorization`] call.
 /// No broadcast path exists in this crate: this artifact records that an
 /// authorization was prepared and binds it to the governed receipt that
-/// authorized the spend. Direction-A execution adds a non-`None`
-/// `execution_nonce` when the signed authorization is submitted on-chain.
+/// authorized the spend. The `execution_nonce` field is `None` until
+/// on-chain execution is implemented.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct OffchainSettlementReceiptArtifact {
     /// Schema identifier. Must equal [`CHIO_OFFCHAIN_SETTLEMENT_RECEIPT_SCHEMA`].
@@ -780,14 +780,13 @@ pub struct OffchainSettlementReceiptArtifact {
     /// Binds the off-chain authorization to this receipt.
     pub authorization_digest: String,
     /// Receipt id of the governed tool-call receipt that authorized this
-    /// spend (A-contract slot 1). Binds the settlement back to the
-    /// governed receipt so a captured digest cannot be redirected to a
-    /// different tool-call receipt.
+    /// spend. Binds the settlement back to the governed receipt so a
+    /// captured digest cannot be redirected to a different tool-call receipt.
     pub governed_receipt_id: String,
     /// Settled monetary amount.
     pub settled_amount: MonetaryAmount,
-    /// A-contract slot 2: reserved for the on-chain execution nonce once
-    /// Direction A lands. `None` until then.
+    /// Reserved for the on-chain execution nonce; `None` until on-chain
+    /// execution is implemented.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_nonce: Option<String>,
     /// Optional human-readable note.
@@ -1631,15 +1630,24 @@ mod tests {
 
     #[test]
     fn bridge_prepare_rejects_payee_mismatch() {
+        // Use a `now` inside the valid time window so the time-window gate
+        // passes and the payee check is actually exercised.
         let error = prepare_transfer_with_authorization(
             sample_domain(),
             sample_authorization_input_with_wrong_payee(),
             &sample_binding(),
-            1_000,
+            SAMPLE_NOW,
             &sample_nonce_store(),
         )
         .test_expect_err("payee mismatch must fail closed");
-        assert!(matches!(error, SettlementError::InvalidBinding(_)));
+        assert!(
+            matches!(error, SettlementError::InvalidBinding(_)),
+            "payee mismatch must produce InvalidBinding"
+        );
+        assert!(
+            error.to_string().contains("payee mismatch"),
+            "error must identify the payee mismatch, got: {error}"
+        );
     }
 
     #[test]
