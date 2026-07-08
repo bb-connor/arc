@@ -308,6 +308,16 @@ pub struct LiabilityClaimAdjudicationArtifact {
     pub awarded_amount: Option<MonetaryAmount>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
+    /// Predeclared decision rule or circuit-breaker condition id the
+    /// adjudication applied (ADR-0015 follow-up B). Optional and omitted when
+    /// absent so existing signed fixtures keep byte-stable canonical JSON.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decision_rule_ref: Option<String>,
+    /// Id or hash of the signed roster artifact the adjudicator was checked
+    /// against (ADR-0015 follow-up B anchoring). Records which ex-ante roster
+    /// was applied so the check is auditable and not per-adjudication fabricable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub roster_anchor_ref: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evidence_refs: Vec<LiabilityClaimEvidenceReference>,
 }
@@ -318,6 +328,24 @@ impl LiabilityClaimAdjudicationArtifact {
         self.dispute.body.validate()?;
         if self.adjudicator.trim().is_empty() {
             return Err("claim adjudications require a non-empty adjudicator".to_string());
+        }
+        if self
+            .decision_rule_ref
+            .as_ref()
+            .is_some_and(|rule| rule.trim().is_empty())
+        {
+            return Err(
+                "claim adjudication decision_rule_ref must not be blank when present".to_string(),
+            );
+        }
+        if self
+            .roster_anchor_ref
+            .as_ref()
+            .is_some_and(|anchor| anchor.trim().is_empty())
+        {
+            return Err(
+                "claim adjudication roster_anchor_ref must not be blank when present".to_string(),
+            );
         }
         let claim_amount = &self
             .dispute

@@ -801,6 +801,8 @@ fn sample_market_fixtures() -> MarketFixtures {
         outcome: LiabilityClaimAdjudicationOutcome::PartialSettlement,
         awarded_amount: Some(usd(6_000)),
         note: Some("partial settlement ordered".to_string()),
+        decision_rule_ref: None,
+        roster_anchor_ref: None,
         evidence_refs: Vec::new(),
     });
     let capital_instruction = sign_export(crate::credit::CapitalExecutionInstructionArtifact {
@@ -1431,4 +1433,34 @@ fn liability_claim_settlement_receipt_rejects_counterparty_match_in_mismatch_sta
         "counterparty mismatch requires differing counterparties",
     );
     assert!(error.contains("require at least one observed counterparty to differ"));
+}
+
+#[test]
+fn adjudication_new_optional_fields_are_omitted_when_none() {
+    let fixtures = sample_market_fixtures();
+    let adjudication = fixtures.claim_adjudication.body.clone();
+    let json = require_ok(
+        serde_json::to_string(&adjudication),
+        "serialize adjudication",
+    );
+    assert!(
+        !json.contains("decisionRuleRef") && !json.contains("decision_rule_ref"),
+        "decision_rule_ref must be omitted when None: {json}"
+    );
+    assert!(
+        !json.contains("rosterAnchorRef") && !json.contains("roster_anchor_ref"),
+        "roster_anchor_ref must be omitted when None: {json}"
+    );
+}
+
+#[test]
+fn adjudication_shape_validate_rejects_blank_decision_rule() {
+    let fixtures = sample_market_fixtures();
+    let mut adjudication = fixtures.claim_adjudication.body.clone();
+    adjudication.decision_rule_ref = Some("   ".to_string());
+    let error = require_err(
+        adjudication.validate(),
+        "blank decision_rule_ref must fail shape validation",
+    );
+    assert!(error.contains("decision_rule_ref"));
 }
