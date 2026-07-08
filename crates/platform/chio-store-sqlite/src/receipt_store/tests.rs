@@ -4,6 +4,8 @@ mod bootstrap;
 mod checkpoint;
 #[path = "tests/errors.rs"]
 mod errors;
+#[path = "tests/head_property.rs"]
+mod head_property;
 #[path = "tests/insert.rs"]
 mod insert;
 #[path = "tests/liability.rs"]
