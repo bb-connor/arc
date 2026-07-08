@@ -38,11 +38,11 @@ class _ChioClientLike(Protocol):
     async def evaluate_tool_call(
         self,
         *,
-        capability_id: str,
+        capability: dict,
         tool_server: str,
         tool_name: str,
-        parameters: dict[str, Any],
-    ) -> ChioReceipt: ...
+        parameters: dict,
+    ) -> dict: ...
 
 
 # ---------------------------------------------------------------------------

@@ -499,9 +499,10 @@ class ChioClient:
         """Kernel-mediated, authoritative tool-call evaluation.
 
         Posts to the reinstated ``/v1/evaluate`` route. Returns
-        ``{"verdict", "receipt", "execution_nonce"}``. Callers MUST verify the
-        receipt with ``is_authoritative_spend_receipt`` and reject anything below
-        ``trust_level == "mediated"``.
+        ``{"verdict", "receipt", "execution_nonce"}``. Callers MUST confirm
+        the receipt is authoritative - ``trust_level`` is ``"mediated"`` and
+        the response carries a bound ``execution_nonce`` - before trusting
+        the verdict.
         """
         body = {
             "capability": capability,
