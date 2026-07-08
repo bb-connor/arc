@@ -688,6 +688,7 @@ pub fn prepare_transfer_with_authorization(
 /// rail-agnostic; the caller resolves and validates the rail before bridging
 /// to [`ApprovalBinding`] via [`approval_binding_from_governed`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RailBinding {
     /// EVM chain id for the target payment rail.
     pub chain_id: u64,
@@ -769,6 +770,7 @@ pub const CHIO_OFFCHAIN_SETTLEMENT_RECEIPT_SCHEMA: &str = "chio.settle.offchain_
 /// authorized the spend. The `execution_nonce` field is `None` until
 /// on-chain execution is implemented.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct OffchainSettlementReceiptArtifact {
     /// Schema identifier. Must equal [`CHIO_OFFCHAIN_SETTLEMENT_RECEIPT_SCHEMA`].
     pub schema: String,
@@ -805,10 +807,11 @@ pub struct OffchainSettlementReceiptArtifact {
 pub fn validate_offchain_settlement_receipt(
     receipt: &OffchainSettlementReceiptArtifact,
 ) -> Result<(), SettlementError> {
-    if receipt.schema.trim().is_empty() {
-        return Err(SettlementError::InvalidInput(
-            "off-chain settlement receipt requires a non-empty schema".to_string(),
-        ));
+    if receipt.schema != CHIO_OFFCHAIN_SETTLEMENT_RECEIPT_SCHEMA {
+        return Err(SettlementError::InvalidInput(format!(
+            "off-chain settlement receipt schema must be \"{CHIO_OFFCHAIN_SETTLEMENT_RECEIPT_SCHEMA}\", got \"{}\"",
+            receipt.schema,
+        )));
     }
     if receipt.settlement_receipt_id.trim().is_empty() {
         return Err(SettlementError::InvalidInput(
@@ -936,6 +939,7 @@ mod tests {
         CircleNanopaymentPolicy, Eip3009Domain, Eip3009NonceStore, Erc4337PaymasterPolicy,
         InMemoryEip3009NonceStore, NonceOutcome, OffchainSettlementReceiptArtifact, RailBinding,
         SettlementError, TransferWithAuthorizationInput, X402SettlementMode,
+        CHIO_OFFCHAIN_SETTLEMENT_RECEIPT_SCHEMA,
     };
     use chio_core::capability::governance::{
         GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
@@ -1711,7 +1715,7 @@ mod tests {
     #[test]
     fn offchain_receipt_validate_binds_digest_to_governed_receipt() {
         let receipt = OffchainSettlementReceiptArtifact {
-            schema: "chio.settle.offchain_receipt.v1".to_string(),
+            schema: CHIO_OFFCHAIN_SETTLEMENT_RECEIPT_SCHEMA.to_string(),
             settlement_receipt_id: "osr-1".to_string(),
             issued_at: 1_700_000_000,
             authorization_digest: "0xdigest".to_string(),
