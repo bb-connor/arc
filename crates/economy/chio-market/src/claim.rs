@@ -397,6 +397,59 @@ impl LiabilityClaimAdjudicationArtifact {
         }
         Ok(())
     }
+
+    /// Fail-closed policy gate for ADR-0015 follow-up B.
+    ///
+    /// Requires the adjudicator to be an exact (trimmed) member of the
+    /// operator-supplied predeclared `roster`, requires `decision_rule_ref` to
+    /// be present and a member of `allowed_decision_rules`, and requires the
+    /// recorded `roster_anchor_ref` to equal `roster_anchor` (the id/hash of the
+    /// signed roster artifact the `roster` was drawn from). Callers pass concrete
+    /// values so `chio-market` needs no dependency on the roster's source crate.
+    pub fn validate_against_roster(
+        &self,
+        roster: &[String],
+        allowed_decision_rules: &[String],
+        roster_anchor: &str,
+    ) -> Result<(), String> {
+        let adjudicator = self.adjudicator.trim();
+        if !roster.iter().any(|entry| entry.trim() == adjudicator) {
+            return Err(format!(
+                "adjudicator \"{adjudicator}\" is not on the predeclared roster"
+            ));
+        }
+        let rule = self
+            .decision_rule_ref
+            .as_ref()
+            .map(|rule| rule.trim())
+            .filter(|rule| !rule.is_empty())
+            .ok_or_else(|| {
+                "adjudication is missing a decision_rule_ref (ADR-0015 follow-up B)".to_string()
+            })?;
+        if !allowed_decision_rules
+            .iter()
+            .any(|allowed| allowed.trim() == rule)
+        {
+            return Err(format!(
+                "decision_rule_ref \"{rule}\" is not an allowed decision rule"
+            ));
+        }
+        let recorded_anchor = self
+            .roster_anchor_ref
+            .as_ref()
+            .map(|anchor| anchor.trim())
+            .filter(|anchor| !anchor.is_empty())
+            .ok_or_else(|| {
+                "adjudication is missing a roster_anchor_ref (ADR-0015 follow-up B)".to_string()
+            })?;
+        if recorded_anchor != roster_anchor.trim() {
+            return Err(format!(
+                "roster_anchor_ref \"{recorded_anchor}\" does not match the applied roster anchor \"{}\"",
+                roster_anchor.trim()
+            ));
+        }
+        Ok(())
+    }
 }
 
 pub type SignedLiabilityClaimAdjudication =
