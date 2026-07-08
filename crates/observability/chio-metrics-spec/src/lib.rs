@@ -6,6 +6,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod runtime;
+
 /// Prometheus metric family kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MetricKind {
