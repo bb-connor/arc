@@ -26,6 +26,7 @@ pub struct TrustServiceConfig {
     pub certification_public_metadata_ttl_seconds: u64,
     pub peer_urls: Vec<String>,
     pub cluster_sync_interval: Duration,
+    pub roster_policy: Option<RosterPolicy>,
 }
 
 impl TrustServiceConfig {
@@ -123,6 +124,7 @@ mod service_config_tests {
             certification_public_metadata_ttl_seconds: PUBLIC_DISCOVERY_TTL_SECS,
             peer_urls: Vec::new(),
             cluster_sync_interval: Duration::from_millis(25),
+            roster_policy: None,
         }
     }
 

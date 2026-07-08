@@ -3781,6 +3781,7 @@ dependencies = [
  "chio-credit",
  "chio-underwriting",
  "serde",
+ "serde_json",
  "thiserror 1.0.69",
 ]
 
