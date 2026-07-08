@@ -5,6 +5,11 @@ use crate::SizeGauge;
 /// Fixed-capacity append-only ring for process-local mirrors. `capacity == 0`
 /// means "disabled" (stores nothing, hands each item straight back), the
 /// correct default when a durable store is authoritative.
+///
+/// `Clone` produces a read-only snapshot sharing the same `SizeGauge` handle;
+/// the clone is never appended to, so the shared gauge is only ever written by
+/// the owning structure.
+#[derive(Clone)]
 pub struct Ring<T> {
     buf: VecDeque<T>,
     capacity: usize,

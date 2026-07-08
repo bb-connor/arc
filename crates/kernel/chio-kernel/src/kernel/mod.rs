@@ -412,70 +412,120 @@ pub trait PromptProvider: Send + Sync {
     }
 }
 
-/// In-memory append-only log of signed receipts.
+/// Default capacity for a process-local receipt mirror when constructed without
+/// an explicit budget (tests / benches). The kernel construction path threads
+/// the configured `MemoryBudgetConfig::receipt_mirror_capacity` instead.
+const DEFAULT_RECEIPT_MIRROR_CAPACITY: usize = 4096;
+
+/// In-memory bounded ring of signed receipts. Process-local inspection mirror;
+/// a durable receipt store is authoritative for id lookups (RFC-0004 F03/F25).
 ///
-/// This remains useful for process-local inspection even when a durable
-/// backend is configured.
-#[derive(Clone, Default)]
+/// `Clone` yields a read-only snapshot (used by the `receipt_log()` accessor).
+#[derive(Clone)]
 pub struct ReceiptLog {
-    receipts: Vec<ChioReceipt>,
+    ring: chio_bounded::Ring<ChioReceipt>,
 }
 
 impl ReceiptLog {
     pub fn new() -> Self {
-        Self::default()
+        Self::with_capacity(
+            DEFAULT_RECEIPT_MIRROR_CAPACITY,
+            chio_bounded::SizeGauge::new(),
+        )
+    }
+
+    pub fn with_capacity(capacity: usize, gauge: chio_bounded::SizeGauge) -> Self {
+        Self {
+            ring: chio_bounded::Ring::with_capacity(capacity, gauge),
+        }
     }
 
     pub fn append(&mut self, receipt: ChioReceipt) {
-        self.receipts.push(receipt);
+        // Evicted receipts are already durably persisted (the store write in
+        // record_chio_receipt precedes this mirror append) or ephemeral by
+        // policy, so dropping the evicted item is safe.
+        let _evicted = self.ring.push(receipt);
     }
 
     pub fn len(&self) -> usize {
-        self.receipts.len()
+        self.ring.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.receipts.is_empty()
+        self.ring.is_empty()
     }
 
-    pub fn receipts(&self) -> &[ChioReceipt] {
-        &self.receipts
+    pub fn iter(&self) -> impl Iterator<Item = &ChioReceipt> {
+        self.ring.iter()
+    }
+
+    /// Cloned snapshot of the mirror (process-local inspection). Bounded by the
+    /// ring capacity.
+    pub fn receipts(&self) -> Vec<ChioReceipt> {
+        self.ring.iter().cloned().collect()
     }
 
     pub fn get(&self, index: usize) -> Option<&ChioReceipt> {
-        self.receipts.get(index)
+        self.ring.iter().nth(index)
     }
 }
 
-/// In-memory append-only log of signed child-request receipts.
-#[derive(Clone, Default)]
+impl Default for ReceiptLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// In-memory bounded ring of signed child-request receipts.
+#[derive(Clone)]
 pub struct ChildReceiptLog {
-    receipts: Vec<ChildRequestReceipt>,
+    ring: chio_bounded::Ring<ChildRequestReceipt>,
 }
 
 impl ChildReceiptLog {
     pub fn new() -> Self {
-        Self::default()
+        Self::with_capacity(
+            DEFAULT_RECEIPT_MIRROR_CAPACITY,
+            chio_bounded::SizeGauge::new(),
+        )
+    }
+
+    pub fn with_capacity(capacity: usize, gauge: chio_bounded::SizeGauge) -> Self {
+        Self {
+            ring: chio_bounded::Ring::with_capacity(capacity, gauge),
+        }
     }
 
     pub fn append(&mut self, receipt: ChildRequestReceipt) {
-        self.receipts.push(receipt);
+        let _evicted = self.ring.push(receipt);
     }
 
     pub fn len(&self) -> usize {
-        self.receipts.len()
+        self.ring.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.receipts.is_empty()
+        self.ring.is_empty()
     }
 
-    pub fn receipts(&self) -> &[ChildRequestReceipt] {
-        &self.receipts
+    pub fn iter(&self) -> impl Iterator<Item = &ChildRequestReceipt> {
+        self.ring.iter()
+    }
+
+    /// Cloned snapshot of the mirror (process-local inspection). Bounded by the
+    /// ring capacity.
+    pub fn receipts(&self) -> Vec<ChildRequestReceipt> {
+        self.ring.iter().cloned().collect()
     }
 
     pub fn get(&self, index: usize) -> Option<&ChildRequestReceipt> {
-        self.receipts.get(index)
+        self.ring.iter().nth(index)
+    }
+}
+
+impl Default for ChildReceiptLog {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -143,6 +143,15 @@ pub struct ChioKernel {
     pub(super) sessions: DashMap<SessionId, Arc<Session>>,
     pub(super) receipt_log: Mutex<ReceiptLog>,
     pub(super) child_receipt_log: Mutex<ChildReceiptLog>,
+    /// Live entry-count gauges for the two receipt mirrors (RFC-0004 section 4).
+    /// Cloned from the ring's gauge at construction so telemetry and the
+    /// bounded-structure registry can read the count without locking the log.
+    // Read by `bounded_structure_gauges()` (added in the registry task); the
+    // allow is removed there once the reader lands.
+    #[allow(dead_code)]
+    pub(super) receipt_mirror_gauge: chio_bounded::SizeGauge,
+    #[allow(dead_code)]
+    pub(super) child_receipt_mirror_gauge: chio_bounded::SizeGauge,
     pub(super) receipt_store: Option<Arc<dyn ReceiptStore>>,
     pub(super) receipt_store_write_lock: Mutex<()>,
     pub(super) payment_adapter: Option<Box<dyn PaymentAdapter>>,

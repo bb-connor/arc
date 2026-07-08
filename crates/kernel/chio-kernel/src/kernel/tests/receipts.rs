@@ -73,6 +73,35 @@ fn receipt_log_basics() {
 }
 
 #[test]
+fn receipt_log_ring_caps_and_reports_gauge() {
+    // RFC-0004 F03/F25: the mirror is a capacity-bounded ring reporting a live
+    // gauge; appends past the cap evict the oldest, they never grow the Vec.
+    let gauge = chio_bounded::SizeGauge::new();
+    let kp = make_keypair();
+    let mut log = ReceiptLog::with_capacity(4, gauge.clone());
+    // `ChioReceipt::sign` derives the receipt id (content hash), so capture the
+    // ids in append order rather than assuming they equal the body label.
+    let mut appended_ids: Vec<String> = Vec::new();
+    for i in 0..10u32 {
+        let receipt = make_signed_receipt(&kp, &format!("r-{i}"));
+        appended_ids.push(receipt.id.clone());
+        log.append(receipt);
+    }
+    assert_eq!(log.len(), 4, "ring caps at 4");
+    assert_eq!(gauge.get(), 4, "gauge tracks ring len");
+    // Only the last four appended survive, in append order (oldest evicted).
+    let ids: Vec<String> = log.iter().map(|r| r.id.clone()).collect();
+    assert_eq!(ids, appended_ids[6..10].to_vec());
+
+    // Capacity 0 disables the mirror entirely (store-authoritative default).
+    let gauge_zero = chio_bounded::SizeGauge::new();
+    let mut log_zero = ReceiptLog::with_capacity(0, gauge_zero.clone());
+    log_zero.append(make_signed_receipt(&kp, "r-zero"));
+    assert_eq!(log_zero.len(), 0, "capacity 0 stores nothing");
+    assert_eq!(gauge_zero.get(), 0);
+}
+
+#[test]
 fn kernel_persists_child_receipts_to_sqlite_store() {
     let path = unique_receipt_db_path("chio-kernel-child-receipts");
     let mut config = make_config();

@@ -192,6 +192,16 @@ pub trait ReceiptStore: Send + Sync {
     ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
         Ok(None)
     }
+    /// Load a child-request receipt by id. Provided default returns `None`; a
+    /// store used for a store-authoritative deployment must override both this
+    /// and `load_chio_receipt` (RFC-0004 F03/F25). A miss is a fail-closed deny
+    /// of the dependent call-chain claim, never a false allow.
+    fn load_child_receipt(
+        &self,
+        _receipt_id: &str,
+    ) -> Result<Option<ChildRequestReceipt>, ReceiptStoreError> {
+        Ok(None)
+    }
     fn append_chio_receipt_canonical(
         &self,
         receipt: &ChioReceipt,

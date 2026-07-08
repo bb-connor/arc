@@ -1539,7 +1539,8 @@ fn tools_call_uses_meta_model_metadata_and_records_asserted_provenance() {
     assert_eq!(allowed["result"]["isError"], false);
 
     let receipt_log = edge.kernel.receipt_log();
-    let receipt = receipt_log.receipts().last().expect("tool call receipt");
+    let receipts = receipt_log.receipts();
+    let receipt = receipts.last().expect("tool call receipt");
     let metadata = receipt.metadata.as_ref().expect("receipt metadata");
     assert_eq!(metadata["model_metadata"]["model_id"], "gpt-5");
     assert_eq!(metadata["model_metadata"]["provenance_class"], "asserted");

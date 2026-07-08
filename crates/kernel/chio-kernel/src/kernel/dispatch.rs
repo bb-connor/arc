@@ -36,14 +36,30 @@ impl ChioKernel {
     }
 
     pub(crate) fn has_local_receipt_id(&self, receipt_id: &str) -> bool {
+        // Store-authoritative: a durable store is a point lookup by id (F22
+        // hot-path budget), not an O(n) mirror scan (RFC-0004 F03/F25).
+        if self.receipt_store.is_some() {
+            let tool = self
+                .with_receipt_store(|store| Ok(store.load_chio_receipt(receipt_id)?))
+                .ok()
+                .flatten()
+                .flatten()
+                .is_some();
+            if tool {
+                return true;
+            }
+            return self
+                .with_receipt_store(|store| Ok(store.load_child_receipt(receipt_id)?))
+                .ok()
+                .flatten()
+                .flatten()
+                .is_some();
+        }
+        // Ephemeral fallback: scan the bounded ring.
         let chio_receipt_match = match self.receipt_log.lock() {
-            Ok(log) => log
-                .receipts()
-                .iter()
-                .any(|receipt| receipt.id == receipt_id),
+            Ok(log) => log.iter().any(|receipt| receipt.id == receipt_id),
             Err(poisoned) => poisoned
                 .into_inner()
-                .receipts()
                 .iter()
                 .any(|receipt| receipt.id == receipt_id),
         };
@@ -52,29 +68,42 @@ impl ChioKernel {
         }
 
         match self.child_receipt_log.lock() {
-            Ok(log) => log
-                .receipts()
-                .iter()
-                .any(|receipt| receipt.id == receipt_id),
+            Ok(log) => log.iter().any(|receipt| receipt.id == receipt_id),
             Err(poisoned) => poisoned
                 .into_inner()
-                .receipts()
                 .iter()
                 .any(|receipt| receipt.id == receipt_id),
         }
     }
 
     pub(crate) fn local_receipt_artifact(&self, receipt_id: &str) -> Option<LocalReceiptArtifact> {
+        if self.receipt_store.is_some() {
+            if let Some(receipt) = self
+                .with_receipt_store(|store| Ok(store.load_chio_receipt(receipt_id)?))
+                .ok()
+                .flatten()
+                .flatten()
+            {
+                return Some(LocalReceiptArtifact::Tool(Box::new(receipt)));
+            }
+            if let Some(child) = self
+                .with_receipt_store(|store| Ok(store.load_child_receipt(receipt_id)?))
+                .ok()
+                .flatten()
+                .flatten()
+            {
+                return Some(LocalReceiptArtifact::Child(Box::new(child)));
+            }
+            return None;
+        }
         let tool_match = match self.receipt_log.lock() {
             Ok(log) => log
-                .receipts()
                 .iter()
                 .find(|receipt| receipt.id == receipt_id)
                 .cloned()
                 .map(|receipt| LocalReceiptArtifact::Tool(Box::new(receipt))),
             Err(poisoned) => poisoned
                 .into_inner()
-                .receipts()
                 .iter()
                 .find(|receipt| receipt.id == receipt_id)
                 .cloned()
@@ -86,14 +115,12 @@ impl ChioKernel {
 
         match self.child_receipt_log.lock() {
             Ok(log) => log
-                .receipts()
                 .iter()
                 .find(|receipt| receipt.id == receipt_id)
                 .cloned()
                 .map(|receipt| LocalReceiptArtifact::Child(Box::new(receipt))),
             Err(poisoned) => poisoned
                 .into_inner()
-                .receipts()
                 .iter()
                 .find(|receipt| receipt.id == receipt_id)
                 .cloned()

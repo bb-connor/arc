@@ -173,6 +173,10 @@ impl ChioKernel {
                 signing_queued_budget,
             ),
         );
+        // Build the receipt-mirror gauges first so they can be shared between
+        // the bounded ring and the telemetry / registry readers (RFC-0004).
+        let receipt_mirror_gauge;
+        let child_receipt_mirror_gauge;
         Self {
             config,
             guards: Vec::new(),
@@ -185,8 +189,18 @@ impl ChioKernel {
             resource_providers: Vec::new(),
             prompt_providers: Vec::new(),
             sessions: DashMap::new(),
-            receipt_log: Mutex::new(ReceiptLog::new()),
-            child_receipt_log: Mutex::new(ChildReceiptLog::new()),
+            receipt_log: {
+                let gauge = chio_bounded::SizeGauge::new();
+                receipt_mirror_gauge = gauge.clone();
+                Mutex::new(ReceiptLog::with_capacity(4096, gauge))
+            },
+            child_receipt_log: {
+                let gauge = chio_bounded::SizeGauge::new();
+                child_receipt_mirror_gauge = gauge.clone();
+                Mutex::new(ChildReceiptLog::with_capacity(4096, gauge))
+            },
+            receipt_mirror_gauge,
+            child_receipt_mirror_gauge,
             receipt_store: None,
             receipt_store_write_lock: Mutex::new(()),
             payment_adapter: None,
