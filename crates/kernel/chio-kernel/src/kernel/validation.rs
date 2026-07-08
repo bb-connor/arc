@@ -930,13 +930,27 @@ impl ChioKernel {
             cap,
         } = cost_context;
         let Some(charge) = charge_result else {
+            // When a payment was authorized but the grant carries no monetary ceiling,
+            // fold the authorization reference into the receipt so the invocation is
+            // auditable as prepaid.
+            let metadata = if let Some(auth) = payment_authorization.as_ref() {
+                let payment_meta = serde_json::json!({
+                    "financial": {
+                        "payment_reference": auth.authorization_id,
+                        "settlement_status": SettlementStatus::Pending,
+                    }
+                });
+                merge_metadata_objects(Some(payment_meta), extra_metadata)
+            } else {
+                extra_metadata
+            };
             return self.finalize_tool_output_with_metadata(
                 request,
                 output,
                 elapsed,
                 timestamp,
                 matched_grant_index,
-                extra_metadata,
+                metadata,
             );
         };
 
@@ -1287,10 +1301,37 @@ impl ChioKernel {
         request: &ToolCallRequest,
         charge_result: Option<&BudgetChargeResult>,
     ) -> Result<Option<PaymentAuthorization>, PaymentError> {
-        let Some(charge) = charge_result else {
-            return Ok(None);
+        // Derive the authorization amount. A MustPrepay intent with no budget charge
+        // (grant carries no monetary ceiling) uses the intent's quoted cost so the
+        // tool is not permitted to execute unpaid.
+        let (amount_units, currency) = if let Some(charge) = charge_result {
+            (charge.cost_charged, charge.currency.clone())
+        } else {
+            let Some(quoted_cost) = request
+                .governed_intent
+                .as_ref()
+                .and_then(|intent| intent.metered_billing.as_ref())
+                .filter(|metered| {
+                    metered.settlement_mode
+                        == chio_core::capability::governance::MeteredSettlementMode::MustPrepay
+                })
+                .map(|metered| &metered.quote.quoted_cost)
+            else {
+                return Ok(None);
+            };
+            (quoted_cost.units, quoted_cost.currency.clone())
         };
+
         let Some(adapter) = self.payment_adapter.as_ref() else {
+            // No budget charge means this point is only reachable for MustPrepay.
+            // The governed gate denies MustPrepay without an adapter earlier, but
+            // the payment boundary is fail-closed as defense-in-depth.
+            if charge_result.is_none() {
+                return Err(PaymentError::RailError(
+                    "MustPrepay intent reached payment authorization without a configured adapter"
+                        .to_string(),
+                ));
+            }
             return Ok(None);
         };
 
@@ -1331,8 +1372,8 @@ impl ChioKernel {
 
         adapter
             .authorize(&PaymentAuthorizeRequest {
-                amount_units: charge.cost_charged,
-                currency: charge.currency.clone(),
+                amount_units,
+                currency,
                 payer: request.agent_id.clone(),
                 payee: request.server_id.clone(),
                 reference: request.request_id.clone(),

@@ -270,3 +270,57 @@ async fn sim_adapter_abort_unwinds_authorization() {
         "adapter.refund() must not be called for an unsettled authorization"
     );
 }
+
+// Governed MustPrepay where the grant carries no monetary ceiling:
+// the budget layer yields PreExecutionBudgetMutation::None (charge_result == None),
+// bypassing the cost path. The payment adapter must still be called and the
+// receipt must carry the authorization reference.
+#[test]
+fn mustprepay_no_budget_charge_authorizes_payment_and_stamps_receipt() {
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
+    // Server reports a cost; the grant has no monetary ceiling so charge_result is None.
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+
+    let agent_kp = Keypair::generate();
+    // Grant without monetary limits: GovernedIntentRequired + approval threshold
+    // ensure validate_governed_transaction runs, but no cost ceiling means the budget
+    // layer returns PreExecutionBudgetMutation::None.
+    let grant = ToolGrant {
+        server_id: "cost-srv".to_string(),
+        tool_name: "compute".to_string(),
+        operations: vec![Operation::Invoke],
+        constraints: vec![
+            Constraint::GovernedIntentRequired,
+            Constraint::RequireApprovalAbove { threshold_units: 50 },
+        ],
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost: None,
+        dpop_required: None,
+    };
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    // Intent quotes 100 USD (above threshold 50), so an approval token is required.
+    let intent = make_mustprepay_intent("intent-no-charge", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-no-charge", &cap, &agent_kp, intent, &kernel);
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    assert_eq!(response.verdict, Verdict::Allow);
+    let financial = expect_financial_meta(&response);
+    let payment_reference = financial["payment_reference"]
+        .as_str()
+        .expect("receipt must carry payment_reference when payment was authorized");
+    assert!(
+        payment_reference.starts_with("sim-"),
+        "payment_reference must be a sim- id; got {payment_reference}"
+    );
+    let status = financial["settlement_status"].as_str().unwrap_or("");
+    assert!(
+        status == "settled" || status == "pending",
+        "settlement_status must be settled or pending; got {status}"
+    );
+}
