@@ -126,6 +126,25 @@ impl SqliteBudgetStore {
         Ok(seq.max(0) as u64)
     }
 
+    /// Highest mutation event_seq written under one origin authority, or 0 when
+    /// none. The cluster budget-write handler reads this immediately after a
+    /// local (leader) write to build the write's quorum-witness token: it is
+    /// always >= the just-written event's own seq (a concurrent same-origin
+    /// write can only raise it), so the per-origin contiguous witness can only
+    /// under-count witnesses, never over-count one (fail-closed, RFC-0011 D2).
+    pub fn max_mutation_event_seq_for_authority(
+        &self,
+        authority_id: &str,
+    ) -> Result<u64, BudgetStoreError> {
+        let connection = self.connection()?;
+        let seq: i64 = connection.query_row(
+            "SELECT COALESCE(MAX(event_seq), 0) FROM budget_mutation_events WHERE authority_id = ?1",
+            rusqlite::params![authority_id],
+            |row| row.get(0),
+        )?;
+        Ok(seq.max(0) as u64)
+    }
+
     /// Per-origin contiguous ack head: the highest event_seq S from an origin
     /// such that every event in (floor..S] is present with no gap AND the run
     /// reaches down to the durable trusted floor. NOT MAX(event_seq), NOT

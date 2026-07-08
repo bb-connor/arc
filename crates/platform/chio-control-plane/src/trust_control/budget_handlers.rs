@@ -5,7 +5,7 @@ use super::cluster::{
     budget_authority_guarantee_level, budget_authority_metadata_view,
     current_budget_event_authority, respond_after_budget_write_quorum_commit,
     respond_after_leader_visible_write, rollback_budget_authorize_exposure,
-    wait_for_budget_write_quorum_commit,
+    wait_for_budget_write_quorum_commit, BudgetWriteToken,
 };
 use super::report_rendering::{
     forward_post_to_leader, json_response_with_leader_visibility_and_budget_commit,
@@ -109,6 +109,38 @@ pub(crate) async fn handle_try_increment_budget(
     )
 }
 
+/// Build the quorum-witness token for a budget write from its origin authority
+/// and the highest event_seq that origin has written. The event_seq is >= this
+/// write's own seq (a concurrent same-origin write can only raise it), so the
+/// per-origin contiguous witness can only under-count witnesses, never
+/// over-count one (fail-closed). A single-node write (no authority) carries a
+/// placeholder token; the quorum wait short-circuits when unclustered
+/// (RFC-0011 D2, F16).
+fn budget_write_token(
+    store: &SqliteBudgetStore,
+    authority: Option<&BudgetEventAuthority>,
+) -> Result<BudgetWriteToken, Response> {
+    match authority {
+        Some(authority) => {
+            let event_seq = store
+                .max_mutation_event_seq_for_authority(&authority.authority_id)
+                .map_err(|error| {
+                    plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+                })?;
+            Ok(BudgetWriteToken {
+                origin_id: authority.authority_id.clone(),
+                event_seq,
+                budget_term: authority.lease_epoch,
+            })
+        }
+        None => Ok(BudgetWriteToken {
+            origin_id: String::new(),
+            event_seq: 0,
+            budget_term: 0,
+        }),
+    }
+}
+
 pub(crate) async fn handle_try_charge_cost(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
@@ -147,38 +179,40 @@ pub(crate) async fn handle_try_charge_cost(
         }
     };
     if allowed {
+        let write = match budget_write_token(&store, authority.as_ref()) {
+            Ok(write) => write,
+            Err(response) => return response,
+        };
         let committed_response = match store.get_usage(&payload.capability_id, payload.grant_index)
         {
-            Ok(Some(usage)) => Some((
-                TryChargeCostResponse {
-                    capability_id: payload.capability_id.clone(),
-                    grant_index: payload.grant_index,
-                    allowed,
-                    invocation_count: Some(usage.invocation_count),
-                    total_cost_exposed: Some(usage.total_cost_exposed),
-                    total_cost_realized_spend: Some(usage.total_cost_realized_spend),
-                    budget_authority: budget_authority_metadata_view(
-                        &state,
-                        Some(usage.seq),
-                        budget_authority_guarantee_level(&state, Some(usage.seq)),
-                    ),
-                    budget_commit: None,
-                },
-                usage.seq,
-            )),
+            Ok(Some(usage)) => Some(TryChargeCostResponse {
+                capability_id: payload.capability_id.clone(),
+                grant_index: payload.grant_index,
+                allowed,
+                invocation_count: Some(usage.invocation_count),
+                total_cost_exposed: Some(usage.total_cost_exposed),
+                total_cost_realized_spend: Some(usage.total_cost_realized_spend),
+                budget_authority: budget_authority_metadata_view(
+                    &state,
+                    Some(usage.seq),
+                    budget_authority_guarantee_level(&state, Some(usage.seq)),
+                ),
+                budget_commit: None,
+            }),
             Ok(None) => None,
             Err(error) => {
                 return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
             }
         };
         drop(store);
-        let Some((response, budget_seq)) = committed_response else {
+        let Some(response) = committed_response else {
             return plain_http_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "budget exposure state was not visible on the leader after write",
             );
         };
-        let budget_commit = match wait_for_budget_write_quorum_commit(&state, budget_seq).await {
+        let commit_index = write.event_seq;
+        let budget_commit = match wait_for_budget_write_quorum_commit(&state, write).await {
             Ok(budget_commit) => budget_commit,
             Err(_) => {
                 let rollback_result =
@@ -187,13 +221,13 @@ pub(crate) async fn handle_try_charge_cost(
                     Ok(()) => plain_http_error(
                         StatusCode::SERVICE_UNAVAILABLE,
                         &format!(
-                            "budget authorize became leader-visible at commit index {budget_seq} but failed quorum commit; local exposure rollback succeeded"
+                            "budget authorize became leader-visible at commit index {commit_index} but failed quorum commit; local exposure rollback succeeded"
                         ),
                     ),
                     Err(error) => plain_http_error(
                         StatusCode::INTERNAL_SERVER_ERROR,
                         &format!(
-                            "budget authorize became leader-visible at commit index {budget_seq} but failed quorum commit and local exposure rollback also failed: {error}"
+                            "budget authorize became leader-visible at commit index {commit_index} but failed quorum commit and local exposure rollback also failed: {error}"
                         ),
                     ),
                 };
@@ -263,6 +297,10 @@ pub(crate) async fn handle_reverse_charge_cost(
     ) {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
     }
+    let write = match budget_write_token(&store, authority.as_ref()) {
+        Ok(write) => write,
+        Err(response) => return response,
+    };
     let committed_response = match store.get_usage(&payload.capability_id, payload.grant_index) {
         Ok(Some(usage)) => Some((
             ReverseChargeCostResponse {
@@ -278,7 +316,7 @@ pub(crate) async fn handle_reverse_charge_cost(
                 ),
                 budget_commit: None,
             },
-            usage.seq,
+            write,
         )),
         Ok(None) => None,
         Err(error) => {
@@ -342,6 +380,10 @@ pub(crate) async fn handle_reduce_charge_cost(
     if let Err(error) = reconcile_result {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
     }
+    let write = match budget_write_token(&store, authority.as_ref()) {
+        Ok(write) => write,
+        Err(response) => return response,
+    };
     let committed_response = match store.get_usage(&payload.capability_id, payload.grant_index) {
         Ok(Some(usage)) => Some((
             ReduceChargeCostResponse {
@@ -358,7 +400,7 @@ pub(crate) async fn handle_reduce_charge_cost(
                 ),
                 budget_commit: None,
             },
-            usage.seq,
+            write,
         )),
         Ok(None) => None,
         Err(error) => {

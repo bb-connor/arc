@@ -344,31 +344,32 @@ mod cluster_and_reports_tests {
         );
         update_peer_reachable(&state, "http://node-b");
         update_peer_reachable(&state, "http://node-c");
-        update_peer_budget_cursor(
+        update_peer_budget_acks(
             &state,
             "http://node-b",
-            BudgetCursor {
-                seq: 9,
-                updated_at: 14,
-                capability_id: "cap-1".to_string(),
-                grant_index: 0,
-            },
+            &[BudgetOriginAck {
+                origin_id: "http://node-a".to_string(),
+                event_seq: 9,
+            }],
         );
-        update_peer_budget_cursor(
+        update_peer_budget_acks(
             &state,
             "http://node-c",
-            BudgetCursor {
-                seq: 7,
-                updated_at: 12,
-                capability_id: "cap-1".to_string(),
-                grant_index: 0,
-            },
+            &[BudgetOriginAck {
+                origin_id: "http://node-a".to_string(),
+                event_seq: 7,
+            }],
         );
 
-        let commit = budget_write_quorum_commit_view(&state, 8).test_unwrap();
+        let write = BudgetWriteToken {
+            origin_id: "http://node-a".to_string(),
+            event_seq: 8,
+            budget_term: 1,
+        };
+        let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
         assert!(commit.quorum_committed);
         assert_eq!(commit.quorum_size, 2);
-        assert_eq!(commit.committed_nodes, 2);
+        assert_eq!(commit.committed_nodes, 2); // self + node-b (acked 9 >= 8)
         assert_eq!(
             commit.witness_urls,
             vec!["http://node-a".to_string(), "http://node-b".to_string()]
@@ -396,6 +397,60 @@ mod cluster_and_reports_tests {
             body["budgetCommit"]["witnessUrls"],
             json!(["http://node-a", "http://node-b"])
         );
+    }
+
+    #[test]
+    fn witness_requires_same_origin_ack() {
+        let state = state_with_cluster(
+            "http://node-a",
+            &["http://node-b", "http://node-c"],
+            None,
+            None,
+            None,
+        );
+        update_peer_reachable(&state, "http://node-b");
+        update_peer_reachable(&state, "http://node-c");
+        // A high ack under an UNRELATED origin must not witness the write.
+        update_peer_budget_acks(
+            &state,
+            "http://node-b",
+            &[BudgetOriginAck {
+                origin_id: "http://other-origin".to_string(),
+                event_seq: 999,
+            }],
+        );
+        update_peer_budget_acks(
+            &state,
+            "http://node-c",
+            &[BudgetOriginAck {
+                origin_id: "http://other-origin".to_string(),
+                event_seq: 999,
+            }],
+        );
+        let write = BudgetWriteToken {
+            origin_id: "http://node-a".to_string(),
+            event_seq: 41,
+            budget_term: 1,
+        };
+        let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
+        assert!(
+            !commit.quorum_committed,
+            "an ack under a different origin must not witness this write"
+        );
+        assert_eq!(commit.committed_nodes, 1, "only self counts");
+
+        // Now node-b acks THIS origin at >= 41: it flips to committed.
+        update_peer_budget_acks(
+            &state,
+            "http://node-b",
+            &[BudgetOriginAck {
+                origin_id: "http://node-a".to_string(),
+                event_seq: 41,
+            }],
+        );
+        let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
+        assert!(commit.quorum_committed);
+        assert_eq!(commit.committed_nodes, 2);
     }
 
     #[test]

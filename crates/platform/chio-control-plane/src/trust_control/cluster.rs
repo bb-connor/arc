@@ -33,6 +33,7 @@ pub(crate) use deltas::{
     handle_internal_revocations_delta, handle_internal_tool_receipts_delta, merge_budget_cursor,
     respond_after_budget_write_quorum_commit, respond_after_leader_visible_write,
     rollback_budget_authorize_exposure, run_cluster_sync_loop, wait_for_budget_write_quorum_commit,
+    BudgetWriteToken,
 };
 pub(crate) use partition::{
     handle_internal_cluster_partition, peer_budget_cursor, peer_child_seq, peer_is_partitioned,

@@ -676,15 +676,15 @@ pub(crate) fn rollback_budget_authorize_exposure(
 pub(crate) async fn respond_after_budget_write_quorum_commit<T>(
     state: &TrustServiceState,
     failure_message: &'static str,
-    payload: Option<(T, u64)>,
+    payload: Option<(T, BudgetWriteToken)>,
 ) -> Response
 where
     T: Serialize,
 {
-    let Some((payload, budget_seq)) = payload else {
+    let Some((payload, write)) = payload else {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, failure_message);
     };
-    let budget_commit = match wait_for_budget_write_quorum_commit(state, budget_seq).await {
+    let budget_commit = match wait_for_budget_write_quorum_commit(state, write).await {
         Ok(commit) => commit,
         Err(response) => return response,
     };
@@ -709,33 +709,47 @@ where
     json_response_with_leader_visibility(state, payload)
 }
 
+/// Identifies a specific budget write for the quorum witness: the origin
+/// authority that wrote the mutation event, the event's own event_seq (NOT
+/// usage.seq), and the budget term (lease epoch) it was written under.
+#[derive(Debug, Clone)]
+pub(crate) struct BudgetWriteToken {
+    pub(crate) origin_id: String,
+    pub(crate) event_seq: u64,
+    pub(crate) budget_term: u64,
+}
+
 pub(crate) fn budget_write_quorum_commit_view(
     state: &TrustServiceState,
-    budget_seq: u64,
+    write: &BudgetWriteToken,
 ) -> Option<BudgetWriteCommitView> {
     let cluster = state.cluster.as_ref()?;
     Some(match cluster.lock() {
-        Ok(mut guard) => budget_write_quorum_commit_view_locked(&mut guard, budget_seq),
+        Ok(mut guard) => budget_write_quorum_commit_view_locked(&mut guard, write),
         Err(poisoned) => {
             let mut guard = poisoned.into_inner();
-            budget_write_quorum_commit_view_locked(&mut guard, budget_seq)
+            budget_write_quorum_commit_view_locked(&mut guard, write)
         }
     })
 }
 
 fn budget_write_quorum_commit_view_locked(
     cluster: &mut ClusterRuntimeState,
-    budget_seq: u64,
+    write: &BudgetWriteToken,
 ) -> BudgetWriteCommitView {
     let consensus = compute_cluster_consensus_locked(cluster);
     let mut witness_urls = BTreeSet::from([cluster.self_url.clone()]);
     for (peer_url, peer_state) in &cluster.peers {
-        let committed = peer_state
-            .budget_cursor
-            .as_ref()
-            .map(|cursor| cursor.seq >= budget_seq)
-            .unwrap_or(false);
-        if peer_state.health.is_reachable() && !peer_state.partitioned && committed {
+        // A peer counts only when its contiguous ack head for THIS write's
+        // origin is at least the write's event_seq. An event from a different
+        // origin is grouped under a different key and cannot witness; a legacy
+        // NULL-authority event is excluded from budget_ack_heads and so never
+        // witnesses (RFC-0011 D2, F16).
+        let acked = peer_state
+            .budget_import_acks
+            .get(&write.origin_id)
+            .is_some_and(|imported_seq| *imported_seq >= write.event_seq);
+        if peer_state.health.is_reachable() && !peer_state.partitioned && acked {
             witness_urls.insert(peer_url.clone());
         }
     }
@@ -744,18 +758,17 @@ fn budget_write_quorum_commit_view_locked(
         .leader_url
         .clone()
         .unwrap_or_else(|| cluster.self_url.clone());
-    let budget_term = consensus.election_term;
-    let lease_epoch = budget_term;
+    let lease_epoch = write.budget_term;
     let lease_id = format!("{authority_id}#term-{lease_epoch}");
     BudgetWriteCommitView {
-        budget_seq,
-        commit_index: budget_seq,
+        budget_seq: write.event_seq,
+        commit_index: write.event_seq,
         quorum_committed: committed_nodes >= consensus.quorum_size,
         quorum_size: consensus.quorum_size,
         committed_nodes,
         witness_urls: witness_urls.into_iter().collect(),
         authority_id,
-        budget_term,
+        budget_term: write.budget_term,
         lease_id,
         lease_epoch,
     }
@@ -772,7 +785,7 @@ fn budget_write_quorum_commit_timeout(sync_interval: Duration) -> Duration {
 
 pub(crate) async fn wait_for_budget_write_quorum_commit(
     state: &TrustServiceState,
-    budget_seq: u64,
+    write: BudgetWriteToken,
 ) -> Result<Option<BudgetWriteCommitView>, Response> {
     if state.cluster.is_none() {
         return Ok(None);
@@ -782,7 +795,7 @@ pub(crate) async fn wait_for_budget_write_quorum_commit(
     let poll_interval = Duration::from_millis(250);
     let deadline = Instant::now() + timeout;
     loop {
-        let Some(commit_view) = budget_write_quorum_commit_view(state, budget_seq) else {
+        let Some(commit_view) = budget_write_quorum_commit_view(state, &write) else {
             return Ok(None);
         };
         if commit_view.quorum_committed {
@@ -792,8 +805,8 @@ pub(crate) async fn wait_for_budget_write_quorum_commit(
             return Err(plain_http_error(
                 StatusCode::SERVICE_UNAVAILABLE,
                 &format!(
-                    "budget write became leader-visible at commit index {budget_seq} for authority term {} but cluster quorum disappeared before commit",
-                    commit_view.budget_term,
+                    "budget write became leader-visible at commit index {} for authority term {} but cluster quorum disappeared before commit",
+                    write.event_seq, write.budget_term,
                 ),
             ));
         }
@@ -807,7 +820,7 @@ pub(crate) async fn wait_for_budget_write_quorum_commit(
                 warn!(error = %error, "trust-control budget quorum sync task panicked");
             }
         }
-        let Some(commit_view) = budget_write_quorum_commit_view(state, budget_seq) else {
+        let Some(commit_view) = budget_write_quorum_commit_view(state, &write) else {
             return Ok(None);
         };
         if commit_view.quorum_committed {
@@ -817,8 +830,8 @@ pub(crate) async fn wait_for_budget_write_quorum_commit(
             return Err(plain_http_error(
                 StatusCode::SERVICE_UNAVAILABLE,
                 &format!(
-                    "budget write became leader-visible at commit index {budget_seq} for authority term {} but only {}/{} quorum witnesses observed before timeout",
-                    commit_view.budget_term, commit_view.committed_nodes, commit_view.quorum_size
+                    "budget write became leader-visible at commit index {} for authority term {} but only {}/{} quorum witnesses observed before timeout",
+                    write.event_seq, write.budget_term, commit_view.committed_nodes, commit_view.quorum_size
                 ),
             ));
         }
