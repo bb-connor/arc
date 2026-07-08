@@ -406,6 +406,13 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         Some(("risk_adjudication_jurisdiction_receipt", "trust-market-v1")),
     ),
     (
+        CHIO_COMPTROLLER_SURFACE_REPORT_V1_SCHEMA,
+        Some((
+            "chio_comptroller_surface_report",
+            "chio-comptroller-surface/v1",
+        )),
+    ),
+    (
         CHIO_ENTERPRISE_DATA_GOVERNANCE_REPORT_V1_SCHEMA,
         Some(("enterprise_data_governance_report", "enterprise-export-v1")),
     ),
