@@ -1055,13 +1055,7 @@ impl ChioKernel {
             return Ok(None);
         };
         let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
-        let binding = crate::execution_nonce::NonceBinding {
-            subject_id: cap.subject.to_hex(),
-            capability_id: cap.id.clone(),
-            tool_server: request.server_id.clone(),
-            tool_name: request.tool_name.clone(),
-            parameter_hash: receipt.action.parameter_hash.clone(),
-        };
+        let binding = self.nonce_binding_for(request, cap, &receipt.action.parameter_hash);
         let signed = crate::execution_nonce::mint_execution_nonce(
             &self.config.keypair,
             binding,

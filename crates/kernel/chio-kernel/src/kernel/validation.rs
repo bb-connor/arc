@@ -1146,8 +1146,12 @@ impl ChioKernel {
                     })?;
                 let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
                 let binding = self.nonce_binding_for(request, cap, &action.parameter_hash);
-                let signed =
-                    crate::execution_nonce::mint_execution_nonce(&self.config.keypair, binding, nonce_config, now)?;
+                let signed = crate::execution_nonce::mint_execution_nonce(
+                    &self.config.keypair,
+                    binding,
+                    nonce_config,
+                    now,
+                )?;
                 Some(Box::new(signed))
             } else {
                 None
@@ -1156,36 +1160,48 @@ impl ChioKernel {
             None
         };
 
-        let budget_metadata = self.budget_execution_receipt_metadata(
-            &charge,
-            Some(("reconciled", &reconcile)),
-            preminted_execution_nonce.as_deref().map(|n| n.nonce_id()),
-        );
-        let merged_extra_metadata =
-            self.merge_budget_receipt_metadata(extra_metadata, budget_metadata);
         let financial_json = Some(serde_json::json!({ "financial": financial_meta }));
-        let merged_extra_metadata = merge_metadata_objects(financial_json, merged_extra_metadata);
 
         match limited_output {
             ToolServerOutput::Value(_)
-            | ToolServerOutput::Stream(ToolServerStreamResult::Complete(_)) => self
-                .build_allow_response_with_metadata(
+            | ToolServerOutput::Stream(ToolServerStreamResult::Complete(_)) => {
+                let budget_metadata = self.budget_execution_receipt_metadata(
+                    &charge,
+                    Some(("reconciled", &reconcile)),
+                    preminted_execution_nonce.as_deref().map(|n| n.nonce_id()),
+                );
+                let merged = merge_metadata_objects(
+                    financial_json,
+                    self.merge_budget_receipt_metadata(extra_metadata, budget_metadata),
+                );
+                self.build_allow_response_with_metadata(
                     request,
                     tool_call_output,
                     timestamp,
                     Some(charge.grant_index),
-                    merged_extra_metadata.clone(),
+                    merged,
                     preminted_execution_nonce,
-                ),
-            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => self
-                .build_incomplete_response_with_output_and_metadata(
+                )
+            }
+            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => {
+                let budget_metadata = self.budget_execution_receipt_metadata(
+                    &charge,
+                    Some(("reconciled", &reconcile)),
+                    None,
+                );
+                let merged = merge_metadata_objects(
+                    financial_json,
+                    self.merge_budget_receipt_metadata(extra_metadata, budget_metadata),
+                );
+                self.build_incomplete_response_with_output_and_metadata(
                     request,
                     Some(tool_call_output),
                     &reason,
                     timestamp,
                     Some(charge.grant_index),
-                    merged_extra_metadata,
-                ),
+                    merged,
+                )
+            }
         }
     }
 

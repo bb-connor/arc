@@ -606,28 +606,55 @@ mod tests {
         // R6 / Acceptance 7: a rename of any nonce field breaks CI so B/C pinned
         // slots cannot silently mis-parse.
         let kp = Keypair::generate();
-        let signed = mint_execution_nonce(&kp, sample_binding(), &ExecutionNonceConfig::default(), 1_000_000).unwrap();
+        let signed = mint_execution_nonce(
+            &kp,
+            sample_binding(),
+            &ExecutionNonceConfig::default(),
+            1_000_000,
+        )
+        .unwrap();
         let value = serde_json::to_value(&signed).unwrap();
         assert_eq!(value["nonce"]["schema"], "chio.execution_nonce.v1");
-        let nonce_keys: std::collections::BTreeSet<String> =
-            value["nonce"].as_object().unwrap().keys().cloned().collect();
+        let nonce_keys: std::collections::BTreeSet<String> = value["nonce"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         assert_eq!(
             nonce_keys,
             ["bound_to", "expires_at", "issued_at", "nonce_id", "schema"]
-                .into_iter().map(String::from).collect()
+                .into_iter()
+                .map(String::from)
+                .collect()
         );
-        let binding_keys: std::collections::BTreeSet<String> =
-            value["nonce"]["bound_to"].as_object().unwrap().keys().cloned().collect();
+        let binding_keys: std::collections::BTreeSet<String> = value["nonce"]["bound_to"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         assert_eq!(
             binding_keys,
-            ["capability_id", "parameter_hash", "subject_id", "tool_name", "tool_server"]
-                .into_iter().map(String::from).collect()
+            [
+                "capability_id",
+                "parameter_hash",
+                "subject_id",
+                "tool_name",
+                "tool_server"
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect()
         );
         let top_keys: std::collections::BTreeSet<String> =
             value.as_object().unwrap().keys().cloned().collect();
         assert_eq!(
             top_keys,
-            ["nonce", "signature"].into_iter().map(String::from).collect()
+            ["nonce", "signature"]
+                .into_iter()
+                .map(String::from)
+                .collect()
         );
     }
 
@@ -635,7 +662,13 @@ mod tests {
     fn signed_execution_nonce_implements_presented_nonce_view() {
         use chio_core_types::receipt::authoritative_spend::PresentedNonceView;
         let kp = Keypair::generate();
-        let signed = mint_execution_nonce(&kp, sample_binding(), &ExecutionNonceConfig::default(), 1_000_000).unwrap();
+        let signed = mint_execution_nonce(
+            &kp,
+            sample_binding(),
+            &ExecutionNonceConfig::default(),
+            1_000_000,
+        )
+        .unwrap();
         assert_eq!(signed.bound_capability_id(), "cap-123");
         assert_eq!(signed.bound_tool_server(), "fs");
         assert_eq!(signed.bound_tool_name(), "read_file");

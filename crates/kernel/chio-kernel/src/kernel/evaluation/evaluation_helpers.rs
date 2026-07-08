@@ -55,7 +55,11 @@ impl ChioKernel {
                 denial.cap,
                 self.merge_budget_receipt_metadata(
                     runtime_admission_metadata,
-                    self.budget_execution_receipt_metadata(charge, Some(("reversed", reverse)), None),
+                    self.budget_execution_receipt_metadata(
+                        charge,
+                        Some(("reversed", reverse)),
+                        None,
+                    ),
                 ),
             );
         }
@@ -86,9 +90,11 @@ impl ChioKernel {
             .map_err(KernelError::DelegationInvalid)?;
         let reverse = self.reverse_pre_execution_budget_mutation(cap, budget_mutation)?;
         let budget_metadata = match (budget_mutation.charge_result(), reverse.as_ref()) {
-            (Some(charge), Some(reverse)) => {
-                Some(self.budget_execution_receipt_metadata(charge, Some(("reversed", reverse)), None))
-            }
+            (Some(charge), Some(reverse)) => Some(self.budget_execution_receipt_metadata(
+                charge,
+                Some(("reversed", reverse)),
+                None,
+            )),
             _ => None,
         };
         let preflight_metadata = Some(serde_json::json!({
