@@ -55,15 +55,27 @@ pub(crate) fn build_operator_report(
 }
 
 /// Compose the unified comptroller surface projection from the operator + exposure read models.
-/// Fail-closed: exposure-builder errors and consistency-validation failures map to 5xx, never 200.
+/// Fail-closed: a missing read context, exposure-builder errors, and consistency-validation
+/// failures all map to 5xx. The exposure half uses the same principal context as the operator
+/// half so both halves share the same read boundary.
 pub(crate) fn build_comptroller_surface_report(
     receipt_store: &SqliteReceiptStore,
     budget_store: &SqliteBudgetStore,
     query: &OperatorReportQuery,
 ) -> Result<ComptrollerSurfaceReport, Response> {
+    let read_context = query.read_context.clone().ok_or_else(|| {
+        plain_http_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "comptroller surface report requires a resolved read context",
+        )
+    })?;
     let operator = build_operator_report(receipt_store, budget_store, query)?;
-    let exposure = build_exposure_ledger_report(receipt_store, &query.to_exposure_ledger_query())
-        .map_err(|error| error.into_response())?;
+    let exposure = build_exposure_ledger_report_with_context(
+        receipt_store,
+        &query.to_exposure_ledger_query(),
+        read_context,
+    )
+    .map_err(|error| error.into_response())?;
     let report = ComptrollerSurfaceReport::from_parts(&operator, &exposure);
     report.validate_consistency().map_err(|message| {
         (
