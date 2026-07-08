@@ -517,7 +517,13 @@ fn receipt_commit_actor_loop(
                     .iter()
                     .map(|request| request.response.clone())
                     .collect();
-                let flush_responses = flushes.clone();
+                // The co-drained Flush waiters are NOT passed into
+                // `commit_receipt_batch`; they are released below, AFTER the
+                // checkpoint build, so a flush is a genuine checkpoint barrier
+                // (codex round 4, finding 3). Keeping them in the loop lets the
+                // success and panic paths fan them out at one point, and
+                // because they are not moved into the panicking call they
+                // survive an unwind untouched.
                 pending_flush_error =
                     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                         commit_receipt_batch(
@@ -525,7 +531,6 @@ fn receipt_commit_actor_loop(
                             &mut head_state,
                             incremental_verification,
                             requests,
-                            flushes,
                             &health,
                         )
                     })) {
@@ -533,20 +538,47 @@ fn receipt_commit_actor_loop(
                         Err(payload) => Some(fan_out_batch_panic_error(
                             &health,
                             request_responses,
-                            flush_responses,
                             receipt_writer_job_panic_error(&payload),
                         )),
                     };
-                // Checkpoint construction runs AFTER the batch commits and
-                // AFTER commit_receipt_batch has already sent every caller's
-                // response, so ADR-0013 durability latency is not extended
-                // by checkpoint building. A build failure is recorded but
-                // does not fail the already-durable appends (fail-closed via
-                // `last_error`, not via poisoning the head).
+                // Checkpoint construction runs AFTER commit_receipt_batch has
+                // already sent every APPEND durability response, so ADR-0013
+                // append latency is not extended by checkpoint building; but it
+                // runs BEFORE the co-drained Flush waiters are released, so a
+                // flush cannot return until the owed checkpoints for the drained
+                // appends are built (flush-as-checkpoint-barrier, finding 3). A
+                // build failure is recorded via `last_error` and does not poison
+                // the head, and is surfaced to the co-drained Flush waiters of
+                // THIS batch via `flush_barrier_error`. It is deliberately NOT
+                // written back into `pending_flush_error`: that keeps the build
+                // error scoped to this batch's barrier and preserves the
+                // established contract of a later STANDALONE flush (which
+                // reflects append durability; background-build health is already
+                // surfaced through `last_error`/`receipt_store_health`).
+                let mut flush_barrier_error = pending_flush_error
+                    .as_ref()
+                    .map(receipt_store_error_snapshot);
                 if pending_flush_error.is_none() {
                     if let WriterHeadState::Verified(head) = &mut head_state {
-                        build_due_checkpoints_and_record(&pool, head, &checkpoint_signer, &health);
+                        if let Some(error) = build_due_checkpoints_and_record(
+                            &pool,
+                            head,
+                            &checkpoint_signer,
+                            &health,
+                        ) {
+                            flush_barrier_error = Some(error);
+                        }
                     }
+                }
+                // Release the co-drained Flush waiters now that owed checkpoints
+                // are built (the checkpoint barrier). An append error or a
+                // checkpoint-build failure reaches them as an Err; otherwise Ok.
+                for response in flushes {
+                    let result = match &flush_barrier_error {
+                        Some(error) => Err(receipt_store_error_snapshot(error)),
+                        None => Ok(()),
+                    };
+                    let _ = response.send(result);
                 }
                 if let Some(command) = deferred {
                     handle_non_append_command(
@@ -657,6 +689,22 @@ fn handle_non_append_command(
         }
         ReceiptCommitCommand::InstallSigner(signer) => {
             *checkpoint_signer = Some(signer);
+            // Install-time catch-up (codex round 4, finding 1). The store can
+            // open on a DB that already has >= max_batch uncheckpointed
+            // claim-log entries (a crash between the durable append response and
+            // the background build, or enabling checkpointing on an existing
+            // store). Without building here, the owed checkpoint waits for some
+            // future Append/Write, so a quiet restarted store stays
+            // uncheckpointed indefinitely despite checkpointing being enabled.
+            // Run the existing bounded builder now so any already-owed
+            // checkpoints (head.claim_log_max_seq - checkpointed_entry_seq >=
+            // max_batch) are built at install time (O(b) per checkpoint, loops
+            // until caught up; NOT a full verify, so F22 holds). Fail-closed:
+            // build_due_checkpoints_and_record records last_error and never
+            // panics the actor.
+            if let WriterHeadState::Verified(head) = head_state {
+                build_due_checkpoints_and_record(pool, head, checkpoint_signer, health);
+            }
         }
         ReceiptCommitCommand::ReseedHead(response) => {
             let outcome = pool
@@ -704,16 +752,18 @@ fn handle_non_append_command(
 /// Build every checkpoint the head owes and, on success, refresh the health
 /// head snapshot; on failure, record the error without poisoning the head or
 /// failing the append/write that triggered it (checkpoint construction never
-/// blocks an already-durable commit, RFC-0006 stage 4).
+/// blocks an already-durable commit, RFC-0006 stage 4). Returns the recorded
+/// error (if any) so a flush-as-checkpoint-barrier caller can surface it to its
+/// co-drained flush waiters (codex round 4, finding 3); the durable append/write
+/// path ignores the return, matching the pre-existing fail-closed-via-last_error
+/// behavior.
 fn build_due_checkpoints_and_record(
     pool: &Pool<SqliteConnectionManager>,
     head: &mut VerifiedHead,
     checkpoint_signer: &Option<BackgroundCheckpointSigner>,
     health: &ReceiptCommitWriterHealth,
-) {
-    let Some(signer) = checkpoint_signer.as_ref() else {
-        return;
-    };
+) -> Option<ReceiptStoreError> {
+    let signer = checkpoint_signer.as_ref()?;
     // Panic isolation (RFC-0006 whole-store-death fix): a panic mid-build
     // (Merkle build, Ed25519 sign, serde) must not kill the writer thread.
     // `head.latest_checkpoint` is only ever assigned AFTER the per-checkpoint
@@ -741,11 +791,13 @@ fn build_due_checkpoints_and_record(
                     *last_error = None;
                 }
             }
+            None
         }
         Err(error) => {
             if let Ok(mut last_error) = health.last_error.lock() {
                 *last_error = Some(error.to_string());
             }
+            Some(error)
         }
     }
 }
@@ -819,6 +871,12 @@ fn maybe_build_checkpoint(
         if test_hooks::panic_during_checkpoint_build(signer.max_batch) {
             panic!("injected test panic during background checkpoint build");
         }
+        #[cfg(test)]
+        if test_hooks::fail_checkpoint_build(signer.max_batch) {
+            return Err(ReceiptStoreError::Conflict(
+                "injected test checkpoint build failure".to_string(),
+            ));
+        }
         ensure_checkpoint_transparency_guards(connection)?;
         let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         // The insert returns the checkpoint now persisted at this seq: either
@@ -841,8 +899,23 @@ fn resync_head_after_write(
     connection: &Connection,
     head: &mut VerifiedHead,
 ) -> Result<(), ReceiptStoreError> {
-    let (delta_count, post_max) =
-        claim_log_delta_count_and_max_seq(connection, head.claim_log_max_seq)?;
+    let pre_resync_max = head.claim_log_max_seq;
+    let (delta_count, post_max) = claim_log_delta_count_and_max_seq(connection, pre_resync_max)?;
+    // Validate the ADOPTED resync delta before advancing the head (codex round
+    // 4, finding 2). A Write closure can commit claim_receipt_log_entries rows
+    // past this actor's head (another shared-DB writer, or a receipt-appending
+    // Write job), and this resync absorbs them via COUNT/MAX. Without
+    // validating them, an orphan/divergent row would be trusted and later
+    // appends would skip it as already-verified, so a background checkpoint
+    // could cover an unaudited entry. Re-validate JUST the
+    // (pre_resync_max, post_max] delta against the source receipt tables
+    // (O(delta)); the full-log validator is NOT called. Single-writer common
+    // case: no other writer, empty delta, no-op (F22). Fail-closed: an
+    // orphan/divergent delta returns the error, which the Write arm turns into
+    // a poisoned head.
+    if delta_count > 0 {
+        validate_adopted_claim_log_delta(connection, pre_resync_max, post_max)?;
+    }
     head.claim_log_count = head.claim_log_count.saturating_add(delta_count);
     head.claim_log_max_seq = post_max;
     verify_head_against_latest_checkpoint(connection, head)
@@ -853,7 +926,6 @@ fn commit_receipt_batch(
     head_state: &mut WriterHeadState,
     incremental_verification: bool,
     requests: Vec<ReceiptCommitRequest>,
-    flushes: Vec<mpsc::SyncSender<Result<(), ReceiptStoreError>>>,
     health: &ReceiptCommitWriterHealth,
 ) -> Option<ReceiptStoreError> {
     let results = match head_state {
@@ -886,15 +958,12 @@ fn commit_receipt_batch(
     if let Ok(mut last_error) = health.last_error.lock() {
         *last_error = flush_error.as_ref().map(ToString::to_string);
     }
+    // APPEND durability responses fan out here (ADR-0013): a durable append
+    // response is never delayed by checkpoint construction. The co-drained
+    // Flush waiters are released by the caller AFTER the checkpoint build, so a
+    // flush is a genuine checkpoint barrier (codex round 4, finding 3).
     for (request, result) in requests.into_iter().zip(results) {
         let _ = request.response.send(result);
-    }
-    for response in flushes {
-        let result = match &flush_error {
-            Some(error) => Err(receipt_store_error_snapshot(error)),
-            None => Ok(()),
-        };
-        let _ = response.send(result);
     }
     flush_error
 }
@@ -1322,15 +1391,17 @@ fn receipt_writer_job_panic_error(payload: &(dyn std::any::Any + Send)) -> Recei
 /// Panic isolation (RFC-0006 whole-store-death fix): `commit_receipt_batch`
 /// runs on the single writer thread, so a panic anywhere inside it (append
 /// transaction, lineage fold) must not kill that thread. By the time this
-/// runs, `requests` and `flushes` have already been moved into the
-/// panicking call and dropped during unwind, so the pre-cloned response
-/// senders are the only way left to answer every caller in the batch. This
-/// mirrors `receipt_batch_error_results`'s uniform fan-out and the health
-/// bookkeeping `commit_receipt_batch` would otherwise have performed itself.
+/// runs, `requests` has already been moved into the panicking call and dropped
+/// during unwind, so the pre-cloned request response senders are the only way
+/// left to answer every appender in the batch. The co-drained Flush waiters are
+/// NOT moved into the panicking call (codex round 4, finding 3): they survive
+/// the unwind in the actor loop, which fans out the returned error to them
+/// after this. This mirrors `receipt_batch_error_results`'s uniform fan-out and
+/// the health bookkeeping `commit_receipt_batch` would otherwise have performed
+/// itself.
 fn fan_out_batch_panic_error(
     health: &ReceiptCommitWriterHealth,
     request_responses: Vec<mpsc::SyncSender<Result<u64, ReceiptStoreError>>>,
-    flush_responses: Vec<mpsc::SyncSender<Result<(), ReceiptStoreError>>>,
     error: ReceiptStoreError,
 ) -> ReceiptStoreError {
     let batch_len = request_responses.len() as u64;
@@ -1340,9 +1411,6 @@ fn fan_out_batch_panic_error(
         *last_error = Some(error.to_string());
     }
     for response in request_responses {
-        let _ = response.send(Err(receipt_store_error_snapshot(&error)));
-    }
-    for response in flush_responses {
         let _ = response.send(Err(receipt_store_error_snapshot(&error)));
     }
     error
@@ -1376,6 +1444,22 @@ pub(crate) mod test_hooks {
     pub(crate) fn panic_during_checkpoint_build(max_batch: u64) -> bool {
         max_batch == PANIC_DURING_CHECKPOINT_BUILD_MARKER_MAX_BATCH
             && PANIC_DURING_CHECKPOINT_BUILD.load(Ordering::SeqCst)
+    }
+
+    /// When set, `maybe_build_checkpoint` returns a fail-closed `Err` (a
+    /// NON-panic checkpoint-build failure) for a signer using
+    /// `FAIL_CHECKPOINT_BUILD_MARKER_MAX_BATCH`, proving a build failure is
+    /// surfaced to a co-drained flush waiter (flush-as-checkpoint-barrier,
+    /// codex round 4 finding 3). It uses a DISTINCT marker from
+    /// `PANIC_DURING_CHECKPOINT_BUILD` so the two process-global flags cannot
+    /// interfere across the crate's parallel tests.
+    pub(crate) static FAIL_CHECKPOINT_BUILD: AtomicBool = AtomicBool::new(false);
+
+    pub(crate) const FAIL_CHECKPOINT_BUILD_MARKER_MAX_BATCH: u64 = 7;
+
+    pub(crate) fn fail_checkpoint_build(max_batch: u64) -> bool {
+        max_batch == FAIL_CHECKPOINT_BUILD_MARKER_MAX_BATCH
+            && FAIL_CHECKPOINT_BUILD.load(Ordering::SeqCst)
     }
 
     /// When set, `append_receipt_batch` panics before inserting the next

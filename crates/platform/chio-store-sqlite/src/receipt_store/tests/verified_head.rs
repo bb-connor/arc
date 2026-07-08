@@ -583,6 +583,87 @@ fn stale_head_validates_adopted_delta_before_trusting() -> Result<(), Box<dyn st
     Ok(())
 }
 
+/// Codex round 4, finding 2: `resync_head_after_write` advances the head after a
+/// Write closure by COUNT/MAX over `claim_receipt_log_entries`. When another
+/// process (or a receipt-appending Write job) commits rows PAST this actor's
+/// head, resync adopts them without validation, so an out-of-band
+/// orphan/divergent row is trusted and later appends skip it as
+/// already-verified (a background checkpoint could then cover an unaudited
+/// entry). The fix validates JUST the adopted delta (the same bounded
+/// `validate_adopted_claim_log_delta` the append path uses) before advancing.
+/// The single-writer common case (empty delta) adds no validation, so F22
+/// holds.
+#[test]
+fn resync_validates_adopted_delta() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-resync-delta");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    // Three real receipts -> claim-log entries 1..=3.
+    for i in 0..3 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-resync-{i}"), (i + 1) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+
+    // An out-of-band writer commits an ORPHAN claim-log row (no source receipt)
+    // at entry_seq 4, past this actor's head. Same injection as the append-path
+    // sibling above; inserts are not blocked by the reject_update trigger.
+    {
+        let connection = store.connection()?;
+        connection.execute(
+            r#"
+            INSERT INTO claim_receipt_log_entries (
+                entry_seq, receipt_id, receipt_kind, source_seq, timestamp,
+                capability_id, tool_server, tool_name, raw_json
+            ) VALUES (4, 'orphan-resync-4', 'tool_receipt', 999, 1, 'cap-oob', 'shell', 'bash', '{}')
+            "#,
+            [],
+        )?;
+    }
+
+    // FAIL-CLOSED: a head at claim_log_max_seq = 3 puts the orphan at entry_seq 4
+    // inside the adopted resync delta. The resync must REJECT it (finding 2), not
+    // silently absorb it, and must not advance the head.
+    let mut stale_head = VerifiedHead {
+        latest_checkpoint: None,
+        claim_log_count: 3,
+        claim_log_max_seq: 3,
+    };
+    let connection = store.connection()?;
+    let error = resync_head_after_write(&connection, &mut stale_head)
+        .err()
+        .ok_or("resync over an out-of-band orphan row must be rejected")?;
+    match &error {
+        ReceiptStoreError::Conflict(message) => assert!(
+            message.contains("chio receipt audit"),
+            "fail-closed Conflict must point at the audit CLI, got: {message}"
+        ),
+        other => return Err(format!("expected Conflict, got {other}").into()),
+    }
+    assert_eq!(
+        stale_head.claim_log_max_seq, 3,
+        "a rejected resync must not adopt the divergent delta"
+    );
+
+    // NO-OP (F22): a head already covering the orphan (max_seq = 4) has an EMPTY
+    // resync delta, so the range validator does NOT re-scan the below-floor
+    // orphan and the resync is a no-op.
+    let mut fresh_head = VerifiedHead {
+        latest_checkpoint: None,
+        claim_log_count: 4,
+        claim_log_max_seq: 4,
+    };
+    resync_head_after_write(&connection, &mut fresh_head)?;
+    assert_eq!(
+        fresh_head.claim_log_max_seq, 4,
+        "empty-delta resync must be a no-op"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
 /// Codex round 3, finding 3: `verify_head_against_latest_checkpoint` compares
 /// only the RFC 8785 body digest for a same-seq checkpoint (to keep the Ed25519
 /// verify off the per-append hot path, F22). A persisted `signature` COLUMN

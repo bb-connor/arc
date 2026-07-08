@@ -662,3 +662,180 @@ fn concurrent_valid_checkpoint_is_adopted_not_conflicted() -> Result<(), Box<dyn
     let _ = fs::remove_file(bad_path);
     Ok(())
 }
+
+/// Codex round 4, finding 1: the `InstallSigner` handler only STORED the signer;
+/// an already-owed checkpoint (the store opened on a DB that already has
+/// >= max_batch uncheckpointed claim-log entries, e.g. a crash between the
+/// durable append response and the background build, or enabling checkpointing
+/// on an existing store) was not built until some future Append/Write. A quiet
+/// restarted store stayed uncheckpointed indefinitely. The fix runs the bounded
+/// catch-up builder at install time.
+#[test]
+fn install_signer_builds_owed_checkpoints() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-install-owed-ckpt");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    let max_batch = 3;
+    // Append >= max_batch receipts with NO signer installed: durable, but no
+    // checkpoint is built, so the store carries an owed (uncheckpointed) range.
+    for i in 0..max_batch {
+        let receipt = sample_receipt_with_keypair(&format!("rcpt-install-{i}"), i + 1, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    assert!(
+        store.load_checkpoint_by_seq(1)?.is_none(),
+        "no checkpoint before the signer is installed"
+    );
+
+    // Install the signer. The InstallSigner handler must build the owed
+    // checkpoint IMMEDIATELY (finding 1), not wait for a future append.
+    store.enable_background_checkpoints(signer(&keypair, max_batch))?;
+    // Flush is only a synchronization barrier here: it makes the InstallSigner
+    // command observably processed. It does NOT itself append or build.
+    store.flush_receipt_writes()?;
+
+    // No further append happened; the owed checkpoint exists.
+    let checkpoint = store
+        .load_checkpoint_by_seq(1)?
+        .ok_or("InstallSigner must build the owed checkpoint at install time")?;
+    assert_eq!(
+        (
+            checkpoint.body.batch_start_seq,
+            checkpoint.body.batch_end_seq
+        ),
+        (1, 3)
+    );
+    let status = store.receipt_checkpoint_status(Some(max_batch))?;
+    assert!(status.healthy, "audit after install-time build: {status:?}");
+    assert_eq!(status.latest_checkpoint_seq, Some(1));
+    assert_eq!(status.latest_checkpointed_entry_seq, 3);
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+/// Deterministically co-drain a Flush with a group-commit batch of `n` fresh
+/// appends. The writer actor is first occupied by a blocking Write job so every
+/// following command queues behind it; then `n` Append commands and one Flush
+/// are enqueued IN ORDER directly on the actor channel; then the Write job is
+/// released. The actor drains the whole queue in ONE batch iteration, so the
+/// Flush lands inside the group-commit coalescing window (co-drained) instead
+/// of arriving as a standalone barrier afterward. Returns the flush waiter's
+/// result once the actor releases it (AFTER the checkpoint build, with the
+/// finding-3 fix).
+fn co_drain_flush_with_appends(
+    store: &SqliteReceiptStore,
+    keypair: &Keypair,
+    n: u64,
+    id_prefix: &str,
+) -> Result<Result<(), ReceiptStoreError>, Box<dyn std::error::Error>> {
+    let sender = store.receipt_commit_actor.sender.clone();
+    let handle = store.writer_handle();
+    let (started_tx, started_rx) = std::sync::mpsc::channel::<()>();
+    let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+    let job = std::thread::spawn(move || {
+        handle.run_write(move |_connection| -> Result<(), ReceiptStoreError> {
+            // Signal that the actor is now blocked INSIDE this Write job, then
+            // wait to be released so the commands below queue behind us.
+            let _ = started_tx.send(());
+            let _ = release_rx.recv();
+            Ok(())
+        })
+    });
+    started_rx.recv()?;
+
+    let mut append_receivers = Vec::new();
+    for i in 0..n {
+        let receipt = sample_receipt_with_keypair(&format!("{id_prefix}-{i}"), i + 1, keypair);
+        let raw_json = serde_json::to_string(&receipt)?;
+        let (response, receiver) = std::sync::mpsc::sync_channel(1);
+        sender
+            .try_send(ReceiptCommitCommand::Append(Box::new(
+                ReceiptCommitRequest {
+                    receipt,
+                    raw_json,
+                    ensure_lineage: false,
+                    response,
+                },
+            )))
+            .map_err(|_| "failed to enqueue append")?;
+        append_receivers.push(receiver);
+    }
+    let (flush_response, flush_receiver) = std::sync::mpsc::sync_channel(1);
+    sender
+        .try_send(ReceiptCommitCommand::Flush(flush_response))
+        .map_err(|_| "failed to enqueue flush")?;
+
+    // Release the Write job: the actor now drains [Append x n, Flush] as one
+    // batch, building owed checkpoints BEFORE releasing the flush waiter.
+    release_tx.send(())?;
+    job.join().map_err(|_| "write job thread panicked")??;
+
+    let flush_result = flush_receiver.recv()?;
+    // Keep the append receivers alive until the flush returns.
+    drop(append_receivers);
+    Ok(flush_result)
+}
+
+/// Codex round 4, finding 3: a Flush co-drained with a group-commit batch was
+/// answered by `commit_receipt_batch` BEFORE the (newly added) checkpoint build
+/// step ran, so a flush-as-barrier caller could observe a missing checkpoint /
+/// stale uncheckpointed range. The fix releases the co-drained Flush waiters
+/// only AFTER `build_due_checkpoints` has run for that batch, and surfaces a
+/// build failure to the flush caller as an error. Append durability responses
+/// still fan out before the build (ADR-0013).
+#[test]
+fn flush_is_a_checkpoint_barrier() -> Result<(), Box<dyn std::error::Error>> {
+    let keypair = receipt_test_keypair();
+
+    // Barrier: an append batch crosses the checkpoint threshold and a Flush is
+    // co-drained with it. When flush_receipt_writes()'s waiter returns, the due
+    // checkpoint MUST already exist.
+    let path = unique_db_path("chio-flush-barrier");
+    let store = SqliteReceiptStore::open(&path)?;
+    let max_batch = 3;
+    store.enable_background_checkpoints(signer(&keypair, max_batch))?;
+    store.flush_receipt_writes()?; // sync InstallSigner (no receipts yet, no build)
+
+    let flush_result = co_drain_flush_with_appends(&store, &keypair, max_batch, "rcpt-barrier")?;
+    assert!(
+        flush_result.is_ok(),
+        "the co-drained flush must succeed: {flush_result:?}"
+    );
+    assert!(
+        store.load_checkpoint_by_seq(1)?.is_some(),
+        "flush must not return until the co-drained batch's checkpoint is built"
+    );
+    let _ = fs::remove_file(path);
+
+    // Teeth: a checkpoint-build FAILURE for the co-drained batch surfaces to the
+    // flush caller as an Err (not a silent Ok). Uses the distinct
+    // FAIL_CHECKPOINT_BUILD hook (marker max_batch) so the process-global flag
+    // cannot interfere with the panic-isolation test.
+    let fail_path = unique_db_path("chio-flush-barrier-fail");
+    let fail_store = SqliteReceiptStore::open(&fail_path)?;
+    let fail_batch = test_hooks::FAIL_CHECKPOINT_BUILD_MARKER_MAX_BATCH;
+    fail_store.enable_background_checkpoints(signer(&keypair, fail_batch))?;
+    fail_store.flush_receipt_writes()?;
+
+    test_hooks::FAIL_CHECKPOINT_BUILD.store(true, std::sync::atomic::Ordering::SeqCst);
+    let flush_result =
+        co_drain_flush_with_appends(&fail_store, &keypair, fail_batch, "rcpt-barrier-fail")?;
+    test_hooks::FAIL_CHECKPOINT_BUILD.store(false, std::sync::atomic::Ordering::SeqCst);
+
+    let error = flush_result
+        .err()
+        .ok_or("a checkpoint-build failure must surface to the flush caller")?;
+    assert!(
+        matches!(error, ReceiptStoreError::Conflict(_)),
+        "flush must receive the build error, got {error:?}"
+    );
+    assert!(
+        fail_store.load_checkpoint_by_seq(1)?.is_none(),
+        "the failed build must not persist a checkpoint"
+    );
+    let _ = fs::remove_file(fail_path);
+
+    Ok(())
+}
