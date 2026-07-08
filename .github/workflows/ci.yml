@@ -163,6 +163,13 @@ jobs:
           CHIO_BIN: target/debug/chio
         run: bash ./scripts/check-chio-transaction-passport.sh
 
+      - name: governed-x402-sim smoke (no-key)
+        env:
+          CARGO_BUILD_JOBS: "1"
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+          CHIO_BIN: target/debug/chio
+        run: bash examples/governed-x402-sim/smoke.sh
+
       - name: Proof Room launch acceptance package
         env:
           CARGO_BUILD_JOBS: "1"

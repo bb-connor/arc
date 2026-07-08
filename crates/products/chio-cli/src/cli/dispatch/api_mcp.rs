@@ -38,6 +38,7 @@ pub(crate) fn dispatch_mcp(
 ) -> Result<(), CliError> {
     match command {
             McpCommands::Wrap(args) => cmd_mcp_wrap(&args),
+            McpCommands::GovernedSim(args) => cmd_mcp_governed_sim(&args),
             McpCommands::Serve {
                 policy,
                 preset,
