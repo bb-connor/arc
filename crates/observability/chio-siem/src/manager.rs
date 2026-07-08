@@ -52,6 +52,12 @@ pub struct SiemConfig {
     /// Explicit read authority for local receipt polling. SIEM polling is an
     /// operator surface and must not run with tenant-scoped authority.
     pub read_context: ReceiptReadContext,
+    /// Optional path to the SIEM-owned RW cursor store (per-exporter high-water
+    /// mark). When set, delivery is at-least-once: the read cursor resumes at
+    /// min(acked_seq) so a failed exporter forces bounded redelivery instead of
+    /// a silent skip (RFC-0009 F78). None keeps the legacy advance-regardless
+    /// behavior. Distinct from the read-only receipt DB (ADR-0009).
+    pub cursor_db_path: Option<PathBuf>,
 }
 
 impl Default for SiemConfig {
@@ -66,6 +72,7 @@ impl Default for SiemConfig {
             rate_limit: None,
             trusted_kernel_keys: BTreeSet::new(),
             read_context: ReceiptReadContext::local_operator_admin_all(),
+            cursor_db_path: None,
         }
     }
 }
@@ -77,9 +84,11 @@ impl Default for SiemConfig {
 /// Exporter. Failed exports are retried with exponential backoff; events that
 /// exhaust all retries are placed on the DeadLetterQueue.
 ///
-/// The cursor is NOT persisted to disk. On restart, the manager re-exports all
-/// receipts from seq=0. Both Splunk HEC (timestamp dedup) and Elasticsearch
-/// (_id upsert) handle duplicate events idempotently.
+/// When `SiemConfig::cursor_db_path` is None the read cursor is NOT persisted:
+/// on restart the manager re-exports all receipts from seq=0 (both Splunk HEC
+/// timestamp dedup and Elasticsearch _id upsert handle duplicates idempotently).
+/// When set, a per-exporter high-water mark is persisted and the cursor resumes
+/// at min(acked_seq) for at-least-once delivery (RFC-0009 F78).
 ///
 /// A single read-only SQLite connection is opened at construction time and
 /// reused across all poll cycles. This avoids the overhead of re-opening the
@@ -97,11 +106,16 @@ pub struct ExporterManager {
     rate_limiter: Option<ExportRateLimiter>,
     /// Persistent read-only connection to the receipt database.
     conn: Mutex<rusqlite::Connection>,
-    // Consumed by the SIEM serve-mode host wiring (RFC-0009 Part F); the
-    // scaffold installs it via with_metrics_sink so the poll loop can emit
-    // export/lag/dlq metrics without chio-siem depending on the registry.
-    #[allow(dead_code)]
+    // The poll loop emits export/lag/dlq metrics through this sink (RFC-0009
+    // Part F). Defaults to no-op so chio-siem stays decoupled from the metric
+    // registry (ADR-0009); the host installs a registry-backed sink.
     metrics: std::sync::Arc<dyn crate::metrics_sink::SiemMetricsSink>,
+    /// SIEM-owned RW high-water-mark store (RFC-0009 F78). None keeps the legacy
+    /// advance-regardless behavior.
+    cursor_store: Option<crate::cursor_store::SiemCursorStore>,
+    /// In-memory per-exporter high-water mark, seeded from the store at open and
+    /// advanced only on confirmed acceptance.
+    acked: std::collections::BTreeMap<String, u64>,
 }
 
 impl ExporterManager {
@@ -138,14 +152,27 @@ impl ExporterManager {
         .map_err(|e| SiemError::DbError(e.to_string()))?;
 
         let dlq = DeadLetterQueue::new(config.dlq_capacity);
+        // Open the SIEM-owned cursor store when configured and resume the read
+        // cursor at the slowest exporter's high-water mark (RFC-0009 F78).
+        let cursor_store = match &config.cursor_db_path {
+            Some(path) => Some(crate::cursor_store::SiemCursorStore::open(path)?),
+            None => None,
+        };
+        let acked = match &cursor_store {
+            Some(store) => store.acked_seqs()?,
+            None => std::collections::BTreeMap::new(),
+        };
+        let cursor = acked.values().copied().min().unwrap_or(0);
         Ok(Self {
             exporters: Vec::new(),
             dlq,
-            cursor: 0,
+            cursor,
             config,
             rate_limiter,
             conn: Mutex::new(conn),
             metrics: crate::metrics_sink::noop_metrics_sink(),
+            cursor_store,
+            acked,
         })
     }
 
@@ -257,13 +284,29 @@ impl ExporterManager {
                         max_seq = *seq;
                     }
                 }
-                Err(e) => {
+                Err(error) => {
+                    // RFC-0009 F80: capture the malformed row (record the outcome
+                    // and land a replayable FailedEvent carrying its raw seq)
+                    // rather than advancing past it with only a warn.
+                    self.metrics.record_export(
+                        "_deserialize",
+                        crate::metrics_sink::ExportOutcome::Malformed,
+                    );
+                    let failed_at = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0);
+                    self.dlq.push(FailedEvent {
+                        event_json: format!("{{\"raw_seq\":{seq}}}"),
+                        error: redact_for_operator_log(&error).to_string(),
+                        failed_at,
+                        exporter_name: "_deserialize".to_string(),
+                    });
                     tracing::warn!(
                         seq = seq,
-                        error = %redact_for_operator_log(&e),
-                        "Failed to deserialize receipt -- skipping"
+                        "Failed to deserialize receipt -- captured to DLQ"
                     );
-                    // Still advance past malformed rows.
+                    // Captured in the DLQ, so advancing past it is safe.
                     if *seq > max_seq {
                         max_seq = *seq;
                     }
@@ -277,9 +320,8 @@ impl ExporterManager {
             return Ok(());
         }
 
-        let mut any_dlq = false;
-
-        // Fan out to each registered exporter with retry.
+        // Fan out to each registered exporter with retry. The high-water mark
+        // for an exporter advances only on confirmed acceptance (RFC-0009 F78).
         for index in 0..self.exporters.len() {
             let exporter = self.exporters[index].as_ref();
             let exporter_name = exporter.name().to_string();
@@ -291,44 +333,62 @@ impl ExporterManager {
                 &events,
             )
             .await;
-            if let Err(e) = result {
-                any_dlq = true;
-                // Serialize failed events and push to DLQ.
-                let now = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0);
-
-                for event in &events {
-                    let event_json = serde_json::to_string(event).unwrap_or_else(|_| {
-                        format!("{{\"serialize_error\": \"receipt {}\"}}", event.receipt.id)
-                    });
-                    self.dlq.push(FailedEvent {
-                        event_json,
-                        error: e.to_string(),
-                        failed_at: now,
-                        exporter_name: exporter_name.clone(),
-                    });
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            match result {
+                Ok(_exported) => {
+                    for _ in &events {
+                        self.metrics
+                            .record_export(&exporter_name, crate::metrics_sink::ExportOutcome::Ok);
+                    }
+                    // Lag: persistence-to-ack for the newest event in the batch.
+                    if let Some(persisted) = events.iter().map(|e| e.receipt.timestamp).max() {
+                        self.metrics.observe_export_lag(
+                            &exporter_name,
+                            "info",
+                            now.saturating_sub(persisted) as f64,
+                        );
+                    }
+                    self.acked.insert(exporter_name.clone(), max_seq);
+                    if let Some(store) = &self.cursor_store {
+                        store.set_acked(&exporter_name, max_seq)?;
+                    }
                 }
-
-                tracing::warn!(
-                    exporter = exporter_name,
-                    error = %redact_for_operator_log(&e),
-                    dlq_len = self.dlq.len(),
-                    "All retries exhausted -- events pushed to DLQ"
-                );
+                Err(e) => {
+                    for event in &events {
+                        self.metrics
+                            .record_export(&exporter_name, crate::metrics_sink::ExportOutcome::Dlq);
+                        let event_json = serde_json::to_string(event).unwrap_or_else(|_| {
+                            format!("{{\"serialize_error\": \"receipt {}\"}}", event.receipt.id)
+                        });
+                        self.dlq.push(FailedEvent {
+                            event_json,
+                            error: e.to_string(),
+                            failed_at: now,
+                            exporter_name: exporter_name.clone(),
+                        });
+                    }
+                    tracing::warn!(
+                        exporter = exporter_name,
+                        error = %redact_for_operator_log(&e),
+                        dlq_len = self.dlq.len(),
+                        "All retries exhausted -- events pushed to DLQ; high-water mark held"
+                    );
+                    // acked_seq for this exporter is NOT advanced: the range is
+                    // redelivered next poll (at-least-once). Idempotent ingest
+                    // (ADR-0009) dedups downstream.
+                }
             }
+            self.metrics
+                .set_dlq_depth(&exporter_name, self.dlq.len() as u64);
         }
 
-        // CRITICAL: advance cursor regardless of DLQ status so we do not re-poll the same range.
-        if any_dlq {
-            tracing::info!(
-                seq_range_start = self.cursor,
-                seq_range_end = max_seq,
-                "Cursor advanced past batch containing DLQ'd events"
-            );
-        }
-        self.cursor = max_seq;
+        // Read cursor resumes at the slowest exporter so nothing is skipped. On
+        // the bootstrap poll (no exporter has acked yet) this falls back to
+        // max_seq, matching the legacy advance-regardless behavior.
+        self.cursor = self.acked.values().copied().min().unwrap_or(max_seq);
 
         Ok(())
     }

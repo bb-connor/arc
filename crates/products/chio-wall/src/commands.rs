@@ -1254,6 +1254,7 @@ mod tests {
             rate_limit: None,
             trusted_kernel_keys: std::collections::BTreeSet::new(),
             read_context: chio_kernel::ReceiptReadContext::local_operator_admin_all(),
+            cursor_db_path: None,
         })
         .expect("open ExporterManager");
         manager.add_exporter(Box::new(exporter.clone()));

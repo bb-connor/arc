@@ -19,6 +19,7 @@
 #![forbid(unsafe_code)]
 
 pub mod alerting;
+pub mod cursor_store;
 pub mod dlq;
 pub mod event;
 pub mod exporter;
@@ -33,6 +34,7 @@ pub use alerting::{
     derive_event_severity, derive_severity, Alert, AlertBackend, AlertSeverity, AlertingConfig,
     AlertingExporter, AlertingExporterBuilder, OpsGenieBackend, PagerDutyBackend,
 };
+pub use cursor_store::SiemCursorStore;
 pub use dlq::{DeadLetterQueue, FailedEvent};
 pub use event::SiemEvent;
 pub use exporter::{ExportError, ExportFuture, Exporter};
