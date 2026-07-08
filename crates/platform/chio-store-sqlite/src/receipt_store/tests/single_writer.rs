@@ -2,6 +2,125 @@ use super::super::*;
 use super::support::*;
 use chio_kernel::ReceiptStore;
 
+/// RFC-0006 whole-store-death fix: a panic inside a Write-routed job (one of
+/// the ~30 rerouted write families: lineage, liability, underwriting,
+/// reconciliation, capability, federated, IOU, checkpoint, reseed) must not
+/// take down the single writer thread for the rest of the process lifetime.
+///
+/// Two assertions:
+///   (a) the panicking job's own caller gets a typed `Err`, not a hang;
+///   (b) a SUBSEQUENT normal append on the SAME store still succeeds. This
+///       is the teeth: without `catch_unwind` isolating the job, the writer
+///       thread is dead here and every later append/write/flush observes
+///       `Disconnected` -> `receipt_actor_unavailable_error()` forever (or,
+///       if the caller happened to be blocked on `recv()` at the moment the
+///       thread died mid-response, a hang).
+#[test]
+fn writer_job_panic_does_not_kill_the_actor() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-writer-job-panic");
+    let store = SqliteReceiptStore::open(&path)?;
+
+    let panic_result =
+        store
+            .writer_handle()
+            .run_write(|_connection| -> Result<(), ReceiptStoreError> {
+                panic!("injected test panic in writer job")
+            });
+    let error = match panic_result {
+        Ok(()) => return Err("expected the panicking job to return Err, got Ok".into()),
+        Err(error) => error,
+    };
+    let message = error.to_string();
+    assert!(
+        message.contains("receipt writer job panicked"),
+        "unexpected error message: {message}"
+    );
+
+    // Teeth: the writer thread survived. A normal Write-routed job still
+    // reaches the (same) actor thread and completes.
+    let _thread_id = store
+        .writer_handle()
+        .run_write(|_connection| Ok(std::thread::current().id()))?;
+
+    // Teeth: a normal append still commits durably.
+    let receipt = sample_receipt_with_id("rcpt-after-writer-job-panic");
+    let seq = store.append_chio_receipt_returning_seq(&receipt)?;
+    assert_eq!(
+        seq, 1,
+        "append after a caught writer-job panic must still commit"
+    );
+
+    store.flush_receipt_writes()?;
+    let health = store.receipt_store_health()?;
+    assert_eq!(
+        health.writer.inflight, 0,
+        "inflight must drain to zero across the panicking job and the two jobs after it"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+/// RFC-0006 whole-store-death fix: a panic inside `commit_receipt_batch`
+/// (the append path itself, not a Write-routed job) must not take down the
+/// writer thread either. Uses the `test_hooks::PANIC_DURING_APPEND_BATCH`
+/// fault hook, which fires inside the per-request insert loop, before the
+/// interrupted request's transaction has committed and before any
+/// response in the batch has been sent -- exercising the
+/// `fan_out_batch_panic_error` path (the pre-cloned response senders, not
+/// the normal `receipt_batch_error_results` fan-out).
+///
+/// This crate's tests run in parallel and the fault-hook flag is
+/// process-global, so the hook is additionally gated on
+/// `PANIC_DURING_APPEND_BATCH_MARKER_CONTENT_HASH`: only a request carrying
+/// that exact `content_hash` can panic (not `receipt.id` -- `ChioReceipt::sign`
+/// always overwrites `id` with a content-derived hash, so a caller-chosen id
+/// string does not survive signing), so a concurrently running, unrelated
+/// append test cannot be hit by this test's injected panic.
+#[test]
+fn append_batch_panic_does_not_kill_the_actor() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-append-batch-panic");
+    let store = SqliteReceiptStore::open(&path)?;
+
+    test_hooks::PANIC_DURING_APPEND_BATCH.store(true, std::sync::atomic::Ordering::SeqCst);
+    let receipt = sample_receipt_with_id(test_hooks::PANIC_DURING_APPEND_BATCH_MARKER_RECEIPT_ID);
+    let panic_result = store.append_chio_receipt_returning_seq(&receipt);
+    test_hooks::PANIC_DURING_APPEND_BATCH.store(false, std::sync::atomic::Ordering::SeqCst);
+
+    let error = match panic_result {
+        Ok(seq) => {
+            return Err(
+                format!("expected the panicking append to return Err, got seq {seq}").into(),
+            )
+        }
+        Err(error) => error,
+    };
+    assert!(
+        error.to_string().contains("receipt writer job panicked"),
+        "unexpected error message: {error}"
+    );
+
+    // Teeth: the writer thread survived, and the interrupted append's
+    // transaction rolled back (no partial row) -- the next append gets
+    // seq 1, not seq 2.
+    let receipt = sample_receipt_with_id("rcpt-after-append-panic");
+    let seq = store.append_chio_receipt_returning_seq(&receipt)?;
+    assert_eq!(
+        seq, 1,
+        "the panicking append's tx must roll back cleanly, leaving seq 1 free"
+    );
+
+    store.flush_receipt_writes()?;
+    let health = store.receipt_store_health()?;
+    assert_eq!(
+        health.writer.inflight, 0,
+        "inflight must drain to zero across the panicking append and the append after it"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
 /// {Append, Write, Flush} from many threads: every Write closure executes on
 /// exactly one thread (single-writer serialization), all appends commit, and
 /// inflight accounting drains to zero (no lost pre-send increments).

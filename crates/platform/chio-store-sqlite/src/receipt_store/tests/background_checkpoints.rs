@@ -8,6 +8,84 @@ fn signer(keypair: &Keypair, max_batch: u64) -> BackgroundCheckpointSigner {
     }
 }
 
+/// RFC-0006 whole-store-death fix: a panic mid checkpoint-build (Merkle
+/// build, Ed25519 sign, serde) must not kill the writer thread and must not
+/// leave `head.latest_checkpoint` pointing at a half-built checkpoint. Uses
+/// the `test_hooks::PANIC_DURING_CHECKPOINT_BUILD` fault hook, which fires
+/// after the checkpoint body is computed but before its write transaction
+/// opens (`maybe_build_checkpoint`), mirroring the Task 9/10 fault-hook
+/// pattern used elsewhere in this suite.
+///
+/// This crate's tests run in parallel and the fault-hook flag is
+/// process-global, so this test uses
+/// `PANIC_DURING_CHECKPOINT_BUILD_MARKER_MAX_BATCH` as its `max_batch`: the
+/// hook only fires for a signer using that exact (otherwise unused) batch
+/// size, so a concurrently running, unrelated background-checkpoint test
+/// cannot be hit by this test's injected panic.
+#[test]
+fn background_build_panic_is_isolated() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-bg-panic-isolated");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    let max_batch = test_hooks::PANIC_DURING_CHECKPOINT_BUILD_MARKER_MAX_BATCH;
+    store.enable_background_checkpoints(signer(&keypair, max_batch))?;
+
+    test_hooks::PANIC_DURING_CHECKPOINT_BUILD.store(true, std::sync::atomic::Ordering::SeqCst);
+    for i in 0..max_batch {
+        let receipt = sample_receipt_with_keypair(&format!("rcpt-bg-panic-{i}"), i + 1, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    // Flush is the synchronization barrier: the actor attempts the
+    // checkpoint build inside the same command iteration as the batch that
+    // crosses the threshold, and a Flush enqueued afterwards is only served
+    // once that iteration (panic included) finishes.
+    store.flush_receipt_writes()?;
+    test_hooks::PANIC_DURING_CHECKPOINT_BUILD.store(false, std::sync::atomic::Ordering::SeqCst);
+
+    // last_error records the caught panic; no checkpoint was persisted
+    // (head.latest_checkpoint stayed unassigned: the panic fires before the
+    // write transaction opens).
+    let health = store.receipt_store_health()?;
+    let last_error = health.writer.last_error.as_deref().unwrap_or_default();
+    assert!(
+        last_error.contains("receipt writer job panicked"),
+        "expected last_error to record the injected panic, got {last_error:?}"
+    );
+    assert!(
+        store.load_checkpoint_by_seq(1)?.is_none(),
+        "a panic mid-build must not leave a partially built checkpoint"
+    );
+    // `receipt_store_health` folds `writer.last_error.is_some()` into
+    // `healthy` (same as a non-panic checkpoint-build `Err` would), so the
+    // caught panic is visible here too -- it is NOT swallowed. This is
+    // distinct from head poisoning, which is proven below by the recovery
+    // append succeeding (a poisoned head fails every subsequent write).
+    assert!(
+        !health.healthy,
+        "a recorded writer error must still surface through receipt_store_health"
+    );
+
+    // Teeth: the writer thread survived AND the head was not poisoned. The
+    // next append (now with the injected panic off) still succeeds and
+    // builds the checkpoint the earlier, panic-interrupted attempt owed;
+    // the batch commit that carries it also clears `last_error`.
+    let receipt = sample_receipt_with_keypair("rcpt-bg-panic-recovery", max_batch + 1, &keypair);
+    store.append_chio_receipt_returning_seq(&receipt)?;
+    store.flush_receipt_writes()?;
+    assert!(
+        store.load_checkpoint_by_seq(1)?.is_some(),
+        "writer thread must still be alive and able to build checkpoints after the panic"
+    );
+    let recovered_health = store.receipt_store_health()?;
+    assert!(
+        recovered_health.healthy,
+        "a successful batch after the panic must clear last_error: {recovered_health:?}"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
 #[test]
 fn maybe_build_checkpoint_builds_one_checkpoint_per_crossed_threshold(
 ) -> Result<(), Box<dyn std::error::Error>> {

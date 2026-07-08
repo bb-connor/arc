@@ -324,7 +324,19 @@ impl WriterHandle {
         let (response, result) = mpsc::sync_channel(1);
         let boxed: WriterClosure = Box::new(move |connection| {
             let outcome = match connection {
-                Ok(connection) => job(connection),
+                // Panic isolation (RFC-0006 whole-store-death fix): `job` is
+                // one of ~30 rerouted write families (lineage, liability,
+                // underwriting, reconciliation, capability, federated, IOU,
+                // checkpoint, reseed) now running on the single writer
+                // thread. `AssertUnwindSafe` is sound here because the
+                // writer actor re-acquires a fresh connection from the pool
+                // for every command (see `handle_non_append_command`); a
+                // caught panic fails only THIS job (fail-closed) and no
+                // state from the panicking closure is reused afterward.
+                Ok(connection) => {
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| job(connection)))
+                        .unwrap_or_else(|payload| Err(receipt_writer_job_panic_error(&payload)))
+                }
                 Err(error) => Err(error),
             };
             let _ = response.send(outcome);
@@ -446,14 +458,38 @@ fn receipt_commit_actor_loop(
                         Err(mpsc::RecvTimeoutError::Disconnected) => break,
                     }
                 }
-                pending_flush_error = commit_receipt_batch(
-                    &pool,
-                    &mut head_state,
-                    incremental_verification,
-                    requests,
-                    flushes,
-                    &health,
-                );
+                // Panic isolation (RFC-0006 whole-store-death fix):
+                // `commit_receipt_batch` runs on the single writer thread. A
+                // panic anywhere inside it (the append transaction, the
+                // lineage fold) must fail THIS batch, not kill the thread.
+                // Clone the response channels before handing `requests` /
+                // `flushes` to the panicking call: if it unwinds, those
+                // values are dropped mid-function and the only way left to
+                // answer every caller is through these pre-cloned senders.
+                let request_responses: Vec<_> = requests
+                    .iter()
+                    .map(|request| request.response.clone())
+                    .collect();
+                let flush_responses = flushes.clone();
+                pending_flush_error =
+                    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        commit_receipt_batch(
+                            &pool,
+                            &mut head_state,
+                            incremental_verification,
+                            requests,
+                            flushes,
+                            &health,
+                        )
+                    })) {
+                        Ok(flush_error) => flush_error,
+                        Err(payload) => Some(fan_out_batch_panic_error(
+                            &health,
+                            request_responses,
+                            flush_responses,
+                            receipt_writer_job_panic_error(&payload),
+                        )),
+                    };
                 // Checkpoint construction runs AFTER the batch commits and
                 // AFTER commit_receipt_batch has already sent every caller's
                 // response, so ADR-0013 durability latency is not extended
@@ -616,7 +652,18 @@ fn build_due_checkpoints_and_record(
     let Some(signer) = checkpoint_signer.as_ref() else {
         return;
     };
-    match build_due_checkpoints(pool, head, signer) {
+    // Panic isolation (RFC-0006 whole-store-death fix): a panic mid-build
+    // (Merkle build, Ed25519 sign, serde) must not kill the writer thread.
+    // `head.latest_checkpoint` is only ever assigned AFTER the per-checkpoint
+    // transaction commits (see `maybe_build_checkpoint`), so a panic
+    // anywhere before that leaves `head` exactly as it was; a caught panic
+    // is therefore handled identically to a non-panicking `Err`: record
+    // `last_error`, leave the head untouched, keep the thread alive.
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        build_due_checkpoints(pool, head, signer)
+    }))
+    .unwrap_or_else(|payload| Err(receipt_writer_job_panic_error(&payload)));
+    match result {
         Ok(()) => health.store_head_snapshot(head),
         Err(error) => {
             if let Ok(mut last_error) = health.last_error.lock() {
@@ -677,6 +724,10 @@ fn maybe_build_checkpoint(
             head.latest_checkpoint.as_ref(),
         )
         .map_err(checkpoint_error_to_receipt_store)?;
+        #[cfg(test)]
+        if test_hooks::panic_during_checkpoint_build(signer.max_batch) {
+            panic!("injected test panic during background checkpoint build");
+        }
         ensure_checkpoint_transparency_guards(connection)?;
         let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         insert_checkpoint_incremental_tx(&tx, head.latest_checkpoint.as_ref(), &checkpoint)?;
@@ -999,6 +1050,10 @@ fn append_receipt_batch(
         };
     let mut results = Vec::with_capacity(requests.len());
     for request in requests {
+        #[cfg(test)]
+        if test_hooks::panic_during_append_batch(&request.receipt.content_hash) {
+            panic!("injected test panic during append batch");
+        }
         match append_chio_receipt_tx(&tx, &request.receipt, &request.raw_json) {
             Ok(seq) => {
                 if request.ensure_lineage {
@@ -1112,6 +1167,49 @@ fn receipt_store_error_snapshot(error: &ReceiptStoreError) -> ReceiptStoreError 
     }
 }
 
+/// Convert a caught panic payload into a typed, fail-closed error. Panic
+/// payloads are almost always `&'static str` (a `panic!("literal")`) or
+/// `String` (a formatted `panic!("{}", ..)`); anything else degrades to a
+/// generic message rather than unwrapping (house rule: no unwrap/expect in
+/// non-test code).
+fn receipt_writer_job_panic_error(payload: &(dyn std::any::Any + Send)) -> ReceiptStoreError {
+    let message = payload
+        .downcast_ref::<&str>()
+        .map(|message| (*message).to_string())
+        .or_else(|| payload.downcast_ref::<String>().cloned())
+        .unwrap_or_else(|| "non-string panic payload".to_string());
+    ReceiptStoreError::Canonical(format!("receipt writer job panicked: {message}"))
+}
+
+/// Panic isolation (RFC-0006 whole-store-death fix): `commit_receipt_batch`
+/// runs on the single writer thread, so a panic anywhere inside it (append
+/// transaction, lineage fold) must not kill that thread. By the time this
+/// runs, `requests` and `flushes` have already been moved into the
+/// panicking call and dropped during unwind, so the pre-cloned response
+/// senders are the only way left to answer every caller in the batch. This
+/// mirrors `receipt_batch_error_results`'s uniform fan-out and the health
+/// bookkeeping `commit_receipt_batch` would otherwise have performed itself.
+fn fan_out_batch_panic_error(
+    health: &ReceiptCommitWriterHealth,
+    request_responses: Vec<mpsc::SyncSender<Result<u64, ReceiptStoreError>>>,
+    flush_responses: Vec<mpsc::SyncSender<Result<(), ReceiptStoreError>>>,
+    error: ReceiptStoreError,
+) -> ReceiptStoreError {
+    let batch_len = request_responses.len() as u64;
+    health.failed_total.fetch_add(batch_len, Ordering::SeqCst);
+    atomic_saturating_sub(&health.inflight, batch_len);
+    if let Ok(mut last_error) = health.last_error.lock() {
+        *last_error = Some(error.to_string());
+    }
+    for response in request_responses {
+        let _ = response.send(Err(receipt_store_error_snapshot(&error)));
+    }
+    for response in flush_responses {
+        let _ = response.send(Err(receipt_store_error_snapshot(&error)));
+    }
+    error
+}
+
 #[cfg(test)]
 pub(crate) mod test_hooks {
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -1122,6 +1220,50 @@ pub(crate) mod test_hooks {
 
     pub(crate) fn fail_between_receipt_and_lineage() -> bool {
         FAIL_BETWEEN_RECEIPT_AND_LINEAGE.load(Ordering::SeqCst)
+    }
+
+    /// When set, `maybe_build_checkpoint` panics after computing the
+    /// checkpoint body but before opening its write transaction, proving the
+    /// background-checkpoint catch_unwind wrap keeps the writer actor alive
+    /// and leaves `head.latest_checkpoint` unadvanced. Tests run in parallel
+    /// within this binary and this flag is process-global, so the panic is
+    /// additionally gated on `PANIC_DURING_CHECKPOINT_BUILD_MARKER_MAX_BATCH`
+    /// (a `max_batch` value no other test in this crate uses): a test whose
+    /// signer does not use that exact batch size never panics, even if the
+    /// flag happens to be `true` while it runs.
+    pub(crate) static PANIC_DURING_CHECKPOINT_BUILD: AtomicBool = AtomicBool::new(false);
+
+    pub(crate) const PANIC_DURING_CHECKPOINT_BUILD_MARKER_MAX_BATCH: u64 = 5;
+
+    pub(crate) fn panic_during_checkpoint_build(max_batch: u64) -> bool {
+        max_batch == PANIC_DURING_CHECKPOINT_BUILD_MARKER_MAX_BATCH
+            && PANIC_DURING_CHECKPOINT_BUILD.load(Ordering::SeqCst)
+    }
+
+    /// When set, `append_receipt_batch` panics before inserting the next
+    /// request in the batch, proving the append-batch catch_unwind wrap in
+    /// `receipt_commit_actor_loop` keeps the writer actor alive and fans out
+    /// a typed error to every request in the interrupted batch. Gated on a
+    /// `content_hash` marker for the same cross-test isolation reason as
+    /// `PANIC_DURING_CHECKPOINT_BUILD` above (this flag is process-global,
+    /// and other tests append receipts concurrently in the same binary).
+    /// `content_hash`, not `receipt.id`, is the marker: `ChioReceipt::sign`
+    /// always overwrites `id` with a content-derived hash
+    /// (`prepare_receipt_body_for_signing`), so a caller-chosen `id` string
+    /// does not survive signing, but a caller-chosen `content_hash` does.
+    pub(crate) static PANIC_DURING_APPEND_BATCH: AtomicBool = AtomicBool::new(false);
+
+    pub(crate) const PANIC_DURING_APPEND_BATCH_MARKER_RECEIPT_ID: &str =
+        "rcpt-test-hook-panic-during-append-batch";
+
+    /// `sample_receipt_with_id(id)` sets `content_hash: format!("content-{id}")`;
+    /// this must match that pattern for `PANIC_DURING_APPEND_BATCH_MARKER_RECEIPT_ID`.
+    pub(crate) const PANIC_DURING_APPEND_BATCH_MARKER_CONTENT_HASH: &str =
+        "content-rcpt-test-hook-panic-during-append-batch";
+
+    pub(crate) fn panic_during_append_batch(content_hash: &str) -> bool {
+        content_hash == PANIC_DURING_APPEND_BATCH_MARKER_CONTENT_HASH
+            && PANIC_DURING_APPEND_BATCH.load(Ordering::SeqCst)
     }
 }
 
