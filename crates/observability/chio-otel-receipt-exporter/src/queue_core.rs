@@ -137,8 +137,8 @@ impl<T: BoundedQueueItem> BoundedDropOldestQueue<T> {
 }
 
 impl<T> BoundedDropOldestQueue<T> {
-    pub fn front(&self) -> Option<&T> {
-        self.queue.front()
+    pub fn front_mut(&mut self) -> Option<&mut T> {
+        self.queue.front_mut()
     }
 
     pub fn snapshot(&self) -> BoundedQueueSnapshot {

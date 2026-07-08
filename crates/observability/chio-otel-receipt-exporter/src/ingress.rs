@@ -7,7 +7,9 @@ use crate::queue_core::{
     BoundedDropOldestQueue, BoundedQueueItem, BoundedQueueLimits, BoundedQueuePushSummary,
     BoundedQueueSnapshot,
 };
-use crate::sink::{OTelReceiptExportError, ReceiptStoreSink, ReceiptStoreSinkSummary};
+use crate::sink::{
+    CanonicalChioReceipt, OTelReceiptExportError, ReceiptStoreSink, ReceiptStoreSinkSummary,
+};
 
 /// Synchronous OTLP gRPC trace ingress facade.
 ///
@@ -250,27 +252,104 @@ impl BoundedOtlpGrpcIngress {
         Ok(summary.into())
     }
 
+    /// Ensure the front item's receipts are generated once (cached on the item)
+    /// and return a clone of (prepared receipts, resume cursor, span count).
+    /// Generation is pure (no store append), so doing it under the queue lock is
+    /// safe (RFC-0009 F81).
+    #[allow(clippy::type_complexity)]
+    fn prepare_front(
+        &self,
+    ) -> Result<
+        Option<(
+            Result<Vec<CanonicalChioReceipt>, OTelReceiptExportError>,
+            usize,
+            usize,
+        )>,
+        OTelReceiptExportError,
+    > {
+        let mut queue = self
+            .queue
+            .lock()
+            .map_err(|_| OTelReceiptExportError::Queue("OTEL queue mutex poisoned".to_string()))?;
+        let Some(item) = queue.front_mut() else {
+            return Ok(None);
+        };
+        let appended = item.appended;
+        let spans = item.spans;
+        // Generate the receipts once and cache them on the item. On failure the
+        // caller records the error and drops/retains the batch (like an append
+        // failure), so a poison-pill batch never wedges the queue.
+        if item.prepared.is_none() {
+            match self.sink.prepare_receipts(&item.export) {
+                Ok(receipts) => item.prepared = Some(receipts),
+                Err(error) => return Ok(Some((Err(error), appended, spans))),
+            }
+        }
+        let prepared = item.prepared.clone().unwrap_or_default();
+        Ok(Some((Ok(prepared), appended, spans)))
+    }
+
+    fn set_front_appended(&self, appended: usize) -> Result<(), OTelReceiptExportError> {
+        let mut queue = self
+            .queue
+            .lock()
+            .map_err(|_| OTelReceiptExportError::Queue("OTEL queue mutex poisoned".to_string()))?;
+        if let Some(item) = queue.front_mut() {
+            item.appended = appended;
+        }
+        Ok(())
+    }
+
     fn drain_locked(&self) -> Result<ReceiptStoreSinkSummary, OTelReceiptExportError> {
         let mut summary = ReceiptStoreSinkSummary::default();
         for _ in 0..self.config.drain_limit {
-            let Some((export, spans)) = self.front_export()? else {
+            let Some((prepare_result, already, spans)) = self.prepare_front()? else {
                 break;
             };
-            let item_summary = match self.sink.export_traces(&export) {
-                Ok(item_summary) => item_summary,
+            let prepared = match prepare_result {
+                Ok(prepared) => prepared,
                 Err(error) => {
-                    let retain_batch = error.is_retryable_batch_error();
-                    self.record_append_error(spans)?;
-                    if !retain_batch {
+                    // Receipt generation failed (validation/signing). Treat like
+                    // an append failure: record the unappended spans and drop the
+                    // batch unless the failure is retryable.
+                    let remaining = spans.saturating_sub(already);
+                    if remaining > 0 {
+                        self.record_append_error(remaining)?;
+                    }
+                    if !error.is_retryable_batch_error() {
                         let _ = self.pop_front()?;
                     }
                     return Err(error);
                 }
             };
-            let _ = self.pop_front()?;
-            summary.accepted_spans += item_summary.accepted_spans;
-            summary.appended_receipts += item_summary.appended_receipts;
-            self.record_appended(spans)?;
+            let mut appended = already;
+            let append_result = self.sink.append_from(&prepared, &mut appended);
+            let newly = appended.saturating_sub(already);
+            if newly > 0 {
+                self.record_appended(newly)?;
+            }
+            match append_result {
+                Ok(()) => {
+                    let _ = self.pop_front()?;
+                    summary.accepted_spans += spans;
+                    summary.appended_receipts += spans;
+                }
+                Err(error) => {
+                    let remaining = spans.saturating_sub(appended);
+                    if remaining > 0 {
+                        self.record_append_error(remaining)?;
+                    }
+                    if error.is_retryable_batch_error() {
+                        // Keep the batch AND its prepared receipts AND its resume
+                        // cursor, so the next drain re-appends only appended..n
+                        // with the SAME ids.
+                        self.set_front_appended(appended)?;
+                    } else {
+                        let _ = self.pop_front()?;
+                    }
+                    return Err(error);
+                }
+            }
         }
         Ok(summary)
     }
@@ -281,14 +360,6 @@ impl BoundedOtlpGrpcIngress {
             .lock()
             .map_err(|_| OTelReceiptExportError::Queue("OTEL queue mutex poisoned".to_string()))?;
         Ok(queue.pop_front())
-    }
-
-    fn front_export(&self) -> Result<Option<(OtlpGrpcTraceExport, usize)>, OTelReceiptExportError> {
-        let queue = self
-            .queue
-            .lock()
-            .map_err(|_| OTelReceiptExportError::Queue("OTEL queue mutex poisoned".to_string()))?;
-        Ok(queue.front().map(|item| (item.export.clone(), item.spans)))
     }
 
     fn record_appended(&self, spans: usize) -> Result<(), OTelReceiptExportError> {
@@ -319,6 +390,11 @@ struct QueuedOtlpExport {
     export: OtlpGrpcTraceExport,
     spans: usize,
     bytes: usize,
+    /// Signed receipts generated once for this batch (RFC-0009 F81). Kept so a
+    /// retryable append failure resumes with the SAME ids rather than re-signing.
+    prepared: Option<Vec<CanonicalChioReceipt>>,
+    /// Resume cursor: how many of `prepared` have been appended so far.
+    appended: usize,
 }
 
 impl QueuedOtlpExport {
@@ -329,6 +405,8 @@ impl QueuedOtlpExport {
             export,
             spans,
             bytes,
+            prepared: None,
+            appended: 0,
         }
     }
 }

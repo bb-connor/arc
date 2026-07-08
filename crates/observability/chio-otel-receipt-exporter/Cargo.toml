@@ -22,6 +22,7 @@ uuid = { workspace = true, features = ["v7"] }
 
 [dev-dependencies]
 loom = { workspace = true }
+proptest = { workspace = true }
 
 [lints.clippy]
 unwrap_used = "deny"
