@@ -153,9 +153,6 @@ enum ReceiptCommitCommand {
     /// Generic single-writer job. Runs on the writer connection after any
     /// in-flight append batch has committed. The closure receives `Err` when
     /// the actor cannot provide a healthy writer connection (fail-closed).
-    // RFC-0006 stage 2 reroutes the existing bypass writers onto this
-    // command, giving it production call sites beyond this stage's tests.
-    #[allow(dead_code)]
     Write(WriterClosure),
 }
 
@@ -272,10 +269,6 @@ impl ReceiptCommitActor {
 /// writer connection. Closures MUST NOT call back into `SqliteReceiptStore`
 /// methods that enqueue writer commands (that would deadlock the actor on
 /// itself); they receive the writer connection directly instead.
-// RFC-0006 stage 2 gives this handle production call sites (Task 2 reroutes
-// the existing bypass writers onto `run_write`); until then it is exercised
-// only by this stage's tests.
-#[allow(dead_code)]
 pub(crate) struct WriterHandle {
     sender: mpsc::SyncSender<ReceiptCommitCommand>,
     health: Arc<ReceiptCommitWriterHealth>,
@@ -284,7 +277,6 @@ pub(crate) struct WriterHandle {
 impl WriterHandle {
     /// Run one write job on the single writer connection and return its
     /// typed result. Fail-closed on saturation or a dead writer.
-    #[allow(dead_code)]
     pub(crate) fn run_write<T, F>(&self, job: F) -> Result<T, ReceiptStoreError>
     where
         F: FnOnce(&mut SqliteStoreConnection) -> Result<T, ReceiptStoreError> + Send + 'static,
@@ -591,15 +583,16 @@ use support::*;
 pub(crate) use support::{decode_verified_child_receipt, decode_verified_chio_receipt, sqlite_u64};
 
 impl SqliteReceiptStore {
+    /// Reader-pool connection. READS ONLY: every write transaction must go
+    /// through `writer_handle().run_write` (single-writer discipline,
+    /// RFC-0006). The reader pool is asserted read-only by
+    /// `reader_pool_never_begins_a_write_transaction` in tests.
     pub(crate) fn connection(&self) -> Result<SqliteStoreConnection, ReceiptStoreError> {
         self.pool
             .get()
             .map_err(|error| ReceiptStoreError::Pool(error.to_string()))
     }
 
-    // RFC-0006 stage 2 (Task 2) reroutes the existing bypass writers onto
-    // `WriterHandle::run_write`, giving this accessor production call sites.
-    #[allow(dead_code)]
     pub(crate) fn writer_handle(&self) -> WriterHandle {
         WriterHandle {
             sender: self.receipt_commit_actor.sender.clone(),
@@ -698,16 +691,21 @@ impl SqliteReceiptStore {
         let raw_json = std::str::from_utf8(raw_json.as_slice()).map_err(|error| {
             ReceiptStoreError::Canonical(format!("canonical receipt bytes are not UTF-8: {error}"))
         })?;
-        let mut connection = self.connection()?;
-        ensure_checkpoint_transparency_guards(&connection)?;
-        validate_claim_receipt_log_entries(&connection)?;
-        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-        verify_latest_checkpoint_integrity(&tx)?;
-        consume_authorization_receipt_tx(&tx, consumption)?;
-        append_chio_receipt_tx(&tx, receipt, raw_json)?;
-        ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &receipt.id)?;
-        tx.commit()?;
-        Ok(())
+        let raw_json = raw_json.to_string();
+        let receipt = receipt.clone();
+        let consumption = consumption.clone();
+        self.writer_handle().run_write(move |connection| {
+            ensure_checkpoint_transparency_guards(connection)?;
+            validate_claim_receipt_log_entries(connection)?;
+            let tx =
+                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+            verify_latest_checkpoint_integrity(&tx)?;
+            consume_authorization_receipt_tx(&tx, &consumption)?;
+            append_chio_receipt_tx(&tx, &receipt, &raw_json)?;
+            ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &receipt.id)?;
+            tx.commit()?;
+            Ok(())
+        })
     }
 
     pub fn flush_receipt_writes(&self) -> Result<ReceiptFlushReport, ReceiptStoreError> {
@@ -842,9 +840,11 @@ impl SqliteReceiptStore {
         max_batch: u64,
         keypair: &Keypair,
     ) -> Result<ReceiptCheckpointCreateReport, ReceiptStoreError> {
-        let mut connection = self.connection()?;
-        validate_claim_receipt_log_entries(&connection)?;
-        create_next_receipt_checkpoint_atomic(&mut connection, max_batch, keypair)
+        let keypair = keypair.clone();
+        self.writer_handle().run_write(move |connection| {
+            validate_claim_receipt_log_entries(connection)?;
+            create_next_receipt_checkpoint_atomic(connection, max_batch, &keypair)
+        })
     }
 
     fn flush_report(
