@@ -957,6 +957,43 @@ fn export_control_path(output: &Path) -> Result<ChioWallExportSummary, CliError>
     Ok(summary)
 }
 
+/// Opt-in production SIEM export serve mode (RFC-0009 F79). Runs the
+/// ExporterManager cursor-pull loop against `receipt_db` with a persisted
+/// per-exporter high-water mark in `cursor_db` (at-least-once delivery) and a
+/// registry-backed metrics sink, until an interrupt. This is the non-test
+/// counterpart of the integration-test spawn: a real, long-running serve path.
+pub fn cmd_chio_wall_siem_export(receipt_db: &Path, cursor_db: &Path) -> Result<(), CliError> {
+    let runtime = tokio::runtime::Runtime::new().map_err(|error| {
+        CliError::cli_other_error(format!("tokio runtime init failed: {error}"))
+    })?;
+    runtime.block_on(serve_siem_export(receipt_db, cursor_db))
+}
+
+async fn serve_siem_export(receipt_db: &Path, cursor_db: &Path) -> Result<(), CliError> {
+    let config = chio_siem::SiemConfig {
+        db_path: receipt_db.to_path_buf(),
+        cursor_db_path: Some(cursor_db.to_path_buf()),
+        ..chio_siem::SiemConfig::default()
+    };
+    let mut manager = chio_siem::ExporterManager::new(config)
+        .map_err(|error| CliError::cli_other_error(format!("open ExporterManager: {error}")))?
+        .with_metrics_sink(std::sync::Arc::new(
+            crate::registry_metrics_sink::RegistryMetricsSink,
+        ));
+    // Deployment-configured exporters are registered here via
+    // `manager.add_exporter(..)`; the loop still advances the cursor and emits
+    // export/dlq metrics when none are configured.
+    let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+    let handle = tokio::spawn(async move {
+        manager.run(cancel_rx).await;
+    });
+    // Serve until an interrupt, then cancel and drain in-flight work.
+    let _ = tokio::signal::ctrl_c().await;
+    let _ = cancel_tx.send(true);
+    let _ = handle.await;
+    Ok(())
+}
+
 pub fn cmd_chio_wall_control_path_export(output: &Path, json: bool) -> Result<(), CliError> {
     let summary = export_control_path(output)?;
     if json {
