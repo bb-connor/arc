@@ -422,6 +422,18 @@ impl ChioKernel {
                 )));
             }
         }
+        if receipt_store.supports_kernel_signed_checkpoints() {
+            receipt_store
+                .enable_background_checkpoints(
+                    self.config.keypair.clone(),
+                    self.checkpoint_batch_size,
+                )
+                .map_err(|error| {
+                    KernelError::Internal(format!(
+                        "failed to enable background receipt checkpoints: {error}"
+                    ))
+                })?;
+        }
         self.receipt_store = Some(receipt_store);
         Ok(())
     }

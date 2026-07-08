@@ -360,6 +360,21 @@ impl ReceiptStore for SqliteReceiptStore {
         true
     }
 
+    fn enable_background_checkpoints(
+        &self,
+        keypair: Keypair,
+        max_batch: u64,
+    ) -> Result<bool, ReceiptStoreError> {
+        SqliteReceiptStore::enable_background_checkpoints(
+            self,
+            crate::receipt_store::BackgroundCheckpointSigner {
+                keypair: std::sync::Arc::new(keypair),
+                max_batch,
+            },
+        )
+        .map(|()| true)
+    }
+
     fn record_capability_snapshot(
         &self,
         token: &CapabilityToken,

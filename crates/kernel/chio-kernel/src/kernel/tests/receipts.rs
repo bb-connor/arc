@@ -413,6 +413,12 @@ fn checkpoint_triggers_at_100_receipts() {
             .unwrap();
     }
 
+    // Flush barrier: background checkpoints are built on the writer thread
+    // after the batch commits; a flush drains the actor past that point.
+    kernel
+        .with_receipt_store(|store| Ok(store.flush_receipt_writes()?))
+        .unwrap();
+
     // Verify a checkpoint was stored in the database.
     let store2 = SqliteReceiptStore::open(&path).unwrap();
     let checkpoint = store2.load_checkpoint_by_seq(1).unwrap();
@@ -478,6 +484,10 @@ fn concurrent_receipt_checkpointing_keeps_contiguous_batches() {
         handle.join().unwrap();
     }
 
+    kernel
+        .with_receipt_store(|store| Ok(store.flush_receipt_writes()?))
+        .unwrap();
+
     let store2 = SqliteReceiptStore::open(&path).unwrap();
     for checkpoint_seq in 1..=6 {
         let checkpoint = store2
@@ -533,6 +543,10 @@ fn checkpoint_counters_restore_when_store_is_reattached() {
             .unwrap();
     }
 
+    first_kernel
+        .with_receipt_store(|store| Ok(store.flush_receipt_writes()?))
+        .unwrap();
+
     let mut restarted_kernel = make_kernel(second_config);
     restarted_kernel.register_tool_server(Box::new(EchoServer::new("srv", vec!["echo"])));
     restarted_kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
@@ -567,6 +581,10 @@ fn checkpoint_counters_restore_when_store_is_reattached() {
             })
             .unwrap();
     }
+
+    restarted_kernel
+        .with_receipt_store(|store| Ok(store.flush_receipt_writes()?))
+        .unwrap();
 
     let store = SqliteReceiptStore::open(&path).unwrap();
     let first_checkpoint = store
@@ -626,6 +644,9 @@ fn checkpoint_counters_refresh_across_kernels_sharing_store() {
             federated_origin_kernel_id: None,
         })
         .unwrap();
+    first_kernel
+        .with_receipt_store(|store| Ok(store.flush_receipt_writes()?))
+        .unwrap();
     second_kernel
         .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: "req-two-kernels-2".to_string(),
@@ -641,6 +662,9 @@ fn checkpoint_counters_refresh_across_kernels_sharing_store() {
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
+        .unwrap();
+    second_kernel
+        .with_receipt_store(|store| Ok(store.flush_receipt_writes()?))
         .unwrap();
 
     let store = SqliteReceiptStore::open(&path).unwrap();
@@ -721,6 +745,10 @@ fn inclusion_proof_verifies_against_stored_checkpoint() {
             .unwrap();
     }
 
+    kernel
+        .with_receipt_store(|store| Ok(store.flush_receipt_writes()?))
+        .unwrap();
+
     // Load checkpoint and receipts, build and verify an inclusion proof.
     let store2 = SqliteReceiptStore::open(&path).unwrap();
     let checkpoint = store2
@@ -740,6 +768,56 @@ fn inclusion_proof_verifies_against_stored_checkpoint() {
         proof.verify(&all_bytes[2], &checkpoint.body.merkle_root),
         "inclusion proof for receipt #3 should verify against checkpoint"
     );
+
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn background_checkpoints_are_installed_at_store_attach_and_fire_off_the_request_path() {
+    let path = unique_receipt_db_path("chio-bg-install");
+    let mut config = make_monetary_config();
+    config.checkpoint_batch_size = 2;
+
+    let mut kernel = make_kernel(config);
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(EchoServer::new("srv", vec!["echo"])));
+    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+
+    let grant = make_grant("srv", "echo");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    for i in 0..2 {
+        kernel
+            .evaluate_tool_call_blocking(&ToolCallRequest {
+                request_id: format!("req-bg-{i}"),
+                capability: cap.clone(),
+                tool_name: "echo".to_string(),
+                server_id: "srv".to_string(),
+                agent_id: agent_kp.public_key().to_hex(),
+                arguments: serde_json::json!({ "i": i }),
+                dpop_proof: None,
+                execution_nonce: None,
+                governed_intent: None,
+                approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
+            })
+            .unwrap();
+    }
+    // Flush barrier: background checkpoints are built on the writer thread
+    // after the batch commits; a flush drains the actor past that point.
+    kernel
+        .with_receipt_store(|store| Ok(store.flush_receipt_writes()?))
+        .unwrap();
+
+    let store2 = SqliteReceiptStore::open(&path).unwrap();
+    let checkpoint = store2
+        .load_checkpoint_by_seq(1)
+        .unwrap()
+        .expect("background checkpoint must exist after threshold crossing");
+    assert_eq!(checkpoint.body.batch_start_seq, 1);
+    assert_eq!(checkpoint.body.batch_end_seq, 2);
 
     let _ = std::fs::remove_file(&path);
 }
