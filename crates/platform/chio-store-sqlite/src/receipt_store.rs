@@ -144,9 +144,19 @@ struct ReceiptCommitRequest {
     response: mpsc::SyncSender<Result<u64, ReceiptStoreError>>,
 }
 
+type WriterClosure =
+    Box<dyn FnOnce(Result<&mut SqliteStoreConnection, ReceiptStoreError>) + Send + 'static>;
+
 enum ReceiptCommitCommand {
     Append(Box<ReceiptCommitRequest>),
     Flush(mpsc::SyncSender<Result<(), ReceiptStoreError>>),
+    /// Generic single-writer job. Runs on the writer connection after any
+    /// in-flight append batch has committed. The closure receives `Err` when
+    /// the actor cannot provide a healthy writer connection (fail-closed).
+    // RFC-0006 stage 2 reroutes the existing bypass writers onto this
+    // command, giving it production call sites beyond this stage's tests.
+    #[allow(dead_code)]
+    Write(WriterClosure),
 }
 
 impl ReceiptCommitActor {
@@ -258,6 +268,60 @@ impl ReceiptCommitActor {
     }
 }
 
+/// Cloneable handle for running arbitrary write transactions on the single
+/// writer connection. Closures MUST NOT call back into `SqliteReceiptStore`
+/// methods that enqueue writer commands (that would deadlock the actor on
+/// itself); they receive the writer connection directly instead.
+// RFC-0006 stage 2 gives this handle production call sites (Task 2 reroutes
+// the existing bypass writers onto `run_write`); until then it is exercised
+// only by this stage's tests.
+#[allow(dead_code)]
+pub(crate) struct WriterHandle {
+    sender: mpsc::SyncSender<ReceiptCommitCommand>,
+    health: Arc<ReceiptCommitWriterHealth>,
+}
+
+impl WriterHandle {
+    /// Run one write job on the single writer connection and return its
+    /// typed result. Fail-closed on saturation or a dead writer.
+    #[allow(dead_code)]
+    pub(crate) fn run_write<T, F>(&self, job: F) -> Result<T, ReceiptStoreError>
+    where
+        F: FnOnce(&mut SqliteStoreConnection) -> Result<T, ReceiptStoreError> + Send + 'static,
+        T: Send + 'static,
+    {
+        let (response, result) = mpsc::sync_channel(1);
+        let boxed: WriterClosure = Box::new(move |connection| {
+            let outcome = match connection {
+                Ok(connection) => job(connection),
+                Err(error) => Err(error),
+            };
+            let _ = response.send(outcome);
+        });
+        // Pre-send increment: same race-avoidance invariant as
+        // `ReceiptCommitActor::append` (see the comment at the `inflight`
+        // increment in `append`). The actor decrements unconditionally on
+        // dequeue; any send failure undoes the speculative increment.
+        self.health.inflight.fetch_add(1, Ordering::SeqCst);
+        match self.sender.try_send(ReceiptCommitCommand::Write(boxed)) {
+            Ok(()) => {}
+            Err(mpsc::TrySendError::Full(_)) => {
+                atomic_saturating_sub(&self.health.inflight, 1);
+                self.health.saturated_total.fetch_add(1, Ordering::SeqCst);
+                return Err(receipt_actor_saturated_error());
+            }
+            Err(mpsc::TrySendError::Disconnected(_)) => {
+                atomic_saturating_sub(&self.health.inflight, 1);
+                return Err(receipt_actor_unavailable_error());
+            }
+        }
+        match result.recv() {
+            Ok(outcome) => outcome,
+            Err(_) => Err(receipt_actor_unavailable_error()),
+        }
+    }
+}
+
 fn receipt_commit_channel() -> (
     mpsc::SyncSender<ReceiptCommitCommand>,
     mpsc::Receiver<ReceiptCommitCommand>,
@@ -291,6 +355,7 @@ fn receipt_commit_actor_loop(
             ReceiptCommitCommand::Append(request) => {
                 let mut requests = vec![*request];
                 let mut flushes = Vec::new();
+                let mut deferred: Option<ReceiptCommitCommand> = None;
                 while requests.len() < RECEIPT_GROUP_COMMIT_MAX_BATCH {
                     match receiver.recv_timeout(RECEIPT_GROUP_COMMIT_FLUSH_DELAY) {
                         Ok(ReceiptCommitCommand::Append(request)) => requests.push(*request),
@@ -298,11 +363,21 @@ fn receipt_commit_actor_loop(
                             flushes.push(response);
                             break;
                         }
+                        Ok(other) => {
+                            // Non-append commands (Write, and later
+                            // InstallSigner/ReseedHead) execute strictly
+                            // after the batch they interrupted commits.
+                            deferred = Some(other);
+                            break;
+                        }
                         Err(mpsc::RecvTimeoutError::Timeout) => break,
                         Err(mpsc::RecvTimeoutError::Disconnected) => break,
                     }
                 }
                 pending_flush_error = commit_receipt_batch(&pool, requests, flushes, &health);
+                if let Some(command) = deferred {
+                    handle_non_append_command(&pool, &health, command);
+                }
             }
             ReceiptCommitCommand::Flush(response) => {
                 let result = match &pending_flush_error {
@@ -311,6 +386,35 @@ fn receipt_commit_actor_loop(
                 };
                 let _ = response.send(result);
             }
+            other => handle_non_append_command(&pool, &health, other),
+        }
+    }
+}
+
+fn handle_non_append_command(
+    pool: &Pool<SqliteConnectionManager>,
+    health: &ReceiptCommitWriterHealth,
+    command: ReceiptCommitCommand,
+) {
+    match command {
+        ReceiptCommitCommand::Write(job) => {
+            // Unconditional decrement pairs with the pre-send increment in
+            // `WriterHandle::run_write`.
+            atomic_saturating_sub(&health.inflight, 1);
+            match pool.get() {
+                Ok(mut connection) => job(Ok(&mut connection)),
+                Err(error) => job(Err(ReceiptStoreError::Pool(error.to_string()))),
+            }
+        }
+        // Append/Flush are handled by the main loop; reaching here is
+        // impossible by construction but must stay fail-safe.
+        ReceiptCommitCommand::Append(request) => {
+            let _ = request
+                .response
+                .send(Err(receipt_actor_unavailable_error()));
+        }
+        ReceiptCommitCommand::Flush(response) => {
+            let _ = response.send(Err(receipt_actor_unavailable_error()));
         }
     }
 }
@@ -491,6 +595,16 @@ impl SqliteReceiptStore {
         self.pool
             .get()
             .map_err(|error| ReceiptStoreError::Pool(error.to_string()))
+    }
+
+    // RFC-0006 stage 2 (Task 2) reroutes the existing bypass writers onto
+    // `WriterHandle::run_write`, giving this accessor production call sites.
+    #[allow(dead_code)]
+    pub(crate) fn writer_handle(&self) -> WriterHandle {
+        WriterHandle {
+            sender: self.receipt_commit_actor.sender.clone(),
+            health: Arc::clone(&self.receipt_commit_actor.health),
+        }
     }
 
     /// Multi-tenant receipt isolation: toggle strict-isolation
@@ -1218,6 +1332,84 @@ mod receipt_commit_actor_tests {
                 );
             }
         }
+        Ok(())
+    }
+
+    #[test]
+    fn run_write_executes_jobs_serially_on_the_writer_thread(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let path = std::env::temp_dir().join(format!(
+            "chio-run-write-{}-{}.sqlite3",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let store = SqliteReceiptStore::open(&path)?;
+        let writer = store.writer_handle();
+
+        let first_thread = writer.run_write(|_connection| Ok(std::thread::current().id()))?;
+        let second_thread = writer.run_write(|_connection| Ok(std::thread::current().id()))?;
+
+        assert_eq!(
+            first_thread, second_thread,
+            "all write jobs must run on the single writer thread"
+        );
+        assert_ne!(
+            first_thread,
+            std::thread::current().id(),
+            "write jobs must not run on the caller thread"
+        );
+
+        // The closure really gets a usable writer connection.
+        let journal_mode = writer.run_write(|connection| {
+            connection
+                .query_row("PRAGMA journal_mode", [], |row| row.get::<_, String>(0))
+                .map_err(ReceiptStoreError::from)
+        })?;
+        assert!(journal_mode.eq_ignore_ascii_case("wal"));
+
+        // Inflight accounting drains back to zero after the jobs complete.
+        assert_eq!(
+            store
+                .receipt_commit_actor
+                .health
+                .inflight
+                .load(Ordering::SeqCst),
+            0
+        );
+
+        let _ = fs::remove_file(path);
+        Ok(())
+    }
+
+    #[test]
+    fn run_write_fails_closed_when_queue_is_full() -> Result<(), Box<dyn std::error::Error>> {
+        let (sender, _receiver) = receipt_commit_channel();
+        let health = Arc::new(ReceiptCommitWriterHealth::default());
+        for _ in 0..RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY {
+            let (response, _result) = mpsc::sync_channel(1);
+            sender.try_send(ReceiptCommitCommand::Flush(response))?;
+        }
+        let handle = WriterHandle {
+            sender,
+            health: Arc::clone(&health),
+        };
+
+        let error = handle.run_write(|_connection| Ok(()));
+
+        assert!(error
+            .err()
+            .ok_or("expected queue saturation error")?
+            .to_string()
+            .contains("sqlite receipt commit queue saturated"));
+        assert_eq!(
+            health.inflight.load(Ordering::SeqCst),
+            0,
+            "speculative inflight increment must be undone on saturation"
+        );
+        assert_eq!(health.saturated_total.load(Ordering::SeqCst), 1);
         Ok(())
     }
 }
