@@ -1,3 +1,7 @@
+//! EXPERIMENTAL (lane c): library-only, not CLI-wired; carries a documented
+//! passive-observation residual (see the "Residual exposure" section below and
+//! docs/release/RISK_REGISTER.md). Do not gate any release claim on this lane.
+//!
 //! Lane c: cross-operator fan-out over iroh-gossip per-treaty topics.
 //!
 //! ADAPTER-SPEC section 4 row (c) + 4.1. This is the one genuinely many-to-many
@@ -812,6 +816,9 @@ fn verify_deposit_self_signature(
 /// secret key for. See [`FanoutLane::new`] for the residual iroh_gossip 0.101
 /// contract (`Gossip` exposes no accessor to recover its own endpoint, so the caller
 /// must pass the SAME endpoint it spawned `gossip` on).
+///
+/// EXPERIMENTAL (lane c): library-only, not wired into the `chio` CLI; see the
+/// module-level residual-exposure note and docs/release/RISK_REGISTER.md.
 #[derive(Debug, Clone)]
 pub struct FanoutLane {
     gossip: Gossip,
