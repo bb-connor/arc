@@ -1,12 +1,15 @@
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used, dead_code)]
 
 use chio_core::capability::scope::{ChioScope, MonetaryAmount, Operation, ToolGrant};
 use chio_core::capability::token::CapabilityToken;
-use chio_core::crypto::Keypair;
+use chio_core::crypto::{Keypair, PublicKey};
+use chio_core::receipt::authoritative_spend::PresentedNonceView;
 use chio_core::receipt::body::{ChioReceipt, ChioReceiptBody};
+use chio_core::receipt::decision::ToolCallAction;
 use chio_core::receipt::kinds::{
     BoundaryClass, ObservationOutcome, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel,
 };
+use chio_core::sha256_hex;
 use chio_kernel::budget_store::BudgetStore;
 use chio_kernel::execution_nonce::{ExecutionNonceConfig, InMemoryExecutionNonceStore};
 use chio_kernel::{
@@ -159,4 +162,97 @@ pub fn advisory_receipt(signer: &Keypair, mediated: &ChioReceipt) -> ChioReceipt
         bbs_projection_version: None,
     };
     ChioReceipt::sign(body, signer).unwrap()
+}
+
+/// Minimal `PresentedNonceView` test double for standalone conformance tests
+/// that need a nonce binding without a live kernel invocation.
+pub struct FakePresentedNonce {
+    nonce_id: String,
+    capability_id: String,
+    tool_server: String,
+    tool_name: String,
+    parameter_hash: String,
+    signer: PublicKey,
+}
+
+impl PresentedNonceView for FakePresentedNonce {
+    fn nonce_id(&self) -> &str {
+        &self.nonce_id
+    }
+
+    fn bound_capability_id(&self) -> &str {
+        &self.capability_id
+    }
+
+    fn bound_tool_server(&self) -> &str {
+        &self.tool_server
+    }
+
+    fn bound_tool_name(&self) -> &str {
+        &self.tool_name
+    }
+
+    fn bound_parameter_hash(&self) -> &str {
+        &self.parameter_hash
+    }
+
+    fn verify_signed_by(&self, key: &PublicKey) -> bool {
+        &self.signer == key
+    }
+}
+
+/// Build a standalone advisory receipt without an existing mediated receipt to
+/// copy fields from. All advisory markers are set exactly as in `advisory_receipt`.
+pub fn standalone_advisory_receipt(
+    signer: &Keypair,
+    cap_id: &str,
+    server: &str,
+    tool: &str,
+) -> ChioReceipt {
+    let action = ToolCallAction::from_parameters(serde_json::json!({})).unwrap();
+    let body = ChioReceiptBody {
+        id: String::new(),
+        timestamp: 0,
+        capability_id: cap_id.to_string(),
+        tool_server: server.to_string(),
+        tool_name: tool.to_string(),
+        action,
+        decision: None,
+        receipt_kind: ReceiptKind::AdvisoryEvaluation,
+        boundary_class: BoundaryClass::AdvisoryOnly,
+        observation_outcome: Some(ObservationOutcome::Evaluated),
+        tool_origin: ToolOrigin::HostExecutedUnmediated,
+        redaction_mode: RedactionMode::None,
+        actor_chain: Vec::new(),
+        content_hash: sha256_hex(b"content"),
+        policy_hash: sha256_hex(b"policy"),
+        evidence: Vec::new(),
+        metadata: None,
+        trust_level: TrustLevel::Advisory,
+        tenant_id: None,
+        kernel_key: signer.public_key(),
+        bbs_projection_version: None,
+    };
+    ChioReceipt::sign(body, signer).unwrap()
+}
+
+/// Construct a `FakePresentedNonce` bound to the given fields.
+///
+/// The returned value implements `PresentedNonceView` so it can be passed to
+/// `is_authoritative_spend_receipt` as a `&dyn PresentedNonceView` reference.
+pub fn fake_bound_nonce(
+    signer: &Keypair,
+    cap_id: &str,
+    server: &str,
+    tool: &str,
+    parameter_hash: &str,
+) -> FakePresentedNonce {
+    FakePresentedNonce {
+        nonce_id: "fake-nonce".to_string(),
+        capability_id: cap_id.to_string(),
+        tool_server: server.to_string(),
+        tool_name: tool.to_string(),
+        parameter_hash: parameter_hash.to_string(),
+        signer: signer.public_key(),
+    }
 }
