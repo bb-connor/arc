@@ -41,6 +41,10 @@ CREATE INDEX IF NOT EXISTS idx_iou_envelope_tenant
 /// IOU writes share the same SQLite database and journal mode.
 pub struct SqliteIouEnvelopeStore {
     pool: Pool<SqliteConnectionManager>,
+    /// Present when opened alongside a receipt store: all writes are
+    /// serialized through the receipt store's single writer connection.
+    /// `None` only for the standalone `open_with_pool` path.
+    writer: Option<crate::receipt_store::WriterHandle>,
 }
 
 impl SqliteIouEnvelopeStore {
@@ -55,17 +59,33 @@ impl SqliteIouEnvelopeStore {
         connection
             .execute_batch(IOU_ENVELOPE_MIGRATION)
             .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?;
-        Ok(Self { pool })
+        Ok(Self { pool, writer: None })
     }
 
     /// Construct the store sharing the connection pool of an
     /// existing [`crate::SqliteReceiptStore`]. The receipt store has
     /// already configured WAL / synchronous=FULL on every connection
     /// out of the pool, so no additional connection setup is needed.
+    /// Writes are routed through the receipt store's writer handle so
+    /// they serialize with receipt commits on the single writer
+    /// connection; reads keep using the reader pool.
     pub fn open_alongside(
         store: &crate::SqliteReceiptStore,
     ) -> Result<Self, IouEnvelopeStoreError> {
-        Self::open_with_pool(store.pool.clone())
+        let writer = store.writer_handle();
+        // Run the additive migration on the writer connection so the reader
+        // pool never executes DDL.
+        writer
+            .run_write(|connection| {
+                connection
+                    .execute_batch(IOU_ENVELOPE_MIGRATION)
+                    .map_err(chio_kernel::ReceiptStoreError::from)
+            })
+            .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?;
+        Ok(Self {
+            pool: store.pool.clone(),
+            writer: Some(writer),
+        })
     }
 }
 
@@ -77,6 +97,68 @@ fn encode_envelope(envelope: &IouEnvelope) -> Result<Arc<[u8]>, IouEnvelopeStore
 
 fn decode_envelope(canonical: &str) -> Result<IouEnvelope, IouEnvelopeStoreError> {
     serde_json::from_str(canonical).map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn insert_envelope_on_connection(
+    connection: &rusqlite::Connection,
+    receipt_id: &str,
+    iou_id: &str,
+    receipt_ts: i64,
+    tenant_id: Option<&str>,
+    amount: i64,
+    currency: &str,
+    issuer_key_str: &str,
+    canonical_str: &str,
+) -> Result<bool, IouEnvelopeStoreError> {
+    let inserted = connection
+        .execute(
+            r#"
+            INSERT INTO iou_envelope (
+                receipt_id,
+                iou_id,
+                receipt_timestamp,
+                tenant_id,
+                amount_units,
+                currency,
+                issuer_key,
+                canonical_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(receipt_id) DO NOTHING
+            "#,
+            params![
+                receipt_id,
+                iou_id,
+                receipt_ts,
+                tenant_id,
+                amount,
+                currency,
+                issuer_key_str,
+                canonical_str,
+            ],
+        )
+        .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?;
+    if inserted == 1 {
+        return Ok(true);
+    }
+
+    let existing = connection
+        .query_row(
+            "SELECT canonical_json FROM iou_envelope WHERE receipt_id = ?1",
+            params![receipt_id],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?;
+    match existing {
+        Some(existing_canonical) if existing_canonical == canonical_str => Ok(false),
+        Some(_) => Err(IouEnvelopeStoreError::Conflict(format!(
+            "iou_envelope row for receipt_id={receipt_id} already exists with different bytes"
+        ))),
+        None => Err(IouEnvelopeStoreError::Backend(format!(
+            "iou_envelope conflict for receipt_id={receipt_id} but no row was readable"
+        ))),
+    }
 }
 
 impl IouEnvelopeStore for SqliteIouEnvelopeStore {
@@ -98,26 +180,37 @@ impl IouEnvelopeStore for SqliteIouEnvelopeStore {
             |err: std::num::TryFromIntError| IouEnvelopeStoreError::Backend(err.to_string()),
         )?;
 
-        let connection = self
-            .pool
-            .get()
-            .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?;
-        let inserted = connection
-            .execute(
-                r#"
-            INSERT INTO iou_envelope (
-                receipt_id,
-                iou_id,
-                receipt_timestamp,
-                tenant_id,
-                amount_units,
-                currency,
-                issuer_key,
-                canonical_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(receipt_id) DO NOTHING
-            "#,
-                params![
+        match &self.writer {
+            Some(writer) => {
+                let receipt_id = envelope.body.receipt_id.clone();
+                let iou_id = envelope.body.iou_id.clone();
+                let tenant_id = envelope.body.tenant_id.clone();
+                let currency = envelope.body.currency.clone();
+                let issuer_key = issuer_key_str.clone();
+                let canonical = canonical_str.to_string();
+                writer
+                    .run_write(move |connection| {
+                        Ok(insert_envelope_on_connection(
+                            connection,
+                            &receipt_id,
+                            &iou_id,
+                            receipt_ts,
+                            tenant_id.as_deref(),
+                            amount,
+                            &currency,
+                            &issuer_key,
+                            &canonical,
+                        ))
+                    })
+                    .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?
+            }
+            None => {
+                let connection = self
+                    .pool
+                    .get()
+                    .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?;
+                insert_envelope_on_connection(
+                    &connection,
                     envelope.body.receipt_id.as_str(),
                     envelope.body.iou_id.as_str(),
                     receipt_ts,
@@ -126,31 +219,8 @@ impl IouEnvelopeStore for SqliteIouEnvelopeStore {
                     envelope.body.currency.as_str(),
                     issuer_key_str.as_str(),
                     canonical_str,
-                ],
-            )
-            .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?;
-        if inserted == 1 {
-            return Ok(true);
-        }
-
-        let existing = connection
-            .query_row(
-                "SELECT canonical_json FROM iou_envelope WHERE receipt_id = ?1",
-                params![envelope.body.receipt_id.as_str()],
-                |row| row.get::<_, String>(0),
-            )
-            .optional()
-            .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?;
-        match existing {
-            Some(existing_canonical) if existing_canonical == canonical_str => Ok(false),
-            Some(_) => Err(IouEnvelopeStoreError::Conflict(format!(
-                "iou_envelope row for receipt_id={} already exists with different bytes",
-                envelope.body.receipt_id
-            ))),
-            None => Err(IouEnvelopeStoreError::Backend(format!(
-                "iou_envelope conflict for receipt_id={} but no row was readable",
-                envelope.body.receipt_id
-            ))),
+                )
+            }
         }
     }
 
@@ -312,5 +382,33 @@ mod tests {
     fn get_missing_returns_none() {
         let store = open_store();
         assert!(store.get_by_receipt_id("nope").unwrap().is_none());
+    }
+
+    #[test]
+    fn open_alongside_routes_writes_through_the_receipt_writer() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("iou-alongside.sqlite3");
+        let receipt_store = crate::SqliteReceiptStore::open(&path).unwrap();
+        let store = SqliteIouEnvelopeStore::open_alongside(&receipt_store).unwrap();
+        assert!(
+            store.writer.is_some(),
+            "open_alongside must carry the receipt writer handle"
+        );
+
+        let kp = Keypair::generate();
+        let account = LocalCreditAccount::new_with_trusted_kernel_keys(
+            Ed25519Backend::new(kp.clone()),
+            [kp.public_key()],
+        );
+        let receipt = make_priced_receipt(&kp, "rcpt-alongside-1", 42);
+        let envelope = account.evaluate(&receipt).unwrap().unwrap();
+        assert!(store.insert(&envelope).unwrap());
+        assert!(!store.insert(&envelope).unwrap());
+        let fetched = store
+            .get_by_receipt_id(&receipt.id)
+            .unwrap()
+            .expect("envelope was inserted");
+        assert_eq!(fetched, envelope);
+        std::mem::forget(dir);
     }
 }
