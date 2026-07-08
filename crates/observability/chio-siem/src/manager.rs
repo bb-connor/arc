@@ -97,6 +97,11 @@ pub struct ExporterManager {
     rate_limiter: Option<ExportRateLimiter>,
     /// Persistent read-only connection to the receipt database.
     conn: Mutex<rusqlite::Connection>,
+    // Consumed by the SIEM serve-mode host wiring (RFC-0009 Part F); the
+    // scaffold installs it via with_metrics_sink so the poll loop can emit
+    // export/lag/dlq metrics without chio-siem depending on the registry.
+    #[allow(dead_code)]
+    metrics: std::sync::Arc<dyn crate::metrics_sink::SiemMetricsSink>,
 }
 
 impl ExporterManager {
@@ -140,7 +145,19 @@ impl ExporterManager {
             config,
             rate_limiter,
             conn: Mutex::new(conn),
+            metrics: crate::metrics_sink::noop_metrics_sink(),
         })
+    }
+
+    /// Attach a metrics sink (RFC-0009). Defaults to no-op so headless callers
+    /// are unchanged.
+    #[must_use]
+    pub fn with_metrics_sink(
+        mut self,
+        sink: std::sync::Arc<dyn crate::metrics_sink::SiemMetricsSink>,
+    ) -> Self {
+        self.metrics = sink;
+        self
     }
 
     /// Register an exporter to receive receipt batches.

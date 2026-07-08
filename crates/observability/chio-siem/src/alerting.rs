@@ -609,6 +609,7 @@ impl Default for AlertingConfig {
 pub struct AlertingExporterBuilder {
     config: AlertingConfig,
     backends: Vec<Arc<dyn AlertBackend>>,
+    metrics: std::sync::Arc<dyn crate::metrics_sink::SiemMetricsSink>,
 }
 
 impl AlertingExporterBuilder {
@@ -628,12 +629,23 @@ impl AlertingExporterBuilder {
         self
     }
 
+    /// Attach a metrics sink (RFC-0009). Defaults to no-op.
+    #[must_use]
+    pub fn with_metrics_sink(
+        mut self,
+        sink: std::sync::Arc<dyn crate::metrics_sink::SiemMetricsSink>,
+    ) -> Self {
+        self.metrics = sink;
+        self
+    }
+
     /// Finalize the builder into a usable [`AlertingExporter`].
     #[must_use]
     pub fn build(self) -> AlertingExporter {
         AlertingExporter {
             config: self.config,
             backends: self.backends,
+            metrics: self.metrics,
         }
     }
 }
@@ -644,6 +656,11 @@ impl AlertingExporterBuilder {
 pub struct AlertingExporter {
     config: AlertingConfig,
     backends: Vec<Arc<dyn AlertBackend>>,
+    // Consumed by the SIEM serve-mode host wiring (RFC-0009 Part F) to emit
+    // alert-dispatch outcome/latency metrics; the scaffold installs it via
+    // with_metrics_sink and defaults to no-op.
+    #[allow(dead_code)]
+    metrics: std::sync::Arc<dyn crate::metrics_sink::SiemMetricsSink>,
 }
 
 impl AlertingExporter {
@@ -653,6 +670,7 @@ impl AlertingExporter {
         AlertingExporterBuilder {
             config,
             backends: Vec::new(),
+            metrics: crate::metrics_sink::noop_metrics_sink(),
         }
     }
 
