@@ -333,6 +333,10 @@ impl HttpAuthority {
                 let outcome = if prepared.verdict.is_allowed() {
                     crate::metrics::GUARD_OUTCOME_ALLOW
                 } else {
+                    crate::metrics::record_dispatch_failure(
+                        crate::metrics::GUARD_LABEL_HTTP_AUTHORITY,
+                        "denied",
+                    );
                     crate::metrics::GUARD_OUTCOME_DENY
                 };
                 crate::metrics::observe_decision_latency_nanos_for_outcome(outcome, elapsed_nanos);
@@ -350,6 +354,10 @@ impl HttpAuthority {
                     elapsed_nanos,
                 );
                 crate::metrics::record_guard_evaluation(crate::metrics::GUARD_OUTCOME_ERROR);
+                crate::metrics::record_dispatch_failure(
+                    crate::metrics::GUARD_LABEL_HTTP_AUTHORITY,
+                    "error",
+                );
                 Err(error)
             }
         }
