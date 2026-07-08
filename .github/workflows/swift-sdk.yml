@@ -1,0 +1,92 @@
+name: Swift SDK
+
+on:
+  push:
+    paths:
+      - ".github/workflows/swift-sdk.yml"
+      - "sdks/swift/**"
+  pull_request:
+    paths:
+      - ".github/workflows/swift-sdk.yml"
+      - "sdks/swift/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swift-sdk-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  xcodebuild-test:
+    name: Swift SDK (iOS Simulator xcodebuild test)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: sdks/swift
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Select Xcode and show toolchain
+        run: |
+          sudo xcode-select -p
+          xcodebuild -version
+          swift --version
+
+      - name: Confirm the test-inclusive scheme exists (no hardcoded -scheme Chio false green)
+        run: |
+          xcodebuild -list -project . 2>/dev/null || xcodebuild -list
+          xcodebuild -list | grep -qw "Chio-Package" \
+            || { echo "::error::expected the test-inclusive 'Chio-Package' scheme"; exit 1; }
+
+      - name: Pin an available iOS Simulator destination
+        id: sim
+        run: |
+          # Pick the newest available iOS runtime + an iPhone device from it, fail closed if none.
+          RUNTIME=$(xcrun simctl list runtimes --json \
+            | python3 -c "import sys,json; r=[x for x in json.load(sys.stdin)['runtimes'] if x['isAvailable'] and 'iOS' in x['name']]; print(sorted(r,key=lambda x:x['version'])[-1]['identifier'] if r else '')")
+          if [ -z "$RUNTIME" ]; then echo "::error::no available iOS Simulator runtime"; exit 1; fi
+          DEVICE=$(xcrun simctl list devices --json \
+            | python3 -c "import sys,json,os; d=json.load(sys.stdin)['devices'].get(os.environ['RUNTIME'],[]); a=[x for x in d if x.get('isAvailable') and x['name'].startswith('iPhone')]; print(a[0]['name'] if a else '')" )
+          if [ -z "$DEVICE" ]; then echo "::error::no available iPhone simulator for $RUNTIME"; exit 1; fi
+          OSVER=$(echo "$RUNTIME" | sed -E 's/.*iOS-([0-9]+)-([0-9]+).*/\1.\2/')
+          echo "device=$DEVICE" >> "$GITHUB_OUTPUT"
+          echo "osver=$OSVER" >> "$GITHUB_OUTPUT"
+          echo "Pinned destination: platform=iOS Simulator,name=$DEVICE,OS=$OSVER"
+        env:
+          RUNTIME: ""
+
+      - name: xcodebuild test (Chio-Package on the pinned simulator)
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -scheme Chio-Package \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }},OS=${{ steps.sim.outputs.osver }}" \
+            -resultBundlePath "$RUNNER_TEMP/ChioTests.xcresult" \
+            | tee "$RUNNER_TEMP/xcodebuild.log"
+
+      - name: Assert a NONZERO executed-test count (guard against a 0-test false green)
+        run: |
+          # xcodebuild prints "Executed N tests, ..." per suite; require at least one N >= 1.
+          if ! grep -Eq 'Executed [1-9][0-9]* test' "$RUNNER_TEMP/xcodebuild.log"; then
+            echo "::error::no tests were executed (0-test filter is a false green)"; exit 1
+          fi
+          grep -E 'Executed [0-9]+ test' "$RUNNER_TEMP/xcodebuild.log" | tail -n 1
+
+  xcframework-drift:
+    name: Swift SDK xcframework drift (nightly/manual)
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Rebuild the xcframework from the current Rust FFI
+        run: bash scripts/build-ios-framework.sh
+      - name: Re-run the sim tests against the rebuilt framework
+        working-directory: sdks/swift
+        run: |
+          set -o pipefail
+          xcodebuild -list | grep -qw "Chio-Package"
+          xcodebuild test -scheme Chio-Package \
+            -destination "platform=iOS Simulator,name=iPhone 15" \
+            | tee "$RUNNER_TEMP/drift.log"
+          grep -Eq 'Executed [1-9][0-9]* test' "$RUNNER_TEMP/drift.log"
