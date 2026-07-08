@@ -92,11 +92,16 @@ pub enum NotAuthoritativeReason {
     ExposureNotCommitted,
     NonceLinkMissing,
     NonceLinkMismatch,
-    NonceBindingMismatch { field: &'static str },
+    NonceBindingMismatch {
+        field: &'static str,
+    },
     NonceSignatureInvalid,
     /// The receipt's guarantee level is weaker than the operator-configured
     /// floor (R4 truthfulness). Unrelated to `TrustLevel::Mediated`.
-    GuaranteeLevelBelowFloor { minimum: String, actual: String },
+    GuaranteeLevelBelowFloor {
+        minimum: String,
+        actual: String,
+    },
 }
 
 /// Structurally checkable conjunction over the kernel signature. Fail-closed:
@@ -148,16 +153,22 @@ pub fn is_authoritative_spend_receipt(
     }
     // (c) the nonce binding must match the exact call the receipt authorized.
     if presented_nonce.bound_capability_id() != receipt.capability_id {
-        return Err(NotAuthoritativeReason::NonceBindingMismatch { field: "capability_id" });
+        return Err(NotAuthoritativeReason::NonceBindingMismatch {
+            field: "capability_id",
+        });
     }
     if presented_nonce.bound_tool_server() != receipt.tool_server {
-        return Err(NotAuthoritativeReason::NonceBindingMismatch { field: "tool_server" });
+        return Err(NotAuthoritativeReason::NonceBindingMismatch {
+            field: "tool_server",
+        });
     }
     if presented_nonce.bound_tool_name() != receipt.tool_name {
         return Err(NotAuthoritativeReason::NonceBindingMismatch { field: "tool_name" });
     }
     if presented_nonce.bound_parameter_hash() != receipt.action.parameter_hash {
-        return Err(NotAuthoritativeReason::NonceBindingMismatch { field: "parameter_hash" });
+        return Err(NotAuthoritativeReason::NonceBindingMismatch {
+            field: "parameter_hash",
+        });
     }
     // (e) the nonce must be signed by the same admitted kernel key.
     if !presented_nonce.verify_signed_by(&receipt.kernel_key) {
@@ -203,7 +214,9 @@ mod tests {
     use crate::crypto::{Keypair, PublicKey};
     use crate::receipt::body::{ChioReceipt, ChioReceiptBody};
     use crate::receipt::decision::{Decision, ToolCallAction};
-    use crate::receipt::kinds::{BoundaryClass, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel};
+    use crate::receipt::kinds::{
+        BoundaryClass, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel,
+    };
 
     /// Minimal test double for a kernel-signed execution nonce.
     struct FakeNonce {
@@ -216,11 +229,21 @@ mod tests {
     }
 
     impl PresentedNonceView for FakeNonce {
-        fn nonce_id(&self) -> &str { &self.nonce_id }
-        fn bound_capability_id(&self) -> &str { &self.capability_id }
-        fn bound_tool_server(&self) -> &str { &self.tool_server }
-        fn bound_tool_name(&self) -> &str { &self.tool_name }
-        fn bound_parameter_hash(&self) -> &str { &self.parameter_hash }
+        fn nonce_id(&self) -> &str {
+            &self.nonce_id
+        }
+        fn bound_capability_id(&self) -> &str {
+            &self.capability_id
+        }
+        fn bound_tool_server(&self) -> &str {
+            &self.tool_server
+        }
+        fn bound_tool_name(&self) -> &str {
+            &self.tool_name
+        }
+        fn bound_parameter_hash(&self) -> &str {
+            &self.parameter_hash
+        }
         fn verify_signed_by(&self, key: &PublicKey) -> bool {
             self.signer.as_ref() == Some(key)
         }
@@ -249,14 +272,27 @@ mod tests {
             }
         });
         let body = ChioReceiptBody {
-            id: "rcpt-1".to_string(), timestamp: 1, capability_id: "cap-1".to_string(),
-            tool_server: "srv".to_string(), tool_name: "tool".to_string(), action,
-            decision: Some(Decision::Allow), receipt_kind: ReceiptKind::MediatedDecision,
-            boundary_class: BoundaryClass::Prevent, observation_outcome: None,
-            tool_origin: ToolOrigin::CallerExecuted, redaction_mode: RedactionMode::None,
-            actor_chain: Vec::new(), content_hash, policy_hash: crate::sha256_hex(b"policy"),
-            evidence: Vec::new(), metadata: Some(metadata), trust_level: TrustLevel::Mediated,
-            tenant_id: None, kernel_key: kp.public_key(), bbs_projection_version: None,
+            id: "rcpt-1".to_string(),
+            timestamp: 1,
+            capability_id: "cap-1".to_string(),
+            tool_server: "srv".to_string(),
+            tool_name: "tool".to_string(),
+            action,
+            decision: Some(Decision::Allow),
+            receipt_kind: ReceiptKind::MediatedDecision,
+            boundary_class: BoundaryClass::Prevent,
+            observation_outcome: None,
+            tool_origin: ToolOrigin::CallerExecuted,
+            redaction_mode: RedactionMode::None,
+            actor_chain: Vec::new(),
+            content_hash,
+            policy_hash: crate::sha256_hex(b"policy"),
+            evidence: Vec::new(),
+            metadata: Some(metadata),
+            trust_level: TrustLevel::Mediated,
+            tenant_id: None,
+            kernel_key: kp.public_key(),
+            bbs_projection_version: None,
         };
         ChioReceipt::sign(body, kp).unwrap()
     }
@@ -306,9 +342,15 @@ mod tests {
         assert_eq!(guarantee_level_rank("partition_escrowed"), 2);
         assert_eq!(guarantee_level_rank("ha_linearizable"), 3);
         // Ordering is strictly monotone across all four levels.
-        assert!(guarantee_level_rank("advisory_posthoc") < guarantee_level_rank("single_node_atomic"));
-        assert!(guarantee_level_rank("single_node_atomic") < guarantee_level_rank("partition_escrowed"));
-        assert!(guarantee_level_rank("partition_escrowed") < guarantee_level_rank("ha_linearizable"));
+        assert!(
+            guarantee_level_rank("advisory_posthoc") < guarantee_level_rank("single_node_atomic")
+        );
+        assert!(
+            guarantee_level_rank("single_node_atomic") < guarantee_level_rank("partition_escrowed")
+        );
+        assert!(
+            guarantee_level_rank("partition_escrowed") < guarantee_level_rank("ha_linearizable")
+        );
     }
 
     #[test]
@@ -316,9 +358,15 @@ mod tests {
         let kp = Keypair::generate();
         let receipt = authoritative_receipt(&kp);
         // Base receipt carries "single_node_atomic". Same level must pass.
-        assert_eq!(receipt_meets_guarantee_floor(&receipt, "single_node_atomic"), Ok(()));
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "single_node_atomic"),
+            Ok(())
+        );
         // Weaker floor also passes.
-        assert_eq!(receipt_meets_guarantee_floor(&receipt, "advisory_posthoc"), Ok(()));
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "advisory_posthoc"),
+            Ok(())
+        );
     }
 
     #[test]
@@ -339,6 +387,45 @@ mod tests {
                 minimum: "partition_escrowed".to_string(),
                 actual: "single_node_atomic".to_string(),
             })
+        );
+    }
+
+    #[test]
+    fn r4_receipt_claiming_ha_linearizable_fails_single_node_operator_floor() {
+        // R4: HaLinearizable is a labeled claim; a single-node store must not be
+        // accepted where the operator requires linearizable, and a receipt must
+        // not claim a level above the backing store.
+        let kp = Keypair::generate();
+        let mut receipt = authoritative_receipt(&kp);
+        // Operator floor is ha_linearizable; the receipt is single_node_atomic.
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "ha_linearizable"),
+            Err(NotAuthoritativeReason::GuaranteeLevelBelowFloor {
+                minimum: "ha_linearizable".to_string(),
+                actual: "single_node_atomic".to_string(),
+            })
+        );
+        // A single_node floor accepts the single_node receipt.
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "single_node_atomic"),
+            Ok(())
+        );
+        // A forged higher claim still ranks correctly once re-signed.
+        if let Some(obj) = receipt
+            .metadata
+            .as_mut()
+            .and_then(|m| m.get_mut("budget_authority"))
+            .and_then(|b| b.as_object_mut())
+        {
+            obj.insert(
+                "guarantee_level".to_string(),
+                serde_json::json!("ha_linearizable"),
+            );
+        }
+        let receipt = ChioReceipt::sign(receipt.body(), &kp).unwrap();
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "ha_linearizable"),
+            Ok(())
         );
     }
 
@@ -408,7 +495,9 @@ mod tests {
                     n.capability_id = "wrong-cap".to_string();
                 }),
                 admitted: vec![kp.public_key()],
-                expected: NotAuthoritativeReason::NonceBindingMismatch { field: "capability_id" },
+                expected: NotAuthoritativeReason::NonceBindingMismatch {
+                    field: "capability_id",
+                },
             },
             Case {
                 name: "nonce_signature_invalid",

@@ -1494,3 +1494,15 @@ fn budget_store_zero_cost_invocation_succeeds_and_records_zero_sqlite() {
     assert_usage_totals(&records[0], 0, 0);
     let _ = fs::remove_file(path);
 }
+
+#[test]
+fn sqlite_store_reports_truthful_single_node_guarantee_level() {
+    use chio_kernel::budget_store::{BudgetGuaranteeLevel, BudgetStore};
+    let dir = std::env::temp_dir().join(format!("chio-glevel-{}", uuid::Uuid::now_v7()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let store = SqliteBudgetStore::open(dir.join("budget.sqlite")).unwrap();
+    assert_eq!(
+        store.budget_guarantee_level(),
+        BudgetGuaranteeLevel::SingleNodeAtomic
+    );
+}
