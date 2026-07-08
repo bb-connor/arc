@@ -1,5 +1,8 @@
 use super::*;
+use chio_core::receipt::lineage::SignedExportEnvelope;
 use chio_kernel::operator_report::ComptrollerSurfaceReport;
+
+pub type SignedComptrollerSurfaceReport = SignedExportEnvelope<ComptrollerSurfaceReport>;
 
 #[derive(Default)]
 pub(crate) struct ResolvedBudgetGrant {
@@ -262,6 +265,19 @@ fn build_behavioral_feed_report(
         shared_evidence: shared_evidence.summary,
         receipts: selection.receipts,
     })
+}
+
+/// Sign an already-built comptroller surface projection with the behavioral-feed signing authority.
+pub fn build_signed_comptroller_surface_report(
+    report: ComptrollerSurfaceReport,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+) -> Result<SignedComptrollerSurfaceReport, CliError> {
+    report
+        .validate_consistency()
+        .map_err(CliError::cli_other_error)?;
+    let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
+    SignedComptrollerSurfaceReport::sign(report, &keypair).map_err(Into::into)
 }
 
 pub fn build_signed_exposure_ledger_report(
@@ -933,4 +949,65 @@ fn build_capital_allocation_decision_artifact_from_store(
         evidence_refs,
         description,
     })
+}
+
+#[cfg(test)]
+mod reports_tests {
+    use super::*;
+    use chio_test_support::prelude::*;
+
+    #[test]
+    fn signed_comptroller_surface_report_verifies_and_is_canonical() {
+        use chio_kernel::operator_report::{
+            ComptrollerDecisionSummary, ComptrollerSurfaceReport, ComptrollerSurfaceSourceRefs,
+            OperatorReportQuery, COMPTROLLER_SURFACE_REPORT_SCHEMA,
+        };
+
+        let dir = std::env::temp_dir().join(format!("chio-signed-cs-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).test_expect("create temp dir");
+        let authority_seed_path = dir.join("authority.seed");
+
+        let report = ComptrollerSurfaceReport {
+            schema: COMPTROLLER_SURFACE_REPORT_SCHEMA.to_string(),
+            generated_at: 1_700_000_000,
+            filters: OperatorReportQuery::default(),
+            exposure_positions: vec![ExposureLedgerCurrencyPosition {
+                currency: "USD".to_string(),
+                governed_max_exposure_units: 4200,
+                reserved_units: 1000,
+                settled_units: 0,
+                pending_units: 0,
+                failed_units: 0,
+                provisional_loss_units: 0,
+                recovered_units: 0,
+                quoted_premium_units: 0,
+                active_quoted_premium_units: 0,
+            }],
+            decision_summary: ComptrollerDecisionSummary {
+                allow_count: 1,
+                deny_count: 1,
+                cancelled_count: 0,
+                incomplete_count: 0,
+            },
+            settlement_reconciliation: Default::default(),
+            budget_utilization: Default::default(),
+            source_refs: ComptrollerSurfaceSourceRefs::default(),
+            execution_nonce_ref: None,
+            hold_ref: None,
+        };
+
+        let signed =
+            build_signed_comptroller_surface_report(report, Some(&authority_seed_path), None)
+                .test_expect("build signed comptroller surface");
+        assert!(
+            signed.verify_signature().test_expect("verify"),
+            "signature must verify"
+        );
+        assert_eq!(signed.body.schema, "chio.comptroller.surface-report.v1");
+        let reserialized = serde_json::to_vec(&signed).test_expect("serialize envelope");
+        let parsed: SignedComptrollerSurfaceReport =
+            serde_json::from_slice(&reserialized).test_expect("parse");
+        assert!(parsed.verify_signature().test_expect("verify parsed"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
