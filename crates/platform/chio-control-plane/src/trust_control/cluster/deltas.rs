@@ -416,13 +416,15 @@ fn sync_peer_tool_receipts(
             break;
         }
         round.charge_page(response.records.len() as u64)?;
-        let page_max_seq = response
+        // Tool receipts are a dense append-only seq stream: require the page to
+        // be cursor-anchored and gap-free from after_seq + 1 so a forward
+        // cursor-jump cannot silently skip unreplicated rows (RFC-0011 D1).
+        let seqs = response
             .records
             .iter()
             .map(|record| record.seq)
-            .max()
-            .unwrap_or(after_seq);
-        ensure_seq_advanced(after_seq, page_max_seq)?;
+            .collect::<Vec<_>>();
+        require_contiguous_page(after_seq.saturating_add(1), &seqs)?;
         let mut last_seq = after_seq;
         for record in response.records {
             let receipt: ChioReceipt =
@@ -459,13 +461,14 @@ fn sync_peer_child_receipts(
             break;
         }
         round.charge_page(response.records.len() as u64)?;
-        let page_max_seq = response
+        // Child receipts are a dense append-only seq stream: require a
+        // cursor-anchored, gap-free page from after_seq + 1 (RFC-0011 D1).
+        let seqs = response
             .records
             .iter()
             .map(|record| record.seq)
-            .max()
-            .unwrap_or(after_seq);
-        ensure_seq_advanced(after_seq, page_max_seq)?;
+            .collect::<Vec<_>>();
+        require_contiguous_page(after_seq.saturating_add(1), &seqs)?;
         let mut last_seq = after_seq;
         for record in response.records {
             let receipt: ChildRequestReceipt =
@@ -510,6 +513,7 @@ fn sync_peer_budgets(
     Ok(applied)
 }
 
+#[derive(Debug)]
 pub(crate) struct BudgetDeltaImportOutcome {
     pub(crate) applied_count: u64,
     pub(crate) next_cursor: Option<BudgetCursor>,
@@ -540,6 +544,42 @@ pub(crate) fn import_budget_delta_response(
     }
     round.charge_page(record_count as u64)?;
 
+    let previous_cursor_seq = current_cursor
+        .as_ref()
+        .map(|cursor| cursor.seq)
+        .unwrap_or(0);
+
+    // Budget mutation events are a dense append-only event_seq stream. Before
+    // importing, require the pulled prefix to be cursor-anchored and gap-free
+    // so a forward cursor-jump cannot silently skip unreplicated events. A gap
+    // BELOW the durable per-origin import floor is legitimate leader compaction,
+    // so anchor at max(previous_cursor_seq, floor) + 1; above the floor the page
+    // must be contiguous. Rejection here demotes the peer (fail-closed) and
+    // leaves the cursor pinned; it does not weaken the gaps-and-islands ack-head
+    // logic, which stays the quorum guard (RFC-0011 D1/D2).
+    if !response.mutation_events.is_empty() {
+        let floor = match response
+            .mutation_events
+            .iter()
+            .min_by_key(|event| event.event_seq)
+        {
+            Some(min_event) => match min_event.authority.as_ref() {
+                Some(authority) => store
+                    .budget_import_floor(&authority.authority_id)
+                    .map_err(CliError::from)?,
+                None => 0,
+            },
+            None => 0,
+        };
+        let expected_next = previous_cursor_seq.max(floor).saturating_add(1);
+        let event_seqs = response
+            .mutation_events
+            .iter()
+            .map(|event| event.event_seq)
+            .collect::<Vec<_>>();
+        require_contiguous_page(expected_next, &event_seqs)?;
+    }
+
     let usage_records = response
         .records
         .iter()
@@ -554,10 +594,6 @@ pub(crate) fn import_budget_delta_response(
         .import_snapshot_records(&usage_records, &mutation_records)
         .map_err(CliError::from)?;
 
-    let previous_cursor_seq = current_cursor
-        .as_ref()
-        .map(|cursor| cursor.seq)
-        .unwrap_or(0);
     let mut next_cursor = current_cursor;
     for event in &response.mutation_events {
         next_cursor = Some(merge_budget_cursor(
@@ -621,13 +657,14 @@ fn sync_peer_lineage(
             break;
         }
         round.charge_page(response.records.len() as u64)?;
-        let page_max_seq = response
+        // Lineage snapshots paginate on the append-only capability_lineage rowid:
+        // require a cursor-anchored, gap-free page from after_seq + 1 (RFC-0011 D1).
+        let seqs = response
             .records
             .iter()
             .map(|record| record.seq)
-            .max()
-            .unwrap_or(after_seq);
-        ensure_seq_advanced(after_seq, page_max_seq)?;
+            .collect::<Vec<_>>();
+        require_contiguous_page(after_seq.saturating_add(1), &seqs)?;
         let mut last_seq = after_seq;
         for record in response.records {
             store

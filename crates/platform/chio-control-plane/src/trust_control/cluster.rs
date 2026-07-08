@@ -44,7 +44,8 @@ pub(crate) use partition::{
     update_peer_tool_seq,
 };
 pub(crate) use pull_budget::{
-    ensure_revocation_advanced, ensure_seq_advanced, PeerProtocolError, PullError, PullRoundBudget,
+    ensure_revocation_advanced, require_contiguous_page, PeerProtocolError, PullError,
+    PullRoundBudget,
 };
 pub(crate) use snapshots::{
     apply_cluster_snapshot, cluster_replication_heads, handle_internal_authority_snapshot,

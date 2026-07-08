@@ -1562,3 +1562,53 @@ fn budget_ack_heads_reports_contiguous_prefix_only() -> Result<(), Box<dyn std::
     let _ = fs::remove_file(&path);
     Ok(())
 }
+
+#[test]
+fn budget_ack_heads_caps_partial_head_at_interior_gap() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-ack-heads-partial");
+    let store = SqliteBudgetStore::open(&path)?;
+
+    let event = |seq: u64| BudgetMutationRecord {
+        event_id: format!("evt-{seq}"),
+        hold_id: None,
+        capability_id: "cap-p".to_string(),
+        grant_index: 0,
+        kind: BudgetMutationKind::AuthorizeExposure,
+        allowed: Some(true),
+        recorded_at: seq as i64,
+        event_seq: seq,
+        usage_seq: Some(seq),
+        exposure_units: 1,
+        realized_spend_units: 0,
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost_units: None,
+        invocation_count_after: 1,
+        total_cost_exposed_after: 1,
+        total_cost_realized_spend_after: 0,
+        authority: Some(BudgetEventAuthority {
+            authority_id: "http://origin-p".to_string(),
+            lease_id: "http://origin-p#term-1".to_string(),
+            lease_epoch: 1,
+        }),
+    };
+
+    // Import {1,2,3,5,6} from floor 0: the run reaches down to the floor and is
+    // gap-free through 3, then an interior gap at 4 splits off the {5,6} island.
+    // The contiguous ack head must be the last gap-free seq (3), NOT the max
+    // present seq (6): a mid-stream hole yields a PARTIAL head.
+    store.import_snapshot_records(&[], &[event(1), event(2), event(3), event(5), event(6)])?;
+    let heads = store.budget_ack_heads()?;
+    let head = heads
+        .iter()
+        .find(|(origin, _)| origin == "http://origin-p")
+        .map(|(_, seq)| *seq)
+        .ok_or("origin P has a contiguous prefix from the floor, so it must report a head")?;
+    assert_eq!(
+        head, 3,
+        "an interior gap at 4 caps the head at 3, not the max present seq 6"
+    );
+
+    let _ = fs::remove_file(&path);
+    Ok(())
+}

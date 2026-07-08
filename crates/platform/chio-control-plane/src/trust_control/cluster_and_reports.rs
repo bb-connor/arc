@@ -1419,15 +1419,128 @@ mod cluster_and_reports_tests {
         };
         let mut round = PullRoundBudget::new();
         let result = import_budget_delta_response(&mut store, &response, Some(cursor), &mut round);
+        // event_seq 40 equals the cursor, so it is neither advancing nor
+        // cursor-anchored at the expected next seq (41): a protocol violation
+        // that demotes the peer. The contiguity guard now surfaces this as a
+        // NonContiguousPage (expected 41, found 40).
         assert!(
             matches!(
                 result,
-                Err(PullError::Protocol(
-                    PeerProtocolError::NonAdvancingPage { .. }
-                ))
+                Err(PullError::Protocol(PeerProtocolError::NonContiguousPage {
+                    expected_seq: 41,
+                    found_seq: 40
+                }))
             ),
-            "a non-advancing non-empty budget page must be a protocol violation"
+            "a non-advancing non-empty budget page must be a protocol violation, got {result:?}"
         );
+    }
+
+    #[test]
+    fn budget_puller_rejects_cursor_jump_and_respects_compaction_floor() {
+        let budget_db = unique_temp_path("cluster-budget-cursor-jump", "sqlite3");
+        let mut store = SqliteBudgetStore::open(&budget_db).test_unwrap();
+
+        // A mutation-event view at event_seq S under a single origin.
+        let event = |seq: u64| BudgetMutationEventView {
+            event_id: format!("evt-{seq}"),
+            hold_id: None,
+            capability_id: "cap-j".to_string(),
+            grant_index: 0,
+            kind: "authorize_exposure".to_string(),
+            allowed: Some(true),
+            recorded_at: seq as i64,
+            event_seq: seq,
+            usage_seq: Some(seq),
+            exposure_units: 1,
+            realized_spend_units: 0,
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost_units: None,
+            invocation_count_after: 1,
+            total_cost_exposed_after: 1,
+            total_cost_realized_spend_after: 0,
+            authority: Some(BudgetMutationAuthorityView {
+                authority_id: "http://origin-j".to_string(),
+                lease_id: "http://origin-j#term-1".to_string(),
+                lease_epoch: 1,
+            }),
+        };
+
+        // From a fresh cursor (expected next event_seq 1), a page that starts at
+        // event_seq 5 is a forward cursor-jump that would skip the append-only
+        // events 1..4. It must be REJECTED and the cursor must NOT advance.
+        // The old max-advance-only guard (page max 6 > cursor 0) accepted this.
+        let jump = BudgetDeltaResponse {
+            records: Vec::new(),
+            mutation_events: vec![event(5), event(6)],
+        };
+        let result =
+            import_budget_delta_response(&mut store, &jump, None, &mut PullRoundBudget::new());
+        assert!(
+            matches!(
+                result,
+                Err(PullError::Protocol(PeerProtocolError::NonContiguousPage {
+                    expected_seq: 1,
+                    found_seq: 5
+                }))
+            ),
+            "a budget page that skips unreplicated events must be rejected, got {result:?}"
+        );
+        // Fail-closed: the skipped page was never imported as a committed prefix.
+        assert!(store
+            .list_mutation_events(10, Some("cap-j"), Some(0))
+            .test_unwrap()
+            .is_empty());
+
+        // A cursor-anchored, gap-free page from the fresh cursor is accepted and
+        // advances the cursor to the page head.
+        let contiguous = BudgetDeltaResponse {
+            records: Vec::new(),
+            mutation_events: vec![event(1), event(2), event(3)],
+        };
+        let outcome = import_budget_delta_response(
+            &mut store,
+            &contiguous,
+            None,
+            &mut PullRoundBudget::new(),
+        )
+        .test_unwrap();
+        assert!(outcome.should_continue);
+        assert_eq!(outcome.next_cursor.test_unwrap().seq, 3);
+
+        // Compaction floor: raise origin-j's durable import floor to 9 (as a
+        // snapshot install does). A page starting at event_seq 10 from a cursor
+        // of 3 is now a LEGITIMATE compaction jump (the gap 4..9 sits below the
+        // floor) and must be ACCEPTED, proving the floor is respected rather
+        // than a blind anchor at cursor + 1.
+        store
+            .record_budget_import_floors(&[
+                budget_mutation_record_from_view(&event(10)).test_unwrap()
+            ])
+            .test_unwrap();
+        assert_eq!(
+            store.budget_import_floor("http://origin-j").test_unwrap(),
+            9
+        );
+        let cursor = BudgetCursor {
+            seq: 3,
+            updated_at: 3,
+            capability_id: "cap-j".to_string(),
+            grant_index: 0,
+        };
+        let compacted = BudgetDeltaResponse {
+            records: Vec::new(),
+            mutation_events: vec![event(10), event(11)],
+        };
+        let outcome = import_budget_delta_response(
+            &mut store,
+            &compacted,
+            Some(cursor),
+            &mut PullRoundBudget::new(),
+        )
+        .test_unwrap();
+        assert!(outcome.should_continue);
+        assert_eq!(outcome.next_cursor.test_unwrap().seq, 11);
     }
 
     #[test]

@@ -7,9 +7,25 @@ pub(crate) const PEER_ROUND_WALL_CLOCK_BUDGET: Duration = Duration::from_secs(20
 
 #[derive(Debug)]
 pub(crate) enum PeerProtocolError {
-    NonAdvancingPage { after_seq: u64, page_max_seq: u64 },
-    PageBudgetExhausted { pages: u32 },
-    RecordBudgetExhausted { records: u64 },
+    NonAdvancingPage {
+        after_seq: u64,
+        page_max_seq: u64,
+    },
+    /// A dense append-only page was not cursor-anchored or had an interior gap:
+    /// the sorted seqs did not run consecutively from the expected next seq.
+    /// `expected_seq` is the seq the puller required next; `found_seq` is the
+    /// out-of-order seq that broke contiguity (either a forward cursor-jump that
+    /// would skip unreplicated rows, or an internal hole).
+    NonContiguousPage {
+        expected_seq: u64,
+        found_seq: u64,
+    },
+    PageBudgetExhausted {
+        pages: u32,
+    },
+    RecordBudgetExhausted {
+        records: u64,
+    },
     RoundDeadlineExceeded,
 }
 
@@ -19,6 +35,10 @@ impl std::fmt::Display for PeerProtocolError {
             Self::NonAdvancingPage { after_seq, page_max_seq } => write!(
                 f,
                 "peer returned a non-empty page whose max seq {page_max_seq} did not advance past cursor {after_seq}"
+            ),
+            Self::NonContiguousPage { expected_seq, found_seq } => write!(
+                f,
+                "peer returned a page that is not cursor-anchored or has a gap: expected next seq {expected_seq}, found {found_seq}"
             ),
             Self::PageBudgetExhausted { pages } => {
                 write!(f, "peer exceeded per-round page budget after {pages} pages")
@@ -67,20 +87,42 @@ impl PullRoundBudget {
     }
 }
 
-/// Strict monotonicity for a `u64` cursor puller. `page_max_seq` MUST be the
-/// maximum seq in a non-empty page.
-pub(crate) fn ensure_seq_advanced(
-    after_seq: u64,
-    page_max_seq: u64,
+/// Soundness guard for a dense append-only `u64` sequence puller (tool
+/// receipts, child receipts, lineage, and the budget mutation-event stream).
+///
+/// A max-advance-only check (page max seq > cursor) is NOT enough: a peer at
+/// cursor 10 that returns the page {110, 111} would pass it, get imported, and
+/// advance the cursor to 111, permanently omitting the append-only rows 11..109
+/// (a replication-soundness hole). This requires the returned page to be BOTH
+/// cursor-anchored and gap-free: the sorted seqs must run consecutively
+/// starting at `expected_next_seq`. Any forward cursor-jump (page starts past
+/// the expected next row) or interior hole is a `NonContiguousPage` protocol
+/// violation, which demotes the peer via the existing `update_peer_failure`
+/// path and does NOT advance the cursor past the gap. An empty slice is
+/// vacuously contiguous (the callers treat an empty page as "caught up" and do
+/// not advance).
+pub(crate) fn require_contiguous_page(
+    expected_next_seq: u64,
+    seqs: &[u64],
 ) -> Result<(), PeerProtocolError> {
-    if page_max_seq > after_seq {
-        Ok(())
-    } else {
-        Err(PeerProtocolError::NonAdvancingPage {
-            after_seq,
-            page_max_seq,
-        })
+    if seqs.is_empty() {
+        return Ok(());
     }
+    // The delta endpoints order ascending, but do not trust the peer's ordering:
+    // sort locally so an out-of-order page cannot mask a skip.
+    let mut sorted = seqs.to_vec();
+    sorted.sort_unstable();
+    let mut expected = expected_next_seq;
+    for &seq in &sorted {
+        if seq != expected {
+            return Err(PeerProtocolError::NonContiguousPage {
+                expected_seq: expected,
+                found_seq: seq,
+            });
+        }
+        expected = expected.saturating_add(1);
+    }
+    Ok(())
 }
 
 /// Strict monotonicity for the composite `(revoked_at, capability_id)`
@@ -153,21 +195,41 @@ mod pull_budget_tests {
     }
 
     #[test]
-    fn non_advancing_page_is_peer_protocol_error() {
-        // Strict advance: equal or lower page max is a violation.
-        assert!(ensure_seq_advanced(10, 11).is_ok());
+    fn require_contiguous_page_rejects_cursor_jump_and_interior_gap() {
+        // Cursor-anchored, gap-free page from cursor 10 (expected next 11).
+        assert!(require_contiguous_page(11, &[11, 12, 13]).is_ok());
+        // An empty page is vacuously contiguous ("caught up").
+        assert!(require_contiguous_page(11, &[]).is_ok());
+        // Out-of-order but still contiguous once sorted.
+        assert!(require_contiguous_page(11, &[13, 11, 12]).is_ok());
+
+        // Forward cursor-jump: {110, 111} from cursor 10 would skip 11..109.
+        // A max-advance-only check (110 > 10) would wrongly ACCEPT this; the
+        // contiguity guard rejects it, anchored at the expected next seq.
         assert!(matches!(
-            ensure_seq_advanced(10, 10),
-            Err(PeerProtocolError::NonAdvancingPage {
-                after_seq: 10,
-                page_max_seq: 10
+            require_contiguous_page(11, &[110, 111]),
+            Err(PeerProtocolError::NonContiguousPage {
+                expected_seq: 11,
+                found_seq: 110
             })
         ));
+        // Interior hole: {11, 12, 14} skips 13.
         assert!(matches!(
-            ensure_seq_advanced(10, 9),
-            Err(PeerProtocolError::NonAdvancingPage { .. })
+            require_contiguous_page(11, &[11, 12, 14]),
+            Err(PeerProtocolError::NonContiguousPage {
+                expected_seq: 13,
+                found_seq: 14
+            })
         ));
+        // A duplicate seq breaks contiguity (second 12 lands below expected 13).
+        assert!(matches!(
+            require_contiguous_page(11, &[11, 12, 12]),
+            Err(PeerProtocolError::NonContiguousPage { .. })
+        ));
+    }
 
+    #[test]
+    fn non_advancing_revocation_cursor_is_peer_protocol_error() {
         // Composite revocation cursor: strict (revoked_at, capability_id) advance.
         let prev = RevocationCursor {
             revoked_at: 5,
