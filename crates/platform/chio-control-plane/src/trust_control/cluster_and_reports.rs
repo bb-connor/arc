@@ -453,6 +453,70 @@ mod cluster_and_reports_tests {
         assert_eq!(commit.committed_nodes, 2);
     }
 
+    proptest::proptest! {
+        #![proptest_config(proptest::prelude::ProptestConfig::with_cases(256))]
+
+        #[test]
+        fn prop_witness_never_overclaims_durability(
+            write_seq in 1u64..50,
+            ack_b in proptest::prelude::prop::option::of(0u64..60),
+            ack_c in proptest::prelude::prop::option::of(0u64..60),
+            same_origin_b in proptest::prelude::any::<bool>(),
+            same_origin_c in proptest::prelude::any::<bool>(),
+        ) {
+            let state = state_with_cluster(
+                "http://node-a",
+                &["http://node-b", "http://node-c"],
+                None,
+                None,
+                None,
+            );
+            update_peer_reachable(&state, "http://node-b");
+            update_peer_reachable(&state, "http://node-c");
+            let origin = "http://node-a";
+            if let Some(seq) = ack_b {
+                let id = if same_origin_b { origin } else { "http://elsewhere" };
+                update_peer_budget_acks(
+                    &state,
+                    "http://node-b",
+                    &[BudgetOriginAck { origin_id: id.to_string(), event_seq: seq }],
+                );
+            }
+            if let Some(seq) = ack_c {
+                let id = if same_origin_c { origin } else { "http://elsewhere" };
+                update_peer_budget_acks(
+                    &state,
+                    "http://node-c",
+                    &[BudgetOriginAck { origin_id: id.to_string(), event_seq: seq }],
+                );
+            }
+            let write = BudgetWriteToken {
+                origin_id: origin.to_string(),
+                event_seq: write_seq,
+                budget_term: 1,
+            };
+            let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
+
+            // A peer only witnesses when it acked THIS origin at >= write_seq.
+            let peer_witnesses = |same_origin: bool, ack: Option<u64>| {
+                same_origin && ack.is_some_and(|seq| seq >= write_seq)
+            };
+            let expected_peer_witnesses = usize::from(peer_witnesses(same_origin_b, ack_b))
+                + usize::from(peer_witnesses(same_origin_c, ack_c));
+            let expected_committed = 1 + expected_peer_witnesses; // self + peers
+            proptest::prop_assert_eq!(commit.committed_nodes, expected_committed);
+            // quorum_size for 2 peers is 2; committed only when >= 2.
+            proptest::prop_assert_eq!(
+                commit.quorum_committed,
+                expected_committed >= commit.quorum_size
+            );
+            // Overclaim guard: never committed on self alone.
+            if expected_peer_witnesses == 0 {
+                proptest::prop_assert!(!commit.quorum_committed);
+            }
+        }
+    }
+
     #[test]
     fn peer_state_helpers_update_health_cursors_and_snapshot_thresholds() {
         let state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
