@@ -1,3 +1,5 @@
+#[path = "tests/background_checkpoints.rs"]
+mod background_checkpoints;
 #[path = "tests/bootstrap.rs"]
 mod bootstrap;
 #[path = "tests/checkpoint.rs"]

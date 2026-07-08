@@ -453,51 +453,30 @@ pub(crate) fn create_next_receipt_checkpoint_atomic(
     Ok(report)
 }
 
-fn store_kernel_checkpoint_tx(
+/// Insert one checkpoint with single-shot validation against a KNOWN
+/// predecessor: validate_checkpoint (one signature), predecessor linkage,
+/// claim-log range check for the new range only, INSERT (projection triggers
+/// populate tree-head/witness/publication rows), read-back equality, and
+/// projection-row validation for the new row. No chain rebuild.
+pub(crate) fn insert_checkpoint_incremental_tx(
     tx: &rusqlite::Transaction<'_>,
+    predecessor: Option<&KernelCheckpoint>,
     checkpoint: &KernelCheckpoint,
 ) -> Result<(), ReceiptStoreError> {
     chio_kernel::checkpoint::validate_checkpoint(checkpoint)
         .map_err(checkpoint_error_to_receipt_store)?;
-
-    if let Some(existing) = load_persisted_checkpoint_row(tx, checkpoint.body.checkpoint_seq)? {
-        let existing_checkpoint = parse_persisted_checkpoint_row(existing.clone())?;
-        if existing_checkpoint == *checkpoint {
-            validate_checkpoint_projection_rows(tx, &existing, checkpoint)?;
-            verify_checkpoint_chain_integrity(tx)?;
-            return Ok(());
-        }
-        return Err(ReceiptStoreError::Conflict(format!(
-            "checkpoint {} already exists with different content",
-            checkpoint.body.checkpoint_seq
-        )));
-    }
-    validate_checkpoint_against_claim_log(tx, checkpoint)?;
-
-    match verify_checkpoint_chain_integrity(tx)? {
+    match predecessor {
         Some(predecessor) => {
-            if checkpoint.body.checkpoint_seq <= predecessor.body.checkpoint_seq {
-                return Err(ReceiptStoreError::Conflict(format!(
-                    "checkpoint {} must be appended after existing checkpoint {}",
-                    checkpoint.body.checkpoint_seq, predecessor.body.checkpoint_seq
-                )));
-            }
-            chio_kernel::checkpoint::validate_checkpoint_predecessor(&predecessor, checkpoint)
+            chio_kernel::checkpoint::validate_checkpoint_predecessor(predecessor, checkpoint)
                 .map_err(|error| {
                     ReceiptStoreError::Conflict(format!(
                         "checkpoint predecessor continuity violation: {error}"
                     ))
                 })?;
         }
-        None if checkpoint.body.checkpoint_seq != 1 => {
-            return Err(ReceiptStoreError::Conflict(format!(
-                "checkpoint {} cannot initialize an empty checkpoint log",
-                checkpoint.body.checkpoint_seq
-            )));
-        }
         None => validate_checkpoint_base(checkpoint)?,
     }
-
+    validate_checkpoint_against_claim_log(tx, checkpoint)?;
     let statement_json = serde_json::to_string(&checkpoint.body)?;
     tx.execute(
         r#"
@@ -519,7 +498,6 @@ fn store_kernel_checkpoint_tx(
         ],
     )
     .map_err(|error| ReceiptStoreError::Conflict(format!("checkpoint append conflict: {error}")))?;
-
     let stored =
         load_persisted_checkpoint_row(tx, checkpoint.body.checkpoint_seq)?.ok_or_else(|| {
             ReceiptStoreError::Conflict(format!(
@@ -535,8 +513,45 @@ fn store_kernel_checkpoint_tx(
         )));
     }
     validate_checkpoint_projection_rows(tx, &stored, &parsed)?;
-    verify_checkpoint_chain_integrity(tx)?;
     Ok(())
+}
+
+fn store_kernel_checkpoint_tx(
+    tx: &rusqlite::Transaction<'_>,
+    checkpoint: &KernelCheckpoint,
+) -> Result<(), ReceiptStoreError> {
+    chio_kernel::checkpoint::validate_checkpoint(checkpoint)
+        .map_err(checkpoint_error_to_receipt_store)?;
+
+    if let Some(existing) = load_persisted_checkpoint_row(tx, checkpoint.body.checkpoint_seq)? {
+        let existing_checkpoint = parse_persisted_checkpoint_row(existing.clone())?;
+        if existing_checkpoint == *checkpoint {
+            validate_checkpoint_projection_rows(tx, &existing, checkpoint)?;
+            return Ok(());
+        }
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {} already exists with different content",
+            checkpoint.body.checkpoint_seq
+        )));
+    }
+
+    let predecessor = load_latest_persisted_checkpoint_row(tx)?
+        .map(parse_persisted_checkpoint_row)
+        .transpose()?;
+    if let Some(predecessor) = predecessor.as_ref() {
+        if checkpoint.body.checkpoint_seq <= predecessor.body.checkpoint_seq {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "checkpoint {} must be appended after existing checkpoint {}",
+                checkpoint.body.checkpoint_seq, predecessor.body.checkpoint_seq
+            )));
+        }
+    } else if checkpoint.body.checkpoint_seq != 1 {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {} cannot initialize an empty checkpoint log",
+            checkpoint.body.checkpoint_seq
+        )));
+    }
+    insert_checkpoint_incremental_tx(tx, predecessor.as_ref(), checkpoint)
 }
 
 fn validate_checkpoint_claim_log_signer_range(

@@ -103,5 +103,5 @@ pub use encrypted_blob::{
 pub use execution_nonce_store::{SqliteExecutionNonceStore, SqliteExecutionNonceStoreError};
 pub use iou_store::{SqliteIouEnvelopeStore, IOU_ENVELOPE_MIGRATION};
 pub use memory_provenance_store::{SqliteMemoryProvenanceStore, SqliteMemoryProvenanceStoreError};
-pub use receipt_store::SqliteReceiptStore;
+pub use receipt_store::{BackgroundCheckpointSigner, SqliteReceiptStore};
 pub use revocation_store::SqliteRevocationStore;

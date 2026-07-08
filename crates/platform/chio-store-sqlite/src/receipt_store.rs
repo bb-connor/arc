@@ -182,6 +182,9 @@ enum ReceiptCommitCommand {
     /// Rerun the full verification on the writer connection and, on success,
     /// adopt the fresh head (clears a poisoned head). Audit-repair path.
     ReseedHead(mpsc::SyncSender<Result<(), ReceiptStoreError>>),
+    /// Install (or replace) the background checkpoint signer on the actor
+    /// thread. Delivered over the command channel: no shared state, no lock.
+    InstallSigner(BackgroundCheckpointSigner),
 }
 
 impl ReceiptCommitActor {
@@ -418,6 +421,7 @@ fn receipt_commit_actor_loop(
     };
 
     let mut pending_flush_error: Option<ReceiptStoreError> = None;
+    let mut checkpoint_signer: Option<BackgroundCheckpointSigner> = None;
     while let Ok(command) = receiver.recv() {
         match command {
             ReceiptCommitCommand::Append(request) => {
@@ -432,9 +436,9 @@ fn receipt_commit_actor_loop(
                             break;
                         }
                         Ok(other) => {
-                            // Non-append commands (Write, and later
-                            // InstallSigner/ReseedHead) execute strictly
-                            // after the batch they interrupted commits.
+                            // Non-append commands (Write, InstallSigner,
+                            // ReseedHead) execute strictly after the batch
+                            // they interrupted commits.
                             deferred = Some(other);
                             break;
                         }
@@ -450,12 +454,24 @@ fn receipt_commit_actor_loop(
                     flushes,
                     &health,
                 );
+                // Checkpoint construction runs AFTER the batch commits and
+                // AFTER commit_receipt_batch has already sent every caller's
+                // response, so ADR-0013 durability latency is not extended
+                // by checkpoint building. A build failure is recorded but
+                // does not fail the already-durable appends (fail-closed via
+                // `last_error`, not via poisoning the head).
+                if pending_flush_error.is_none() {
+                    if let WriterHeadState::Verified(head) = &mut head_state {
+                        build_due_checkpoints_and_record(&pool, head, &checkpoint_signer, &health);
+                    }
+                }
                 if let Some(command) = deferred {
                     handle_non_append_command(
                         &pool,
                         &mut head_state,
                         incremental_verification,
                         &health,
+                        &mut checkpoint_signer,
                         command,
                     );
                 }
@@ -472,6 +488,7 @@ fn receipt_commit_actor_loop(
                 &mut head_state,
                 incremental_verification,
                 &health,
+                &mut checkpoint_signer,
                 other,
             ),
         }
@@ -483,6 +500,7 @@ fn handle_non_append_command(
     head_state: &mut WriterHeadState,
     incremental_verification: bool,
     health: &ReceiptCommitWriterHealth,
+    checkpoint_signer: &mut Option<BackgroundCheckpointSigner>,
     command: ReceiptCommitCommand,
 ) {
     match command {
@@ -527,8 +545,20 @@ fn handle_non_append_command(
                         return;
                     }
                     health.store_head_snapshot(head);
+                    // Writer-routed appends (child receipts, consuming auth)
+                    // can cross the threshold too; no pending_flush_error
+                    // guard here since a Write job is not part of a batch.
+                    // The writer pool holds exactly one connection
+                    // (DEFAULT_WRITER_POOL_MAX_SIZE = 1): drop this one
+                    // before build_due_checkpoints_and_record acquires its
+                    // own, or `pool.get()` would block on itself.
+                    drop(connection);
+                    build_due_checkpoints_and_record(pool, head, checkpoint_signer, health);
                 }
             }
+        }
+        ReceiptCommitCommand::InstallSigner(signer) => {
+            *checkpoint_signer = Some(signer);
         }
         ReceiptCommitCommand::ReseedHead(response) => {
             let outcome = pool
@@ -571,6 +601,89 @@ fn handle_non_append_command(
             let _ = response.send(Err(receipt_actor_unavailable_error()));
         }
     }
+}
+
+/// Build every checkpoint the head owes and, on success, refresh the health
+/// head snapshot; on failure, record the error without poisoning the head or
+/// failing the append/write that triggered it (checkpoint construction never
+/// blocks an already-durable commit, RFC-0006 stage 4).
+fn build_due_checkpoints_and_record(
+    pool: &Pool<SqliteConnectionManager>,
+    head: &mut VerifiedHead,
+    checkpoint_signer: &Option<BackgroundCheckpointSigner>,
+    health: &ReceiptCommitWriterHealth,
+) {
+    let Some(signer) = checkpoint_signer.as_ref() else {
+        return;
+    };
+    match build_due_checkpoints(pool, head, signer) {
+        Ok(()) => health.store_head_snapshot(head),
+        Err(error) => {
+            if let Ok(mut last_error) = health.last_error.lock() {
+                *last_error = Some(error.to_string());
+            }
+        }
+    }
+}
+
+fn build_due_checkpoints(
+    pool: &Pool<SqliteConnectionManager>,
+    head: &mut VerifiedHead,
+    signer: &BackgroundCheckpointSigner,
+) -> Result<(), ReceiptStoreError> {
+    if signer.max_batch == 0 {
+        return Ok(()); // ADR-0008: batch_size 0 disables checkpointing
+    }
+    let mut connection = pool
+        .get()
+        .map_err(|error| ReceiptStoreError::Pool(error.to_string()))?;
+    maybe_build_checkpoint(&mut connection, head, signer)
+}
+
+/// Build every checkpoint the head owes: count-based ADR-0008 trigger, range
+/// derived from the cached head (NOT next_checkpoint_range_for_connection,
+/// which runs a full chain verify), O(b) work per checkpoint.
+fn maybe_build_checkpoint(
+    connection: &mut SqliteStoreConnection,
+    head: &mut VerifiedHead,
+    signer: &BackgroundCheckpointSigner,
+) -> Result<(), ReceiptStoreError> {
+    if signer.max_batch == 0 {
+        return Ok(());
+    }
+    while head
+        .claim_log_max_seq
+        .saturating_sub(head.checkpointed_entry_seq())
+        >= signer.max_batch
+    {
+        let start_seq = head.checkpointed_entry_seq().saturating_add(1);
+        let end_seq = start_seq.saturating_add(signer.max_batch - 1);
+        ensure_claim_log_range_contiguous(connection, start_seq, end_seq, "checkpoint range")?;
+        let receipt_bytes = load_claim_tree_canonical_bytes_range(connection, start_seq, end_seq)?
+            .into_iter()
+            .map(|(_, bytes)| bytes)
+            .collect::<Vec<_>>();
+        let checkpoint_seq = head
+            .checkpoint_seq()
+            .checked_add(1)
+            .ok_or_else(|| ReceiptStoreError::Conflict("checkpoint_seq overflow".to_string()))?;
+        // O(b) Merkle build; predecessor digest comes from the cached head.
+        let checkpoint = chio_kernel::build_checkpoint_with_previous(
+            checkpoint_seq,
+            start_seq,
+            end_seq,
+            &receipt_bytes,
+            &signer.keypair,
+            head.latest_checkpoint.as_ref(),
+        )
+        .map_err(checkpoint_error_to_receipt_store)?;
+        ensure_checkpoint_transparency_guards(connection)?;
+        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        insert_checkpoint_incremental_tx(&tx, head.latest_checkpoint.as_ref(), &checkpoint)?;
+        tx.commit()?;
+        head.latest_checkpoint = Some(checkpoint);
+    }
+    Ok(())
 }
 
 /// RFC-0006 head-resync rule: one indexed delta aggregate plus one
@@ -653,6 +766,15 @@ fn atomic_saturating_sub(value: &AtomicU64, amount: u64) {
             Err(observed) => current = observed,
         }
     }
+}
+
+/// Background checkpoint signer, installed once by the kernel after `open`
+/// and before serving (RFC-0006 stage 4). `max_batch = 0` disables
+/// checkpointing (ADR-0008 semantics).
+#[derive(Clone)]
+pub struct BackgroundCheckpointSigner {
+    pub keypair: Arc<Keypair>,
+    pub max_batch: u64,
 }
 
 /// Last verified position of the receipt chain. Owned exclusively by the
@@ -1190,6 +1312,24 @@ impl SqliteReceiptStore {
         result
             .recv()
             .map_err(|_| receipt_actor_unavailable_error())?
+    }
+
+    /// Install the background checkpoint signer. Idempotent per store (a
+    /// second call replaces the signer). Until called, the store appends
+    /// without producing checkpoints.
+    pub fn enable_background_checkpoints(
+        &self,
+        signer: BackgroundCheckpointSigner,
+    ) -> Result<(), ReceiptStoreError> {
+        match self
+            .receipt_commit_actor
+            .sender
+            .try_send(ReceiptCommitCommand::InstallSigner(signer))
+        {
+            Ok(()) => Ok(()),
+            Err(mpsc::TrySendError::Full(_)) => Err(receipt_actor_saturated_error()),
+            Err(mpsc::TrySendError::Disconnected(_)) => Err(receipt_actor_unavailable_error()),
+        }
     }
 
     pub fn flush_receipt_writes_with_timeout(
