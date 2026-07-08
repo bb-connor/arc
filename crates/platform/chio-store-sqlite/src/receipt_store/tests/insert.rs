@@ -157,9 +157,10 @@ fn append_receipt_batch_commits_multiple_receipts_together(
         });
     }
 
-    let seqs: Vec<u64> = append_receipt_batch(&store.pool, &requests)
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()?;
+    let seqs: Vec<u64> =
+        append_receipt_batch(&store.pool, &mut VerifiedHead::default(), true, &requests)
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
 
     assert_eq!(seqs, vec![1, 2, 3, 4]);
     assert_eq!(store.tool_receipt_count()?, 4);
@@ -287,7 +288,7 @@ fn append_receipt_batch_rolls_back_all_receipts_on_batch_error(
         });
     }
 
-    let results = append_receipt_batch(&store.pool, &requests);
+    let results = append_receipt_batch(&store.pool, &mut VerifiedHead::default(), true, &requests);
 
     assert!(results.into_iter().all(|result| result.is_err()));
     assert_eq!(store.tool_receipt_count()?, 0);
@@ -400,7 +401,7 @@ fn append_receipt_batch_rolls_back_full_batch_error() -> Result<(), Box<dyn std:
         });
     }
 
-    let results = append_receipt_batch(&store.pool, &requests);
+    let results = append_receipt_batch(&store.pool, &mut VerifiedHead::default(), true, &requests);
     assert!(results.into_iter().all(|result| {
         matches!(
             result,

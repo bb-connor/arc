@@ -109,6 +109,8 @@ pub struct SqliteReceiptStore {
     /// `tenant_id = id OR tenant_id IS NULL`, which keeps pre-multitenant
     /// (NULL-tagged) receipts visible during explicit compatibility mode.
     pub(crate) strict_tenant_isolation: std::sync::atomic::AtomicBool,
+    /// RFC-0006 staged-rollout flag: read-only after open.
+    pub(crate) incremental_verification: bool,
 }
 
 type FederatedShareSubjectCorpus = (
@@ -145,7 +147,6 @@ struct ReceiptCommitWriterHealth {
 }
 
 impl ReceiptCommitWriterHealth {
-    #[allow(dead_code)] // wired in the incremental append path (same PR)
     fn store_head_snapshot(&self, head: &VerifiedHead) {
         self.head_checkpoint_seq
             .store(head.checkpoint_seq(), Ordering::SeqCst);
@@ -181,11 +182,13 @@ enum ReceiptCommitCommand {
 }
 
 impl ReceiptCommitActor {
-    fn start(pool: Pool<SqliteConnectionManager>) -> Self {
+    fn start(pool: Pool<SqliteConnectionManager>, incremental_verification: bool) -> Self {
         let (sender, receiver) = receipt_commit_channel();
         let health = Arc::new(ReceiptCommitWriterHealth::default());
         let actor_health = Arc::clone(&health);
-        thread::spawn(move || receipt_commit_actor_loop(pool, receiver, actor_health));
+        thread::spawn(move || {
+            receipt_commit_actor_loop(pool, receiver, actor_health, incremental_verification)
+        });
         Self { sender, health }
     }
 
@@ -366,11 +369,51 @@ fn receipt_actor_flush_timeout_error(timeout: Duration) -> ReceiptStoreError {
     }
 }
 
+/// Last verified position of the writer connection's view of the receipt
+/// chain, owned exclusively by the commit-actor thread (RFC-0006).
+enum WriterHeadState {
+    // Boxed: `VerifiedHead` embeds an `Option<KernelCheckpoint>`, which makes
+    // this variant far larger than `Poisoned(String)` (clippy::large_enum_variant).
+    Verified(Box<VerifiedHead>),
+    /// Seeding or resync failed: every write is rejected with Conflict until
+    /// `chio receipt audit --repair` reseeds (fail-closed, RFC-0006).
+    Poisoned(String),
+}
+
+fn poisoned_head_error(message: &str) -> ReceiptStoreError {
+    ReceiptStoreError::Conflict(format!(
+        "receipt store verified head is unavailable ({message}); run `chio receipt audit --repair`"
+    ))
+}
+
 fn receipt_commit_actor_loop(
     pool: Pool<SqliteConnectionManager>,
     receiver: mpsc::Receiver<ReceiptCommitCommand>,
     health: Arc<ReceiptCommitWriterHealth>,
+    incremental_verification: bool,
 ) {
+    let mut head_state = match pool
+        .get()
+        .map_err(|error| ReceiptStoreError::Pool(error.to_string()))
+        .and_then(|connection| {
+            if incremental_verification {
+                seed_verified_head(&connection)
+            } else {
+                seed_head_snapshot(&connection)
+            }
+        }) {
+        Ok(head) => {
+            health.store_head_snapshot(&head);
+            WriterHeadState::Verified(Box::new(head))
+        }
+        Err(error) => {
+            if let Ok(mut last_error) = health.last_error.lock() {
+                *last_error = Some(error.to_string());
+            }
+            WriterHeadState::Poisoned(error.to_string())
+        }
+    };
+
     let mut pending_flush_error: Option<ReceiptStoreError> = None;
     while let Ok(command) = receiver.recv() {
         match command {
@@ -396,9 +439,22 @@ fn receipt_commit_actor_loop(
                         Err(mpsc::RecvTimeoutError::Disconnected) => break,
                     }
                 }
-                pending_flush_error = commit_receipt_batch(&pool, requests, flushes, &health);
+                pending_flush_error = commit_receipt_batch(
+                    &pool,
+                    &mut head_state,
+                    incremental_verification,
+                    requests,
+                    flushes,
+                    &health,
+                );
                 if let Some(command) = deferred {
-                    handle_non_append_command(&pool, &health, command);
+                    handle_non_append_command(
+                        &pool,
+                        &mut head_state,
+                        incremental_verification,
+                        &health,
+                        command,
+                    );
                 }
             }
             ReceiptCommitCommand::Flush(response) => {
@@ -408,13 +464,21 @@ fn receipt_commit_actor_loop(
                 };
                 let _ = response.send(result);
             }
-            other => handle_non_append_command(&pool, &health, other),
+            other => handle_non_append_command(
+                &pool,
+                &mut head_state,
+                incremental_verification,
+                &health,
+                other,
+            ),
         }
     }
 }
 
 fn handle_non_append_command(
     pool: &Pool<SqliteConnectionManager>,
+    head_state: &mut WriterHeadState,
+    incremental_verification: bool,
     health: &ReceiptCommitWriterHealth,
     command: ReceiptCommitCommand,
 ) {
@@ -423,9 +487,44 @@ fn handle_non_append_command(
             // Unconditional decrement pairs with the pre-send increment in
             // `WriterHandle::run_write`.
             atomic_saturating_sub(&health.inflight, 1);
-            match pool.get() {
-                Ok(mut connection) => job(Ok(&mut connection)),
-                Err(error) => job(Err(ReceiptStoreError::Pool(error.to_string()))),
+            let mut connection = match pool.get() {
+                Ok(connection) => connection,
+                Err(error) => {
+                    job(Err(ReceiptStoreError::Pool(error.to_string())));
+                    return;
+                }
+            };
+            match head_state {
+                WriterHeadState::Poisoned(message) => {
+                    job(Err(poisoned_head_error(message)));
+                }
+                WriterHeadState::Verified(head) => {
+                    // Pre-check (fail-closed): same predecessor check the
+                    // append path runs, so writer-routed appends (child
+                    // receipts, consuming auth) are equally protected.
+                    let pre_check = if incremental_verification {
+                        verify_head_against_latest_checkpoint(&connection, head)
+                    } else {
+                        verify_latest_checkpoint_integrity(&connection)
+                    };
+                    if let Err(error) = pre_check {
+                        job(Err(error));
+                        return;
+                    }
+                    job(Ok(&mut connection));
+                    // Post-resync: absorb whatever the closure committed
+                    // (claim-log rows via projection triggers, checkpoint
+                    // rows via the manual path) so the next append's
+                    // cross-check cannot false-Conflict.
+                    if let Err(error) = resync_head_after_write(&connection, head) {
+                        if let Ok(mut last_error) = health.last_error.lock() {
+                            *last_error = Some(error.to_string());
+                        }
+                        *head_state = WriterHeadState::Poisoned(error.to_string());
+                        return;
+                    }
+                    health.store_head_snapshot(head);
+                }
             }
         }
         // Append/Flush are handled by the main loop; reaching here is
@@ -441,13 +540,37 @@ fn handle_non_append_command(
     }
 }
 
+/// RFC-0006 head-resync rule: one indexed delta aggregate plus one
+/// latest-checkpoint row read after every Write closure.
+fn resync_head_after_write(
+    connection: &Connection,
+    head: &mut VerifiedHead,
+) -> Result<(), ReceiptStoreError> {
+    let (delta_count, post_max) =
+        claim_log_delta_count_and_max_seq(connection, head.claim_log_max_seq)?;
+    head.claim_log_count = head.claim_log_count.saturating_add(delta_count);
+    head.claim_log_max_seq = post_max;
+    verify_head_against_latest_checkpoint(connection, head)
+}
+
 fn commit_receipt_batch(
     pool: &Pool<SqliteConnectionManager>,
+    head_state: &mut WriterHeadState,
+    incremental_verification: bool,
     requests: Vec<ReceiptCommitRequest>,
     flushes: Vec<mpsc::SyncSender<Result<(), ReceiptStoreError>>>,
     health: &ReceiptCommitWriterHealth,
 ) -> Option<ReceiptStoreError> {
-    let results = append_receipt_batch(pool, &requests);
+    let results = match head_state {
+        WriterHeadState::Verified(head) => {
+            let results = append_receipt_batch(pool, head, incremental_verification, &requests);
+            health.store_head_snapshot(head);
+            results
+        }
+        WriterHeadState::Poisoned(message) => {
+            receipt_batch_error_results(requests.len(), poisoned_head_error(message))
+        }
+    };
     let flush_error = results
         .iter()
         .find_map(|result| result.as_ref().err().map(receipt_store_error_snapshot));
@@ -526,9 +649,24 @@ impl VerifiedHead {
     }
 }
 
+/// Writer-actor head snapshot exposed to `flush_report` and diagnostics
+/// (RFC-0006). Values are read from the health struct's atomics, written
+/// only by the actor thread.
+pub(crate) struct WriterHeadSnapshot {
+    pub(crate) checkpoint_seq: u64,
+    pub(crate) checkpointed_entry_seq: u64,
+    // Read only by tests (`incremental_append_updates_the_head_and_stays_correct`,
+    // `writer_routed_inserts_do_not_false_conflict_the_next_append`): they
+    // cross-check the actor-maintained head against a full re-verification.
+    // `flush_report` does not need the claim-log counters today.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) claim_log_count: u64,
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) claim_log_max_seq: u64,
+}
+
 /// Seed the verified head by running the existing FULL verification exactly
 /// once (the startup path for the O(N) check; also the audit-repair path).
-#[allow(dead_code)] // wired in the incremental append path (same PR)
 fn seed_verified_head(connection: &Connection) -> Result<VerifiedHead, ReceiptStoreError> {
     validate_claim_receipt_log_entries(connection)?;
     let latest_checkpoint = verify_checkpoint_chain_integrity(connection)?;
@@ -544,7 +682,6 @@ fn seed_verified_head(connection: &Connection) -> Result<VerifiedHead, ReceiptSt
 /// full per-append verification still runs on that path, so seeding only
 /// parses the single latest checkpoint row (one signature check) plus two
 /// aggregates. This keeps a suspect database openable for A/B verification.
-#[allow(dead_code)] // wired in the incremental append path (same PR)
 fn seed_head_snapshot(connection: &Connection) -> Result<VerifiedHead, ReceiptStoreError> {
     let latest_checkpoint = load_latest_persisted_checkpoint_row(connection)?
         .map(parse_persisted_checkpoint_row)
@@ -582,7 +719,6 @@ fn claim_log_delta_count_and_max_seq(
 /// compare). When the persisted chain has moved FORWARD, verify only the new
 /// checkpoints (bounded catch-up); every other divergence is a fail-closed
 /// `Conflict` pointing at `chio receipt audit`.
-#[allow(dead_code)] // wired in the incremental append path (same PR)
 fn verify_head_against_latest_checkpoint(
     connection: &Connection,
     head: &mut VerifiedHead,
@@ -663,6 +799,8 @@ fn catch_up_verified_head_to(
 
 fn append_receipt_batch(
     pool: &Pool<SqliteConnectionManager>,
+    head: &mut VerifiedHead,
+    incremental_verification: bool,
     requests: &[ReceiptCommitRequest],
 ) -> Vec<Result<u64, ReceiptStoreError>> {
     let mut connection = match pool.get() {
@@ -677,7 +815,12 @@ fn append_receipt_batch(
     if let Err(error) = ensure_checkpoint_transparency_guards(&connection) {
         return receipt_batch_error_results(requests.len(), error);
     }
-    if let Err(error) = validate_claim_receipt_log_entries(&connection) {
+    if incremental_verification {
+        // O(1) predecessor check (+ bounded catch-up), not a chain rebuild.
+        if let Err(error) = verify_head_against_latest_checkpoint(&connection, head) {
+            return receipt_batch_error_results(requests.len(), error);
+        }
+    } else if let Err(error) = validate_claim_receipt_log_entries(&connection) {
         return receipt_batch_error_results(requests.len(), error);
     }
     let tx = match connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate) {
@@ -686,9 +829,19 @@ fn append_receipt_batch(
             return receipt_batch_error_results(requests.len(), ReceiptStoreError::Sqlite(error));
         }
     };
-    if let Err(error) = verify_latest_checkpoint_integrity(&tx) {
-        return receipt_batch_error_results(requests.len(), error);
+    if !incremental_verification {
+        if let Err(error) = verify_latest_checkpoint_integrity(&tx) {
+            return receipt_batch_error_results(requests.len(), error);
+        }
     }
+    // Baseline inside the IMMEDIATE tx: rows another store instance committed
+    // since our last look are adopted as pre-existing, so the cross-check
+    // below measures exactly what THIS batch inserted.
+    let (pre_delta, baseline_max) =
+        match claim_log_delta_count_and_max_seq(&tx, head.claim_log_max_seq) {
+            Ok(pair) => pair,
+            Err(error) => return receipt_batch_error_results(requests.len(), error),
+        };
     let mut results = Vec::with_capacity(requests.len());
     for request in requests {
         match append_chio_receipt_tx(&tx, &request.receipt, &request.raw_json) {
@@ -715,8 +868,40 @@ fn append_receipt_batch(
             Err(error) => return receipt_batch_error_results(requests.len(), error),
         }
     }
+    // Idempotent duplicates return the existing entry_seq without adding a
+    // projection row (append_chio_receipt_tx: ON CONFLICT(receipt_id) DO
+    // NOTHING at receipt_store.rs:972, byte-identical duplicate branch at
+    // :992-1011). Only entry_seqs beyond the baseline count as new rows.
+    let inserted = results
+        .iter()
+        .filter_map(|result| result.as_ref().ok())
+        .filter(|seq| **seq > baseline_max)
+        .count() as u64;
+    // O(b) projection cross-check over the delta only: the claim-log
+    // projection triggers (bootstrap/open.rs:676 tool, :711 child) must have
+    // advanced the projection by exactly the rows this batch inserted.
+    let (delta_count, post_max) = match claim_log_delta_count_and_max_seq(&tx, baseline_max) {
+        Ok(pair) => pair,
+        Err(error) => return receipt_batch_error_results(requests.len(), error),
+    };
+    if delta_count != inserted || post_max < baseline_max {
+        return receipt_batch_error_results(
+            requests.len(),
+            ReceiptStoreError::Conflict(
+                "claim receipt log projection drift on append; run `chio receipt audit`"
+                    .to_string(),
+            ),
+        );
+    }
     match tx.commit() {
-        Ok(()) => results,
+        Ok(()) => {
+            head.claim_log_count = head
+                .claim_log_count
+                .saturating_add(pre_delta)
+                .saturating_add(delta_count);
+            head.claim_log_max_seq = post_max.max(baseline_max);
+            results
+        }
         Err(error) => receipt_batch_error_results(requests.len(), ReceiptStoreError::Sqlite(error)),
     }
 }
@@ -850,6 +1035,22 @@ impl SqliteReceiptStore {
             .load(std::sync::atomic::Ordering::SeqCst)
     }
 
+    /// Read-only after open (RFC-0006 staged-rollout flag).
+    #[must_use]
+    pub fn incremental_verification_enabled(&self) -> bool {
+        self.incremental_verification
+    }
+
+    pub(crate) fn writer_head_snapshot(&self) -> WriterHeadSnapshot {
+        let health = &self.receipt_commit_actor.health;
+        WriterHeadSnapshot {
+            checkpoint_seq: health.head_checkpoint_seq.load(Ordering::SeqCst),
+            checkpointed_entry_seq: health.head_checkpointed_entry_seq.load(Ordering::SeqCst),
+            claim_log_count: health.head_claim_log_count.load(Ordering::SeqCst),
+            claim_log_max_seq: health.head_claim_log_max_seq.load(Ordering::SeqCst),
+        }
+    }
+
     pub fn append_chio_receipt_canonical(
         &self,
         canonical: Arc<CanonicalBytes>,
@@ -921,10 +1122,8 @@ impl SqliteReceiptStore {
         let consumption = consumption.clone();
         self.writer_handle().run_write(move |connection| {
             ensure_checkpoint_transparency_guards(connection)?;
-            validate_claim_receipt_log_entries(connection)?;
             let tx =
                 connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-            verify_latest_checkpoint_integrity(&tx)?;
             consume_authorization_receipt_tx(&tx, &consumption)?;
             append_chio_receipt_tx(&tx, &receipt, &raw_json)?;
             ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &receipt.id)?;
@@ -1076,15 +1275,10 @@ impl SqliteReceiptStore {
         &self,
         wal_checkpoint: Option<ReceiptWalCheckpointReport>,
     ) -> Result<ReceiptFlushReport, ReceiptStoreError> {
-        self.validate_claim_receipt_log_projection_current()?;
+        let head = self.writer_head_snapshot();
         let latest_committed_entry_seq = self.latest_committed_entry_seq()?;
-        let latest = self.load_latest_checkpoint()?;
-        let latest_checkpoint_seq = latest
-            .as_ref()
-            .map(|checkpoint| checkpoint.body.checkpoint_seq);
-        let latest_checkpointed_entry_seq = latest
-            .as_ref()
-            .map_or(0, |checkpoint| checkpoint.body.batch_end_seq);
+        let latest_checkpoint_seq = (head.checkpoint_seq > 0).then_some(head.checkpoint_seq);
+        let latest_checkpointed_entry_seq = head.checkpointed_entry_seq;
         let (uncheckpointed_start_seq, uncheckpointed_end_seq) =
             uncheckpointed_range(latest_checkpointed_entry_seq, latest_committed_entry_seq);
         Ok(ReceiptFlushReport {

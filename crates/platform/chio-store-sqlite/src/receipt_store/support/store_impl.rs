@@ -152,10 +152,8 @@ impl SqliteReceiptStore {
         let receipt = receipt.clone();
         self.writer_handle().run_write(move |connection| {
             ensure_checkpoint_transparency_guards(connection)?;
-            validate_claim_receipt_log_entries(connection)?;
             let tx =
                 connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-            verify_latest_checkpoint_integrity(&tx)?;
             let inserted = tx.execute(
                 r#"
                 INSERT INTO chio_child_receipts (
@@ -263,10 +261,6 @@ impl ReceiptStore for SqliteReceiptStore {
         canonical: &CanonicalBytes,
     ) -> Result<(), ReceiptStoreError> {
         let decoded = decode_canonical_chio_receipt(canonical)?;
-        let connection = self.connection()?;
-        ensure_checkpoint_transparency_guards(&connection)?;
-        verify_latest_checkpoint_integrity(&connection)?;
-        drop(connection);
         let raw_json = canonical_receipt_json(canonical)?;
         self.append_verified_chio_receipt_record(&decoded, raw_json, true)?;
         Ok(())
@@ -276,10 +270,6 @@ impl ReceiptStore for SqliteReceiptStore {
         &self,
         receipt: &ChioReceipt,
     ) -> Result<Option<u64>, ReceiptStoreError> {
-        let connection = self.connection()?;
-        ensure_checkpoint_transparency_guards(&connection)?;
-        verify_latest_checkpoint_integrity(&connection)?;
-        drop(connection);
         let raw_json = serde_json::to_string(receipt)?;
         let seq = self.append_verified_chio_receipt_record(receipt, &raw_json, true)?;
         Ok(Some(seq))
@@ -510,9 +500,6 @@ impl ReceiptStore for SqliteReceiptStore {
     }
 
     fn append_child_receipt(&self, receipt: &ChildRequestReceipt) -> Result<(), ReceiptStoreError> {
-        let connection = self.connection()?;
-        ensure_checkpoint_transparency_guards(&connection)?;
-        verify_latest_checkpoint_integrity(&connection)?;
         SqliteReceiptStore::append_child_receipt_record(self, receipt).map(|_| ())
     }
 
@@ -520,9 +507,6 @@ impl ReceiptStore for SqliteReceiptStore {
         &self,
         receipt: &ChildRequestReceipt,
     ) -> Result<Option<u64>, ReceiptStoreError> {
-        let connection = self.connection()?;
-        ensure_checkpoint_transparency_guards(&connection)?;
-        verify_latest_checkpoint_integrity(&connection)?;
         SqliteReceiptStore::append_child_receipt_record(self, receipt).map(Some)
     }
 }

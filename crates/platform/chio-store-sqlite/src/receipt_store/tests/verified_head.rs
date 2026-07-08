@@ -98,3 +98,155 @@ fn claim_log_delta_aggregate_is_scoped_to_the_floor() -> Result<(), Box<dyn std:
     let _ = fs::remove_file(path);
     Ok(())
 }
+
+#[test]
+fn incremental_append_updates_the_head_and_stays_correct() -> Result<(), Box<dyn std::error::Error>>
+{
+    let path = unique_db_path("chio-head-incremental");
+    let store = SqliteReceiptStore::open(&path)?; // default: incremental on
+    assert!(store.incremental_verification_enabled());
+    let keypair = receipt_test_keypair();
+    for i in 0..7 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-inc-{i}"), (i + 1) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    let snapshot = store.writer_head_snapshot();
+    assert_eq!(snapshot.claim_log_count, 7);
+    assert_eq!(snapshot.claim_log_max_seq, 7);
+    // The head equals what a full re-verification computes.
+    let connection = store.connection()?;
+    let reference = seed_verified_head(&connection)?;
+    assert_eq!(snapshot.claim_log_count, reference.claim_log_count);
+    assert_eq!(snapshot.claim_log_max_seq, reference.claim_log_max_seq);
+    assert_eq!(snapshot.checkpoint_seq, reference.checkpoint_seq());
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn append_denies_when_head_diverges() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-head-deny");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    for i in 0..3 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-deny-{i}"), (i + 1) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    store.create_next_receipt_checkpoint(3, &keypair)?;
+    // Prime the head past the checkpoint (any append or flush suffices).
+    store.flush_receipt_writes()?;
+
+    // Out-of-band mutation of the persisted latest checkpoint row.
+    let connection = store.connection()?;
+    connection.execute_batch("DROP TRIGGER IF EXISTS kernel_checkpoints_reject_update;")?;
+    // Mutate a REAL body field (an ignored extra field would not change the
+    // RFC 8785 digest of the parsed body): batch_end_seq 3 -> 2.
+    connection.execute(
+        "UPDATE kernel_checkpoints SET statement_json = replace(statement_json, '\"batch_end_seq\":3', '\"batch_end_seq\":2')",
+        [],
+    )?;
+    drop(connection);
+
+    // The NEXT append fails closed with Conflict pointing at the audit CLI.
+    let receipt = sample_receipt_with_keypair("rcpt-deny-after-tamper", 99, &keypair);
+    let error = store
+        .append_chio_receipt_returning_seq(&receipt)
+        .err()
+        .ok_or("append after tamper must be denied")?;
+    match &error {
+        ReceiptStoreError::Conflict(message) => {
+            assert!(message.contains("chio receipt audit"), "got: {message}");
+        }
+        other => return Err(format!("expected Conflict, got {other}").into()),
+    }
+
+    // The audit surface localizes the divergence (full chain verify fails
+    // with a checkpoint-identifying error).
+    let status = store.receipt_checkpoint_status(Some(1))?;
+    assert!(!status.healthy);
+    let checkpoint_error = status
+        .checkpoint_error
+        .ok_or("audit must report the fault")?;
+    assert!(
+        checkpoint_error.contains("checkpoint") || checkpoint_error.contains("1"),
+        "audit must localize the divergent checkpoint: {checkpoint_error}"
+    );
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn writer_routed_inserts_do_not_false_conflict_the_next_append(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-head-resync");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    let receipt = sample_receipt_with_keypair("rcpt-resync-0", 1, &keypair);
+    store.append_chio_receipt_returning_seq(&receipt)?;
+    store.flush_receipt_writes()?;
+
+    // Writer-routed child receipt inserts a claim-log row via the projection
+    // trigger (bootstrap/open.rs:711); manual checkpoint creation inserts a
+    // checkpoint row. Both must be absorbed by the post-Write resync.
+    let child = sample_child_receipt_with_keypair_and_timestamp("child-resync-1", 2, &keypair);
+    store.append_child_receipt_record(&child)?;
+    store.create_next_receipt_checkpoint(2, &keypair)?;
+
+    // The next appends must succeed (no projection-drift Conflict, no
+    // predecessor Conflict).
+    for i in 1..4 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-resync-{i}"), (i + 2) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    let snapshot = store.writer_head_snapshot();
+    assert_eq!(snapshot.claim_log_max_seq, 5); // 1 tool + 1 child + 3 tool
+    assert_eq!(snapshot.checkpoint_seq, 1);
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn full_verification_fallback_still_catches_projection_drift(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-head-fallback");
+    let keypair = receipt_test_keypair();
+    // `ChioReceipt::sign` overwrites `body.id` with the authoritative
+    // `chio_receipt_id` (an RFC 8785 canonical-body sha256), discarding the
+    // caller-supplied seed string, so the persisted `receipt_id` must be read
+    // back from the signed receipt, not the seed passed to
+    // `sample_receipt_with_keypair`.
+    let receipt_id = {
+        let store = SqliteReceiptStore::open(&path)?;
+        let receipt = sample_receipt_with_keypair("rcpt-fallback-0", 1, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+        store.flush_receipt_writes()?;
+        receipt.id.clone()
+    };
+    let store = SqliteReceiptStore::open_existing_with_options(
+        &path,
+        crate::SqliteStoreOptions {
+            pool: crate::SqlitePoolConfig::default(),
+            incremental_verification: false,
+        },
+    )?;
+    assert!(!store.incremental_verification_enabled());
+
+    // Same tamper the legacy full path catches today.
+    tamper_claim_log_tool_receipt(&store, &receipt_id, |receipt| {
+        receipt.tool_name = "tampered".to_string();
+    });
+    let receipt = sample_receipt_with_keypair("rcpt-fallback-1", 2, &keypair);
+    let error = store
+        .append_chio_receipt_returning_seq(&receipt)
+        .err()
+        .ok_or("full-path append after tamper must be denied")?;
+    assert!(matches!(error, ReceiptStoreError::Conflict(_)));
+    let _ = fs::remove_file(path);
+    Ok(())
+}

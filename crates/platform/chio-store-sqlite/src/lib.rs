@@ -72,6 +72,26 @@ impl Default for SqlitePoolConfig {
     }
 }
 
+/// Receipt-store construction options (RFC-0006).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SqliteStoreOptions {
+    pub pool: SqlitePoolConfig,
+    /// When true (default), the append path uses the actor-owned verified
+    /// head (O(1) predecessor check + O(b) delta cross-check). When false,
+    /// the store keeps today's full per-append verification so operators can
+    /// A/B a suspect database. Read-only after open.
+    pub incremental_verification: bool,
+}
+
+impl Default for SqliteStoreOptions {
+    fn default() -> Self {
+        Self {
+            pool: SqlitePoolConfig::default(),
+            incremental_verification: true,
+        }
+    }
+}
+
 pub use approval_store::SqliteApprovalStore;
 pub use authority::SqliteCapabilityAuthority;
 pub use batch_approval_store::SqliteBatchApprovalStore;

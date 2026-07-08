@@ -77,3 +77,70 @@ fn writer_commands_serialize_and_never_lose_inflight_accounting(
     let _ = fs::remove_file(path);
     Ok(())
 }
+
+/// Force every pooled reader connection into `PRAGMA query_only = ON`, then
+/// exercise the routed write surface: all writes must still succeed (they run
+/// on the writer connection), while a direct write through the reader pool
+/// must fail. r2d2 creates connections lazily up to max_size, so grabbing all
+/// DEFAULT_READER_POOL_MAX_SIZE connections at once pins the whole pool.
+#[test]
+fn reader_pool_never_begins_a_write_transaction() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-reader-pool-readonly");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+
+    {
+        let mut held = Vec::new();
+        for _ in 0..crate::DEFAULT_READER_POOL_MAX_SIZE {
+            held.push(store.connection()?);
+        }
+        for connection in &held {
+            connection.execute_batch("PRAGMA query_only = ON;")?;
+        }
+    }
+
+    // Control: the reader pool now refuses writes.
+    {
+        let connection = store.connection()?;
+        let denied = connection.execute("CREATE TABLE reader_probe (x INTEGER)", []);
+        assert!(denied.is_err(), "reader pool accepted a write");
+    }
+
+    // The routed write surface still works end to end.
+    let receipt = sample_receipt_with_keypair("rcpt-ro-pool-0", 1, &keypair);
+    ReceiptStore::append_chio_receipt_returning_seq(&store, &receipt)?.ok_or("expected seq")?;
+    let child = sample_child_receipt_with_keypair_and_timestamp("child-ro-pool-0", 2, &keypair);
+    store.append_child_receipt_record(&child)?;
+    store.record_session_anchor_record(
+        "sess-ro",
+        "anchor-ro",
+        "fp-ro",
+        3,
+        None,
+        &serde_json::json!({"anchor": "ro"}),
+    )?;
+    // `record_request_lineage_record` validates `lineage_json` against
+    // `chio_core::session::RequestLineageRecord` (requires a `schema` field
+    // among others), unlike `record_session_anchor_record`'s unvalidated
+    // passthrough JSON above; `request_lineage_json` builds a
+    // schema-compliant payload.
+    store.record_request_lineage_record(
+        "sess-ro",
+        "req-ro",
+        None,
+        Some("anchor-ro"),
+        4,
+        None,
+        &request_lineage_json("req-ro", "anchor-ro", None),
+    )?;
+    let _links = store.list_receipt_lineage_statement_links("rcpt-ro-pool-0")?;
+    let _verification = store.receipt_lineage_verification("rcpt-ro-pool-0")?;
+    store.create_next_receipt_checkpoint(2, &keypair)?;
+
+    let iou_store = crate::SqliteIouEnvelopeStore::open_alongside(&store)
+        .map_err(|error| std::io::Error::other(error.to_string()))?;
+    drop(iou_store); // migration DDL ran on the writer; construction succeeding is the assertion
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
