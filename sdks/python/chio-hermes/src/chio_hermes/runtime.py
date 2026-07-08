@@ -155,11 +155,17 @@ def _install_receipt_id_capture(client: Any) -> None:
     from chio_hermes.handlers import _LAST_RECEIPT_ID
 
     async def wrapped(*args: Any, **kwargs: Any) -> Any:
-        receipt = await original(*args, **kwargs)
-        receipt_id = getattr(receipt, "id", None)
+        result = await original(*args, **kwargs)
+        # evaluate_tool_call now returns a mediated dict
+        # {"verdict": ..., "receipt": {...}, "execution_nonce": ...}.
+        # Support legacy object returns defensively.
+        if isinstance(result, dict):
+            receipt_id = result.get("receipt", {}).get("id")
+        else:
+            receipt_id = getattr(result, "id", None)
         if isinstance(receipt_id, str):
             _LAST_RECEIPT_ID.set(receipt_id)
-        return receipt
+        return result
 
     wrapped.__chio_hermes_wrapped__ = True  # type: ignore[attr-defined]
     try:

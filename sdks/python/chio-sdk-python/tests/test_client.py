@@ -381,7 +381,7 @@ class TestEvaluateToolCall:
     @respx.mock
     async def test_evaluate_tool_call_returns_mediated_response(self) -> None:
         expected = {
-            "verdict": {"verdict": "allow"},
+            "verdict": "allow",
             "receipt": _make_receipt_dict(),
             "execution_nonce": "nonce-123",
         }
