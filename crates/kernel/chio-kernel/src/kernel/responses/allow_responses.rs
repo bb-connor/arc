@@ -8,6 +8,7 @@ impl ChioKernel {
         timestamp: u64,
         matched_grant_index: Option<usize>,
         extra_metadata: Option<serde_json::Value>,
+        preminted_nonce: Option<Box<crate::execution_nonce::SignedExecutionNonce>>,
     ) -> Result<ToolCallResponse, KernelError> {
         let cap = &request.capability;
         let expected_chunks = match &output {
@@ -94,10 +95,13 @@ impl ChioKernel {
             )?;
         }
 
-        // Mint a short-lived, single-use execution nonce for allow responses
-        // that did not already present one. A request that consumed a nonce
-        // to execute must not chain-mint a replacement for the same call.
-        let execution_nonce = self.mint_execution_nonce_for_allow(request, cap, &receipt)?;
+        // Use a pre-minted nonce when the caller already minted one (cost-bearing
+        // allow paths that need the nonce id in the receipt metadata before signing).
+        // Otherwise fall back to minting after the receipt is signed.
+        let execution_nonce = match preminted_nonce {
+            Some(nonce) => Some(nonce),
+            None => self.mint_execution_nonce_for_allow(request, cap, &receipt)?,
+        };
 
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),

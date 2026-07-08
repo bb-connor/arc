@@ -630,3 +630,40 @@ fn in_memory_store_ttl_grace_period_does_not_regress() {
     // body's `expires_at` is what prevents the actual replay.
     assert!(store.reserve("a").unwrap());
 }
+
+#[test]
+fn mediated_allow_receipt_records_bound_execution_nonce_id() {
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+    let cfg = ExecutionNonceConfig { nonce_ttl_secs: 30, nonce_store_capacity: 1024, require_nonce: false };
+    kernel.set_execution_nonce_store(cfg.clone(), Box::new(InMemoryExecutionNonceStore::from_config(&cfg)));
+
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
+    let cap = kernel.issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600).unwrap();
+    let request = ToolCallRequest {
+        request_id: "req-nonce-link".to_string(),
+        capability: cap,
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({ "invoice": "inv-1" }),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    };
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    assert_eq!(response.verdict, Verdict::Allow);
+    let nonce = response.execution_nonce.as_ref().expect("mediated allow mints a nonce");
+    let metadata = response.receipt.metadata.as_ref().expect("receipt metadata present");
+    let recorded = metadata["budget_authority"]["execution_nonce_id"].as_str()
+        .expect("execution_nonce_id recorded on budget_authority metadata");
+    assert_eq!(recorded, nonce.nonce_id());
+    assert_eq!(
+        metadata["budget_authority"]["mediated_spend"]["profile"],
+        "chio.mediated_spend.v1"
+    );
+}

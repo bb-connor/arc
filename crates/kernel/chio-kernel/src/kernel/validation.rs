@@ -651,6 +651,7 @@ impl ChioKernel {
         &self,
         charge: &BudgetChargeResult,
         terminal_event: Option<(&str, &BudgetHoldMutationDecision)>,
+        execution_nonce_id: Option<&str>,
     ) -> serde_json::Value {
         let mut budget_authority = serde_json::Map::new();
         budget_authority.insert(
@@ -731,6 +732,19 @@ impl ChioKernel {
                 serde_json::json!(terminal_event.committed_cost_units_after),
             );
             budget_authority.insert("terminal".to_string(), serde_json::Value::Object(terminal));
+        }
+
+        if let Some(nonce_id) = execution_nonce_id {
+            budget_authority.insert(
+                "execution_nonce_id".to_string(),
+                serde_json::json!(nonce_id),
+            );
+            budget_authority.insert(
+                "mediated_spend".to_string(),
+                serde_json::json!({
+                    "profile": chio_core_types::receipt::authoritative_spend::MEDIATED_SPEND_PROFILE
+                }),
+            );
         }
 
         serde_json::json!({ "budget_authority": budget_authority })
@@ -1118,8 +1132,35 @@ impl ChioKernel {
             }
         };
 
-        let budget_metadata =
-            self.budget_execution_receipt_metadata(&charge, Some(("reconciled", &reconcile)));
+        // For cost-bearing allows without a presented nonce, mint the execution
+        // nonce before signing the receipt so the nonce id can be recorded in
+        // the budget-authority metadata. The same nonce is placed on the
+        // response so receipt metadata and response carry the same id.
+        let preminted_execution_nonce = if request.execution_nonce.is_none() {
+            if let Some(nonce_config) = self.execution_nonce_config.as_ref() {
+                let action =
+                    ToolCallAction::from_parameters(request.arguments.clone()).map_err(|e| {
+                        KernelError::ReceiptSigningFailed(format!(
+                            "failed to hash parameters for nonce binding: {e}"
+                        ))
+                    })?;
+                let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
+                let binding = self.nonce_binding_for(request, cap, &action.parameter_hash);
+                let signed =
+                    crate::execution_nonce::mint_execution_nonce(&self.config.keypair, binding, nonce_config, now)?;
+                Some(Box::new(signed))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let budget_metadata = self.budget_execution_receipt_metadata(
+            &charge,
+            Some(("reconciled", &reconcile)),
+            preminted_execution_nonce.as_deref().map(|n| n.nonce_id()),
+        );
         let merged_extra_metadata =
             self.merge_budget_receipt_metadata(extra_metadata, budget_metadata);
         let financial_json = Some(serde_json::json!({ "financial": financial_meta }));
@@ -1134,6 +1175,7 @@ impl ChioKernel {
                     timestamp,
                     Some(charge.grant_index),
                     merged_extra_metadata.clone(),
+                    preminted_execution_nonce,
                 ),
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => self
                 .build_incomplete_response_with_output_and_metadata(

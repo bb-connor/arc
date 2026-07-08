@@ -74,7 +74,7 @@ impl Drop for PostAdmissionDropGuard<'_> {
             Ok(Some(reverse)) => self.kernel.merge_budget_receipt_metadata(
                 self.receipt_context.extra_metadata.clone(),
                 self.kernel
-                    .budget_execution_receipt_metadata(charge, Some(("reversed", reverse))),
+                    .budget_execution_receipt_metadata(charge, Some(("reversed", reverse)), None),
             ),
             Ok(None) => self.receipt_context.extra_metadata.clone(),
             Err(error) => {

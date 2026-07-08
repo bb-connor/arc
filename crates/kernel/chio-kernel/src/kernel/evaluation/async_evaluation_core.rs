@@ -311,6 +311,7 @@ impl ChioKernel {
                             self.budget_execution_receipt_metadata(
                                 charge,
                                 Some(("reversed", reverse)),
+                                None,
                             ),
                         ),
                     );
@@ -369,6 +370,7 @@ impl ChioKernel {
                                 self.budget_execution_receipt_metadata(
                                     charge,
                                     Some(("reversed", reverse)),
+                                    None,
                                 ),
                             ),
                         )
@@ -419,6 +421,7 @@ impl ChioKernel {
                             self.budget_execution_receipt_metadata(
                                 charge,
                                 Some(("reversed", reverse)),
+                                None,
                             ),
                         ),
                     )
@@ -571,6 +574,7 @@ impl ChioKernel {
                                         self.budget_execution_receipt_metadata(
                                             charge,
                                             Some(("reversed", reverse)),
+                                            None,
                                         ),
                                     ),
                                 _ => extra_metadata.clone(),
@@ -607,6 +611,7 @@ impl ChioKernel {
                                         self.budget_execution_receipt_metadata(
                                             charge,
                                             Some(("reversed", reverse)),
+                                            None,
                                         ),
                                     ),
                                 _ => extra_metadata.clone(),
@@ -642,6 +647,7 @@ impl ChioKernel {
                                         self.budget_execution_receipt_metadata(
                                             charge,
                                             Some(("reversed", reverse)),
+                                            None,
                                         ),
                                     ),
                                 _ => extra_metadata.clone(),

@@ -50,6 +50,7 @@ impl ChioKernel {
                 timestamp,
                 Some(matched_grant_index),
                 post_invocation.extra_metadata,
+                None,
             ),
             ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => self
                 .build_allow_response_with_metadata(
@@ -58,6 +59,7 @@ impl ChioKernel {
                     timestamp,
                     Some(matched_grant_index),
                     post_invocation.extra_metadata,
+                    None,
                 ),
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, reason }) => self
                 .build_incomplete_response_with_output_and_metadata(

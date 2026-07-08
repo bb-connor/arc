@@ -1015,6 +1015,25 @@ impl ChioKernel {
             .is_some_and(|cfg| cfg.require_nonce)
     }
 
+    /// Compute the nonce binding for a call from the request, capability, and
+    /// the canonical parameter hash. Used to mint the nonce before the receipt
+    /// is signed so the receipt can record the nonce id (hold <-> nonce
+    /// cross-binding).
+    pub(crate) fn nonce_binding_for(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        parameter_hash: &str,
+    ) -> crate::execution_nonce::NonceBinding {
+        crate::execution_nonce::NonceBinding {
+            subject_id: cap.subject.to_hex(),
+            capability_id: cap.id.clone(),
+            tool_server: request.server_id.clone(),
+            tool_name: request.tool_name.clone(),
+            parameter_hash: parameter_hash.to_string(),
+        }
+    }
+
     /// Mint a signed execution nonce for an allow verdict.
     ///
     /// Returns `Ok(None)` when no config is installed (nonces disabled) or
