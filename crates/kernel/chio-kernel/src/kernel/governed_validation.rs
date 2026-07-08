@@ -276,11 +276,32 @@ impl ChioKernel {
     fn validate_metered_billing_context(
         intent: &chio_core::capability::governance::GovernedTransactionIntent,
         charge_result: Option<&BudgetChargeResult>,
+        payment_adapter_configured: bool,
         now: u64,
     ) -> Result<(), KernelError> {
         let Some(metered) = intent.metered_billing.as_ref() else {
             return Ok(());
         };
+
+        // Fail-closed rail-mandate gate (ADR/house rule; Direction C adversarial fix).
+        // A governed intent that mandates prepayment must not execute unless a
+        // payment adapter is configured to prepay it. This fires for EVERY
+        // MustPrepay intent regardless of charge_result, so it cannot be bypassed
+        // by the charge_result == None early-return in authorize_payment_if_needed.
+        // v1 decision: the gate is charge-independent; the authorized amount stays
+        // charge.cost_charged and the charge currency is already checked below
+        // against quote.quoted_cost.currency. Binding the authorized amount itself
+        // to quote.quoted_cost is a documented deferred refinement.
+        if metered.settlement_mode
+            == chio_core::capability::governance::MeteredSettlementMode::MustPrepay
+            && !payment_adapter_configured
+        {
+            return Err(KernelError::GovernedTransactionDenied(
+                "governed intent mandates prepayment (settlement_mode=MustPrepay) but no payment \
+                 adapter is configured; denying fail-closed"
+                    .to_string(),
+            ));
+        }
 
         let quote = &metered.quote;
         if quote.quote_id.trim().is_empty() {
@@ -1031,7 +1052,12 @@ impl ChioKernel {
             now,
         )?;
 
-        Self::validate_metered_billing_context(intent, charge_result, now)?;
+        Self::validate_metered_billing_context(
+            intent,
+            charge_result,
+            self.payment_adapter.is_some(),
+            now,
+        )?;
 
         if let (Some(intent_amount), Some(charge)) = (intent.max_amount.as_ref(), charge_result) {
             if intent_amount.currency != charge.currency {
@@ -1127,5 +1153,73 @@ impl ChioKernel {
             continuation_token_id,
             session_anchor_id,
         })
+    }
+}
+
+#[cfg(test)]
+mod mustprepay_gate_tests {
+    use super::*;
+    use chio_core::capability::governance::{
+        GovernedTransactionIntent, MeteredBillingContext, MeteredBillingQuote,
+        MeteredSettlementMode,
+    };
+    use chio_core::capability::scope::MonetaryAmount;
+
+    fn must_prepay_intent() -> GovernedTransactionIntent {
+        GovernedTransactionIntent {
+            id: "intent-1".to_string(),
+            server_id: "srv-1".to_string(),
+            tool_name: "tool-1".to_string(),
+            purpose: "test".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: Some(MeteredBillingContext {
+                settlement_mode: MeteredSettlementMode::MustPrepay,
+                quote: MeteredBillingQuote {
+                    quote_id: "q-1".to_string(),
+                    provider: "meter".to_string(),
+                    billing_unit: "1k_tokens".to_string(),
+                    quoted_units: 10,
+                    quoted_cost: MonetaryAmount {
+                        units: 100,
+                        currency: "USD".to_string(),
+                    },
+                    issued_at: 1_000,
+                    expires_at: None,
+                },
+                max_billed_units: None,
+            }),
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: None,
+        }
+    }
+
+    #[test]
+    fn mustprepay_without_adapter_and_no_charge_is_denied() {
+        // The uncovered path: MustPrepay + charge_result None + no adapter.
+        let intent = must_prepay_intent();
+        let result = ChioKernel::validate_metered_billing_context(&intent, None, false, 1_500);
+        let error = result.expect_err("MustPrepay with no adapter and no charge must be denied");
+        assert!(matches!(error, KernelError::GovernedTransactionDenied(_)));
+        assert!(error.to_string().contains("MustPrepay"));
+    }
+
+    #[test]
+    fn mustprepay_with_adapter_passes_metered_validation() {
+        let intent = must_prepay_intent();
+        ChioKernel::validate_metered_billing_context(&intent, None, true, 1_500)
+            .expect("MustPrepay with an adapter configured should pass metered validation");
+    }
+
+    #[test]
+    fn non_mustprepay_without_adapter_is_allowed() {
+        let mut intent = must_prepay_intent();
+        if let Some(metered) = intent.metered_billing.as_mut() {
+            metered.settlement_mode = MeteredSettlementMode::AllowThenSettle;
+        }
+        ChioKernel::validate_metered_billing_context(&intent, None, false, 1_500)
+            .expect("non-prepay mode without an adapter must not be gated");
     }
 }
