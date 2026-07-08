@@ -85,6 +85,10 @@ name = "authoritative_spend_double_spend"
 path = "tests/authoritative_spend_double_spend.rs"
 
 [[test]]
+name = "authoritative_spend_predicate_matrix"
+path = "tests/authoritative_spend_predicate_matrix.rs"
+
+[[test]]
 name = "verdict_matrix_rust_driver"
 path = "verdict_matrix/tests/verdict_matrix_rust_driver.rs"
 

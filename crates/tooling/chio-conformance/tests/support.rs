@@ -236,6 +236,18 @@ pub fn standalone_advisory_receipt(
     ChioReceipt::sign(body, signer).unwrap()
 }
 
+/// Re-sign a receipt whose body has been mutated for an adversarial test case.
+///
+/// Calls [`ChioReceipt::sign`] when the body remains semantically valid; falls
+/// back to returning the mutated receipt when semantics are intentionally
+/// broken (e.g. `trust_level` flipped to `Advisory` while `receipt_kind` stays
+/// `MediatedDecision`). [`is_authoritative_spend_receipt`] checks field values
+/// and the admission check only, not the raw Ed25519 signature.
+pub fn resign(signer: &Keypair, receipt: ChioReceipt) -> ChioReceipt {
+    let body = receipt.body();
+    ChioReceipt::sign(body, signer).unwrap_or(receipt)
+}
+
 /// Construct a `FakePresentedNonce` bound to the given fields.
 ///
 /// The returned value implements `PresentedNonceView` so it can be passed to
