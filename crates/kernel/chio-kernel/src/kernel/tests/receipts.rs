@@ -325,7 +325,10 @@ fn streamed_tool_receipt_records_chunk_hash_metadata() {
 }
 
 #[test]
-fn streamed_tool_byte_limit_truncates_output_and_marks_receipt_incomplete() {
+fn streamed_tool_byte_limit_denies_with_overloaded_at_invoke_seam() {
+    // RFC-0004 F06: a connector stream exceeding max_stream_total_bytes is
+    // refused at the kernel invoke seam with a fail-closed Overloaded deny
+    // (superseding the earlier silent truncate-to-incomplete behavior).
     let mut config = make_config();
     config.max_stream_total_bytes = 20;
     let mut kernel = make_kernel(config);
@@ -333,7 +336,7 @@ fn streamed_tool_byte_limit_truncates_output_and_marks_receipt_incomplete() {
     let second_chunk = serde_json::json!({"delta": "this chunk exceeds the configured byte limit"});
     kernel.register_tool_server(Box::new(StreamingServer {
         id: "stream".to_string(),
-        chunks: vec![first_chunk.clone(), second_chunk],
+        chunks: vec![first_chunk, second_chunk],
     }));
 
     let agent_kp = make_keypair();
@@ -354,29 +357,11 @@ fn streamed_tool_byte_limit_truncates_output_and_marks_receipt_incomplete() {
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response.receipt.is_incomplete());
-    assert!(matches!(
-        response.terminal_state,
-        OperationTerminalState::Incomplete { .. }
-    ));
-    assert!(response
-        .reason
-        .as_deref()
-        .unwrap_or("")
-        .contains("max total bytes"));
-
-    let output_stream = tool_call_stream_output(response.output).expect("expected stream output");
-    assert_eq!(output_stream.chunk_count(), 1);
-    assert_eq!(output_stream.chunks[0].data, first_chunk);
-
-    let stream_metadata = response
-        .receipt
-        .metadata
-        .as_ref()
-        .and_then(|metadata| metadata.get("stream"))
-        .expect("stream metadata");
-    assert!(stream_metadata["chunks_expected"].is_null());
-    assert_eq!(stream_metadata["chunks_received"].as_u64(), Some(1));
+    let reason = response.reason.as_deref().unwrap_or("");
+    assert!(
+        reason.to_lowercase().contains("overloaded") && reason.contains("StreamBytes"),
+        "expected an Overloaded StreamBytes deny reason, got: {reason}"
+    );
 }
 
 #[test]

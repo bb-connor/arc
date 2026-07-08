@@ -489,6 +489,15 @@ impl ChioKernel {
             .invoke_stream(&request.tool_name, request.arguments.clone(), None)
             .await?
         {
+            // RFC-0004 F06: size the returned stream at the earliest point the
+            // kernel owns, before any guard or serde copy, and deny early. A
+            // conforming connector never materializes past this; a
+            // non-conforming one is refused here inside the TCB.
+            let inner = match &stream {
+                crate::runtime::ToolServerStreamResult::Complete(s) => s,
+                crate::runtime::ToolServerStreamResult::Incomplete { stream, .. } => stream,
+            };
+            crate::runtime::enforce_stream_byte_limit(inner, self.config.max_stream_total_bytes)?;
             return Ok((ToolServerOutput::Stream(stream), None));
         }
 

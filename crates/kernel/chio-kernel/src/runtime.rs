@@ -135,6 +135,59 @@ impl ToolCallStream {
     }
 }
 
+/// Sum the canonical byte size of a materialized stream and deny with
+/// `Overloaded { StreamBytes }` if it exceeds `max_total_bytes` (0 = unlimited).
+/// Uses the same per-chunk measurement as truncate_stream_to_byte_limit, so the
+/// at-arrival count and the finalize-time count agree by construction
+/// (RFC-0004 F06).
+pub fn enforce_stream_byte_limit(
+    stream: &ToolCallStream,
+    max_total_bytes: u64,
+) -> Result<(), KernelError> {
+    if max_total_bytes == 0 {
+        return Ok(());
+    }
+    let mut total: u64 = 0;
+    for chunk in &stream.chunks {
+        let bytes = crate::canonical_json_bytes(&chunk.data)
+            .map_err(|e| KernelError::Internal(format!("failed to size stream chunk: {e}")))?;
+        total = total.saturating_add(bytes.len() as u64);
+        if total > max_total_bytes {
+            return Err(KernelError::Overloaded {
+                resource: crate::OverloadResource::StreamBytes,
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Fallible per-chunk push for KernelError-returning accumulators. Denies before
+/// materializing past `max_total_bytes` (StreamBytes) and maps a failed
+/// allocation under strict overcommit to a typed deny (Allocation) rather than
+/// an abort (RFC-0004 F06).
+pub fn push_chunk_bounded(
+    acc: &mut Vec<ToolCallChunk>,
+    running_bytes: &mut u64,
+    chunk: ToolCallChunk,
+    max_total_bytes: u64,
+) -> Result<(), KernelError> {
+    let chunk_bytes = crate::canonical_json_bytes(&chunk.data)
+        .map_err(|e| KernelError::Internal(format!("failed to size stream chunk: {e}")))?
+        .len() as u64;
+    let next = running_bytes.saturating_add(chunk_bytes);
+    if max_total_bytes > 0 && next > max_total_bytes {
+        return Err(KernelError::Overloaded {
+            resource: crate::OverloadResource::StreamBytes,
+        });
+    }
+    acc.try_reserve(1).map_err(|_| KernelError::Overloaded {
+        resource: crate::OverloadResource::Allocation,
+    })?;
+    acc.push(chunk);
+    *running_bytes = next;
+    Ok(())
+}
+
 /// Output produced by a tool invocation.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ToolCallOutput {
