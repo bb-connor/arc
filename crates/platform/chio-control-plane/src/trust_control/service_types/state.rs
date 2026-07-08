@@ -93,12 +93,33 @@ pub(crate) struct PeerSyncState {
     pub(crate) force_snapshot: bool,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct FederationAdmissionRateLimiter {
     attempts: HashMap<String, Vec<u64>>,
+    insertion_order: std::collections::VecDeque<String>,
+    key_cap: usize,
+}
+
+impl Default for FederationAdmissionRateLimiter {
+    fn default() -> Self {
+        Self::with_key_cap(4096)
+    }
 }
 
 impl FederationAdmissionRateLimiter {
+    pub(crate) fn with_key_cap(key_cap: usize) -> Self {
+        Self {
+            attempts: HashMap::new(),
+            insertion_order: std::collections::VecDeque::new(),
+            key_cap: key_cap.max(1),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn key_count(&self) -> usize {
+        self.attempts.len()
+    }
+
     pub(crate) fn check_and_record(
         &mut self,
         policy_id: &str,
@@ -108,7 +129,20 @@ impl FederationAdmissionRateLimiter {
     ) -> FederationAdmissionRateLimitStatus {
         let key = format!("{policy_id}:{subject_key}");
         let lower_bound = now.saturating_sub(limit.window_seconds);
-        let entry = self.attempts.entry(key).or_default();
+
+        let is_new_key = !self.attempts.contains_key(&key);
+        // Key cap with oldest-eviction, mirroring McpRateLimiter: when full and
+        // this is a new key, evict the oldest inserted key so a distinct-subject
+        // flood saturates instead of growing without bound (RFC-0004 F39).
+        if is_new_key && self.attempts.len() >= self.key_cap {
+            while let Some(oldest) = self.insertion_order.pop_front() {
+                if self.attempts.remove(&oldest).is_some() {
+                    break;
+                }
+            }
+        }
+
+        let entry = self.attempts.entry(key.clone()).or_default();
         entry.retain(|timestamp| *timestamp > lower_bound);
         if entry.len() >= limit.max_requests as usize {
             let retry_after_seconds = entry
@@ -126,11 +160,32 @@ impl FederationAdmissionRateLimiter {
                 retry_after_seconds: Some(retry_after_seconds.max(1)),
             };
         }
+        let was_empty = entry.is_empty();
         entry.push(now);
+        if is_new_key || was_empty {
+            // New key, or a key pruned to empty then re-pushed (effectively
+            // fresh): keep insertion order coherent (stale duplicates are skipped
+            // by the evict loop's remove guard).
+            self.insertion_order.push_back(key);
+        }
+
+        // Drop-empty maintenance: prune any key whose window has fully emptied so
+        // a fresh subject costs nothing once its window empties (RFC-0004 F39,
+        // F21 rate-limiter half). Bounded: touches at most `key_cap` keys.
+        self.attempts.retain(|_, timestamps| {
+            timestamps.retain(|t| *t > lower_bound);
+            !timestamps.is_empty()
+        });
+
         FederationAdmissionRateLimitStatus {
             limit: limit.max_requests,
             window_seconds: limit.window_seconds,
-            remaining: limit.max_requests.saturating_sub(entry.len() as u32),
+            remaining: limit.max_requests.saturating_sub(
+                self.attempts
+                    .get(&format!("{policy_id}:{subject_key}"))
+                    .map(|v| v.len())
+                    .unwrap_or(0) as u32,
+            ),
             retry_after_seconds: None,
         }
     }
@@ -199,5 +254,44 @@ impl PeerHealth {
             Self::Healthy => "healthy",
             Self::Unhealthy => "unhealthy",
         }
+    }
+}
+
+#[cfg(test)]
+mod admission_bound_tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+    use super::*;
+
+    fn limit() -> FederationAdmissionRateLimit {
+        FederationAdmissionRateLimit {
+            max_requests: 5,
+            window_seconds: 60,
+        }
+    }
+
+    #[test]
+    fn distinct_subject_flood_saturates_at_key_cap() {
+        let mut limiter = FederationAdmissionRateLimiter::with_key_cap(8);
+        for i in 0..1000u64 {
+            let subject = format!("subject-{i}");
+            let _ = limiter.check_and_record("policy", &subject, &limit(), 100);
+        }
+        assert!(
+            limiter.key_count() <= 8,
+            "attempts map grew past key cap: {}",
+            limiter.key_count()
+        );
+    }
+
+    #[test]
+    fn emptied_window_key_leaves_no_residue() {
+        let mut limiter = FederationAdmissionRateLimiter::with_key_cap(4096);
+        let _ = limiter.check_and_record("policy", "s", &limit(), 100);
+        assert_eq!(limiter.key_count(), 1);
+        // A later call whose window has fully passed prunes the old timestamp;
+        // the drop-empty maintenance pass then removes the residual key from the
+        // unrelated emptied subject, so only "s2" remains.
+        let _ = limiter.check_and_record("policy", "s2", &limit(), 100_000);
+        assert_eq!(limiter.key_count(), 1, "emptied-window key left residue");
     }
 }
