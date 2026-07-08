@@ -432,3 +432,57 @@ fn reseed_on_still_corrupt_store_stays_poisoned() -> Result<(), Box<dyn std::err
     let _ = fs::remove_file(path);
     Ok(())
 }
+
+/// RFC-0006 fail-closed parity: a writer-routed (Write path) receipt append
+/// (child receipt / consuming-auth append) on an `incremental_verification =
+/// false` store must run the SAME full claim-log validation the append batch
+/// path runs, so uncheckpointed projection drift is denied at append time.
+/// Before the fix the fallback pre-check ran only
+/// `verify_latest_checkpoint_integrity`, which returns Ok when no checkpoint
+/// exists, so a writer-routed append silently committed over tampered rows.
+/// Sibling of `full_verification_fallback_still_catches_projection_drift`
+/// (which covers the append batch path).
+#[test]
+fn writer_routed_fallback_append_catches_uncheckpointed_drift(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-writer-fallback-drift");
+    let keypair = receipt_test_keypair();
+    // Seed one tool receipt on the default (incremental) store; capture the
+    // authoritative persisted receipt id.
+    let receipt_id = {
+        let store = SqliteReceiptStore::open(&path)?;
+        let receipt = sample_receipt_with_keypair("rcpt-wfd-0", 1, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+        store.flush_receipt_writes()?;
+        receipt.id.clone()
+    };
+    // Reopen with incremental verification OFF (full-verification fallback).
+    let store = SqliteReceiptStore::open_existing_with_options(
+        &path,
+        crate::SqliteStoreOptions {
+            pool: crate::SqlitePoolConfig::default(),
+            incremental_verification: false,
+        },
+    )?;
+    assert!(!store.incremental_verification_enabled());
+
+    // Tamper an UNCHECKPOINTED claim-log row (no checkpoint has been built).
+    tamper_claim_log_tool_receipt(&store, &receipt_id, |receipt| {
+        receipt.tool_name = "tampered".to_string();
+    });
+
+    // A writer-routed child receipt append must be DENIED fail-closed by the
+    // pre-write full claim-log validation, not silently committed.
+    let child = sample_child_receipt_with_keypair_and_timestamp("child-wfd-1", 2, &keypair);
+    let error = store
+        .append_child_receipt_record(&child)
+        .err()
+        .ok_or("writer-routed append after uncheckpointed tamper must be denied")?;
+    assert!(
+        matches!(error, ReceiptStoreError::Conflict(_)),
+        "expected fail-closed Conflict, got {error:?}"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}

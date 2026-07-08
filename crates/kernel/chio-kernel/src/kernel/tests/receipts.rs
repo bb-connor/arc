@@ -821,3 +821,45 @@ fn background_checkpoints_are_installed_at_store_attach_and_fire_off_the_request
 
     let _ = std::fs::remove_file(&path);
 }
+
+/// RFC-0006 fail-closed attach: a receipt store that reports
+/// `supports_kernel_signed_checkpoints() = true` but relies on the DEFAULT
+/// `enable_background_checkpoints` hook (which returns `Ok(false)`, i.e. never
+/// installs a background signer) would append forever without producing
+/// kernel-signed Web3 checkpoints now that the synchronous checkpoint trigger
+/// is gone. Attaching such a store must fail closed.
+struct CheckpointCapableWithoutBackgroundStore;
+
+impl ReceiptStore for CheckpointCapableWithoutBackgroundStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn supports_kernel_signed_checkpoints(&self) -> bool {
+        true
+    }
+    // `enable_background_checkpoints` intentionally uses the trait default,
+    // which returns `Ok(false)` (no background signer installed).
+}
+
+#[test]
+fn checkpoint_capable_store_without_background_fails_setup() {
+    let mut kernel = make_kernel(make_config());
+    let error = kernel
+        .set_receipt_store(Box::new(CheckpointCapableWithoutBackgroundStore))
+        .expect_err("checkpoint-capable store without a background signer must fail setup");
+    match error {
+        KernelError::Internal(message) => assert!(
+            message.contains("did not install a background checkpoint signer"),
+            "unexpected fail-closed error: {message}"
+        ),
+        other => panic!("expected KernelError::Internal, got {other:?}"),
+    }
+}

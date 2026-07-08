@@ -212,3 +212,99 @@ fn background_and_writer_routed_child_appends_share_the_threshold(
     let _ = fs::remove_file(path);
     Ok(())
 }
+
+/// RFC-0006 idempotent background-checkpoint convergence: two kernels/store
+/// instances sharing one receipt DB can each build the same due checkpoint
+/// before either head catches up. The loser reaches
+/// `insert_checkpoint_incremental_tx` after the winner already committed a
+/// byte-identical row. It must be treated as success (like
+/// `store_kernel_checkpoint_tx`), not a conflict that records
+/// `writer.last_error` and reports the store UNHEALTHY even though the
+/// persisted chain is valid.
+#[test]
+fn identical_background_checkpoint_is_idempotent() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-bg-idempotent");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    // Seed three receipts and build checkpoint 1 (batch 1..=3): the "winner".
+    for i in 0..3 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-idem-{i}"), (i + 1) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    store.create_next_receipt_checkpoint(3, &keypair)?;
+    let persisted = store
+        .load_checkpoint_by_seq(1)?
+        .ok_or("winner checkpoint 1 missing")?;
+
+    // The "loser" rebuilds and re-inserts the byte-identical checkpoint 1.
+    // Before the fix the raw INSERT hit the primary-key conflict and errored;
+    // now it is adopted as success.
+    {
+        let mut connection = store.connection()?;
+        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        insert_checkpoint_incremental_tx(&tx, None, &persisted)?;
+        tx.commit()?;
+    }
+
+    // The persisted chain is unchanged and the full audit stays healthy: no
+    // duplicate row, checkpoint head caught up at seq 1.
+    let status = store.receipt_checkpoint_status(Some(3))?;
+    assert!(
+        status.healthy,
+        "idempotent re-insert must keep the store healthy: {status:?}"
+    );
+    assert_eq!(status.latest_checkpoint_seq, Some(1));
+    assert_eq!(status.latest_checkpointed_entry_seq, 3);
+    assert!(
+        store.load_checkpoint_by_seq(2)?.is_none(),
+        "the idempotent re-insert must not add a second checkpoint row"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+/// RFC-0006 flush-report freshness: when a second handle extends the
+/// checkpoint chain out of band and this handle has had no intervening append,
+/// a Flush must reflect the CURRENT persisted checkpoint (read from the DB),
+/// not the stale writer-head atomics that would overstate the uncheckpointed
+/// range.
+#[test]
+fn flush_report_reflects_externally_extended_checkpoint() -> Result<(), Box<dyn std::error::Error>>
+{
+    let path = unique_db_path("chio-flush-external-ckpt");
+    let keypair = receipt_test_keypair();
+    let store_a = SqliteReceiptStore::open(&path)?;
+    for i in 0..3 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-flush-{i}"), (i + 1) as u64, &keypair);
+        store_a.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store_a.flush_receipt_writes()?;
+
+    // A stale baseline flush: no checkpoint exists yet.
+    let baseline = store_a.flush_receipt_writes()?;
+    assert_eq!(baseline.latest_checkpoint_seq, None);
+    assert_eq!(baseline.uncheckpointed_end_seq, Some(3));
+
+    // A second handle on the SAME DB extends the checkpoint chain.
+    let store_b = SqliteReceiptStore::open_existing(&path)?;
+    store_b.create_next_receipt_checkpoint(3, &keypair)?;
+
+    // store_a had no intervening write, so its head atomics are stale. The
+    // flush report must still reflect the externally persisted checkpoint.
+    let report = store_a.flush_receipt_writes()?;
+    assert_eq!(
+        report.latest_checkpoint_seq,
+        Some(1),
+        "flush must reflect the externally extended checkpoint"
+    );
+    assert_eq!(report.latest_checkpointed_entry_seq, 3);
+    assert_eq!(report.uncheckpointed_start_seq, None);
+    assert_eq!(report.uncheckpointed_end_seq, None);
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}

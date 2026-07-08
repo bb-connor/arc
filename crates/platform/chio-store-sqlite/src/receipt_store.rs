@@ -178,7 +178,18 @@ enum ReceiptCommitCommand {
     /// Generic single-writer job. Runs on the writer connection after any
     /// in-flight append batch has committed. The closure receives `Err` when
     /// the actor cannot provide a healthy writer connection (fail-closed).
-    Write(WriterClosure),
+    ///
+    /// `appends_receipts` is true for jobs that insert tool/child receipt rows
+    /// (child receipts, authorization-consuming appends), which populate
+    /// `claim_receipt_log_entries` via the projection triggers. On a
+    /// non-incremental (full-verification) store, the pre-write check runs the
+    /// full claim-log validation for these, restoring the pre-refactor
+    /// guarantee. Metadata-only Write jobs leave it false and skip the O(N)
+    /// scan.
+    Write {
+        job: WriterClosure,
+        appends_receipts: bool,
+    },
     /// Rerun the full verification on the writer connection and, on success,
     /// adopt the fresh head (clears a poisoned head). Audit-repair path.
     ReseedHead(mpsc::SyncSender<Result<(), ReceiptStoreError>>),
@@ -315,8 +326,30 @@ pub(crate) struct WriterHandle {
 
 impl WriterHandle {
     /// Run one write job on the single writer connection and return its
-    /// typed result. Fail-closed on saturation or a dead writer.
+    /// typed result. Fail-closed on saturation or a dead writer. Use for
+    /// metadata-only writes (capability, liability, underwriting, IOU,
+    /// session anchors) that do not insert receipt rows.
     pub(crate) fn run_write<T, F>(&self, job: F) -> Result<T, ReceiptStoreError>
+    where
+        F: FnOnce(&mut SqliteStoreConnection) -> Result<T, ReceiptStoreError> + Send + 'static,
+        T: Send + 'static,
+    {
+        self.run_write_kind(job, false)
+    }
+
+    /// Run one receipt-appending write job (child receipts,
+    /// authorization-consuming appends). These insert `claim_receipt_log_entries`
+    /// rows via the projection triggers, so the non-incremental fallback
+    /// pre-check runs the full claim-log validation (RFC-0006 fail-closed).
+    pub(crate) fn run_write_receipt<T, F>(&self, job: F) -> Result<T, ReceiptStoreError>
+    where
+        F: FnOnce(&mut SqliteStoreConnection) -> Result<T, ReceiptStoreError> + Send + 'static,
+        T: Send + 'static,
+    {
+        self.run_write_kind(job, true)
+    }
+
+    fn run_write_kind<T, F>(&self, job: F, appends_receipts: bool) -> Result<T, ReceiptStoreError>
     where
         F: FnOnce(&mut SqliteStoreConnection) -> Result<T, ReceiptStoreError> + Send + 'static,
         T: Send + 'static,
@@ -346,7 +379,10 @@ impl WriterHandle {
         // increment in `append`). The actor decrements unconditionally on
         // dequeue; any send failure undoes the speculative increment.
         self.health.inflight.fetch_add(1, Ordering::SeqCst);
-        match self.sender.try_send(ReceiptCommitCommand::Write(boxed)) {
+        match self.sender.try_send(ReceiptCommitCommand::Write {
+            job: boxed,
+            appends_receipts,
+        }) {
             Ok(()) => {}
             Err(mpsc::TrySendError::Full(_)) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
@@ -360,7 +396,18 @@ impl WriterHandle {
         }
         match result.recv() {
             Ok(outcome) => outcome,
-            Err(_) => Err(receipt_actor_unavailable_error()),
+            Err(_) => {
+                // Accepted-then-lost: the actor took the command but exited
+                // before delivering a response (actor death; job panics are
+                // caught and answered above). The unconditional dequeue
+                // decrement never ran, so undo the speculative pre-send
+                // increment and record the failure, mirroring the append
+                // path's recv-Err handling, so writer.inflight does not
+                // report a permanently-stuck write.
+                atomic_saturating_sub(&self.health.inflight, 1);
+                self.health.failed_total.fetch_add(1, Ordering::SeqCst);
+                Err(receipt_actor_unavailable_error())
+            }
         }
     }
 }
@@ -540,7 +587,10 @@ fn handle_non_append_command(
     command: ReceiptCommitCommand,
 ) {
     match command {
-        ReceiptCommitCommand::Write(job) => {
+        ReceiptCommitCommand::Write {
+            job,
+            appends_receipts,
+        } => {
             // Unconditional decrement pairs with the pre-send increment in
             // `WriterHandle::run_write`.
             atomic_saturating_sub(&health.inflight, 1);
@@ -558,11 +608,23 @@ fn handle_non_append_command(
                 WriterHeadState::Verified(head) => {
                     // Pre-check (fail-closed): same predecessor check the
                     // append path runs, so writer-routed appends (child
-                    // receipts, consuming auth) are equally protected.
+                    // receipts, consuming auth) are equally protected. On the
+                    // non-incremental (full-verification) fallback, a
+                    // receipt-appending job also runs the full claim-log
+                    // validation the pre-refactor path guaranteed, so
+                    // uncheckpointed projection drift is caught before the
+                    // write commits. Metadata-only Write jobs skip the O(N)
+                    // scan.
                     let pre_check = if incremental_verification {
                         verify_head_against_latest_checkpoint(&connection, head)
                     } else {
-                        verify_latest_checkpoint_integrity(&connection)
+                        verify_latest_checkpoint_integrity(&connection).and_then(|()| {
+                            if appends_receipts {
+                                validate_claim_receipt_log_entries(&connection)
+                            } else {
+                                Ok(())
+                            }
+                        })
                     };
                     if let Err(error) = pre_check {
                         job(Err(error));
@@ -1081,12 +1143,20 @@ fn append_receipt_batch(
     // Idempotent duplicates return the existing entry_seq without adding a
     // projection row (append_chio_receipt_tx: ON CONFLICT(receipt_id) DO
     // NOTHING at receipt_store.rs:972, byte-identical duplicate branch at
-    // :992-1011). Only entry_seqs beyond the baseline count as new rows.
+    // :992-1011). Only entry_seqs beyond the baseline count as new rows, and
+    // only DISTINCT ones: two byte-identical receipts landing in a single
+    // group-commit batch (a concurrent duplicate append) both return the SAME
+    // entry_seq from the idempotent branch while inserting exactly one
+    // projection row. Deduplicating the new seqs keeps `inserted` equal to the
+    // distinct row count so the cross-check below does not false-trigger the
+    // projection-drift Conflict and roll back a valid idempotent batch.
     let inserted = results
         .iter()
         .filter_map(|result| result.as_ref().ok())
         .filter(|seq| **seq > baseline_max)
-        .count() as u64;
+        .copied()
+        .collect::<std::collections::BTreeSet<u64>>()
+        .len() as u64;
     // O(b) projection cross-check over the delta only: the claim-log
     // projection triggers (bootstrap/open.rs:676 tool, :711 child) must have
     // advanced the projection by exactly the rows this batch inserted.
@@ -1417,7 +1487,7 @@ impl SqliteReceiptStore {
         let raw_json = raw_json.to_string();
         let receipt = receipt.clone();
         let consumption = consumption.clone();
-        self.writer_handle().run_write(move |connection| {
+        self.writer_handle().run_write_receipt(move |connection| {
             ensure_checkpoint_transparency_guards(connection)?;
             let tx =
                 connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
@@ -1612,9 +1682,24 @@ impl SqliteReceiptStore {
         wal_checkpoint: Option<ReceiptWalCheckpointReport>,
     ) -> Result<ReceiptFlushReport, ReceiptStoreError> {
         let head = self.writer_head_snapshot();
-        let latest_committed_entry_seq = self.latest_committed_entry_seq()?;
-        let latest_checkpoint_seq = (head.checkpoint_seq > 0).then_some(head.checkpoint_seq);
-        let latest_checkpointed_entry_seq = head.checkpointed_entry_seq;
+        let connection = self.connection()?;
+        let latest_committed_entry_seq = latest_claim_log_entry_seq(&connection)?;
+        // The writer head snapshot is only refreshed by this handle's own
+        // appends/writes. When another store instance or the operator CLI
+        // extends the checkpoint chain and this handle has had no intervening
+        // local write, the head atomics are stale and would overstate the
+        // uncheckpointed range. Read the persisted checkpoint head from the DB
+        // (read-only reader-pool query, not a writer-head mutation) and take
+        // the higher of the two so the report reflects the current chain.
+        let persisted = load_latest_persisted_checkpoint_row(&connection)?;
+        let persisted_checkpoint_seq = persisted.as_ref().map_or(0, |row| row.checkpoint_seq);
+        let persisted_checkpointed_entry_seq =
+            persisted.as_ref().map_or(0, |row| row.batch_end_seq);
+        let checkpoint_seq = head.checkpoint_seq.max(persisted_checkpoint_seq);
+        let latest_checkpointed_entry_seq = head
+            .checkpointed_entry_seq
+            .max(persisted_checkpointed_entry_seq);
+        let latest_checkpoint_seq = (checkpoint_seq > 0).then_some(checkpoint_seq);
         let (uncheckpointed_start_seq, uncheckpointed_end_seq) =
             uncheckpointed_range(latest_checkpointed_entry_seq, latest_committed_entry_seq);
         Ok(ReceiptFlushReport {

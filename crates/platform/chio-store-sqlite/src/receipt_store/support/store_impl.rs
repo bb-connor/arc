@@ -150,7 +150,7 @@ impl SqliteReceiptStore {
         let raw_json = serde_json::to_string(receipt)?;
         let lineage_json = child_receipt_request_lineage_json(receipt)?;
         let receipt = receipt.clone();
-        self.writer_handle().run_write(move |connection| {
+        self.writer_handle().run_write_receipt(move |connection| {
             ensure_checkpoint_transparency_guards(connection)?;
             let tx =
                 connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;

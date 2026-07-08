@@ -724,3 +724,68 @@ fn receipt_and_lineage_commit_atomically() -> Result<(), Box<dyn std::error::Err
     let _ = fs::remove_file(path);
     Ok(())
 }
+
+/// RFC-0006 group-commit idempotency: when the SAME receipt is appended
+/// concurrently and both requests land in one group-commit batch, the first
+/// insert creates entry_seq E and the second (byte-identical duplicate)
+/// returns that SAME E from `append_chio_receipt_tx`'s idempotent branch while
+/// adding exactly one projection row. The batch's projection cross-check must
+/// count DISTINCT new entry_seqs (1), not the two Ok results, or it would
+/// false-trigger the projection-drift Conflict and roll back a valid batch.
+#[test]
+fn batched_duplicate_receipts_commit_without_false_drift() -> Result<(), Box<dyn std::error::Error>>
+{
+    let path = unique_db_path("chio-batch-dup-drift");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+
+    let receipt = sample_receipt_with_keypair("rcpt-batch-dup-0", 1, &keypair);
+    let raw_json = serde_json::to_string(&receipt)?;
+
+    // Two byte-identical requests for the same receipt inside ONE batch: the
+    // concurrent-duplicate group-commit scenario. `append_receipt_batch` never
+    // touches `response`, so a discarded receiver is fine.
+    let make_request = || {
+        let (response, _rx) = std::sync::mpsc::sync_channel(1);
+        ReceiptCommitRequest {
+            receipt: receipt.clone(),
+            raw_json: raw_json.clone(),
+            ensure_lineage: false,
+            response,
+        }
+    };
+    let requests = vec![make_request(), make_request()];
+
+    let mut head = {
+        let connection = store.connection()?;
+        seed_verified_head(&connection)?
+    };
+    let results = append_receipt_batch(
+        &store.pool,
+        &mut head,
+        store.incremental_verification,
+        &requests,
+    );
+
+    // The batch COMMITS: no projection-drift Conflict. Both results carry the
+    // same entry_seq (the idempotent duplicate returns the original's E).
+    assert!(
+        results.iter().all(|result| result.is_ok()),
+        "batched idempotent duplicate must commit, got {results:?}"
+    );
+    let seqs: std::collections::BTreeSet<u64> = results
+        .iter()
+        .filter_map(|result| result.as_ref().ok().copied())
+        .collect();
+    assert_eq!(seqs.len(), 1, "both requests must resolve to one entry_seq");
+
+    // The head advances by the DISTINCT new-row count (1), not by 2.
+    assert_eq!(head.claim_log_count, 1);
+    assert_eq!(head.claim_log_max_seq, 1);
+
+    // Exactly one projection row persisted.
+    assert_eq!(load_claim_log_rows(&store).len(), 1);
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}

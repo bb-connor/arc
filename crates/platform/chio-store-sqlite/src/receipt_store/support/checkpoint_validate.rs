@@ -477,6 +477,26 @@ pub(crate) fn insert_checkpoint_incremental_tx(
         None => validate_checkpoint_base(checkpoint)?,
     }
     validate_checkpoint_against_claim_log(tx, checkpoint)?;
+    // Idempotent background-checkpoint convergence (RFC-0006): two kernels or
+    // store instances sharing one receipt DB can each build the same due
+    // checkpoint before either head catches up. The loser reaches here after
+    // the winner already committed a byte-identical row at this seq. Adopt it
+    // as success (mirror store_kernel_checkpoint_tx) rather than failing the
+    // raw INSERT on the primary-key conflict, which would record
+    // writer.last_error and report the store UNHEALTHY even though the
+    // persisted chain is valid. A genuinely different checkpoint at the same
+    // seq stays fail-closed.
+    if let Some(existing) = load_persisted_checkpoint_row(tx, checkpoint.body.checkpoint_seq)? {
+        let existing_checkpoint = parse_persisted_checkpoint_row(existing.clone())?;
+        if existing_checkpoint == *checkpoint {
+            validate_checkpoint_projection_rows(tx, &existing, checkpoint)?;
+            return Ok(());
+        }
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {} already exists with different content",
+            checkpoint.body.checkpoint_seq
+        )));
+    }
     let statement_json = serde_json::to_string(&checkpoint.body)?;
     tx.execute(
         r#"
