@@ -446,36 +446,6 @@ class ChioClient:
     # Tool evaluation (sidecar proxy)
     # ------------------------------------------------------------------
 
-    async def evaluate_tool_call(
-        self,
-        *,
-        capability_id: str,
-        tool_server: str,
-        tool_name: str,
-        parameters: dict[str, Any],
-    ) -> ChioReceipt:
-        """Require mediated tool-call authorization.
-
-        The current sidecar tool-call route emits an audit receipt. This method
-        verifies the advisory receipt's integrity, then fails closed because
-        advisory evaluation is not execution authorization.
-        """
-        receipt = await self.evaluate_tool_call_advisory(
-            capability_id=capability_id,
-            tool_server=tool_server,
-            tool_name=tool_name,
-            parameters=parameters,
-        )
-        outcome = getattr(receipt.observation_outcome, "value", receipt.observation_outcome)
-        if outcome == "dropped":
-            raise ChioDeniedError(
-                "Chio sidecar advisory evaluation refused the tool call"
-            )
-        raise ChioDeniedError(
-            "Chio sidecar returned an advisory evaluation, not an "
-            "authoritative authorization decision"
-        )
-
     async def evaluate_tool_call_advisory(
         self,
         *,
@@ -517,6 +487,29 @@ class ChioClient:
                 code="INVALID_RECEIPT",
             )
         return receipt
+
+    async def evaluate_tool_call(
+        self,
+        *,
+        capability: dict,
+        tool_server: str,
+        tool_name: str,
+        parameters: dict,
+    ) -> dict:
+        """Kernel-mediated, authoritative tool-call evaluation.
+
+        Posts to the reinstated ``/v1/evaluate`` route. Returns
+        ``{"verdict", "receipt", "execution_nonce"}``. Callers MUST verify the
+        receipt with ``is_authoritative_spend_receipt`` and reject anything below
+        ``trust_level == "mediated"``.
+        """
+        body = {
+            "capability": capability,
+            "tool_server": tool_server,
+            "tool_name": tool_name,
+            "parameters": parameters,
+        }
+        return await self._post("/v1/evaluate", body)
 
     async def evaluate_http_request(
         self,
