@@ -72,6 +72,11 @@ pub enum KernelServiceError {
     /// Tenant or global service saturation caused load shedding.
     #[error("overloaded")]
     Overloaded,
+    /// The per-tenant bucket table is at capacity and this tenant has no bucket.
+    /// Distinct from `Overloaded` (a per-tenant concurrency shed) so a full table
+    /// is observable separately; maps to the same shed edge (RFC-0004 F12).
+    #[error("tenant bucket table is full")]
+    TenantTableFull,
     /// Request exceeded the configured tower timeout.
     #[error("timeout")]
     Timeout,
@@ -177,6 +182,10 @@ where
     }
 }
 
+/// Default idle window after which an unused tenant bucket may be reaped to make
+/// room for a new tenant (RFC-0004 F12).
+const DEFAULT_TENANT_IDLE_REAP_SECS: u64 = 3600;
+
 /// Per-tenant concurrency limiter for kernel requests.
 ///
 /// Each tenant key gets its own bounded tower concurrency service. Waiting for
@@ -186,6 +195,7 @@ where
 pub struct TenantConcurrencyLimitLayer {
     per_tenant_limit: usize,
     max_tenants: usize,
+    tenant_idle_reap_secs: u64,
 }
 
 impl TenantConcurrencyLimitLayer {
@@ -194,12 +204,20 @@ impl TenantConcurrencyLimitLayer {
         Self {
             per_tenant_limit,
             max_tenants: DEFAULT_MAX_TENANT_CONCURRENCY_BUCKETS,
+            tenant_idle_reap_secs: DEFAULT_TENANT_IDLE_REAP_SECS,
         }
     }
 
     /// Set the maximum number of tenant limiter buckets retained at once.
     pub fn with_max_tenants(mut self, max_tenants: usize) -> Self {
         self.max_tenants = max_tenants;
+        self
+    }
+
+    /// Set the idle window after which an unused tenant bucket may be reaped so
+    /// a new tenant is not permanently blocked by a full table (RFC-0004 F12).
+    pub fn with_tenant_idle_reap_secs(mut self, secs: u64) -> Self {
+        self.tenant_idle_reap_secs = secs;
         self
     }
 }
@@ -212,6 +230,7 @@ impl<S> Layer<S> for TenantConcurrencyLimitLayer {
             inner,
             per_tenant_limit: self.per_tenant_limit,
             max_tenants: self.max_tenants,
+            tenant_idle_reap_secs: self.tenant_idle_reap_secs,
             tenants: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -223,10 +242,13 @@ pub struct TenantConcurrencyLimitService<S> {
     inner: S,
     per_tenant_limit: usize,
     max_tenants: usize,
-    tenants: Arc<Mutex<HashMap<TenantId, TenantBucketService<S>>>>,
+    tenant_idle_reap_secs: u64,
+    tenants: Arc<Mutex<HashMap<TenantId, TenantBucketEntry<S>>>>,
 }
 
 type TenantBucketService<S> = LoadShed<ConcurrencyLimit<S>>;
+/// A tenant's bucket service paired with its last-use instant (for idle reap).
+type TenantBucketEntry<S> = (TenantBucketService<S>, std::time::Instant);
 
 impl<S> TenantConcurrencyLimitService<S>
 where
@@ -239,18 +261,35 @@ where
         let mut tenants = self.tenants.lock().map_err(|_| {
             KernelServiceError::Middleware("tenant concurrency limit state poisoned".to_string())
         })?;
-        if !tenants.contains_key(tenant_id) && tenants.len() >= self.max_tenants {
-            return Err(KernelServiceError::Overloaded);
+
+        if let Some((service, last_use)) = tenants.get_mut(tenant_id) {
+            *last_use = std::time::Instant::now();
+            return Ok(service.clone());
         }
 
-        let service = tenants
-            .entry(tenant_id.clone())
-            .or_insert_with(|| {
-                let service =
-                    ConcurrencyLimitLayer::new(self.per_tenant_limit).layer(self.inner.clone());
-                LoadShedLayer::new().layer(service)
-            })
-            .clone();
+        if tenants.len() >= self.max_tenants {
+            // Reap the most-idle tenant so a new tenant is not permanently
+            // blocked; only then declare the table full (RFC-0004 F12).
+            let idle = std::time::Duration::from_secs(self.tenant_idle_reap_secs);
+            let victim = tenants
+                .iter()
+                .filter(|(_, (_, last))| last.elapsed() >= idle)
+                .max_by_key(|(_, (_, last))| last.elapsed())
+                .map(|(k, _)| k.clone());
+            match victim {
+                Some(v) => {
+                    tenants.remove(&v);
+                }
+                None => return Err(KernelServiceError::TenantTableFull),
+            }
+        }
+
+        let service = ConcurrencyLimitLayer::new(self.per_tenant_limit).layer(self.inner.clone());
+        let service = LoadShedLayer::new().layer(service);
+        tenants.insert(
+            tenant_id.clone(),
+            (service.clone(), std::time::Instant::now()),
+        );
         Ok(service)
     }
 }
@@ -409,6 +448,44 @@ mod tests {
         ) -> Result<Option<ToolServerStreamResult>, KernelError> {
             Ok(None)
         }
+    }
+
+    #[test]
+    fn table_full_is_distinct_from_per_tenant_overload() {
+        // RFC-0004 F12: at cap, a third distinct tenant sees the distinct
+        // TenantTableFull (not the per-tenant Overloaded), and a non-idle table
+        // does not reap, so the third tenant is refused rather than admitted.
+        #[derive(Clone, Debug)]
+        struct MockInner;
+
+        let service = TenantConcurrencyLimitLayer::new(1)
+            .with_max_tenants(2)
+            .layer(MockInner);
+        assert!(service.service_for_tenant(&"tenant-a".to_string()).is_ok());
+        assert!(service.service_for_tenant(&"tenant-b".to_string()).is_ok());
+        match service.service_for_tenant(&"tenant-c".to_string()) {
+            Err(KernelServiceError::TenantTableFull) => {}
+            other => panic!("expected TenantTableFull, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn idle_tenant_is_reaped_to_admit_a_new_tenant() {
+        // With a zero idle window every existing tenant is immediately reapable,
+        // so a full table admits a new tenant by evicting the most-idle one.
+        #[derive(Clone, Debug)]
+        struct MockInner;
+
+        let service = TenantConcurrencyLimitLayer::new(1)
+            .with_max_tenants(2)
+            .with_tenant_idle_reap_secs(0)
+            .layer(MockInner);
+        assert!(service.service_for_tenant(&"tenant-a".to_string()).is_ok());
+        assert!(service.service_for_tenant(&"tenant-b".to_string()).is_ok());
+        assert!(
+            service.service_for_tenant(&"tenant-c".to_string()).is_ok(),
+            "an idle tenant should be reaped to admit a new one"
+        );
     }
 
     fn make_config() -> KernelConfig {
