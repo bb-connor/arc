@@ -144,5 +144,31 @@ pub fn render_guard_metrics_prometheus() -> String {
     chio_metrics_spec::runtime::render_guard_families(&mut output);
     chio_metrics_spec::runtime::render_otel_drop_families(&mut output);
     chio_metrics_spec::runtime::families::SIGNING_QUEUE_BLOCK.render(&mut output);
+    chio_metrics_spec::runtime::render_receipt_watchdog_gauges(&mut output);
     output
+}
+
+/// Turn a receipt-store health report into the watchdog gauges (RFC-0009 F83):
+/// the uncheckpointed entry_seq range and the seconds since the last commit.
+/// A serve-mode watchdog loop calls this on an interval so uncheckpointed
+/// growth and checkpoint staleness are observable without a human `chio receipt
+/// health` run.
+pub fn record_receipt_health_gauges(
+    report: &crate::receipt_store::ReceiptStoreHealthReport,
+    now_unix_ms: u64,
+) {
+    let range = match (
+        report.uncheckpointed_start_seq,
+        report.uncheckpointed_end_seq,
+    ) {
+        (Some(start), Some(end)) => end.saturating_sub(start),
+        _ => 0,
+    };
+    chio_metrics_spec::runtime::families::RECEIPT_UNCHECKPOINTED_RANGE.set(&[], range);
+    let age_seconds = report
+        .writer
+        .last_commit_unix_ms
+        .map(|last| now_unix_ms.saturating_sub(last) / 1000)
+        .unwrap_or(0);
+    chio_metrics_spec::runtime::families::RECEIPT_CHECKPOINT_AGE_SECONDS.set(&[], age_seconds);
 }

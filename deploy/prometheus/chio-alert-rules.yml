@@ -148,3 +148,14 @@ groups:
         annotations:
           summary: Chio capability revocation p95 lag is above 30 seconds
           runbook: docs/operator-runbook/slo.md
+
+      - alert: ChioReceiptCheckpointStale
+        expr: chio_receipt_seconds_since_last_checkpoint > 86400
+        for: 15m
+        labels:
+          severity: p2
+          notification_route: pagerduty
+          slo: receipt-log
+        annotations:
+          summary: Chio receipt checkpointing has stalled
+          runbook: docs/operator-runbook/slo.md

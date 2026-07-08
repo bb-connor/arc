@@ -139,6 +139,36 @@ fn signing_block_counter_reports_reason_label() {
 }
 
 #[test]
+fn watchdog_gauges_render_from_health_report() {
+    use chio_kernel::receipt_store::{ReceiptStoreHealthReport, ReceiptWriterCounters};
+    let report = ReceiptStoreHealthReport {
+        healthy: true,
+        writer: ReceiptWriterCounters {
+            last_commit_unix_ms: Some(1_000_000),
+            ..Default::default()
+        },
+        latest_committed_entry_seq: 50,
+        latest_checkpoint_seq: Some(4),
+        latest_checkpointed_entry_seq: 40,
+        uncheckpointed_start_seq: Some(41),
+        uncheckpointed_end_seq: Some(50),
+        checkpoint_error: None,
+        db_size_bytes: None,
+    };
+    // now = 1_000_000ms + 30s
+    chio_kernel::record_receipt_health_gauges(&report, 1_030_000);
+    let body = chio_kernel::render_guard_metrics_prometheus();
+    assert!(
+        body.contains("chio_receipt_uncheckpointed_seq_range 9"),
+        "{body}"
+    ); // 50-41
+    assert!(
+        body.contains("chio_receipt_seconds_since_last_checkpoint 30"),
+        "{body}"
+    );
+}
+
+#[test]
 fn metrics_endpoint_serves_prometheus_body() {
     let response = match guard_metrics_endpoint(GUARD_METRICS_PATH) {
         Some(response) => response,

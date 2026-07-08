@@ -984,6 +984,12 @@ async fn serve_siem_export(receipt_db: &Path, cursor_db: &Path) -> Result<(), Cl
     // `manager.add_exporter(..)`; the loop still advances the cursor and emits
     // export/dlq metrics when none are configured.
     let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+
+    // Receipt-log gap/lag watchdog (RFC-0009 F83): sample the receipt store's
+    // health on an interval and publish the uncheckpointed-range and
+    // checkpoint-age gauges. Never panics; logs and continues on error.
+    let watchdog = spawn_receipt_watchdog(receipt_db.to_path_buf(), cancel_rx.clone());
+
     let handle = tokio::spawn(async move {
         manager.run(cancel_rx).await;
     });
@@ -991,7 +997,58 @@ async fn serve_siem_export(receipt_db: &Path, cursor_db: &Path) -> Result<(), Cl
     let _ = tokio::signal::ctrl_c().await;
     let _ = cancel_tx.send(true);
     let _ = handle.await;
+    let _ = watchdog.await;
     Ok(())
+}
+
+/// Spawn the receipt-log watchdog loop for the serve path (RFC-0009 F83). Each
+/// tick samples `receipt_store_health()` off the async runtime (SQLite is
+/// blocking) and records the watchdog gauges; a sampling failure logs and the
+/// loop continues rather than aborting the serve.
+fn spawn_receipt_watchdog(
+    receipt_db: std::path::PathBuf,
+    mut cancel: tokio::sync::watch::Receiver<bool>,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(30));
+        loop {
+            tokio::select! {
+                _ = ticker.tick() => {
+                    let db = receipt_db.clone();
+                    let sampled = tokio::task::spawn_blocking(move || sample_receipt_health(&db)).await;
+                    match sampled {
+                        Ok(Ok(report)) => {
+                            let now_ms = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .map(|d| d.as_millis() as u64)
+                                .unwrap_or(0);
+                            chio_kernel::record_receipt_health_gauges(&report, now_ms);
+                        }
+                        Ok(Err(error)) => {
+                            eprintln!("receipt-store health sample failed: {error}");
+                        }
+                        Err(error) => {
+                            eprintln!("receipt-store health task join failed: {error}");
+                        }
+                    }
+                }
+                changed = cancel.changed() => {
+                    if changed.is_err() || *cancel.borrow() {
+                        break;
+                    }
+                }
+            }
+        }
+    })
+}
+
+fn sample_receipt_health(
+    receipt_db: &Path,
+) -> Result<chio_kernel::receipt_store::ReceiptStoreHealthReport, String> {
+    let store = SqliteReceiptStore::open(receipt_db).map_err(|error| error.to_string())?;
+    store
+        .receipt_store_health()
+        .map_err(|error| error.to_string())
 }
 
 pub fn cmd_chio_wall_control_path_export(output: &Path, json: bool) -> Result<(), CliError> {

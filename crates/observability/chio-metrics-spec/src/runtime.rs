@@ -323,6 +323,14 @@ pub mod families {
     // with the label here so the producer and renderer agree from the start.
     pub static SIGNING_QUEUE_BLOCK: LabeledCounter =
         LabeledCounter::new(CHIO_SIGNING_QUEUE_BLOCK_TOTAL, &["reason"]);
+
+    // Receipt-log watchdog gauges (RFC-0009 F83). Producer: the serve-mode
+    // watchdog loop sampling ReceiptStoreHealthReport; renderer: the kernel
+    // /metrics endpoint.
+    pub static RECEIPT_UNCHECKPOINTED_RANGE: LabeledGauge =
+        LabeledGauge::new(CHIO_RECEIPT_UNCHECKPOINTED_SEQ_RANGE, &[]);
+    pub static RECEIPT_CHECKPOINT_AGE_SECONDS: LabeledGauge =
+        LabeledGauge::new(CHIO_RECEIPT_SECONDS_SINCE_LAST_CHECKPOINT, &[]);
 }
 
 /// Seed every KNOWN label set at zero once at startup so `absent_over_time`
@@ -359,6 +367,12 @@ pub fn render_guard_families(out: &mut String) {
 pub fn render_otel_drop_families(out: &mut String) {
     families::OTEL_INGRESS_DROP.render(out);
     families::OTEL_SINK_DROP.render(out);
+}
+
+/// Render the receipt-log watchdog gauges (producer: the serve-mode watchdog).
+pub fn render_receipt_watchdog_gauges(out: &mut String) {
+    families::RECEIPT_UNCHECKPOINTED_RANGE.render(out);
+    families::RECEIPT_CHECKPOINT_AGE_SECONDS.render(out);
 }
 
 /// Render the alert-pack families that serving surfaces compose.
