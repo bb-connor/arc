@@ -72,8 +72,6 @@ fn advisory_path_double_authorizes_and_is_a_visible_failure() {
     // Two advisory "authorizations" move no ledger; both fail the predicate, so
     // treating either as authorization is a machine-visible conformance failure.
     let signer = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
-    let _ = &budget; // advisory path never touches the ledger.
     let advisory_a = support::standalone_advisory_receipt(&signer, "cap-x", "cost-srv", "compute");
     let advisory_b = support::standalone_advisory_receipt(&signer, "cap-x", "cost-srv", "compute");
     let nonce = support::fake_bound_nonce(
