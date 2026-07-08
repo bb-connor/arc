@@ -201,6 +201,24 @@ pub(crate) fn update_peer_budget_cursor(
     update_peer_state(state, peer_url, |peer| peer.budget_cursor = Some(cursor));
 }
 
+/// Record a peer's advertised per-origin contiguous ack heads. Monotone: an ack
+/// head never regresses in local state, which is fail-safe (RFC-0011 D2, F16).
+pub(crate) fn update_peer_budget_acks(
+    state: &TrustServiceState,
+    peer_url: &str,
+    acks: &[BudgetOriginAck],
+) {
+    update_peer_state(state, peer_url, |peer| {
+        for ack in acks {
+            let entry = peer
+                .budget_import_acks
+                .entry(ack.origin_id.clone())
+                .or_insert(0);
+            *entry = (*entry).max(ack.event_seq);
+        }
+    });
+}
+
 pub(crate) fn update_peer_tool_seq(state: &TrustServiceState, peer_url: &str, seq: u64) {
     update_peer_state(state, peer_url, |peer| peer.tool_seq = seq);
 }

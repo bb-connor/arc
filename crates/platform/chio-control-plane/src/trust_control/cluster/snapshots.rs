@@ -232,6 +232,9 @@ pub(crate) fn apply_cluster_snapshot(
         store
             .import_snapshot_records(&usage_records, &mutation_records)
             .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        store
+            .record_budget_import_floors(&mutation_records)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
         for event in &budget_mutation_events {
             budget_cursor = Some(merge_budget_cursor(
                 budget_cursor,

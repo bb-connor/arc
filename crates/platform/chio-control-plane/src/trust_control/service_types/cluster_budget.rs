@@ -15,6 +15,18 @@ pub(crate) struct ClusterStatusResponse {
     pub(crate) authority_lease: Option<ClusterAuthorityLeaseView>,
     pub(crate) replication: ClusterReplicationHeadsView,
     pub(crate) peers: Vec<PeerStatusView>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) budget_ack_heads: Vec<BudgetOriginAck>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BudgetOriginAck {
+    pub(crate) origin_id: String,
+    /// Contiguous ack head: the highest event_seq S from origin_id such that
+    /// every event in (floor..S] is present (no gap) down to the durable
+    /// trusted floor. NOT MAX(event_seq), NOT anchored on MIN(present).
+    pub(crate) event_seq: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

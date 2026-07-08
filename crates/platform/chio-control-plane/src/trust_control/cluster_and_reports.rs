@@ -1297,6 +1297,40 @@ mod cluster_and_reports_tests {
     }
 
     #[test]
+    fn status_advertises_contiguous_ack_heads() {
+        // Wire shape: budgetAckHeads serializes as camelCase originId/eventSeq
+        // when non-empty, and is omitted entirely when empty (additive,
+        // backward-compatible with older peers who never witness).
+        let response = ClusterStatusResponse {
+            self_url: "http://node-a".to_string(),
+            leader_url: None,
+            role: "follower".to_string(),
+            has_quorum: true,
+            quorum_size: 2,
+            reachable_nodes: 2,
+            election_term: 1,
+            authority_lease: None,
+            replication: ClusterReplicationHeadsView::default(),
+            peers: Vec::new(),
+            budget_ack_heads: vec![BudgetOriginAck {
+                origin_id: "http://origin-o".to_string(),
+                event_seq: 3,
+            }],
+        };
+        let value = serde_json::to_value(&response).test_unwrap();
+        assert_eq!(value["budgetAckHeads"][0]["originId"], "http://origin-o");
+        assert_eq!(value["budgetAckHeads"][0]["eventSeq"], 3);
+
+        // Empty ack heads are omitted from the wire (skip_serializing_if).
+        let empty = ClusterStatusResponse {
+            budget_ack_heads: Vec::new(),
+            ..response
+        };
+        let value = serde_json::to_value(&empty).test_unwrap();
+        assert!(value.get("budgetAckHeads").is_none());
+    }
+
+    #[test]
     fn apply_cluster_snapshot_seeds_authority_term_for_late_joiner_budget_writes() {
         let source_state =
             state_with_cluster("http://node-a", &["http://node-b"], None, None, None);

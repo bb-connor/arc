@@ -22,7 +22,7 @@ mod state;
 pub(crate) use self::cluster_budget::{
     AuthoritySnapshotView, AuthorityTrustedKeyView, BudgetAuthorityMetadataView, BudgetCursorView,
     BudgetDeltaQuery, BudgetDeltaResponse, BudgetMutationAuthorityView, BudgetMutationEventView,
-    BudgetWriteCommitView, ClusterAuthorityLeaseView, ClusterPartitionRequest,
+    BudgetOriginAck, BudgetWriteCommitView, ClusterAuthorityLeaseView, ClusterPartitionRequest,
     ClusterPartitionResponse, ClusterReplicationHeadsView, ClusterStateSnapshotResponse,
     ClusterStatusResponse, LineageDeltaResponse, PeerStatusView, ReceiptDeltaQuery,
     ReceiptDeltaResponse, ReduceChargeCostRequest, ReduceChargeCostResponse,

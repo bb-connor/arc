@@ -37,8 +37,8 @@ pub(crate) use deltas::{
 pub(crate) use partition::{
     handle_internal_cluster_partition, peer_budget_cursor, peer_child_seq, peer_is_partitioned,
     peer_lineage_seq, peer_revocation_cursor, peer_should_force_snapshot, peer_tool_seq,
-    update_peer_budget_cursor, update_peer_child_seq, update_peer_delta_records,
-    update_peer_failure, update_peer_lineage_seq, update_peer_reachable,
+    update_peer_budget_acks, update_peer_budget_cursor, update_peer_child_seq,
+    update_peer_delta_records, update_peer_failure, update_peer_lineage_seq, update_peer_reachable,
     update_peer_revocation_cursor, update_peer_state, update_peer_success, update_peer_sync_error,
     update_peer_tool_seq,
 };

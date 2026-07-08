@@ -228,11 +228,15 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
         &state.config.service_token,
         &self_url,
     )?;
-    if let Err(error) = client.cluster_status() {
-        update_peer_failure(state, peer_url, error.to_string());
-        return Err(error);
-    }
+    let peer_status = match client.cluster_status() {
+        Ok(status) => status,
+        Err(error) => {
+            update_peer_failure(state, peer_url, error.to_string());
+            return Err(error);
+        }
+    };
     update_peer_reachable(state, peer_url);
+    update_peer_budget_acks(state, peer_url, &peer_status.budget_ack_heads);
     if peer_should_force_snapshot(state, peer_url) {
         let snapshot = client.cluster_snapshot()?;
         apply_cluster_snapshot(state, peer_url, snapshot)?;
