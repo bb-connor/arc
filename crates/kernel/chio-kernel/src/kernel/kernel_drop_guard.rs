@@ -10,14 +10,18 @@ use super::{
 };
 
 /// Builds a pending-reversal marker for a budget hold that could not be
-/// reversed on the spot. The returned value is the inner object placed
-/// under the `budget_authority` key in receipt metadata so the reaper
-/// can locate and close it.
+/// reversed on the spot. The returned value is placed under the `budget_authority`
+/// key in receipt metadata so the reaper can locate and close it.
+///
+/// The `terminal.disposition` field is nested consistently with every other
+/// terminal disposition in this codebase ("reversed", "reconciled").
 pub(crate) fn pending_reversal_marker(hold_id: &str, reason: &str) -> serde_json::Value {
     serde_json::json!({
         "hold_id": hold_id,
-        "disposition": "pending_reversal",
-        "reason": reason,
+        "terminal": {
+            "disposition": "pending_reversal",
+            "reason": reason,
+        }
     })
 }
 
@@ -64,19 +68,6 @@ impl<'a> PostAdmissionDropGuard<'a> {
     pub(crate) fn disarm(&mut self) {
         self.armed = false;
     }
-
-    fn record_pending_reversal(&self, hold_id: &str, reason: &str) -> Result<(), KernelError> {
-        let marker = pending_reversal_marker(hold_id, reason);
-        let metadata = serde_json::json!({ "budget_authority": marker });
-        self.kernel.build_cancelled_response_with_metadata(
-            self.request,
-            POST_ADMISSION_DROP_REASON,
-            current_unix_timestamp(),
-            self.matched_grant_index,
-            Some(metadata),
-        )?;
-        Ok(())
-    }
 }
 
 impl Drop for PostAdmissionDropGuard<'_> {
@@ -111,7 +102,15 @@ impl Drop for PostAdmissionDropGuard<'_> {
                     reason = %redacted!(error),
                     "failed to unwind dropped post-admission monetary invocation"
                 );
-                self.receipt_context.extra_metadata.clone()
+                self.kernel.merge_budget_receipt_metadata(
+                    self.receipt_context.extra_metadata.clone(),
+                    serde_json::json!({
+                        "budget_authority": pending_reversal_marker(
+                            &charge.budget_hold_id,
+                            &error.to_string(),
+                        )
+                    }),
+                )
             }
         };
 
@@ -130,15 +129,6 @@ impl Drop for PostAdmissionDropGuard<'_> {
                 reason = %redacted!(&error),
                 "failed to record cancellation receipt for dropped post-admission invocation"
             );
-            if let Err(reversal_err) =
-                self.record_pending_reversal(&charge.budget_hold_id, &error.to_string())
-            {
-                warn!(
-                    request_id = %self.request.request_id,
-                    reason = %redacted!(reversal_err),
-                    "failed to record pending-reversal marker for dropped post-admission invocation"
-                );
-            }
         }
     }
 }
@@ -155,12 +145,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn drop_guard_reverse_failure_records_pending_reversal() {
-        // Escalate beyond warn!: a reverse failure must leave a durable marker the
-        // reaper can arbitrate, not a silently leaked hold.
-        let marker =
-            pending_reversal_marker("budget-hold:req-x:cap-x:0", "reverse store unreachable");
-        assert_eq!(marker["disposition"], "pending_reversal");
+    fn pending_reversal_marker_nests_disposition_under_terminal() {
+        let marker = pending_reversal_marker("budget-hold:req-x:cap-x:0", "store unavailable");
+        assert_eq!(marker["terminal"]["disposition"], "pending_reversal");
         assert_eq!(marker["hold_id"], "budget-hold:req-x:cap-x:0");
+        assert_eq!(marker["terminal"]["reason"], "store unavailable");
     }
 }
