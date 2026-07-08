@@ -291,6 +291,59 @@ fn host_fetch_blob_and_verify_helpers_emit_exact_fields() {
 }
 
 #[test]
+fn evaluation_emits_verdict_duration_and_fuel() {
+    use chio_metrics_spec::runtime::families;
+    // Build a guard named uniquely for this test and drive one allow eval.
+    let guard = WasmGuard::new_with_metadata(
+        "emit-test-guard-7".to_string(),
+        "1.2.3".to_string(),
+        Box::new(loaded_allowing_backend()),
+        false,
+        Some("abc123".to_string()),
+    );
+
+    let request = make_test_request();
+    let scope = ChioScope::default();
+    let agent_id = "agent-1".to_string();
+    let server_id = "test_server".to_string();
+    let ctx = GuardContext {
+        request: &request,
+        scope: &scope,
+        agent_id: &agent_id,
+        server_id: &server_id,
+        session_filesystem_roots: None,
+        matched_grant_index: None,
+    };
+
+    let verdict = match guard.evaluate(&ctx) {
+        Ok(verdict) => verdict,
+        Err(err) => panic!("evaluation succeeds: {err}"),
+    };
+    assert!(matches!(verdict.verdict, Verdict::Allow));
+
+    let mut body = String::new();
+    families::GUARD_VERDICT.render(&mut body);
+    families::GUARD_EVAL_DURATION.render(&mut body);
+    families::GUARD_FUEL_CONSUMED.render(&mut body);
+    assert!(
+        body.contains(
+            "chio_guard_verdict_total{guard_id=\"emit-test-guard-7\",verdict=\"allow\"} 1"
+        ),
+        "{body}"
+    );
+    assert!(
+        body.contains(
+            "chio_guard_eval_duration_seconds_count{guard_id=\"emit-test-guard-7\",verdict=\"allow\"} 1"
+        ),
+        "{body}"
+    );
+    assert!(
+        body.contains("chio_guard_fuel_consumed_total{guard_id=\"emit-test-guard-7\"}"),
+        "{body}"
+    );
+}
+
+#[test]
 fn reload_path_emits_applied_span() {
     let captured = CapturedSpans::default();
     tracing::subscriber::with_default(subscriber(&captured), || {
