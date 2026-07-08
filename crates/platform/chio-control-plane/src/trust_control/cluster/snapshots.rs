@@ -55,8 +55,37 @@ pub(crate) async fn handle_internal_authority_snapshot(
 pub(crate) fn cluster_replication_heads(
     state: &TrustServiceState,
 ) -> Result<ClusterReplicationHeadsView, CliError> {
-    let snapshot = build_cluster_state_snapshot(state)?;
-    Ok(snapshot.replication)
+    let (tool_seq, child_seq, lineage_seq) =
+        if let Some(path) = state.config.receipt_db_path.as_deref() {
+            let store = SqliteReceiptStore::open(path)?;
+            (
+                store.max_tool_receipt_seq()?,
+                store.max_child_receipt_seq()?,
+                store.max_lineage_seq()?,
+            )
+        } else {
+            (0, 0, 0)
+        };
+    let budget_seq = match state.config.budget_db_path.as_deref() {
+        Some(path) => SqliteBudgetStore::open(path)?.max_mutation_event_seq()?,
+        None => 0,
+    };
+    let revocation_cursor = match state.config.revocation_db_path.as_deref() {
+        Some(path) => SqliteRevocationStore::open(path)?.latest_revocation_cursor()?,
+        None => None,
+    };
+    Ok(ClusterReplicationHeadsView {
+        tool_seq,
+        child_seq,
+        lineage_seq,
+        budget_seq,
+        revocation_cursor: revocation_cursor.map(|(revoked_at, capability_id)| {
+            RevocationCursorView {
+                revoked_at,
+                capability_id,
+            }
+        }),
+    })
 }
 
 pub(crate) fn build_cluster_state_snapshot(

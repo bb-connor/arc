@@ -1265,6 +1265,38 @@ mod cluster_and_reports_tests {
     }
 
     #[test]
+    fn cluster_replication_heads_reports_heads_without_materializing() {
+        let budget_db = unique_temp_path("cluster-heads-budget", "sqlite3");
+        let revocation_db = unique_temp_path("cluster-heads-revocation", "sqlite3");
+        {
+            let store = SqliteBudgetStore::open(&budget_db).test_unwrap();
+            store
+                .try_charge_cost("cap-heads", 0, Some(5), 3, None, None)
+                .test_unwrap();
+            let revocations = SqliteRevocationStore::open(&revocation_db).test_unwrap();
+            revocations
+                .upsert_revocation(&RevocationRecord {
+                    capability_id: "cap-heads".to_string(),
+                    revoked_at: 77,
+                })
+                .test_unwrap();
+        }
+        let state = state_with_cluster(
+            "http://node-a",
+            &["http://node-b"],
+            None,
+            Some(revocation_db.clone()),
+            Some(budget_db.clone()),
+        );
+        let heads = cluster_replication_heads(&state).test_unwrap();
+        assert_eq!(heads.budget_seq, 1);
+        assert_eq!(heads.tool_seq, 0);
+        let cursor = heads.revocation_cursor.test_unwrap();
+        assert_eq!(cursor.revoked_at, 77);
+        assert_eq!(cursor.capability_id, "cap-heads");
+    }
+
+    #[test]
     fn apply_cluster_snapshot_seeds_authority_term_for_late_joiner_budget_writes() {
         let source_state =
             state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
