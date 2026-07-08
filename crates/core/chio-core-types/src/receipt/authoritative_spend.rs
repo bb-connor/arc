@@ -94,6 +94,9 @@ pub enum NotAuthoritativeReason {
     NonceLinkMismatch,
     NonceBindingMismatch { field: &'static str },
     NonceSignatureInvalid,
+    /// The receipt's guarantee level is weaker than the operator-configured
+    /// floor (R4 truthfulness). Unrelated to `TrustLevel::Mediated`.
+    GuaranteeLevelBelowFloor { minimum: String, actual: String },
 }
 
 /// Structurally checkable conjunction over the kernel signature. Fail-closed:
@@ -185,19 +188,22 @@ pub fn receipt_meets_guarantee_floor(
     let budget = BudgetAuthorityReceiptRef::from_receipt(receipt)
         .ok_or(NotAuthoritativeReason::MissingBudgetAuthority)?;
     if guarantee_level_rank(&budget.guarantee_level) < guarantee_level_rank(minimum_level) {
-        return Err(NotAuthoritativeReason::NotMediatedTrustLevel);
+        return Err(NotAuthoritativeReason::GuaranteeLevelBelowFloor {
+            minimum: minimum_level.to_string(),
+            actual: budget.guarantee_level.clone(),
+        });
     }
     Ok(())
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, dead_code, unused_imports)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use crate::crypto::{Keypair, PublicKey};
     use crate::receipt::body::{ChioReceipt, ChioReceiptBody};
     use crate::receipt::decision::{Decision, ToolCallAction};
-    use crate::receipt::kinds::{BoundaryClass, ObservationOutcome, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel};
+    use crate::receipt::kinds::{BoundaryClass, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel};
 
     /// Minimal test double for a kernel-signed execution nonce.
     struct FakeNonce {
@@ -220,14 +226,8 @@ mod tests {
         }
     }
 
-    fn param_hash() -> String {
-        let canonical = crate::canonical_json_bytes(&serde_json::json!({"x": 1})).unwrap();
-        crate::sha256_hex(&canonical)
-    }
-
     fn authoritative_receipt(kp: &Keypair) -> ChioReceipt {
         let action = ToolCallAction::from_parameters(serde_json::json!({"x": 1})).unwrap();
-        let parameter_hash = action.parameter_hash.clone();
         let content_hash = crate::sha256_hex(b"content");
         let metadata = serde_json::json!({
             "financial": { "grant_index": 0, "cost_charged": 50, "currency": "USD",
@@ -258,7 +258,6 @@ mod tests {
             evidence: Vec::new(), metadata: Some(metadata), trust_level: TrustLevel::Mediated,
             tenant_id: None, kernel_key: kp.public_key(), bbs_projection_version: None,
         };
-        let _ = parameter_hash;
         ChioReceipt::sign(body, kp).unwrap()
     }
 
@@ -296,5 +295,143 @@ mod tests {
             is_authoritative_spend_receipt(&receipt, &[kp.public_key()], &nonce),
             Err(NotAuthoritativeReason::MissingBudgetAuthority)
         );
+    }
+
+    #[test]
+    fn guarantee_level_rank_ordering() {
+        // Unknown strings rank 0 (fail-closed: treated as weakest).
+        assert_eq!(guarantee_level_rank("advisory_posthoc"), 0);
+        assert_eq!(guarantee_level_rank("unknown_level"), 0);
+        assert_eq!(guarantee_level_rank("single_node_atomic"), 1);
+        assert_eq!(guarantee_level_rank("partition_escrowed"), 2);
+        assert_eq!(guarantee_level_rank("ha_linearizable"), 3);
+        // Ordering is strictly monotone across all four levels.
+        assert!(guarantee_level_rank("advisory_posthoc") < guarantee_level_rank("single_node_atomic"));
+        assert!(guarantee_level_rank("single_node_atomic") < guarantee_level_rank("partition_escrowed"));
+        assert!(guarantee_level_rank("partition_escrowed") < guarantee_level_rank("ha_linearizable"));
+    }
+
+    #[test]
+    fn guarantee_floor_passes_when_at_or_above_minimum() {
+        let kp = Keypair::generate();
+        let receipt = authoritative_receipt(&kp);
+        // Base receipt carries "single_node_atomic". Same level must pass.
+        assert_eq!(receipt_meets_guarantee_floor(&receipt, "single_node_atomic"), Ok(()));
+        // Weaker floor also passes.
+        assert_eq!(receipt_meets_guarantee_floor(&receipt, "advisory_posthoc"), Ok(()));
+    }
+
+    #[test]
+    fn guarantee_floor_fails_when_below_minimum() {
+        let kp = Keypair::generate();
+        let receipt = authoritative_receipt(&kp);
+        // Base receipt carries "single_node_atomic"; a stronger floor rejects it.
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "ha_linearizable"),
+            Err(NotAuthoritativeReason::GuaranteeLevelBelowFloor {
+                minimum: "ha_linearizable".to_string(),
+                actual: "single_node_atomic".to_string(),
+            })
+        );
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "partition_escrowed"),
+            Err(NotAuthoritativeReason::GuaranteeLevelBelowFloor {
+                minimum: "partition_escrowed".to_string(),
+                actual: "single_node_atomic".to_string(),
+            })
+        );
+    }
+
+    /// Table-driven negative tests for security-critical rejection reasons.
+    /// Each case mutates one field at a time from a valid baseline receipt.
+    /// The full a-f conformance matrix is a later task; this covers the
+    /// rejection paths most likely to mask a bypass.
+    #[test]
+    fn security_critical_rejections() {
+        let kp = Keypair::generate();
+        let other_kp = Keypair::generate();
+        let base = authoritative_receipt(&kp);
+
+        struct Case {
+            name: &'static str,
+            patch_receipt: Box<dyn Fn(&mut ChioReceipt)>,
+            patch_nonce: Box<dyn Fn(&mut FakeNonce)>,
+            admitted: Vec<PublicKey>,
+            expected: NotAuthoritativeReason,
+        }
+
+        let cases: Vec<Case> = vec![
+            Case {
+                name: "signer_not_admitted",
+                patch_receipt: Box::new(|_| {}),
+                patch_nonce: Box::new(|_| {}),
+                admitted: vec![other_kp.public_key()],
+                expected: NotAuthoritativeReason::SignerNotAdmitted,
+            },
+            Case {
+                name: "hold_not_reconciled",
+                patch_receipt: Box::new(|r| {
+                    if let Some(m) = r.metadata.as_mut() {
+                        m["budget_authority"]["terminal"]["disposition"] =
+                            serde_json::json!("released");
+                    }
+                }),
+                patch_nonce: Box::new(|_| {}),
+                admitted: vec![kp.public_key()],
+                expected: NotAuthoritativeReason::HoldNotReconciled,
+            },
+            Case {
+                name: "exposure_not_committed",
+                patch_receipt: Box::new(|r| {
+                    if let Some(m) = r.metadata.as_mut() {
+                        m["budget_authority"]["authorize"]["exposure_units"] =
+                            serde_json::json!(0_u64);
+                    }
+                }),
+                patch_nonce: Box::new(|_| {}),
+                admitted: vec![kp.public_key()],
+                expected: NotAuthoritativeReason::ExposureNotCommitted,
+            },
+            Case {
+                name: "nonce_link_mismatch",
+                patch_receipt: Box::new(|_| {}),
+                patch_nonce: Box::new(|n| {
+                    n.nonce_id = "wrong-nonce-id".to_string();
+                }),
+                admitted: vec![kp.public_key()],
+                expected: NotAuthoritativeReason::NonceLinkMismatch,
+            },
+            Case {
+                name: "nonce_binding_mismatch_capability",
+                patch_receipt: Box::new(|_| {}),
+                patch_nonce: Box::new(|n| {
+                    n.capability_id = "wrong-cap".to_string();
+                }),
+                admitted: vec![kp.public_key()],
+                expected: NotAuthoritativeReason::NonceBindingMismatch { field: "capability_id" },
+            },
+            Case {
+                name: "nonce_signature_invalid",
+                patch_receipt: Box::new(|_| {}),
+                patch_nonce: Box::new(|n| {
+                    n.signer = None;
+                }),
+                admitted: vec![kp.public_key()],
+                expected: NotAuthoritativeReason::NonceSignatureInvalid,
+            },
+        ];
+
+        for case in &cases {
+            let mut receipt = base.clone();
+            let mut nonce = good_nonce(&kp, &base);
+            (case.patch_receipt)(&mut receipt);
+            (case.patch_nonce)(&mut nonce);
+            assert_eq!(
+                is_authoritative_spend_receipt(&receipt, &case.admitted, &nonce),
+                Err(case.expected.clone()),
+                "case: {}",
+                case.name,
+            );
+        }
     }
 }
