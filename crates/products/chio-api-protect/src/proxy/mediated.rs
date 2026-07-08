@@ -4,7 +4,8 @@ use chio_kernel::budget_store::BudgetStore;
 use chio_kernel::execution_nonce::{ExecutionNonceConfig, InMemoryExecutionNonceStore};
 use chio_kernel::{
     ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ToolCallRequest, ToolServerConnection,
-    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 
 /// Build the sidecar's budget store: remote under `--control-url`, else a local
@@ -54,7 +55,10 @@ pub(crate) fn build_mediation_kernel(
         retention_config: None,
     });
     kernel.set_budget_store_handle(budget_store);
-    let nonce_cfg = ExecutionNonceConfig { require_nonce, ..ExecutionNonceConfig::default() };
+    let nonce_cfg = ExecutionNonceConfig {
+        require_nonce,
+        ..ExecutionNonceConfig::default()
+    };
     kernel.set_execution_nonce_store(
         nonce_cfg.clone(),
         Box::new(InMemoryExecutionNonceStore::from_config(&nonce_cfg)),
@@ -159,10 +163,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     };
     if let Err(error) = record_tool_receipt(&state, &response.receipt).await {
         warn!("failed to persist mediated receipt: {error}");
-        return internal_json_error_response(
-            "chio_receipt_persistence_failed",
-            &error.to_string(),
-        );
+        return internal_json_error_response("chio_receipt_persistence_failed", &error.to_string());
     }
     let verdict_str = match response.verdict {
         chio_kernel::Verdict::Allow => "allow",
@@ -272,7 +273,9 @@ mod tests {
             grants: vec![grant],
             ..ChioScope::default()
         };
-        kernel.issue_capability(&agent.public_key(), scope, 3600).test_unwrap()
+        kernel
+            .issue_capability(&agent.public_key(), scope, 3600)
+            .test_unwrap()
     }
 
     fn mediated_test_state(
@@ -290,8 +293,7 @@ mod tests {
             "test-policy".to_string(),
             Arc::clone(&approval_store),
         );
-        let egress_contract =
-            default_upstream_egress_contract("http://127.0.0.1:1").test_unwrap();
+        let egress_contract = default_upstream_egress_contract("http://127.0.0.1:1").test_unwrap();
         let http_client = client_builder_with_contract(&egress_contract)
             .build()
             .test_unwrap();
@@ -302,8 +304,12 @@ mod tests {
             http_client,
             egress_contract,
             approval_admin: ApprovalAdmin::new(approval_store),
-            receipt_log: Mutex::new(ReceiptLog { receipts: Vec::new() }),
-            tool_receipt_log: Mutex::new(ToolReceiptLog { receipts: Vec::new() }),
+            receipt_log: Mutex::new(ReceiptLog {
+                receipts: Vec::new(),
+            }),
+            tool_receipt_log: Mutex::new(ToolReceiptLog {
+                receipts: Vec::new(),
+            }),
             receipt_store: None,
             revoked_capability_ids: Mutex::new(std::collections::HashSet::new()),
             trusted_capability_issuers,
@@ -319,7 +325,10 @@ mod tests {
         let mut request = request;
         request
             .extensions_mut()
-            .insert(ConnectInfo(std::net::SocketAddr::from(([127, 0, 0, 1], 4100))));
+            .insert(ConnectInfo(std::net::SocketAddr::from((
+                [127, 0, 0, 1],
+                4100,
+            ))));
         request
     }
 
@@ -335,7 +344,8 @@ mod tests {
             vec![Box::new(test_cost_server("cost-srv", "compute", 50, "USD"))],
         )
         .test_unwrap();
-        let cap = issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
+        let cap =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
         let cap_id = cap.id.clone();
         let state = mediated_test_state(Arc::clone(&kernel), Arc::clone(&budget));
 
@@ -346,18 +356,29 @@ mod tests {
             "parameters": { "invoice": "inv-1" }
         });
         let request = with_loopback_peer(
-            Request::builder().method("POST").uri("/v1/evaluate")
+            Request::builder()
+                .method("POST")
+                .uri("/v1/evaluate")
                 .header("content-type", "application/json")
-                .body(Body::from(serde_json::to_vec(&body).unwrap())).unwrap(),
+                .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                .unwrap(),
         );
-        let response = build_app(Arc::clone(&state)).oneshot(request).await.unwrap();
+        let response = build_app(Arc::clone(&state))
+            .oneshot(request)
+            .await
+            .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
-        let bytes = axum::body::to_bytes(response.into_body(), 1 << 20).await.unwrap();
+        let bytes = axum::body::to_bytes(response.into_body(), 1 << 20)
+            .await
+            .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
 
         assert_eq!(json["receipt"]["trust_level"], "mediated");
         assert_eq!(json["receipt"]["decision"]["verdict"], "allow");
-        assert!(json["execution_nonce"].is_object(), "mediated route must return a nonce");
+        assert!(
+            json["execution_nonce"].is_object(),
+            "mediated route must return a nonce"
+        );
 
         let usage = budget.get_usage(&cap_id, 0).unwrap().unwrap();
         assert_eq!(usage.committed_cost_units().unwrap(), 50);
@@ -369,19 +390,33 @@ mod tests {
         let agent = Keypair::generate();
         let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
         let kernel = build_mediation_kernel(
-            &signer, Arc::clone(&budget), false,
+            &signer,
+            Arc::clone(&budget),
+            false,
             vec![Box::new(test_cost_server("cost-srv", "compute", 50, "USD"))],
-        ).test_unwrap();
-        let cap = issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 40, "USD");
+        )
+        .test_unwrap();
+        let cap =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 40, "USD");
         let cap_id = cap.id.clone();
         let state = mediated_test_state(Arc::clone(&kernel), Arc::clone(&budget));
         let body = serde_json::json!({ "capability": cap, "tool_server": "cost-srv",
             "tool_name": "compute", "parameters": {} });
-        let request = with_loopback_peer(Request::builder().method("POST").uri("/v1/evaluate")
-            .header("content-type", "application/json")
-            .body(Body::from(serde_json::to_vec(&body).unwrap())).unwrap());
-        let response = build_app(Arc::clone(&state)).oneshot(request).await.unwrap();
-        let bytes = axum::body::to_bytes(response.into_body(), 1 << 20).await.unwrap();
+        let request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/evaluate")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                .unwrap(),
+        );
+        let response = build_app(Arc::clone(&state))
+            .oneshot(request)
+            .await
+            .unwrap();
+        let bytes = axum::body::to_bytes(response.into_body(), 1 << 20)
+            .await
+            .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_ne!(json["receipt"]["decision"]["verdict"], "allow");
         let usage = budget.get_usage(&cap_id, 0).unwrap();
@@ -418,6 +453,9 @@ mod tests {
             Arc::new(chio_kernel::budget_store::InMemoryBudgetStore::new());
         let kernel =
             build_mediation_kernel(&signer, Arc::clone(&budget), true, Vec::new()).unwrap();
-        assert!(kernel.execution_nonce_required(), "require_nonce must be honored");
+        assert!(
+            kernel.execution_nonce_required(),
+            "require_nonce must be honored"
+        );
     }
 }

@@ -1,5 +1,5 @@
-use super::*;
 use super::mediated;
+use super::*;
 
 /// Stored receipts for inspection and querying.
 pub(crate) struct ReceiptLog {
