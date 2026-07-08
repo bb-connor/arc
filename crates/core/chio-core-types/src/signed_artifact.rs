@@ -91,6 +91,8 @@ pub const CHIO_RISK_COLLATERAL_POSITION_REPORT_V1_SCHEMA: &str =
 pub const CHIO_RISK_GUARANTEE_DECISION_V1_SCHEMA: &str = "chio.risk.guarantee-decision.v1";
 pub const CHIO_RISK_ADJUDICATION_JURISDICTION_RECEIPT_V1_SCHEMA: &str =
     "chio.risk.adjudication-jurisdiction-receipt.v1";
+/// Schema id for the unified spend/exposure comptroller surface projection.
+pub const CHIO_COMPTROLLER_SURFACE_REPORT_V1_SCHEMA: &str = "chio.comptroller.surface-report.v1";
 pub const CHIO_ENTERPRISE_DATA_GOVERNANCE_REPORT_V1_SCHEMA: &str =
     "chio.enterprise.data-governance-report.v1";
 pub const CHIO_ENTERPRISE_EVIDENCE_EXPORT_BUNDLE_V1_SCHEMA: &str =
