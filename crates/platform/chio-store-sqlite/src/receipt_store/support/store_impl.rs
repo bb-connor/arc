@@ -266,12 +266,9 @@ impl ReceiptStore for SqliteReceiptStore {
         let connection = self.connection()?;
         ensure_checkpoint_transparency_guards(&connection)?;
         verify_latest_checkpoint_integrity(&connection)?;
+        drop(connection);
         let raw_json = canonical_receipt_json(canonical)?;
-        self.append_verified_chio_receipt_record(&decoded, raw_json)?;
-        let mut connection = self.connection()?;
-        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-        ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &decoded.id)?;
-        tx.commit()?;
+        self.append_verified_chio_receipt_record(&decoded, raw_json, true)?;
         Ok(())
     }
 
@@ -282,11 +279,9 @@ impl ReceiptStore for SqliteReceiptStore {
         let connection = self.connection()?;
         ensure_checkpoint_transparency_guards(&connection)?;
         verify_latest_checkpoint_integrity(&connection)?;
-        let seq = SqliteReceiptStore::append_chio_receipt_returning_seq(self, receipt)?;
-        let mut connection = self.connection()?;
-        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-        ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &receipt.id)?;
-        tx.commit()?;
+        drop(connection);
+        let raw_json = serde_json::to_string(receipt)?;
+        let seq = self.append_verified_chio_receipt_record(receipt, &raw_json, true)?;
         Ok(Some(seq))
     }
 

@@ -152,6 +152,7 @@ fn append_receipt_batch_commits_multiple_receipts_together(
         requests.push(ReceiptCommitRequest {
             receipt,
             raw_json,
+            ensure_lineage: false,
             response,
         });
     }
@@ -281,6 +282,7 @@ fn append_receipt_batch_rolls_back_all_receipts_on_batch_error(
         requests.push(ReceiptCommitRequest {
             receipt,
             raw_json,
+            ensure_lineage: false,
             response,
         });
     }
@@ -311,6 +313,7 @@ fn receipt_commit_flush_waits_for_queued_receipts() -> Result<(), Box<dyn std::e
                 ReceiptCommitRequest {
                     receipt,
                     raw_json,
+                    ensure_lineage: false,
                     response,
                 },
             )))
@@ -351,6 +354,7 @@ fn receipt_commit_flush_reports_queued_batch_error() -> Result<(), Box<dyn std::
             ReceiptCommitRequest {
                 receipt: invalid,
                 raw_json,
+                ensure_lineage: false,
                 response,
             },
         )))
@@ -391,6 +395,7 @@ fn append_receipt_batch_rolls_back_full_batch_error() -> Result<(), Box<dyn std:
         requests.push(ReceiptCommitRequest {
             receipt,
             raw_json,
+            ensure_lineage: false,
             response,
         });
     }
@@ -597,4 +602,124 @@ fn append_inflight_counter_does_not_underflow_on_concurrent_drain() {
     );
 
     let _ = fs::remove_file(path);
+}
+
+/// `ensure_receipt_lineage_statement_for_receipt_id_tx` only inserts a
+/// `receipt_lineage_statements` row for receipts carrying governed-transaction
+/// call-chain metadata (see `tests/lineage.rs`); a bare `sample_receipt_with_id`
+/// receipt never reaches the lineage insert at all. The atomicity fold under
+/// test only matters for receipts that actually trigger that insert, so this
+/// helper builds one.
+fn sample_receipt_with_id_and_call_chain(id: &str) -> ChioReceipt {
+    let keypair = receipt_test_keypair();
+    ChioReceipt::sign(
+        ChioReceiptBody {
+            id: id.to_string(),
+            timestamp: 1,
+            capability_id: "cap-1".to_string(),
+            tool_server: "shell".to_string(),
+            tool_name: "bash".to_string(),
+            action: valid_tool_action(serde_json::json!({"receipt": id})),
+            decision: Some(Decision::Allow),
+            receipt_kind: Default::default(),
+            boundary_class: Default::default(),
+            observation_outcome: None,
+            tool_origin: Default::default(),
+            redaction_mode: Default::default(),
+            actor_chain: Vec::new(),
+            content_hash: format!("content-{id}"),
+            policy_hash: "policy-1".to_string(),
+            evidence: Vec::new(),
+            metadata: Some(serde_json::json!({
+                "governed_transaction": GovernedTransactionReceiptMetadata {
+                    intent_id: format!("intent-{id}"),
+                    intent_hash: format!("intent-hash-{id}"),
+                    purpose: "atomic receipt+lineage fold test".to_string(),
+                    server_id: "shell".to_string(),
+                    tool_name: "bash".to_string(),
+                    max_amount: None,
+                    commerce: None,
+                    metered_billing: None,
+                    approval: None,
+                    runtime_assurance: None,
+                    call_chain: Some(GovernedCallChainProvenance::verified(
+                        GovernedCallChainContext {
+                            chain_id: format!("chain-{id}"),
+                            parent_request_id: format!("req-parent-{id}"),
+                            parent_receipt_id: None,
+                            origin_subject: "subject-root".to_string(),
+                            delegator_subject: "subject-delegator".to_string(),
+                        },
+                    )),
+                    autonomy: None,
+                    economic_authorization: None,
+                }
+            })),
+            trust_level: chio_core::receipt::kinds::TrustLevel::default(),
+            tenant_id: None,
+            kernel_key: keypair.public_key(),
+            bbs_projection_version: None,
+        },
+        &keypair,
+    )
+    .test_unwrap()
+}
+
+#[test]
+fn receipt_and_lineage_commit_atomically() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-receipt-lineage-atomic");
+    let store = SqliteReceiptStore::open(&path)?;
+
+    // Baseline: the trait append writes receipt AND lineage in one tx.
+    let receipt_ok = sample_receipt_with_id_and_call_chain("rcpt-atomic-ok");
+    let seq = chio_kernel::ReceiptStore::append_chio_receipt_returning_seq(&store, &receipt_ok)?
+        .ok_or("expected a claim-log seq")?;
+    assert!(seq > 0);
+    let connection = store.connection()?;
+    let lineage_rows: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM receipt_lineage_statements WHERE receipt_id = ?1",
+        rusqlite::params![receipt_ok.id],
+        |row| row.get(0),
+    )?;
+    assert_eq!(lineage_rows, 1, "lineage row must exist after append");
+    drop(connection);
+
+    // Inject a failure between the receipt insert and the lineage insert.
+    test_hooks::FAIL_BETWEEN_RECEIPT_AND_LINEAGE.store(true, std::sync::atomic::Ordering::SeqCst);
+    let receipt_fail = sample_receipt_with_id_and_call_chain("rcpt-atomic-fail");
+    let result =
+        chio_kernel::ReceiptStore::append_chio_receipt_returning_seq(&store, &receipt_fail);
+    test_hooks::FAIL_BETWEEN_RECEIPT_AND_LINEAGE.store(false, std::sync::atomic::Ordering::SeqCst);
+    assert!(
+        matches!(result, Err(ReceiptStoreError::Conflict(_))),
+        "injected failure must surface as Conflict, got {result:?}"
+    );
+
+    // The folded transaction rolled back: no receipt row, no claim-log row,
+    // no lineage row survives (no receipt-without-lineage state possible).
+    let connection = store.connection()?;
+    let receipt_rows: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM chio_tool_receipts WHERE receipt_id = ?1",
+        rusqlite::params![receipt_fail.id],
+        |row| row.get(0),
+    )?;
+    let claim_rows: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE receipt_id = ?1",
+        rusqlite::params![receipt_fail.id],
+        |row| row.get(0),
+    )?;
+    let lineage_rows: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM receipt_lineage_statements WHERE receipt_id = ?1",
+        rusqlite::params![receipt_fail.id],
+        |row| row.get(0),
+    )?;
+    assert_eq!((receipt_rows, claim_rows, lineage_rows), (0, 0, 0));
+
+    // The store is healthy again after the injected fault clears.
+    let receipt_retry = sample_receipt_with_id("rcpt-atomic-retry");
+    chio_kernel::ReceiptStore::append_chio_receipt_returning_seq(&store, &receipt_retry)?
+        .ok_or("expected a claim-log seq on retry")?;
+
+    let _ = fs::remove_file(path);
+    Ok(())
 }

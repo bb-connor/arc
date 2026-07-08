@@ -141,6 +141,10 @@ struct ReceiptCommitWriterHealth {
 struct ReceiptCommitRequest {
     receipt: ChioReceipt,
     raw_json: String,
+    /// When true, `ensure_receipt_lineage_statement_for_receipt_id_tx` runs
+    /// inside the same batch transaction as the receipt insert (trait-append
+    /// paths). Canonical inherent paths keep `false` (today's behavior).
+    ensure_lineage: bool,
     response: mpsc::SyncSender<Result<u64, ReceiptStoreError>>,
 }
 
@@ -165,11 +169,17 @@ impl ReceiptCommitActor {
         Self { sender, health }
     }
 
-    fn append(&self, receipt: ChioReceipt, raw_json: String) -> Result<u64, ReceiptStoreError> {
+    fn append(
+        &self,
+        receipt: ChioReceipt,
+        raw_json: String,
+        ensure_lineage: bool,
+    ) -> Result<u64, ReceiptStoreError> {
         let (response, result) = mpsc::sync_channel(1);
         let command = ReceiptCommitCommand::Append(Box::new(ReceiptCommitRequest {
             receipt,
             raw_json,
+            ensure_lineage,
             response,
         }));
         // Increment `inflight` BEFORE handing the command to the worker. If we
@@ -500,7 +510,26 @@ fn append_receipt_batch(
     let mut results = Vec::with_capacity(requests.len());
     for request in requests {
         match append_chio_receipt_tx(&tx, &request.receipt, &request.raw_json) {
-            Ok(seq) => results.push(Ok(seq)),
+            Ok(seq) => {
+                if request.ensure_lineage {
+                    #[cfg(test)]
+                    if test_hooks::fail_between_receipt_and_lineage() {
+                        return receipt_batch_error_results(
+                            requests.len(),
+                            ReceiptStoreError::Conflict(
+                                "injected failure between receipt insert and lineage insert"
+                                    .to_string(),
+                            ),
+                        );
+                    }
+                    if let Err(error) =
+                        ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &request.receipt.id)
+                    {
+                        return receipt_batch_error_results(requests.len(), error);
+                    }
+                }
+                results.push(Ok(seq));
+            }
             Err(error) => return receipt_batch_error_results(requests.len(), error),
         }
     }
@@ -558,6 +587,19 @@ fn receipt_store_error_snapshot(error: &ReceiptStoreError) -> ReceiptStoreError 
         }
         ReceiptStoreError::Conflict(message) => ReceiptStoreError::Conflict(message.clone()),
         ReceiptStoreError::NotFound(message) => ReceiptStoreError::NotFound(message.clone()),
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod test_hooks {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    /// When set, `append_receipt_batch` fails the batch between the receipt
+    /// insert and the lineage ensure, proving the fold is one transaction.
+    pub(crate) static FAIL_BETWEEN_RECEIPT_AND_LINEAGE: AtomicBool = AtomicBool::new(false);
+
+    pub(crate) fn fail_between_receipt_and_lineage() -> bool {
+        FAIL_BETWEEN_RECEIPT_AND_LINEAGE.load(Ordering::SeqCst)
     }
 }
 
@@ -647,7 +689,7 @@ impl SqliteReceiptStore {
     ) -> Result<u64, ReceiptStoreError> {
         let receipt = decode_canonical_chio_receipt(canonical.as_ref())?;
         let raw_json = canonical_receipt_json(canonical.as_ref())?;
-        self.append_verified_chio_receipt_record(&receipt, raw_json)
+        self.append_verified_chio_receipt_record(&receipt, raw_json, false)
     }
 
     pub fn append_chio_receipt_canonical_bytes_returning_seq(
@@ -661,11 +703,12 @@ impl SqliteReceiptStore {
         &self,
         receipt: &ChioReceipt,
         raw_json: &str,
+        ensure_lineage: bool,
     ) -> Result<u64, ReceiptStoreError> {
         ensure_chio_receipt_verified(receipt)?;
         sqlite_i64(receipt.timestamp, "receipt timestamp")?;
         self.receipt_commit_actor
-            .append(receipt.clone(), raw_json.to_string())
+            .append(receipt.clone(), raw_json.to_string(), ensure_lineage)
     }
 
     pub fn append_chio_receipt_consuming_authorization(
@@ -1300,7 +1343,7 @@ mod receipt_commit_actor_tests {
         }
         let actor = ReceiptCommitActor { sender, health };
 
-        let error = actor.append(actor_test_receipt()?, "{}".to_string());
+        let error = actor.append(actor_test_receipt()?, "{}".to_string(), false);
 
         assert!(error
             .err()
