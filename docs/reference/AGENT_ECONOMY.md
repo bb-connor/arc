@@ -1227,8 +1227,8 @@ absent or does not match the pinned version -- this is the fail-closed contract.
 
 **Schema-governed HTTP polling** is the primary integration pattern. The
 endpoint is read-only, requires a Bearer token, and returns a snapshot as of
-`generatedAt`. Consumers should not merge or cache across multiple snapshots
-without comparing `sourceRefs.receiptCorpusSeq` to detect stale reads.
+`generatedAt` (integer Unix seconds). Consumers should not merge or cache across
+multiple snapshots without comparing `generatedAt` values to detect stale reads.
 
 **Optional signed offline export** (`SignedComptrollerSurfaceReport`) is
 available for consumers that need to verify surface state offline or carry it to

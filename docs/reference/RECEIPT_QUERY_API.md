@@ -323,60 +323,70 @@ The response envelope schema identifier is `chio.comptroller.surface-report.v1`.
 ```json
 {
   "schema": "chio.comptroller.surface-report.v1",
-  "generatedAt": "2026-07-08T00:00:00Z",
+  "generatedAt": 1700000000,
+  "filters": {},
   "exposurePositions": [
     {
       "currency": "USD",
-      "reserveUnits": 10000,
-      "heldUnits": 2500,
-      "drawnUnits": 1200,
-      "disbursedUnits": 800,
-      "releasedUnits": 0,
-      "impairedUnits": 0
+      "governedMaxExposureUnits": 10000,
+      "reservedUnits": 1000,
+      "settledUnits": 8500,
+      "pendingUnits": 200,
+      "failedUnits": 0,
+      "provisionalLossUnits": 0,
+      "recoveredUnits": 0,
+      "quotedPremiumUnits": 0,
+      "activeQuotedPremiumUnits": 0
     }
   ],
   "decisionSummary": {
-    "totalDecisions": 42,
     "allowCount": 38,
     "denyCount": 4,
-    "pendingCount": 0
+    "cancelledCount": 0,
+    "incompleteCount": 0
   },
   "settlementReconciliation": {
-    "pendingCount": 1,
-    "failedCount": 0,
-    "reconciledCount": 37,
-    "openBacklogUnits": 300,
-    "currency": "USD"
+    "matchingReceipts": 42,
+    "returnedReceipts": 0,
+    "pendingReceipts": 1,
+    "failedReceipts": 0,
+    "actionableReceipts": 1,
+    "reconciledReceipts": 37,
+    "truncated": false
   },
   "budgetUtilization": {
     "matchingGrants": 5,
+    "returnedGrants": 0,
+    "distinctCapabilities": 2,
+    "distinctSubjects": 1,
+    "totalInvocations": 42,
+    "totalCostCharged": 8500,
     "nearLimitCount": 1,
     "exhaustedCount": 0,
-    "rows": []
+    "rowsMissingScope": 0,
+    "rowsMissingLineage": 0,
+    "truncated": false
   },
-  "sourceRefs": {
-    "schemaPath": "spec/schemas/chio-comptroller/v1/surface-report.schema.json",
-    "receiptCorpusSeq": 142,
-    "facilitySnapshotId": "facility-001"
-  },
-  "executionNonceRef": null,
-  "holdRef": null
+  "sourceRefs": {}
 }
 ```
+
+Note: `executionNonceRef` and `holdRef` are omitted from the response when absent (the serializer applies `skip_serializing_if = is_none`). They appear only when a specific governed invocation or pre-authorization hold context is supplied.
 
 ### Field Reference
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `schema` | string | Always `chio.comptroller.surface-report.v1`. Consumers must reject unknown values fail-closed. |
-| `generatedAt` | string (ISO 8601) | UTC timestamp when this report was produced. |
-| `exposurePositions` | array | Per-currency economic-position rows. Each row partitions totals into reserve, held, drawn, disbursed, released, and impaired units. Positions are never netted across currencies. |
-| `decisionSummary` | object | Aggregate decision counts over the governed receipt corpus. |
-| `settlementReconciliation` | object | Settlement backlog summary: pending, failed, and reconciled counts plus the open backlog in currency units. |
-| `budgetUtilization` | object | Active grant utilization summary (matching grants, near-limit and exhausted counts) plus optional detail rows. |
-| `sourceRefs` | object | Provenance anchors: the canonical schema path within this repository, the highest receipt corpus `seq` included in the report, and the facility-snapshot identifier when a live facility was resolved. |
-| `executionNonceRef` | string or null | Reserved. Identifies the execution nonce when this surface is attached to a specific governed invocation. Null in polling mode. |
-| `holdRef` | string or null | Reserved. Identifies an open pre-authorization hold when the surface is polled mid-execution. Null in standard polling mode. |
+| `generatedAt` | integer (Unix seconds) | Epoch timestamp when this report was produced. |
+| `filters` | object | The corpus filters applied to this snapshot (mirrors the request parameters). |
+| `exposurePositions` | array | Per-currency credit-exposure rows (`ExposurePosition`). Fields: `currency`, `governedMaxExposureUnits`, `reservedUnits`, `settledUnits`, `pendingUnits`, `failedUnits`, `provisionalLossUnits`, `recoveredUnits`, `quotedPremiumUnits`, `activeQuotedPremiumUnits`. Positions are never netted across currencies. |
+| `decisionSummary` | object | Aggregate allow/deny/cancelled/incomplete decision counts: `allowCount`, `denyCount`, `cancelledCount`, `incompleteCount`. |
+| `settlementReconciliation` | object | Settlement backlog summary: `matchingReceipts`, `returnedReceipts`, `pendingReceipts`, `failedReceipts`, `actionableReceipts`, `reconciledReceipts`, `truncated`. |
+| `budgetUtilization` | object | Active grant utilization summary: `matchingGrants`, `returnedGrants`, `distinctCapabilities`, `distinctSubjects`, `totalInvocations`, `totalCostCharged`, `nearLimitCount`, `exhaustedCount`, `rowsMissingScope`, `rowsMissingLineage`, `truncated`. |
+| `sourceRefs` | object | Optional provenance anchors. All sub-fields are optional strings: `operatorReportRef`, `exposureLedgerRef`, `riskComptrollerReportRef`. The object is present but may be empty `{}`. |
+| `executionNonceRef` | string (optional) | Reserved. Identifies the execution nonce when this surface is attached to a specific governed invocation. Omitted when not applicable. |
+| `holdRef` | string (optional) | Reserved. Identifies an open pre-authorization hold when the surface is polled mid-execution. Omitted when not applicable. |
 
 The projection implies no fund movement. The surface report is a read-only snapshot of canonical receipt, settlement, and budget truth as of `generatedAt`.
 
