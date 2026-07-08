@@ -193,7 +193,21 @@ pub(crate) async fn run_cluster_sync_loop(state: TrustServiceState) {
                 warn!(error = %error, "trust-control cluster sync task panicked");
             }
         }
-        tokio::time::sleep(state.config.cluster_sync_interval).await;
+        if let Some(progress) = state.cluster_progress.as_ref() {
+            progress.notify_round_complete();
+        }
+        // The loop is the sole sync driver: race the inter-round sleep against a
+        // writer kick so a waiting budget write is served promptly without
+        // spawning its own sync storm (RFC-0011 D3, F14).
+        match state.cluster_progress.as_ref() {
+            Some(progress) => {
+                tokio::select! {
+                    _ = tokio::time::sleep(state.config.cluster_sync_interval) => {}
+                    _ = progress.awaited_kick() => {}
+                }
+            }
+            None => tokio::time::sleep(state.config.cluster_sync_interval).await,
+        }
     }
 }
 
@@ -787,55 +801,56 @@ pub(crate) async fn wait_for_budget_write_quorum_commit(
     state: &TrustServiceState,
     write: BudgetWriteToken,
 ) -> Result<Option<BudgetWriteCommitView>, Response> {
-    if state.cluster.is_none() {
-        return Ok(None);
-    }
-
+    let Some(progress) = state.cluster_progress.as_ref() else {
+        return Ok(None); // not clustered
+    };
     let timeout = budget_write_quorum_commit_timeout(state.config.cluster_sync_interval);
-    let poll_interval = Duration::from_millis(250);
-    let deadline = Instant::now() + timeout;
-    loop {
-        let Some(commit_view) = budget_write_quorum_commit_view(state, &write) else {
-            return Ok(None);
-        };
-        if commit_view.quorum_committed {
-            return Ok(Some(commit_view));
+    let mut rx = progress.subscribe();
+    progress.request_sync();
+
+    // Park on the progress watch under a single wall-clock bound and drive no
+    // sync directly: the background loop is the sole sync driver, so one slow
+    // peer can no longer multiply N concurrent writes into N sync storms; the
+    // write waits out the bound and fails closed (RFC-0011 D3, F14).
+    let waited = tokio::time::timeout(timeout, async {
+        loop {
+            let Some(view) = budget_write_quorum_commit_view(state, &write) else {
+                return Ok::<_, Response>(None);
+            };
+            if view.quorum_committed {
+                return Ok(Some(view));
+            }
+            if !cluster_consensus_view(state).is_some_and(|consensus| consensus.has_quorum) {
+                return Err(plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    &format!(
+                        "budget write became leader-visible at commit index {} for authority term {} but cluster quorum disappeared before commit",
+                        write.event_seq, write.budget_term
+                    ),
+                ));
+            }
+            if rx.changed().await.is_err() {
+                return Ok(None); // sender dropped: treat as not-clustered
+            }
         }
-        if !cluster_consensus_view(state).is_some_and(|consensus| consensus.has_quorum) {
-            return Err(plain_http_error(
+    })
+    .await;
+
+    match waited {
+        Ok(inner) => inner,
+        Err(_elapsed) => {
+            let observed = budget_write_quorum_commit_view(state, &write);
+            Err(plain_http_error(
                 StatusCode::SERVICE_UNAVAILABLE,
                 &format!(
-                    "budget write became leader-visible at commit index {} for authority term {} but cluster quorum disappeared before commit",
-                    write.event_seq, write.budget_term,
+                    "budget write became leader-visible at commit index {} for authority term {} but quorum acks did not arrive before timeout ({}/{})",
+                    write.event_seq,
+                    write.budget_term,
+                    observed.as_ref().map(|v| v.committed_nodes).unwrap_or(0),
+                    observed.as_ref().map(|v| v.quorum_size).unwrap_or(0),
                 ),
-            ));
+            ))
         }
-        let sync_state = state.clone();
-        match tokio::task::spawn_blocking(move || sync_cluster_once(&sync_state)).await {
-            Ok(Ok(())) => {}
-            Ok(Err(error)) => {
-                warn!(error = %error, "trust-control budget quorum sync failed");
-            }
-            Err(error) => {
-                warn!(error = %error, "trust-control budget quorum sync task panicked");
-            }
-        }
-        let Some(commit_view) = budget_write_quorum_commit_view(state, &write) else {
-            return Ok(None);
-        };
-        if commit_view.quorum_committed {
-            return Ok(Some(commit_view));
-        }
-        if Instant::now() >= deadline {
-            return Err(plain_http_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                &format!(
-                    "budget write became leader-visible at commit index {} for authority term {} but only {}/{} quorum witnesses observed before timeout",
-                    write.event_seq, write.budget_term, commit_view.committed_nodes, commit_view.quorum_size
-                ),
-            ));
-        }
-        tokio::time::sleep(poll_interval).await;
     }
 }
 

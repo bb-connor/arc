@@ -53,6 +53,7 @@ mod cluster_and_reports_tests {
         config.revocation_db_path = revocation_db_path;
         config.budget_db_path = budget_db_path;
         let cluster = build_cluster_state(&config, config.listen).test_unwrap();
+        let cluster_progress = cluster.as_ref().map(|_| Arc::new(ClusterProgress::new()));
         TrustServiceState {
             config,
             enterprise_provider_registry: None,
@@ -61,6 +62,7 @@ mod cluster_and_reports_tests {
                 FederationAdmissionRateLimiter::default(),
             )),
             cluster,
+            cluster_progress,
         }
     }
 
@@ -515,6 +517,51 @@ mod cluster_and_reports_tests {
                 proptest::prop_assert!(!commit.quorum_committed);
             }
         }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn writer_wait_never_wedges_sync_loop() {
+        // Two peers, quorum_size 2. The writer parks on the progress watch; a
+        // simulated background round records an ack and notifies, and the writer
+        // observes the committed view without ever driving a sync itself.
+        let state = state_with_cluster(
+            "http://node-a",
+            &["http://node-b", "http://node-c"],
+            None,
+            None,
+            None,
+        );
+        update_peer_reachable(&state, "http://node-b");
+        update_peer_reachable(&state, "http://node-c");
+        let write = BudgetWriteToken {
+            origin_id: "http://node-a".to_string(),
+            event_seq: 5,
+            budget_term: 1,
+        };
+
+        let loop_state = state.clone();
+        let background = tokio::spawn(async move {
+            // Simulate one background round: import the ack, then notify.
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            update_peer_budget_acks(
+                &loop_state,
+                "http://node-b",
+                &[BudgetOriginAck {
+                    origin_id: "http://node-a".to_string(),
+                    event_seq: 5,
+                }],
+            );
+            if let Some(progress) = loop_state.cluster_progress.as_ref() {
+                progress.notify_round_complete();
+            }
+        });
+
+        let commit = wait_for_budget_write_quorum_commit(&state, write)
+            .await
+            .test_unwrap()
+            .test_unwrap();
+        assert!(commit.quorum_committed);
+        background.await.test_unwrap();
     }
 
     #[test]
