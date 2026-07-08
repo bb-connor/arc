@@ -1233,6 +1233,8 @@ fn build_liability_claim_adjudication_artifact(
         outcome: request.outcome,
         awarded_amount: request.awarded_amount.clone(),
         note: request.note.clone(),
+        decision_rule_ref: None,
+        roster_anchor_ref: None,
         evidence_refs,
     };
     artifact.validate().map_err(CliError::cli_other_error)?;
