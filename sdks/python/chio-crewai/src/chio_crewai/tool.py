@@ -233,12 +233,13 @@ class ChioBaseTool(BaseTool):
             owns_client = True
 
         try:
-            return await client.evaluate_tool_call(
-                capability_id=self.capability_id,
+            _mediated = await client.evaluate_tool_call(
+                capability={"id": self.capability_id},
                 tool_server=self.server_id,
                 tool_name=self.name,
                 parameters=parameters,
             )
+            return ChioReceipt.model_validate(_mediated["receipt"])
         except ChioDeniedError as exc:
             raise ChioToolError(
                 exc.message,

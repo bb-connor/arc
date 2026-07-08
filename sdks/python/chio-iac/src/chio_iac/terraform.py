@@ -121,12 +121,13 @@ async def _evaluate_sidecar(
         tool_name, parameters, policy=redaction_policy
     )
     try:
-        receipt = await chio_client.evaluate_tool_call(
-            capability_id=capability_id,
+        _mediated = await chio_client.evaluate_tool_call(
+            capability={"id": capability_id},
             tool_server=tool_server,
             tool_name=tool_name,
             parameters=redacted_parameters,
         )
+        receipt = ChioReceipt.model_validate(_mediated["receipt"])
     except ChioDeniedError as exc:
         raise ChioIACError(
             f"Chio denied terraform {subcommand}: {exc.reason or exc.message}",

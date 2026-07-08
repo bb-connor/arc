@@ -47,12 +47,13 @@ async def _evaluate_with_sidecar(
     the caller can record actor / method context in the error.
     """
     try:
-        return await chio_client.evaluate_tool_call(
-            capability_id=capability_id,
+        _mediated = await chio_client.evaluate_tool_call(
+            capability={"id": capability_id},
             tool_server=tool_server,
             tool_name=tool_name,
             parameters=parameters,
         )
+        return ChioReceipt.model_validate(_mediated["receipt"])
     except ChioDeniedError as exc:
         err = ChioRayError(
             exc.message,

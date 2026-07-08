@@ -82,12 +82,13 @@ async def _evaluate(
     Airflow retry policy can apply.
     """
     try:
-        receipt = await chio_client.evaluate_tool_call(
-            capability_id=capability_id,
+        _mediated = await chio_client.evaluate_tool_call(
+            capability={"id": capability_id},
             tool_server=tool_server,
             tool_name=tool_name,
             parameters=parameters,
         )
+        receipt = ChioReceipt.model_validate(_mediated["receipt"])
     except ChioDeniedError as exc:
         raise _denied_permission_error(
             task_id=task_id,

@@ -121,12 +121,13 @@ class _BaseChioTool:
                 guard="tool_access",
             )
         try:
-            receipt = await self._chio_client.evaluate_tool_call(
-                capability_id=self._capability_id,
+            _mediated = await self._chio_client.evaluate_tool_call(
+                capability={"id": self._capability_id},
                 tool_server=self.SERVER_ID,
                 tool_name=tool_name,
                 parameters=parameters,
             )
+            receipt = ChioReceipt.model_validate(_mediated["receipt"])
         except ChioDeniedError:
             raise
         if not receipt.is_allowed:

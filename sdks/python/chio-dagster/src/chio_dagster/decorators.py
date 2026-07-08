@@ -176,12 +176,13 @@ async def _evaluate(
     tool_name: str,
     parameters: dict[str, Any],
 ) -> ChioReceipt:
-    return await chio_client.evaluate_tool_call(
-        capability_id=capability_id,
+    _mediated = await chio_client.evaluate_tool_call(
+        capability={"id": capability_id},
         tool_server=tool_server,
         tool_name=tool_name,
         parameters=parameters,
     )
+    return ChioReceipt.model_validate(_mediated["receipt"])
 
 
 def _denied_permission_error(

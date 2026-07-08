@@ -85,12 +85,13 @@ async def evaluate_with_chio(
     ``ChioStreamingError``, carrying ``failure_context`` for logs.
     """
     try:
-        return await chio_client.evaluate_tool_call(
-            capability_id=capability_id,
+        _mediated = await chio_client.evaluate_tool_call(
+            capability={"id": capability_id},
             tool_server=tool_server,
             tool_name=tool_name,
             parameters=parameters,
         )
+        return ChioReceipt.model_validate(_mediated["receipt"])
     except ChioDeniedError as exc:
         return synthesize_deny_receipt(
             capability_id=capability_id,
