@@ -863,3 +863,35 @@ fn checkpoint_capable_store_without_background_fails_setup() {
         other => panic!("expected KernelError::Internal, got {other:?}"),
     }
 }
+
+/// Codex round 5, finding 3: KernelConfig documents `checkpoint_batch_size = 0`
+/// as DISABLING automatic checkpointing (non-web3 deployments). The round-4
+/// attach-time fail-closed check must not reject such a configuration: with
+/// batch_size 0 the store attaches without requiring a background signer, while
+/// batch_size > 0 still enforces the check.
+#[test]
+fn attach_honors_disabled_checkpointing() {
+    // Disabled (batch_size 0): attach must succeed even though the store is
+    // checkpoint-capable but installs no background signer.
+    let mut config = make_config();
+    config.checkpoint_batch_size = 0;
+    let mut kernel = make_kernel(config);
+    kernel
+        .set_receipt_store(Box::new(CheckpointCapableWithoutBackgroundStore))
+        .expect("batch_size 0 disables checkpointing; attach must not require a signer");
+
+    // Enabled (batch_size > 0): the fail-closed check still applies.
+    let mut config = make_config();
+    config.checkpoint_batch_size = 2;
+    let mut kernel = make_kernel(config);
+    let error = kernel
+        .set_receipt_store(Box::new(CheckpointCapableWithoutBackgroundStore))
+        .expect_err("batch_size > 0 must still require a background checkpoint signer");
+    match error {
+        KernelError::Internal(message) => assert!(
+            message.contains("did not install a background checkpoint signer"),
+            "unexpected fail-closed error: {message}"
+        ),
+        other => panic!("expected KernelError::Internal, got {other:?}"),
+    }
+}

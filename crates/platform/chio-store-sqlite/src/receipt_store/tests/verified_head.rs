@@ -664,6 +664,63 @@ fn resync_validates_adopted_delta() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// Codex round 5, finding 2: for a writer-routed Write job the actor used to
+/// send the caller's result BEFORE running `resync_head_after_write`. Round-4's
+/// finding 2 made that resync able to FAIL (poison the head on a divergent
+/// adopted delta), so a write whose closure COMMITTED but whose resync then
+/// failed still returned `Ok` while the head was left poisoned. The fix defers
+/// the response until AFTER resync: a committed write whose resync fails returns
+/// the resync error, not a stale `Ok`.
+#[test]
+fn write_job_response_reflects_resync_failure() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-write-resync-fail");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    // Real receipts -> claim-log entries 1..=3, writer head at claim_log_max_seq 3.
+    for i in 0..3 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-wrf-{i}"), (i + 1) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+
+    // A Write job whose closure COMMITS (returns Ok) but inserts an out-of-band
+    // ORPHAN claim-log row at entry_seq 4 (no source receipt). The post-write
+    // resync adopts (3, 4] as a delta, validates it, and REJECTS the orphan,
+    // poisoning the head. The caller must receive that resync error, NOT Ok.
+    let result: Result<(), ReceiptStoreError> =
+        store.writer_handle().run_write(move |connection| {
+            connection.execute(
+                r#"
+                INSERT INTO claim_receipt_log_entries (
+                    entry_seq, receipt_id, receipt_kind, source_seq, timestamp,
+                    capability_id, tool_server, tool_name, raw_json
+                ) VALUES (4, 'orphan-wrf-4', 'tool_receipt', 999, 1, 'cap-oob', 'shell', 'bash', '{}')
+                "#,
+                [],
+            )?;
+            Ok(())
+        });
+
+    let error = result
+        .err()
+        .ok_or("a committed Write whose resync fails must return the resync error, not Ok")?;
+    match &error {
+        ReceiptStoreError::Conflict(message) => assert!(
+            message.contains("chio receipt audit"),
+            "resync failure must surface the fail-closed Conflict, got: {message}"
+        ),
+        other => return Err(format!("expected Conflict, got {other}").into()),
+    }
+
+    // Teeth: the resync failure poisoned the head, so the next write is denied.
+    let next: Result<(), ReceiptStoreError> = store.writer_handle().run_write(|_connection| Ok(()));
+    assert!(next.is_err(), "resync failure must poison the head");
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
 /// Codex round 3, finding 3: `verify_head_against_latest_checkpoint` compares
 /// only the RFC 8785 body digest for a same-seq checkpoint (to keep the Ed25519
 /// verify off the per-append hot path, F22). A persisted `signature` COLUMN

@@ -715,6 +715,69 @@ fn install_signer_builds_owed_checkpoints() -> Result<(), Box<dyn std::error::Er
     Ok(())
 }
 
+/// Codex round 5, finding 1: the round-4 install-time catch-up builds owed
+/// checkpoints when the signer is installed. But with
+/// `incremental_verification = false` the actor seeds via `seed_head_snapshot`,
+/// which INTENTIONALLY skips the full claim-log + checkpoint-chain audit
+/// (deferred to the next append/verify), so the seeded head is
+/// `Verified`-but-UNVALIDATED. Building catch-up checkpoints at install over
+/// that range would checkpoint unaudited data (fail-closed violation), so the
+/// install-time build must DEFER in this mode: the next append runs the full
+/// per-append validation and THEN the owed checkpoints build. The normal
+/// verified mode (`install_signer_builds_owed_checkpoints`) still builds at
+/// install.
+#[test]
+fn install_catch_up_respects_deferred_validation() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-install-deferred");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open_with_options(
+        &path,
+        crate::SqliteStoreOptions {
+            incremental_verification: false,
+            ..crate::SqliteStoreOptions::default()
+        },
+    )?;
+    let max_batch = 3;
+    // Append >= max_batch receipts with NO signer: durable and uncheckpointed,
+    // and (deferred-seed mode) not yet covered by the full audit.
+    for i in 0..max_batch {
+        let receipt = sample_receipt_with_keypair(&format!("rcpt-deferred-{i}"), i + 1, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+
+    // Install the signer. In deferred-seed mode the head is
+    // Verified-but-UNVALIDATED, so the install-time catch-up MUST NOT build over
+    // it (finding 1).
+    store.enable_background_checkpoints(signer(&keypair, max_batch))?;
+    // Flush is only a synchronization barrier: it makes the InstallSigner
+    // command observably processed. It does NOT itself append or build.
+    store.flush_receipt_writes()?;
+    assert!(
+        store.load_checkpoint_by_seq(1)?.is_none(),
+        "deferred-seed mode must not checkpoint the unvalidated range at install"
+    );
+
+    // It DEFERS, not skips: the next append runs the full per-append validation
+    // (non-incremental path) and then builds the now-owed checkpoint.
+    let receipt = sample_receipt_with_keypair("rcpt-deferred-tail", max_batch + 1, &keypair);
+    store.append_chio_receipt_returning_seq(&receipt)?;
+    store.flush_receipt_writes()?;
+    let checkpoint = store
+        .load_checkpoint_by_seq(1)?
+        .ok_or("the deferred catch-up must build once the full validation has run")?;
+    assert_eq!(
+        (
+            checkpoint.body.batch_start_seq,
+            checkpoint.body.batch_end_seq
+        ),
+        (1, 3)
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
 /// Deterministically co-drain a Flush with a group-commit batch of `n` fresh
 /// appends. The writer actor is first occupied by a blocking Write job so every
 /// following command queues behind it; then `n` Append commands and one Flush

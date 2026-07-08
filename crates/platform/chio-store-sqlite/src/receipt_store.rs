@@ -169,8 +169,23 @@ struct ReceiptCommitRequest {
     response: mpsc::SyncSender<Result<u64, ReceiptStoreError>>,
 }
 
-type WriterClosure =
-    Box<dyn FnOnce(Result<&mut SqliteStoreConnection, ReceiptStoreError>) + Send + 'static>;
+/// Deferred response sender for a `Write` job (codex round 5, finding 2). The
+/// actor invokes it AFTER `resync_head_after_write` so a committed write whose
+/// head resync then fails returns the resync error instead of a stale `Ok`.
+/// Called with `Ok(())` when resync succeeded (or never ran) to send the job's
+/// own outcome, or `Err(resync_error)` to override a committed job's `Ok` with
+/// the resync failure.
+type WriterResponder = Box<dyn FnOnce(Result<(), ReceiptStoreError>) + Send + 'static>;
+
+/// A single-writer job. Runs the caller's closure on the writer connection and
+/// returns a [`WriterResponder`] so the ACTOR controls when the caller's result
+/// is sent: the response is withheld until the post-write head resync outcome
+/// is known.
+type WriterClosure = Box<
+    dyn FnOnce(Result<&mut SqliteStoreConnection, ReceiptStoreError>) -> WriterResponder
+        + Send
+        + 'static,
+>;
 
 enum ReceiptCommitCommand {
     Append(Box<ReceiptCommitRequest>),
@@ -372,7 +387,20 @@ impl WriterHandle {
                 }
                 Err(error) => Err(error),
             };
-            let _ = response.send(outcome);
+            // Defer the send (codex round 5, finding 2): the actor calls this
+            // responder with the post-write head resync outcome. A resync
+            // failure overrides a committed job's `Ok` with the resync error; a
+            // job that already failed keeps its own error.
+            let responder: WriterResponder =
+                Box::new(move |resync: Result<(), ReceiptStoreError>| {
+                    let final_outcome = match (outcome, resync) {
+                        (job_outcome, Ok(())) => job_outcome,
+                        (Err(job_error), Err(_)) => Err(job_error),
+                        (Ok(_), Err(resync_error)) => Err(resync_error),
+                    };
+                    let _ = response.send(final_outcome);
+                });
+            responder
         });
         // Pre-send increment: same race-avoidance invariant as
         // `ReceiptCommitActor::append` (see the comment at the `inflight`
@@ -629,13 +657,18 @@ fn handle_non_append_command(
             let mut connection = match pool.get() {
                 Ok(connection) => connection,
                 Err(error) => {
-                    job(Err(ReceiptStoreError::Pool(error.to_string())));
+                    // No write ran (no connection), so there is no resync to
+                    // gate on: send the pool error now (`Ok(())` = nothing to
+                    // override).
+                    let respond = job(Err(ReceiptStoreError::Pool(error.to_string())));
+                    respond(Ok(()));
                     return;
                 }
             };
             match head_state {
                 WriterHeadState::Poisoned(message) => {
-                    job(Err(poisoned_head_error(message)));
+                    let respond = job(Err(poisoned_head_error(message)));
+                    respond(Ok(()));
                 }
                 WriterHeadState::Verified(head) => {
                     // Pre-check (fail-closed): same predecessor check the
@@ -659,31 +692,47 @@ fn handle_non_append_command(
                         })
                     };
                     if let Err(error) = pre_check {
-                        job(Err(error));
+                        let respond = job(Err(error));
+                        respond(Ok(()));
                         return;
                     }
-                    job(Ok(&mut connection));
+                    // Run the job but DEFER its response (codex round 5, finding
+                    // 2): the caller must not observe `Ok` until
+                    // `resync_head_after_write` confirms the head. A committed
+                    // write whose resync then fails receives the resync error,
+                    // not a stale `Ok`.
+                    let respond = job(Ok(&mut connection));
                     // Post-resync: absorb whatever the closure committed
                     // (claim-log rows via projection triggers, checkpoint
                     // rows via the manual path) so the next append's
                     // cross-check cannot false-Conflict.
-                    if let Err(error) = resync_head_after_write(&connection, head) {
-                        if let Ok(mut last_error) = health.last_error.lock() {
-                            *last_error = Some(error.to_string());
+                    match resync_head_after_write(&connection, head) {
+                        Ok(()) => {
+                            respond(Ok(()));
+                            health.store_head_snapshot(head);
+                            // Writer-routed appends (child receipts, consuming
+                            // auth) can cross the threshold too; no
+                            // pending_flush_error guard here since a Write job is
+                            // not part of a batch. The writer pool holds exactly
+                            // one connection (DEFAULT_WRITER_POOL_MAX_SIZE = 1):
+                            // drop this one before build_due_checkpoints_and_record
+                            // acquires its own, or `pool.get()` would block on
+                            // itself.
+                            drop(connection);
+                            build_due_checkpoints_and_record(pool, head, checkpoint_signer, health);
                         }
-                        *head_state = WriterHeadState::Poisoned(error.to_string());
-                        return;
+                        Err(error) => {
+                            if let Ok(mut last_error) = health.last_error.lock() {
+                                *last_error = Some(error.to_string());
+                            }
+                            let poison_message = error.to_string();
+                            // Surface the resync failure to the caller: a write
+                            // that returned `Ok` from its closure must NOT report
+                            // success when the head is now poisoned.
+                            respond(Err(error));
+                            *head_state = WriterHeadState::Poisoned(poison_message);
+                        }
                     }
-                    health.store_head_snapshot(head);
-                    // Writer-routed appends (child receipts, consuming auth)
-                    // can cross the threshold too; no pending_flush_error
-                    // guard here since a Write job is not part of a batch.
-                    // The writer pool holds exactly one connection
-                    // (DEFAULT_WRITER_POOL_MAX_SIZE = 1): drop this one
-                    // before build_due_checkpoints_and_record acquires its
-                    // own, or `pool.get()` would block on itself.
-                    drop(connection);
-                    build_due_checkpoints_and_record(pool, head, checkpoint_signer, health);
                 }
             }
         }
@@ -702,8 +751,23 @@ fn handle_non_append_command(
             // until caught up; NOT a full verify, so F22 holds). Fail-closed:
             // build_due_checkpoints_and_record records last_error and never
             // panics the actor.
-            if let WriterHeadState::Verified(head) = head_state {
-                build_due_checkpoints_and_record(pool, head, checkpoint_signer, health);
+            //
+            // Deferred-seed gate (codex round 5, finding 1): only build at
+            // install when the head has actually been VALIDATED. With
+            // `incremental_verification = false` the actor seeds via
+            // `seed_head_snapshot`, which INTENTIONALLY skips the full claim-log
+            // + checkpoint-chain audit (deferred to the next append/verify), so
+            // the seeded head is `Verified` but UNVALIDATED. Building catch-up
+            // checkpoints over that range would checkpoint unaudited data (a
+            // fail-closed violation), so defer it in that mode: the next
+            // receipt-appending append/Write runs the deferred full validation
+            // and THEN builds the owed checkpoints. In the normal incremental
+            // mode the seeded head is genuinely verified, so the owed
+            // checkpoints still build here (preserves round-4 finding 1).
+            if incremental_verification {
+                if let WriterHeadState::Verified(head) = head_state {
+                    build_due_checkpoints_and_record(pool, head, checkpoint_signer, health);
+                }
             }
         }
         ReceiptCommitCommand::ReseedHead(response) => {
