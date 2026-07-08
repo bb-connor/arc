@@ -284,11 +284,12 @@ impl ChioKernel {
         };
 
         // A governed intent that mandates prepayment must not execute unless a
-        // payment adapter is configured to prepay it. The gate fires for every
-        // MustPrepay intent regardless of charge_result, so it cannot be bypassed
-        // by the charge_result == None early-return in authorize_payment_if_needed.
-        // It is charge-independent: the charge currency is checked below against
-        // quote.quoted_cost.currency.
+        // payment adapter is configured to prepay it. This is the primary
+        // fail-closed denial and fires for every MustPrepay intent regardless of
+        // charge_result. authorize_payment_if_needed independently fail-closes for
+        // MustPrepay (it authorizes the quoted cost through the adapter, or denies
+        // when none is present), so an unpaid MustPrepay execution has no path.
+        // The charge currency is checked below against quote.quoted_cost.currency.
         if metered.settlement_mode
             == chio_core::capability::governance::MeteredSettlementMode::MustPrepay
             && !payment_adapter_configured
