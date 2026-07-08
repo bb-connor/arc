@@ -9,6 +9,7 @@ on:
     paths:
       - ".github/workflows/swift-sdk.yml"
       - "sdks/swift/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -33,11 +34,24 @@ jobs:
           xcodebuild -version
           swift --version
 
-      - name: Confirm the test-inclusive scheme exists (no hardcoded -scheme Chio false green)
+      - name: Resolve test-inclusive scheme
+        id: scheme
         run: |
-          xcodebuild -list -project . 2>/dev/null || xcodebuild -list
-          xcodebuild -list | grep -qw "Chio-Package" \
-            || { echo "::error::expected the test-inclusive 'Chio-Package' scheme"; exit 1; }
+          SCHEMES=$(xcodebuild -list -json 2>/dev/null \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); top=d.get('workspace',d.get('project',{})); print('\n'.join(top.get('schemes',[])))")
+          SCHEME=""
+          for candidate in "Chio-Package" "Chio"; do
+            if echo "$SCHEMES" | grep -qx "$candidate"; then
+              SCHEME="$candidate"
+              break
+            fi
+          done
+          if [ -z "$SCHEME" ]; then
+            echo "::error::no recognized scheme found; available: $(echo "$SCHEMES" | tr '\n' ' ')"
+            exit 1
+          fi
+          echo "name=$SCHEME" >> "$GITHUB_OUTPUT"
+          echo "Resolved scheme: $SCHEME"
 
       - name: Pin an available iOS Simulator destination
         id: sim
@@ -56,22 +70,22 @@ jobs:
         env:
           RUNTIME: ""
 
-      - name: xcodebuild test (Chio-Package on the pinned simulator)
+      - name: xcodebuild test
         run: |
           set -o pipefail
           xcodebuild test \
-            -scheme Chio-Package \
+            -scheme "${{ steps.scheme.outputs.name }}" \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }},OS=${{ steps.sim.outputs.osver }}" \
             -resultBundlePath "$RUNNER_TEMP/ChioTests.xcresult" \
             | tee "$RUNNER_TEMP/xcodebuild.log"
 
-      - name: Assert a NONZERO executed-test count (guard against a 0-test false green)
+      - name: Assert nonzero executed-test count
         run: |
-          # xcodebuild prints "Executed N tests, ..." per suite; require at least one N >= 1.
-          if ! grep -Eq 'Executed [1-9][0-9]* test' "$RUNNER_TEMP/xcodebuild.log"; then
-            echo "::error::no tests were executed (0-test filter is a false green)"; exit 1
-          fi
-          grep -E 'Executed [0-9]+ test' "$RUNNER_TEMP/xcodebuild.log" | tail -n 1
+          xcrun xcresulttool get test-results summary \
+            --path "$RUNNER_TEMP/ChioTests.xcresult" \
+            --format json \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); n=d.get('totalTestCount',0); print(f'totalTestCount={n}'); exit(0 if n>=1 else 1)" \
+            || { echo "::error::xcresult reports zero tests executed"; exit 1; }
 
   xcframework-drift:
     name: Swift SDK xcframework drift (nightly/manual)
@@ -79,14 +93,60 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
       - name: Rebuild the xcframework from the current Rust FFI
         run: bash scripts/build-ios-framework.sh
-      - name: Re-run the sim tests against the rebuilt framework
+
+      - name: Resolve test-inclusive scheme
+        id: scheme
+        working-directory: sdks/swift
+        run: |
+          SCHEMES=$(xcodebuild -list -json 2>/dev/null \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); top=d.get('workspace',d.get('project',{})); print('\n'.join(top.get('schemes',[])))")
+          SCHEME=""
+          for candidate in "Chio-Package" "Chio"; do
+            if echo "$SCHEMES" | grep -qx "$candidate"; then
+              SCHEME="$candidate"
+              break
+            fi
+          done
+          if [ -z "$SCHEME" ]; then
+            echo "::error::no recognized scheme found; available: $(echo "$SCHEMES" | tr '\n' ' ')"
+            exit 1
+          fi
+          echo "name=$SCHEME" >> "$GITHUB_OUTPUT"
+          echo "Resolved scheme: $SCHEME"
+
+      - name: Pin an available iOS Simulator destination
+        id: sim
+        run: |
+          RUNTIME=$(xcrun simctl list runtimes --json \
+            | python3 -c "import sys,json; r=[x for x in json.load(sys.stdin)['runtimes'] if x['isAvailable'] and 'iOS' in x['name']]; print(sorted(r,key=lambda x:x['version'])[-1]['identifier'] if r else '')")
+          if [ -z "$RUNTIME" ]; then echo "::error::no available iOS Simulator runtime"; exit 1; fi
+          DEVICE=$(xcrun simctl list devices --json \
+            | python3 -c "import sys,json,os; d=json.load(sys.stdin)['devices'].get(os.environ['RUNTIME'],[]); a=[x for x in d if x.get('isAvailable') and x['name'].startswith('iPhone')]; print(a[0]['name'] if a else '')" )
+          if [ -z "$DEVICE" ]; then echo "::error::no available iPhone simulator for $RUNTIME"; exit 1; fi
+          OSVER=$(echo "$RUNTIME" | sed -E 's/.*iOS-([0-9]+)-([0-9]+).*/\1.\2/')
+          echo "device=$DEVICE" >> "$GITHUB_OUTPUT"
+          echo "osver=$OSVER" >> "$GITHUB_OUTPUT"
+          echo "Pinned destination: platform=iOS Simulator,name=$DEVICE,OS=$OSVER"
+        env:
+          RUNTIME: ""
+
+      - name: xcodebuild test against rebuilt framework
         working-directory: sdks/swift
         run: |
           set -o pipefail
-          xcodebuild -list | grep -qw "Chio-Package"
-          xcodebuild test -scheme Chio-Package \
-            -destination "platform=iOS Simulator,name=iPhone 15" \
+          xcodebuild test \
+            -scheme "${{ steps.scheme.outputs.name }}" \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }},OS=${{ steps.sim.outputs.osver }}" \
+            -resultBundlePath "$RUNNER_TEMP/drift.xcresult" \
             | tee "$RUNNER_TEMP/drift.log"
-          grep -Eq 'Executed [1-9][0-9]* test' "$RUNNER_TEMP/drift.log"
+
+      - name: Assert nonzero executed-test count
+        run: |
+          xcrun xcresulttool get test-results summary \
+            --path "$RUNNER_TEMP/drift.xcresult" \
+            --format json \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); n=d.get('totalTestCount',0); print(f'totalTestCount={n}'); exit(0 if n>=1 else 1)" \
+            || { echo "::error::xcresult reports zero tests executed"; exit 1; }
