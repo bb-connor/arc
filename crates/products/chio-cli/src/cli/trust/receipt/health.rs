@@ -131,11 +131,27 @@ pub(crate) fn cmd_receipt_checkpoint_verify(backend: QueryBackend<'_>) -> Result
 
 /// `chio receipt audit [--repair]`: the promoted full-verification surface
 /// (RFC-0006 rollout step 3). Runs validate_claim_receipt_log_entries plus a
-/// complete checkpoint-chain verification via receipt_checkpoint_status; with
-/// --repair it first reseeds the writer's verified head on the writer
-/// connection (clearing a poisoned head).
+/// complete checkpoint-chain verification via receipt_checkpoint_status.
+///
+/// `--repair` is an OFFLINE operation (codex round 2, finding 3). It opens a
+/// LOCAL throwaway store and revalidates/reseeds the ON-DISK state on that
+/// connection. The CLI runs in a separate process from a live kernel and cannot
+/// reach that kernel's in-memory writer head, so `--repair` does NOT clear a
+/// live poisoned writer. Run it with the kernel stopped and restart the kernel
+/// to seed a clean verified head from the validated on-disk state.
 pub(crate) fn cmd_receipt_audit(repair: bool, backend: QueryBackend<'_>) -> Result<(), CliError> {
     receipt_audit_with_schema(repair, CHIO_CLI_RECEIPT_AUDIT_SCHEMA, backend)
+}
+
+/// Honest, cross-process description of what `chio receipt audit --repair`
+/// actually does (codex round 2, finding 3): it validates the on-disk receipt
+/// state OFFLINE and cannot reseed a running kernel's in-memory writer head.
+/// Kept as a pure function so the wording is unit-testable.
+pub(crate) fn offline_repair_notice() -> &'static str {
+    "receipt audit --repair ran OFFLINE: the on-disk receipt state was revalidated on a local \
+     connection. A running kernel keeps its verified head in-memory in a separate process the CLI \
+     cannot reach, so a live poisoned writer was NOT reseeded. Run this with the kernel stopped, \
+     then restart the kernel to seed a clean verified head from the validated on-disk state."
 }
 
 fn receipt_audit_with_schema(
@@ -145,13 +161,23 @@ fn receipt_audit_with_schema(
 ) -> Result<(), CliError> {
     let store = local_receipt_store(&backend, "receipt audit")?;
     if repair {
+        // Revalidate + reseed the ON-DISK state on this throwaway local store.
+        // This validates the persisted chain (fail-closed) but cannot reach a
+        // live kernel's in-memory writer head; see `offline_repair_notice`.
         store.reseed_verified_head()?;
     }
     let report = store.receipt_checkpoint_status(Some(1))?;
     if backend.json_output {
         print_receipt_operator_json(schema, &report)?;
+        // Keep stdout pure JSON; surface the honest offline-repair note on stderr.
+        if repair {
+            eprintln!("{}", offline_repair_notice());
+        }
     } else {
         print!("{}", render_receipt_checkpoint_status_human(&report));
+        if repair {
+            println!("{}", offline_repair_notice());
+        }
     }
     if report.healthy {
         Ok(())
@@ -545,5 +571,27 @@ mod receipt_operator_tests {
 
         let _ = std::fs::remove_file(db_path);
         Ok(())
+    }
+
+    /// Codex round 2, finding 3: `chio receipt audit --repair` cannot reach a
+    /// running kernel's in-memory writer head (a separate process), so its
+    /// operator-facing wording must be honest about being an OFFLINE on-disk
+    /// operation and must instruct restarting the kernel to clear a live poison
+    /// rather than claim to have reseeded the live writer.
+    #[test]
+    fn receipt_audit_repair_notice_is_offline_honest() {
+        let notice = offline_repair_notice();
+        assert!(
+            notice.contains("OFFLINE"),
+            "repair notice must state it is offline: {notice}"
+        );
+        assert!(
+            notice.contains("restart the kernel"),
+            "repair notice must instruct restarting the kernel: {notice}"
+        );
+        assert!(
+            notice.contains("NOT reseeded") && notice.contains("cannot reach"),
+            "repair notice must be explicit that a live writer was not reseeded: {notice}"
+        );
     }
 }

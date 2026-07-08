@@ -726,7 +726,22 @@ fn build_due_checkpoints_and_record(
     }))
     .unwrap_or_else(|payload| Err(receipt_writer_job_panic_error(&payload)));
     match result {
-        Ok(()) => health.store_head_snapshot(head),
+        Ok(built) => {
+            health.store_head_snapshot(head);
+            // Recovery signal (codex round 2, finding 2): a prior background
+            // checkpoint build may have set `last_error`. A later SUCCESSFUL
+            // build is reached here through a writer-routed op (a `Write` job
+            // crossing the threshold), which does NOT run the append batch's
+            // `last_error` reset, so without this the store keeps reporting
+            // unhealthy after it has recovered. Clear the stale error only on an
+            // ACTUAL build (`built`), never on a no-op due-check, so a genuinely
+            // current error is not masked by an idle refresh.
+            if built {
+                if let Ok(mut last_error) = health.last_error.lock() {
+                    *last_error = None;
+                }
+            }
+        }
         Err(error) => {
             if let Ok(mut last_error) = health.last_error.lock() {
                 *last_error = Some(error.to_string());
@@ -739,13 +754,26 @@ fn build_due_checkpoints(
     pool: &Pool<SqliteConnectionManager>,
     head: &mut VerifiedHead,
     signer: &BackgroundCheckpointSigner,
-) -> Result<(), ReceiptStoreError> {
+) -> Result<bool, ReceiptStoreError> {
     if signer.max_batch == 0 {
-        return Ok(()); // ADR-0008: batch_size 0 disables checkpointing
+        return Ok(false); // ADR-0008: batch_size 0 disables checkpointing
     }
     let mut connection = pool
         .get()
         .map_err(|error| ReceiptStoreError::Pool(error.to_string()))?;
+    // Shared-file freshness (codex round 2, finding 1): on a shared receipt DB
+    // another writer can commit a checkpoint AFTER this actor's append
+    // pre-check but BEFORE its batch tx. `append_receipt_batch` then adopts that
+    // writer's claim-log rows via the baseline delta yet leaves
+    // `head.latest_checkpoint` stale, so building from the stale position would
+    // try to rebuild an already-committed checkpoint and fail with "already
+    // exists with different content" (the clock-skew case the idempotent-
+    // identical guard does not cover). Refresh the head against the latest
+    // persisted checkpoint first so that checkpoint is ADOPTED, not rebuilt.
+    // This is an O(1) latest-row read + digest adopt (plus bounded catch-up),
+    // NOT a full chain verify, so the RFC-0006 incremental hot path (F22)
+    // stays intact.
+    verify_head_against_latest_checkpoint(&connection, head)?;
     maybe_build_checkpoint(&mut connection, head, signer)
 }
 
@@ -756,10 +784,11 @@ fn maybe_build_checkpoint(
     connection: &mut SqliteStoreConnection,
     head: &mut VerifiedHead,
     signer: &BackgroundCheckpointSigner,
-) -> Result<(), ReceiptStoreError> {
+) -> Result<bool, ReceiptStoreError> {
     if signer.max_batch == 0 {
-        return Ok(());
+        return Ok(false);
     }
+    let mut built = false;
     while head
         .claim_log_max_seq
         .saturating_sub(head.checkpointed_entry_seq())
@@ -795,8 +824,9 @@ fn maybe_build_checkpoint(
         insert_checkpoint_incremental_tx(&tx, head.latest_checkpoint.as_ref(), &checkpoint)?;
         tx.commit()?;
         head.latest_checkpoint = Some(checkpoint);
+        built = true;
     }
-    Ok(())
+    Ok(built)
 }
 
 /// RFC-0006 head-resync rule: one indexed delta aggregate plus one
@@ -1691,10 +1721,22 @@ impl SqliteReceiptStore {
         // uncheckpointed range. Read the persisted checkpoint head from the DB
         // (read-only reader-pool query, not a writer-head mutation) and take
         // the higher of the two so the report reflects the current chain.
-        let persisted = load_latest_persisted_checkpoint_row(&connection)?;
-        let persisted_checkpoint_seq = persisted.as_ref().map_or(0, |row| row.checkpoint_seq);
-        let persisted_checkpointed_entry_seq =
-            persisted.as_ref().map_or(0, |row| row.batch_end_seq);
+        // Only trust the persisted latest checkpoint if its signed body VERIFIES
+        // (codex round 2, finding 4): `parse_persisted_checkpoint_row` checks
+        // column/body agreement AND the signature, so a tampered or out-of-band
+        // row with an inflated `batch_end_seq` cannot make the flush report a
+        // false `checkpointed_entry_seq` and hide the uncheckpointed range. On a
+        // verification failure fall back to ONLY the actor's verified head (via
+        // the `.max` below). Reader-pool READ, no write (F29); single latest-row
+        // body verification, not a full chain verify.
+        let verified_persisted = load_latest_persisted_checkpoint_row(&connection)?
+            .and_then(|row| parse_persisted_checkpoint_row(row).ok());
+        let persisted_checkpoint_seq = verified_persisted
+            .as_ref()
+            .map_or(0, |checkpoint| checkpoint.body.checkpoint_seq);
+        let persisted_checkpointed_entry_seq = verified_persisted
+            .as_ref()
+            .map_or(0, |checkpoint| checkpoint.body.batch_end_seq);
         let checkpoint_seq = head.checkpoint_seq.max(persisted_checkpoint_seq);
         let latest_checkpointed_entry_seq = head
             .checkpointed_entry_seq

@@ -387,6 +387,17 @@ pub(crate) fn store_kernel_checkpoint_atomic(
 ) -> Result<(), ReceiptStoreError> {
     ensure_checkpoint_transparency_guards(connection)?;
     let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+    // Operator / import append re-verification (codex round 2, finding 5): a
+    // manually stored or externally imported checkpoint is a rare, off-hot-path
+    // surface. `store_kernel_checkpoint_tx` only parses the LATEST checkpoint as
+    // the predecessor, so a mid-chain tamper (an earlier checkpoint or a
+    // projection row whose latest row still parses) would go undetected and this
+    // append would extend an already-corrupt chain. Re-verify the FULL persisted
+    // chain here so the operator path fails closed. This is the operator/import
+    // surface ONLY; the RFC-0006 background builder (maybe_build_checkpoint /
+    // insert_checkpoint_incremental_tx) deliberately stays on the O(b)
+    // incremental head (F22) and does not run through here.
+    verify_checkpoint_chain_integrity(&tx)?;
     store_kernel_checkpoint_tx(&tx, checkpoint)?;
     tx.commit()?;
     Ok(())
