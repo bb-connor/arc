@@ -173,10 +173,12 @@ impl ChioKernel {
                 signing_queued_budget,
             ),
         );
-        // Build the receipt-mirror gauges first so they can be shared between
-        // the bounded ring and the telemetry / registry readers (RFC-0004).
+        // Build the bounded-structure gauges first so they can be shared between
+        // each structure and the telemetry / registry readers (RFC-0004).
         let receipt_mirror_gauge;
         let child_receipt_mirror_gauge;
+        let federation_dual_receipts_gauge;
+        let federation_dsse_envelopes_gauge;
         Self {
             config,
             guards: Vec::new(),
@@ -227,8 +229,19 @@ impl ChioKernel {
             capability_trust_roots: ArcSwap::from_pointee(HashMap::new()),
             capability_trust_roots_write_lock: Mutex::new(()),
             federation_cosigner: None,
-            federation_dual_receipts: DashMap::new(),
-            federation_dsse_envelopes: DashMap::new(),
+            federation_dual_receipts: {
+                let gauge = chio_bounded::SizeGauge::new();
+                federation_dual_receipts_gauge = gauge.clone();
+                Mutex::new(chio_bounded::BoundedMap::new(8192, 3600, gauge))
+            },
+            federation_dual_receipts_gauge,
+            federation_dsse_envelopes: {
+                let gauge = chio_bounded::SizeGauge::new();
+                federation_dsse_envelopes_gauge = gauge.clone();
+                Mutex::new(chio_bounded::BoundedMap::new(8192, 3600, gauge))
+            },
+            federation_dsse_envelopes_gauge,
+            federation_artifact_store: None,
             receipt_tenant_ids: Arc::new(DashMap::new()),
             receipt_federation_admissions: Arc::new(DashMap::new()),
             federation_local_kernel_id: ArcSwap::from_pointee(Option::<String>::None),
@@ -722,18 +735,38 @@ impl ChioKernel {
         &self,
         receipt_id: &str,
     ) -> Option<chio_federation::bilateral::DualSignedReceipt> {
-        self.federation_dual_receipts
-            .get(receipt_id)
-            .map(|entry| entry.value().clone())
+        let now = current_unix_timestamp();
+        {
+            let mut cache = match self.federation_dual_receipts.lock() {
+                Ok(g) => g,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            if let Some(hit) = cache.get(&receipt_id.to_string(), now) {
+                return Some(hit.clone());
+            }
+        }
+        self.federation_artifact_store
+            .as_ref()
+            .and_then(|store| store.get_dual_signed(receipt_id).ok().flatten())
     }
 
     pub fn federation_dsse_envelope(
         &self,
         receipt_id: &str,
     ) -> Option<chio_federation::bilateral_dsse::DsseEnvelope> {
-        self.federation_dsse_envelopes
-            .get(receipt_id)
-            .map(|entry| entry.value().clone())
+        let now = current_unix_timestamp();
+        {
+            let mut cache = match self.federation_dsse_envelopes.lock() {
+                Ok(g) => g,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            if let Some(hit) = cache.get(&receipt_id.to_string(), now) {
+                return Some(hit.clone());
+            }
+        }
+        self.federation_artifact_store
+            .as_ref()
+            .and_then(|store| store.get_dsse(receipt_id).ok().flatten())
     }
 
     /// Local kernel identifier used in bilateral co-signing. Falls back
@@ -896,10 +929,27 @@ impl ChioKernel {
             )
             .map_err(|e| KernelError::Internal(format!("bilateral DSSE co-sign failed: {e}")))?;
 
-        self.federation_dual_receipts
-            .insert(receipt.id.clone(), dual);
-        self.federation_dsse_envelopes
-            .insert(receipt.id.clone(), dsse_envelope);
+        if let Some(store) = self.federation_artifact_store.as_ref() {
+            store.put_dual_signed(&receipt.id, &dual)?;
+            store.put_dsse(&receipt.id, &dsse_envelope)?;
+        }
+        let now = current_unix_timestamp();
+        {
+            let mut cache = match self.federation_dual_receipts.lock() {
+                Ok(g) => g,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            // Evicted entry (if any) is durable via the store above, or lossy by
+            // policy when no store is configured; dropping it is safe.
+            let _ = cache.insert(receipt.id.clone(), dual, now);
+        }
+        {
+            let mut cache = match self.federation_dsse_envelopes.lock() {
+                Ok(g) => g,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            let _ = cache.insert(receipt.id.clone(), dsse_envelope, now);
+        }
         Ok(())
     }
 

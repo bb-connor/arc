@@ -231,13 +231,24 @@ pub struct ChioKernel {
     /// Populated only when the post-sign hook fires successfully. Kept
     /// in-memory; persistent storage plugs in via the federation-state
     /// APIs already in chio-federation.
+    /// Capped, idle-swept, gauged instead of an unbounded DashMap (RFC-0004
+    /// F10): federated calls no longer grow kernel RSS without bound.
     pub(super) federation_dual_receipts:
-        DashMap<String, chio_federation::bilateral::DualSignedReceipt>,
+        Mutex<chio_bounded::BoundedMap<String, chio_federation::bilateral::DualSignedReceipt>>,
+    #[allow(dead_code)]
+    pub(super) federation_dual_receipts_gauge: chio_bounded::SizeGauge,
     /// DSSE signature-slice envelopes, indexed by ChioReceipt.id.
     /// These are emitted through the federation cosigner protocol rather than
     /// by loading Org A private key material in the tool-host kernel.
     pub(super) federation_dsse_envelopes:
-        DashMap<String, chio_federation::bilateral_dsse::DsseEnvelope>,
+        Mutex<chio_bounded::BoundedMap<String, chio_federation::bilateral_dsse::DsseEnvelope>>,
+    #[allow(dead_code)]
+    pub(super) federation_dsse_envelopes_gauge: chio_bounded::SizeGauge,
+    /// Optional durable backing for bilateral co-sign artifacts (RFC-0004 F10).
+    /// When set, the co-sign hook writes through to it before caching and the
+    /// accessors fall through to it on a cache miss.
+    pub(super) federation_artifact_store:
+        Option<std::sync::Arc<dyn crate::federation_artifact_store::FederationArtifactStore>>,
     /// Request-keyed tenant scope for receipts. Async evaluate futures
     /// can resume on a different worker after dispatch, so the scope is
     /// stored in this map rather than a thread-local.
