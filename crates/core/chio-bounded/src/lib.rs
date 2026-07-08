@@ -5,9 +5,11 @@
 //! (2) a live size metric. This crate is the substrate: `Ring` and `BoundedMap`
 //! each own a cloneable `SizeGauge`.
 
+mod bounded_map;
 mod gauge;
 mod ring;
 mod sync;
 
+pub use bounded_map::BoundedMap;
 pub use gauge::SizeGauge;
 pub use ring::Ring;
