@@ -306,6 +306,89 @@ Response shape:
 
 This endpoint is the stable operator workflow surface. It packages the existing analytics, cost-attribution, and evidence-export substrate into one response so dashboards and back-office tooling do not need to reconstruct the report client-side.
 
+## Comptroller Surface Endpoint
+
+The trust-control service exposes the unified spend and exposure surface for cross-language consumers:
+
+```
+GET /v1/reports/comptroller-surface
+```
+
+It uses the same Bearer authentication model as the other report endpoints.
+
+The response envelope schema identifier is `chio.comptroller.surface-report.v1`. Every response carries this identifier in the top-level `schema` field so consumers can reject unknown schema versions fail-closed before parsing the body.
+
+### Response Shape
+
+```json
+{
+  "schema": "chio.comptroller.surface-report.v1",
+  "generatedAt": "2026-07-08T00:00:00Z",
+  "exposurePositions": [
+    {
+      "currency": "USD",
+      "reserveUnits": 10000,
+      "heldUnits": 2500,
+      "drawnUnits": 1200,
+      "disbursedUnits": 800,
+      "releasedUnits": 0,
+      "impairedUnits": 0
+    }
+  ],
+  "decisionSummary": {
+    "totalDecisions": 42,
+    "allowCount": 38,
+    "denyCount": 4,
+    "pendingCount": 0
+  },
+  "settlementReconciliation": {
+    "pendingCount": 1,
+    "failedCount": 0,
+    "reconciledCount": 37,
+    "openBacklogUnits": 300,
+    "currency": "USD"
+  },
+  "budgetUtilization": {
+    "matchingGrants": 5,
+    "nearLimitCount": 1,
+    "exhaustedCount": 0,
+    "rows": []
+  },
+  "sourceRefs": {
+    "schemaPath": "spec/schemas/chio-comptroller/v1/surface-report.schema.json",
+    "receiptCorpusSeq": 142,
+    "facilitySnapshotId": "facility-001"
+  },
+  "executionNonceRef": null,
+  "holdRef": null
+}
+```
+
+### Field Reference
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `schema` | string | Always `chio.comptroller.surface-report.v1`. Consumers must reject unknown values fail-closed. |
+| `generatedAt` | string (ISO 8601) | UTC timestamp when this report was produced. |
+| `exposurePositions` | array | Per-currency economic-position rows. Each row partitions totals into reserve, held, drawn, disbursed, released, and impaired units. Positions are never netted across currencies. |
+| `decisionSummary` | object | Aggregate decision counts over the governed receipt corpus. |
+| `settlementReconciliation` | object | Settlement backlog summary: pending, failed, and reconciled counts plus the open backlog in currency units. |
+| `budgetUtilization` | object | Active grant utilization summary (matching grants, near-limit and exhausted counts) plus optional detail rows. |
+| `sourceRefs` | object | Provenance anchors: the canonical schema path within this repository, the highest receipt corpus `seq` included in the report, and the facility-snapshot identifier when a live facility was resolved. |
+| `executionNonceRef` | string or null | Reserved. Identifies the execution nonce when this surface is attached to a specific governed invocation. Null in polling mode. |
+| `holdRef` | string or null | Reserved. Identifies an open pre-authorization hold when the surface is polled mid-execution. Null in standard polling mode. |
+
+The projection implies no fund movement. The surface report is a read-only snapshot of canonical receipt, settlement, and budget truth as of `generatedAt`.
+
+### Schema Governance
+
+The canonical JSON Schema for `chio.comptroller.surface-report.v1` is
+`spec/schemas/chio-comptroller/v1/surface-report.schema.json` in this repository.
+The TypeScript binding at `src/generated/comptroller-surface.ts` is generated
+from that schema and must not be hand-edited. Any shape change requires a schema
+version bump. Out-of-repo consumers must pin to the published schema SHA tracked
+in `spec/schemas/chio-comptroller/v1/`.
+
 ## CLI Usage: chio receipt list
 
 The `chio receipt list` subcommand wraps the HTTP endpoint.

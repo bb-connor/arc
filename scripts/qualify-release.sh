@@ -37,6 +37,11 @@ CHIO_BIN="$(pwd)/target/debug/chio" cargo xtask verify launch-acceptance --out t
 bash ./scripts/tests/check-chio-proof-room-launch-acceptance.test.sh
 CHIO_BIN="$(pwd)/target/debug/chio" bash ./scripts/tests/flagship-wall-stops-money.test.sh
 
+# Unified spend/exposure contract regression (governance + codegen + endpoint).
+bash ./scripts/check-chio-schema-registry.sh
+bash ./scripts/check-comptroller-contract-no-drift.sh
+bash ./scripts/qualify-comptroller-operator-surfaces.sh
+
 output_root="target/release-qualification"
 conformance_root="${output_root}/conformance"
 log_root="${output_root}/logs"
