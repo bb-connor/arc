@@ -515,7 +515,11 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
         .route(LINEAGE_RECORD_PATH, post(handle_record_lineage_snapshot))
         .route(LINEAGE_PATH, get(handle_get_lineage))
         .route(LINEAGE_CHAIN_PATH, get(handle_get_delegation_chain))
-        .route(AGENT_RECEIPTS_PATH, get(handle_agent_receipts));
+        .route(AGENT_RECEIPTS_PATH, get(handle_agent_receipts))
+        // Prometheus scrape endpoint (RFC-0009 F58), composed from the kernel
+        // guard families and the alert-pack families. Inherits the same serving
+        // posture as the other trust-control routes.
+        .route("/metrics", get(handle_trust_control_metrics));
 
     // Wire the dashboard SPA after all API routes so it acts as a catch-all.
     // API routes registered above take priority over the fallback service.
@@ -546,4 +550,26 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
         axum::http::header::CONTENT_SECURITY_POLICY,
         csp_value,
     ))
+}
+
+/// Prometheus scrape body for the trust-control surface: the kernel guard
+/// families plus the alert-pack families, composed (never fabricated) from the
+/// chio-metrics-spec runtime families (RFC-0009 F58).
+async fn handle_trust_control_metrics() -> impl axum::response::IntoResponse {
+    let alert_pack = || {
+        let mut out = String::new();
+        chio_metrics_spec::runtime::render_alert_pack_families(&mut out);
+        out
+    };
+    let body = chio_metrics_spec::runtime::compose_metrics_body(&[
+        &chio_kernel::render_guard_metrics_prometheus,
+        &alert_pack,
+    ]);
+    (
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; version=0.0.4",
+        )],
+        body,
+    )
 }

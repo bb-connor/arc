@@ -31,6 +31,12 @@ spec:
         # App waits until chio-sidecar startupProbe succeeds.
         run.googleapis.com/container-dependencies: '{"app":["chio-sidecar"]}'
         run.googleapis.com/execution-environment: gen2
+        # Prometheus scrape target: the sidecar serves an admin-gated /metrics
+        # carrying the kernel/edge/alert-pack families on the ingress port
+        # (RFC-0009 F58).
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "9090"
     spec:
       serviceAccountName: chio-sidecar@PROJECT_ID.iam.gserviceaccount.com
       containerConcurrency: 80

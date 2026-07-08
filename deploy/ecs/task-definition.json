@@ -50,6 +50,11 @@
       "portMappings": [
         { "containerPort": 9090, "hostPort": 9090, "protocol": "tcp" }
       ],
+      "dockerLabels": {
+        "prometheus.io/scrape": "true",
+        "prometheus.io/path": "/metrics",
+        "prometheus.io/port": "9090"
+      },
       "command": [
         "api",
         "protect",
