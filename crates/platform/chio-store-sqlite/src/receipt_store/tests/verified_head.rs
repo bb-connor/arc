@@ -309,3 +309,126 @@ fn reseed_clears_a_poisoned_head_after_repairing_the_database(
     let _ = fs::remove_file(path);
     Ok(())
 }
+
+/// `chio receipt audit --repair` on a store whose data is STILL corrupt (the
+/// operator ran `--repair` without actually fixing the underlying rows) must
+/// fail closed: `reseed_verified_head` returns `Err`, the writer stays
+/// `Poisoned`, and the next append is denied via the poisoned-head Conflict
+/// (not silently readopted as healthy). This is the counterpart to
+/// `reseed_clears_a_poisoned_head_after_repairing_the_database`, which proves
+/// the success path; this test proves the fail-closed path the review
+/// flagged as untested.
+#[test]
+fn reseed_on_still_corrupt_store_stays_poisoned() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-head-reseed-fail");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    for i in 0..3 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-reseed-fail-{i}"), (i + 1) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    store.create_next_receipt_checkpoint(3, &keypair)?;
+
+    // Same tamper mechanics as `reseed_clears_a_poisoned_head_after_repairing_the_database`:
+    // drop the immutability trigger, then mutate a real body field so the
+    // RFC 8785 digest changes. Keep the original bytes so the last section of
+    // this test can still prove the same store object recovers once the data
+    // really is repaired.
+    let connection = store.connection()?;
+    let original: String = connection.query_row(
+        "SELECT statement_json FROM kernel_checkpoints WHERE checkpoint_seq = 1",
+        [],
+        |row| row.get(0),
+    )?;
+    connection.execute_batch("DROP TRIGGER IF EXISTS kernel_checkpoints_reject_update;")?;
+    connection.execute(
+        "UPDATE kernel_checkpoints SET statement_json = replace(statement_json, '\"batch_end_seq\":3', '\"batch_end_seq\":2')",
+        [],
+    )?;
+    drop(connection);
+
+    // Poison the writer's cached head exactly as the existing reseed test
+    // does: a denied append surfaces the divergence without repairing it.
+    let denied_before_reseed =
+        sample_receipt_with_keypair("rcpt-reseed-fail-denied-before", 50, &keypair);
+    assert!(store
+        .append_chio_receipt_returning_seq(&denied_before_reseed)
+        .is_err());
+
+    // The corruption is NOT repaired here (unlike the success-path test):
+    // reseed_verified_head reruns full verification on the still-corrupt
+    // store and must fail closed.
+    let reseed_error = store
+        .reseed_verified_head()
+        .err()
+        .ok_or("reseed on a still-corrupt store must return Err")?;
+    match &reseed_error {
+        ReceiptStoreError::Conflict(_) => {}
+        other => return Err(format!("expected Conflict, got {other}").into()),
+    }
+
+    // The writer-health surface reflects the reseed failure: `last_error` is
+    // read here, before the next append below overwrites it with its own
+    // (differently worded) poisoned-Conflict text, so this specifically
+    // checks the ReseedHead command's own failure, not a downstream echo.
+    let health = store.receipt_store_health()?;
+    let last_error = health
+        .writer
+        .last_error
+        .clone()
+        .ok_or("writer last_error must be set after a failed reseed")?;
+    assert_eq!(
+        last_error,
+        reseed_error.to_string(),
+        "writer last_error must mirror the reseed failure"
+    );
+
+    // The store stays fail-closed: the next append is still rejected, now
+    // via the Poisoned head_state (not the stale predecessor check that
+    // denied the pre-reseed append above), which points the operator back at
+    // `chio receipt audit --repair`.
+    let denied_after_reseed =
+        sample_receipt_with_keypair("rcpt-reseed-fail-denied-after", 51, &keypair);
+    let error = store
+        .append_chio_receipt_returning_seq(&denied_after_reseed)
+        .err()
+        .ok_or("append on a still-poisoned store must be denied")?;
+    match &error {
+        ReceiptStoreError::Conflict(message) => {
+            assert!(
+                message.contains("chio receipt audit"),
+                "poisoned Conflict must point the operator at the audit CLI, got: {message}"
+            );
+            assert!(
+                message.contains("verified head is unavailable"),
+                "poisoned Conflict must come from the Poisoned head_state (not a stale \
+                 predecessor-check Conflict), got: {message}"
+            );
+        }
+        other => return Err(format!("expected Conflict, got {other}").into()),
+    }
+
+    // The same store object recovers once the data is actually repaired.
+    let connection = store.connection()?;
+    connection.execute_batch("DROP TRIGGER IF EXISTS kernel_checkpoints_reject_update;")?;
+    connection.execute(
+        "UPDATE kernel_checkpoints SET statement_json = ?1 WHERE checkpoint_seq = 1",
+        rusqlite::params![original],
+    )?;
+    drop(connection);
+    store.reseed_verified_head()?;
+
+    let receipt = sample_receipt_with_keypair("rcpt-reseed-fail-recovered", 52, &keypair);
+    store.append_chio_receipt_returning_seq(&receipt)?;
+    store.flush_receipt_writes()?;
+    let health = store.receipt_store_health()?;
+    assert!(
+        health.writer.last_error.is_none(),
+        "reseed after a real repair must clear last_error"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}

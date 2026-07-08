@@ -504,4 +504,46 @@ mod receipt_operator_tests {
         let _ = std::fs::remove_file(db_path);
         Ok(())
     }
+
+    /// `chio receipt audit` (no `--repair`) is the read-only surface: it must
+    /// return `Err` on an unhealthy report, carrying the divergence detail in
+    /// the error string, rather than reporting success on a diverged store.
+    #[test]
+    fn receipt_audit_without_repair_fails_closed_on_a_diverged_checkpoint(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let db_path = unique_temp_path("receipt-audit-unhealthy", "sqlite3");
+        let keypair = chio_core::crypto::Keypair::generate();
+        let store = chio_store_sqlite::SqliteReceiptStore::open(&db_path)?;
+        store.append_chio_receipt(&operator_sample_receipt_with_keypair(&keypair)?)?;
+        store.flush_receipt_writes()?;
+        store.create_next_receipt_checkpoint(10, &keypair)?;
+        drop(store);
+
+        // Tamper the persisted checkpoint out of band, same mechanics as the
+        // store-side reseed fixtures (drop the immutability trigger, then
+        // mutate a real body field so it no longer matches the batch_end_seq
+        // column recorded alongside it).
+        let connection = rusqlite::Connection::open(&db_path)?;
+        connection.execute_batch("DROP TRIGGER IF EXISTS kernel_checkpoints_reject_update;")?;
+        connection.execute(
+            "UPDATE kernel_checkpoints SET statement_json = replace(statement_json, '\"batch_end_seq\":1', '\"batch_end_seq\":0')",
+            [],
+        )?;
+        drop(connection);
+
+        let error = match cmd_receipt_audit(false, backend(Some(&db_path), None)) {
+            Ok(()) => panic!(
+                "receipt audit without --repair must fail closed on a diverged checkpoint"
+            ),
+            Err(error) => error,
+        };
+        let message = error.to_string();
+        assert!(
+            message.contains("batch_end_seq") && message.contains("checkpoint"),
+            "receipt audit error must carry the divergence detail, got: {message}"
+        );
+
+        let _ = std::fs::remove_file(db_path);
+        Ok(())
+    }
 }
