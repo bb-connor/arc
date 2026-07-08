@@ -96,6 +96,8 @@
 //! rests on federation admission plus routing separation, not join-time treaty
 //! enforcement. This is a documented API limitation, NOT a closed gap.
 //!
+//! Upstream tracking (iroh-gossip 0.101): TODO(iroh-gossip-admission-FR): file + backfill URL - owner: <you>, 2026-07-07
+//!
 //! ## The load-bearing correctness property: `delivered_from` is NOT the author
 //!
 //! In gossip, [`Message::delivered_from`](iroh_gossip::api::Message) is the

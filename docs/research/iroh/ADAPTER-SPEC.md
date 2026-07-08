@@ -447,6 +447,7 @@ adoption, not now.
   receiver promotes the new version; favor short transport-key validity / fast
   re-issue, distinct from the long-term passport. Blast radius is bounded by
   directory propagation latency.
+  Upstream tracking (inbound-admission predicate FR, iroh-gossip 0.101): TODO(iroh-gossip-admission-FR): file + backfill URL - owner: <you>, 2026-07-07
 - **Gossip `max_message_size` budget.** iroh-gossip's
   `DEFAULT_MAX_MESSAGE_SIZE = 4096` bytes (floor 512). Decide the per-lane payload
   budget and the chunk-or-reference-by-hash policy for anything larger (bulk goes
