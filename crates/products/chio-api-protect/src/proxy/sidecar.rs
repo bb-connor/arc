@@ -992,19 +992,6 @@ pub(crate) struct SidecarEvaluateToolCallRequest {
     parameter_hash: Option<String>,
 }
 
-pub(crate) async fn sidecar_removed_evaluate_handler() -> Response {
-    (
-        StatusCode::GONE,
-        axum::Json(serde_json::json!({
-            "error": "chio_route_removed",
-            "message": "use POST /v1/evaluate/advisory for advisory tool-call evaluation",
-            "replacement": "/v1/evaluate/advisory",
-            "authorization": false,
-        })),
-    )
-        .into_response()
-}
-
 pub(crate) async fn sidecar_evaluate_tool_call_handler(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
