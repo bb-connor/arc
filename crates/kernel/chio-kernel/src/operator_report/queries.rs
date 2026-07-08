@@ -77,8 +77,8 @@ impl OperatorReportQuery {
 
     /// Project the shared operator filters into an exposure-ledger query.
     ///
-    /// ExposureLedgerQuery has exactly eight fields (verified: chio-credit lib.rs:116);
-    /// construct all of them explicitly so this does not depend on a Default impl.
+    /// Every field is constructed explicitly so that a newly added `ExposureLedgerQuery`
+    /// field fails to compile here rather than being silently omitted.
     #[must_use]
     pub fn to_exposure_ledger_query(&self) -> chio_credit::ExposureLedgerQuery {
         chio_credit::ExposureLedgerQuery {
@@ -337,6 +337,7 @@ mod exposure_query_tests {
     #[test]
     fn to_exposure_ledger_query_threads_shared_filters() {
         let query = OperatorReportQuery {
+            capability_id: Some("cap-abc".to_string()),
             agent_subject: Some("subject-hex".to_string()),
             tool_server: Some("shell".to_string()),
             tool_name: Some("bash".to_string()),
@@ -345,7 +346,13 @@ mod exposure_query_tests {
             ..OperatorReportQuery::default()
         };
         let exposure = query.to_exposure_ledger_query();
+        assert_eq!(exposure.capability_id.as_deref(), Some("cap-abc"));
         assert_eq!(exposure.agent_subject.as_deref(), Some("subject-hex"));
         assert_eq!(exposure.tool_server.as_deref(), Some("shell"));
+        assert_eq!(exposure.tool_name.as_deref(), Some("bash"));
+        assert_eq!(exposure.since, Some(10));
+        assert_eq!(exposure.until, Some(99));
+        assert_eq!(exposure.receipt_limit, None);
+        assert_eq!(exposure.decision_limit, None);
     }
 }
