@@ -152,6 +152,7 @@ pub(crate) struct ProxyState {
     pub(crate) sidecar_control_token: Option<String>,
     pub(crate) budget_store: Option<Arc<dyn chio_kernel::budget_store::BudgetStore>>,
     pub(crate) mediation_kernel: Option<Arc<chio_kernel::ChioKernel>>,
+    pub(crate) allow_advisory: bool,
 }
 
 /// The protect proxy.
@@ -316,6 +317,7 @@ impl ProtectProxy {
             sidecar_control_token: self.config.sidecar_control_token.clone(),
             budget_store,
             mediation_kernel,
+            allow_advisory: self.config.allow_advisory,
         });
 
         let app = build_app(Arc::clone(&state));

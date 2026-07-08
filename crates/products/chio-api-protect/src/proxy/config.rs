@@ -26,6 +26,11 @@ pub struct ProtectConfig {
     pub budget_db: Option<String>,
     /// When true, the mediation kernel runs execution-nonce strict mode.
     pub require_nonce: bool,
+    /// When true, the `/v1/evaluate/advisory` route is active.
+    /// Defaults to false; production deployments should leave this off to
+    /// prevent agents from receiving advisory receipts and bypassing the
+    /// kernel-mediated route.
+    pub allow_advisory: bool,
 }
 
 impl std::fmt::Debug for ProtectConfig {
@@ -54,6 +59,7 @@ impl std::fmt::Debug for ProtectConfig {
             .field("control_url", &self.control_url)
             .field("budget_db", &self.budget_db)
             .field("require_nonce", &self.require_nonce)
+            .field("allow_advisory", &self.allow_advisory)
             .finish()
     }
 }

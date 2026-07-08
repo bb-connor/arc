@@ -996,6 +996,18 @@ pub(crate) async fn sidecar_evaluate_tool_call_handler(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
 ) -> Response {
+    if !state.allow_advisory {
+        return (
+            StatusCode::CONFLICT,
+            axum::Json(serde_json::json!({
+                "error": "chio_advisory_disabled",
+                "authorization": false,
+                "message": "advisory tool-call evaluation is disabled; use the kernel-mediated route",
+                "replacement": "/v1/evaluate",
+            })),
+        )
+            .into_response();
+    }
     let (_parts, body) = request.into_parts();
     let body_bytes = match axum::body::to_bytes(body, 1024 * 1024).await {
         Ok(bytes) => bytes,

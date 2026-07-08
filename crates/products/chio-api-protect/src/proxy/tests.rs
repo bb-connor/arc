@@ -154,13 +154,22 @@ impl MockUpstreamServer {
 }
 
 fn test_state(routes: Vec<RouteEntry>, upstream: String) -> Arc<ProxyState> {
-    test_state_with_receipt_db(routes, upstream, None)
+    make_test_state(routes, upstream, None, false)
 }
 
 fn test_state_with_receipt_db(
     routes: Vec<RouteEntry>,
     upstream: String,
     receipt_db: Option<&str>,
+) -> Arc<ProxyState> {
+    make_test_state(routes, upstream, receipt_db, false)
+}
+
+fn make_test_state(
+    routes: Vec<RouteEntry>,
+    upstream: String,
+    receipt_db: Option<&str>,
+    allow_advisory: bool,
 ) -> Arc<ProxyState> {
     let keypair = Keypair::generate();
     let approval_store: Arc<dyn ApprovalStore> = if let Some(path) = receipt_db {
@@ -214,6 +223,7 @@ fn test_state_with_receipt_db(
         sidecar_control_token: None,
         budget_store: None,
         mediation_kernel: None,
+        allow_advisory,
     })
 }
 
@@ -2412,7 +2422,7 @@ async fn sidecar_attenuate_capability_fails_closed_without_subject_signer() {
 
 #[tokio::test]
 async fn sidecar_verify_receipt_round_trips_a_signed_chio_receipt() {
-    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+    let state = make_test_state(Vec::new(), "http://127.0.0.1:1".to_string(), None, true);
 
     let mint_body = serde_json::json!({
         "subject": Keypair::generate().public_key().to_hex(),
@@ -2494,7 +2504,7 @@ async fn sidecar_verify_receipt_round_trips_a_signed_chio_receipt() {
 
 #[tokio::test]
 async fn sidecar_evaluate_advisory_route_wraps_non_authorization_response() {
-    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+    let state = make_test_state(Vec::new(), "http://127.0.0.1:1".to_string(), None, true);
     let evaluate_body = serde_json::json!({
         "capability_id": "cap-advisory-route",
         "tool_server": "fs",
@@ -2782,7 +2792,7 @@ async fn sidecar_verify_receipt_rejects_action_parameter_hash_mismatch() {
 
 #[tokio::test]
 async fn sidecar_verify_receipt_rejects_expected_decision_mismatch() {
-    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+    let state = make_test_state(Vec::new(), "http://127.0.0.1:1".to_string(), None, true);
 
     let mint_body = serde_json::json!({
         "subject": Keypair::generate().public_key().to_hex(),
@@ -2841,10 +2851,11 @@ async fn sidecar_verify_receipt_rejects_expected_decision_mismatch() {
 #[tokio::test]
 async fn sidecar_evaluate_tool_call_denies_revoked_capability() {
     let receipt_db = temp_receipt_db_path();
-    let state = test_state_with_receipt_db(
+    let state = make_test_state(
         Vec::new(),
         "http://127.0.0.1:1".to_string(),
         Some(&receipt_db),
+        true,
     );
 
     let mint_body = serde_json::json!({
@@ -2927,7 +2938,7 @@ async fn sidecar_evaluate_tool_call_denies_revoked_capability() {
 
 #[tokio::test]
 async fn sidecar_evaluate_tool_call_denies_parameter_hash_mismatch() {
-    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+    let state = make_test_state(Vec::new(), "http://127.0.0.1:1".to_string(), None, true);
 
     let evaluate_body = serde_json::json!({
         "capability_id": "cap-test",
@@ -2966,4 +2977,33 @@ async fn sidecar_evaluate_tool_call_denies_parameter_hash_mismatch() {
         .and_then(|m| m.get("advisory_check_outcome"))
         .and_then(|v| v.as_str());
     assert_eq!(alias_outcome, Some("parameter_hash_mismatch"));
+}
+
+#[tokio::test]
+async fn advisory_route_is_non_authorizing_when_advisory_disabled() {
+    // R5: advisory is off by default; production stops emitting advisory
+    // receipts that agents could skip the sidecar with.
+    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+    // test_state builds allow_advisory=false by default (Step 3).
+    let payload = serde_json::json!({
+        "capability_id": "cap-x", "tool_server": "fs",
+        "tool_name": "read_file", "parameters": {}
+    });
+    let request = with_loopback_peer(
+        Request::builder()
+            .method("POST")
+            .uri("/v1/evaluate/advisory")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_vec(&payload).test_unwrap()))
+            .test_unwrap(),
+    );
+    let response = build_app(Arc::clone(&state))
+        .oneshot(request)
+        .await
+        .test_unwrap();
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+    let bytes = to_bytes(response.into_body(), 1 << 20).await.test_unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).test_unwrap();
+    assert_eq!(json["authorization"], false);
+    assert_eq!(json["replacement"], "/v1/evaluate");
 }

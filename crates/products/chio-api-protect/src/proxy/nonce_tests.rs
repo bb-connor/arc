@@ -49,6 +49,7 @@ fn strict_nonce_state_with_upstream(routes: Vec<RouteEntry>, upstream: String) -
         sidecar_control_token: None,
         budget_store: None,
         mediation_kernel: None,
+        allow_advisory: false,
     })
 }
 

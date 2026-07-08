@@ -317,6 +317,7 @@ mod tests {
             sidecar_control_token: None,
             budget_store: Some(budget),
             mediation_kernel: Some(kernel),
+            allow_advisory: false,
         })
     }
 
@@ -441,6 +442,7 @@ mod tests {
             control_token: None,
             budget_db: Some(db.to_string_lossy().to_string()),
             require_nonce: false,
+            allow_advisory: false,
         };
         let store = build_budget_store(&config).unwrap();
         assert!(store.is_some(), "local sqlite budget store must be built");
