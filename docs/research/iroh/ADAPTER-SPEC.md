@@ -423,6 +423,18 @@ adoption, not now.
   The net-new `signer_id -> EndpointId` (and `signer_id -> verifying-key`) binding
   needs a home - likely anchored at `KernelTrustExchange` - distinct from the
   pheromone directory.
+  **RESOLVED (2026-07-03, commit `7f8e156d3`; the open framing above is retained
+  for history):** the binding was anchored in the crate's own issuer-signed
+  transport directory, NOT `KernelTrustExchange`. `TransportDirectoryEntry` gained
+  an additive `#[serde(default)] revocation_signers: Vec<RevocationSignerEntry> {
+  signer_id, oracle_public_key, oracle_endorsement }`, and `verify_bundle` projects
+  a DERIVED `VerifiedSignerDirectory` (`signer_id -> (EndpointId,
+  Ed25519RootVerifier)`) inside `VerifiedDirectory`, inheriting the body-hash pin,
+  issuer signature, validity window, and rollback machinery; duplicate `signer_id`
+  and removed operators are rejected/suppressed fail-closed. Schema bumped to
+  `...v2`. `KernelTrustExchange` carries the kernel key not the oracle root, has no
+  `EndpointId`, and is a TOFU self-claim, so it was explicitly NOT chosen (matches
+  ADR-0014 Status update, decision tally).
 - **Blobs-vs-direct-QUIC default for catch-up.** iroh-blobs is pre-1.0 and its
   README is not production-quality. Decide whether blobs is the default catch-up
   substrate at Year-2 or whether the direct-QUIC fallback ships as v1 until blobs
