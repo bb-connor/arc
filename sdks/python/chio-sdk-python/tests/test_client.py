@@ -458,6 +458,27 @@ class TestEvaluateToolCall:
         assert "execution_nonce" not in request_body
 
     @respx.mock
+    async def test_reconcile_mediated_authorization_posts_nonce_and_cost(self) -> None:
+        nonce = {"nonce_id": "n-1", "signature": "e" * 128}
+        arguments = {"path": "/tmp"}
+        realized_cost = {"units": 30, "currency": "USD", "breakdown": None}
+        expected = {"status": "reconciled", "receipt": _make_receipt_dict()}
+        route = respx.post(f"{BASE}/v1/reconcile").mock(
+            return_value=httpx.Response(200, json=expected)
+        )
+        async with ChioClient(BASE) as client:
+            result = await client.reconcile_mediated_authorization(
+                execution_nonce=nonce,
+                arguments=arguments,
+                realized_cost=realized_cost,
+            )
+        assert result == expected
+        body = json.loads(route.calls.last.request.content)
+        assert body["execution_nonce"] == nonce
+        assert body["arguments"] == arguments
+        assert body["realized_cost"] == realized_cost
+
+    @respx.mock
     async def test_evaluate_tool_call_mediated_forwards_governed_and_dpop(self) -> None:
         # Single-phase authorization: the helper forwards governed intent,
         # approval token, request id, and DPoP proof for gated grants, and never
