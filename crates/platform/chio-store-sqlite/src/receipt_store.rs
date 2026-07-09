@@ -615,6 +615,7 @@ fn receipt_commit_actor_loop(
                         incremental_verification,
                         &health,
                         &mut checkpoint_signer,
+                        &mut pending_flush_error,
                         command,
                     );
                 }
@@ -632,6 +633,7 @@ fn receipt_commit_actor_loop(
                 incremental_verification,
                 &health,
                 &mut checkpoint_signer,
+                &mut pending_flush_error,
                 other,
             ),
         }
@@ -644,6 +646,7 @@ fn handle_non_append_command(
     incremental_verification: bool,
     health: &ReceiptCommitWriterHealth,
     checkpoint_signer: &mut Option<BackgroundCheckpointSigner>,
+    pending_flush_error: &mut Option<ReceiptStoreError>,
     command: ReceiptCommitCommand,
 ) {
     match command {
@@ -787,6 +790,15 @@ fn handle_non_append_command(
                     if let Ok(mut last_error) = health.last_error.lock() {
                         *last_error = None;
                     }
+                    // Clear the actor loop's stale flush error (codex round 7,
+                    // finding 3): a prior append poisoned the head and set
+                    // `pending_flush_error`, but this reseed has just revalidated
+                    // the DB and replaced the head. Without clearing it, a
+                    // subsequent STANDALONE `flush_receipt_writes()` (no queued
+                    // writes) would keep returning the stale append error even
+                    // though the store recovered. Fail-closed is unaffected: a
+                    // real later batch failure re-sets `pending_flush_error`.
+                    *pending_flush_error = None;
                     *head_state = WriterHeadState::Verified(Box::new(head));
                     Ok(())
                 }
@@ -1224,9 +1236,13 @@ fn verify_head_against_latest_checkpoint(
 
 /// Verify and adopt checkpoints `head.checkpoint_seq()+1 ..= latest_seq`.
 /// O(new checkpoints): each row is parsed (one signature check), predecessor-
-/// linked to the cached head, and range-checked against the claim log. Used
-/// when another writer instance (second kernel on the same file, operator
-/// CLI) legitimately extended the chain.
+/// linked to the cached head, range-checked against the claim log, AND its
+/// transparency projection rows validated (codex round 7, finding 2) before it
+/// advances the head. Used when another writer instance (second kernel on the
+/// same file, operator CLI) legitimately extended the chain. In the single-
+/// writer hot path the head is never behind, so this loop body does not run
+/// (zero added per-append cost); each caught-up checkpoint is O(b) for its own
+/// batch, never a full-history walk (F22).
 fn catch_up_verified_head_to(
     connection: &Connection,
     head: &mut VerifiedHead,
@@ -1240,7 +1256,7 @@ fn catch_up_verified_head_to(
                 "checkpoint chain gap at {next_seq} behind latest {latest_seq}; run `chio receipt audit`"
             )));
         };
-        let checkpoint = parse_persisted_checkpoint_row(row)?;
+        let checkpoint = parse_persisted_checkpoint_row(row.clone())?;
         match head.latest_checkpoint.as_ref() {
             Some(predecessor) => {
                 chio_kernel::checkpoint::validate_checkpoint_predecessor(predecessor, &checkpoint)
@@ -1249,6 +1265,15 @@ fn catch_up_verified_head_to(
             None => validate_checkpoint_base(&checkpoint)?,
         }
         validate_checkpoint_against_claim_log(connection, &checkpoint)?;
+        // Projection validation before adoption (codex round 7, finding 2): the
+        // catch-up path verified signature + predecessor + claim-log range but
+        // not the transparency projection rows that full
+        // `verify_checkpoint_chain_integrity` rejects. Adopting a checkpoint with
+        // missing/divergent projection rows would advance `head.latest_checkpoint`
+        // and let subsequent appends build on an audit-invalid chain. Validate ONLY
+        // this adopted checkpoint's projection rows (O(b) for its batch, not full
+        // history), fail closed on any divergence.
+        validate_checkpoint_projection_rows(connection, &row, &checkpoint)?;
         head.latest_checkpoint = Some(checkpoint);
         cursor = next_seq;
     }
@@ -1920,8 +1945,22 @@ impl SqliteReceiptStore {
         // verification failure fall back to ONLY the actor's verified head (via
         // the `.max` below). Reader-pool READ, no write (F29); single latest-row
         // body verification, not a full chain verify.
+        //
+        // Chain-connectivity guard (codex round 7, finding 1): a single-row parse
+        // does NOT catch a latest checkpoint that individually verifies yet is
+        // DISCONNECTED from the chain (skipped `checkpoint_seq` or wrong
+        // predecessor), which the removed `load_latest_checkpoint()` path rejected
+        // via the full `verify_checkpoint_chain_integrity`. Additionally require
+        // the latest checkpoint to link to its immediate predecessor before
+        // trusting its `batch_end_seq`; a disconnected latest is dropped (fall
+        // back to the actor's verified head). This is a bounded O(1) predecessor
+        // read on the operator/health surface, NOT a full O(N) chain walk on the
+        // per-append hot path (F22).
         let verified_persisted = load_latest_persisted_checkpoint_row(&connection)?
-            .and_then(|row| parse_persisted_checkpoint_row(row).ok());
+            .and_then(|row| parse_persisted_checkpoint_row(row).ok())
+            .filter(|checkpoint| {
+                latest_checkpoint_is_chain_connected(&connection, checkpoint).is_ok()
+            });
         let persisted_checkpoint_seq = verified_persisted
             .as_ref()
             .map_or(0, |checkpoint| checkpoint.body.checkpoint_seq);

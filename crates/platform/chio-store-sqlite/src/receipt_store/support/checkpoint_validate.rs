@@ -407,6 +407,38 @@ pub(crate) fn validate_checkpoint_base(
     Ok(())
 }
 
+/// Confirm the LATEST persisted checkpoint is CHAIN-CONNECTED before an
+/// operator/health surface (`flush_report`) trusts its `batch_end_seq`. A single
+/// row parsed by `parse_persisted_checkpoint_row` validates only its OWN
+/// columns/body/signature; a latest row with a skipped `checkpoint_seq` or a
+/// wrong predecessor digest still parses individually yet is DISCONNECTED from
+/// the chain the removed `load_latest_checkpoint()` path rejected via the full
+/// `verify_checkpoint_chain_integrity`. This is the bounded predecessor check:
+/// for the base checkpoint (seq 1) confirm it is a valid base; otherwise read
+/// the IMMEDIATELY PRIOR checkpoint row (seq - 1) and confirm predecessor
+/// linkage (contiguous seq/batch + matching `previous_checkpoint_sha256`). One
+/// indexed row read + linkage compare, NOT a full O(N) chain walk, so it never
+/// lands on the per-append hot path (F22). Fail closed on any gap or mismatch
+/// (codex round 7, finding 1).
+pub(crate) fn latest_checkpoint_is_chain_connected(
+    connection: &Connection,
+    checkpoint: &KernelCheckpoint,
+) -> Result<(), ReceiptStoreError> {
+    let checkpoint_seq = checkpoint.body.checkpoint_seq;
+    if checkpoint_seq <= 1 {
+        return validate_checkpoint_base(checkpoint);
+    }
+    let predecessor_seq = checkpoint_seq - 1;
+    let Some(predecessor_row) = load_persisted_checkpoint_row(connection, predecessor_seq)? else {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {checkpoint_seq} predecessor {predecessor_seq} is missing; run `chio receipt audit`"
+        )));
+    };
+    let predecessor = parse_persisted_checkpoint_row(predecessor_row)?;
+    chio_kernel::checkpoint::validate_checkpoint_predecessor(&predecessor, checkpoint)
+        .map_err(checkpoint_error_to_receipt_store)
+}
+
 pub(crate) fn validate_checkpoint_against_claim_log(
     connection: &Connection,
     checkpoint: &KernelCheckpoint,

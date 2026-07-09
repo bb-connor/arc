@@ -433,6 +433,161 @@ fn reseed_on_still_corrupt_store_stays_poisoned() -> Result<(), Box<dyn std::err
     Ok(())
 }
 
+/// Codex round 7, finding 3: `reseed_verified_head()` success clears
+/// `last_error` and replaces the head, but the actor loop's separate
+/// `pending_flush_error` (set by the earlier poisoned append) was left
+/// untouched, so a subsequent STANDALONE `flush_receipt_writes()` (no queued
+/// writes) kept returning the stale append error even though the reseed
+/// revalidated the DB. The fix clears `pending_flush_error` on reseed success.
+#[test]
+fn reseed_clears_stale_flush_error() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-reseed-clears-flush-error");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    for i in 0..3 {
+        let receipt = sample_receipt_with_keypair(
+            &format!("rcpt-reseed-flush-{i}"),
+            (i + 1) as u64,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    store.create_next_receipt_checkpoint(3, &keypair)?;
+
+    // Poison: tamper the latest checkpoint so the next append is denied. The
+    // denied append records the actor loop's `pending_flush_error`.
+    let connection = store.connection()?;
+    let original: String = connection.query_row(
+        "SELECT statement_json FROM kernel_checkpoints WHERE checkpoint_seq = 1",
+        [],
+        |row| row.get(0),
+    )?;
+    connection.execute_batch("DROP TRIGGER IF EXISTS kernel_checkpoints_reject_update;")?;
+    connection.execute(
+        "UPDATE kernel_checkpoints SET statement_json = replace(statement_json, '\"batch_end_seq\":3', '\"batch_end_seq\":2')",
+        [],
+    )?;
+    drop(connection);
+
+    let denied = sample_receipt_with_keypair("rcpt-reseed-flush-denied", 50, &keypair);
+    assert!(store.append_chio_receipt_returning_seq(&denied).is_err());
+    // A standalone flush now surfaces the stale append error (the bug this fix
+    // targets: the flush error outlives the failed append).
+    assert!(
+        store.flush_receipt_writes().is_err(),
+        "a poisoned append must leave the standalone flush returning the stale error"
+    );
+
+    // Repair the DB out of band, then reseed. The denied append re-created the
+    // immutability trigger, so drop it again before the repair write.
+    let connection = store.connection()?;
+    connection.execute_batch("DROP TRIGGER IF EXISTS kernel_checkpoints_reject_update;")?;
+    connection.execute(
+        "UPDATE kernel_checkpoints SET statement_json = ?1 WHERE checkpoint_seq = 1",
+        rusqlite::params![original],
+    )?;
+    drop(connection);
+    store.reseed_verified_head()?;
+
+    // The finding: a subsequent STANDALONE flush (no intervening append that
+    // would itself reset the error) returns Ok, not the stale append error.
+    let report = store.flush_receipt_writes();
+    assert!(
+        report.is_ok(),
+        "reseed success must clear the stale flush error: {report:?}"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+/// Codex round 7, finding 2: when another writer extends the checkpoint chain
+/// out of band, the catch-up adoption path verifies signature + predecessor +
+/// claim-log range but must ALSO validate the adopted checkpoint's transparency
+/// projection rows (which full `verify_checkpoint_chain_integrity` checks)
+/// before advancing `head.latest_checkpoint`. A checkpoint with missing /
+/// divergent projection rows must NOT be adopted; a valid extension still is
+/// (bounded per-checkpoint, not a full-history walk, F22).
+#[test]
+fn catch_up_validates_checkpoint_projections() -> Result<(), Box<dyn std::error::Error>> {
+    // REJECT: an externally persisted checkpoint whose kernel_checkpoints row is
+    // present (valid signature, valid predecessor linkage, valid claim-log range)
+    // but whose transparency projection rows are MISSING must fail the catch-up
+    // closed. The projections are normally auto-populated by the
+    // `kernel_checkpoints_project_tree_head` AFTER INSERT trigger, so this drops
+    // that trigger out of band before the external insert to leave the projection
+    // rows missing (the exact state full verify_checkpoint_chain_integrity
+    // rejects).
+    let path = unique_db_path("chio-catchup-bad-projections");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    for i in 0..6 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-catchup-{i}"), (i + 1) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    // Checkpoint 1 (1..=3) with full, valid projections.
+    store.create_next_receipt_checkpoint(3, &keypair)?;
+    let checkpoint_one = store
+        .load_checkpoint_by_seq(1)?
+        .ok_or("checkpoint 1 missing")?;
+
+    let connection = store.connection()?;
+    let mut head = seed_verified_head(&connection)?;
+    assert_eq!(head.checkpoint_seq(), 1);
+
+    // Another writer extends with a chain-linked checkpoint 2 (4..=6). Drop the
+    // projection auto-populate trigger first so the row lands with MISSING
+    // transparency projections.
+    connection.execute_batch("DROP TRIGGER IF EXISTS kernel_checkpoints_project_tree_head;")?;
+    let range_bytes = canonical_receipt_bytes(&store, 4, 6);
+    let checkpoint_two =
+        build_checkpoint_with_previous(2, 4, 6, &range_bytes, &keypair, Some(&checkpoint_one))?;
+    insert_checkpoint_row(&store, &checkpoint_two, checkpoint_two.body.batch_end_seq);
+
+    let error = verify_head_against_latest_checkpoint(&connection, &mut head)
+        .err()
+        .ok_or("catch-up must reject a checkpoint with missing projection rows")?;
+    assert!(
+        matches!(error, ReceiptStoreError::Conflict(_)),
+        "expected a fail-closed Conflict, got {error:?}"
+    );
+    assert_eq!(
+        head.checkpoint_seq(),
+        1,
+        "the head must NOT adopt a checkpoint whose projection rows are invalid"
+    );
+    drop(connection);
+    let _ = fs::remove_file(path);
+
+    // ADOPT: a valid extension (projection rows written by the store's own
+    // checkpoint builder) is still caught up.
+    let good_path = unique_db_path("chio-catchup-good-projections");
+    let good_store = SqliteReceiptStore::open(&good_path)?;
+    for i in 0..6 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-catchup-ok-{i}"), (i + 1) as u64, &keypair);
+        good_store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    good_store.flush_receipt_writes()?;
+    good_store.create_next_receipt_checkpoint(3, &keypair)?; // cp1 (1..=3)
+    let good_connection = good_store.connection()?;
+    let mut good_head = seed_verified_head(&good_connection)?;
+    assert_eq!(good_head.checkpoint_seq(), 1);
+    good_store.create_next_receipt_checkpoint(3, &keypair)?; // cp2 (4..=6), valid projections
+    verify_head_against_latest_checkpoint(&good_connection, &mut good_head)?;
+    assert_eq!(
+        good_head.checkpoint_seq(),
+        2,
+        "a valid extension with intact projection rows must be adopted"
+    );
+    drop(good_connection);
+    let _ = fs::remove_file(good_path);
+    Ok(())
+}
+
 /// RFC-0006 fail-closed parity: a writer-routed (Write path) receipt append
 /// (child receipt / consuming-auth append) on an `incremental_verification =
 /// false` store must run the SAME full claim-log validation the append batch

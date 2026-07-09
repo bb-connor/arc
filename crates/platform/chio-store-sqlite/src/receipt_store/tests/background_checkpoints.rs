@@ -489,6 +489,87 @@ fn flush_report_ignores_unverified_checkpoint() -> Result<(), Box<dyn std::error
     Ok(())
 }
 
+/// Codex round 7, finding 1: `flush_report` trusts the persisted latest
+/// checkpoint's `batch_end_seq` after `parse_persisted_checkpoint_row`, which
+/// validates only ONE row's columns/body/signature. A latest checkpoint that is
+/// individually well-formed but DISCONNECTED from the chain (skipped
+/// `checkpoint_seq` or wrong predecessor) - which the removed
+/// `load_latest_checkpoint()` path rejected via the full chain integrity check -
+/// must NOT be reported as checkpointed progress; the report must fall back to
+/// the last chain-connected checkpoint. A properly chain-connected latest IS
+/// reported. Bounded O(1) predecessor check on the health surface (F22).
+#[test]
+fn flush_report_rejects_disconnected_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
+    let keypair = receipt_test_keypair();
+
+    // CONNECTED (accepted): a properly chain-connected latest checkpoint (cp2
+    // linked to cp1) has its batch_end_seq reported.
+    let good_path = unique_db_path("chio-flush-connected-ckpt");
+    let good_store = SqliteReceiptStore::open(&good_path)?;
+    for i in 0..6 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-conn-{i}"), (i + 1) as u64, &keypair);
+        good_store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    good_store.flush_receipt_writes()?;
+    good_store.create_next_receipt_checkpoint(3, &keypair)?; // cp1 (1..=3)
+    good_store.create_next_receipt_checkpoint(3, &keypair)?; // cp2 (4..=6), chain-connected
+    let good = good_store.flush_receipt_writes()?;
+    assert_eq!(good.latest_checkpoint_seq, Some(2));
+    assert_eq!(good.latest_checkpointed_entry_seq, 6);
+    assert_eq!(good.uncheckpointed_end_seq, None);
+    let _ = fs::remove_file(good_path);
+
+    // DISCONNECTED (rejected): cp1 (1..=3) is chain-connected and adopted by the
+    // actor head; then a latest cp2 (4..=6) is persisted OUT OF BAND whose signed
+    // `previous_checkpoint_sha256` does NOT match cp1 (re-signed after mutation),
+    // so it parses individually yet is disconnected. Its inflated batch_end_seq
+    // must not be reported; the report falls back to the last chain-connected
+    // checkpoint (cp1, batch_end 3).
+    let bad_path = unique_db_path("chio-flush-disconnected-ckpt");
+    let bad_store = SqliteReceiptStore::open(&bad_path)?;
+    for i in 0..6 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-disc-{i}"), (i + 1) as u64, &keypair);
+        bad_store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    bad_store.flush_receipt_writes()?;
+    bad_store.create_next_receipt_checkpoint(3, &keypair)?; // cp1 (1..=3), adopted by the head
+    let checkpoint_one = bad_store
+        .load_checkpoint_by_seq(1)?
+        .ok_or("checkpoint 1 missing")?;
+
+    let range_bytes = canonical_receipt_bytes(&bad_store, 4, 6);
+    let mut disconnected_two =
+        build_checkpoint_with_previous(2, 4, 6, &range_bytes, &keypair, Some(&checkpoint_one))?;
+    // Break the predecessor linkage while keeping the row individually valid:
+    // point at a digest that is NOT cp1's, then re-sign so the body/signature
+    // still verify (same mechanics as the clock-skew re-sign fixtures).
+    disconnected_two.body.previous_checkpoint_sha256 = Some("00".repeat(32));
+    let body_bytes = canonical_json_bytes(&disconnected_two.body).test_unwrap();
+    disconnected_two.signature = keypair.sign(&body_bytes);
+    insert_checkpoint_row(
+        &bad_store,
+        &disconnected_two,
+        disconnected_two.body.batch_end_seq,
+    );
+
+    let report = bad_store.flush_receipt_writes()?;
+    assert_ne!(
+        report.latest_checkpointed_entry_seq, 6,
+        "a chain-disconnected latest checkpoint must not be reported as checkpointed progress"
+    );
+    assert_eq!(
+        report.latest_checkpointed_entry_seq, 3,
+        "the report must fall back to the last chain-connected checkpoint (cp1)"
+    );
+    assert_eq!(report.latest_checkpoint_seq, Some(1));
+    assert_eq!(report.uncheckpointed_end_seq, Some(6));
+
+    let _ = fs::remove_file(bad_path);
+    Ok(())
+}
+
 /// Codex round 2, finding 5: the OPERATOR/IMPORT checkpoint append
 /// (store_checkpoint -> store_kernel_checkpoint_atomic) only parses the LATEST
 /// checkpoint as predecessor, so a mid-chain tamper whose latest row still
