@@ -73,6 +73,36 @@ fn receipt_log_basics() {
 }
 
 #[test]
+fn store_miss_falls_back_to_local_mirror() {
+    // RFC-0004 F03/F25: a durable store that appends but cannot point-load (an
+    // append-only / remote store, like RemoteReceiptStore) must not disable the
+    // local mirror. A receipt appended and mirrored locally has to resolve on a
+    // store miss.
+    let mut kernel = make_kernel(make_config());
+    kernel.set_receipt_store(Box::new(AppendOnlyReceiptStore)).unwrap();
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
+
+    let agent_kp = make_keypair();
+    let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+    let request = make_request("req-store-miss-mirror", &cap, "read_file", "srv-a");
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    assert_eq!(response.verdict, Verdict::Allow);
+
+    // The receipt is in the local mirror; AppendOnlyReceiptStore's load_* miss.
+    let receipt_id = kernel.receipt_log().receipts()[0].id.clone();
+    assert!(
+        kernel.has_local_receipt_id(&receipt_id),
+        "store miss must fall back to the local mirror"
+    );
+    assert!(
+        kernel.local_receipt_artifact(&receipt_id).is_some(),
+        "store miss must return the mirrored artifact"
+    );
+}
+
+#[test]
 fn kernel_bounded_registry_lists_every_labelled_structure() {
     // RFC-0004 sections 4/6: every kernel-held bounded structure has a live
     // gauge; the registry enumerates them so the soak harness and a future

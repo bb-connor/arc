@@ -225,8 +225,28 @@ impl Drop for RssSamplerHandle {
 fn read_process_rss_bytes() -> Option<u64> {
     let statm = std::fs::read_to_string("/proc/self/statm").ok()?;
     let resident_pages: u64 = statm.split_whitespace().nth(1)?.parse().ok()?;
-    let page_size = 4096u64; // conservative; matches the common Linux page size
-    Some(resident_pages.saturating_mul(page_size))
+    Some(resident_pages.saturating_mul(linux_page_size()))
+}
+
+/// Real system page size in bytes, read once via `sysconf(_SC_PAGESIZE)` and
+/// cached. Hosts with non-4-KiB pages (for example common 64-KiB-page ARM
+/// deployments) would otherwise undercount RSS by the page-size ratio and shed
+/// far past the configured soft ceiling. Falls back to 4096 only if the query
+/// fails.
+#[cfg(target_os = "linux")]
+fn linux_page_size() -> u64 {
+    use std::sync::OnceLock;
+    static PAGE_SIZE: OnceLock<u64> = OnceLock::new();
+    *PAGE_SIZE.get_or_init(|| {
+        // SAFETY: `sysconf` with a compile-time constant name has no
+        // preconditions; it returns the configured page size, or -1 on failure.
+        let raw = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
+        if raw > 0 {
+            raw as u64
+        } else {
+            4096
+        }
+    })
 }
 
 #[cfg(not(target_os = "linux"))]

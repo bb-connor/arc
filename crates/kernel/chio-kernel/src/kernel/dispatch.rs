@@ -37,25 +37,32 @@ impl ChioKernel {
 
     pub(crate) fn has_local_receipt_id(&self, receipt_id: &str) -> bool {
         // Store-authoritative: a durable store is a point lookup by id (F22
-        // hot-path budget), not an O(n) mirror scan (RFC-0004 F03/F25).
+        // hot-path budget), not an O(n) mirror scan (RFC-0004 F03/F25). On a
+        // store MISS fall back to the local mirror below: a store may implement
+        // append without point loads (for example an append-only or remote
+        // store), so a receipt appended and mirrored locally must still resolve.
         if self.receipt_store.is_some() {
-            let tool = self
+            let tool_hit = self
                 .with_receipt_store(|store| Ok(store.load_chio_receipt(receipt_id)?))
                 .ok()
                 .flatten()
                 .flatten()
                 .is_some();
-            if tool {
+            if tool_hit {
                 return true;
             }
-            return self
+            let child_hit = self
                 .with_receipt_store(|store| Ok(store.load_child_receipt(receipt_id)?))
                 .ok()
                 .flatten()
                 .flatten()
                 .is_some();
+            if child_hit {
+                return true;
+            }
+            // Store miss: fall through to the local mirror scan.
         }
-        // Ephemeral fallback: scan the bounded ring.
+        // Local mirror scan (no store, or store missed).
         let chio_receipt_match = match self.receipt_log.lock() {
             Ok(log) => log.iter().any(|receipt| receipt.id == receipt_id),
             Err(poisoned) => poisoned
@@ -77,6 +84,9 @@ impl ChioKernel {
     }
 
     pub(crate) fn local_receipt_artifact(&self, receipt_id: &str) -> Option<LocalReceiptArtifact> {
+        // Consult the durable store first; on a MISS fall back to the local
+        // mirror (append-only / remote stores may not implement point loads, so
+        // a receipt appended and mirrored locally must still resolve).
         if self.receipt_store.is_some() {
             if let Some(receipt) = self
                 .with_receipt_store(|store| Ok(store.load_chio_receipt(receipt_id)?))
@@ -94,7 +104,7 @@ impl ChioKernel {
             {
                 return Some(LocalReceiptArtifact::Child(Box::new(child)));
             }
-            return None;
+            // Store miss: fall through to the local mirror scan.
         }
         let tool_match = match self.receipt_log.lock() {
             Ok(log) => log
