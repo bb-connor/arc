@@ -126,12 +126,30 @@ impl Default for VelocityConfig {
 /// Buckets are keyed by `(capability_id, grant_index)` so different grants
 /// within the same capability can have independent rate limits.
 pub struct VelocityGuard {
-    invocation_buckets: Mutex<HashMap<(String, usize), TokenBucket>>,
-    spend_buckets: Mutex<HashMap<(String, usize), TokenBucket>>,
+    /// Both bucket maps live behind ONE mutex so the combined-cap check and the
+    /// insert are atomic across both maps: no evaluate() ever samples a stale
+    /// sibling-map size, so the combined `invocation + spend` bucket count stays
+    /// bounded by `bucket_cap` even under concurrent evaluate() calls for
+    /// distinct capability ids (RFC-0004 F38, codex finding 3553826793). A single
+    /// lock also removes any cross-map lock ordering, so there is no deadlock.
+    state: Mutex<VelocityState>,
     config: VelocityConfig,
     bucket_cap: usize,
-    invocation_inserts_since_sweep: Mutex<usize>,
-    spend_inserts_since_sweep: Mutex<usize>,
+}
+
+/// Combined bucket state guarded by a single mutex (see [`VelocityGuard::state`]).
+struct VelocityState {
+    invocation_buckets: HashMap<(String, usize), TokenBucket>,
+    spend_buckets: HashMap<(String, usize), TokenBucket>,
+    invocation_inserts_since_sweep: usize,
+    spend_inserts_since_sweep: usize,
+}
+
+/// Which of the two combined maps an operation targets.
+#[derive(Clone, Copy)]
+enum BucketKind {
+    Invocation,
+    Spend,
 }
 
 impl VelocityGuard {
@@ -150,98 +168,168 @@ impl VelocityGuard {
 
     /// Create a `VelocityGuard` with an explicit total-bucket cap so a
     /// self-minted-leaf flood saturates rather than growing (RFC-0004 F38). The
-    /// cap is a TOTAL across BOTH the invocation and spend maps: with both limits
-    /// enabled the combined bucket count stays bounded by `bucket_cap` rather than
-    /// `2 * bucket_cap`. The sibling map's size is read as a snapshot outside the
-    /// inserting map's critical section, so under concurrent evaluations or
-    /// asymmetric growth (e.g. grants lacking `max_cost_per_invocation` never
-    /// touch the spend map) the combined total can settle at a small, fixed
-    /// overshoot (`bucket_cap + 1`); it never approaches the un-folded
-    /// `2 * bucket_cap`, so the RFC-0004 bounded-memory invariant holds.
+    /// cap is a TOTAL across BOTH the invocation and spend maps. Because both maps
+    /// share one mutex, the combined-cap check and the insert are atomic: no
+    /// evaluate() reads a stale sibling-map size, so the combined bucket count is
+    /// bounded by `bucket_cap` (a tight, provable bound for `bucket_cap >= 3`)
+    /// even under concurrent evaluate() calls for distinct capability ids, rather
+    /// than the un-folded `2 * bucket_cap` or an unbounded concurrent overshoot.
     pub fn with_bucket_cap(config: VelocityConfig, bucket_cap: usize) -> Self {
         Self {
-            invocation_buckets: Mutex::new(HashMap::new()),
-            spend_buckets: Mutex::new(HashMap::new()),
+            state: Mutex::new(VelocityState {
+                invocation_buckets: HashMap::new(),
+                spend_buckets: HashMap::new(),
+                invocation_inserts_since_sweep: 0,
+                spend_inserts_since_sweep: 0,
+            }),
             config,
             bucket_cap: bucket_cap.max(1),
-            invocation_inserts_since_sweep: Mutex::new(0),
-            spend_inserts_since_sweep: Mutex::new(0),
         }
     }
 
     #[cfg(test)]
     pub(crate) fn invocation_bucket_count(&self) -> usize {
-        match self.invocation_buckets.lock() {
-            Ok(g) => g.len(),
-            Err(poisoned) => poisoned.into_inner().len(),
+        match self.state.lock() {
+            Ok(g) => g.invocation_buckets.len(),
+            Err(poisoned) => poisoned.into_inner().invocation_buckets.len(),
         }
     }
 
     #[cfg(test)]
     pub(crate) fn spend_bucket_count(&self) -> usize {
-        match self.spend_buckets.lock() {
-            Ok(g) => g.len(),
-            Err(poisoned) => poisoned.into_inner().len(),
+        match self.state.lock() {
+            Ok(g) => g.spend_buckets.len(),
+            Err(poisoned) => poisoned.into_inner().spend_buckets.len(),
+        }
+    }
+
+    /// Combined bucket count across BOTH maps read under the single lock, so it is
+    /// a consistent snapshot (never a torn read across two separate locks).
+    #[cfg(test)]
+    pub(crate) fn combined_bucket_count(&self) -> usize {
+        match self.state.lock() {
+            Ok(g) => g.invocation_buckets.len() + g.spend_buckets.len(),
+            Err(poisoned) => {
+                let g = poisoned.into_inner();
+                g.invocation_buckets.len() + g.spend_buckets.len()
+            }
         }
     }
 }
 
-/// Sweep buckets idle longer than `window_secs` (a full-and-idle bucket is
-/// semantically a fresh one) and cap keys with most-idle eviction so a
-/// self-minted-leaf flood saturates instead of growing (RFC-0004 F38).
-///
-/// `bucket_cap` is a TOTAL budget across BOTH the invocation and spend maps, so
-/// `other_bucket_count` (the current size of the sibling map) is folded into the
-/// cap check: eviction from THIS map triggers once the combined count would
-/// reach the cap, keeping `invocation + spend` buckets bounded by `bucket_cap`
-/// rather than `2 * bucket_cap` when both limits are enabled (RFC-0004 F38).
-/// `other_bucket_count` is a snapshot taken outside this map's critical section,
-/// so the combined total is held CLOSE to `bucket_cap` (a bounded `bucket_cap + 1`
-/// steady state is reachable under concurrent evaluations or asymmetric map
-/// growth), not exactly at it; the point is boundedness well below the un-folded
-/// `2 * bucket_cap`, not a strict equality.
-fn sweep_and_cap_buckets(
-    buckets: &mut HashMap<(String, usize), TokenBucket>,
-    inserts_since_sweep: &Mutex<usize>,
-    window_secs: u64,
-    bucket_cap: usize,
-    other_bucket_count: usize,
-    key: &(String, usize),
-) {
-    let do_sweep = {
-        let mut counter = match inserts_since_sweep.lock() {
-            Ok(g) => g,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        *counter = counter.saturating_add(1);
-        if *counter >= 256 {
-            *counter = 0;
-            true
-        } else {
-            false
-        }
-    };
-
-    let idle = std::time::Duration::from_secs(window_secs);
-    if do_sweep {
-        buckets.retain(|_, bucket| bucket.last_refill.elapsed() < idle);
+impl VelocityState {
+    /// Combined bucket count across both maps.
+    fn combined_len(&self) -> usize {
+        self.invocation_buckets
+            .len()
+            .saturating_add(self.spend_buckets.len())
     }
-    // Enforce the cap only when INSERTING a genuinely new key. Updating an
-    // existing bucket must never evict: otherwise, once the table is full, a
-    // repeat request for an already-tracked capability could evict and recreate
-    // its own bucket with a full token balance, defeating the per-window limit
-    // (RFC-0004 F38). Because eviction runs only when `key` is absent, the
-    // victim is never the bucket being consumed. The cap is enforced against the
-    // COMBINED size of both maps so the documented total is never exceeded.
-    if !buckets.contains_key(key) && buckets.len().saturating_add(other_bucket_count) >= bucket_cap
-    {
-        // Evict the most-idle key (largest elapsed since last_refill).
-        if let Some(victim) = buckets
-            .iter()
-            .max_by_key(|(_, b)| b.last_refill.elapsed())
-            .map(|(k, _)| k.clone())
-        {
-            buckets.remove(&victim);
+
+    /// Amortized idle-sweep of both maps plus COMBINED-cap enforcement before a
+    /// new key is inserted into `kind`'s map. Run under the single state lock, so
+    /// `combined_len()` is always the true current total (never a stale sibling
+    /// snapshot). A full-and-idle bucket is semantically a fresh one, so idle
+    /// buckets are periodically dropped from BOTH maps.
+    ///
+    /// The cap is enforced only when INSERTING a genuinely new key: updating an
+    /// existing bucket must never evict, otherwise a repeat request for an
+    /// already-tracked capability could evict and recreate its own bucket with a
+    /// full token balance, defeating the per-window limit (RFC-0004 F38). When a
+    /// new insert would reach the combined cap, the most-idle bucket across BOTH
+    /// maps is evicted -- excluding the active `key` in either map so the bucket
+    /// being consumed by this evaluate is never reset. Because the combined size
+    /// is the true total under one lock, the combined count stays bounded by
+    /// `bucket_cap` (tight for `bucket_cap >= 3`) rather than overshooting under
+    /// concurrency (codex finding 3553826793).
+    fn sweep_and_enforce_combined_cap(
+        &mut self,
+        kind: BucketKind,
+        window_secs: u64,
+        bucket_cap: usize,
+        key: &(String, usize),
+    ) {
+        let do_sweep = {
+            let counter = match kind {
+                BucketKind::Invocation => &mut self.invocation_inserts_since_sweep,
+                BucketKind::Spend => &mut self.spend_inserts_since_sweep,
+            };
+            *counter = counter.saturating_add(1);
+            if *counter >= 256 {
+                *counter = 0;
+                true
+            } else {
+                false
+            }
+        };
+        if do_sweep {
+            let idle = std::time::Duration::from_secs(window_secs);
+            self.invocation_buckets
+                .retain(|_, bucket| bucket.last_refill.elapsed() < idle);
+            self.spend_buckets
+                .retain(|_, bucket| bucket.last_refill.elapsed() < idle);
+        }
+
+        let target_has_key = match kind {
+            BucketKind::Invocation => self.invocation_buckets.contains_key(key),
+            BucketKind::Spend => self.spend_buckets.contains_key(key),
+        };
+        if target_has_key {
+            return;
+        }
+
+        // Evict until inserting one new bucket keeps the combined total within
+        // `bucket_cap`. `combined_len()` is the true total under this lock, so
+        // there is no stale-snapshot overshoot. The loop stops only when the
+        // combined total is below the cap or when the only remaining buckets are
+        // the excluded active `key` (bounded: at most two such entries).
+        while self.combined_len() >= bucket_cap {
+            if !self.evict_most_idle_excluding(key) {
+                break;
+            }
+        }
+    }
+
+    /// Evict the single most-idle bucket (largest elapsed since `last_refill`)
+    /// across BOTH maps whose map-key is not `exclude`. Returns true if a bucket
+    /// was removed.
+    fn evict_most_idle_excluding(&mut self, exclude: &(String, usize)) -> bool {
+        let mut victim: Option<(BucketKind, (String, usize), std::time::Duration)> = None;
+        for (k, b) in self.invocation_buckets.iter() {
+            if k == exclude {
+                continue;
+            }
+            let idle = b.last_refill.elapsed();
+            let better = match &victim {
+                None => true,
+                Some((_, _, best)) => idle > *best,
+            };
+            if better {
+                victim = Some((BucketKind::Invocation, k.clone(), idle));
+            }
+        }
+        for (k, b) in self.spend_buckets.iter() {
+            if k == exclude {
+                continue;
+            }
+            let idle = b.last_refill.elapsed();
+            let better = match &victim {
+                None => true,
+                Some((_, _, best)) => idle > *best,
+            };
+            if better {
+                victim = Some((BucketKind::Spend, k.clone(), idle));
+            }
+        }
+        match victim {
+            Some((BucketKind::Invocation, k, _)) => {
+                self.invocation_buckets.remove(&k);
+                true
+            }
+            Some((BucketKind::Spend, k, _)) => {
+                self.spend_buckets.remove(&k);
+                true
+            }
+            None => false,
         }
     }
 }
@@ -257,30 +345,30 @@ impl Guard for VelocityGuard {
 
         let window_secs = self.config.window_secs.max(1);
 
+        // Both maps share ONE lock, held for the whole evaluate, so the
+        // combined-cap check and the insert are atomic across both maps: no
+        // evaluate() ever reads a stale sibling-map size, so the combined bucket
+        // count cannot overshoot under concurrency (RFC-0004 F38, codex finding
+        // 3553826793). A single lock means no cross-map lock ordering and no
+        // deadlock. If spend limiting fails closed below, the guard drops cleanly
+        // (no panic, no poison).
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| KernelError::Internal("velocity guard state lock poisoned".to_string()))?;
+
         // Check invocation rate limit.
         if let Some(max_inv) = self.config.max_invocations_per_window {
             // Burst capacity: max_inv * burst_factor, rounded to nearest integer.
             let capacity = ((max_inv as f64 * self.config.burst_factor).round() as u64).max(1);
-
-            // Read the sibling (spend) map size first and release its lock, so
-            // the two bucket locks are never held simultaneously (no cross-map
-            // lock ordering, no deadlock). It feeds the shared total-bucket cap.
-            let spend_bucket_count = match self.spend_buckets.lock() {
-                Ok(g) => g.len(),
-                Err(poisoned) => poisoned.into_inner().len(),
-            };
-            let mut buckets = self.invocation_buckets.lock().map_err(|_| {
-                KernelError::Internal("velocity guard invocation lock poisoned".to_string())
-            })?;
-            sweep_and_cap_buckets(
-                &mut buckets,
-                &self.invocation_inserts_since_sweep,
+            state.sweep_and_enforce_combined_cap(
+                BucketKind::Invocation,
                 window_secs,
                 self.bucket_cap,
-                spend_bucket_count,
                 &key,
             );
-            let bucket = buckets
+            let bucket = state
+                .invocation_buckets
                 .entry(key.clone())
                 .or_insert_with(|| TokenBucket::new(capacity, max_inv as u64, window_secs));
             if !bucket.try_consume(1) {
@@ -292,26 +380,14 @@ impl Guard for VelocityGuard {
         if let Some(max_spend) = self.config.max_spend_per_window {
             let capacity = ((max_spend as f64 * self.config.burst_factor).round() as u64).max(1);
             let spend_units = planned_spend_units(ctx)?;
-
-            // Read the sibling (invocation) map size first and release its lock,
-            // so the two bucket locks are never held simultaneously. It feeds the
-            // shared total-bucket cap.
-            let invocation_bucket_count = match self.invocation_buckets.lock() {
-                Ok(g) => g.len(),
-                Err(poisoned) => poisoned.into_inner().len(),
-            };
-            let mut buckets = self.spend_buckets.lock().map_err(|_| {
-                KernelError::Internal("velocity guard spend lock poisoned".to_string())
-            })?;
-            sweep_and_cap_buckets(
-                &mut buckets,
-                &self.spend_inserts_since_sweep,
+            state.sweep_and_enforce_combined_cap(
+                BucketKind::Spend,
                 window_secs,
                 self.bucket_cap,
-                invocation_bucket_count,
                 &key,
             );
-            let bucket = buckets
+            let bucket = state
+                .spend_buckets
                 .entry(key)
                 .or_insert_with(|| TokenBucket::new(capacity, max_spend, window_secs));
             if !bucket.try_consume(spend_units) {
@@ -505,6 +581,72 @@ mod tests {
         assert!(
             guard.invocation_bucket_count() > 0 && guard.spend_bucket_count() > 0,
             "test is vacuous: one of the maps stayed empty"
+        );
+    }
+
+    #[test]
+    fn combined_cap_holds_under_concurrent_distinct_capability_flood() {
+        // RFC-0004 F38 (codex finding 3553826793, REAL fix not docs): concurrent
+        // evaluate() calls for distinct capability ids used to sample a stale
+        // sibling-map size, so both maps could grow past the combined cap. With
+        // both maps under one lock the combined-cap check and insert are atomic,
+        // so the combined bucket count never exceeds `bucket_cap`. This test
+        // hammers the guard from many threads with distinct capability ids (each
+        // mints an invocation AND a spend bucket) and asserts the combined count
+        // stays within the cap at every observation.
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        let config = VelocityConfig {
+            max_invocations_per_window: Some(1000),
+            max_spend_per_window: Some(1000),
+            window_secs: 60,
+            burst_factor: 1.0,
+        };
+        let bucket_cap = 16usize;
+        let guard = Arc::new(VelocityGuard::with_bucket_cap(config, bucket_cap));
+        let max_observed = Arc::new(AtomicUsize::new(0));
+
+        let threads = 8usize;
+        let per_thread = 400u64;
+        let handles: Vec<_> = (0..threads)
+            .map(|t| {
+                let guard = Arc::clone(&guard);
+                let max_observed = Arc::clone(&max_observed);
+                thread::spawn(move || {
+                    let kp = Keypair::generate();
+                    let agent = kp.public_key().to_hex();
+                    let server = "srv".to_string();
+                    let scope = spend_scope(1);
+                    for i in 0..per_thread {
+                        // Distinct capability id per (thread, iteration): each is a
+                        // brand-new key, exercising the new-key insert + cap path.
+                        let cap = signed_cap(&kp, &format!("cap-{t}-{i}"));
+                        let request = make_request(&cap, &agent, &server);
+                        let ctx = guard_ctx(&request, &scope, &agent, &server, Some(0));
+                        let _ = guard.evaluate(&ctx);
+                        // Observe the combined count under the single lock: it must
+                        // never exceed the cap. Before the fix the stale sibling
+                        // snapshot let concurrent inserts overshoot this bound.
+                        let combined = guard.combined_bucket_count();
+                        max_observed.fetch_max(combined, Ordering::Relaxed);
+                    }
+                })
+            })
+            .collect();
+        for h in handles {
+            h.join().expect("thread panicked");
+        }
+
+        let observed = max_observed.load(Ordering::Relaxed);
+        assert!(
+            observed <= bucket_cap,
+            "combined bucket count {observed} exceeded the total cap {bucket_cap} under concurrency"
+        );
+        // The bound is meaningful only if buckets were actually created.
+        assert!(
+            observed > 0,
+            "test is vacuous: no buckets were ever created"
         );
     }
 
