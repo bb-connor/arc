@@ -53,15 +53,74 @@ pub const HOST_CALL_DURATION_BUCKETS_SECONDS: &[f64] = &[
 pub const VERDICT_LABEL_VALUES: &[&str] =
     &[VERDICT_ALLOW, VERDICT_DENY, VERDICT_REWRITE, VERDICT_ERROR];
 
+pub const REASON_CLASS_POLICY: &str = "policy";
+pub const REASON_CLASS_PII: &str = "pii";
+pub const REASON_CLASS_SECRET: &str = "secret";
+pub const REASON_CLASS_PROMPT_INJECTION: &str = "prompt_injection";
+pub const REASON_CLASS_OVERSIZE: &str = "oversize";
+pub const REASON_CLASS_FUEL: &str = "fuel";
+pub const REASON_CLASS_TRAP: &str = "trap";
+/// Host-side argument extraction failed before the guard module ran (a
+/// fail-closed deny). Bounded reason class for the malformed-argument deny path
+/// (RFC-0009 F75, Codex round-3 finding 2).
+pub const REASON_CLASS_MALFORMED: &str = "malformed";
+/// Fallback bounded class for any deny reason that does not match a known,
+/// documented class. Guarantees `chio_guard_deny_total{reason_class}` has a
+/// finite label domain even when a guard emits a novel free-form reason string
+/// (RFC-0009 F75, Codex round-3 finding 7).
+pub const REASON_CLASS_OTHER: &str = "other";
+
 pub const REASON_CLASS_LABEL_VALUES: &[&str] = &[
-    "policy",
-    "pii",
-    "secret",
-    "prompt_injection",
-    "oversize",
-    "fuel",
-    "trap",
+    REASON_CLASS_POLICY,
+    REASON_CLASS_PII,
+    REASON_CLASS_SECRET,
+    REASON_CLASS_PROMPT_INJECTION,
+    REASON_CLASS_OVERSIZE,
+    REASON_CLASS_FUEL,
+    REASON_CLASS_TRAP,
+    REASON_CLASS_MALFORMED,
+    REASON_CLASS_OTHER,
 ];
+
+/// Map a free-form guard deny reason to a bounded, fixed reason class so the
+/// `chio_guard_deny_total{reason_class}` series stays finite in cardinality
+/// (RFC-0009 F75, Codex round-3 finding 7). Never returns a raw reason string:
+/// an unrecognized or absent reason maps to [`REASON_CLASS_OTHER`], and every
+/// return value is one of [`REASON_CLASS_LABEL_VALUES`].
+#[must_use]
+pub fn classify_deny_reason_class(reason: Option<&str>) -> &'static str {
+    let Some(reason) = reason else {
+        return REASON_CLASS_OTHER;
+    };
+    let lower = reason.to_ascii_lowercase();
+    if lower.contains("prompt") && lower.contains("inject") {
+        REASON_CLASS_PROMPT_INJECTION
+    } else if lower.contains("pii") || lower.contains("personal data") {
+        REASON_CLASS_PII
+    } else if lower.contains("secret")
+        || lower.contains("credential")
+        || lower.contains("api key")
+        || lower.contains("api_key")
+    {
+        REASON_CLASS_SECRET
+    } else if lower.contains("oversize")
+        || lower.contains("too large")
+        || lower.contains("size limit")
+        || lower.contains("payload too")
+    {
+        REASON_CLASS_OVERSIZE
+    } else if lower.contains("fuel") || lower.contains("out of gas") {
+        REASON_CLASS_FUEL
+    } else if lower.contains("trap") {
+        REASON_CLASS_TRAP
+    } else if lower.contains("malformed") || lower.contains("invalid argument") {
+        REASON_CLASS_MALFORMED
+    } else if lower.contains("policy") {
+        REASON_CLASS_POLICY
+    } else {
+        REASON_CLASS_OTHER
+    }
+}
 
 pub const HOST_FN_LABEL_VALUES: &[&str] = &[
     HOST_LOG,
@@ -477,5 +536,75 @@ impl GuardPoolMetrics {
 impl Default for GuardPoolMetrics {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod reason_class_tests {
+    use super::*;
+
+    #[test]
+    fn known_reasons_map_to_documented_bounded_classes() {
+        assert_eq!(
+            classify_deny_reason_class(Some("blocked by policy rule 12")),
+            REASON_CLASS_POLICY
+        );
+        assert_eq!(
+            classify_deny_reason_class(Some("detected prompt injection attempt")),
+            REASON_CLASS_PROMPT_INJECTION
+        );
+        assert_eq!(
+            classify_deny_reason_class(Some("PII detected in tool arguments")),
+            REASON_CLASS_PII
+        );
+        assert_eq!(
+            classify_deny_reason_class(Some("secret credential exposed")),
+            REASON_CLASS_SECRET
+        );
+        assert_eq!(
+            classify_deny_reason_class(Some("payload too large / oversize body")),
+            REASON_CLASS_OVERSIZE
+        );
+        assert_eq!(
+            classify_deny_reason_class(Some("fuel exhausted")),
+            REASON_CLASS_FUEL
+        );
+        assert_eq!(
+            classify_deny_reason_class(Some("wasm trap during execution")),
+            REASON_CLASS_TRAP
+        );
+        assert_eq!(
+            classify_deny_reason_class(Some("malformed arguments")),
+            REASON_CLASS_MALFORMED
+        );
+    }
+
+    #[test]
+    fn novel_or_absent_reason_maps_to_other_and_domain_is_finite() {
+        // An arbitrary, never-before-seen free-form reason collapses to `other`
+        // rather than minting a new high-cardinality series (finding 7).
+        assert_eq!(
+            classify_deny_reason_class(Some("xyzzy-9f3a-unclassifiable-reason")),
+            REASON_CLASS_OTHER
+        );
+        assert_eq!(classify_deny_reason_class(None), REASON_CLASS_OTHER);
+        // Every classifier output is a member of the bounded, finite label set.
+        for reason in [
+            "policy",
+            "prompt injection",
+            "pii leak",
+            "secret",
+            "oversize",
+            "fuel",
+            "trap",
+            "malformed",
+            "totally novel string",
+        ] {
+            let class = classify_deny_reason_class(Some(reason));
+            assert!(
+                REASON_CLASS_LABEL_VALUES.contains(&class),
+                "reason {reason:?} produced out-of-domain class {class:?}"
+            );
+        }
     }
 }

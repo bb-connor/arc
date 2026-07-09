@@ -227,6 +227,8 @@ fn exposes_normative_label_value_sets() {
             "oversize",
             "fuel",
             "trap",
+            "malformed",
+            "other",
         ]
     );
     assert_eq!(
