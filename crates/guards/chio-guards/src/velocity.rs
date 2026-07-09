@@ -64,17 +64,25 @@ impl TokenBucket {
         }
     }
 
-    /// Attempt to consume `amount_tokens` logical tokens. Returns true on
-    /// success (tokens were available), false if the bucket is too empty.
-    fn try_consume(&mut self, amount_tokens: u64) -> bool {
+    /// Refill, then report whether `amount_tokens` logical tokens are available
+    /// WITHOUT consuming them. Split from [`Self::consume`] so a guard evaluating
+    /// two buckets under one lock can check BOTH can satisfy the request before
+    /// consuming from EITHER (reserve-both-then-consume), avoiding partial
+    /// consumption when one limit denies (RFC-0004 F38, codex finding 3555239296).
+    /// Refilling here and again inside the paired [`Self::consume`] adds ~0 tokens
+    /// (near-zero elapsed under the same lock), so the peek cannot inflate the
+    /// balance.
+    fn can_consume(&mut self, amount_tokens: u64) -> bool {
         self.refill();
         let cost_mt = amount_tokens.saturating_mul(MT_PER_TOKEN);
-        if self.tokens_mt >= cost_mt {
-            self.tokens_mt -= cost_mt;
-            true
-        } else {
-            false
-        }
+        self.tokens_mt >= cost_mt
+    }
+
+    /// Deduct `amount_tokens`, saturating at zero. Only call after
+    /// [`Self::can_consume`] returned true for the same amount under the same lock.
+    fn consume(&mut self, amount_tokens: u64) {
+        let cost_mt = amount_tokens.saturating_mul(MT_PER_TOKEN);
+        self.tokens_mt = self.tokens_mt.saturating_sub(cost_mt);
     }
 
     /// Refill the bucket based on elapsed time since the last refill.
@@ -141,13 +149,6 @@ pub struct VelocityGuard {
 struct VelocityState {
     invocation_buckets: HashMap<(String, usize), TokenBucket>,
     spend_buckets: HashMap<(String, usize), TokenBucket>,
-}
-
-/// Which of the two combined maps an operation targets.
-#[derive(Clone, Copy)]
-enum BucketKind {
-    Invocation,
-    Spend,
 }
 
 impl VelocityGuard {
@@ -250,46 +251,41 @@ impl VelocityState {
             .retain(|_, bucket| bucket.last_refill.elapsed() < idle);
     }
 
-    /// Reserve a slot for a genuinely new key in `kind`'s map without exceeding the
-    /// COMBINED cap. Returns `true` when the caller may insert the new key, `false`
-    /// when the guard must DENY fail-closed. Run under the single state lock, so
-    /// `combined_len()` is always the true current total (never a stale sibling
-    /// snapshot).
+    /// Reserve `new_slots` free slots in the COMBINED table (across both maps)
+    /// without exceeding `bucket_cap`. Returns `true` when the caller may insert
+    /// that many genuinely-new keys, `false` when the guard must DENY fail-closed.
+    /// Run under the single state lock, so `combined_len()` is always the true
+    /// current total (never a stale sibling snapshot).
     ///
-    /// Updating an EXISTING key never needs a slot and returns `true` immediately,
-    /// so a repeat request for an already-tracked capability never evicts and
-    /// recreates its own bucket with a full token balance (RFC-0004 F38). For a
-    /// genuinely new key at the combined cap, EXPIRED (out-of-window) buckets are
-    /// pruned from BOTH maps first; if only ACTIVE (in-window) buckets remain, the
-    /// new key is DENIED rather than evicting an active bucket. Evicting an active
-    /// bucket would reset its per-window rate/spend limit, letting a caller who can
-    /// mint many distinct capability ids force a depleted bucket out and reuse the
-    /// id within the same window for a fresh `TokenBucket` (the same fail-open
-    /// bypass class fixed in the admission guard, RFC-0004 F39, codex finding
-    /// 3554566269). Denying keeps memory bounded (cap unchanged) without the bypass:
-    /// a distinct-capability flood saturates at `bucket_cap` and is denied instead
-    /// of growing.
-    fn reserve_slot_for_new_key(
-        &mut self,
-        kind: BucketKind,
-        window_secs: u64,
-        bucket_cap: usize,
-        key: &(String, usize),
-    ) -> bool {
-        let target_has_key = match kind {
-            BucketKind::Invocation => self.invocation_buckets.contains_key(key),
-            BucketKind::Spend => self.spend_buckets.contains_key(key),
-        };
-        if target_has_key {
+    /// A request with both invocation and spend limits enabled needs TWO new
+    /// slots for a brand-new key (one per map), so it must reserve them TOGETHER:
+    /// checking one slot at a time would let a request pass the invocation check
+    /// on the last free slot and then fail the spend check, wedging an unpaired
+    /// invocation bucket in the final slot and burning a token for a call that
+    /// never ran (codex finding 3555239296). Reserving 0 slots (all keys already
+    /// exist) always succeeds, so a repeat request for an already-tracked
+    /// capability never evicts and recreates its own bucket with a full token
+    /// balance (RFC-0004 F38).
+    ///
+    /// When the reservation would exceed the cap, EXPIRED (out-of-window) buckets
+    /// are pruned from BOTH maps first; if only ACTIVE (in-window) buckets remain,
+    /// the request is DENIED rather than evicting an active bucket. Evicting an
+    /// active bucket would reset its per-window rate/spend limit, letting a caller
+    /// who can mint many distinct capability ids force a depleted bucket out and
+    /// reuse the id within the same window for a fresh `TokenBucket` (the same
+    /// fail-open bypass class fixed in the admission guard, RFC-0004 F39, codex
+    /// finding 3554566269). Denying keeps memory bounded (cap unchanged) without
+    /// the bypass: a distinct-capability flood saturates at `bucket_cap`.
+    fn reserve_slots(&mut self, new_slots: usize, window_secs: u64, bucket_cap: usize) -> bool {
+        if new_slots == 0 {
             return true;
         }
-
-        // Inserting one new bucket must keep the combined total within `bucket_cap`.
-        // `combined_len()` is the true total under this lock, so there is no
-        // stale-snapshot overshoot.
-        if self.combined_len() >= bucket_cap {
+        // Inserting `new_slots` new buckets must keep the combined total within
+        // `bucket_cap`. `combined_len()` is the true total under this lock, so
+        // there is no stale-snapshot overshoot.
+        if self.combined_len().saturating_add(new_slots) > bucket_cap {
             self.prune_expired(window_secs);
-            if self.combined_len() >= bucket_cap {
+            if self.combined_len().saturating_add(new_slots) > bucket_cap {
                 return false;
             }
         }
@@ -320,48 +316,80 @@ impl Guard for VelocityGuard {
             .lock()
             .map_err(|_| KernelError::Internal("velocity guard state lock poisoned".to_string()))?;
 
-        // Check invocation rate limit.
-        if let Some(max_inv) = self.config.max_invocations_per_window {
-            // Burst capacity: max_inv * burst_factor, rounded to nearest integer.
-            let capacity = ((max_inv as f64 * self.config.burst_factor).round() as u64).max(1);
-            // Deny fail-closed if the combined table is full of ACTIVE buckets and
-            // this is a new key: never evict an active bucket (RFC-0004 F38/F39).
-            if !state.reserve_slot_for_new_key(
-                BucketKind::Invocation,
-                window_secs,
-                self.bucket_cap,
-                &key,
-            ) {
-                return Ok(GuardDecision::deny(Vec::new()));
-            }
-            let bucket = state
-                .invocation_buckets
-                .entry(key.clone())
-                .or_insert_with(|| TokenBucket::new(capacity, max_inv as u64, window_secs));
-            if !bucket.try_consume(1) {
-                return Ok(GuardDecision::deny(Vec::new()));
-            }
+        let inv_limit = self.config.max_invocations_per_window;
+        let spend_limit = self.config.max_spend_per_window;
+
+        // Resolve the planned spend cost up front. This can fail closed (missing
+        // grant cost metadata) with an Err, which must surface BEFORE any bucket
+        // is created or consumed, so a denied-by-metadata request never burns a
+        // sibling invocation token.
+        let spend_units = match spend_limit {
+            Some(_) => Some(planned_spend_units(ctx)?),
+            None => None,
+        };
+
+        // Phase 1 - RESERVE. Secure a slot for EVERY genuinely-new bucket this
+        // request needs across BOTH maps before consuming from EITHER. A brand-new
+        // key with both limits enabled needs two slots (one per map); reserving
+        // them together means a request that will be denied for lack of capacity
+        // never inserts an unpaired invocation bucket into the final slot or burns
+        // an invocation token for a call denied at the spend limit (reserve-both,
+        // no partial consumption -- RFC-0004 F38, codex finding 3555239296).
+        let inv_new = inv_limit.is_some() && !state.invocation_buckets.contains_key(&key);
+        let spend_new = spend_limit.is_some() && !state.spend_buckets.contains_key(&key);
+        let new_slots = usize::from(inv_new) + usize::from(spend_new);
+        if !state.reserve_slots(new_slots, window_secs, self.bucket_cap) {
+            return Ok(GuardDecision::deny(Vec::new()));
         }
 
-        // Check spend rate limit.
-        if let Some(max_spend) = self.config.max_spend_per_window {
-            let capacity = ((max_spend as f64 * self.config.burst_factor).round() as u64).max(1);
-            let spend_units = planned_spend_units(ctx)?;
-            if !state.reserve_slot_for_new_key(
-                BucketKind::Spend,
-                window_secs,
-                self.bucket_cap,
-                &key,
-            ) {
-                return Ok(GuardDecision::deny(Vec::new()));
+        // Phase 2 - obtain both buckets (creating the reserved new ones). Borrow
+        // the two disjoint maps through one `&mut VelocityState` so both bucket
+        // handles can be held at once.
+        let state = &mut *state;
+        let mut inv_bucket: Option<&mut TokenBucket> = match inv_limit {
+            Some(max_inv) => {
+                // Burst capacity: max_inv * burst_factor, rounded to nearest integer.
+                let capacity = ((max_inv as f64 * self.config.burst_factor).round() as u64).max(1);
+                Some(
+                    state
+                        .invocation_buckets
+                        .entry(key.clone())
+                        .or_insert_with(|| TokenBucket::new(capacity, max_inv as u64, window_secs)),
+                )
             }
-            let bucket = state
-                .spend_buckets
-                .entry(key)
-                .or_insert_with(|| TokenBucket::new(capacity, max_spend, window_secs));
-            if !bucket.try_consume(spend_units) {
-                return Ok(GuardDecision::deny(Vec::new()));
+            None => None,
+        };
+        let mut spend_bucket: Option<&mut TokenBucket> = match spend_limit {
+            Some(max_spend) => {
+                let capacity =
+                    ((max_spend as f64 * self.config.burst_factor).round() as u64).max(1);
+                Some(
+                    state
+                        .spend_buckets
+                        .entry(key)
+                        .or_insert_with(|| TokenBucket::new(capacity, max_spend, window_secs)),
+                )
             }
+            None => None,
+        };
+
+        // Phase 3 - check BOTH buckets can satisfy the request before consuming
+        // from EITHER, then commit both. Peeking (`can_consume`) before consuming
+        // means a denial from one limit never depletes the other bucket.
+        let spend_cost = spend_units.unwrap_or(0);
+        let inv_ok = inv_bucket.as_mut().map(|b| b.can_consume(1)).unwrap_or(true);
+        let spend_ok = spend_bucket
+            .as_mut()
+            .map(|b| b.can_consume(spend_cost))
+            .unwrap_or(true);
+        if !inv_ok || !spend_ok {
+            return Ok(GuardDecision::deny(Vec::new()));
+        }
+        if let Some(bucket) = inv_bucket.as_mut() {
+            bucket.consume(1);
+        }
+        if let Some(bucket) = spend_bucket.as_mut() {
+            bucket.consume(spend_cost);
         }
 
         Ok(GuardDecision::allow())
@@ -724,6 +752,67 @@ mod tests {
             Verdict::Deny,
             "active bucket a was reset by eviction (rate-limit bypass regressed)"
         );
+    }
+
+    #[test]
+    fn spend_denial_does_not_wedge_or_deplete_invocation_bucket() {
+        // codex finding 3555239296 (RFC-0004 F38, no partial consumption): with
+        // both limits enabled and a combined cap that has only one free slot, a
+        // brand-new key needs TWO slots (one invocation, one spend). The guard must
+        // reserve both BEFORE consuming from either, so a request that will be
+        // denied at the spend reservation never inserts an invocation-only bucket
+        // into the final slot or burns an invocation token for a call that never
+        // ran. RED (pre-fix): the invocation bucket was inserted + consumed before
+        // the spend reservation failed, wedging the table at the cap with an
+        // unpaired invocation bucket (combined = 5, inv = 3).
+        let config = VelocityConfig {
+            max_invocations_per_window: Some(1000),
+            max_spend_per_window: Some(1000),
+            window_secs: 60,
+            burst_factor: 1.0,
+        };
+        // Odd cap: two fully tracked keys use four slots (inv+spend each), leaving
+        // exactly one free slot -- codex's "odd cap such as 5 after two fully
+        // tracked keys" scenario.
+        let guard = VelocityGuard::with_bucket_cap(config, 5);
+        let kp = Keypair::generate();
+        let agent = kp.public_key().to_hex();
+        let server = "srv".to_string();
+        let scope = spend_scope(1);
+
+        for id in ["cap-a", "cap-b"] {
+            let cap = signed_cap(&kp, id);
+            let request = make_request(&cap, &agent, &server);
+            let ctx = guard_ctx(&request, &scope, &agent, &server, Some(0));
+            assert_eq!(
+                guard.evaluate(&ctx).expect("tracked key should be allowed"),
+                Verdict::Allow,
+            );
+        }
+        assert_eq!(guard.invocation_bucket_count(), 2);
+        assert_eq!(guard.spend_bucket_count(), 2);
+        assert_eq!(guard.combined_bucket_count(), 4);
+
+        // A third brand-new key needs two slots but only one is free: it must be
+        // DENIED without creating an invocation-only bucket in the last slot.
+        let cap_c = signed_cap(&kp, "cap-c");
+        let request_c = make_request(&cap_c, &agent, &server);
+        let ctx_c = guard_ctx(&request_c, &scope, &agent, &server, Some(0));
+        assert_eq!(
+            guard.evaluate(&ctx_c).expect("third key eval"),
+            Verdict::Deny,
+            "a new key that cannot fit BOTH buckets must be denied"
+        );
+
+        // The table was NOT wedged: no unpaired invocation bucket was inserted, and
+        // no invocation token was burned for the spend-denied request.
+        assert_eq!(
+            guard.invocation_bucket_count(),
+            2,
+            "spend-denied request wedged an invocation-only bucket in the final slot"
+        );
+        assert_eq!(guard.spend_bucket_count(), 2);
+        assert_eq!(guard.combined_bucket_count(), 4);
     }
 
     #[test]
