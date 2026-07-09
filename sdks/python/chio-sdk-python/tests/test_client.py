@@ -549,6 +549,85 @@ class TestEvaluateToolCall:
             assert exc_info.value.code == "INVALID_RECEIPT"
 
     @respx.mock
+    async def test_evaluate_tool_call_denied_when_advisory_disabled(self) -> None:
+        # With the hardened sidecar default, /v1/evaluate/advisory answers 409
+        # (advisory disabled). The id-only default must still honour the
+        # always-deny contract: a capability id can never authorize execution,
+        # so the 409 becomes a ChioDeniedError, not a bare infrastructure
+        # ChioError that adapters would retry as a transport failure.
+        advisory_route = respx.post(f"{BASE}/v1/evaluate/advisory").mock(
+            return_value=httpx.Response(
+                409,
+                json={
+                    "error": "chio_advisory_disabled",
+                    "authorization": False,
+                    "message": (
+                        "advisory tool-call evaluation is disabled; use the "
+                        "kernel-mediated route"
+                    ),
+                    "replacement": "/v1/evaluate",
+                },
+            )
+        )
+        mediated_route = respx.post(f"{BASE}/v1/evaluate").mock(
+            return_value=httpx.Response(200, json={})
+        )
+        async with ChioClient(BASE) as client:
+            with pytest.raises(ChioDeniedError) as exc_info:
+                await client.evaluate_tool_call(
+                    capability_id="cap-1",
+                    tool_server="srv",
+                    tool_name="read",
+                    parameters={"path": "/tmp"},
+                )
+        assert (
+            exc_info.value.reason_code
+            == "chio_advisory_evaluation_unavailable"
+        )
+        assert exc_info.value.tool_name == "read"
+        assert exc_info.value.tool_server == "srv"
+        assert advisory_route.called
+        # Deny must not silently reach for the token-requiring mediated route.
+        assert not mediated_route.called
+
+    @respx.mock
+    async def test_evaluate_tool_call_propagates_transport_error(self) -> None:
+        # A genuine transport failure (5xx) is retryable infrastructure, not a
+        # policy decision. It must surface as ChioError so adapters that
+        # distinguish a DENY from a FAILURE do not mask it as a deny.
+        respx.post(f"{BASE}/v1/evaluate/advisory").mock(
+            return_value=httpx.Response(503, json={"error": "unavailable"})
+        )
+        async with ChioClient(BASE) as client:
+            with pytest.raises(ChioError) as exc_info:
+                await client.evaluate_tool_call(
+                    capability_id="cap-1",
+                    tool_server="srv",
+                    tool_name="read",
+                    parameters={"path": "/tmp"},
+                )
+        # Not a deny: the error keeps its transport code for retryability.
+        assert not isinstance(exc_info.value, ChioDeniedError)
+        assert exc_info.value.code == "HTTP_503"
+
+    @respx.mock
+    async def test_evaluate_tool_call_propagates_connection_error(self) -> None:
+        # A connection failure is likewise infrastructure, not a policy deny.
+        respx.post(f"{BASE}/v1/evaluate/advisory").mock(
+            side_effect=httpx.ConnectError("connection refused")
+        )
+        async with ChioClient(BASE) as client:
+            with pytest.raises(ChioError) as exc_info:
+                await client.evaluate_tool_call(
+                    capability_id="cap-1",
+                    tool_server="srv",
+                    tool_name="read",
+                    parameters={"path": "/tmp"},
+                )
+        assert not isinstance(exc_info.value, ChioDeniedError)
+        assert exc_info.value.code == "CONNECTION_ERROR"
+
+    @respx.mock
     async def test_evaluate_tool_call_denied_on_403(self) -> None:
         respx.post(f"{BASE}/v1/evaluate/advisory").mock(
             return_value=httpx.Response(

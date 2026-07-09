@@ -489,16 +489,43 @@ class ChioClient:
         Raises
         ------
         ChioDeniedError
-            Always. A hard deny from the advisory route surfaces its guard and
-            reason; otherwise the deny reports that advisory evaluation is not
-            execution authorization.
+            The default outcome. Raised for a hard deny from the advisory route
+            (surfacing its guard and reason), for a dropped observation, when
+            advisory evaluation is disabled on the sidecar (HTTP 409), and
+            otherwise to report that advisory evaluation is not execution
+            authorization. A capability id alone never authorizes execution.
+        ChioError
+            Only for a genuine infrastructure or transport failure reaching the
+            sidecar (connection error, timeout, 5xx). These stay retryable and
+            are never masked as a policy deny.
         """
-        receipt = await self.evaluate_tool_call_advisory(
-            capability_id=capability_id,
-            tool_server=tool_server,
-            tool_name=tool_name,
-            parameters=parameters,
-        )
+        try:
+            receipt = await self.evaluate_tool_call_advisory(
+                capability_id=capability_id,
+                tool_server=tool_server,
+                tool_name=tool_name,
+                parameters=parameters,
+            )
+        except ChioError as exc:
+            # HTTP 409 on the advisory route is the sidecar's advisory-disabled
+            # signal (the hardened default), not a transport failure. A
+            # capability id can never authorize execution, so this is a policy
+            # deny: fail closed with a non-authoritative reason instead of
+            # leaking a retryable infrastructure error. Any other ChioError
+            # (connection, timeout, 5xx, or a 403 ChioDeniedError) propagates
+            # unchanged so callers keep its retryability and deny context.
+            if exc.code == "HTTP_409":
+                raise ChioDeniedError(
+                    "advisory tool-call evaluation is disabled on the sidecar; "
+                    "a signed capability token and the kernel-mediated route "
+                    "are required to authorize execution",
+                    reason="advisory evaluation is unavailable and is not "
+                    "execution authorization",
+                    reason_code="chio_advisory_evaluation_unavailable",
+                    tool_name=tool_name,
+                    tool_server=tool_server,
+                ) from exc
+            raise
         outcome = _receipt_field_value(receipt.observation_outcome)
         if outcome == "dropped":
             raise ChioDeniedError(
