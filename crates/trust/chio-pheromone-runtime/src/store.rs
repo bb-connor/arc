@@ -96,9 +96,7 @@ mod tests {
             received_at_unix_ms: 1,
             frames: Vec::new(),
         };
-        store
-            .record_receive_report(&report)
-            .expect("record report");
+        store.record_receive_report(&report).expect("record report");
         let found = store
             .lookup_receive_report_by_batch("abc123")
             .expect("lookup runs")

@@ -395,7 +395,9 @@ async fn read_frame(recv: &mut RecvStream) -> Result<Vec<u8>, WireError> {
             .map_err(|error| WireError::Io(error.to_string()))?
         {
             Some(0) | None => {
-                return Err(WireError::Io("unexpected eof reading frame body".to_string()));
+                return Err(WireError::Io(
+                    "unexpected eof reading frame body".to_string(),
+                ));
             }
             Some(n) => {
                 buf.extend_from_slice(&chunk[..n]);

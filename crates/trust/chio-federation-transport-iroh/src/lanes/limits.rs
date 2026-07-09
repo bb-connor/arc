@@ -324,18 +324,18 @@ impl AcceptLimiter {
     /// lane semaphore. Returns a guard that releases the per-peer slot on drop and
     /// carries the shared permit. Fail-closed: over-cap or a saturated lane sheds,
     /// and a poisoned per-peer lock is treated as at-cap (never admits).
-    pub async fn admit_peer(
-        &self,
-        peer: &EndpointId,
-    ) -> Result<PeerAdmitGuard, AcceptLimitError> {
+    pub async fn admit_peer(&self, peer: &EndpointId) -> Result<PeerAdmitGuard, AcceptLimitError> {
         let cap = self.config.max_in_flight_per_peer.max(1);
         // 1. Reserve the per-peer slot (bounded, no await under the lock). A
         //    poisoned lock fails closed (treated as at-cap).
         {
-            let mut counts = self.per_peer.lock().map_err(|_| AcceptLimitError::PeerBusy {
-                peer: peer.fmt_short().to_string(),
-                cap,
-            })?;
+            let mut counts = self
+                .per_peer
+                .lock()
+                .map_err(|_| AcceptLimitError::PeerBusy {
+                    peer: peer.fmt_short().to_string(),
+                    cap,
+                })?;
             let entry = counts.entry(*peer).or_insert(0);
             if *entry >= cap {
                 return Err(AcceptLimitError::PeerBusy {
@@ -495,11 +495,17 @@ mod tests {
         assert_eq!(shed.close_code(), ACCEPT_BUSY_CLOSE_CODE);
 
         // A different peer is unaffected.
-        let gb = limiter.admit_peer(&b).await.expect("B admitted while A capped");
+        let gb = limiter
+            .admit_peer(&b)
+            .await
+            .expect("B admitted while A capped");
 
         // Releasing one of A's guards frees a per-peer slot immediately.
         drop(g1);
-        let g3 = limiter.admit_peer(&a).await.expect("A slot re-opens after release");
+        let g3 = limiter
+            .admit_peer(&a)
+            .await
+            .expect("A slot re-opens after release");
         drop(g2);
         drop(g3);
         drop(gb);

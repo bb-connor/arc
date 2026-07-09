@@ -1774,12 +1774,12 @@ mod tests {
             frames: Vec::new(),
         };
 
-        let receiver: Arc<dyn RelayBatchReceiver> =
-            Arc::new(RecoveringReceiver { report: canned });
-        let scope_check: InboundBatchScopeCheck =
-            Arc::new(|_sender: &str, _batch: &PheromoneGossipBatch| -> Result<(), PheromoneRelayError> {
+        let receiver: Arc<dyn RelayBatchReceiver> = Arc::new(RecoveringReceiver { report: canned });
+        let scope_check: InboundBatchScopeCheck = Arc::new(
+            |_sender: &str, _batch: &PheromoneGossipBatch| -> Result<(), PheromoneRelayError> {
                 Ok(())
-            });
+            },
+        );
         let now: Arc<dyn Fn() -> u64 + Send + Sync> = Arc::new(|| NOW);
         let handler = PheromoneBatchHandler::new(
             gate.clone(),
@@ -1811,7 +1811,10 @@ mod tests {
 
         // Convergence: the dialer reads the recovered accepted verdict, and the
         // durable inbox now records it so a further redelivery short-circuits.
-        assert!(outcome.accepted, "the recovered verdict is the accepted one");
+        assert!(
+            outcome.accepted,
+            "the recovered verdict is the accepted one"
+        );
         assert!(
             store.lookup_inbox_report(sender, &nonce).unwrap().is_some(),
             "recovery adopts the durable verdict as the inbox record"
@@ -1868,10 +1871,11 @@ mod tests {
 
         let store = Arc::new(SqlitePheromoneRelayStore::open_in_memory().unwrap());
         let receiver: Arc<dyn RelayBatchReceiver> = Arc::new(AcceptingReceiver { report });
-        let scope_check: InboundBatchScopeCheck =
-            Arc::new(|_sender: &str, _batch: &PheromoneGossipBatch| -> Result<(), PheromoneRelayError> {
+        let scope_check: InboundBatchScopeCheck = Arc::new(
+            |_sender: &str, _batch: &PheromoneGossipBatch| -> Result<(), PheromoneRelayError> {
                 Ok(())
-            });
+            },
+        );
         let now: Arc<dyn Fn() -> u64 + Send + Sync> = Arc::new(|| NOW);
         let handler = PheromoneBatchHandler::new(gate.clone(), receiver, store, now, scope_check)
             .with_accept_limits(AcceptLimitConfig {

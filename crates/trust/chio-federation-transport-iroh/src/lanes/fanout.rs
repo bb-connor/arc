@@ -1393,8 +1393,10 @@ mod tests {
             kernel_id: "did:chio:alice".to_string(),
             passport_public_key: passport.public_key(),
             transport_endpoint_id: transport,
-            passport_endorsement: passport
-                .sign(&transport_endorsement_preimage("did:chio:alice", &transport)),
+            passport_endorsement: passport.sign(&transport_endorsement_preimage(
+                "did:chio:alice",
+                &transport,
+            )),
             revocation_signers: Vec::new(),
             removed: false,
         };
@@ -1435,7 +1437,9 @@ mod tests {
             expected_previous_version_sha256: None,
             now_unix_ms: NOW,
         };
-        bundle.verify_bundle(&trust).expect("treaty bundle verifies")
+        bundle
+            .verify_bundle(&trust)
+            .expect("treaty bundle verifies")
     }
 
     #[test]
@@ -1455,8 +1459,13 @@ mod tests {
         // her key resolves via the caller resolver; the directory still denies the
         // treaty membership AFTER the self-signature verifies (fail-closed).
         let eve = Keypair::from_seed(&[71; 32]);
-        let frame =
-            signed_direct_frame(&eve, "did:chio:eve", "did:chio:hub", TREATY_ALPHA, NAMESPACE);
+        let frame = signed_direct_frame(
+            &eve,
+            "did:chio:eve",
+            "did:chio:hub",
+            TREATY_ALPHA,
+            NAMESPACE,
+        );
         let keys = StaticOriginKeys::new().with("did:chio:eve", eve.public_key());
         let policy = live_policy(NAMESPACE);
         let error = verify_fanout_frame(&frame, &keys, &directory, &policy, NOW)
