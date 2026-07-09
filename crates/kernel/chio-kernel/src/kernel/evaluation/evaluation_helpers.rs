@@ -186,9 +186,9 @@ impl ChioKernel {
         // The reserved monetary hold is kept open and bound into the signed nonce
         // so reconcile-by-nonce can name the exact hold to settle at the execution
         // site. The response builder stamps the hold's TTL deadline from the minted
-        // nonce's exact expiry (Finding 4) and records the grant currency for
-        // reconcile-time validation (Finding 3), keeping the reaper deadline and
-        // the nonce validity window consistent.
+        // nonce's exact expiry and records the grant currency for reconcile-time
+        // validation, keeping the reaper deadline and the nonce validity window
+        // consistent.
         let reserved_hold = budget_mutation
             .charge_result()
             .map(|charge| ReservedHoldStamp {

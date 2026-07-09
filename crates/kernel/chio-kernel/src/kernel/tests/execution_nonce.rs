@@ -746,7 +746,7 @@ fn reserving_authorization_keeps_hold_open_and_blocks_oversubscription() {
         "a reserved authorization receipt must not be an authoritative spend"
     );
 
-    // Finding 1: the hold stayed reserved (not reversed), so a second
+    // The hold stayed reserved (not reversed), so a second
     // authorization for the same fully-reserved grant is denied. No
     // over-subscription past max_total_cost.
     let mut second = first.clone();
@@ -1162,7 +1162,7 @@ fn reserved_hold_ttl_reaper_settles_expired_authorization_at_worst_case() {
 
 #[test]
 fn reserved_hold_ttl_matches_minted_nonce_expiry() {
-    // Finding 4: the reserved-hold TTL deadline must be derived from the exact
+    // The reserved-hold TTL deadline must be derived from the exact
     // instant the nonce is minted (its signed `expires_at`), so a valid nonce can
     // never expire after its hold has already been reaped. Guarantees the caller
     // can always reconcile-before-reaper while the nonce is still valid.
@@ -1192,7 +1192,7 @@ fn reserved_hold_ttl_matches_minted_nonce_expiry() {
 
 #[test]
 fn reconcile_by_nonce_rejects_mismatched_realized_currency() {
-    // Finding 3: reconcile must reject a realized cost whose currency differs from
+    // Reconcile must reject a realized cost whose currency differs from
     // the currency the hold/grant was authorized in, before settling or signing.
     // A caller-supplied currency is never stamped onto a signed authoritative
     // receipt unchecked.
@@ -1245,7 +1245,7 @@ fn reconcile_by_nonce_rejects_mismatched_realized_currency() {
 
 #[test]
 fn reserving_authorization_succeeds_for_unregistered_tool_server() {
-    // Finding 2: the reserve-for-caller authorization path never dispatches a tool
+    // The reserve-for-caller authorization path never dispatches a tool
     // on this kernel, so it must NOT require the caller's tool server to be
     // registered. This lets the sidecar stop registering caller-arbitrary server
     // ids (unbounded growth) into the kernel.

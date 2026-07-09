@@ -177,9 +177,9 @@ impl ChioKernel {
             reserved_hold.as_ref().map(|stamp| stamp.hold_id),
         )?;
 
-        // Finding 4: stamp the reserved hold's TTL deadline from the minted
-        // nonce's exact `expires_at` (not a separately sampled evaluation clock),
-        // so an unreconciled reserved hold can never expire before its own nonce.
+        // Stamp the reserved hold's TTL deadline from the minted nonce's exact
+        // `expires_at` (not a separately sampled evaluation clock), so an
+        // unreconciled reserved hold can never expire before its own nonce.
         // The grant currency is recorded here too, for reconcile-time validation.
         // Only the reserve-for-caller path supplies a stamp; the reverse-for-retry
         // preflight passes `None` and marks nothing.

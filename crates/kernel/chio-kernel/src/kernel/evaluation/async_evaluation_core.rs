@@ -193,12 +193,12 @@ impl ChioKernel {
             }
         }
 
-        // Finding 2: the reserve-for-caller authorization path never dispatches a
-        // tool on this kernel, so it must not require the caller's tool server to
-        // be registered; the sidecar can then stop registering caller-arbitrary
-        // server ids (unbounded growth). Every other path -- including a
+        // The reserve-for-caller authorization path never dispatches a tool on
+        // this kernel, so it must not require the caller's tool server to be
+        // registered; the sidecar can then avoid registering caller-arbitrary
+        // server ids (unbounded growth). Every other path, including a
         // ReserveForCaller request that falls through to dispatch because no nonce
-        // preflight is required -- still requires registration exactly as before.
+        // preflight is required, still requires registration exactly as before.
         let reserving_preflight = matches!(
             preflight_disposition,
             PreflightHoldDisposition::ReserveForCaller

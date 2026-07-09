@@ -905,7 +905,7 @@ mod tests {
             "a reserved authorization receipt must not be an authoritative spend"
         );
 
-        // Finding 1: the pre-execution hold is RESERVED (open), not reversed. The
+        // The pre-execution hold is RESERVED (open), not reversed. The
         // budget store shows the worst-case exposure committed against the grant,
         // so the caller's downstream execution is backed by a real reservation.
         let usage = budget.get_usage(&cap_id, 0).unwrap();
@@ -940,7 +940,7 @@ mod tests {
         let (_, first) = post_evaluate(Arc::clone(&state), &body).await;
         assert_eq!(first["status"], "authorized");
 
-        // Finding 1: because the reserved hold is NOT reversed, a second
+        // Because the reserved hold is NOT reversed, a second
         // authorization for the same fully-reserved grant is DENIED. Sequential
         // mediated authorizations respect max_total_cost; no over-subscription.
         let (_, second) = post_evaluate(Arc::clone(&state), &body).await;
@@ -972,7 +972,7 @@ mod tests {
         let minted_nonce = authorized["execution_nonce"].clone();
         assert!(minted_nonce.is_object());
 
-        // Finding 2: presenting that nonce back to /v1/evaluate is rejected
+        // Presenting that nonce back to /v1/evaluate is rejected
         // fail-closed. This endpoint mints nonces; it does not settle them, so
         // the sidecar never consumes the downstream nonce (which would make the
         // real tool server reject the caller as a replay).
@@ -1131,7 +1131,7 @@ mod tests {
         let approver = signer.clone();
         let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
 
-        // Finding 4: without a governed intent + approval token, the governed
+        // Without a governed intent + approval token, the governed
         // grant is DENIED (the forwarded fields are load-bearing).
         let bare_body = serde_json::json!({
             "capability": cap_value,
@@ -1178,7 +1178,7 @@ mod tests {
         let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
         let params = serde_json::json!({ "invoice": "inv-1" });
 
-        // Finding 5: without a DPoP proof, a dpop_required grant is DENIED
+        // Without a DPoP proof, a dpop_required grant is DENIED
         // fail-closed.
         let bare_body = serde_json::json!({
             "capability": cap_value,
@@ -1636,7 +1636,7 @@ mod tests {
             "realized_cost": { "units": 30, "currency": "USD" },
         });
 
-        // Finding 1: the controlled agent could self-reconcile at cost zero when
+        // The controlled agent could self-reconcile at cost zero when
         // reconcile was on the public router. Without the sidecar-control token
         // the reconcile is rejected by the trusted-caller gate before it can
         // settle the hold; the gate runs ahead of the handler, so the nonce is
@@ -1676,8 +1676,8 @@ mod tests {
         let (_, authorized) = post_evaluate(Arc::clone(&state), &body).await;
         let nonce_json = authorized["execution_nonce"].clone();
 
-        // Finding 1 fail-closed: with no control token configured there is no
-        // trusted caller, so reconcile is rejected outright rather than left open.
+        // Fail-closed: with no control token configured there is no trusted
+        // caller, so reconcile is rejected outright rather than left open.
         // Presenting any bearer cannot help because none is configured to match.
         let reconcile_body = serde_json::json!({
             "execution_nonce": nonce_json,
@@ -1691,7 +1691,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn mediated_authorization_needs_no_tool_server_registration() {
-        // Finding 2: the reserve-for-caller path no longer requires the target
+        // The reserve-for-caller path no longer requires the target
         // tool server to be registered, so the route registers nothing. Many
         // distinct caller-arbitrary server ids each authorize, and because the
         // handler holds the kernel behind a shared (non-mut) lock it cannot
@@ -1774,7 +1774,7 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         assert_eq!(first["status"], "deny");
 
-        // Finding 3(a): a denied authorization must not permanently burn the id.
+        // A denied authorization must not permanently burn the id.
         // Reusing it is NOT a 409 conflict; it is evaluated again (and denied
         // again), proving the claim was released.
         let (status, second) = post_evaluate(Arc::clone(&state), &body).await;
@@ -1795,7 +1795,7 @@ mod tests {
         // No reaper before spawn.
         assert!(state.reaper_handle.lock().await.is_none());
 
-        // Finding 3(b): the reaper's JoinHandle is retained on the shared state,
+        // The reaper's JoinHandle is retained on the shared state,
         // not dropped/detached, so it can be aborted on shutdown.
         spawn_reserved_hold_reaper(&state).await;
         {
