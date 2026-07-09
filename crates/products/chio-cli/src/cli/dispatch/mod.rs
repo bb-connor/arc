@@ -167,6 +167,9 @@ pub(crate) fn run() {
             &listen,
             receipt_store.as_deref().or(receipt_db.as_deref()),
             authority_seed_file.as_deref(),
+            budget_db.as_deref(),
+            control_url.as_deref(),
+            control_token.as_deref(),
             print_config,
         ),
     };

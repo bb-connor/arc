@@ -213,6 +213,9 @@ pub(crate) fn cmd_start(
     listen_addr: &str,
     receipt_store: Option<&Path>,
     authority_seed_path: Option<&Path>,
+    budget_db: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
     print_config: bool,
 ) -> Result<(), CliError> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -233,6 +236,15 @@ pub(crate) fn cmd_start(
             .transpose()?
             .map(|keypair| keypair.seed_hex());
         let trusted_capability_issuers = parse_trusted_capability_issuers_from_env()?;
+        // The mediated `/v1/evaluate` route needs a budget store, which the
+        // proxy builds only from a control-plane URL or a local SQLite budget
+        // path. `chio start` keeps other optional stores in-memory so the first
+        // run leaves no on-disk artifacts, so it does not fabricate a default
+        // on-disk budget store here: the route is advertised only when the
+        // operator supplies one of these backends. Otherwise the banner omits
+        // the route rather than advertising one that always fails closed with
+        // chio_mediation_unavailable.
+        let mediation_available = control_url.is_some() || budget_db.is_some();
         let config = ProtectConfig {
             // The chio-start shape never proxies upstream traffic; the
             // catch-all route exists only because the underlying axum
@@ -248,9 +260,9 @@ pub(crate) fn cmd_start(
             sidecar_control_token,
             signer_seed_hex,
             trusted_capability_issuers,
-            control_url: None,
-            control_token: None,
-            budget_db: None,
+            control_url: control_url.map(str::to_string),
+            control_token: control_token.map(str::to_string),
+            budget_db: budget_db.map(|path| path.display().to_string()),
             require_nonce: false,
             allow_advisory: false,
         };
@@ -259,9 +271,9 @@ pub(crate) fn cmd_start(
             .run_with_observer(move |bound_addr| {
                 let base_url = format!("http://{bound_addr}");
                 println!("chio sidecar listening on {base_url}");
-                println!(
-                    "  routes: /chio/* (health, evaluate, verify), /v1/capabilities/{{,mint,validate,attenuate,release}}, /v1/evaluate, /v1/receipts{{,/verify}}, /approvals/*"
-                );
+                for line in start_sidecar_route_banner(mediation_available) {
+                    println!("{line}");
+                }
                 if print_config {
                     println!();
                     println!("# chio-hermes quickstart -- copy into your shell:");
@@ -277,6 +289,31 @@ pub(crate) fn cmd_start(
                 CliError::transport_error(format!("failed to start chio sidecar: {error}"))
             })
     })
+}
+
+/// Build the `chio start` route banner. The mediated `/v1/evaluate` route is
+/// advertised only when `mediation_available`, which mirrors the proxy's own
+/// budget-store predicate (a budget store exists exactly when a control-plane
+/// URL or a local SQLite budget path is configured). When it is absent the
+/// banner omits the route and explains how to enable it, so the advertised
+/// surface always matches the running configuration instead of listing a route
+/// that fails closed with chio_mediation_unavailable.
+pub(crate) fn start_sidecar_route_banner(mediation_available: bool) -> Vec<String> {
+    let evaluate_route = if mediation_available {
+        ", /v1/evaluate"
+    } else {
+        ""
+    };
+    let mut lines = vec![format!(
+        "  routes: /chio/* (health, evaluate, verify), /v1/capabilities/{{,mint,validate,attenuate,release}}{evaluate_route}, /v1/receipts{{,/verify}}, /approvals/*"
+    )];
+    if !mediation_available {
+        lines.push(
+            "  note: mediated /v1/evaluate is disabled without a budget store; pass --budget-db <path> or --control-url <url> to enable tool-call budget mediation"
+                .to_string(),
+        );
+    }
+    lines
 }
 
 pub(crate) fn parse_trusted_capability_issuers_from_env(
@@ -1294,5 +1331,35 @@ mod runtime_local_error_domain_tests {
         assert!(contract.allowed_schemes.contains("http"));
         assert!(contract.allowed_authority_set.contains("127.0.0.1:18080"));
         assert!(!contract.deny_loopback);
+    }
+
+    #[test]
+    fn start_banner_advertises_evaluate_only_when_budget_store_present() {
+        let with_store = start_sidecar_route_banner(true);
+        assert_eq!(
+            with_store.len(),
+            1,
+            "banner should be a single routes line when mediation is available"
+        );
+        assert!(
+            with_store[0].contains(", /v1/evaluate,"),
+            "advertised routes must list /v1/evaluate when a budget store backs it: {}",
+            with_store[0]
+        );
+
+        let without_store = start_sidecar_route_banner(false);
+        assert!(
+            !without_store[0].contains("/v1/evaluate"),
+            "routes line must not advertise /v1/evaluate without a budget store: {}",
+            without_store[0]
+        );
+        assert!(
+            without_store
+                .iter()
+                .any(|line| line.contains("mediated /v1/evaluate is disabled")
+                    && line.contains("--budget-db")
+                    && line.contains("--control-url")),
+            "banner must explain how to enable mediation when it is unavailable: {without_store:?}"
+        );
     }
 }
