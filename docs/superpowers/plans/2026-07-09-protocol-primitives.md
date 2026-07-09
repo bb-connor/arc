@@ -1011,11 +1011,11 @@ Expected: FAIL until the kernel consults the ledger (the standalone `try_spend` 
 
 1. In `verify_capability_full` (or the dispatch step that owns a `BurnLedger`), after expiry and caveat checks, call `try_spend(ledger, &token.id, token.use_limit)` and deny on `BurnDecision::Denied`, emitting a `Burn` receipt with the returned `spend_index`.
 2. In the caveat-admission path, for a `RequireQuorum` caveat parse the requirement, collect the presented `SignedApproval`s, and deny unless `chio_quorum::verify::quorum_satisfied` returns true; emit a `QuorumSatisfied` receipt on success. A caveat-bearing capability with no registered quorum gate denies.
-3. Optionally, verify a carried `ProofEnvelope` via `chio_proof_carry::verify::verify` before dispatch.
+3. For an operation that declares a proof requirement, verify the carried `ProofEnvelope` via `chio_proof_carry::verify::verify` and deny when the proof is missing or does not verify. Proof-carrying is mandatory for those operations, not optional; a missing proof denies. Add a kernel-path test that a proof-requiring operation with a missing or invalid proof is denied.
 
 - [ ] **Step 4: Run the enforcement tests**
 
-Run: `cargo test -p chio-kernel burn_enforcement && cargo test -p chio-kernel quorum_enforcement`
+Run: `cargo test -p chio-kernel burn_enforcement && cargo test -p chio-kernel quorum_enforcement && cargo test -p chio-kernel proof_enforcement`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**

@@ -189,7 +189,7 @@ git commit -m "feat(keyring): scaffold with KeyEpoch lifecycle record"
 
 **Interfaces:**
 - Consumes: `sha2::Sha256`, `crate::epoch::KeyEpoch`.
-- Produces: `TransparencyLog` with `pub fn new() -> Self`, `pub fn append(&mut self, epoch: KeyEpoch) -> LogRoot`, and `pub fn root(&self) -> LogRoot`. `LogRoot { size: u64, root_hash: [u8; 32] }`. Each root commits to the previous root, so the log is append-only and tamper-evident.
+- Produces: `TransparencyLog` with `pub fn new() -> Self`, `pub fn append(&mut self, epoch: KeyEpoch) -> Result<LogRoot, LogError>`, and `pub fn root(&self) -> LogRoot`. `LogRoot { size: u64, root_hash: [u8; 32] }`; `LogError::Serialization`. `append` returns `Err` without mutating the log on serialization failure, so a caller never treats a failed append as success. Each root commits to the previous root, so the log is append-only and tamper-evident.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -215,7 +215,7 @@ mod tests {
     fn append_grows_and_changes_root() {
         let mut log = TransparencyLog::new();
         let r0 = log.root();
-        let r1 = log.append(epoch(0));
+        let r1 = log.append(epoch(0)).expect("append");
         assert_eq!(r1.size, 1);
         assert_ne!(r1.root_hash, r0.root_hash);
     }
@@ -224,11 +224,11 @@ mod tests {
     fn root_commits_to_previous_root() {
         let mut a = TransparencyLog::new();
         let mut b = TransparencyLog::new();
-        a.append(epoch(0));
-        let ra = a.append(epoch(1));
+        a.append(epoch(0)).expect("append");
+        let ra = a.append(epoch(1)).expect("append");
         // A log that appended the same two epochs in order has the same root.
-        b.append(epoch_fixed(0));
-        let rb = b.append(epoch_fixed(1));
+        b.append(epoch_fixed(0)).expect("append");
+        let rb = b.append(epoch_fixed(1)).expect("append");
         // Different keys -> different roots, proving order and content bind.
         assert_ne!(ra.root_hash, rb.root_hash);
     }
@@ -271,6 +271,13 @@ pub struct LogRoot {
     pub root_hash: [u8; 32],
 }
 
+/// A transparency-log operation failure.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LogError {
+    /// The epoch could not be canonicalized for hashing; the log is unchanged.
+    Serialization,
+}
+
 /// An append-only log of key epochs with a rolling Merkle-style root.
 pub struct TransparencyLog {
     size: u64,
@@ -289,19 +296,17 @@ impl TransparencyLog {
         Self::default()
     }
 
-    /// Append an epoch, folding it into the rolling root. Returns the new root.
-    /// A serialization failure leaves the log unchanged and returns the prior
-    /// root (fail-closed: the caller sees no growth and must retry).
-    pub fn append(&mut self, epoch: KeyEpoch) -> LogRoot {
-        let Ok(bytes) = to_canonical_json(&epoch) else {
-            return self.root();
-        };
+    /// Append an epoch, folding it into the rolling root. Returns the new root,
+    /// or `Err` on serialization failure without mutating the log, so a caller
+    /// (rotation) never activates a key whose append did not commit.
+    pub fn append(&mut self, epoch: KeyEpoch) -> Result<LogRoot, LogError> {
+        let bytes = to_canonical_json(&epoch).map_err(|_| LogError::Serialization)?;
         let mut hasher = Sha256::new();
         hasher.update(self.root_hash);
         hasher.update(bytes);
         self.root_hash = hasher.finalize().into();
         self.size += 1;
-        self.root()
+        Ok(self.root())
     }
 
     #[must_use]
@@ -333,7 +338,7 @@ git commit -m "feat(keyring): add append-only transparency log"
 
 **Interfaces:**
 - Consumes: `crate::epoch::{KeyEpoch, KeyOperation}`, `crate::log::TransparencyLog`.
-- Produces: `Keyring { log: TransparencyLog, active: Option<KeyEpoch>, overlap_secs: u64 }` with `pub fn rotate(&mut self, new_key: KeyEpoch, now: u64)` (retires the previous active key at `now + overlap_secs`, appends the new key) and `pub fn is_valid(&self, seq: u64, now: u64) -> bool` (a key is valid while active or within its overlap window).
+- Produces: `Keyring` holding the log and epoch history, with `pub fn rotate(&mut self, new_key: KeyEpoch, now: u64) -> Result<(), LogError>` (appends a Retirement record for the previous key then the new key, activating the new key only after both appends commit) and `pub fn is_valid(&self, seq: u64, now: u64) -> bool` (a key is valid only at or after its activation time, and while active or within its overlap window).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -358,8 +363,8 @@ mod tests {
     #[test]
     fn previous_key_valid_during_overlap_then_expires() {
         let mut kr = Keyring::new(60);
-        kr.rotate(epoch(0, 0), 0);
-        kr.rotate(epoch(1, 100), 100);
+        kr.rotate(epoch(0, 0), 0).expect("rotate");
+        kr.rotate(epoch(1, 100), 100).expect("rotate");
         // key 0 retired at 100, overlap 60 -> valid until 160.
         assert!(kr.is_valid(0, 150));
         assert!(!kr.is_valid(0, 161));
@@ -383,7 +388,7 @@ Expected: FAIL.
 //! `overlap_secs` after retirement so in-flight capabilities do not break.
 
 use crate::epoch::{KeyEpoch, KeyOperation};
-use crate::log::TransparencyLog;
+use crate::log::{LogError, TransparencyLog};
 
 /// Holds the transparency log and the current active key.
 pub struct Keyring {
@@ -399,11 +404,11 @@ impl Keyring {
     }
 
     /// Rotate to a new key. Append a Retirement record for the current active
-    /// key to the transparency log first, so a verifier or restarted authority
-    /// reconstructing state from the append-only log sees the retirement (and
-    /// therefore the overlap-window expiry) rather than only in-memory state.
-    /// Then append the new key.
-    pub fn rotate(&mut self, new_key: KeyEpoch, now: u64) {
+    /// key first, then the new key, marking state only after each append
+    /// commits. If an append fails, the rotation returns `Err` and the new key
+    /// is not activated, so the authority never signs with a key absent from
+    /// the pinned log.
+    pub fn rotate(&mut self, new_key: KeyEpoch, now: u64) -> Result<(), LogError> {
         if let Some(prev) = self.epochs.last().cloned() {
             if prev.retired_at.is_none() {
                 self.log.append(KeyEpoch {
@@ -413,14 +418,15 @@ impl Keyring {
                     algorithm: prev.algorithm,
                     public_key: prev.public_key.clone(),
                     operation: KeyOperation::Retirement,
-                });
+                })?;
                 if let Some(entry) = self.epochs.last_mut() {
                     entry.retired_at = Some(now);
                 }
             }
         }
-        self.log.append(new_key.clone());
+        self.log.append(new_key.clone())?;
         self.epochs.push(new_key);
+        Ok(())
     }
 
     /// Whether the key at `seq` is valid at `now`: active (not retired) or
@@ -428,9 +434,13 @@ impl Keyring {
     #[must_use]
     pub fn is_valid(&self, seq: u64, now: u64) -> bool {
         self.epochs.iter().any(|e| {
+            // A key is never valid before its activation time, whether active or
+            // retired, so a rewound clock cannot make a not-yet-activated key
+            // valid just because it carries a retirement record.
             e.seq == seq
+                && now >= e.activated_at
                 && match e.retired_at {
-                    None => now >= e.activated_at,
+                    None => true,
                     Some(retired) => now <= retired.saturating_add(self.overlap_secs),
                 }
         })
@@ -485,7 +495,7 @@ mod tests {
         let epochs = vec![epoch(0, kp.public_key())];
         // Pin the root the honest log would produce for these epochs.
         let mut log = TransparencyLog::new();
-        log.append(epochs[0].clone());
+        log.append(epochs[0].clone()).expect("append");
         let pinned = log.root();
 
         assert!(key_in_log(&epochs, pinned, &kp.public_key()));
@@ -527,7 +537,9 @@ use crate::log::{LogRoot, TransparencyLog};
 pub fn key_in_log(epochs: &[KeyEpoch], pinned: LogRoot, key: &PublicKey) -> bool {
     let mut log = TransparencyLog::new();
     for epoch in epochs {
-        log.append(epoch.clone());
+        if log.append(epoch.clone()).is_err() {
+            return false;
+        }
     }
     let recomputed = log.root();
     if recomputed.size != pinned.size || recomputed.root_hash != pinned.root_hash {
@@ -648,10 +660,12 @@ pub struct Lease {
 }
 
 impl Lease {
-    /// Whether the lease is still within its TTL at `now`.
+    /// Whether `now` is within the lease's validity window. Requires
+    /// `issued_at <= now <= expires_at`, so a rewound clock (`now < issued_at`)
+    /// fails closed instead of reviving an expired lease.
     #[must_use]
     pub fn is_live(&self, now: u64) -> bool {
-        now <= self.expires_at
+        self.issued_at <= now && now <= self.expires_at
     }
 }
 ```
@@ -677,7 +691,7 @@ git commit -m "feat(secret-broker): scaffold with capability-bound Lease"
 - Test: inline in `broker.rs`
 
 **Interfaces:**
-- Produces: `SecretBackend` trait (`resolve`/`store`) and `LocalBackend`; a `RevocationView` trait (`fn is_revoked(&self, capability_id: &str) -> bool`); `Broker` tracking issued leases, with `mint`, `revoke`, and `pub fn resolve(&self, lease: &Lease, now: u64, revocations: &dyn RevocationView) -> Option<String>`. `resolve` yields `None` unless the lease was minted by this broker and equals its stored binding, is within TTL, is not lease-revoked, and its bound capability is not revoked. The raw-secret boundary scan is wired into `resolve` in Task 7.
+- Produces: `SecretBackend` trait (`resolve`/`store`) and `LocalBackend`; a `RevocationView` trait (`fn is_revoked(&self, capability_id: &str) -> bool`); `Broker::new(backend, default_ttl, max_leases_per_subject)` tracking issued leases, with `pub fn mint(&mut self, capability_id: &str, subject: &str, now: u64) -> Option<Lease>` (returns `None` past the per-subject live-lease limit), `revoke`, and `pub fn resolve(&self, lease: &Lease, now: u64, revocations: &dyn RevocationView) -> Option<String>`. `resolve` yields `None` unless the lease was minted by this broker and equals its stored binding, is within TTL, is not lease-revoked, and its bound capability is not revoked. The raw-secret boundary scan is wired into `resolve` in Task 7.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -699,13 +713,13 @@ mod tests {
     fn broker_with_secret() -> Broker {
         let mut backend = LocalBackend::new();
         backend.store("cap-1", "s3cr3t".to_string());
-        Broker::new(Box::new(backend), 60)
+        Broker::new(Box::new(backend), 60, 8)
     }
 
     #[test]
     fn minted_lease_resolves_then_revokes() {
         let mut broker = broker_with_secret();
-        let lease = broker.mint("cap-1", "did:chio:agent", 100);
+        let lease = broker.mint("cap-1", "did:chio:agent", 100).expect("under limit");
         assert_eq!(lease.expires_at, 160);
         assert_eq!(broker.resolve(&lease, 150, &NoRevocations), Some("s3cr3t".to_string()));
         broker.revoke(&lease.id);
@@ -729,8 +743,20 @@ mod tests {
     #[test]
     fn lease_dies_when_bound_capability_is_revoked() {
         let mut broker = broker_with_secret();
-        let lease = broker.mint("cap-1", "did:chio:agent", 100);
+        let lease = broker.mint("cap-1", "did:chio:agent", 100).expect("under limit");
         assert!(broker.resolve(&lease, 150, &CapabilityRevoked).is_none());
+    }
+
+    #[test]
+    fn mint_refuses_past_the_per_subject_limit() {
+        let backend = LocalBackend::new();
+        let mut broker = Broker::new(Box::new(backend), 60, 2);
+        assert!(broker.mint("cap-1", "sub", 100).is_some());
+        assert!(broker.mint("cap-1", "sub", 100).is_some());
+        // Third live lease for the same subject is refused.
+        assert!(broker.mint("cap-1", "sub", 100).is_none());
+        // A different subject is unaffected.
+        assert!(broker.mint("cap-1", "other", 100).is_some());
     }
 }
 ```
@@ -809,23 +835,39 @@ pub struct Broker {
     revoked: HashSet<String>,
     next_id: u64,
     default_ttl: u64,
+    max_leases_per_subject: usize,
 }
 
 impl Broker {
     #[must_use]
-    pub fn new(backend: Box<dyn SecretBackend>, default_ttl: u64) -> Self {
+    pub fn new(
+        backend: Box<dyn SecretBackend>,
+        default_ttl: u64,
+        max_leases_per_subject: usize,
+    ) -> Self {
         Self {
             backend,
             issued: HashMap::new(),
             revoked: HashSet::new(),
             next_id: 0,
             default_ttl,
+            max_leases_per_subject,
         }
     }
 
     /// Mint a lease bound to a capability, expiring at `now + default_ttl`, and
-    /// record it so only broker-minted leases can later resolve.
-    pub fn mint(&mut self, capability_id: &str, subject: &str, now: u64) -> Lease {
+    /// record it so only broker-minted leases can later resolve. Returns `None`
+    /// when the subject already holds `max_leases_per_subject` live, unrevoked
+    /// leases, so a compromised subject cannot mint unbounded live leases.
+    pub fn mint(&mut self, capability_id: &str, subject: &str, now: u64) -> Option<Lease> {
+        let live_for_subject = self
+            .issued
+            .values()
+            .filter(|l| l.subject == subject && !self.revoked.contains(&l.id) && l.is_live(now))
+            .count();
+        if live_for_subject >= self.max_leases_per_subject {
+            return None;
+        }
         let id = format!("lease-{}", self.next_id);
         self.next_id += 1;
         let lease = Lease {
@@ -836,7 +878,7 @@ impl Broker {
             expires_at: now.saturating_add(self.default_ttl),
         };
         self.issued.insert(id, lease.clone());
-        lease
+        Some(lease)
     }
 
     /// Revoke a lease by id.
@@ -957,8 +999,8 @@ Add a broker test proving a lease over a raw AWS-style secret refuses to resolve
     fn lease_refuses_to_return_a_raw_secret() {
         let mut backend = LocalBackend::new();
         backend.store("cap-raw", "AKIAIOSFODNN7EXAMPLE".to_string());
-        let mut broker = Broker::new(Box::new(backend), 60);
-        let lease = broker.mint("cap-raw", "did:chio:agent", 100);
+        let mut broker = Broker::new(Box::new(backend), 60, 8);
+        let lease = broker.mint("cap-raw", "did:chio:agent", 100).expect("under limit");
         assert!(broker.resolve(&lease, 150, &NoRevocations).is_none());
     }
 ```
@@ -1310,6 +1352,17 @@ impl Sandbox for LinuxSandbox {
         if profile.read_roots.is_empty() && profile.write_roots.is_empty() {
             return Err(SandboxError {
                 detail: "empty filesystem profile; refusing to launch".to_string(),
+            });
+        }
+        if !profile.network_dests.is_empty() {
+            // seccomp and Landlock filesystem rules do not constrain network
+            // egress to the signed manifest hosts. Until a per-destination
+            // network path exists (Landlock network port rules on newer kernels,
+            // or an nftables/eBPF hook), refuse to launch a networked tool rather
+            // than allow unconstrained egress.
+            return Err(SandboxError {
+                detail: "network destinations declared but not enforceable; refusing to launch"
+                    .to_string(),
             });
         }
         // Full implementation: build a Landlock ruleset from read_roots and

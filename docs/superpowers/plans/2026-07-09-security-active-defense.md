@@ -53,7 +53,7 @@ New and modified files, grouped by the crate that owns them.
 **`crates/security/chio-quarantine/` (create):**
 - `Cargo.toml`, `src/lib.rs`
 - `src/event.rs`: the `SecurityEvent` model.
-- `src/ports.rs`: `RevocationPort`, `VelocityPort`, `IssuancePort`, `AlertPort`, `BlastRadiusPort` traits.
+- `src/ports.rs`: `RevocationPort`, `VelocityPort`, `IssuancePort`, `AlertPort`, `TenantPort`, `BlastRadiusPort` traits (revoke and restore methods for the lift path).
 - `src/action.rs`: `ContainmentAction`, `ActionTier`, the tiered executor.
 - `src/receipt.rs`: `ContainmentReceipt` and `LiftOrder`.
 - `src/playbook.rs`: the `when/within/then` playbook parser and evaluator.
@@ -1321,6 +1321,19 @@ pub fn canary_scope(tool: &str) -> ChioScope {
     };
     ChioScope { grants: vec![grant] }
 }
+
+/// Stateless canary recognition: a capability is a canary if any grant targets
+/// the reserved `decoy:` server namespace. Because that namespace is signed into
+/// the capability scope, this recognition survives a kernel restart and works
+/// across processes with no shared state, unlike the id registry (which is only
+/// a fast-path index of locally minted ids).
+#[must_use]
+pub fn scope_is_canary(scope: &ChioScope) -> bool {
+    scope
+        .grants
+        .iter()
+        .any(|g| g.server_id.as_deref().is_some_and(is_decoy_server))
+}
 ```
 
 Read `crates/core/chio-core-types/src/capability/scope.rs:63` for the exact `ToolGrant` fields; if it does not derive `Default` or `server_id` is not `Option<String>`, construct the grant with the real field set and adjust the test's `server_id` access accordingly.
@@ -1345,7 +1358,7 @@ git commit -m "feat(decoy): scaffold chio-decoy with canary capability scopes"
 - Test: inline
 
 **Interfaces:**
-- Produces: `CanaryRegistry` with `pub fn new() -> Self`, `pub fn register(&mut self, capability_id: String)`, `pub fn is_canary(&self, capability_id: &str) -> bool`. The kernel consults `is_canary` during capability validation, before ordinary grant matching, and a hit is a tripwire; that kernel wiring is integration Task 20b (this task only builds the registry).
+- Produces: `CanaryRegistry` with `pub fn new() -> Self`, `pub fn register(&mut self, capability_id: String)`, `pub fn is_canary(&self, capability_id: &str) -> bool` (a fast-path index of locally minted ids). Authoritative, restart-safe recognition is the stateless `scope_is_canary` (a grant in the reserved `decoy:` namespace, signed into the capability), which the kernel checks during capability validation before ordinary grant matching; a hit is a tripwire. Because the registry is in-memory, the kernel must not rely on it alone (it is empty after a restart or in another process); `scope_is_canary` is the source of truth. That kernel wiring is integration Task 20b.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1642,7 +1655,7 @@ git commit -m "feat(decoy): add honey-tool catalog and tripwire events"
 - Test: inline in `event.rs`
 
 **Interfaces:**
-- Produces: `SecurityEvent { source: EventSource, subject: String, session_key: String }` with `EventSource { CanaryHit, FlowViolation, AdvisoryPromotion, ReputationIncident, DenyStorm, VelocityBreach }`; and the port traits `RevocationPort`, `VelocityPort`, `IssuancePort`, `AlertPort`, `BlastRadiusPort` (object-safe, `Send + Sync`).
+- Produces: `SecurityEvent { source: EventSource, subject: String, session_key: String }` with `EventSource { CanaryHit, FlowViolation, AdvisoryPromotion, ReputationIncident, DenyStorm, VelocityBreach }`; and the port traits `RevocationPort` (revoke/restore session), `VelocityPort` (throttle/restore), `IssuancePort` (freeze/unfreeze), `AlertPort`, `TenantPort` (revoke/restore tenant), `BlastRadiusPort` (object-safe, `Send + Sync`). The restore methods back the lift path; `TenantPort` keeps tenant-scope containment off the session-scoped port.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1683,6 +1696,8 @@ license = "Apache-2.0"
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
+# The executor verifies heavy-action co-signatures with chio-quorum.
+chio-quorum = { workspace = true }
 
 [features]
 # Real adapters are opt-in so the core engine stays lean and out of the TCB.
@@ -1739,24 +1754,39 @@ pub struct SecurityEvent {
 //! `adapters` feature so the engine is unit-testable with fakes and carries
 //! no heavy dependency graph by default.
 
-/// Bump a revocation epoch for a session's capability chain.
+/// Bump a revocation epoch for a session's capability chain, or restore it.
 pub trait RevocationPort: Send + Sync {
     fn revoke_session(&self, session_key: &str) -> Result<(), PortError>;
+    /// Reverse a session revocation when a lift order is applied.
+    fn restore_session(&self, session_key: &str) -> Result<(), PortError>;
 }
 
-/// Tighten a subject's velocity token bucket by a factor.
+/// Tighten or restore a subject's velocity token bucket.
 pub trait VelocityPort: Send + Sync {
     fn throttle(&self, subject: &str, factor: u32) -> Result<(), PortError>;
+    /// Reverse a throttle when a lift order is applied.
+    fn restore(&self, subject: &str) -> Result<(), PortError>;
 }
 
-/// Zero (freeze) or restore a subject's issuance rate.
+/// Freeze or unfreeze a subject's issuance rate.
 pub trait IssuancePort: Send + Sync {
     fn freeze_subject(&self, subject: &str) -> Result<(), PortError>;
+    /// Reverse a freeze when a lift order is applied.
+    fn unfreeze_subject(&self, subject: &str) -> Result<(), PortError>;
 }
 
 /// Page an external alerting backend.
 pub trait AlertPort: Send + Sync {
     fn escalate(&self, summary: &str) -> Result<(), PortError>;
+}
+
+/// Revoke or restore an entire tenant's capabilities. Distinct from the
+/// session-scoped `RevocationPort`: a tenant action touches every session and
+/// capability under the tenant, not a single session key.
+pub trait TenantPort: Send + Sync {
+    fn revoke_tenant(&self, tenant: &str) -> Result<(), PortError>;
+    /// Reverse a tenant revocation when a lift order is applied.
+    fn restore_tenant(&self, tenant: &str) -> Result<(), PortError>;
 }
 
 /// Resolve the continuation-token subtree affected by a triggering session.
@@ -1794,7 +1824,7 @@ git commit -m "feat(quarantine): scaffold with SecurityEvent model and ports"
 - Test: inline in both
 
 **Interfaces:**
-- Produces: `ContainmentAction { Throttle{subject,factor}, RevokeSession{session_key}, Escalate{summary}, FreezeSubject{subject}, RevokeTenant{tenant} }`; `pub fn tier(action: &ContainmentAction) -> ActionTier` with `ActionTier { AutoReversible, Heavy }`; `ContainmentReceipt { action, tier, ttl_secs, requires_cosign }` and `LiftOrder { receipt_ref }` as canonical-JSON bodies. Auto-reversible actions carry a default TTL; heavy actions set `requires_cosign = true`.
+- Produces: `ContainmentAction { Throttle{subject,factor}, RevokeSession{session_key}, Escalate{summary}, FreezeSubject{subject}, RevokeTenant{tenant} }`; `pub fn tier(action: &ContainmentAction) -> ActionTier` with `ActionTier { AutoReversible, Heavy }`; `ContainmentReceipt { action, tier, ttl_secs, requires_cosign }` and `LiftOrder { receipt_ref }` as canonical-JSON bodies. Auto-reversible actions carry a default TTL; heavy actions set `requires_cosign = true`. A `LiftOrder` is executed by `Executor::apply_lift` (Task 18), which resolves the referenced receipt's action and reverses it through the ports' restore methods, so the reversible model is enforced, not merely recorded.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1939,7 +1969,7 @@ git commit -m "feat(quarantine): add tiered containment actions and reversible r
 
 **Interfaces:**
 - Consumes: `crate::action::{ContainmentAction, ActionTier, tier}`, `crate::ports::*`, `crate::receipt::ContainmentReceipt`.
-- Produces: `Executor<'a>` holding references to the ports, with `pub fn execute(&self, action: ContainmentAction) -> ExecOutcome` where `ExecOutcome { Applied(ContainmentReceipt), Pending(ContainmentReceipt) }`. Auto-reversible actions call the port and return `Applied`; heavy actions return `Pending` (awaiting co-sign) without touching a port.
+- Produces: `Executor<'a>` holding references to all ports (including `TenantPort` and `BlastRadiusPort`), with `pub fn execute(&self, action) -> ExecOutcome`, `pub fn apply_cosigned(&self, action, req: &QuorumRequirement, request_hash: &str, approvals: &[SignedApproval]) -> ExecOutcome`, and `pub fn apply_lift(&self, action: &ContainmentAction) -> ExecOutcome`. `ExecOutcome { Applied, Pending, Failed(_, PortError) }`. `execute` runs auto-reversible actions (expanding `RevokeSession` to the blast-radius subtree) and stages heavy ones as `Pending`; `apply_cosigned` applies a heavy action only when `quorum_satisfied` holds, routing `RevokeTenant` through the `TenantPort`; `apply_lift` reverses an action via the ports' restore methods. A port failure yields `Failed`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1950,6 +1980,10 @@ mod tests {
     use crate::ports::*;
     use std::sync::Mutex;
 
+    use chio_core_types::crypto::Keypair;
+    use chio_quorum::envelope::SignedApproval;
+    use chio_quorum::requirement::QuorumRequirement;
+
     #[derive(Default)]
     struct FakeRevocation { calls: Mutex<Vec<String>> }
     impl RevocationPort for FakeRevocation {
@@ -1958,24 +1992,57 @@ mod tests {
                 .push(session_key.to_string());
             Ok(())
         }
+        fn restore_session(&self, _: &str) -> Result<(), PortError> { Ok(()) }
     }
     struct NoVelocity;
     impl VelocityPort for NoVelocity {
         fn throttle(&self, _: &str, _: u32) -> Result<(), PortError> { Ok(()) }
+        fn restore(&self, _: &str) -> Result<(), PortError> { Ok(()) }
     }
     struct NoIssuance;
     impl IssuancePort for NoIssuance {
         fn freeze_subject(&self, _: &str) -> Result<(), PortError> { Ok(()) }
+        fn unfreeze_subject(&self, _: &str) -> Result<(), PortError> { Ok(()) }
+    }
+    #[derive(Default)]
+    struct FakeIssuance { freezes: Mutex<Vec<String>> }
+    impl IssuancePort for FakeIssuance {
+        fn freeze_subject(&self, subject: &str) -> Result<(), PortError> {
+            self.freezes.lock().map_err(|_| PortError { detail: "poisoned".into() })?
+                .push(subject.to_string());
+            Ok(())
+        }
+        fn unfreeze_subject(&self, _: &str) -> Result<(), PortError> { Ok(()) }
     }
     struct NoAlert;
     impl AlertPort for NoAlert {
         fn escalate(&self, _: &str) -> Result<(), PortError> { Ok(()) }
     }
+    struct NoTenant;
+    impl TenantPort for NoTenant {
+        fn revoke_tenant(&self, _: &str) -> Result<(), PortError> { Ok(()) }
+        fn restore_tenant(&self, _: &str) -> Result<(), PortError> { Ok(()) }
+    }
+    struct NoBlast;
+    impl BlastRadiusPort for NoBlast {
+        fn affected_sessions(&self, _: &str) -> Vec<String> { Vec::new() }
+    }
+
+    fn approval(kp: &Keypair, hash: &str) -> SignedApproval {
+        SignedApproval {
+            signer_id: kp.public_key().to_hex(),
+            request_hash: hash.to_string(),
+            signature_hex: kp.sign(hash.as_bytes()).to_hex(),
+        }
+    }
 
     #[test]
     fn auto_action_applies_via_port() {
         let rev = FakeRevocation::default();
-        let exec = Executor { revocation: &rev, velocity: &NoVelocity, issuance: &NoIssuance, alert: &NoAlert };
+        let exec = Executor {
+            revocation: &rev, velocity: &NoVelocity, issuance: &NoIssuance,
+            alert: &NoAlert, tenant: &NoTenant, blast: &NoBlast,
+        };
         let outcome = exec.execute(ContainmentAction::RevokeSession { session_key: "agent-1".to_string() });
         assert!(matches!(outcome, ExecOutcome::Applied(_)));
         assert_eq!(rev.calls.lock().expect("lock").len(), 1);
@@ -1984,10 +2051,38 @@ mod tests {
     #[test]
     fn heavy_action_is_pending_without_port_call() {
         let rev = FakeRevocation::default();
-        let exec = Executor { revocation: &rev, velocity: &NoVelocity, issuance: &NoIssuance, alert: &NoAlert };
+        let exec = Executor {
+            revocation: &rev, velocity: &NoVelocity, issuance: &NoIssuance,
+            alert: &NoAlert, tenant: &NoTenant, blast: &NoBlast,
+        };
         let outcome = exec.execute(ContainmentAction::FreezeSubject { subject: "s".to_string() });
         assert!(matches!(outcome, ExecOutcome::Pending(_)));
         assert_eq!(rev.calls.lock().expect("lock").len(), 0);
+    }
+
+    #[test]
+    fn heavy_action_needs_quorum_to_apply() {
+        let iss = FakeIssuance::default();
+        let exec = Executor {
+            revocation: &FakeRevocation::default(), velocity: &NoVelocity, issuance: &iss,
+            alert: &NoAlert, tenant: &NoTenant, blast: &NoBlast,
+        };
+        let a = Keypair::from_seed(&[1u8; 32]);
+        let b = Keypair::from_seed(&[2u8; 32]);
+        let req = QuorumRequirement {
+            m: 2, n: 2,
+            signers: vec![a.public_key().to_hex(), b.public_key().to_hex()],
+        };
+        let action = ContainmentAction::FreezeSubject { subject: "s".to_string() };
+        // No approvals: stays Pending and the issuance port is not touched.
+        let pending = exec.apply_cosigned(action.clone(), &req, "h1", &[]);
+        assert!(matches!(pending, ExecOutcome::Pending(_)));
+        assert_eq!(iss.freezes.lock().expect("lock").len(), 0);
+        // Two valid approvals over the request: applied.
+        let approvals = [approval(&a, "h1"), approval(&b, "h1")];
+        let applied = exec.apply_cosigned(action, &req, "h1", &approvals);
+        assert!(matches!(applied, ExecOutcome::Applied(_)));
+        assert_eq!(iss.freezes.lock().expect("lock").len(), 1);
     }
 }
 ```
@@ -2003,10 +2098,17 @@ Expected: FAIL.
 
 ```rust
 //! The tiered executor: auto-reversible actions apply through a port and
-//! return an Applied receipt; heavy actions return Pending until co-signed.
+//! return an Applied receipt; heavy actions apply only under a verified m-of-n
+//! co-signature; every applied action is reversible via a lift.
+
+use chio_quorum::envelope::SignedApproval;
+use chio_quorum::requirement::QuorumRequirement;
+use chio_quorum::verify::quorum_satisfied;
 
 use crate::action::{tier, ActionTier, ContainmentAction};
-use crate::ports::{AlertPort, IssuancePort, PortError, RevocationPort, VelocityPort};
+use crate::ports::{
+    AlertPort, BlastRadiusPort, IssuancePort, PortError, RevocationPort, TenantPort, VelocityPort,
+};
 use crate::receipt::ContainmentReceipt;
 
 /// The result of attempting an action.
@@ -2026,12 +2128,15 @@ pub struct Executor<'a> {
     pub velocity: &'a dyn VelocityPort,
     pub issuance: &'a dyn IssuancePort,
     pub alert: &'a dyn AlertPort,
+    pub tenant: &'a dyn TenantPort,
+    pub blast: &'a dyn BlastRadiusPort,
 }
 
 impl Executor<'_> {
     /// Execute an auto-reversible action now, or stage a heavy one. A port
-    /// failure yields `Failed` (never a silent `Applied`), so the receipt
-    /// reflects what actually happened during a port outage.
+    /// failure yields `Failed` (never a silent `Applied`). `RevokeSession`
+    /// expands to the lineage-bounded affected subtree, so a delegated child
+    /// session is contained too, not just the triggering session.
     #[must_use]
     pub fn execute(&self, action: ContainmentAction) -> ExecOutcome {
         let receipt = ContainmentReceipt::for_action(action.clone());
@@ -2039,9 +2144,7 @@ impl Executor<'_> {
             return ExecOutcome::Pending(receipt);
         }
         let result = match &action {
-            ContainmentAction::RevokeSession { session_key } => {
-                self.revocation.revoke_session(session_key)
-            }
+            ContainmentAction::RevokeSession { session_key } => self.revoke_subtree(session_key),
             ContainmentAction::Throttle { subject, factor } => {
                 self.velocity.throttle(subject, *factor)
             }
@@ -2057,19 +2160,64 @@ impl Executor<'_> {
         }
     }
 
-    /// Apply a heavy action after its m-of-n co-signature has been verified by
-    /// chio-quorum. Callers must not invoke this without a verified quorum. A
-    /// port failure yields `Failed`, matching `execute`.
+    /// Revoke a session and every affected sub-agent session in its lineage
+    /// subtree. Returns the first port error, if any.
+    fn revoke_subtree(&self, session_key: &str) -> Result<(), PortError> {
+        let mut sessions = self.blast.affected_sessions(session_key);
+        if !sessions.iter().any(|s| s == session_key) {
+            sessions.push(session_key.to_string());
+        }
+        let mut outcome = Ok(());
+        for s in &sessions {
+            if let Err(err) = self.revocation.revoke_session(s) {
+                outcome = Err(err);
+            }
+        }
+        outcome
+    }
+
+    /// Apply a heavy action, but only after verifying the m-of-n co-signature
+    /// over the request. Without a satisfied quorum the action stays `Pending`,
+    /// so no path can freeze a subject or revoke a tenant without the required
+    /// human co-sign. A port failure yields `Failed`.
     #[must_use]
-    pub fn apply_cosigned(&self, action: ContainmentAction) -> ExecOutcome {
+    pub fn apply_cosigned(
+        &self,
+        action: ContainmentAction,
+        req: &QuorumRequirement,
+        request_hash: &str,
+        approvals: &[SignedApproval],
+    ) -> ExecOutcome {
         let receipt = ContainmentReceipt::for_action(action.clone());
+        if !quorum_satisfied(req, request_hash, approvals) {
+            return ExecOutcome::Pending(receipt);
+        }
         let result = match &action {
             ContainmentAction::FreezeSubject { subject } => self.issuance.freeze_subject(subject),
-            // RevokeTenant uses the revocation port at tenant scope; a dedicated
-            // TenantPort is the fuller design (see ports.rs follow-up).
-            ContainmentAction::RevokeTenant { tenant } => self.revocation.revoke_session(tenant),
+            ContainmentAction::RevokeTenant { tenant } => self.tenant.revoke_tenant(tenant),
             // Auto-reversible actions do not need co-sign; apply directly.
             other => return self.execute(other.clone()),
+        };
+        match result {
+            Ok(()) => ExecOutcome::Applied(receipt),
+            Err(err) => ExecOutcome::Failed(receipt, err),
+        }
+    }
+
+    /// Reverse a previously applied action (the one a signed LiftOrder
+    /// references) when its TTL expires or an operator lifts it. Every tier has
+    /// a reverse, so the reversible-containment model is real, not advisory.
+    #[must_use]
+    pub fn apply_lift(&self, action: &ContainmentAction) -> ExecOutcome {
+        let receipt = ContainmentReceipt::for_action(action.clone());
+        let result = match action {
+            ContainmentAction::RevokeSession { session_key } => {
+                self.revocation.restore_session(session_key)
+            }
+            ContainmentAction::Throttle { subject, .. } => self.velocity.restore(subject),
+            ContainmentAction::FreezeSubject { subject } => self.issuance.unfreeze_subject(subject),
+            ContainmentAction::RevokeTenant { tenant } => self.tenant.restore_tenant(tenant),
+            ContainmentAction::Escalate { .. } => Ok(()),
         };
         match result {
             Ok(()) => ExecOutcome::Applied(receipt),
@@ -2079,12 +2227,12 @@ impl Executor<'_> {
 }
 ```
 
-Add `pub mod executor;` to `lib.rs`.
+Add `pub mod executor;` to `lib.rs`, and add `chio-quorum = { workspace = true }` to `crates/security/chio-quarantine/Cargo.toml` (the executor verifies co-signatures with it).
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cargo test -p chio-quarantine executor`
-Expected: PASS (2 tests).
+Expected: PASS (3 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -2196,13 +2344,16 @@ impl Playbook {
 /// acts on the event's real subject, not the empty string.
 fn bind_event(action: &ContainmentAction, event: &SecurityEvent) -> ContainmentAction {
     match action {
-        ContainmentAction::RevokeSession { .. } => {
+        // Only fill a blank template target from the event. A rule that names an
+        // explicit session or subject (a fixed quarantine session, a service
+        // account) is preserved and acts on that target, not the event's.
+        ContainmentAction::RevokeSession { session_key } if session_key.is_empty() => {
             ContainmentAction::RevokeSession { session_key: event.session_key.clone() }
         }
-        ContainmentAction::Throttle { factor, .. } => {
+        ContainmentAction::Throttle { subject, factor } if subject.is_empty() => {
             ContainmentAction::Throttle { subject: event.subject.clone(), factor: *factor }
         }
-        ContainmentAction::FreezeSubject { .. } => {
+        ContainmentAction::FreezeSubject { subject } if subject.is_empty() => {
             ContainmentAction::FreezeSubject { subject: event.subject.clone() }
         }
         other => other.clone(),
@@ -2253,7 +2404,7 @@ active until it lands.
 **Files:**
 - Modify: the default guard-pipeline builder (`crates/guards/chio-guards/src/pipeline.rs`) and kernel boot wiring (`crates/kernel/chio-kernel/src/kernel/mod.rs`) to register `FlowGuard`.
 - Modify: the post-invocation pipeline registration to add `FlowTaintHook` (implements `PostInvocationHook`), mirroring `SanitizerHook`.
-- Modify: capability validation (`crates/kernel/chio-kernel-core/src/capability_verify.rs`) to consult `chio_decoy::CanaryRegistry::is_canary` before grant matching and, on a hit, deny and emit a `CanaryPresented`/`CanaryUsed` tripwire receipt.
+- Modify: capability validation (`crates/kernel/chio-kernel-core/src/capability_verify.rs`) to treat a capability as a canary when `chio_decoy::scope_is_canary(&cap.scope)` (stateless, restart-safe) or the in-memory `CanaryRegistry::is_canary(&cap.id)` matches, before grant matching, and on a hit deny and emit a `CanaryPresented`/`CanaryUsed` tripwire receipt.
 - Modify: the FlowGuard egress path to call `chio_decoy::watermark::detect` on outbound payloads (emit `WatermarkAtEgress`) and to emit a `FlowViolation` event into the deny receipt for quarantine.
 - Test: `crates/kernel/chio-kernel/tests/flow_integration.rs`, `.../canary_integration.rs`.
 
@@ -2277,7 +2428,7 @@ Expected: FAIL (`flow-egress` not registered). Adjust the builder and accessor n
 
 1. Register `FlowGuard` in the default pipeline builder (confirm the builder fn and a `guard_names` accessor against `crates/guards/chio-guards/src/pipeline.rs`; add the accessor if absent).
 2. Register `FlowTaintHook` in the post-invocation pipeline, mirroring `SanitizerHook` in `crates/guards/chio-guards/src/post_invocation.rs`.
-3. In capability validation, call `is_canary(capability_id)` before grant matching; on a hit, take the deny path and emit a `CanaryPresented`/`CanaryUsed` tripwire receipt so a canary never reads as an ordinary matching failure.
+3. In capability validation, before ordinary grant matching, treat the capability as a canary when `scope_is_canary(&cap.scope)` (stateless, restart-safe) or `registry.is_canary(&cap.id)` matches; on a hit, take the deny path and emit a `CanaryPresented`/`CanaryUsed` tripwire receipt so a canary never reads as an ordinary matching failure.
 4. In the FlowGuard egress path, call `watermark::detect` on the outbound payload (emit `WatermarkAtEgress` on a hit), and on any deny emit a `FlowViolation` event into the deny receipt.
 
 - [ ] **Step 4: Run the integration tests**
