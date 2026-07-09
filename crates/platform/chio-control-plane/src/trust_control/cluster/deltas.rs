@@ -211,6 +211,15 @@ pub(crate) async fn run_cluster_sync_loop(state: TrustServiceState) {
     }
 }
 
+/// Bump the cluster-progress tick so any parked budget-write waiter rechecks the
+/// quorum view now. Safe to call mid-round: it drives no sync, just wakes waiters
+/// (the same tick the background loop bumps at round end) (codex #965 round-3).
+pub(crate) fn notify_cluster_progress(state: &TrustServiceState) {
+    if let Some(progress) = state.cluster_progress.as_ref() {
+        progress.notify_round_complete();
+    }
+}
+
 pub(crate) fn sync_cluster_once(state: &TrustServiceState) -> Result<(), CliError> {
     let Some(cluster) = state.cluster.as_ref() else {
         return Ok(());
@@ -251,6 +260,12 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
     };
     update_peer_reachable(state, peer_url);
     update_peer_budget_acks(state, peer_url, &peer_status.budget_ack_heads);
+    // Wake any parked budget-write waiter the moment fresh acks land, not only at
+    // the end of the whole sync round: a quorum may already be reachable from
+    // THIS peer's acks while another peer in the same round is slow or unreachable
+    // (peer HTTP can block ~15s), so waiting for round completion could time the
+    // write out and roll it back even though quorum was met (codex #965 round-3).
+    notify_cluster_progress(state);
     if peer_should_force_snapshot(state, peer_url) {
         let snapshot = client.cluster_snapshot()?;
         apply_cluster_snapshot(state, peer_url, snapshot)?;
@@ -357,7 +372,11 @@ fn sync_peer_revocations(
         if response.records.is_empty() {
             break;
         }
-        round.charge_page(response.records.len() as u64)?;
+        // Stop the round (not demote) when the local per-round pull cap is hit:
+        // a large well-ordered backlog resumes next sync round (codex #965 round-3).
+        if round.charge_page(response.records.len() as u64).is_err() {
+            break;
+        }
         let page_max = response
             .records
             .iter()
@@ -415,7 +434,11 @@ fn sync_peer_tool_receipts(
         if response.records.is_empty() {
             break;
         }
-        round.charge_page(response.records.len() as u64)?;
+        // Stop the round (not demote) when the local per-round pull cap is hit:
+        // a large well-ordered backlog resumes next sync round (codex #965 round-3).
+        if round.charge_page(response.records.len() as u64).is_err() {
+            break;
+        }
         // Tool receipts are a NON-DENSE append-only seq stream: `seq` is an
         // INTEGER PRIMARY KEY AUTOINCREMENT written with ON CONFLICT DO NOTHING
         // and pruned by retention, so legitimate gaps (rows 1 and 3, no 2)
@@ -463,7 +486,11 @@ fn sync_peer_child_receipts(
         if response.records.is_empty() {
             break;
         }
-        round.charge_page(response.records.len() as u64)?;
+        // Stop the round (not demote) when the local per-round pull cap is hit:
+        // a large well-ordered backlog resumes next sync round (codex #965 round-3).
+        if round.charge_page(response.records.len() as u64).is_err() {
+            break;
+        }
         // Child receipts are a NON-DENSE append-only seq stream (AUTOINCREMENT +
         // ON CONFLICT DO NOTHING, retention-pruned), so gaps are legitimate.
         // Require only forward progress + within-page monotonicity; a gap-free
@@ -547,7 +574,27 @@ pub(crate) fn import_budget_delta_response(
             "budget delta response contains {record_count} records, maximum is {BUDGET_DELTA_MAX_RECORDS}"
         ))));
     }
-    round.charge_page(record_count as u64)?;
+    // Honest budget deltas pair usage projections with the mutation events they
+    // derive from; a records-only page can never advance the global event cursor
+    // without importing unverified events, so reject it as a protocol violation
+    // (demote) rather than pinning the cursor past unreplicated seqs (codex #965
+    // round-3 P1).
+    if response.mutation_events.is_empty() {
+        return Err(PullError::Protocol(
+            PeerProtocolError::RecordsWithoutMutationEvents {
+                record_count: response.records.len(),
+            },
+        ));
+    }
+    // Local per-round pull cap: stop the round WITHOUT demoting; the next sync
+    // round resumes from the unchanged cursor (codex #965 round-3 P2).
+    if round.charge_page(record_count as u64).is_err() {
+        return Ok(BudgetDeltaImportOutcome {
+            applied_count: 0,
+            next_cursor: current_cursor,
+            should_continue: false,
+        });
+    }
 
     let previous_cursor_seq = current_cursor
         .as_ref()
@@ -595,6 +642,10 @@ pub(crate) fn import_budget_delta_response(
         .import_snapshot_records(&usage_records, &mutation_records)
         .map_err(CliError::from)?;
 
+    // The global event cursor advances ONLY from mutation events (guaranteed
+    // non-empty here: a records-only page was rejected above). Usage `seq`s never
+    // move the event cursor, so a peer cannot pin the cursor past unimported
+    // events via usage projections alone (codex #965 round-3 P1).
     let mut next_cursor = current_cursor;
     for event in &response.mutation_events {
         next_cursor = Some(merge_budget_cursor(
@@ -602,21 +653,12 @@ pub(crate) fn import_budget_delta_response(
             budget_cursor_from_event(event),
         ));
     }
-    if response.mutation_events.is_empty() {
-        for usage in &response.records {
-            if let Some(cursor) = budget_cursor_from_usage(usage) {
-                next_cursor = Some(merge_budget_cursor(next_cursor, cursor));
-            }
-        }
-    }
 
     let cursor_advanced = next_cursor
         .as_ref()
         .is_some_and(|cursor| cursor.seq > previous_cursor_seq);
-    // Fail-closed: a non-empty page (records or mutation events) that does not
-    // advance the merged cursor past the caller's position is a replaying or
-    // buggy peer, not a continuation. Drop the old
-    // `!mutation_events.is_empty()` escape hatch (RFC-0011 D1, F15).
+    // Fail-closed: a non-empty page that does not advance the merged cursor past
+    // the caller's position is a replaying or buggy peer, not a continuation.
     if !cursor_advanced {
         let page_max_seq = next_cursor.as_ref().map(|cursor| cursor.seq).unwrap_or(0);
         return Err(PullError::Protocol(PeerProtocolError::NonAdvancingPage {
@@ -624,11 +666,7 @@ pub(crate) fn import_budget_delta_response(
             page_max_seq,
         }));
     }
-    let applied_count = if mutation_records.is_empty() {
-        usage_records.len()
-    } else {
-        mutation_records.len()
-    } as u64;
+    let applied_count = mutation_records.len() as u64;
 
     Ok(BudgetDeltaImportOutcome {
         applied_count,
@@ -657,7 +695,11 @@ fn sync_peer_lineage(
         if response.records.is_empty() {
             break;
         }
-        round.charge_page(response.records.len() as u64)?;
+        // Stop the round (not demote) when the local per-round pull cap is hit:
+        // a large well-ordered backlog resumes next sync round (codex #965 round-3).
+        if round.charge_page(response.records.len() as u64).is_err() {
+            break;
+        }
         // Lineage snapshots paginate on the capability_lineage rowid, which is
         // NON-DENSE: an upsert on an existing capability_id keeps its rowid and
         // deletes leave holes, so gaps are legitimate. Require only forward
@@ -804,7 +846,16 @@ fn budget_write_quorum_commit_view_locked(
             .budget_import_acks
             .get(&write.origin_id)
             .is_some_and(|imported_seq| *imported_seq >= write.event_seq);
-        if peer_state.health.is_reachable() && !peer_state.partitioned && acked {
+        // A peer pending a forced snapshot (demoted by a protocol error, then
+        // probed reachable again before its snapshot + delta re-sync completed)
+        // carries stale, untrusted ack heads: it must NOT witness until it has
+        // re-synced, even though a bare reachability probe flipped it Healthy
+        // (codex #965 round-3 P1).
+        if peer_state.health.is_reachable()
+            && !peer_state.partitioned
+            && !peer_state.force_snapshot
+            && acked
+        {
             witness_urls.insert(peer_url.clone());
         }
     }
@@ -1022,15 +1073,6 @@ pub(crate) fn budget_cursor_from_event(event: &BudgetMutationEventView) -> Budge
         capability_id: event.capability_id.clone(),
         grant_index: event.grant_index,
     }
-}
-
-fn budget_cursor_from_usage(usage: &BudgetUsageView) -> Option<BudgetCursor> {
-    Some(BudgetCursor {
-        seq: usage.seq?,
-        updated_at: usage.updated_at,
-        capability_id: usage.capability_id.clone(),
-        grant_index: usage.grant_index,
-    })
 }
 
 pub(crate) fn merge_budget_cursor(

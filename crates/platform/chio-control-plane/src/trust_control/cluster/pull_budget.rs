@@ -5,6 +5,9 @@ pub(crate) const MAX_PULL_PAGES_PER_PEER_PER_ROUND: u32 = 64;
 pub(crate) const MAX_PULL_RECORDS_PER_PEER_PER_ROUND: u64 = 200_000;
 pub(crate) const PEER_ROUND_WALL_CLOCK_BUDGET: Duration = Duration::from_secs(20);
 
+/// A peer wire-contract VIOLATION: the peer is demoted to `Unhealthy`
+/// (fail-closed). These are genuine misbehavior, distinct from a local per-round
+/// pull cap (see `RoundLimit`), which is not.
 #[derive(Debug)]
 pub(crate) enum PeerProtocolError {
     NonAdvancingPage {
@@ -20,13 +23,13 @@ pub(crate) enum PeerProtocolError {
         expected_seq: u64,
         found_seq: u64,
     },
-    PageBudgetExhausted {
-        pages: u32,
+    /// A budget delta page carried usage records with NO mutation events. The
+    /// honest leader only emits usage projections alongside the mutation events
+    /// they derive from, so a records-only page cannot advance the global event
+    /// cursor without importing unverified events (codex #965 round-3 P1).
+    RecordsWithoutMutationEvents {
+        record_count: usize,
     },
-    RecordBudgetExhausted {
-        records: u64,
-    },
-    RoundDeadlineExceeded,
 }
 
 impl std::fmt::Display for PeerProtocolError {
@@ -40,15 +43,24 @@ impl std::fmt::Display for PeerProtocolError {
                 f,
                 "peer returned a page that is not cursor-anchored or has a gap: expected next seq {expected_seq}, found {found_seq}"
             ),
-            Self::PageBudgetExhausted { pages } => {
-                write!(f, "peer exceeded per-round page budget after {pages} pages")
-            }
-            Self::RecordBudgetExhausted { records } => {
-                write!(f, "peer exceeded per-round record budget after {records} records")
-            }
-            Self::RoundDeadlineExceeded => write!(f, "peer exceeded per-round wall-clock budget"),
+            Self::RecordsWithoutMutationEvents { record_count } => write!(
+                f,
+                "peer returned a budget delta with {record_count} usage records but no mutation events"
+            ),
         }
     }
+}
+
+/// The per-round pull budget was reached. This is a LOCAL cap on how much a
+/// single peer is pulled per sync round, NOT peer misbehavior: a large but
+/// well-ordered backlog legitimately exceeds it. The puller stops the round and
+/// resumes from the advanced cursor next round WITHOUT demoting the peer
+/// (codex #965 round-3 P2).
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum RoundLimit {
+    Pages,
+    Records,
+    Deadline,
 }
 
 pub(crate) struct PullRoundBudget {
@@ -66,23 +78,20 @@ impl PullRoundBudget {
         }
     }
 
-    /// Charge one page of `records`. Fail-closed: any exhaustion is a peer
-    /// protocol error, not a silent stop.
-    pub(crate) fn charge_page(&mut self, records: u64) -> Result<(), PeerProtocolError> {
+    /// Charge one page of `records`. An `Err(RoundLimit)` means the LOCAL per-round
+    /// cap (pages, records, or wall-clock deadline) was reached: the caller stops
+    /// this round and resumes next sync round, keeping the peer Healthy. It is NOT
+    /// a peer protocol violation, so it must never route through the demotion path
+    /// (codex #965 round-3 P2).
+    pub(crate) fn charge_page(&mut self, records: u64) -> Result<(), RoundLimit> {
         if Instant::now() >= self.deadline {
-            return Err(PeerProtocolError::RoundDeadlineExceeded);
+            return Err(RoundLimit::Deadline);
         }
-        self.pages_left =
-            self.pages_left
-                .checked_sub(1)
-                .ok_or(PeerProtocolError::PageBudgetExhausted {
-                    pages: MAX_PULL_PAGES_PER_PEER_PER_ROUND,
-                })?;
-        self.records_left = self.records_left.checked_sub(records).ok_or(
-            PeerProtocolError::RecordBudgetExhausted {
-                records: MAX_PULL_RECORDS_PER_PEER_PER_ROUND,
-            },
-        )?;
+        self.pages_left = self.pages_left.checked_sub(1).ok_or(RoundLimit::Pages)?;
+        self.records_left = self
+            .records_left
+            .checked_sub(records)
+            .ok_or(RoundLimit::Records)?;
         Ok(())
     }
 }
@@ -230,23 +239,22 @@ mod pull_budget_tests {
     use super::*;
 
     #[test]
-    fn charge_page_exhausts_pages_records_and_reports_typed_errors() {
+    fn charge_page_reports_round_limits_not_protocol_errors() {
+        // A per-round cap is a LOCAL RoundLimit (the caller stops and resumes next
+        // round), NOT a PeerProtocolError that would demote an honest backlog.
         let mut budget = PullRoundBudget::new();
-        // Records budget: one page that overruns the record budget is a typed error.
+        // Records budget: one page that overruns the record budget stops the round.
         let mut records_budget = PullRoundBudget::new();
-        assert!(matches!(
+        assert_eq!(
             records_budget.charge_page(MAX_PULL_RECORDS_PER_PEER_PER_ROUND + 1),
-            Err(PeerProtocolError::RecordBudgetExhausted { .. })
-        ));
+            Err(RoundLimit::Records)
+        );
 
-        // Page budget: charging one more page than allowed is a typed error.
+        // Page budget: the 65th page (>64 pages of honest backlog) stops the round.
         for _ in 0..MAX_PULL_PAGES_PER_PEER_PER_ROUND {
             assert!(budget.charge_page(1).is_ok(), "page within budget");
         }
-        assert!(matches!(
-            budget.charge_page(1),
-            Err(PeerProtocolError::PageBudgetExhausted { .. })
-        ));
+        assert_eq!(budget.charge_page(1), Err(RoundLimit::Pages));
     }
 
     #[test]

@@ -59,6 +59,7 @@ pub(crate) use consensus::{authority_lease_ttl, cluster_authority_lease_view_loc
 pub(crate) use deltas::{
     budget_write_progress_closed_outcome, budget_write_quorum_commit_view,
     collect_budget_mutation_event_views_after_seq, import_budget_delta_response,
+    notify_cluster_progress,
 };
 
 #[cfg(test)]

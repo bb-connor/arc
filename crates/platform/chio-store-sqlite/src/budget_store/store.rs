@@ -92,21 +92,37 @@ impl SqliteBudgetStore {
                 CHECK (head_seq >= 0)
             );
 
+            -- Incrementally-maintained per-origin ack head, so the status path does
+            -- not GROUP BY the full mutation history every call. Each entry is the
+            -- highest event_seq that origin has WITHIN the verified global contiguous
+            -- prefix (<= the watermark); a DELETE clears it (see the trigger) so a
+            -- hole forces a rebuild rather than leaving a stale-high per-origin head
+            -- (codex #965 round-3 P2).
+            CREATE TABLE IF NOT EXISTS budget_origin_ack_heads (
+                authority_id TEXT PRIMARY KEY,
+                head_seq     INTEGER NOT NULL,
+                CHECK (head_seq >= 0)
+            );
+
             -- Structural (trigger-enforced) mirror of reset_budget_ack_head_watermark:
             -- ANY delete from budget_mutation_events - whether through a known call
             -- site, a future call site added without remembering the reset, or an
-            -- out-of-band/operator delete - forces the watermark back to genesis so
-            -- budget_ack_heads always re-verifies contiguity instead of trusting a
-            -- watermark that may now sit above a freshly punched hole. This fires in
-            -- the same transaction as the DELETE (SQLite AFTER triggers run within the
+            -- out-of-band/operator delete - forces the watermark back to genesis AND
+            -- clears the per-origin heads so budget_ack_heads re-verifies contiguity
+            -- and rebuilds the per-origin heads instead of trusting values that may
+            -- now sit above a freshly punched hole. This fires in the same
+            -- transaction as the DELETE (SQLite AFTER triggers run within the
             -- statement that fired them), so it can never observe a partial delete.
             -- The manual reset_budget_ack_head_watermark calls at each known delete
             -- site are kept as belt-and-suspenders; this trigger is what makes the
-            -- invariant hold even if one of them is ever missed.
-            CREATE TRIGGER IF NOT EXISTS budget_mutation_events_reset_ack_head_watermark
+            -- invariant hold even if one of them is ever missed. DROP+CREATE (not
+            -- IF NOT EXISTS) so an older single-statement trigger is upgraded.
+            DROP TRIGGER IF EXISTS budget_mutation_events_reset_ack_head_watermark;
+            CREATE TRIGGER budget_mutation_events_reset_ack_head_watermark
             AFTER DELETE ON budget_mutation_events
             BEGIN
                 UPDATE budget_ack_head_watermark SET head_seq = 0 WHERE singleton = 1;
+                DELETE FROM budget_origin_ack_heads;
             END;
             "#,
         )?;
@@ -289,19 +305,32 @@ impl SqliteBudgetStore {
                 "UPDATE budget_ack_head_watermark SET head_seq = ?1 WHERE singleton = 1",
                 rusqlite::params![head as i64],
             )?;
+            // Fold ONLY the newly-covered rows (watermark, head] into the durable
+            // per-origin heads, so the status path never GROUPs the full history:
+            // steady-state cost is O(new rows). MAX keeps each origin monotone
+            // within a hole-free window; a DELETE clears this table (trigger +
+            // reset helper), so a per-origin head can never sit above a hole
+            // (codex #965 round-3 P2).
+            transaction.execute(
+                r#"
+                INSERT INTO budget_origin_ack_heads (authority_id, head_seq)
+                SELECT authority_id, MAX(event_seq)
+                FROM budget_mutation_events
+                WHERE authority_id IS NOT NULL
+                  AND event_seq IS NOT NULL
+                  AND event_seq > ?1
+                  AND event_seq <= ?2
+                GROUP BY authority_id
+                ON CONFLICT(authority_id)
+                    DO UPDATE SET head_seq = MAX(head_seq, excluded.head_seq)
+                "#,
+                rusqlite::params![watermark as i64, head as i64],
+            )?;
         }
-        let mut statement = transaction.prepare(
-            r#"
-            SELECT authority_id, MAX(event_seq) AS ack_head
-            FROM budget_mutation_events
-            WHERE authority_id IS NOT NULL
-              AND event_seq IS NOT NULL
-              AND event_seq <= ?1
-            GROUP BY authority_id
-            "#,
-        )?;
+        let mut statement =
+            transaction.prepare("SELECT authority_id, head_seq FROM budget_origin_ack_heads")?;
         let rows = statement
-            .query_map(rusqlite::params![head as i64], |row| {
+            .query_map([], |row| {
                 let origin: String = row.get(0)?;
                 let ack_head = budget_u64_from_row(row, 1, "ack_head")?;
                 Ok((origin, ack_head))
@@ -331,6 +360,9 @@ impl SqliteBudgetStore {
             "UPDATE budget_ack_head_watermark SET head_seq = 0 WHERE singleton = 1",
             [],
         )?;
+        // Clear the incrementally-maintained per-origin heads too: a hole below a
+        // per-origin head would otherwise leave it stale-high until a full rebuild.
+        transaction.execute("DELETE FROM budget_origin_ack_heads", [])?;
         Ok(())
     }
 

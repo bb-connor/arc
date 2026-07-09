@@ -54,7 +54,7 @@ mod cluster_and_reports_tests {
         config.budget_db_path = budget_db_path;
         let cluster = build_cluster_state(&config, config.listen).test_unwrap();
         let cluster_progress = cluster.as_ref().map(|_| Arc::new(ClusterProgress::new()));
-        TrustServiceState {
+        let state = TrustServiceState {
             config,
             enterprise_provider_registry: None,
             verifier_policy_registry: None,
@@ -63,7 +63,15 @@ mod cluster_and_reports_tests {
             )),
             cluster,
             cluster_progress,
+        };
+        // A fresh peer starts with force_snapshot = true (it must snapshot before
+        // its acks are trusted, per codex #965 round-3 P1). Witness tests model
+        // peers that have ALREADY completed their initial sync, so clear it here;
+        // the force_snapshot exclusion itself is covered by its own test.
+        for peer in peer_urls {
+            update_peer_state(&state, peer, |peer| peer.force_snapshot = false);
         }
+        state
     }
 
     fn unique_temp_path(prefix: &str, extension: &str) -> PathBuf {
@@ -757,6 +765,106 @@ mod cluster_and_reports_tests {
         );
         assert_eq!(commit.budget_term, 7);
         assert_eq!(commit.lease_id, "http://writer#term-7");
+    }
+
+    #[test]
+    fn force_snapshot_peer_is_excluded_from_witnesses_until_resynced() {
+        // codex #965 round-3 P1: a peer demoted by a protocol error and pending a
+        // forced snapshot carries stale, untrusted acks. Even after a bare
+        // reachability probe flips it Healthy and it re-advertises acks, it must
+        // NOT witness until the snapshot + delta re-sync clears force_snapshot.
+        let origin = "http://node-a";
+        let state = state_with_cluster(
+            "http://node-a",
+            &["http://node-b", "http://node-c"],
+            None,
+            None,
+            None,
+        );
+        update_peer_reachable(&state, "http://node-b");
+        update_peer_reachable(&state, "http://node-c");
+        let ack = |seq: u64| {
+            vec![BudgetOriginAck {
+                origin_id: origin.to_string(),
+                event_seq: seq,
+            }]
+        };
+        update_peer_budget_acks(&state, "http://node-b", &ack(10));
+        update_peer_budget_acks(&state, "http://node-c", &ack(10));
+        let write = BudgetWriteToken {
+            origin_id: origin.to_string(),
+            event_seq: 8,
+            budget_term: 1,
+        };
+        let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
+        assert_eq!(commit.committed_nodes, 3);
+
+        // node-b is Healthy (probed reachable) but still pending its forced
+        // snapshot: its stale acks must not witness.
+        update_peer_state(&state, "http://node-b", |peer| peer.force_snapshot = true);
+        let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
+        assert_eq!(
+            commit.committed_nodes, 2,
+            "a force_snapshot peer must not witness until it re-syncs"
+        );
+
+        // Snapshot completed: force_snapshot cleared, node-b witnesses again.
+        update_peer_state(&state, "http://node-b", |peer| peer.force_snapshot = false);
+        let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
+        assert_eq!(commit.committed_nodes, 3);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn notify_cluster_progress_wakes_a_parked_waiter_on_quorum() {
+        // codex #965 round-3 P2: a waiter must wake as soon as the ack needed for
+        // quorum lands, not only when the whole sync round finishes. In a 3-node
+        // cluster (quorum 2), self + one peer is quorum: recording ONE peer's ack
+        // mid-round and bumping progress must commit the parked write promptly,
+        // well within the multi-second timeout, even though the other peer never
+        // acked in this round.
+        let state = state_with_cluster(
+            "http://node-a",
+            &["http://node-b", "http://node-c"],
+            None,
+            None,
+            None,
+        );
+        update_peer_reachable(&state, "http://node-b");
+        update_peer_reachable(&state, "http://node-c");
+        let write = BudgetWriteToken {
+            origin_id: "http://node-a".to_string(),
+            event_seq: 5,
+            budget_term: 1,
+        };
+
+        let loop_state = state.clone();
+        let background = tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            // One peer advertises the quorum-making ack mid-round; the other stays
+            // silent (simulating a slow/unreachable peer in the same round).
+            update_peer_budget_acks(
+                &loop_state,
+                "http://node-b",
+                &[BudgetOriginAck {
+                    origin_id: "http://node-a".to_string(),
+                    event_seq: 5,
+                }],
+            );
+            notify_cluster_progress(&loop_state);
+        });
+
+        let started = std::time::Instant::now();
+        let commit = wait_for_budget_write_quorum_commit(&state, write)
+            .await
+            .test_unwrap()
+            .test_unwrap();
+        assert!(commit.quorum_committed);
+        assert_eq!(commit.committed_nodes, 2, "self + the single acking peer");
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(2),
+            "the waiter must wake on the mid-round ack, not wait out the timeout"
+        );
+        background.await.test_unwrap();
     }
 
     #[test]
@@ -1588,7 +1696,11 @@ mod cluster_and_reports_tests {
     }
 
     #[test]
-    fn budget_delta_import_handles_records_without_mutation_events() {
+    fn budget_delta_import_rejects_records_without_mutation_events() {
+        // codex #965 round-3 P1: the honest leader only emits usage projections
+        // alongside the mutation events they derive from. A records-only page
+        // would pin the global cursor past unimported events, so it must be a
+        // protocol violation (demote), NOT an accepted cursor advance.
         let budget_db = unique_temp_path("cluster-records-only-budget-delta", "sqlite3");
         let mut store = SqliteBudgetStore::open(&budget_db).test_unwrap();
         let response = BudgetDeltaResponse {
@@ -1604,25 +1716,22 @@ mod cluster_and_reports_tests {
             mutation_events: Vec::new(),
         };
 
-        let outcome =
-            import_budget_delta_response(&mut store, &response, None, &mut PullRoundBudget::new())
-                .test_unwrap();
-        assert_eq!(outcome.applied_count, 1);
-        assert!(outcome.should_continue);
-        assert_eq!(outcome.next_cursor.test_unwrap().seq, 42);
-
-        let usage = store
+        let result =
+            import_budget_delta_response(&mut store, &response, None, &mut PullRoundBudget::new());
+        assert!(
+            matches!(
+                result,
+                Err(PullError::Protocol(
+                    PeerProtocolError::RecordsWithoutMutationEvents { record_count: 1 }
+                ))
+            ),
+            "a records-only budget page must be rejected as a protocol violation, got {result:?}"
+        );
+        // Fail-closed: nothing was imported and the usage row was not created.
+        assert!(store
             .get_usage("cap-records-only", 0)
             .test_unwrap()
-            .test_unwrap();
-        assert_eq!(usage.invocation_count, 3);
-        assert_eq!(usage.seq, 42);
-        assert_eq!(usage.total_cost_exposed, 55);
-        assert_eq!(usage.total_cost_realized_spend, 21);
-        assert!(store
-            .list_mutation_events(10, Some("cap-records-only"), Some(0))
-            .test_unwrap()
-            .is_empty());
+            .is_none());
     }
 
     #[test]
