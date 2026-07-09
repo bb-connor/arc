@@ -102,7 +102,9 @@ pub(crate) struct FederationAdmissionRateLimiter {
 
 impl Default for FederationAdmissionRateLimiter {
     fn default() -> Self {
-        Self::with_key_cap(4096)
+        // Single-sourced with the process memory budget (RFC-0004 section 5)
+        // instead of a duplicated literal; tighter caps use `with_key_cap`.
+        Self::with_key_cap(chio_kernel::MemoryBudgetConfig::defaults().admission_key_cap)
     }
 }
 
@@ -118,6 +120,11 @@ impl FederationAdmissionRateLimiter {
     #[cfg(test)]
     pub(crate) fn key_count(&self) -> usize {
         self.attempts.len()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn insertion_order_len(&self) -> usize {
+        self.insertion_order.len()
     }
 
     pub(crate) fn check_and_record(
@@ -172,10 +179,17 @@ impl FederationAdmissionRateLimiter {
         // Drop-empty maintenance: prune any key whose window has fully emptied so
         // a fresh subject costs nothing once its window empties (RFC-0004 F39,
         // F21 rate-limiter half). Bounded: touches at most `key_cap` keys.
-        self.attempts.retain(|_, timestamps| {
+        // Prune `insertion_order` in lockstep so an expired subject removed from
+        // `attempts` cannot leave a stale key behind: otherwise the order deque
+        // leaks one String per distinct subject even below `key_cap`, because
+        // the eviction loop (which drains stale entries) never runs.
+        let attempts = &mut self.attempts;
+        let insertion_order = &mut self.insertion_order;
+        attempts.retain(|_, timestamps| {
             timestamps.retain(|t| *t > lower_bound);
             !timestamps.is_empty()
         });
+        insertion_order.retain(|entry_key| attempts.contains_key(entry_key));
 
         FederationAdmissionRateLimitStatus {
             limit: limit.max_requests,
@@ -279,6 +293,31 @@ mod admission_bound_tests {
         assert!(
             limiter.key_count() <= 8,
             "attempts map grew past key cap: {}",
+            limiter.key_count()
+        );
+    }
+
+    #[test]
+    fn expired_subjects_do_not_leak_insertion_order() {
+        // Distinct subjects, each in its own window (1000s apart, far past the
+        // 60s window), stay below `key_cap`, so the eviction loop never runs. The
+        // maintenance pass must prune `insertion_order` alongside `attempts` or
+        // the order deque grows one String per subject without bound (RFC-0004
+        // F39).
+        let mut limiter = FederationAdmissionRateLimiter::with_key_cap(4096);
+        for i in 0..1000u64 {
+            let subject = format!("subject-{i}");
+            let now = 100 + i * 1000;
+            let _ = limiter.check_and_record("policy", &subject, &limit(), now);
+        }
+        assert!(
+            limiter.insertion_order_len() <= 8,
+            "insertion_order leaked stale keys: {}",
+            limiter.insertion_order_len()
+        );
+        assert!(
+            limiter.key_count() <= 8,
+            "attempts leaked stale keys: {}",
             limiter.key_count()
         );
     }
