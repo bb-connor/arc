@@ -759,6 +759,21 @@ impl SqliteBudgetStore {
                             params![hold_id],
                         )?;
                     }
+                    // Insert the incoming re-appended event (same event_id, fresh
+                    // higher event_seq) AFTER tombstoning the superseded seq, so the
+                    // follower actually holds the retried write. Without this insert
+                    // the follower's contiguous ack head halts at the abandoned marker
+                    // and never reaches the re-appended seq, so it never witnesses the
+                    // retried write and quorum waits time out even though the delta was
+                    // applied (codex #965: insert replacement events after
+                    // tombstoning). This never over-counts: the superseded old seq
+                    // stays abandoned (a FILLED-but-not-live slot, contributing no
+                    // origin ack), while the re-appended event is a genuine
+                    // leader-committed write, so witnessing its fresh seq is correct.
+                    // A plain INSERT (mirroring the new-event path) is fail-closed: if a
+                    // corrupt stream reused this fresh seq for a different event the
+                    // unique event_seq index rejects it rather than masking it.
+                    Self::insert_imported_mutation_event(transaction, record)?;
                     false
                 } else {
                     return Err(BudgetStoreError::Invariant(format!(
@@ -770,8 +785,31 @@ impl SqliteBudgetStore {
                 true
             }
         } else {
-            transaction.execute(
-                r#"
+            Self::insert_imported_mutation_event(transaction, record)?;
+            false
+        };
+
+        if duplicate_event {
+            return Ok(());
+        }
+
+        Self::apply_imported_hold_state(transaction, record)?;
+        Ok(())
+    }
+
+    /// Insert one imported mutation event row verbatim. Shared by the new-event
+    /// import path and the follower rollback-retry REPLACE path (which deletes the
+    /// superseded row and tombstones its seq before re-inserting the leader's
+    /// re-appended event under its fresh higher event_seq). A plain INSERT is
+    /// deliberate and fail-closed: the unique event_seq index rejects a corrupt
+    /// stream that reused a seq for a different event rather than silently masking
+    /// it.
+    fn insert_imported_mutation_event(
+        transaction: &rusqlite::Transaction<'_>,
+        record: &BudgetMutationRecord,
+    ) -> Result<(), BudgetStoreError> {
+        transaction.execute(
+            r#"
                 INSERT INTO budget_mutation_events (
                     event_id,
                     hold_id,
@@ -795,37 +833,29 @@ impl SqliteBudgetStore {
                     lease_epoch
                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
                 "#,
-                params![
-                    record.event_id,
-                    record.hold_id,
-                    record.capability_id,
-                    i64::from(record.grant_index),
-                    record.kind.as_str(),
-                    record.allowed.map(|value| if value { 1_i64 } else { 0_i64 }),
-                    record.recorded_at,
-                    record.event_seq as i64,
-                    record.usage_seq.map(|value| value as i64),
-                    record.exposure_units as i64,
-                    record.realized_spend_units as i64,
-                    record.max_invocations.map(i64::from),
-                    record.max_cost_per_invocation.map(|value| value as i64),
-                    record.max_total_cost_units.map(|value| value as i64),
-                    i64::from(record.invocation_count_after),
-                    record.total_cost_exposed_after as i64,
-                    record.total_cost_realized_spend_after as i64,
-                    record.authority.as_ref().map(|value| value.authority_id.as_str()),
-                    record.authority.as_ref().map(|value| value.lease_id.as_str()),
-                    record.authority.as_ref().map(|value| value.lease_epoch as i64),
-                ],
-            )?;
-            false
-        };
-
-        if duplicate_event {
-            return Ok(());
-        }
-
-        Self::apply_imported_hold_state(transaction, record)?;
+            params![
+                record.event_id,
+                record.hold_id,
+                record.capability_id,
+                i64::from(record.grant_index),
+                record.kind.as_str(),
+                record.allowed.map(|value| if value { 1_i64 } else { 0_i64 }),
+                record.recorded_at,
+                record.event_seq as i64,
+                record.usage_seq.map(|value| value as i64),
+                record.exposure_units as i64,
+                record.realized_spend_units as i64,
+                record.max_invocations.map(i64::from),
+                record.max_cost_per_invocation.map(|value| value as i64),
+                record.max_total_cost_units.map(|value| value as i64),
+                i64::from(record.invocation_count_after),
+                record.total_cost_exposed_after as i64,
+                record.total_cost_realized_spend_after as i64,
+                record.authority.as_ref().map(|value| value.authority_id.as_str()),
+                record.authority.as_ref().map(|value| value.lease_id.as_str()),
+                record.authority.as_ref().map(|value| value.lease_epoch as i64),
+            ],
+        )?;
         Ok(())
     }
 

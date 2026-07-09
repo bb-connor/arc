@@ -2291,6 +2291,132 @@ fn follower_replace_self_records_abandoned_seq_and_head_advances() {
 }
 
 #[test]
+fn follower_replace_inserts_reappended_event_and_head_reaches_new_seq() {
+    // codex #965 (insert replacement events after tombstoning): TEETH-TEST for the
+    // follower REPLACE path. An ALREADY-SYNCED follower holds the ORIGINAL authorize
+    // E@1 (its pull cursor is already past 1). When it imports the leader's
+    // re-appended E@new (same event_id, fresh higher seq), the REPLACE path deletes
+    // E@1 and tombstones seq 1, then MUST re-insert E@new so the follower actually
+    // holds the retried write and its budget_ack_heads head ADVANCES to the new seq.
+    // RED before the fix: the REPLACE branch tombstoned + returned without inserting,
+    // so E@new was ABSENT and the head halted at the rollback marker (never
+    // witnessing the retried write -> quorum waits time out). This pins the ABSOLUTE
+    // new seq (not head == max, which passed even with E@new missing because both
+    // degraded to the rollback marker together).
+    let leader_path = unique_db_path("chio-follower-replace-teeth-leader");
+    let follower_path = unique_db_path("chio-follower-replace-teeth-follower");
+    let leader = SqliteBudgetStore::open(&leader_path).unwrap();
+    let follower = SqliteBudgetStore::open(&follower_path).unwrap();
+    let hold_id = "hold-teeth";
+    let event_id = "evt-teeth:authorize";
+    let initial = authority("budget-primary", "lease-1", 1);
+    let changed = authority("budget-primary", "lease-2", 2);
+
+    // Leader authorizes E (seq 1), then rolls it back (rollback marker at seq 2).
+    assert!(leader
+        .try_charge_cost_with_ids_and_authority(
+            "cap-teeth",
+            0,
+            Some(10),
+            100,
+            Some(200),
+            Some(1000),
+            Some(hold_id),
+            Some(event_id),
+            Some(&initial),
+        )
+        .unwrap());
+    leader
+        .reverse_charge_cost_with_ids_and_authority(
+            "cap-teeth",
+            0,
+            100,
+            Some(hold_id),
+            Some("evt-teeth:authorize:rollback:1"),
+            Some(&initial),
+        )
+        .unwrap();
+
+    // Follower syncs the PRE-retry state (E@1 + the rollback marker), and confirms it
+    // holds the ORIGINAL authorize at seq 1 with no abandoned slot yet.
+    let pre_retry = leader.list_mutation_events_after_seq(100, 0).unwrap();
+    follower.import_snapshot_records(&[], &pre_retry).unwrap();
+    assert_eq!(
+        follower.mutation_event_seq_for_event_id(event_id).unwrap(),
+        Some(1),
+        "follower holds the ORIGINAL authorize at seq 1 pre-retry"
+    );
+    assert!(follower.list_abandoned_event_seqs().unwrap().is_empty());
+
+    // Leader retries under the NEW lease: deletes E@1 (abandons 1), re-appends E@new.
+    assert!(leader
+        .try_charge_cost_with_ids_and_authority(
+            "cap-teeth",
+            0,
+            Some(10),
+            100,
+            Some(200),
+            Some(1000),
+            Some(hold_id),
+            Some(event_id),
+            Some(&changed),
+        )
+        .unwrap());
+    let reappended = leader
+        .list_mutation_events_after_seq(100, 0)
+        .unwrap()
+        .into_iter()
+        .find(|record| record.event_id == event_id)
+        .expect("the re-appended authorize event");
+    let new_seq = reappended.event_seq;
+    assert!(
+        new_seq > 2,
+        "re-appended strictly above the rollback marker"
+    );
+
+    // Follower imports the re-appended authorize. The REPLACE path deletes E@1,
+    // tombstones seq 1, and (with the fix) re-inserts E@new.
+    follower.import_mutation_record(&reappended).unwrap();
+
+    // TEETH: the re-appended event is PRESENT at its new seq (exactly one row: the
+    // unique event_seq index would reject a duplicate).
+    assert_eq!(
+        follower.mutation_event_seq_for_event_id(event_id).unwrap(),
+        Some(new_seq),
+        "the follower re-inserts the re-appended event at its fresh seq"
+    );
+    // The follower's max advances to the re-appended seq (E@new is held, not lost).
+    assert_eq!(
+        follower.max_mutation_event_seq().unwrap(),
+        new_seq,
+        "the follower's max advances to the re-appended seq"
+    );
+    // TEETH: the contiguous ack head ADVANCES to the ABSOLUTE new seq, so the
+    // follower witnesses the retried write.
+    let head = follower
+        .budget_ack_heads()
+        .unwrap()
+        .into_iter()
+        .find(|(origin, _)| origin == "budget-primary")
+        .map(|(_, seq)| seq);
+    assert_eq!(
+        head,
+        Some(new_seq),
+        "the follower's ack head reaches the re-appended seq, not the rollback marker"
+    );
+    // The superseded OLD seq stays abandoned (a FILLED-but-not-live slot: it lets the
+    // head cross the hole but contributes no origin ack, so no over-count).
+    assert_eq!(
+        follower.list_abandoned_event_seqs().unwrap(),
+        vec![1],
+        "the superseded old seq stays abandoned, never a live witness"
+    );
+
+    let _ = fs::remove_file(&leader_path);
+    let _ = fs::remove_file(&follower_path);
+}
+
+#[test]
 fn mutation_event_witness_returns_stored_origin_authority() -> Result<(), Box<dyn std::error::Error>>
 {
     // codex #965 round-5 P1: the witness identity for an idempotent retry comes
