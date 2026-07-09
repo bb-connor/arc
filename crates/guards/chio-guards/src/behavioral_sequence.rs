@@ -79,11 +79,18 @@ impl Guard for BehavioralSequenceGuard {
             }
         }
 
-        // Check required predecessors.
+        // Check required predecessors. "Has this tool ever been invoked" is a
+        // cumulative property, so consult the journal's cumulative `tool_counts`
+        // (which survives ring eviction under RFC-0004 F21) rather than the
+        // bounded `tool_sequence` tail. A predecessor invoked once and then
+        // pushed out of the retained window is still known to have run, so a
+        // workflow that runs setup once and then more than `journal_entry_cap`
+        // other calls is no longer falsely denied when a dependent tool needs
+        // that evicted predecessor. `tool_counts` stays bounded because it is
+        // keyed by the (naturally bounded) set of distinct tool names.
         if let Some(required) = self.policy.required_predecessors.get(tool_name) {
-            let invoked: HashSet<&str> = sequence.iter().map(|s| s.as_str()).collect();
             for req in required {
-                if !invoked.contains(req.as_str()) {
+                if !snapshot.tool_counts.contains_key(req) {
                     return Ok(GuardDecision::deny(Vec::new()));
                 }
             }
@@ -247,6 +254,59 @@ mod tests {
         let (request2, scope2, agent_id2, server_id2) = make_ctx_for_tool("write_file");
         let ctx2 = guard_ctx(&request2, &scope2, &agent_id2, &server_id2);
         assert_eq!(guard.evaluate(&ctx2).expect("ok"), Verdict::Allow);
+    }
+
+    #[test]
+    fn required_predecessor_survives_journal_ring_eviction() {
+        // RFC-0004 F21 (codex round-7): the required-predecessor check asks
+        // "has this tool ever been invoked", which is cumulative. Once the
+        // bounded tool_sequence ring evicts the setup call, the check must still
+        // resolve it via the cumulative tool_counts, so a long workflow (setup
+        // once, then more than journal_entry_cap other calls) is not falsely
+        // denied when a dependent tool needs the evicted predecessor.
+        let cap = 4;
+        let journal = Arc::new(SessionJournal::with_entry_cap(
+            "sess-evict".to_string(),
+            cap,
+        ));
+        // Run the required predecessor once.
+        record(&journal, "read_file");
+        // Then run well over `cap` other calls, evicting "read_file" from the ring.
+        for _ in 0..(cap * 3) {
+            record(&journal, "bash");
+        }
+
+        let mut required = HashMap::new();
+        required.insert(
+            "write_file".to_string(),
+            HashSet::from(["read_file".to_string()]),
+        );
+        let guard = BehavioralSequenceGuard::new(
+            journal.clone(),
+            SequencePolicy {
+                required_predecessors: required,
+                ..SequencePolicy::default()
+            },
+        );
+
+        // Precondition: the retained ring no longer holds the evicted
+        // predecessor, but the cumulative tool_counts still records it.
+        let snapshot = journal.snapshot().expect("snapshot");
+        assert!(
+            !snapshot.tool_sequence.iter().any(|t| t == "read_file"),
+            "test precondition: read_file must have been evicted from the ring"
+        );
+        assert!(
+            snapshot.tool_counts.contains_key("read_file"),
+            "cumulative tool_counts must still record the evicted predecessor"
+        );
+
+        // write_file requires read_file, which ran once but was evicted; it must
+        // still be ALLOWED because the predecessor is cumulatively known. Before
+        // the fix (sequence-based check) this would falsely DENY.
+        let (request, scope, agent_id, server_id) = make_ctx_for_tool("write_file");
+        let ctx = guard_ctx(&request, &scope, &agent_id, &server_id);
+        assert_eq!(guard.evaluate(&ctx).expect("ok"), Verdict::Allow);
     }
 
     #[test]
