@@ -607,7 +607,8 @@ class ChioClient:
         id-only ``{"id": ...}`` stub); the id-only SDK wrappers cannot drive
         this route and use ``evaluate_tool_call`` instead. Posts to the
         kernel-mediated ``/v1/evaluate`` route and returns
-        ``{"verdict", "receipt", "execution_nonce"}``.
+        ``{"status", "receipt", "execution_nonce"}``, where ``status`` is one of
+        ``"authorized"``, ``"deny"``, or ``"pending_approval"``.
 
         This route is a single-phase authorization gate: it verifies the
         capability (and any governed intent, approval token, or DPoP proof),

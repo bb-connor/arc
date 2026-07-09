@@ -438,7 +438,7 @@ class TestEvaluateToolCall:
     @respx.mock
     async def test_evaluate_tool_call_mediated_returns_mediated_response(self) -> None:
         expected = {
-            "verdict": "allow",
+            "status": "authorized",
             "receipt": _make_receipt_dict(),
             "execution_nonce": {"nonce_id": "n-1", "signature": "e" * 128},
         }
@@ -453,9 +453,9 @@ class TestEvaluateToolCall:
                 parameters={"path": "/tmp"},
             )
         assert result == expected
-        # The preflight (no nonce) must not carry an execution_nonce field.
-        preflight_body = json.loads(route.calls.last.request.content)
-        assert "execution_nonce" not in preflight_body
+        # This authorization request must not carry an execution_nonce field.
+        request_body = json.loads(route.calls.last.request.content)
+        assert "execution_nonce" not in request_body
 
     @respx.mock
     async def test_evaluate_tool_call_mediated_forwards_governed_and_dpop(self) -> None:
@@ -467,7 +467,7 @@ class TestEvaluateToolCall:
             return_value=httpx.Response(
                 200,
                 json={
-                    "verdict": "allow",
+                    "status": "authorized",
                     "receipt": _make_receipt_dict(),
                     "execution_nonce": {"nonce_id": "n-1", "signature": "e" * 128},
                 },
