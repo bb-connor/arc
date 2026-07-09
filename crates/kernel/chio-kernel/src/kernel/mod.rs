@@ -443,7 +443,12 @@ impl ReceiptLog {
     pub fn append(&mut self, receipt: ChioReceipt) {
         // Evicted receipts are already durably persisted (the store write in
         // record_chio_receipt precedes this mirror append) or ephemeral by
-        // policy, so dropping the evicted item is safe.
+        // policy, so dropping the evicted item is safe. Caveat (RFC-0004
+        // F03/F25): for an append-only/remote store that does NOT implement
+        // point lookups, this mirror is the only lookup source, so eviction here
+        // makes an older receipt unresolvable and parent-receipt call-chain
+        // validation fails closed. Such deployments must implement
+        // ReceiptStore::load_chio_receipt (see has_local_receipt_id).
         let _evicted = self.ring.push(receipt);
     }
 

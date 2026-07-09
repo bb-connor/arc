@@ -134,6 +134,135 @@ fn store_read_error_propagates_and_is_not_mirror_served() {
 }
 
 #[test]
+fn point_load_store_resolves_parent_receipt_after_mirror_eviction() {
+    // RFC-0004 F03/F25 (codex round-7): the receipt mirror is bounded, so it is
+    // NOT a durable point-lookup source. A store-authoritative deployment whose
+    // store implements point loads (here SqliteReceiptStore) must still resolve a
+    // parent receipt by id AFTER the bounded mirror has evicted it, so governed
+    // call-chain validation of an older parent_receipt_id does not falsely deny.
+    // This pins that RFC-0004's bounded mirror does not break the supported
+    // store-authoritative path.
+    let mut config = make_config();
+    config.memory_budget.receipt_mirror_capacity = 2;
+    let mut kernel = make_kernel(config);
+    kernel
+        .set_receipt_store(Box::new(PointLookupReceiptStore::default()))
+        .unwrap();
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
+
+    let agent_kp = make_keypair();
+    let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+
+    let first = kernel
+        .evaluate_tool_call_blocking(&make_request_with_arguments(
+            "req-evict-1",
+            &cap,
+            "read_file",
+            "srv-a",
+            serde_json::json!({ "path": "/f-1" }),
+        ))
+        .unwrap();
+    let first_id = first.receipt.id.clone();
+
+    // Push more receipts than the mirror cap so the first is evicted from it.
+    for i in 2..=5 {
+        kernel
+            .evaluate_tool_call_blocking(&make_request_with_arguments(
+                &format!("req-evict-{i}"),
+                &cap,
+                "read_file",
+                "srv-a",
+                serde_json::json!({ "path": format!("/f-{i}") }),
+            ))
+            .unwrap();
+    }
+
+    assert!(
+        !kernel
+            .receipt_log()
+            .receipts()
+            .iter()
+            .any(|r| r.id == first_id),
+        "precondition: first receipt must be evicted from the bounded mirror"
+    );
+    // A point-load-capable store still resolves the evicted parent receipt.
+    assert!(
+        kernel.has_local_receipt_id(&first_id).unwrap(),
+        "point-load store must resolve an evicted parent receipt by id"
+    );
+    assert!(kernel.local_receipt_artifact(&first_id).unwrap().is_some());
+}
+
+#[test]
+fn append_only_store_fails_closed_for_parent_receipt_after_mirror_eviction() {
+    // RFC-0004 F03/F25 (codex round-7): the documented boundary. An append-only
+    // / remote store that does NOT implement point loads relies entirely on the
+    // bounded mirror. Once the mirror evicts a receipt, an older parent_receipt_id
+    // resolves in neither the store nor the mirror, so governed call-chain
+    // validation fails closed (a safe deny, never a false allow). Deployments
+    // that must avoid this MUST implement ReceiptStore::load_chio_receipt.
+    let mut config = make_config();
+    config.memory_budget.receipt_mirror_capacity = 2;
+    let mut kernel = make_kernel(config);
+    kernel
+        .set_receipt_store(Box::new(AppendOnlyReceiptStore))
+        .unwrap();
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
+
+    let agent_kp = make_keypair();
+    let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+
+    let first = kernel
+        .evaluate_tool_call_blocking(&make_request_with_arguments(
+            "req-ao-1",
+            &cap,
+            "read_file",
+            "srv-a",
+            serde_json::json!({ "path": "/f-1" }),
+        ))
+        .unwrap();
+    let first_id = first.receipt.id.clone();
+
+    // While still in the mirror, the receipt resolves (round-2 mirror fallback).
+    assert!(
+        kernel.has_local_receipt_id(&first_id).unwrap(),
+        "receipt must resolve from the mirror before eviction"
+    );
+
+    // Push more receipts than the mirror cap so the first is evicted.
+    for i in 2..=5 {
+        kernel
+            .evaluate_tool_call_blocking(&make_request_with_arguments(
+                &format!("req-ao-{i}"),
+                &cap,
+                "read_file",
+                "srv-a",
+                serde_json::json!({ "path": format!("/f-{i}") }),
+            ))
+            .unwrap();
+    }
+
+    assert!(
+        !kernel
+            .receipt_log()
+            .receipts()
+            .iter()
+            .any(|r| r.id == first_id),
+        "precondition: first receipt must be evicted from the bounded mirror"
+    );
+    // Documented boundary: append-only store cannot point-load and the mirror
+    // evicted it, so the lookup fails closed (false = deny of any dependent
+    // call-chain claim, never a false allow).
+    assert!(
+        !kernel.has_local_receipt_id(&first_id).unwrap(),
+        "append-only store + mirror eviction must fail closed (no false allow)"
+    );
+    assert!(kernel.local_receipt_artifact(&first_id).unwrap().is_none());
+}
+
+#[test]
 fn kernel_bounded_registry_lists_every_labelled_structure() {
     // RFC-0004 sections 4/6: every kernel-held bounded structure has a live
     // gauge; the registry enumerates them so the soak harness and a future

@@ -44,6 +44,14 @@ impl ChioKernel {
         // A store READ ERROR fails closed and PROPAGATES; only a genuine miss
         // (`Ok(None)`) falls through to the mirror, so a store verification
         // failure is never masked by a mirror hit (RFC-0004 F1 round-2).
+        //
+        // Boundary (RFC-0004 F03/F25): if that append-only/remote store does not
+        // implement point loads, the bounded mirror is the ONLY lookup source.
+        // Once the mirror evicts a receipt past `receipt_mirror_capacity`, this
+        // returns `Ok(false)` and the dependent call-chain claim is denied
+        // (fail-closed, never a false allow). Such deployments must implement
+        // `ReceiptStore::load_chio_receipt` so older parent receipts stay
+        // point-loadable after eviction.
         if self.receipt_store.is_some() {
             if self
                 .with_receipt_store(|store| Ok(store.load_chio_receipt(receipt_id)?))?

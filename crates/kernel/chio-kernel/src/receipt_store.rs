@@ -186,6 +186,19 @@ pub enum ReceiptStoreError {
 
 pub trait ReceiptStore: Send + Sync {
     fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError>;
+    /// Load a chio receipt by id. The provided default returns `None`; a store
+    /// backing a store-authoritative deployment MUST override this (and
+    /// `load_child_receipt`) with a real point lookup (RFC-0004 F03/F25).
+    ///
+    /// The kernel consults this BEFORE the bounded in-memory receipt mirror and
+    /// falls back to the mirror only on a genuine `Ok(None)` miss. An append-only
+    /// or remote store that does NOT override this therefore relies entirely on
+    /// the mirror for point lookups: once the mirror evicts a receipt (past
+    /// `receipt_mirror_capacity`), governed call-chain validation of an older
+    /// `parent_receipt_id` misses both the store and the mirror and fails closed
+    /// (a deny of the dependent claim, never a false allow). A store-authoritative
+    /// remote deployment that must resolve older parent receipts MUST implement
+    /// this point load so bounded-mirror eviction does not cause false denials.
     fn load_chio_receipt(
         &self,
         _receipt_id: &str,
@@ -195,7 +208,8 @@ pub trait ReceiptStore: Send + Sync {
     /// Load a child-request receipt by id. Provided default returns `None`; a
     /// store used for a store-authoritative deployment must override both this
     /// and `load_chio_receipt` (RFC-0004 F03/F25). A miss is a fail-closed deny
-    /// of the dependent call-chain claim, never a false allow.
+    /// of the dependent call-chain claim, never a false allow. The same
+    /// bounded-mirror eviction caveat documented on `load_chio_receipt` applies.
     fn load_child_receipt(
         &self,
         _receipt_id: &str,
