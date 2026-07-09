@@ -197,17 +197,22 @@ impl LabeledHistogram {
         }
     }
 
-    /// Numeric upper bounds parsed from the registry descriptor (string form).
-    fn bounds(&self) -> Vec<f64> {
+    /// The registry descriptor's bucket upper bounds in their ORIGINAL string
+    /// form (e.g. `"1.0"`, `"5.0"`, `"10.0"`).
+    ///
+    /// Rendered verbatim as the `le=` label so the runtime exposition matches
+    /// the locked registry labels (Codex round-6): parsing to `f64` first would
+    /// emit `le="1"` for a `"1.0"` descriptor bucket, and Prometheus treats `1`
+    /// and `1.0` as distinct buckets, so `sum by (le)` / `histogram_quantile`
+    /// split across the runtime renderer and any dashboard/renderer keyed on the
+    /// registry strings. A numeric copy is parsed inline only for the
+    /// `observe()` comparison; the exposition label always uses this string
+    /// form. Iterating a single unfiltered source keeps the bucket index aligned
+    /// between `observe` (fetch_add) and `render` (le label).
+    fn bucket_bounds(&self) -> &'static [&'static str] {
         descriptor_for(self.name)
-            .map(|descriptor| {
-                descriptor
-                    .buckets
-                    .iter()
-                    .filter_map(|bound| bound.parse::<f64>().ok())
-                    .collect()
-            })
-            .unwrap_or_default()
+            .map(|descriptor| descriptor.buckets)
+            .unwrap_or(&[])
     }
 
     fn cell(&self, values: &[&str], bucket_len: usize) -> Option<Arc<HistogramCell>> {
@@ -227,12 +232,19 @@ impl LabeledHistogram {
     }
 
     pub fn observe(&self, values: &[&str], seconds: f64) {
-        let bounds = self.bounds();
+        let bounds = self.bucket_bounds();
         let Some(cell) = self.cell(values, bounds.len()) else {
             return;
         };
         for (index, bound) in bounds.iter().enumerate() {
-            if seconds <= *bound {
+            // Parse a numeric copy ONLY for the bucket comparison; the exposition
+            // le= label is rendered from the original string form (Codex
+            // round-6). A bucket that cannot parse is skipped for counting but
+            // still occupies its index so render stays aligned.
+            let Ok(bound) = bound.parse::<f64>() else {
+                continue;
+            };
+            if seconds <= bound {
                 if let Some(bucket) = cell.bucket_counts.get(index) {
                     bucket.fetch_add(1, Ordering::Relaxed);
                 }
@@ -250,13 +262,13 @@ impl LabeledHistogram {
     }
 
     pub fn preregister(&self, values: &[&str]) {
-        let bounds = self.bounds();
+        let bounds = self.bucket_bounds();
         let _ = self.cell(values, bounds.len());
     }
 
     pub fn render(&self, out: &mut String) {
         render_header(out, self.name, "histogram");
-        let bounds = self.bounds();
+        let bounds = self.bucket_bounds();
         let Ok(cells) = self.cells.lock() else { return };
         for (values, cell) in cells.iter() {
             let base = render_label_set(self.labels, values);
@@ -504,6 +516,39 @@ mod tests {
                 "chio_soc_export_lag_seconds_count{exporter=\"splunk\",severity=\"info\"} 1"
             ),
             "{out}"
+        );
+    }
+
+    #[test]
+    fn histogram_render_preserves_registry_bucket_label_strings() {
+        // Codex round-6: the le= label must be the registry descriptor's ORIGINAL
+        // string form. CHIO_GUARD_EVAL_DURATION_SECONDS declares a "1.0" bucket;
+        // rendering the parsed f64 would collapse "1.0"->le="1", which Prometheus
+        // treats as a different bucket than the locked "1.0" label, splitting
+        // sum by (le) / histogram_quantile across the runtime renderer and any
+        // dashboard keyed on the registry strings.
+        let hist = LabeledHistogram::new(
+            crate::CHIO_GUARD_EVAL_DURATION_SECONDS,
+            &["guard_id", "verdict"],
+        );
+        hist.observe(&["g1", "allow"], 0.6);
+        let mut out = String::new();
+        hist.render(&mut out);
+        // Every declared bucket string is emitted verbatim, and the descriptor's
+        // canonical source (never the reparsed f64) drives the label.
+        for label in crate::descriptor_for(crate::CHIO_GUARD_EVAL_DURATION_SECONDS)
+            .map(|d| d.buckets)
+            .unwrap_or(&[])
+        {
+            assert!(
+                out.contains(&format!("le=\"{label}\"")),
+                "the registry bucket string `{label}` must be emitted verbatim: {out}"
+            );
+        }
+        // The `1.0` descriptor bucket must NOT be collapsed to a bare integer.
+        assert!(
+            out.contains("le=\"1.0\"") && !out.contains("le=\"1\""),
+            "a `.0` descriptor bucket must render verbatim, not as le=\"1\": {out}"
         );
     }
 
