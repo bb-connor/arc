@@ -337,8 +337,15 @@ impl ExporterManager {
                     // dlq_depth, so without this the `_deserialize` gauge would
                     // stay absent/stale while the in-memory DLQ grows and the
                     // alert-pack backstop underreports malformed-row failures.
-                    self.metrics
-                        .set_dlq_depth("_deserialize", self.dlq.len() as u64);
+                    // Scope the depth to `_deserialize` entries only (Codex
+                    // round-4 finding 2): the DLQ is shared, so the global length
+                    // would fold a coexisting exporter backlog into the
+                    // malformed-row gauge (the cross-exporter attribution bug
+                    // round-3 finding 4 fixed for the exporter loop).
+                    self.metrics.set_dlq_depth(
+                        "_deserialize",
+                        self.dlq.depth_for_exporter("_deserialize") as u64,
+                    );
                     tracing::warn!(
                         seq = seq,
                         "Failed to deserialize receipt -- captured to durable DLQ"
@@ -988,6 +995,101 @@ mod tests {
         assert!(
             depths.contains(&("_deserialize".to_string(), 1)),
             "the deserialize DLQ depth must be reported for a malformed row: {depths:?}"
+        );
+        Ok(())
+    }
+
+    /// Seed a receipt DB with `valid` valid receipts (seq 1..=valid) followed by
+    /// one malformed row (seq valid+1).
+    fn seed_valid_then_malformed_receipt_db(path: &std::path::Path, valid: usize) -> TestResult {
+        let conn = rusqlite::Connection::open(path)?;
+        conn.execute_batch(
+            "CREATE TABLE chio_tool_receipts (
+                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                 receipt_id TEXT NOT NULL UNIQUE,
+                 timestamp INTEGER NOT NULL,
+                 capability_id TEXT NOT NULL,
+                 tool_server TEXT NOT NULL,
+                 tool_name TEXT NOT NULL,
+                 decision_kind TEXT NOT NULL,
+                 policy_hash TEXT NOT NULL,
+                 content_hash TEXT NOT NULL,
+                 raw_json TEXT NOT NULL
+             );",
+        )?;
+        for i in 0..valid {
+            let receipt = sample_receipt(&format!("rcpt-{i:04}"))?;
+            let raw_json = serde_json::to_string(&receipt)?;
+            conn.execute(
+                "INSERT INTO chio_tool_receipts (receipt_id, timestamp, capability_id, \
+                 tool_server, tool_name, decision_kind, policy_hash, content_hash, raw_json) \
+                 VALUES (?1, 1, 'c', 's', 't', 'allow', 'p', 'h', ?2)",
+                rusqlite::params![receipt.id, raw_json],
+            )?;
+        }
+        conn.execute(
+            "INSERT INTO chio_tool_receipts (receipt_id, timestamp, capability_id, \
+             tool_server, tool_name, decision_kind, policy_hash, content_hash, raw_json) \
+             VALUES ('malformed-1', 1, 'c', 's', 't', 'allow', 'p', 'h', 'not valid receipt json')",
+            [],
+        )?;
+        Ok(())
+    }
+
+    /// Codex round-4 finding 2: the `_deserialize` DLQ-depth gauge must count only
+    /// `_deserialize` entries, never the global queue length. A coexisting
+    /// exporter backlog must not inflate the malformed-row gauge (the
+    /// cross-exporter attribution bug round-3 F4 fixed for the exporter path, but
+    /// which the malformed-capture path still exhibited).
+    #[tokio::test]
+    async fn deserialize_dlq_depth_excludes_other_exporter_backlog() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let receipt_db = dir.path().join("receipts.sqlite3");
+        // seq 1,2 valid; seq 3 malformed.
+        seed_valid_then_malformed_receipt_db(&receipt_db, 2)?;
+
+        let sink = std::sync::Arc::new(RecordingSink::default());
+        let mut manager = ExporterManager::new(SiemConfig {
+            db_path: receipt_db.clone(),
+            max_retries: 0,
+            // Batch of 2 so poll 1 reads only the two valid rows and poll 2 reads
+            // the malformed row alone (a malformed-only batch).
+            batch_size: 2,
+            // Legacy None mode: the cursor advances past the failed batch so poll 2
+            // reaches the malformed row.
+            cursor_db_path: None,
+            ..SiemConfig::default()
+        })?
+        .with_metrics_sink(sink.clone());
+        // A failing exporter fills the SHARED DLQ with two "webhook" entries.
+        manager.add_exporter(Box::new(FailExporter {
+            name: "webhook".to_string(),
+        }));
+
+        // Poll 1: both valid rows fail export -> 2 "webhook" DLQ entries.
+        manager.poll_once().await?;
+        // Poll 2: the malformed row alone -> the _deserialize gauge must report 1,
+        // not the global DLQ length of 3 (2 webhook + 1 _deserialize).
+        manager.poll_once().await?;
+
+        assert_eq!(
+            manager.dlq_len(),
+            3,
+            "the shared DLQ holds the webhook backlog plus the malformed row"
+        );
+        let depths = sink
+            .dlq_depths
+            .lock()
+            .map_err(|_| std::io::Error::other("dlq depth lock poisoned"))?;
+        let deserialize_depth = depths
+            .iter()
+            .rev()
+            .find(|(name, _)| name == "_deserialize")
+            .map(|(_, depth)| *depth);
+        assert_eq!(
+            deserialize_depth,
+            Some(1),
+            "the _deserialize gauge must exclude the webhook backlog: {depths:?}"
         );
         Ok(())
     }
