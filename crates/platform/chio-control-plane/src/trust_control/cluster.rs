@@ -45,7 +45,7 @@ pub(crate) use partition::{
 };
 pub(crate) use pull_budget::{
     ensure_revocation_page_ascending, require_contiguous_page, require_forward_progress,
-    PeerProtocolError, PullError, PullRoundBudget,
+    PeerProtocolError, PullError, PullRoundBudget, PEER_ROUND_WALL_CLOCK_BUDGET,
 };
 pub(crate) use snapshots::{
     apply_cluster_snapshot, cluster_replication_heads, handle_internal_authority_snapshot,

@@ -358,7 +358,12 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
     // leaves the peer Healthy, so its status-advertised acks (which come from
     // cluster_status, not the delta pull) are still recorded: a broken delta
     // endpoint must not starve budget ack convergence.
-    finalize_peer_sync_round(state, peer_url, &peer_status.budget_ack_heads, delta_records);
+    finalize_peer_sync_round(
+        state,
+        peer_url,
+        &peer_status.budget_ack_heads,
+        delta_records,
+    );
     Ok(())
 }
 
@@ -1116,30 +1121,49 @@ fn cluster_peer_count(state: &TrustServiceState) -> usize {
 
 /// How long a budget write waits for peer acks to reach quorum.
 ///
-/// The single background sync loop visits peers SERIALLY and each peer HTTP call
-/// can block up to `CONTROL_HTTP_TIMEOUT`, so if a slow/unreachable peer is
-/// visited before the healthy peer whose ack makes quorum, the wait must outlast
-/// one worst-case cycle plus the mid-cycle start, or it would 503 a write a
-/// quorum peer could still complete (codex #965 round-5 P1). The bound scales with
-/// the peer count (inherently bounded by cluster size) and is capped so a
-/// misconfigured huge peer list cannot make it unbounded. A GENUINE partition
-/// still returns 503 promptly via the has-quorum check inside the wait loop, so
-/// this longer bound only delays the "quorum reachable but a preceding peer is
-/// slow" case, never a real partition.
+/// The single background sync loop visits peers SERIALLY, and one `sync_peer`
+/// visit is FAR more than a single HTTP call: it performs cluster_status, an
+/// optional cluster_snapshot, an authority_snapshot, and then the delta pull
+/// rounds (a shared budget/receipt/lineage round and an independent revocation
+/// round), each blocking call up to `CONTROL_HTTP_TIMEOUT` and each delta round
+/// bounded by its wall-clock budget. If a slow-but-reachable peer is visited
+/// before the peer whose ack makes quorum, the wait must outlast a full serial
+/// visit for every preceding peer, or it 503s a write the next peer would have
+/// committed in the same round (codex #965 Finding: account for all per-peer
+/// fetches). The old bound budgeted only ONE `CONTROL_HTTP_TIMEOUT` per peer.
+///
+/// The bound scales with the peer count (inherently bounded by cluster size) and
+/// is capped so a misconfigured huge peer list cannot make it unbounded. A GENUINE
+/// partition still returns 503 promptly via the has-quorum check inside the wait
+/// loop, so this longer bound only delays the "quorum reachable but a preceding
+/// peer is slow" case, never a real partition.
 fn budget_write_quorum_commit_timeout(sync_interval: Duration, peer_count: usize) -> Duration {
+    // Absolute ceiling so a misconfigured huge peer list cannot make the wait
+    // unbounded (a real partition still 503s promptly via the has-quorum check).
+    const MAX_QUORUM_COMMIT_TIMEOUT: Duration = Duration::from_secs(300);
     let scaled = sync_interval
         .checked_mul(20)
-        .unwrap_or_else(|| Duration::from_secs(30))
+        .unwrap_or(Duration::from_secs(30))
         .max(Duration::from_secs(5))
         .min(Duration::from_secs(30));
-    // One worst-case sync cycle where every peer preceding the quorum peer blocks
-    // for the full control timeout, plus one extra cycle for a mid-cycle start.
+    // Worst-case cost of ONE serial sync_peer visit that must complete for every
+    // peer preceding the quorum peer: the three fixed blocking HTTP stages
+    // (cluster_status, cluster_snapshot, authority_snapshot) each up to
+    // CONTROL_HTTP_TIMEOUT, plus the two wall-clock-bounded delta pull rounds (the
+    // shared budget/receipt/lineage round and the independent revocation round).
+    let per_peer_sync = CONTROL_HTTP_TIMEOUT
+        .checked_mul(3)
+        .unwrap_or(Duration::from_secs(45))
+        .saturating_add(PEER_ROUND_WALL_CLOCK_BUDGET)
+        .saturating_add(PEER_ROUND_WALL_CLOCK_BUDGET);
+    // One worst-case cycle over all peers preceding the quorum peer, plus one extra
+    // cycle for a mid-cycle write arrival.
     let cycles = (peer_count as u32).saturating_add(1);
-    let peer_bound = CONTROL_HTTP_TIMEOUT
+    let peer_bound = per_peer_sync
         .checked_mul(cycles)
-        .unwrap_or(Duration::from_secs(120))
+        .unwrap_or(MAX_QUORUM_COMMIT_TIMEOUT)
         .saturating_add(sync_interval)
-        .min(Duration::from_secs(120));
+        .min(MAX_QUORUM_COMMIT_TIMEOUT);
     scaled.max(peer_bound)
 }
 
@@ -1407,8 +1431,7 @@ mod deltas_tests {
         // security-critical revocation propagation. Budget stays first here.
         let shared = peer_pullers();
         assert_eq!(
-            shared[0] as usize,
-            sync_peer_budgets as Puller as usize,
+            shared[0] as usize, sync_peer_budgets as Puller as usize,
             "budget remains first in the shared round"
         );
         assert!(
@@ -1420,17 +1443,27 @@ mod deltas_tests {
     }
 
     #[test]
-    fn quorum_commit_timeout_scales_with_peer_count_and_is_bounded() {
-        // codex #965 round-5 P1: the wait must outlast one worst-case serial sync
-        // cycle (a slow peer visited before the quorum peer blocks up to the
-        // control timeout), but stay bounded by the peer count.
+    fn quorum_commit_timeout_covers_full_per_peer_sync_and_is_bounded() {
+        // codex #965 Finding (account for all per-peer fetches): the wait must
+        // outlast a FULL serial sync_peer visit for every peer preceding the quorum
+        // peer, not just one CONTROL_HTTP_TIMEOUT per peer. A full visit is the three
+        // fixed blocking stages plus the two wall-clock-bounded delta rounds.
         let interval = Duration::from_millis(25);
+        let per_peer_sync =
+            CONTROL_HTTP_TIMEOUT * 3 + PEER_ROUND_WALL_CLOCK_BUDGET + PEER_ROUND_WALL_CLOCK_BUDGET;
+
         assert!(budget_write_quorum_commit_timeout(interval, 0) >= Duration::from_secs(5));
-        let two = budget_write_quorum_commit_timeout(interval, 2);
+
+        // One preceding peer must be budgeted a full sync_peer visit. The OLD bound
+        // gave only CONTROL_HTTP_TIMEOUT * 2 = 30s here, far short of a full visit.
+        let one = budget_write_quorum_commit_timeout(interval, 1);
         assert!(
-            two >= CONTROL_HTTP_TIMEOUT * 3,
-            "two peers must allow >= 3 control timeouts, got {two:?}"
+            one >= per_peer_sync,
+            "one preceding peer must allow a full serial sync_peer visit, got {one:?}"
         );
-        assert!(budget_write_quorum_commit_timeout(interval, 10_000) <= Duration::from_secs(120));
+
+        // Still bounded by a fixed ceiling so a misconfigured huge peer list cannot
+        // make the wait unbounded.
+        assert!(budget_write_quorum_commit_timeout(interval, 10_000) <= Duration::from_secs(300));
     }
 }
