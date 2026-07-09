@@ -274,8 +274,7 @@ fn duplicate_child_receipt_id_with_different_bytes_conflicts() {
 /// finding corrected: independent producers keep independent success/failure
 /// semantics.
 #[test]
-fn append_receipt_batch_isolates_per_record_error(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn append_receipt_batch_isolates_per_record_error() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-receipts-group-isolation");
     let store = SqliteReceiptStore::open(&path)?;
     let mut requests = Vec::new();
