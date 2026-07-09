@@ -61,14 +61,12 @@ jobs:
             | python3 -c "import sys,json; r=[x for x in json.load(sys.stdin)['runtimes'] if x['isAvailable'] and 'iOS' in x['name']]; print(sorted(r,key=lambda x:x['version'])[-1]['identifier'] if r else '')")
           if [ -z "$RUNTIME" ]; then echo "::error::no available iOS Simulator runtime"; exit 1; fi
           DEVICE=$(xcrun simctl list devices --json \
-            | python3 -c "import sys,json,os; d=json.load(sys.stdin)['devices'].get(os.environ['RUNTIME'],[]); a=[x for x in d if x.get('isAvailable') and x['name'].startswith('iPhone')]; print(a[0]['name'] if a else '')" )
+            | RUNTIME="$RUNTIME" python3 -c "import sys,json,os; d=json.load(sys.stdin)['devices'].get(os.environ['RUNTIME'],[]); a=[x for x in d if x.get('isAvailable') and x['name'].startswith('iPhone')]; print(a[0]['name'] if a else '')" )
           if [ -z "$DEVICE" ]; then echo "::error::no available iPhone simulator for $RUNTIME"; exit 1; fi
           OSVER=$(echo "$RUNTIME" | sed -E 's/.*iOS-([0-9]+)-([0-9]+).*/\1.\2/')
           echo "device=$DEVICE" >> "$GITHUB_OUTPUT"
           echo "osver=$OSVER" >> "$GITHUB_OUTPUT"
           echo "Pinned destination: platform=iOS Simulator,name=$DEVICE,OS=$OSVER"
-        env:
-          RUNTIME: ""
 
       - name: xcodebuild test
         run: |
