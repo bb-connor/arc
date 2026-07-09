@@ -96,12 +96,22 @@ pub(crate) struct PeerSyncState {
 #[derive(Debug)]
 pub(crate) struct FederationAdmissionRateLimiter {
     attempts: HashMap<String, Vec<u64>>,
-    insertion_order: std::collections::VecDeque<String>,
-    // Keys currently present in `insertion_order`, kept in lockstep so a key
-    // that is pruned to empty and re-pushed within a single call never gets a
-    // SECOND live entry (RFC-0004 F3 residual). O(1) membership keeps the dedupe
-    // amortized-constant rather than scanning the deque on every push.
-    present: std::collections::HashSet<String>,
+    // FIFO order of live keys as `(key, generation)`. A reactivated key (its
+    // window emptied then reused) is re-pushed at the NEWEST position with a
+    // fresh generation so recency-of-use is respected; the superseded position is
+    // lazily skipped on eviction and pruned each call, keeping the move-to-back
+    // amortized-O(1) rather than scanning the deque (RFC-0004 F3 + reactivation
+    // refresh).
+    insertion_order: std::collections::VecDeque<(String, u64)>,
+    // The generation of each live key's CURRENT `insertion_order` position, kept
+    // in lockstep so exactly one entry per key is treated as live: a deque entry
+    // `(key, gen)` is live iff `live_position[key] == gen`. Any other entry for
+    // that key is a stale, superseded position. O(1) membership keeps the dedupe
+    // amortized-constant.
+    live_position: std::collections::HashMap<String, u64>,
+    // Monotonic stamp handed out on each (re)insertion so a refreshed position
+    // always supersedes the key's prior one.
+    next_generation: u64,
     key_cap: usize,
 }
 
@@ -127,7 +137,8 @@ impl FederationAdmissionRateLimiter {
         Self {
             attempts: HashMap::new(),
             insertion_order: std::collections::VecDeque::new(),
-            present: std::collections::HashSet::new(),
+            live_position: std::collections::HashMap::new(),
+            next_generation: 0,
             key_cap: key_cap.max(1),
         }
     }
@@ -157,11 +168,15 @@ impl FederationAdmissionRateLimiter {
         // this is a new key, evict the oldest inserted key so a distinct-subject
         // flood saturates instead of growing without bound (RFC-0004 F39).
         if is_new_key && self.attempts.len() >= self.key_cap {
-            while let Some(oldest) = self.insertion_order.pop_front() {
-                self.present.remove(&oldest);
-                if self.attempts.remove(&oldest).is_some() {
-                    break;
+            while let Some((oldest, generation)) = self.insertion_order.pop_front() {
+                // Skip a superseded position: a reactivated key sits at a newer
+                // generation, so its stale front entry must not evict it.
+                if self.live_position.get(&oldest) != Some(&generation) {
+                    continue;
                 }
+                self.live_position.remove(&oldest);
+                self.attempts.remove(&oldest);
+                break;
             }
         }
 
@@ -185,14 +200,19 @@ impl FederationAdmissionRateLimiter {
         }
         let was_empty = entry.is_empty();
         entry.push(now);
-        if (is_new_key || was_empty) && self.present.insert(key.clone()) {
-            // New key, or a key pruned to empty then re-pushed (effectively
-            // fresh). `present.insert` returns false when this key already has a
-            // live `insertion_order` entry, so a subject that empties and refills
-            // its OWN window in one call (F3 residual) keeps exactly ONE entry:
-            // no stale front duplicate for the FIFO evictor to pop first and
-            // mis-evict a freshly-active key from, and no unbounded deque growth.
-            self.insertion_order.push_back(key);
+        if is_new_key || was_empty {
+            // New key, or a key pruned to empty then reused (effectively fresh):
+            // refresh it to the NEWEST FIFO position with a fresh generation so
+            // recency-of-use is respected. Any prior position is superseded and
+            // lazily skipped on eviction, then pruned below, so this key keeps
+            // exactly ONE live entry -- now at the back, where the FIFO evictor
+            // reaches it only after genuinely-older keys (RFC-0004 F3 +
+            // reactivation refresh). Amortized O(1): no deque scan, no unbounded
+            // deque growth.
+            let generation = self.next_generation;
+            self.next_generation = self.next_generation.wrapping_add(1);
+            self.live_position.insert(key.clone(), generation);
+            self.insertion_order.push_back((key, generation));
         }
 
         // Drop-empty maintenance: prune any key whose window has fully emptied so
@@ -204,18 +224,25 @@ impl FederationAdmissionRateLimiter {
         // the eviction loop (which drains stale entries) never runs.
         let attempts = &mut self.attempts;
         let insertion_order = &mut self.insertion_order;
-        let present = &mut self.present;
+        let live_position = &mut self.live_position;
         attempts.retain(|_, timestamps| {
             timestamps.retain(|t| *t > lower_bound);
             !timestamps.is_empty()
         });
-        insertion_order.retain(|entry_key| {
-            if attempts.contains_key(entry_key) {
+        insertion_order.retain(|(entry_key, generation)| {
+            // Keep only the LIVE position of a still-live key; drop expired keys
+            // and superseded (stale) positions so the deque never diverges from
+            // `attempts` and never leaks.
+            if attempts.contains_key(entry_key) && live_position.get(entry_key) == Some(generation)
+            {
                 true
             } else {
-                // Drop the `present` marker in lockstep so the dedupe set never
-                // outlives the deque entry it guards.
-                present.remove(entry_key);
+                // Clear the `live_position` marker only when THIS entry owns it
+                // (an expired key), never when a newer position supersedes it, so
+                // the marker never outlives the deque entry it guards.
+                if live_position.get(entry_key) == Some(generation) {
+                    live_position.remove(entry_key);
+                }
                 false
             }
         });
@@ -446,6 +473,42 @@ mod admission_bound_tests {
             "insertion_order diverged from attempts under eviction pressure: order={} keys={}",
             limiter.insertion_order_len(),
             limiter.key_count(),
+        );
+    }
+
+    #[test]
+    fn reactivated_key_refreshed_to_newest_survives_eviction() {
+        // RFC-0004 F3 reactivation refresh: a key whose window expired and is
+        // then reused must move to the NEWEST FIFO position, so under key-cap
+        // pressure it is evicted only AFTER genuinely-older keys, never despite
+        // being freshly active.
+        let l = FederationAdmissionRateLimit {
+            max_requests: 10,
+            window_seconds: 60,
+        };
+        let mut limiter = FederationAdmissionRateLimiter::with_key_cap(2);
+        // "a" is recorded first (oldest original position), then "b".
+        let _ = limiter.check_and_record("policy", "a", &l, 100);
+        let _ = limiter.check_and_record("policy", "b", &l, 150);
+        // "a"'s window empties (100 <= 170 - 60); reactivating it must refresh
+        // "a" to the newest position, making "b" the genuine oldest live key.
+        let _ = limiter.check_and_record("policy", "a", &l, 170);
+        // "c" trips the cap (a, b == 2 live keys): the genuine oldest ("b") is
+        // evicted, NOT the freshly-reactivated "a".
+        let _ = limiter.check_and_record("policy", "c", &l, 180);
+        assert!(
+            limiter.key_count() <= 2,
+            "key cap breached: {}",
+            limiter.key_count()
+        );
+        // "a" survived with its reactivation attempt intact: re-recording it
+        // shows two in-window attempts (170 + 185), so remaining = 10 - 2 = 8.
+        // Had "a" been wrongly evicted from its stale FIFO position, it would be
+        // recreated fresh with remaining = 10 - 1 = 9.
+        let status = limiter.check_and_record("policy", "a", &l, 185);
+        assert_eq!(
+            status.remaining, 8,
+            "reactivated key was wrongly evicted before a genuinely-older key"
         );
     }
 }
