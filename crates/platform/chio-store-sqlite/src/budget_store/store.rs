@@ -284,30 +284,58 @@ impl SqliteBudgetStore {
         // abandoned) is NOT filled and still caps the head (codex #965 round-5 P1).
         // NULL-authority events still occupy a slot for contiguity but are never
         // reported as an ack below.
-        let head: i64 = transaction.query_row(
+        // Fast path (codex #965 Finding: avoid rescanning the ledger after a gap):
+        // the contiguous run can only advance when the very next slot (W+1) is
+        // FILLED (a mutation event or a recorded abandoned seq). When a real hole
+        // sits at W+1 (data loss, or a legacy snapshot that lacks abandoned slots),
+        // the head is pinned at W forever, yet the window query below still computes
+        // ROW_NUMBER() over the whole suffix `> W` on every status-path call. Probe
+        // the single W+1 slot first (an indexed point lookup): if it is absent, the
+        // head is W, so skip the O(suffix) window scan entirely. This is purely an
+        // optimization: the window query ALSO yields exactly W when W+1 is absent
+        // (the smallest filled seq > W then has island >= W+1, so no row matches the
+        // island == W run and COALESCE(MAX(seq), W) collapses to W), so the
+        // genesis-anchored gaps-and-islands head is unchanged.
+        let next_slot = (watermark as i64).saturating_add(1);
+        let next_slot_filled: bool = transaction.query_row(
             r#"
-            WITH filled AS (
-                SELECT event_seq AS seq
-                FROM budget_mutation_events
-                WHERE event_seq IS NOT NULL AND event_seq > ?1
-                UNION
-                SELECT seq
-                FROM budget_abandoned_event_seqs
-                WHERE seq > ?1
-            ),
-            run AS (
-                SELECT
-                    seq,
-                    seq - ROW_NUMBER() OVER (ORDER BY seq) AS island
-                FROM filled
+            SELECT EXISTS(
+                SELECT 1 FROM budget_mutation_events WHERE event_seq = ?1
+                UNION ALL
+                SELECT 1 FROM budget_abandoned_event_seqs WHERE seq = ?1
             )
-            SELECT COALESCE(MAX(seq), ?1) AS head_seq
-            FROM run
-            WHERE island = ?1
             "#,
-            rusqlite::params![watermark as i64],
-            |row| row.get(0),
+            rusqlite::params![next_slot],
+            |row| row.get::<_, i64>(0).map(|value| value != 0),
         )?;
+        let head: i64 = if next_slot_filled {
+            transaction.query_row(
+                r#"
+                WITH filled AS (
+                    SELECT event_seq AS seq
+                    FROM budget_mutation_events
+                    WHERE event_seq IS NOT NULL AND event_seq > ?1
+                    UNION
+                    SELECT seq
+                    FROM budget_abandoned_event_seqs
+                    WHERE seq > ?1
+                ),
+                run AS (
+                    SELECT
+                        seq,
+                        seq - ROW_NUMBER() OVER (ORDER BY seq) AS island
+                    FROM filled
+                )
+                SELECT COALESCE(MAX(seq), ?1) AS head_seq
+                FROM run
+                WHERE island = ?1
+                "#,
+                rusqlite::params![watermark as i64],
+                |row| row.get(0),
+            )?
+        } else {
+            watermark as i64
+        };
         let head = head.max(0) as u64;
         if head > watermark {
             transaction.execute(

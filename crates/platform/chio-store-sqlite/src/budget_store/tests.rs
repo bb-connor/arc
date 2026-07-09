@@ -1614,6 +1614,78 @@ fn budget_ack_heads_caps_partial_head_at_interior_gap() -> Result<(), Box<dyn st
 }
 
 #[test]
+fn budget_ack_heads_stays_pinned_at_a_post_watermark_gap() -> Result<(), Box<dyn std::error::Error>>
+{
+    // codex #965 Finding (avoid rescanning the ledger after a gap): once the
+    // watermark W has advanced over a contiguous prefix and a REAL hole sits at
+    // W+1, the head is pinned at W. The status-path fast path probes only the
+    // single W+1 slot and short-circuits the O(suffix) window scan, so it must
+    // (a) keep returning W across repeated polls (never advance over the gap) and
+    // (b) advance correctly the moment the gap is filled - the result must match
+    // the genesis-anchored gaps-and-islands computation exactly.
+    let path = unique_db_path("chio-ack-heads-post-watermark-gap");
+    let store = SqliteBudgetStore::open(&path)?;
+
+    let origin = "http://origin-g";
+    let event = |seq: u64| BudgetMutationRecord {
+        event_id: format!("evt-{seq}"),
+        hold_id: None,
+        capability_id: "cap-g".to_string(),
+        grant_index: 0,
+        kind: BudgetMutationKind::AuthorizeExposure,
+        allowed: Some(true),
+        recorded_at: seq as i64,
+        event_seq: seq,
+        usage_seq: Some(seq),
+        exposure_units: 1,
+        realized_spend_units: 0,
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost_units: None,
+        invocation_count_after: 1,
+        total_cost_exposed_after: 1,
+        total_cost_realized_spend_after: 0,
+        authority: Some(BudgetEventAuthority {
+            authority_id: origin.to_string(),
+            lease_id: format!("{origin}#term-1"),
+            lease_epoch: 1,
+        }),
+    };
+    let origin_head = |heads: &[(String, u64)]| -> Option<u64> {
+        heads
+            .iter()
+            .find(|(id, _)| id == origin)
+            .map(|(_, seq)| *seq)
+    };
+
+    // Contiguous {1,2,3}: the head reaches 3 and the durable watermark advances to 3.
+    store.import_snapshot_records(&[], &[event(1), event(2), event(3)])?;
+    assert_eq!(origin_head(&store.budget_ack_heads()?), Some(3));
+
+    // A hole at 4 (== W+1) with a later island {5,6}: the head must stay pinned at
+    // 3 no matter how many times it is polled, and must never jump over the gap.
+    store.import_snapshot_records(&[], &[event(5), event(6)])?;
+    for _ in 0..3 {
+        assert_eq!(
+            origin_head(&store.budget_ack_heads()?),
+            Some(3),
+            "a permanent hole at W+1 keeps the head pinned at W (fail-closed, no over-count)"
+        );
+    }
+
+    // Filling the gap at 4 lets the head advance across the now-contiguous 4,5,6.
+    store.import_snapshot_records(&[], &[event(4)])?;
+    assert_eq!(
+        origin_head(&store.budget_ack_heads()?),
+        Some(6),
+        "filling W+1 advances the head over the now-contiguous 4,5,6"
+    );
+
+    let _ = fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
 fn budget_ack_heads_recognizes_multi_authority_global_contiguity(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // event_seq is a single store-wide sequence, so multiple authorities share
