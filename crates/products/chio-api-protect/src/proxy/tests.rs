@@ -2511,11 +2511,14 @@ async fn sidecar_evaluate_advisory_route_wraps_non_authorization_response() {
         "tool_name": "read",
         "parameters": {"path": "/etc/hostname"},
     });
-    let removed_response = build_app(Arc::clone(&state))
+    // /v1/evaluate is the kernel-mediated route; this body uses capability_id
+    // (advisory shape) rather than a full capability token, so the mediated
+    // handler rejects it with 400 before reaching the kernel.
+    let mediated_response = build_app(Arc::clone(&state))
         .oneshot(loopback_post("/v1/evaluate", evaluate_body.clone()))
         .await
         .test_unwrap();
-    assert_eq!(removed_response.status(), StatusCode::GONE);
+    assert_eq!(mediated_response.status(), StatusCode::BAD_REQUEST);
 
     let evaluate_response = build_app(Arc::clone(&state))
         .oneshot(loopback_post("/v1/evaluate/advisory", evaluate_body))
