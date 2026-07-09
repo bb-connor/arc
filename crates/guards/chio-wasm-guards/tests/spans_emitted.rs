@@ -480,7 +480,7 @@ fn deny_records_bounded_reason_class_from_reason_string() {
         Ok(verdict) => verdict,
         Err(err) => panic!("evaluation succeeds: {err}"),
     };
-    assert!(matches!(verdict.verdict, Verdict::Deny { .. }));
+    assert!(matches!(verdict.verdict, Verdict::Deny));
 
     let mut body = String::new();
     families::GUARD_DENY.render(&mut body);
@@ -527,7 +527,7 @@ fn malformed_argument_deny_records_metrics() {
         Ok(verdict) => verdict,
         Err(err) => panic!("evaluation succeeds: {err}"),
     };
-    assert!(matches!(verdict.verdict, Verdict::Deny { .. }));
+    assert!(matches!(verdict.verdict, Verdict::Deny));
 
     let mut body = String::new();
     families::GUARD_VERDICT.render(&mut body);

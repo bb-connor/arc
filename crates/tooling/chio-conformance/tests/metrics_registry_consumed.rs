@@ -1333,7 +1333,7 @@ fn drive_and_render(name: &str) -> Result<Option<String>, Box<dyn Error>> {
         families::FAIL_OPEN_SUSPECTED.incr(&["tower"]);
         families::FAIL_OPEN_SUSPECTED.render(&mut out);
     } else if name == chio_metrics_spec::CHIO_DISPATCH_FAILURE_TOTAL {
-        families::DISPATCH_FAILURE.incr(&["http_authority", "denied"]);
+        families::DISPATCH_FAILURE.incr(&["http_authority", "error"]);
         families::DISPATCH_FAILURE.render(&mut out);
     } else if name == chio_metrics_spec::CHIO_CAPABILITY_REVOCATION_LAG_SECONDS {
         families::CAPABILITY_REVOCATION_LAG.observe(&["control_plane"], 5.0);

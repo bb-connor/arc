@@ -938,7 +938,7 @@ mod capability_revocation_lag_tests {
             .unwrap_or(0);
         observe_capability_revocation_lag(now.saturating_sub(45));
         assert!(
-            lag_count() >= before + 1,
+            lag_count() > before,
             "a capability revoke must observe a capability-revocation lag sample"
         );
     }
