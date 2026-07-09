@@ -864,6 +864,84 @@ fn checkpoint_capable_store_without_background_fails_setup() {
     }
 }
 
+/// Positive-install analogue of `CheckpointCapableWithoutBackgroundStore`: a
+/// store that both reports `supports_kernel_signed_checkpoints() = true` AND
+/// genuinely installs a background signer (returns `Ok(true)` from
+/// `enable_background_checkpoints`). Attaching such a store must succeed.
+struct CheckpointCapableWithBackgroundStore;
+
+impl ReceiptStore for CheckpointCapableWithBackgroundStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn supports_kernel_signed_checkpoints(&self) -> bool {
+        true
+    }
+
+    fn enable_background_checkpoints(
+        &self,
+        _keypair: Keypair,
+        _max_batch: u64,
+    ) -> Result<bool, ReceiptStoreError> {
+        // Genuinely installs a signer.
+        Ok(true)
+    }
+}
+
+/// Codex (RFC-0006 PLAN review): with the synchronous request-path checkpoint
+/// trigger removed, a background signer installed at store attach is the ONLY
+/// producer of kernel-signed checkpoints. So when checkpointing is enabled
+/// (`checkpoint_batch_size > 0`) and the store claims checkpoint support, the
+/// attach path MUST require that `enable_background_checkpoints` actually
+/// installed a signer; a `false`/no-op return is a misconfiguration and must
+/// fail closed rather than attach a silently-checkpointless store. This test
+/// locks all three branches of that invariant in one place.
+#[test]
+fn attach_requires_checkpoint_install_when_supported() {
+    // Branch 1: claims support but relies on the default no-op
+    // `enable_background_checkpoints` (returns `Ok(false)`) -> fail closed.
+    let mut config = make_config();
+    config.checkpoint_batch_size = 2;
+    let mut kernel = make_kernel(config);
+    let error = kernel
+        .set_receipt_store(Box::new(CheckpointCapableWithoutBackgroundStore))
+        .expect_err("store claiming checkpoint support without an installed signer must fail closed");
+    match error {
+        KernelError::Internal(message) => assert!(
+            message.contains("did not install a background checkpoint signer"),
+            "unexpected fail-closed error: {message}"
+        ),
+        other => panic!("expected KernelError::Internal, got {other:?}"),
+    }
+
+    // Branch 2: claims support AND genuinely installs the signer
+    // (`enable_background_checkpoints` returns `Ok(true)`) -> attaches.
+    let mut config = make_config();
+    config.checkpoint_batch_size = 2;
+    let mut kernel = make_kernel(config);
+    kernel
+        .set_receipt_store(Box::new(CheckpointCapableWithBackgroundStore))
+        .expect("store that genuinely installs a background signer must attach");
+
+    // Branch 3: checkpointing disabled (`checkpoint_batch_size == 0`) -> the
+    // requirement is skipped even for a checkpoint-capable store that installs
+    // no signer.
+    let mut config = make_config();
+    config.checkpoint_batch_size = 0;
+    let mut kernel = make_kernel(config);
+    kernel
+        .set_receipt_store(Box::new(CheckpointCapableWithoutBackgroundStore))
+        .expect("batch_size 0 disables checkpointing; attach must not require a signer");
+}
+
 /// Codex round 5, finding 3: KernelConfig documents `checkpoint_batch_size = 0`
 /// as DISABLING automatic checkpointing (non-web3 deployments). The round-4
 /// attach-time fail-closed check must not reject such a configuration: with
