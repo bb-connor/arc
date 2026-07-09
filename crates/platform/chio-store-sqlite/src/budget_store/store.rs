@@ -1,5 +1,9 @@
 use super::*;
 
+/// Quorum-witness identity of a stored budget mutation event: its `event_seq`,
+/// origin `authority_id`, and origin `lease_epoch` (codex #965 round-5 P1).
+pub type BudgetEventWitness = (u64, Option<String>, Option<u64>);
+
 impl SqliteBudgetStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, BudgetStoreError> {
         let path = path.as_ref();
@@ -102,6 +106,22 @@ impl SqliteBudgetStore {
                 authority_id TEXT PRIMARY KEY,
                 head_seq     INTEGER NOT NULL,
                 CHECK (head_seq >= 0)
+            );
+
+            -- Metadata tombstones for event_seqs that were CONSUMED but have no
+            -- surviving mutation event: the leader-local rollback-retry path
+            -- (existing_event_allowed) and the delta-import replace path delete a
+            -- rolled-back authorize and re-append it under a fresh higher seq,
+            -- permanently abandoning the original seq. Recording the abandoned seq
+            -- lets the global contiguous ack head treat it as FILLED so it does not
+            -- wedge cluster-wide at the hole. This never over-counts: an abandoned
+            -- seq is never a live write (its write was rolled back / superseded), so
+            -- no witness targets it; a genuinely MISSING event (never received, never
+            -- deleted here) is not recorded and still caps the head (codex #965
+            -- round-5 P1).
+            CREATE TABLE IF NOT EXISTS budget_abandoned_event_seqs (
+                seq INTEGER PRIMARY KEY,
+                CHECK (seq > 0)
             );
             "#,
         )?;
@@ -254,25 +274,34 @@ impl SqliteBudgetStore {
             |row| row.get(0),
         )?;
         let watermark = watermark.max(0) as u64;
-        // Advance the head over rows ABOVE the watermark only. The contiguous run
-        // from W+1 has island == W (its first row W+1 has ROW_NUMBER 1), so the
-        // new head is MAX(event_seq) in that island, or W when W+1 is missing.
-        // NULL-authority events still occupy a global slot, so they count for
-        // contiguity here but are never reported as an ack below.
+        // Advance the head over slots ABOVE the watermark only. A slot is FILLED if
+        // a real mutation event occupies it OR it is a recorded abandoned/tombstoned
+        // seq (a rolled-back-then-re-appended write's original seq). The contiguous
+        // run from W+1 has island == W (its first slot W+1 has ROW_NUMBER 1), so the
+        // new head is MAX(seq) in that island, or W when W+1 is neither present nor
+        // abandoned. Treating abandoned seqs as filled lets the head advance past a
+        // rollback-retry hole; a genuinely MISSING event (never recorded as
+        // abandoned) is NOT filled and still caps the head (codex #965 round-5 P1).
+        // NULL-authority events still occupy a slot for contiguity but are never
+        // reported as an ack below.
         let head: i64 = transaction.query_row(
             r#"
-            WITH seqs AS (
-                SELECT event_seq
+            WITH filled AS (
+                SELECT event_seq AS seq
                 FROM budget_mutation_events
                 WHERE event_seq IS NOT NULL AND event_seq > ?1
+                UNION
+                SELECT seq
+                FROM budget_abandoned_event_seqs
+                WHERE seq > ?1
             ),
             run AS (
                 SELECT
-                    event_seq,
-                    event_seq - ROW_NUMBER() OVER (ORDER BY event_seq) AS island
-                FROM seqs
+                    seq,
+                    seq - ROW_NUMBER() OVER (ORDER BY seq) AS island
+                FROM filled
             )
-            SELECT COALESCE(MAX(event_seq), ?1) AS head_seq
+            SELECT COALESCE(MAX(seq), ?1) AS head_seq
             FROM run
             WHERE island = ?1
             "#,
@@ -343,6 +372,105 @@ impl SqliteBudgetStore {
         // Clear the incrementally-maintained per-origin heads too: a hole below a
         // per-origin head would otherwise leave it stale-high until a full rebuild.
         transaction.execute("DELETE FROM budget_origin_ack_heads", [])?;
+        Ok(())
+    }
+
+    /// The abandoned/tombstoned event_seqs (rolled-back-then-re-appended writes'
+    /// original seqs) that `budget_ack_heads` treats as filled slots. Replicated
+    /// in the cluster snapshot so a FRESH follower - which never held the original
+    /// event and so never fired the delete-trigger that records it locally - still
+    /// learns the slot is abandoned and does not wedge its contiguous head at the
+    /// hole (codex #965 round-5 P1).
+    pub fn list_abandoned_event_seqs(&self) -> Result<Vec<u64>, BudgetStoreError> {
+        let connection = self.connection()?;
+        let mut statement =
+            connection.prepare("SELECT seq FROM budget_abandoned_event_seqs ORDER BY seq ASC")?;
+        let rows = statement.query_map([], |row| {
+            let seq: i64 = row.get(0)?;
+            Ok(seq.max(0) as u64)
+        })?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(BudgetStoreError::from)
+    }
+
+    /// The quorum-witness identity of the mutation event stored under `event_id`:
+    /// `(event_seq, authority_id, lease_epoch)`, or None when no such event exists
+    /// or it predates seq assignment. The witness must target the event's STORED
+    /// origin authority, not the current lease: an idempotent retry after
+    /// leadership moved re-reads the already-written event, and peers advertise it
+    /// under its ORIGINAL authority, so keying the wait on the current leader would
+    /// look under the wrong origin and time out a write that already committed
+    /// (codex #965 round-5 P1). A null-seq (legacy) row returns None so the caller
+    /// falls back to the authority MAX rather than witnessing on seq 0.
+    pub fn mutation_event_witness_for_event_id(
+        &self,
+        event_id: &str,
+    ) -> Result<Option<BudgetEventWitness>, BudgetStoreError> {
+        let connection = self.connection()?;
+        let row = connection
+            .query_row(
+                "SELECT event_seq, authority_id, lease_epoch FROM budget_mutation_events WHERE event_id = ?1",
+                rusqlite::params![event_id],
+                |row| {
+                    let seq: Option<i64> = row.get(0)?;
+                    let authority_id: Option<String> = row.get(1)?;
+                    let lease_epoch: Option<i64> = row.get(2)?;
+                    Ok((seq, authority_id, lease_epoch))
+                },
+            )
+            .optional()?;
+        Ok(row.and_then(|(seq, authority_id, lease_epoch)| {
+            seq.map(|seq| {
+                (
+                    seq.max(0) as u64,
+                    authority_id,
+                    lease_epoch.map(|epoch| epoch.max(0) as u64),
+                )
+            })
+        }))
+    }
+
+    /// Abandoned event_seqs strictly above `after_seq` (ascending). The budget
+    /// delta endpoint returns these alongside the pulled events so the puller can
+    /// treat the abandoned slots as filled and not reject the leader's legitimately
+    /// gappy stream (codex #965 round-5 P1).
+    pub fn list_abandoned_event_seqs_after(
+        &self,
+        after_seq: u64,
+    ) -> Result<Vec<u64>, BudgetStoreError> {
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            "SELECT seq FROM budget_abandoned_event_seqs WHERE seq > ?1 ORDER BY seq ASC",
+        )?;
+        let rows = statement.query_map(rusqlite::params![after_seq as i64], |row| {
+            let seq: i64 = row.get(0)?;
+            Ok(seq.max(0) as u64)
+        })?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(BudgetStoreError::from)
+    }
+
+    /// Record snapshot-carried abandoned event_seqs (see `list_abandoned_event_seqs`).
+    /// Fail-closed: this only ADDS filled slots (an abandoned seq is never a live
+    /// write, so it cannot inflate any origin's ack head), and it resets the
+    /// watermark so the next `budget_ack_heads` recomputes with the new slots.
+    pub fn record_abandoned_event_seqs(&self, seqs: &[u64]) -> Result<(), BudgetStoreError> {
+        if seqs.is_empty() {
+            return Ok(());
+        }
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        for &seq in seqs {
+            if seq == 0 {
+                continue;
+            }
+            transaction.execute(
+                "INSERT OR IGNORE INTO budget_abandoned_event_seqs(seq) VALUES (?1)",
+                rusqlite::params![seq as i64],
+            )?;
+        }
+        Self::reset_budget_ack_head_watermark(&transaction)?;
+        transaction.commit()?;
         Ok(())
     }
 
@@ -1378,10 +1506,35 @@ impl SqliteBudgetStore {
             if usage_matches && hold_matches {
                 return Ok(Some(existing_allowed));
             }
+            // This is a GENUINE rollback-retry: the rolled-back authorize is
+            // deleted and the caller re-appends it under a fresh higher seq. Record
+            // the freed seq as abandoned/tombstoned BEFORE the delete so the global
+            // contiguous ack head treats it as filled and does not wedge cluster-
+            // wide at the resulting hole. This recording is deliberately ONLY at the
+            // rollback-retry site (not the AFTER DELETE trigger), so that a data-loss
+            // delete still caps the head (fail-closed). Never over-counts: the
+            // abandoned seq's write was superseded, so no live write targets it
+            // (codex #965 round-5 P1).
+            let abandoned_seq: Option<i64> = transaction
+                .query_row(
+                    "SELECT event_seq FROM budget_mutation_events WHERE event_id = ?1",
+                    params![event_id],
+                    |row| row.get::<_, Option<i64>>(0),
+                )
+                .optional()?
+                .flatten();
             transaction.execute(
                 "DELETE FROM budget_mutation_events WHERE event_id = ?1",
                 params![event_id],
             )?;
+            if let Some(seq) = abandoned_seq {
+                if seq > 0 {
+                    transaction.execute(
+                        "INSERT OR IGNORE INTO budget_abandoned_event_seqs(seq) VALUES (?1)",
+                        params![seq],
+                    )?;
+                }
+            }
             Self::reset_budget_ack_head_watermark(transaction)?;
             if let Some(hold_id) = hold_id {
                 transaction.execute(

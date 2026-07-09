@@ -113,6 +113,11 @@ pub(super) fn ensure_budget_mutation_event_seq_column(
 /// the per-origin heads exists, so any delete from `budget_mutation_events`
 /// forces `budget_ack_heads` to re-verify contiguity from genesis (fail-closed).
 ///
+/// The trigger deliberately does NOT record the deleted seq as abandoned: a delete
+/// caused by DATA LOSS (a restored older DB) must CAP the head below the hole so a
+/// data-losing node cannot over-count. Only a genuine rollback-retry records the
+/// abandoned seq, explicitly at its own call site (codex #965 round-5 P1).
+///
 /// Idempotent and non-churning (codex #965 round-4 P2): the trigger is (re)created
 /// only when it is absent or an OLDER version (one that predates the per-origin
 /// `budget_origin_ack_heads` clear). Steady state is a single `sqlite_master`

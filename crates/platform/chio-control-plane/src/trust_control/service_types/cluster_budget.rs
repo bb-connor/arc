@@ -82,6 +82,13 @@ pub(crate) struct ClusterStateSnapshotResponse {
     pub(crate) budgets: Vec<BudgetUsageView>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) budget_mutation_events: Vec<BudgetMutationEventView>,
+    /// Abandoned/tombstoned budget event_seqs (rolled-back-then-re-appended
+    /// writes' original seqs). Carried so a fresh follower treats these slots as
+    /// filled and its contiguous ack head does not wedge at the hole (codex #965
+    /// round-5 P1). Additive + default-empty: a mixed-version peer that omits it
+    /// simply relies on the delete-trigger path, never on a wrong value.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) budget_abandoned_seqs: Vec<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -313,6 +320,12 @@ pub(crate) struct BudgetDeltaResponse {
     pub(crate) records: Vec<BudgetUsageView>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) mutation_events: Vec<BudgetMutationEventView>,
+    /// Abandoned/tombstoned event_seqs above the cursor, so the puller can treat
+    /// those slots as filled when verifying the pulled page is gap-free and does
+    /// not demote a leader whose stream legitimately skips a rolled-back seq
+    /// (codex #965 round-5 P1). Additive + default-empty for mixed-version peers.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) abandoned_seqs: Vec<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -160,25 +160,39 @@ fn budget_write_token(
         plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
     };
     match authority {
-        Some(authority) => {
-            let event_seq = match event_id {
-                Some(event_id) => match store
-                    .mutation_event_seq_for_event_id(event_id)
-                    .map_err(http_error)?
-                {
-                    Some(seq) => seq,
-                    None => store
-                        .max_mutation_event_seq_for_authority(&authority.authority_id)
-                        .map_err(http_error)?,
-                },
-                None => store
-                    .max_mutation_event_seq_for_authority(&authority.authority_id)
+        Some(current) => {
+            let stored = match event_id {
+                Some(event_id) => store
+                    .mutation_event_witness_for_event_id(event_id)
                     .map_err(http_error)?,
+                None => None,
+            };
+            let (event_seq, origin_id, budget_term) = match stored {
+                // Existing event with a stored authority: use ITS origin + term so
+                // an idempotent retry after leadership moved targets the ORIGINAL
+                // origin peers advertise it under, not the current leader (codex
+                // #965 round-5 P1).
+                Some((seq, Some(authority_id), lease_epoch)) => (
+                    seq,
+                    authority_id,
+                    lease_epoch.unwrap_or(current.lease_epoch),
+                ),
+                // Existing event with a legacy null authority: use the current lease.
+                Some((seq, None, _)) => (seq, current.authority_id.clone(), current.lease_epoch),
+                // No stored event (or no event_id): fall back to the authority MAX
+                // under the current lease. Over-targets (waits longer), never
+                // under-targets, so the witness still never over-counts.
+                None => {
+                    let seq = store
+                        .max_mutation_event_seq_for_authority(&current.authority_id)
+                        .map_err(http_error)?;
+                    (seq, current.authority_id.clone(), current.lease_epoch)
+                }
             };
             Ok(BudgetWriteToken {
-                origin_id: authority.authority_id.clone(),
+                origin_id,
                 event_seq,
-                budget_term: authority.lease_epoch,
+                budget_term,
             })
         }
         None => Ok(BudgetWriteToken {

@@ -1779,6 +1779,7 @@ mod cluster_and_reports_tests {
                 seq: Some(42),
             }],
             mutation_events: Vec::new(),
+            abandoned_seqs: Vec::new(),
         };
 
         let result =
@@ -1816,6 +1817,7 @@ mod cluster_and_reports_tests {
                 })
                 .collect(),
             mutation_events: Vec::new(),
+            abandoned_seqs: Vec::new(),
         };
 
         let result =
@@ -1860,6 +1862,7 @@ mod cluster_and_reports_tests {
                 total_cost_realized_spend_after: 0,
                 authority: None,
             }],
+            abandoned_seqs: Vec::new(),
         };
         let mut round = PullRoundBudget::new();
         let result = import_budget_delta_response(&mut store, &response, Some(cursor), &mut round);
@@ -1917,6 +1920,7 @@ mod cluster_and_reports_tests {
         let jump = BudgetDeltaResponse {
             records: Vec::new(),
             mutation_events: vec![event(5), event(6)],
+            abandoned_seqs: Vec::new(),
         };
         let result =
             import_budget_delta_response(&mut store, &jump, None, &mut PullRoundBudget::new());
@@ -1941,6 +1945,7 @@ mod cluster_and_reports_tests {
         let contiguous = BudgetDeltaResponse {
             records: Vec::new(),
             mutation_events: vec![event(1), event(2), event(3)],
+            abandoned_seqs: Vec::new(),
         };
         let outcome = import_budget_delta_response(
             &mut store,
@@ -1977,6 +1982,7 @@ mod cluster_and_reports_tests {
         let compacted = BudgetDeltaResponse {
             records: Vec::new(),
             mutation_events: vec![event(10), event(11)],
+            abandoned_seqs: Vec::new(),
         };
         let result = import_budget_delta_response(
             &mut store,

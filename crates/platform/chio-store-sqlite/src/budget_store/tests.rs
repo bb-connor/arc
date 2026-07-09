@@ -1952,3 +1952,173 @@ fn ack_head_reset_trigger_is_idempotent_across_reopens_and_concurrent_opens(
     let _ = fs::remove_file(&path);
     Ok(())
 }
+
+#[test]
+fn abandoned_seqs_advance_the_head_but_genuine_gaps_still_cap(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // codex #965 round-5 P1: an abandoned/tombstoned seq (a rolled-back-then-
+    // re-appended write's original seq) is treated as FILLED so the global
+    // contiguous ack head advances past it (no permanent wedge). A GENUINELY
+    // missing seq (never recorded abandoned) still caps the head (never
+    // over-counts a data-losing node).
+    let path = unique_db_path("chio-abandoned-fills-hole");
+    let store = SqliteBudgetStore::open(&path)?;
+    let head_for = |heads: &[(String, u64)], origin: &str| {
+        heads.iter().find(|(o, _)| o == origin).map(|(_, seq)| *seq)
+    };
+
+    // Present {1, 3} with a hole at 2: without an abandoned record the head caps
+    // at 1 (fail-closed).
+    store.import_snapshot_records(
+        &[],
+        &[
+            ack_head_event(1, "e1", "http://o"),
+            ack_head_event(3, "e3", "http://o"),
+        ],
+    )?;
+    assert_eq!(
+        head_for(&store.budget_ack_heads()?, "http://o"),
+        Some(1),
+        "a genuine gap at 2 must cap the head at 1"
+    );
+
+    // Record 2 as abandoned: the head now advances to 3 (2 is a filled tombstone).
+    store.record_abandoned_event_seqs(&[2])?;
+    assert_eq!(
+        head_for(&store.budget_ack_heads()?, "http://o"),
+        Some(3),
+        "an abandoned seq is filled, so the head advances past it"
+    );
+
+    // Add {5} (a NEW genuine hole at 4, not abandoned): the head still caps at 3.
+    store.import_snapshot_records(&[], &[ack_head_event(5, "e5", "http://o")])?;
+    assert_eq!(
+        head_for(&store.budget_ack_heads()?, "http://o"),
+        Some(3),
+        "a genuine missing seq 4 (not abandoned) must still cap the head at 3"
+    );
+
+    let _ = fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
+fn rollback_retry_records_abandoned_seq_and_head_does_not_wedge() {
+    // codex #965 round-5 P1 (end-to-end): an authorize, its rollback, and a retry
+    // under a new lease. The retry auto-deletes the rolled-back authorize and
+    // re-appends it at a fresh seq; the freed seq is recorded abandoned so the
+    // global contiguous ack head advances to the re-appended event instead of
+    // wedging at the hole.
+    let path = unique_db_path("chio-rollback-retry-no-wedge");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let hold_id = "hold-x";
+    let event_id = "evt-x:authorize";
+    let initial = authority("budget-primary", "lease-1", 1);
+    let changed = authority("budget-primary", "lease-2", 2);
+
+    assert!(store
+        .try_charge_cost_with_ids_and_authority(
+            "cap-x",
+            0,
+            Some(10),
+            100,
+            Some(200),
+            Some(1000),
+            Some(hold_id),
+            Some(event_id),
+            Some(&initial),
+        )
+        .unwrap());
+    assert!(
+        store.list_abandoned_event_seqs().unwrap().is_empty(),
+        "no seq is abandoned before the rollback-retry"
+    );
+    store
+        .reverse_charge_cost_with_ids_and_authority(
+            "cap-x",
+            0,
+            100,
+            Some(hold_id),
+            Some("evt-x:authorize:rollback:1"),
+            Some(&initial),
+        )
+        .unwrap();
+    // Retry the SAME event_id WITHOUT a manual delete: existing_event_allowed
+    // auto-deletes the stale authorize (abandoning its seq 1) and re-appends it.
+    assert!(store
+        .try_charge_cost_with_ids_and_authority(
+            "cap-x",
+            0,
+            Some(10),
+            100,
+            Some(200),
+            Some(1000),
+            Some(hold_id),
+            Some(event_id),
+            Some(&changed),
+        )
+        .unwrap());
+
+    assert_eq!(
+        store.list_abandoned_event_seqs().unwrap(),
+        vec![1],
+        "the rolled-back authorize's freed seq 1 must be recorded abandoned"
+    );
+
+    // The contiguous ack head advances to the max present event_seq (the re-
+    // appended authorize): the abandoned seq 1 is filled, so no permanent wedge.
+    let max_seq = store.max_mutation_event_seq().unwrap();
+    let heads = store.budget_ack_heads().unwrap();
+    let origin_head = heads
+        .iter()
+        .find(|(origin, _)| origin == "budget-primary")
+        .map(|(_, seq)| *seq);
+    assert_eq!(
+        origin_head,
+        Some(max_seq),
+        "the ack head must advance past the abandoned seq to the re-appended event, not wedge"
+    );
+
+    let _ = fs::remove_file(&path);
+}
+
+#[test]
+fn mutation_event_witness_returns_stored_origin_authority() -> Result<(), Box<dyn std::error::Error>>
+{
+    // codex #965 round-5 P1: the witness identity for an idempotent retry comes
+    // from the event's STORED origin authority, not the current lease, so a retry
+    // after leadership moved targets the origin peers advertise it under.
+    let path = unique_db_path("chio-stored-witness");
+    let store = SqliteBudgetStore::open(&path)?;
+    let old_leader = authority("http://old-leader", "http://old-leader#term-3", 3);
+    store.try_charge_cost_with_ids_and_authority(
+        "cap",
+        0,
+        Some(10),
+        5,
+        None,
+        None,
+        None,
+        Some("evt-1"),
+        Some(&old_leader),
+    )?;
+
+    let (seq, authority_id, lease_epoch) = store
+        .mutation_event_witness_for_event_id("evt-1")?
+        .ok_or("the written event must be found")?;
+    assert!(seq > 0, "a real event carries a positive seq");
+    assert_eq!(
+        authority_id.as_deref(),
+        Some("http://old-leader"),
+        "the witness must carry the STORED origin, not the current leader"
+    );
+    assert_eq!(lease_epoch, Some(3), "and the stored lease epoch");
+
+    // An absent event returns None so the caller falls back to the current lease.
+    assert!(store
+        .mutation_event_witness_for_event_id("evt-absent")?
+        .is_none());
+
+    let _ = fs::remove_file(&path);
+    Ok(())
+}

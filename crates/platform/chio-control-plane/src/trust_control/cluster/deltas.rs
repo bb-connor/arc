@@ -146,9 +146,32 @@ pub(crate) async fn handle_internal_budgets_delta(
             }
         }
     };
+    // Abandoned/tombstoned seqs within the pulled range, so the puller can treat
+    // those slots as filled (no demote on a legitimately gappy stream). Bounded to
+    // the page's max event so the puller only verifies contiguity up to what it is
+    // importing (codex #965 round-5 P1).
+    let abandoned_seqs = if mutation_events.is_empty() {
+        Vec::new()
+    } else {
+        let page_max = mutation_events
+            .iter()
+            .map(|event| event.event_seq)
+            .max()
+            .unwrap_or(0);
+        match store.list_abandoned_event_seqs_after(query.after_seq.unwrap_or(0)) {
+            Ok(seqs) => seqs.into_iter().filter(|&seq| seq <= page_max).collect(),
+            Err(error) => {
+                return internal_cluster_http_error(
+                    "failed to collect budget abandoned-seq deltas",
+                    &error,
+                );
+            }
+        }
+    };
     Json(BudgetDeltaResponse {
         records,
         mutation_events,
+        abandoned_seqs,
     })
     .into_response()
 }
@@ -286,20 +309,7 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
     // so we do not issue more blocking peer fetches just to rediscover the same
     // exhausted budget and delay parked writers; the skipped streams resume next
     // round (honest backlog, no demotion) (codex #965 round-4 P2).
-    type Puller = fn(
-        &TrustServiceState,
-        &TrustControlClient,
-        &str,
-        &mut PullRoundBudget,
-    ) -> Result<u64, PullError>;
-    let pullers: [Puller; 5] = [
-        sync_peer_revocations,
-        sync_peer_tool_receipts,
-        sync_peer_child_receipts,
-        sync_peer_lineage,
-        sync_peer_budgets,
-    ];
-    for puller in pullers {
+    for puller in peer_pullers() {
         if round.is_exhausted() {
             break;
         }
@@ -591,7 +601,8 @@ pub(crate) fn import_budget_delta_response(
     let record_count = response
         .records
         .len()
-        .saturating_add(response.mutation_events.len());
+        .saturating_add(response.mutation_events.len())
+        .saturating_add(response.abandoned_seqs.len());
     if record_count > BUDGET_DELTA_MAX_RECORDS {
         return Err(PullError::Transient(CliError::cli_other_error(format!(
             "budget delta response contains {record_count} records, maximum is {BUDGET_DELTA_MAX_RECORDS}"
@@ -648,7 +659,38 @@ pub(crate) fn import_budget_delta_response(
             .iter()
             .map(|event| event.event_seq)
             .collect::<Vec<_>>();
-        require_contiguous_page(previous_cursor_seq.saturating_add(1), &event_seqs)?;
+        // Events must arrive in strictly ASCENDING received order: the importer
+        // applies them in order, so a release-before-authorize reorder must be
+        // rejected (codex #965 round-3 P2). Forward progress and gap-freeness are
+        // checked by the union guard below.
+        let mut previous: Option<u64> = None;
+        for &seq in &event_seqs {
+            if let Some(prev) = previous {
+                if seq <= prev {
+                    return Err(PullError::Protocol(PeerProtocolError::NonContiguousPage {
+                        expected_seq: prev.saturating_add(1),
+                        found_seq: seq,
+                    }));
+                }
+            }
+            previous = Some(seq);
+        }
+        // The UNION of imported events and the page's abandoned/tombstoned slots
+        // must be gap-free from the cursor. An abandoned seq legitimately fills a
+        // hole left by a rolled-back-then-re-appended write, so it is NOT a skip;
+        // a seq that is neither an event nor abandoned IS a skip and stays a
+        // NonContiguousPage that demotes the peer (codex #965 round-5 P1).
+        let mut filled = event_seqs;
+        filled.extend(
+            response
+                .abandoned_seqs
+                .iter()
+                .copied()
+                .filter(|&seq| seq > previous_cursor_seq),
+        );
+        filled.sort_unstable();
+        filled.dedup();
+        require_contiguous_page(previous_cursor_seq.saturating_add(1), &filled)?;
     }
 
     let usage_records = response
@@ -664,6 +706,14 @@ pub(crate) fn import_budget_delta_response(
     store
         .import_snapshot_records(&usage_records, &mutation_records)
         .map_err(CliError::from)?;
+    // Record the page's abandoned slots so this follower's contiguous ack head
+    // treats them as filled even if it never held (and so never deleted) the
+    // original event (codex #965 round-5 P1).
+    if !response.abandoned_seqs.is_empty() {
+        store
+            .record_abandoned_event_seqs(&response.abandoned_seqs)
+            .map_err(CliError::from)?;
+    }
 
     // The global event cursor advances ONLY from mutation events (guaranteed
     // non-empty here: a records-only page was rejected above). Usage `seq`s never
@@ -917,13 +967,65 @@ fn budget_write_quorum_commit_view_locked(
     }
 }
 
-fn budget_write_quorum_commit_timeout(sync_interval: Duration) -> Duration {
+type Puller = fn(
+    &TrustServiceState,
+    &TrustControlClient,
+    &str,
+    &mut PullRoundBudget,
+) -> Result<u64, PullError>;
+
+/// The per-peer pull order. Budget replication is quorum-critical (HA budget
+/// writes wait on peers' budget_ack_heads), so it is pulled FIRST: a sustained
+/// receipt/lineage backlog must not spend the shared round budget and starve the
+/// budget pull, timing out otherwise-committable writes (codex #965 round-5 P1).
+fn peer_pullers() -> [Puller; 5] {
+    [
+        sync_peer_budgets,
+        sync_peer_revocations,
+        sync_peer_tool_receipts,
+        sync_peer_child_receipts,
+        sync_peer_lineage,
+    ]
+}
+
+/// Number of configured cluster peers (0 when unclustered).
+fn cluster_peer_count(state: &TrustServiceState) -> usize {
+    let Some(cluster) = state.cluster.as_ref() else {
+        return 0;
+    };
+    match cluster.lock() {
+        Ok(guard) => guard.peers.len(),
+        Err(poisoned) => poisoned.into_inner().peers.len(),
+    }
+}
+
+/// How long a budget write waits for peer acks to reach quorum.
+///
+/// The single background sync loop visits peers SERIALLY and each peer HTTP call
+/// can block up to `CONTROL_HTTP_TIMEOUT`, so if a slow/unreachable peer is
+/// visited before the healthy peer whose ack makes quorum, the wait must outlast
+/// one worst-case cycle plus the mid-cycle start, or it would 503 a write a
+/// quorum peer could still complete (codex #965 round-5 P1). The bound scales with
+/// the peer count (inherently bounded by cluster size) and is capped so a
+/// misconfigured huge peer list cannot make it unbounded. A GENUINE partition
+/// still returns 503 promptly via the has-quorum check inside the wait loop, so
+/// this longer bound only delays the "quorum reachable but a preceding peer is
+/// slow" case, never a real partition.
+fn budget_write_quorum_commit_timeout(sync_interval: Duration, peer_count: usize) -> Duration {
     let scaled = sync_interval
         .checked_mul(20)
-        .unwrap_or_else(|| Duration::from_secs(30));
-    scaled
+        .unwrap_or_else(|| Duration::from_secs(30))
         .max(Duration::from_secs(5))
-        .min(Duration::from_secs(30))
+        .min(Duration::from_secs(30));
+    // One worst-case sync cycle where every peer preceding the quorum peer blocks
+    // for the full control timeout, plus one extra cycle for a mid-cycle start.
+    let cycles = (peer_count as u32).saturating_add(1);
+    let peer_bound = CONTROL_HTTP_TIMEOUT
+        .checked_mul(cycles)
+        .unwrap_or(Duration::from_secs(120))
+        .saturating_add(sync_interval)
+        .min(Duration::from_secs(120));
+    scaled.max(peer_bound)
 }
 
 /// Outcome when the `ClusterProgress` watch closes while a budget write is
@@ -959,7 +1061,9 @@ pub(crate) async fn wait_for_budget_write_quorum_commit(
     let Some(progress) = state.cluster_progress.as_ref() else {
         return Ok(None); // not clustered
     };
-    let timeout = budget_write_quorum_commit_timeout(state.config.cluster_sync_interval);
+    let peer_count = cluster_peer_count(state);
+    let timeout =
+        budget_write_quorum_commit_timeout(state.config.cluster_sync_interval, peer_count);
     let mut rx = progress.subscribe();
     progress.request_sync();
 
@@ -1160,4 +1264,37 @@ pub(crate) fn budget_mutation_record_from_view(
             .as_ref()
             .map(budget_event_authority_from_view),
     })
+}
+
+#[cfg(test)]
+mod deltas_tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn budget_pull_is_prioritized_first() {
+        // codex #965 round-5 P1: budget replication is pulled FIRST so a
+        // receipt/lineage backlog cannot spend the shared round budget and starve
+        // the quorum-critical budget pull.
+        assert_eq!(
+            peer_pullers()[0] as usize,
+            sync_peer_budgets as Puller as usize,
+            "the budget pull must run first in the per-peer pull order"
+        );
+    }
+
+    #[test]
+    fn quorum_commit_timeout_scales_with_peer_count_and_is_bounded() {
+        // codex #965 round-5 P1: the wait must outlast one worst-case serial sync
+        // cycle (a slow peer visited before the quorum peer blocks up to the
+        // control timeout), but stay bounded by the peer count.
+        let interval = Duration::from_millis(25);
+        assert!(budget_write_quorum_commit_timeout(interval, 0) >= Duration::from_secs(5));
+        let two = budget_write_quorum_commit_timeout(interval, 2);
+        assert!(
+            two >= CONTROL_HTTP_TIMEOUT * 3,
+            "two peers must allow >= 3 control timeouts, got {two:?}"
+        );
+        assert!(budget_write_quorum_commit_timeout(interval, 10_000) <= Duration::from_secs(120));
+    }
 }

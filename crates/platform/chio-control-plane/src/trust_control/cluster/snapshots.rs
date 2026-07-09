@@ -132,6 +132,11 @@ pub(crate) fn build_cluster_state_snapshot(
     } else {
         Vec::new()
     };
+    let budget_abandoned_seqs = if let Some(path) = state.config.budget_db_path.as_deref() {
+        SqliteBudgetStore::open(path)?.list_abandoned_event_seqs()?
+    } else {
+        Vec::new()
+    };
 
     let replication = ClusterReplicationHeadsView {
         tool_seq: tool_receipts.last().map(|record| record.seq).unwrap_or(0),
@@ -162,6 +167,7 @@ pub(crate) fn build_cluster_state_snapshot(
         lineage,
         budgets,
         budget_mutation_events,
+        budget_abandoned_seqs,
     })
 }
 
@@ -182,6 +188,7 @@ pub(crate) fn apply_cluster_snapshot(
         lineage,
         budgets,
         budget_mutation_events,
+        budget_abandoned_seqs,
     } = snapshot;
 
     if let (Some(path), Some(authority_view)) =
@@ -234,6 +241,12 @@ pub(crate) fn apply_cluster_snapshot(
             .map_err(|error| CliError::cli_other_error(error.to_string()))?;
         store
             .record_budget_import_floors(&mutation_records)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        // Learn the leader's abandoned/tombstoned seqs so a fresh follower's
+        // contiguous ack head treats those holes as filled instead of wedging at
+        // them (codex #965 round-5 P1).
+        store
+            .record_abandoned_event_seqs(&budget_abandoned_seqs)
             .map_err(|error| CliError::cli_other_error(error.to_string()))?;
         for event in &budget_mutation_events {
             budget_cursor = Some(merge_budget_cursor(
