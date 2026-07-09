@@ -505,6 +505,41 @@ mod tests {
         drop(gb);
     }
 
+    proptest::proptest! {
+        #[test]
+        fn per_peer_never_exceeds_cap(cap in 1usize..8, extra in 0usize..8) {
+            // For any per-peer cap and any number of extra attempts, a single peer
+            // holds at most `cap` guards concurrently; the rest shed PeerBusy.
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_time()
+                .build()
+                .expect("runtime");
+            rt.block_on(async {
+                let config = AcceptLimitConfig {
+                    max_in_flight: 64,
+                    max_in_flight_per_peer: cap,
+                    shed_wait: Duration::from_millis(1),
+                    ..AcceptLimitConfig::default()
+                };
+                let limiter = AcceptLimiter::new(config);
+                let peer = iroh::SecretKey::from_bytes(&[9u8; 32]).public();
+                let mut held = Vec::new();
+                let mut shed = 0usize;
+                for _ in 0..(cap + extra) {
+                    match limiter.admit_peer(&peer).await {
+                        Ok(guard) => held.push(guard),
+                        Err(AcceptLimitError::PeerBusy { .. }) => shed += 1,
+                        Err(other) => panic!("unexpected shed: {other:?}"),
+                    }
+                }
+                proptest::prop_assert!(held.len() <= cap);
+                proptest::prop_assert_eq!(held.len(), cap.min(cap + extra));
+                proptest::prop_assert_eq!(shed, extra);
+                Ok(())
+            })?;
+        }
+    }
+
     #[test]
     fn distinct_close_codes() {
         assert_ne!(LANE_RESET_CLOSE_CODE, ACCEPT_TIMEOUT_CLOSE_CODE);

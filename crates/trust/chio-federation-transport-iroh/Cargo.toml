@@ -64,6 +64,20 @@ chio-pheromone = { workspace = true }
 # only through `Arc<dyn RelayBatchReceiver>`, by inference).
 chio-pheromone-runtime = { workspace = true }
 async-trait = { workspace = true }
+# RFC-0012 nightly loom tier: concurrency models for the per-peer counter and the
+# ArcSwap publish/read, cfg-gated behind chio_iroh_transport_loom (not the default
+# PR gate). loom is a workspace dep; adding it here mirrors chio-kernel.
+loom = { workspace = true }
+# RFC-0012 per-peer fairness property test (PR gate).
+proptest = { workspace = true }
 
-[lints]
-workspace = true
+# Explicit lint tables (mirroring chio-kernel): `[lints] workspace = true` cannot
+# register the loom cfg, so switch to explicit `[lints.clippy]` (verbatim copy of
+# the two workspace clippy lints) plus a `[lints.rust]` unexpected_cfgs block for
+# the loom cfg.
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(chio_iroh_transport_loom)"] }
