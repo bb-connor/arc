@@ -185,6 +185,7 @@ git commit -m "feat(core-types): add DLM flow Label type"
 
 **Interfaces:**
 - Produces: `CaveatKind::Declassify`. The `predicate` string carries the comma-separated compartments this caveat authorizes downgrading (for example `phi,pii`).
+- Cross-arc dependency: adding the enum variant is not sufficient for a running kernel. Caveat-bearing capabilities are rejected at admission today (`crates/core/chio-core-types/src/capability/token.rs:379-384`) until the caveat-admission allowlist lands. That change is Task 2 of the protocol-primitives plan (`2026-07-09-protocol-primitives.md`), which admits `Declassify` and `RequireQuorum`. Land that task before exercising `Declassify` end-to-end; `chio-flow`'s `authorized_downgrade` (Task 10 here) is the enforcement layer the allowlist refers to for `Declassify`.
 
 - [ ] **Step 1: Write the failing test**
 
