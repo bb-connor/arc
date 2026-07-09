@@ -256,6 +256,12 @@ pub enum FanoutError {
     /// The underlying iroh-gossip subscribe/join/broadcast/receive failed.
     #[error("gossip transport error: {0}")]
     Gossip(String),
+    /// The gossip receiver fell behind and iroh-gossip dropped messages
+    /// (Event::Lagged). Fieldless: iroh-gossip 0.101 reports no drop count, so
+    /// the number of dropped messages is unknowable at this layer. A dropped
+    /// message is a lost-frame signal, never an accepted frame.
+    #[error("gossip receiver lagged: an unknown number of messages were dropped")]
+    Lagged,
 }
 
 impl FanoutError {
@@ -274,6 +280,7 @@ impl FanoutError {
             Self::Canonical(_) => "canonical-json",
             Self::Frame(_) => "frame-invalid",
             Self::Gossip(_) => "gossip-transport",
+            Self::Lagged => "lagged",
         }
     }
 }
@@ -1069,7 +1076,23 @@ impl FanoutTopic {
         loop {
             match self.receiver.next().await {
                 Some(Ok(Event::Received(message))) => return Some(Ok(message)),
-                // NeighborUp / NeighborDown / Lagged are not payloads.
+                Some(Ok(Event::Lagged)) => {
+                    // The receiver fell behind and iroh-gossip dropped messages.
+                    // Meter, log, and surface it as a dropped-message signal (never
+                    // an accepted frame) so a subscriber that fell behind cannot
+                    // silently lose frames (RFC-0012 F36).
+                    crate::metrics::record_lane_frame(
+                        crate::metrics::LANE_FANOUT,
+                        crate::metrics::LANE_OUTCOME_LAGGED,
+                    );
+                    tracing::warn!(
+                        target: crate::observability::TARGET_VERIFY,
+                        treaty = %self.treaty_id,
+                        "fan-out gossip receiver lagged; messages dropped"
+                    );
+                    return Some(Err(FanoutError::Lagged));
+                }
+                // NeighborUp / NeighborDown are not payloads.
                 Some(Ok(_)) => continue,
                 Some(Err(error)) => return Some(Err(FanoutError::Gossip(error.to_string()))),
                 None => return None,
@@ -1218,6 +1241,29 @@ mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
+
+    #[test]
+    fn lagged_event_is_metered_and_surfaced() {
+        // The variant exists, is fieldless, and has a stable code.
+        assert_eq!(FanoutError::Lagged.code(), "lagged");
+        // The lagged outcome has a real metrics slot that advances (observe-only,
+        // monotone lower bound: other tests only ever add).
+        let before = crate::metrics::lane_total(
+            crate::metrics::LANE_FANOUT,
+            crate::metrics::LANE_OUTCOME_LAGGED,
+        );
+        crate::metrics::record_lane_frame(
+            crate::metrics::LANE_FANOUT,
+            crate::metrics::LANE_OUTCOME_LAGGED,
+        );
+        assert!(
+            crate::metrics::lane_total(
+                crate::metrics::LANE_FANOUT,
+                crate::metrics::LANE_OUTCOME_LAGGED,
+            ) > before,
+            "a lagged event must be counted, never silently dropped"
+        );
+    }
     use chio_core_types::Keypair;
     use chio_federation::pheromone_gossip::PheromoneDepositGossip;
     use chio_federation::pheromone_gossip::PheromoneTransitPolicy;

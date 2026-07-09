@@ -66,6 +66,10 @@ pub const LANE_OUTCOME_REJECT: &str = "reject";
 pub const LANE_OUTCOME_BUSY: &str = "busy";
 /// Lane outcome: a peer-dependent accept step exceeded its bound (slowloris).
 pub const LANE_OUTCOME_TIMEOUT: &str = "timeout";
+/// Lane outcome: a fan-out gossip receiver fell behind and iroh-gossip dropped
+/// messages (Event::Lagged). Metered so the "gate looks green but measures
+/// nothing" failure is visible; iroh-gossip 0.101 reports no drop count.
+pub const LANE_OUTCOME_LAGGED: &str = "lagged";
 
 /// Outbox outcome: a batch was accepted by its recipient.
 pub const OUTBOX_DELIVERED: &str = "delivered";
@@ -94,7 +98,7 @@ pub const SEAM_BILATERAL: &str = "bilateral";
 
 const NUM_LANES: usize = 4;
 const NUM_ADMISSION: usize = 2;
-const NUM_LANE_OUTCOME: usize = 4;
+const NUM_LANE_OUTCOME: usize = 5;
 const NUM_OUTBOX: usize = 3;
 const NUM_CATCHUP_SOURCE: usize = 2;
 
@@ -120,11 +124,6 @@ static LANE_TOTAL: [[AtomicU64; NUM_LANE_OUTCOME]; NUM_LANES] = [
         AtomicU64::new(0),
         AtomicU64::new(0),
         AtomicU64::new(0),
-    ],
-    [
-        AtomicU64::new(0),
-        AtomicU64::new(0),
-        AtomicU64::new(0),
         AtomicU64::new(0),
     ],
     [
@@ -132,8 +131,17 @@ static LANE_TOTAL: [[AtomicU64; NUM_LANE_OUTCOME]; NUM_LANES] = [
         AtomicU64::new(0),
         AtomicU64::new(0),
         AtomicU64::new(0),
+        AtomicU64::new(0),
     ],
     [
+        AtomicU64::new(0),
+        AtomicU64::new(0),
+        AtomicU64::new(0),
+        AtomicU64::new(0),
+        AtomicU64::new(0),
+    ],
+    [
+        AtomicU64::new(0),
         AtomicU64::new(0),
         AtomicU64::new(0),
         AtomicU64::new(0),
@@ -234,7 +242,9 @@ fn lane_outcome_index(outcome: &str) -> usize {
         "accept" => 0,
         "reject" => 1,
         "busy" => 2,
-        _ => 3,
+        "timeout" => 3,
+        "lagged" => 4,
+        _ => 1, // unknown outcomes count as reject (fail-closed accounting)
     }
 }
 
@@ -505,6 +515,7 @@ pub fn render_iroh_transport_metrics_prometheus() -> String {
             LANE_OUTCOME_REJECT,
             LANE_OUTCOME_BUSY,
             LANE_OUTCOME_TIMEOUT,
+            LANE_OUTCOME_LAGGED,
         ] {
             push_labeled(
                 &mut output,
