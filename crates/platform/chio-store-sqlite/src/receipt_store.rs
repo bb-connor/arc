@@ -683,16 +683,24 @@ fn handle_non_append_command(
         } => {
             // Hold the writer `inflight` count for the DURATION of this Write job
             // (codex round 10, finding 3) rather than releasing it immediately on
-            // dequeue. The pre-send increment in `WriterHandle::run_write_kind` is
-            // adopted by this RAII guard and released only when the job finishes,
-            // so a health poll during a slow or stuck liability/checkpoint write
-            // reports `inflight > 0`, mirroring the Append path (which stays
-            // inflight until `commit_receipt_batch` fans out its results). The
-            // guard decrements on every exit path (pool/pre-check `return`,
-            // poisoned head, resync error) exactly once; `atomic_saturating_sub`
-            // keeps a rare overlap with the caller's recv-Err compensation
-            // (actor-thread death) from underflowing.
-            let _inflight = WriterInflightGuard::new(&health.inflight);
+            // dequeue, so a health poll during a slow or stuck liability/checkpoint
+            // write reports `inflight > 0`. The pre-send increment in
+            // `WriterHandle::run_write_kind` is adopted by this RAII guard.
+            //
+            // Ordering (pre-review F1): the guard is released (`drop`) IMMEDIATELY
+            // BEFORE each `respond(...)` on every exit path, so a caller that
+            // observes its own response never sees itself still counted inflight.
+            // This mirrors the Append path, which decrements in
+            // `commit_receipt_batch` BEFORE fanning out its responses; the round-10
+            // guard instead dropped at the END of this arm, AFTER `respond(...)`
+            // had already unblocked the caller, so `run_write` could return while
+            // `inflight` was still 1. The decrement stays deferred until here, so
+            // inflight remains up through the job body and the head resync (the
+            // response itself is deferred until then). The guard's Drop still
+            // backstops any exit that panics before a respond runs;
+            // `atomic_saturating_sub` keeps a rare overlap with the caller's
+            // recv-Err compensation (actor-thread death) from underflowing.
+            let inflight_guard = WriterInflightGuard::new(&health.inflight);
             let mut connection = match pool.get() {
                 Ok(connection) => connection,
                 Err(error) => {
@@ -700,6 +708,8 @@ fn handle_non_append_command(
                     // gate on: send the pool error now (`Ok(())` = nothing to
                     // override). Count the failed outcome (round 9, finding 1).
                     let respond = job(Err(ReceiptStoreError::Pool(error.to_string())));
+                    // Decrement before the response reaches the caller (F1).
+                    drop(inflight_guard);
                     record_write_job_outcome(health, respond(Ok(())));
                     return;
                 }
@@ -707,6 +717,8 @@ fn handle_non_append_command(
             match head_state {
                 WriterHeadState::Poisoned(message) => {
                     let respond = job(Err(poisoned_head_error(message)));
+                    // Decrement before the response reaches the caller (F1).
+                    drop(inflight_guard);
                     record_write_job_outcome(health, respond(Ok(())));
                 }
                 WriterHeadState::Verified(head) => {
@@ -732,6 +744,8 @@ fn handle_non_append_command(
                     };
                     if let Err(error) = pre_check {
                         let respond = job(Err(error));
+                        // Decrement before the response reaches the caller (F1).
+                        drop(inflight_guard);
                         record_write_job_outcome(health, respond(Ok(())));
                         return;
                     }
@@ -754,7 +768,10 @@ fn handle_non_append_command(
                         Ok(()) => {
                             // Reconcile committed/failed for this writer-routed
                             // job (codex round 9, finding 1) using the responder's
-                            // resync-adjusted outcome signal.
+                            // resync-adjusted outcome signal. Decrement before the
+                            // response reaches the caller (F1); the post-response
+                            // catch-up build below reads no inflight state.
+                            drop(inflight_guard);
                             record_write_job_outcome(health, respond(Ok(())));
                             health.store_head_snapshot(head);
                             // Clear a stale checkpoint error after a manual
@@ -815,7 +832,9 @@ fn handle_non_append_command(
                             // Surface the resync failure to the caller: a write
                             // that returned `Ok` from its closure must NOT report
                             // success when the head is now poisoned. Count the
-                            // failed outcome (codex round 9, finding 1).
+                            // failed outcome (codex round 9, finding 1). Decrement
+                            // before the response reaches the caller (F1).
+                            drop(inflight_guard);
                             record_write_job_outcome(health, respond(Err(error)));
                             *head_state = WriterHeadState::Poisoned(poison_message);
                         }
@@ -1178,15 +1197,18 @@ fn atomic_saturating_sub(value: &AtomicU64, amount: u64) {
 
 /// Holds the writer `inflight` count for the DURATION of a writer-routed `Write`
 /// job (codex round 10, finding 3). The pre-send increment in
-/// `WriterHandle::run_write_kind` is ADOPTED by this guard and released only when
-/// the job (pool acquire, pre-check, closure, resync, catch-up build) finishes,
-/// so `receipt_store_health` reports `inflight > 0` while a slow or stuck
-/// writer-routed op is actually running - mirroring the Append path, which stays
-/// inflight until its results fan out (`commit_receipt_batch`). Drop-based, so
-/// every exit path of the `Write` arm (early pool/pre-check returns, poisoned
-/// head, resync error, or an unwinding panic) releases exactly once; a release
-/// overlap with the caller's recv-Err compensation under actor-thread death
-/// saturates at zero via `atomic_saturating_sub` rather than underflowing.
+/// `WriterHandle::run_write_kind` is ADOPTED by this guard, so
+/// `receipt_store_health` reports `inflight > 0` while a slow or stuck
+/// writer-routed op (pool acquire, pre-check, closure, resync) is actually
+/// running. The `Write` arm releases it (`drop`) IMMEDIATELY BEFORE each
+/// `respond(...)` (pre-review F1), so a caller that observes its own response
+/// never sees itself still counted inflight - mirroring the Append path, which
+/// decrements in `commit_receipt_batch` BEFORE fanning out its results (the
+/// round-10 guard instead dropped at the END of the arm, AFTER the response had
+/// already unblocked the caller). Still Drop-based, so any exit that panics
+/// before a respond runs releases exactly once; a release overlap with the
+/// caller's recv-Err compensation under actor-thread death saturates at zero via
+/// `atomic_saturating_sub` rather than underflowing.
 struct WriterInflightGuard<'a> {
     inflight: &'a AtomicU64,
 }
@@ -2815,8 +2837,9 @@ mod receipt_commit_actor_tests {
         );
 
         // Release the job and confirm inflight drains back to baseline. The
-        // `WriterInflightGuard` decrements at the end of the Write arm, a hair
-        // after the caller's response is delivered, so poll briefly.
+        // `WriterInflightGuard` now decrements just BEFORE the caller's response
+        // is delivered (pre-review F1), so this is already at baseline once the
+        // worker join returns; poll defensively regardless.
         release_tx.send(())?;
         worker
             .join()
@@ -2833,6 +2856,68 @@ mod receipt_commit_actor_tests {
             drained,
             "inflight must return to baseline after the Write completes"
         );
+
+        let _ = fs::remove_file(path);
+        Ok(())
+    }
+
+    /// Pre-review F1: the `WriterInflightGuard` decrement must be SYNCHRONOUS with
+    /// caller-return. The round-10 guard dropped at the END of the Write arm,
+    /// AFTER `respond(...)` had delivered the caller's response and unblocked
+    /// `run_write`, so a caller could return while `inflight` was still counted -
+    /// the exact window that made
+    /// `run_write_executes_jobs_serially_on_the_writer_thread` intermittently
+    /// observe `inflight == 1`. The fix drops the guard IMMEDIATELY BEFORE each
+    /// `respond(...)`, matching the Append path's decrement-then-fan-out ordering
+    /// (`commit_receipt_batch`), so caller-return implies the decrement already
+    /// happened. This asserts that guarantee DIRECTLY and deterministically (no
+    /// `wait_until`): right after `run_write` returns, `inflight` reads 0 on every
+    /// one of many iterations. RED before the fix (the caller can observe
+    /// `inflight == 1` while the writer thread is still finishing the arm).
+    #[test]
+    fn write_decrements_inflight_before_returning_to_caller(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let path = std::env::temp_dir().join(format!(
+            "chio-write-inflight-order-{}-{}.sqlite3",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let store = SqliteReceiptStore::open(&path)?;
+        let writer = store.writer_handle();
+
+        // Drain any open-time writer activity to a known baseline first.
+        let drained_baseline = wait_until(|| {
+            store
+                .receipt_commit_actor
+                .health
+                .inflight
+                .load(Ordering::SeqCst)
+                == 0
+        });
+        assert!(drained_baseline, "writer failed to drain to baseline");
+
+        // Many iterations to expose the ordering race: the pre-fix guard dropped
+        // AFTER the response reached the caller (and the writer thread still had
+        // the head snapshot, error clear, connection drop and catch-up build to
+        // run), so this load would intermittently observe 1. With the fix the
+        // decrement precedes the response, so caller-return happens-before this
+        // load and it must read 0 on EVERY iteration with no polling.
+        for iteration in 0..512 {
+            writer.run_write(|_connection| Ok(()))?;
+            let observed = store
+                .receipt_commit_actor
+                .health
+                .inflight
+                .load(Ordering::SeqCst);
+            assert_eq!(
+                observed, 0,
+                "caller returned from run_write with inflight still counted \
+                 (iteration {iteration}); the decrement must precede the response"
+            );
+        }
 
         let _ = fs::remove_file(path);
         Ok(())
