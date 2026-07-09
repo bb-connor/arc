@@ -73,35 +73,94 @@ mod tests {
         PHEROMONE_RECEIVE_REPORT_SCHEMA,
     };
 
+    fn receive_report(
+        batch_sha256: &str,
+        sender: &str,
+        accepted: bool,
+        received_at_unix_ms: u64,
+    ) -> PheromoneReceiveReport {
+        PheromoneReceiveReport {
+            schema: PHEROMONE_RECEIVE_REPORT_SCHEMA.to_string(),
+            accepted,
+            batch_outcome: if accepted {
+                PheromoneBatchOutcome::Accepted
+            } else {
+                PheromoneBatchOutcome::Rejected
+            },
+            accepted_frame_count: u64::from(accepted),
+            rejected_frame_count: u64::from(!accepted),
+            batch_sha256: batch_sha256.to_string(),
+            recipient_kernel_id: "did:chio:bob".to_string(),
+            authenticated_sender_kernel_id: sender.to_string(),
+            received_at_unix_ms,
+            frames: Vec::new(),
+        }
+    }
+
     #[test]
     fn receive_report_is_recoverable_by_batch_sha256() {
         let store = SqlitePheromoneRuntimeStore::open_in_memory().expect("store opens");
 
         // A batch hash that was never recorded is not found.
         assert!(store
-            .lookup_receive_report_by_batch("deadbeef")
+            .lookup_receive_report_by_batch("deadbeef", "did:chio:alice")
             .expect("lookup runs")
             .is_none());
 
-        // Record a report carrying a known batch hash, then recover it by batch.
-        let report = PheromoneReceiveReport {
-            schema: PHEROMONE_RECEIVE_REPORT_SCHEMA.to_string(),
-            accepted: true,
-            batch_outcome: PheromoneBatchOutcome::Accepted,
-            accepted_frame_count: 1,
-            rejected_frame_count: 0,
-            batch_sha256: "abc123".to_string(),
-            recipient_kernel_id: "did:chio:bob".to_string(),
-            authenticated_sender_kernel_id: "did:chio:alice".to_string(),
-            received_at_unix_ms: 1,
-            frames: Vec::new(),
-        };
+        // Record a report carrying a known batch hash, then recover it by (batch, sender).
+        let report = receive_report("abc123", "did:chio:alice", true, 1);
         store.record_receive_report(&report).expect("record report");
         let found = store
-            .lookup_receive_report_by_batch("abc123")
+            .lookup_receive_report_by_batch("abc123", "did:chio:alice")
             .expect("lookup runs")
             .expect("report recovered by batch hash");
         assert_eq!(found.batch_sha256, "abc123");
+    }
+
+    #[test]
+    fn receive_report_lookup_is_scoped_to_the_authenticated_sender() {
+        // RFC-0012 F35: a batch hash is NOT sender-unique. A wrong-sender replay can record
+        // a REJECTED verdict for the same bytes BEFORE the correct sender's crash-recovery
+        // report. The lookup must return the row for the QUERIED sender, never an arbitrary
+        // cross-sender row, or recovery would adopt the wrong verdict and re-run receive on
+        // an already-committed batch.
+        //
+        // TEETH:
+        //  - RED (unqualified `SELECT ... WHERE batch_sha256 = ?`): returns whichever row
+        //    the engine yields first (here the wrong-sender REJECTED report, recorded first).
+        //  - GREEN (sender-scoped query): returns each sender's own row.
+        let store = SqlitePheromoneRuntimeStore::open_in_memory().expect("store opens");
+        // Wrong sender records a rejected verdict for the batch FIRST (earlier timestamp).
+        let wrong = receive_report("shared-batch", "did:chio:mallory", false, 1);
+        store.record_receive_report(&wrong).expect("record wrong");
+        // Correct sender records an accepted verdict for the SAME batch bytes.
+        let correct = receive_report("shared-batch", "did:chio:alice", true, 2);
+        store
+            .record_receive_report(&correct)
+            .expect("record correct");
+
+        let found = store
+            .lookup_receive_report_by_batch("shared-batch", "did:chio:alice")
+            .expect("lookup runs")
+            .expect("the correct sender's verdict is recovered");
+        assert_eq!(found.authenticated_sender_kernel_id, "did:chio:alice");
+        assert!(
+            found.accepted,
+            "the correct sender's accepted verdict is returned"
+        );
+
+        // The wrong sender's own row is still addressable under its own scope.
+        let mallory = store
+            .lookup_receive_report_by_batch("shared-batch", "did:chio:mallory")
+            .expect("lookup runs")
+            .expect("mallory's own verdict is addressable under its own scope");
+        assert!(!mallory.accepted);
+
+        // A sender that recorded nothing for this batch gets None (fail-closed).
+        assert!(store
+            .lookup_receive_report_by_batch("shared-batch", "did:chio:nobody")
+            .expect("lookup runs")
+            .is_none());
     }
 
     #[test]
@@ -258,11 +317,12 @@ impl SqlitePheromoneRuntimeStore {
                 report_sha256 TEXT PRIMARY KEY,
                 received_at_unix_ms INTEGER NOT NULL,
                 json TEXT NOT NULL,
-                batch_sha256 TEXT
+                batch_sha256 TEXT,
+                sender_kernel_id TEXT
             );
             "#,
         )?;
-        ensure_receive_report_batch_sha256_column(&conn)?;
+        ensure_receive_report_recovery_columns(&conn)?;
         Ok(())
     }
 
@@ -308,19 +368,29 @@ impl SqlitePheromoneRuntimeStore {
         Ok(())
     }
 
-    /// Recover a durably-recorded receive report by its batch hash, if the store
-    /// committed one for that batch (RFC-0012 F35). Returns None when no row for
-    /// the batch exists (pre-migration rows have a NULL batch_sha256 and are not
+    /// Recover a durably-recorded receive report by its batch hash SCOPED to the
+    /// authenticated sender, if the store committed one for that (batch, sender) pair
+    /// (RFC-0012 F35). The sender scope is applied AT THE QUERY LEVEL: a batch hash is
+    /// NOT sender-unique (a wrong-sender replay can record a rejected report for the same
+    /// bytes before the correct sender's crash-recovery report), so an unqualified
+    /// `SELECT` could return an arbitrary cross-sender row. Filtering by
+    /// `sender_kernel_id` returns the correct sender's durable verdict; the adoption site
+    /// re-checks the deserialized `authenticated_sender_kernel_id` as belt-and-suspenders.
+    /// The most-recent matching row wins (deterministic). Returns None when no row for the
+    /// (batch, sender) pair exists (pre-migration rows have NULL columns and are not
     /// returned). Read-only.
     pub fn lookup_receive_report_by_batch(
         &self,
         batch_sha256: &str,
+        authenticated_sender_kernel_id: &str,
     ) -> Result<Option<PheromoneReceiveReport>, PheromoneRuntimeError> {
         let conn = self.conn.lock()?;
         let json: Option<String> = conn
             .query_row(
-                "SELECT json FROM chio_pheromone_receive_reports WHERE batch_sha256 = ?1",
-                params![batch_sha256],
+                "SELECT json FROM chio_pheromone_receive_reports \
+                 WHERE batch_sha256 = ?1 AND sender_kernel_id = ?2 \
+                 ORDER BY received_at_unix_ms DESC LIMIT 1",
+                params![batch_sha256, authenticated_sender_kernel_id],
                 |row| row.get::<_, String>(0),
             )
             .optional()?;
@@ -728,34 +798,41 @@ impl PheromoneRuntimeStore for SqlitePheromoneRuntimeStore {
     }
 }
 
-/// Additive migration: the batch-hash recovery column + index for verdict
-/// recovery (RFC-0012 F35). Existing rows keep a NULL batch_sha256 and are not
-/// recoverable-by-batch (acceptable: only reports written after the migration
-/// need recovery). Idempotent.
-pub(crate) fn ensure_receive_report_batch_sha256_column(
+/// Additive migration: the recovery columns + index for verdict recovery (RFC-0012
+/// F35). `batch_sha256` keys the recovery lookup; `sender_kernel_id` SCOPES it to the
+/// authenticated sender, so a lookup for a batch that several senders recorded reports
+/// for (for example a wrong-sender replay that recorded a rejected verdict alongside the
+/// correct sender's crash-recovery report) returns the CORRECT sender's row rather than
+/// an arbitrary one. Existing rows keep NULL columns and are not recoverable-by-batch
+/// (acceptable: only reports written after the migration need recovery). Idempotent.
+pub(crate) fn ensure_receive_report_recovery_columns(
     conn: &rusqlite::Connection,
 ) -> Result<(), PheromoneRuntimeError> {
-    let mut has_column = false;
+    let mut existing_columns = std::collections::HashSet::new();
     let mut stmt = conn.prepare("PRAGMA table_info(chio_pheromone_receive_reports)")?;
     let mut rows = stmt.query([])?;
     while let Some(row) = rows.next()? {
         let name: String = row.get(1)?;
-        if name == "batch_sha256" {
-            has_column = true;
-            break;
-        }
+        existing_columns.insert(name);
     }
     drop(rows);
     drop(stmt);
-    if !has_column {
+    if !existing_columns.contains("batch_sha256") {
         conn.execute(
             "ALTER TABLE chio_pheromone_receive_reports ADD COLUMN batch_sha256 TEXT",
             [],
         )?;
     }
+    if !existing_columns.contains("sender_kernel_id") {
+        conn.execute(
+            "ALTER TABLE chio_pheromone_receive_reports ADD COLUMN sender_kernel_id TEXT",
+            [],
+        )?;
+    }
+    // Composite index so the sender-scoped recovery lookup is a single index probe.
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_receive_reports_batch_sha256 \
-         ON chio_pheromone_receive_reports (batch_sha256)",
+        "CREATE INDEX IF NOT EXISTS idx_receive_reports_batch_sender \
+         ON chio_pheromone_receive_reports (batch_sha256, sender_kernel_id)",
         [],
     )?;
     Ok(())
@@ -884,14 +961,15 @@ fn record_receive_report_tx(
     tx.execute(
         r#"
         INSERT OR REPLACE INTO chio_pheromone_receive_reports
-            (report_sha256, received_at_unix_ms, json, batch_sha256)
-        VALUES (?1, ?2, ?3, ?4)
+            (report_sha256, received_at_unix_ms, json, batch_sha256, sender_kernel_id)
+        VALUES (?1, ?2, ?3, ?4, ?5)
         "#,
         params![
             canonical_sha256(report)?,
             i64_from_u64(report.received_at_unix_ms, "received_at_unix_ms")?,
             json,
             report.batch_sha256,
+            report.authenticated_sender_kernel_id,
         ],
     )?;
     Ok(())
@@ -905,14 +983,15 @@ fn record_receive_report_connection(
     conn.execute(
         r#"
         INSERT OR REPLACE INTO chio_pheromone_receive_reports
-            (report_sha256, received_at_unix_ms, json, batch_sha256)
-        VALUES (?1, ?2, ?3, ?4)
+            (report_sha256, received_at_unix_ms, json, batch_sha256, sender_kernel_id)
+        VALUES (?1, ?2, ?3, ?4, ?5)
         "#,
         params![
             canonical_sha256(report)?,
             i64_from_u64(report.received_at_unix_ms, "received_at_unix_ms")?,
             json,
             report.batch_sha256,
+            report.authenticated_sender_kernel_id,
         ],
     )?;
     Ok(())
