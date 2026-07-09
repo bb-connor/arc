@@ -1120,9 +1120,14 @@ fn spawn_receipt_watchdog(
 fn sample_receipt_health(
     receipt_db: &Path,
 ) -> Result<chio_kernel::receipt_store::ReceiptStoreHealthReport, String> {
-    let store = SqliteReceiptStore::open(receipt_db).map_err(|error| error.to_string())?;
-    store
-        .receipt_store_health()
+    // Sample via a READ-ONLY open (no create/WAL/writer-pool), matching the
+    // read-only receipt-polling contract (ADR-0009, Codex round-4 finding 5). The
+    // watchdog observes a receipt DB the kernel owns: `open` would create a
+    // mistyped path, switch the mount to WAL, and spin a writer pool, so every
+    // sample failed on a read-only mount. The read-only sampler reports a missing
+    // DB as missing (NotFound) instead of creating it; the caller logs and
+    // continues on any error.
+    SqliteReceiptStore::receipt_store_health_read_only(receipt_db)
         .map_err(|error| error.to_string())
 }
 
@@ -1822,5 +1827,39 @@ mod tests {
             error.to_string().contains("SOC export sink"),
             "unexpected error: {error}"
         );
+    }
+
+    /// Codex round-4 finding 5: the receipt-log watchdog samples health via a
+    /// READ-ONLY open. A missing receipt DB must be reported as missing and must
+    /// NOT be created; the old `open` path created an empty DB on a mistyped
+    /// path (and failed outright on a read-only mount).
+    #[test]
+    fn watchdog_sample_receipt_health_does_not_create_a_missing_db() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let missing = std::env::temp_dir().join(format!(
+            "chio-wall-watchdog-missing-{}-{nonce}.sqlite3",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&missing);
+        assert!(
+            !missing.exists(),
+            "precondition: the DB path must be absent"
+        );
+
+        let error = sample_receipt_health(&missing)
+            .expect_err("a missing receipt DB must report missing, not be created");
+        assert!(
+            error.contains("does not exist"),
+            "unexpected error: {error}"
+        );
+        assert!(
+            !missing.exists(),
+            "the watchdog must not create the missing receipt DB"
+        );
+
+        let _ = std::fs::remove_file(&missing);
     }
 }

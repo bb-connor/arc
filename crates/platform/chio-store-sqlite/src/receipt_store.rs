@@ -646,6 +646,62 @@ impl SqliteReceiptStore {
         })
     }
 
+    /// Sample receipt-store health from a READ-ONLY connection (RFC-0009 F83,
+    /// Codex round-4 finding 5).
+    ///
+    /// The SIEM serve-mode watchdog observes a receipt DB the kernel owns; it
+    /// must not create it, switch it to WAL, or spin a writer pool on it -
+    /// matching the read-only receipt-polling contract (ADR-0009). `open` does
+    /// all three, so on a read-only mount every watchdog sample failed and a
+    /// mistyped path created an empty DB. This opens a single READ_ONLY
+    /// connection instead: a missing file reports `NotFound` rather than being
+    /// created, and a read-only mount is sampled without any write attempt.
+    ///
+    /// A read-only observer cannot see the owning writer's in-memory counters, so
+    /// `writer` is defaulted; the checkpoint-progress fields the watchdog gauges
+    /// consume (committed/checkpointed seqs and the uncheckpointed range) are
+    /// computed from the read connection with the same helpers as
+    /// `receipt_store_health`.
+    pub fn receipt_store_health_read_only(
+        path: &Path,
+    ) -> Result<ReceiptStoreHealthReport, ReceiptStoreError> {
+        let connection = Connection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(|error| {
+            if error.sqlite_error_code() == Some(rusqlite::ErrorCode::CannotOpen) {
+                ReceiptStoreError::NotFound(format!(
+                    "receipt database {} does not exist",
+                    path.display()
+                ))
+            } else {
+                ReceiptStoreError::Sqlite(error)
+            }
+        })?;
+        let latest_committed_entry_seq = latest_claim_log_entry_seq(&connection)?;
+        let latest = verify_checkpoint_chain_integrity(&connection)?;
+        let latest_checkpoint_seq = latest
+            .as_ref()
+            .map(|checkpoint| checkpoint.body.checkpoint_seq);
+        let latest_checkpointed_entry_seq = latest
+            .as_ref()
+            .map_or(0, |checkpoint| checkpoint.body.batch_end_seq);
+        let (uncheckpointed_start_seq, uncheckpointed_end_seq) =
+            uncheckpointed_range(latest_checkpointed_entry_seq, latest_committed_entry_seq);
+        Ok(ReceiptStoreHealthReport {
+            healthy: latest_committed_entry_seq >= latest_checkpointed_entry_seq,
+            writer: ReceiptWriterCounters::default(),
+            latest_committed_entry_seq,
+            latest_checkpoint_seq,
+            latest_checkpointed_entry_seq,
+            uncheckpointed_start_seq,
+            uncheckpointed_end_seq,
+            checkpoint_error: None,
+            db_size_bytes: None,
+        })
+    }
+
     pub fn latest_committed_entry_seq(&self) -> Result<u64, ReceiptStoreError> {
         let connection = self.connection()?;
         latest_claim_log_entry_seq(&connection)
