@@ -345,18 +345,35 @@ impl AcceptLimiter {
             }
             *entry += 1;
         }
-        // 2. Acquire the shared permit under the existing bounded shed wait. On a
-        //    shed, release the per-peer slot so it is not leaked.
+        // Hold the freshly-reserved slot via an RAII guard, ARMED, ACROSS the shared-
+        // permit await below. That await can be CANCELLED (the accept future is dropped -
+        // a Router shutdown or connection close cancels it) between reserving the slot and
+        // constructing the PeerAdmitGuard; without this guard neither the success arm nor
+        // the shed arm would run, LEAKING the per-peer count and permanently shedding this
+        // peer with accept_peer_busy until restart. While armed, a drop (cancel OR shed)
+        // releases the slot; on success we DISARM and the returned PeerAdmitGuard takes
+        // over the release for the handler's lifetime.
+        let mut reservation = PeerSlotReservation {
+            per_peer: Arc::clone(&self.per_peer),
+            peer: *peer,
+            armed: true,
+        };
+        // 2. Acquire the shared permit under the existing bounded shed wait. A shed (or a
+        //    cancel of this await) releases the per-peer slot via the reservation guard.
         match self.admit().await {
-            Ok(permit) => Ok(PeerAdmitGuard {
-                _permit: permit,
-                per_peer: Arc::clone(&self.per_peer),
-                peer: *peer,
-            }),
-            Err(busy) => {
-                release_peer_slot(&self.per_peer, peer);
-                Err(busy)
+            Ok(permit) => {
+                // The slot is now owned by the returned guard; disarm the reservation so
+                // its drop does not double-release it.
+                reservation.disarm();
+                Ok(PeerAdmitGuard {
+                    _permit: permit,
+                    per_peer: Arc::clone(&self.per_peer),
+                    peer: *peer,
+                })
             }
+            // The reservation drops here (still armed) and releases the slot, so a shed
+            // no longer needs an explicit release.
+            Err(busy) => Err(busy),
         }
     }
 
@@ -410,6 +427,32 @@ fn release_peer_slot(per_peer: &Arc<Mutex<HashMap<EndpointId, usize>>>, peer: &E
             peer = %peer.fmt_short(),
             "per-peer accept counter lock poisoned; slot held fail-closed"
         ),
+    }
+}
+
+/// RAII reservation for a per-peer in-flight slot, held ONLY across the shared-permit
+/// await in [`AcceptLimiter::admit_peer`]. While ARMED, dropping it releases the slot,
+/// so an accept future CANCELLED (dropped) between reserving the slot and constructing
+/// the [`PeerAdmitGuard`] never leaks the peer's capacity (which would permanently shed
+/// that peer with `accept_peer_busy` until restart). [`Self::disarm`] hands the release
+/// responsibility to the [`PeerAdmitGuard`] once the shared permit is acquired.
+struct PeerSlotReservation {
+    per_peer: Arc<Mutex<HashMap<EndpointId, usize>>>,
+    peer: EndpointId,
+    armed: bool,
+}
+
+impl PeerSlotReservation {
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for PeerSlotReservation {
+    fn drop(&mut self) {
+        if self.armed {
+            release_peer_slot(&self.per_peer, &self.peer);
+        }
     }
 }
 
@@ -509,6 +552,59 @@ mod tests {
         drop(g2);
         drop(g3);
         drop(gb);
+    }
+
+    #[tokio::test]
+    async fn cancelled_admission_releases_the_per_peer_slot() {
+        // RFC-0012 F33 per-peer fairness (cancel-safety). admit_peer reserves the
+        // per-peer slot, then AWAITS the shared lane permit. If the accept future is
+        // CANCELLED (dropped - a Router shutdown or connection close cancels it) during
+        // that await, the reservation must be RELEASED; otherwise the per-peer count leaks
+        // and later connections from the same peer shed accept_peer_busy until restart.
+        //
+        // TEETH: saturate the SHARED lane cap (1 permit, held) so admit_peer blocks on the
+        // shared semaphore AFTER reserving the per-peer slot (the per-peer cap of 4 is not
+        // the binding constraint). Cancel that future before shed_wait elapses. The peer's
+        // count must return to its prior value (absent / 0).
+        //  - RED (pre-fix): the cancelled await leaks the reservation; the count stays 1.
+        //  - GREEN (post-fix): the reservation guard releases on drop; the count is 0.
+        let config = AcceptLimitConfig {
+            max_in_flight: 1,
+            max_in_flight_per_peer: 4,
+            shed_wait: Duration::from_secs(30),
+            ..AcceptLimitConfig::default()
+        };
+        let limiter = AcceptLimiter::new(config);
+        let peer = endpoint(7);
+
+        // Hold the sole shared permit so admit_peer(&peer) reserves its per-peer slot and
+        // then blocks on the saturated shared semaphore.
+        let held = limiter.admit().await.expect("hold the sole shared permit");
+
+        // Cancel the admission mid-await: the 50ms outer bound drops the inner admit_peer
+        // future while it is still awaiting the shared permit (shed_wait is 30s, so it is
+        // NOT a shed - it is a genuine cancellation).
+        let cancelled =
+            tokio::time::timeout(Duration::from_millis(50), limiter.admit_peer(&peer)).await;
+        assert!(
+            cancelled.is_err(),
+            "the admission is cancelled mid-await, not completed or shed"
+        );
+
+        // The cancelled admission must have released the per-peer slot it reserved.
+        let count = limiter
+            .per_peer
+            .lock()
+            .expect("per-peer lock")
+            .get(&peer)
+            .copied()
+            .unwrap_or(0);
+        assert_eq!(
+            count, 0,
+            "a cancelled admission releases the per-peer slot (no leak)"
+        );
+
+        drop(held);
     }
 
     proptest::proptest! {
