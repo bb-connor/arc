@@ -1022,10 +1022,11 @@ async fn serve_siem_export(receipt_db: &Path, cursor_db: &Path) -> Result<(), Cl
         manager.add_exporter(Box::new(alerting));
     }
 
-    // Fail closed when no consumer is configured (RFC-0009 Codex round-1 finding
-    // 6). With zero exporters the manager still parses batches and advances its
-    // cursor, silently consuming receipts without exporting them anywhere. Refuse
-    // to start so a misconfigured deploy is loud, not silently lossy.
+    // Fail closed unless a real SOC export sink is configured (RFC-0009 Codex
+    // round-1 finding 6 + round-4 finding 3). With zero exporters the manager
+    // advances its cursor while exporting nowhere; with ONLY alerting it advances
+    // past allow/low-severity audit rows the notification overlay never exports.
+    // Refuse to start so a misconfigured deploy is loud, not silently lossy.
     ensure_serve_has_consumer(&registered_exporters)?;
 
     // Pre-register the soc/dlq/alert-dispatch series at zero so the
@@ -1191,18 +1192,35 @@ fn build_serve_alerting_exporter(
     Some((builder.build(), routes))
 }
 
-/// Fail closed unless the serve mode has at least one configured consumer
-/// (RFC-0009 F78/F79, Codex round-1 finding 6). With zero registered exporters
-/// the manager parses batches and advances its cursor, silently discarding
-/// receipts; refusing to start makes that misconfiguration loud instead. SOC
-/// exporters (Splunk/Elastic/Webhook) and alerting backends both register here.
+/// The AlertingExporter's registered name. Alerting is a NOTIFICATION overlay,
+/// not an audit-export sink, so it does not satisfy the SOC-export requirement.
+/// Must stay in sync with `chio_siem::AlertingExporter::name()`.
+const ALERTING_EXPORTER_NAME: &str = "alerting";
+
+/// Fail closed unless the serve mode has at least one real SOC EXPORT sink
+/// (RFC-0009 F78/F79, Codex round-1 finding 6 + round-4 finding 3).
+///
+/// With zero registered exporters the manager parses batches and advances its
+/// cursor, silently discarding receipts. An alerting-only deploy is lossy in a
+/// subtler way: `AlertingExporter` returns every event as "processed" (so the
+/// manager advances the high-water mark) but only delivers high-severity denials
+/// to PagerDuty/OpsGenie and drops every allow/low-severity receipt. If alerting
+/// is the ONLY consumer the cursor advances past audit rows no durable SOC export
+/// sink ever received - silently losing SOC export coverage and permanently
+/// skipping those rows for any SOC sink added later. Require a real SOC export
+/// sink (Splunk/Elastic/Webhook/...) before serving; alerting may run ALONGSIDE
+/// one but must not be the sole consumer.
 fn ensure_serve_has_consumer(registered_exporters: &[String]) -> Result<(), CliError> {
-    if registered_exporters.is_empty() {
+    let has_soc_export_sink = registered_exporters
+        .iter()
+        .any(|name| name != ALERTING_EXPORTER_NAME);
+    if !has_soc_export_sink {
         return Err(CliError::cli_other_error(
-            "chio-wall siem-export requires at least one configured consumer: set \
-             CHIO_SIEM_ALERT_* to enable an alerting backend, or register a SOC \
-             exporter. Refusing to start so the read cursor never advances past \
-             receipts no exporter has consumed (RFC-0009 F78/F79)."
+            "chio-wall siem-export requires a real SOC export sink (Splunk/Elastic/Webhook/...): \
+             alerting alone is a notification overlay that delivers only high-severity denials \
+             and drops every other receipt, so advancing the read cursor past receipts it did \
+             not export would silently lose SOC export coverage. Configure a SOC export sink \
+             (alerting may run alongside one) before serving (RFC-0009 F78/F79)."
                 .to_string(),
         ));
     }
@@ -1775,19 +1793,34 @@ mod tests {
     /// receipts nothing exports.
     #[test]
     fn serve_fails_closed_with_no_configured_consumer() {
-        let error = ensure_serve_has_consumer(&[])
-            .err()
-            .expect("zero consumers must fail closed");
+        let error = ensure_serve_has_consumer(&[]).expect_err("zero consumers must fail closed");
         assert!(
-            error
-                .to_string()
-                .contains("at least one configured consumer"),
+            error.to_string().contains("SOC export sink"),
             "unexpected error: {error}"
         );
     }
 
     #[test]
-    fn serve_accepts_any_configured_consumer() {
-        assert!(ensure_serve_has_consumer(&["pagerduty".to_string()]).is_ok());
+    fn serve_accepts_a_real_soc_export_sink() {
+        // A real SOC export sink (Splunk/Elastic/Webhook/...) satisfies the gate.
+        assert!(ensure_serve_has_consumer(&["splunk".to_string()]).is_ok());
+        // Alerting running ALONGSIDE a SOC sink is also fine.
+        assert!(ensure_serve_has_consumer(&["alerting".to_string(), "splunk".to_string()]).is_ok());
+    }
+
+    /// Codex round-4 finding 3: alerting is a notification overlay, not a SOC
+    /// export sink. It returns every event as "processed" (so the manager
+    /// advances the high-water mark) but only delivers high-severity denials and
+    /// drops every allow/low-severity receipt. An alerting-ONLY serve config must
+    /// be rejected at startup so the cursor never advances past audit rows no
+    /// durable SOC export sink received.
+    #[test]
+    fn serve_fails_closed_when_only_alerting_is_configured() {
+        let error = ensure_serve_has_consumer(&["alerting".to_string()])
+            .expect_err("an alerting-only serve config must fail closed");
+        assert!(
+            error.to_string().contains("SOC export sink"),
+            "unexpected error: {error}"
+        );
     }
 }
