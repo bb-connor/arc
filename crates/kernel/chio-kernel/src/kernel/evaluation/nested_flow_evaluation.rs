@@ -276,17 +276,46 @@ impl ChioKernel {
                     .as_ref()
                     .and_then(|admission| admission.verified_runtime_attestation.clone()),
             );
+        // A receipt-store read error while resolving the parent call-chain
+        // receipt fails closed, but check_and_increment_budget above already
+        // consumed the pre-execution budget (invocation count / monetary hold).
+        // Route the error through the same reversal + deny path the governed and
+        // guard denial branches use so a transient store failure never burns
+        // quota or holds funds for a call that never dispatches (codex round-7).
+        let governed_call_chain_receipt_evidence = match self.governed_call_chain_receipt_evidence(
+            request,
+            cap,
+            Some(parent_context),
+            validated_governed_admission
+                .as_ref()
+                .and_then(|admission| admission.call_chain_proof.clone()),
+        ) {
+            Ok(evidence) => evidence,
+            Err(error) => {
+                let msg = error.to_string();
+                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "governed call-chain evidence lookup failed (nested flow)");
+                let reverse = self.reverse_pre_execution_budget_mutation(cap, &budget_mutation)?;
+                if let (Some(charge), Some(reverse)) =
+                    (budget_mutation.charge_result(), reverse.as_ref())
+                {
+                    return self.build_pre_execution_monetary_deny_response_with_metadata(
+                        request,
+                        &msg,
+                        now,
+                        charge,
+                        reverse.committed_cost_units_after,
+                        cap,
+                        Some(self.budget_execution_receipt_metadata(
+                            charge,
+                            Some(("reversed", reverse)),
+                        )),
+                    );
+                }
+                return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
+            }
+        };
         let _governed_call_chain_receipt_evidence_scope =
-            scope_governed_call_chain_receipt_evidence(
-                self.governed_call_chain_receipt_evidence(
-                    request,
-                    cap,
-                    Some(parent_context),
-                    validated_governed_admission
-                        .as_ref()
-                        .and_then(|admission| admission.call_chain_proof.clone()),
-                )?,
-            );
+            scope_governed_call_chain_receipt_evidence(governed_call_chain_receipt_evidence);
 
         let session_roots =
             self.session_enforceable_filesystem_root_paths_owned(&parent_context.session_id)?;

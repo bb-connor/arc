@@ -1308,3 +1308,194 @@ fn governed_request_rejects_empty_call_chain_chain_id() {
         .as_ref()
         .is_some_and(|reason| reason.contains("call_chain.chain_id must not be empty")));
 }
+
+#[test]
+fn governed_call_chain_evidence_store_error_reverses_pre_execution_budget() {
+    // RFC-0004 / codex round-7: a receipt-store READ error while resolving the
+    // parent call-chain receipt fails closed, but check_and_increment_budget has
+    // already consumed the invocation count and monetary hold. The error must be
+    // routed through the same reversal + deny path the governed/guard denials
+    // use, never propagated raw, so a transient store failure never burns quota
+    // or holds funds for a call that never dispatches.
+    let mut kernel = make_kernel(make_monetary_config());
+    // Appends fine (so the request's own receipt persists) but errors on every
+    // point load; the governed call-chain evidence lookup is the first (and
+    // only) admission-path store read for this request, so it fails closed here.
+    kernel.set_receipt_store(Box::new(ErroringReceiptStore)).unwrap();
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50);
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let request_id = "req-governed-call-chain-store-error";
+    let mut intent = make_governed_intent(
+        "intent-governed-call-chain-store-error",
+        "cost-srv",
+        "compute",
+        "execute delegated governed compute",
+        100,
+        "USD",
+    );
+    // parent_receipt_id = Some(..) forces has_local_receipt_id() inside the
+    // evidence lookup, which the erroring store fails.
+    intent.call_chain = Some(make_governed_call_chain_context(
+        "chain-store-error",
+        "req-parent-store-error",
+    ));
+    let approval_token = make_governed_approval_token(
+        &kernel.config.keypair,
+        &agent_kp.public_key(),
+        &intent,
+        request_id,
+    );
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: request_id.to_string(),
+            capability: cap.clone(),
+            tool_name: "compute".to_string(),
+            server_id: "cost-srv".to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({ "invoice_id": "inv-store-error" }),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: Some(intent),
+            approval_token: Some(approval_token),
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        })
+        // Before the fix the evidence-lookup `?` propagated the store error out
+        // of evaluate; after the fix it fails closed as a clean deny instead.
+        .expect("evidence-lookup store error must fail closed as a deny, not propagate");
+
+    assert_eq!(response.verdict, Verdict::Deny);
+
+    // The pre-execution budget mutation must have been reversed: neither the
+    // invocation count nor the committed monetary cost may survive a call that
+    // never dispatched.
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    assert_eq!(
+        usage.invocation_count, 0,
+        "invocation budget must be reversed on an evidence-lookup store error"
+    );
+    assert_eq!(
+        usage.committed_cost_units().unwrap(),
+        0,
+        "monetary hold must be released on an evidence-lookup store error"
+    );
+}
+
+#[test]
+fn nested_governed_call_chain_evidence_store_error_reverses_pre_execution_budget() {
+    // RFC-0004 / codex round-7: the nested-flow admission path has the same
+    // evidence-lookup `?` as the top-level evaluate. A store read error there
+    // must reverse the pre-execution budget before denying, on the nested arm
+    // too, so a transient store failure never burns invocation quota.
+    let mut kernel = make_kernel(make_config());
+    kernel.set_receipt_store(Box::new(ErroringReceiptStore)).unwrap();
+    let agent_kp = make_keypair();
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-echo", vec!["delegate"])));
+
+    // An invocation-limited grant so the budget store tracks (and can reverse)
+    // an invocation count.
+    let grant = make_invocation_limited_grant("srv-echo", "delegate", 5);
+    let capability = make_capability(&kernel, &agent_kp, make_scope(vec![grant]), 300);
+    let cap_id = capability.id.clone();
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![capability.clone()])
+        .unwrap();
+    kernel.activate_session(&session_id).unwrap();
+
+    let parent_context = make_operation_context(
+        &session_id,
+        "req-parent-nested-store-error",
+        &agent_kp.public_key().to_hex(),
+    );
+    kernel
+        .begin_session_request(&parent_context, OperationKind::ToolCall, true)
+        .unwrap();
+
+    let mut client = MockNestedFlowClient {
+        roots: Vec::new(),
+        sampled_message: CreateMessageResult {
+            role: "assistant".to_string(),
+            content: serde_json::json!({ "type": "text", "text": "unused" }),
+            model: "unused".to_string(),
+            stop_reason: None,
+        },
+        elicited_content: make_elicited_content(),
+        cancel_parent_on_create_message: false,
+        cancel_child_on_create_message: false,
+        completed_elicitation_ids: Vec::new(),
+        resource_updates: Vec::new(),
+        resources_list_changed_count: 0,
+    };
+
+    let response = kernel
+        .evaluate_tool_call_with_nested_flow_client(
+            &parent_context,
+            &ToolCallRequest {
+                request_id: "req-child-nested-store-error".to_string(),
+                capability,
+                tool_name: "delegate".to_string(),
+                server_id: "srv-echo".to_string(),
+                agent_id: agent_kp.public_key().to_hex(),
+                arguments: serde_json::json!({ "stage": "child" }),
+                dpop_proof: None,
+                execution_nonce: None,
+                governed_intent: Some(GovernedTransactionIntent {
+                    id: "intent-nested-store-error".to_string(),
+                    server_id: "srv-echo".to_string(),
+                    tool_name: "delegate".to_string(),
+                    purpose: "continue nested delegated workflow".to_string(),
+                    max_amount: None,
+                    commerce: None,
+                    metered_billing: None,
+                    runtime_attestation: None,
+                    // parent_request_id matches the locally authenticated parent
+                    // so validate_governed_transaction passes and we reach the
+                    // evidence lookup; parent_receipt_id = Some(..) then forces
+                    // the erroring store read there.
+                    call_chain: Some(chio_core::capability::governance::GovernedCallChainContext {
+                        chain_id: "chain-nested-store-error".to_string(),
+                        parent_request_id: parent_context.request_id.to_string(),
+                        parent_receipt_id: Some("rc-nested-missing".to_string()),
+                        origin_subject: "origin-subject".to_string(),
+                        delegator_subject: "delegator-subject".to_string(),
+                    }),
+                    autonomy: None,
+                    context: None,
+                }),
+                approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
+            },
+            &mut client,
+            None,
+        )
+        // Before the fix the nested evidence-lookup `?` propagated the store
+        // error; after the fix it fails closed as a clean deny.
+        .expect("nested evidence-lookup store error must fail closed as a deny, not propagate");
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    // Pin that the deny comes from the evidence-lookup store read (not some
+    // earlier validation), so the test actually exercises the fixed path.
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("simulated receipt store read failure")),
+        "nested deny must be the evidence-lookup store error, got reason {:?}",
+        response.reason
+    );
+
+    let usage = kernel.budget_store.get_usage(&cap_id, 0).unwrap();
+    // The invocation reservation must have been released on the nested arm too.
+    assert!(
+        usage.as_ref().map_or(0, |usage| usage.invocation_count) == 0,
+        "nested evidence-lookup store error must reverse the invocation reservation, got {usage:?}"
+    );
+}
