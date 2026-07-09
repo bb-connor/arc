@@ -458,43 +458,41 @@ class TestEvaluateToolCall:
         assert "execution_nonce" not in preflight_body
 
     @respx.mock
-    async def test_evaluate_tool_call_mediated_forwards_nonce_object(self) -> None:
-        # Two-phase strict-nonce flow: the preflight returns an execution_nonce
-        # object, and the retry must post that object back, unchanged, as an
-        # object (not a re-encoded string).
-        nonce_object = {
-            "nonce_id": "n-1",
-            "binding": {"tool_server": "srv", "tool_name": "read"},
-            "signature": "e" * 128,
-        }
-        preflight_response = {
-            "verdict": "allow",
-            "receipt": _make_receipt_dict(),
-            "execution_nonce": nonce_object,
-        }
+    async def test_evaluate_tool_call_mediated_forwards_governed_and_dpop(self) -> None:
+        # Single-phase authorization: the helper forwards governed intent,
+        # approval token, request id, and DPoP proof for gated grants, and never
+        # sends an execution_nonce (this route mints nonces, it does not settle
+        # a presented one).
         route = respx.post(f"{BASE}/v1/evaluate").mock(
-            return_value=httpx.Response(200, json=preflight_response)
-        )
-        async with ChioClient(BASE) as client:
-            preflight = await client.evaluate_tool_call_mediated(
-                capability=_make_token_dict(),
-                tool_server="srv",
-                tool_name="read",
-                parameters={"path": "/tmp"},
+            return_value=httpx.Response(
+                200,
+                json={
+                    "verdict": "allow",
+                    "receipt": _make_receipt_dict(),
+                    "execution_nonce": {"nonce_id": "n-1", "signature": "e" * 128},
+                },
             )
-            returned_nonce = preflight["execution_nonce"]
-            assert isinstance(returned_nonce, dict)
+        )
+        governed_intent = {"kind": "eip3009_transfer", "amount": {"units": 5}}
+        approval_token = {"request_id": "req-7", "signature": "a" * 128}
+        dpop_proof = {"jkt": "thumb", "proof": "p" * 32}
+        async with ChioClient(BASE) as client:
             await client.evaluate_tool_call_mediated(
                 capability=_make_token_dict(),
                 tool_server="srv",
                 tool_name="read",
                 parameters={"path": "/tmp"},
-                execution_nonce=returned_nonce,
+                request_id="req-7",
+                governed_intent=governed_intent,
+                approval_token=approval_token,
+                dpop_proof=dpop_proof,
             )
-        retry_body = json.loads(route.calls.last.request.content)
-        assert retry_body["execution_nonce"] == nonce_object
-        # It must be forwarded as a JSON object, never a double-encoded string.
-        assert isinstance(retry_body["execution_nonce"], dict)
+        body = json.loads(route.calls.last.request.content)
+        assert body["request_id"] == "req-7"
+        assert body["governed_intent"] == governed_intent
+        assert body["approval_token"] == approval_token
+        assert body["dpop_proof"] == dpop_proof
+        assert "execution_nonce" not in body
 
     @respx.mock
     async def test_evaluate_rejects_unwrapped_advisory_route_response(self) -> None:

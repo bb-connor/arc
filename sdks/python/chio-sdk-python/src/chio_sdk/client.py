@@ -595,9 +595,12 @@ class ChioClient:
         tool_server: str,
         tool_name: str,
         parameters: dict,
-        execution_nonce: dict[str, Any] | None = None,
+        request_id: str | None = None,
+        governed_intent: dict[str, Any] | None = None,
+        approval_token: dict[str, Any] | None = None,
+        dpop_proof: dict[str, Any] | None = None,
     ) -> dict:
-        """Kernel-mediated, authoritative tool-call evaluation.
+        """Kernel-mediated pre-execution authorization for a tool call.
 
         Optional helper for callers that hold a full signed capability token.
         ``capability`` must be the complete signed ``CapabilityToken`` (not an
@@ -606,30 +609,29 @@ class ChioClient:
         kernel-mediated ``/v1/evaluate`` route and returns
         ``{"verdict", "receipt", "execution_nonce"}``.
 
-        The route is strict-nonce and completes in two phases. The first call
-        omits ``execution_nonce`` (a preflight); its response has top-level
-        ``verdict`` ``"pending_nonce"`` and carries a freshly minted
-        ``execution_nonce`` as a ``SignedExecutionNonce`` object, but authorizes
-        no spend. The follow-up call presents that object back, unchanged, via
-        ``execution_nonce`` so the kernel can dispatch and settle. The nonce is
-        forwarded as an object (not a re-encoded string), matching the shape the
-        preflight returned.
-
-        A ``"pending_nonce"`` preflight is not authorization to execute. Before
-        trusting the verdict, callers MUST confirm the completed result is
-        authoritative: the top-level ``verdict`` is ``"allow"`` and the receipt
-        is a settled, reconciled mediated spend (it passes the kernel
-        authoritative-spend predicate). ``trust_level == "mediated"`` and a
-        bound ``execution_nonce`` are necessary but NOT sufficient; a preflight
-        and a provisional receipt (one produced by a tool server that does not
-        measure realized cost) carry those too yet authorize no final spend.
+        This route is a single-phase authorization gate: it verifies the
+        capability (and any governed intent, approval token, or DPoP proof),
+        RESERVES the budget hold so concurrent authorizations cannot
+        over-subscribe, and MINTS a fresh ``execution_nonce``. It does not
+        execute the tool or settle a spend. The returned receipt is therefore a
+        reserved authorization and is intentionally non-authoritative (the hold
+        is not yet reconciled). The caller presents the minted ``execution_nonce``
+        to the real tool server, which verifies and consumes it, runs the tool,
+        and reconciles the reserved hold. This endpoint only issues nonces:
+        presenting one back here is rejected.
 
         Parameters
         ----------
-        execution_nonce:
-            The ``execution_nonce`` object returned by a prior preflight,
-            forwarded verbatim to dispatch and settle the mediated call. Omit it
-            on the initial preflight.
+        request_id:
+            Optional caller-chosen request identifier. Supply it when passing an
+            ``approval_token`` so the token can be bound to this exact request
+            (the kernel requires ``approval_token.request_id == request_id``).
+        governed_intent, approval_token:
+            Forward these for a grant that carries ``GovernedIntentRequired`` or
+            an approval threshold; without them such a grant is denied.
+        dpop_proof:
+            Forward this for a ``dpop_required`` grant; without it the grant is
+            denied.
         """
         body: dict[str, Any] = {
             "capability": capability,
@@ -637,8 +639,14 @@ class ChioClient:
             "tool_name": tool_name,
             "parameters": parameters,
         }
-        if execution_nonce is not None:
-            body["execution_nonce"] = execution_nonce
+        if request_id is not None:
+            body["request_id"] = request_id
+        if governed_intent is not None:
+            body["governed_intent"] = governed_intent
+        if approval_token is not None:
+            body["approval_token"] = approval_token
+        if dpop_proof is not None:
+            body["dpop_proof"] = dpop_proof
         return await self._post("/v1/evaluate", body)
 
     async def evaluate_http_request(
