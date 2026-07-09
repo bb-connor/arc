@@ -714,6 +714,23 @@ pub(crate) fn import_budget_delta_response(
         // hole left by a rolled-back-then-re-appended write, so it is NOT a skip;
         // a seq that is neither an event nor abandoned IS a skip and stays a
         // NonContiguousPage that demotes the peer (codex #965 round-5 P1).
+        //
+        // TRUST BOUNDARY (codex #965 Finding 2): honoring the source peer's
+        // `abandoned_seqs` lets it make THIS follower skip seq S (treat S as filled
+        // without importing an event for it) with NO independent verification that S
+        // is genuinely abandoned. This is SAFE ONLY under the crash-fault
+        // (honest-peer) trust model that governs cluster replication: an honest peer
+        // reports a seq as abandoned only after it durably tombstoned a
+        // rolled-back-then-re-appended write, so S carries no live row anywhere. It
+        // is deliberately OUTSIDE the strict-contiguity guarantee that
+        // `require_contiguous_page` otherwise provides (that a peer cannot make a
+        // follower skip an unreplicated row): a Byzantine or buggy source could
+        // report a live seq as abandoned and induce this follower to skip it and
+        // then over-advertise its contiguous ack head. Under crash-fault that cannot
+        // happen; the periodic full snapshot (`apply_cluster_snapshot`) is the
+        // backstop that reconverges a follower that ever diverged. Widening the trust
+        // model to Byzantine would require signed, independently-verifiable
+        // abandonment proofs here, which this deployment does not assume.
         let mut filled = event_seqs;
         filled.extend(
             response
@@ -742,7 +759,11 @@ pub(crate) fn import_budget_delta_response(
         .map_err(CliError::from)?;
     // Record the page's abandoned slots so this follower's contiguous ack head
     // treats them as filled even if it never held (and so never deleted) the
-    // original event (codex #965 round-5 P1).
+    // original event (codex #965 round-5 P1). This trusts the source peer's
+    // abandonment claim without independent verification; see the TRUST BOUNDARY
+    // note at the contiguity union above (codex #965 Finding 2): it is sound only
+    // under the crash-fault honest-peer model and sits outside the strict
+    // require_contiguous_page guarantee, with the periodic snapshot as backstop.
     if !response.abandoned_seqs.is_empty() {
         store
             .record_abandoned_event_seqs(&response.abandoned_seqs)
