@@ -366,13 +366,11 @@ impl PassportStatusRegistry {
         entry.revoked_at = Some(revoked_at);
         entry.updated_at = revoked_at;
         entry.revoked_reason = reason.map(str::to_string);
-        // RFC-0009 F57: observe revocation propagation lag when the revoke
-        // instant is backdated (a remote/propagated revoke applied here). A
-        // local revoke defaults revoked_at to now, giving lag 0.
-        let now = unix_timestamp_now();
-        let lag_seconds = now.saturating_sub(revoked_at) as f64;
-        chio_metrics_spec::runtime::families::CAPABILITY_REVOCATION_LAG
-            .observe(&["control_plane"], lag_seconds);
+        // Passport lifecycle revocation is NOT a capability revocation, so it
+        // must not emit chio_capability_revocation_lag_seconds. That family is
+        // observed from the actual capability revoke paths instead, keeping the
+        // capability-revocation SLO measured on real capability revokes (Codex
+        // round-3 finding 5).
         Ok(entry.clone())
     }
 
@@ -1562,14 +1560,16 @@ mod revocation_lag_tests {
     }
 
     #[test]
-    fn revoke_with_backdated_instant_observes_revocation_lag() {
+    fn passport_lifecycle_revoke_does_not_observe_capability_revocation_lag() {
+        // Codex round-3 finding 5: a passport lifecycle revoke must NOT emit the
+        // capability-revocation lag family; that SLO is observed from the actual
+        // capability revoke paths (see the cluster delta module).
         let mut registry = PassportStatusRegistry::default();
         let passport_id = seed_one_passport(&mut registry);
 
         let mut before = String::new();
         chio_metrics_spec::runtime::families::CAPABILITY_REVOCATION_LAG.render(&mut before);
 
-        // Backdate the revoke instant by 45 seconds relative to now.
         let now = unix_timestamp_now();
         let revoked_at = now.saturating_sub(45);
         let _ = registry
@@ -1578,12 +1578,9 @@ mod revocation_lag_tests {
 
         let mut after = String::new();
         chio_metrics_spec::runtime::families::CAPABILITY_REVOCATION_LAG.render(&mut after);
-        assert!(
-            after.contains(
-                "chio_capability_revocation_lag_seconds_count{authority=\"control_plane\"} 1"
-            ),
-            "one lag observation expected: {after}"
+        assert_eq!(
+            before, after,
+            "a passport lifecycle revoke must not observe a capability revocation lag sample"
         );
-        assert_ne!(before, after, "revoke must observe a lag sample");
     }
 }
