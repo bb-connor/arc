@@ -97,6 +97,11 @@ pub(crate) struct PeerSyncState {
 pub(crate) struct FederationAdmissionRateLimiter {
     attempts: HashMap<String, Vec<u64>>,
     insertion_order: std::collections::VecDeque<String>,
+    // Keys currently present in `insertion_order`, kept in lockstep so a key
+    // that is pruned to empty and re-pushed within a single call never gets a
+    // SECOND live entry (RFC-0004 F3 residual). O(1) membership keeps the dedupe
+    // amortized-constant rather than scanning the deque on every push.
+    present: std::collections::HashSet<String>,
     key_cap: usize,
 }
 
@@ -104,15 +109,25 @@ impl Default for FederationAdmissionRateLimiter {
     fn default() -> Self {
         // Single-sourced with the process memory budget (RFC-0004 section 5)
         // instead of a duplicated literal; tighter caps use `with_key_cap`.
-        Self::with_key_cap(chio_kernel::MemoryBudgetConfig::defaults().admission_key_cap)
+        Self::from_memory_budget(&chio_kernel::MemoryBudgetConfig::defaults())
     }
 }
 
 impl FederationAdmissionRateLimiter {
+    /// Build a limiter whose key cap comes from a CONFIGURED process memory
+    /// budget. Threading the operator's `MemoryBudgetConfig` (rather than a
+    /// fresh `defaults()` read) means lowering `admission_key_cap` on the trust
+    /// service config actually tightens this guard instead of being silently
+    /// ignored (RFC-0004 F7).
+    pub(crate) fn from_memory_budget(budget: &chio_kernel::MemoryBudgetConfig) -> Self {
+        Self::with_key_cap(budget.admission_key_cap)
+    }
+
     pub(crate) fn with_key_cap(key_cap: usize) -> Self {
         Self {
             attempts: HashMap::new(),
             insertion_order: std::collections::VecDeque::new(),
+            present: std::collections::HashSet::new(),
             key_cap: key_cap.max(1),
         }
     }
@@ -143,6 +158,7 @@ impl FederationAdmissionRateLimiter {
         // flood saturates instead of growing without bound (RFC-0004 F39).
         if is_new_key && self.attempts.len() >= self.key_cap {
             while let Some(oldest) = self.insertion_order.pop_front() {
+                self.present.remove(&oldest);
                 if self.attempts.remove(&oldest).is_some() {
                     break;
                 }
@@ -169,10 +185,13 @@ impl FederationAdmissionRateLimiter {
         }
         let was_empty = entry.is_empty();
         entry.push(now);
-        if is_new_key || was_empty {
+        if (is_new_key || was_empty) && self.present.insert(key.clone()) {
             // New key, or a key pruned to empty then re-pushed (effectively
-            // fresh): keep insertion order coherent (stale duplicates are skipped
-            // by the evict loop's remove guard).
+            // fresh). `present.insert` returns false when this key already has a
+            // live `insertion_order` entry, so a subject that empties and refills
+            // its OWN window in one call (F3 residual) keeps exactly ONE entry:
+            // no stale front duplicate for the FIFO evictor to pop first and
+            // mis-evict a freshly-active key from, and no unbounded deque growth.
             self.insertion_order.push_back(key);
         }
 
@@ -185,11 +204,21 @@ impl FederationAdmissionRateLimiter {
         // the eviction loop (which drains stale entries) never runs.
         let attempts = &mut self.attempts;
         let insertion_order = &mut self.insertion_order;
+        let present = &mut self.present;
         attempts.retain(|_, timestamps| {
             timestamps.retain(|t| *t > lower_bound);
             !timestamps.is_empty()
         });
-        insertion_order.retain(|entry_key| attempts.contains_key(entry_key));
+        insertion_order.retain(|entry_key| {
+            if attempts.contains_key(entry_key) {
+                true
+            } else {
+                // Drop the `present` marker in lockstep so the dedupe set never
+                // outlives the deque entry it guards.
+                present.remove(entry_key);
+                false
+            }
+        });
 
         FederationAdmissionRateLimitStatus {
             limit: limit.max_requests,
@@ -332,5 +361,91 @@ mod admission_bound_tests {
         // unrelated emptied subject, so only "s2" remains.
         let _ = limiter.check_and_record("policy", "s2", &limit(), 100_000);
         assert_eq!(limiter.key_count(), 1, "emptied-window key left residue");
+    }
+
+    #[test]
+    fn lowered_admission_key_cap_from_memory_budget_takes_effect() {
+        // F7: the CONFIGURED process memory budget must reach this guard. A
+        // budget that lowers `admission_key_cap` to 3 must cap the limiter at 3
+        // live keys, not the compiled-in default of 4096.
+        let budget = chio_kernel::MemoryBudgetConfig {
+            admission_key_cap: 3,
+            ..chio_kernel::MemoryBudgetConfig::defaults()
+        };
+        let mut limiter = FederationAdmissionRateLimiter::from_memory_budget(&budget);
+        for i in 0..200u64 {
+            let subject = format!("subject-{i}");
+            let _ = limiter.check_and_record("policy", &subject, &limit(), 100);
+        }
+        assert!(
+            limiter.key_count() <= 3,
+            "configured admission_key_cap did not take effect: {} live keys",
+            limiter.key_count()
+        );
+    }
+
+    #[test]
+    fn single_subject_reactivation_keeps_one_insertion_order_entry() {
+        // F3 residual: when a subject is the FIRST to observe its own staleness
+        // (low-diversity traffic, no other subject interleaves during its idle
+        // gap), the re-burst call sees is_new_key=false, empties its own window,
+        // and hits the was_empty re-push path. Without the dedupe that pushes a
+        // SECOND live insertion_order entry for the same still-live key.
+        let mut limiter = FederationAdmissionRateLimiter::with_key_cap(2);
+        let l = limit();
+        let _ = limiter.check_and_record("policy", "solo", &l, 100);
+        // Idle strictly past the window, then burst again -- alone, so this call
+        // is the first to observe "solo" as stale.
+        let _ = limiter.check_and_record("policy", "solo", &l, 100 + l.window_seconds + 1);
+        assert_eq!(limiter.key_count(), 1);
+        assert_eq!(
+            limiter.insertion_order_len(),
+            limiter.key_count(),
+            "reactivation created a duplicate insertion_order entry: order={} keys={}",
+            limiter.insertion_order_len(),
+            limiter.key_count(),
+        );
+    }
+
+    #[test]
+    fn reactivation_does_not_leak_or_mis_evict_under_key_cap() {
+        // Many burst -> idle-past-window -> burst cycles for a SINGLE subject.
+        // Without the dedupe each cycle leaks one insertion_order entry (the
+        // deque grows without bound even though only one key is live, RFC-0004),
+        // and each leaked entry is a stale front duplicate that the FIFO evictor
+        // would pop first, evicting the subject's freshly-active data.
+        let l = limit();
+        let mut limiter = FederationAdmissionRateLimiter::with_key_cap(2);
+        for i in 0..32u64 {
+            let now = 100 + i * (l.window_seconds + 1);
+            let _ = limiter.check_and_record("policy", "solo", &l, now);
+        }
+        assert_eq!(limiter.key_count(), 1);
+        assert_eq!(
+            limiter.insertion_order_len(),
+            1,
+            "single-subject reactivation leaked {} insertion_order entries",
+            limiter.insertion_order_len(),
+        );
+
+        // Under key_cap pressure the genuinely-oldest LIVE key is evicted and the
+        // deque never diverges from `attempts`. "solo" was last active at the end
+        // of the loop; two newer distinct subjects arrive inside "solo"'s window,
+        // then a third trips the cap and evicts the genuine oldest ("solo").
+        let base = 100 + 31 * (l.window_seconds + 1);
+        let _ = limiter.check_and_record("policy", "beta", &l, base + 1);
+        let _ = limiter.check_and_record("policy", "gamma", &l, base + 2);
+        assert!(
+            limiter.key_count() <= 2,
+            "key cap breached under pressure: {}",
+            limiter.key_count()
+        );
+        assert_eq!(
+            limiter.insertion_order_len(),
+            limiter.key_count(),
+            "insertion_order diverged from attempts under eviction pressure: order={} keys={}",
+            limiter.insertion_order_len(),
+            limiter.key_count(),
+        );
     }
 }
