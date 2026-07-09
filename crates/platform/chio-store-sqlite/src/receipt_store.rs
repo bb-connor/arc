@@ -411,7 +411,18 @@ impl WriterHandle {
             job: boxed,
             appends_receipts,
         }) {
-            Ok(()) => {}
+            Ok(()) => {
+                // Count writer-routed writes in health (codex round 8, finding
+                // 3). A successful enqueue mirrors the Append path's
+                // `accepted_total` bump (see `append`): child receipts and
+                // authorization-consuming receipts now go through
+                // `run_write_receipt`, so without this a store dominated by
+                // writer-routed receipts would advance the log while
+                // `receipt_store_health().writer.accepted_total` stayed at zero.
+                // O(1), fail-closed unchanged (a Full/Disconnected send still
+                // returns before counting).
+                self.health.accepted_total.fetch_add(1, Ordering::SeqCst);
+            }
             Err(mpsc::TrySendError::Full(_)) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
                 self.health.saturated_total.fetch_add(1, Ordering::SeqCst);
@@ -778,11 +789,23 @@ fn handle_non_append_command(
                 .get()
                 .map_err(|error| ReceiptStoreError::Pool(error.to_string()))
                 .and_then(|connection| {
-                    if incremental_verification {
-                        seed_verified_head(&connection)
-                    } else {
-                        seed_head_snapshot(&connection)
-                    }
+                    // Reseed always runs the FULL verification (codex round 8,
+                    // finding 2). This is the `chio receipt audit --repair`
+                    // recovery path: it clears a poisoned head and must establish
+                    // a genuinely CLEAN, fully-verified head, so it runs
+                    // `seed_verified_head` (full claim-log validation +
+                    // checkpoint-chain audit) regardless of the hot-path
+                    // `incremental_verification` mode. Using the cheap
+                    // `seed_head_snapshot` here would let `--repair` clear
+                    // `last_error` and mark the head `Verified` while the on-disk
+                    // log is still corrupt (repair theater). This is the recovery
+                    // path, not per-append, so it is not F22-bound. NOTE the
+                    // deliberate difference from the InstallSigner catch-up (codex
+                    // round 5, finding 1): that path DEFERS in
+                    // `incremental_verification = false` because `seed_head_snapshot`
+                    // leaves the head UNVALIDATED; reseed full-verifies, so it does
+                    // not defer.
+                    seed_verified_head(&connection)
                 });
             let result = match outcome {
                 Ok(head) => {
@@ -800,6 +823,24 @@ fn handle_non_append_command(
                     // real later batch failure re-sets `pending_flush_error`.
                     *pending_flush_error = None;
                     *head_state = WriterHeadState::Verified(Box::new(head));
+                    // Build owed checkpoints after a successful reseed (codex
+                    // round 8, finding 4). If the background signer was installed
+                    // while the head was poisoned, its install-time catch-up
+                    // (round 4) was skipped, so a quiet store with >= max_batch
+                    // uncheckpointed claim-log entries would stay uncheckpointed
+                    // until some future write. Run the SAME bounded builder now.
+                    // Unlike the InstallSigner catch-up (which gates on
+                    // `incremental_verification` because its deferred seed is
+                    // unvalidated), this is unconditional: the reseed just
+                    // full-verified the head (finding 2), so building over that
+                    // range never checkpoints unaudited data. Bounded (O(b) per
+                    // owed checkpoint), a recovery-path build (not per-append, so
+                    // not F22-bound). No-op when no signer is present. Fail-closed:
+                    // `build_due_checkpoints_and_record` records `last_error` on a
+                    // build failure and never re-poisons the freshly verified head.
+                    if let WriterHeadState::Verified(head) = head_state {
+                        build_due_checkpoints_and_record(pool, head, checkpoint_signer, health);
+                    }
                     Ok(())
                 }
                 Err(error) => {
@@ -1403,6 +1444,26 @@ fn append_receipt_batch(
                     .to_string(),
             ),
         );
+    }
+    // Validate the NEWLY-projected rows before advancing the head (codex round
+    // 8, finding 1). The count/MAX cross-check above only proves the projection
+    // advanced by the right NUMBER of rows; `append_chio_receipt_tx` verifies
+    // only the projected `receipt_id`/`raw_json`, so a tampered projection
+    // trigger could emit one row per insert whose `timestamp`, `tool_name`, or
+    // attribution columns diverge from the source receipt and still pass here.
+    // The removed per-append full validation would have rejected that drift on
+    // the next append; without validating it now the head advances and future
+    // appends treat the bad row as already verified. Re-validate JUST the
+    // (baseline_max, post_max] delta this batch projected with the same
+    // full-field validator (O(delta): the batch inserts a bounded number of
+    // rows, so the flat per-append cost holds and the full-log validator is
+    // NEVER called; F22 intact). Gated on a non-empty delta (an all-idempotent
+    // batch projects nothing, so this is a no-op). Fail-closed: a divergent row
+    // returns the Conflict before `tx.commit()`, so the head never advances.
+    if delta_count > 0 {
+        if let Err(error) = validate_adopted_claim_log_delta(&tx, baseline_max, post_max) {
+            return receipt_batch_error_results(requests.len(), error);
+        }
     }
     match tx.commit() {
         Ok(()) => {

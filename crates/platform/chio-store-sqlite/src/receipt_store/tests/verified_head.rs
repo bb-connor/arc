@@ -1056,3 +1056,195 @@ fn tampered_checkpoint_signature_column_denies_append() -> Result<(), Box<dyn st
     let _ = fs::remove_file(path);
     Ok(())
 }
+
+/// Codex round 8, finding 1: with incremental verification the per-append
+/// count/MAX cross-check only proves the projection advanced by the right
+/// NUMBER of rows; `append_chio_receipt_tx` verifies only the projected
+/// `receipt_id`/`raw_json`. A projection trigger that emits one row per insert
+/// whose OTHER columns (here `tool_name`) diverge from the source receipt would
+/// slip past the count/MAX gate and advance the head, after which later appends
+/// treat the bad row as already verified. The fix validates the NEWLY-projected
+/// (baseline_max, post_max] delta with the full-field validator BEFORE the head
+/// advances (O(delta), single-batch bounded, F22 intact), so the divergent row
+/// is rejected fail-closed and the head does not move.
+#[test]
+fn divergent_newly_projected_row_is_rejected_before_head_advance(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-head-newproj-drift");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    for i in 0..3 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-newproj-{i}"), (i + 1) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    let head_before = store.writer_head_snapshot().claim_log_max_seq;
+    assert_eq!(head_before, 3);
+
+    // Simulate a modified projection trigger that still emits exactly one row per
+    // insert (count/MAX gate passes) and keeps `receipt_id`/`raw_json` correct
+    // (append_chio_receipt_tx passes) but writes a DIVERGENT `tool_name` column
+    // that does not match the source receipt.
+    let connection = store.connection()?;
+    connection.execute_batch(
+        r#"
+        DROP TRIGGER IF EXISTS chio_tool_receipts_project_claim_log_entry;
+        CREATE TRIGGER chio_tool_receipts_project_claim_log_entry
+        AFTER INSERT ON chio_tool_receipts
+        BEGIN
+            INSERT INTO claim_receipt_log_entries (
+                receipt_id,
+                receipt_kind,
+                source_seq,
+                timestamp,
+                capability_id,
+                session_id,
+                parent_request_id,
+                request_id,
+                subject_key,
+                issuer_key,
+                tool_server,
+                tool_name,
+                raw_json
+            ) VALUES (
+                NEW.receipt_id,
+                'tool_receipt',
+                NEW.seq,
+                NEW.timestamp,
+                NEW.capability_id,
+                NULL,
+                NULL,
+                NULL,
+                NEW.subject_key,
+                NEW.issuer_key,
+                NEW.tool_server,
+                'divergent-projected-tool-name',
+                NEW.raw_json
+            );
+        END;
+        "#,
+    )?;
+    drop(connection);
+
+    // The append inserts a source receipt whose projected row now diverges in
+    // `tool_name`; the newly-projected-delta validation must reject it BEFORE the
+    // head advances (fail-closed Conflict).
+    let receipt = sample_receipt_with_keypair("rcpt-newproj-divergent", 4, &keypair);
+    let error = store
+        .append_chio_receipt_returning_seq(&receipt)
+        .err()
+        .ok_or("a divergent newly-projected row must be rejected before the head advances")?;
+    assert!(
+        matches!(error, ReceiptStoreError::Conflict(_)),
+        "expected a fail-closed Conflict, got {error:?}"
+    );
+
+    // The head did NOT advance: the rejected append rolled its transaction back,
+    // so the actor's cached head still stops at the last clean entry. (No flush
+    // here: the failed batch leaves a pending flush error by design.)
+    let head_after = store.writer_head_snapshot().claim_log_max_seq;
+    assert_eq!(
+        head_after, head_before,
+        "the head must not advance past a divergent newly-projected row"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+/// Codex round 8, finding 2: `reseed_verified_head()` is the
+/// `chio receipt audit --repair` recovery path. Even when the store was opened
+/// with `incremental_verification = false` (where the hot path defers the full
+/// claim-log audit to the next append), a RESEED must run the FULL verification
+/// so it cannot clear `last_error` and mark a still-corrupt log as `Verified`
+/// (repair theater). This is the deliberate opposite of the InstallSigner
+/// catch-up, which legitimately DEFERS in the same mode because its seed is
+/// unvalidated.
+#[test]
+fn reseed_runs_full_verification_in_non_incremental_mode() -> Result<(), Box<dyn std::error::Error>>
+{
+    let path = unique_db_path("chio-reseed-nonincremental-fullverify");
+    let keypair = receipt_test_keypair();
+    let receipt_id = {
+        let store = SqliteReceiptStore::open(&path)?;
+        let mut first_id = String::new();
+        for i in 0..3 {
+            let receipt = sample_receipt_with_keypair(
+                &format!("rcpt-reseed-fv-{i}"),
+                (i + 1) as u64,
+                &keypair,
+            );
+            if i == 0 {
+                first_id = receipt.id.clone();
+            }
+            store.append_chio_receipt_returning_seq(&receipt)?;
+        }
+        store.flush_receipt_writes()?;
+        first_id
+    };
+
+    // Reopen with incremental_verification = false: the hot path (and the
+    // pre-fix reseed) would only run the cheap `seed_head_snapshot`.
+    let store = SqliteReceiptStore::open_existing_with_options(
+        &path,
+        crate::SqliteStoreOptions {
+            pool: crate::SqlitePoolConfig::default(),
+            incremental_verification: false,
+        },
+    )?;
+    assert!(!store.incremental_verification_enabled());
+
+    // Corrupt a claim-log projection row. The cheap snapshot never inspects
+    // projection rows, so only a FULL verification catches this.
+    tamper_claim_log_tool_receipt(&store, &receipt_id, |receipt| {
+        receipt.tool_name = "tampered".to_string();
+    });
+
+    // The reseed must fail closed (full verification catches the tamper) rather
+    // than clearing the head to `Verified` over a corrupt log.
+    let error = store.reseed_verified_head().err().ok_or(
+        "reseed in non-incremental mode must run the full verify and reject a corrupt log",
+    )?;
+    assert!(
+        matches!(error, ReceiptStoreError::Conflict(_)),
+        "expected a fail-closed Conflict from the full reseed verification, got {error:?}"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+/// Codex round 8, finding 3: a successfully-enqueued writer-routed
+/// (`run_write`/`run_write_receipt`) write must increment the writer
+/// `accepted_total` health counter, mirroring the Append path. Child receipts
+/// and authorization-consuming receipts flow through `run_write_receipt`, so
+/// without this a store dominated by writer-routed receipts would advance the
+/// log while `accepted_total` stayed at zero.
+#[test]
+fn writer_routed_write_increments_accepted_total() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-writer-routed-accepted");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+
+    // A parent tool receipt first (Append path, also increments accepted_total);
+    // capture the baseline AFTER it so the child's writer-routed write is the only
+    // additional accepted enqueue measured below.
+    let parent = sample_receipt_with_keypair("rcpt-writer-routed-parent", 1, &keypair);
+    store.append_chio_receipt_returning_seq(&parent)?;
+    let baseline = store.flush_receipt_writes()?.writer.accepted_total;
+
+    // A child receipt append is a writer-routed (`run_write_receipt`) write.
+    let child = sample_child_receipt_with_keypair_and_timestamp("child-writer-routed", 2, &keypair);
+    store.append_child_receipt_record(&child)?;
+    let accepted = store.flush_receipt_writes()?.writer.accepted_total;
+
+    assert_eq!(
+        accepted,
+        baseline + 1,
+        "a successfully-enqueued writer-routed write must increment accepted_total"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}

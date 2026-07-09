@@ -983,3 +983,102 @@ fn flush_is_a_checkpoint_barrier() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+/// Codex round 8, finding 4: when the background signer is installed while the
+/// writer head is POISONED, the InstallSigner install-time catch-up is skipped
+/// (it only builds for a Verified head). After the operator repairs the database
+/// and the reseed succeeds, the owed checkpoints must be built: the reseed just
+/// full-verified the head (finding 2), so the SAME bounded catch-up used by
+/// InstallSigner (round 4) runs here (O(b) per owed checkpoint, recovery-path,
+/// not F22-bound). Without the fix a quiet reseeded store with owed
+/// uncheckpointed entries stays uncheckpointed until some future write.
+#[test]
+fn reseed_builds_owed_checkpoints_after_repair() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-reseed-owed-ckpt");
+    let keypair = receipt_test_keypair();
+    let max_batch = 3;
+    let store = SqliteReceiptStore::open(&path)?;
+
+    // Seed >= max_batch uncheckpointed entries with NO signer: owed but unbuilt.
+    let mut first_id = String::new();
+    for i in 0..max_batch {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-reseed-owed-{i}"), i + 1, &keypair);
+        if i == 0 {
+            first_id = receipt.id.clone();
+        }
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    assert!(
+        store.load_checkpoint_by_seq(1)?.is_none(),
+        "no checkpoint before a signer is installed"
+    );
+
+    // Corrupt a claim-log projection row and capture the original bytes so the
+    // repair below can restore an exactly-valid log.
+    let original_raw_json = {
+        let connection = store.connection()?;
+        connection
+            .execute_batch("DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_update;")?;
+        let original: String = connection.query_row(
+            "SELECT raw_json FROM claim_receipt_log_entries WHERE receipt_id = ?1 AND receipt_kind = 'tool_receipt'",
+            rusqlite::params![first_id],
+            |row| row.get(0),
+        )?;
+        let mut tampered: ChioReceipt = serde_json::from_str(&original)?;
+        tampered.tool_name = "tampered".to_string();
+        let tampered_json = serde_json::to_string(&tampered)?;
+        connection.execute(
+            "UPDATE claim_receipt_log_entries SET raw_json = ?1 WHERE receipt_id = ?2 AND receipt_kind = 'tool_receipt'",
+            rusqlite::params![tampered_json, first_id],
+        )?;
+        original
+    };
+
+    // A reseed over the corrupt log fails closed and POISONS the head.
+    assert!(
+        store.reseed_verified_head().is_err(),
+        "a reseed over a corrupt log must fail closed"
+    );
+
+    // Install the signer while the head is POISONED: the install-time catch-up is
+    // skipped (it only builds for a Verified head), so no checkpoint is built.
+    store.enable_background_checkpoints(signer(&keypair, max_batch))?;
+    // Barrier: the Flush queues behind (and is processed after) the InstallSigner,
+    // so once it returns the signer is observably installed. It may itself return
+    // the stale poisoned error, which is irrelevant here.
+    let _ = store.flush_receipt_writes();
+    assert!(
+        store.load_checkpoint_by_seq(1)?.is_none(),
+        "no checkpoint may be built while the head is poisoned"
+    );
+
+    // Repair the database out of band, restoring the original bytes.
+    {
+        let connection = store.connection()?;
+        connection
+            .execute_batch("DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_update;")?;
+        connection.execute(
+            "UPDATE claim_receipt_log_entries SET raw_json = ?1 WHERE receipt_id = ?2 AND receipt_kind = 'tool_receipt'",
+            rusqlite::params![original_raw_json, first_id],
+        )?;
+    }
+
+    // Reseed now succeeds (full verify) and builds the owed checkpoint (finding 4)
+    // WITHOUT any further append.
+    store.reseed_verified_head()?;
+    let checkpoint = store
+        .load_checkpoint_by_seq(1)?
+        .ok_or("reseed must build the owed checkpoint without a further append")?;
+    assert_eq!(
+        (
+            checkpoint.body.batch_start_seq,
+            checkpoint.body.batch_end_seq
+        ),
+        (1, 3)
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
