@@ -1447,6 +1447,7 @@ impl ChioKernel {
                 authorization_id = %authorization.authorization_id,
                 "prepaid authorization lacks a resolvable quote amount; denying fail-closed"
             );
+            Self::release_unsettled_prepaid_hold(&**adapter, request, authorization);
             return Ok(None);
         };
         match adapter.capture(
@@ -1465,6 +1466,7 @@ impl ChioKernel {
                         authorization_id = %authorization.authorization_id,
                         "prepaid authorization capture did not settle; denying fail-closed"
                     );
+                    Self::release_unsettled_prepaid_hold(&**adapter, request, authorization);
                     Ok(None)
                 }
             }
@@ -1474,8 +1476,28 @@ impl ChioKernel {
                     reason = %redacted!(&error),
                     "prepaid authorization capture failed; denying fail-closed"
                 );
+                Self::release_unsettled_prepaid_hold(&**adapter, request, authorization);
                 Ok(None)
             }
+        }
+    }
+
+    /// Best-effort void of an unsettled prepaid hold when a MustPrepay call fails
+    /// closed after execution, so the payer's funds are not left frozen at the
+    /// facilitator until the authorization expires. Logs on failure and never
+    /// propagates: the call is denied regardless of whether the release lands.
+    fn release_unsettled_prepaid_hold(
+        adapter: &dyn PaymentAdapter,
+        request: &ToolCallRequest,
+        authorization: &PaymentAuthorization,
+    ) {
+        if let Err(error) = adapter.release(&authorization.authorization_id, &request.request_id) {
+            warn!(
+                request_id = %request.request_id,
+                authorization_id = %authorization.authorization_id,
+                reason = %redacted!(&error),
+                "failed to release unsettled prepaid authorization on fail-closed deny"
+            );
         }
     }
 }

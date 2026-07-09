@@ -388,8 +388,9 @@ fn mustprepay_no_budget_charge_captures_unsettled_authorization() {
 // a perpetual pending receipt.
 #[test]
 fn mustprepay_no_budget_charge_uncapturable_authorization_denies() {
+    let payment = UncapturablePaymentAdapter::default();
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(UncapturablePaymentAdapter));
+    kernel.set_payment_adapter(Box::new(payment.clone()));
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
 
     let agent_kp = Keypair::generate();
@@ -412,12 +413,19 @@ fn mustprepay_no_budget_charge_uncapturable_authorization_denies() {
         Verdict::Deny,
         "an unsettled prepayment that cannot be captured must fail closed"
     );
+    assert_eq!(
+        payment.released.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "a fail-closed deny must void the unsettled hold so the payer's funds are not left frozen"
+    );
 }
 
 // Authorizes an unsettled hold whose capture always fails, exercising the
-// fail-closed settlement path.
+// fail-closed settlement path. Counts releases so a leaked hold is observable.
 #[derive(Debug, Clone, Default)]
-struct UncapturablePaymentAdapter;
+struct UncapturablePaymentAdapter {
+    released: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+}
 
 impl PaymentAdapter for UncapturablePaymentAdapter {
     fn authorize(
@@ -446,6 +454,8 @@ impl PaymentAdapter for UncapturablePaymentAdapter {
         authorization_id: &str,
         _reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
+        self.released
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Ok(PaymentResult {
             transaction_id: authorization_id.to_string(),
             settlement_status: RailSettlementStatus::Released,
