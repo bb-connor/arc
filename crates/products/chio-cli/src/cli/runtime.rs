@@ -150,6 +150,9 @@ pub(crate) fn cmd_api_protect(
     listen_addr: &str,
     receipt_store: Option<&Path>,
     authority_seed_path: Option<&Path>,
+    budget_db: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
 ) -> Result<(), CliError> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -178,9 +181,9 @@ pub(crate) fn cmd_api_protect(
             sidecar_control_token,
             signer_seed_hex,
             trusted_capability_issuers,
-            control_url: None,
-            control_token: None,
-            budget_db: None,
+            control_url: control_url.map(str::to_string),
+            control_token: control_token.map(str::to_string),
+            budget_db: budget_db.map(|path| path.display().to_string()),
             require_nonce: false,
             allow_advisory: false,
         };

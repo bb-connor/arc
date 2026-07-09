@@ -119,7 +119,7 @@ pub(crate) fn run() {
             control_token.as_deref(),
         ),
         Commands::Init { path } => scaffold::cmd_init(&path),
-        Commands::Api { command } => dispatch_api(command, receipt_db, authority_seed_file),
+        Commands::Api { command } => dispatch_api(command, receipt_db, authority_seed_file, budget_db, control_url, control_token),
         Commands::Mcp { command } => dispatch_mcp(command, receipt_db, revocation_db, authority_seed_file, authority_db, budget_db, session_db, control_url, control_token),
         Commands::Trust { command } => dispatch_trust(command, json_output, receipt_db, revocation_db, authority_seed_file, authority_db, budget_db, session_db, control_url, control_token),
         Commands::Receipt { command } => dispatch_receipt(command, json_output, receipt_db, control_url, control_token),
