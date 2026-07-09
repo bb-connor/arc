@@ -256,6 +256,18 @@ impl PagerDutyBackend {
     /// 30s timeout is intentional and must not be silently dropped on
     /// builder failure.
     pub fn with_endpoint(routing_key: String, endpoint: String) -> Result<Self, ExportError> {
+        // Fail closed on a plaintext endpoint, exactly like the webhook SOC sink
+        // (Codex round-6): the production serve wiring passes
+        // CHIO_SIEM_ALERT_PAGERDUTY_ENDPOINT straight here, and an http:// value
+        // would send the PagerDuty routing key over the wire in the clear. The
+        // egress contract otherwise derives its allowed scheme FROM the endpoint,
+        // so http:// would be accepted. Tests that need a plaintext loopback
+        // wiremock target construct via with_endpoint_and_contract instead.
+        crate::exporters::require_https_endpoint(
+            &endpoint,
+            "PagerDuty alert endpoint requires https: a plaintext http endpoint \
+             would transmit the routing key without TLS",
+        )?;
         let egress_contract = siem_endpoint_egress_contract("pagerduty", &endpoint)?;
         Self::with_endpoint_and_contract(routing_key, endpoint, egress_contract)
     }
@@ -381,6 +393,17 @@ impl OpsGenieBackend {
     /// 30s timeout is intentional and must not be silently dropped on
     /// builder failure.
     pub fn with_endpoint(api_key: String, endpoint: String) -> Result<Self, ExportError> {
+        // Fail closed on a plaintext endpoint, exactly like the webhook SOC sink
+        // (Codex round-6): the production serve wiring passes
+        // CHIO_SIEM_ALERT_OPSGENIE_ENDPOINT straight here, and an http:// value
+        // would send the OpsGenie API key in the clear. The egress contract
+        // otherwise derives its allowed scheme FROM the endpoint. Tests needing a
+        // plaintext loopback wiremock target use with_endpoint_and_contract.
+        crate::exporters::require_https_endpoint(
+            &endpoint,
+            "OpsGenie alert endpoint requires https: a plaintext http endpoint \
+             would transmit the API key without TLS",
+        )?;
         let egress_contract = siem_endpoint_egress_contract("opsgenie", &endpoint)?;
         Self::with_endpoint_and_contract(api_key, endpoint, egress_contract)
     }
@@ -849,6 +872,56 @@ mod tests {
         body::ChioReceiptBody, decision::ToolCallAction, metadata::GuardEvidence,
         metadata::ReceiptSemanticFields,
     };
+
+    /// Codex round-6 (SECURITY): the production serve wiring passes the operator
+    /// `CHIO_SIEM_ALERT_*_ENDPOINT` value straight to `with_endpoint`, so a
+    /// plaintext http:// endpoint must fail closed the same way the webhook SOC
+    /// sink does, or the routing key / API key would be sent without TLS.
+    #[test]
+    fn pagerduty_with_endpoint_rejects_plaintext_accepts_https() {
+        let err = match PagerDutyBackend::with_endpoint(
+            "rk".to_string(),
+            "http://events.pagerduty.com".to_string(),
+        ) {
+            Ok(_) => panic!("a plaintext http PagerDuty endpoint must fail closed"),
+            Err(err) => err,
+        };
+        assert!(
+            err.to_string().contains("https"),
+            "the rejection must name the https requirement: {err}"
+        );
+        assert!(
+            PagerDutyBackend::with_endpoint(
+                "rk".to_string(),
+                "https://events.pagerduty.com".to_string()
+            )
+            .is_ok(),
+            "an https PagerDuty endpoint must build"
+        );
+    }
+
+    #[test]
+    fn opsgenie_with_endpoint_rejects_plaintext_accepts_https() {
+        let err = match OpsGenieBackend::with_endpoint(
+            "api-key".to_string(),
+            "http://api.opsgenie.com".to_string(),
+        ) {
+            Ok(_) => panic!("a plaintext http OpsGenie endpoint must fail closed"),
+            Err(err) => err,
+        };
+        assert!(
+            err.to_string().contains("https"),
+            "the rejection must name the https requirement: {err}"
+        );
+        assert!(
+            OpsGenieBackend::with_endpoint(
+                "api-key".to_string(),
+                "https://api.opsgenie.com".to_string()
+            )
+            .is_ok(),
+            "an https OpsGenie endpoint must build"
+        );
+    }
 
     fn deny_receipt(guard: &str) -> ChioReceipt {
         let keypair = Keypair::generate();
