@@ -256,15 +256,19 @@ pub(crate) enum PullError {
     Protocol(PeerProtocolError),
     /// Transport or store failure; retryable, peer keeps its standing.
     Transient(CliError),
-    /// A delta page cannot make forward progress via INCREMENTAL pull: its record
-    /// count (events + usage projections + abandoned/tombstoned slots over the
-    /// covered global-seq range) exceeds `BUDGET_DELTA_MAX_RECORDS`, so no smaller
-    /// cursor-anchored page exists (a dense rollback burst can pack more abandoned
-    /// seqs than the cap BEFORE the next live event, and an events-empty page is
-    /// rejected). This is NOT peer misbehavior: route the peer through the full
-    /// snapshot recovery path (which resets the cursor to the snapshot head,
-    /// skipping the unpageable window WITHOUT a delta cursor jump) rather than
-    /// pinning the cursor forever with a bare `Transient` (codex #965 Finding 1).
+    /// A fetched delta page's record count (events + usage projections +
+    /// abandoned/tombstoned slots over the covered global-seq range) exceeds
+    /// `BUDGET_DELTA_MAX_RECORDS`. The puller (`drain_budget_delta_pages`) FIRST
+    /// retries the same cursor with a SMALLER event limit, since a page often
+    /// overflows only because a full `MAX_LIST_LIMIT` event window also drags in its
+    /// paired usages/abandoned seqs. This variant is honored as a genuine full resync
+    /// ONLY when even a MINIMAL one-event page still overflows: a dense rollback burst
+    /// can pack more abandoned seqs than the cap BEFORE the next live event (and an
+    /// events-empty page is rejected), so no cursor-anchored page makes forward
+    /// progress. This is NOT peer misbehavior: route the peer through the full
+    /// snapshot recovery path (which resets the cursor to the snapshot head, skipping
+    /// the unpageable window WITHOUT a delta cursor jump) rather than pinning the
+    /// cursor forever with a bare `Transient` (codex #965 Finding 1, deltas.rs:713).
     ForceSnapshot(CliError),
 }
 

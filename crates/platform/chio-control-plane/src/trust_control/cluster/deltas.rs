@@ -641,23 +641,94 @@ fn sync_peer_budgets(
         return Ok(0);
     };
     let mut store = SqliteBudgetStore::open(path).map_err(CliError::from)?;
+    let cursor = peer_budget_cursor(state, peer_url);
+    drain_budget_delta_pages(
+        &mut store,
+        round,
+        cursor,
+        |after_seq, limit| {
+            client.budget_deltas(&BudgetDeltaQuery {
+                after_seq,
+                limit: Some(limit),
+            })
+        },
+        |cursor| update_peer_budget_cursor(state, peer_url, cursor),
+    )
+}
+
+/// Drain a peer's budget delta stream page by page, SHRINKING the requested event
+/// limit before ever force-snapshotting.
+///
+/// A page can exceed `BUDGET_DELTA_MAX_RECORDS` merely because we asked for a full
+/// `MAX_LIST_LIMIT` window of events: each event also drags in its paired usage
+/// projection and any abandoned/tombstoned seqs in the covered range, so e.g. 200
+/// events + 200 usages + one abandoned seq = 401 records trips the cap even though
+/// a 199-event page would import fine. Routing that STRAIGHT to a full snapshot is
+/// wasteful and, in a large ledger whose full snapshot itself exceeds the response
+/// byte cap, is a wedge: the snapshot fetch fails and the cursor repeats the same
+/// over-large incremental page forever (codex #965 deltas.rs:713).
+///
+/// So on `PullError::ForceSnapshot` (the over-cap signal from
+/// `import_budget_delta_response`) we RETRY the same cursor with a SMALLER event
+/// limit (halving the returned event count) whenever the page carried more than one
+/// event, delivering a merely-large-but-pageable window incrementally. Only a
+/// MINIMAL single-event page that STILL overflows (a dense rollback burst packs
+/// more abandoned seqs than the cap before the next live event, and an events-empty
+/// page is rejected upstream) is a genuinely unpageable window: we propagate
+/// `ForceSnapshot` and let the peer resync via the snapshot backstop.
+///
+/// Never over-counts and never skips a row: every retried page (large or small) is
+/// still contiguity-checked and cursor-advance-checked by
+/// `import_budget_delta_response`, and a smaller page covers a shorter global-seq
+/// range that is still gap-free from the cursor. Shrinking only reduces how MUCH of
+/// the contiguous stream one page carries, never which seqs are trusted as filled.
+fn drain_budget_delta_pages<Fetch, Commit>(
+    store: &mut SqliteBudgetStore,
+    round: &mut PullRoundBudget,
+    mut cursor: Option<BudgetCursor>,
+    mut fetch: Fetch,
+    mut commit_cursor: Commit,
+) -> Result<u64, PullError>
+where
+    Fetch: FnMut(Option<u64>, usize) -> Result<BudgetDeltaResponse, CliError>,
+    Commit: FnMut(BudgetCursor),
+{
     let mut applied = 0u64;
+    let mut event_limit = MAX_LIST_LIMIT;
     loop {
         if round.is_exhausted() {
             break;
         }
-        let cursor = peer_budget_cursor(state, peer_url);
-        let response = client.budget_deltas(&BudgetDeltaQuery {
-            after_seq: cursor.as_ref().map(|value| value.seq),
-            limit: Some(MAX_LIST_LIMIT),
-        })?;
-        let outcome = import_budget_delta_response(&mut store, &response, cursor, round)?;
-        applied = applied.saturating_add(outcome.applied_count);
-        if let Some(cursor) = outcome.next_cursor {
-            update_peer_budget_cursor(state, peer_url, cursor);
-        }
-        if !outcome.should_continue {
-            break;
+        let after_seq = cursor.as_ref().map(|value| value.seq);
+        let response = fetch(after_seq, event_limit)?;
+        match import_budget_delta_response(store, &response, cursor.clone(), round) {
+            Ok(outcome) => {
+                applied = applied.saturating_add(outcome.applied_count);
+                if let Some(next) = outcome.next_cursor {
+                    commit_cursor(next.clone());
+                    cursor = Some(next);
+                }
+                if !outcome.should_continue {
+                    break;
+                }
+                // A fresh window may be normal-sized; reopen the throttle so we do not
+                // permanently page in tiny increments after one dense window.
+                event_limit = MAX_LIST_LIMIT;
+            }
+            Err(PullError::ForceSnapshot(error)) => {
+                // Over-cap. Retry a smaller page only if this one carried more than a
+                // single event (so a smaller event window genuinely shrinks the record
+                // count). A one-event page that still overflows is unpageable: route to
+                // full snapshot recovery. The cursor is unchanged (ForceSnapshot is an
+                // Err, so no next_cursor was committed), so the retry refetches from the
+                // same position.
+                if response.mutation_events.len() > 1 {
+                    event_limit = (response.mutation_events.len() / 2).max(1);
+                    continue;
+                }
+                return Err(PullError::ForceSnapshot(error));
+            }
+            Err(other) => return Err(other),
         }
     }
     Ok(applied)
@@ -704,21 +775,23 @@ pub(crate) fn import_budget_delta_response(
         .saturating_add(response.mutation_events.len())
         .saturating_add(response.abandoned_seqs.len());
     if record_count > BUDGET_DELTA_MAX_RECORDS {
-        // An HONEST but unpageable delta window: the covered global-seq range packs
-        // more records (events + usage projections + abandoned/tombstoned slots)
-        // than a single page's BUDGET_DELTA_MAX_RECORDS cap. Capping the event page
-        // limit cannot guarantee forward progress, because a dense rollback burst
-        // can pack more than BUDGET_DELTA_MAX_RECORDS abandoned seqs BEFORE the next
-        // live event, so even a minimal one-event page overflows (and an
-        // events-empty page is rejected above). Route the peer through the full
-        // snapshot recovery path (which resets the cursor to the source's global
-        // head) instead of returning a bare Transient: a Transient neither advances
-        // the cursor nor bumps delta_records_since_snapshot, so force_snapshot
-        // recovery would never trigger and the peer's whole sync would wedge
-        // indefinitely (codex #965 Finding 1). Fail-closed and sound: the snapshot
-        // skips the window WITHOUT a delta cursor jump, so it cannot over-count or
-        // skip unreplicated rows, and a force_snapshot peer is excluded from
-        // witnesses until it re-syncs.
+        // This fetched page exceeds the record cap (events + usage projections +
+        // abandoned/tombstoned slots over the covered global-seq range). Signal it to
+        // the caller as ForceSnapshot; the caller (drain_budget_delta_pages) FIRST
+        // retries the same cursor with a SMALLER event limit, because a page often
+        // overflows only because we asked for a full MAX_LIST_LIMIT window of events
+        // (a 199-event page would import fine). ForceSnapshot is honored as a genuine
+        // full-resync ONLY when even a MINIMAL one-event page still overflows: a dense
+        // rollback burst can pack more than BUDGET_DELTA_MAX_RECORDS abandoned seqs
+        // BEFORE the next live event (and an events-empty page is rejected above), so
+        // no cursor-anchored page makes forward progress. Routing THAT window through
+        // the snapshot path (which resets the cursor to the source's global head)
+        // rather than a bare Transient is what unwedges it: a Transient neither
+        // advances the cursor nor bumps delta_records_since_snapshot, so force_snapshot
+        // recovery would never trigger (codex #965 Finding 1, deltas.rs:713). Fail-
+        // closed and sound: the snapshot skips the window WITHOUT a delta cursor jump,
+        // so it cannot over-count or skip unreplicated rows, and a force_snapshot peer
+        // is excluded from witnesses until it re-syncs.
         return Err(PullError::ForceSnapshot(CliError::cli_other_error(format!(
             "budget delta response contains {record_count} records, maximum is {BUDGET_DELTA_MAX_RECORDS}; routing peer through full snapshot recovery"
         ))));
@@ -1474,5 +1547,162 @@ mod deltas_tests {
         // Still bounded by a fixed ceiling so a misconfigured huge peer list cannot
         // make the wait unbounded.
         assert!(budget_write_quorum_commit_timeout(interval, 10_000) <= Duration::from_secs(300));
+    }
+
+    fn storm_event(seq: u64) -> BudgetMutationEventView {
+        BudgetMutationEventView {
+            event_id: format!("evt-{seq}"),
+            hold_id: None,
+            capability_id: "cap-page".to_string(),
+            grant_index: 0,
+            kind: "authorize_exposure".to_string(),
+            allowed: Some(true),
+            recorded_at: seq as i64,
+            event_seq: seq,
+            usage_seq: Some(seq),
+            exposure_units: 1,
+            realized_spend_units: 0,
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost_units: None,
+            invocation_count_after: 1,
+            total_cost_exposed_after: 1,
+            total_cost_realized_spend_after: 0,
+            authority: Some(BudgetMutationAuthorityView {
+                authority_id: "http://origin-page".to_string(),
+                lease_id: "http://origin-page#term-1".to_string(),
+                lease_epoch: 1,
+            }),
+        }
+    }
+
+    fn temp_budget_db(tag: &str) -> std::path::PathBuf {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|elapsed| elapsed.as_nanos())
+            .unwrap_or(0);
+        std::env::temp_dir().join(format!("chio-{tag}-{nonce}.sqlite3"))
+    }
+
+    #[test]
+    fn oversized_budget_page_retries_smaller_before_snapshotting() {
+        // codex #965 deltas.rs:713 (retry smaller budget pages before snapshotting):
+        // a page can exceed BUDGET_DELTA_MAX_RECORDS just because we asked for a full
+        // MAX_LIST_LIMIT window (events + their usages + abandoned seqs). Such a
+        // large-but-PAGEABLE window must be delivered incrementally via a SMALLER
+        // event limit, NOT routed straight to a full snapshot. RED before the fix:
+        // the first over-cap page returns ForceSnapshot and the whole drain fails.
+        // GREEN: the drain refetches the SAME cursor with a smaller limit and imports
+        // the window (still contiguity-checked, so no skip / no over-count).
+        use chio_test_support::prelude::*;
+        let db = temp_budget_db("retry-smaller-budget-page");
+        let mut store = SqliteBudgetStore::open(&db).test_unwrap();
+
+        // The oversized first page: MAX_LIST_LIMIT events plus a dense abandoned burst,
+        // so record_count > BUDGET_DELTA_MAX_RECORDS. It carries MANY events, so it is
+        // reducible: a smaller event window would fit under the cap.
+        let over_cap = || BudgetDeltaResponse {
+            records: Vec::new(),
+            mutation_events: (1..=MAX_LIST_LIMIT as u64).map(storm_event).collect(),
+            abandoned_seqs: ((MAX_LIST_LIMIT as u64 + 1)..=(BUDGET_DELTA_MAX_RECORDS as u64 + 1))
+                .collect(),
+        };
+        // The smaller retry page: a short contiguous run that imports cleanly.
+        let small = || BudgetDeltaResponse {
+            records: Vec::new(),
+            mutation_events: (1..=3).map(storm_event).collect(),
+            abandoned_seqs: Vec::new(),
+        };
+
+        let calls = std::cell::RefCell::new(Vec::<(Option<u64>, usize)>::new());
+        let result = drain_budget_delta_pages(
+            &mut store,
+            &mut PullRoundBudget::new(),
+            None,
+            |after_seq, limit| {
+                calls.borrow_mut().push((after_seq, limit));
+                Ok(match (after_seq, limit) {
+                    // First fetch: full limit from the head -> the oversized window.
+                    (None, l) if l >= MAX_LIST_LIMIT => over_cap(),
+                    // Retry from the SAME head at a reduced limit -> the pageable window.
+                    (None, _) => small(),
+                    // Cursor advanced past the imported window -> the stream is drained.
+                    _ => BudgetDeltaResponse {
+                        records: Vec::new(),
+                        mutation_events: Vec::new(),
+                        abandoned_seqs: Vec::new(),
+                    },
+                })
+            },
+            |_cursor| {},
+        );
+
+        // GREEN: the window drained incrementally; no ForceSnapshot escaped the drain.
+        let applied = match result {
+            Ok(applied) => applied,
+            Err(other) => {
+                panic!("a large-but-pageable window must drain, not force-snapshot: {other:?}")
+            }
+        };
+        assert_eq!(applied, 3, "the smaller page's events were imported");
+        // TEETH: the drain retried the same cursor with a limit strictly below
+        // MAX_LIST_LIMIT before ever force-snapshotting.
+        let calls = calls.into_inner();
+        assert!(
+            calls
+                .iter()
+                .any(|(after, limit)| after.is_none() && *limit < MAX_LIST_LIMIT),
+            "the drain must retry the SAME cursor with a smaller event limit before snapshotting, got {calls:?}"
+        );
+        // The follower actually holds the imported events (contiguity preserved).
+        assert_eq!(store.max_mutation_event_seq().test_unwrap(), 3);
+
+        let _ = std::fs::remove_file(&db);
+    }
+
+    #[test]
+    fn unpageable_single_event_budget_page_still_force_snapshots() {
+        // codex #965 deltas.rs:713: a GENUINELY unpageable window - a single live
+        // event preceded by a dense rollback burst of abandoned seqs that alone
+        // exceeds the record cap - cannot be split smaller, so the drain must still
+        // route the peer to full snapshot recovery (ForceSnapshot) rather than
+        // shrink-looping forever.
+        use chio_test_support::prelude::*;
+        let db = temp_budget_db("unpageable-budget-page");
+        let mut store = SqliteBudgetStore::open(&db).test_unwrap();
+
+        let fetches = std::cell::RefCell::new(0usize);
+        let result = drain_budget_delta_pages(
+            &mut store,
+            &mut PullRoundBudget::new(),
+            None,
+            |_after_seq, _limit| {
+                *fetches.borrow_mut() += 1;
+                Ok(BudgetDeltaResponse {
+                    records: Vec::new(),
+                    // ONE event; the abandoned burst ALONE exceeds the record cap, so
+                    // no smaller event page can bring the count under the cap.
+                    mutation_events: vec![storm_event(1)],
+                    abandoned_seqs: (2..=(BUDGET_DELTA_MAX_RECORDS as u64 + 2)).collect(),
+                })
+            },
+            |_cursor| {},
+        );
+
+        match result {
+            Err(PullError::ForceSnapshot(_)) => {}
+            other => {
+                panic!("a minimal one-event over-cap page must force-snapshot, got {other:?}")
+            }
+        }
+        // A single-event page is not reducible, so it force-snapshots after exactly
+        // ONE fetch: no unbounded shrink-retry loop.
+        assert_eq!(
+            fetches.into_inner(),
+            1,
+            "no shrink-retry for an unpageable single-event page"
+        );
+
+        let _ = std::fs::remove_file(&db);
     }
 }
