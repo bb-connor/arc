@@ -333,12 +333,38 @@ impl SessionJournal {
             .map_err(|_| SessionJournalError::LockPoisoned)
     }
 
-    /// Create a new empty journal for the given session (default caps).
+    /// Create a new empty journal for the given session using the DEFAULT process
+    /// memory budget caps.
+    ///
+    /// Session-aware guards that hold a CONFIGURED process memory budget should
+    /// prefer [`Self::from_memory_budget`] so lowering `journal_entry_cap` (or
+    /// `journal_tool_counts_cap`) actually tightens each per-session journal
+    /// instead of every caller silently retaining the compiled-in default
+    /// (RFC-0004 F21, codex finding 3554566285).
     pub fn new(session_id: String) -> Self {
         Self::with_caps(
             session_id,
             default_journal_entry_cap(),
             default_journal_tool_counts_cap(),
+        )
+    }
+
+    /// Create a new empty journal whose entry-ring and distinct-tool-name caps come
+    /// from a CONFIGURED process memory budget. Threading the operator's
+    /// [`chio_kernel::MemoryBudgetConfig`] (rather than a fresh `defaults()` read
+    /// inside [`Self::new`]) means lowering `journal_entry_cap` /
+    /// `journal_tool_counts_cap` on the process budget actually bounds each
+    /// per-session journal, so a multi-session workload stays within the configured
+    /// budget instead of every session retaining the default 4096 entries
+    /// (RFC-0004 F21, codex finding 3554566285).
+    pub fn from_memory_budget(
+        session_id: String,
+        budget: &chio_kernel::MemoryBudgetConfig,
+    ) -> Self {
+        Self::with_caps(
+            session_id,
+            budget.journal_entry_cap,
+            budget.journal_tool_counts_cap,
         )
     }
 
@@ -636,6 +662,42 @@ mod tests {
         let entries = journal.entries().unwrap();
         assert_eq!(entries.last().map(|e| e.sequence), Some(9));
         journal.verify_integrity().unwrap();
+    }
+
+    #[test]
+    fn from_memory_budget_honors_lowered_journal_caps() {
+        // codex finding 3554566285 (RFC-0004 F21): the CONFIGURED process memory
+        // budget must reach each per-session journal. A budget lowering
+        // `journal_entry_cap` to 4 and `journal_tool_counts_cap` to 3 must bound
+        // this journal at those caps, not the compiled-in default of 4096. RED
+        // (pre-fix): a caller using `new` reads `defaults()` and retains 4096.
+        let budget = chio_kernel::MemoryBudgetConfig {
+            journal_entry_cap: 4,
+            journal_tool_counts_cap: 3,
+            ..chio_kernel::MemoryBudgetConfig::defaults()
+        };
+        let journal = SessionJournal::from_memory_budget("sess-budget".to_string(), &budget);
+
+        // Flood distinct tool names: entries ring stays <= 4, distinct tool-counts
+        // keys stay <= 3, while cumulative invocation totals still survive.
+        for i in 0..100u32 {
+            journal.record(test_params(&format!("tool-{i}"))).unwrap();
+        }
+        assert!(
+            journal.entries().unwrap().len() <= 4,
+            "configured journal_entry_cap did not take effect: {} entries",
+            journal.entries().unwrap().len()
+        );
+        assert!(
+            journal.tool_counts_len().unwrap() <= 3,
+            "configured journal_tool_counts_cap did not take effect: {} keys",
+            journal.tool_counts_len().unwrap()
+        );
+        assert_eq!(
+            journal.data_flow().unwrap().total_invocations,
+            100,
+            "cumulative invocation total must survive eviction"
+        );
     }
 
     #[test]
