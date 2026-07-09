@@ -799,9 +799,23 @@ impl ChioKernel {
                 return Some(hit.clone());
             }
         }
-        self.federation_artifact_store
-            .as_ref()
-            .and_then(|store| store.get_dual_signed(receipt_id).ok().flatten())
+        self.federation_artifact_store.as_ref().and_then(|store| {
+            // A store READ error is not an admission gate (writes fail closed via
+            // `?` elsewhere), but collapsing Err to None silently makes a transient
+            // read failure indistinguishable from an absent artifact. Log it so the
+            // read-through fallback is observable (RFC-0004 / codex round-7 nit).
+            match store.get_dual_signed(receipt_id) {
+                Ok(hit) => hit,
+                Err(error) => {
+                    debug!(
+                        receipt_id = %receipt_id,
+                        reason = %redacted!(&error.to_string()),
+                        "federation artifact-store dual-signed read failed; treating as absent"
+                    );
+                    None
+                }
+            }
+        })
     }
 
     pub fn federation_dsse_envelope(
@@ -818,9 +832,22 @@ impl ChioKernel {
                 return Some(hit.clone());
             }
         }
-        self.federation_artifact_store
-            .as_ref()
-            .and_then(|store| store.get_dsse(receipt_id).ok().flatten())
+        self.federation_artifact_store.as_ref().and_then(|store| {
+            // As with the dual-signed read above: log a swallowed store read error
+            // so a transient failure is not silently reported as an absent DSSE
+            // envelope (RFC-0004 / codex round-7 nit).
+            match store.get_dsse(receipt_id) {
+                Ok(hit) => hit,
+                Err(error) => {
+                    debug!(
+                        receipt_id = %receipt_id,
+                        reason = %redacted!(&error.to_string()),
+                        "federation artifact-store DSSE read failed; treating as absent"
+                    );
+                    None
+                }
+            }
+        })
     }
 
     /// Local kernel identifier used in bilateral co-signing. Falls back
