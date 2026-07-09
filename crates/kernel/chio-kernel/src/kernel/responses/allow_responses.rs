@@ -120,6 +120,7 @@ impl ChioKernel {
         timestamp: u64,
         matched_grant_index: Option<usize>,
         extra_metadata: Option<serde_json::Value>,
+        incomplete_reason: &str,
     ) -> Result<ToolCallResponse, KernelError> {
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
@@ -147,7 +148,7 @@ impl ChioKernel {
             tool_name: &request.tool_name,
             server_id: &request.server_id,
             decision: Decision::Incomplete {
-                reason: "execution nonce preflight requires retry with presented nonce".to_string(),
+                reason: incomplete_reason.to_string(),
             },
             action,
             content_hash: receipt_content.content_hash,

@@ -222,7 +222,6 @@ fn make_test_state(
         trusted_receipt_signers,
         sidecar_control_token: None,
         budget_store: None,
-        mediation_nonce_store: None,
         allow_advisory,
     })
 }

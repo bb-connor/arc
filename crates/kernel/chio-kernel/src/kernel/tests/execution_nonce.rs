@@ -669,6 +669,100 @@ fn mediated_allow_receipt_records_bound_execution_nonce_id() {
 }
 
 #[test]
+fn reserving_authorization_keeps_hold_open_and_blocks_oversubscription() {
+    use chio_core_types::receipt::authoritative_spend::is_authoritative_spend_receipt;
+
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+    let cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: true,
+    };
+    kernel.set_execution_nonce_store(
+        cfg.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+    );
+
+    // max_cost_per_invocation == max_total_cost == 100: one authorization
+    // reserves the entire grant budget.
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    let first = ToolCallRequest {
+        request_id: "req-reserve-1".to_string(),
+        capability: cap.clone(),
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({ "invoice": "inv-1" }),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    };
+
+    // The reserving authorization returns an allow verdict, an incomplete
+    // terminal (no dispatch), and a freshly minted execution nonce.
+    let authorized = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
+        .unwrap();
+    assert_eq!(authorized.verdict, Verdict::Allow);
+    assert!(matches!(
+        &authorized.terminal_state,
+        OperationTerminalState::Incomplete { .. }
+    ));
+    assert!(
+        authorized.output.is_none(),
+        "an authorization gate must not dispatch the tool"
+    );
+    let nonce = authorized
+        .execution_nonce
+        .as_ref()
+        .expect("authorization mints a nonce");
+
+    // The receipt records the reserved hold's authorize block with no terminal
+    // reconcile, so it is truthfully non-authoritative.
+    let metadata = authorized
+        .receipt
+        .metadata
+        .as_ref()
+        .expect("receipt metadata present");
+    assert_eq!(
+        metadata["budget_authority"]["authorize"]["exposure_units"], 100,
+        "the reserved hold must record the authorized exposure"
+    );
+    assert!(
+        metadata["budget_authority"].get("terminal").is_none(),
+        "a reserved (not reconciled) hold must carry no terminal disposition"
+    );
+    let admitted = [kernel.config.keypair.public_key()];
+    assert!(
+        is_authoritative_spend_receipt(&authorized.receipt, &admitted, nonce.as_ref()).is_err(),
+        "a reserved authorization receipt must not be an authoritative spend"
+    );
+
+    // Finding 1: the hold stayed reserved (not reversed), so a second
+    // authorization for the same fully-reserved grant is denied. No
+    // over-subscription past max_total_cost.
+    let mut second = first.clone();
+    second.request_id = "req-reserve-2".to_string();
+    let denied = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&second, None)
+        .unwrap();
+    assert_eq!(
+        denied.verdict,
+        Verdict::Deny,
+        "the reserved hold must block a second authorization: {:?}",
+        denied.reason
+    );
+}
+
+#[test]
 fn strict_retry_mediated_spend_receipt_names_presented_nonce() {
     use chio_core_types::receipt::authoritative_spend::is_authoritative_spend_receipt;
 

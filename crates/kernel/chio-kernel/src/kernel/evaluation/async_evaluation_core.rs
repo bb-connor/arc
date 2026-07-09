@@ -8,6 +8,7 @@ impl ChioKernel {
         session_filesystem_roots: Option<&[String]>,
         extra_metadata: Option<serde_json::Value>,
         session_id: Option<&SessionId>,
+        preflight_disposition: PreflightHoldDisposition,
     ) -> Result<ToolCallResponse, KernelError> {
         // Resolve tenant_id from the session's enterprise identity context
         // (if any) and install it for the remainder of this evaluation so
@@ -458,14 +459,26 @@ impl ChioKernel {
 
         if self.execution_nonce_preflight_required(request) {
             return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_execution_nonce_preflight_allow_response_after_cleanup(
-                    request,
-                    now,
-                    matched_grant_index,
-                    cap,
-                    &budget_mutation,
-                    extra_metadata,
-                )
+                match preflight_disposition {
+                    PreflightHoldDisposition::ReverseForRetry => self
+                        .build_execution_nonce_preflight_allow_response_after_cleanup(
+                            request,
+                            now,
+                            matched_grant_index,
+                            cap,
+                            &budget_mutation,
+                            extra_metadata,
+                        ),
+                    PreflightHoldDisposition::ReserveForCaller => self
+                        .build_execution_nonce_authorization_reserving_response(
+                            request,
+                            now,
+                            matched_grant_index,
+                            cap,
+                            &budget_mutation,
+                            extra_metadata,
+                        ),
+                }
             });
         }
 

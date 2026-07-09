@@ -1,4 +1,3 @@
-use super::mediated;
 use super::*;
 
 /// Stored receipts for inspection and querying.
@@ -151,8 +150,6 @@ pub(crate) struct ProxyState {
     pub(crate) trusted_receipt_signers: Vec<PublicKey>,
     pub(crate) sidecar_control_token: Option<String>,
     pub(crate) budget_store: Option<Arc<dyn chio_kernel::budget_store::BudgetStore>>,
-    pub(crate) mediation_nonce_store:
-        Option<Arc<dyn chio_kernel::execution_nonce::ExecutionNonceStore>>,
     pub(crate) allow_advisory: bool,
 }
 
@@ -340,13 +337,11 @@ impl ProtectProxy {
             }
         }
 
-        // The mediated route builds a fresh kernel per request (registering the
-        // pass-through under the caller's requested server id), so state only
-        // holds the shared execution-nonce replay store. It is present exactly
-        // when a budget store is configured.
-        let mediation_nonce_store = budget_store
-            .as_ref()
-            .map(|_| mediated::build_mediation_nonce_store());
+        // The mediated route builds a fresh kernel per request (registering a
+        // placeholder under the caller's requested server id and its own
+        // mint-only execution-nonce store). It is available exactly when a
+        // budget store is configured, so no separate nonce-store handle is held
+        // in shared state.
         let state = Arc::new(ProxyState {
             evaluator,
             signer_keypair: keypair,
@@ -362,7 +357,6 @@ impl ProtectProxy {
             trusted_receipt_signers,
             sidecar_control_token: self.config.sidecar_control_token.clone(),
             budget_store,
-            mediation_nonce_store,
             allow_advisory: self.config.allow_advisory,
         });
 
@@ -380,7 +374,6 @@ impl ProtectProxy {
 
         info!(
             has_budget_store = state.budget_store.is_some(),
-            has_mediation_nonce_store = state.mediation_nonce_store.is_some(),
             "chio api protect: mediation layer ready"
         );
         info!(

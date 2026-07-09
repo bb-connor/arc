@@ -1,8 +1,10 @@
 use super::*;
 
+use chio_core_types::capability::governance::GovernedTransactionIntent;
 use chio_kernel::budget_store::BudgetStore;
+use chio_kernel::dpop::{DpopConfig, DpopNonceStore, DpopProof};
 use chio_kernel::execution_nonce::{
-    ExecutionNonceConfig, ExecutionNonceStore, InMemoryExecutionNonceStore, SignedExecutionNonce,
+    ExecutionNonceConfig, InMemoryExecutionNonceStore, SignedExecutionNonce,
 };
 use chio_kernel::{
     ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ToolCallRequest, ToolServerConnection,
@@ -78,49 +80,31 @@ pub(crate) fn load_revocation_db_ids(
     Ok(ids)
 }
 
-/// Build the shared execution-nonce replay store for the mediated route.
+/// Build a `ChioKernel` for tool-call mediation with the budget store, a strict
+/// execution-nonce config, and DPoP verification state installed.
 ///
-/// The store is shared across every per-request mediation kernel so a minted
-/// nonce is consumable exactly once globally; a per-request store would let a
-/// caller replay a nonce across requests and double-charge the budget.
-pub(crate) fn build_mediation_nonce_store() -> Arc<dyn ExecutionNonceStore> {
-    Arc::new(InMemoryExecutionNonceStore::from_config(
-        &ExecutionNonceConfig::default(),
-    ))
-}
-
-/// Adapter that lets a single [`ExecutionNonceStore`] be shared (by `Arc`)
-/// across the per-request mediation kernels, which each take ownership of a
-/// boxed store. All calls delegate to the shared store so replay protection
-/// stays global.
-struct SharedExecutionNonceStore(Arc<dyn ExecutionNonceStore>);
-
-impl ExecutionNonceStore for SharedExecutionNonceStore {
-    fn reserve(&self, nonce_id: &str) -> Result<bool, KernelError> {
-        self.0.reserve(nonce_id)
-    }
-
-    fn reserve_until(&self, nonce_id: &str, nonce_expires_at: i64) -> Result<bool, KernelError> {
-        self.0.reserve_until(nonce_id, nonce_expires_at)
-    }
-}
-
-/// Build a `ChioKernel` for tool-call mediation with the budget store and a
-/// strict execution-nonce config installed.
+/// The mediated `/v1/evaluate` route is a PURE pre-execution authorization gate.
+/// Strict execution-nonce mode is always on, so every request reaches the
+/// authorization preflight: the kernel verifies the capability (plus any DPoP
+/// proof, governed intent, and approval token), reserves the pre-execution
+/// budget hold and KEEPS IT OPEN, and mints a fresh execution nonce. It never
+/// dispatches a tool server, never consumes a presented nonce, and never signs
+/// a completed or settled spend. The caller presents the minted nonce to the
+/// real tool server, which verifies and consumes it and reconciles the reserved
+/// hold at the execution site.
 ///
-/// The mediation kernel always runs execution-nonce strict mode because the
-/// mediated route is a pre-execution authorization gate: a request that does
-/// not present a nonce receives a preflight allow with a freshly minted nonce
-/// and never dispatches a tool server, reconciles budget, or signs a completed
-/// spend receipt. The caller executes the real tool afterwards presenting that
-/// nonce, and realized-cost reconciliation happens outside this route.
+/// The execution-nonce store installed here is mint-only: this route mints
+/// nonces and never calls the verify/consume path, so the store is NOT a replay
+/// authority (replay/consumption is owned by the downstream tool server). It is
+/// therefore a fresh per-kernel in-memory store; durability is irrelevant
+/// because there is no consumed-nonce record to lose across a restart.
 ///
-/// A fresh kernel is built per mediated request so the pass-through tool server
+/// A fresh kernel is built per mediated request so the registration placeholder
 /// can be registered under the caller's requested `server_id`: the kernel's
-/// pre-dispatch registration check runs before the preflight return, so an
-/// unregistered target would otherwise deny an ordinary preflight. The budget
-/// store and `nonce_store` are shared across those per-request kernels so holds
-/// and replay protection remain global.
+/// pre-dispatch registration check runs before the authorization return, so an
+/// unregistered target would otherwise deny. The budget store is shared across
+/// those per-request kernels so reserved holds remain global and enforce
+/// `max_total_cost` against concurrent authorizations.
 ///
 /// `trusted_capability_issuers` are trusted as capability authorities in
 /// addition to the sidecar signer, so an externally minted capability that the
@@ -128,7 +112,6 @@ impl ExecutionNonceStore for SharedExecutionNonceStore {
 pub(crate) fn build_mediation_kernel(
     signer: &Keypair,
     budget_store: Arc<dyn BudgetStore>,
-    nonce_store: Arc<dyn ExecutionNonceStore>,
     trusted_capability_issuers: &[PublicKey],
     tool_servers: Vec<Box<dyn ToolServerConnection>>,
 ) -> Result<Arc<ChioKernel>, ProtectError> {
@@ -158,31 +141,42 @@ pub(crate) fn build_mediation_kernel(
         require_nonce: true,
         ..ExecutionNonceConfig::default()
     };
-    kernel.set_execution_nonce_store(nonce_cfg, Box::new(SharedExecutionNonceStore(nonce_store)));
+    kernel.set_execution_nonce_store(
+        nonce_cfg,
+        Box::new(InMemoryExecutionNonceStore::from_config(
+            &ExecutionNonceConfig::default(),
+        )),
+    );
+    // Install DPoP verification state so a grant with `dpop_required` can verify
+    // a presented proof. Without it every dpop_required capability denies
+    // fail-closed with no way to present a proof.
+    kernel.set_dpop_store(
+        DpopNonceStore::new(
+            DpopConfig::default().nonce_store_capacity,
+            std::time::Duration::from_secs(DpopConfig::default().proof_ttl_secs),
+        ),
+        DpopConfig::default(),
+    );
     for server in tool_servers {
         kernel.register_tool_server(server);
     }
     Ok(Arc::new(kernel))
 }
 
-/// Tool server registered under the caller's requested `server_id` so the
-/// kernel's pre-dispatch registration check admits an ordinary preflight. The
-/// mediated route does not execute the real tool (the caller does), so this
-/// reports `measures_realized_cost() == false`: on a presented-nonce dispatch
-/// the kernel reverses the pre-execution hold and signs a provisional,
-/// unreconciled receipt rather than a settled authoritative spend. Realized-cost
-/// reconciliation happens at the execution site outside this route.
+/// Registration placeholder for the caller's requested `server_id`.
+///
+/// The kernel's pre-dispatch registration check (`ToolNotRegistered`) runs
+/// before the authorization preflight returns, so the target server must be
+/// registered even though the mediated route never dispatches it. This route is
+/// a pure authorization gate: the caller executes the real tool downstream, so
+/// `invoke` is unreachable here and fails closed if ever reached.
 pub(crate) struct MediatedProxyToolServer {
     server_id: String,
-    upstream: String,
 }
 
 impl MediatedProxyToolServer {
-    pub(crate) fn new(server_id: String, upstream: String) -> Self {
-        Self {
-            server_id,
-            upstream,
-        }
+    pub(crate) fn new(server_id: String) -> Self {
+        Self { server_id }
     }
 }
 
@@ -196,23 +190,17 @@ impl ToolServerConnection for MediatedProxyToolServer {
         Vec::new()
     }
 
-    /// The mediated route does not execute the real tool (the caller does), so
-    /// this pass-through measures no realized cost. Reporting `false` keeps the
-    /// kernel from signing a settled, reconciled authoritative spend for a
-    /// dispatch that never ran: it reverses the pre-execution hold and emits a
-    /// provisional receipt instead. Realized-cost reconciliation happens at the
-    /// execution site.
-    fn measures_realized_cost(&self) -> bool {
-        false
-    }
-
     async fn invoke(
         &self,
         _tool_name: &str,
         _arguments: serde_json::Value,
         _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
     ) -> Result<serde_json::Value, KernelError> {
-        Ok(serde_json::json!({ "upstream": self.upstream.as_str() }))
+        // Unreachable: the mediated route authorizes and reserves but never
+        // dispatches. Fail closed if the invariant is ever violated.
+        Err(KernelError::Internal(
+            "mediated authorization gate must not dispatch the caller's tool".to_string(),
+        ))
     }
 }
 
@@ -225,12 +213,30 @@ pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     parameters: serde_json::Value,
     #[serde(default)]
     agent_id: Option<String>,
-    /// Signed execution nonce presented on a follow-up request so strict
-    /// deployments can proceed past the preflight authorization and dispatch
-    /// the tool. This is the `SignedExecutionNonce` object the preflight
-    /// response returns verbatim under `execution_nonce`; the caller copies it
-    /// back unchanged with no re-encoding. A malformed nonce fails the
-    /// enclosing deserialization, which is rejected fail-closed with a 400.
+    /// Optional caller-chosen request identifier. When present it is forwarded
+    /// verbatim so the caller can bind a governed approval token to this exact
+    /// request (the kernel requires `approval_token.request_id == request_id`).
+    /// When absent the sidecar mints one; that is fine for capabilities that do
+    /// not carry an approval-gated governed intent.
+    #[serde(default)]
+    request_id: Option<String>,
+    /// Optional governed transaction intent bound to this invocation. Forwarded
+    /// so a grant carrying `GovernedIntentRequired` (or an approval threshold)
+    /// can be authorized instead of denied.
+    #[serde(default)]
+    governed_intent: Option<GovernedTransactionIntent>,
+    /// Optional approval token authorizing this governed invocation, forwarded
+    /// alongside `governed_intent` so an approval-gated grant can be authorized.
+    #[serde(default)]
+    approval_token: Option<GovernedApprovalToken>,
+    /// Optional DPoP proof-of-possession. Forwarded so a grant carrying
+    /// `dpop_required` can verify the proof instead of denying fail-closed.
+    #[serde(default)]
+    dpop_proof: Option<DpopProof>,
+    /// A signed execution nonce. This endpoint MINTS nonces; it does not settle
+    /// presented ones. The field is parsed only so a caller that mistakenly
+    /// presents a nonce here is rejected explicitly (fail-closed) rather than
+    /// having the nonce silently ignored.
     #[serde(default)]
     execution_nonce: Option<SignedExecutionNonce>,
 }
@@ -254,10 +260,20 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
                 .into_response();
         }
     };
-    let (Some(budget_store), Some(nonce_store)) = (
-        state.budget_store.as_ref(),
-        state.mediation_nonce_store.as_ref(),
-    ) else {
+    // This endpoint is a pre-execution authorization gate: it mints an execution
+    // nonce for the caller to present downstream. It does not consume or settle a
+    // presented nonce. Reject one fail-closed so a caller cannot mistake this for
+    // a completion endpoint (and so the sidecar never consumes the downstream
+    // nonce, which would make the real tool server reject the caller as a
+    // replay).
+    if parsed.execution_nonce.is_some() {
+        return sidecar_bad_request(
+            "/v1/evaluate issues execution nonces; it does not accept a presented nonce. \
+             Present the minted nonce to the tool server, not to this endpoint",
+        )
+        .into_response();
+    }
+    let Some(budget_store) = state.budget_store.as_ref() else {
         return internal_json_error_response(
             "chio_mediation_unavailable",
             "mediated tool-call route requires a configured budget store (--control-url or --budget-db)",
@@ -267,7 +283,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     // recorded in the sidecar revocation set, which the per-request mediation
     // kernel does not carry. Reject a revoked capability here, mirroring the
     // validate, proxy, and advisory paths, so a revoked token cannot keep
-    // earning mediated allows until expiry.
+    // earning mediated authorizations until expiry.
     let revoked = state
         .revoked_capability_ids
         .lock()
@@ -283,18 +299,16 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         )
             .into_response();
     }
-    // Build a fresh kernel that registers the pass-through under the caller's
-    // requested server id so the kernel's pre-dispatch registration check
-    // admits the preflight. Budget store and nonce store are shared so holds
-    // and replay protection stay global.
+    // Build a fresh kernel that registers a placeholder under the caller's
+    // requested server id so the kernel's pre-dispatch registration check admits
+    // the authorization. The budget store is shared so reserved holds remain
+    // global and enforce max_total_cost across concurrent authorizations.
     let kernel = match build_mediation_kernel(
         &state.signer_keypair,
         Arc::clone(budget_store),
-        Arc::clone(nonce_store),
         &state.trusted_capability_issuers,
         vec![Box::new(MediatedProxyToolServer::new(
             parsed.tool_server.clone(),
-            state.upstream.clone(),
         ))],
     ) {
         Ok(kernel) => kernel,
@@ -306,50 +320,53 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     let agent_id = parsed
         .agent_id
         .unwrap_or_else(|| parsed.capability.subject.to_hex());
+    let request_id = parsed
+        .request_id
+        .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
     let kernel_request = ToolCallRequest {
-        request_id: uuid::Uuid::now_v7().to_string(),
+        request_id,
         capability: parsed.capability,
         tool_name: parsed.tool_name,
         server_id: parsed.tool_server,
         agent_id,
         arguments: parsed.parameters,
-        dpop_proof: None,
-        execution_nonce: parsed.execution_nonce,
-        governed_intent: None,
-        approval_token: None,
+        dpop_proof: parsed.dpop_proof,
+        // The route mints the nonce; it never forwards a presented one (rejected
+        // above), so the kernel always takes the authorization-reserve path.
+        execution_nonce: None,
+        governed_intent: parsed.governed_intent,
+        approval_token: parsed.approval_token,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
-    let response = match kernel.evaluate_tool_call_blocking_with_metadata(&kernel_request, None) {
-        Ok(response) => response,
-        Err(error) => {
-            warn!("mediated evaluation error: {error}");
-            return internal_json_error_response("chio_mediation_failed", &error.to_string());
-        }
-    };
+    // Single-phase authorization: verify + reserve the budget hold (kept open) +
+    // mint a fresh execution nonce. No dispatch, no reconcile, no settlement.
+    let response =
+        match kernel.authorize_tool_call_reserving_blocking_with_metadata(&kernel_request, None) {
+            Ok(response) => response,
+            Err(error) => {
+                warn!("mediated authorization error: {error}");
+                return internal_json_error_response("chio_mediation_failed", &error.to_string());
+            }
+        };
     if let Err(error) = record_tool_receipt(&state, &response.receipt).await {
         warn!("failed to persist mediated receipt: {error}");
         return internal_json_error_response("chio_receipt_persistence_failed", &error.to_string());
     }
-    // Derive the top-level wire status from the terminal lifecycle state, not
-    // the raw verdict. A nonce-less preflight returns `Verdict::Allow` with an
-    // `Incomplete` terminal state and an incomplete-decision receipt: nothing
-    // was authorized to execute yet. Surfacing "allow" there would let a caller
-    // that gates on the top-level status execute the tool before retrying with
-    // the minted nonce. Only a genuinely completed authorization surfaces
-    // "allow".
-    let verdict_str = match (&response.verdict, &response.terminal_state) {
-        (chio_kernel::Verdict::Allow, chio_core_types::OperationTerminalState::Completed) => {
-            "allow"
-        }
-        (chio_kernel::Verdict::Allow, _) => "pending_nonce",
-        (chio_kernel::Verdict::Deny, _) => "deny",
-        (chio_kernel::Verdict::PendingApproval, _) => "pending_approval",
+    // A successful authorization is `Verdict::Allow` with an incomplete terminal
+    // state (the tool has not run) and a minted nonce. It maps to the wire
+    // status "authorized": the reserved hold enforces budget and the caller
+    // presents the minted nonce to the real tool server. This route never
+    // completes or settles a spend, so no wire status implies a completed spend.
+    let status_str = match &response.verdict {
+        chio_kernel::Verdict::Allow => "authorized",
+        chio_kernel::Verdict::Deny => "deny",
+        chio_kernel::Verdict::PendingApproval => "pending_approval",
     };
     (
         StatusCode::OK,
         axum::Json(serde_json::json!({
-            "verdict": verdict_str,
+            "status": status_str,
             "receipt": response.receipt,
             "execution_nonce": response.execution_nonce,
         })),
@@ -372,17 +389,9 @@ mod tests {
     fn issuing_kernel(
         signer: &Keypair,
         budget: Arc<dyn BudgetStore>,
-        nonce_store: Arc<dyn ExecutionNonceStore>,
         trusted_capability_issuers: &[PublicKey],
     ) -> Arc<ChioKernel> {
-        build_mediation_kernel(
-            signer,
-            budget,
-            nonce_store,
-            trusted_capability_issuers,
-            Vec::new(),
-        )
-        .test_unwrap()
+        build_mediation_kernel(signer, budget, trusted_capability_issuers, Vec::new()).test_unwrap()
     }
 
     fn issue_cost_bearing_capability(
@@ -426,7 +435,6 @@ mod tests {
     /// external issuers to trust.
     fn mediated_test_state(
         signer: Keypair,
-        nonce_store: Arc<dyn ExecutionNonceStore>,
         budget: Arc<dyn BudgetStore>,
         trusted_capability_issuers: Vec<PublicKey>,
     ) -> Arc<ProxyState> {
@@ -466,7 +474,6 @@ mod tests {
             trusted_receipt_signers,
             sidecar_control_token: None,
             budget_store: Some(budget),
-            mediation_nonce_store: Some(nonce_store),
             allow_advisory: false,
         })
     }
@@ -483,22 +490,203 @@ mod tests {
         request
     }
 
+    // --- Scaffolding for governed and DPoP authorization tests ---
+
+    use chio_core_types::capability::governance::{
+        GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+        GovernedTransactionIntent,
+    };
+    use chio_core_types::capability::scope::{Constraint, MonetaryAmount};
+    use chio_core_types::receipt::authoritative_spend::is_authoritative_spend_receipt;
+    use chio_kernel::dpop::{DpopProof, DpopProofBody, DPOP_SCHEMA};
+
+    fn issue_governed_capability(
+        kernel: &Arc<ChioKernel>,
+        agent: &Keypair,
+        server: &str,
+        tool: &str,
+        max_per: u64,
+        currency: &str,
+        approval_threshold_units: u64,
+    ) -> CapabilityToken {
+        let grant = ToolGrant {
+            server_id: server.to_string(),
+            tool_name: tool.to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: vec![
+                Constraint::GovernedIntentRequired,
+                Constraint::RequireApprovalAbove {
+                    threshold_units: approval_threshold_units,
+                },
+            ],
+            max_invocations: None,
+            max_cost_per_invocation: Some(MonetaryAmount {
+                units: max_per,
+                currency: currency.to_string(),
+            }),
+            max_total_cost: Some(MonetaryAmount {
+                units: max_per,
+                currency: currency.to_string(),
+            }),
+            dpop_required: None,
+        };
+        let scope = ChioScope {
+            grants: vec![grant],
+            ..ChioScope::default()
+        };
+        kernel
+            .issue_capability(&agent.public_key(), scope, 3600)
+            .test_unwrap()
+    }
+
+    fn issue_dpop_capability(
+        kernel: &Arc<ChioKernel>,
+        agent: &Keypair,
+        server: &str,
+        tool: &str,
+        max_per: u64,
+        currency: &str,
+    ) -> CapabilityToken {
+        let grant = ToolGrant {
+            server_id: server.to_string(),
+            tool_name: tool.to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: vec![],
+            max_invocations: None,
+            max_cost_per_invocation: Some(MonetaryAmount {
+                units: max_per,
+                currency: currency.to_string(),
+            }),
+            max_total_cost: Some(MonetaryAmount {
+                units: max_per,
+                currency: currency.to_string(),
+            }),
+            dpop_required: Some(true),
+        };
+        let scope = ChioScope {
+            grants: vec![grant],
+            ..ChioScope::default()
+        };
+        kernel
+            .issue_capability(&agent.public_key(), scope, 3600)
+            .test_unwrap()
+    }
+
+    fn governed_intent(
+        id: &str,
+        server: &str,
+        tool: &str,
+        units: u64,
+        currency: &str,
+    ) -> GovernedTransactionIntent {
+        GovernedTransactionIntent {
+            id: id.to_string(),
+            server_id: server.to_string(),
+            tool_name: tool.to_string(),
+            purpose: "invoice-settlement".to_string(),
+            max_amount: Some(MonetaryAmount {
+                units,
+                currency: currency.to_string(),
+            }),
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: None,
+        }
+    }
+
+    fn governed_approval_token(
+        approver: &Keypair,
+        subject: &PublicKey,
+        intent: &GovernedTransactionIntent,
+        request_id: &str,
+    ) -> GovernedApprovalToken {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .test_unwrap()
+            .as_secs();
+        GovernedApprovalToken::sign(
+            GovernedApprovalTokenBody {
+                id: format!("approval-{request_id}"),
+                approver: approver.public_key(),
+                subject: subject.clone(),
+                governed_intent_hash: intent.binding_hash().test_unwrap(),
+                request_id: request_id.to_string(),
+                issued_at: now.saturating_sub(1),
+                expires_at: now + 300,
+                decision: GovernedApprovalDecision::Approved,
+            },
+            approver,
+        )
+        .test_unwrap()
+    }
+
+    fn dpop_proof_for(
+        agent: &Keypair,
+        cap: &CapabilityToken,
+        server: &str,
+        tool: &str,
+        parameters: &serde_json::Value,
+    ) -> DpopProof {
+        // Match the kernel's action-hash computation exactly: SHA-256 hex over
+        // the canonical JSON of the tool arguments.
+        let args_bytes = chio_core_types::canonical::canonical_json_bytes(parameters).test_unwrap();
+        let action_hash = chio_core_types::crypto::sha256_hex(&args_bytes);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .test_unwrap()
+            .as_secs();
+        DpopProof::sign(
+            DpopProofBody {
+                schema: DPOP_SCHEMA.to_string(),
+                capability_id: cap.id.clone(),
+                tool_server: server.to_string(),
+                tool_name: tool.to_string(),
+                action_hash,
+                nonce: uuid::Uuid::now_v7().to_string(),
+                issued_at: now,
+                agent_key: agent.public_key(),
+            },
+            agent,
+        )
+        .test_unwrap()
+    }
+
+    /// POST a body to `/v1/evaluate` and return the status and parsed JSON.
+    async fn post_evaluate(
+        state: Arc<ProxyState>,
+        body: &serde_json::Value,
+    ) -> (StatusCode, serde_json::Value) {
+        let request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/evaluate")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(body).unwrap()))
+                .unwrap(),
+        );
+        let response = build_app(state).oneshot(request).await.unwrap();
+        let status = response.status();
+        let bytes = axum::body::to_bytes(response.into_body(), 1 << 20)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        (status, json)
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn mediated_nonce_less_request_is_preflight_allow_without_completed_spend() {
+    async fn mediated_authorization_reserves_hold_and_mints_non_authoritative_receipt() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
         let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
-        let nonce_store = build_mediation_nonce_store();
-        let kernel = issuing_kernel(&signer, Arc::clone(&budget), Arc::clone(&nonce_store), &[]);
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let cap =
             issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
         let cap_id = cap.id.clone();
-        let state = mediated_test_state(
-            signer,
-            Arc::clone(&nonce_store),
-            Arc::clone(&budget),
-            Vec::new(),
-        );
+        let signer_pub = signer.public_key();
+        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
 
         let body = serde_json::json!({
             "capability": cap,
@@ -506,48 +694,122 @@ mod tests {
             "tool_name": "compute",
             "parameters": { "invoice": "inv-1" }
         });
-        let request = with_loopback_peer(
-            Request::builder()
-                .method("POST")
-                .uri("/v1/evaluate")
-                .header("content-type", "application/json")
-                .body(Body::from(serde_json::to_vec(&body).unwrap()))
-                .unwrap(),
-        );
-        let response = build_app(Arc::clone(&state))
-            .oneshot(request)
-            .await
-            .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
-        let bytes = axum::body::to_bytes(response.into_body(), 1 << 20)
-            .await
-            .unwrap();
-        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(status, StatusCode::OK);
 
-        // A nonce-less mediated request is a pre-execution authorization gate:
-        // it returns a distinct non-authorizing status ("pending_nonce") with a
-        // freshly minted execution nonce, does not dispatch the tool, and does
-        // not sign a completed spend. The top-level status must not be "allow",
-        // so a caller gating on it cannot execute before retrying with the
-        // minted nonce.
-        assert_eq!(json["verdict"], "pending_nonce");
-        assert_ne!(json["verdict"], "allow");
+        // Single-phase authorization: wire status "authorized", a minted nonce
+        // object, and a non-authoritative reserved receipt. The route never
+        // dispatches, never consumes a nonce, never settles a spend.
+        assert_eq!(json["status"], "authorized");
         assert!(
             json["execution_nonce"].is_object(),
-            "preflight must mint an execution nonce"
+            "authorization must mint an execution nonce object"
         );
         assert_eq!(
             json["receipt"]["decision"]["verdict"], "incomplete",
-            "preflight receipt must not be a completed-spend decision"
+            "a reserved authorization is not a completed-spend decision"
         );
 
-        // The tool has not run, so no realized cost is reconciled against the
-        // capability: the hold is not moved into committed spend.
-        let usage = budget.get_usage(&cap_id, 0).unwrap();
+        // The receipt records the reserved hold's authorize block with NO
+        // terminal reconcile disposition: reserved, not reconciled.
+        let budget_authority = &json["receipt"]["metadata"]["budget_authority"];
+        assert_eq!(budget_authority["authorize"]["exposure_units"], 100);
         assert!(
-            usage.is_none() || usage.unwrap().committed_cost_units().unwrap() == 0,
-            "nonce-less preflight must not move committed cost"
+            budget_authority.get("terminal").is_none(),
+            "a reserved (not reconciled) hold must carry no terminal disposition"
         );
+
+        // The receipt is rejected as an authoritative spend: the hold is
+        // reserved, not reconciled.
+        let receipt: ChioReceipt = serde_json::from_value(json["receipt"].clone()).unwrap();
+        let nonce: SignedExecutionNonce =
+            serde_json::from_value(json["execution_nonce"].clone()).unwrap();
+        assert!(
+            is_authoritative_spend_receipt(&receipt, &[signer_pub], &nonce).is_err(),
+            "a reserved authorization receipt must not be an authoritative spend"
+        );
+
+        // Finding 1: the pre-execution hold is RESERVED (open), not reversed. The
+        // budget store shows the worst-case exposure committed against the grant,
+        // so the caller's downstream execution is backed by a real reservation.
+        let usage = budget.get_usage(&cap_id, 0).unwrap();
+        let usage = usage.expect("the reserved hold must be recorded in the budget store");
+        assert_eq!(
+            usage.committed_cost_units().unwrap(),
+            100,
+            "the pre-execution hold must remain reserved (open), not reversed"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_reserved_hold_blocks_oversubscription() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        // max_cost_per_invocation == max_total_cost == 100: one authorization
+        // reserves the entire grant budget.
+        let cap =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 100, "USD");
+        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+
+        let body = serde_json::json!({
+            "capability": cap,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-1" }
+        });
+
+        // First authorization reserves the hold.
+        let (_, first) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(first["status"], "authorized");
+
+        // Finding 1: because the reserved hold is NOT reversed, a second
+        // authorization for the same fully-reserved grant is DENIED. Sequential
+        // mediated authorizations respect max_total_cost; no over-subscription.
+        let (_, second) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(
+            second["status"], "deny",
+            "the reserved hold must block a second authorization past max_total_cost"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_presented_execution_nonce_is_rejected() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
+        let cap_value = serde_json::to_value(&cap).unwrap();
+        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+
+        // Obtain a genuine minted nonce from a first authorization.
+        let body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-1" }
+        });
+        let (_, authorized) = post_evaluate(Arc::clone(&state), &body).await;
+        let minted_nonce = authorized["execution_nonce"].clone();
+        assert!(minted_nonce.is_object());
+
+        // Finding 2: presenting that nonce back to /v1/evaluate is rejected
+        // fail-closed. This endpoint mints nonces; it does not settle them, so
+        // the sidecar never consumes the downstream nonce (which would make the
+        // real tool server reject the caller as a replay).
+        let settle_body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-1" },
+            "execution_nonce": minted_nonce
+        });
+        let (status, json) = post_evaluate(Arc::clone(&state), &settle_body).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_ne!(json["status"], "authorized");
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -555,17 +817,11 @@ mod tests {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
         let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
-        let nonce_store = build_mediation_nonce_store();
-        let kernel = issuing_kernel(&signer, Arc::clone(&budget), Arc::clone(&nonce_store), &[]);
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let cap =
             issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
         let cap_id = cap.id.clone();
-        let state = mediated_test_state(
-            signer,
-            Arc::clone(&nonce_store),
-            Arc::clone(&budget),
-            Vec::new(),
-        );
+        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
         // Record the capability id as revoked, mirroring a prior
         // `/v1/capabilities/release`.
         state
@@ -580,26 +836,10 @@ mod tests {
             "tool_name": "compute",
             "parameters": { "invoice": "inv-1" }
         });
-        let request = with_loopback_peer(
-            Request::builder()
-                .method("POST")
-                .uri("/v1/evaluate")
-                .header("content-type", "application/json")
-                .body(Body::from(serde_json::to_vec(&body).unwrap()))
-                .unwrap(),
-        );
-        let response = build_app(Arc::clone(&state))
-            .oneshot(request)
-            .await
-            .unwrap();
-        // A revoked capability is rejected fail-closed rather than returning a
-        // preflight allow.
-        assert_eq!(response.status(), StatusCode::FORBIDDEN);
-        let bytes = axum::body::to_bytes(response.into_body(), 1 << 20)
-            .await
-            .unwrap();
-        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-        assert_ne!(json["verdict"], "allow");
+        let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+        // A revoked capability is rejected fail-closed rather than authorized.
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_ne!(json["status"], "authorized");
         assert_eq!(json["error"], "chio_capability_revoked");
 
         // The revoked capability never reaches the kernel, so no hold is placed.
@@ -608,17 +848,16 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn mediated_preflight_admits_caller_named_server_id() {
+    async fn mediated_authorization_admits_caller_named_server_id() {
         // The operator does not pre-register tool servers; the mediated route
-        // registers a pass-through under whatever server id the caller names,
-        // so a nonce-less preflight for an arbitrary server is authorized
-        // ("pending_nonce" + minted nonce) rather than denied `ToolNotRegistered`
-        // by the kernel's pre-dispatch registration check.
+        // registers a placeholder under whatever server id the caller names, so
+        // an authorization for an arbitrary server is authorized rather than
+        // denied `ToolNotRegistered` by the kernel's pre-dispatch registration
+        // check.
         let signer = Keypair::generate();
         let agent = Keypair::generate();
         let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
-        let nonce_store = build_mediation_nonce_store();
-        let kernel = issuing_kernel(&signer, Arc::clone(&budget), Arc::clone(&nonce_store), &[]);
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         let cap = issue_cost_bearing_capability(
             &kernel,
             &agent,
@@ -628,200 +867,18 @@ mod tests {
             1000,
             "USD",
         );
-        let state = mediated_test_state(
-            signer,
-            Arc::clone(&nonce_store),
-            Arc::clone(&budget),
-            Vec::new(),
-        );
+        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
         let body = serde_json::json!({
             "capability": cap,
             "tool_server": "arbitrary-srv",
             "tool_name": "invoke",
             "parameters": {}
         });
-        let request = with_loopback_peer(
-            Request::builder()
-                .method("POST")
-                .uri("/v1/evaluate")
-                .header("content-type", "application/json")
-                .body(Body::from(serde_json::to_vec(&body).unwrap()))
-                .unwrap(),
-        );
-        let response = build_app(Arc::clone(&state))
-            .oneshot(request)
-            .await
-            .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
-        let bytes = axum::body::to_bytes(response.into_body(), 1 << 20)
-            .await
-            .unwrap();
-        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-        assert_eq!(json["verdict"], "pending_nonce");
+        let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(json["status"], "authorized");
         assert!(json["execution_nonce"].is_object());
         assert_eq!(json["receipt"]["decision"]["verdict"], "incomplete");
-    }
-
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn mediated_presented_nonce_proceeds_past_preflight() {
-        let signer = Keypair::generate();
-        let agent = Keypair::generate();
-        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
-        let nonce_store = build_mediation_nonce_store();
-        let kernel = issuing_kernel(&signer, Arc::clone(&budget), Arc::clone(&nonce_store), &[]);
-        let cap =
-            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
-        let cap_id = cap.id.clone();
-        let cap_value = serde_json::to_value(&cap).unwrap();
-        let state = mediated_test_state(
-            signer,
-            Arc::clone(&nonce_store),
-            Arc::clone(&budget),
-            Vec::new(),
-        );
-        let signer_pub = state.signer_keypair.public_key();
-
-        // Step 1: nonce-less preflight mints the execution nonce and does not
-        // move committed cost.
-        let preflight_body = serde_json::json!({
-            "capability": cap_value,
-            "tool_server": "cost-srv",
-            "tool_name": "compute",
-            "parameters": { "invoice": "inv-1" }
-        });
-        let preflight_request = with_loopback_peer(
-            Request::builder()
-                .method("POST")
-                .uri("/v1/evaluate")
-                .header("content-type", "application/json")
-                .body(Body::from(serde_json::to_vec(&preflight_body).unwrap()))
-                .unwrap(),
-        );
-        let preflight_response = build_app(Arc::clone(&state))
-            .oneshot(preflight_request)
-            .await
-            .unwrap();
-        let preflight_json: serde_json::Value = serde_json::from_slice(
-            &axum::body::to_bytes(preflight_response.into_body(), 1 << 20)
-                .await
-                .unwrap(),
-        )
-        .unwrap();
-        assert_eq!(preflight_json["verdict"], "pending_nonce");
-        assert_eq!(
-            preflight_json["receipt"]["decision"]["verdict"],
-            "incomplete"
-        );
-        assert!(preflight_json["execution_nonce"].is_object());
-        let usage_after_preflight = budget.get_usage(&cap_id, 0).unwrap();
-        assert!(
-            usage_after_preflight.is_none()
-                || usage_after_preflight
-                    .unwrap()
-                    .committed_cost_units()
-                    .unwrap()
-                    == 0
-        );
-        // The caller copies the exact nonce object the preflight returned back
-        // into the retry body with no re-encoding.
-        let minted_nonce = preflight_json["execution_nonce"].clone();
-        assert!(minted_nonce.is_object());
-
-        // Step 2: presenting the minted nonce proceeds past preflight to a
-        // completed authorization confirmation. The mediated route does not
-        // execute the real tool, so the pass-through measures no realized cost:
-        // the kernel reverses the pre-execution hold and signs a provisional,
-        // unreconciled receipt rather than a settled authoritative spend.
-        let execute_body = serde_json::json!({
-            "capability": cap_value,
-            "tool_server": "cost-srv",
-            "tool_name": "compute",
-            "parameters": { "invoice": "inv-1" },
-            "execution_nonce": minted_nonce
-        });
-        let execute_request = with_loopback_peer(
-            Request::builder()
-                .method("POST")
-                .uri("/v1/evaluate")
-                .header("content-type", "application/json")
-                .body(Body::from(serde_json::to_vec(&execute_body).unwrap()))
-                .unwrap(),
-        );
-        let execute_response = build_app(Arc::clone(&state))
-            .oneshot(execute_request)
-            .await
-            .unwrap();
-        assert_eq!(execute_response.status(), StatusCode::OK);
-        let execute_json: serde_json::Value = serde_json::from_slice(
-            &axum::body::to_bytes(execute_response.into_body(), 1 << 20)
-                .await
-                .unwrap(),
-        )
-        .unwrap();
-        // A completed authorization confirmation surfaces the top-level "allow"
-        // and a completed-decision receipt, so the caller may execute the real
-        // tool.
-        assert_eq!(execute_json["verdict"], "allow");
-        assert_eq!(execute_json["receipt"]["decision"]["verdict"], "allow");
-        assert_eq!(execute_json["receipt"]["trust_level"], "mediated");
-
-        // The stub measured no realized cost, so the receipt is truthfully
-        // provisional: the budget hold is reversed (not reconciled) and
-        // settlement stays pending.
-        let budget_authority = &execute_json["receipt"]["metadata"]["budget_authority"];
-        assert_eq!(budget_authority["terminal"]["disposition"], "reversed");
-        assert_ne!(budget_authority["terminal"]["disposition"], "reconciled");
-        assert_eq!(
-            execute_json["receipt"]["metadata"]["financial"]["settlement_status"],
-            "pending"
-        );
-
-        // The pre-execution hold is reversed: no committed spend was moved by
-        // the stub dispatch. Realized-cost reconciliation happens at the real
-        // execution site outside this route.
-        let usage = budget.get_usage(&cap_id, 0).unwrap();
-        assert!(
-            usage.is_none() || usage.unwrap().committed_cost_units().unwrap() == 0,
-            "unmeasured stub dispatch must not move committed cost"
-        );
-
-        // The invariant: a receipt minted by the stub dispatch must never be
-        // accepted as a final settled/reconciled authoritative spend. It is
-        // rejected because the hold was not reconciled.
-        use chio_core_types::receipt::authoritative_spend::{
-            is_authoritative_spend_receipt, NotAuthoritativeReason,
-        };
-        let signed_receipt: ChioReceipt =
-            serde_json::from_value(execute_json["receipt"].clone()).unwrap();
-        let presented_nonce: SignedExecutionNonce =
-            serde_json::from_value(minted_nonce.clone()).unwrap();
-        assert_eq!(
-            is_authoritative_spend_receipt(&signed_receipt, &[signer_pub], &presented_nonce),
-            Err(NotAuthoritativeReason::HoldNotReconciled),
-            "the stub dispatch must not mint an authoritative spend receipt"
-        );
-
-        // Replaying the same nonce is rejected: the shared replay store consumed
-        // it on the first execute, so a second presentation fails closed.
-        let replay_request = with_loopback_peer(
-            Request::builder()
-                .method("POST")
-                .uri("/v1/evaluate")
-                .header("content-type", "application/json")
-                .body(Body::from(serde_json::to_vec(&execute_body).unwrap()))
-                .unwrap(),
-        );
-        let replay_response = build_app(Arc::clone(&state))
-            .oneshot(replay_request)
-            .await
-            .unwrap();
-        let replay_json: serde_json::Value = serde_json::from_slice(
-            &axum::body::to_bytes(replay_response.into_body(), 1 << 20)
-                .await
-                .unwrap(),
-        )
-        .unwrap();
-        assert_ne!(replay_json["verdict"], "allow");
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -832,18 +889,16 @@ mod tests {
 
         // A capability minted by an operator-configured external issuer.
         let issuer_budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
-        let issuer_nonce_store = build_mediation_nonce_store();
-        let issuer = issuing_kernel(&external_signer, issuer_budget, issuer_nonce_store, &[]);
+        let issuer = issuing_kernel(&external_signer, issuer_budget, &[]);
         let cap =
             issue_cost_bearing_capability(&issuer, &agent, "cost-srv", "compute", 100, 1000, "USD");
         let cap_value = serde_json::to_value(&cap).unwrap();
 
-        // Trusting the external issuer: the mediated route authorizes the
-        // preflight rather than rejecting the capability as untrusted.
+        // Trusting the external issuer: the mediated route authorizes rather than
+        // rejecting the capability as untrusted.
         let trusting_budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
         let trusting_state = mediated_test_state(
             signer.clone(),
-            build_mediation_nonce_store(),
             trusting_budget,
             vec![external_signer.public_key()],
         );
@@ -853,58 +908,16 @@ mod tests {
             "tool_name": "compute",
             "parameters": {}
         });
-        let request = with_loopback_peer(
-            Request::builder()
-                .method("POST")
-                .uri("/v1/evaluate")
-                .header("content-type", "application/json")
-                .body(Body::from(serde_json::to_vec(&body).unwrap()))
-                .unwrap(),
-        );
-        let response = build_app(trusting_state).oneshot(request).await.unwrap();
-        let json: serde_json::Value = serde_json::from_slice(
-            &axum::body::to_bytes(response.into_body(), 1 << 20)
-                .await
-                .unwrap(),
-        )
-        .unwrap();
-        // A trusted issuer's nonce-less request is authorized to the preflight
-        // stage: a distinct "pending_nonce" status with a minted nonce, not a
-        // completed "allow".
-        assert_eq!(json["verdict"], "pending_nonce");
+        let (_, json) = post_evaluate(trusting_state, &body).await;
+        assert_eq!(json["status"], "authorized");
         assert!(json["execution_nonce"].is_object());
 
         // Control: without the configured issuer the same capability is denied,
         // proving the trust set is load-bearing.
         let untrusting_budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
-        let untrusting_state = mediated_test_state(
-            signer,
-            build_mediation_nonce_store(),
-            untrusting_budget,
-            Vec::new(),
-        );
-        let body = serde_json::json!({
-            "capability": cap_value,
-            "tool_server": "cost-srv",
-            "tool_name": "compute",
-            "parameters": {}
-        });
-        let request = with_loopback_peer(
-            Request::builder()
-                .method("POST")
-                .uri("/v1/evaluate")
-                .header("content-type", "application/json")
-                .body(Body::from(serde_json::to_vec(&body).unwrap()))
-                .unwrap(),
-        );
-        let response = build_app(untrusting_state).oneshot(request).await.unwrap();
-        let json: serde_json::Value = serde_json::from_slice(
-            &axum::body::to_bytes(response.into_body(), 1 << 20)
-                .await
-                .unwrap(),
-        )
-        .unwrap();
-        assert_eq!(json["verdict"], "deny");
+        let untrusting_state = mediated_test_state(signer, untrusting_budget, Vec::new());
+        let (_, json) = post_evaluate(untrusting_state, &body).await;
+        assert_eq!(json["status"], "deny");
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -912,40 +925,113 @@ mod tests {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
         let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
-        let nonce_store = build_mediation_nonce_store();
-        let kernel = issuing_kernel(&signer, Arc::clone(&budget), Arc::clone(&nonce_store), &[]);
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
         // max_cost_per_invocation (100) exceeds max_total_cost (40), so the
-        // pre-execution hold is refused before the preflight check.
+        // pre-execution hold is refused before the authorization check.
         let cap =
             issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 40, "USD");
         let cap_id = cap.id.clone();
-        let state = mediated_test_state(
-            signer,
-            Arc::clone(&nonce_store),
-            Arc::clone(&budget),
-            Vec::new(),
-        );
+        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
         let body = serde_json::json!({ "capability": cap, "tool_server": "cost-srv",
             "tool_name": "compute", "parameters": {} });
-        let request = with_loopback_peer(
-            Request::builder()
-                .method("POST")
-                .uri("/v1/evaluate")
-                .header("content-type", "application/json")
-                .body(Body::from(serde_json::to_vec(&body).unwrap()))
-                .unwrap(),
-        );
-        let response = build_app(Arc::clone(&state))
-            .oneshot(request)
-            .await
-            .unwrap();
-        let bytes = axum::body::to_bytes(response.into_body(), 1 << 20)
-            .await
-            .unwrap();
-        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let (_, json) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(json["status"], "deny");
         assert_ne!(json["receipt"]["decision"]["verdict"], "allow");
         let usage = budget.get_usage(&cap_id, 0).unwrap();
         assert!(usage.is_none() || usage.unwrap().committed_cost_units().unwrap() == 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_governed_capability_requires_intent_and_approval() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        // The grant requires a governed intent and approval above 50 units; the
+        // worst-case charge (100) crosses the threshold, so an approval token is
+        // required.
+        let cap = issue_governed_capability(&kernel, &agent, "cost-srv", "compute", 100, "USD", 50);
+        let cap_value = serde_json::to_value(&cap).unwrap();
+        let approver = signer.clone();
+        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+
+        // Finding 4: without a governed intent + approval token, the governed
+        // grant is DENIED (the forwarded fields are load-bearing).
+        let bare_body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-1" }
+        });
+        let (_, denied) = post_evaluate(Arc::clone(&state), &bare_body).await;
+        assert_eq!(
+            denied["status"], "deny",
+            "a governed grant without a forwarded intent must be denied"
+        );
+
+        // With a valid governed intent + approval token bound to the caller-chosen
+        // request_id, the same grant is AUTHORIZED.
+        let request_id = "req-governed-1";
+        let intent = governed_intent("intent-gov-1", "cost-srv", "compute", 100, "USD");
+        let approval = governed_approval_token(&approver, &agent.public_key(), &intent, request_id);
+        let governed_body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-1" },
+            "request_id": request_id,
+            "governed_intent": intent,
+            "approval_token": approval
+        });
+        let (_, authorized) = post_evaluate(Arc::clone(&state), &governed_body).await;
+        assert_eq!(
+            authorized["status"], "authorized",
+            "a governed grant with a valid intent and approval must be authorized"
+        );
+        assert!(authorized["execution_nonce"].is_object());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_dpop_capability_requires_valid_proof() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap = issue_dpop_capability(&kernel, &agent, "cost-srv", "compute", 100, "USD");
+        let cap_value = serde_json::to_value(&cap).unwrap();
+        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+        let params = serde_json::json!({ "invoice": "inv-1" });
+
+        // Finding 5: without a DPoP proof, a dpop_required grant is DENIED
+        // fail-closed.
+        let bare_body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": params.clone()
+        });
+        let (_, denied) = post_evaluate(Arc::clone(&state), &bare_body).await;
+        assert_eq!(
+            denied["status"], "deny",
+            "a dpop_required grant without a proof must be denied"
+        );
+
+        // With a valid DPoP proof bound to the exact call, the mediation kernel's
+        // installed DPoP state verifies it and the grant is AUTHORIZED.
+        let proof = dpop_proof_for(&agent, &cap, "cost-srv", "compute", &params);
+        let dpop_body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": params,
+            "dpop_proof": proof
+        });
+        let (_, authorized) = post_evaluate(Arc::clone(&state), &dpop_body).await;
+        assert_eq!(
+            authorized["status"], "authorized",
+            "a valid DPoP proof must authorize the dpop_required grant"
+        );
+        assert!(authorized["execution_nonce"].is_object());
     }
 
     #[test]
@@ -1040,14 +1126,11 @@ mod tests {
         let signer = Keypair::generate();
         let budget: Arc<dyn BudgetStore> =
             Arc::new(chio_kernel::budget_store::InMemoryBudgetStore::new());
-        let kernel = build_mediation_kernel(
-            &signer,
-            Arc::clone(&budget),
-            build_mediation_nonce_store(),
-            &[],
-            Vec::new(),
-        )
-        .unwrap();
+        let kernel = build_mediation_kernel(&signer, Arc::clone(&budget), &[], Vec::new()).unwrap();
+        // Strict nonce mode is what routes every mediated request through the
+        // authorization-reserve path. DPoP verification state is installed here
+        // too; the `mediated_dpop_capability_requires_valid_proof` integration
+        // test exercises it end to end.
         assert!(
             kernel.execution_nonce_required(),
             "mediation kernel must always run execution-nonce strict mode"

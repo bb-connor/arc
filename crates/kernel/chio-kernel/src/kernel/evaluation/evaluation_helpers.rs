@@ -1,5 +1,18 @@
 use super::*;
 
+/// Incomplete-decision reason for a strict-nonce preflight whose hold was
+/// reversed. The caller retries the same endpoint presenting the minted nonce,
+/// at which point the hold is re-taken and the tool dispatched.
+const EXECUTION_NONCE_PREFLIGHT_RETRY_REASON: &str =
+    "execution nonce preflight requires retry with presented nonce";
+
+/// Incomplete-decision reason for a pre-execution authorization whose hold was
+/// reserved (kept open) for a caller that executes the tool downstream. The
+/// caller does not retry this endpoint: it presents the minted nonce to the
+/// real tool server, which consumes it and reconciles the reserved hold.
+const EXECUTION_NONCE_AUTHORIZATION_RESERVED_REASON: &str =
+    "pre-execution authorization reserved; present the minted execution nonce to the tool server";
+
 pub(super) struct PreDispatchCleanupDeny<'a> {
     pub(super) request: &'a ToolCallRequest,
     pub(super) reason: &'a str,
@@ -113,6 +126,66 @@ impl ChioKernel {
             timestamp,
             Some(matched_grant_index),
             metadata,
+            EXECUTION_NONCE_PREFLIGHT_RETRY_REASON,
+        )
+    }
+
+    /// Build the pre-execution authorization response for a caller that executes
+    /// the tool itself (the sidecar mediated `/v1/evaluate` route).
+    ///
+    /// Unlike [`Self::build_execution_nonce_preflight_allow_response_after_cleanup`],
+    /// this KEEPS the pre-execution budget hold reserved (open): it does not
+    /// call `reverse_pre_execution_budget_mutation`. Only the in-memory,
+    /// per-dispatch reservations are released (the runtime-admission slot and
+    /// the sibling-sum share) because the tool never dispatches on this kernel.
+    /// The durable hold stays open so it enforces `max_total_cost` against
+    /// concurrent authorizations; it is reconciled at the execution site when
+    /// the caller presents the minted nonce, or reclaimed by the crash reaper
+    /// if the caller never executes (fail-closed, never over-subscribed).
+    ///
+    /// The receipt records the reserved hold's authorize block with no terminal
+    /// disposition, so it is truthfully non-authoritative: the hold is reserved,
+    /// not reconciled, and `is_authoritative_spend_receipt` rejects it.
+    pub(super) fn build_execution_nonce_authorization_reserving_response(
+        &self,
+        request: &ToolCallRequest,
+        timestamp: u64,
+        matched_grant_index: usize,
+        cap: &CapabilityToken,
+        budget_mutation: &PreExecutionBudgetMutation,
+        runtime_admission_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let runtime_admission_metadata = self
+            .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                runtime_admission_metadata,
+            );
+        self.release_admitted_capability_budget(cap)
+            .map_err(KernelError::DelegationInvalid)?;
+
+        // Record the reserved hold's authorize block with NO terminal event:
+        // the hold is open, neither reversed nor reconciled. This is what keeps
+        // the receipt non-authoritative and keeps the budget reserved.
+        let budget_metadata = budget_mutation
+            .charge_result()
+            .map(|charge| self.budget_execution_receipt_metadata(charge, None, None));
+        let authorization_metadata = Some(serde_json::json!({
+            "execution_nonce": {
+                "stage": "authorization",
+                "tool_dispatched": false,
+                "hold_disposition": "reserved"
+            }
+        }));
+        let metadata = merge_metadata_objects(
+            merge_metadata_objects(runtime_admission_metadata, budget_metadata),
+            authorization_metadata,
+        );
+
+        self.build_execution_nonce_preflight_allow_response_with_metadata(
+            request,
+            timestamp,
+            Some(matched_grant_index),
+            metadata,
+            EXECUTION_NONCE_AUTHORIZATION_RESERVED_REASON,
         )
     }
 }
