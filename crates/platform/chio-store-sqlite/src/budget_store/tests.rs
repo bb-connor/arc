@@ -1686,6 +1686,36 @@ fn budget_ack_heads_stays_pinned_at_a_post_watermark_gap() -> Result<(), Box<dyn
 }
 
 #[test]
+fn list_abandoned_event_seqs_in_range_bounds_upper_and_limit(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // codex #965 Finding (bound abandoned seqs): the budget delta endpoint must
+    // never serialize an unbounded abandoned window. The bounded query enforces
+    // BOTH an upper bound (<= page_max) and a row cap in SQL, so a rollback storm
+    // cannot materialize millions of tombstones into one response and blow past
+    // the peer-response byte cap.
+    let path = unique_db_path("chio-abandoned-in-range");
+    let store = SqliteBudgetStore::open(&path)?;
+
+    let seqs: Vec<u64> = (1..=1000).collect();
+    store.record_abandoned_event_seqs(&seqs)?;
+
+    // Upper bound: only (10, 20], ascending.
+    let bounded = store.list_abandoned_event_seqs_in_range(10, 20, 100)?;
+    assert_eq!(bounded, (11..=20).collect::<Vec<u64>>());
+
+    // Row cap: a huge window returns at most `limit` rows, never the whole window.
+    let capped = store.list_abandoned_event_seqs_in_range(0, 1000, 5)?;
+    assert_eq!(capped, vec![1, 2, 3, 4, 5]);
+
+    // Contrast: the unbounded method returns the whole window (the wedge risk the
+    // bounded query removes).
+    assert_eq!(store.list_abandoned_event_seqs_after(0)?.len(), 1000);
+
+    let _ = fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
 fn budget_ack_heads_recognizes_multi_authority_global_contiguity(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // event_seq is a single store-wide sequence, so multiple authorities share

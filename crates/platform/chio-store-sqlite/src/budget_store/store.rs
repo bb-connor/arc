@@ -478,6 +478,40 @@ impl SqliteBudgetStore {
             .map_err(BudgetStoreError::from)
     }
 
+    /// Abandoned event_seqs in `(after_seq, up_to_seq]` (ascending), at most
+    /// `limit` entries.
+    ///
+    /// The budget delta endpoint uses this to BOUND the abandoned list it serves
+    /// (codex #965 Finding: bound abandoned seqs). A rollback storm can pack an
+    /// arbitrarily large abandoned window between the follower cursor and the next
+    /// live event; serializing all of it (the old unbounded
+    /// `list_abandoned_event_seqs_after` + in-memory `<= page_max` filter) could
+    /// exceed the peer-response byte cap, so the client rejects the body while
+    /// decoding and never gets to classify the oversized window as
+    /// snapshot-recovery, pinning the cursor forever. Both the upper bound and the
+    /// row cap are pushed into SQL so a huge window is never materialized here.
+    pub fn list_abandoned_event_seqs_in_range(
+        &self,
+        after_seq: u64,
+        up_to_seq: u64,
+        limit: usize,
+    ) -> Result<Vec<u64>, BudgetStoreError> {
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            "SELECT seq FROM budget_abandoned_event_seqs \
+             WHERE seq > ?1 AND seq <= ?2 ORDER BY seq ASC LIMIT ?3",
+        )?;
+        let rows = statement.query_map(
+            rusqlite::params![after_seq as i64, up_to_seq as i64, limit as i64],
+            |row| {
+                let seq: i64 = row.get(0)?;
+                Ok(seq.max(0) as u64)
+            },
+        )?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(BudgetStoreError::from)
+    }
+
     /// Record snapshot-carried abandoned event_seqs (see `list_abandoned_event_seqs`).
     /// Fail-closed: this only ADDS filled slots (an abandoned seq is never a live
     /// write, so it cannot inflate any origin's ack head), and it resets the

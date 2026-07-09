@@ -149,7 +149,16 @@ pub(crate) async fn handle_internal_budgets_delta(
     // Abandoned/tombstoned seqs within the pulled range, so the puller can treat
     // those slots as filled (no demote on a legitimately gappy stream). Bounded to
     // the page's max event so the puller only verifies contiguity up to what it is
-    // importing (codex #965 round-5 P1).
+    // importing (codex #965 round-5 P1), AND capped at BUDGET_DELTA_MAX_RECORDS + 1
+    // rows so a rollback storm that packs an enormous abandoned window before the
+    // next live event cannot blow past MAX_PEER_RESPONSE_BYTES (codex #965 Finding:
+    // bound abandoned seqs). An importable page carries at most
+    // BUDGET_DELTA_MAX_RECORDS records total, so its abandoned list is never
+    // truncated (limit > cap); a truncated list only ever occurs on an over-cap
+    // window, and returning cap + 1 abandoned rows guarantees the client's
+    // `record_count > BUDGET_DELTA_MAX_RECORDS` check trips ForceSnapshot (snapshot
+    // recovery) BEFORE the contiguity guard runs, so truncation can never demote an
+    // honest peer or exceed the byte cap.
     let abandoned_seqs = if mutation_events.is_empty() {
         Vec::new()
     } else {
@@ -158,8 +167,13 @@ pub(crate) async fn handle_internal_budgets_delta(
             .map(|event| event.event_seq)
             .max()
             .unwrap_or(0);
-        match store.list_abandoned_event_seqs_after(query.after_seq.unwrap_or(0)) {
-            Ok(seqs) => seqs.into_iter().filter(|&seq| seq <= page_max).collect(),
+        let abandoned_limit = BUDGET_DELTA_MAX_RECORDS.saturating_add(1);
+        match store.list_abandoned_event_seqs_in_range(
+            query.after_seq.unwrap_or(0),
+            page_max,
+            abandoned_limit,
+        ) {
+            Ok(seqs) => seqs,
             Err(error) => {
                 return internal_cluster_http_error(
                     "failed to collect budget abandoned-seq deltas",
