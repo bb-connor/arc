@@ -2083,6 +2083,112 @@ fn rollback_retry_records_abandoned_seq_and_head_does_not_wedge() {
 }
 
 #[test]
+fn follower_replace_self_records_abandoned_seq_and_head_advances() {
+    // codex #965 round-5 (follower-replace wedge): an ALREADY-SYNCED follower
+    // holds E@X before the leader's rollback-retry, so its pull cursor is already
+    // past X and the delta's abandoned_seqs (which are strictly ABOVE the cursor)
+    // exclude X. When it later imports the re-appended E@Y, the REPLACE path
+    // deletes its local E@X; it must self-record X abandoned in the same
+    // transaction so its contiguous ack head advances past the hole WITHOUT
+    // waiting for a snapshot. Only the specifically-superseded seq is recorded, so
+    // a genuine gap is never filled and the witness never over-counts.
+    let leader_path = unique_db_path("chio-follower-replace-leader");
+    let follower_path = unique_db_path("chio-follower-replace-follower");
+    let leader = SqliteBudgetStore::open(&leader_path).unwrap();
+    let follower = SqliteBudgetStore::open(&follower_path).unwrap();
+    let hold_id = "hold-fr";
+    let event_id = "evt-fr:authorize";
+    let initial = authority("budget-primary", "lease-1", 1);
+    let changed = authority("budget-primary", "lease-2", 2);
+
+    // Leader authorizes E (seq 1), then rolls it back (rollback marker at seq 2).
+    assert!(leader
+        .try_charge_cost_with_ids_and_authority(
+            "cap-fr",
+            0,
+            Some(10),
+            100,
+            Some(200),
+            Some(1000),
+            Some(hold_id),
+            Some(event_id),
+            Some(&initial),
+        )
+        .unwrap());
+    leader
+        .reverse_charge_cost_with_ids_and_authority(
+            "cap-fr",
+            0,
+            100,
+            Some(hold_id),
+            Some("evt-fr:authorize:rollback:1"),
+            Some(&initial),
+        )
+        .unwrap();
+
+    // Follower syncs the PRE-retry state (E@1 + the rollback marker), ascending.
+    let pre_retry = leader.list_mutation_events_after_seq(100, 0).unwrap();
+    follower.import_snapshot_records(&[], &pre_retry).unwrap();
+    assert!(
+        follower.list_abandoned_event_seqs().unwrap().is_empty(),
+        "no abandoned seq before the leader's retry"
+    );
+
+    // Leader retries under the NEW lease: deletes E@1 (abandons 1), re-appends E@3.
+    assert!(leader
+        .try_charge_cost_with_ids_and_authority(
+            "cap-fr",
+            0,
+            Some(10),
+            100,
+            Some(200),
+            Some(1000),
+            Some(hold_id),
+            Some(event_id),
+            Some(&changed),
+        )
+        .unwrap());
+    assert_eq!(leader.list_abandoned_event_seqs().unwrap(), vec![1]);
+
+    // Follower imports the re-appended authorize (the leader's delta). Its cursor
+    // is already past seq 1, so the delta would NOT carry seq 1 as abandoned - the
+    // REPLACE path must record it locally.
+    let reappended = leader
+        .list_mutation_events_after_seq(100, 0)
+        .unwrap()
+        .into_iter()
+        .find(|record| record.event_id == event_id)
+        .expect("the re-appended authorize event");
+    assert!(
+        reappended.event_seq > 1,
+        "re-appended at a fresh higher seq"
+    );
+    follower.import_mutation_record(&reappended).unwrap();
+
+    // The follower self-recorded the superseded seq 1 abandoned, so its head
+    // advances to the re-appended event instead of wedging at the hole.
+    assert_eq!(
+        follower.list_abandoned_event_seqs().unwrap(),
+        vec![1],
+        "the follower REPLACE path self-records the superseded seq abandoned"
+    );
+    let follower_max = follower.max_mutation_event_seq().unwrap();
+    let heads = follower.budget_ack_heads().unwrap();
+    let head = heads
+        .iter()
+        .find(|(origin, _)| origin == "budget-primary")
+        .map(|(_, seq)| *seq);
+    assert_eq!(
+        head,
+        Some(follower_max),
+        "the follower head advances past the abandoned hole with no snapshot needed"
+    );
+
+    let _ = fs::remove_file(&leader_path);
+    let _ = fs::remove_file(&follower_path);
+}
+
+#[test]
 fn mutation_event_witness_returns_stored_origin_authority() -> Result<(), Box<dyn std::error::Error>>
 {
     // codex #965 round-5 P1: the witness identity for an idempotent retry comes

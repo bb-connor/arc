@@ -661,6 +661,22 @@ impl SqliteBudgetStore {
                         "DELETE FROM budget_mutation_events WHERE event_id = ?1",
                         params![record.event_id],
                     )?;
+                    // Symmetric with existing_event_allowed on the leader: the
+                    // replaced old event's seq is genuinely superseded by the higher
+                    // re-appended seq, so record it abandoned in the SAME transaction.
+                    // An ALREADY-SYNCED follower (whose pull cursor is already past
+                    // the old seq, so the delta's abandoned_seqs excludes it) then
+                    // self-heals immediately - its contiguous ack head advances past
+                    // the filled slot instead of wedging at the hole until a snapshot
+                    // (codex #965 round-5). Only the SPECIFICALLY-superseded seq is
+                    // recorded (not an arbitrary gap), so a genuine missing event
+                    // still caps the head; never over-counts.
+                    if existing.event_seq > 0 && existing.event_seq != record.event_seq {
+                        transaction.execute(
+                            "INSERT OR IGNORE INTO budget_abandoned_event_seqs(seq) VALUES (?1)",
+                            params![existing.event_seq as i64],
+                        )?;
+                    }
                     Self::reset_budget_ack_head_watermark(transaction)?;
                     if let Some(hold_id) = record.hold_id.as_deref() {
                         transaction.execute(
