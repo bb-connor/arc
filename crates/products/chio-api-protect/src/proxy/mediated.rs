@@ -170,10 +170,12 @@ pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     agent_id: Option<String>,
     /// Signed execution nonce presented on a follow-up request so strict
     /// deployments can proceed past the preflight authorization and dispatch
-    /// the tool. Encoded as the JSON serialization of a `SignedExecutionNonce`
-    /// (the same shape the preflight response returns under `execution_nonce`).
+    /// the tool. This is the `SignedExecutionNonce` object the preflight
+    /// response returns verbatim under `execution_nonce`; the caller copies it
+    /// back unchanged with no re-encoding. A malformed nonce fails the
+    /// enclosing deserialization, which is rejected fail-closed with a 400.
     #[serde(default)]
-    execution_nonce: Option<String>,
+    execution_nonce: Option<SignedExecutionNonce>,
 }
 
 pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
@@ -204,16 +206,26 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
             "mediated tool-call route requires a configured budget store (--control-url or --budget-db)",
         );
     };
-    let execution_nonce = match parsed.execution_nonce.as_deref() {
-        Some(raw) => match serde_json::from_str::<SignedExecutionNonce>(raw) {
-            Ok(nonce) => Some(nonce),
-            Err(error) => {
-                return sidecar_bad_request(&format!("invalid execution nonce: {error}"))
-                    .into_response();
-            }
-        },
-        None => None,
-    };
+    // Fail-closed: a capability released via `/v1/capabilities/release` is
+    // recorded in the sidecar revocation set, which the per-request mediation
+    // kernel does not carry. Reject a revoked capability here, mirroring the
+    // validate, proxy, and advisory paths, so a revoked token cannot keep
+    // earning mediated allows until expiry.
+    let revoked = state
+        .revoked_capability_ids
+        .lock()
+        .await
+        .contains(&parsed.capability.id);
+    if revoked {
+        return (
+            StatusCode::FORBIDDEN,
+            axum::Json(serde_json::json!({
+                "error": "chio_capability_revoked",
+                "message": "capability has been revoked",
+            })),
+        )
+            .into_response();
+    }
     // Build a fresh kernel that registers the pass-through under the caller's
     // requested server id so the kernel's pre-dispatch registration check
     // admits the preflight. Budget store and nonce store are shared so holds
@@ -245,7 +257,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         agent_id,
         arguments: parsed.parameters,
         dpop_proof: None,
-        execution_nonce,
+        execution_nonce: parsed.execution_nonce,
         governed_intent: None,
         approval_token: None,
         model_metadata: None,
@@ -468,6 +480,63 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_revoked_capability_is_rejected() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let nonce_store = build_mediation_nonce_store();
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), Arc::clone(&nonce_store), &[]);
+        let cap =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
+        let cap_id = cap.id.clone();
+        let state = mediated_test_state(
+            signer,
+            Arc::clone(&nonce_store),
+            Arc::clone(&budget),
+            Vec::new(),
+        );
+        // Record the capability id as revoked, mirroring a prior
+        // `/v1/capabilities/release`.
+        state
+            .revoked_capability_ids
+            .lock()
+            .await
+            .insert(cap_id.clone());
+
+        let body = serde_json::json!({
+            "capability": cap,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-1" }
+        });
+        let request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/evaluate")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                .unwrap(),
+        );
+        let response = build_app(Arc::clone(&state))
+            .oneshot(request)
+            .await
+            .unwrap();
+        // A revoked capability is rejected fail-closed rather than returning a
+        // preflight allow.
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        let bytes = axum::body::to_bytes(response.into_body(), 1 << 20)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_ne!(json["verdict"], "allow");
+        assert_eq!(json["error"], "chio_capability_revoked");
+
+        // The revoked capability never reaches the kernel, so no hold is placed.
+        let usage = budget.get_usage(&cap_id, 0).unwrap();
+        assert!(usage.is_none() || usage.unwrap().committed_cost_units().unwrap() == 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn mediated_preflight_admits_caller_named_server_id() {
         // The operator does not pre-register tool servers; the mediated route
         // registers a pass-through under whatever server id the caller names,
@@ -580,7 +649,10 @@ mod tests {
                     .unwrap()
                     == 0
         );
-        let minted_nonce = serde_json::to_string(&preflight_json["execution_nonce"]).unwrap();
+        // The caller copies the exact nonce object the preflight returned back
+        // into the retry body with no re-encoding.
+        let minted_nonce = preflight_json["execution_nonce"].clone();
+        assert!(minted_nonce.is_object());
 
         // Step 2: presenting the minted nonce proceeds past preflight to a
         // completed authorization. The mediated route does not execute the real
