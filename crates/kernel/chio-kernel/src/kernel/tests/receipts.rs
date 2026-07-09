@@ -580,6 +580,38 @@ fn rss_shed_persists_signed_overload_deny_receipt() {
 }
 
 #[test]
+fn non_tool_admission_denied_while_rss_shedding() {
+    // RFC-0004 section 5 (codex finding 3555239302): the RSS soft-ceiling shed
+    // must also apply to NON-TOOL admissions. Resource reads, prompt gets, and
+    // completions all funnel through `validate_non_tool_capability`, which pre-fix
+    // only checked the emergency stop before continuing. Under RSS pressure a large
+    // read_resource or prompt completion could still allocate and execute while
+    // tool calls were being shed, so the soft ceiling did not actually shed all new
+    // admissions. The helper must shed uniformly (fail-closed Overloaded). RED
+    // (pre-fix): the helper returned Ok for a valid capability while shedding.
+    let kernel = make_kernel(make_config());
+    let agent_kp = make_keypair();
+    let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+    let agent_id = agent_kp.public_key().to_hex();
+
+    // Sanity: with shedding OFF the non-tool admission helper passes (valid cap).
+    kernel
+        .validate_non_tool_capability(&cap, &agent_id)
+        .expect("non-tool admission should pass when not shedding");
+
+    // Raise the RSS soft-ceiling shed flag, mirroring the sampler crossing the
+    // configured limit.
+    kernel.set_rss_shed_for_test(true);
+
+    let result = kernel.validate_non_tool_capability(&cap, &agent_id);
+    assert!(
+        matches!(result, Err(KernelError::Overloaded { .. })),
+        "non-tool admission must shed Overloaded while RSS-shedding, got {result:?}"
+    );
+}
+
+#[test]
 fn session_tool_call_records_incomplete_terminal_state() {
     let mut kernel = make_kernel(make_config());
     kernel.register_tool_server(Box::new(IncompleteServer {
