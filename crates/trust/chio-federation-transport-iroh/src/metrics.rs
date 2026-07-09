@@ -710,11 +710,16 @@ mod tests {
         record_catchup_epoch_gap(CATCHUP_SOURCE_CATCHUP);
         record_verify_failure(SEAM_REVOCATION, "bad-signature");
         observe_accept_duration_nanos(LANE_REVOCATION, 5_000_000);
+        // Exercise the AcceptOpenGuard enter/drop on LANE_FANOUT: no fan-out accept
+        // handler is wired (lane c is disabled), so no concurrent test mutates this
+        // gauge, keeping the exact enter=1 / post-drop=0 assertions robust. (The
+        // three direct lanes' gauges are held by parallel over-QUIC handler tests, so
+        // an exact absolute on those would be racy on a process-global gauge.)
         {
-            let _open = AcceptOpenGuard::enter(LANE_PHEROMONE);
-            assert!(accept_open(LANE_PHEROMONE) >= 1);
+            let _open = AcceptOpenGuard::enter(LANE_FANOUT);
+            assert_eq!(accept_open(LANE_FANOUT), 1);
         }
-        assert_eq!(accept_open(LANE_PHEROMONE), 0);
+        assert_eq!(accept_open(LANE_FANOUT), 0);
 
         assert!(admission_total(ADMISSION_REJECT) >= 1);
         assert!(lane_total(LANE_REVOCATION, LANE_OUTCOME_REJECT) >= 1);
