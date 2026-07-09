@@ -667,3 +667,77 @@ fn mediated_allow_receipt_records_bound_execution_nonce_id() {
         "chio.mediated_spend.v1"
     );
 }
+
+#[test]
+fn strict_retry_mediated_spend_receipt_names_presented_nonce() {
+    use chio_core_types::receipt::authoritative_spend::is_authoritative_spend_receipt;
+
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+    let cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: true,
+    };
+    kernel.set_execution_nonce_store(
+        cfg.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+    );
+
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    let mut request = ToolCallRequest {
+        request_id: "req-strict-retry-nonce".to_string(),
+        capability: cap.clone(),
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({ "invoice": "inv-1" }),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    };
+
+    // The strict retry presents a nonce from a prior allow (the nonce binds the
+    // capability/server/tool/parameter-hash, not the request id), so no nonce is
+    // preminted during this completion.
+    let nonce = mint_nonce_for_request(&kernel, &cap, &request, &cfg);
+    request.execution_nonce = Some(nonce.clone());
+    let executed = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    assert_eq!(executed.verdict, Verdict::Allow);
+    assert!(
+        executed.output.is_some(),
+        "strict retry must return tool output"
+    );
+    assert!(
+        executed.execution_nonce.is_none(),
+        "strict retry must not mint another nonce"
+    );
+
+    // The completed receipt must name the presented nonce id, not drop it.
+    let metadata = executed
+        .receipt
+        .metadata
+        .as_ref()
+        .expect("receipt metadata present");
+    assert_eq!(
+        metadata["budget_authority"]["execution_nonce_id"]
+            .as_str()
+            .expect("execution_nonce_id recorded on budget_authority metadata"),
+        nonce.nonce_id()
+    );
+
+    // The reconciled receipt is an authoritative mediated-spend receipt bound to
+    // the presented nonce: no NonceLinkMissing.
+    let admitted = [kernel.config.keypair.public_key()];
+    assert_eq!(
+        is_authoritative_spend_receipt(&executed.receipt, &admitted, &nonce),
+        Ok(())
+    );
+}

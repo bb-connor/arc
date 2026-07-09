@@ -1198,10 +1198,18 @@ impl ChioKernel {
         match limited_output {
             ToolServerOutput::Value(_)
             | ToolServerOutput::Stream(ToolServerStreamResult::Complete(_)) => {
+                // Record the nonce that authorizes this spend: the freshly
+                // preminted nonce when one was minted, otherwise the nonce the
+                // request presented on a strict retry. Without the fallback a
+                // successful strict retry records no nonce and the receipt fails
+                // `is_authoritative_spend_receipt` with `NonceLinkMissing`.
                 let budget_metadata = self.budget_execution_receipt_metadata(
                     &charge,
                     Some(("reconciled", &reconcile)),
-                    preminted_execution_nonce.as_deref().map(|n| n.nonce_id()),
+                    preminted_execution_nonce
+                        .as_deref()
+                        .map(|n| n.nonce_id())
+                        .or_else(|| request.execution_nonce.as_ref().map(|n| n.nonce_id())),
                 );
                 let merged = merge_metadata_objects(
                     financial_json,
