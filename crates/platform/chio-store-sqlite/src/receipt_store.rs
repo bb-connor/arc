@@ -175,7 +175,13 @@ struct ReceiptCommitRequest {
 /// Called with `Ok(())` when resync succeeded (or never ran) to send the job's
 /// own outcome, or `Err(resync_error)` to override a committed job's `Ok` with
 /// the resync failure.
-type WriterResponder = Box<dyn FnOnce(Result<(), ReceiptStoreError>) + Send + 'static>;
+///
+/// Returns `true` when the job's FINAL outcome (after any resync override) was
+/// `Ok`, so the actor can reconcile `committed_total` / `failed_total` for
+/// writer-routed receipts (codex round 9, finding 1). This responder is the
+/// only place that knows the resync-adjusted outcome, so it reports the signal
+/// out of band (the actual `Result` still travels to the caller's channel).
+type WriterResponder = Box<dyn FnOnce(Result<(), ReceiptStoreError>) -> bool + Send + 'static>;
 
 /// A single-writer job. Runs the caller's closure on the writer connection and
 /// returns a [`WriterResponder`] so the ACTOR controls when the caller's result
@@ -398,7 +404,12 @@ impl WriterHandle {
                         (Err(job_error), Err(_)) => Err(job_error),
                         (Ok(_), Err(resync_error)) => Err(resync_error),
                     };
+                    // Report the resync-adjusted outcome to the actor (codex
+                    // round 9, finding 1) so it can reconcile committed/failed
+                    // for this writer-routed job, then send the caller's result.
+                    let committed = final_outcome.is_ok();
                     let _ = response.send(final_outcome);
+                    committed
                 });
             responder
         });
@@ -673,16 +684,16 @@ fn handle_non_append_command(
                 Err(error) => {
                     // No write ran (no connection), so there is no resync to
                     // gate on: send the pool error now (`Ok(())` = nothing to
-                    // override).
+                    // override). Count the failed outcome (round 9, finding 1).
                     let respond = job(Err(ReceiptStoreError::Pool(error.to_string())));
-                    respond(Ok(()));
+                    record_write_job_outcome(health, respond(Ok(())));
                     return;
                 }
             };
             match head_state {
                 WriterHeadState::Poisoned(message) => {
                     let respond = job(Err(poisoned_head_error(message)));
-                    respond(Ok(()));
+                    record_write_job_outcome(health, respond(Ok(())));
                 }
                 WriterHeadState::Verified(head) => {
                     // Pre-check (fail-closed): same predecessor check the
@@ -707,9 +718,14 @@ fn handle_non_append_command(
                     };
                     if let Err(error) = pre_check {
                         let respond = job(Err(error));
-                        respond(Ok(()));
+                        record_write_job_outcome(health, respond(Ok(())));
                         return;
                     }
+                    // Capture the head's checkpoint position BEFORE the job runs
+                    // (codex round 9, finding 3): a writer-routed recovery
+                    // (`create_next_receipt_checkpoint`) that creates/adopts the
+                    // missing checkpoint advances this during the resync below.
+                    let pre_checkpoint_seq = head.checkpoint_seq();
                     // Run the job but DEFER its response (codex round 5, finding
                     // 2): the caller must not observe `Ok` until
                     // `resync_head_after_write` confirms the head. A committed
@@ -722,8 +738,30 @@ fn handle_non_append_command(
                     // cross-check cannot false-Conflict.
                     match resync_head_after_write(&connection, head) {
                         Ok(()) => {
-                            respond(Ok(()));
+                            // Reconcile committed/failed for this writer-routed
+                            // job (codex round 9, finding 1) using the responder's
+                            // resync-adjusted outcome signal.
+                            record_write_job_outcome(health, respond(Ok(())));
                             health.store_head_snapshot(head);
+                            // Clear a stale checkpoint error after a manual
+                            // recovery (codex round 9, finding 3): a writer-routed
+                            // op such as `create_next_receipt_checkpoint` can
+                            // build/adopt the missing checkpoint inside the job,
+                            // advancing the head's checkpoint seq during the resync
+                            // above. `build_due_checkpoints_and_record` below then
+                            // finds nothing due (`Ok(false)`) and would leave a
+                            // prior background-build `last_error` in place, so
+                            // `receipt_store_health` keeps reporting the store
+                            // unhealthy after the repair. Clear it here when the
+                            // checkpoint chain actually advanced (mirrors the
+                            // round-2 "clear only on an actual build" and the
+                            // round-7 reseed-clears-flush-error fix); a real later
+                            // build failure re-sets it below.
+                            if head.checkpoint_seq() > pre_checkpoint_seq {
+                                if let Ok(mut last_error) = health.last_error.lock() {
+                                    *last_error = None;
+                                }
+                            }
                             // Writer-routed appends (child receipts, consuming
                             // auth) can cross the threshold too; no
                             // pending_flush_error guard here since a Write job is
@@ -733,7 +771,27 @@ fn handle_non_append_command(
                             // acquires its own, or `pool.get()` would block on
                             // itself.
                             drop(connection);
-                            build_due_checkpoints_and_record(pool, head, checkpoint_signer, health);
+                            // Gate the catch-up build on a full-verified head
+                            // (codex round 9, finding 4), mirroring the round-5
+                            // InstallSigner defer. On a non-incremental (suspect)
+                            // store `seed_head_snapshot` leaves the head
+                            // UNVALIDATED; only a receipt-appending Write reran the
+                            // full claim-log validation in the pre-check above, so
+                            // a metadata-only `run_write` did NOT. Building here
+                            // would checkpoint unaudited claim-log rows before the
+                            // deferred full validation ever runs (fail-closed
+                            // violation). Build only when the head is genuinely
+                            // verified: incremental mode (seed_verified_head +
+                            // per-append verify) OR a receipt-appending job that
+                            // just ran the full validation.
+                            if incremental_verification || appends_receipts {
+                                build_due_checkpoints_and_record(
+                                    pool,
+                                    head,
+                                    checkpoint_signer,
+                                    health,
+                                );
+                            }
                         }
                         Err(error) => {
                             if let Ok(mut last_error) = health.last_error.lock() {
@@ -742,8 +800,9 @@ fn handle_non_append_command(
                             let poison_message = error.to_string();
                             // Surface the resync failure to the caller: a write
                             // that returned `Ok` from its closure must NOT report
-                            // success when the head is now poisoned.
-                            respond(Err(error));
+                            // success when the head is now poisoned. Count the
+                            // failed outcome (codex round 9, finding 1).
+                            record_write_job_outcome(health, respond(Err(error)));
                             *head_state = WriterHeadState::Poisoned(poison_message);
                         }
                     }
@@ -1103,6 +1162,27 @@ fn atomic_saturating_sub(value: &AtomicU64, amount: u64) {
     }
 }
 
+/// Reconcile a writer-routed `Write` job's health counters (codex round 9,
+/// finding 1). Child receipts and authorization-consuming appends run through
+/// `WriterHandle::run_write_receipt`, and metadata-only writes through
+/// `run_write`; both are `accepted_total`-counted at enqueue, but their
+/// success/failure OUTCOME was never folded into `committed_total` /
+/// `failed_total`, so accepted / committed / failed did not reconcile and a
+/// store dominated by writer-routed receipts undercounted commits. The actor
+/// calls this exactly once per `Write` with the responder's resync-adjusted
+/// signal (O(1) per write). A committed outcome also refreshes
+/// `last_commit_unix_ms`, mirroring the Append path (`commit_receipt_batch`).
+fn record_write_job_outcome(health: &ReceiptCommitWriterHealth, committed: bool) {
+    if committed {
+        health.committed_total.fetch_add(1, Ordering::SeqCst);
+        health
+            .last_commit_unix_ms
+            .store(current_unix_ms(), Ordering::SeqCst);
+    } else {
+        health.failed_total.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
 /// Background checkpoint signer, installed once by the kernel after `open`
 /// and before serving (RFC-0006 stage 4). `max_batch = 0` disables
 /// checkpointing (ADR-0008 semantics).
@@ -1269,6 +1349,23 @@ fn verify_head_against_latest_checkpoint(
                         .to_string(),
                 ));
             }
+            // Recheck the latest checkpoint's transparency projection rows
+            // (codex round 9, finding 2). The body-digest / column / signature
+            // checks above re-verify the `kernel_checkpoints` row on every
+            // append, but the projection rows (`checkpoint_tree_heads`,
+            // `checkpoint_predecessor_witnesses`,
+            // `checkpoint_publication_metadata`) were validated only when this
+            // checkpoint was first adopted (seed or catch-up). A projection row
+            // tampered out of band (immutability guards momentarily absent, then
+            // restored) while the checkpoint seq is UNCHANGED would otherwise be
+            // trusted as verified until the next open/health/audit. Rechecking it
+            // here closes that gap symmetrically with the per-append column
+            // recheck: O(1) (three indexed single-row projection lookups plus an
+            // O(1) derivation from the already-parsed checkpoint body, NO
+            // batch/leaf scan and NO full-history walk), so the RFC-0006
+            // incremental hot path stays flat per append (F22). Fail-closed on
+            // any divergence.
+            validate_checkpoint_projection_rows(connection, &row, cached)?;
             Ok(())
         }
         Some(row) => catch_up_verified_head_to(connection, head, row.checkpoint_seq),

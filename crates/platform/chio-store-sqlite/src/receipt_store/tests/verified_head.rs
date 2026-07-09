@@ -1248,3 +1248,117 @@ fn writer_routed_write_increments_accepted_total() -> Result<(), Box<dyn std::er
     let _ = fs::remove_file(path);
     Ok(())
 }
+
+/// Codex round 9, finding 1: writer-routed writes (`run_write_receipt` child
+/// receipts / consuming auth, and the general `run_write` path) were
+/// `accepted_total`-counted at enqueue, but their success/failure OUTCOME was
+/// never folded into `committed_total` / `failed_total`, so accepted / committed
+/// / failed did not reconcile and a store dominated by writer-routed receipts
+/// undercounted commits. The actor now records each writer-routed job's
+/// resync-adjusted outcome (O(1) per write): a success increments
+/// committed_total, a failure increments failed_total.
+#[test]
+fn writer_routed_write_outcome_updates_committed_and_failed(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-writer-routed-outcome");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+
+    // Parent tool receipt (Append path) so the child below has a lineage anchor;
+    // capture the baseline AFTER it so only the writer-routed writes are measured.
+    let parent = sample_receipt_with_keypair("rcpt-outcome-parent", 1, &keypair);
+    store.append_chio_receipt_returning_seq(&parent)?;
+    let baseline = store.flush_receipt_writes()?.writer;
+
+    // A child receipt append (run_write_receipt) SUCCEEDS: committed_total + 1.
+    let child = sample_child_receipt_with_keypair_and_timestamp("child-outcome", 2, &keypair);
+    store.append_child_receipt_record(&child)?;
+    let after_commit = store.flush_receipt_writes()?.writer;
+    assert_eq!(
+        after_commit.committed_total,
+        baseline.committed_total + 1,
+        "a writer-routed success must increment committed_total"
+    );
+    assert_eq!(
+        after_commit.failed_total, baseline.failed_total,
+        "a writer-routed success must not increment failed_total"
+    );
+
+    // A general `run_write` whose job returns Err FAILS: failed_total + 1.
+    let failed =
+        store
+            .writer_handle()
+            .run_write(move |_connection| -> Result<(), ReceiptStoreError> {
+                Err(ReceiptStoreError::Conflict(
+                    "intentional writer job failure".to_string(),
+                ))
+            });
+    assert!(failed.is_err(), "the failing job must surface its error");
+    let after_fail = store.flush_receipt_writes()?.writer;
+    assert_eq!(
+        after_fail.failed_total,
+        after_commit.failed_total + 1,
+        "a writer-routed failure must increment failed_total"
+    );
+    assert_eq!(
+        after_fail.committed_total, after_commit.committed_total,
+        "a writer-routed failure must not increment committed_total"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+/// Codex round 9, finding 2: when the latest checkpoint seq is UNCHANGED, the
+/// append pre-check hot path (`verify_head_against_latest_checkpoint`'s
+/// seq-equal branch) re-verified the `kernel_checkpoints` row's body digest,
+/// columns, and signature on every append but did NOT recheck the checkpoint's
+/// transparency projection rows. A projection row tampered out of band (guards
+/// momentarily absent, then restored) while the seq is unchanged was therefore
+/// trusted as verified until the next open/health/audit. The recheck closes that
+/// gap symmetrically with the per-append column recheck (O(1) - three indexed
+/// single-row projection lookups, no batch/leaf scan, F22 intact). A valid
+/// projection still passes.
+#[test]
+fn seq_unchanged_recheck_catches_projection_tamper() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-seq-unchanged-projection-tamper");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    for i in 0..3 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-seq-tamper-{i}"), (i + 1) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    store.create_next_receipt_checkpoint(3, &keypair)?; // cp1 (1..=3), adopted
+
+    let connection = store.connection()?;
+    let mut head = seed_verified_head(&connection)?;
+    assert_eq!(head.checkpoint_seq(), 1);
+
+    // A clean recheck (seq unchanged, projections intact) still passes.
+    verify_head_against_latest_checkpoint(&connection, &mut head)?;
+    assert_eq!(head.checkpoint_seq(), 1);
+
+    // Tamper the latest checkpoint's tree-head projection row WITHOUT changing
+    // the checkpoint seq: drop the immutability guard, then mutate merkle_root so
+    // the projection row diverges from the untouched kernel_checkpoints row.
+    connection.execute_batch("DROP TRIGGER IF EXISTS checkpoint_tree_heads_reject_update;")?;
+    connection.execute(
+        "UPDATE checkpoint_tree_heads SET merkle_root = ?1 WHERE checkpoint_seq = 1",
+        rusqlite::params!["00".repeat(32)],
+    )?;
+
+    // The seq-unchanged hot path must now reject the tampered projection.
+    let error = verify_head_against_latest_checkpoint(&connection, &mut head)
+        .err()
+        .ok_or("the seq-unchanged recheck must reject a tampered projection row")?;
+    assert!(
+        matches!(error, ReceiptStoreError::Conflict(_)),
+        "expected a fail-closed Conflict, got {error:?}"
+    );
+
+    drop(connection);
+    let _ = fs::remove_file(path);
+    Ok(())
+}

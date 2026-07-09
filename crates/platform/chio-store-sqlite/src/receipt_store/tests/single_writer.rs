@@ -188,9 +188,15 @@ fn writer_commands_serialize_and_never_lose_inflight_accounting(
     store.flush_receipt_writes()?;
     let health = store.receipt_store_health()?;
     assert_eq!(health.writer.inflight, 0, "inflight must drain to zero");
-    // 4 workers x 25 ops, i % 3 == 0 on 9 of 25 iterations per worker.
-    assert_eq!(health.writer.committed_total, 4 * 9);
+    // Committed now reconciles BOTH commit paths (codex round 9, finding 1):
+    // the Append path (i % 3 == 0 on 9 of 25 iterations per worker) AND the
+    // writer-routed `run_write` path (i % 3 == 1 on 8 of 25 iterations per
+    // worker), whose successful outcome is now folded into committed_total.
+    // Flushes (i % 3 == 2) are not commits.
+    assert_eq!(health.writer.committed_total, 4 * 9 + 4 * 8);
     assert_eq!(health.writer.failed_total, 0);
+    // Only the Append path inserts claim-log entries; the run_write closures
+    // return a thread id without writing, so the log length tracks appends only.
     assert_eq!(health.latest_committed_entry_seq, 4 * 9);
 
     let _ = fs::remove_file(path);

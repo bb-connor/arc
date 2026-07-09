@@ -1082,3 +1082,133 @@ fn reseed_builds_owed_checkpoints_after_repair() -> Result<(), Box<dyn std::erro
     let _ = fs::remove_file(path);
     Ok(())
 }
+
+/// Codex round 9, finding 3: a background checkpoint build that previously failed
+/// set `writer.last_error`. A later manual recovery via
+/// `create_next_receipt_checkpoint` creates/adopts the missing checkpoint so
+/// there is no due work left; the follow-up `build_due_checkpoints_and_record`
+/// then returns `Ok(false)` and would leave the stale error in place, so
+/// `receipt_store_health` keeps reporting the store UNHEALTHY after the repair.
+/// The recovery must clear the stale error when the checkpoint chain actually
+/// advanced (mirroring the round-7 reseed-clears-flush-error fix). A real later
+/// failure re-sets it.
+#[test]
+fn manual_recovery_clears_stale_checkpoint_error() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-manual-recovery-clear-error");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    let max_batch = 3;
+    for i in 0..max_batch {
+        let receipt = sample_receipt_with_keypair(&format!("rcpt-recover-{i}"), i + 1, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    assert!(
+        store.load_checkpoint_by_seq(1)?.is_none(),
+        "a due checkpoint (1..=3) is pending but unbuilt (no signer installed)"
+    );
+
+    // Simulate a PRIOR background-checkpoint build failure that set the actor's
+    // last_error and was never cleared (same precondition as the round-2
+    // successful_checkpoint_build_clears_stale_error fixture, exercised through
+    // the real writer-routed recovery path here).
+    if let Ok(mut last_error) = store.receipt_commit_actor.health.last_error.lock() {
+        *last_error = Some("prior background checkpoint build failed".to_string());
+    }
+    let unhealthy = store.receipt_store_health()?;
+    assert!(
+        !unhealthy.healthy && unhealthy.writer.last_error.is_some(),
+        "a recorded background-build error must report the store unhealthy: {unhealthy:?}"
+    );
+
+    // Manual recovery: create the missing checkpoint. The Write resync adopts it
+    // (advancing the head's checkpoint seq), so the follow-up due-check finds
+    // nothing to build and returns Ok(false); the stale error must still clear.
+    store.create_next_receipt_checkpoint(max_batch, &keypair)?;
+    assert!(
+        store.load_checkpoint_by_seq(1)?.is_some(),
+        "the manual recovery must persist the missing checkpoint"
+    );
+    let recovered = store.receipt_store_health()?;
+    assert!(
+        recovered.writer.last_error.is_none(),
+        "a successful manual recovery must clear the stale checkpoint error: {recovered:?}"
+    );
+    assert!(
+        recovered.healthy,
+        "the store must report healthy after recovery: {recovered:?}"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+/// Codex round 9, finding 4: on a non-incremental (suspect) store the head is
+/// seeded UNVALIDATED (`seed_head_snapshot`), and the round-5 InstallSigner
+/// defer already skips the install-time catch-up. But the Write resync path then
+/// called `build_due_checkpoints_and_record` UNCONDITIONALLY after every
+/// successful Write, including a metadata-only `run_write` that never ran the
+/// full claim-log validation. On a store with already-due uncheckpointed
+/// entries, that metadata write would checkpoint unaudited claim-log rows before
+/// the deferred full validation ever runs. The build must be gated on a
+/// full-verified head (incremental mode OR a receipt-appending job that just ran
+/// the full validation), fail-closed. A receipt-appending write still builds.
+#[test]
+fn metadata_write_does_not_checkpoint_unvalidated_data() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-metadata-defer-build");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open_with_options(
+        &path,
+        crate::SqliteStoreOptions {
+            incremental_verification: false,
+            ..crate::SqliteStoreOptions::default()
+        },
+    )?;
+    let max_batch = 3;
+    // Append >= max_batch receipts with NO signer: durable, uncheckpointed, and
+    // (deferred-seed mode) not yet covered by the full audit.
+    for i in 0..max_batch {
+        let receipt = sample_receipt_with_keypair(&format!("rcpt-meta-defer-{i}"), i + 1, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+
+    // Install the signer: deferred-seed mode skips the install-time catch-up
+    // (round 5), so no checkpoint yet.
+    store.enable_background_checkpoints(signer(&keypair, max_batch))?;
+    store.flush_receipt_writes()?;
+    assert!(
+        store.load_checkpoint_by_seq(1)?.is_none(),
+        "deferred-seed mode must not checkpoint at install"
+    );
+
+    // A metadata-only writer-routed write (`run_write`, appends_receipts = false)
+    // must NOT trigger the catch-up build over the still-unvalidated range.
+    store
+        .writer_handle()
+        .run_write(move |_connection| -> Result<(), ReceiptStoreError> { Ok(()) })?;
+    store.flush_receipt_writes()?;
+    assert!(
+        store.load_checkpoint_by_seq(1)?.is_none(),
+        "a metadata-only write must not checkpoint the unvalidated range (fail-closed)"
+    );
+
+    // It DEFERS, not skips: a receipt-appending write reruns the full claim-log
+    // validation, so the now-validated owed checkpoint builds.
+    let receipt = sample_receipt_with_keypair("rcpt-meta-defer-tail", max_batch + 1, &keypair);
+    store.append_chio_receipt_returning_seq(&receipt)?;
+    store.flush_receipt_writes()?;
+    let checkpoint = store
+        .load_checkpoint_by_seq(1)?
+        .ok_or("a receipt-appending write after full validation must build the owed checkpoint")?;
+    assert_eq!(
+        (
+            checkpoint.body.batch_start_seq,
+            checkpoint.body.batch_end_seq
+        ),
+        (1, 3)
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
