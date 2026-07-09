@@ -356,6 +356,19 @@ impl ReloadWatchdog {
         self.guard
             .restore_loaded_module(Arc::clone(&self.previous_module));
         self.rolled_back = true;
+        // Count the rolled-back outcome AS SOON AS the rollback is real, before
+        // the incident write, so `chio_guard_reload_total{outcome="rolled_back"}`
+        // reflects every genuine rollback even when the incident write fails and
+        // this method returns Err below. Counting after the write would let the
+        // instrument under-count (lie) on an incident-write failure, hiding a
+        // real rollback from the alerting surface. The `self.rolled_back`
+        // early-return at the top of this method makes the increment run exactly
+        // once per rollback, so hoisting it here cannot double-count. The
+        // descriptor already declares the outcome; only the applied path was
+        // wired before (Codex round-4 finding 6, completing the round-3 F1 fix;
+        // RFC-0009 N2).
+        chio_metrics_spec::runtime::families::GUARD_RELOAD
+            .incr(&[&self.guard_id, RELOAD_ROLLED_BACK]);
         let incident = ReloadIncident {
             guard_id: self.guard_id.clone(),
             reload_seq: self.reload_seq,
@@ -372,13 +385,6 @@ impl ReloadWatchdog {
             .incident_writer
             .write_reload_incident(&incident)
             .map_err(|source| HotReloadError::IncidentWrite { source })?;
-        // Count the rolled-back outcome so `chio_guard_reload_total{outcome=
-        // "rolled_back"}` is a real production series the alerting surface can
-        // catch, not just a span. The descriptor already declares the outcome;
-        // only the applied path was wired before (Codex round-4 finding 6,
-        // completing the round-3 F1 fix).
-        chio_metrics_spec::runtime::families::GUARD_RELOAD
-            .incr(&[&self.guard_id, RELOAD_ROLLED_BACK]);
         let span = guard_reload_span(RELOAD_ROLLED_BACK, self.reload_seq);
         let _span_guard = span.enter();
         warn!(
