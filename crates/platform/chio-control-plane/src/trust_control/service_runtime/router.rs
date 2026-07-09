@@ -8,6 +8,15 @@ use super::super::cluster::{
 use super::super::*;
 
 pub(crate) fn build_router(state: TrustServiceState) -> Router {
+    // Seed the fixed alert-pack label sets at zero before this serve process can
+    // be scraped (Codex round-5). The trust-control /metrics route renders the
+    // fail-open / dispatch-failure / capability-revocation families, but unlike
+    // the chio-cli, chio-wall, and tower startup paths the service-runtime never
+    // called preregister_known_label_sets. On a fresh, healthy-but-quiet control
+    // plane those families were absent, so the shipped absent_over_time backstops
+    // would page on a true scrape gap that never happened. Idempotent.
+    chio_metrics_spec::runtime::preregister_known_label_sets();
+
     let router = trust_control_health::install_health_routes(Router::new())
         .route(
             AUTHORITY_PATH,
@@ -658,5 +667,31 @@ mod tests {
         );
         let response = handle_trust_control_metrics(State(state), headers).await;
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    /// Codex round-5: building the trust-control serve router must seed the fixed
+    /// alert-pack label sets, so a fresh, healthy-but-quiet control plane renders
+    /// the fail-open / dispatch-failure / capability-revocation families at zero
+    /// and the shipped absent_over_time backstops fire only on a true scrape gap,
+    /// not on a control plane that simply has not had an event yet.
+    #[tokio::test]
+    async fn build_router_seeds_alert_pack_series_for_absent_over_time_backstops() {
+        let state = metrics_state("service-secret");
+        let _router = super::build_router(state);
+
+        let mut body = String::new();
+        chio_metrics_spec::runtime::render_alert_pack_families(&mut body);
+        assert!(
+            body.contains("chio_dispatch_failure_total{surface=\"http_authority\",outcome=\"error\"}"),
+            "the dispatch-failure family must be present at zero after building the serve router: {body}"
+        );
+        assert!(
+            body.contains("chio_fail_open_suspected_total{surface=\"tower\"}"),
+            "the fail-open family must be present at zero after building the serve router: {body}"
+        );
+        assert!(
+            body.contains("chio_capability_revocation_lag_seconds"),
+            "the capability-revocation-lag family must be present after building the serve router: {body}"
+        );
     }
 }
