@@ -145,33 +145,58 @@ impl SqliteBudgetStore {
         Ok(seq.max(0) as u64)
     }
 
-    /// Per-origin contiguous ack head: the highest event_seq S from an origin
-    /// such that every event in (floor..S] is present with no gap AND the run
-    /// reaches down to the durable trusted floor. NOT MAX(event_seq), NOT
-    /// anchored on MIN(present). Origins whose lowest present row is above
-    /// floor+1 are absent from the result (the caller defaults them to their
-    /// recorded floor). This is fail-safe: under-reporting can only withhold
-    /// quorum, never grant it (RFC-0011 D2, F16).
+    /// Per-origin contiguous ack head, anchored on the peer's GLOBAL contiguous
+    /// import head.
+    ///
+    /// `event_seq` is a single store-wide dense sequence, so each origin's events
+    /// are a sparse subsequence of one global stream; a per-origin gaps-and-
+    /// islands run (partitioned by authority) mis-models this: an origin whose
+    /// block starts mid-sequence after a leadership change looks like a gap and is
+    /// wrongly dropped, wedging its writes.
+    ///
+    /// Instead this first computes the GLOBAL contiguous head H (the largest seq
+    /// such that every global event_seq in `1..=H` is present with no hole) as a
+    /// single gaps-and-islands run over the whole stream (NOT partitioned),
+    /// anchored at genesis (island 0). A hole caps H below it. Legacy
+    /// NULL-authority events still occupy their global slot, so they count for
+    /// contiguity (a present slot is not a gap) but are never reported as an ack.
+    /// It then reports, per origin, `MAX(event_seq)` among that origin's events
+    /// with `event_seq <= H`.
+    ///
+    /// Sound because global-contiguity enforcement on the puller (codex #965
+    /// Finding 3) means holding H implies holding EVERY event (all origins) at
+    /// seq `<= H`, so `head[origin] >= write.event_seq` iff the peer durably holds
+    /// that write and all its predecessors. Fail-closed: a global hole caps H, so
+    /// no origin is ever reported past a missing global predecessor, and a missing
+    /// prefix (nothing at seq 1) yields H = 0 and no acks.
+    ///
+    /// NOTE: genesis anchoring assumes budget mutation events are never
+    /// bulk-compacted below seq 1 (they are not today); if such compaction is
+    /// added, anchor at a durable global floor instead (codex #965 Finding 1).
     pub fn budget_ack_heads(&self) -> Result<Vec<(String, u64)>, BudgetStoreError> {
         let connection = self.connection()?;
         let mut statement = connection.prepare(
             r#"
-            WITH imported AS (
+            WITH seqs AS (
+                SELECT authority_id, event_seq
+                FROM budget_mutation_events
+                WHERE event_seq IS NOT NULL
+            ),
+            global_run AS (
                 SELECT
-                    bme.authority_id,
-                    bme.event_seq,
-                    bme.event_seq - ROW_NUMBER() OVER (
-                        PARTITION BY bme.authority_id ORDER BY bme.event_seq
-                    ) AS island,
-                    COALESCE(bif.floor_seq, 0) AS floor
-                FROM budget_mutation_events bme
-                LEFT JOIN budget_import_floors bif
-                    ON bif.authority_id = bme.authority_id
-                WHERE bme.authority_id IS NOT NULL AND bme.event_seq IS NOT NULL
+                    event_seq,
+                    event_seq - ROW_NUMBER() OVER (ORDER BY event_seq) AS island
+                FROM seqs
+            ),
+            head AS (
+                SELECT COALESCE(MAX(event_seq), 0) AS head_seq
+                FROM global_run
+                WHERE island = 0
             )
             SELECT authority_id, MAX(event_seq) AS ack_head
-            FROM imported
-            WHERE island = floor
+            FROM seqs
+            WHERE authority_id IS NOT NULL
+              AND event_seq <= (SELECT head_seq FROM head)
             GROUP BY authority_id
             "#,
         )?;

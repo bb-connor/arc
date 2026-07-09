@@ -44,8 +44,8 @@ pub(crate) use partition::{
     update_peer_tool_seq,
 };
 pub(crate) use pull_budget::{
-    ensure_revocation_advanced, require_contiguous_page, PeerProtocolError, PullError,
-    PullRoundBudget,
+    ensure_revocation_advanced, require_contiguous_page, require_forward_progress,
+    PeerProtocolError, PullError, PullRoundBudget,
 };
 pub(crate) use snapshots::{
     apply_cluster_snapshot, cluster_replication_heads, handle_internal_authority_snapshot,
@@ -57,8 +57,8 @@ pub(crate) use consensus::{authority_lease_ttl, cluster_authority_lease_view_loc
 
 #[cfg(test)]
 pub(crate) use deltas::{
-    budget_write_quorum_commit_view, collect_budget_mutation_event_views_after_seq,
-    import_budget_delta_response,
+    budget_write_progress_closed_outcome, budget_write_quorum_commit_view,
+    collect_budget_mutation_event_views_after_seq, import_budget_delta_response,
 };
 
 #[cfg(test)]

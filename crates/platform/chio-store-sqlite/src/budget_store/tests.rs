@@ -1612,3 +1612,94 @@ fn budget_ack_heads_caps_partial_head_at_interior_gap() -> Result<(), Box<dyn st
     let _ = fs::remove_file(&path);
     Ok(())
 }
+
+#[test]
+fn budget_ack_heads_recognizes_multi_authority_global_contiguity(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // event_seq is a single store-wide sequence, so multiple authorities share
+    // one global stream and an origin's events are a sparse subsequence of it
+    // (codex #965 Finding 1). budget_ack_heads must anchor on the GLOBAL
+    // contiguous head, not a per-origin island.
+    let path = unique_db_path("chio-ack-heads-multi");
+    let store = SqliteBudgetStore::open(&path)?;
+
+    let event = |seq: u64, origin: &str| BudgetMutationRecord {
+        event_id: format!("evt-{origin}-{seq}"),
+        hold_id: None,
+        capability_id: "cap-m".to_string(),
+        grant_index: 0,
+        kind: BudgetMutationKind::AuthorizeExposure,
+        allowed: Some(true),
+        recorded_at: seq as i64,
+        event_seq: seq,
+        usage_seq: Some(seq),
+        exposure_units: 1,
+        realized_spend_units: 0,
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost_units: None,
+        invocation_count_after: 1,
+        total_cost_exposed_after: 1,
+        total_cost_realized_spend_after: 0,
+        authority: Some(BudgetEventAuthority {
+            authority_id: origin.to_string(),
+            lease_id: format!("{origin}#term-1"),
+            lease_epoch: 1,
+        }),
+    };
+    let head_for = |heads: &[(String, u64)], origin: &str| {
+        heads.iter().find(|(o, _)| o == origin).map(|(_, seq)| *seq)
+    };
+    let a = "http://origin-a";
+    let b = "http://origin-b";
+
+    // Interleaved gap-free global prefix 1..=5: A owns {1,2,5}, B owns {3,4}.
+    // Even though A's own seqs (1,2,5) are NOT consecutive integers, the GLOBAL
+    // stream is gap-free, so both origins are acked at their true max within the
+    // global head (5): A -> 5, B -> 4. A per-origin island query would wrongly
+    // cap A at 2 (the 5 looks like a gap in A's own order).
+    store.import_snapshot_records(
+        &[],
+        &[
+            event(1, a),
+            event(2, a),
+            event(3, b),
+            event(4, b),
+            event(5, a),
+        ],
+    )?;
+    let heads = store.budget_ack_heads()?;
+    assert_eq!(
+        head_for(&heads, a),
+        Some(5),
+        "origin A's sparse block must be acked to the global head, not its own island"
+    );
+    assert_eq!(
+        head_for(&heads, b),
+        Some(4),
+        "the authority-change origin B (block starts at global 3) must be acked"
+    );
+
+    let _ = fs::remove_file(&path);
+
+    // Global hole (teeth): A owns {1,2}, B owns {4,5} -> global seq 3 missing.
+    // The global head is 2, so A -> 2 and B is ABSENT. A naive MAX-per-origin
+    // ack head would over-report B = 5 past the hole (a double-spend risk).
+    let path = unique_db_path("chio-ack-heads-multi-hole");
+    let store = SqliteBudgetStore::open(&path)?;
+    store.import_snapshot_records(&[], &[event(1, a), event(2, a), event(4, b), event(5, b)])?;
+    let heads = store.budget_ack_heads()?;
+    assert_eq!(
+        head_for(&heads, a),
+        Some(2),
+        "origin A is gap-free through the global head 2"
+    );
+    assert_eq!(
+        head_for(&heads, b),
+        None,
+        "origin B (all events above the global hole at 3) must be absent, never acked past the hole"
+    );
+
+    let _ = fs::remove_file(&path);
+    Ok(())
+}

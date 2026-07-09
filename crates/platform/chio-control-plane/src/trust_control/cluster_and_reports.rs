@@ -461,11 +461,19 @@ mod cluster_and_reports_tests {
         #[test]
         fn prop_witness_never_overclaims_durability(
             write_seq in 1u64..50,
-            ack_b in proptest::prelude::prop::option::of(0u64..60),
-            ack_c in proptest::prelude::prop::option::of(0u64..60),
-            same_origin_b in proptest::prelude::any::<bool>(),
-            same_origin_c in proptest::prelude::any::<bool>(),
+            // The write is authored under one of TWO authorities that share the
+            // single global event_seq stream: `origin-a` is the genesis authority
+            // and `origin-b` is the authority-change origin whose block starts
+            // mid-sequence. Each peer independently advertises a per-origin ack
+            // head for each authority (or none).
+            write_under_b in proptest::prelude::any::<bool>(),
+            ack_b_a in proptest::prelude::prop::option::of(0u64..60),
+            ack_b_b in proptest::prelude::prop::option::of(0u64..60),
+            ack_c_a in proptest::prelude::prop::option::of(0u64..60),
+            ack_c_b in proptest::prelude::prop::option::of(0u64..60),
         ) {
+            let origin_a = "http://node-a";
+            let origin_b = "http://node-b-origin";
             let state = state_with_cluster(
                 "http://node-a",
                 &["http://node-b", "http://node-c"],
@@ -475,36 +483,38 @@ mod cluster_and_reports_tests {
             );
             update_peer_reachable(&state, "http://node-b");
             update_peer_reachable(&state, "http://node-c");
-            let origin = "http://node-a";
-            if let Some(seq) = ack_b {
-                let id = if same_origin_b { origin } else { "http://elsewhere" };
-                update_peer_budget_acks(
-                    &state,
-                    "http://node-b",
-                    &[BudgetOriginAck { origin_id: id.to_string(), event_seq: seq }],
-                );
-            }
-            if let Some(seq) = ack_c {
-                let id = if same_origin_c { origin } else { "http://elsewhere" };
-                update_peer_budget_acks(
-                    &state,
-                    "http://node-c",
-                    &[BudgetOriginAck { origin_id: id.to_string(), event_seq: seq }],
-                );
-            }
+            let advertise = |peer: &str, ack_a: Option<u64>, ack_b: Option<u64>| {
+                let mut acks = Vec::new();
+                if let Some(seq) = ack_a {
+                    acks.push(BudgetOriginAck { origin_id: origin_a.to_string(), event_seq: seq });
+                }
+                if let Some(seq) = ack_b {
+                    acks.push(BudgetOriginAck { origin_id: origin_b.to_string(), event_seq: seq });
+                }
+                update_peer_budget_acks(&state, peer, &acks);
+            };
+            advertise("http://node-b", ack_b_a, ack_b_b);
+            advertise("http://node-c", ack_c_a, ack_c_b);
+
+            let write_origin = if write_under_b { origin_b } else { origin_a };
             let write = BudgetWriteToken {
-                origin_id: origin.to_string(),
+                origin_id: write_origin.to_string(),
                 event_seq: write_seq,
                 budget_term: 1,
             };
             let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
 
-            // A peer only witnesses when it acked THIS origin at >= write_seq.
-            let peer_witnesses = |same_origin: bool, ack: Option<u64>| {
-                same_origin && ack.is_some_and(|seq| seq >= write_seq)
+            // A peer witnesses iff its ack head for the WRITE's origin (not any
+            // other origin) is >= write_seq. An ack under the sibling authority
+            // never witnesses this write.
+            let peer_ack = |ack_a: Option<u64>, ack_b: Option<u64>| {
+                if write_under_b { ack_b } else { ack_a }
             };
-            let expected_peer_witnesses = usize::from(peer_witnesses(same_origin_b, ack_b))
-                + usize::from(peer_witnesses(same_origin_c, ack_c));
+            let peer_witnesses =
+                |ack: Option<u64>| ack.is_some_and(|seq| seq >= write_seq);
+            let expected_peer_witnesses =
+                usize::from(peer_witnesses(peer_ack(ack_b_a, ack_b_b)))
+                    + usize::from(peer_witnesses(peer_ack(ack_c_a, ack_c_b)));
             let expected_committed = 1 + expected_peer_witnesses; // self + peers
             proptest::prop_assert_eq!(commit.committed_nodes, expected_committed);
             // quorum_size for 2 peers is 2; committed only when >= 2.
@@ -517,6 +527,191 @@ mod cluster_and_reports_tests {
                 proptest::prop_assert!(!commit.quorum_committed);
             }
         }
+    }
+
+    /// End-to-end proof of codex #965 Finding 1: budget_ack_heads (the store
+    /// SQL) -> update_peer_budget_acks -> witness. Two authorities share one
+    /// global event_seq stream; origin B's block starts mid-sequence (a
+    /// leadership change). A peer that has durably imported the contiguous
+    /// global prefix MUST witness B's write (no false time-out), and a global
+    /// hole MUST cap the head so a write above the hole is NOT witnessed.
+    #[test]
+    fn witness_counts_authority_change_origin_and_caps_at_global_hole() {
+        let origin_a = "http://origin-a";
+        let origin_b = "http://origin-b";
+        let event = |seq: u64, origin: &str| BudgetMutationEventView {
+            event_id: format!("evt-{origin}-{seq}"),
+            hold_id: None,
+            capability_id: "cap-x".to_string(),
+            grant_index: 0,
+            kind: "authorize_exposure".to_string(),
+            allowed: Some(true),
+            recorded_at: seq as i64,
+            event_seq: seq,
+            usage_seq: Some(seq),
+            exposure_units: 1,
+            realized_spend_units: 0,
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost_units: None,
+            invocation_count_after: 1,
+            total_cost_exposed_after: 1,
+            total_cost_realized_spend_after: 0,
+            authority: Some(BudgetMutationAuthorityView {
+                authority_id: origin.to_string(),
+                lease_id: format!("{origin}#term-1"),
+                lease_epoch: 1,
+            }),
+        };
+        let import = |store: &SqliteBudgetStore, events: &[BudgetMutationEventView]| {
+            let records = events
+                .iter()
+                .map(|view| budget_mutation_record_from_view(view).test_unwrap())
+                .collect::<Vec<_>>();
+            store.import_snapshot_records(&[], &records).test_unwrap();
+        };
+        let acks_from = |heads: &[(String, u64)]| {
+            heads
+                .iter()
+                .map(|(origin_id, event_seq)| BudgetOriginAck {
+                    origin_id: origin_id.clone(),
+                    event_seq: *event_seq,
+                })
+                .collect::<Vec<_>>()
+        };
+
+        // --- Case 1: fully-imported contiguous prefix across an authority change.
+        // origin A owns global seqs 1..=3, origin B owns 4..=6 (authority change
+        // at seq 4). The whole 1..=6 prefix is gap-free.
+        let db1 = unique_temp_path("witness-authority-change", "sqlite3");
+        {
+            let store = SqliteBudgetStore::open(&db1).test_unwrap();
+            let mut events = Vec::new();
+            for seq in 1..=3 {
+                events.push(event(seq, origin_a));
+            }
+            for seq in 4..=6 {
+                events.push(event(seq, origin_b));
+            }
+            import(&store, &events);
+            let heads = store.budget_ack_heads().test_unwrap();
+            let b_head = heads
+                .iter()
+                .find(|(origin, _)| origin == origin_b)
+                .map(|(_, seq)| *seq);
+            // The old per-origin islands dropped B (its block starts at 4, island
+            // 3 != floor 0); the global head 6 now acks B at 6.
+            assert_eq!(
+                b_head,
+                Some(6),
+                "authority-change origin B must be acked at the global head, not dropped"
+            );
+
+            let state = state_with_cluster(
+                "http://node-a",
+                &["http://node-b", "http://node-c"],
+                None,
+                None,
+                None,
+            );
+            update_peer_reachable(&state, "http://node-b");
+            update_peer_reachable(&state, "http://node-c");
+            let acks = acks_from(&heads);
+            update_peer_budget_acks(&state, "http://node-b", &acks);
+            update_peer_budget_acks(&state, "http://node-c", &acks);
+            let write = BudgetWriteToken {
+                origin_id: origin_b.to_string(),
+                event_seq: 4,
+                budget_term: 1,
+            };
+            let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
+            assert!(
+                commit.quorum_committed,
+                "the authority-change write must witness on a fully-imported quorum (Finding 1)"
+            );
+            assert_eq!(commit.committed_nodes, 3);
+        }
+        let _ = std::fs::remove_file(&db1);
+
+        // --- Case 2 (teeth): a global hole caps the head. origin A owns 1..=3,
+        // origin B owns 5..=6, so global seq 4 is MISSING. A MAX-per-origin ack
+        // head would report B = 6 and wrongly witness a write at 5; the
+        // contiguous global head is 3, so B must not be acked at all.
+        let db2 = unique_temp_path("witness-global-hole", "sqlite3");
+        {
+            let store = SqliteBudgetStore::open(&db2).test_unwrap();
+            let mut events = Vec::new();
+            for seq in 1..=3 {
+                events.push(event(seq, origin_a));
+            }
+            for seq in [5u64, 6] {
+                events.push(event(seq, origin_b));
+            }
+            import(&store, &events);
+            let heads = store.budget_ack_heads().test_unwrap();
+            assert!(
+                heads.iter().all(|(origin, _)| origin != origin_b),
+                "origin B must not be acked past the global hole at 4 (a MAX ack head would over-report)"
+            );
+
+            let state = state_with_cluster(
+                "http://node-a",
+                &["http://node-b", "http://node-c"],
+                None,
+                None,
+                None,
+            );
+            update_peer_reachable(&state, "http://node-b");
+            update_peer_reachable(&state, "http://node-c");
+            let acks = acks_from(&heads);
+            update_peer_budget_acks(&state, "http://node-b", &acks);
+            update_peer_budget_acks(&state, "http://node-c", &acks);
+            let write = BudgetWriteToken {
+                origin_id: origin_b.to_string(),
+                event_seq: 5,
+                budget_term: 1,
+            };
+            let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
+            assert!(
+                !commit.quorum_committed,
+                "a write above a global hole must not witness (teeth: a MAX-per-origin ack head would)"
+            );
+            assert_eq!(
+                commit.committed_nodes, 1,
+                "only self counts when the global hole caps the head below the write"
+            );
+        }
+        let _ = std::fs::remove_file(&db2);
+    }
+
+    #[test]
+    fn budget_write_progress_close_fails_closed_while_clustered() {
+        // codex #962: if the ClusterProgress sender is lost mid-write, a node
+        // that is STILL clustered must fail closed (503) so the caller rolls back
+        // the local exposure. Returning Ok(None) would render as a committed-
+        // looking leader-visible write with no quorum budgetCommit (fail-open).
+        // A genuinely unclustered node returns Ok(None).
+        let write = BudgetWriteToken {
+            origin_id: "http://node-a".to_string(),
+            event_seq: 7,
+            budget_term: 1,
+        };
+        let clustered = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
+        assert!(clustered.cluster.is_some(), "peers must build a cluster");
+        let response = match budget_write_progress_closed_outcome(&clustered, &write) {
+            Err(response) => response,
+            Ok(_) => panic!("a clustered node must fail closed when the progress channel closes"),
+        };
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+        // Genuinely unclustered: the closed channel is expected, not an error.
+        let mut unclustered = clustered.clone();
+        unclustered.cluster = None;
+        unclustered.cluster_progress = None;
+        assert!(matches!(
+            budget_write_progress_closed_outcome(&unclustered, &write),
+            Ok(None)
+        ));
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1436,7 +1631,7 @@ mod cluster_and_reports_tests {
     }
 
     #[test]
-    fn budget_puller_rejects_cursor_jump_and_respects_compaction_floor() {
+    fn budget_puller_enforces_strict_global_contiguity() {
         let budget_db = unique_temp_path("cluster-budget-cursor-jump", "sqlite3");
         let mut store = SqliteBudgetStore::open(&budget_db).test_unwrap();
 
@@ -1508,11 +1703,13 @@ mod cluster_and_reports_tests {
         assert!(outcome.should_continue);
         assert_eq!(outcome.next_cursor.test_unwrap().seq, 3);
 
-        // Compaction floor: raise origin-j's durable import floor to 9 (as a
-        // snapshot install does). A page starting at event_seq 10 from a cursor
-        // of 3 is now a LEGITIMATE compaction jump (the gap 4..9 sits below the
-        // floor) and must be ACCEPTED, proving the floor is respected rather
-        // than a blind anchor at cursor + 1.
+        // The budget cursor is a single GLOBAL event_seq. A per-origin
+        // compaction floor must NOT authorize a global cursor jump (codex #965
+        // Finding 3): recording origin-j's floor at 9 does not license a page
+        // that starts at event_seq 10 from a cursor of 3, because the skipped
+        // global seqs 4..9 could carry a DIFFERENT origin's unreplicated events.
+        // The jump is a protocol violation regardless of any per-origin floor;
+        // fail-closed recovery is a full snapshot, not a floor-authorized jump.
         store
             .record_budget_import_floors(&[
                 budget_mutation_record_from_view(&event(10)).test_unwrap()
@@ -1532,15 +1729,24 @@ mod cluster_and_reports_tests {
             records: Vec::new(),
             mutation_events: vec![event(10), event(11)],
         };
-        let outcome = import_budget_delta_response(
+        let result = import_budget_delta_response(
             &mut store,
             &compacted,
             Some(cursor),
             &mut PullRoundBudget::new(),
-        )
-        .test_unwrap();
-        assert!(outcome.should_continue);
-        assert_eq!(outcome.next_cursor.test_unwrap().seq, 11);
+        );
+        assert!(
+            matches!(
+                result,
+                Err(PullError::Protocol(PeerProtocolError::NonContiguousPage {
+                    expected_seq: 4,
+                    found_seq: 10
+                }))
+            ),
+            "a per-origin floor must not license a global cursor jump, got {result:?}"
+        );
+        // Fail-closed: only the gap-free prefix 1..3 remains committed.
+        assert_eq!(store.max_mutation_event_seq().test_unwrap(), 3);
     }
 
     #[test]

@@ -125,6 +125,60 @@ pub(crate) fn require_contiguous_page(
     Ok(())
 }
 
+/// Soundness guard for a NON-DENSE append-only `u64` sequence puller (tool
+/// receipts, child receipts, and lineage snapshots).
+///
+/// Unlike the budget mutation-event stream, these seqs come from `INTEGER
+/// PRIMARY KEY AUTOINCREMENT` columns (lineage paginates on the plain rowid)
+/// written with `INSERT ... ON CONFLICT DO NOTHING` and are subject to
+/// retention deletes, so they legitimately contain GAPS: a store can hold rows
+/// 1 and 3 with no row 2. Requiring gap-free contiguity here (the dense
+/// `require_contiguous_page` guard) would wrongly demote an honest peer that
+/// returns seq 3 after cursor 1 and permanently break replication of that
+/// stream. The safe, still fail-closed check for a non-dense stream is only
+/// forward progress (the page's lowest seq is strictly above the cursor, so the
+/// peer cannot resend/rewind already-consumed rows) plus within-page strict
+/// monotonicity (no duplicate or repeated seq).
+///
+/// A legitimate gap above the cursor is accepted. Because the stream is not
+/// dense, a malicious mid-stream skip is NOT reliably client-detectable (the
+/// same fundamental limitation as the revocation stream); the periodic full
+/// snapshot (`apply_cluster_snapshot`) is the backstop that bounds a lying peer,
+/// not incremental convergence. An empty slice is vacuously valid ("caught up").
+pub(crate) fn require_forward_progress(
+    after_seq: u64,
+    seqs: &[u64],
+) -> Result<(), PeerProtocolError> {
+    if seqs.is_empty() {
+        return Ok(());
+    }
+    // Do not trust the peer's ordering: sort locally so an out-of-order page
+    // cannot mask a rewind or a duplicate.
+    let mut sorted = seqs.to_vec();
+    sorted.sort_unstable();
+    let lowest = *sorted.first().unwrap_or(&after_seq);
+    let highest = *sorted.last().unwrap_or(&lowest);
+    // Forward progress: every row must sit strictly above the cursor, so a page
+    // can never resend or rewind rows the puller already consumed.
+    if lowest <= after_seq {
+        return Err(PeerProtocolError::NonAdvancingPage {
+            after_seq,
+            page_max_seq: highest,
+        });
+    }
+    // Strict monotonicity: a duplicate seq is a malformed page (a PK seq column
+    // cannot legitimately repeat a value within a page).
+    for pair in sorted.windows(2) {
+        if pair[0] == pair[1] {
+            return Err(PeerProtocolError::NonContiguousPage {
+                expected_seq: pair[0].saturating_add(1),
+                found_seq: pair[1],
+            });
+        }
+    }
+    Ok(())
+}
+
 /// Strict monotonicity for the composite `(revoked_at, capability_id)`
 /// revocation cursor.
 pub(crate) fn ensure_revocation_advanced(
@@ -224,6 +278,35 @@ mod pull_budget_tests {
         // A duplicate seq breaks contiguity (second 12 lands below expected 13).
         assert!(matches!(
             require_contiguous_page(11, &[11, 12, 12]),
+            Err(PeerProtocolError::NonContiguousPage { .. })
+        ));
+    }
+
+    #[test]
+    fn require_forward_progress_accepts_legit_gaps_but_rejects_rewind_and_duplicate() {
+        // Non-dense streams (tool/child receipts, lineage) legitimately gap: a
+        // page {3} after cursor 1 (no row 2, retention-deleted or a burned
+        // AUTOINCREMENT slot) must be ACCEPTED, unlike the dense budget stream.
+        assert!(require_forward_progress(1, &[3]).is_ok());
+        assert!(require_forward_progress(1, &[2, 3, 5, 8]).is_ok());
+        // Empty page is vacuously valid ("caught up").
+        assert!(require_forward_progress(9, &[]).is_ok());
+        // Out-of-order but still all above the cursor and distinct.
+        assert!(require_forward_progress(1, &[8, 3, 5]).is_ok());
+
+        // Rewind/resend: a row at or below the cursor is forbidden (would replay
+        // already-consumed rows).
+        assert!(matches!(
+            require_forward_progress(5, &[5, 6]),
+            Err(PeerProtocolError::NonAdvancingPage { after_seq: 5, .. })
+        ));
+        assert!(matches!(
+            require_forward_progress(5, &[3, 7]),
+            Err(PeerProtocolError::NonAdvancingPage { after_seq: 5, .. })
+        ));
+        // A duplicate seq within the page is malformed.
+        assert!(matches!(
+            require_forward_progress(1, &[3, 3, 4]),
             Err(PeerProtocolError::NonContiguousPage { .. })
         ));
     }
