@@ -199,6 +199,19 @@ pub trait RelayBatchReceiver: Send + Sync {
         authenticated_sender_kernel_id: String,
         received_at_unix_ms: u64,
     ) -> Result<PheromoneReceiveReport, PheromoneRelayError>;
+
+    /// Return a previously durably-recorded receive report for `batch_sha256`, if
+    /// the runtime store committed one for that batch. Used to recover the verdict
+    /// after a crash in the commit-to-record window WITHOUT re-running
+    /// `receive_batch` (which would re-enter the replay window and reject
+    /// already-accepted deposits). Default: `Ok(None)` (a receiver with no durable
+    /// report cannot recover; the handler then keeps its fail-closed loser path).
+    async fn recorded_report_for_batch(
+        &self,
+        _batch_sha256: &str,
+    ) -> Result<Option<PheromoneReceiveReport>, PheromoneRelayError> {
+        Ok(None)
+    }
 }
 
 /// Optional process-wide metrics hook whose Prometheus output is appended to the
@@ -838,4 +851,41 @@ pub(crate) fn sanitize_event_part(value: &str) -> String {
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use super::{PheromoneReceiveReport, RelayBatchReceiver};
+    use crate::PheromoneRelayError;
+    use async_trait::async_trait;
+    use chio_federation::pheromone_gossip::PheromoneGossipBatch;
+
+    struct SilentReceiver;
+
+    #[async_trait]
+    impl RelayBatchReceiver for SilentReceiver {
+        async fn receive_batch(
+            &self,
+            _batch: PheromoneGossipBatch,
+            _authenticated_sender_kernel_id: String,
+            _received_at_unix_ms: u64,
+        ) -> Result<PheromoneReceiveReport, PheromoneRelayError> {
+            unreachable!("not exercised by this test")
+        }
+    }
+
+    #[tokio::test]
+    async fn recorded_report_for_batch_defaults_to_none() {
+        let receiver = SilentReceiver;
+        let recovered = receiver
+            .recorded_report_for_batch("any-batch-hash")
+            .await
+            .expect("default recovery method runs");
+        assert!(
+            recovered.is_none(),
+            "a receiver with no durable report cannot recover"
+        );
+    }
 }

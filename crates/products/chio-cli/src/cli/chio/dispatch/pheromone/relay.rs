@@ -40,6 +40,24 @@ impl chio_pheromone_relay::RelayBatchReceiver for CliRelayBatchReceiver {
             .receive_batch(&batch, &self.transit_policy)
             .map_err(|error| chio_pheromone_relay::PheromoneRelayError::Json(error.to_string()))
     }
+
+    async fn recorded_report_for_batch(
+        &self,
+        batch_sha256: &str,
+    ) -> Result<
+        Option<chio_pheromone_runtime::PheromoneReceiveReport>,
+        chio_pheromone_relay::PheromoneRelayError,
+    > {
+        // Consult the same runtime store receive_batch opens: surface a
+        // durably-committed verdict for this batch (RFC-0012 F35) without
+        // re-running receive_batch. Store errors map to the Json variant, the same
+        // internal-error shape receive_batch uses for a store-open failure above.
+        let store = chio_pheromone_runtime::store::SqlitePheromoneRuntimeStore::open(&self.store)
+            .map_err(|error| chio_pheromone_relay::PheromoneRelayError::Json(error.to_string()))?;
+        store
+            .lookup_receive_report_by_batch(batch_sha256)
+            .map_err(|error| chio_pheromone_relay::PheromoneRelayError::Json(error.to_string()))
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]
