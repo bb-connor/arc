@@ -37,7 +37,11 @@
 //! 1. JOIN side: [`FanoutLane::subscribe_treaty`] /
 //!    [`subscribe_treaty_with_timeout`](FanoutLane::subscribe_treaty_with_timeout)
 //!    reject with [`FanoutError::TreatyMembershipDenied`] BEFORE joining the swarm
-//!    if the LOCAL operator's `kernel_id` is not a party to `treaty_id`.
+//!    if the LOCAL operator is not a party to `treaty_id`. The local operator's
+//!    kernel id is resolved from the node's OWN AUTHENTICATED endpoint identity (the
+//!    `EndpointId` the swarm authenticates as on the wire), NOT from a
+//!    caller-supplied string, so a non-party cannot pass a real party's kernel id to
+//!    slip past the gate.
 //! 2. RECEIVE side: the frame-verification path
 //!    ([`verify_fanout_frame`] / [`FanoutTopic::recv_verified`]) additionally
 //!    rejects (same variant) a frame whose ORIGIN kernel is not a party to the
@@ -51,6 +55,46 @@
 //! [`FanoutTopic::recv_verified`] and [`FanoutError::TreatyMismatch`]). This is
 //! federation admission AND treaty-party membership, not one standing in for the
 //! other.
+//!
+//! ## Residual exposure: inbound gossip joins are NOT gated at admission (iroh_gossip 0.101)
+//!
+//! The JOIN-side gate above guards THIS node's OWN subscription: it stops a local
+//! non-party from calling [`FanoutLane::subscribe_treaty`] and joining a swarm it is
+//! not a party to. It does NOT gate INBOUND joins by OTHER peers. A custom client
+//! that BYPASSES the local helper (dials a party's endpoint directly and computes
+//! the deterministic, non-secret `TopicId`) can still be admitted as a gossip
+//! neighbor and PASSIVELY OBSERVE frames the honest swarm members forward. This is a
+//! CONFIDENTIALITY residual, and it is NOT closed here because iroh_gossip 0.101
+//! exposes no inbound-admission hook. Verified against iroh-gossip 0.101:
+//!
+//! - The membership protocol admits inbound joins UNCONDITIONALLY:
+//!   `hyparview::HyparView::on_join` adds the joining peer with `Priority::High`, and
+//!   `add_active` ALWAYS succeeds for a high-priority join (evicting a random slot if
+//!   full). There is no application predicate consulted.
+//! - `JoinOptions` (the only per-subscription config) carries just `bootstrap` and
+//!   `subscription_capacity`: no per-peer/per-topic admission callback or ACL.
+//! - There is no pre-acceptance event: `iroh_gossip::api::Event` is only
+//!   `NeighborUp` / `NeighborDown` / `Received` / `Lagged`; `NeighborUp` fires AFTER
+//!   the peer is already in the active view, and a neighbor cannot be rejected then.
+//! - The mounted `ProtocolHandler::accept` for `iroh_gossip::ALPN` admits ALL
+//!   connections; the federation-wide accept-time
+//!   [`DirectoryGate`](crate::admission::DirectoryGate) is the only connection-level
+//!   filter, and it is per-FEDERATION not per-TREATY (one gossip connection
+//!   multiplexes every topic, so it cannot be gated per treaty at the connection
+//!   layer either).
+//!
+//! What IS enforced despite this: a bypassing joiner cannot INJECT an accepted frame
+//! (the RECEIVE-side treaty-party gate drops a non-party origin, and the
+//! swarm/treaty binding drops a foreign-treaty frame), and topic-per-treaty routing
+//! separation keeps other treaties' traffic off this swarm. What is NOT enforceable
+//! with this gossip version is preventing a federation-admitted non-party from
+//! JOINING a treaty swarm and OBSERVING its forwarded traffic. Closing that requires
+//! an upstream iroh_gossip capability this lane would then gate on treaty membership:
+//! a per-topic/per-peer inbound admission predicate in `JoinOptions`, or a
+//! pre-acceptance `NeighborJoinRequested` event with the ability to deny the join.
+//! Until then treaty confidentiality against a passive federation-admitted observer
+//! rests on federation admission plus routing separation, not join-time treaty
+//! enforcement. This is a documented API limitation, NOT a closed gap.
 //!
 //! ## The load-bearing correctness property: `delivered_from` is NOT the author
 //!
@@ -157,6 +201,21 @@ pub enum FanoutError {
     /// resolver. Fail-closed: an unresolvable author is rejected, never trusted.
     #[error("no verifying key is bound to origin kernel {0}")]
     UnknownOrigin(String),
+    /// The caller-provided [`OriginKeyResolver`] bound a key for the frame's origin
+    /// that DISAGREES with the CURRENT directory-bound passport key for that origin
+    /// (the resolver LAGS a key rotation/removal in the issuer-signed directory).
+    /// Fail-closed: a lagging resolver key is refused BEFORE the frame is accepted,
+    /// so a rotated-away/revoked key can never launder a frame even while the
+    /// resolver still lists it. This mirrors the bilateral co-signing stale-key
+    /// refusal ([`crate::identity::VerifiedDirectory::resolve_passport_key`] being
+    /// authoritative over a separately-fed pinned map that can lag it).
+    #[error(
+        "origin `{origin_kernel_id}` resolver key disagrees with the current directory binding"
+    )]
+    OriginKeyMismatch {
+        /// The origin kernel whose resolver key lags the current directory binding.
+        origin_kernel_id: String,
+    },
     /// The embedded deposit's OWN self-signature did not verify against the
     /// origin operator's resolved passport key. This is the check that makes
     /// `delivered_from` irrelevant to authorship.
@@ -208,6 +267,7 @@ impl FanoutError {
             Self::MessageTooLarge { .. } => "message-too-large",
             Self::Codec(_) => "codec",
             Self::UnknownOrigin(_) => "unknown-origin",
+            Self::OriginKeyMismatch { .. } => "origin-key-mismatch",
             Self::DepositSignatureInvalid => "deposit-signature-invalid",
             Self::TreatyMismatch { .. } => "treaty-mismatch",
             Self::TreatyMembershipDenied { .. } => "treaty-membership-denied",
@@ -241,6 +301,15 @@ fn note_fanout_failure(error: &FanoutError) {
 /// mirroring `PheromoneValidationContext.passports`), and is resolved by the
 /// payload's `origin_kernel_id`. It is NEVER derived from the gossip transport:
 /// `Message::delivered_from` is the forwarding neighbor, not the author.
+///
+/// This resolver is NOT authoritative on its own. When the receive path's
+/// `membership` oracle binds a current key for the origin
+/// ([`TreatyMembership::directory_origin_key`], the production
+/// [`crate::identity::VerifiedDirectory`]), THAT directory key is authoritative and
+/// a resolver key that lags it (a rotated-away/revoked key) is refused with
+/// [`FanoutError::OriginKeyMismatch`]. The resolver stands alone only for a
+/// non-directory membership backend that binds no origin keys (see the private
+/// `resolve_origin_key` helper).
 pub trait OriginKeyResolver {
     /// The origin operator's passport verifying key, or `None` (fail-closed) when
     /// no admitted operator is bound to `origin_kernel_id`.
@@ -292,11 +361,67 @@ impl OriginKeyResolver for StaticOriginKeys {
 pub trait TreatyMembership {
     /// Whether `kernel_id` is a party to `treaty_id` (fail-closed on unknown).
     fn is_party(&self, treaty_id: &str, kernel_id: &str) -> bool;
+
+    /// Resolve an AUTHENTICATED transport `EndpointId` to the admitted `kernel_id`
+    /// bound to it, or `None` (fail-closed) when the endpoint is not
+    /// directory-bound. This is the seam the JOIN gate uses to bind the party
+    /// check to the LOCAL node's real endpoint identity (the same `EndpointId` the
+    /// gossip swarm authenticates as on the wire) rather than a caller-supplied
+    /// string: the production [`crate::identity::VerifiedDirectory`] resolves it
+    /// from its issuer-signed `EndpointId -> kernel_id` admission map (the same map
+    /// the accept-time [`DirectoryGate`](crate::admission::DirectoryGate) uses).
+    ///
+    /// The default returns `None`, so any membership backend that does NOT bind
+    /// endpoints to kernel ids fails closed (the JOIN gate denies rather than
+    /// trusting the caller's claimed id).
+    fn kernel_id_for_endpoint(&self, _endpoint: &EndpointId) -> Option<String> {
+        None
+    }
+
+    /// The origin operator's CURRENT directory-bound passport key for
+    /// `origin_kernel_id`, resolved from the SAME issuer-signed, anti-rollback
+    /// snapshot this oracle authorizes treaty membership against.
+    ///
+    /// The receive path binds origin-key resolution to THIS key so a
+    /// caller-provided [`OriginKeyResolver`] cannot lag the directory: the
+    /// production [`crate::identity::VerifiedDirectory`] returns
+    /// [`resolve_passport_key`](crate::identity::VerifiedDirectory::resolve_passport_key)
+    /// (the algorithm-agnostic long-term key of a NON-removed operator, rebuilt in
+    /// the same verified pass as the party set), so a rotated-away/revoked passport
+    /// (one the current directory no longer binds) is authoritative here and a
+    /// resolver still listing the stale key is refused (see
+    /// [`verify_fanout_frame`] and [`FanoutError::OriginKeyMismatch`]).
+    ///
+    /// The default returns `None`: a membership backend that binds no origin keys
+    /// (a non-directory test oracle) falls back to the caller's resolver, preserving
+    /// the pre-directory behavior. Because the party set and passport bindings are
+    /// built in the SAME verified pass, a party with no directory-bound key is not a
+    /// reachable state for [`crate::identity::VerifiedDirectory`] (a removed operator
+    /// is absent from BOTH), so the fallback never re-opens the stale-key gap for the
+    /// production oracle.
+    fn directory_origin_key(&self, _origin_kernel_id: &str) -> Option<PublicKey> {
+        None
+    }
 }
 
 impl TreatyMembership for crate::identity::VerifiedDirectory {
     fn is_party(&self, treaty_id: &str, kernel_id: &str) -> bool {
         self.is_treaty_party(treaty_id, kernel_id)
+    }
+
+    fn kernel_id_for_endpoint(&self, endpoint: &EndpointId) -> Option<String> {
+        // The SAME issuer-signed EndpointId -> kernel_id admission map the
+        // accept-time DirectoryGate consults (VerifiedDirectory::authorize),
+        // fail-closed on an unbound or removed endpoint.
+        self.authorize(endpoint).map(str::to_owned)
+    }
+
+    fn directory_origin_key(&self, origin_kernel_id: &str) -> Option<PublicKey> {
+        // The origin's CURRENT issuer-signed passport key from the SAME verified
+        // snapshot the party set is built in: a rotated-away/removed operator is
+        // absent here (fail-closed), so the receive path never accepts a frame
+        // against a key the current directory no longer binds.
+        self.resolve_passport_key(origin_kernel_id).cloned()
     }
 }
 
@@ -307,6 +432,17 @@ impl TreatyMembership for crate::identity::VerifiedDirectory {
 #[derive(Debug, Clone, Default)]
 pub struct StaticTreatyMembership {
     parties: HashMap<String, HashSet<String>>,
+    /// The authenticated `EndpointId -> kernel_id` binding the JOIN gate resolves
+    /// the LOCAL node's identity through (mirroring the issuer-signed admission map
+    /// [`crate::identity::VerifiedDirectory`] carries). Empty by default, so an
+    /// unbound endpoint fails closed at the gate.
+    endpoints: HashMap<EndpointId, String>,
+    /// The CURRENT directory-bound `kernel_id -> passport key` binding the receive
+    /// path resolves origin keys through (mirroring
+    /// [`crate::identity::VerifiedDirectory::resolve_passport_key`]). Empty by
+    /// default, so a backend that binds no origin keys falls back to the caller's
+    /// [`OriginKeyResolver`] exactly as before.
+    origin_keys: HashMap<String, PublicKey>,
 }
 
 impl StaticTreatyMembership {
@@ -314,6 +450,26 @@ impl StaticTreatyMembership {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Bind an authenticated transport `EndpointId` to its `kernel_id` (builder
+    /// style), so the JOIN gate can resolve the LOCAL node's identity from its
+    /// endpoint the way [`crate::identity::VerifiedDirectory`] does in production.
+    #[must_use]
+    pub fn with_endpoint(mut self, endpoint: EndpointId, kernel_id: impl Into<String>) -> Self {
+        self.endpoints.insert(endpoint, kernel_id.into());
+        self
+    }
+
+    /// Bind `kernel_id` to its CURRENT directory-bound passport key (builder style),
+    /// so the receive path resolves the origin key from this snapshot the way
+    /// [`crate::identity::VerifiedDirectory::resolve_passport_key`] does in
+    /// production. A resolver key that lags this binding is refused
+    /// ([`FanoutError::OriginKeyMismatch`]).
+    #[must_use]
+    pub fn with_origin_key(mut self, kernel_id: impl Into<String>, key: PublicKey) -> Self {
+        self.origin_keys.insert(kernel_id.into(), key);
+        self
     }
 
     /// Bind `treaty_id` to a party set (builder style).
@@ -345,6 +501,14 @@ impl TreatyMembership for StaticTreatyMembership {
             .get(treaty_id)
             .is_some_and(|parties| parties.contains(kernel_id))
     }
+
+    fn kernel_id_for_endpoint(&self, endpoint: &EndpointId) -> Option<String> {
+        self.endpoints.get(endpoint).cloned()
+    }
+
+    fn directory_origin_key(&self, origin_kernel_id: &str) -> Option<PublicKey> {
+        self.origin_keys.get(origin_kernel_id).cloned()
+    }
 }
 
 /// Origin-verify a fan-out frame FROM THE PAYLOAD ALONE. This is the whole point
@@ -357,7 +521,10 @@ impl TreatyMembership for StaticTreatyMembership {
 ///    first also PINS the origin to the deposit author, so the key resolved next
 ///    is bound to the deposit's own signer.
 /// 2. Resolve the AUTHOR key from `frame.origin_kernel_id` (the signed payload),
-///    NEVER from `delivered_from`.
+///    NEVER from `delivered_from`, BOUND to the same verified directory snapshot
+///    `membership` uses: when the directory binds a current key for the origin it
+///    is AUTHORITATIVE, and a caller-resolver key that lags it is refused (see the
+///    private `resolve_origin_key` helper).
 /// 3. Verify the deposit's OWN self-signature against that key.
 /// 4. TREATY-PARTY AUTHORIZATION: the (now-authenticated) origin kernel MUST be a
 ///    party to the frame's own `treaty_id` per `membership`. A non-party origin is
@@ -367,9 +534,10 @@ impl TreatyMembership for StaticTreatyMembership {
 /// # Errors
 /// Returns [`FanoutError::Frame`] on frame verification failure,
 /// [`FanoutError::UnknownOrigin`] when the origin has no bound key,
-/// [`FanoutError::DepositSignatureInvalid`] when the self-signature does not
-/// verify, and [`FanoutError::TreatyMembershipDenied`] when the origin is not a
-/// party to the frame's treaty.
+/// [`FanoutError::OriginKeyMismatch`] when the caller resolver key lags the current
+/// directory binding, [`FanoutError::DepositSignatureInvalid`] when the
+/// self-signature does not verify, and [`FanoutError::TreatyMembershipDenied`] when
+/// the origin is not a party to the frame's treaty.
 pub fn verify_fanout_frame<R, M>(
     frame: &PheromoneDepositGossip,
     origin_keys: &R,
@@ -405,10 +573,16 @@ where
     // (1) Transport-independent frame verification. Pins origin == deposit author.
     verify_pheromone_gossip_frame(frame, policy, now_unix_ms).map_err(FanoutError::Frame)?;
 
-    // (2) Resolve the author key from the PAYLOAD origin, never `delivered_from`.
-    let origin_key = origin_keys
-        .verifying_key(&frame.origin_kernel_id)
-        .ok_or_else(|| FanoutError::UnknownOrigin(frame.origin_kernel_id.clone()))?;
+    // (2) Resolve the author key from the PAYLOAD origin, never `delivered_from`,
+    // and BIND it to the SAME verified directory snapshot `membership` authorizes
+    // against. When the directory binds a CURRENT key for this origin that key is
+    // AUTHORITATIVE, so a rotated-away/removed key can never be accepted just
+    // because the caller's `origin_keys` resolver still lists it: a resolver key
+    // that disagrees with the directory binding is refused with
+    // `OriginKeyMismatch` BEFORE any signature work (mirroring the bilateral
+    // co-signing stale-key refusal). Only when the membership backend binds no key
+    // for the origin (a non-directory test oracle) do we fall back to the resolver.
+    let origin_key = resolve_origin_key(frame, origin_keys, membership)?;
 
     // (3) Verify the deposit's OWN self-signature against that key.
     verify_deposit_self_signature(frame, &origin_key)?;
@@ -422,6 +596,52 @@ where
         });
     }
     Ok(())
+}
+
+/// Resolve the origin author key to verify the deposit self-signature against,
+/// BOUND to the SAME verified directory snapshot `membership` authorizes against.
+///
+/// Fail-closed resolution order (mirrors the bilateral co-signing key resolution):
+/// - If `membership` binds a CURRENT directory key for the origin
+///   ([`TreatyMembership::directory_origin_key`], the production
+///   [`crate::identity::VerifiedDirectory::resolve_passport_key`]), that key is
+///   AUTHORITATIVE. A caller `origin_keys` resolver key that DISAGREES with it (a
+///   key that lags a rotation/removal) is refused with
+///   [`FanoutError::OriginKeyMismatch`] before any signature work, so a
+///   rotated-away/revoked key can never launder a frame even while the resolver
+///   still lists it. A missing resolver key is fine here: the directory binding
+///   stands on its own (an old frame signed by a rotated-away key then fails the
+///   self-signature check against the current directory key).
+/// - Only when the membership backend binds NO directory key for the origin (a
+///   non-directory oracle) do we fall back to the caller's resolver, rejecting an
+///   unresolvable origin with [`FanoutError::UnknownOrigin`].
+fn resolve_origin_key<R, M>(
+    frame: &PheromoneDepositGossip,
+    origin_keys: &R,
+    membership: &M,
+) -> Result<PublicKey, FanoutError>
+where
+    R: OriginKeyResolver + ?Sized,
+    M: TreatyMembership + ?Sized,
+{
+    let resolver_key = origin_keys.verifying_key(&frame.origin_kernel_id);
+    match membership.directory_origin_key(&frame.origin_kernel_id) {
+        // The directory binds a current key: it is AUTHORITATIVE. A resolver key
+        // that disagrees with it (lags a rotation/removal) is refused; a matching or
+        // absent resolver key defers to the directory binding.
+        Some(directory_key) => match resolver_key {
+            Some(resolver_key) if resolver_key != directory_key => {
+                Err(FanoutError::OriginKeyMismatch {
+                    origin_kernel_id: frame.origin_kernel_id.clone(),
+                })
+            }
+            _ => Ok(directory_key),
+        },
+        // No directory binding for this origin: fall back to the caller's resolver.
+        None => {
+            resolver_key.ok_or_else(|| FanoutError::UnknownOrigin(frame.origin_kernel_id.clone()))
+        }
+    }
 }
 
 /// Decode a raw gossip payload from `Message::content`, BIND it to the joined
@@ -564,23 +784,81 @@ fn verify_deposit_self_signature(
 /// topic swarm is gated UPSTREAM by the accept-time
 /// [`DirectoryGate`](crate::admission::DirectoryGate) installed via
 /// `Endpoint::builder(..).hooks(gate)`.
+///
+/// That accept-time gate is FEDERATION-GLOBAL; the PER-TREATY party gate is layered
+/// on top at [`subscribe_treaty`](FanoutLane::subscribe_treaty). To keep that gate
+/// unbypassable, the underlying [`Gossip`] handle is held PRIVATELY and NOT exposed
+/// by any accessor: the only way to join a treaty swarm is through the
+/// membership-checked `subscribe_treaty` /
+/// [`subscribe_treaty_with_timeout`](FanoutLane::subscribe_treaty_with_timeout),
+/// so a caller cannot reach
+/// `subscribe_and_join(pheromone_topic_for_treaty(..), ..)` directly and join a
+/// treaty it is not a party to.
+///
+/// ## The JOIN gate binds to the AUTHENTICATED local endpoint, not a caller string
+///
+/// The lane also captures its own `local_endpoint_id`: the `EndpointId` of the
+/// endpoint the [`Gossip`] handle was spawned on, i.e. the identity this node
+/// AUTHENTICATES as on the wire when it joins a swarm. The JOIN gate resolves THAT
+/// endpoint to a kernel id through the issuer-signed directory
+/// ([`TreatyMembership::kernel_id_for_endpoint`]) and authorizes against the
+/// resolved id, so a caller cannot pass an arbitrary party's `kernel_id` string to
+/// slip past the party check. The id is DERIVED INTERNALLY from the
+/// [`iroh::Endpoint`] handed to [`FanoutLane::new`] (`endpoint.id()`), NOT accepted
+/// as a raw caller value: a caller can only pass an endpoint whose id is
+/// cryptographically its own, never a real party's `EndpointId` it does not hold the
+/// secret key for. See [`FanoutLane::new`] for the residual iroh_gossip 0.101
+/// contract (`Gossip` exposes no accessor to recover its own endpoint, so the caller
+/// must pass the SAME endpoint it spawned `gossip` on).
 #[derive(Debug, Clone)]
 pub struct FanoutLane {
     gossip: Gossip,
+    /// The AUTHENTICATED local endpoint identity, DERIVED from the `Endpoint` passed
+    /// to [`FanoutLane::new`] (`endpoint.id()`) - never a raw caller-supplied id. The
+    /// `gossip` swarm authenticates as this endpoint on the wire; the JOIN gate
+    /// resolves it to the local kernel id it authorizes.
+    local_endpoint_id: EndpointId,
 }
 
 impl FanoutLane {
-    /// Wrap an already-spawned, router-mounted [`Gossip`] handle.
+    /// Wrap an already-spawned, router-mounted [`Gossip`] handle together with the
+    /// AUTHENTICATED local endpoint the JOIN gate binds to.
+    ///
+    /// `endpoint` MUST be the SAME [`iroh::Endpoint`] the `gossip` handle was spawned
+    /// on (`Gossip::builder().spawn(endpoint.clone())`). The lane DERIVES
+    /// `local_endpoint_id = endpoint.id()` INTERNALLY, so a caller cannot supply an
+    /// id that differs from an endpoint it actually holds: it can only pass an
+    /// `Endpoint` whose id is cryptographically its own (derived from a secret key it
+    /// possesses), never a real party's `EndpointId` it does not control. This closes
+    /// the join-spoof where a non-party passed a real party's `EndpointId` while its
+    /// gossip endpoint authenticated as someone else.
+    ///
+    /// Residual contract (iroh_gossip 0.101 limitation): `iroh_gossip::Gossip`
+    /// exposes NO accessor to recover the endpoint it was spawned on (verified
+    /// against iroh-gossip 0.101 - the endpoint is consumed by `GossipBuilder::spawn`
+    /// into a private actor task and never surfaced), so the lane cannot itself
+    /// confirm `endpoint` is the one `gossip` actually runs on. The caller MUST pass
+    /// that same endpoint; passing a DIFFERENT endpoint it also owns would bind the
+    /// gate to an identity other than the one the swarm authenticates as on the wire.
+    /// Taking the `Endpoint` and deriving the id internally is nonetheless strictly
+    /// stronger than accepting a raw `EndpointId` (which a non-party could set to any
+    /// real party's id): here the id is always tied to an endpoint the caller holds.
     #[must_use]
-    pub fn new(gossip: Gossip) -> Self {
-        Self { gossip }
+    pub fn new(gossip: Gossip, endpoint: &iroh::Endpoint) -> Self {
+        Self {
+            gossip,
+            local_endpoint_id: endpoint.id(),
+        }
     }
 
-    /// The underlying gossip handle.
-    #[must_use]
-    pub fn gossip(&self) -> &Gossip {
-        &self.gossip
-    }
+    // NO raw gossip accessor is exposed (deliberate, fail-closed). Handing out the
+    // underlying `Gossip` handle would let a caller run
+    // `subscribe_and_join(pheromone_topic_for_treaty(treaty_id), bootstrap)` directly
+    // and join a treaty swarm WITHOUT the treaty-party membership check enforced in
+    // `subscribe_treaty` / `subscribe_treaty_with_timeout` below - reopening exactly
+    // the leak the JOIN gate closes (a globally-admitted non-party computing the
+    // non-secret topic id and joining anyway). The handle stays private so EVERY join
+    // routes through the membership gate; there is no membership-bypass escape hatch.
 
     /// Subscribe to and join the per-treaty topic swarm, returning the split
     /// sender/receiver handle.
@@ -590,17 +868,23 @@ impl FanoutLane {
     /// that are not directory-bound simply fail to connect). The topic is derived
     /// deterministically from `treaty_id` via [`pheromone_topic_for_treaty`].
     ///
-    /// TREATY-PARTY JOIN GATE (fail-closed): the swarm is joined ONLY if
-    /// `local_kernel_id` is a party to `treaty_id` per `membership` (the
-    /// issuer-signed per-treaty party set). A globally-admitted operator that is
-    /// NOT a party is rejected with [`FanoutError::TreatyMembershipDenied`] BEFORE
-    /// the (non-secret, deterministic) topic is computed or any neighbor is dialed,
-    /// so federation admission alone never leaks a treaty's traffic to a non-party.
+    /// TREATY-PARTY JOIN GATE (fail-closed), bound to the AUTHENTICATED local
+    /// identity: the swarm is joined ONLY if the LOCAL node's OWN endpoint
+    /// (`local_endpoint_id`, resolved to a kernel id through `membership` the way
+    /// [`crate::identity::VerifiedDirectory`] does) is a party to `treaty_id`. The
+    /// caller-supplied `local_kernel_id` is NOT trusted on its own: it is rejected
+    /// unless it EQUALS the id resolved from the authenticated endpoint, so a
+    /// globally-admitted non-party cannot pass a real party's `kernel_id` string to
+    /// slip past the check. A non-party is rejected with
+    /// [`FanoutError::TreatyMembershipDenied`] BEFORE the (non-secret,
+    /// deterministic) topic is computed or any neighbor is dialed, so federation
+    /// admission alone never leaks a treaty's traffic to a non-party.
     ///
     /// # Errors
-    /// Returns [`FanoutError::TreatyMembershipDenied`] when the local operator is
-    /// not a party to `treaty_id`, or [`FanoutError::Gossip`] if the subscribe/join
-    /// fails.
+    /// Returns [`FanoutError::TreatyMembershipDenied`] when the local endpoint does
+    /// not resolve to a kernel id, when `local_kernel_id` does not match that
+    /// resolved id, or when the resolved id is not a party to `treaty_id`; or
+    /// [`FanoutError::Gossip`] if the subscribe/join fails.
     pub async fn subscribe_treaty<M>(
         &self,
         treaty_id: &str,
@@ -629,13 +913,15 @@ impl FanoutLane {
     /// is deliberately NOT bounded: a receive loop is meant to block until the next
     /// gossip message.
     ///
-    /// The treaty-party JOIN gate (see [`subscribe_treaty`](Self::subscribe_treaty))
-    /// is enforced here, fail-closed, BEFORE the topic is derived or joined.
+    /// The treaty-party JOIN gate (see [`subscribe_treaty`](Self::subscribe_treaty)),
+    /// bound to the AUTHENTICATED local endpoint identity, is enforced here,
+    /// fail-closed, BEFORE the topic is derived or joined.
     ///
     /// # Errors
-    /// Returns [`FanoutError::TreatyMembershipDenied`] when the local operator is
-    /// not a party to `treaty_id`, or [`FanoutError::Gossip`] if the join times out
-    /// or the subscribe/join fails.
+    /// Returns [`FanoutError::TreatyMembershipDenied`] when the local endpoint does
+    /// not resolve to a kernel id, when `local_kernel_id` does not match that
+    /// resolved id, or when the resolved id is not a party to `treaty_id`; or
+    /// [`FanoutError::Gossip`] if the join times out or the subscribe/join fails.
     pub async fn subscribe_treaty_with_timeout<M>(
         &self,
         treaty_id: &str,
@@ -647,13 +933,45 @@ impl FanoutLane {
     where
         M: TreatyMembership + ?Sized,
     {
-        // TREATY-PARTY JOIN GATE (fail-closed): a non-party local operator is
-        // rejected before the (non-secret) topic is even computed, so it never
-        // joins the swarm. Federation admission is necessary but not sufficient.
-        if !membership.is_party(treaty_id, local_kernel_id) {
+        // TREATY-PARTY JOIN GATE (fail-closed), bound to the AUTHENTICATED local
+        // identity. The gate MUST NOT authorize on the caller-supplied
+        // `local_kernel_id` string alone: a globally-admitted operator that is not a
+        // party to `treaty_id` could otherwise pass ANY real party's kernel id here,
+        // satisfy `is_party`, join the deterministic gossip topic, and observe that
+        // treaty's traffic. Instead we resolve the LOCAL node's OWN endpoint
+        // (`local_endpoint_id`, the same identity the swarm authenticates as on the
+        // wire, captured at construction) to its admitted kernel id through the
+        // issuer-signed directory, then (1) reject unless the caller's claimed id
+        // equals that authenticated id, and (2) authorize the authenticated id
+        // against the treaty party set. All three failure modes reject BEFORE the
+        // (non-secret) topic is computed, so a non-party never joins the swarm.
+        let Some(authenticated_kernel_id) =
+            membership.kernel_id_for_endpoint(&self.local_endpoint_id)
+        else {
+            // The local endpoint is not directory-bound: fail closed rather than
+            // trust the caller's claimed id.
             let error = FanoutError::TreatyMembershipDenied {
                 treaty_id: treaty_id.to_string(),
                 kernel_id: local_kernel_id.to_string(),
+            };
+            note_fanout_failure(&error);
+            return Err(error);
+        };
+        if authenticated_kernel_id != local_kernel_id {
+            // The caller claimed an identity that is NOT the one this node
+            // authenticates as: reject the spoof, whether or not the claimed id is a
+            // genuine party.
+            let error = FanoutError::TreatyMembershipDenied {
+                treaty_id: treaty_id.to_string(),
+                kernel_id: local_kernel_id.to_string(),
+            };
+            note_fanout_failure(&error);
+            return Err(error);
+        }
+        if !membership.is_party(treaty_id, &authenticated_kernel_id) {
+            let error = FanoutError::TreatyMembershipDenied {
+                treaty_id: treaty_id.to_string(),
+                kernel_id: authenticated_kernel_id,
             };
             note_fanout_failure(&error);
             return Err(error);
@@ -1287,14 +1605,20 @@ mod tests {
             .bind()
             .await
             .expect("endpoint binds on loopback");
+        let local_id = endpoint.id();
         let gossip = Gossip::builder().spawn(endpoint.clone());
+        // The lane DERIVES its local endpoint id from &endpoint (finding 1), so it
+        // must be built before the endpoint is moved into the router.
+        let lane = FanoutLane::new(gossip.clone(), &endpoint);
         let _router = Router::builder(endpoint)
-            .accept(iroh_gossip::ALPN, gossip.clone())
+            .accept(iroh_gossip::ALPN, gossip)
             .spawn();
-        let lane = FanoutLane::new(gossip);
-        // Local operator IS a party, so it passes the membership gate and reaches
-        // the (empty-bootstrap) join, which then fails closed on the client bound.
-        let membership = StaticTreatyMembership::new().with(TREATY_ALPHA, [AUTHOR]);
+        // Local operator IS a party AND its authenticated endpoint resolves to
+        // AUTHOR, so it passes the membership gate and reaches the (empty-bootstrap)
+        // join, which then fails closed on the client bound.
+        let membership = StaticTreatyMembership::new()
+            .with(TREATY_ALPHA, [AUTHOR])
+            .with_endpoint(local_id, AUTHOR);
         let result = lane
             .subscribe_treaty_with_timeout(
                 TREATY_ALPHA,
@@ -1597,15 +1921,23 @@ mod tests {
             .bind()
             .await
             .expect("endpoint binds on loopback");
+        let local_id = endpoint.id();
         let gossip = Gossip::builder().spawn(endpoint.clone());
+        // The lane DERIVES its local endpoint id from &endpoint (finding 1), so it
+        // must be built before the endpoint is moved into the router.
+        let lane = FanoutLane::new(gossip.clone(), &endpoint);
         let router = Router::builder(endpoint)
-            .accept(iroh_gossip::ALPN, gossip.clone())
+            .accept(iroh_gossip::ALPN, gossip)
             .spawn();
-        let lane = FanoutLane::new(gossip);
 
-        // Membership admits a DIFFERENT operator to alpha; the local operator is a
-        // non-party, so the join is rejected before any neighbor dial.
-        let membership = StaticTreatyMembership::new().with(TREATY_ALPHA, ["did:chio:party"]);
+        // Membership admits a DIFFERENT operator to alpha; the local endpoint
+        // authenticates (honestly) as "did:chio:non-party", which is NOT a party, so
+        // the join is rejected before any neighbor dial. (The caller's claimed id
+        // equals the authenticated id here, so this exercises the party-denial path,
+        // not the spoof path.)
+        let membership = StaticTreatyMembership::new()
+            .with(TREATY_ALPHA, ["did:chio:party"])
+            .with_endpoint(local_id, "did:chio:non-party");
         let result = lane
             .subscribe_treaty(TREATY_ALPHA, "did:chio:non-party", &membership, vec![])
             .await;
@@ -1616,6 +1948,30 @@ mod tests {
                     if treaty_id == TREATY_ALPHA && kernel_id == "did:chio:non-party"
             ),
             "a non-party local operator must be rejected at join, got {result:?}"
+        );
+
+        // The gate fires BEFORE any neighbor dial: even with a NON-empty bootstrap
+        // (an unreachable fabricated endpoint) and a short join bound, a non-party is
+        // still denied with TreatyMembershipDenied rather than attempting the dial and
+        // timing out. This pins finding 1's "before any neighbor is dialed" claim and,
+        // with the raw gossip handle now private (finding 2), leaves no path that
+        // reaches subscribe_and_join without this check.
+        let denied_with_bootstrap = lane
+            .subscribe_treaty_with_timeout(
+                TREATY_ALPHA,
+                "did:chio:non-party",
+                &membership,
+                vec![endpoint_from_seed(99)],
+                Duration::from_millis(50),
+            )
+            .await;
+        assert!(
+            matches!(
+                denied_with_bootstrap,
+                Err(FanoutError::TreatyMembershipDenied { ref treaty_id, ref kernel_id })
+                    if treaty_id == TREATY_ALPHA && kernel_id == "did:chio:non-party"
+            ),
+            "the membership gate must short-circuit before dialing bootstrap, got {denied_with_bootstrap:?}"
         );
         router.shutdown().await.ok();
     }
@@ -1633,13 +1989,20 @@ mod tests {
             .bind()
             .await
             .expect("endpoint binds on loopback");
+        let local_id = endpoint.id();
         let gossip = Gossip::builder().spawn(endpoint.clone());
+        // The lane DERIVES its local endpoint id from &endpoint (finding 1), so it
+        // must be built before the endpoint is moved into the router.
+        let lane = FanoutLane::new(gossip.clone(), &endpoint);
         let router = Router::builder(endpoint)
-            .accept(iroh_gossip::ALPN, gossip.clone())
+            .accept(iroh_gossip::ALPN, gossip)
             .spawn();
-        let lane = FanoutLane::new(gossip);
 
-        let membership = StaticTreatyMembership::new().with(TREATY_ALPHA, ["did:chio:party"]);
+        // The local endpoint AUTHENTICATES as the genuine party, and the caller's
+        // claimed id matches it, so the gate lets it through to the join.
+        let membership = StaticTreatyMembership::new()
+            .with(TREATY_ALPHA, ["did:chio:party"])
+            .with_endpoint(local_id, "did:chio:party");
         let result = lane
             .subscribe_treaty_with_timeout(
                 TREATY_ALPHA,
@@ -1654,5 +2017,264 @@ mod tests {
             "a party must pass the membership gate and reach the empty-bootstrap join, got {result:?}"
         );
         router.shutdown().await.ok();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn subscribe_rejects_a_non_party_spoofing_a_real_party_kernel_id() {
+        // SPOOFING CASE (codex P1 follow-up): the JOIN gate must bind to the node's
+        // AUTHENTICATED endpoint identity, not the caller-supplied `local_kernel_id`
+        // string. A globally-admitted operator that is NOT a party to the treaty
+        // calls subscribe_treaty passing a REAL party's kernel id as the argument;
+        // because that string is a genuine party, the OLD `is_party(treaty, arg)`
+        // check would have admitted it and leaked the treaty's traffic. The gate now
+        // resolves the LOCAL endpoint to its admitted kernel id and rejects the spoof.
+        let endpoint = Endpoint::builder(presets::Minimal)
+            .secret_key(SecretKey::from_bytes(&[78u8; 32]))
+            .relay_mode(RelayMode::Disabled)
+            .bind_addr((Ipv4Addr::LOCALHOST, 0))
+            .expect("valid loopback bind addr")
+            .bind()
+            .await
+            .expect("endpoint binds on loopback");
+        let local_id = endpoint.id();
+        let gossip = Gossip::builder().spawn(endpoint.clone());
+        // The lane DERIVES its local endpoint id from &endpoint (finding 1), so it
+        // must be built before the endpoint is moved into the router.
+        let lane = FanoutLane::new(gossip.clone(), &endpoint);
+        let router = Router::builder(endpoint)
+            .accept(iroh_gossip::ALPN, gossip)
+            .spawn();
+
+        // The directory authenticates THIS node's endpoint as the NON-party
+        // "did:chio:intruder". "did:chio:party" is a real party, but a DIFFERENT
+        // node - the intruder does not authenticate as it.
+        let membership = StaticTreatyMembership::new()
+            .with(TREATY_ALPHA, ["did:chio:party"])
+            .with_endpoint(local_id, "did:chio:intruder");
+
+        // Spoof: the intruder passes the real party's kernel id as the arg. Even
+        // with a non-empty bootstrap and a short bound, it is denied (not dialed and
+        // timed out), because the arg does not match the authenticated id.
+        let spoofed = lane
+            .subscribe_treaty_with_timeout(
+                TREATY_ALPHA,
+                "did:chio:party",
+                &membership,
+                vec![endpoint_from_seed(99)],
+                Duration::from_millis(50),
+            )
+            .await;
+        assert!(
+            matches!(
+                spoofed,
+                Err(FanoutError::TreatyMembershipDenied { ref treaty_id, ref kernel_id })
+                    if treaty_id == TREATY_ALPHA && kernel_id == "did:chio:party"
+            ),
+            "a non-party spoofing a real party's kernel id must be rejected, got {spoofed:?}"
+        );
+
+        // And the intruder gets no join even under its OWN authenticated id: it is
+        // simply not a party to the treaty (the honest party-denial path).
+        let honest = lane
+            .subscribe_treaty_with_timeout(
+                TREATY_ALPHA,
+                "did:chio:intruder",
+                &membership,
+                vec![endpoint_from_seed(99)],
+                Duration::from_millis(50),
+            )
+            .await;
+        assert!(
+            matches!(
+                honest,
+                Err(FanoutError::TreatyMembershipDenied { ref treaty_id, ref kernel_id })
+                    if treaty_id == TREATY_ALPHA && kernel_id == "did:chio:intruder"
+            ),
+            "the intruder is a non-party even under its own id, got {honest:?}"
+        );
+        router.shutdown().await.ok();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn new_derives_local_identity_from_the_spawned_endpoint() {
+        // FINDING 1: the constructor DERIVES local_endpoint_id from the passed
+        // Endpoint (endpoint.id()); it no longer accepts a raw caller-supplied
+        // EndpointId. Proof: the directory binds a DIFFERENT (foreign) endpoint to
+        // the party and admits that party to the treaty, but does NOT bind THIS
+        // node's endpoint.id(). Because the JOIN gate resolves the lane's OWN derived
+        // endpoint id, it finds it unbound and fails closed - a caller cannot make
+        // the lane authenticate under an endpoint id it does not actually hold.
+        let endpoint = Endpoint::builder(presets::Minimal)
+            .secret_key(SecretKey::from_bytes(&[79u8; 32]))
+            .relay_mode(RelayMode::Disabled)
+            .bind_addr((Ipv4Addr::LOCALHOST, 0))
+            .expect("valid loopback bind addr")
+            .bind()
+            .await
+            .expect("endpoint binds on loopback");
+        let real_id = endpoint.id();
+        let gossip = Gossip::builder().spawn(endpoint.clone());
+        let lane = FanoutLane::new(gossip.clone(), &endpoint);
+        let router = Router::builder(endpoint)
+            .accept(iroh_gossip::ALPN, gossip)
+            .spawn();
+
+        // The directory binds a FOREIGN endpoint (seed 200, NOT this node's real_id)
+        // to the genuine party, and admits that party to the treaty.
+        let foreign = endpoint_from_seed(200);
+        assert_ne!(
+            foreign, real_id,
+            "the foreign endpoint must differ from this node's derived id"
+        );
+        let membership = StaticTreatyMembership::new()
+            .with(TREATY_ALPHA, ["did:chio:party"])
+            .with_endpoint(foreign, "did:chio:party");
+
+        // Even claiming the genuine party's kernel id, the lane's DERIVED endpoint id
+        // (real_id) is unbound in the directory, so the gate denies the join before
+        // any dial: the lane used endpoint.id(), not a caller value.
+        let result = lane
+            .subscribe_treaty_with_timeout(
+                TREATY_ALPHA,
+                "did:chio:party",
+                &membership,
+                vec![endpoint_from_seed(99)],
+                Duration::from_millis(50),
+            )
+            .await;
+        assert!(
+            matches!(result, Err(FanoutError::TreatyMembershipDenied { .. })),
+            "the lane derives its id from the spawned endpoint; an id it does not own is unbound and denied, got {result:?}"
+        );
+
+        // Control: bind THIS node's real (derived) endpoint id to the party, and the
+        // same call passes the gate and reaches the (empty-bootstrap) join timeout,
+        // proving the lane authenticates as endpoint.id().
+        let membership_ok = StaticTreatyMembership::new()
+            .with(TREATY_ALPHA, ["did:chio:party"])
+            .with_endpoint(real_id, "did:chio:party");
+        let admitted = lane
+            .subscribe_treaty_with_timeout(
+                TREATY_ALPHA,
+                "did:chio:party",
+                &membership_ok,
+                vec![],
+                Duration::from_millis(50),
+            )
+            .await;
+        assert!(
+            matches!(admitted, Err(FanoutError::Gossip(ref msg)) if msg.contains("timed out")),
+            "binding the DERIVED endpoint id admits the party past the gate, got {admitted:?}"
+        );
+        router.shutdown().await.ok();
+    }
+
+    #[test]
+    fn receive_rejects_a_resolver_key_that_lags_the_directory() {
+        // FINDING 2: origin-key resolution is bound to the SAME verified directory
+        // snapshot membership authorizes against. A caller resolver that still lists
+        // a rotated-away key (disagreeing with the directory's CURRENT binding) is
+        // refused BEFORE any signature work, so a stale key cannot launder a frame
+        // (mirrors the bilateral co-signing stale-key refusal).
+        let author = Keypair::from_seed(&[7; 32]); // the CURRENT directory key
+        let stale = Keypair::from_seed(&[9; 32]); // a rotated-away key the resolver still lists
+        let frame = signed_direct_frame(&author, AUTHOR, "did:chio:hub", TREATY_ALPHA, NAMESPACE);
+        let policy = live_policy(NAMESPACE);
+        // Resolver LAGS: it binds the stale key.
+        let keys = StaticOriginKeys::new().with(AUTHOR, stale.public_key());
+        // Directory binds AUTHOR's CURRENT key and admits it as a party.
+        let membership = StaticTreatyMembership::new()
+            .with(TREATY_ALPHA, [AUTHOR])
+            .with_origin_key(AUTHOR, author.public_key());
+
+        let result = verify_fanout_frame(&frame, &keys, &membership, &policy, NOW);
+        assert!(
+            matches!(
+                result,
+                Err(FanoutError::OriginKeyMismatch { ref origin_kernel_id })
+                    if origin_kernel_id == AUTHOR
+            ),
+            "a resolver key that lags the directory must be refused, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn receive_binds_origin_key_to_the_directory_even_with_an_empty_resolver() {
+        // The directory-bound key is authoritative on its own: with an EMPTY resolver
+        // (no mismatch to trip), the frame is verified against the directory key. A
+        // frame signed by the CURRENT key is accepted; a frame signed by a
+        // rotated-away key the directory no longer binds fails on signature - so an
+        // OLD frame minted under a compromised/rotated key can never be replayed.
+        let current = Keypair::from_seed(&[7; 32]);
+        let rotated_away = Keypair::from_seed(&[9; 32]);
+        let policy = live_policy(NAMESPACE);
+        let keys = StaticOriginKeys::new(); // empty: forces reliance on the directory
+        let membership = StaticTreatyMembership::new()
+            .with(TREATY_ALPHA, [AUTHOR])
+            .with_origin_key(AUTHOR, current.public_key());
+
+        // A frame signed by the CURRENT directory key verifies against the binding.
+        let ok_frame =
+            signed_direct_frame(&current, AUTHOR, "did:chio:hub", TREATY_ALPHA, NAMESPACE);
+        verify_fanout_frame(&ok_frame, &keys, &membership, &policy, NOW)
+            .expect("the current directory key is authoritative even with an empty resolver");
+
+        // A frame signed by the ROTATED-AWAY key is rejected: verification uses the
+        // directory's CURRENT key, so the old signature no longer matches.
+        let stale_frame = signed_direct_frame(
+            &rotated_away,
+            AUTHOR,
+            "did:chio:hub",
+            TREATY_ALPHA,
+            NAMESPACE,
+        );
+        let result = verify_fanout_frame(&stale_frame, &keys, &membership, &policy, NOW);
+        assert!(
+            matches!(result, Err(FanoutError::DepositSignatureInvalid)),
+            "a frame signed by a rotated-away key must fail against the current directory key, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn receive_accepts_when_resolver_matches_the_directory() {
+        // Control: when the resolver AGREES with the directory binding, resolution
+        // succeeds and a valid frame verifies (no false-positive mismatch).
+        let author = Keypair::from_seed(&[7; 32]);
+        let frame = signed_direct_frame(&author, AUTHOR, "did:chio:hub", TREATY_ALPHA, NAMESPACE);
+        let policy = live_policy(NAMESPACE);
+        let keys = StaticOriginKeys::new().with(AUTHOR, author.public_key());
+        let membership = StaticTreatyMembership::new()
+            .with(TREATY_ALPHA, [AUTHOR])
+            .with_origin_key(AUTHOR, author.public_key());
+        verify_fanout_frame(&frame, &keys, &membership, &policy, NOW)
+            .expect("a resolver key matching the directory binding verifies");
+    }
+
+    #[test]
+    fn origin_key_mismatch_bumps_verify_failure_counter_and_is_still_rejected() {
+        // OBSERVE-ONLY proof: a lagging resolver key still fails closed AND bumps
+        // verify_failures{fanout,origin-key-mismatch}; the returned Err is unchanged.
+        let author = Keypair::from_seed(&[7; 32]);
+        let stale = Keypair::from_seed(&[9; 32]);
+        let frame = signed_direct_frame(&author, AUTHOR, "did:chio:hub", TREATY_ALPHA, NAMESPACE);
+        let policy = live_policy(NAMESPACE);
+        let keys = StaticOriginKeys::new().with(AUTHOR, stale.public_key());
+        let membership = StaticTreatyMembership::new()
+            .with(TREATY_ALPHA, [AUTHOR])
+            .with_origin_key(AUTHOR, author.public_key());
+
+        let before = crate::metrics::verify_failures_total(
+            crate::metrics::SEAM_FANOUT,
+            "origin-key-mismatch",
+        );
+        let result = verify_fanout_frame(&frame, &keys, &membership, &policy, NOW);
+        assert!(matches!(result, Err(FanoutError::OriginKeyMismatch { .. })));
+        assert!(
+            crate::metrics::verify_failures_total(
+                crate::metrics::SEAM_FANOUT,
+                "origin-key-mismatch"
+            ) > before,
+            "the origin-key mismatch must be counted (observe-only)"
+        );
     }
 }

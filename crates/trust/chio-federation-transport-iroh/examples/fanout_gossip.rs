@@ -165,14 +165,17 @@ async fn spawn_node(seed: u8, gate: DirectoryGate) -> Result<Node, Box<dyn Error
     // Spawn gossip and mount it on a router under its own ALPN (gossip owns the
     // ALPN; this lane does not invent one). Membership is gated upstream.
     let gossip = Gossip::builder().spawn(endpoint.clone());
+    // Build the lane before the router moves `endpoint`: the lane derives its
+    // authenticated local id from this endpoint, so it must see the real one.
+    let lane = FanoutLane::new(gossip.clone(), &endpoint);
     let router = Router::builder(endpoint)
-        .accept(iroh_gossip::ALPN, gossip.clone())
+        .accept(iroh_gossip::ALPN, gossip)
         .spawn();
     Ok(Node {
         id,
         addr,
         lookup,
-        lane: FanoutLane::new(gossip),
+        lane,
         router,
     })
 }
@@ -310,15 +313,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // The issuer-signed per-treaty party set the fan-out gate consults. Every node
     // (and the frame author) is a party to TREATY, so join and receive both admit;
     // a non-party would be rejected with FanoutError::TreatyMembershipDenied.
-    let membership = StaticTreatyMembership::new().with(
-        TREATY,
-        [
-            "did:chio:node-a",
-            "did:chio:node-b",
-            "did:chio:node-c",
-            AUTHOR,
-        ],
-    );
+    // The join gate resolves each node's authenticated EndpointId to its kernel id
+    // through this same membership, so bind every node's endpoint here.
+    let membership = StaticTreatyMembership::new()
+        .with(
+            TREATY,
+            [
+                "did:chio:node-a",
+                "did:chio:node-b",
+                "did:chio:node-c",
+                AUTHOR,
+            ],
+        )
+        .with_endpoint(node_a.id, "did:chio:node-a")
+        .with_endpoint(node_b.id, "did:chio:node-b")
+        .with_endpoint(node_c.id, "did:chio:node-c");
 
     println!("joining topic for {TREATY:?} (A seed; B<-A; C<-B) ...");
     let joined = tokio::time::timeout(Duration::from_secs(30), async {
