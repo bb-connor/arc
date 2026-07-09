@@ -289,8 +289,12 @@ impl ExporterManager {
             return Ok(());
         }
 
-        // Parse rows into SiemEvents.
+        // Parse rows into SiemEvents. `event_seqs` mirrors `events` (seq
+        // ascending) so a short/partial export can ack ONLY the delivered prefix
+        // (Codex round-6): a malformed row is skipped from both, so the index
+        // into `events` maps back to its DB seq via `event_seqs`.
         let mut events: Vec<SiemEvent> = Vec::with_capacity(rows.len());
+        let mut event_seqs: Vec<u64> = Vec::with_capacity(rows.len());
         let mut max_seq = self.cursor;
 
         for (seq, raw_json) in &rows {
@@ -300,6 +304,7 @@ impl ExporterManager {
                         receipt,
                         Some(&self.config.trusted_kernel_keys),
                     ));
+                    event_seqs.push(*seq);
                     if *seq > max_seq {
                         max_seq = *seq;
                     }
@@ -435,32 +440,66 @@ impl ExporterManager {
                 .map(|d| d.as_secs())
                 .unwrap_or(0);
             match result {
-                Ok(_exported) => {
+                Ok(exported) => {
+                    // A backend may return Ok(n) after accepting only the first n
+                    // events of the batch (a short/partial success distinct from
+                    // ExportError::PartialFailure). Treat the un-exported tail as
+                    // UNACKED: ack only through the delivered prefix so
+                    // at-least-once redelivers the tail next poll (Codex round-6).
+                    // `events`/`event_seqs` are seq-ascending, so the delivered
+                    // prefix is events[..delivered], acked at event_seqs[delivered-1].
+                    let delivered = exported.min(events.len());
+                    let delivered_events = &events[..delivered];
                     if records_soc {
-                        for _ in &events {
+                        for _ in delivered_events {
                             self.metrics.record_export(
                                 &exporter_name,
                                 crate::metrics_sink::ExportOutcome::Ok,
                             );
                         }
-                        // Lag: persistence-to-ack for the newest event in the
-                        // batch, tagged with the MAX severity present in the batch
-                        // (Codex round-5). Hard-coding "info" hid every
-                        // high/critical denial from the severity-specific
-                        // chio_soc_export_lag_seconds dashboards and alerts; a
-                        // batch containing a critical denial must record its lag
-                        // under severity="critical", not "info".
-                        if let Some(persisted) = events.iter().map(|e| e.receipt.timestamp).max() {
+                        // Lag: persistence-to-ack for the newest DELIVERED event,
+                        // tagged with the MAX severity present among the delivered
+                        // events (Codex round-5). An un-exported tail records no Ok
+                        // sample and no lag: it is redelivered, not acked, so
+                        // counting it as delivered would let a short success mask
+                        // the tail's real export latency.
+                        if let Some(persisted) =
+                            delivered_events.iter().map(|e| e.receipt.timestamp).max()
+                        {
                             self.metrics.observe_export_lag(
                                 &exporter_name,
-                                batch_max_severity_tag(&events),
+                                batch_max_severity_tag(delivered_events),
                                 now.saturating_sub(persisted) as f64,
                             );
                         }
                     }
-                    self.acked.insert(cursor_key.clone(), max_seq);
-                    if let Some(store) = &self.cursor_store {
-                        store.set_acked(&cursor_key, max_seq)?;
+                    // Advance the high-water mark through the delivered prefix
+                    // ONLY. A full batch acks max_seq (which also covers trailing
+                    // malformed rows already durably captured); a short success
+                    // acks event_seqs[delivered-1]; a zero-delivery Ok advances
+                    // nothing (whole batch redelivered). Never regress the
+                    // in-memory ack: the durable set_acked is already MAX-monotonic
+                    // in SQLite, but a plain insert of a stale/duplicate low batch
+                    // would regress the in-memory mark and re-export history
+                    // (Codex round-6, the resume follow-up).
+                    let ack_target = if delivered == events.len() {
+                        Some(max_seq)
+                    } else if delivered > 0 {
+                        event_seqs.get(delivered - 1).copied()
+                    } else {
+                        None
+                    };
+                    if let Some(target) = ack_target {
+                        let advanced = self
+                            .acked
+                            .get(&cursor_key)
+                            .copied()
+                            .unwrap_or(0)
+                            .max(target);
+                        self.acked.insert(cursor_key.clone(), advanced);
+                        if let Some(store) = &self.cursor_store {
+                            store.set_acked(&cursor_key, advanced)?;
+                        }
                     }
                 }
                 Err(e) => {
@@ -1041,6 +1080,37 @@ mod tests {
         }
     }
 
+    /// A mock exporter that accepts only the first `accept` events of each batch
+    /// and returns `Ok(accept)` (a SHORT success, distinct from a PartialFailure
+    /// error). Records the receipt ids it was handed on every call so a test can
+    /// prove the un-exported tail is redelivered rather than silently skipped.
+    struct ShortSuccessExporter {
+        name: String,
+        accept: usize,
+        seen: std::sync::Arc<Mutex<Vec<String>>>,
+    }
+
+    impl Exporter for ShortSuccessExporter {
+        fn export_batch<'a>(
+            &'a self,
+            events: &'a [SiemEvent],
+        ) -> crate::exporter::ExportFuture<'a> {
+            let seen = self.seen.clone();
+            let accept = self.accept;
+            Box::pin(async move {
+                if let Ok(mut guard) = seen.lock() {
+                    for event in events {
+                        guard.push(event.receipt.id.clone());
+                    }
+                }
+                Ok(accept.min(events.len()))
+            })
+        }
+        fn name(&self) -> &str {
+            &self.name
+        }
+    }
+
     /// Sign a minimal-but-valid receipt so the poll loop parses it into an event.
     fn sample_receipt(id: &str) -> Result<chio_core::receipt::body::ChioReceipt, Box<dyn Error>> {
         use chio_core::crypto::Keypair;
@@ -1231,6 +1301,79 @@ mod tests {
             manager.cursor, 100,
             "an exporter resumes at the mark persisted under its stable identity"
         );
+        Ok(())
+    }
+
+    /// Codex round-6: a SHORT success (a backend returns Ok(n) after accepting
+    /// only the first n of a larger batch) must advance the cursor ONLY past the
+    /// delivered events; the un-exported tail stays unacked and at-least-once
+    /// redelivers it. Without the fix the success arm acked the whole batch's
+    /// max_seq and the tail was permanently skipped on restart.
+    #[tokio::test]
+    async fn short_success_leaves_the_undelivered_tail_unacked_for_redelivery() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let receipt_db = dir.path().join("receipts.sqlite3");
+        // seq 1 = rcpt-0000, seq 2 = rcpt-0001 (AUTOINCREMENT in insertion order).
+        seed_valid_receipt_db(&receipt_db, 2)?;
+        let cursor_db = dir.path().join("cursor.sqlite3");
+
+        let seen = std::sync::Arc::new(Mutex::new(Vec::new()));
+        let mut manager = ExporterManager::new(SiemConfig {
+            db_path: receipt_db.clone(),
+            cursor_db_path: Some(cursor_db.clone()),
+            max_retries: 0,
+            ..SiemConfig::default()
+        })?;
+        manager.add_exporter(Box::new(ShortSuccessExporter {
+            name: "webhook".to_string(),
+            accept: 1,
+            seen: seen.clone(),
+        }));
+
+        // Poll 1: batch [seq1, seq2]; the exporter accepts only seq1. The cursor
+        // must advance to seq 1 (the delivered event) ONLY, not the batch max 2.
+        manager.poll_once().await?;
+        assert_eq!(
+            manager.cursor, 1,
+            "a short success advances the cursor only past the delivered event"
+        );
+
+        // Poll 2: the un-exported tail (seq 2) is redelivered and now accepted.
+        manager.poll_once().await?;
+        assert_eq!(
+            manager.cursor, 2,
+            "the redelivered tail is acked once it is actually delivered"
+        );
+
+        let seen = seen
+            .lock()
+            .map_err(|_| std::io::Error::other("seen lock poisoned"))?;
+        // Poll 1 delivered [head(seq1), tail(seq2)]; poll 2 re-delivered the tail.
+        // Receipt ids are content hashes, so identify head/tail by delivery order.
+        assert_eq!(
+            seen.len(),
+            3,
+            "expected head, tail, redelivered tail: {seen:?}"
+        );
+        let head = &seen[0];
+        let tail = &seen[1];
+        assert_ne!(
+            head, tail,
+            "head and tail must be distinct receipts: {seen:?}"
+        );
+        assert_eq!(
+            &seen[2], tail,
+            "the un-exported tail must be the receipt redelivered on poll 2: {seen:?}"
+        );
+        assert_eq!(
+            seen.iter().filter(|id| *id == head).count(),
+            1,
+            "the delivered head must NOT be redelivered (its ack advanced): {seen:?}"
+        );
+
+        // The durable cursor persisted the tail ack (no permanent skip on restart).
+        let store = crate::cursor_store::SiemCursorStore::open(&cursor_db)?;
+        assert_eq!(store.acked_seqs()?.get("webhook").copied(), Some(2));
         Ok(())
     }
 
