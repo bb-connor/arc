@@ -73,6 +73,30 @@ fn receipt_log_basics() {
 }
 
 #[test]
+fn kernel_bounded_registry_lists_every_labelled_structure() {
+    // RFC-0004 sections 4/6: every kernel-held bounded structure has a live
+    // gauge; the registry enumerates them so the soak harness and a future
+    // long-lived-collection lint can read them. Fails if a label is dropped.
+    let kernel = make_kernel(make_config());
+    let labels: Vec<&'static str> = kernel
+        .bounded_structure_gauges()
+        .into_iter()
+        .map(|(label, _count)| label)
+        .collect();
+    for expected in [
+        "receipt_mirror",
+        "child_receipt_mirror",
+        "federation_dual_receipts",
+        "federation_dsse_envelopes",
+    ] {
+        assert!(
+            labels.contains(&expected),
+            "bounded registry is missing the gauge label {expected}: {labels:?}"
+        );
+    }
+}
+
+#[test]
 fn receipt_log_ring_caps_and_reports_gauge() {
     // RFC-0004 F03/F25: the mirror is a capacity-bounded ring reporting a live
     // gauge; appends past the cap evict the oldest, they never grow the Vec.

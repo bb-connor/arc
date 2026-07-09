@@ -257,12 +257,9 @@ pub struct ChioKernel {
     pub(super) child_receipt_log: Mutex<ChildReceiptLog>,
     /// Live entry-count gauges for the two receipt mirrors (RFC-0004 section 4).
     /// Cloned from the ring's gauge at construction so telemetry and the
-    /// bounded-structure registry can read the count without locking the log.
-    // Read by `bounded_structure_gauges()` (added in the registry task); the
-    // allow is removed there once the reader lands.
-    #[allow(dead_code)]
+    /// bounded-structure registry (`bounded_structure_gauges`) can read the
+    /// count without locking the log.
     pub(super) receipt_mirror_gauge: chio_bounded::SizeGauge,
-    #[allow(dead_code)]
     pub(super) child_receipt_mirror_gauge: chio_bounded::SizeGauge,
     pub(super) receipt_store: Option<Arc<dyn ReceiptStore>>,
     pub(super) receipt_store_write_lock: Mutex<()>,
@@ -347,14 +344,12 @@ pub struct ChioKernel {
     /// F10): federated calls no longer grow kernel RSS without bound.
     pub(super) federation_dual_receipts:
         Mutex<chio_bounded::BoundedMap<String, chio_federation::bilateral::DualSignedReceipt>>,
-    #[allow(dead_code)]
     pub(super) federation_dual_receipts_gauge: chio_bounded::SizeGauge,
     /// DSSE signature-slice envelopes, indexed by ChioReceipt.id.
     /// These are emitted through the federation cosigner protocol rather than
     /// by loading Org A private key material in the tool-host kernel.
     pub(super) federation_dsse_envelopes:
         Mutex<chio_bounded::BoundedMap<String, chio_federation::bilateral_dsse::DsseEnvelope>>,
-    #[allow(dead_code)]
     pub(super) federation_dsse_envelopes_gauge: chio_bounded::SizeGauge,
     /// Optional durable backing for bilateral co-sign artifacts (RFC-0004 F10).
     /// When set, the co-sign hook writes through to it before caching and the

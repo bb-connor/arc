@@ -1046,6 +1046,29 @@ impl ChioKernel {
         self.rss_shed.load(Ordering::Relaxed)
     }
 
+    /// Enumerate each long-lived bounded structure's telemetry label and its
+    /// current live entry count (RFC-0004 sections 4 and 6). This is the
+    /// registry the size-metric convention and the soak harness read; adding a
+    /// new long-lived collection without a gauge here fails the registry test.
+    #[must_use]
+    pub fn bounded_structure_gauges(&self) -> Vec<(&'static str, usize)> {
+        vec![
+            ("receipt_mirror", self.receipt_mirror_gauge.get()),
+            (
+                "child_receipt_mirror",
+                self.child_receipt_mirror_gauge.get(),
+            ),
+            (
+                "federation_dual_receipts",
+                self.federation_dual_receipts_gauge.get(),
+            ),
+            (
+                "federation_dsse_envelopes",
+                self.federation_dsse_envelopes_gauge.get(),
+            ),
+        ]
+    }
+
     #[cfg(test)]
     pub(crate) fn set_rss_shed_for_test(&self, on: bool) {
         self.rss_shed.store(on, Ordering::Relaxed);
