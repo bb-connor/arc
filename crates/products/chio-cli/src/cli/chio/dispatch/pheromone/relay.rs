@@ -2,8 +2,9 @@ use super::{
     build_iroh_outbound_endpoint, build_iroh_router, build_peer_directory_bundle_trust,
     iroh_transport_metrics_prometheus, load_chio_verified_workflow_resolver,
     load_chio_workflow_verifier_trust_bundle, load_iroh_serve_inputs,
-    load_relay_peer_directory_from_paths, load_relay_signing_key, read_json_documents_from_dir,
-    read_utf8_json_file, unix_now_ms, write_json_string, write_pretty_json, IrohServeInputs,
+    load_relay_peer_directory_from_paths, load_relay_signing_key, note_router_liveness,
+    read_json_documents_from_dir, read_utf8_json_file, run_directory_reloader, unix_now_ms,
+    write_json_string, write_pretty_json, DirectoryReloadConfig, IrohServeInputs,
 };
 use crate::CliError;
 use std::collections::HashMap;
@@ -316,10 +317,63 @@ pub(crate) fn cmd_chio_pheromone_relay_serve(
             .map_err(|error| {
                 CliError::cli_other_error(format!("Chio pheromone relay bind: {error}"))
             })?;
+
+        // RFC-0012: spawn the directory reloader (F34) and the router-liveness
+        // watchdog (F33d) alongside the serve when the iroh transport is mounted.
+        // Both reuse the dedicated liveness-task pattern and are aborted before the
+        // router teardown below.
+        let iroh_background = iroh_mount.as_ref().map(|mount| {
+            let alive = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
+            chio_federation_transport_iroh::metrics::set_router_alive(true);
+
+            // Re-verify the directory bundle every interval, fail closed on expiry.
+            let reloader = match (iroh_transport_directory, trusted_issuers) {
+                (Some(bundle_path), Some(issuers_path)) => {
+                    let reload_config = DirectoryReloadConfig {
+                        interval: std::time::Duration::from_secs(60),
+                        bundle_path: bundle_path.to_path_buf(),
+                        trusted_issuers_path: issuers_path.to_path_buf(),
+                        state_path: iroh_transport_directory_state
+                            .map(std::path::Path::to_path_buf),
+                    };
+                    Some(tokio::spawn(run_directory_reloader(
+                        mount.gate.clone(),
+                        reload_config,
+                        std::sync::Arc::new(unix_now_ms),
+                        std::sync::Arc::clone(&alive),
+                    )))
+                }
+                _ => None,
+            };
+
+            // A panicked accept task kills the whole Router while HTTP keeps
+            // serving; poll liveness and make the freeze loud.
+            let router = mount.router.clone();
+            let watchdog_alive = std::sync::Arc::clone(&alive);
+            let watchdog = tokio::spawn(async move {
+                let mut ticker = tokio::time::interval(std::time::Duration::from_secs(5));
+                loop {
+                    ticker.tick().await;
+                    if router.is_shutdown() || router.endpoint().is_closed() {
+                        note_router_liveness(false);
+                        watchdog_alive.store(false, std::sync::atomic::Ordering::SeqCst);
+                        break;
+                    }
+                }
+            });
+            (reloader, watchdog)
+        });
+
         let serve_result = service
             .serve(listener)
             .await
             .map_err(|error| CliError::cli_other_error(format!("Chio pheromone relay: {error}")));
+        if let Some((reloader, watchdog)) = iroh_background {
+            if let Some(reloader) = reloader {
+                reloader.abort();
+            }
+            watchdog.abort();
+        }
         if let Some(mount) = iroh_mount {
             // The live iroh federation-transport metrics are scraped on the relay's
             // own /metrics endpoint for the whole process lifetime (see the

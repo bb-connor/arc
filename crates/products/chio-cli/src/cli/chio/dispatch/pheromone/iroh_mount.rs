@@ -44,6 +44,7 @@
 
 use std::net::SocketAddr;
 use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -174,6 +175,10 @@ pub(crate) struct IrohMount {
     pub(crate) bound_sockets: Vec<SocketAddr>,
     /// The lane labels actually mounted (for the startup log line).
     pub(crate) enabled_lanes: Vec<&'static str>,
+    /// The admission gate installed on the endpoint (shares one Arc<ArcSwap> with
+    /// the installed hook), so the directory reloader can publish re-verified
+    /// directories that every lane observes immediately (RFC-0012 F34).
+    pub(crate) gate: DirectoryGate,
 }
 
 /// Render the iroh federation-transport Prometheus metric families.
@@ -451,6 +456,223 @@ pub(crate) fn load_iroh_serve_inputs(
     }))
 }
 
+// -- Live directory reload (RFC-0012 F34) ------------------------------------
+
+/// A directory-reload failure. Never crosses the trust boundary as an admit: the
+/// reloader keeps last-good on a transient error and fails closed on expiry.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum DirectoryReloadError {
+    #[error("directory reload read error: {0}")]
+    Read(String),
+    #[error("directory reload verify error: {0}")]
+    Verify(String),
+    #[error("directory reload rollback: on-disk version {found} is not above current {current}")]
+    Rollback { found: u64, current: u64 },
+}
+
+/// The outcome of one reload evaluation.
+#[derive(Debug)]
+pub(crate) enum ReloadOutcome {
+    /// A strictly-newer, in-window bundle re-verified; swap it in.
+    Updated(VerifiedDirectory),
+    /// The on-disk bundle is unchanged and still in-window; no swap.
+    Unchanged,
+    /// The running bundle expired with no valid successor; swap to deny-all.
+    ExpiredWhileRunning,
+}
+
+/// Inputs for the bounded poll reloader.
+pub(crate) struct DirectoryReloadConfig {
+    pub interval: Duration,
+    pub bundle_path: PathBuf,
+    pub trusted_issuers_path: PathBuf,
+    pub state_path: Option<PathBuf>,
+}
+
+/// Read + parse the on-disk transport directory bundle (no verification).
+fn read_bundle_document(path: &Path) -> Result<TransportDirectoryBundleDocument, String> {
+    let json = read_utf8_json_file(path, "Chio iroh transport directory bundle")
+        .map_err(|error| error.to_string())?;
+    serde_json::from_str(&json).map_err(|error| error.to_string())
+}
+
+/// Read + parse the trusted-issuers file into the verifier's issuer list.
+fn read_trusted_issuers(path: &Path) -> Result<Vec<TrustedTransportDirectoryIssuer>, String> {
+    let json = read_utf8_json_file(path, "Chio iroh transport trusted issuers")
+        .map_err(|error| error.to_string())?;
+    let document: super::relay::RelayTrustedIssuersDocument =
+        serde_json::from_str(&json).map_err(|error| error.to_string())?;
+    let issuers: Vec<TrustedTransportDirectoryIssuer> = document
+        .issuers
+        .into_iter()
+        .map(|issuer| TrustedTransportDirectoryIssuer {
+            issuer: issuer.issuer,
+            key_id: issuer.key_id,
+            public_key: issuer.public_key,
+        })
+        .collect();
+    if issuers.is_empty() {
+        return Err("no issuers configured".to_string());
+    }
+    Ok(issuers)
+}
+
+/// Re-verify the directory bundle, fail-closed. EXPIRY IS CHECKED BEFORE THE
+/// UNCHANGED FAST PATH (RFC-0012 F34, absorbed Codex fix): an unchanged-but-
+/// expired bundle must not be treated as valid; with no strictly-newer in-window
+/// successor it fails closed as `ExpiredWhileRunning`.
+pub(crate) fn reload_verified_directory(
+    config: &DirectoryReloadConfig,
+    now: u64,
+    current_version: u64,
+    current_expires_at_unix_ms: u64,
+    current_body_sha256: &str,
+) -> Result<ReloadOutcome, DirectoryReloadError> {
+    let expired = current_expires_at_unix_ms <= now;
+
+    // Read the on-disk bundle. If it cannot be read and the running bundle is
+    // expired, we cannot keep serving it -> fail closed; else keep last-good.
+    let bundle = match read_bundle_document(&config.bundle_path) {
+        Ok(bundle) => bundle,
+        Err(error) => {
+            if expired {
+                return Ok(ReloadOutcome::ExpiredWhileRunning);
+            }
+            return Err(DirectoryReloadError::Read(error));
+        }
+    };
+
+    // Fast path ONLY when still in-window: a genuinely unchanged, still-valid
+    // bundle needs no re-verify. Guarded by `!expired` so an expired bundle can
+    // never be short-circuited as Unchanged.
+    if !expired && bundle.body.version == current_version {
+        return Ok(ReloadOutcome::Unchanged);
+    }
+
+    if bundle.body.version > current_version {
+        // Strictly newer: verify against a floor of the current version, chaining
+        // onto the current body hash, with a FRESH now. verify_bundle's validity
+        // window rejects an already-expired successor, so an expired bundle cannot
+        // be swapped in.
+        let issuers = match read_trusted_issuers(&config.trusted_issuers_path) {
+            Ok(issuers) => issuers,
+            Err(error) => {
+                if expired {
+                    return Ok(ReloadOutcome::ExpiredWhileRunning);
+                }
+                return Err(DirectoryReloadError::Read(error));
+            }
+        };
+        let trust = TransportDirectoryBundleTrust {
+            issuers,
+            version_floor: current_version,
+            expected_previous_version_sha256: Some(current_body_sha256.to_string()),
+            now_unix_ms: now,
+        };
+        return match bundle.verify_bundle(&trust) {
+            Ok(verified) => Ok(ReloadOutcome::Updated(verified)),
+            Err(error) => {
+                if expired {
+                    Ok(ReloadOutcome::ExpiredWhileRunning)
+                } else {
+                    Err(DirectoryReloadError::Verify(error.to_string()))
+                }
+            }
+        };
+    }
+
+    // version <= current and not the in-window-unchanged case: either a rollback
+    // attempt or an expired bundle with no newer successor. Fail closed if
+    // expired; else reject the rollback and keep last-good.
+    if expired {
+        Ok(ReloadOutcome::ExpiredWhileRunning)
+    } else {
+        Err(DirectoryReloadError::Rollback {
+            found: bundle.body.version,
+            current: current_version,
+        })
+    }
+}
+
+/// Bounded poll loop: every `interval`, re-verify the directory and either swap
+/// in a successor, alarm + deny-all on expiry, or keep last-good. Reuses the
+/// dedicated-liveness-task pattern (a task feeding shared state, joined on
+/// shutdown).
+// RFC-0012: implemented inline; reconcile to RFC-0001's canonical liveness-task
+// pattern when it lands.
+pub(crate) async fn run_directory_reloader(
+    gate: DirectoryGate,
+    config: DirectoryReloadConfig,
+    now_fn: Arc<dyn Fn() -> u64 + Send + Sync>,
+    alive: Arc<std::sync::atomic::AtomicBool>,
+) {
+    use std::sync::atomic::Ordering;
+    let mut ticker = tokio::time::interval(config.interval);
+    loop {
+        ticker.tick().await;
+        let now = now_fn();
+        match reload_verified_directory(
+            &config,
+            now,
+            gate.current_version(),
+            gate.current_expires_at_unix_ms(),
+            &gate.current_body_sha256(),
+        ) {
+            Ok(ReloadOutcome::Updated(next)) => {
+                gate.swap(Arc::new(next));
+                chio_federation_transport_iroh::metrics::record_directory_reload(
+                    chio_federation_transport_iroh::metrics::RELOAD_UPDATED,
+                );
+            }
+            Ok(ReloadOutcome::Unchanged) => {
+                chio_federation_transport_iroh::metrics::record_directory_reload(
+                    chio_federation_transport_iroh::metrics::RELOAD_UNCHANGED,
+                );
+            }
+            Ok(ReloadOutcome::ExpiredWhileRunning) => {
+                gate.swap(Arc::new(
+                    chio_federation_transport_iroh::identity::VerifiedDirectory::empty_deny_all(),
+                ));
+                alive.store(false, Ordering::SeqCst);
+                chio_federation_transport_iroh::metrics::record_directory_reload(
+                    chio_federation_transport_iroh::metrics::RELOAD_EXPIRED_FAILCLOSED,
+                );
+                tracing::error!(
+                    target: chio_federation_transport_iroh::observability::TARGET_ADMISSION,
+                    "transport directory expired with no valid successor; admitting nothing"
+                );
+            }
+            Err(error) => {
+                chio_federation_transport_iroh::metrics::record_directory_reload(
+                    chio_federation_transport_iroh::metrics::RELOAD_ERROR,
+                );
+                tracing::warn!(
+                    target: chio_federation_transport_iroh::observability::TARGET_ADMISSION,
+                    error = %error,
+                    "transport directory reload failed; keeping last-good"
+                );
+            }
+        }
+    }
+}
+
+/// Per-tick router-liveness step (RFC-0012 F33d), testable without a live router:
+/// flip the `chio_iroh_router_alive` gauge and, on the transition to dead, log an
+/// alarm so a panicked accept task that silently kills the router (while HTTP keeps
+/// serving) becomes loud. Returns the liveness it was given.
+// RFC-0012: implemented inline; reconcile to RFC-0001's canonical liveness-task
+// pattern when it lands.
+pub(crate) fn note_router_liveness(alive: bool) -> bool {
+    chio_federation_transport_iroh::metrics::set_router_alive(alive);
+    if !alive {
+        tracing::error!(
+            target: chio_federation_transport_iroh::observability::TARGET_ADMISSION,
+            "iroh router is down; federation ingress frozen while HTTP keeps serving"
+        );
+    }
+    alive
+}
+
 /// Build and spawn the iroh router, sharing the relay's receiver + store.
 ///
 /// One `Endpoint` with the [`DirectoryGate`] installed via `.hooks(gate)` (so
@@ -573,7 +795,9 @@ pub(crate) async fn build_iroh_router(
     // max_body_bytes: 256 KiB production / 1 MiB local-dev) on the iroh ingress, so
     // the new transport is no laxer than the HTTP `DefaultBodyLimit` (fail-closed;
     // clamped to the transport hard cap inside the handler).
-    let handler = PheromoneBatchHandler::new(gate, receiver, store, now_fn, scope_check)
+    // Clone the gate for the handler (it also feeds the installed .hooks(gate)):
+    // the mount keeps a clone so the reloader can swap the shared directory.
+    let handler = PheromoneBatchHandler::new(gate.clone(), receiver, store, now_fn, scope_check)
         .with_max_batch_bytes(max_batch_bytes);
     let router = mount_pheromone_lane(endpoint, handler);
 
@@ -583,6 +807,7 @@ pub(crate) async fn build_iroh_router(
         endpoint_id,
         bound_sockets,
         enabled_lanes,
+        gate,
     })
 }
 
@@ -1057,6 +1282,158 @@ mod tests {
             version,
             previous_version_sha256,
         )
+    }
+
+    /// Write a signed, verifiable transport-directory bundle (peer did:chio:bob at
+    /// transport seed 24, optionally tombstoned) plus its trusted-issuers file to
+    /// `dir`. Returns (bundle_path, issuers_path, expires_at, body_sha256). The body
+    /// hash is the full-document canonical sha256 the gate reports, so a successor
+    /// can chain onto it. Bundles carry expires_at = NOW + 1.
+    fn write_test_bundle(
+        dir: &std::path::Path,
+        version: u64,
+        removed: bool,
+        previous_version_sha256: Option<String>,
+    ) -> (PathBuf, PathBuf, u64, String) {
+        let issuer = Keypair::from_seed(&[240u8; 32]);
+        let mut peer = directory_entry("did:chio:bob", 7, 24);
+        peer.removed = removed;
+        let directory = TransportDirectoryDocument {
+            schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
+            local_kernel_id: LOCAL_KERNEL_ID.to_string(),
+            peers: vec![local_relay_entry(LOCAL_TRANSPORT_SEED), peer],
+            treaties: Vec::new(),
+        };
+        let directory_sha256 = sha256_hex(&canonical_json_bytes(&directory).unwrap());
+        let expires_at = NOW + 1;
+        let body = TransportDirectoryBundleBody {
+            schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
+            issuer: "did:chio:issuer".to_string(),
+            key_id: "issuer-key-1".to_string(),
+            directory_sha256,
+            version,
+            previous_version_sha256,
+            issued_at_unix_ms: NOW - 1,
+            expires_at_unix_ms: expires_at,
+        };
+        let (signature, _) = issuer.sign_canonical(&body).unwrap();
+        let bundle = TransportDirectoryBundleDocument {
+            schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
+            body,
+            directory,
+            signature,
+        };
+        let body_hash = sha256_hex(&canonical_json_bytes(&bundle).unwrap());
+        let bundle_path = dir.join(format!("bundle-{version}.json"));
+        std::fs::write(&bundle_path, serde_json::to_string(&bundle).unwrap()).unwrap();
+        let issuers_path = dir.join("issuers.json");
+        let issuers = serde_json::json!({
+            "issuers": [{
+                "issuer": "did:chio:issuer",
+                "keyId": "issuer-key-1",
+                "publicKey": issuer.public_key(),
+            }],
+        });
+        std::fs::write(&issuers_path, serde_json::to_string(&issuers).unwrap()).unwrap();
+        (bundle_path, issuers_path, expires_at, body_hash)
+    }
+
+    #[test]
+    fn reload_expiry_is_checked_before_the_unchanged_fast_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let (bundle_path, issuers_path, expires_at, body_hash) =
+            write_test_bundle(dir.path(), 1, false, None);
+        let config = DirectoryReloadConfig {
+            interval: Duration::from_secs(60),
+            bundle_path,
+            trusted_issuers_path: issuers_path,
+            state_path: None,
+        };
+
+        // In-window, same version on disk => Unchanged (the fast path fires).
+        let now_in_window = expires_at - 1;
+        assert!(matches!(
+            reload_verified_directory(&config, now_in_window, 1, expires_at, &body_hash)
+                .expect("reload runs"),
+            ReloadOutcome::Unchanged
+        ));
+
+        // CODEX FIX: same (unchanged) version on disk but now PAST expiry must NOT
+        // short-circuit to Unchanged; with no strictly-newer in-window successor it
+        // fails closed as ExpiredWhileRunning.
+        let now_expired = expires_at + 1;
+        assert!(matches!(
+            reload_verified_directory(&config, now_expired, 1, expires_at, &body_hash)
+                .expect("reload runs"),
+            ReloadOutcome::ExpiredWhileRunning
+        ));
+    }
+
+    #[test]
+    fn directory_reload_swaps_in_successor_and_evicts_tombstoned_peer() {
+        let dir = tempfile::tempdir().unwrap();
+        // Genesis version 1 (peer live); its full-document hash is the chain pin.
+        let (_v1_path, _v1_issuers, _v1_expires, v1_hash) =
+            write_test_bundle(dir.path(), 1, false, None);
+        // Version 2 on disk tombstones the peer, chaining onto v1's hash.
+        let (bundle_path, issuers_path, expires_at, _v2_hash) =
+            write_test_bundle(dir.path(), 2, true, Some(v1_hash.clone()));
+        let config = DirectoryReloadConfig {
+            interval: Duration::from_secs(60),
+            bundle_path,
+            trusted_issuers_path: issuers_path,
+            state_path: None,
+        };
+
+        let now_in_window = expires_at - 1;
+        let outcome = reload_verified_directory(&config, now_in_window, 1, expires_at, &v1_hash)
+            .expect("reload runs");
+        let verified = match outcome {
+            ReloadOutcome::Updated(verified) => verified,
+            _ => panic!("expected Updated for a strictly-newer in-window successor"),
+        };
+        // Apply it through the gate and assert the tombstoned peer no longer admits.
+        let gate = DirectoryGate::new(std::sync::Arc::new(verified));
+        assert_eq!(gate.current_version(), 2);
+        assert_eq!(gate.resolve(&endpoint_from_seed(24)), None);
+    }
+
+    #[test]
+    fn watchdog_flips_gauge_and_alarms_on_death() {
+        // A liveness probe reporting dead flips the router-alive gauge to 0 (the
+        // testable per-tick step the spawned watchdog loops over) (RFC-0012 F33d).
+        chio_federation_transport_iroh::metrics::set_router_alive(true);
+        let dead = true;
+        note_router_liveness(!dead); // alive = false
+        assert_eq!(chio_federation_transport_iroh::metrics::router_alive(), 0);
+        // A live probe restores the gauge.
+        note_router_liveness(true);
+        assert_eq!(chio_federation_transport_iroh::metrics::router_alive(), 1);
+    }
+
+    #[test]
+    fn directory_reload_rejects_rollback_and_keeps_last_good() {
+        let dir = tempfile::tempdir().unwrap();
+        // On-disk bundle is version 1; the running directory is already at version 3.
+        let (bundle_path, issuers_path, expires_at, _hash) =
+            write_test_bundle(dir.path(), 1, false, None);
+        let config = DirectoryReloadConfig {
+            interval: Duration::from_secs(60),
+            bundle_path,
+            trusted_issuers_path: issuers_path,
+            state_path: None,
+        };
+        let now_in_window = expires_at - 1;
+        let error =
+            reload_verified_directory(&config, now_in_window, 3, expires_at, "current-hash")
+                .expect_err("an in-window rollback is rejected");
+        assert!(matches!(
+            error,
+            DirectoryReloadError::Rollback {
+                found: 1,
+                current: 3
+            }
+        ));
     }
 
     #[test]

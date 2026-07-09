@@ -407,6 +407,64 @@ pub fn verify_failures_total(seam: &'static str, reason: &'static str) -> u64 {
     }
 }
 
+// -- Directory reload outcomes (RFC-0012 F34) --------------------------------
+
+/// Reload outcome: a strictly-newer, in-window bundle re-verified and swapped in.
+pub const RELOAD_UPDATED: &str = "updated";
+/// Reload outcome: the on-disk bundle is unchanged and still in-window (no swap).
+pub const RELOAD_UNCHANGED: &str = "unchanged";
+/// Reload outcome: the running bundle expired with no valid successor; the gate
+/// was swapped to deny-all (fail-closed) and an alarm raised. Operators alert on
+/// this being non-zero.
+pub const RELOAD_EXPIRED_FAILCLOSED: &str = "expired_failclosed";
+/// Reload outcome: a transient read/verify/rollback error; last-good is kept.
+pub const RELOAD_ERROR: &str = "error";
+const NUM_RELOAD_OUTCOME: usize = 4;
+
+static DIRECTORY_RELOAD: [AtomicU64; NUM_RELOAD_OUTCOME] = [
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+];
+
+fn reload_outcome_index(outcome: &str) -> usize {
+    match outcome {
+        "updated" => 0,
+        "unchanged" => 1,
+        "expired_failclosed" => 2,
+        _ => 3, // error
+    }
+}
+
+/// Record one directory-reload outcome (observe-only).
+pub fn record_directory_reload(outcome: &str) {
+    DIRECTORY_RELOAD[reload_outcome_index(outcome)].fetch_add(1, Ordering::Relaxed);
+}
+
+/// The count of a directory-reload outcome (for tests / export).
+#[must_use]
+pub fn directory_reload_total(outcome: &str) -> u64 {
+    DIRECTORY_RELOAD[reload_outcome_index(outcome)].load(Ordering::Relaxed)
+}
+
+// -- Router-liveness gauge (RFC-0012 F33d) -----------------------------------
+
+static ROUTER_ALIVE: AtomicU64 = AtomicU64::new(1);
+
+/// Set the router-liveness gauge (RFC-0012 F33d): 1 = the iroh Router run loop
+/// and endpoint are live, 0 = the router died (a panicked accept task killed it)
+/// while HTTP may keep serving. Operators alert on 0.
+pub fn set_router_alive(alive: bool) {
+    ROUTER_ALIVE.store(u64::from(alive), Ordering::Relaxed);
+}
+
+/// The current router-liveness gauge value (1 alive / 0 dead).
+#[must_use]
+pub fn router_alive() -> u64 {
+    ROUTER_ALIVE.load(Ordering::Relaxed)
+}
+
 // -- Prometheus rendering ----------------------------------------------------
 
 const LANES: [&str; NUM_LANES] = ["pheromone", "revocation", "bilateral", "fanout"];
@@ -682,5 +740,25 @@ mod tests {
         assert!(body.contains("seam=\"revocation\",reason=\"bad-signature\""));
         assert!(body.contains("chio_federation_transport_accept_duration_seconds_bucket"));
         assert!(body.contains("le=\"+Inf\""));
+    }
+
+    #[test]
+    fn directory_reload_fail_closed_outcome_is_counted() {
+        // Observe-only monotone lower bound: an expired-with-no-successor reload
+        // increments its counter so operators can alert on it (RFC-0012 F34).
+        let before = directory_reload_total(RELOAD_EXPIRED_FAILCLOSED);
+        record_directory_reload(RELOAD_EXPIRED_FAILCLOSED);
+        assert!(
+            directory_reload_total(RELOAD_EXPIRED_FAILCLOSED) > before,
+            "an expired-while-running reload must be counted"
+        );
+    }
+
+    #[test]
+    fn router_alive_gauge_reflects_liveness() {
+        set_router_alive(true);
+        assert_eq!(router_alive(), 1);
+        set_router_alive(false);
+        assert_eq!(router_alive(), 0);
     }
 }
