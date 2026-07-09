@@ -109,6 +109,31 @@ pub(crate) async fn handle_try_increment_budget(
     )
 }
 
+/// Mint a unique event_id for a budget write whose caller omitted `eventId`, so
+/// the mutation event is stored under a KNOWN id and `budget_write_token` can look
+/// up THIS write's exact event_seq instead of falling back to the authority MAX
+/// (which a concurrent same-authority write to another capability can raise,
+/// making the quorum wait target a later event and spuriously roll back / 503 a
+/// write that itself reached quorum) (codex #965 round-4 P2).
+///
+/// Uniqueness: a process-local monotonic counter + wall-clock nanos + pid, so it
+/// cannot collide with a concurrent write or a caller-supplied id. An omitted
+/// `eventId` already carries NO idempotency guarantee (the store would otherwise
+/// auto-generate one internally), so minting it here changes no retry semantics.
+fn generated_budget_event_id() -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_nanos())
+        .unwrap_or(0);
+    let sequence = COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!(
+        "cluster-budget-write-{}-{nanos}-{sequence}",
+        std::process::id()
+    )
+}
+
 /// Build the quorum-witness token for a budget write from its origin authority
 /// and THIS write's own event_seq.
 ///
@@ -119,11 +144,13 @@ pub(crate) async fn handle_try_increment_budget(
 /// commit (or a retry while later same-origin events exist) raises that MAX
 /// above this write's seq, so the quorum wait would target a later event and
 /// `handle_try_charge_cost` would roll back a write that itself reached quorum
-/// (codex #965 round-2 P1). When no event_id is available (or the row is not
-/// found) it falls back to the authority MAX, which can only OVER-target the seq
-/// (wait longer), never under-target it, so the witness still never over-counts
-/// (fail-closed). A single-node write (no authority) carries a placeholder token
-/// and the quorum wait short-circuits when unclustered (RFC-0011 D2, F16).
+/// (codex #965 round-2 P1). The handlers now always mint an event_id when the
+/// caller omitted one (`generated_budget_event_id`), so the by-id lookup is
+/// precise; the authority-MAX fallback remains only as a defensive path (row not
+/// found) and can only OVER-target the seq (wait longer), never under-target it,
+/// so the witness still never over-counts (fail-closed). A single-node write (no
+/// authority) carries a placeholder token and the quorum wait short-circuits when
+/// unclustered (RFC-0011 D2, F16).
 fn budget_write_token(
     store: &SqliteBudgetStore,
     authority: Option<&BudgetEventAuthority>,
@@ -183,6 +210,14 @@ pub(crate) async fn handle_try_charge_cost(
         Ok(store) => store,
         Err(response) => return response,
     };
+    // Mint an event_id when the caller omitted one, and use it for BOTH the write
+    // and the witness token so the quorum wait targets THIS write's exact
+    // event_seq, never a concurrent same-authority write's higher seq (codex #965
+    // round-4 P2).
+    let effective_event_id = payload
+        .event_id
+        .clone()
+        .unwrap_or_else(generated_budget_event_id);
     let allowed = match store.try_charge_cost_with_ids_and_authority(
         &payload.capability_id,
         payload.grant_index,
@@ -191,7 +226,7 @@ pub(crate) async fn handle_try_charge_cost(
         payload.max_cost_per_invocation,
         payload.max_total_cost_units,
         payload.hold_id.as_deref(),
-        payload.event_id.as_deref(),
+        Some(effective_event_id.as_str()),
         authority.as_ref(),
     ) {
         Ok(allowed) => allowed,
@@ -200,11 +235,14 @@ pub(crate) async fn handle_try_charge_cost(
         }
     };
     if allowed {
-        let write =
-            match budget_write_token(&store, authority.as_ref(), payload.event_id.as_deref()) {
-                Ok(write) => write,
-                Err(response) => return response,
-            };
+        let write = match budget_write_token(
+            &store,
+            authority.as_ref(),
+            Some(effective_event_id.as_str()),
+        ) {
+            Ok(write) => write,
+            Err(response) => return response,
+        };
         let committed_response = match store.get_usage(&payload.capability_id, payload.grant_index)
         {
             Ok(Some(usage)) => Some(TryChargeCostResponse {
@@ -309,17 +347,27 @@ pub(crate) async fn handle_reverse_charge_cost(
             Ok(authority) => authority,
             Err(response) => return response,
         };
+    // Mint an event_id when omitted so the witness waits on this reverse's exact
+    // event_seq, not the authority MAX (codex #965 round-4 P2).
+    let effective_event_id = payload
+        .event_id
+        .clone()
+        .unwrap_or_else(generated_budget_event_id);
     if let Err(error) = store.reverse_charge_cost_with_ids_and_authority(
         &payload.capability_id,
         payload.grant_index,
         payload.cost_units,
         payload.hold_id.as_deref(),
-        payload.event_id.as_deref(),
+        Some(effective_event_id.as_str()),
         authority.as_ref(),
     ) {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
     }
-    let write = match budget_write_token(&store, authority.as_ref(), payload.event_id.as_deref()) {
+    let write = match budget_write_token(
+        &store,
+        authority.as_ref(),
+        Some(effective_event_id.as_str()),
+    ) {
         Ok(write) => write,
         Err(response) => return response,
     };
@@ -377,6 +425,12 @@ pub(crate) async fn handle_reduce_charge_cost(
             Ok(authority) => authority,
             Err(response) => return response,
         };
+    // Mint an event_id when omitted so the witness waits on this reconcile's exact
+    // event_seq, not the authority MAX (codex #965 round-4 P2).
+    let effective_event_id = payload
+        .event_id
+        .clone()
+        .unwrap_or_else(generated_budget_event_id);
     let reconcile_result = if let (Some(exposure_units), Some(realized_spend_units)) =
         (payload.exposure_units, payload.realized_spend_units)
     {
@@ -386,7 +440,7 @@ pub(crate) async fn handle_reduce_charge_cost(
             exposure_units,
             realized_spend_units,
             payload.hold_id.as_deref(),
-            payload.event_id.as_deref(),
+            Some(effective_event_id.as_str()),
             authority.as_ref(),
         )
     } else {
@@ -395,14 +449,18 @@ pub(crate) async fn handle_reduce_charge_cost(
             payload.grant_index,
             released_exposure_units,
             payload.hold_id.as_deref(),
-            payload.event_id.as_deref(),
+            Some(effective_event_id.as_str()),
             authority.as_ref(),
         )
     };
     if let Err(error) = reconcile_result {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
     }
-    let write = match budget_write_token(&store, authority.as_ref(), payload.event_id.as_deref()) {
+    let write = match budget_write_token(
+        &store,
+        authority.as_ref(),
+        Some(effective_event_id.as_str()),
+    ) {
         Ok(write) => write,
         Err(response) => return response,
     };
@@ -456,4 +514,25 @@ fn resolve_budget_hold_authority(
         }
     }
     current_budget_event_authority(state)
+}
+
+#[cfg(test)]
+mod budget_handlers_tests {
+    use super::generated_budget_event_id;
+    use std::collections::HashSet;
+
+    #[test]
+    fn generated_budget_event_id_is_unique_per_call() {
+        // Each omitted-eventId write must get a distinct id so the mutation event
+        // is stored under a known, unique key and the witness can look up THIS
+        // write's exact event_seq (codex #965 round-4 P2).
+        let first = generated_budget_event_id();
+        let second = generated_budget_event_id();
+        assert_ne!(first, second, "consecutive ids must differ");
+        assert!(first.starts_with("cluster-budget-write-"));
+        // A tight burst (same wall-clock nanos possible) is still all-distinct via
+        // the monotonic counter.
+        let ids: HashSet<String> = (0..10_000).map(|_| generated_budget_event_id()).collect();
+        assert_eq!(ids.len(), 10_000, "all minted ids must be unique");
+    }
 }

@@ -78,6 +78,15 @@ impl PullRoundBudget {
         }
     }
 
+    /// Whether the round budget is already spent, checked BEFORE issuing the next
+    /// (blocking) peer fetch so an exhausted stream stops without one more fetch,
+    /// and so `sync_peer` can skip the remaining streams' fetches entirely
+    /// (codex #965 round-4 P2). This is a read-only pre-check; `charge_page` still
+    /// does the authoritative decrement + records accounting after the page lands.
+    pub(crate) fn is_exhausted(&self) -> bool {
+        self.pages_left == 0 || self.records_left == 0 || Instant::now() >= self.deadline
+    }
+
     /// Charge one page of `records`. An `Err(RoundLimit)` means the LOCAL per-round
     /// cap (pages, records, or wall-clock deadline) was reached: the caller stops
     /// this round and resumes next sync round, keeping the peer Healthy. It is NOT
@@ -255,6 +264,29 @@ mod pull_budget_tests {
             assert!(budget.charge_page(1).is_ok(), "page within budget");
         }
         assert_eq!(budget.charge_page(1), Err(RoundLimit::Pages));
+    }
+
+    #[test]
+    fn is_exhausted_flags_spent_budget_before_the_next_fetch() {
+        // A fresh round is not exhausted, so pullers may fetch.
+        let mut pages = PullRoundBudget::new();
+        assert!(!pages.is_exhausted());
+        // Spend the page budget: is_exhausted() flips true so the NEXT fetch is
+        // skipped (no extra page beyond the cap) and sync_peer skips later streams.
+        for _ in 0..MAX_PULL_PAGES_PER_PEER_PER_ROUND {
+            assert!(pages.charge_page(1).is_ok());
+        }
+        assert!(pages.is_exhausted(), "no page budget left");
+
+        // Record budget exhaustion also flags is_exhausted (records_left == 0).
+        let mut records = PullRoundBudget::new();
+        assert!(records
+            .charge_page(MAX_PULL_RECORDS_PER_PEER_PER_ROUND)
+            .is_ok());
+        assert!(
+            records.is_exhausted(),
+            "no record budget left after consuming it exactly"
+        );
     }
 
     #[test]

@@ -269,6 +269,11 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
     if peer_should_force_snapshot(state, peer_url) {
         let snapshot = client.cluster_snapshot()?;
         apply_cluster_snapshot(state, peer_url, snapshot)?;
+        // apply_cluster_snapshot cleared force_snapshot: the peer's already-recorded
+        // acks are now trusted for witnessing, so wake parked waiters to re-check
+        // quorum with the freshly-valid peer counted, rather than leaving them
+        // parked until the next tick (codex #965 round-4 P2).
+        notify_cluster_progress(state);
     }
     if let Err(error) = sync_peer_authority(state, &client) {
         update_peer_sync_error(state, peer_url, error.to_string());
@@ -276,38 +281,42 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
     }
     let mut round = PullRoundBudget::new();
     let mut delta_records = 0u64;
-    route_pull(
-        state,
-        peer_url,
-        sync_peer_revocations(state, &client, peer_url, &mut round),
-        &mut delta_records,
-    )?;
-    route_pull(
-        state,
-        peer_url,
-        sync_peer_tool_receipts(state, &client, peer_url, &mut round),
-        &mut delta_records,
-    )?;
-    route_pull(
-        state,
-        peer_url,
-        sync_peer_child_receipts(state, &client, peer_url, &mut round),
-        &mut delta_records,
-    )?;
-    route_pull(
-        state,
-        peer_url,
-        sync_peer_lineage(state, &client, peer_url, &mut round),
-        &mut delta_records,
-    )?;
-    route_pull(
-        state,
-        peer_url,
-        sync_peer_budgets(state, &client, peer_url, &mut round),
-        &mut delta_records,
-    )?;
+    // Run each stream's puller only while round budget remains. Once a stream
+    // exhausts the shared per-peer budget (pages/records/deadline), skip the rest
+    // so we do not issue more blocking peer fetches just to rediscover the same
+    // exhausted budget and delay parked writers; the skipped streams resume next
+    // round (honest backlog, no demotion) (codex #965 round-4 P2).
+    type Puller = fn(
+        &TrustServiceState,
+        &TrustControlClient,
+        &str,
+        &mut PullRoundBudget,
+    ) -> Result<u64, PullError>;
+    let pullers: [Puller; 5] = [
+        sync_peer_revocations,
+        sync_peer_tool_receipts,
+        sync_peer_child_receipts,
+        sync_peer_lineage,
+        sync_peer_budgets,
+    ];
+    for puller in pullers {
+        if round.is_exhausted() {
+            break;
+        }
+        route_pull(
+            state,
+            peer_url,
+            puller(state, &client, peer_url, &mut round),
+            &mut delta_records,
+        )?;
+    }
     update_peer_delta_records(state, peer_url, delta_records);
     update_peer_success(state, peer_url);
+    // update_peer_success cleared force_snapshot and marked the peer Healthy: its
+    // acks are fully trusted now, so wake parked waiters to re-check quorum
+    // promptly instead of waiting out this peer's remaining round work or the
+    // whole-round end tick (codex #965 round-3/4).
+    notify_cluster_progress(state);
     Ok(())
 }
 
@@ -363,6 +372,11 @@ fn sync_peer_revocations(
     let store = SqliteRevocationStore::open(path).map_err(CliError::from)?;
     let mut applied = 0u64;
     loop {
+        // Check the shared round budget BEFORE the next blocking fetch so an
+        // exhausted stream stops without one more peer request (codex #965 round-4).
+        if round.is_exhausted() {
+            break;
+        }
         let cursor = peer_revocation_cursor(state, peer_url);
         let response = client.revocation_deltas(&RevocationDeltaQuery {
             after_revoked_at: cursor.as_ref().map(|value| value.revoked_at),
@@ -426,6 +440,9 @@ fn sync_peer_tool_receipts(
     let store = SqliteReceiptStore::open(path).map_err(CliError::from)?;
     let mut applied = 0u64;
     loop {
+        if round.is_exhausted() {
+            break;
+        }
         let after_seq = peer_tool_seq(state, peer_url);
         let response = client.tool_receipt_deltas(&ReceiptDeltaQuery {
             after_seq: Some(after_seq),
@@ -478,6 +495,9 @@ fn sync_peer_child_receipts(
     let store = SqliteReceiptStore::open(path).map_err(CliError::from)?;
     let mut applied = 0u64;
     loop {
+        if round.is_exhausted() {
+            break;
+        }
         let after_seq = peer_child_seq(state, peer_url);
         let response = client.child_receipt_deltas(&ReceiptDeltaQuery {
             after_seq: Some(after_seq),
@@ -528,6 +548,9 @@ fn sync_peer_budgets(
     let mut store = SqliteBudgetStore::open(path).map_err(CliError::from)?;
     let mut applied = 0u64;
     loop {
+        if round.is_exhausted() {
+            break;
+        }
         let cursor = peer_budget_cursor(state, peer_url);
         let response = client.budget_deltas(&BudgetDeltaQuery {
             after_seq: cursor.as_ref().map(|value| value.seq),
@@ -687,6 +710,9 @@ fn sync_peer_lineage(
     let mut store = SqliteReceiptStore::open(path).map_err(CliError::from)?;
     let mut applied = 0u64;
     loop {
+        if round.is_exhausted() {
+            break;
+        }
         let after_seq = peer_lineage_seq(state, peer_url);
         let response = client.lineage_deltas(&ReceiptDeltaQuery {
             after_seq: Some(after_seq),

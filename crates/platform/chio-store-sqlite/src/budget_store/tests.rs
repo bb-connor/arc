@@ -1877,3 +1877,78 @@ fn budget_mutation_events_delete_trigger_resets_watermark_even_without_manual_ca
     let _ = fs::remove_file(&path);
     Ok(())
 }
+
+#[test]
+fn ack_head_reset_trigger_is_idempotent_across_reopens_and_concurrent_opens(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // codex #965 round-4 P2: open() no longer DROP+CREATEs the ack-reset trigger
+    // on every open. Repeated and concurrent opens must not error (no "trigger
+    // already exists" race) and must not churn the trigger, while it still exists
+    // exactly once with the current per-origin-clearing body.
+    let path = unique_db_path("chio-trigger-idempotent");
+    // First open creates the trigger.
+    {
+        let _ = SqliteBudgetStore::open(&path)?;
+    }
+    // Many concurrent opens: the steady-state path is a single sqlite_master read
+    // with no DDL, so none of these may fail or churn the trigger.
+    let handles: Vec<_> = (0..8)
+        .map(|_| {
+            let path = path.clone();
+            std::thread::spawn(move || SqliteBudgetStore::open(&path).map(|_| ()))
+        })
+        .collect();
+    for handle in handles {
+        handle
+            .join()
+            .expect("open thread panicked")
+            .expect("a concurrent open must not error on the trigger migration");
+    }
+
+    let store = SqliteBudgetStore::open(&path)?;
+    // The trigger exists exactly once and clears the per-origin heads (new body).
+    {
+        let connection = store.connection()?;
+        let count: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' \
+             AND name = 'budget_mutation_events_reset_ack_head_watermark'",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(count, 1, "the reset trigger must exist exactly once");
+        let sql: String = connection.query_row(
+            "SELECT sql FROM sqlite_master WHERE type = 'trigger' \
+             AND name = 'budget_mutation_events_reset_ack_head_watermark'",
+            [],
+            |row| row.get(0),
+        )?;
+        assert!(
+            sql.contains("budget_origin_ack_heads"),
+            "the trigger must be the current version that clears the per-origin heads"
+        );
+    }
+
+    // Functional: after all the reopens the trigger still resets the watermark on
+    // delete, so the ack head re-verifies and caps below a punched hole.
+    let head_for = |heads: &[(String, u64)], origin: &str| {
+        heads.iter().find(|(o, _)| o == origin).map(|(_, seq)| *seq)
+    };
+    store.import_snapshot_records(
+        &[],
+        &[
+            ack_head_event(1, "t1", "http://o"),
+            ack_head_event(2, "t2", "http://o"),
+            ack_head_event(3, "t3", "http://o"),
+        ],
+    )?;
+    assert_eq!(head_for(&store.budget_ack_heads()?, "http://o"), Some(3));
+    store.delete_mutation_event("t2")?;
+    assert_eq!(
+        head_for(&store.budget_ack_heads()?, "http://o"),
+        Some(1),
+        "the reset trigger must still fire after repeated/concurrent reopens"
+    );
+
+    let _ = fs::remove_file(&path);
+    Ok(())
+}

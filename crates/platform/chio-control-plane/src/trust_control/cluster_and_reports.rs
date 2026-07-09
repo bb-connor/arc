@@ -815,6 +815,71 @@ mod cluster_and_reports_tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn clearing_force_snapshot_then_notifying_wakes_a_parked_waiter() {
+        // codex #965 round-4 P2: a peer whose acks were recorded while still
+        // force_snapshot is excluded from witnesses; when its snapshot CLEARS
+        // force_snapshot, sync_peer must notify so the parked write re-checks and
+        // counts the now-valid peer, instead of timing out while the next peer in
+        // the round stalls. In a 3-node cluster (quorum 2), self + the just-cleared
+        // peer is quorum.
+        let state = state_with_cluster(
+            "http://node-a",
+            &["http://node-b", "http://node-c"],
+            None,
+            None,
+            None,
+        );
+        update_peer_reachable(&state, "http://node-b");
+        update_peer_reachable(&state, "http://node-c");
+        // node-b advertised the quorum-making ack but is still pending its snapshot
+        // (excluded); node-c never acks (simulating a slow peer in the same round).
+        update_peer_state(&state, "http://node-b", |peer| peer.force_snapshot = true);
+        update_peer_budget_acks(
+            &state,
+            "http://node-b",
+            &[BudgetOriginAck {
+                origin_id: "http://node-a".to_string(),
+                event_seq: 5,
+            }],
+        );
+        // While node-b is force_snapshot, quorum is NOT met (only self counts).
+        let write = BudgetWriteToken {
+            origin_id: "http://node-a".to_string(),
+            event_seq: 5,
+            budget_term: 1,
+        };
+        assert!(
+            !budget_write_quorum_commit_view(&state, &write)
+                .test_unwrap()
+                .quorum_committed
+        );
+
+        let loop_state = state.clone();
+        let background = tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            // The snapshot completes: force_snapshot cleared, then notify (exactly
+            // what sync_peer now does after apply_cluster_snapshot).
+            update_peer_state(&loop_state, "http://node-b", |peer| {
+                peer.force_snapshot = false
+            });
+            notify_cluster_progress(&loop_state);
+        });
+
+        let started = std::time::Instant::now();
+        let commit = wait_for_budget_write_quorum_commit(&state, write)
+            .await
+            .test_unwrap()
+            .test_unwrap();
+        assert!(commit.quorum_committed);
+        assert_eq!(commit.committed_nodes, 2, "self + the just-re-synced peer");
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(2),
+            "the waiter must wake on the post-snapshot notify, not wait out the timeout"
+        );
+        background.await.test_unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn notify_cluster_progress_wakes_a_parked_waiter_on_quorum() {
         // codex #965 round-3 P2: a waiter must wake as soon as the ack needed for
         // quorum lands, not only when the whole sync round finishes. In a 3-node
