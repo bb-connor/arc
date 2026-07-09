@@ -333,8 +333,6 @@ pub(crate) fn cmd_chio_pheromone_relay_serve(
                         interval: std::time::Duration::from_secs(60),
                         bundle_path: bundle_path.to_path_buf(),
                         trusted_issuers_path: issuers_path.to_path_buf(),
-                        state_path: iroh_transport_directory_state
-                            .map(std::path::Path::to_path_buf),
                     };
                     Some(tokio::spawn(run_directory_reloader(
                         mount.gate.clone(),

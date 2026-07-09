@@ -1283,6 +1283,20 @@ mod tests {
     use iroh_gossip::proto::DeliveryScope;
     use std::net::Ipv4Addr;
 
+    // RFC-0012 F37: build a real issuer-signed VerifiedDirectory as the membership
+    // oracle to pin the production treaty-party gate.
+    use crate::identity::transport_endorsement_preimage;
+    use crate::identity::TransportDirectoryBundleBody;
+    use crate::identity::TransportDirectoryBundleDocument;
+    use crate::identity::TransportDirectoryBundleTrust;
+    use crate::identity::TransportDirectoryDocument;
+    use crate::identity::TransportDirectoryEntry;
+    use crate::identity::TransportTreatyEntry;
+    use crate::identity::TrustedTransportDirectoryIssuer;
+    use crate::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA;
+    use chio_core_types::canonical_json_bytes;
+    use chio_core_types::sha256_hex;
+
     const NOW: u64 = 1_700_000_000_000;
     const NAMESPACE: &str = "chio/agents";
     const TREATY_ALPHA: &str = "treaty-alpha";
@@ -1365,6 +1379,92 @@ mod tests {
             required_action_class_id: "action".to_string(),
             pinned_ladder_refs: Vec::new(),
         }
+    }
+
+    /// An issuer-signed, load-time-verified directory whose treaty `TREATY_ALPHA`
+    /// party set is exactly {did:chio:alice}. This is the PRODUCTION membership
+    /// oracle (a `VerifiedDirectory`), so it pins the real F37 gate rather than a
+    /// `StaticTreatyMembership` stand-in.
+    fn party_verified_directory() -> crate::identity::VerifiedDirectory {
+        let passport = Keypair::from_seed(&[50; 32]);
+        let issuer = Keypair::from_seed(&[240; 32]);
+        let transport = endpoint_from_seed(60);
+        let entry = TransportDirectoryEntry {
+            kernel_id: "did:chio:alice".to_string(),
+            passport_public_key: passport.public_key(),
+            transport_endpoint_id: transport,
+            passport_endorsement: passport
+                .sign(&transport_endorsement_preimage("did:chio:alice", &transport)),
+            revocation_signers: Vec::new(),
+            removed: false,
+        };
+        let directory = TransportDirectoryDocument {
+            schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
+            local_kernel_id: "did:chio:local".to_string(),
+            peers: vec![entry],
+            treaties: vec![TransportTreatyEntry {
+                treaty_id: TREATY_ALPHA.to_string(),
+                party_kernel_ids: vec!["did:chio:alice".to_string()],
+            }],
+        };
+        let directory_sha256 = sha256_hex(&canonical_json_bytes(&directory).unwrap());
+        let body = TransportDirectoryBundleBody {
+            schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
+            issuer: "did:chio:issuer".to_string(),
+            key_id: "issuer-key-1".to_string(),
+            directory_sha256,
+            version: 1,
+            previous_version_sha256: None,
+            issued_at_unix_ms: NOW - 1,
+            expires_at_unix_ms: NOW + 1,
+        };
+        let (signature, _) = issuer.sign_canonical(&body).unwrap();
+        let bundle = TransportDirectoryBundleDocument {
+            schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
+            body,
+            directory,
+            signature,
+        };
+        let trust = TransportDirectoryBundleTrust {
+            issuers: vec![TrustedTransportDirectoryIssuer {
+                issuer: "did:chio:issuer".to_string(),
+                key_id: "issuer-key-1".to_string(),
+                public_key: issuer.public_key(),
+            }],
+            version_floor: 0,
+            expected_previous_version_sha256: None,
+            now_unix_ms: NOW,
+        };
+        bundle.verify_bundle(&trust).expect("treaty bundle verifies")
+    }
+
+    #[test]
+    fn fanout_membership_gate_rejects_non_party_at_join_and_receive() {
+        // F37 regression pin (already-closed behavior): the per-treaty membership
+        // gate is enforced against the issuer-signed VerifiedDirectory party set.
+        let directory = party_verified_directory();
+
+        // JOIN precondition the swarm-join gate reads: is_treaty_party is fail-closed
+        // for a non-party (and true for a party).
+        assert!(directory.is_treaty_party(TREATY_ALPHA, "did:chio:alice"));
+        assert!(!directory.is_treaty_party(TREATY_ALPHA, "did:chio:eve"));
+
+        // RECEIVE: a validly self-signed frame whose origin (eve) is NOT a party to
+        // TREATY_ALPHA is rejected with TreatyMembershipDenied, using the
+        // VerifiedDirectory as the membership oracle. Eve is not directory-bound, so
+        // her key resolves via the caller resolver; the directory still denies the
+        // treaty membership AFTER the self-signature verifies (fail-closed).
+        let eve = Keypair::from_seed(&[71; 32]);
+        let frame =
+            signed_direct_frame(&eve, "did:chio:eve", "did:chio:hub", TREATY_ALPHA, NAMESPACE);
+        let keys = StaticOriginKeys::new().with("did:chio:eve", eve.public_key());
+        let policy = live_policy(NAMESPACE);
+        let error = verify_fanout_frame(&frame, &keys, &directory, &policy, NOW)
+            .expect_err("a non-party origin is denied on receive");
+        assert!(
+            matches!(error, FanoutError::TreatyMembershipDenied { .. }),
+            "unexpected: {error:?}"
+        );
     }
 
     #[test]

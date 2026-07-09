@@ -481,12 +481,14 @@ pub(crate) enum ReloadOutcome {
     ExpiredWhileRunning,
 }
 
-/// Inputs for the bounded poll reloader.
+/// Inputs for the bounded poll reloader. The reloader deliberately advances its
+/// version floor + previous-hash chain from the LIVE directory (current_version /
+/// current_body_sha256), not from a rotation-state file, so a downgrade can never
+/// be re-accepted; hence no state-file path is carried here.
 pub(crate) struct DirectoryReloadConfig {
     pub interval: Duration,
     pub bundle_path: PathBuf,
     pub trusted_issuers_path: PathBuf,
-    pub state_path: Option<PathBuf>,
 }
 
 /// Read + parse the on-disk transport directory bundle (no verification).
@@ -704,8 +706,16 @@ pub(crate) async fn build_iroh_router(
         config,
     } = inputs;
 
-    // Only the pheromone lane is wireable here; parse_iroh_lanes already rejected
-    // anything else, so this is a defense-in-depth re-check.
+    // FAIL-CLOSED WIRING GUARD (RFC-0012 F37): only the pheromone lane is wireable
+    // on this serve hook. Enabling lane c (fan-out) here is a fail-closed error and
+    // MUST stay so until BOTH are satisfied: (1) the F36 Lagged handling has an
+    // anti-entropy path or an explicit accepted-loss decision, and (2) any lane-c
+    // mount passes the issuer-signed VerifiedDirectory (never a StaticTreatyMembership
+    // and never the raw topic id) as the TreatyMembership oracle and derives origin
+    // keys from the same trusted admission set. The per-treaty membership gate is
+    // enforced at JOIN (subscribe_treaty_with_timeout) and RECEIVE
+    // (verify_fanout_frame); this guard keeps it that way. parse_iroh_lanes already
+    // rejected anything else, so this is a defense-in-depth re-check.
     if config.lanes.iter().any(|lane| !matches!(lane, IrohLane::Pheromone)) {
         return Err(CliError::cli_other_error(
             "Chio iroh transport: only the pheromone lane is wireable on the relay serve hook"
@@ -1347,7 +1357,6 @@ mod tests {
             interval: Duration::from_secs(60),
             bundle_path,
             trusted_issuers_path: issuers_path,
-            state_path: None,
         };
 
         // In-window, same version on disk => Unchanged (the fast path fires).
@@ -1382,7 +1391,6 @@ mod tests {
             interval: Duration::from_secs(60),
             bundle_path,
             trusted_issuers_path: issuers_path,
-            state_path: None,
         };
 
         let now_in_window = expires_at - 1;
@@ -1421,7 +1429,6 @@ mod tests {
             interval: Duration::from_secs(60),
             bundle_path,
             trusted_issuers_path: issuers_path,
-            state_path: None,
         };
         let now_in_window = expires_at - 1;
         let error =
