@@ -173,6 +173,14 @@ impl SqliteBudgetStore {
     /// NOTE: genesis anchoring assumes budget mutation events are never
     /// bulk-compacted below seq 1 (they are not today); if such compaction is
     /// added, anchor at a durable global floor instead (codex #965 Finding 1).
+    ///
+    /// NOTE: a rollback-retry that abandons a seq (existing_event_allowed)
+    /// leaves a permanent interior hole that caps this GLOBAL head, wedging
+    /// quorum budget-writes above the hole for EVERY origin cluster-wide (not
+    /// per-origin) until operator intervention - it does not self-heal, since a
+    /// snapshot from the holed leader carries the hole. Fail-closed (a hole
+    /// withholds quorum and never over-counts). See the plan's rollback-retry
+    /// residual and its seq-preserving follow-up.
     pub fn budget_ack_heads(&self) -> Result<Vec<(String, u64)>, BudgetStoreError> {
         let connection = self.connection()?;
         let mut statement = connection.prepare(
