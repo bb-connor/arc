@@ -746,7 +746,7 @@ fn concurrent_valid_checkpoint_is_adopted_not_conflicted() -> Result<(), Box<dyn
 
 /// Codex round 4, finding 1: the `InstallSigner` handler only STORED the signer;
 /// an already-owed checkpoint (the store opened on a DB that already has
-/// >= max_batch uncheckpointed claim-log entries, e.g. a crash between the
+/// at least max_batch uncheckpointed claim-log entries, e.g. a crash between the
 /// durable append response and the background build, or enabling checkpointing
 /// on an existing store) was not built until some future Append/Write. A quiet
 /// restarted store stayed uncheckpointed indefinitely. The fix runs the bounded
