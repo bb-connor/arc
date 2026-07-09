@@ -6,11 +6,17 @@ error mapping, and receipt verification.
 
 Authoritative enforcement uses the kernel-mediated ``/v1/evaluate`` route,
 which requires a full signed capability token and an execution nonce. The
-id-only wrappers exposed here (``evaluate_tool_call`` and the SDK adapters that
-build on it) hold only a capability id, not a signed token, so they use the
-advisory ``/v1/evaluate/advisory`` path. Their receipts are explicitly
-non-authoritative (``trust_level == "advisory"``). Callers holding a full
-signed token can drive the mediated route via ``evaluate_tool_call_mediated``.
+id-only ``evaluate_tool_call`` default holds only a capability id, not a signed
+token, so it cannot obtain an authoritative allow. It therefore fails closed:
+it runs advisory evaluation for its audit receipt and integrity check, then
+raises :class:`ChioDeniedError` because advisory evaluation is not execution
+authorization. This keeps the SDK adapters that gate on "not denied" from
+executing a tool after a non-authoritative observation.
+
+Callers that deliberately want a non-authoritative observation (and will check
+``trust_level`` themselves) use ``evaluate_tool_call_advisory`` directly.
+Callers holding a full signed token drive the authoritative mediated route via
+``evaluate_tool_call_mediated``.
 """
 
 from __future__ import annotations
@@ -19,7 +25,7 @@ import hashlib
 import json
 import time
 from enum import Enum
-from typing import Any
+from typing import Any, NoReturn
 
 import httpx
 from pydantic import BaseModel
@@ -461,23 +467,56 @@ class ChioClient:
         tool_server: str,
         tool_name: str,
         parameters: dict[str, Any],
-    ) -> ChioReceipt:
-        """Evaluate a tool call via the advisory (id-based) path.
+    ) -> NoReturn:
+        """Evaluate an id-only tool call and fail closed.
 
-        This is the default the id-only SDK wrappers use. They hold a
+        This is the default the id-only SDK wrappers call. They hold a
         capability id, not a signed capability token, so they cannot drive the
         kernel-mediated ``/v1/evaluate`` route (which requires a full signed
-        token and an execution nonce). This delegates to
-        ``evaluate_tool_call_advisory`` and returns its non-authoritative
-        :class:`ChioReceipt` (``trust_level == "advisory"``). Use
-        ``evaluate_tool_call_mediated`` when a full signed token is available
-        and authoritative enforcement is required.
+        token and an execution nonce) and cannot obtain an authoritative allow.
+
+        A capability id alone must never authorize execution, so this runs
+        advisory evaluation for its audit receipt and integrity check, then
+        always raises :class:`ChioDeniedError`. It never returns a receipt: the
+        SDK adapters gate execution on "not denied", and returning a permissive
+        advisory receipt (which carries no decision) would let them run the tool
+        after a non-authoritative observation. Raising blocks that path.
+
+        Use ``evaluate_tool_call_advisory`` when a non-authoritative observation
+        is explicitly wanted, or ``evaluate_tool_call_mediated`` when a full
+        signed token is available and authoritative enforcement is required.
+
+        Raises
+        ------
+        ChioDeniedError
+            Always. A hard deny from the advisory route surfaces its guard and
+            reason; otherwise the deny reports that advisory evaluation is not
+            execution authorization.
         """
-        return await self.evaluate_tool_call_advisory(
+        receipt = await self.evaluate_tool_call_advisory(
             capability_id=capability_id,
             tool_server=tool_server,
             tool_name=tool_name,
             parameters=parameters,
+        )
+        outcome = _receipt_field_value(receipt.observation_outcome)
+        if outcome == "dropped":
+            raise ChioDeniedError(
+                "Chio sidecar advisory evaluation refused the tool call",
+                reason="advisory evaluation dropped the tool call",
+                reason_code="chio_advisory_evaluation_dropped",
+                tool_name=tool_name,
+                tool_server=tool_server,
+                receipt_id=receipt.id,
+            )
+        raise ChioDeniedError(
+            "id-only tool-call evaluation is not authoritative; a signed "
+            "capability token is required to authorize execution",
+            reason="advisory evaluation is not execution authorization",
+            reason_code="chio_advisory_evaluation_not_authoritative",
+            tool_name=tool_name,
+            tool_server=tool_server,
+            receipt_id=receipt.id,
         )
 
     async def evaluate_tool_call_advisory(
@@ -529,6 +568,7 @@ class ChioClient:
         tool_server: str,
         tool_name: str,
         parameters: dict,
+        execution_nonce: dict[str, Any] | None = None,
     ) -> dict:
         """Kernel-mediated, authoritative tool-call evaluation.
 
@@ -537,17 +577,35 @@ class ChioClient:
         id-only ``{"id": ...}`` stub); the id-only SDK wrappers cannot drive
         this route and use ``evaluate_tool_call`` instead. Posts to the
         kernel-mediated ``/v1/evaluate`` route and returns
-        ``{"verdict", "receipt", "execution_nonce"}``. Callers MUST confirm the
-        receipt is authoritative - ``trust_level`` is ``"mediated"`` and the
-        response carries a bound ``execution_nonce`` - before trusting the
-        verdict.
+        ``{"verdict", "receipt", "execution_nonce"}``.
+
+        The route is strict-nonce and completes in two phases. The first call
+        omits ``execution_nonce`` (a preflight); its response carries a freshly
+        minted ``execution_nonce`` as a ``SignedExecutionNonce`` object. The
+        follow-up call presents that object back, unchanged, via
+        ``execution_nonce`` so the kernel can dispatch and settle. The nonce is
+        forwarded as an object (not a re-encoded string), matching the shape the
+        preflight returned.
+
+        Callers MUST confirm the receipt is authoritative - ``trust_level`` is
+        ``"mediated"`` and the response carries a bound ``execution_nonce`` -
+        before trusting the verdict.
+
+        Parameters
+        ----------
+        execution_nonce:
+            The ``execution_nonce`` object returned by a prior preflight,
+            forwarded verbatim to dispatch and settle the mediated call. Omit it
+            on the initial preflight.
         """
-        body = {
+        body: dict[str, Any] = {
             "capability": capability,
             "tool_server": tool_server,
             "tool_name": tool_name,
             "parameters": parameters,
         }
+        if execution_nonce is not None:
+            body["execution_nonce"] = execution_nonce
         return await self._post("/v1/evaluate", body)
 
     async def evaluate_http_request(

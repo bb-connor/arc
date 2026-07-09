@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import httpx
 import pytest
 import respx
@@ -379,9 +381,11 @@ class TestEvaluateToolCall:
             assert getattr(receipt.boundary_class, "value", receipt.boundary_class) == "advisory_only"
 
     @respx.mock
-    async def test_evaluate_tool_call_returns_advisory_receipt(self) -> None:
-        # The id-only default delegates to the advisory route and returns a
-        # non-authoritative receipt; it must never post to /v1/evaluate.
+    async def test_evaluate_tool_call_id_only_fails_closed(self) -> None:
+        # The id-only default runs advisory evaluation for its audit receipt,
+        # then fails closed: a capability id alone cannot authorize execution.
+        # It must never post to the token-requiring /v1/evaluate route and must
+        # never return a permissive receipt a wrapper could treat as allowed.
         advisory = _advisory_receipt_dict()
         advisory_route = respx.post(f"{BASE}/v1/evaluate/advisory").mock(
             return_value=httpx.Response(200, json=_advisory_wrapper(advisory))
@@ -393,25 +397,52 @@ class TestEvaluateToolCall:
             return_value=httpx.Response(200, json=_advisory_verify_report())
         )
         async with ChioClient(BASE) as client:
-            receipt = await client.evaluate_tool_call(
-                capability_id="cap-1",
-                tool_server="srv",
-                tool_name="read",
-                parameters={"path": "/tmp"},
-            )
-        assert isinstance(receipt, ChioReceipt)
-        assert getattr(receipt.trust_level, "value", receipt.trust_level) == "advisory"
+            with pytest.raises(ChioDeniedError) as exc_info:
+                await client.evaluate_tool_call(
+                    capability_id="cap-1",
+                    tool_server="srv",
+                    tool_name="read",
+                    parameters={"path": "/tmp"},
+                )
+        assert (
+            exc_info.value.reason_code
+            == "chio_advisory_evaluation_not_authoritative"
+        )
         assert advisory_route.called
         assert not mediated_route.called
+
+    @respx.mock
+    async def test_evaluate_tool_call_id_only_fails_closed_on_dropped(self) -> None:
+        # A dropped advisory observation still fails closed, with a distinct
+        # deny reason so callers can tell a refusal from a non-authoritative
+        # observation.
+        advisory = _advisory_receipt_dict(outcome="dropped")
+        respx.post(f"{BASE}/v1/evaluate/advisory").mock(
+            return_value=httpx.Response(200, json=_advisory_wrapper(advisory))
+        )
+        respx.post(f"{BASE}/v1/receipts/verify").mock(
+            return_value=httpx.Response(200, json=_advisory_verify_report())
+        )
+        async with ChioClient(BASE) as client:
+            with pytest.raises(ChioDeniedError) as exc_info:
+                await client.evaluate_tool_call(
+                    capability_id="cap-1",
+                    tool_server="srv",
+                    tool_name="read",
+                    parameters={"path": "/tmp"},
+                )
+        assert (
+            exc_info.value.reason_code == "chio_advisory_evaluation_dropped"
+        )
 
     @respx.mock
     async def test_evaluate_tool_call_mediated_returns_mediated_response(self) -> None:
         expected = {
             "verdict": "allow",
             "receipt": _make_receipt_dict(),
-            "execution_nonce": "nonce-123",
+            "execution_nonce": {"nonce_id": "n-1", "signature": "e" * 128},
         }
-        respx.post(f"{BASE}/v1/evaluate").mock(
+        route = respx.post(f"{BASE}/v1/evaluate").mock(
             return_value=httpx.Response(200, json=expected)
         )
         async with ChioClient(BASE) as client:
@@ -422,6 +453,48 @@ class TestEvaluateToolCall:
                 parameters={"path": "/tmp"},
             )
         assert result == expected
+        # The preflight (no nonce) must not carry an execution_nonce field.
+        preflight_body = json.loads(route.calls.last.request.content)
+        assert "execution_nonce" not in preflight_body
+
+    @respx.mock
+    async def test_evaluate_tool_call_mediated_forwards_nonce_object(self) -> None:
+        # Two-phase strict-nonce flow: the preflight returns an execution_nonce
+        # object, and the retry must post that object back, unchanged, as an
+        # object (not a re-encoded string).
+        nonce_object = {
+            "nonce_id": "n-1",
+            "binding": {"tool_server": "srv", "tool_name": "read"},
+            "signature": "e" * 128,
+        }
+        preflight_response = {
+            "verdict": "allow",
+            "receipt": _make_receipt_dict(),
+            "execution_nonce": nonce_object,
+        }
+        route = respx.post(f"{BASE}/v1/evaluate").mock(
+            return_value=httpx.Response(200, json=preflight_response)
+        )
+        async with ChioClient(BASE) as client:
+            preflight = await client.evaluate_tool_call_mediated(
+                capability=_make_token_dict(),
+                tool_server="srv",
+                tool_name="read",
+                parameters={"path": "/tmp"},
+            )
+            returned_nonce = preflight["execution_nonce"]
+            assert isinstance(returned_nonce, dict)
+            await client.evaluate_tool_call_mediated(
+                capability=_make_token_dict(),
+                tool_server="srv",
+                tool_name="read",
+                parameters={"path": "/tmp"},
+                execution_nonce=returned_nonce,
+            )
+        retry_body = json.loads(route.calls.last.request.content)
+        assert retry_body["execution_nonce"] == nonce_object
+        # It must be forwarded as a JSON object, never a double-encoded string.
+        assert isinstance(retry_body["execution_nonce"], dict)
 
     @respx.mock
     async def test_evaluate_rejects_unwrapped_advisory_route_response(self) -> None:
