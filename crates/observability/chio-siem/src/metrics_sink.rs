@@ -18,7 +18,13 @@ impl ExportOutcome {
     #[must_use]
     pub fn as_label(&self) -> &'static str {
         match self {
-            ExportOutcome::Ok => "ok",
+            // A successful export is labeled "success" (not "ok") so it agrees
+            // with the shipped `chio:soc_export_error_ratio_*` recording rules,
+            // whose numerator is `chio_soc_export_total{outcome!="success"}`. An
+            // "ok" label would be counted as an error and drive the SOC export
+            // error-budget alerts to 100% even when every export succeeds
+            // (RFC-0009 Codex round-1 finding 3).
+            ExportOutcome::Ok => "success",
             ExportOutcome::Malformed => "malformed",
             ExportOutcome::Dlq => "dlq",
             ExportOutcome::Error => "error",
@@ -75,6 +81,15 @@ mod tests {
     fn outcome_labels_are_stable() {
         assert_eq!(ExportOutcome::Malformed.as_label(), "malformed");
         assert_eq!(ExportOutcome::Dlq.as_label(), "dlq");
+    }
+
+    #[test]
+    fn successful_export_uses_success_outcome_for_recording_rules() {
+        // The soc_export_error_ratio recording rules count outcome!="success" as
+        // an error, so a successful export MUST carry the "success" outcome or
+        // the SOC export error budget reads as 100% while everything succeeds
+        // (RFC-0009 Codex round-1 finding 3).
+        assert_eq!(ExportOutcome::Ok.as_label(), "success");
     }
 
     #[test]

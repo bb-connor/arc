@@ -401,10 +401,14 @@ impl ExporterManager {
                 .set_dlq_depth(&exporter_name, self.dlq.len() as u64);
         }
 
-        // Read cursor resumes at the slowest exporter so nothing is skipped. On
-        // the bootstrap poll (no exporter has acked yet) this falls back to
-        // max_seq, matching the legacy advance-regardless behavior.
-        self.cursor = self.acked.values().copied().min().unwrap_or(max_seq);
+        // Read cursor resumes at the slowest REGISTERED exporter so nothing is
+        // skipped. A registered exporter that has NEVER acked (failed before its
+        // first ack) is held at the pre-poll cursor `cursor`, so the read cursor
+        // does not advance past receipts it has not consumed (at-least-once,
+        // RFC-0009 F78, Codex round-1 finding 1). With zero registered exporters
+        // this falls back to max_seq (legacy headless / malformed-only behavior).
+        let exporter_names: Vec<&str> = self.exporters.iter().map(|e| e.name()).collect();
+        self.cursor = resume_cursor(&exporter_names, &self.acked, cursor, max_seq);
 
         Ok(())
     }
@@ -476,6 +480,28 @@ impl ExporterManager {
     }
 }
 
+/// Compute the read cursor after a poll: the minimum high-water mark across all
+/// REGISTERED exporters, so the cursor never advances past receipts the slowest
+/// exporter has not consumed (at-least-once, RFC-0009 F78).
+///
+/// A registered exporter absent from `acked` has never acked (it failed before
+/// its first successful export); it is held at `baseline` (the pre-poll cursor)
+/// so the un-acked batch is redelivered rather than skipped (Codex round-1
+/// finding 1). With zero registered exporters the cursor advances to `max_seq`,
+/// matching the legacy headless / malformed-only advance-regardless behavior.
+fn resume_cursor(
+    exporter_names: &[&str],
+    acked: &std::collections::BTreeMap<String, u64>,
+    baseline: u64,
+    max_seq: u64,
+) -> u64 {
+    exporter_names
+        .iter()
+        .map(|name| acked.get(*name).copied().unwrap_or(baseline))
+        .min()
+        .unwrap_or(max_seq)
+}
+
 fn retry_backoff_ms(base_backoff_ms: u64, attempt: u32) -> u64 {
     let shift = attempt.saturating_sub(1).min(u64::BITS - 1);
     let multiplier = 1u64.checked_shl(shift).unwrap_or(u64::MAX);
@@ -501,6 +527,44 @@ mod tests {
     use super::*;
 
     type TestResult = Result<(), Box<dyn Error>>;
+
+    #[test]
+    fn resume_cursor_holds_at_baseline_for_a_never_acked_exporter() {
+        // "webhook" is registered but has never acked (absent from `acked`).
+        // Even though "splunk" acked up to seq 10, the cursor must be HELD at the
+        // pre-poll baseline (3) so the batch is redelivered to "webhook"
+        // (at-least-once). The old `min(acked)` logic would have advanced to 10,
+        // permanently skipping [4..10] for "webhook".
+        let mut acked = std::collections::BTreeMap::new();
+        acked.insert("splunk".to_string(), 10u64);
+        let cursor = resume_cursor(&["splunk", "webhook"], &acked, 3, 10);
+        assert_eq!(
+            cursor, 3,
+            "a never-acked exporter holds the cursor at baseline"
+        );
+    }
+
+    #[test]
+    fn resume_cursor_advances_to_the_slowest_acked_exporter() {
+        let mut acked = std::collections::BTreeMap::new();
+        acked.insert("splunk".to_string(), 10u64);
+        acked.insert("webhook".to_string(), 7u64);
+        let cursor = resume_cursor(&["splunk", "webhook"], &acked, 3, 10);
+        assert_eq!(
+            cursor, 7,
+            "the cursor resumes at the slowest acked exporter"
+        );
+    }
+
+    #[test]
+    fn resume_cursor_advances_to_max_seq_with_zero_exporters() {
+        let acked = std::collections::BTreeMap::new();
+        let cursor = resume_cursor(&[], &acked, 3, 10);
+        assert_eq!(
+            cursor, 10,
+            "with no registered exporters the cursor advances (legacy headless behavior)"
+        );
+    }
 
     #[test]
     fn retry_backoff_ms_saturates_at_configured_ceiling() {
