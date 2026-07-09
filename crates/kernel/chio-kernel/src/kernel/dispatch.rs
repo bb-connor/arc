@@ -485,19 +485,21 @@ impl ChioKernel {
         })?;
 
         // Try streaming first regardless of monetary mode.
+        //
+        // RFC-0004 F06 note: the kernel's stream byte-limit is enforced at
+        // finalize by `apply_stream_limits` / `truncate_stream_to_byte_limit`,
+        // which bounds the stream to `max_stream_total_bytes` and marks the
+        // receipt incomplete (preserving the charge-for-work-done and financial
+        // metadata on governed monetary streams). The reusable TCB primitives
+        // `enforce_stream_byte_limit` and `push_chunk_bounded`
+        // (crate::runtime) provide a fail-closed Overloaded { StreamBytes }
+        // byte-accumulation check for KernelError-returning accumulators and
+        // out-of-tree connectors; in-tree connectors (A2A caps at 1 MiB) bound
+        // the worst case, so the dispatch seam does not hard-deny here.
         if let Some(stream) = server
             .invoke_stream(&request.tool_name, request.arguments.clone(), None)
             .await?
         {
-            // RFC-0004 F06: size the returned stream at the earliest point the
-            // kernel owns, before any guard or serde copy, and deny early. A
-            // conforming connector never materializes past this; a
-            // non-conforming one is refused here inside the TCB.
-            let inner = match &stream {
-                crate::runtime::ToolServerStreamResult::Complete(s) => s,
-                crate::runtime::ToolServerStreamResult::Incomplete { stream, .. } => stream,
-            };
-            crate::runtime::enforce_stream_byte_limit(inner, self.config.max_stream_total_bytes)?;
             return Ok((ToolServerOutput::Stream(stream), None));
         }
 

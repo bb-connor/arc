@@ -972,6 +972,14 @@ fn tool_call_value_output(output: Option<ToolCallOutput>) -> Option<serde_json::
     }
 }
 
+fn tool_call_stream_output(output: Option<ToolCallOutput>) -> Option<ToolCallStream> {
+    if let Some(ToolCallOutput::Stream(stream)) = output {
+        Some(stream)
+    } else {
+        None
+    }
+}
+
 fn assert_content_addressed_receipt_id(id: &str) {
     assert_eq!(id.len(), 64, "receipt id should be a SHA-256 hex digest");
     assert!(
