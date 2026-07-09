@@ -13,7 +13,7 @@ surface real agents use (the `chio-api-protect` sidecar direct tool-call route)
 routed around it and emitted an advisory receipt that admits, in its own
 metadata, that it is not authorization. `TrustLevel::Mediated` is a stamp
 (`receipt_persistence.rs`), not proof that budget was held and guards ran. This
-ADR declares the enforcement contract normative so downstream directions can pin
+ADR declares the enforcement contract normative so downstream consumers can pin
 to a stable shape.
 
 Two code-only realities are hereby reconciled with the docs: the
@@ -40,15 +40,18 @@ Two code-only realities are hereby reconciled with the docs: the
    (hold <-> nonce cross-bound); (e) the signer is an admitted kernel key; (f)
    fail-closed on any missing or invalid element. Implemented by
    `chio_core_types::receipt::authoritative_spend::is_authoritative_spend_receipt`.
-4. Prepay authority (A's call, threaded to B and C): authorize the worst case
-   (`quote.quoted_cost` when a quote is present, else `max_cost_per_invocation`)
-   and reconcile down to realized `cost_charged`. The authoritative number B's
-   exposure/spend projection reports and C's gate charges is this
-   authorize-then-reconcile pair, not either endpoint alone.
-5. Reserved linkage slots (populate as `Option::None` until Phase 2 so no
-   governance-gated schema v2 is forced): B's `chio.comptroller.surface-report.v1`
-   MUST carry `execution_nonce_ref: Option<String>` and `hold_ref: Option<String>`;
-   C's settlement receipt MUST carry the same two slots.
+4. Prepay authority (owned by the kernel enforcement lane, threaded to the
+   comptroller surface-report projection and the settlement receipt): authorize
+   the worst case (`quote.quoted_cost` when a quote is present, else
+   `max_cost_per_invocation`) and reconcile down to realized `cost_charged`. The
+   authoritative number the comptroller surface-report projection reports and the
+   settlement receipt gate charges is this authorize-then-reconcile pair, not
+   either endpoint alone.
+5. Reserved linkage slots (populate as `Option::None` until a v2 schema revision
+   so no governance-gated schema v2 is forced): the comptroller surface-report
+   contract `chio.comptroller.surface-report.v1` MUST carry
+   `execution_nonce_ref: Option<String>` and `hold_ref: Option<String>`; the
+   settlement receipt MUST carry the same two slots.
 
 ## Consequences
 
