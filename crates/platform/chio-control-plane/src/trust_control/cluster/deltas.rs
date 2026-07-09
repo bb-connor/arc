@@ -296,6 +296,15 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
         }
     };
     update_peer_reachable(state, peer_url);
+    // Apply any DECREASE/CLEAR in the freshly-advertised acks IMMEDIATELY, before
+    // any witness-visible pulling or parking check this round. A peer that
+    // lost/restored its budget DB now advertises a lower (or absent) head, so the
+    // recorded head must not keep witnessing writes the peer no longer durably
+    // holds. `clamp_down_peer_budget_acks` only ever SHRINKS the recorded acks
+    // (recorded = min(recorded, advertised), dropped origins removed); an INCREASE
+    // stays deferred to finalize_peer_sync_round below until this peer's pull round
+    // validates (codex #965 deltas.rs:403).
+    clamp_down_peer_budget_acks(state, peer_url, &peer_status.budget_ack_heads);
     // Do NOT record or wake on the peer's freshly-advertised budget acks yet
     // (codex #965 Finding P1 "do not commit on acks before validation"): a high
     // ack head advertised via cluster_status must not be counted for a quorum

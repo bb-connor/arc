@@ -463,6 +463,111 @@ mod cluster_and_reports_tests {
         assert_eq!(commit.committed_nodes, 2);
     }
 
+    #[test]
+    fn regressed_ack_head_is_cleared_before_validation_not_witnessed_at_old_high() {
+        // codex #965 deltas.rs:403 (clear regressed ack heads before validation):
+        // the per-peer sync round records a peer's freshly-advertised acks only at
+        // the END (finalize_peer_sync_round). If a peer REGRESSED its ack head
+        // (lost/restored its budget DB and now advertises a lower or absent head),
+        // the stale-HIGH recorded value would keep witnessing for the WHOLE round,
+        // so a budget write that checks the quorum view mid-round could commit
+        // against a peer that already disavowed the write - an over-count.
+        // `clamp_down_peer_budget_acks` applies the DECREASE/CLEAR immediately at the
+        // TOP of the round (sync_peer, right after update_peer_reachable). TEETH:
+        // RED if the clamp is a no-op or max-merges (node-b still witnesses seq 8);
+        // GREEN after the down-clamp (node-b drops out at the old-high seq).
+        let state = state_with_cluster(
+            "http://node-a",
+            &["http://node-b", "http://node-c"],
+            None,
+            None,
+            None,
+        );
+        update_peer_reachable(&state, "http://node-b");
+        update_peer_reachable(&state, "http://node-c");
+        // Both peers previously imported node-a's stream up to seq 10.
+        update_peer_budget_acks(
+            &state,
+            "http://node-b",
+            &[BudgetOriginAck {
+                origin_id: "http://node-a".to_string(),
+                event_seq: 10,
+            }],
+        );
+        update_peer_budget_acks(
+            &state,
+            "http://node-c",
+            &[BudgetOriginAck {
+                origin_id: "http://node-a".to_string(),
+                event_seq: 10,
+            }],
+        );
+
+        let write = BudgetWriteToken {
+            origin_id: "http://node-a".to_string(),
+            event_seq: 8,
+            budget_term: 1,
+        };
+        // Precondition: with both peers recorded at 10, the write at seq 8 witnesses
+        // on self + node-b + node-c.
+        let before = budget_write_quorum_commit_view(&state, &write).test_unwrap();
+        assert!(before.witness_urls.contains(&"http://node-b".to_string()));
+        assert_eq!(before.committed_nodes, 3);
+
+        // node-b REGRESSES to seq 5 (lost a suffix of node-a's stream). This is the
+        // top-of-round clamp that sync_peer now applies from cluster_status.
+        clamp_down_peer_budget_acks(
+            &state,
+            "http://node-b",
+            &[BudgetOriginAck {
+                origin_id: "http://node-a".to_string(),
+                event_seq: 5,
+            }],
+        );
+        // TEETH: node-b no longer witnesses at seq 8 (5 < 8); the stale-high 10 is
+        // gone the instant the peer disavowed it, not at the end of the round.
+        let after = budget_write_quorum_commit_view(&state, &write).test_unwrap();
+        assert!(
+            !after.witness_urls.contains(&"http://node-b".to_string()),
+            "a regressed peer must not witness at the OLD-high seq"
+        );
+        assert_eq!(
+            after.committed_nodes, 2,
+            "only self + node-c (still at 10) witness after the regression"
+        );
+
+        // An INCREASE must NOT be applied by the clamp (increases wait for
+        // validation in finalize_peer_sync_round): even if node-b now advertises 20,
+        // the clamp leaves it at the regressed 5, so it still does not witness seq 8.
+        clamp_down_peer_budget_acks(
+            &state,
+            "http://node-b",
+            &[BudgetOriginAck {
+                origin_id: "http://node-a".to_string(),
+                event_seq: 20,
+            }],
+        );
+        let after_increase = budget_write_quorum_commit_view(&state, &write).test_unwrap();
+        assert!(
+            !after_increase
+                .witness_urls
+                .contains(&"http://node-b".to_string()),
+            "the clamp must not RAISE a head on an increase (increases wait for validation)"
+        );
+
+        // A CLEAR (origin no longer advertised at all) drops the origin entirely, so
+        // node-c stops witnessing it too.
+        clamp_down_peer_budget_acks(&state, "http://node-c", &[]);
+        let after_clear = budget_write_quorum_commit_view(&state, &write).test_unwrap();
+        assert!(
+            !after_clear
+                .witness_urls
+                .contains(&"http://node-c".to_string()),
+            "a peer that no longer advertises the origin must not witness it"
+        );
+        assert_eq!(after_clear.committed_nodes, 1, "only self remains");
+    }
+
     proptest::proptest! {
         #![proptest_config(proptest::prelude::ProptestConfig::with_cases(256))]
 
