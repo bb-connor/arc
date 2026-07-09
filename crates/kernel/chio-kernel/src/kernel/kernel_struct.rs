@@ -149,6 +149,15 @@ pub struct MemoryBudgetConfig {
     pub velocity_bucket_cap: usize,
     pub admission_key_cap: usize,
     pub journal_entry_cap: usize,
+    /// Max number of DISTINCT tool names retained in each session journal's
+    /// cumulative `tool_counts` map (RFC-0004 F21). Unlike the `entries` and
+    /// `tool_sequence` rings, `tool_counts` is cumulative (it survives ring
+    /// eviction so the behavioral-sequence guard can answer "was this tool ever
+    /// invoked"), so a ring cannot bound it. Once a session reaches this many
+    /// distinct tool names a previously-unseen name is dropped fail-closed: a
+    /// dependent required-predecessor check then treats it as never-invoked and
+    /// denies. Sized well above any legitimate (registry-bounded) tool set.
+    pub journal_tool_counts_cap: usize,
     /// Process RSS soft ceiling in bytes. When set and exceeded, new admissions
     /// shed with Overloaded { Allocation }. Set to roughly 85-90% of the cgroup
     /// memory.max so the graceful stop fires before the kill. Stage A ships None.
@@ -166,6 +175,7 @@ impl MemoryBudgetConfig {
             velocity_bucket_cap: 65_536,
             admission_key_cap: 4096,
             journal_entry_cap: 4096,
+            journal_tool_counts_cap: 4096,
             rss_soft_limit_bytes: None,
             rss_sample_interval_secs: 30,
         }

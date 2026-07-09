@@ -86,8 +86,11 @@ impl Guard for BehavioralSequenceGuard {
         // pushed out of the retained window is still known to have run, so a
         // workflow that runs setup once and then more than `journal_entry_cap`
         // other calls is no longer falsely denied when a dependent tool needs
-        // that evicted predecessor. `tool_counts` stays bounded because it is
-        // keyed by the (naturally bounded) set of distinct tool names.
+        // that evicted predecessor. `tool_counts` cannot grow without bound: the
+        // journal caps its distinct-key set fail-closed (`journal_tool_counts_cap`,
+        // RFC-0004 F21). Legitimate registry-bounded predecessors stay recorded,
+        // but a predecessor that overflowed the cap is absent here and therefore
+        // denies (fail-closed) rather than being falsely treated as invoked.
         if let Some(required) = self.policy.required_predecessors.get(tool_name) {
             for req in required {
                 if !snapshot.tool_counts.contains_key(req) {
@@ -304,6 +307,89 @@ mod tests {
         // write_file requires read_file, which ran once but was evicted; it must
         // still be ALLOWED because the predecessor is cumulatively known. Before
         // the fix (sequence-based check) this would falsely DENY.
+        let (request, scope, agent_id, server_id) = make_ctx_for_tool("write_file");
+        let ctx = guard_ctx(&request, &scope, &agent_id, &server_id);
+        assert_eq!(guard.evaluate(&ctx).expect("ok"), Verdict::Allow);
+    }
+
+    #[test]
+    fn required_predecessor_denies_when_predecessor_overflowed_tool_counts_cap() {
+        // RFC-0004 F21: the cumulative tool_counts map is distinct-key bounded
+        // fail-closed. A predecessor whose tool name overflowed the cap is absent
+        // from tool_counts, so the required-predecessor check must DENY (treat it
+        // as never-invoked) rather than falsely allow. This is the fail-closed
+        // teeth for the bound the round-7 predecessor fix now depends on.
+        let journal = Arc::new(SessionJournal::with_caps(
+            "sess-overflow".to_string(),
+            1024,
+            1,
+        ));
+        // Fill the single distinct-key slot with an unrelated tool, then invoke
+        // the required predecessor -- which overflows the cap and is dropped from
+        // the cumulative counts even though it ran.
+        record(&journal, "filler");
+        record(&journal, "read_file");
+
+        let snapshot = journal.snapshot().expect("snapshot");
+        assert!(
+            snapshot.tool_sequence.iter().any(|t| t == "read_file"),
+            "test precondition: read_file ran and is in the sequence ring"
+        );
+        assert!(
+            !snapshot.tool_counts.contains_key("read_file"),
+            "test precondition: read_file overflowed the distinct-key cap"
+        );
+
+        let mut required = HashMap::new();
+        required.insert(
+            "write_file".to_string(),
+            HashSet::from(["read_file".to_string()]),
+        );
+        let guard = BehavioralSequenceGuard::new(
+            journal,
+            SequencePolicy {
+                required_predecessors: required,
+                ..SequencePolicy::default()
+            },
+        );
+
+        // read_file "ran" but overflowed the cap, so it is unknown to the check:
+        // write_file must be DENIED fail-closed.
+        let (request, scope, agent_id, server_id) = make_ctx_for_tool("write_file");
+        let ctx = guard_ctx(&request, &scope, &agent_id, &server_id);
+        assert_eq!(guard.evaluate(&ctx).expect("ok"), Verdict::Deny);
+    }
+
+    #[test]
+    fn required_predecessor_within_tool_counts_cap_still_allows() {
+        // The bound must not regress legitimate (registry-bounded) workflows: a
+        // predecessor that fits under the distinct-key cap stays recorded and the
+        // dependent tool is allowed.
+        let journal = Arc::new(SessionJournal::with_caps(
+            "sess-within-cap".to_string(),
+            1024,
+            8,
+        ));
+        record(&journal, "read_file");
+        assert!(journal
+            .snapshot()
+            .expect("snapshot")
+            .tool_counts
+            .contains_key("read_file"));
+
+        let mut required = HashMap::new();
+        required.insert(
+            "write_file".to_string(),
+            HashSet::from(["read_file".to_string()]),
+        );
+        let guard = BehavioralSequenceGuard::new(
+            journal,
+            SequencePolicy {
+                required_predecessors: required,
+                ..SequencePolicy::default()
+            },
+        );
+
         let (request, scope, agent_id, server_id) = make_ctx_for_tool("write_file");
         let ctx = guard_ctx(&request, &scope, &agent_id, &server_id);
         assert_eq!(guard.evaluate(&ctx).expect("ok"), Verdict::Allow);

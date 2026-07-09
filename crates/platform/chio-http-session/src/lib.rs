@@ -158,10 +158,19 @@ pub struct SessionJournalSnapshot {
 /// budget, single-sourced from the process memory budget
 /// ([`chio_kernel::MemoryBudgetConfig`]'s `journal_entry_cap`) rather than a
 /// duplicated literal, so lowering the budget lowers this cap. The `entries` and
-/// `tool_sequence` rings are bounded (RFC-0004 F21); `data_flow` and
-/// `tool_counts` remain cumulative.
+/// `tool_sequence` rings are bounded (RFC-0004 F21); `data_flow` stays
+/// cumulative and `tool_counts` is cumulative but distinct-key bounded (see
+/// [`default_journal_tool_counts_cap`]).
 fn default_journal_entry_cap() -> usize {
     chio_kernel::MemoryBudgetConfig::defaults().journal_entry_cap
+}
+
+/// Default distinct-tool-name cap for the cumulative `tool_counts` map,
+/// single-sourced from the process memory budget
+/// ([`chio_kernel::MemoryBudgetConfig`]'s `journal_tool_counts_cap`) so lowering
+/// the budget lowers this cap (RFC-0004 F21).
+fn default_journal_tool_counts_cap() -> usize {
+    chio_kernel::MemoryBudgetConfig::defaults().journal_tool_counts_cap
 }
 
 /// Fold an evicted entry's hash into the running head hash so the dropped prefix
@@ -189,12 +198,22 @@ struct JournalInner {
     data_flow: CumulativeDataFlow,
     /// Tool invocation sequence (tool names in order), bounded to the entry cap.
     tool_sequence: chio_bounded::Ring<String>,
-    /// Per-tool invocation counts (cumulative).
+    /// Per-tool invocation counts (cumulative). The counts survive entry-ring
+    /// eviction so the behavioral-sequence guard can answer "was this tool ever
+    /// invoked", but the set of DISTINCT keys is bounded fail-closed by
+    /// `tool_counts_cap` (RFC-0004 F21). See `record` for the overflow rule.
     tool_counts: HashMap<String, u64>,
+    /// Maximum number of distinct tool names retained in `tool_counts`. Once
+    /// reached, a previously-unseen tool name is dropped from the cumulative
+    /// counts (fail-closed): a dependent required-predecessor check then treats
+    /// it as never-invoked and denies (RFC-0004 F21). Already-seen tools keep
+    /// counting so legitimate (registry-bounded) predecessor checks stay
+    /// correct across ring eviction.
+    tool_counts_cap: usize,
 }
 
 impl JournalInner {
-    fn new(entry_cap: usize) -> Self {
+    fn new(entry_cap: usize, tool_counts_cap: usize) -> Self {
         Self {
             entries: chio_bounded::Ring::with_capacity(entry_cap, chio_bounded::SizeGauge::new()),
             evicted_head_hash: None,
@@ -205,6 +224,7 @@ impl JournalInner {
                 chio_bounded::SizeGauge::new(),
             ),
             tool_counts: HashMap::new(),
+            tool_counts_cap,
         }
     }
 
@@ -289,17 +309,30 @@ impl SessionJournal {
             .map_err(|_| SessionJournalError::LockPoisoned)
     }
 
-    /// Create a new empty journal for the given session (default entry cap).
+    /// Create a new empty journal for the given session (default caps).
     pub fn new(session_id: String) -> Self {
-        Self::with_entry_cap(session_id, default_journal_entry_cap())
+        Self::with_caps(
+            session_id,
+            default_journal_entry_cap(),
+            default_journal_tool_counts_cap(),
+        )
     }
 
-    /// Create a new empty journal with an explicit entry-ring capacity. The
-    /// `entries` and `tool_sequence` rings are bounded to `entry_cap`;
-    /// `data_flow` and `tool_counts` remain cumulative (RFC-0004 F21).
+    /// Create a new empty journal with an explicit entry-ring capacity and the
+    /// default distinct-tool-name cap. The `entries` and `tool_sequence` rings
+    /// are bounded to `entry_cap`; `data_flow` stays cumulative and
+    /// `tool_counts` is cumulative but distinct-key bounded (RFC-0004 F21).
     pub fn with_entry_cap(session_id: String, entry_cap: usize) -> Self {
+        Self::with_caps(session_id, entry_cap, default_journal_tool_counts_cap())
+    }
+
+    /// Create a new empty journal with explicit entry-ring and distinct-tool-name
+    /// caps. `entry_cap` bounds the `entries` and `tool_sequence` rings;
+    /// `tool_counts_cap` bounds the number of DISTINCT tool names retained in the
+    /// cumulative `tool_counts` map fail-closed (RFC-0004 F21).
+    pub fn with_caps(session_id: String, entry_cap: usize, tool_counts_cap: usize) -> Self {
         Self {
-            inner: Mutex::new(JournalInner::new(entry_cap)),
+            inner: Mutex::new(JournalInner::new(entry_cap, tool_counts_cap)),
             session_id,
         }
     }
@@ -360,10 +393,24 @@ impl SessionJournal {
             .max(params.delegation_depth);
 
         // Update tool sequence and counts. tool_sequence is a bounded ring; the
-        // cumulative tool_counts survive eviction.
+        // cumulative tool_counts survive ring eviction (RFC-0004 F21) so the
+        // "ever invoked" predecessor check stays correct. The distinct-key set
+        // is bounded fail-closed by tool_counts_cap: an already-seen tool keeps
+        // counting, but once the cap is reached a previously-unseen tool name is
+        // NOT inserted, so a dependent required-predecessor check treats it as
+        // never-invoked and denies (fail-closed). This bounds the one long-lived
+        // per-session collection a ring cannot bound, without breaking the
+        // cumulative predecessor semantics for the naturally registry-bounded
+        // legitimate tool set. The append-only entry, sequence ring, and
+        // data-flow totals above are unaffected by the overflow.
         let _ = inner.tool_sequence.push(tool_name.clone());
-        let count = inner.tool_counts.entry(tool_name).or_insert(0);
-        *count = count.saturating_add(1);
+        if inner.tool_counts.contains_key(&tool_name) {
+            if let Some(count) = inner.tool_counts.get_mut(&tool_name) {
+                *count = count.saturating_add(1);
+            }
+        } else if inner.tool_counts.len() < inner.tool_counts_cap {
+            inner.tool_counts.insert(tool_name, 1);
+        }
 
         if let Some(evicted) = inner.entries.push(entry) {
             // Fold the evicted prefix into a running head hash so the chain
@@ -401,6 +448,17 @@ impl SessionJournal {
     pub fn tool_counts(&self) -> Result<HashMap<String, u64>, SessionJournalError> {
         let inner = self.lock_inner()?;
         Ok(inner.tool_counts.clone())
+    }
+
+    /// Number of DISTINCT tool names currently retained in the cumulative
+    /// `tool_counts` map. Bounded above by the journal's `tool_counts_cap`
+    /// (RFC-0004 F21). Exposed so a telemetry exporter or the kernel's
+    /// bounded-structure registry can observe how close the per-session
+    /// distinct-key set is to saturation once the journal is wired into a live
+    /// dispatch path.
+    pub fn tool_counts_len(&self) -> Result<usize, SessionJournalError> {
+        let inner = self.lock_inner()?;
+        Ok(inner.tool_counts.len())
     }
 
     /// Return the number of entries in the journal.
@@ -539,6 +597,57 @@ mod tests {
         // eviction boundary.
         let entries = journal.entries().unwrap();
         assert_eq!(entries.last().map(|e| e.sequence), Some(9));
+        journal.verify_integrity().unwrap();
+    }
+
+    #[test]
+    fn tool_counts_distinct_keys_are_capped_fail_closed() {
+        // RFC-0004 F21: tool_counts is cumulative (survives ring eviction) but its
+        // DISTINCT-KEY set must be bounded, or a writer that can influence tool
+        // names (the journal only validates non-empty/trimmed/control-free, not
+        // registry membership) could grow one long-lived per-session map without
+        // bound. Cap the distinct keys fail-closed: already-seen tools keep
+        // counting; a previously-unseen tool name past the cap is dropped so a
+        // dependent predecessor check treats it as never-invoked.
+        let journal = SessionJournal::with_caps("sess-tool-cap".to_string(), 1024, 2);
+
+        // Fill the distinct-key cap with two legitimate tools.
+        journal.record(test_params("setup")).unwrap();
+        journal.record(test_params("helper")).unwrap();
+        assert_eq!(journal.tool_counts_len().unwrap(), 2);
+
+        // Already-seen tools keep counting cumulatively past the cap.
+        journal.record(test_params("setup")).unwrap();
+        journal.record(test_params("setup")).unwrap();
+        let counts = journal.tool_counts().unwrap();
+        assert_eq!(
+            counts.get("setup"),
+            Some(&3),
+            "known tool must keep counting"
+        );
+        assert_eq!(counts.get("helper"), Some(&1));
+
+        // Flood with many previously-unseen tool names: none are inserted, so the
+        // distinct-key set never exceeds the cap.
+        for i in 0..10_000u32 {
+            journal
+                .record(test_params(&format!("attacker-tool-{i}")))
+                .unwrap();
+        }
+        assert_eq!(
+            journal.tool_counts_len().unwrap(),
+            2,
+            "distinct-key set must stay at the cap under unbounded new tool names"
+        );
+        let counts = journal.tool_counts().unwrap();
+        assert!(
+            !counts.contains_key("attacker-tool-0"),
+            "an overflow tool name must be treated as never-invoked (fail-closed)"
+        );
+
+        // The append-only journal itself is unaffected: every record still counts
+        // toward the cumulative invocation total and the sequence ring.
+        assert_eq!(journal.data_flow().unwrap().total_invocations, 10_004);
         journal.verify_integrity().unwrap();
     }
 
