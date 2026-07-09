@@ -407,6 +407,7 @@ pub struct VerifiedDirectory {
     treaty_parties: HashMap<String, HashSet<String>>,
     version: u64,
     body_sha256: String,
+    expires_at_unix_ms: u64,
 }
 
 impl VerifiedDirectory {
@@ -500,6 +501,30 @@ impl VerifiedDirectory {
     #[must_use]
     pub fn body_sha256(&self) -> &str {
         &self.body_sha256
+    }
+
+    /// The bundle validity-window end this directory was verified against (the
+    /// same field the load-time validity check reads). The reloader compares this
+    /// against `now` BEFORE any unchanged fast path (RFC-0012 F34).
+    #[must_use]
+    pub fn expires_at_unix_ms(&self) -> u64 {
+        self.expires_at_unix_ms
+    }
+
+    /// A deny-all directory: admits nothing, is party to no treaty. Used as the
+    /// fail-closed terminal state when the running bundle expires with no valid
+    /// successor (RFC-0012 F34). version 0, expiry 0, empty indices.
+    #[must_use]
+    pub fn empty_deny_all() -> Self {
+        Self {
+            by_endpoint: HashMap::new(),
+            by_kernel_passport: HashMap::new(),
+            signers: VerifiedSignerDirectory::from_verified_map(HashMap::new()),
+            treaty_parties: HashMap::new(),
+            version: 0,
+            body_sha256: String::new(),
+            expires_at_unix_ms: 0,
+        }
     }
 
     /// Number of admitted (and removed) bindings held.
@@ -805,6 +830,7 @@ impl TransportDirectoryBundleDocument {
             treaty_parties,
             version: self.body.version,
             body_sha256,
+            expires_at_unix_ms: self.body.expires_at_unix_ms,
         })
     }
 }

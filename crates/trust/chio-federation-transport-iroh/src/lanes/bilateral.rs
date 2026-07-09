@@ -725,9 +725,11 @@ impl BilateralCoSignHandler {
         // CURRENT directory no longer binds - can never be used to obtain Org A's
         // co-signature. Fail-closed: an unknown or removed peer has no
         // directory-bound passport key.
-        let directory_key = self
-            .gate
-            .directory()
+        // Hold the current verified directory for the lifetime of the borrowed
+        // passport key: `directory()` now returns an owned snapshot Arc (RFC-0012
+        // F34 ArcSwap), so a temporary would drop the backing directory.
+        let directory = self.gate.directory();
+        let directory_key = directory
             .resolve_passport_key(&request.org_b_kernel_id)
             .ok_or_else(|| BilateralCoSigningError::UnknownPeer(request.org_b_kernel_id.clone()))?;
         // The pinned map is Org A's co-signing allowlist (which admitted peers it
