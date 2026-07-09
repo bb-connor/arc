@@ -164,6 +164,19 @@ impl VelocityGuard {
         )
     }
 
+    /// Create a `VelocityGuard` whose total-bucket cap comes from a CONFIGURED
+    /// process memory budget (RFC-0004 F38). Threading the operator's
+    /// [`chio_kernel::MemoryBudgetConfig`] (rather than a fresh `defaults()` read
+    /// inside [`Self::new`]) means lowering `velocity_bucket_cap` on the process
+    /// memory budget actually tightens this long-lived collection instead of being
+    /// silently ignored on the policy-compiled path (codex finding 3554566274).
+    pub fn from_memory_budget(
+        config: VelocityConfig,
+        budget: &chio_kernel::MemoryBudgetConfig,
+    ) -> Self {
+        Self::with_bucket_cap(config, budget.velocity_bucket_cap)
+    }
+
     /// Create a `VelocityGuard` with an explicit total-bucket cap so a
     /// self-minted-leaf flood saturates rather than growing (RFC-0004 F38). The
     /// cap is a TOTAL across BOTH the invocation and spend maps. Because both maps
@@ -761,6 +774,39 @@ mod tests {
             guard.combined_bucket_count(),
             1,
             "the expired bucket was not pruned; table exceeded the cap"
+        );
+    }
+
+    #[test]
+    fn from_memory_budget_honors_lowered_velocity_bucket_cap() {
+        // codex finding 3554566274 (RFC-0004 F38): the CONFIGURED process memory
+        // budget must reach this guard. A budget that lowers `velocity_bucket_cap`
+        // to 4 must cap the combined bucket table at 4, not the compiled-in default
+        // of 65_536. RED (pre-fix): `new` reads `defaults()` and ignores the budget.
+        let budget = chio_kernel::MemoryBudgetConfig {
+            velocity_bucket_cap: 4,
+            ..chio_kernel::MemoryBudgetConfig::defaults()
+        };
+        let config = VelocityConfig {
+            max_invocations_per_window: Some(1000),
+            window_secs: 60,
+            ..VelocityConfig::default()
+        };
+        let guard = VelocityGuard::from_memory_budget(config, &budget);
+        let kp = Keypair::generate();
+        let agent = kp.public_key().to_hex();
+        let server = "srv".to_string();
+        let scope = ChioScope::default();
+        for i in 0..200u64 {
+            let cap = signed_cap(&kp, &format!("cap-{i}"));
+            let request = make_request(&cap, &agent, &server);
+            let ctx = guard_ctx(&request, &scope, &agent, &server, None);
+            let _ = guard.evaluate(&ctx);
+        }
+        assert!(
+            guard.combined_bucket_count() <= 4,
+            "configured velocity_bucket_cap did not take effect: {} buckets",
+            guard.combined_bucket_count()
         );
     }
 
