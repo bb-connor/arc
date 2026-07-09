@@ -279,13 +279,28 @@ impl BoundedOtlpGrpcIngress {
         // Generate the receipts once and cache them on the item. On failure the
         // caller records the error and drops/retains the batch (like an append
         // failure), so a poison-pill batch never wedges the queue.
+        let mut newly_cached_bytes = 0usize;
         if item.prepared.is_none() {
             match self.sink.prepare_receipts(&item.export) {
-                Ok(receipts) => item.prepared = Some(receipts),
+                Ok(receipts) => {
+                    // Charge the cached signed receipts against the queue byte
+                    // budget so a batch held open during a store outage cannot
+                    // exceed the 64 MiB limit while snapshots report it in budget
+                    // (Codex round-5).
+                    newly_cached_bytes = estimate_prepared_bytes(&receipts);
+                    item.prepared_bytes = newly_cached_bytes;
+                    item.prepared = Some(receipts);
+                }
                 Err(error) => return Ok(Some((Err(error), appended, spans))),
             }
         }
         let prepared = item.prepared.clone().unwrap_or_default();
+        // `item` (a &mut borrow of `queue`) is no longer used past this point, so
+        // the queue can be reborrowed to fold the cached receipt bytes into
+        // `queued_bytes`. pop_front subtracts them again via item.bytes().
+        if newly_cached_bytes > 0 {
+            queue.record_prepared_bytes(newly_cached_bytes);
+        }
         Ok(Some((Ok(prepared), appended, spans)))
     }
 
@@ -330,10 +345,19 @@ impl BoundedOtlpGrpcIngress {
             let append_result = self.sink.append_from(&prepared, &mut appended);
             let newly = appended.saturating_sub(already);
             if newly > 0 {
-                self.record_appended(newly)?;
+                // Span accounting only: a partial append records the spans it
+                // managed to write, but the BATCH is not counted as completed
+                // until the whole batch drains on the Ok path below (Codex
+                // round-5). This keeps one batch resumed across retries from
+                // being counted as several completed batches, or as completed
+                // while it is still queued.
+                self.record_appended_spans(newly)?;
             }
             match append_result {
                 Ok(()) => {
+                    // The whole batch drained: count exactly one completed batch
+                    // here, never per partial append (Codex round-5).
+                    self.record_appended_batch()?;
                     let _ = self.pop_front()?;
                     // Count only receipts appended DURING THIS drain. After a
                     // retryable partial append, `already` receipts were appended
@@ -374,12 +398,21 @@ impl BoundedOtlpGrpcIngress {
         Ok(queue.pop_front())
     }
 
-    fn record_appended(&self, spans: usize) -> Result<(), OTelReceiptExportError> {
+    fn record_appended_spans(&self, spans: usize) -> Result<(), OTelReceiptExportError> {
         let mut queue = self
             .queue
             .lock()
             .map_err(|_| OTelReceiptExportError::Queue("OTEL queue mutex poisoned".to_string()))?;
-        queue.record_appended(spans);
+        queue.record_appended_spans(spans);
+        Ok(())
+    }
+
+    fn record_appended_batch(&self) -> Result<(), OTelReceiptExportError> {
+        let mut queue = self
+            .queue
+            .lock()
+            .map_err(|_| OTelReceiptExportError::Queue("OTEL queue mutex poisoned".to_string()))?;
+        queue.record_appended_batch();
         Ok(())
     }
 
@@ -411,6 +444,12 @@ struct QueuedOtlpExport {
     /// Signed receipts generated once for this batch (RFC-0009 F81). Kept so a
     /// retryable append failure resumes with the SAME ids rather than re-signing.
     prepared: Option<Vec<CanonicalChioReceipt>>,
+    /// Resident bytes of the cached `prepared` receipts, counted toward the
+    /// queue byte budget (Codex round-5). Zero until the receipts are prepared;
+    /// mirrored into the queue's `queued_bytes` when they are cached so the
+    /// bounded queue accounts a batch retained during a store outage at its real
+    /// memory footprint, not just its original OTLP estimate.
+    prepared_bytes: usize,
     /// Resume cursor: how many of `prepared` have been appended so far.
     appended: usize,
 }
@@ -424,9 +463,20 @@ impl QueuedOtlpExport {
             spans,
             bytes,
             prepared: None,
+            prepared_bytes: 0,
             appended: 0,
         }
     }
+}
+
+/// Estimate the resident bytes of a prepared receipt batch from the length of
+/// each receipt's canonical serialization (Codex round-5). Used to charge the
+/// cached signed receipts against the bounded queue's byte budget.
+fn estimate_prepared_bytes(receipts: &[CanonicalChioReceipt]) -> usize {
+    receipts
+        .iter()
+        .map(|receipt| receipt.canonical_bytes().len())
+        .fold(0usize, usize::saturating_add)
 }
 
 impl BoundedQueueItem for QueuedOtlpExport {
@@ -435,7 +485,11 @@ impl BoundedQueueItem for QueuedOtlpExport {
     }
 
     fn bytes(&self) -> usize {
-        self.bytes
+        // Include the cached signed receipts so a batch retained after a
+        // retryable append error is accounted at its true resident size; the
+        // queue adds these bytes when they are cached (`record_prepared_bytes`)
+        // and subtracts them here on pop, keeping `queued_bytes` consistent.
+        self.bytes.saturating_add(self.prepared_bytes)
     }
 }
 
@@ -1042,6 +1096,88 @@ mod tests {
             "the retry counts only the newly accepted span: {summary:?}"
         );
         assert_eq!(ingress.snapshot()?.queued_batches, 0);
+        Ok(())
+    }
+
+    /// Codex round-5: a partial append that fails retryably must NOT count the
+    /// batch as completed (it is still queued for retry), and the batch must be
+    /// counted exactly once when it finally drains, never once per partial
+    /// append.
+    #[test]
+    fn partial_append_counts_the_batch_once_on_completion() -> Result<(), Box<dyn Error>> {
+        let sink = ReceiptStoreSink::new_canonical(
+            Arc::new(PartialThenRetrySink {
+                appended: Mutex::new(0),
+                fail_after: 1,
+                failed_once: Mutex::new(false),
+            }),
+            ReceiptStoreSinkConfig::new(Keypair::generate()),
+        );
+        let ingress = BoundedOtlpGrpcIngress::new(sink, OtlpExporterQueueConfig::default());
+        ingress.enqueue(export_with_two_spans("span-a", "span-b"))?;
+
+        // First drain appends 1 of 2 receipts, then fails retryably and retains
+        // the batch. The batch is still queued, so it must NOT be counted as an
+        // appended (completed) batch; only its 1 appended span is accounted.
+        let first = ingress.drain();
+        assert!(first.is_err(), "the partial append must surface the error");
+        let after_partial = ingress.snapshot()?;
+        assert_eq!(
+            after_partial.appended_batches, 0,
+            "a batch retained for retry must not count as a completed batch: {after_partial:?}"
+        );
+        assert_eq!(
+            after_partial.appended_spans, 1,
+            "the 1 span appended before the failure is accounted: {after_partial:?}"
+        );
+        assert_eq!(after_partial.queued_batches, 1);
+
+        // Second drain appends the remaining receipt and completes the batch,
+        // which is counted exactly once (not twice).
+        ingress.drain()?;
+        let after_complete = ingress.snapshot()?;
+        assert_eq!(
+            after_complete.appended_batches, 1,
+            "the resumed batch is counted exactly once on completion: {after_complete:?}"
+        );
+        assert_eq!(
+            after_complete.appended_spans, 2,
+            "both spans are accounted across the two drains: {after_complete:?}"
+        );
+        assert_eq!(after_complete.queued_batches, 0);
+        Ok(())
+    }
+
+    /// Codex round-5: a batch retained after a retryable append error keeps its
+    /// signed receipts cached in the queue, so those bytes must count toward the
+    /// bounded queue's byte budget rather than being invisible to `queued_bytes`.
+    #[test]
+    fn retained_batch_accounts_cached_receipt_bytes_in_queue_budget() -> Result<(), Box<dyn Error>>
+    {
+        let sink = ReceiptStoreSink::new_canonical(
+            Arc::new(FailingCanonicalSink),
+            ReceiptStoreSinkConfig::new(Keypair::generate()),
+        );
+        let ingress = BoundedOtlpGrpcIngress::new(sink, OtlpExporterQueueConfig::default());
+
+        ingress.enqueue(export_with_span("span-1"))?;
+        let base_bytes = ingress.snapshot()?.queued_bytes;
+
+        // A retryable append error retains the batch WITH its cached signed
+        // receipts, so the accounted bytes must grow beyond the raw OTLP estimate.
+        let _ = ingress.drain();
+        let after = ingress.snapshot()?;
+
+        assert_eq!(
+            after.queued_batches, 1,
+            "the retryable batch is retained for redelivery"
+        );
+        assert!(
+            after.queued_bytes > base_bytes,
+            "cached signed receipts must count toward the queue byte budget: \
+             base={base_bytes} after={}",
+            after.queued_bytes
+        );
         Ok(())
     }
 
