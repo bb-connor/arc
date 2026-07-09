@@ -5,6 +5,38 @@ use super::*;
 /// lapses; sweeping on this cadence bounds how long abandoned budget stays held.
 const RESERVED_HOLD_REAP_INTERVAL_SECS: u64 = 30;
 
+/// Spawn the reserved-hold reaper and retain its `JoinHandle` on the shared
+/// state so the task can be aborted when the server stops. Dropping a
+/// `JoinHandle` only detaches the task (it keeps running); retaining it is what
+/// binds the reaper's lifetime to the server's. A no-op without a mediation
+/// kernel, since nothing reserves holds there.
+pub(crate) async fn spawn_reserved_hold_reaper(state: &Arc<ProxyState>) {
+    if state.mediation_kernel.is_none() {
+        return;
+    }
+    let reaper_state = Arc::clone(state);
+    let handle = tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(
+            RESERVED_HOLD_REAP_INTERVAL_SECS,
+        ));
+        ticker.tick().await;
+        loop {
+            ticker.tick().await;
+            let now = chrono::Utc::now().timestamp();
+            match reap_expired_reserved_holds_once(&reaper_state, now).await {
+                Ok(0) => {}
+                Ok(released) => {
+                    info!(released, "reaped expired reserved budget holds");
+                }
+                Err(error) => {
+                    warn!("reserved-hold reaper failed: {error}");
+                }
+            }
+        }
+    });
+    *state.reaper_handle.lock().await = Some(handle);
+}
+
 /// Stored receipts for inspection and querying.
 pub(crate) struct ReceiptLog {
     pub(crate) receipts: Vec<HttpReceipt>,
@@ -139,6 +171,60 @@ impl SqliteReceiptStore {
     }
 }
 
+/// Bounded, TTL-keyed set of request ids claimed for a live reservation window.
+///
+/// A request id must be unique only for the lifetime of the reservation it
+/// backs: the kernel derives the durable budget-hold identity from it, so a
+/// reused id inside the window would collapse into an idempotent authorize with
+/// no fresh reservation and defeat the over-subscription guard. Once the
+/// execution-nonce TTL lapses the hold is reconciled or reaped, so the id may be
+/// reused. Each entry carries that expiry and is pruned lazily on every
+/// mutation, bounding the set to the reservations opened within one TTL window
+/// instead of growing without limit.
+pub(crate) struct MintedRequestIdWindow {
+    ttl_secs: i64,
+    expiries: HashMap<String, i64>,
+}
+
+impl MintedRequestIdWindow {
+    pub(crate) fn new(ttl_secs: u64) -> Self {
+        Self {
+            ttl_secs: ttl_secs as i64,
+            expiries: HashMap::new(),
+        }
+    }
+
+    /// Claim `request_id` for a reservation opening at `now`. Prunes expired
+    /// entries first, then admits the id only when it is not already live inside
+    /// its window. Returns `false` for a reuse inside a live window, which the
+    /// caller maps to a fail-closed 409.
+    pub(crate) fn claim(&mut self, request_id: &str, now: i64) -> bool {
+        self.prune(now);
+        if self.expiries.contains_key(request_id) {
+            return false;
+        }
+        self.expiries
+            .insert(request_id.to_string(), now.saturating_add(self.ttl_secs));
+        true
+    }
+
+    /// Release a claimed id. Called when the authorization placed no durable
+    /// hold (denied, pending, or errored) so a failed attempt does not
+    /// permanently burn the id.
+    pub(crate) fn release(&mut self, request_id: &str) {
+        self.expiries.remove(request_id);
+    }
+
+    fn prune(&mut self, now: i64) {
+        self.expiries.retain(|_, expiry| *expiry > now);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
+        self.expiries.len()
+    }
+}
+
 /// Shared proxy state.
 pub(crate) struct ProxyState {
     pub(crate) evaluator: RequestEvaluator,
@@ -162,11 +248,19 @@ pub(crate) struct ProxyState {
     /// authoritative, and so the nonce it mints on `/v1/evaluate` is the one it
     /// verifies and consumes on `/v1/reconcile`.
     pub(crate) mediation_kernel: Option<Mutex<chio_kernel::ChioKernel>>,
-    /// Request ids already claimed for a reservation on `/v1/evaluate`. The
+    /// Request ids claimed for a live reservation window on `/v1/evaluate`. The
     /// kernel derives the durable budget hold identity from the request id, so
-    /// each id is admitted at most once; a reuse is rejected fail-closed (409) to
-    /// preserve the over-subscription guard.
-    pub(crate) minted_request_ids: Mutex<HashSet<String>>,
+    /// each id is admitted at most once inside its window; a reuse is rejected
+    /// fail-closed (409) to preserve the over-subscription guard. Entries expire
+    /// with the reservation (execution-nonce) TTL and are pruned lazily, so the
+    /// set stays bounded rather than growing on every request.
+    pub(crate) minted_request_ids: Mutex<MintedRequestIdWindow>,
+    /// Retained `JoinHandle` for the reserved-hold reaper task. Held so the
+    /// reaper can be aborted when the server stops accepting; a dropped
+    /// `JoinHandle` only detaches the task (it keeps running) rather than
+    /// aborting it. `None` until the reaper is spawned (and when no mediation
+    /// kernel is configured, since nothing reserves holds).
+    pub(crate) reaper_handle: Mutex<Option<tokio::task::JoinHandle<()>>>,
     pub(crate) allow_advisory: bool,
 }
 
@@ -386,36 +480,19 @@ impl ProtectProxy {
             sidecar_control_token: self.config.sidecar_control_token.clone(),
             budget_store,
             mediation_kernel,
-            minted_request_ids: Mutex::new(HashSet::new()),
+            minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
+                chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
+            )),
+            reaper_handle: Mutex::new(None),
             allow_advisory: self.config.allow_advisory,
         });
 
         // Release expired, unreconciled reserved budget holds on an interval so a
         // caller that authorizes but never reconciles does not permanently burn
-        // budget. Runs only when a mediation kernel exists (budget store
-        // configured). The task is aborted when the server task ends.
-        if state.mediation_kernel.is_some() {
-            let reaper_state = Arc::clone(&state);
-            tokio::spawn(async move {
-                let mut ticker = tokio::time::interval(std::time::Duration::from_secs(
-                    RESERVED_HOLD_REAP_INTERVAL_SECS,
-                ));
-                ticker.tick().await;
-                loop {
-                    ticker.tick().await;
-                    let now = chrono::Utc::now().timestamp();
-                    match reap_expired_reserved_holds_once(&reaper_state, now).await {
-                        Ok(0) => {}
-                        Ok(released) => {
-                            info!(released, "reaped expired reserved budget holds");
-                        }
-                        Err(error) => {
-                            warn!("reserved-hold reaper failed: {error}");
-                        }
-                    }
-                }
-            });
-        }
+        // budget. The reaper's JoinHandle is retained on the shared state and
+        // aborted once the server stops accepting (below), bounding the task's
+        // lifetime to the server's.
+        spawn_reserved_hold_reaper(&state).await;
 
         let app = build_app(Arc::clone(&state));
 
@@ -440,12 +517,21 @@ impl ProtectProxy {
 
         observer(local_addr);
 
-        axum::serve(
+        let serve_result = axum::serve(
             listener,
             app.into_make_service_with_connect_info::<SocketAddr>(),
         )
         .await
-        .map_err(ProtectError::Io)?;
+        .map_err(ProtectError::Io);
+
+        // The reaper holds a clone of the shared state; abort it now the server
+        // has stopped so the task does not outlive the serving lifetime (a
+        // dropped JoinHandle would only detach it, leaving it running).
+        if let Some(handle) = state.reaper_handle.lock().await.take() {
+            handle.abort();
+        }
+
+        serve_result?;
 
         Ok(())
     }

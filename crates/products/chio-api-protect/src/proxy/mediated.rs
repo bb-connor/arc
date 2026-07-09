@@ -7,7 +7,7 @@ use chio_kernel::execution_nonce::{
     ExecutionNonceConfig, InMemoryExecutionNonceStore, SignedExecutionNonce,
 };
 use chio_kernel::{
-    ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ToolCallRequest, ToolInvocationCost,
+    ChioKernel, KernelConfig, KernelError, ToolCallRequest, ToolInvocationCost,
     ToolServerConnection, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
@@ -100,10 +100,11 @@ pub(crate) fn load_revocation_db_ids(
 /// an approval token or DPoP proof be replayed within its TTL. One instance
 /// keeps both replay stores authoritative across `/v1/evaluate` requests, and it
 /// is the same nonce store that mints on `/v1/evaluate` and verifies+consumes on
-/// `/v1/reconcile`, so a reconciled nonce cannot be replayed. The caller-named
-/// `server_id` is registered on this shared kernel under the lock per request
-/// (the kernel's pre-dispatch registration check runs before the authorization
-/// return, and registration needs `&mut self`); the insert is idempotent.
+/// `/v1/reconcile`, so a reconciled nonce cannot be replayed. The route never
+/// registers the caller-named `server_id`: the reserve-for-caller authorization
+/// path never dispatches a tool on this kernel and so no longer requires the
+/// target to be registered, which keeps the kernel's tool-server map from
+/// growing on every caller-arbitrary request.
 ///
 /// `trusted_capability_issuers` are trusted as capability authorities in
 /// addition to the sidecar signer, so an externally minted capability that the
@@ -160,47 +161,6 @@ pub(crate) fn build_mediation_kernel(
         kernel.register_tool_server(server);
     }
     Ok(kernel)
-}
-
-/// Registration placeholder for the caller's requested `server_id`.
-///
-/// The kernel's pre-dispatch registration check (`ToolNotRegistered`) runs
-/// before the authorization preflight returns, so the target server must be
-/// registered even though the mediated route never dispatches it. This route is
-/// a pure authorization gate: the caller executes the real tool downstream, so
-/// `invoke` is unreachable here and fails closed if ever reached.
-pub(crate) struct MediatedProxyToolServer {
-    server_id: String,
-}
-
-impl MediatedProxyToolServer {
-    pub(crate) fn new(server_id: String) -> Self {
-        Self { server_id }
-    }
-}
-
-#[async_trait::async_trait]
-impl ToolServerConnection for MediatedProxyToolServer {
-    fn server_id(&self) -> &str {
-        &self.server_id
-    }
-
-    fn tool_names(&self) -> Vec<String> {
-        Vec::new()
-    }
-
-    async fn invoke(
-        &self,
-        _tool_name: &str,
-        _arguments: serde_json::Value,
-        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
-    ) -> Result<serde_json::Value, KernelError> {
-        // Unreachable: the mediated route authorizes and reserves but never
-        // dispatches. Fail closed if the invariant is ever violated.
-        Err(KernelError::Internal(
-            "mediated authorization gate must not dispatch the caller's tool".to_string(),
-        ))
-    }
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -304,14 +264,19 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         .request_id
         .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
     // Fail-closed over-subscription guard: the kernel derives the durable budget
-    // hold identity from `request_id`, so a reused id yields an idempotent
-    // authorize with no new reservation. Claim each id at most once for a
-    // reservation and reject a reuse with 409 before authorizing.
+    // hold identity from `request_id`, so a reused id inside a live reservation
+    // window would collapse into an idempotent authorize with no fresh
+    // reservation. Claim the id for this window before authorizing and reject a
+    // reuse with 409. The claim is released below when the authorization places
+    // no durable hold, so a denied or failed attempt does not permanently burn
+    // the id; claimed ids expire with the reservation TTL, keeping the set
+    // bounded.
+    let now_unix = chrono::Utc::now().timestamp();
     if !state
         .minted_request_ids
         .lock()
         .await
-        .insert(request_id.clone())
+        .claim(&request_id, now_unix)
     {
         return (
             StatusCode::CONFLICT,
@@ -324,10 +289,10 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
             .into_response();
     }
     let kernel_request = ToolCallRequest {
-        request_id,
+        request_id: request_id.clone(),
         capability: parsed.capability,
         tool_name: parsed.tool_name,
-        server_id: parsed.tool_server.clone(),
+        server_id: parsed.tool_server,
         agent_id,
         arguments: parsed.parameters,
         dpop_proof: parsed.dpop_proof,
@@ -339,23 +304,33 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
-    // Single-phase authorization on the shared, process-lifetime kernel: register
-    // the caller-named server (idempotent; the pre-dispatch check requires it)
-    // then verify + reserve the budget hold (kept open) + mint a fresh execution
-    // nonce. No dispatch, no reconcile, no settlement. The lock is released at the
-    // end of the block, before any await, so authorizations serialize without
-    // holding the kernel across receipt-persistence I/O.
+    // Single-phase authorization on the shared, process-lifetime kernel: verify +
+    // reserve the budget hold (kept open) + mint a fresh execution nonce. The
+    // reserve-for-caller path never dispatches, so it does not require the
+    // caller-named server to be registered; the route therefore never registers
+    // it and holds the kernel behind a shared (non-mut) lock. No dispatch, no
+    // reconcile, no settlement. The lock is released at the end of the block,
+    // before any await, so authorizations serialize without holding the kernel
+    // across receipt-persistence I/O.
     let response = {
-        let mut kernel = mediation_kernel.lock().await;
-        kernel.register_tool_server(Box::new(MediatedProxyToolServer::new(parsed.tool_server)));
+        let kernel = mediation_kernel.lock().await;
         match kernel.authorize_tool_call_reserving_blocking_with_metadata(&kernel_request, None) {
             Ok(response) => response,
             Err(error) => {
+                // The reservation did not open; release the claimed id so a
+                // failed authorization does not permanently burn it.
+                state.minted_request_ids.lock().await.release(&request_id);
                 warn!("mediated authorization error: {error}");
                 return internal_json_error_response("chio_mediation_failed", &error.to_string());
             }
         }
     };
+    // Only a successful reservation (Verdict::Allow) keeps its request-id claim: a
+    // denied or pending verdict placed no durable hold, so release the id to let
+    // the caller retry it without a spurious 409.
+    if !matches!(response.verdict, chio_kernel::Verdict::Allow) {
+        state.minted_request_ids.lock().await.release(&request_id);
+    }
     if let Err(error) = record_tool_receipt(&state, &response.receipt).await {
         warn!("failed to persist mediated receipt: {error}");
         return internal_json_error_response("chio_receipt_persistence_failed", &error.to_string());
@@ -396,12 +371,19 @@ pub(crate) struct SidecarReconcileRequest {
 
 /// Settle a reserved authorization by the execution nonce that names its hold.
 ///
+/// This route is gated by the reconcile control middleware: only the trusted
+/// tool server, presenting the sidecar-control token, reconciles. The controlled
+/// agent that called `/v1/evaluate` must not reach this endpoint, or it could
+/// settle its own reservation at cost zero and defeat the cumulative spend cap.
+///
 /// The presented nonce is the credential: the shared kernel that minted it
 /// verifies it (signature under the sidecar key, expiry, single-use replay),
 /// settles the exact reserved hold at `min(realized, reserved)`, releases the
 /// difference back to the grant, and signs a completed authoritative receipt.
-/// Fail-closed: a forged, tampered, replayed, or argument-mismatched nonce, or a
-/// hold that is already closed, is rejected with a 4xx and never settles.
+/// The `realized_cost` is the tool server's own report of what the call cost;
+/// binding it to an attested oracle cost is a later concern. Fail-closed: a
+/// forged, tampered, replayed, or argument-mismatched nonce, or a hold that is
+/// already closed, is rejected with a 4xx and never settles.
 pub(crate) async fn sidecar_reconcile_handler(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
@@ -541,14 +523,36 @@ mod tests {
             .test_unwrap()
     }
 
-    /// Build proxy state for the mediated route. `signer` is the sidecar signer
-    /// the shared mediation kernel is built from (so capabilities minted by it
-    /// are trusted), and `trusted_capability_issuers` are additional external
-    /// issuers to trust.
+    /// Control token the mediated test state configures so `/v1/reconcile`, now
+    /// behind the reconcile control gate, admits the trusted tool server that
+    /// presents it. `/v1/evaluate` is not gated, so evaluate tests are unaffected.
+    const MEDIATED_CONTROL_TOKEN: &str = "tool-server-control-token";
+
+    /// Build proxy state for the mediated route with the standard reconcile
+    /// control token configured.
     fn mediated_test_state(
         signer: Keypair,
         budget: Arc<dyn BudgetStore>,
         trusted_capability_issuers: Vec<PublicKey>,
+    ) -> Arc<ProxyState> {
+        mediated_test_state_with_control_token(
+            signer,
+            budget,
+            trusted_capability_issuers,
+            Some(MEDIATED_CONTROL_TOKEN.to_string()),
+        )
+    }
+
+    /// Build proxy state for the mediated route. `signer` is the sidecar signer
+    /// the shared mediation kernel is built from (so capabilities minted by it
+    /// are trusted), and `trusted_capability_issuers` are additional external
+    /// issuers to trust. `sidecar_control_token` gates `/v1/reconcile`; `None`
+    /// leaves the sidecar with no configured token, so reconcile fails closed.
+    fn mediated_test_state_with_control_token(
+        signer: Keypair,
+        budget: Arc<dyn BudgetStore>,
+        trusted_capability_issuers: Vec<PublicKey>,
+        sidecar_control_token: Option<String>,
     ) -> Arc<ProxyState> {
         let approval_store: Arc<dyn ApprovalStore> = Arc::new(InMemoryApprovalStore::new());
         let signer_public_key = signer.public_key();
@@ -597,10 +601,13 @@ mod tests {
             revoked_capability_ids: Mutex::new(std::collections::HashSet::new()),
             trusted_capability_issuers,
             trusted_receipt_signers,
-            sidecar_control_token: None,
+            sidecar_control_token,
             budget_store: Some(budget),
             mediation_kernel: Some(mediation_kernel),
-            minted_request_ids: Mutex::new(std::collections::HashSet::new()),
+            minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
+                chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
+            )),
+            reaper_handle: Mutex::new(None),
             allow_advisory: false,
         })
     }
@@ -801,12 +808,13 @@ mod tests {
         post_json(state, "/v1/evaluate", body).await
     }
 
-    /// POST a body to `/v1/reconcile` and return the status and parsed JSON.
+    /// POST a body to `/v1/reconcile` presenting the standard control token, so
+    /// the reconcile control gate admits it, and return the status and JSON.
     async fn post_reconcile(
         state: Arc<ProxyState>,
         body: &serde_json::Value,
     ) -> (StatusCode, serde_json::Value) {
-        post_json(state, "/v1/reconcile", body).await
+        post_json_with_bearer(state, "/v1/reconcile", body, Some(MEDIATED_CONTROL_TOKEN)).await
     }
 
     async fn post_json(
@@ -814,11 +822,24 @@ mod tests {
         uri: &str,
         body: &serde_json::Value,
     ) -> (StatusCode, serde_json::Value) {
+        post_json_with_bearer(state, uri, body, None).await
+    }
+
+    async fn post_json_with_bearer(
+        state: Arc<ProxyState>,
+        uri: &str,
+        body: &serde_json::Value,
+        bearer: Option<&str>,
+    ) -> (StatusCode, serde_json::Value) {
+        let mut builder = Request::builder()
+            .method("POST")
+            .uri(uri)
+            .header("content-type", "application/json");
+        if let Some(bearer) = bearer {
+            builder = builder.header("authorization", format!("Bearer {bearer}"));
+        }
         let request = with_loopback_peer(
-            Request::builder()
-                .method("POST")
-                .uri(uri)
-                .header("content-type", "application/json")
+            builder
                 .body(Body::from(serde_json::to_vec(body).unwrap()))
                 .unwrap(),
         );
@@ -1414,7 +1435,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn reaper_releases_expired_hold_and_unblocks_authorization() {
+    async fn reaper_forfeits_expired_hold_at_worst_case() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
         let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
@@ -1422,6 +1443,7 @@ mod tests {
         // One reservation reserves the whole grant.
         let cap =
             issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 100, "USD");
+        let cap_id = cap.id.clone();
         let cap_value = serde_json::to_value(&cap).unwrap();
         let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
         let params = serde_json::json!({ "invoice": "inv-1" });
@@ -1448,13 +1470,17 @@ mod tests {
         assert_eq!(blocked["status"], "deny");
 
         // Sweep with a far-future clock: the abandoned reserved hold is past its
-        // execution-nonce TTL and is released.
-        let released = reap_expired_reserved_holds_once(&state, i64::MAX)
+        // execution-nonce TTL and is settled at its reserved worst-case.
+        let settled = reap_expired_reserved_holds_once(&state, i64::MAX)
             .await
             .unwrap();
-        assert_eq!(released, 1, "the expired reserved hold must be released");
+        assert_eq!(settled, 1, "the expired reserved hold must be settled");
 
-        // The freed grant admits an authorization that was blocked before.
+        // Fail-closed: reaping FORFEITS the reserved worst-case to realized spend
+        // (an abandoned reservation may correspond to a call that ran), so the
+        // grant stays fully committed and a new authorization is still denied.
+        // The reaper's job is to convert a lingering open hold into a settled
+        // spend, not to free budget for the caller who never reconciled.
         let after_body = serde_json::json!({
             "capability": cap_value,
             "tool_server": "cost-srv",
@@ -1464,8 +1490,17 @@ mod tests {
         });
         let (_, after) = post_evaluate(Arc::clone(&state), &after_body).await;
         assert_eq!(
-            after["status"], "authorized",
-            "reaping the expired hold must free the grant for a new authorization"
+            after["status"], "deny",
+            "a forfeited reserved hold must keep the grant committed, not free it"
+        );
+
+        // The forfeited worst-case remains committed against the grant.
+        let usage = budget.get_usage(&cap_id, 0).unwrap();
+        let usage = usage.expect("the forfeited hold must remain recorded in the budget store");
+        assert_eq!(
+            usage.committed_cost_units().unwrap(),
+            100,
+            "reaping settles the reserved worst-case as realized spend (fail-closed)"
         );
     }
 
@@ -1569,6 +1604,217 @@ mod tests {
         assert!(
             kernel.execution_nonce_required(),
             "mediation kernel must always run execution-nonce strict mode"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn reconcile_requires_sidecar_control_token() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 150, "USD");
+        let cap_value = serde_json::to_value(&cap).unwrap();
+        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+        let params = serde_json::json!({ "invoice": "inv-1" });
+
+        let body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": params,
+            "request_id": "recon-auth-gate",
+        });
+        let (_, authorized) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(authorized["status"], "authorized");
+        let nonce_json = authorized["execution_nonce"].clone();
+
+        let reconcile_body = serde_json::json!({
+            "execution_nonce": nonce_json,
+            "arguments": params,
+            "realized_cost": { "units": 30, "currency": "USD" },
+        });
+
+        // Finding 1: the controlled agent could self-reconcile at cost zero when
+        // reconcile was on the public router. Without the sidecar-control token
+        // the reconcile is rejected by the trusted-caller gate before it can
+        // settle the hold; the gate runs ahead of the handler, so the nonce is
+        // not consumed by the rejected attempt.
+        let (status, denied) =
+            post_json(Arc::clone(&state), "/v1/reconcile", &reconcile_body).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_eq!(denied["error"], "chio_control_forbidden");
+
+        // Presenting the control token (the tool server's trust boundary) settles.
+        let (status, reconciled) = post_reconcile(Arc::clone(&state), &reconcile_body).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(reconciled["status"], "reconciled");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn reconcile_without_configured_control_token_is_rejected() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 150, "USD");
+        let cap_value = serde_json::to_value(&cap).unwrap();
+        // No sidecar-control token configured.
+        let state =
+            mediated_test_state_with_control_token(signer, Arc::clone(&budget), Vec::new(), None);
+        let params = serde_json::json!({ "invoice": "inv-1" });
+
+        let body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": params,
+            "request_id": "recon-no-token",
+        });
+        let (_, authorized) = post_evaluate(Arc::clone(&state), &body).await;
+        let nonce_json = authorized["execution_nonce"].clone();
+
+        // Finding 1 fail-closed: with no control token configured there is no
+        // trusted caller, so reconcile is rejected outright rather than left open.
+        // Presenting any bearer cannot help because none is configured to match.
+        let reconcile_body = serde_json::json!({
+            "execution_nonce": nonce_json,
+            "arguments": params,
+            "realized_cost": { "units": 0, "currency": "USD" },
+        });
+        let (status, denied) = post_reconcile(Arc::clone(&state), &reconcile_body).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_eq!(denied["error"], "chio_control_forbidden");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_authorization_needs_no_tool_server_registration() {
+        // Finding 2: the reserve-for-caller path no longer requires the target
+        // tool server to be registered, so the route registers nothing. Many
+        // distinct caller-arbitrary server ids each authorize, and because the
+        // handler holds the kernel behind a shared (non-mut) lock it cannot
+        // register a server or otherwise grow the kernel's tool-server map.
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+
+        for index in 0..8 {
+            let server = format!("arbitrary-srv-{index}");
+            let cap =
+                issue_cost_bearing_capability(&kernel, &agent, &server, "invoke", 100, 1000, "USD");
+            let body = serde_json::json!({
+                "capability": cap,
+                "tool_server": server,
+                "tool_name": "invoke",
+                "parameters": {},
+                "request_id": format!("noreg-{index}"),
+            });
+            let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(
+                json["status"], "authorized",
+                "an arbitrary caller server id must authorize without any registration"
+            );
+            assert!(json["execution_nonce"].is_object());
+        }
+    }
+
+    #[test]
+    fn minted_request_id_window_bounds_reuse_and_expiry() {
+        let mut window = MintedRequestIdWindow::new(30);
+        // A fresh id is claimed; an immediate reuse inside the window is rejected.
+        assert!(window.claim("req-a", 1_000));
+        assert!(!window.claim("req-a", 1_000));
+        assert_eq!(window.len(), 1);
+
+        // Releasing an id (a denied/failed authorization) makes it reusable at once.
+        window.release("req-a");
+        assert_eq!(window.len(), 0);
+        assert!(window.claim("req-a", 1_000));
+
+        // Distinct live ids accumulate, but a later claim prunes entries whose
+        // reservation TTL has lapsed, so the set stays bounded and an expired id
+        // is reusable again.
+        assert!(window.claim("req-b", 1_010));
+        assert_eq!(window.len(), 2);
+        // At 1_031, "req-a" (expires 1_030) is pruned; "req-b" (expires 1_040)
+        // is still live.
+        assert!(window.claim("req-c", 1_031));
+        assert_eq!(window.len(), 2);
+        assert!(window.claim("req-a", 1_031));
+        assert_eq!(window.len(), 3);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_denied_authorization_does_not_burn_request_id() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        // max_cost_per_invocation (100) exceeds max_total_cost (40): the
+        // reservation is refused, so the authorization is denied and places no
+        // durable hold.
+        let cap =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 40, "USD");
+        let cap_value = serde_json::to_value(&cap).unwrap();
+        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+        let body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": {},
+            "request_id": "denied-then-retry",
+        });
+
+        let (status, first) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(first["status"], "deny");
+
+        // Finding 3(a): a denied authorization must not permanently burn the id.
+        // Reusing it is NOT a 409 conflict; it is evaluated again (and denied
+        // again), proving the claim was released.
+        let (status, second) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_ne!(
+            status,
+            StatusCode::CONFLICT,
+            "a denied authorization must release its request-id claim"
+        );
+        assert_eq!(second["status"], "deny");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn reserved_hold_reaper_handle_is_retained_not_detached() {
+        let signer = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let state = mediated_test_state(signer, budget, Vec::new());
+
+        // No reaper before spawn.
+        assert!(state.reaper_handle.lock().await.is_none());
+
+        // Finding 3(b): the reaper's JoinHandle is retained on the shared state,
+        // not dropped/detached, so it can be aborted on shutdown.
+        spawn_reserved_hold_reaper(&state).await;
+        {
+            let guard = state.reaper_handle.lock().await;
+            let handle = guard
+                .as_ref()
+                .expect("the reaper handle must be retained on the state");
+            assert!(
+                !handle.is_finished(),
+                "the retained reaper handle must reference a live, abortable task"
+            );
+        }
+
+        // The retained handle is abortable; aborting cancels the reaper task.
+        let handle = state.reaper_handle.lock().await.take().unwrap();
+        handle.abort();
+        assert!(
+            handle.await.is_err(),
+            "aborting the retained handle must cancel the reaper task"
         );
     }
 }

@@ -223,7 +223,10 @@ fn make_test_state(
         sidecar_control_token: None,
         budget_store: None,
         mediation_kernel: None,
-        minted_request_ids: Mutex::new(HashSet::new()),
+        minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
+            chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
+        )),
+        reaper_handle: Mutex::new(None),
         allow_advisory,
     })
 }
