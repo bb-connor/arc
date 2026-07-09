@@ -420,6 +420,130 @@ fn mustprepay_no_budget_charge_uncapturable_authorization_denies() {
     );
 }
 
+// An aborted dispatch after a no-ceiling MustPrepay authorization must release the
+// unsettled hold. The grant carries no monetary ceiling so charge_result is None;
+// the tool then fails after the hold is authorized, driving the abort cleanup path
+// through unwind_aborted_monetary_invocation with charge_result == None and a live
+// payment_authorization. Fail-closed: the payer's funds must not be left frozen.
+#[test]
+fn mustprepay_no_budget_charge_releases_hold_on_aborted_dispatch() {
+    let payment = TrackingPaymentAdapter::new();
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel.register_tool_server(Box::new(FailingMonetaryServer {
+        id: "cost-srv".to_string(),
+    }));
+
+    let agent_kp = Keypair::generate();
+    let cap = kernel
+        .issue_capability(
+            &agent_kp.public_key(),
+            make_scope(vec![make_no_ceiling_mustprepay_grant()]),
+            3600,
+        )
+        .unwrap();
+
+    let intent =
+        make_mustprepay_intent("intent-no-charge-abort", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-no-charge-abort", &cap, &agent_kp, intent, &kernel);
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        payment.authorized.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "adapter.authorize() must have been called once"
+    );
+    assert_eq!(
+        payment.released.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "aborted no-ceiling MustPrepay must release the unsettled prepaid hold"
+    );
+    assert_eq!(
+        payment.captured.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "an aborted dispatch must not capture the hold"
+    );
+    assert_eq!(
+        payment.refunded.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "an unsettled hold is released, never refunded"
+    );
+}
+
+// A no-ceiling MustPrepay intent whose declared max_amount is absent but whose
+// quote.quoted_cost is the amount that will actually be prepaid.
+fn make_no_ceiling_mustprepay_intent_over_threshold(
+    id: &str,
+    quoted_units: u64,
+    currency: &str,
+) -> GovernedTransactionIntent {
+    let mut intent = make_mustprepay_intent(id, "cost-srv", "compute", quoted_units, currency);
+    // The prepaid amount is quote.quoted_cost; drop the declared max_amount so only
+    // the quote can drive the approval-threshold decision.
+    intent.max_amount = None;
+    intent
+}
+
+// The amount actually prepaid for a no-ceiling MustPrepay intent is
+// quote.quoted_cost, so a quote above RequireApprovalAbove must be gated even when
+// max_amount is absent. Denied without an approval token, admitted with one.
+#[test]
+fn governed_mustprepay_quote_above_threshold_requires_approval() {
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+
+    let agent_kp = Keypair::generate();
+    // make_no_ceiling_mustprepay_grant gates approval above 50 units.
+    let cap = kernel
+        .issue_capability(
+            &agent_kp.public_key(),
+            make_scope(vec![make_no_ceiling_mustprepay_grant()]),
+            3600,
+        )
+        .unwrap();
+
+    // Quote 100 > threshold 50, max_amount absent: the prepaid quote alone forces approval.
+    let intent = make_no_ceiling_mustprepay_intent_over_threshold("intent-quote-gate", 100, "USD");
+
+    let no_token = ToolCallRequest {
+        request_id: "req-quote-gate-deny".to_string(),
+        capability: cap.clone(),
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: Some(intent.clone()),
+        approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    };
+    let denied = kernel.evaluate_tool_call_blocking(&no_token).unwrap();
+    assert_eq!(
+        denied.verdict,
+        Verdict::Deny,
+        "a MustPrepay quote above the approval threshold must be denied without an approval token"
+    );
+    let reason = denied.reason.as_deref().unwrap_or("");
+    assert!(
+        reason.contains("approval token required"),
+        "denial must cite the missing approval token; got: {reason}"
+    );
+
+    let with_token =
+        mustprepay_tool_call("req-quote-gate-allow", &cap, &agent_kp, intent, &kernel);
+    let allowed = kernel.evaluate_tool_call_blocking(&with_token).unwrap();
+    assert_eq!(
+        allowed.verdict,
+        Verdict::Allow,
+        "a valid approval token must admit the prepaid MustPrepay quote"
+    );
+}
+
 // Authorizes an unsettled hold whose capture always fails, exercising the
 // fail-closed settlement path. Counts releases so a leaked hold is observable.
 #[derive(Debug, Clone, Default)]

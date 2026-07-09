@@ -78,9 +78,13 @@ impl Drop for PostAdmissionDropGuard<'_> {
             return;
         }
 
-        let Some(charge) = self.charge_result else {
+        // Nothing was admitted that needs unwinding when there is neither a budget
+        // charge to reverse nor a payment authorization to release. A no-ceiling
+        // MustPrepay hold carries payment_authorization with charge_result == None,
+        // and must still be released so the prepaid funds are not left frozen.
+        if self.charge_result.is_none() && self.payment_authorization.is_none() {
             return;
-        };
+        }
 
         let unwind = self.kernel.unwind_aborted_monetary_invocation(
             self.request,
@@ -88,8 +92,8 @@ impl Drop for PostAdmissionDropGuard<'_> {
             self.charge_result,
             self.payment_authorization,
         );
-        let extra_metadata = match &unwind {
-            Ok(Some(reverse)) => self.kernel.merge_budget_receipt_metadata(
+        let extra_metadata = match (&unwind, self.charge_result) {
+            (Ok(Some(reverse)), Some(charge)) => self.kernel.merge_budget_receipt_metadata(
                 self.receipt_context.extra_metadata.clone(),
                 self.kernel.budget_execution_receipt_metadata(
                     charge,
@@ -97,8 +101,7 @@ impl Drop for PostAdmissionDropGuard<'_> {
                     None,
                 ),
             ),
-            Ok(None) => self.receipt_context.extra_metadata.clone(),
-            Err(error) => {
+            (Err(error), Some(charge)) => {
                 warn!(
                     request_id = %self.request.request_id,
                     reason = %redacted!(error),
@@ -114,6 +117,15 @@ impl Drop for PostAdmissionDropGuard<'_> {
                     }),
                 )
             }
+            (Err(error), None) => {
+                warn!(
+                    request_id = %self.request.request_id,
+                    reason = %redacted!(error),
+                    "failed to release dropped post-admission payment authorization"
+                );
+                self.receipt_context.extra_metadata.clone()
+            }
+            _ => self.receipt_context.extra_metadata.clone(),
         };
 
         let _guard_evidence_scope = scope_pre_invocation_guard_evidence(

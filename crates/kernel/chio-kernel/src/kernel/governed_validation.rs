@@ -369,6 +369,23 @@ impl ChioKernel {
         Ok(())
     }
 
+    /// Units that a MustPrepay intent will actually prepay, if the intent mandates
+    /// prepayment. This is `quote.quoted_cost` when the grant carries no monetary
+    /// ceiling, so it is the amount that gates approval and max-amount checks in
+    /// the no-charge path.
+    fn mustprepay_prepaid_units(
+        intent: &chio_core::capability::governance::GovernedTransactionIntent,
+    ) -> Option<u64> {
+        intent
+            .metered_billing
+            .as_ref()
+            .filter(|metered| {
+                metered.settlement_mode
+                    == chio_core::capability::governance::MeteredSettlementMode::MustPrepay
+            })
+            .map(|metered| metered.quote.quoted_cost.units)
+    }
+
     fn validate_governed_call_chain_context(
         &self,
         request: &ToolCallRequest,
@@ -1071,9 +1088,34 @@ impl ChioKernel {
             }
         }
 
+        // No-charge MustPrepay path: the amount that will actually be prepaid is the
+        // quote, not the provisional charge (there is none). Bound it by any declared
+        // max_amount so a small ceiling cannot understate the prepaid cost. The quote
+        // currency is already reconciled against max_amount in metered validation.
+        let mustprepay_prepaid_units = if charge_result.is_none() {
+            Self::mustprepay_prepaid_units(intent)
+        } else {
+            None
+        };
+        if let (Some(intent_amount), Some(prepaid_units)) =
+            (intent.max_amount.as_ref(), mustprepay_prepaid_units)
+        {
+            if intent_amount.units < prepaid_units {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "governed intent amount is lower than the MustPrepay quoted cost".to_string(),
+                ));
+            }
+        }
+
         let requested_units = charge_result
             .map(|charge| charge.cost_charged)
-            .or_else(|| intent.max_amount.as_ref().map(|amount| amount.units))
+            .or_else(|| {
+                let declared = intent.max_amount.as_ref().map(|amount| amount.units);
+                match (mustprepay_prepaid_units, declared) {
+                    (Some(prepaid), Some(declared)) => Some(prepaid.max(declared)),
+                    (prepaid, declared) => prepaid.or(declared),
+                }
+            })
             .unwrap_or(0);
         let approval_required = approval_threshold_units
             .map(|threshold_units| requested_units >= threshold_units)

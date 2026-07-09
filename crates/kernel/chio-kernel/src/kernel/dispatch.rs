@@ -129,25 +129,25 @@ impl ChioKernel {
         charge_result: Option<&BudgetChargeResult>,
         payment_authorization: Option<&PaymentAuthorization>,
     ) -> Result<Option<BudgetReverseHoldDecision>, KernelError> {
-        let Some(charge) = charge_result else {
-            return Ok(None);
-        };
-
         if let Some(authorization) = payment_authorization {
             let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
                 KernelError::Internal(
                     "payment authorization present without configured adapter".to_string(),
                 )
             })?;
-            let unwind_result = if authorization.settled {
-                adapter.refund(
+            // A settled hold with a known budget charge is refunded at the captured
+            // amount. Every other aborted authorization is released, including a
+            // no-ceiling MustPrepay hold (charge_result == None) that was authorized
+            // but never settled, so the payer's prepaid funds are not left frozen at
+            // the facilitator.
+            let unwind_result = match charge_result {
+                Some(charge) if authorization.settled => adapter.refund(
                     &authorization.authorization_id,
                     charge.cost_charged,
                     &charge.currency,
                     &request.request_id,
-                )
-            } else {
-                adapter.release(&authorization.authorization_id, &request.request_id)
+                ),
+                _ => adapter.release(&authorization.authorization_id, &request.request_id),
             };
             if let Err(error) = unwind_result {
                 return Err(KernelError::Internal(format!(
@@ -155,6 +155,10 @@ impl ChioKernel {
                 )));
             }
         }
+
+        let Some(charge) = charge_result else {
+            return Ok(None);
+        };
 
         Ok(Some(self.reverse_budget_charge(&cap.id, charge)?))
     }
