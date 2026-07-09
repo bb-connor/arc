@@ -103,6 +103,18 @@ pub struct ExecutionNonce {
     pub expires_at: i64,
     /// Invocation binding: subject, capability, server, tool, parameter hash.
     pub bound_to: NonceBinding,
+    /// Reserved budget hold this nonce authorizes. Set only by the
+    /// pre-execution authorization-reserving path so the reconcile-by-nonce
+    /// entry point can name the exact hold to settle. Part of the signed body,
+    /// so it is tamper-evident like the rest of the binding. `None` on every
+    /// other mint path, where it is omitted from the serialized form to keep
+    /// non-reserving nonces byte-for-byte backward compatible.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reserved_hold_id: Option<String>,
+    /// Request id of the reserving authorization that minted this nonce. Set
+    /// only alongside `reserved_hold_id`. Signed and tamper-evident.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reserving_request_id: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -130,6 +142,20 @@ impl SignedExecutionNonce {
     #[must_use]
     pub fn expires_at(&self) -> i64 {
         self.nonce.expires_at
+    }
+
+    /// The reserved budget hold this nonce authorizes, present only when the
+    /// nonce was minted by the pre-execution authorization-reserving path.
+    #[must_use]
+    pub fn reserved_hold_id(&self) -> Option<&str> {
+        self.nonce.reserved_hold_id.as_deref()
+    }
+
+    /// The request id of the reserving authorization that minted this nonce,
+    /// present only alongside [`Self::reserved_hold_id`].
+    #[must_use]
+    pub fn reserving_request_id(&self) -> Option<&str> {
+        self.nonce.reserving_request_id.as_deref()
     }
 }
 
@@ -308,6 +334,26 @@ pub fn mint_execution_nonce(
     config: &ExecutionNonceConfig,
     now: i64,
 ) -> Result<SignedExecutionNonce, KernelError> {
+    mint_execution_nonce_with_reservation(kernel_keypair, binding, None, None, config, now)
+}
+
+/// Mint a nonce that additionally binds a reserved budget hold identity.
+///
+/// The pre-execution authorization-reserving path uses this so the minted
+/// nonce carries the reserved `hold_id` (and the reserving request id) inside
+/// the signed body. The reconcile-by-nonce entry point then reads the hold id
+/// straight from the verified nonce to name the exact hold to settle. Because
+/// both fields are covered by the kernel signature, tampering with them fails
+/// verification. Callers on non-reserving paths pass `None` for both, which
+/// mints a nonce byte-for-byte identical to the pre-reservation format.
+pub fn mint_execution_nonce_with_reservation(
+    kernel_keypair: &Keypair,
+    binding: NonceBinding,
+    reserved_hold_id: Option<String>,
+    reserving_request_id: Option<String>,
+    config: &ExecutionNonceConfig,
+    now: i64,
+) -> Result<SignedExecutionNonce, KernelError> {
     let ttl = i64::try_from(config.nonce_ttl_secs).unwrap_or(i64::MAX);
     let expires_at = now.saturating_add(ttl);
     let nonce = ExecutionNonce {
@@ -316,6 +362,8 @@ pub fn mint_execution_nonce(
         issued_at: now,
         expires_at,
         bound_to: binding,
+        reserved_hold_id,
+        reserving_request_id,
     };
     let (signature, _bytes) = kernel_keypair.sign_canonical(&nonce).map_err(|e| {
         KernelError::ReceiptSigningFailed(format!("failed to sign execution nonce: {e}"))
@@ -656,6 +704,75 @@ mod tests {
                 .map(String::from)
                 .collect()
         );
+    }
+
+    #[test]
+    fn default_nonce_omits_reservation_fields() {
+        // A nonce minted on any non-reserving path carries no reserved hold and
+        // serializes without the reservation keys, so it stays byte-for-byte
+        // backward compatible with the pre-reservation nonce format.
+        let kp = Keypair::generate();
+        let signed = mint_execution_nonce(
+            &kp,
+            sample_binding(),
+            &ExecutionNonceConfig::default(),
+            1_000_000,
+        )
+        .unwrap();
+        assert_eq!(signed.reserved_hold_id(), None);
+        assert_eq!(signed.reserving_request_id(), None);
+        let value = serde_json::to_value(&signed).unwrap();
+        assert!(value["nonce"].get("reserved_hold_id").is_none());
+        assert!(value["nonce"].get("reserving_request_id").is_none());
+    }
+
+    #[test]
+    fn reserved_nonce_binds_hold_id_in_signed_body() {
+        let kp = Keypair::generate();
+        let store = InMemoryExecutionNonceStore::default();
+        let cfg = ExecutionNonceConfig::default();
+        let binding = sample_binding();
+        let now = 1_000_000;
+        let signed = mint_execution_nonce_with_reservation(
+            &kp,
+            binding.clone(),
+            Some("budget-hold:req-1:cap-123:0".to_string()),
+            Some("req-1".to_string()),
+            &cfg,
+            now,
+        )
+        .unwrap();
+        assert_eq!(
+            signed.reserved_hold_id(),
+            Some("budget-hold:req-1:cap-123:0")
+        );
+        assert_eq!(signed.reserving_request_id(), Some("req-1"));
+        // The reservation fields ride inside the signed body and verify cleanly.
+        verify_execution_nonce(&signed, &kp.public_key(), &binding, now + 1, &store).unwrap();
+    }
+
+    #[test]
+    fn tampered_reserved_hold_id_breaks_signature() {
+        let kp = Keypair::generate();
+        let store = InMemoryExecutionNonceStore::default();
+        let cfg = ExecutionNonceConfig::default();
+        let binding = sample_binding();
+        let now = 1_000_000;
+        let mut signed = mint_execution_nonce_with_reservation(
+            &kp,
+            binding.clone(),
+            Some("budget-hold:req-1:cap-123:0".to_string()),
+            Some("req-1".to_string()),
+            &cfg,
+            now,
+        )
+        .unwrap();
+        // Repoint the signed hold id at an attacker-chosen hold without
+        // re-signing: the signature no longer covers the mutated body.
+        signed.nonce.reserved_hold_id = Some("budget-hold:attacker:cap-123:0".to_string());
+        let err = verify_execution_nonce(&signed, &kp.public_key(), &binding, now + 1, &store)
+            .unwrap_err();
+        assert!(matches!(err, ExecutionNonceError::InvalidSignature));
     }
 
     #[test]

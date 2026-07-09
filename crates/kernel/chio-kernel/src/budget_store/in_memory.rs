@@ -5,10 +5,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use super::{
     budget_commit_metadata, checked_committed_cost_units, AuthorizedBudgetHold,
     BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCaptureHoldDecision,
-    BudgetCaptureHoldRequest, BudgetEventAuthority, BudgetHoldMutationDecision, BudgetMutationKind,
-    BudgetMutationRecord, BudgetReconcileHoldDecision, BudgetReconcileHoldRequest,
-    BudgetReleaseHoldDecision, BudgetReleaseHoldRequest, BudgetReverseHoldDecision,
-    BudgetReverseHoldRequest, BudgetStore, BudgetStoreError, BudgetUsageRecord, DeniedBudgetHold,
+    BudgetCaptureHoldRequest, BudgetEventAuthority, BudgetHoldDispositionView,
+    BudgetHoldMutationDecision, BudgetHoldSnapshot, BudgetMutationKind, BudgetMutationRecord,
+    BudgetReconcileHoldDecision, BudgetReconcileHoldRequest, BudgetReleaseHoldDecision,
+    BudgetReleaseHoldRequest, BudgetReverseHoldDecision, BudgetReverseHoldRequest, BudgetStore,
+    BudgetStoreError, BudgetUsageRecord, DeniedBudgetHold,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,6 +18,17 @@ enum BudgetHoldDisposition {
     Released,
     Reversed,
     Reconciled,
+}
+
+impl BudgetHoldDisposition {
+    fn view(&self) -> BudgetHoldDispositionView {
+        match self {
+            Self::Open => BudgetHoldDispositionView::Open,
+            Self::Released => BudgetHoldDispositionView::Released,
+            Self::Reversed => BudgetHoldDispositionView::Reversed,
+            Self::Reconciled => BudgetHoldDispositionView::Reconciled,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,6 +40,9 @@ struct BudgetHoldState {
     invocation_count_debited: bool,
     disposition: BudgetHoldDisposition,
     authority: Option<BudgetEventAuthority>,
+    /// Set only when the reserving path marks this hold reserved; drives the
+    /// TTL reaper. `None` for normal in-flight holds.
+    reserved_until: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -440,6 +455,7 @@ impl InMemoryBudgetStoreInner {
                         invocation_count_debited: true,
                         disposition: BudgetHoldDisposition::Open,
                         authority: authority.cloned(),
+                        reserved_until: None,
                     },
                 );
             }
@@ -934,6 +950,79 @@ impl InMemoryBudgetStoreInner {
         events.truncate(limit);
         Ok(events)
     }
+
+    fn get_budget_hold(
+        &self,
+        hold_id: &str,
+    ) -> Result<Option<BudgetHoldSnapshot>, BudgetStoreError> {
+        Ok(self.holds.get(hold_id).map(|hold| BudgetHoldSnapshot {
+            hold_id: hold_id.to_string(),
+            capability_id: hold.capability_id.clone(),
+            grant_index: hold.grant_index,
+            authorized_exposure_units: hold.authorized_exposure_units,
+            remaining_exposure_units: hold.remaining_exposure_units,
+            disposition: hold.disposition.view(),
+            reserved_until: hold.reserved_until,
+            authority: hold.authority.clone(),
+        }))
+    }
+
+    fn mark_hold_reserved(
+        &mut self,
+        hold_id: &str,
+        reserved_until_unix_secs: i64,
+    ) -> Result<(), BudgetStoreError> {
+        let hold = self.holds.get_mut(hold_id).ok_or_else(|| {
+            BudgetStoreError::Invariant(format!("missing budget hold `{hold_id}`"))
+        })?;
+        if hold.disposition != BudgetHoldDisposition::Open {
+            return Err(BudgetStoreError::Invariant(format!(
+                "cannot mark non-open budget hold `{hold_id}` reserved"
+            )));
+        }
+        hold.reserved_until = Some(reserved_until_unix_secs);
+        Ok(())
+    }
+
+    fn reap_expired_reserved_holds(
+        &mut self,
+        now_unix_secs: i64,
+    ) -> Result<usize, BudgetStoreError> {
+        // Snapshot the expired-and-still-open reserved holds first so the
+        // release loop can mutate the map without an aliasing borrow.
+        let expired: Vec<(String, String, usize, u64, Option<BudgetEventAuthority>)> = self
+            .holds
+            .iter()
+            .filter(|(_, hold)| hold.disposition == BudgetHoldDisposition::Open)
+            .filter_map(|(hold_id, hold)| {
+                hold.reserved_until
+                    .filter(|until| *until <= now_unix_secs)
+                    .map(|_| {
+                        (
+                            hold_id.clone(),
+                            hold.capability_id.clone(),
+                            hold.grant_index,
+                            hold.remaining_exposure_units,
+                            hold.authority.clone(),
+                        )
+                    })
+            })
+            .collect();
+
+        let mut released = 0usize;
+        for (hold_id, capability_id, grant_index, remaining, authority) in expired {
+            self.reduce_charge_cost_with_ids_and_authority(
+                &capability_id,
+                grant_index,
+                remaining,
+                Some(&hold_id),
+                Some(&format!("{hold_id}:ttl-reap-release")),
+                authority.as_ref(),
+            )?;
+            released += 1;
+        }
+        Ok(released)
+    }
 }
 
 impl BudgetStore for InMemoryBudgetStore {
@@ -1351,6 +1440,27 @@ impl BudgetStore for InMemoryBudgetStore {
         request: BudgetCaptureHoldRequest,
     ) -> Result<BudgetCaptureHoldDecision, BudgetStoreError> {
         self.reconcile_budget_hold(request)
+    }
+
+    fn get_budget_hold(
+        &self,
+        hold_id: &str,
+    ) -> Result<Option<BudgetHoldSnapshot>, BudgetStoreError> {
+        self.lock_inner()?.get_budget_hold(hold_id)
+    }
+
+    fn mark_hold_reserved(
+        &self,
+        hold_id: &str,
+        reserved_until_unix_secs: i64,
+    ) -> Result<(), BudgetStoreError> {
+        self.lock_inner()?
+            .mark_hold_reserved(hold_id, reserved_until_unix_secs)
+    }
+
+    fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
+        self.lock_inner()?
+            .reap_expired_reserved_holds(now_unix_secs)
     }
 }
 

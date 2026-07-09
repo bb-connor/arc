@@ -835,3 +835,289 @@ fn strict_retry_mediated_spend_receipt_names_presented_nonce() {
         Ok(())
     );
 }
+
+// ---------------------------------------------------------------------------
+// Reconcile-by-nonce: mediated spend becomes authoritative at the realized cost.
+// ---------------------------------------------------------------------------
+
+fn reconcile_kernel_and_cap() -> (ChioKernel, Keypair, CapabilityToken, ExecutionNonceConfig) {
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+    let cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: true,
+    };
+    kernel.set_execution_nonce_store(
+        cfg.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+    );
+    // max_cost_per_invocation 100, max_total 150: one authorization reserves the
+    // worst-case 100; a second (needing 100 more -> 200 > 150) is blocked until
+    // the first frees its unspent slack.
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 150, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    (kernel, agent_kp, cap, cfg)
+}
+
+fn reserve_request(request_id: &str, cap: &CapabilityToken, agent_kp: &Keypair) -> ToolCallRequest {
+    ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability: cap.clone(),
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({ "invoice": "inv-1" }),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    }
+}
+
+#[test]
+fn reconcile_by_nonce_settles_reserved_hold_and_frees_difference() {
+    use chio_core_types::receipt::authoritative_spend::is_authoritative_spend_receipt;
+
+    let (kernel, agent_kp, cap, _cfg) = reconcile_kernel_and_cap();
+    let first = reserve_request("req-recon-1", &cap, &agent_kp);
+
+    // Reserving authorization: hold H stays open, a nonce bound to H is minted.
+    let authorized = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
+        .unwrap();
+    assert_eq!(authorized.verdict, Verdict::Allow);
+    let nonce = *authorized
+        .execution_nonce
+        .clone()
+        .expect("reserving authorization mints a nonce");
+    assert!(
+        nonce.reserved_hold_id().is_some(),
+        "the reserving nonce must name the reserved hold"
+    );
+    assert_eq!(nonce.reserving_request_id(), Some("req-recon-1"));
+
+    // A second authorization is blocked while the slack is reserved.
+    let second = reserve_request("req-recon-2", &cap, &agent_kp);
+    let blocked = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&second, None)
+        .unwrap();
+    assert_eq!(
+        blocked.verdict,
+        Verdict::Deny,
+        "reserved hold must block the second authorization: {:?}",
+        blocked.reason
+    );
+
+    // Reconcile H at realized 30 (< reserved 100): settle down, free 70.
+    let realized = ToolInvocationCost {
+        units: 30,
+        currency: "USD".to_string(),
+        breakdown: None,
+    };
+    let reconciled = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &first.arguments, &realized)
+        .unwrap();
+    assert_eq!(reconciled.verdict, Verdict::Allow);
+
+    // The receipt is an authoritative mediated spend bound to the presented nonce.
+    let admitted = [kernel.config.keypair.public_key()];
+    assert_eq!(
+        is_authoritative_spend_receipt(&reconciled.receipt, &admitted, &nonce),
+        Ok(())
+    );
+    let meta = reconciled.receipt.metadata.as_ref().unwrap();
+    assert_eq!(
+        meta["budget_authority"]["terminal"]["disposition"], "reconciled",
+        "the reserved hold must be reconciled, not released"
+    );
+    assert_eq!(meta["budget_authority"]["terminal"]["realized_spend_units"], 30);
+    assert_eq!(meta["budget_authority"]["authorize"]["exposure_units"], 100);
+    assert_eq!(
+        meta["budget_authority"]["execution_nonce_id"]
+            .as_str()
+            .unwrap(),
+        nonce.nonce_id()
+    );
+
+    // The freed difference admits a subsequent authorization that was blocked.
+    let third = reserve_request("req-recon-3", &cap, &agent_kp);
+    let now_allowed = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&third, None)
+        .unwrap();
+    assert_eq!(
+        now_allowed.verdict,
+        Verdict::Allow,
+        "the freed budget must admit a new authorization: {:?}",
+        now_allowed.reason
+    );
+}
+
+#[test]
+fn reconcile_by_nonce_second_time_is_rejected_as_replay() {
+    let (kernel, agent_kp, cap, _cfg) = reconcile_kernel_and_cap();
+    let first = reserve_request("req-recon-replay", &cap, &agent_kp);
+    let authorized = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
+        .unwrap();
+    let nonce = *authorized.execution_nonce.clone().unwrap();
+    let realized = ToolInvocationCost {
+        units: 30,
+        currency: "USD".to_string(),
+        breakdown: None,
+    };
+
+    kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &first.arguments, &realized)
+        .unwrap();
+    let err = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &first.arguments, &realized)
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("nonce"),
+        "second reconcile of the same nonce must be rejected as replay, got: {err}"
+    );
+}
+
+#[test]
+fn reconcile_by_nonce_rejects_forged_nonce() {
+    let (kernel, agent_kp, cap, _cfg) = reconcile_kernel_and_cap();
+    let first = reserve_request("req-recon-forge", &cap, &agent_kp);
+    let authorized = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
+        .unwrap();
+    let nonce = *authorized.execution_nonce.clone().unwrap();
+
+    // Repoint the signed hold id at an attacker-chosen hold without re-signing.
+    let mut forged = nonce.clone();
+    forged.nonce.reserved_hold_id = Some("budget-hold:attacker:cap:0".to_string());
+    let realized = ToolInvocationCost {
+        units: 10,
+        currency: "USD".to_string(),
+        breakdown: None,
+    };
+    let err = kernel
+        .reconcile_reserved_authorization_by_nonce(&forged, &first.arguments, &realized)
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("nonce"),
+        "a tampered nonce must be rejected, got: {err}"
+    );
+
+    // The genuine hold is untouched: the real nonce still reconciles.
+    let ok = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &first.arguments, &realized)
+        .unwrap();
+    assert_eq!(ok.verdict, Verdict::Allow);
+}
+
+#[test]
+fn reconcile_by_nonce_clamps_realized_above_reserved() {
+    use chio_core_types::receipt::authoritative_spend::is_authoritative_spend_receipt;
+
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+    let cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: true,
+    };
+    kernel.set_execution_nonce_store(
+        cfg.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+    );
+    // Reserve the whole grant (max_per == max_total == 100).
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    let first = reserve_request("req-recon-clamp", &cap, &agent_kp);
+    let authorized = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
+        .unwrap();
+    let nonce = *authorized.execution_nonce.clone().unwrap();
+
+    // Realized cost 250 exceeds the reserved worst-case 100: clamp to 100.
+    let realized = ToolInvocationCost {
+        units: 250,
+        currency: "USD".to_string(),
+        breakdown: None,
+    };
+    let reconciled = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &first.arguments, &realized)
+        .unwrap();
+    let meta = reconciled.receipt.metadata.as_ref().unwrap();
+    assert_eq!(
+        meta["budget_authority"]["terminal"]["realized_spend_units"], 100,
+        "realized cost above the reserved worst-case must clamp to the reserved amount"
+    );
+    let admitted = [kernel.config.keypair.public_key()];
+    assert_eq!(
+        is_authoritative_spend_receipt(&reconciled.receipt, &admitted, &nonce),
+        Ok(())
+    );
+}
+
+#[test]
+fn reserved_hold_ttl_reaper_frees_expired_authorization_only_when_due() {
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+    let cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: true,
+    };
+    kernel.set_execution_nonce_store(
+        cfg.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+    );
+    // Whole grant reserved by one authorization.
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let first = reserve_request("req-reap-1", &cap, &agent_kp);
+    let authorized = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
+        .unwrap();
+    assert_eq!(authorized.verdict, Verdict::Allow);
+
+    // Not yet expired: the reaper leaves the still-valid reserved hold in place.
+    let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
+    assert_eq!(kernel.reap_expired_reserved_budget_holds(now).unwrap(), 0);
+    let blocked = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(
+            &reserve_request("req-reap-2", &cap, &agent_kp),
+            None,
+        )
+        .unwrap();
+    assert_eq!(
+        blocked.verdict,
+        Verdict::Deny,
+        "a still-valid reserved hold must keep blocking: {:?}",
+        blocked.reason
+    );
+
+    // Past expiry: the reaper releases the abandoned reserved hold, freeing the grant.
+    assert_eq!(kernel.reap_expired_reserved_budget_holds(i64::MAX).unwrap(), 1);
+    let now_allowed = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(
+            &reserve_request("req-reap-3", &cap, &agent_kp),
+            None,
+        )
+        .unwrap();
+    assert_eq!(
+        now_allowed.verdict,
+        Verdict::Allow,
+        "reaping the expired reserved hold must free the grant: {:?}",
+        now_allowed.reason
+    );
+}

@@ -1526,8 +1526,9 @@ impl ChioKernel {
     /// Prepaid quote amount for a MustPrepay intent, if one applies.
     ///
     /// This is the authorization amount when the grant carries no monetary
-    /// ceiling, so the same figure settles the hold after execution.
-    fn mustprepay_quoted_amount(request: &ToolCallRequest) -> Option<(u64, String)> {
+    /// ceiling, so the same figure settles the hold after execution and is the
+    /// amount refunded when a settled-at-authorize invocation is aborted.
+    pub(crate) fn mustprepay_quoted_amount(request: &ToolCallRequest) -> Option<(u64, String)> {
         request
             .governed_intent
             .as_ref()

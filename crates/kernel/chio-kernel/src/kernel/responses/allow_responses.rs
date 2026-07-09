@@ -121,6 +121,7 @@ impl ChioKernel {
         matched_grant_index: Option<usize>,
         extra_metadata: Option<serde_json::Value>,
         incomplete_reason: &str,
+        reserved_hold_id: Option<&str>,
     ) -> Result<ToolCallResponse, KernelError> {
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
@@ -160,7 +161,12 @@ impl ChioKernel {
         })?;
 
         self.record_chio_receipt_with_federation(request, &receipt)?;
-        let execution_nonce = self.mint_execution_nonce_for_allow(request, cap, &receipt)?;
+        let execution_nonce = self.mint_execution_nonce_for_allow_reserving(
+            request,
+            cap,
+            &receipt,
+            reserved_hold_id,
+        )?;
 
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),

@@ -135,19 +135,31 @@ impl ChioKernel {
                     "payment authorization present without configured adapter".to_string(),
                 )
             })?;
-            // A settled hold with a known budget charge is refunded at the captured
-            // amount. Every other aborted authorization is released, including a
-            // no-ceiling MustPrepay hold (charge_result == None) that was authorized
-            // but never settled, so the payer's prepaid funds are not left frozen at
-            // the facilitator.
-            let unwind_result = match charge_result {
-                Some(charge) if authorization.settled => adapter.refund(
+            // A settled hold is refunded at the captured amount; an unsettled hold
+            // is released so the payer's prepaid funds are not left frozen at the
+            // facilitator. A settled no-ceiling MustPrepay (charge_result == None)
+            // was captured at authorize time, so releasing it would leave the payer
+            // CHARGED for a tool that never completed: refund the prepaid quote
+            // instead. Only genuinely unsettled holds are released.
+            let unwind_result = match (charge_result, authorization.settled) {
+                (Some(charge), true) => adapter.refund(
                     &authorization.authorization_id,
                     charge.cost_charged,
                     &charge.currency,
                     &request.request_id,
                 ),
-                _ => adapter.release(&authorization.authorization_id, &request.request_id),
+                (None, true) => match Self::mustprepay_quoted_amount(request) {
+                    Some((amount_units, currency)) => adapter.refund(
+                        &authorization.authorization_id,
+                        amount_units,
+                        &currency,
+                        &request.request_id,
+                    ),
+                    None => adapter.release(&authorization.authorization_id, &request.request_id),
+                },
+                (Some(_), false) | (None, false) => {
+                    adapter.release(&authorization.authorization_id, &request.request_id)
+                }
             };
             if let Err(error) = unwind_result {
                 return Err(KernelError::Internal(format!(

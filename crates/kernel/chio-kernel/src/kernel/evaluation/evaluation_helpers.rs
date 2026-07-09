@@ -127,6 +127,7 @@ impl ChioKernel {
             Some(matched_grant_index),
             metadata,
             EXECUTION_NONCE_PREFLIGHT_RETRY_REASON,
+            None,
         )
     }
 
@@ -180,12 +181,26 @@ impl ChioKernel {
             authorization_metadata,
         );
 
+        // Stamp the reserved monetary hold with a TTL equal to the minted
+        // nonce's validity window so an unreconciled reserved hold is reclaimed
+        // by the TTL reaper if the caller never presents the nonce. The hold id
+        // is also bound into the signed nonce so reconcile-by-nonce can name the
+        // exact hold to settle at the execution site.
+        let reserved_hold_id = budget_mutation
+            .charge_result()
+            .map(|charge| charge.budget_hold_id.clone());
+        if let Some(hold_id) = reserved_hold_id.as_deref() {
+            let reserved_until = self.reserved_hold_ttl_deadline(timestamp);
+            self.with_budget_store(|store| Ok(store.mark_hold_reserved(hold_id, reserved_until)?))?;
+        }
+
         self.build_execution_nonce_preflight_allow_response_with_metadata(
             request,
             timestamp,
             Some(matched_grant_index),
             metadata,
             EXECUTION_NONCE_AUTHORIZATION_RESERVED_REASON,
+            reserved_hold_id.as_deref(),
         )
     }
 }

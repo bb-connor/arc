@@ -1048,6 +1048,21 @@ impl ChioKernel {
         cap: &CapabilityToken,
         receipt: &ChioReceipt,
     ) -> Result<Option<Box<crate::execution_nonce::SignedExecutionNonce>>, KernelError> {
+        self.mint_execution_nonce_for_allow_reserving(request, cap, receipt, None)
+    }
+
+    /// Mint an allow-verdict nonce that, when `reserved_hold_id` is `Some`,
+    /// additionally binds the reserved budget hold and the reserving request id
+    /// into the signed body. Only the pre-execution authorization-reserving path
+    /// supplies a hold id; every other allow path passes `None` and mints a
+    /// backward-compatible nonce carrying no hold identity.
+    pub(crate) fn mint_execution_nonce_for_allow_reserving(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        receipt: &ChioReceipt,
+        reserved_hold_id: Option<&str>,
+    ) -> Result<Option<Box<crate::execution_nonce::SignedExecutionNonce>>, KernelError> {
         if request.execution_nonce.is_some() {
             return Ok(None);
         }
@@ -1056,9 +1071,15 @@ impl ChioKernel {
         };
         let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
         let binding = self.nonce_binding_for(request, cap, &receipt.action.parameter_hash);
-        let signed = crate::execution_nonce::mint_execution_nonce(
+        let (reserved_hold_id, reserving_request_id) = match reserved_hold_id {
+            Some(hold_id) => (Some(hold_id.to_string()), Some(request.request_id.clone())),
+            None => (None, None),
+        };
+        let signed = crate::execution_nonce::mint_execution_nonce_with_reservation(
             &self.config.keypair,
             binding,
+            reserved_hold_id,
+            reserving_request_id,
             config,
             now,
         )?;

@@ -601,3 +601,125 @@ impl PaymentAdapter for UncapturablePaymentAdapter {
         })
     }
 }
+
+// Captures the prepaid hold at authorize time (settled == true) and counts every
+// unwind operation so an aborted no-charge invocation's cleanup is observable.
+#[derive(Debug, Clone, Default)]
+struct SettledAtAuthorizeTrackingAdapter {
+    authorized: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    captured: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    released: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    refunded: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl PaymentAdapter for SettledAtAuthorizeTrackingAdapter {
+    fn authorize(
+        &self,
+        _request: &PaymentAuthorizeRequest,
+    ) -> Result<PaymentAuthorization, PaymentError> {
+        self.authorized
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Ok(PaymentAuthorization {
+            authorization_id: "sim-settled-authorize".to_string(),
+            settled: true,
+            metadata: serde_json::json!({ "adapter": "settled-at-authorize" }),
+        })
+    }
+
+    fn capture(
+        &self,
+        authorization_id: &str,
+        _amount_units: u64,
+        _currency: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.captured
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Ok(PaymentResult {
+            transaction_id: authorization_id.to_string(),
+            settlement_status: RailSettlementStatus::Settled,
+            metadata: serde_json::json!({ "adapter": "settled-at-authorize" }),
+        })
+    }
+
+    fn release(
+        &self,
+        authorization_id: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.released
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Ok(PaymentResult {
+            transaction_id: authorization_id.to_string(),
+            settlement_status: RailSettlementStatus::Released,
+            metadata: serde_json::json!({ "adapter": "settled-at-authorize" }),
+        })
+    }
+
+    fn refund(
+        &self,
+        transaction_id: &str,
+        _amount_units: u64,
+        _currency: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.refunded
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Ok(PaymentResult {
+            transaction_id: transaction_id.to_string(),
+            settlement_status: RailSettlementStatus::Refunded,
+            metadata: serde_json::json!({ "adapter": "settled-at-authorize" }),
+        })
+    }
+}
+
+// A no-ceiling MustPrepay captured at authorize time (settled == true) whose tool
+// then aborts drives unwind_aborted_monetary_invocation with charge_result == None
+// and a SETTLED authorization. Releasing would leave the payer charged for a tool
+// that never completed, so the prepaid quote must be refunded instead.
+#[test]
+fn settled_no_charge_mustprepay_abort_refunds_prepaid_quote() {
+    let payment = SettledAtAuthorizeTrackingAdapter::default();
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel.register_tool_server(Box::new(FailingMonetaryServer {
+        id: "cost-srv".to_string(),
+    }));
+
+    let agent_kp = Keypair::generate();
+    let cap = kernel
+        .issue_capability(
+            &agent_kp.public_key(),
+            make_scope(vec![make_no_ceiling_mustprepay_grant()]),
+            3600,
+        )
+        .unwrap();
+
+    let intent =
+        make_mustprepay_intent("intent-settled-abort", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-settled-abort", &cap, &agent_kp, intent, &kernel);
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        payment.authorized.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "adapter.authorize() must have been called once"
+    );
+    assert_eq!(
+        payment.refunded.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "a settled no-charge authorization aborted mid-tool must be refunded"
+    );
+    assert_eq!(
+        payment.released.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "a settled authorization must never be released on abort"
+    );
+    assert_eq!(
+        payment.captured.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "an aborted dispatch must not capture the hold again"
+    );
+}

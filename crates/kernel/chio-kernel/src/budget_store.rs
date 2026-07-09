@@ -257,6 +257,51 @@ pub type BudgetReverseHoldDecision = BudgetHoldMutationDecision;
 pub type BudgetReconcileHoldDecision = BudgetHoldMutationDecision;
 pub type BudgetCaptureHoldDecision = BudgetHoldMutationDecision;
 
+/// Terminal state of an authorization hold, projected for callers that need to
+/// inspect a hold by id without depending on a store's private disposition type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BudgetHoldDispositionView {
+    Open,
+    Released,
+    Reversed,
+    Reconciled,
+}
+
+impl BudgetHoldDispositionView {
+    #[must_use]
+    pub fn is_open(self) -> bool {
+        matches!(self, Self::Open)
+    }
+
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Open => "open",
+            Self::Released => "released",
+            Self::Reversed => "reversed",
+            Self::Reconciled => "reconciled",
+        }
+    }
+}
+
+/// Read-only projection of a single authorization hold, used by the
+/// reconcile-by-nonce entry point to look up the exact reserved hold a signed
+/// execution nonce names.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BudgetHoldSnapshot {
+    pub hold_id: String,
+    pub capability_id: String,
+    pub grant_index: usize,
+    pub authorized_exposure_units: u64,
+    pub remaining_exposure_units: u64,
+    pub disposition: BudgetHoldDispositionView,
+    /// Wall-clock unix seconds after which an unreconciled reserved hold is
+    /// eligible for the TTL reaper. `None` for holds that were never marked
+    /// reserved (they are reclaimed by the crash reaper, not the TTL reaper).
+    pub reserved_until: Option<i64>,
+    pub authority: Option<BudgetEventAuthority>,
+}
+
 pub trait BudgetStore: Send + Sync {
     fn try_increment(
         &self,
@@ -687,6 +732,46 @@ pub trait BudgetStore: Send + Sync {
     fn count_open_holds(&self) -> Result<usize, BudgetStoreError> {
         Ok(0)
     }
+
+    /// Project a single hold by id, or `None` when it is unknown. Stores that
+    /// do not persist hold state return `Ok(None)` (the default). Used by the
+    /// reconcile-by-nonce entry point to resolve the exact reserved hold a
+    /// signed execution nonce names.
+    fn get_budget_hold(
+        &self,
+        hold_id: &str,
+    ) -> Result<Option<BudgetHoldSnapshot>, BudgetStoreError> {
+        let _ = hold_id;
+        Ok(None)
+    }
+
+    /// Stamp an open hold with the wall-clock unix second after which the TTL
+    /// reaper may release it if it is still unreconciled. Only the
+    /// pre-execution authorization-reserving path calls this, so a normal
+    /// in-flight hold (reconciled or reversed within one evaluation) is never
+    /// marked and never touched by the TTL reaper. Stores that do not persist
+    /// hold state treat this as a no-op (the default).
+    fn mark_hold_reserved(
+        &self,
+        hold_id: &str,
+        reserved_until_unix_secs: i64,
+    ) -> Result<(), BudgetStoreError> {
+        let _ = (hold_id, reserved_until_unix_secs);
+        Ok(())
+    }
+
+    /// Release every reserved hold that is still `open` and whose
+    /// `reserved_until` is at or before `now_unix_secs`, freeing the reserved
+    /// exposure back to the grant. Fail-closed and self-healing: it releases
+    /// ONLY holds that were explicitly marked reserved (via
+    /// [`Self::mark_hold_reserved`]) and are past their expiry; a not-yet-expired
+    /// reserved hold and a reconciled/reversed/released hold are never touched.
+    /// Returns the number of holds released. Stores that do not persist hold
+    /// state return `Ok(0)` (the default).
+    fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
+        let _ = now_unix_secs;
+        Ok(0)
+    }
 }
 
 fn checked_committed_cost_units(
@@ -780,6 +865,123 @@ mod tests {
         assert_eq!(events[1].kind, BudgetMutationKind::ReconcileSpend);
         assert_eq!(events[1].authority.as_ref(), Some(&authority));
         assert_eq!(events[1].realized_spend_units, 75);
+    }
+
+    fn authorize_reserved(
+        store: &InMemoryBudgetStore,
+        hold_id: &str,
+        cap: &str,
+        reserved_until: i64,
+    ) {
+        let decision = store
+            .authorize_budget_hold(BudgetAuthorizeHoldRequest {
+                capability_id: cap.to_string(),
+                grant_index: 0,
+                max_invocations: Some(10),
+                requested_exposure_units: 100,
+                max_cost_per_invocation: Some(100),
+                max_total_cost_units: Some(1_000),
+                hold_id: Some(hold_id.to_string()),
+                event_id: Some(format!("{hold_id}:authorize")),
+                authority: None,
+            })
+            .unwrap();
+        assert!(matches!(
+            decision,
+            BudgetAuthorizeHoldDecision::Authorized(_)
+        ));
+        store.mark_hold_reserved(hold_id, reserved_until).unwrap();
+    }
+
+    #[test]
+    fn ttl_reaper_releases_only_expired_unreconciled_reserved_holds() {
+        let store = InMemoryBudgetStore::new();
+        // Expired reserved hold on cap-a: reserved_until 100 <= now 1000.
+        authorize_reserved(&store, "hold-expired", "cap-a", 100);
+        // Not-yet-expired reserved hold on cap-b: reserved_until 5000 > now 1000.
+        authorize_reserved(&store, "hold-fresh", "cap-b", 5_000);
+        // Reconciled reserved hold on cap-c: reconciled before the reap.
+        authorize_reserved(&store, "hold-done", "cap-c", 100);
+        store
+            .reconcile_budget_hold(BudgetReconcileHoldRequest {
+                capability_id: "cap-c".to_string(),
+                grant_index: 0,
+                exposed_cost_units: 100,
+                realized_spend_units: 40,
+                hold_id: Some("hold-done".to_string()),
+                event_id: Some("hold-done:reconcile".to_string()),
+                authority: None,
+            })
+            .unwrap();
+
+        // Before the reap: expired/fresh committed 100 each, reconciled committed 40.
+        assert_eq!(
+            store
+                .get_usage("cap-a", 0)
+                .unwrap()
+                .unwrap()
+                .committed_cost_units()
+                .unwrap(),
+            100
+        );
+
+        let released = store.reap_expired_reserved_holds(1_000).unwrap();
+        assert_eq!(released, 1, "only the expired reserved hold is released");
+
+        // cap-a expired reserved hold released back to 0.
+        assert_eq!(
+            store
+                .get_usage("cap-a", 0)
+                .unwrap()
+                .unwrap()
+                .committed_cost_units()
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            store
+                .get_budget_hold("hold-expired")
+                .unwrap()
+                .unwrap()
+                .disposition,
+            BudgetHoldDispositionView::Released
+        );
+        // cap-b not-yet-expired reserved hold untouched.
+        assert_eq!(
+            store
+                .get_usage("cap-b", 0)
+                .unwrap()
+                .unwrap()
+                .committed_cost_units()
+                .unwrap(),
+            100
+        );
+        assert_eq!(
+            store
+                .get_budget_hold("hold-fresh")
+                .unwrap()
+                .unwrap()
+                .disposition,
+            BudgetHoldDispositionView::Open
+        );
+        // cap-c reconciled hold untouched (still at realized 40).
+        assert_eq!(
+            store
+                .get_usage("cap-c", 0)
+                .unwrap()
+                .unwrap()
+                .committed_cost_units()
+                .unwrap(),
+            40
+        );
+        assert_eq!(
+            store
+                .get_budget_hold("hold-done")
+                .unwrap()
+                .unwrap()
+                .disposition,
+            BudgetHoldDispositionView::Reconciled
+        );
     }
 
     #[test]
