@@ -229,6 +229,16 @@ pub(crate) enum PullError {
     Protocol(PeerProtocolError),
     /// Transport or store failure; retryable, peer keeps its standing.
     Transient(CliError),
+    /// A delta page cannot make forward progress via INCREMENTAL pull: its record
+    /// count (events + usage projections + abandoned/tombstoned slots over the
+    /// covered global-seq range) exceeds `BUDGET_DELTA_MAX_RECORDS`, so no smaller
+    /// cursor-anchored page exists (a dense rollback burst can pack more abandoned
+    /// seqs than the cap BEFORE the next live event, and an events-empty page is
+    /// rejected). This is NOT peer misbehavior: route the peer through the full
+    /// snapshot recovery path (which resets the cursor to the snapshot head,
+    /// skipping the unpageable window WITHOUT a delta cursor jump) rather than
+    /// pinning the cursor forever with a bare `Transient` (codex #965 Finding 1).
+    ForceSnapshot(CliError),
 }
 
 impl From<PeerProtocolError> for PullError {

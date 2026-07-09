@@ -333,8 +333,12 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
 /// Fold one puller's result into the round: on success accumulate the applied
 /// count; on `PullError::Protocol` demote the peer to Unhealthy (fail-closed,
 /// leaves consensus and witness sets); on `PullError::Transient` keep the peer
-/// Healthy but record the error. Both error arms short-circuit the round.
-fn route_pull(
+/// Healthy but record the error; on `PullError::ForceSnapshot` keep the peer
+/// Healthy but flag it for a full snapshot resync (an honest, unpageable delta
+/// window). Every error arm short-circuits the round BEFORE `update_peer_success`
+/// runs, so a `ForceSnapshot` flag survives to the next round's snapshot probe
+/// (codex #965 Finding 1).
+pub(crate) fn route_pull(
     state: &TrustServiceState,
     peer_url: &str,
     outcome: Result<u64, PullError>,
@@ -352,6 +356,18 @@ fn route_pull(
         }
         Err(PullError::Transient(error)) => {
             update_peer_sync_error(state, peer_url, error.to_string());
+            Err(error)
+        }
+        Err(PullError::ForceSnapshot(error)) => {
+            // The delta stream cannot make forward progress incrementally (an
+            // oversized/unpageable window). Flag the peer for a full snapshot
+            // resync WITHOUT demoting it (this is honest backlog, not misbehavior);
+            // the next round's snapshot probe resets the cursor to the source head,
+            // skipping the window WITHOUT a delta cursor jump. Returning Err
+            // short-circuits the round before update_peer_success would clear the
+            // flag. A force_snapshot peer is excluded from witnesses until it
+            // re-syncs, so this cannot over-count (codex #965 Finding 1).
+            request_peer_snapshot_recovery(state, peer_url, error.to_string());
             Err(error)
         }
     }
@@ -598,27 +614,45 @@ pub(crate) fn import_budget_delta_response(
             should_continue: false,
         });
     }
-    let record_count = response
-        .records
-        .len()
-        .saturating_add(response.mutation_events.len())
-        .saturating_add(response.abandoned_seqs.len());
-    if record_count > BUDGET_DELTA_MAX_RECORDS {
-        return Err(PullError::Transient(CliError::cli_other_error(format!(
-            "budget delta response contains {record_count} records, maximum is {BUDGET_DELTA_MAX_RECORDS}"
-        ))));
-    }
     // Honest budget deltas pair usage projections with the mutation events they
     // derive from; a records-only page can never advance the global event cursor
     // without importing unverified events, so reject it as a protocol violation
     // (demote) rather than pinning the cursor past unreplicated seqs (codex #965
-    // round-3 P1).
+    // round-3 P1). Checked BEFORE the oversized-page cap below so a malformed
+    // records-only page always DEMOTES and never gets routed to snapshot recovery:
+    // the ForceSnapshot path is reserved for honest, genuinely unpageable event
+    // windows (codex #965 Finding 1).
     if response.mutation_events.is_empty() {
         return Err(PullError::Protocol(
             PeerProtocolError::RecordsWithoutMutationEvents {
                 record_count: response.records.len(),
             },
         ));
+    }
+    let record_count = response
+        .records
+        .len()
+        .saturating_add(response.mutation_events.len())
+        .saturating_add(response.abandoned_seqs.len());
+    if record_count > BUDGET_DELTA_MAX_RECORDS {
+        // An HONEST but unpageable delta window: the covered global-seq range packs
+        // more records (events + usage projections + abandoned/tombstoned slots)
+        // than a single page's BUDGET_DELTA_MAX_RECORDS cap. Capping the event page
+        // limit cannot guarantee forward progress, because a dense rollback burst
+        // can pack more than BUDGET_DELTA_MAX_RECORDS abandoned seqs BEFORE the next
+        // live event, so even a minimal one-event page overflows (and an
+        // events-empty page is rejected above). Route the peer through the full
+        // snapshot recovery path (which resets the cursor to the source's global
+        // head) instead of returning a bare Transient: a Transient neither advances
+        // the cursor nor bumps delta_records_since_snapshot, so force_snapshot
+        // recovery would never trigger and the peer's whole sync would wedge
+        // indefinitely (codex #965 Finding 1). Fail-closed and sound: the snapshot
+        // skips the window WITHOUT a delta cursor jump, so it cannot over-count or
+        // skip unreplicated rows, and a force_snapshot peer is excluded from
+        // witnesses until it re-syncs.
+        return Err(PullError::ForceSnapshot(CliError::cli_other_error(format!(
+            "budget delta response contains {record_count} records, maximum is {BUDGET_DELTA_MAX_RECORDS}; routing peer through full snapshot recovery"
+        ))));
     }
     // Local per-round pull cap: stop the round WITHOUT demoting; the next sync
     // round resumes from the unchanged cursor (codex #965 round-3 P2).

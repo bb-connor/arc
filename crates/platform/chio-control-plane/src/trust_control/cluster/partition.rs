@@ -157,6 +157,29 @@ pub(crate) fn update_peer_sync_error(state: &TrustServiceState, peer_url: &str, 
     });
 }
 
+/// Flag a peer for a full snapshot resync WITHOUT demoting it to Unhealthy.
+///
+/// Used when a delta stream cannot make forward progress via INCREMENTAL pull (an
+/// oversized/unpageable page whose record count exceeds `BUDGET_DELTA_MAX_RECORDS`,
+/// e.g. a rollback storm that packs more abandoned seqs into the covered range than
+/// a single page can carry). This is NOT peer misbehavior, so unlike
+/// `update_peer_failure` it keeps the peer Healthy; the snapshot backstop
+/// (`peer_should_force_snapshot`) resyncs it next round, resetting the cursor to the
+/// snapshot head and skipping the unpageable window WITHOUT a delta cursor jump. A
+/// force_snapshot peer is excluded from witnesses until the snapshot + delta
+/// re-sync clears the flag, so this cannot over-count (codex #965 Finding 1).
+pub(crate) fn request_peer_snapshot_recovery(
+    state: &TrustServiceState,
+    peer_url: &str,
+    error: String,
+) {
+    update_peer_state(state, peer_url, |peer| {
+        peer.health = PeerHealth::Healthy;
+        peer.last_error = Some(error);
+        peer.force_snapshot = true;
+    });
+}
+
 pub(crate) fn peer_revocation_cursor(
     state: &TrustServiceState,
     peer_url: &str,

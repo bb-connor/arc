@@ -1801,31 +1801,129 @@ mod cluster_and_reports_tests {
     }
 
     #[test]
-    fn budget_delta_import_rejects_oversized_peer_payloads() {
+    fn budget_delta_import_routes_oversized_page_to_snapshot_recovery() {
+        // codex #965 Finding 1: an HONEST but unpageable budget delta page (a
+        // rollback storm packs more abandoned seqs into the covered range than a
+        // single page's BUDGET_DELTA_MAX_RECORDS cap) must route the peer through
+        // the full snapshot recovery path, NOT return a bare Transient that pins the
+        // cursor and wedges the peer's whole sync forever. The signal is
+        // PullError::ForceSnapshot; route_pull turns it into a force_snapshot flag
+        // (see oversized_budget_delta_routes_peer_to_force_snapshot_not_wedge).
         let budget_db = unique_temp_path("cluster-oversized-budget-delta", "sqlite3");
         let mut store = SqliteBudgetStore::open(&budget_db).test_unwrap();
-        let response = BudgetDeltaResponse {
-            records: (0..=BUDGET_DELTA_MAX_RECORDS)
-                .map(|idx| BudgetUsageView {
-                    capability_id: format!("cap-{idx}"),
-                    grant_index: 0,
-                    invocation_count: 1,
-                    total_cost_exposed: 0,
-                    total_cost_realized_spend: 0,
-                    updated_at: 1_717_171_717,
-                    seq: Some(idx as u64 + 1),
-                })
-                .collect(),
-            mutation_events: Vec::new(),
-            abandoned_seqs: Vec::new(),
+        let event = |seq: u64| BudgetMutationEventView {
+            event_id: format!("evt-{seq}"),
+            hold_id: None,
+            capability_id: "cap-storm".to_string(),
+            grant_index: 0,
+            kind: "authorize_exposure".to_string(),
+            allowed: Some(true),
+            recorded_at: seq as i64,
+            event_seq: seq,
+            usage_seq: Some(seq),
+            exposure_units: 1,
+            realized_spend_units: 0,
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost_units: None,
+            invocation_count_after: 1,
+            total_cost_exposed_after: 1,
+            total_cost_realized_spend_after: 0,
+            authority: Some(BudgetMutationAuthorityView {
+                authority_id: "http://origin-storm".to_string(),
+                lease_id: "http://origin-storm#term-1".to_string(),
+                lease_epoch: 1,
+            }),
         };
+        // MAX_LIST_LIMIT live events interspersed with a dense burst of abandoned
+        // (rolled-back-then-retried) seqs: events + abandoned exceeds
+        // BUDGET_DELTA_MAX_RECORDS for the covered range, so no smaller
+        // cursor-anchored page makes forward progress.
+        let live_events = MAX_LIST_LIMIT as u64;
+        let abandoned_start = live_events + 1;
+        let abandoned_end = BUDGET_DELTA_MAX_RECORDS as u64 + 1;
+        let response = BudgetDeltaResponse {
+            records: Vec::new(),
+            mutation_events: (1..=live_events).map(event).collect(),
+            abandoned_seqs: (abandoned_start..=abandoned_end).collect(),
+        };
+        let record_count = response.mutation_events.len() + response.abandoned_seqs.len();
+        assert!(
+            record_count > BUDGET_DELTA_MAX_RECORDS,
+            "the crafted page must exceed the record cap to exercise the wedge path"
+        );
 
         let result =
             import_budget_delta_response(&mut store, &response, None, &mut PullRoundBudget::new());
-        let Err(PullError::Transient(error)) = result else {
-            panic!("oversized peer budget deltas should fail closed as a transient error");
+        let Err(PullError::ForceSnapshot(error)) = result else {
+            panic!(
+                "an oversized budget page must route to snapshot recovery, not wedge as Transient: {result:?}"
+            );
         };
-        assert!(error.to_string().contains("budget delta response contains"));
+        assert!(error.to_string().contains("full snapshot recovery"));
+        // Fail-closed: nothing from the unpageable window was imported as a prefix.
+        assert!(store
+            .list_mutation_events(10, Some("cap-storm"), Some(0))
+            .test_unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn oversized_budget_delta_routes_peer_to_force_snapshot_not_wedge() {
+        // codex #965 Finding 1: route_pull must turn a ForceSnapshot into a
+        // force_snapshot flag (so the next sync round full-resyncs and makes forward
+        // progress) while keeping the peer Healthy (honest backlog, not misbehavior),
+        // and short-circuit the round. Contrast with a bare Transient, which flags
+        // nothing: that is the indefinite wedge this fix removes.
+        let state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
+        update_peer_reachable(&state, "http://node-b");
+        assert!(
+            !peer_should_force_snapshot(&state, "http://node-b"),
+            "a freshly reachable, already-synced peer has no pending snapshot"
+        );
+
+        // RED baseline: a bare Transient (the OLD oversized behavior) neither demotes
+        // nor flags a snapshot, so the cursor stays pinned and the peer wedges.
+        let mut records = 0u64;
+        let transient = route_pull(
+            &state,
+            "http://node-b",
+            Err(PullError::Transient(CliError::cli_other_error(
+                "oversized (old behavior)",
+            ))),
+            &mut records,
+        );
+        assert!(transient.is_err(), "a Transient short-circuits the round");
+        assert!(
+            !peer_should_force_snapshot(&state, "http://node-b"),
+            "a bare Transient does NOT trigger snapshot recovery: this is the wedge"
+        );
+
+        // GREEN: ForceSnapshot flags the peer for a full resync without demoting it.
+        let mut records = 0u64;
+        let routed = route_pull(
+            &state,
+            "http://node-b",
+            Err(PullError::ForceSnapshot(CliError::cli_other_error(
+                "budget delta response contains 401 records, maximum is 400",
+            ))),
+            &mut records,
+        );
+        assert!(
+            routed.is_err(),
+            "ForceSnapshot short-circuits the round before update_peer_success clears the flag"
+        );
+        assert!(
+            peer_should_force_snapshot(&state, "http://node-b"),
+            "an oversized/unpageable page must route the peer to force-snapshot recovery"
+        );
+        // Not demoted to Unhealthy: an honest large window is not peer misbehavior.
+        assert!(
+            with_peer_state(&state, "http://node-b", |peer| peer.health.is_reachable())
+                .unwrap_or(false),
+            "force-snapshot recovery keeps an honest peer Healthy"
+        );
+        assert_eq!(records, 0, "an unpageable page counts no delta records");
     }
 
     #[test]
