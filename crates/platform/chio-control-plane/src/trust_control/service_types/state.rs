@@ -95,23 +95,17 @@ pub(crate) struct PeerSyncState {
 
 #[derive(Debug)]
 pub(crate) struct FederationAdmissionRateLimiter {
+    // Per-subject in-window attempt timestamps, keyed by `policy:subject`. The
+    // distinct-key set is bounded fail-closed by `key_cap`: EXPIRED (out-of-
+    // window) subjects are pruned first, and once the table holds `key_cap`
+    // ACTIVE (in-window) subjects a new subject is DENIED rather than evicting an
+    // active bucket. Never evicting an ACTIVE bucket closes the reset-by-eviction
+    // bypass (an attacker cannot force its own active bucket out with throwaway
+    // subjects and then reuse its subject with a fresh limit in the same window)
+    // (RFC-0004 F39, codex finding 3553826807), while still saturating instead of
+    // growing under a distinct-subject flood. A subject is removed only when its
+    // window fully empties.
     attempts: HashMap<String, Vec<u64>>,
-    // FIFO order of live keys as `(key, generation)`. A reactivated key (its
-    // window emptied then reused) is re-pushed at the NEWEST position with a
-    // fresh generation so recency-of-use is respected; the superseded position is
-    // lazily skipped on eviction and pruned each call, keeping the move-to-back
-    // amortized-O(1) rather than scanning the deque (RFC-0004 F3 + reactivation
-    // refresh).
-    insertion_order: std::collections::VecDeque<(String, u64)>,
-    // The generation of each live key's CURRENT `insertion_order` position, kept
-    // in lockstep so exactly one entry per key is treated as live: a deque entry
-    // `(key, gen)` is live iff `live_position[key] == gen`. Any other entry for
-    // that key is a stale, superseded position. O(1) membership keeps the dedupe
-    // amortized-constant.
-    live_position: std::collections::HashMap<String, u64>,
-    // Monotonic stamp handed out on each (re)insertion so a refreshed position
-    // always supersedes the key's prior one.
-    next_generation: u64,
     key_cap: usize,
 }
 
@@ -136,9 +130,6 @@ impl FederationAdmissionRateLimiter {
     pub(crate) fn with_key_cap(key_cap: usize) -> Self {
         Self {
             attempts: HashMap::new(),
-            insertion_order: std::collections::VecDeque::new(),
-            live_position: std::collections::HashMap::new(),
-            next_generation: 0,
             key_cap: key_cap.max(1),
         }
     }
@@ -148,9 +139,14 @@ impl FederationAdmissionRateLimiter {
         self.attempts.len()
     }
 
-    #[cfg(test)]
-    pub(crate) fn insertion_order_len(&self) -> usize {
-        self.insertion_order.len()
+    /// Drop subjects whose entire attempt window has expired, freeing slots for
+    /// new subjects. Bounded: touches at most the live keys (<= `key_cap` once
+    /// saturated).
+    fn prune_expired(&mut self, lower_bound: u64) {
+        self.attempts.retain(|_, timestamps| {
+            timestamps.retain(|t| *t > lower_bound);
+            !timestamps.is_empty()
+        });
     }
 
     pub(crate) fn check_and_record(
@@ -164,19 +160,25 @@ impl FederationAdmissionRateLimiter {
         let lower_bound = now.saturating_sub(limit.window_seconds);
 
         let is_new_key = !self.attempts.contains_key(&key);
-        // Key cap with oldest-eviction, mirroring McpRateLimiter: when full and
-        // this is a new key, evict the oldest inserted key so a distinct-subject
-        // flood saturates instead of growing without bound (RFC-0004 F39).
+        // Key cap (RFC-0004 F39). When the table is full and this is a new
+        // subject, prune EXPIRED (out-of-window) subjects first to reclaim slots.
+        // If every remaining slot still holds an ACTIVE (in-window) subject, DENY
+        // the new subject fail-closed rather than evicting an active bucket:
+        // evicting an active bucket would reset its per-window limit, so an
+        // attacker could reset its own limit by flooding throwaway subjects to
+        // force its eviction, then reusing its subject in the same window (codex
+        // finding 3553826807, FAIL-OPEN). Denying keeps memory bounded (cap
+        // unchanged) without the bypass, and a distinct-subject flood still
+        // saturates instead of growing.
         if is_new_key && self.attempts.len() >= self.key_cap {
-            while let Some((oldest, generation)) = self.insertion_order.pop_front() {
-                // Skip a superseded position: a reactivated key sits at a newer
-                // generation, so its stale front entry must not evict it.
-                if self.live_position.get(&oldest) != Some(&generation) {
-                    continue;
-                }
-                self.live_position.remove(&oldest);
-                self.attempts.remove(&oldest);
-                break;
+            self.prune_expired(lower_bound);
+            if self.attempts.len() >= self.key_cap {
+                return FederationAdmissionRateLimitStatus {
+                    limit: limit.max_requests,
+                    window_seconds: limit.window_seconds,
+                    remaining: 0,
+                    retry_after_seconds: Some(limit.window_seconds.max(1)),
+                };
             }
         }
 
@@ -198,64 +200,21 @@ impl FederationAdmissionRateLimiter {
                 retry_after_seconds: Some(retry_after_seconds.max(1)),
             };
         }
-        let was_empty = entry.is_empty();
         entry.push(now);
-        if is_new_key || was_empty {
-            // New key, or a key pruned to empty then reused (effectively fresh):
-            // refresh it to the NEWEST FIFO position with a fresh generation so
-            // recency-of-use is respected. Any prior position is superseded and
-            // lazily skipped on eviction, then pruned below, so this key keeps
-            // exactly ONE live entry -- now at the back, where the FIFO evictor
-            // reaches it only after genuinely-older keys (RFC-0004 F3 +
-            // reactivation refresh). Amortized O(1): no deque scan, no unbounded
-            // deque growth.
-            let generation = self.next_generation;
-            self.next_generation = self.next_generation.wrapping_add(1);
-            self.live_position.insert(key.clone(), generation);
-            self.insertion_order.push_back((key, generation));
-        }
 
-        // Drop-empty maintenance: prune any key whose window has fully emptied so
-        // a fresh subject costs nothing once its window empties (RFC-0004 F39,
-        // F21 rate-limiter half). Bounded: touches at most `key_cap` keys.
-        // Prune `insertion_order` in lockstep so an expired subject removed from
-        // `attempts` cannot leave a stale key behind: otherwise the order deque
-        // leaks one String per distinct subject even below `key_cap`, because
-        // the eviction loop (which drains stale entries) never runs.
-        let attempts = &mut self.attempts;
-        let insertion_order = &mut self.insertion_order;
-        let live_position = &mut self.live_position;
-        attempts.retain(|_, timestamps| {
-            timestamps.retain(|t| *t > lower_bound);
-            !timestamps.is_empty()
-        });
-        insertion_order.retain(|(entry_key, generation)| {
-            // Keep only the LIVE position of a still-live key; drop expired keys
-            // and superseded (stale) positions so the deque never diverges from
-            // `attempts` and never leaks.
-            if attempts.contains_key(entry_key) && live_position.get(entry_key) == Some(generation)
-            {
-                true
-            } else {
-                // Clear the `live_position` marker only when THIS entry owns it
-                // (an expired key), never when a newer position supersedes it, so
-                // the marker never outlives the deque entry it guards.
-                if live_position.get(entry_key) == Some(generation) {
-                    live_position.remove(entry_key);
-                }
-                false
-            }
-        });
+        // Drop-empty maintenance: prune any subject whose window has fully
+        // emptied so a fresh subject costs nothing once its window empties
+        // (RFC-0004 F39, F21 rate-limiter half). Bounded: touches at most
+        // `key_cap` keys. The subject just recorded above retains its `now`
+        // timestamp, so it survives.
+        self.prune_expired(lower_bound);
 
         FederationAdmissionRateLimitStatus {
             limit: limit.max_requests,
             window_seconds: limit.window_seconds,
-            remaining: limit.max_requests.saturating_sub(
-                self.attempts
-                    .get(&format!("{policy_id}:{subject_key}"))
-                    .map(|v| v.len())
-                    .unwrap_or(0) as u32,
-            ),
+            remaining: limit
+                .max_requests
+                .saturating_sub(self.attempts.get(&key).map(|v| v.len()).unwrap_or(0) as u32),
             retry_after_seconds: None,
         }
     }
@@ -354,23 +313,17 @@ mod admission_bound_tests {
     }
 
     #[test]
-    fn expired_subjects_do_not_leak_insertion_order() {
+    fn expired_subjects_do_not_leak_keys() {
         // Distinct subjects, each in its own window (1000s apart, far past the
-        // 60s window), stay below `key_cap`, so the eviction loop never runs. The
-        // maintenance pass must prune `insertion_order` alongside `attempts` or
-        // the order deque grows one String per subject without bound (RFC-0004
-        // F39).
+        // 60s window), stay below `key_cap`. The drop-empty maintenance pass must
+        // prune expired subjects from `attempts` or the map grows one key per
+        // subject without bound (RFC-0004 F39).
         let mut limiter = FederationAdmissionRateLimiter::with_key_cap(4096);
         for i in 0..1000u64 {
             let subject = format!("subject-{i}");
             let now = 100 + i * 1000;
             let _ = limiter.check_and_record("policy", &subject, &limit(), now);
         }
-        assert!(
-            limiter.insertion_order_len() <= 8,
-            "insertion_order leaked stale keys: {}",
-            limiter.insertion_order_len()
-        );
         assert!(
             limiter.key_count() <= 8,
             "attempts leaked stale keys: {}",
@@ -412,103 +365,93 @@ mod admission_bound_tests {
     }
 
     #[test]
-    fn single_subject_reactivation_keeps_one_insertion_order_entry() {
-        // F3 residual: when a subject is the FIRST to observe its own staleness
-        // (low-diversity traffic, no other subject interleaves during its idle
-        // gap), the re-burst call sees is_new_key=false, empties its own window,
-        // and hits the was_empty re-push path. Without the dedupe that pushes a
-        // SECOND live insertion_order entry for the same still-live key.
+    fn single_subject_reactivation_keeps_one_key() {
+        // A single subject that empties its window and re-bursts must stay exactly
+        // one key (keyed by `policy:subject`), never leaking a residual entry.
         let mut limiter = FederationAdmissionRateLimiter::with_key_cap(2);
         let l = limit();
         let _ = limiter.check_and_record("policy", "solo", &l, 100);
-        // Idle strictly past the window, then burst again -- alone, so this call
-        // is the first to observe "solo" as stale.
+        // Idle strictly past the window, then burst again.
         let _ = limiter.check_and_record("policy", "solo", &l, 100 + l.window_seconds + 1);
         assert_eq!(limiter.key_count(), 1);
-        assert_eq!(
-            limiter.insertion_order_len(),
-            limiter.key_count(),
-            "reactivation created a duplicate insertion_order entry: order={} keys={}",
-            limiter.insertion_order_len(),
-            limiter.key_count(),
-        );
     }
 
     #[test]
-    fn reactivation_does_not_leak_or_mis_evict_under_key_cap() {
-        // Many burst -> idle-past-window -> burst cycles for a SINGLE subject.
-        // Without the dedupe each cycle leaks one insertion_order entry (the
-        // deque grows without bound even though only one key is live, RFC-0004),
-        // and each leaked entry is a stale front duplicate that the FIFO evictor
-        // would pop first, evicting the subject's freshly-active data.
+    fn full_table_of_active_subjects_denies_new_subject_without_eviction() {
+        // The cap must never evict an ACTIVE (in-window) subject to admit a new
+        // one; the new subject is DENIED fail-closed instead. Two in-window
+        // subjects fill a cap of 2, so a third distinct subject is denied and the
+        // two actives keep their buckets intact (RFC-0004 F39, finding 3553826807).
         let l = limit();
         let mut limiter = FederationAdmissionRateLimiter::with_key_cap(2);
-        for i in 0..32u64 {
-            let now = 100 + i * (l.window_seconds + 1);
-            let _ = limiter.check_and_record("policy", "solo", &l, now);
-        }
-        assert_eq!(limiter.key_count(), 1);
+        let a = limiter.check_and_record("policy", "a", &l, 100);
+        let b = limiter.check_and_record("policy", "b", &l, 100);
+        assert!(a.retry_after_seconds.is_none() && b.retry_after_seconds.is_none());
+
+        // "c" trips the cap while a and b are both in-window: c is denied, and no
+        // active bucket is evicted.
+        let c = limiter.check_and_record("policy", "c", &l, 100);
+        assert_eq!(c.remaining, 0);
+        assert!(
+            c.retry_after_seconds.is_some(),
+            "new subject must be denied when the table is full of active buckets, not admitted by eviction"
+        );
         assert_eq!(
-            limiter.insertion_order_len(),
-            1,
-            "single-subject reactivation leaked {} insertion_order entries",
-            limiter.insertion_order_len(),
+            limiter.key_count(),
+            2,
+            "an active bucket was wrongly evicted"
         );
 
-        // Under key_cap pressure the genuinely-oldest LIVE key is evicted and the
-        // deque never diverges from `attempts`. "solo" was last active at the end
-        // of the loop; two newer distinct subjects arrive inside "solo"'s window,
-        // then a third trips the cap and evicts the genuine oldest ("solo").
-        let base = 100 + 31 * (l.window_seconds + 1);
-        let _ = limiter.check_and_record("policy", "beta", &l, base + 1);
-        let _ = limiter.check_and_record("policy", "gamma", &l, base + 2);
-        assert!(
-            limiter.key_count() <= 2,
-            "key cap breached under pressure: {}",
-            limiter.key_count()
-        );
-        assert_eq!(
-            limiter.insertion_order_len(),
-            limiter.key_count(),
-            "insertion_order diverged from attempts under eviction pressure: order={} keys={}",
-            limiter.insertion_order_len(),
-            limiter.key_count(),
-        );
+        // "a" retained its bucket: re-recording it reflects its two in-window
+        // attempts (remaining = 5 - 2 = 3), proving it was not reset by eviction.
+        let a2 = limiter.check_and_record("policy", "a", &l, 100);
+        assert_eq!(a2.remaining, 3, "active subject a was reset by eviction");
     }
 
     #[test]
-    fn reactivated_key_refreshed_to_newest_survives_eviction() {
-        // RFC-0004 F3 reactivation refresh: a key whose window expired and is
-        // then reused must move to the NEWEST FIFO position, so under key-cap
-        // pressure it is evicted only AFTER genuinely-older keys, never despite
-        // being freshly active.
+    fn active_bucket_not_evicted_by_throwaway_subject_flood() {
+        // codex finding 3553826807 (FAIL-OPEN): with max_requests=1 and a small
+        // key cap, a subject must not be able to reset its own in-window rate
+        // limit by flooding a throwaway subject to force its bucket's eviction,
+        // then reusing its own subject in the same window.
         let l = FederationAdmissionRateLimit {
-            max_requests: 10,
-            window_seconds: 60,
+            max_requests: 1,
+            window_seconds: 1000,
         };
-        let mut limiter = FederationAdmissionRateLimiter::with_key_cap(2);
-        // "a" is recorded first (oldest original position), then "b".
-        let _ = limiter.check_and_record("policy", "a", &l, 100);
-        let _ = limiter.check_and_record("policy", "b", &l, 150);
-        // "a"'s window empties (100 <= 170 - 60); reactivating it must refresh
-        // "a" to the newest position, making "b" the genuine oldest live key.
-        let _ = limiter.check_and_record("policy", "a", &l, 170);
-        // "c" trips the cap (a, b == 2 live keys): the genuine oldest ("b") is
-        // evicted, NOT the freshly-reactivated "a".
-        let _ = limiter.check_and_record("policy", "c", &l, 180);
+        let mut limiter = FederationAdmissionRateLimiter::with_key_cap(1);
+        let now = 100;
+
+        // The attacker spends its single allowed request for the window.
+        let first = limiter.check_and_record("policy", "attacker", &l, now);
+        assert_eq!(first.remaining, 0);
         assert!(
-            limiter.key_count() <= 2,
-            "key cap breached: {}",
-            limiter.key_count()
+            first.retry_after_seconds.is_none(),
+            "the first request must be allowed"
         );
-        // "a" survived with its reactivation attempt intact: re-recording it
-        // shows two in-window attempts (170 + 185), so remaining = 10 - 2 = 8.
-        // Had "a" been wrongly evicted from its stale FIFO position, it would be
-        // recreated fresh with remaining = 10 - 1 = 9.
-        let status = limiter.check_and_record("policy", "a", &l, 185);
+
+        // A throwaway subject tries to evict the attacker's ACTIVE bucket. The
+        // table is full of an active bucket, so the throwaway is DENIED (not
+        // admitted by evicting the attacker).
+        let throwaway = limiter.check_and_record("policy", "throwaway", &l, now);
+        assert!(
+            throwaway.retry_after_seconds.is_some(),
+            "throwaway must be denied, not admitted by evicting the active bucket"
+        );
         assert_eq!(
-            status.remaining, 8,
-            "reactivated key was wrongly evicted before a genuinely-older key"
+            limiter.key_count(),
+            1,
+            "the attacker's active bucket must survive the throwaway flood"
+        );
+
+        // The attacker reuses its subject in the SAME window: it must stay
+        // rate-limited. Before the fix the throwaway evicted the attacker, so this
+        // returned a fresh allowed bucket (retry_after_seconds = None) -- the
+        // bypass (RED). After the fix the attacker is still denied (GREEN).
+        let replay = limiter.check_and_record("policy", "attacker", &l, now);
+        assert_eq!(replay.remaining, 0);
+        assert!(
+            replay.retry_after_seconds.is_some(),
+            "attacker must stay rate-limited in-window; eviction bypass regressed"
         );
     }
 }
