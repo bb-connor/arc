@@ -1525,6 +1525,30 @@ fn catch_up_verified_head_to(
     Ok(())
 }
 
+/// Insert one receipt (and, when requested, its lineage statement) within the
+/// caller's transaction, returning the claim-log `entry_seq`. Split out of
+/// `append_receipt_batch` so each record can run inside its own SAVEPOINT (codex
+/// round 11, P2): a per-receipt failure is returned as this record's `Err`
+/// instead of aborting the whole coalesced batch. Receipt + lineage stay one
+/// unit - a lineage failure returns `Err`, and the caller's savepoint rollback
+/// undoes the receipt too, so no receipt-without-lineage state is possible.
+fn append_single_receipt_record(
+    tx: &rusqlite::Transaction<'_>,
+    request: &ReceiptCommitRequest,
+) -> Result<u64, ReceiptStoreError> {
+    let seq = append_chio_receipt_tx(tx, &request.receipt, &request.raw_json)?;
+    if request.ensure_lineage {
+        #[cfg(test)]
+        if test_hooks::fail_between_receipt_and_lineage() {
+            return Err(ReceiptStoreError::Conflict(
+                "injected failure between receipt insert and lineage insert".to_string(),
+            ));
+        }
+        ensure_receipt_lineage_statement_for_receipt_id_tx(tx, &request.receipt.id)?;
+    }
+    Ok(seq)
+}
+
 fn append_receipt_batch(
     pool: &Pool<SqliteConnectionManager>,
     head: &mut VerifiedHead,
@@ -1592,28 +1616,45 @@ fn append_receipt_batch(
         if test_hooks::panic_during_append_batch(&request.receipt.content_hash) {
             panic!("injected test panic during append batch");
         }
-        match append_chio_receipt_tx(&tx, &request.receipt, &request.raw_json) {
+        // Per-record SAVEPOINT (codex round 11, P2): a coalesced group-commit
+        // batch mixes independent producers. A per-receipt failure (a conflicting
+        // duplicate raw JSON, a lineage insert failure) must fail ONLY that
+        // record, not roll back and error every unrelated valid append sharing
+        // the same group-commit window. Wrap each record so a failure ROLLBACK TO
+        // the savepoint undoes JUST this record's partial work - its receipt row,
+        // its projection-trigger claim-log row, and its AUTOINCREMENT entry_seq,
+        // which SQLite restores with the savepoint so surviving rows stay
+        // contiguous - and the loop continues with the others. Two extra SQL
+        // statements per record: O(1) per record, O(b) per batch, never a
+        // full-history scan, so the flat per-append cost holds (F22).
+        if let Err(error) = tx.execute_batch("SAVEPOINT chio_append_record") {
+            return receipt_batch_error_results(requests.len(), ReceiptStoreError::Sqlite(error));
+        }
+        match append_single_receipt_record(&tx, request) {
             Ok(seq) => {
-                if request.ensure_lineage {
-                    #[cfg(test)]
-                    if test_hooks::fail_between_receipt_and_lineage() {
-                        return receipt_batch_error_results(
-                            requests.len(),
-                            ReceiptStoreError::Conflict(
-                                "injected failure between receipt insert and lineage insert"
-                                    .to_string(),
-                            ),
-                        );
-                    }
-                    if let Err(error) =
-                        ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &request.receipt.id)
-                    {
-                        return receipt_batch_error_results(requests.len(), error);
-                    }
+                if let Err(error) = tx.execute_batch("RELEASE chio_append_record") {
+                    return receipt_batch_error_results(
+                        requests.len(),
+                        ReceiptStoreError::Sqlite(error),
+                    );
                 }
                 results.push(Ok(seq));
             }
-            Err(error) => return receipt_batch_error_results(requests.len(), error),
+            Err(error) => {
+                // Fail THIS record closed and undo only its work, then keep going
+                // for the others. A savepoint that will not unwind is a
+                // transaction-integrity fault, so fail the whole batch closed in
+                // that (unexpected) case.
+                if let Err(rollback) =
+                    tx.execute_batch("ROLLBACK TO chio_append_record; RELEASE chio_append_record")
+                {
+                    return receipt_batch_error_results(
+                        requests.len(),
+                        ReceiptStoreError::Sqlite(rollback),
+                    );
+                }
+                results.push(Err(error));
+            }
         }
     }
     // Idempotent duplicates return the existing entry_seq without adding a

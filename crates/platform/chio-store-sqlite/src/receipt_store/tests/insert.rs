@@ -266,10 +266,17 @@ fn duplicate_child_receipt_id_with_different_bytes_conflicts() {
     let _ = fs::remove_file(path);
 }
 
+/// Codex round 11, P2: a per-receipt failure in a coalesced group-commit batch
+/// is now ISOLATED to that record via per-record savepoints - the valid sibling
+/// still commits and persists rather than the whole batch rolling back and
+/// failing every caller. This replaces the pre-P2 whole-batch-rollback contract
+/// (formerly `append_receipt_batch_rolls_back_all_receipts_on_batch_error`) the
+/// finding corrected: independent producers keep independent success/failure
+/// semantics.
 #[test]
-fn append_receipt_batch_rolls_back_all_receipts_on_batch_error(
+fn append_receipt_batch_isolates_per_record_error(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-receipts-group-rollback");
+    let path = unique_db_path("chio-receipts-group-isolation");
     let store = SqliteReceiptStore::open(&path)?;
     let mut requests = Vec::new();
 
@@ -290,8 +297,21 @@ fn append_receipt_batch_rolls_back_all_receipts_on_batch_error(
 
     let results = append_receipt_batch(&store.pool, &mut VerifiedHead::default(), true, &requests);
 
-    assert!(results.into_iter().all(|result| result.is_err()));
-    assert_eq!(store.tool_receipt_count()?, 0);
+    assert!(
+        results[0].is_ok(),
+        "the valid append must commit despite a bad sibling: {:?}",
+        results[0]
+    );
+    assert!(
+        results[1].is_err(),
+        "the invalid receipt must fail in isolation: {:?}",
+        results[1]
+    );
+    assert_eq!(
+        store.tool_receipt_count()?,
+        1,
+        "only the valid receipt persists"
+    );
 
     let _ = fs::remove_file(path);
     Ok(())
@@ -380,9 +400,14 @@ fn receipt_commit_flush_reports_queued_batch_error() -> Result<(), Box<dyn std::
     Ok(())
 }
 
+/// Codex round 11, P2: only the ONE invalid receipt in a full group-commit batch
+/// fails; every valid sibling still commits (per-record savepoint isolation).
+/// This replaces the pre-P2 whole-batch-rollback contract (formerly
+/// `append_receipt_batch_rolls_back_full_batch_error`).
 #[test]
-fn append_receipt_batch_rolls_back_full_batch_error() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-receipts-full-batch-flush-error");
+fn append_receipt_batch_isolates_trailing_invalid_in_full_batch(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-receipts-full-batch-isolation");
     let store = SqliteReceiptStore::open(&path)?;
     let mut requests = Vec::new();
 
@@ -402,14 +427,29 @@ fn append_receipt_batch_rolls_back_full_batch_error() -> Result<(), Box<dyn std:
     }
 
     let results = append_receipt_batch(&store.pool, &mut VerifiedHead::default(), true, &requests);
-    assert!(results.into_iter().all(|result| {
-        matches!(
-            result,
-            Err(chio_kernel::ReceiptStoreError::Conflict(message))
-                if message.contains("receipt timestamp")
-        )
-    }));
-    assert_eq!(store.tool_receipt_count()?, 0);
+    let last = results.len() - 1;
+    for (index, result) in results.iter().enumerate() {
+        if index == last {
+            assert!(
+                matches!(
+                    result,
+                    Err(chio_kernel::ReceiptStoreError::Conflict(message))
+                        if message.contains("receipt timestamp")
+                ),
+                "the trailing invalid receipt must fail: {result:?}"
+            );
+        } else {
+            assert!(
+                result.is_ok(),
+                "valid receipt {index} must commit despite the trailing bad sibling: {result:?}"
+            );
+        }
+    }
+    assert_eq!(
+        store.tool_receipt_count()?,
+        (RECEIPT_GROUP_COMMIT_MAX_BATCH - 1) as u64,
+        "every valid receipt persists; only the invalid one is dropped"
+    );
 
     let _ = fs::remove_file(path);
     Ok(())
@@ -785,6 +825,122 @@ fn batched_duplicate_receipts_commit_without_false_drift() -> Result<(), Box<dyn
 
     // Exactly one projection row persisted.
     assert_eq!(load_claim_log_rows(&store).len(), 1);
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+/// Codex round 11, P2: a coalesced group-commit batch used to abort ENTIRELY
+/// when any one request hit a per-receipt error (a conflicting duplicate raw
+/// JSON, a lineage insert failure). Dropping the shared transaction rolled back
+/// every earlier successful insert and returned the same error to every caller,
+/// so an unrelated valid append from another producer was lost solely because it
+/// was coalesced with a bad receipt. The fix wraps each record in its own
+/// SAVEPOINT so a per-receipt failure is isolated to that record and independent
+/// callers keep independent success/failure semantics.
+#[test]
+fn group_commit_isolates_per_record_failure() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-group-commit-isolation");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+
+    // Pre-commit a base receipt so its receipt_id already exists with its own
+    // stored raw_json (claim-log entry 1).
+    let base = sample_receipt_with_keypair("rcpt-p2-base", 1, &keypair);
+    store.append_chio_receipt_returning_seq(&base)?;
+    store.flush_receipt_writes()?;
+
+    // One group-commit batch from three independent producers: two fresh valid
+    // appends bracketing ONE bad request that reuses `base`'s receipt_id with
+    // DIFFERENT raw JSON (the conflicting duplicate the finding names).
+    // `append_chio_receipt_tx` rejects it with "already exists with different
+    // content".
+    let good_one = sample_receipt_with_keypair("rcpt-p2-good-1", 2, &keypair);
+    let good_two = sample_receipt_with_keypair("rcpt-p2-good-2", 3, &keypair);
+    let (r0_tx, _r0) = std::sync::mpsc::sync_channel(1);
+    let (r1_tx, _r1) = std::sync::mpsc::sync_channel(1);
+    let (r2_tx, _r2) = std::sync::mpsc::sync_channel(1);
+    let requests = vec![
+        ReceiptCommitRequest {
+            receipt: good_one.clone(),
+            raw_json: serde_json::to_string(&good_one)?,
+            ensure_lineage: false,
+            response: r0_tx,
+        },
+        ReceiptCommitRequest {
+            receipt: base.clone(),
+            raw_json: "{\"conflicting\":\"payload\"}".to_string(),
+            ensure_lineage: false,
+            response: r1_tx,
+        },
+        ReceiptCommitRequest {
+            receipt: good_two.clone(),
+            raw_json: serde_json::to_string(&good_two)?,
+            ensure_lineage: false,
+            response: r2_tx,
+        },
+    ];
+
+    let mut head = {
+        let connection = store.connection()?;
+        seed_verified_head(&connection)?
+    };
+    let results = append_receipt_batch(
+        &store.pool,
+        &mut head,
+        store.incremental_verification,
+        &requests,
+    );
+
+    // TEETH: the two valid appends COMMIT; only the conflicting middle request
+    // fails. Before the fix, the bad record aborted the whole batch, so all three
+    // returned Err and neither good receipt persisted.
+    assert!(
+        results[0].is_ok(),
+        "first valid append must commit: {:?}",
+        results[0]
+    );
+    assert!(
+        results[1].is_err(),
+        "the conflicting duplicate must fail: {:?}",
+        results[1]
+    );
+    assert!(
+        results[2].is_ok(),
+        "third valid append must commit: {:?}",
+        results[2]
+    );
+    match &results[1] {
+        Err(ReceiptStoreError::Conflict(message)) => assert!(
+            message.contains("different content"),
+            "expected the conflicting-duplicate Conflict, got: {message}"
+        ),
+        other => {
+            return Err(format!("expected a Conflict for the bad record, got {other:?}").into())
+        }
+    }
+
+    // TEETH: both good receipts are DURABLY persisted, not rolled back with the
+    // bad sibling.
+    let connection = store.connection()?;
+    let good_one_rows: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM chio_tool_receipts WHERE receipt_id = ?1",
+        rusqlite::params![good_one.id],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        good_one_rows, 1,
+        "the first valid append must survive a batched sibling failure"
+    );
+    let good_two_rows: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM chio_tool_receipts WHERE receipt_id = ?1",
+        rusqlite::params![good_two.id],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        good_two_rows, 1,
+        "the third valid append must survive a batched sibling failure"
+    );
 
     let _ = fs::remove_file(path);
     Ok(())
