@@ -2826,6 +2826,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-bounded"
+version = "0.1.0"
+dependencies = [
+ "loom",
+ "proptest",
+]
+
+[[package]]
 name = "chio-cli"
 version = "0.1.0"
 dependencies = [
@@ -3601,6 +3609,7 @@ dependencies = [
 name = "chio-http-session"
 version = "0.1.0"
 dependencies = [
+ "chio-bounded",
  "hex",
  "serde",
  "serde_json",
@@ -3616,6 +3625,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chio-appraisal",
+ "chio-bounded",
  "chio-core",
  "chio-core-types",
  "chio-credit",

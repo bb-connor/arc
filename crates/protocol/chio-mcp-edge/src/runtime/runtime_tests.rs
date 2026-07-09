@@ -458,6 +458,7 @@ fn make_kernel() -> (ChioKernel, Keypair) {
         allow_ephemeral_receipt_log: true,
         checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
+        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
     };
     let mut kernel = ChioKernel::new(config);
     kernel.register_tool_server(Box::new(EchoServer));
@@ -483,6 +484,7 @@ fn make_web3_required_kernel() -> (ChioKernel, Keypair) {
         allow_ephemeral_receipt_log: false,
         checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
+        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
     };
     let mut kernel = ChioKernel::new(config);
     kernel.register_tool_server(Box::new(EchoServer));
@@ -510,6 +512,7 @@ fn make_kernel_error_bridge_fixture(
         allow_ephemeral_receipt_log: true,
         checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
+        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
     };
     let mut kernel = ChioKernel::new(config);
     kernel.register_tool_server(server);
@@ -1586,6 +1589,7 @@ fn make_url_required_edge() -> ChioMcpEdge {
         allow_ephemeral_receipt_log: true,
         checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
+        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
     };
     let mut kernel = ChioKernel::new(config);
     kernel.register_tool_server(Box::new(UrlRequiredServer));
@@ -1655,6 +1659,7 @@ fn make_event_edge(server: Arc<AsyncEventServer>) -> ChioMcpEdge {
         allow_ephemeral_receipt_log: true,
         checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
+        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
     };
     let mut kernel = ChioKernel::new(config);
     kernel.register_tool_server(Box::new(AsyncEventServerConnection(server)));

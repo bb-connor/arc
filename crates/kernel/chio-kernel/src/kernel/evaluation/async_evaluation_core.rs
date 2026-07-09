@@ -38,6 +38,19 @@ impl ChioKernel {
             );
         }
 
+        // RSS soft ceiling: shed new admissions before the OS OOM-kills the
+        // mediator. Checked on the same atomic-load fast path as the emergency
+        // stop, right after it (RFC-0004 section 5).
+        if self.is_rss_shedding() {
+            warn!(
+                request_id = %request.request_id,
+                "rss soft ceiling exceeded -- shedding evaluate_tool_call"
+            );
+            return Err(KernelError::Overloaded {
+                resource: crate::OverloadResource::Allocation,
+            });
+        }
+
         // Receipt-version negotiation is a TRUST-BOUNDARY admission check
         // that must run BEFORE any dispatch path. The admission snapshot is
         // scoped for every receipt builder below so persistence and federation cosign

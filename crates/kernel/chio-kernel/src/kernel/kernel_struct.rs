@@ -57,6 +57,21 @@ pub struct KernelConfig {
     /// indefinitely. When `Some(config)`, the kernel will archive receipts
     /// that exceed the time or size threshold.
     pub retention_config: Option<crate::receipt_store::RetentionConfig>,
+
+    /// Per-process memory budget (bounded-structure caps + RSS soft ceiling).
+    pub memory_budget: MemoryBudgetConfig,
+}
+
+impl KernelConfig {
+    pub(crate) fn memory_budget_receipt_mirror_capacity(&self) -> usize {
+        self.memory_budget.receipt_mirror_capacity
+    }
+    pub(crate) fn memory_budget_federation_cache_capacity(&self) -> usize {
+        self.memory_budget.federation_cache_capacity
+    }
+    pub(crate) fn memory_budget_federation_cache_idle_ttl_secs(&self) -> u64 {
+        self.memory_budget.federation_cache_idle_ttl_secs
+    }
 }
 
 /// Boot-time configuration for the kernel-side hybrid signing path.
@@ -121,6 +136,103 @@ pub const DEFAULT_MAX_STREAM_TOTAL_BYTES: u64 = 256 * 1024 * 1024;
 pub const DEFAULT_CHECKPOINT_BATCH_SIZE: u64 = 100;
 pub const DEFAULT_RETENTION_DAYS: u64 = 90;
 pub const DEFAULT_MAX_SIZE_BYTES: u64 = 10_737_418_240;
+
+/// Per-process memory budget (RFC-0004 section 5). Bounded-structure capacities
+/// plus a process RSS soft ceiling. The soft ceiling is the in-process analog
+/// of the cgroup hard limit: the kernel sheds (Overloaded) before the OS
+/// OOM-kills it.
+#[derive(Debug, Clone)]
+pub struct MemoryBudgetConfig {
+    pub receipt_mirror_capacity: usize,
+    pub federation_cache_capacity: usize,
+    pub federation_cache_idle_ttl_secs: u64,
+    pub velocity_bucket_cap: usize,
+    pub admission_key_cap: usize,
+    pub journal_entry_cap: usize,
+    /// Process RSS soft ceiling in bytes. When set and exceeded, new admissions
+    /// shed with Overloaded { Allocation }. Set to roughly 85-90% of the cgroup
+    /// memory.max so the graceful stop fires before the kill. Stage A ships None.
+    pub rss_soft_limit_bytes: Option<u64>,
+    /// How often the RSS sampler reads /proc/self/statm.
+    pub rss_sample_interval_secs: u64,
+}
+
+impl MemoryBudgetConfig {
+    pub fn defaults() -> Self {
+        Self {
+            receipt_mirror_capacity: 4096,
+            federation_cache_capacity: 8192,
+            federation_cache_idle_ttl_secs: 3600,
+            velocity_bucket_cap: 65_536,
+            admission_key_cap: 4096,
+            journal_entry_cap: 4096,
+            rss_soft_limit_bytes: None,
+            rss_sample_interval_secs: 30,
+        }
+    }
+}
+
+impl Default for MemoryBudgetConfig {
+    fn default() -> Self {
+        Self::defaults()
+    }
+}
+
+/// Owns the RSS sampler thread; signals stop and joins on drop. On non-Linux
+/// hosts the sampler is a no-op and the soft limit is inert (cgroup and
+/// try_reserve backstops still apply).
+pub(crate) struct RssSamplerHandle {
+    stop: Arc<AtomicBool>,
+    join: Option<std::thread::JoinHandle<()>>,
+}
+
+impl RssSamplerHandle {
+    pub(crate) fn spawn(shed: Arc<AtomicBool>, soft_limit_bytes: u64, interval_secs: u64) -> Self {
+        let stop = Arc::new(AtomicBool::new(false));
+        let worker_stop = Arc::clone(&stop);
+        let interval = std::time::Duration::from_secs(interval_secs.max(1));
+        let join = std::thread::spawn(move || {
+            use std::sync::atomic::Ordering;
+            while !worker_stop.load(Ordering::SeqCst) {
+                if let Some(rss) = read_process_rss_bytes() {
+                    shed.store(rss > soft_limit_bytes, Ordering::Relaxed);
+                }
+                let mut waited = std::time::Duration::ZERO;
+                let slice = std::time::Duration::from_millis(200);
+                while waited < interval && !worker_stop.load(Ordering::SeqCst) {
+                    std::thread::sleep(slice);
+                    waited += slice;
+                }
+            }
+        });
+        Self {
+            stop,
+            join: Some(join),
+        }
+    }
+}
+
+impl Drop for RssSamplerHandle {
+    fn drop(&mut self) {
+        self.stop.store(true, std::sync::atomic::Ordering::SeqCst);
+        if let Some(join) = self.join.take() {
+            let _ = join.join();
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn read_process_rss_bytes() -> Option<u64> {
+    let statm = std::fs::read_to_string("/proc/self/statm").ok()?;
+    let resident_pages: u64 = statm.split_whitespace().nth(1)?.parse().ok()?;
+    let page_size = 4096u64; // conservative; matches the common Linux page size
+    Some(resident_pages.saturating_mul(page_size))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn read_process_rss_bytes() -> Option<u64> {
+    None
+}
 
 /// The Chio Runtime Kernel.
 ///
@@ -284,6 +396,12 @@ pub struct ChioKernel {
     /// shape stays feature-flag agnostic.
     pub(super) revocation_view: Option<std::sync::Arc<chio_kernel_core::RevocationView>>,
     pub(super) budget_registry: Mutex<chio_kernel_core::InMemoryBudgetRegistry>,
+    /// RSS soft-ceiling shed flag (RFC-0004 section 5). Set by the sampler when
+    /// process RSS exceeds `memory_budget.rss_soft_limit_bytes`; read on the
+    /// admission fast path alongside the emergency stop.
+    pub(super) rss_shed: Arc<AtomicBool>,
+    /// Owns the sampler thread when a soft limit is configured; joins on drop.
+    pub(super) rss_sampler: Option<RssSamplerHandle>,
 }
 
 impl ChioKernel {

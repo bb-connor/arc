@@ -441,12 +441,11 @@ pub(crate) use kernel::{current_unix_timestamp, MatchingGrant, ReceiptContent};
 
 pub use kernel::{
     AgentId, CapabilityId, ChildReceiptLog, ChioKernel, Guard, GuardContext, GuardDecision,
-    HybridSigningConfig, KernelConfig, KernelError, OverloadResource, PromptProvider, ReceiptLog,
-    ResourceProvider,
-    RuntimeAdmissionContext, RuntimeAdmissionDecision, RuntimeAdmissionHook, ServerId,
-    StructuredErrorReport, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES,
-    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RETENTION_DAYS,
-    EMERGENCY_STOP_DENY_REASON,
+    HybridSigningConfig, KernelConfig, KernelError, MemoryBudgetConfig, OverloadResource,
+    PromptProvider, ReceiptLog, ResourceProvider, RuntimeAdmissionContext,
+    RuntimeAdmissionDecision, RuntimeAdmissionHook, ServerId, StructuredErrorReport,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RETENTION_DAYS, EMERGENCY_STOP_DENY_REASON,
 };
 
 pub use kernel::evaluator::ToolEvaluator;

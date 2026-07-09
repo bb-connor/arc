@@ -36,6 +36,10 @@ fn racing_insert_and_get_never_breaches_capacity_or_desyncs_gauge() {
         assert!(h.join().is_ok(), "worker thread panicked");
     }
     let guard = lock(&map);
-    assert_eq!(guard.len(), gauge.get(), "gauge desynced from len after race");
+    assert_eq!(
+        guard.len(),
+        gauge.get(),
+        "gauge desynced from len after race"
+    );
     assert!(guard.len() <= 16);
 }

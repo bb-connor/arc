@@ -14,9 +14,9 @@ mod kernel_struct;
 
 pub use error::{KernelError, OverloadResource, StructuredErrorReport};
 pub use kernel_struct::{
-    ChioKernel, HybridSigningConfig, KernelConfig, DEFAULT_CHECKPOINT_BATCH_SIZE,
-    DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
-    DEFAULT_RETENTION_DAYS,
+    ChioKernel, HybridSigningConfig, KernelConfig, MemoryBudgetConfig,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RETENTION_DAYS,
 };
 
 pub(crate) use kernel_drop_guard::{

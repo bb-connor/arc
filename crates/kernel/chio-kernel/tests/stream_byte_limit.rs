@@ -33,6 +33,9 @@ fn within_budget_stream_is_allowed() {
     let stream = ToolCallStream {
         chunks: vec![chunk("x")],
     };
-    assert!(enforce_stream_byte_limit(&stream, 0).is_ok(), "0 = unlimited");
+    assert!(
+        enforce_stream_byte_limit(&stream, 0).is_ok(),
+        "0 = unlimited"
+    );
     assert!(enforce_stream_byte_limit(&stream, 1_000_000).is_ok());
 }

@@ -173,13 +173,20 @@ impl ChioKernel {
                 signing_queued_budget,
             ),
         );
+        // Read the memory-budget-driven caps before `config` is moved into the
+        // struct literal (RFC-0004 section 5).
+        let receipt_mirror_capacity = config.memory_budget_receipt_mirror_capacity();
+        let federation_cache_capacity = config.memory_budget_federation_cache_capacity();
+        let federation_cache_idle_ttl = config.memory_budget_federation_cache_idle_ttl_secs();
+        let rss_soft_limit_bytes = config.memory_budget.rss_soft_limit_bytes;
+        let rss_sample_interval_secs = config.memory_budget.rss_sample_interval_secs;
         // Build the bounded-structure gauges first so they can be shared between
         // each structure and the telemetry / registry readers (RFC-0004).
         let receipt_mirror_gauge;
         let child_receipt_mirror_gauge;
         let federation_dual_receipts_gauge;
         let federation_dsse_envelopes_gauge;
-        Self {
+        let mut kernel = Self {
             config,
             guards: Vec::new(),
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
@@ -194,12 +201,15 @@ impl ChioKernel {
             receipt_log: {
                 let gauge = chio_bounded::SizeGauge::new();
                 receipt_mirror_gauge = gauge.clone();
-                Mutex::new(ReceiptLog::with_capacity(4096, gauge))
+                Mutex::new(ReceiptLog::with_capacity(receipt_mirror_capacity, gauge))
             },
             child_receipt_log: {
                 let gauge = chio_bounded::SizeGauge::new();
                 child_receipt_mirror_gauge = gauge.clone();
-                Mutex::new(ChildReceiptLog::with_capacity(4096, gauge))
+                Mutex::new(ChildReceiptLog::with_capacity(
+                    receipt_mirror_capacity,
+                    gauge,
+                ))
             },
             receipt_mirror_gauge,
             child_receipt_mirror_gauge,
@@ -232,13 +242,21 @@ impl ChioKernel {
             federation_dual_receipts: {
                 let gauge = chio_bounded::SizeGauge::new();
                 federation_dual_receipts_gauge = gauge.clone();
-                Mutex::new(chio_bounded::BoundedMap::new(8192, 3600, gauge))
+                Mutex::new(chio_bounded::BoundedMap::new(
+                    federation_cache_capacity,
+                    federation_cache_idle_ttl,
+                    gauge,
+                ))
             },
             federation_dual_receipts_gauge,
             federation_dsse_envelopes: {
                 let gauge = chio_bounded::SizeGauge::new();
                 federation_dsse_envelopes_gauge = gauge.clone();
-                Mutex::new(chio_bounded::BoundedMap::new(8192, 3600, gauge))
+                Mutex::new(chio_bounded::BoundedMap::new(
+                    federation_cache_capacity,
+                    federation_cache_idle_ttl,
+                    gauge,
+                ))
             },
             federation_dsse_envelopes_gauge,
             federation_artifact_store: None,
@@ -249,7 +267,19 @@ impl ChioKernel {
             settlement_observer: None,
             revocation_view: None,
             budget_registry: Mutex::new(chio_kernel_core::InMemoryBudgetRegistry::new()),
+            rss_shed: Arc::new(AtomicBool::new(false)),
+            rss_sampler: None,
+        };
+        // Start the RSS soft-ceiling sampler only when a limit is configured
+        // (Stage A ships None, so no thread is spawned by default) (RFC-0004).
+        if let Some(limit) = rss_soft_limit_bytes {
+            kernel.rss_sampler = Some(kernel_struct::RssSamplerHandle::spawn(
+                Arc::clone(&kernel.rss_shed),
+                limit,
+                rss_sample_interval_secs,
+            ));
         }
+        kernel
     }
 
     pub(crate) fn ensure_federated_receipt_persistence_ready(
@@ -1006,6 +1036,19 @@ impl ChioKernel {
     #[must_use]
     pub fn is_emergency_stopped(&self) -> bool {
         self.emergency_stopped.load(Ordering::SeqCst)
+    }
+
+    /// Return `true` when the RSS soft-ceiling sampler has flagged that process
+    /// RSS crossed `memory_budget.rss_soft_limit_bytes` (RFC-0004 section 5).
+    /// A single relaxed atomic load on the admission fast path.
+    #[must_use]
+    pub fn is_rss_shedding(&self) -> bool {
+        self.rss_shed.load(Ordering::Relaxed)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_rss_shed_for_test(&self, on: bool) {
+        self.rss_shed.store(on, Ordering::Relaxed);
     }
 
     /// Return the unix timestamp (seconds) at which the kill switch was
