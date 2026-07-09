@@ -68,10 +68,15 @@ impl Guard for BehavioralSequenceGuard {
                 "behavioral-sequence guard journal error (fail-closed): {e}"
             ))
         })?;
-        let sequence = snapshot.tool_sequence;
 
-        // Check required first tool.
-        if sequence.is_empty() {
+        // Check required first tool. "Have any tools run yet" is a cumulative
+        // property, so consult the journal's cumulative O(1) last-tool field
+        // (`current_streak_tool`), which is `None` only before the first record,
+        // NOT the bounded `tool_sequence` ring. When `journal_entry_cap` is 0 the
+        // ring stores no tool names (capacity 0 = disabled), so `tool_sequence`
+        // would report EVERY call as the first and mis-fire this check; the
+        // cumulative field is correct at any entry cap (RFC-0004 F21).
+        if snapshot.current_streak_tool.is_none() {
             if let Some(ref required_first) = self.policy.required_first_tool {
                 if tool_name != required_first {
                     return Ok(GuardDecision::deny(Vec::new()));
@@ -99,8 +104,16 @@ impl Guard for BehavioralSequenceGuard {
             }
         }
 
-        // Check forbidden transitions.
-        if let Some(last_tool) = sequence.last() {
+        // Check forbidden transitions. The "last invoked tool" comes from the
+        // journal's cumulative O(1) last-tool field (`current_streak_tool`), NOT
+        // the bounded `tool_sequence` tail: when `journal_entry_cap` is 0 the ring
+        // stores no tool names (capacity 0 = disabled), so `tool_sequence.last()`
+        // is always None and a forbidden transition would silently never fire
+        // (fail-OPEN), letting a memory-budget setting disable a transition-deny
+        // policy (codex finding 3555239290). The cumulative field tracks the most
+        // recent recorded tool at any entry cap, so the check holds fail-closed
+        // (RFC-0004 F21).
+        if let Some(last_tool) = snapshot.current_streak_tool.as_deref() {
             for (from, to) in &self.policy.forbidden_transitions {
                 if last_tool == from && tool_name == to {
                     return Ok(GuardDecision::deny(Vec::new()));
@@ -421,6 +434,53 @@ mod tests {
         assert_eq!(guard.evaluate(&ctx).expect("ok"), Verdict::Deny);
 
         // bash -> read_file is fine.
+        let (request2, scope2, agent_id2, server_id2) = make_ctx_for_tool("read_file");
+        let ctx2 = guard_ctx(&request2, &scope2, &agent_id2, &server_id2);
+        assert_eq!(guard.evaluate(&ctx2).expect("ok"), Verdict::Allow);
+    }
+
+    #[test]
+    fn forbidden_transition_enforced_at_zero_entry_cap() {
+        // codex finding 3555239290 (RFC-0004 F21, fail-closed): a memory budget
+        // that sets journal_entry_cap = 0 disables the entries/tool_sequence rings
+        // (capacity 0 = stores nothing), so snapshot.tool_sequence.last() is always
+        // None. The forbidden-transition check must NOT silently stop firing: it
+        // reads the journal's cumulative O(1) last-tool field, which survives at any
+        // cap. RED (pre-fix, reading sequence.last()): at cap 0 the transition never
+        // denied and `bash` then `write_file` was allowed.
+        let journal = Arc::new(SessionJournal::with_entry_cap(
+            "sess-zero-cap".to_string(),
+            0,
+        ));
+        record(&journal, "bash");
+
+        // The ring really stores nothing at cap 0 (the test only bites if the
+        // tool_sequence tail is empty here)...
+        let snapshot = journal.snapshot().expect("snapshot");
+        assert!(
+            snapshot.tool_sequence.is_empty(),
+            "entry_cap 0 must leave the bounded tool_sequence empty for this test to bite"
+        );
+        // ...but the cumulative last-tool field still tracks `bash`.
+        assert_eq!(snapshot.current_streak_tool.as_deref(), Some("bash"));
+
+        let guard = BehavioralSequenceGuard::new(
+            Arc::clone(&journal),
+            SequencePolicy {
+                forbidden_transitions: vec![("bash".to_string(), "write_file".to_string())],
+                ..SequencePolicy::default()
+            },
+        );
+
+        let (request, scope, agent_id, server_id) = make_ctx_for_tool("write_file");
+        let ctx = guard_ctx(&request, &scope, &agent_id, &server_id);
+        assert_eq!(
+            guard.evaluate(&ctx).expect("ok"),
+            Verdict::Deny,
+            "forbidden transition bash -> write_file must fire even at entry_cap 0"
+        );
+
+        // A non-forbidden transition from the same cumulative last-tool still allows.
         let (request2, scope2, agent_id2, server_id2) = make_ctx_for_tool("read_file");
         let ctx2 = guard_ctx(&request2, &scope2, &agent_id2, &server_id2);
         assert_eq!(guard.evaluate(&ctx2).expect("ok"), Verdict::Allow);
