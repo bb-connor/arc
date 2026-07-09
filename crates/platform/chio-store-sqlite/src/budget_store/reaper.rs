@@ -17,7 +17,9 @@ impl SqliteBudgetStore {
     /// reconciled to their realized spend; holds absent from it (never durably
     /// admitted) are reversed. This is fail-closed against double-spend: a naive
     /// blanket release is never used.
-    pub fn reap_orphaned_holds(
+    ///
+    /// Called by the `BudgetStore` trait implementation of `reap_orphaned_holds`.
+    pub fn reap_holds_by_map(
         &self,
         realized_by_hold: &HashMap<String, u64>,
     ) -> Result<ReapSummary, BudgetStoreError> {
@@ -138,7 +140,7 @@ mod tests {
 
         let mut realized = HashMap::new();
         realized.insert("hold-admitted".to_string(), 40u64);
-        let summary = store.reap_orphaned_holds(&realized).unwrap();
+        let summary = store.reap_holds_by_map(&realized).unwrap();
         assert_eq!(summary.reconciled, 1);
         assert_eq!(summary.reversed, 1);
 

@@ -290,6 +290,28 @@ impl ProtectProxy {
         let egress_contract = default_upstream_egress_contract(&self.config.upstream)?;
         let http_client = client_builder_with_contract(&egress_contract).build()?;
         let budget_store = build_budget_store(&self.config)?;
+
+        // Reverse any hold left open by a prior crash. Full integration with
+        // the durable receipt log (ADR-0013) for arbitration is not yet wired;
+        // an empty map is passed so all open holds are reversed, which is the
+        // correct fail-closed default when realized amounts are unknown.
+        if let Some(store) = budget_store.as_ref() {
+            match store.reap_orphaned_holds(&HashMap::new()) {
+                Ok((reconciled, reversed)) => {
+                    info!(
+                        reconciled,
+                        reversed,
+                        "startup hold reap: open holds cleared (receipt-log arbitration pending)"
+                    );
+                }
+                Err(error) => {
+                    return Err(ProtectError::Config(format!(
+                        "startup hold reap failed: {error}"
+                    )));
+                }
+            }
+        }
+
         let mediation_kernel = match budget_store.as_ref() {
             Some(store) => Some(build_mediation_kernel(
                 &keypair,

@@ -1128,4 +1128,12 @@ impl BudgetStore for SqliteBudgetStore {
         )?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
+
+    fn reap_orphaned_holds(
+        &self,
+        realized_by_hold: &std::collections::HashMap<String, u64>,
+    ) -> Result<(usize, usize), BudgetStoreError> {
+        let summary = self.reap_holds_by_map(realized_by_hold)?;
+        Ok((summary.reconciled, summary.reversed))
+    }
 }

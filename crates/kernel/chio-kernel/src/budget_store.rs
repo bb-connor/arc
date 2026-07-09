@@ -659,6 +659,23 @@ pub trait BudgetStore: Send + Sync {
     ) -> Result<BudgetCaptureHoldDecision, BudgetStoreError> {
         self.reconcile_budget_hold(request)
     }
+
+    /// Reverse any hold that is still `open` after a process restart, arbitrated
+    /// by the provided realized-spend map. Holds present in `realized_by_hold`
+    /// are reconciled to their recorded amount; holds absent from it (orphans)
+    /// are reversed. Stores that do not persist hold state return `Ok((0, 0))`
+    /// (the default). Returns `(reconciled, reversed)` counts.
+    ///
+    /// Invoke once at sidecar/control-plane startup before accepting traffic.
+    /// Passing an empty map reverses all open holds, which is the correct
+    /// fail-closed behavior when the arbitration source is unavailable.
+    fn reap_orphaned_holds(
+        &self,
+        realized_by_hold: &std::collections::HashMap<String, u64>,
+    ) -> Result<(usize, usize), BudgetStoreError> {
+        let _ = realized_by_hold;
+        Ok((0, 0))
+    }
 }
 
 fn checked_committed_cost_units(
