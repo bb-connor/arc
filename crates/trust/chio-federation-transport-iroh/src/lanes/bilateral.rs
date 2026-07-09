@@ -380,10 +380,29 @@ async fn read_frame(recv: &mut RecvStream) -> Result<Vec<u8>, WireError> {
     if len > MAX_WIRE_BYTES {
         return Err(WireError::FrameTooLarge(len));
     }
-    let mut buf = vec![0u8; len];
-    recv.read_exact(&mut buf)
-        .await
-        .map_err(|error| WireError::Io(error.to_string()))?;
+    // Incremental read: grow as bytes arrive, never pre-commit the declared len.
+    // `recv` is an iroh (noq) RecvStream, whose inherent `read` yields
+    // `Option<usize>` (None == stream finished / EOF).
+    const READ_CHUNK: usize = 64 * 1024;
+    let mut buf: Vec<u8> = Vec::with_capacity(len.min(READ_CHUNK));
+    let mut remaining = len;
+    let mut chunk = [0u8; READ_CHUNK];
+    while remaining > 0 {
+        let want = remaining.min(READ_CHUNK);
+        match recv
+            .read(&mut chunk[..want])
+            .await
+            .map_err(|error| WireError::Io(error.to_string()))?
+        {
+            Some(0) | None => {
+                return Err(WireError::Io("unexpected eof reading frame body".to_string()));
+            }
+            Some(n) => {
+                buf.extend_from_slice(&chunk[..n]);
+                remaining -= n;
+            }
+        }
+    }
     Ok(buf)
 }
 

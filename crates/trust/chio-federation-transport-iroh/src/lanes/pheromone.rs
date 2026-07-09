@@ -312,8 +312,24 @@ where
     if len > max_bytes {
         return Err(IrohLaneError::FrameTooLarge(len));
     }
-    let mut buf = vec![0u8; len];
-    reader.read_exact(&mut buf).await?;
+    // Grow the buffer as bytes actually arrive instead of committing `len` up
+    // front: a peer that declares a large length then dribbles holds only what it
+    // has sent (the per-phase ReadFrame timeout still bounds the dribble).
+    const READ_CHUNK: usize = 64 * 1024;
+    let mut buf: Vec<u8> = Vec::with_capacity(len.min(READ_CHUNK));
+    let mut remaining = len;
+    let mut chunk = [0u8; READ_CHUNK];
+    while remaining > 0 {
+        let want = remaining.min(READ_CHUNK);
+        let n = reader.read(&mut chunk[..want]).await?;
+        if n == 0 {
+            return Err(IrohLaneError::Io(std::io::Error::from(
+                std::io::ErrorKind::UnexpectedEof,
+            )));
+        }
+        buf.extend_from_slice(&chunk[..n]);
+        remaining -= n;
+    }
     Ok(buf)
 }
 
@@ -1302,6 +1318,32 @@ mod tests {
             IrohLaneError::FrameTooLarge(len) => assert_eq!(len as u32, over_configured),
             other => panic!("expected FrameTooLarge, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn incremental_read_holds_only_delivered_bytes() {
+        // A frame that declares a large length but is fully delivered still reads
+        // back byte-for-byte, and the buffer never pre-commits the declared length.
+        let payload = vec![7u8; 200 * 1024];
+        let mut framed = Vec::new();
+        framed.extend_from_slice(&(payload.len() as u32).to_be_bytes());
+        framed.extend_from_slice(&payload);
+        let mut reader = std::io::Cursor::new(framed);
+        let out = read_len_delimited(&mut reader, 8 * 1024 * 1024)
+            .await
+            .expect("a fully-delivered frame reads back");
+        assert_eq!(out, payload);
+
+        // A truncated body (declares more than it delivers) fails with an EOF Io
+        // error after consuming only the delivered bytes, never allocating `len`.
+        let mut short = Vec::new();
+        short.extend_from_slice(&(64u32 * 1024).to_be_bytes());
+        short.extend_from_slice(&[1u8; 10]); // only 10 of 65536 bytes delivered
+        let mut reader = std::io::Cursor::new(short);
+        let err = read_len_delimited(&mut reader, 8 * 1024 * 1024)
+            .await
+            .expect_err("a truncated frame is rejected");
+        assert!(matches!(err, IrohLaneError::Io(_)), "unexpected: {err:?}");
     }
 
     // -- Inbox-reservation lifecycle (InboxSlotGuard) --
