@@ -40,6 +40,7 @@ pub const LABEL_OUTCOME: &str = "outcome";
 pub const LABEL_HOST_FN: &str = "host_fn";
 pub const LABEL_EPOCH: &str = "epoch";
 pub const LABEL_TENANT_ID: &str = "tenant_id";
+pub const LABEL_REASON: &str = "reason";
 
 pub const EVAL_DURATION_BUCKETS_SECONDS: &[f64] = &[
     0.0001, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0,
@@ -79,6 +80,7 @@ const LABELS_GUARD_OUTCOME: &[&str] = &[LABEL_GUARD_ID, LABEL_OUTCOME];
 const LABELS_GUARD_HOST_FN: &[&str] = &[LABEL_GUARD_ID, LABEL_HOST_FN];
 const LABELS_GUARD_EPOCH: &[&str] = &[LABEL_GUARD_ID, LABEL_EPOCH];
 const LABELS_GUARD_TENANT: &[&str] = &[LABEL_GUARD_ID, LABEL_TENANT_ID];
+const LABELS_SIGNING_REASON: &[&str] = &[LABEL_REASON];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MetricFamilyKind {
@@ -176,7 +178,12 @@ pub const RUNTIME_METRIC_FAMILIES: &[MetricFamilyDescriptor] = &[
     MetricFamilyDescriptor {
         name: METRIC_CHIO_SIGNING_QUEUE_BLOCK_TOTAL,
         kind: MetricFamilyKind::Counter,
-        labels: &[],
+        // The workspace descriptor and the kernel renderer emit this family with
+        // a `reason` label (chio_signing_queue_block_total{reason="..."}); the
+        // exported descriptor table must declare the same label set so consumers
+        // that document/validate runtime metrics agree with what is emitted
+        // (Codex round-2 finding 5).
+        labels: LABELS_SIGNING_REASON,
         unit: Some("count"),
         buckets: &[],
     },
