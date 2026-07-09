@@ -814,6 +814,74 @@ mod cluster_and_reports_tests {
         assert_eq!(commit.committed_nodes, 3);
     }
 
+    #[test]
+    fn finalize_records_fresh_acks_only_when_the_peer_was_not_demoted() {
+        // codex #965 Finding P1 (do not commit on acks before validation): a peer's
+        // freshly-advertised budget acks must become countable for a quorum commit
+        // ONLY after its pull round completes without demotion.
+        // finalize_peer_sync_round is the SINGLE ack-record site and runs after the
+        // pull round, so a peer demoted mid-round (a Protocol violation ->
+        // update_peer_failure -> Unhealthy) never has its fresh, unvalidated ack
+        // recorded. That closes the over-count window where an early progress wake
+        // let a parked writer commit on an ack the fail-closed path then removed.
+        let origin = "http://node-a";
+        let state = state_with_cluster(
+            "http://node-a",
+            &["http://node-b", "http://node-c"],
+            None,
+            None,
+            None,
+        );
+        update_peer_reachable(&state, "http://node-b");
+        update_peer_reachable(&state, "http://node-c");
+        let acks = vec![BudgetOriginAck {
+            origin_id: origin.to_string(),
+            event_seq: 9,
+        }];
+
+        // node-b was demoted during its round (route_pull -> update_peer_failure):
+        // finalize must NOT record its advertised ack. Under the old code the ack
+        // was recorded before the pull and an early wake could have committed on it.
+        update_peer_failure(&state, "http://node-b", "protocol violation".to_string());
+        finalize_peer_sync_round(&state, "http://node-b", &acks, 0);
+        let recorded_b = with_peer_state(&state, "http://node-b", |peer| {
+            peer.budget_import_acks.get(origin).copied()
+        })
+        .flatten();
+        assert_eq!(
+            recorded_b, None,
+            "a demoted peer's fresh ack must never be recorded (over-count guard)"
+        );
+
+        // node-c finished the round Healthy: finalize records its ack, so it can
+        // witness. This is the ONLY path that makes a fresh ack countable.
+        finalize_peer_sync_round(&state, "http://node-c", &acks, 0);
+        let recorded_c = with_peer_state(&state, "http://node-c", |peer| {
+            peer.budget_import_acks.get(origin).copied()
+        })
+        .flatten();
+        assert_eq!(
+            recorded_c,
+            Some(9),
+            "a non-demoted, non-force-snapshot peer records its advertised ack"
+        );
+
+        // The witness set counts self + node-c only: node-b (demoted) is excluded,
+        // and node-c counts solely because finalize recorded its ack post-validation.
+        let write = BudgetWriteToken {
+            origin_id: origin.to_string(),
+            event_seq: 9,
+            budget_term: 1,
+        };
+        let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
+        assert_eq!(
+            commit.committed_nodes, 2,
+            "self + node-c witness; the demoted node-b never contributes its fresh ack"
+        );
+        assert!(commit.witness_urls.iter().any(|url| url == "http://node-c"));
+        assert!(!commit.witness_urls.iter().any(|url| url == "http://node-b"));
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn clearing_force_snapshot_then_notifying_wakes_a_parked_waiter() {
         // codex #965 round-4 P2: a peer whose acks were recorded while still

@@ -296,21 +296,17 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
         }
     };
     update_peer_reachable(state, peer_url);
-    update_peer_budget_acks(state, peer_url, &peer_status.budget_ack_heads);
-    // Wake any parked budget-write waiter the moment fresh acks land, not only at
-    // the end of the whole sync round: a quorum may already be reachable from
-    // THIS peer's acks while another peer in the same round is slow or unreachable
-    // (peer HTTP can block ~15s), so waiting for round completion could time the
-    // write out and roll it back even though quorum was met (codex #965 round-3).
-    notify_cluster_progress(state);
+    // Do NOT record or wake on the peer's freshly-advertised budget acks yet
+    // (codex #965 Finding P1 "do not commit on acks before validation"): a high
+    // ack head advertised via cluster_status must not be counted for a quorum
+    // commit until this peer's pull round completes WITHOUT demotion. Recording it
+    // here (before the pullers run) and waking parked writers let a writer commit
+    // on an ack from a peer that then hit a Protocol violation and was removed from
+    // the witness set. The advertised heads are captured in `peer_status` and
+    // recorded only in `finalize_peer_sync_round`, after the pull round.
     if peer_should_force_snapshot(state, peer_url) {
         let snapshot = client.cluster_snapshot()?;
         apply_cluster_snapshot(state, peer_url, snapshot)?;
-        // apply_cluster_snapshot cleared force_snapshot: the peer's already-recorded
-        // acks are now trusted for witnessing, so wake parked waiters to re-check
-        // quorum with the freshly-valid peer counted, rather than leaving them
-        // parked until the next tick (codex #965 round-4 P2).
-        notify_cluster_progress(state);
     }
     if let Err(error) = sync_peer_authority(state, &client) {
         update_peer_sync_error(state, peer_url, error.to_string());
@@ -334,14 +330,49 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
             &mut delta_records,
         )?;
     }
-    update_peer_delta_records(state, peer_url, delta_records);
-    update_peer_success(state, peer_url);
-    // update_peer_success cleared force_snapshot and marked the peer Healthy: its
-    // acks are fully trusted now, so wake parked waiters to re-check quorum
-    // promptly instead of waiting out this peer's remaining round work or the
-    // whole-round end tick (codex #965 round-3/4).
-    notify_cluster_progress(state);
+    // The pull round completed without demotion (any Protocol/Transient/ForceSnapshot
+    // error short-circuits via `?` above, before this point): only now record the
+    // peer's advertised acks, mark it successful, and wake parked writers.
+    finalize_peer_sync_round(state, peer_url, &peer_status.budget_ack_heads, delta_records);
     Ok(())
+}
+
+/// Whether the peer was demoted to `Unhealthy` this round.
+///
+/// Only a `PullError::Protocol` violation demotes a peer (`update_peer_failure`
+/// sets `Unhealthy`); a transient error or force-snapshot keeps it `Healthy`. By
+/// the time a round reaches `finalize_peer_sync_round` the peer was marked
+/// `Healthy` (`update_peer_reachable`) at the top of the round, so a non-reachable
+/// status here means a puller demoted it.
+pub(crate) fn peer_was_demoted(state: &TrustServiceState, peer_url: &str) -> bool {
+    !with_peer_state(state, peer_url, |peer| peer.health.is_reachable()).unwrap_or(false)
+}
+
+/// Record a peer's freshly-advertised budget acks, mark it successful, and wake
+/// parked budget-write waiters - the SINGLE site that records a peer's acks, run
+/// AFTER its pull round.
+///
+/// Fail-closed (codex #965 Finding P1): skips every success side effect when the
+/// peer was demoted this round (its fresh, unvalidated ack must never be counted
+/// for a quorum commit - that would be an over-count / budget double-spend) or is
+/// pending a forced snapshot (it is excluded from witnesses until it re-syncs, and
+/// `update_peer_success` would prematurely clear that pending-snapshot flag, codex
+/// #965 Finding 1). Deferring the ack record to here closes the window where an
+/// early progress wake let a parked writer commit on an ack the fail-closed path
+/// was about to remove.
+pub(crate) fn finalize_peer_sync_round(
+    state: &TrustServiceState,
+    peer_url: &str,
+    advertised_budget_acks: &[BudgetOriginAck],
+    delta_records: u64,
+) {
+    if peer_was_demoted(state, peer_url) || peer_should_force_snapshot(state, peer_url) {
+        return;
+    }
+    update_peer_delta_records(state, peer_url, delta_records);
+    update_peer_budget_acks(state, peer_url, advertised_budget_acks);
+    update_peer_success(state, peer_url);
+    notify_cluster_progress(state);
 }
 
 /// Fold one puller's result into the round: on success accumulate the applied
