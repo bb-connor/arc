@@ -95,6 +95,7 @@ jobs:
           bash ./scripts/tests/check-agent-web-proof-envelope-schema.test.sh
           bash ./scripts/check-liability-roster-enforcement.sh
           bash ./scripts/tests/check-liability-roster-enforcement.test.sh
+          bash ./scripts/check-no-eip3009-broadcast.sh
 
       - name: Anchor batch async witness lint
         run: bash ./scripts/check-anchor-batch-async-witness.sh
@@ -185,7 +186,19 @@ jobs:
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: cargo test --workspace --exclude chio-wasm-guards
 
-      - name: chio-cli iroh feature (shipped binary excludes iroh; workspace still compiles it)
+      - name: chio-cli default build excludes iroh
+        env:
+          CARGO_BUILD_JOBS: "1"
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+        run: |
+          if cargo tree -p chio-cli -e normal 2>/dev/null | grep -q '^iroh\b'; then
+            echo "ERROR: iroh is present in the default chio-cli dependency tree" >&2
+            echo "The default shipped binary must not link iroh; use --features iroh to opt in." >&2
+            exit 1
+          fi
+          echo "OK: iroh is not linked into the default chio-cli binary"
+
+      - name: chio-cli iroh feature build and clippy
         env:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"

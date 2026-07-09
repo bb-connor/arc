@@ -40,6 +40,7 @@ CHIO_BIN="$(pwd)/target/debug/chio" bash ./scripts/tests/flagship-wall-stops-mon
 # Unified spend/exposure contract regression (governance + codegen + endpoint).
 bash ./scripts/check-chio-schema-registry.sh
 bash ./scripts/check-comptroller-contract-no-drift.sh
+bash ./scripts/check-no-eip3009-broadcast.sh
 bash ./scripts/qualify-comptroller-operator-surfaces.sh
 
 output_root="target/release-qualification"
