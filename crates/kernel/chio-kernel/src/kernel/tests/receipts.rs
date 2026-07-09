@@ -374,6 +374,80 @@ fn nested_admission_denied_while_rss_shedding() {
         matches!(result, Err(KernelError::Overloaded { .. })),
         "nested admission must be denied Overloaded while RSS-shedding, got {result:?}"
     );
+
+    // Receipt-totality (codex round-7): the nested shed must still persist a
+    // signed deny receipt naming the shed resource, like every other denial.
+    let receipts = kernel.receipt_log().receipts();
+    let shed_receipt = receipts
+        .iter()
+        .find(|receipt| {
+            matches!(
+                receipt.decision.as_ref(),
+                Some(Decision::Deny { guard, .. }) if guard == "kernel.overload"
+            )
+        })
+        .expect("nested shed must persist a signed overload deny receipt");
+    assert!(
+        shed_receipt.verify_signature().unwrap(),
+        "nested shed deny receipt must verify"
+    );
+    match shed_receipt.decision.clone() {
+        Some(Decision::Deny { reason, .. }) => assert!(
+            reason.contains("memory budget") && reason.contains("Allocation"),
+            "nested shed deny reason must name the shed resource, got {reason:?}"
+        ),
+        other => panic!("expected overload deny decision, got {other:?}"),
+    }
+}
+
+#[test]
+fn rss_shed_persists_signed_overload_deny_receipt() {
+    // RFC-0004 receipt-totality (codex round-7): an RSS soft-ceiling shed is a
+    // denied admission and must persist a signed deny receipt naming the shed
+    // resource, exactly like the emergency-stop fast path, even though it also
+    // returns Overloaded to the caller for backpressure. Before the fix the shed
+    // returned a bare Err with no receipt, contradicting error.rs's claim that
+    // the OverloadResource appears in a receipt deny reason.
+    let mut kernel = make_kernel(make_config());
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
+    let agent_kp = make_keypair();
+    let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+
+    // Raise the RSS soft-ceiling shed flag, mirroring the sampler crossing the
+    // configured limit.
+    kernel.set_rss_shed_for_test(true);
+
+    let request = make_request("req-rss-shed-receipt", &cap, "read_file", "srv-a");
+    let result = kernel.evaluate_tool_call_blocking(&request);
+
+    // Backpressure edge preserved: the shed still surfaces as Overloaded.
+    assert!(
+        matches!(result, Err(KernelError::Overloaded { .. })),
+        "shed must return Overloaded, got {result:?}"
+    );
+
+    // Receipt-totality: exactly one signed deny receipt naming the shed resource.
+    let receipts = kernel.receipt_log().receipts();
+    assert_eq!(
+        receipts.len(),
+        1,
+        "shed must persist exactly one deny receipt"
+    );
+    assert!(
+        receipts[0].verify_signature().unwrap(),
+        "shed deny receipt must verify"
+    );
+    match receipts[0].decision.clone() {
+        Some(Decision::Deny { reason, guard }) => {
+            assert!(
+                reason.contains("memory budget") && reason.contains("Allocation"),
+                "shed deny reason must name the shed resource, got {reason:?}"
+            );
+            assert_eq!(guard, "kernel.overload");
+        }
+        other => panic!("expected overload deny decision, got {other:?}"),
+    }
 }
 
 #[test]

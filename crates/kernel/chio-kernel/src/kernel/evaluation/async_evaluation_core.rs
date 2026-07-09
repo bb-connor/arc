@@ -46,6 +46,24 @@ impl ChioKernel {
                 request_id = %request.request_id,
                 "rss soft ceiling exceeded -- shedding evaluate_tool_call"
             );
+            // Receipt-totality: persist a signed deny receipt naming the shed
+            // resource, like the emergency-stop fast path above, so the overload
+            // denial has the same audit trail as every other admission decision.
+            // The shed still returns Overloaded so the tower load-shed edge
+            // surfaces backpressure; a receipt-persist failure is logged but must
+            // not mask the shed decision (fail-closed).
+            if let Err(receipt_error) = self.record_overload_shed_deny_receipt(
+                request,
+                crate::OverloadResource::Allocation,
+                now,
+                extra_metadata.clone(),
+            ) {
+                warn!(
+                    request_id = %request.request_id,
+                    reason = %redacted!(&receipt_error.to_string()),
+                    "failed to persist overload-shed deny receipt"
+                );
+            }
             return Err(KernelError::Overloaded {
                 resource: crate::OverloadResource::Allocation,
             });
