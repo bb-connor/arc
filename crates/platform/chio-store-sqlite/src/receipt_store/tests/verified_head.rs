@@ -721,6 +721,116 @@ fn write_job_response_reflects_resync_failure() -> Result<(), Box<dyn std::error
     Ok(())
 }
 
+/// Codex round 6, finding 1: on the same-seq fast path
+/// `verify_head_against_latest_checkpoint` compared only the RFC 8785 body
+/// digest (statement_json) plus the signature/kernel_key columns. The
+/// kernel_checkpoints row ALSO stores batch_start_seq/batch_end_seq/tree_size/
+/// merkle_root/issued_at as their own columns; a signed-body-bound column
+/// tampered out of band while statement_json is untouched passed the digest
+/// check. The fix reconciles EVERY such column against the signed body
+/// (`ensure_checkpoint_columns_match_body`, O(1) over one row, no Ed25519), so
+/// the column tamper now fails closed.
+#[test]
+fn head_trust_checks_all_checkpoint_columns() -> Result<(), Box<dyn std::error::Error>> {
+    let (path, store, keypair) = open_seeded_store("chio-head-allcols", 3)?;
+    store.create_next_receipt_checkpoint(3, &keypair)?;
+    let connection = store.connection()?;
+    let mut head = seed_verified_head(&connection)?;
+
+    // Baseline: an untouched same-seq checkpoint verifies clean on the fast path.
+    verify_head_against_latest_checkpoint(&connection, &mut head)?;
+
+    // Tamper a SIGNED-BODY integrity COLUMN (batch_end_seq) out of band while
+    // leaving statement_json (and thus the body digest) intact, bypassing the
+    // immutability trigger. The digest branch alone would accept this.
+    connection.execute_batch("DROP TRIGGER IF EXISTS kernel_checkpoints_reject_update;")?;
+    let tampered = connection.execute(
+        "UPDATE kernel_checkpoints SET batch_end_seq = batch_end_seq + 1 WHERE checkpoint_seq = 1",
+        [],
+    )?;
+    assert_eq!(tampered, 1, "expected to tamper exactly one checkpoint row");
+
+    let error = verify_head_against_latest_checkpoint(&connection, &mut head)
+        .err()
+        .ok_or("a tampered signed-body column must be rejected on the fast path")?;
+    match &error {
+        ReceiptStoreError::Conflict(message) => {
+            assert!(
+                message.contains("batch_end_seq"),
+                "Conflict should name the tampered column, got: {message}"
+            );
+            assert!(
+                message.contains("chio receipt audit"),
+                "Conflict must point the operator at the audit CLI, got: {message}"
+            );
+        }
+        other => return Err(format!("expected Conflict, got {other}").into()),
+    }
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+/// Codex round 6, finding 2: `validate_adopted_claim_log_delta` iterated only
+/// the claim-log rows that CURRENTLY EXIST in the adopted range, so an interior
+/// GAP (a missing entry_seq) passed unnoticed. The fix requires the adopted
+/// range to be CONTIGUOUS (floor+1..=max with no hole), an O(delta) ordered
+/// scan over the already-loaded delta, and rejects fail-closed on a gap while a
+/// contiguous delta still passes.
+#[test]
+fn adopted_delta_rejects_interior_gap() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-adopted-delta-gap");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    // Four real, correctly-projecting receipts -> contiguous claim-log entries
+    // 1,2,3,4. Every row projects from its source receipt, so the projection
+    // cross-check alone cannot fail; only the contiguity rule can.
+    for i in 0..4 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-gap-{i}"), (i + 1) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+
+    let connection = store.connection()?;
+
+    // Contiguous delta (0, 4] = {1,2,3,4}: every row present and projecting, so
+    // the validator accepts it.
+    validate_adopted_claim_log_delta(&connection, 0, 4)?;
+
+    // Punch an INTERIOR hole: delete entry_seq 3 (drop the append-only trigger
+    // first), leaving {1,2,4}. The three surviving rows still project cleanly.
+    connection.execute_batch("DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete;")?;
+    let deleted = connection.execute(
+        "DELETE FROM claim_receipt_log_entries WHERE entry_seq = 3",
+        [],
+    )?;
+    assert_eq!(deleted, 1, "expected to remove exactly one claim-log row");
+
+    // Now (0, 4] = {1,2,4} is non-contiguous. Without the contiguity check the
+    // projection loop would accept the surviving rows and return Ok; the fix
+    // detects the gap at entry_seq 3 and fails closed.
+    let error = validate_adopted_claim_log_delta(&connection, 0, 4)
+        .err()
+        .ok_or("a non-contiguous adopted delta must be rejected")?;
+    match &error {
+        ReceiptStoreError::Conflict(message) => {
+            assert!(
+                message.contains("not contiguous") && message.contains('3'),
+                "Conflict should identify the interior gap, got: {message}"
+            );
+            assert!(
+                message.contains("chio receipt audit"),
+                "Conflict must point the operator at the audit CLI, got: {message}"
+            );
+        }
+        other => return Err(format!("expected Conflict, got {other}").into()),
+    }
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
 /// Codex round 3, finding 3: `verify_head_against_latest_checkpoint` compares
 /// only the RFC 8785 body digest for a same-seq checkpoint (to keep the Ed25519
 /// verify off the per-append hot path, F22). A persisted `signature` COLUMN

@@ -561,6 +561,32 @@ pub(crate) fn validate_adopted_claim_log_delta(
         })
         .collect::<Result<Vec<_>, _>>()?
     };
+    // Contiguity (codex round 6, finding 2): the adopted range must be exactly
+    // floor+1, floor+2, ..., max_entry_seq with no missing entry_seq. The
+    // projection loop below only inspects rows that CURRENTLY EXIST, so a hole
+    // (an append or resync adopting a non-contiguous shared-DB delta) would
+    // slip through and a later append would skip the hole as already-verified.
+    // One ordered scan over the already-loaded delta (O(delta), NOT O(N))
+    // catches the first break; a trailing check confirms the range is closed at
+    // max_entry_seq (a row missing at the top of the range). Fail closed on a
+    // gap so the whole adopted delta is rejected, mirroring the contiguity rule
+    // enforced for the checkpoint build range. `entries` is ordered ASC by the
+    // query above.
+    let mut expected_seq = floor_entry_seq.saturating_add(1);
+    for (entry_seq, _, _) in &entries {
+        if *entry_seq != expected_seq {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "adopted claim receipt log delta ({floor_entry_seq}, {max_entry_seq}] is not contiguous: expected entry_seq {expected_seq}, found {entry_seq}; run `chio receipt audit`"
+            )));
+        }
+        expected_seq = expected_seq.saturating_add(1);
+    }
+    if expected_seq != max_entry_seq.saturating_add(1) {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "adopted claim receipt log delta ({floor_entry_seq}, {max_entry_seq}] is missing trailing entries after entry_seq {}; run `chio receipt audit`",
+            expected_seq.saturating_sub(1)
+        )));
+    }
     for (entry_seq, receipt_id, receipt_kind) in entries {
         let existing = load_claim_receipt_log_projection_row(connection, &receipt_id)?
             .ok_or_else(|| {

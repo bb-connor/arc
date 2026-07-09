@@ -1194,20 +1194,25 @@ fn verify_head_against_latest_checkpoint(
                         .to_string(),
                 ));
             }
-            // Column-tamper catch (codex round 3, finding 3): the body digest
-            // above covers only statement_json, so a persisted `signature` or
-            // `kernel_key` COLUMN corrupted out of band (immutability trigger
-            // bypassed) while statement_json is untouched would pass it. Compare
-            // those already-read columns against the cached head, which was
-            // signature-verified at seed/catch-up time. This is an O(1) byte/
-            // string equality, NOT a per-append Ed25519 re-verify, so F22 holds.
-            // (kernel_key is also inside the signed body, so a column that
-            // disagrees with the cached head is itself proof of tamper.)
-            if row.signature_hex != cached.signature.to_hex()
-                || row.kernel_key_hex != cached.body.kernel_key.to_hex()
-            {
+            // Full-column tamper catch (codex round 6, finding 1; extends round
+            // 3, finding 3): the body digest above covers ONLY what
+            // statement_json serializes. The kernel_checkpoints row also stores
+            // batch_start_seq/batch_end_seq/tree_size/merkle_root/issued_at/
+            // kernel_key as their own columns; any one of them corrupted out of
+            // band (immutability trigger bypassed) while statement_json is
+            // untouched would pass the digest check yet leave a signed-body-bound
+            // column diverged. `ensure_checkpoint_columns_match_body` reconciles
+            // every such column against the (signature-verified) signed body it
+            // is meant to mirror. This is O(1) int/string equality over the one
+            // already-read row, NOT a per-append Ed25519 re-verify, so F22 holds.
+            ensure_checkpoint_columns_match_body(&row, &persisted_body)?;
+            // The `signature` column is the signature OVER the body, not a body
+            // field, so it is not covered above; compare it against the cached
+            // head, which was signature-verified at seed/catch-up time (O(1)
+            // string equality, no crypto).
+            if row.signature_hex != cached.signature.to_hex() {
                 return Err(ReceiptStoreError::Conflict(
-                    "latest checkpoint signature or kernel key column diverged from verified head; run `chio receipt audit`"
+                    "latest checkpoint signature column diverged from verified head; run `chio receipt audit`"
                         .to_string(),
                 ));
             }

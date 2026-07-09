@@ -274,6 +274,69 @@ pub(crate) fn parse_persisted_checkpoint_row(
     Ok(checkpoint)
 }
 
+/// Confirm every persisted checkpoint COLUMN that mirrors a signed body field
+/// still matches that body. The `kernel_checkpoints` row stores
+/// checkpoint_seq/batch_start_seq/batch_end_seq/tree_size/merkle_root/issued_at
+/// and kernel_key as their OWN columns in addition to the signed
+/// `statement_json`, so a column corrupted out of band (immutability trigger
+/// bypassed) while statement_json is untouched must still be caught. Pure O(1)
+/// int/string equality over a single row (no Ed25519 verify), so it is safe on
+/// the RFC-0006 incremental hot path (F22). The `signature` column is the
+/// signature OVER the body, not a body field, so each caller checks it
+/// separately. Fail closed on any divergence (codex round 6, finding 1).
+pub(crate) fn ensure_checkpoint_columns_match_body(
+    row: &PersistedCheckpointRow,
+    body: &KernelCheckpointBody,
+) -> Result<(), ReceiptStoreError> {
+    if body.checkpoint_seq != row.checkpoint_seq {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint row seq {} does not match signed checkpoint_seq {}; run `chio receipt audit`",
+            row.checkpoint_seq, body.checkpoint_seq
+        )));
+    }
+    if body.batch_start_seq != row.batch_start_seq {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {} batch_start_seq column {} does not match signed body {}; run `chio receipt audit`",
+            row.checkpoint_seq, row.batch_start_seq, body.batch_start_seq
+        )));
+    }
+    if body.batch_end_seq != row.batch_end_seq {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {} batch_end_seq column {} does not match signed body {}; run `chio receipt audit`",
+            row.checkpoint_seq, row.batch_end_seq, body.batch_end_seq
+        )));
+    }
+    if body.tree_size as u64 != row.tree_size {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {} tree_size column {} does not match signed body {}; run `chio receipt audit`",
+            row.checkpoint_seq, row.tree_size, body.tree_size
+        )));
+    }
+    if body.merkle_root.to_hex() != row.merkle_root_hex {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {} merkle_root column {} does not match signed body {}; run `chio receipt audit`",
+            row.checkpoint_seq,
+            row.merkle_root_hex,
+            body.merkle_root.to_hex()
+        )));
+    }
+    if body.issued_at != row.issued_at {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {} issued_at column {} does not match signed body {}; run `chio receipt audit`",
+            row.checkpoint_seq, row.issued_at, body.issued_at
+        )));
+    }
+    if body.kernel_key.to_hex() != row.kernel_key_hex {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {} kernel_key column {} does not match signed body {}; run `chio receipt audit`",
+            row.checkpoint_seq,
+            row.kernel_key_hex,
+            body.kernel_key.to_hex()
+        )));
+    }
+    Ok(())
+}
+
 pub(crate) fn verify_latest_checkpoint_integrity(
     connection: &Connection,
 ) -> Result<(), ReceiptStoreError> {
