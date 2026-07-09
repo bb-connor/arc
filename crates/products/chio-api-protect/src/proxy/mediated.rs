@@ -122,9 +122,11 @@ pub(crate) fn build_mediation_kernel(
 
 /// Tool server registered under the caller's requested `server_id` so the
 /// kernel's pre-dispatch registration check admits an ordinary preflight. The
-/// mediated route does not execute the real tool (the caller does), so on
-/// dispatch this reports no cost: realized-cost reconciliation happens outside
-/// this route.
+/// mediated route does not execute the real tool (the caller does), so this
+/// reports `measures_realized_cost() == false`: on a presented-nonce dispatch
+/// the kernel reverses the pre-execution hold and signs a provisional,
+/// unreconciled receipt rather than a settled authoritative spend. Realized-cost
+/// reconciliation happens at the execution site outside this route.
 pub(crate) struct MediatedProxyToolServer {
     server_id: String,
     upstream: String,
@@ -147,6 +149,16 @@ impl ToolServerConnection for MediatedProxyToolServer {
 
     fn tool_names(&self) -> Vec<String> {
         Vec::new()
+    }
+
+    /// The mediated route does not execute the real tool (the caller does), so
+    /// this pass-through measures no realized cost. Reporting `false` keeps the
+    /// kernel from signing a settled, reconciled authoritative spend for a
+    /// dispatch that never ran: it reverses the pre-execution hold and emits a
+    /// provisional receipt instead. Realized-cost reconciliation happens at the
+    /// execution site.
+    fn measures_realized_cost(&self) -> bool {
+        false
     }
 
     async fn invoke(
@@ -274,10 +286,20 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         warn!("failed to persist mediated receipt: {error}");
         return internal_json_error_response("chio_receipt_persistence_failed", &error.to_string());
     }
-    let verdict_str = match response.verdict {
-        chio_kernel::Verdict::Allow => "allow",
-        chio_kernel::Verdict::Deny => "deny",
-        chio_kernel::Verdict::PendingApproval => "pending_approval",
+    // Derive the top-level wire status from the terminal lifecycle state, not
+    // the raw verdict. A nonce-less preflight returns `Verdict::Allow` with an
+    // `Incomplete` terminal state and an incomplete-decision receipt: nothing
+    // was authorized to execute yet. Surfacing "allow" there would let a caller
+    // that gates on the top-level status execute the tool before retrying with
+    // the minted nonce. Only a genuinely completed authorization surfaces
+    // "allow".
+    let verdict_str = match (&response.verdict, &response.terminal_state) {
+        (chio_kernel::Verdict::Allow, chio_core_types::OperationTerminalState::Completed) => {
+            "allow"
+        }
+        (chio_kernel::Verdict::Allow, _) => "pending_nonce",
+        (chio_kernel::Verdict::Deny, _) => "deny",
+        (chio_kernel::Verdict::PendingApproval, _) => "pending_approval",
     };
     (
         StatusCode::OK,
@@ -458,9 +480,13 @@ mod tests {
         let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
 
         // A nonce-less mediated request is a pre-execution authorization gate:
-        // it returns a preflight allow with a freshly minted execution nonce,
-        // does not dispatch the tool, and does not sign a completed spend.
-        assert_eq!(json["verdict"], "allow");
+        // it returns a distinct non-authorizing status ("pending_nonce") with a
+        // freshly minted execution nonce, does not dispatch the tool, and does
+        // not sign a completed spend. The top-level status must not be "allow",
+        // so a caller gating on it cannot execute before retrying with the
+        // minted nonce.
+        assert_eq!(json["verdict"], "pending_nonce");
+        assert_ne!(json["verdict"], "allow");
         assert!(
             json["execution_nonce"].is_object(),
             "preflight must mint an execution nonce"
@@ -541,8 +567,8 @@ mod tests {
         // The operator does not pre-register tool servers; the mediated route
         // registers a pass-through under whatever server id the caller names,
         // so a nonce-less preflight for an arbitrary server is authorized
-        // (allow + minted nonce) rather than denied `ToolNotRegistered` by the
-        // kernel's pre-dispatch registration check.
+        // ("pending_nonce" + minted nonce) rather than denied `ToolNotRegistered`
+        // by the kernel's pre-dispatch registration check.
         let signer = Keypair::generate();
         let agent = Keypair::generate();
         let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
@@ -586,7 +612,7 @@ mod tests {
             .await
             .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-        assert_eq!(json["verdict"], "allow");
+        assert_eq!(json["verdict"], "pending_nonce");
         assert!(json["execution_nonce"].is_object());
         assert_eq!(json["receipt"]["decision"]["verdict"], "incomplete");
     }
@@ -608,6 +634,7 @@ mod tests {
             Arc::clone(&budget),
             Vec::new(),
         );
+        let signer_pub = state.signer_keypair.public_key();
 
         // Step 1: nonce-less preflight mints the execution nonce and does not
         // move committed cost.
@@ -635,6 +662,7 @@ mod tests {
                 .unwrap(),
         )
         .unwrap();
+        assert_eq!(preflight_json["verdict"], "pending_nonce");
         assert_eq!(
             preflight_json["receipt"]["decision"]["verdict"],
             "incomplete"
@@ -655,8 +683,10 @@ mod tests {
         assert!(minted_nonce.is_object());
 
         // Step 2: presenting the minted nonce proceeds past preflight to a
-        // completed authorization. The mediated route does not execute the real
-        // tool, so the no-cost pass-through commits the authorized exposure.
+        // completed authorization confirmation. The mediated route does not
+        // execute the real tool, so the pass-through measures no realized cost:
+        // the kernel reverses the pre-execution hold and signs a provisional,
+        // unreconciled receipt rather than a settled authoritative spend.
         let execute_body = serde_json::json!({
             "capability": cap_value,
             "tool_server": "cost-srv",
@@ -683,11 +713,48 @@ mod tests {
                 .unwrap(),
         )
         .unwrap();
+        // A completed authorization confirmation surfaces the top-level "allow"
+        // and a completed-decision receipt, so the caller may execute the real
+        // tool.
         assert_eq!(execute_json["verdict"], "allow");
         assert_eq!(execute_json["receipt"]["decision"]["verdict"], "allow");
         assert_eq!(execute_json["receipt"]["trust_level"], "mediated");
-        let usage = budget.get_usage(&cap_id, 0).unwrap().unwrap();
-        assert_eq!(usage.committed_cost_units().unwrap(), 100);
+
+        // The stub measured no realized cost, so the receipt is truthfully
+        // provisional: the budget hold is reversed (not reconciled) and
+        // settlement stays pending.
+        let budget_authority = &execute_json["receipt"]["metadata"]["budget_authority"];
+        assert_eq!(budget_authority["terminal"]["disposition"], "reversed");
+        assert_ne!(budget_authority["terminal"]["disposition"], "reconciled");
+        assert_eq!(
+            execute_json["receipt"]["metadata"]["financial"]["settlement_status"],
+            "pending"
+        );
+
+        // The pre-execution hold is reversed: no committed spend was moved by
+        // the stub dispatch. Realized-cost reconciliation happens at the real
+        // execution site outside this route.
+        let usage = budget.get_usage(&cap_id, 0).unwrap();
+        assert!(
+            usage.is_none() || usage.unwrap().committed_cost_units().unwrap() == 0,
+            "unmeasured stub dispatch must not move committed cost"
+        );
+
+        // The invariant: a receipt minted by the stub dispatch must never be
+        // accepted as a final settled/reconciled authoritative spend. It is
+        // rejected because the hold was not reconciled.
+        use chio_core_types::receipt::authoritative_spend::{
+            is_authoritative_spend_receipt, NotAuthoritativeReason,
+        };
+        let signed_receipt: ChioReceipt =
+            serde_json::from_value(execute_json["receipt"].clone()).unwrap();
+        let presented_nonce: SignedExecutionNonce =
+            serde_json::from_value(minted_nonce.clone()).unwrap();
+        assert_eq!(
+            is_authoritative_spend_receipt(&signed_receipt, &[signer_pub], &presented_nonce),
+            Err(NotAuthoritativeReason::HoldNotReconciled),
+            "the stub dispatch must not mint an authoritative spend receipt"
+        );
 
         // Replaying the same nonce is rejected: the shared replay store consumed
         // it on the first execute, so a second presentation fails closed.
@@ -756,7 +823,10 @@ mod tests {
                 .unwrap(),
         )
         .unwrap();
-        assert_eq!(json["verdict"], "allow");
+        // A trusted issuer's nonce-less request is authorized to the preflight
+        // stage: a distinct "pending_nonce" status with a minted nonce, not a
+        // completed "allow".
+        assert_eq!(json["verdict"], "pending_nonce");
         assert!(json["execution_nonce"].is_object());
 
         // Control: without the configured issuer the same capability is denied,
