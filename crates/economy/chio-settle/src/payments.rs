@@ -708,10 +708,22 @@ pub struct RailBinding {
 ///
 /// The caller is the trust boundary: it resolves the rail from the operator
 /// config and independently supplies the amount and approval expiry that the
-/// verified token authorizes. The token is only consulted for its `decision`;
-/// the discrete rail fields (chain, token contract, payee, symbol) come from
-/// the operator-configured [`RailBinding`] the caller resolved and the
-/// caller-supplied `amount_minor_units` and `approval_expires_at`.
+/// verified token authorizes. The token is consulted for its `decision` and
+/// its `expires_at`; the discrete rail fields (chain, token contract, payee,
+/// symbol) come from the operator-configured [`RailBinding`] the caller
+/// resolved and the caller-supplied `amount_minor_units` and
+/// `approval_expires_at`.
+///
+/// The effective binding expiry is clamped to `min(approval_expires_at,
+/// token.expires_at)`. The signed approval cannot justify any spend after it
+/// lapses, so the binding must never outlive `token.expires_at`. A caller may
+/// legitimately request a tighter (shorter) window for a specific dispatch and
+/// that shorter value is preserved; a value later than the token's own expiry
+/// is narrowed to the token expiry. Clamping only shrinks the window, so no
+/// caller input can produce a binding whose
+/// [`ApprovalBinding::approval_expires_at`] outlives the approval token, and
+/// the invariant [`prepare_transfer_with_authorization`] enforces
+/// (`validBefore <= approval_expires_at`) holds structurally at this bridge.
 ///
 /// Fails closed when:
 /// - `token.decision` is not [`GovernedApprovalDecision::Approved`].
@@ -754,7 +766,13 @@ pub fn approval_binding_from_governed(
         amount_minor_units,
         token_symbol: rail.token_symbol.clone(),
         token_contract: Some(rail.token_contract.clone()),
-        approval_expires_at,
+        // Clamp to the token's own expiry: the signed approval cannot justify
+        // any spend after it lapses, so the effective binding window must never
+        // outlive `token.expires_at`. A shorter caller value is a legitimately
+        // tighter window and is preserved; a later value is narrowed to the
+        // token's expiry. Clamping only shrinks the window, so no caller input
+        // can produce a binding that outlives the approval that justified it.
+        approval_expires_at: approval_expires_at.min(token.expires_at),
     })
 }
 
@@ -1840,6 +1858,40 @@ mod tests {
         assert!(
             matches!(error, SettlementError::InvalidInput(_)),
             "an empty token_symbol must produce InvalidInput, got: {error}"
+        );
+    }
+
+    #[test]
+    fn approval_binding_from_governed_clamps_expiry_to_token_expiry() {
+        // A caller-supplied approval_expires_at LATER than the token's own
+        // expiry cannot be honored: the token does not authorize a window
+        // longer than its own life. The effective binding expiry must clamp
+        // to token.expires_at so a prepared transfer can never stay valid
+        // after the approval that justified it has lapsed.
+        let token = sample_verified_approval_token();
+        let rail = sample_rail();
+        let binding =
+            approval_binding_from_governed(&token, &rail, 1_000_000, token.expires_at + 3_600)
+                .test_unwrap();
+        assert_eq!(
+            binding.approval_expires_at, token.expires_at,
+            "an approval_expires_at later than the token must clamp to token.expires_at"
+        );
+    }
+
+    #[test]
+    fn approval_binding_from_governed_preserves_shorter_expiry() {
+        // A caller may bind a tighter (shorter) window than the token's own
+        // expiry for a specific dispatch. That shorter expiry must be
+        // preserved, never widened to the token's expiry.
+        let token = sample_verified_approval_token();
+        let rail = sample_rail();
+        let shorter = token.expires_at - 100;
+        let binding =
+            approval_binding_from_governed(&token, &rail, 1_000_000, shorter).test_unwrap();
+        assert_eq!(
+            binding.approval_expires_at, shorter,
+            "a shorter approval_expires_at must be preserved, not widened to token.expires_at"
         );
     }
 }
