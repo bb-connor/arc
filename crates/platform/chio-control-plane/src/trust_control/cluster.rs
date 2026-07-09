@@ -44,7 +44,7 @@ pub(crate) use partition::{
     update_peer_sync_error, update_peer_tool_seq,
 };
 pub(crate) use pull_budget::{
-    ensure_revocation_advanced, require_contiguous_page, require_forward_progress,
+    ensure_revocation_page_ascending, require_contiguous_page, require_forward_progress,
     PeerProtocolError, PullError, PullRoundBudget,
 };
 pub(crate) use snapshots::{

@@ -431,24 +431,15 @@ fn sync_peer_revocations(
         if round.charge_page(response.records.len() as u64).is_err() {
             break;
         }
-        let page_max = response
-            .records
-            .iter()
-            .map(|record| RevocationCursor {
-                revoked_at: record.revoked_at,
-                capability_id: record.capability_id.clone(),
-            })
-            .max_by(|a, b| {
-                (a.revoked_at, a.capability_id.as_str())
-                    .cmp(&(b.revoked_at, b.capability_id.as_str()))
-            })
-            .ok_or(PeerProtocolError::NonAdvancingPage {
-                after_seq: 0,
-                page_max_seq: 0,
-            })?;
-        ensure_revocation_advanced(cursor.as_ref(), &page_max)?;
-        let mut last_cursor = None;
-        for record in response.records {
+        // The revocation delta endpoint promises ascending (revoked_at,
+        // capability_id) order and we persist the page HEAD as the next cursor, so
+        // require the page to be STRICTLY ascending from the current cursor. A
+        // reorder (e.g. [high, low]) is a protocol violation that demotes the peer,
+        // rather than silently persisting a cursor behind page_max and replaying
+        // already-applied revocations every round (codex #965 Finding: reject
+        // out-of-order revocation pages). The returned head equals page_max.
+        let page_head = ensure_revocation_page_ascending(cursor.as_ref(), &response.records)?;
+        for record in &response.records {
             store
                 .upsert_revocation(&RevocationRecord {
                     capability_id: record.capability_id.clone(),
@@ -456,14 +447,8 @@ fn sync_peer_revocations(
                 })
                 .map_err(CliError::from)?;
             applied = applied.saturating_add(1);
-            last_cursor = Some(RevocationCursor {
-                revoked_at: record.revoked_at,
-                capability_id: record.capability_id,
-            });
         }
-        if let Some(cursor) = last_cursor {
-            update_peer_revocation_cursor(state, peer_url, cursor);
-        }
+        update_peer_revocation_cursor(state, peer_url, page_head);
     }
     Ok(applied)
 }

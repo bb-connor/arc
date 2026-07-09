@@ -198,27 +198,54 @@ pub(crate) fn require_forward_progress(
     Ok(())
 }
 
-/// Strict monotonicity for the composite `(revoked_at, capability_id)`
-/// revocation cursor.
-pub(crate) fn ensure_revocation_advanced(
-    after: Option<&RevocationCursor>,
-    page_max: &RevocationCursor,
-) -> Result<(), PeerProtocolError> {
-    let advanced = match after {
-        None => true,
-        Some(prev) => {
-            (page_max.revoked_at, page_max.capability_id.as_str())
-                > (prev.revoked_at, prev.capability_id.as_str())
+/// Validate that a revocation delta page is STRICTLY ASCENDING in composite
+/// `(revoked_at, capability_id)` order starting after `cursor`, returning its head
+/// (the last, and therefore maximum, tuple) as the next cursor.
+///
+/// The revocation delta endpoint promises ascending cursor order and the puller
+/// persists the page HEAD as the next cursor. A max-only advance check (comparing
+/// the page maximum against the cursor) would accept a reordered page such as
+/// `[high, low]`; the puller would then persist `low` (behind the maximum) as the
+/// cursor and re-fetch the already-applied `high` every round, burning the shared
+/// round budget forever instead of demoting the malformed peer. Requiring every
+/// row to be strictly after the previous one rejects both a rewind past the cursor
+/// and an interior reorder as a `NonAdvancingPage` protocol violation, and
+/// guarantees the returned head equals `page_max` (codex #965 Finding: reject
+/// out-of-order revocation pages).
+pub(crate) fn ensure_revocation_page_ascending(
+    cursor: Option<&RevocationCursor>,
+    records: &[RevocationRecordView],
+) -> Result<RevocationCursor, PeerProtocolError> {
+    let mut previous = cursor.cloned();
+    let mut head: Option<RevocationCursor> = None;
+    for record in records {
+        let current = RevocationCursor {
+            revoked_at: record.revoked_at,
+            capability_id: record.capability_id.clone(),
+        };
+        let advanced = match &previous {
+            None => true,
+            Some(prev) => {
+                (current.revoked_at, current.capability_id.as_str())
+                    > (prev.revoked_at, prev.capability_id.as_str())
+            }
+        };
+        if !advanced {
+            return Err(PeerProtocolError::NonAdvancingPage {
+                after_seq: previous
+                    .as_ref()
+                    .map(|cursor| cursor.revoked_at.max(0) as u64)
+                    .unwrap_or(0),
+                page_max_seq: current.revoked_at.max(0) as u64,
+            });
         }
-    };
-    if advanced {
-        Ok(())
-    } else {
-        Err(PeerProtocolError::NonAdvancingPage {
-            after_seq: after.map(|cursor| cursor.revoked_at as u64).unwrap_or(0),
-            page_max_seq: page_max.revoked_at as u64,
-        })
+        previous = Some(current.clone());
+        head = Some(current);
     }
+    head.ok_or(PeerProtocolError::NonAdvancingPage {
+        after_seq: 0,
+        page_max_seq: 0,
+    })
 }
 
 /// Carries the protocol-violation distinction out of the pullers so `sync_peer`
@@ -377,25 +404,46 @@ mod pull_budget_tests {
     }
 
     #[test]
-    fn non_advancing_revocation_cursor_is_peer_protocol_error() {
-        // Composite revocation cursor: strict (revoked_at, capability_id) advance.
-        let prev = RevocationCursor {
+    fn revocation_page_must_be_strictly_ascending_and_returns_page_head() {
+        // codex #965 Finding: the puller persists the page HEAD as the next cursor,
+        // so an out-of-order page that a max-only advance check would accept must be
+        // rejected here, or the cursor lands behind page_max and replays forever.
+        let rec = |revoked_at: i64, cap: &str| RevocationRecordView {
+            capability_id: cap.to_string(),
+            revoked_at,
+        };
+        let cursor = RevocationCursor {
             revoked_at: 5,
             capability_id: "cap-b".to_string(),
         };
-        let same = RevocationCursor {
-            revoked_at: 5,
-            capability_id: "cap-b".to_string(),
+
+        // A strictly ascending page returns its LAST (== maximum) tuple as the head.
+        let Ok(head) = ensure_revocation_page_ascending(
+            Some(&cursor),
+            &[rec(5, "cap-c"), rec(6, "cap-a"), rec(9, "cap-z")],
+        ) else {
+            panic!("an ascending page is valid");
         };
-        let higher = RevocationCursor {
-            revoked_at: 5,
-            capability_id: "cap-c".to_string(),
-        };
-        assert!(ensure_revocation_advanced(None, &same).is_ok());
-        assert!(ensure_revocation_advanced(Some(&prev), &higher).is_ok());
+        assert_eq!((head.revoked_at, head.capability_id.as_str()), (9, "cap-z"));
+
+        // A reordered page [high, low] is a protocol violation, even though its
+        // MAXIMUM (10, cap-a) advances past the cursor: a max-only check accepted it.
         assert!(matches!(
-            ensure_revocation_advanced(Some(&prev), &same),
+            ensure_revocation_page_ascending(Some(&cursor), &[rec(10, "cap-a"), rec(7, "cap-a")]),
             Err(PeerProtocolError::NonAdvancingPage { .. })
         ));
+
+        // The first row must also advance past the cursor (no rewind/resend).
+        assert!(matches!(
+            ensure_revocation_page_ascending(Some(&cursor), &[rec(5, "cap-b"), rec(6, "cap-a")]),
+            Err(PeerProtocolError::NonAdvancingPage { .. })
+        ));
+
+        // A fresh cursor accepts the first row unconditionally, then requires ascent.
+        let Ok(head) = ensure_revocation_page_ascending(None, &[rec(1, "cap-a"), rec(2, "cap-a")])
+        else {
+            panic!("ascending page from a fresh cursor is valid");
+        };
+        assert_eq!((head.revoked_at, head.capability_id.as_str()), (2, "cap-a"));
     }
 }
