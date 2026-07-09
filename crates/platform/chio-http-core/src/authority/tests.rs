@@ -569,6 +569,31 @@ fn pending_approval_id_reads_nested_metadata() {
 }
 
 #[test]
+fn pending_approval_is_not_a_dispatch_failure() {
+    // A HITL PendingApproval is the normal approval-required flow (a 409), not a
+    // mediation-edge dispatch failure. The `evaluate` error arm gates the
+    // dispatch-failure counter and the error latency/guard-eval series on this
+    // predicate, so a governed approval prompt cannot page the P0
+    // fail-open/dispatch-failure alert or skew the error metrics (Codex round-5).
+    assert!(
+        !is_dispatch_failure(&HttpAuthorityError::PendingApproval {
+            approval_id: Some("ap-1".to_string()),
+            kernel_receipt_id: "rcpt-1".to_string(),
+        }),
+        "a pending approval must not count as a dispatch failure"
+    );
+    // A genuine kernel evaluation error is still a dispatch failure and must
+    // continue to feed the paging metric.
+    assert!(
+        is_dispatch_failure(&HttpAuthorityError::Kernel("boom".to_string())),
+        "a real evaluation error is a dispatch failure"
+    );
+    assert!(is_dispatch_failure(&HttpAuthorityError::ContentHash(
+        "bad".to_string()
+    )));
+}
+
+#[test]
 fn deny_by_default_proxy_path_requires_http_authority_grant() {
     let query = HashMap::new();
     let (authority, issuer) = authority_with_issuer();

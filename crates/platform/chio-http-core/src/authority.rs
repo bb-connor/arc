@@ -151,6 +151,16 @@ pub enum HttpAuthorityError {
     ReceiptSign(String),
 }
 
+/// Whether an evaluation error is a genuine mediation-edge dispatch failure that
+/// must feed `chio_dispatch_failure_total` and the error-outcome latency/guard
+/// evaluation series. A [`HttpAuthorityError::PendingApproval`] is NOT a dispatch
+/// failure: it is the normal HITL approval-required flow (surfaced as a 409),
+/// so it must be excluded from the paging metric and the error series (Codex
+/// round-5). Every other error is a real evaluation failure.
+fn is_dispatch_failure(error: &HttpAuthorityError) -> bool {
+    !matches!(error, HttpAuthorityError::PendingApproval { .. })
+}
+
 #[derive(Debug, Clone)]
 struct PresentedCapabilityState {
     capability_id: Option<String>,
@@ -351,15 +361,26 @@ impl HttpAuthority {
                 })
             }
             Err(error) => {
-                crate::metrics::observe_decision_latency_nanos_for_outcome(
-                    crate::metrics::GUARD_OUTCOME_ERROR,
-                    elapsed_nanos,
-                );
-                crate::metrics::record_guard_evaluation(crate::metrics::GUARD_OUTCOME_ERROR);
-                crate::metrics::record_dispatch_failure(
-                    crate::metrics::GUARD_LABEL_HTTP_AUTHORITY,
-                    "error",
-                );
+                // A HITL PendingApproval is the normal approval-required control
+                // flow (the caller turns it into a 409 approval response), NOT a
+                // mediation-edge dispatch failure. Recording it as an error would
+                // feed chio_dispatch_failure_total (paging the P0 fail-open alert
+                // on every governed approval prompt) and skew the error-outcome
+                // latency/guard-eval series, which fold every unknown outcome into
+                // the error bucket. Only a GENUINE evaluation error feeds these
+                // instruments (Codex round-5). A pending approval is honestly
+                // absent from the error metrics.
+                if is_dispatch_failure(&error) {
+                    crate::metrics::observe_decision_latency_nanos_for_outcome(
+                        crate::metrics::GUARD_OUTCOME_ERROR,
+                        elapsed_nanos,
+                    );
+                    crate::metrics::record_guard_evaluation(crate::metrics::GUARD_OUTCOME_ERROR);
+                    crate::metrics::record_dispatch_failure(
+                        crate::metrics::GUARD_LABEL_HTTP_AUTHORITY,
+                        "error",
+                    );
+                }
                 Err(error)
             }
         }
