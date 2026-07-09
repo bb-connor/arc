@@ -479,6 +479,12 @@ pub(crate) enum ReloadOutcome {
     Unchanged,
     /// The running bundle expired with no valid successor; swap to deny-all.
     ExpiredWhileRunning,
+    /// A strictly-newer, in-window successor re-verified but no longer binds THIS
+    /// node's local transport endpoint (it tombstoned or rotated this node). The
+    /// already-bound endpoint would keep serving with the old key, so the swap must
+    /// NOT proceed as an admit; fail closed to deny-all (RFC-0012 F34 local-binding
+    /// recheck, mirroring the startup binding check).
+    LocalBindingRevoked,
 }
 
 /// Inputs for the bounded poll reloader. The reloader deliberately advances its
@@ -489,6 +495,13 @@ pub(crate) struct DirectoryReloadConfig {
     pub interval: Duration,
     pub bundle_path: PathBuf,
     pub trusted_issuers_path: PathBuf,
+    /// This node's LOCAL transport binding: the `EndpointId` the running endpoint is
+    /// actually bound to (the public half of the configured `--iroh-transport-key`).
+    /// Rechecked against every re-verified successor BEFORE the swap (RFC-0012 F34):
+    /// the startup path rejects a directory that does not endorse this binding, and a
+    /// live successor that tombstones or rotates this node must not be swapped in while
+    /// the endpoint keeps serving with the old key. The recheck fails closed to deny-all.
+    pub local_transport_endpoint: EndpointId,
 }
 
 /// Read + parse the on-disk transport directory bundle (no verification).
@@ -572,7 +585,27 @@ pub(crate) fn reload_verified_directory(
             now_unix_ms: now,
         };
         return match bundle.verify_bundle(&trust) {
-            Ok(verified) => Ok(ReloadOutcome::Updated(verified)),
+            Ok(verified) => {
+                // RECHECK THE LOCAL TRANSPORT BINDING BEFORE SWAPPING (fail-closed,
+                // RFC-0012 F34). The successor verified as a valid, in-window, monotone
+                // directory, but that does NOT prove it still endorses THIS node's bound
+                // transport endpoint. If the successor tombstones this node (removes its
+                // entry) or rotates its transport endpoint to a different `EndpointId`,
+                // `authorize` denies the bound endpoint (unbound / removed). Swapping such
+                // a directory in would leave the already-bound endpoint serving iroh
+                // ingress under the OLD `SecretKey` for peers still admitted in the new
+                // directory until restart. The startup path rejects a directory that does
+                // not bind this endpoint; mirror it here and fail closed to deny-all rather
+                // than admit under a revoked local identity.
+                if verified
+                    .authorize(&config.local_transport_endpoint)
+                    .is_none()
+                {
+                    Ok(ReloadOutcome::LocalBindingRevoked)
+                } else {
+                    Ok(ReloadOutcome::Updated(verified))
+                }
+            }
             Err(error) => {
                 if expired {
                     Ok(ReloadOutcome::ExpiredWhileRunning)
@@ -642,6 +675,25 @@ pub(crate) async fn run_directory_reloader(
                 tracing::error!(
                     target: chio_federation_transport_iroh::observability::TARGET_ADMISSION,
                     "transport directory expired with no valid successor; admitting nothing"
+                );
+            }
+            Ok(ReloadOutcome::LocalBindingRevoked) => {
+                // The successor verified but no longer binds this node's local transport
+                // endpoint (tombstone or endpoint rotation). The endpoint is still bound
+                // with the old key, so continuing to admit peers from the successor would
+                // serve ingress under a revoked identity. Fail closed to deny-all and raise
+                // the same alarm as expiry (RFC-0012 F34 local-binding recheck).
+                gate.swap(Arc::new(
+                    chio_federation_transport_iroh::identity::VerifiedDirectory::empty_deny_all(),
+                ));
+                alive.store(false, Ordering::SeqCst);
+                chio_federation_transport_iroh::metrics::record_directory_reload(
+                    chio_federation_transport_iroh::metrics::RELOAD_BINDING_REVOKED,
+                );
+                tracing::error!(
+                    target: chio_federation_transport_iroh::observability::TARGET_ADMISSION,
+                    "transport directory successor no longer binds this node's local transport \
+                     endpoint (tombstoned or rotated); admitting nothing until restart"
                 );
             }
             Err(error) => {
@@ -1357,6 +1409,7 @@ mod tests {
             interval: Duration::from_secs(60),
             bundle_path,
             trusted_issuers_path: issuers_path,
+            local_transport_endpoint: endpoint_from_seed(LOCAL_TRANSPORT_SEED),
         };
 
         // In-window, same version on disk => Unchanged (the fast path fires).
@@ -1391,6 +1444,7 @@ mod tests {
             interval: Duration::from_secs(60),
             bundle_path,
             trusted_issuers_path: issuers_path,
+            local_transport_endpoint: endpoint_from_seed(LOCAL_TRANSPORT_SEED),
         };
 
         let now_in_window = expires_at - 1;
@@ -1404,6 +1458,100 @@ mod tests {
         let gate = DirectoryGate::new(std::sync::Arc::new(verified));
         assert_eq!(gate.current_version(), 2);
         assert_eq!(gate.resolve(&endpoint_from_seed(24)), None);
+    }
+
+    /// Write a signed successor bundle (version `version`, chaining onto
+    /// `previous_version_sha256`) that binds the LOCAL node at `local_transport_seed`
+    /// (pass a seed != [`LOCAL_TRANSPORT_SEED`] to ROTATE this node's binding, so the
+    /// successor no longer endorses the currently-bound endpoint). The peer entry is
+    /// left live. Returns (bundle_path, issuers_path, expires_at).
+    fn write_local_rotated_bundle(
+        dir: &std::path::Path,
+        version: u64,
+        local_transport_seed: u8,
+        previous_version_sha256: Option<String>,
+    ) -> (PathBuf, PathBuf, u64) {
+        let issuer = Keypair::from_seed(&[240u8; 32]);
+        let directory = TransportDirectoryDocument {
+            schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
+            local_kernel_id: LOCAL_KERNEL_ID.to_string(),
+            peers: vec![
+                local_relay_entry(local_transport_seed),
+                directory_entry("did:chio:bob", 7, 24),
+            ],
+            treaties: Vec::new(),
+        };
+        let directory_sha256 = sha256_hex(&canonical_json_bytes(&directory).unwrap());
+        let expires_at = NOW + 1;
+        let body = TransportDirectoryBundleBody {
+            schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
+            issuer: "did:chio:issuer".to_string(),
+            key_id: "issuer-key-1".to_string(),
+            directory_sha256,
+            version,
+            previous_version_sha256,
+            issued_at_unix_ms: NOW - 1,
+            expires_at_unix_ms: expires_at,
+        };
+        let (signature, _) = issuer.sign_canonical(&body).unwrap();
+        let bundle = TransportDirectoryBundleDocument {
+            schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
+            body,
+            directory,
+            signature,
+        };
+        let bundle_path = dir.join(format!("bundle-{version}.json"));
+        std::fs::write(&bundle_path, serde_json::to_string(&bundle).unwrap()).unwrap();
+        let issuers_path = dir.join("issuers.json");
+        let issuers = serde_json::json!({
+            "issuers": [{
+                "issuer": "did:chio:issuer",
+                "keyId": "issuer-key-1",
+                "publicKey": issuer.public_key(),
+            }],
+        });
+        std::fs::write(&issuers_path, serde_json::to_string(&issuers).unwrap()).unwrap();
+        (bundle_path, issuers_path, expires_at)
+    }
+
+    #[test]
+    fn directory_reload_fails_closed_when_successor_rotates_local_binding() {
+        // RFC-0012 F34 local-binding recheck (SECURITY). A strictly-newer, in-window,
+        // validly-signed successor that ROTATES this node's local transport endpoint (or
+        // tombstones it) no longer endorses the endpoint this node is bound to. Swapping
+        // it in would leave the already-bound endpoint serving iroh ingress under the old
+        // key for peers admitted in the new directory. The reloader must fail closed to
+        // LocalBindingRevoked (deny-all), never Updated.
+        //
+        // TEETH: the successor rotates the LOCAL entry from LOCAL_TRANSPORT_SEED (0x11)
+        // to a DIFFERENT seed (0x22); the reloader's config pins the currently-bound
+        // endpoint (endpoint_from_seed(LOCAL_TRANSPORT_SEED)).
+        //  - RED (pre-fix, no recheck): the successor verifies and returns Updated,
+        //    admitting under a revoked local identity.
+        //  - GREEN (post-fix): the recheck denies the bound endpoint -> LocalBindingRevoked.
+        let dir = tempfile::tempdir().unwrap();
+        let (_v1_path, _v1_issuers, _v1_expires, v1_hash) =
+            write_test_bundle(dir.path(), 1, false, None);
+        // Version 2 rotates the LOCAL node's transport endpoint to seed 0x22, chaining
+        // onto v1's hash. The peer stays live, so only the local binding changed.
+        let (bundle_path, issuers_path, expires_at) =
+            write_local_rotated_bundle(dir.path(), 2, 0x22, Some(v1_hash.clone()));
+        let config = DirectoryReloadConfig {
+            interval: Duration::from_secs(60),
+            bundle_path,
+            trusted_issuers_path: issuers_path,
+            // The endpoint this node is actually bound to (the OLD seed 0x11), which the
+            // rotated successor no longer endorses.
+            local_transport_endpoint: endpoint_from_seed(LOCAL_TRANSPORT_SEED),
+        };
+
+        let now_in_window = expires_at - 1;
+        let outcome = reload_verified_directory(&config, now_in_window, 1, expires_at, &v1_hash)
+            .expect("reload runs");
+        assert!(
+            matches!(outcome, ReloadOutcome::LocalBindingRevoked),
+            "a successor that no longer binds this node's local endpoint fails closed, never Updated"
+        );
     }
 
     #[test]
@@ -1429,6 +1577,7 @@ mod tests {
             interval: Duration::from_secs(60),
             bundle_path,
             trusted_issuers_path: issuers_path,
+            local_transport_endpoint: endpoint_from_seed(LOCAL_TRANSPORT_SEED),
         };
         let now_in_window = expires_at - 1;
         let error =

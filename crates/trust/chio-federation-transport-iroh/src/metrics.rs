@@ -417,11 +417,17 @@ pub const RELOAD_UNCHANGED: &str = "unchanged";
 /// was swapped to deny-all (fail-closed) and an alarm raised. Operators alert on
 /// this being non-zero.
 pub const RELOAD_EXPIRED_FAILCLOSED: &str = "expired_failclosed";
+/// Reload outcome: a strictly-newer, in-window successor re-verified but no longer
+/// binds THIS node's local transport endpoint (it tombstoned or rotated this node);
+/// the gate was swapped to deny-all (fail-closed) and an alarm raised. Operators
+/// alert on this being non-zero (RFC-0012 F34 local-binding recheck).
+pub const RELOAD_BINDING_REVOKED: &str = "binding_revoked";
 /// Reload outcome: a transient read/verify/rollback error; last-good is kept.
 pub const RELOAD_ERROR: &str = "error";
-const NUM_RELOAD_OUTCOME: usize = 4;
+const NUM_RELOAD_OUTCOME: usize = 5;
 
 static DIRECTORY_RELOAD: [AtomicU64; NUM_RELOAD_OUTCOME] = [
+    AtomicU64::new(0),
     AtomicU64::new(0),
     AtomicU64::new(0),
     AtomicU64::new(0),
@@ -433,7 +439,8 @@ fn reload_outcome_index(outcome: &str) -> usize {
         "updated" => 0,
         "unchanged" => 1,
         "expired_failclosed" => 2,
-        _ => 3, // error
+        "binding_revoked" => 3,
+        _ => 4, // error
     }
 }
 

@@ -333,6 +333,11 @@ pub(crate) fn cmd_chio_pheromone_relay_serve(
                         interval: std::time::Duration::from_secs(60),
                         bundle_path: bundle_path.to_path_buf(),
                         trusted_issuers_path: issuers_path.to_path_buf(),
+                        // This node's actual bound transport endpoint. The reloader
+                        // rechecks every re-verified successor against it and fails
+                        // closed to deny-all if the successor tombstones or rotates
+                        // this binding (RFC-0012 F34).
+                        local_transport_endpoint: mount.endpoint_id,
                     };
                     Some(tokio::spawn(run_directory_reloader(
                         mount.gate.clone(),
