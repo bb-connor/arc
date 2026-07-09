@@ -666,7 +666,7 @@ impl ProtocolHandler for PheromoneBatchHandler {
         // Concurrency cap: acquire one in-flight permit (held for the whole
         // handler) or shed under saturation with a distinct busy code, so one
         // hostile peer cannot spawn unbounded accept tasks.
-        let _permit = match self.limiter.admit().await {
+        let _permit = match self.limiter.admit_peer(&conn.remote_id()).await {
             Ok(permit) => permit,
             Err(error) => {
                 crate::metrics::record_lane_frame(
@@ -1822,6 +1822,80 @@ mod tests {
                 crate::metrics::LANE_OUTCOME_ACCEPT,
             ) > before,
             "recovery counts an accept, never a dead-letter"
+        );
+
+        router.shutdown().await.ok();
+    }
+
+    /// A receiver double that always accepts, for the per-peer-cap wiring test.
+    struct AcceptingReceiver {
+        report: chio_pheromone_runtime::PheromoneReceiveReport,
+    }
+
+    #[async_trait::async_trait]
+    impl RelayBatchReceiver for AcceptingReceiver {
+        async fn receive_batch(
+            &self,
+            _batch: PheromoneGossipBatch,
+            _authenticated_sender_kernel_id: String,
+            _received_at_unix_ms: u64,
+        ) -> Result<chio_pheromone_runtime::PheromoneReceiveReport, PheromoneRelayError> {
+            Ok(self.report.clone())
+        }
+    }
+
+    #[tokio::test]
+    async fn per_peer_cap_one_still_admits_a_single_dialer() {
+        // A per-peer cap of 1 must not break a single, sequential dialer: the guard
+        // releases when the handler task ends, so the exchange completes (RFC-0012
+        // F33a wiring: the accept site now calls admit_peer, not admit).
+        let dialer_seed = 42u8;
+        let gate = verified_gate("did:chio:bob", 1, dialer_seed, false);
+        let batch = direct_batch("did:chio:bob");
+        let batch_bytes = canonical_json_bytes(&batch).unwrap();
+        let report = chio_pheromone_runtime::PheromoneReceiveReport {
+            schema: "chio.pheromone-receive-report.v1".to_string(),
+            accepted: true,
+            batch_outcome: chio_pheromone_runtime::PheromoneBatchOutcome::Accepted,
+            accepted_frame_count: batch.frames.len() as u64,
+            rejected_frame_count: 0,
+            batch_sha256: core_sha256_hex(&batch_bytes),
+            recipient_kernel_id: RECIPIENT.to_string(),
+            authenticated_sender_kernel_id: "did:chio:bob".to_string(),
+            received_at_unix_ms: NOW,
+            frames: Vec::new(),
+        };
+
+        let store = Arc::new(SqlitePheromoneRelayStore::open_in_memory().unwrap());
+        let receiver: Arc<dyn RelayBatchReceiver> = Arc::new(AcceptingReceiver { report });
+        let scope_check: InboundBatchScopeCheck =
+            Arc::new(|_sender: &str, _batch: &PheromoneGossipBatch| -> Result<(), PheromoneRelayError> {
+                Ok(())
+            });
+        let now: Arc<dyn Fn() -> u64 + Send + Sync> = Arc::new(|| NOW);
+        let handler = PheromoneBatchHandler::new(gate.clone(), receiver, store, now, scope_check)
+            .with_accept_limits(AcceptLimitConfig {
+                max_in_flight_per_peer: 1,
+                ..AcceptLimitConfig::default()
+            });
+
+        let acceptor = bind_endpoint(43, Some(gate.clone())).await;
+        let router = Router::builder(acceptor)
+            .accept(ALPN_PHEROMONE_BATCH, handler)
+            .spawn();
+        let acceptor_addr = direct_addr(router.endpoint());
+
+        let dialer = bind_endpoint(dialer_seed, None).await;
+        let outcome = tokio::time::timeout(
+            Duration::from_secs(15),
+            deliver_batch_over_iroh(&dialer, acceptor_addr, &batch),
+        )
+        .await
+        .expect("delivery completes before timeout")
+        .expect("a per-peer cap of 1 still admits a single dialer");
+        assert!(
+            outcome.accepted,
+            "single dialer under per-peer cap 1 is accepted"
         );
 
         router.shutdown().await.ok();

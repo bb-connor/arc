@@ -812,7 +812,7 @@ impl ProtocolHandler for BilateralCoSignHandler {
         use tracing::Instrument;
         // Concurrency cap: acquire one in-flight permit (held for the whole
         // handler) or shed under saturation with a distinct busy code.
-        let _permit = match self.limiter.admit().await {
+        let _permit = match self.limiter.admit_peer(&connection.remote_id()).await {
             Ok(permit) => permit,
             Err(error) => {
                 crate::metrics::record_lane_frame(

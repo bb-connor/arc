@@ -845,7 +845,7 @@ impl ProtocolHandler for RevocationHandler {
         use tracing::Instrument;
         // Concurrency cap: acquire one in-flight permit (held for the whole
         // handler) or shed under saturation with a distinct busy code.
-        let _permit = match self.limiter.admit().await {
+        let _permit = match self.limiter.admit_peer(&conn.remote_id()).await {
             Ok(permit) => permit,
             Err(error) => {
                 // OBSERVE-ONLY: the slowloris saturation shed is now countable.
