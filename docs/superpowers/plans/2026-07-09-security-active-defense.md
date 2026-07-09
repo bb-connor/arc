@@ -619,7 +619,7 @@ mod tests {
         pii.compartments.insert("pii".to_string());
         store.add("agent-1", &phi);
         store.add("agent-1", &pii);
-        let ctx = store.context("agent-1");
+        let ctx = store.context("agent-1").expect("taint readable");
         assert!(ctx.compartments.contains("phi"));
         assert!(ctx.compartments.contains("pii"));
     }
@@ -627,7 +627,7 @@ mod tests {
     #[test]
     fn unknown_session_is_public() {
         let store = SessionTaintStore::new();
-        assert_eq!(store.context("nobody"), Label::public());
+        assert_eq!(store.context("nobody").expect("taint readable"), Label::public());
     }
 }
 ```
@@ -673,16 +673,22 @@ impl SessionTaintStore {
         }
     }
 
-    /// The current accumulated context for a session, or public if unknown
-    /// or if the lock is poisoned (callers must fail closed elsewhere).
-    #[must_use]
-    pub fn context(&self, session_key: &str) -> Label {
+    /// The current accumulated context for a session. A poisoned lock returns
+    /// `Err` so the caller fails closed (denies egress) rather than treating a
+    /// lost taint store as public; an unknown session is `Ok(public)` because
+    /// nothing sensitive has been read yet.
+    pub fn context(&self, session_key: &str) -> Result<Label, TaintUnavailable> {
         match self.inner.lock() {
-            Ok(map) => map.get(session_key).cloned().unwrap_or_else(Label::public),
-            Err(_) => Label::public(),
+            Ok(map) => Ok(map.get(session_key).cloned().unwrap_or_else(Label::public)),
+            Err(_) => Err(TaintUnavailable),
         }
     }
 }
+
+/// Returned when the taint store cannot be read (poisoned lock). The guard
+/// treats this as a denied egress, never as public.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TaintUnavailable;
 ```
 
 Add `pub mod env;` to `lib.rs`.
@@ -729,9 +735,9 @@ mod tests {
     fn denies_phi_context_to_public_sink() {
         let taint = Arc::new(SessionTaintStore::new());
         taint.add("agent-1", &phi());
-        // Sink tool declared with public clearance.
-        let guard = FlowGuard::for_test(taint.clone(), "send_email", Label::public());
-        let verdict = guard.check("agent-1", "send_email");
+        // Sink tool on server "srv" declared with public clearance.
+        let guard = FlowGuard::for_test(taint.clone(), "srv", "send_email", Label::public());
+        let verdict = guard.check("agent-1", "srv", "send_email", &Label::public());
         assert_eq!(verdict, Verdict::Deny);
     }
 
@@ -739,8 +745,8 @@ mod tests {
     fn allows_phi_context_to_phi_cleared_sink() {
         let taint = Arc::new(SessionTaintStore::new());
         taint.add("agent-1", &phi());
-        let guard = FlowGuard::for_test(taint.clone(), "phi_store", phi());
-        let verdict = guard.check("agent-1", "phi_store");
+        let guard = FlowGuard::for_test(taint.clone(), "srv", "phi_store", phi());
+        let verdict = guard.check("agent-1", "srv", "phi_store", &Label::public());
         assert_eq!(verdict, Verdict::Allow);
     }
 }
@@ -774,9 +780,13 @@ use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError, Verdict};
 use crate::env::SessionTaintStore;
 use crate::label::{flows_to, join};
 
-/// A tool's egress clearance, indexed by tool name. A tool present here is an
-/// egress sink; its value is the maximum label it may receive.
-type ClearanceIndex = HashMap<String, Label>;
+/// A tool's egress clearance, keyed by `(server_id, tool_name)` because the
+/// same tool name can be exposed by different servers at different clearances.
+/// A present key is egress-capable: `Some(label)` is its maximum receivable
+/// label, and `None` marks an egress-capable tool that declared no clearance
+/// (fail closed: the guard denies rather than letting a missing manifest field
+/// bypass accumulated taint).
+type ClearanceIndex = HashMap<(String, String), Option<Label>>;
 
 /// Guard that enforces information-flow egress dominance.
 pub struct FlowGuard {
@@ -792,26 +802,37 @@ impl FlowGuard {
         Self { taint, clearances }
     }
 
-    /// Test helper: a guard with a single sink tool and its clearance.
+    /// Test helper: a guard with a single declared sink `(server, tool)`.
     #[must_use]
-    pub fn for_test(taint: Arc<SessionTaintStore>, tool: &str, clearance: Label) -> Self {
+    pub fn for_test(
+        taint: Arc<SessionTaintStore>,
+        server: &str,
+        tool: &str,
+        clearance: Label,
+    ) -> Self {
         let mut clearances = HashMap::new();
-        clearances.insert(tool.to_string(), clearance);
+        clearances.insert((server.to_string(), tool.to_string()), Some(clearance));
         Self::new(taint, clearances)
     }
 
-    /// Core decision, factored out for direct testing.
+    /// Core decision, factored out for direct testing. `payload` is the label
+    /// of the outbound arguments; the effective label is `context join payload`.
     #[must_use]
-    pub fn check(&self, session_key: &str, tool: &str) -> Verdict {
-        let Some(clearance) = self.clearances.get(tool) else {
-            // Not a declared egress sink: this guard does not apply.
-            return Verdict::Allow;
+    pub fn check(&self, session_key: &str, server_id: &str, tool: &str, payload: &Label) -> Verdict {
+        let clearance = match self.clearances.get(&(server_id.to_string(), tool.to_string())) {
+            // Not an egress-capable tool: this guard does not apply.
+            None => return Verdict::Allow,
+            // Egress-capable but with no declared clearance: fail closed.
+            Some(None) => return Verdict::Deny,
+            Some(Some(clearance)) => clearance,
         };
-        let context = self.taint.context(session_key);
-        // Payload label folds into context; v1 uses context alone since the
-        // response labeling hook has already joined read payloads in.
-        let effective = join(&context, &Label::public());
-        if flows_to(&effective, clearance) {
+        // A poisoned taint store denies rather than erasing accumulated context.
+        let Ok(context) = self.taint.context(session_key) else {
+            return Verdict::Deny;
+        };
+        // Join the outbound payload label so argument-borne sensitive data is
+        // covered even when no prior read tainted the session.
+        if flows_to(&join(&context, payload), clearance) {
             Verdict::Allow
         } else {
             Verdict::Deny
@@ -825,10 +846,15 @@ impl Guard for FlowGuard {
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
-        // `Verdict` has three variants (Allow, Deny, PendingApproval); this
-        // guard only ever produces Allow/Deny, but the match must be
-        // exhaustive and fail closed on anything that is not Allow.
-        match self.check(ctx.agent_id, &ctx.request.tool_name) {
+        // Classify the outbound arguments so payload-borne sensitive data (for
+        // example a user-supplied SSN sent to a public sink) is labeled even
+        // when no prior tool read tainted the session. `seed::from_value`
+        // classifies a JSON value via the shared data-guard detectors.
+        let payload = crate::seed::from_value(&ctx.request.arguments);
+        // Anything that is not Allow denies. A denial also emits a FlowViolation
+        // event into the receipt log via the kernel deny path (integration
+        // Task 20b) so chio-quarantine playbooks can react.
+        match self.check(ctx.agent_id, ctx.server_id, &ctx.request.tool_name, &payload) {
             Verdict::Allow => Ok(GuardDecision::allow()),
             Verdict::Deny | Verdict::PendingApproval => Ok(GuardDecision::deny(Vec::new())),
         }
@@ -864,7 +890,7 @@ git commit -m "feat(flow): add FlowGuard egress dominance check"
 - Test: inline `#[cfg(test)]` in the touched files
 
 **Interfaces:**
-- Produces: `pub fn clearance_index(manifest: &ToolManifest) -> HashMap<String, Label>` (collects each tool with a `clearance` set). `FlowTaintHook { taint: Arc<SessionTaintStore> }` with `pub fn observe(&self, session_key: &str, def: &ToolDefinition, response_tags: &[String])`, which joins the tool's declared sensitivity and any response classifier tags into the session context.
+- Produces: `pub fn clearance_index(manifest: &ToolManifest) -> HashMap<(String, String), Option<Label>>` (an entry per egress-capable tool: `Some(clearance)`, or `None` when it declared none). `FlowTaintHook { taint: Arc<SessionTaintStore>, manifest: Arc<ToolManifest> }` implementing `chio_guards::post_invocation::PostInvocationHook` (its `inspect` joins the responding tool's declared sensitivity and response classifier tags into the session context and passes the response through), plus a `pub fn record(&self, session_key: &str, def: &ToolDefinition, tags: &[String])` helper for direct testing.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -875,9 +901,8 @@ mod hook_tests {
     use std::sync::Arc;
 
     #[test]
-    fn observe_adds_response_tags_to_context() {
+    fn record_adds_response_tags_to_context() {
         let taint = Arc::new(crate::env::SessionTaintStore::new());
-        let hook = FlowTaintHook::new(taint.clone());
         let def = chio_manifest::ToolDefinition {
             name: "read_record".to_string(),
             description: String::new(),
@@ -889,8 +914,21 @@ mod hook_tests {
             sensitivity: None,
             clearance: None,
         };
-        hook.observe("agent-1", &def, &["phi".to_string()]);
-        assert!(taint.context("agent-1").compartments.contains("phi"));
+        let manifest = Arc::new(chio_manifest::ToolManifest {
+            schema: "chio.manifest.v1".to_string(),
+            server_id: "srv".into(),
+            name: "s".to_string(),
+            description: None,
+            version: "1".to_string(),
+            tools: vec![def.clone()],
+            server_tools: Vec::new(),
+            required_permissions: None,
+            public_key: String::new(),
+        });
+        let hook = FlowTaintHook::new(taint.clone(), manifest);
+        hook.record("agent-1", &def, &["phi".to_string()]);
+        // context() now returns Result; a readable store yields the label.
+        assert!(taint.context("agent-1").expect("taint readable").compartments.contains("phi"));
     }
 }
 ```
@@ -905,58 +943,89 @@ Expected: FAIL (`FlowTaintHook` missing).
 `src/hook.rs`:
 
 ```rust
-//! Post-invocation taint hook: after a tool returns, join its declared
-//! sensitivity and any classifier tags on the response into the session
-//! context, so a later egress call sees what the agent has read.
+//! Post-invocation taint hook: after a tool returns, join the tool's declared
+//! output sensitivity and any classifier tags on the response into the session
+//! context, so a later egress call sees what the agent has read. Implements the
+//! kernel's `PostInvocationHook` so it runs on every real tool response, not
+//! only in unit tests.
 
 use std::sync::Arc;
 
-use chio_manifest::ToolDefinition;
+use serde_json::Value;
+
+use chio_guards::post_invocation::{
+    PostInvocationContext, PostInvocationHook, PostInvocationVerdict,
+};
+use chio_manifest::{ToolDefinition, ToolManifest};
 
 use crate::env::SessionTaintStore;
 use crate::label::join;
-use crate::seed::{from_tags, from_tool_output};
+use crate::seed::{from_tags, from_tool_output, tags_from_value};
 
 /// Joins read-payload labels into the per-session taint context.
 pub struct FlowTaintHook {
     taint: Arc<SessionTaintStore>,
+    manifest: Arc<ToolManifest>,
 }
 
 impl FlowTaintHook {
     #[must_use]
-    pub fn new(taint: Arc<SessionTaintStore>) -> Self {
-        Self { taint }
+    pub fn new(taint: Arc<SessionTaintStore>, manifest: Arc<ToolManifest>) -> Self {
+        Self { taint, manifest }
     }
 
-    /// Record that `session_key` read the output of `def`, whose response
-    /// carried the given classifier `response_tags`.
-    pub fn observe(&self, session_key: &str, def: &ToolDefinition, response_tags: &[String]) {
-        let label = join(&from_tool_output(def), &from_tags(response_tags));
+    /// Join a read tool's declared output sensitivity and response classifier
+    /// tags into the session taint context. Public for direct unit testing.
+    pub fn record(&self, session_key: &str, def: &ToolDefinition, tags: &[String]) {
+        let label = join(&from_tool_output(def), &from_tags(tags));
         self.taint.add(session_key, &label);
     }
 }
+
+impl PostInvocationHook for FlowTaintHook {
+    /// Look up the responding tool in the manifest, then join its declared
+    /// output sensitivity and the response classifier tags into the session
+    /// taint context; the response passes through unchanged (observe only).
+    fn inspect(&self, ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict {
+        if let Some(def) = self.manifest.tools.iter().find(|d| d.name == ctx.tool_name) {
+            self.record(ctx.agent_id, def, &tags_from_value(response));
+        }
+        PostInvocationVerdict::Pass
+    }
+}
 ```
+
+Confirm the `PostInvocationContext` field names (`agent_id`, `tool_name`), the pass variant of `PostInvocationVerdict`, and the trait path against `crates/guards/chio-guards/src/post_invocation.rs`; adjust the unit test to drive `inspect` with a constructed `PostInvocationContext`. Implement `seed::from_value(&Value) -> Label` and `seed::tags_from_value(&Value) -> Vec<String>` in `src/seed.rs` (classify a JSON value via the same data-guard detectors `from_tags` consumes). Registration of this hook in the kernel post-invocation pipeline is integration Task 20b.
 
 Add to `src/guard.rs`:
 
 ```rust
 use chio_manifest::ToolManifest;
 
-/// Build the egress clearance index from a manifest: every tool that declares
-/// a `clearance` is an egress sink.
+/// Build the egress clearance index from a manifest, keyed by
+/// `(server_id, tool_name)`. Every egress-capable tool (one with side effects
+/// or whose server declares network hosts) becomes an entry: `Some(clearance)`
+/// when the tool declares one, or `None` when it does not, so an unclassified
+/// egress-capable tool fails closed. Non-egress tools are omitted.
 #[must_use]
-pub fn clearance_index(manifest: &ToolManifest) -> HashMap<String, Label> {
+pub fn clearance_index(manifest: &ToolManifest) -> HashMap<(String, String), Option<Label>> {
+    let server = manifest.server_id.to_string();
+    let networked = manifest
+        .required_permissions
+        .as_ref()
+        .and_then(|p| p.network_hosts.as_ref())
+        .is_some_and(|hosts| !hosts.is_empty());
     let mut index = HashMap::new();
     for tool in &manifest.tools {
-        if let Some(clearance) = &tool.clearance {
-            index.insert(tool.name.clone(), clearance.clone());
+        if tool.has_side_effects || networked {
+            index.insert((server.clone(), tool.name.clone()), tool.clearance.clone());
         }
     }
     index
 }
 ```
 
-Add `pub mod hook;` to `lib.rs`. If `manifest.tools` is not the correct field name, read `crates/platform/chio-manifest/src/lib.rs:30` for the `ToolManifest` struct and use its tool-list field.
+Add `pub mod hook;` to `lib.rs`. Confirm the `ToolManifest` tool-list field (`tools`), the `server_id` `Display`/`as_str` conversion, and `has_side_effects` against `crates/platform/chio-manifest/src/lib.rs:30`. Keying by `(server_id, tool_name)` matters because two servers can expose the same tool name at different clearances.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -979,7 +1048,7 @@ git commit -m "feat(flow): add clearance index and post-invocation taint hook"
 
 **Interfaces:**
 - Consumes: `chio_core_types::capability::caveat::{Caveat, CaveatKind}`, `chio_core_types::flow_label::Label`.
-- Produces: `pub fn authorized_downgrade(caveats: &[Caveat], requested: &BTreeSet<String>) -> Result<Label, DeclassifyError>` (returns the residual label after removing authorized compartments, or an error if any requested compartment is not authorized by a `Declassify` caveat). `FlowViolation { session_key, tool, context, clearance }` and `Declassification { session_key, removed_compartments }` as canonical-JSON serializable event bodies for receipt emission.
+- Produces: `pub fn authorized_downgrade(caveats: &[Caveat], source: &Label, requested: &BTreeSet<String>) -> Result<Label, DeclassifyError>` (returns `source` with the requested compartments removed, preserving all other compartments plus the level and any owner policy, or an error if any requested compartment is not authorized by a `Declassify` caveat). `FlowViolation { session_key, tool, context, clearance }` and `Declassification { session_key, removed_compartments }` as canonical-JSON serializable event bodies for receipt emission.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -994,20 +1063,32 @@ mod tests {
         Caveat { kind: CaveatKind::Declassify, predicate: predicate.to_string(), sig: None }
     }
 
+    fn label_with(compartments: &[&str]) -> Label {
+        let mut l = Label::public();
+        for c in compartments {
+            l.compartments.insert((*c).to_string());
+        }
+        l
+    }
+
     #[test]
-    fn authorized_when_caveat_lists_compartment() {
+    fn authorized_downgrade_removes_only_requested_compartment() {
         let mut requested = BTreeSet::new();
         requested.insert("phi".to_string());
-        let residual = authorized_downgrade(&[declassify_caveat("phi,pii")], &requested)
+        let source = label_with(&["phi", "secret"]);
+        let residual = authorized_downgrade(&[declassify_caveat("phi,pii")], &source, &requested)
             .expect("authorized");
+        // phi is removed; secret is preserved, not silently dropped to public.
         assert!(!residual.compartments.contains("phi"));
+        assert!(residual.compartments.contains("secret"));
     }
 
     #[test]
     fn rejected_when_compartment_not_listed() {
         let mut requested = BTreeSet::new();
         requested.insert("secret".to_string());
-        let err = authorized_downgrade(&[declassify_caveat("phi")], &requested);
+        let source = label_with(&["secret"]);
+        let err = authorized_downgrade(&[declassify_caveat("phi")], &source, &requested);
         assert!(err.is_err());
     }
 }
@@ -1060,13 +1141,15 @@ pub fn authorized_downgrade(
     if !unauthorized.is_empty() {
         return Err(DeclassifyError { unauthorized });
     }
-    let mut residual = Label::public();
-    residual.compartments = requested.difference(requested).cloned().collect();
+    // Remove only the requested compartments; keep everything else. A
+    // Declassify(phi) on {phi, secret} yields {secret}, never public.
+    let mut residual = source.clone();
+    residual.compartments = source.compartments.difference(requested).cloned().collect();
     Ok(residual)
 }
 ```
 
-Note: `residual` here starts from public; a fuller implementation subtracts `requested` from a supplied source label. For this task the residual carries no downgraded compartments, which the test asserts. Wire the source label in Task 11 when the guard calls this.
+Note: `authorized_downgrade` takes the `source` label and removes only the requested compartments, preserving all others, the level, and any owner policy. Task 11 passes the labeled source (the accumulated context being declassified) when the guard calls this, so a single-compartment Declassify never collapses a multi-compartment label to public.
 
 `src/event.rs`:
 
@@ -1213,7 +1296,7 @@ pub mod canary;
 //! Canary capabilities: valid, authority-signed tokens whose scope targets a
 //! reserved `decoy:` server namespace.
 
-use chio_core_types::capability::scope::{ChioScope, ToolGrant};
+use chio_core_types::capability::scope::{ChioScope, Operation, ToolGrant};
 
 /// Reserved server-id prefix for decoy tool servers.
 pub const DECOY_SERVER_PREFIX: &str = "decoy:";
@@ -1224,12 +1307,16 @@ pub fn is_decoy_server(server_id: &str) -> bool {
     server_id.starts_with(DECOY_SERVER_PREFIX)
 }
 
-/// A scope with a single grant that targets a decoy server for `tool`.
+/// A scope with a single grant that targets a decoy server for `tool`. The
+/// grant carries `Operation::Invoke` so it matches an invocation exactly like a
+/// real grant: a canary must be usable bait, not an invalid grant that the
+/// kernel rejects during ordinary grant matching. Presentation or use is caught
+/// by the tripwire check (integration Task 20b), not by a matching failure.
 #[must_use]
 pub fn canary_scope(tool: &str) -> ChioScope {
     let grant = ToolGrant {
         server_id: Some(format!("{DECOY_SERVER_PREFIX}{tool}")),
-        operations: Vec::new(),
+        operations: vec![Operation::Invoke],
         ..ToolGrant::default()
     };
     ChioScope { grants: vec![grant] }
@@ -1258,7 +1345,7 @@ git commit -m "feat(decoy): scaffold chio-decoy with canary capability scopes"
 - Test: inline
 
 **Interfaces:**
-- Produces: `CanaryRegistry` with `pub fn new() -> Self`, `pub fn register(&mut self, capability_id: String)`, `pub fn is_canary(&self, capability_id: &str) -> bool`. The kernel consults `is_canary` on capability presentation; a hit is a tripwire (Task 16).
+- Produces: `CanaryRegistry` with `pub fn new() -> Self`, `pub fn register(&mut self, capability_id: String)`, `pub fn is_canary(&self, capability_id: &str) -> bool`. The kernel consults `is_canary` during capability validation, before ordinary grant matching, and a hit is a tripwire; that kernel wiring is integration Task 20b (this task only builds the registry).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1919,13 +2006,18 @@ Expected: FAIL.
 //! return an Applied receipt; heavy actions return Pending until co-signed.
 
 use crate::action::{tier, ActionTier, ContainmentAction};
-use crate::ports::{AlertPort, IssuancePort, RevocationPort, VelocityPort};
+use crate::ports::{AlertPort, IssuancePort, PortError, RevocationPort, VelocityPort};
 use crate::receipt::ContainmentReceipt;
 
 /// The result of attempting an action.
 pub enum ExecOutcome {
+    /// Applied and the underlying port call succeeded.
     Applied(ContainmentReceipt),
+    /// A heavy action staged, awaiting m-of-n co-sign before it is applied.
     Pending(ContainmentReceipt),
+    /// Attempted but the port call failed. The receipt carries the failure so
+    /// the log never attests containment that did not actually happen.
+    Failed(ContainmentReceipt, PortError),
 }
 
 /// Holds borrowed ports for the duration of a response cycle.
@@ -1937,15 +2029,16 @@ pub struct Executor<'a> {
 }
 
 impl Executor<'_> {
-    /// Execute or stage an action per its reversibility tier. Port failures
-    /// are folded into the receipt (best-effort), never panicked.
+    /// Execute an auto-reversible action now, or stage a heavy one. A port
+    /// failure yields `Failed` (never a silent `Applied`), so the receipt
+    /// reflects what actually happened during a port outage.
     #[must_use]
     pub fn execute(&self, action: ContainmentAction) -> ExecOutcome {
         let receipt = ContainmentReceipt::for_action(action.clone());
         if matches!(tier(&action), ActionTier::Heavy) {
             return ExecOutcome::Pending(receipt);
         }
-        let _ = match &action {
+        let result = match &action {
             ContainmentAction::RevokeSession { session_key } => {
                 self.revocation.revoke_session(session_key)
             }
@@ -1953,10 +2046,35 @@ impl Executor<'_> {
                 self.velocity.throttle(subject, *factor)
             }
             ContainmentAction::Escalate { summary } => self.alert.escalate(summary),
-            ContainmentAction::FreezeSubject { subject } => self.issuance.freeze_subject(subject),
-            ContainmentAction::RevokeTenant { .. } => Ok(()),
+            // Heavy actions are staged above; if one reaches here, fail closed.
+            ContainmentAction::FreezeSubject { .. } | ContainmentAction::RevokeTenant { .. } => {
+                return ExecOutcome::Pending(receipt);
+            }
         };
-        ExecOutcome::Applied(receipt)
+        match result {
+            Ok(()) => ExecOutcome::Applied(receipt),
+            Err(err) => ExecOutcome::Failed(receipt, err),
+        }
+    }
+
+    /// Apply a heavy action after its m-of-n co-signature has been verified by
+    /// chio-quorum. Callers must not invoke this without a verified quorum. A
+    /// port failure yields `Failed`, matching `execute`.
+    #[must_use]
+    pub fn apply_cosigned(&self, action: ContainmentAction) -> ExecOutcome {
+        let receipt = ContainmentReceipt::for_action(action.clone());
+        let result = match &action {
+            ContainmentAction::FreezeSubject { subject } => self.issuance.freeze_subject(subject),
+            // RevokeTenant uses the revocation port at tenant scope; a dedicated
+            // TenantPort is the fuller design (see ports.rs follow-up).
+            ContainmentAction::RevokeTenant { tenant } => self.revocation.revoke_session(tenant),
+            // Auto-reversible actions do not need co-sign; apply directly.
+            other => return self.execute(other.clone()),
+        };
+        match result {
+            Ok(()) => ExecOutcome::Applied(receipt),
+            Err(err) => ExecOutcome::Failed(receipt, err),
+        }
     }
 }
 ```
@@ -2057,15 +2175,15 @@ pub struct Playbook {
 }
 
 impl Playbook {
-    /// Return the actions triggered by an event, with the event's session
-    /// key bound into session-scoped action templates.
+    /// Return the actions triggered by an event, with the event's session key
+    /// and subject bound into session- and subject-scoped action templates.
     #[must_use]
     pub fn evaluate(&self, event: &SecurityEvent) -> Vec<ContainmentAction> {
         let mut out = Vec::new();
         for rule in &self.rules {
             if rule.on == event.source {
                 for action in &rule.actions {
-                    out.push(bind_session(action, &event.session_key));
+                    out.push(bind_event(action, event));
                 }
             }
         }
@@ -2073,11 +2191,19 @@ impl Playbook {
     }
 }
 
-/// Fill a session-scoped action's key from the triggering event.
-fn bind_session(action: &ContainmentAction, session_key: &str) -> ContainmentAction {
+/// Fill a session- or subject-scoped action's target from the triggering event
+/// so a blank template (for example `Throttle { subject: String::new(), .. }`)
+/// acts on the event's real subject, not the empty string.
+fn bind_event(action: &ContainmentAction, event: &SecurityEvent) -> ContainmentAction {
     match action {
         ContainmentAction::RevokeSession { .. } => {
-            ContainmentAction::RevokeSession { session_key: session_key.to_string() }
+            ContainmentAction::RevokeSession { session_key: event.session_key.clone() }
+        }
+        ContainmentAction::Throttle { factor, .. } => {
+            ContainmentAction::Throttle { subject: event.subject.clone(), factor: *factor }
+        }
+        ContainmentAction::FreezeSubject { .. } => {
+            ContainmentAction::FreezeSubject { subject: event.subject.clone() }
         }
         other => other.clone(),
     }
@@ -2114,6 +2240,58 @@ git add -A
 git commit -m "test(quarantine): green phase 3 checks"
 ```
 
+### Task 20b: Kernel integration wiring (deployment gate)
+
+The three crates are inert until wired into the kernel, and the gaps are not
+fail-closed: un-wired, `FlowGuard` never runs so egress is unchecked (fail-open),
+`FlowTaintHook` never observes real reads so the taint store stays public, a
+presented canary looks like an ordinary capability failure, an egressed
+watermark is plain text, and a FlowGuard deny produces no event for quarantine.
+This task performs that wiring and is a deployment gate: the controls are not
+active until it lands.
+
+**Files:**
+- Modify: the default guard-pipeline builder (`crates/guards/chio-guards/src/pipeline.rs`) and kernel boot wiring (`crates/kernel/chio-kernel/src/kernel/mod.rs`) to register `FlowGuard`.
+- Modify: the post-invocation pipeline registration to add `FlowTaintHook` (implements `PostInvocationHook`), mirroring `SanitizerHook`.
+- Modify: capability validation (`crates/kernel/chio-kernel-core/src/capability_verify.rs`) to consult `chio_decoy::CanaryRegistry::is_canary` before grant matching and, on a hit, deny and emit a `CanaryPresented`/`CanaryUsed` tripwire receipt.
+- Modify: the FlowGuard egress path to call `chio_decoy::watermark::detect` on outbound payloads (emit `WatermarkAtEgress`) and to emit a `FlowViolation` event into the deny receipt for quarantine.
+- Test: `crates/kernel/chio-kernel/tests/flow_integration.rs`, `.../canary_integration.rs`.
+
+- [ ] **Step 1: Write the failing integration test**
+
+```rust
+// crates/kernel/chio-kernel/tests/flow_integration.rs
+#[test]
+fn default_pipeline_registers_flow_guard() {
+    let pipeline = chio_kernel::default_guard_pipeline();
+    assert!(pipeline.guard_names().iter().any(|n| n == "flow-egress"));
+}
+```
+
+- [ ] **Step 2: Run it to verify it fails**
+
+Run: `cargo test -p chio-kernel flow_integration`
+Expected: FAIL (`flow-egress` not registered). Adjust the builder and accessor names to the real ones in `pipeline.rs`.
+
+- [ ] **Step 3: Wire each control**
+
+1. Register `FlowGuard` in the default pipeline builder (confirm the builder fn and a `guard_names` accessor against `crates/guards/chio-guards/src/pipeline.rs`; add the accessor if absent).
+2. Register `FlowTaintHook` in the post-invocation pipeline, mirroring `SanitizerHook` in `crates/guards/chio-guards/src/post_invocation.rs`.
+3. In capability validation, call `is_canary(capability_id)` before grant matching; on a hit, take the deny path and emit a `CanaryPresented`/`CanaryUsed` tripwire receipt so a canary never reads as an ordinary matching failure.
+4. In the FlowGuard egress path, call `watermark::detect` on the outbound payload (emit `WatermarkAtEgress` on a hit), and on any deny emit a `FlowViolation` event into the deny receipt.
+
+- [ ] **Step 4: Run the integration tests**
+
+Run: `cargo test -p chio-kernel flow_integration && cargo test -p chio-kernel canary_integration`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add crates/guards crates/kernel
+git commit -m "feat(kernel): wire flow guard, taint hook, canary tripwire, and watermark detection"
+```
+
 ---
 
 ## Phase 4: Release gates, evidence, and spec
@@ -2125,7 +2303,7 @@ git commit -m "test(quarantine): green phase 3 checks"
 - Test: run each script
 
 **Interfaces:**
-- Produces: three fail-closed shell gates. `check-decoy-unreachable` greps every non-decoy manifest and fixture for a `decoy:` server binding and fails if found. `check-containment-reversible` asserts every `ContainmentAction` variant is covered by `tier` (greps the source for a match arm). `check-flow-invariants` runs the `chio-flow` lattice property test as a named test.
+- Produces: three fail-closed shell gates. `check-decoy-unreachable` greps every non-decoy manifest and fixture under `crates/` (never prose docs) for a `decoy:` server binding and fails if found. `check-containment-reversible` asserts every `ContainmentAction` variant is covered by `tier`. `check-flow-invariants` runs the full `chio-flow` suite (lattice, FlowGuard egress dominance, and clearance-index tests), not just the pure lattice helper.
 
 - [ ] **Step 1: Write `check-decoy-unreachable.sh`**
 
@@ -2133,8 +2311,12 @@ git commit -m "test(quarantine): green phase 3 checks"
 #!/usr/bin/env bash
 # Fail-closed gate: no real manifest may bind a decoy: server namespace.
 set -euo pipefail
-hits=$(grep -rn "decoy:" --include="*.json" --include="*.yaml" crates/ spec/ \
-  | grep -v "crates/security/chio-decoy" || true)
+# Scan real manifests and fixtures only, never prose docs (spec/ and docs/
+# document the reserved namespace on purpose). Exclude the decoy crate and the
+# adversarial corpus, which legitimately reference it.
+hits=$(grep -rn "decoy:" --include="*.json" --include="*.yaml" crates/ \
+  | grep -v "crates/security/chio-decoy" \
+  | grep -v "crates/core/chio-adversarial-suite" || true)
 if [ -n "$hits" ]; then
   echo "FAIL: decoy namespace referenced outside chio-decoy:" >&2
   echo "$hits" >&2
@@ -2168,10 +2350,17 @@ echo "OK: containment tiering and TTL present"
 
 ```bash
 #!/usr/bin/env bash
-# Fail-closed gate: the lattice order tests must exist and pass.
+# Fail-closed gate: the full flow suite must pass, including the FlowGuard
+# egress-dominance and clearance-index tests, not just the pure lattice helper.
+# A regression in guard wiring, clearance lookup, or taint propagation must fail
+# this gate rather than slip through because the lattice helpers still pass.
 set -euo pipefail
-cargo test -p chio-flow flows_to -- --nocapture
-echo "OK: flow lattice invariants pass"
+cargo test -p chio-flow
+# Assert the egress-dominance guard test exists so the gate cannot pass on the
+# lattice helper alone.
+grep -rq "denies_phi_context_to_public_sink" crates/security/chio-flow/src/guard.rs \
+  || { echo "FAIL: FlowGuard egress-dominance test missing" >&2; exit 1; }
+echo "OK: flow lattice and egress-dominance invariants pass"
 ```
 
 - [ ] **Step 4: Run all three**
@@ -2263,7 +2452,9 @@ git commit -m "docs(spec): specify flow labels, declassify caveat, canary and co
 - Testing/evidence (adversarial corpus, arena, gates, formal): Tasks 21, 22. Formal lattice property is covered by the `flows_to` order tests in Task 5 and gated by Task 21; a Kani harness is out of scope for v1 and is called out here as deferred rather than left as a silent gap.
 - Release framing (gates, bounded claims): Task 21 plus the Global Constraints note.
 
-**Deferred items made explicit (not silent gaps):** session-granular taint keying (v1 keys by agent id, Task 7), the HushSpec textual playbook parser (v1 uses a builder API, Task 19), feature-gated real adapters wrapping revocation-oracle/custody-hw/swarm-authority/siem (traits and fakes ship in Tasks 16 and 18; concrete adapters are a follow-up behind the `adapters` feature), and a Kani proof of the lattice order (Task 5 tests the properties; a formal harness is deferred).
+**Kernel integration is required, not deferred:** Task 20b wires `FlowGuard`, `FlowTaintHook`, the canary tripwire, watermark detection at egress, and `FlowViolation` emission into the kernel. Until it lands the controls do not run, so it is a deployment gate, not an optional follow-up.
+
+**Deferred items made explicit (not silent gaps):** session-granular taint keying (v1 keys by agent id, Task 7), the HushSpec textual playbook parser (v1 uses a builder API, Task 19), feature-gated real adapters wrapping revocation-oracle/custody-hw/lineage/siem (trait ports and fakes ship in Tasks 16 and 18; concrete adapters are a follow-up behind the `adapters` feature), a dedicated `TenantPort` for tenant-scope revocation (v1 routes `RevokeTenant` through the revocation port), and a Kani proof of the lattice order (Task 5 tests the properties; a formal harness is deferred).
 
 **Placeholder scan:** no `TBD`/`TODO`/`implement later` in any step; every code step carries complete code. Two tasks (9 and 12) instruct the implementer to confirm an exact upstream field name against a cited file path before use, which is a verification instruction, not a placeholder.
 

@@ -45,7 +45,7 @@ Relevant existing surfaces this design builds on rather than duplicates:
 - Revocation: `crates/trust/chio-revocation-oracle` (epoch-based, sparse Merkle inclusion and non-inclusion proofs).
 - Issuance rate limiting: `crates/trust/chio-custody-hw` (per-subject limiter, per-credential replay nonce store, revocation cascade).
 - Velocity: `AgentVelocityGuard` token buckets in `crates/guards/chio-guards`.
-- Swarm authority: `crates/kernel/chio-swarm-authority` tracks the task DAG, budget fan-out and fan-in, and continuation tokens.
+- Lineage: `crates/observability/chio-lineage` indexes signed receipts and capability lineage into a provenance DAG, from which the sub-agent set affected by a triggering session can be derived through the delegation chain. Note: there is no continuation-token task-DAG crate today, so precise blast-radius scoping beyond capability lineage is a future dependency, not an existing primitive.
 - Reputation: `crates/trust/chio-reputation` already applies incident penalties.
 - SIEM: `crates/observability/chio-siem` forwards receipt events and pages via OpsGenie and PagerDuty backends.
 - Adversarial testing: `crates/core/chio-adversarial-suite` (eight attack classes) and `crates/core/chio-arena` (coevolutionary replay arena).
@@ -79,7 +79,7 @@ chio-core-types (Label, declassify caveat, receipt subtypes)
                                                   (ports -> adapters ->
                                                    revocation-oracle,
                                                    custody-hw,
-                                                   swarm-authority,
+                                                   lineage,
                                                    siem, guards)
 ```
 
@@ -121,8 +121,8 @@ Modules:
   | Heavy | `FreezeSubject`, `RevokeTenant`, `RequireCosign` | m-of-n human co-sign to apply and to extend past TTL |
 
   Every action is a signed `ContainmentReceipt` carrying a TTL, with an explicit signed `LiftOrder` to reverse it. Automated response can never permanently disable a tenant without a human renewing the state past its TTL.
-- `ports`: traits over existing primitives, with thin adapters behind cargo features so the crate stays lean and unit-testable with fakes: `RevocationPort` (to `chio-revocation-oracle` epoch bump), `IssuancePort` (to `chio-custody-hw` limiter), `VelocityPort` (to `AgentVelocityGuard`), `AlertPort` (to `chio-siem`), `BlastRadiusPort` (to `chio-swarm-authority`).
-- `blast`: given a triggering session or subject, computes the affected continuation-token subtree from `chio-swarm-authority` and scopes actions to exactly that subtree rather than the whole tenant.
+- `ports`: traits over existing primitives, with thin adapters behind cargo features so the crate stays lean and unit-testable with fakes: `RevocationPort` (to `chio-revocation-oracle` epoch bump), `IssuancePort` (to `chio-custody-hw` limiter), `VelocityPort` (to `AgentVelocityGuard`), `AlertPort` (to `chio-siem`), `BlastRadiusPort` (to `chio-lineage`).
+- `blast`: given a triggering session or subject, derives the affected sub-agent subtree from the capability lineage in `chio-lineage` (via the delegation chain) and scopes actions to that subtree rather than the whole tenant. Finer continuation-token-level scoping is a future dependency, not an existing crate; until it exists, blast-radius is bounded by capability lineage.
 
 Posture: the response engine is best-effort and fully attested, and is not part of the TCB.
 

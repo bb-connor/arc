@@ -66,6 +66,7 @@ The caveat-discharge seam in Task 2 is shared. The active-defense arc's `Declass
 
 **Interfaces:**
 - Produces: `CapabilityToken.use_limit: Option<u32>`. `None` means unbounded (today's behavior). `Some(n)` means the capability may be spent at most `n` times. The field is included in the signing body only when present, so existing tokens verify unchanged.
+- Fail-closed until enforced: adding the field does not enforce it. Until the burn check is wired into `verify_capability_full` (Task 7b), the kernel MUST reject a token whose `use_limit` is `Some` rather than admit it unenforced, so there is never a window where a `use_limit = 1` token can be replayed. Admission and enforcement land together in Task 7b.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -120,7 +121,7 @@ git commit -m "feat(core-types): add optional use_limit to CapabilityToken"
 
 **Interfaces:**
 - Produces: `CaveatKind::RequireQuorum`; `pub fn caveat_admission_supported(kind: CaveatKind) -> bool` returning true only for kinds with a wired enforcement layer (`Declassify` via `chio-flow`, `RequireQuorum` via `chio-quorum`); `CaveatError`. The token sign path rejects only caveats whose kind is not admission-supported, replacing today's blanket rejection.
-- Security invariant: a supported caveat MUST be enforced by its owning layer at the relevant boundary. The kernel refuses to dispatch a caveat-bearing capability unless the enforcing guard is registered (implemented in Task 8 for quorum; the FlowGuard covers `Declassify`). This prevents a supported-but-ignored caveat from silently broadening access.
+- Security invariant: a supported caveat MUST be enforced by its owning layer at the relevant boundary. The kernel refuses to dispatch a caveat-bearing capability unless the enforcing guard is registered and returns satisfied (the quorum gate is wired in Task 7b; the FlowGuard covers `Declassify`). Marking a kind admission-supported without its enforcement wired would be a bypass, so `RequireQuorum` stays effectively denied until Task 7b lands. This prevents a supported-but-ignored caveat from silently broadening access.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -356,7 +357,7 @@ git commit -m "feat(burn): add monotonic burn ledger"
 
 **Interfaces:**
 - Consumes: `crate::ledger::BurnLedger`.
-- Produces: `pub fn try_spend(ledger: &dyn BurnLedger, capability_id: &str, use_limit: Option<u32>) -> BurnDecision` with `BurnDecision { Allowed { remaining: Option<u32> }, Denied }`. `None` limit is always allowed. `Some(n)` denies once the post-increment count exceeds `n`. `Burn { capability_id, spend_index, remaining }` is the canonical-JSON event body.
+- Produces: `pub fn try_spend(ledger: &dyn BurnLedger, capability_id: &str, use_limit: Option<u32>) -> BurnDecision` with `BurnDecision { Allowed { spend_index: u32, remaining: Option<u32> }, Denied { spend_index: u32 } }`. Both variants carry the post-increment `spend_index` so the caller populates an accurate `Burn` receipt without a second, racy ledger read. `None` limit is always allowed. `Some(n)` denies once the post-increment count exceeds `n`. `Burn { capability_id, spend_index, remaining }` is the canonical-JSON event body.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -370,15 +371,22 @@ mod tests {
     #[test]
     fn unbounded_capability_always_allowed() {
         let ledger = InMemoryBurnLedger::new();
-        assert!(matches!(try_spend(&ledger, "c", None), BurnDecision::Allowed { .. }));
+        assert_eq!(
+            try_spend(&ledger, "c", None),
+            BurnDecision::Allowed { spend_index: 1, remaining: None }
+        );
     }
 
     #[test]
-    fn bounded_capability_denies_after_limit() {
+    fn bounded_capability_denies_after_limit_and_reports_index() {
         let ledger = InMemoryBurnLedger::new();
+        assert_eq!(
+            try_spend(&ledger, "c", Some(2)),
+            BurnDecision::Allowed { spend_index: 1, remaining: Some(1) }
+        );
         assert!(matches!(try_spend(&ledger, "c", Some(2)), BurnDecision::Allowed { .. }));
-        assert!(matches!(try_spend(&ledger, "c", Some(2)), BurnDecision::Allowed { .. }));
-        assert!(matches!(try_spend(&ledger, "c", Some(2)), BurnDecision::Denied));
+        // The third spend is denied and still reports its index for the receipt.
+        assert_eq!(try_spend(&ledger, "c", Some(2)), BurnDecision::Denied { spend_index: 3 });
     }
 }
 ```
@@ -398,11 +406,13 @@ Expected: FAIL.
 
 use crate::ledger::BurnLedger;
 
-/// The outcome of attempting to spend a capability.
+/// The outcome of attempting to spend a capability. Both variants carry the
+/// post-increment `spend_index` so the caller can populate an accurate signed
+/// `Burn` receipt without a second, racy ledger read.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BurnDecision {
-    Allowed { remaining: Option<u32> },
-    Denied,
+    Allowed { spend_index: u32, remaining: Option<u32> },
+    Denied { spend_index: u32 },
 }
 
 /// Attempt to spend a capability once. `None` limit is unbounded.
@@ -414,12 +424,12 @@ pub fn try_spend(
 ) -> BurnDecision {
     let spent = ledger.spend(capability_id);
     match use_limit {
-        None => BurnDecision::Allowed { remaining: None },
+        None => BurnDecision::Allowed { spend_index: spent, remaining: None },
         Some(limit) => {
             if spent <= limit {
-                BurnDecision::Allowed { remaining: Some(limit - spent) }
+                BurnDecision::Allowed { spend_index: spent, remaining: Some(limit - spent) }
             } else {
-                BurnDecision::Denied
+                BurnDecision::Denied { spend_index: spent }
             }
         }
     }
@@ -489,6 +499,12 @@ mod tests {
     fn rejects_threshold_above_signer_count() {
         assert!(QuorumRequirement::parse("3-of-2:aa,bb").is_err());
     }
+
+    #[test]
+    fn rejects_duplicate_or_empty_signers() {
+        assert!(QuorumRequirement::parse("2-of-3:aa,aa,bb").is_err());
+        assert!(QuorumRequirement::parse("1-of-2:aa,").is_err());
+    }
 }
 ```
 
@@ -540,6 +556,8 @@ pub mod verify;
 ```rust
 //! The quorum requirement parsed from a RequireQuorum caveat predicate.
 
+use std::collections::BTreeSet;
+
 /// Parse error for a quorum predicate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QuorumError {
@@ -572,6 +590,14 @@ impl QuorumRequirement {
         if signers.len() != n as usize {
             return Err(QuorumError { detail: "signer count must equal n".to_string() });
         }
+        if signers.iter().any(String::is_empty) {
+            return Err(QuorumError { detail: "signer ids must be non-empty".to_string() });
+        }
+        // Duplicate signer ids weaken the m-of-n independence model: reject them
+        // so a declared set never looks larger than its real signer count.
+        if signers.iter().collect::<BTreeSet<_>>().len() != signers.len() {
+            return Err(QuorumError { detail: "signer ids must be distinct".to_string() });
+        }
         Ok(Self { m, n, signers })
     }
 }
@@ -599,7 +625,7 @@ git commit -m "feat(quorum): scaffold with m-of-n requirement parsing"
 
 **Interfaces:**
 - Consumes: `crate::requirement::QuorumRequirement`.
-- Produces: `SignedApproval { signer_id: String, request_hash: String }` (an approval binds to a request hash); `pub fn quorum_satisfied(req: &QuorumRequirement, request_hash: &str, approvals: &[SignedApproval]) -> bool` (at least `m` distinct authorized signers approved this exact request hash); `QuorumSatisfied { request_hash, signers }` event body. In production `SignedApproval` carries a real `Signature` verified against the signer's key; this task checks distinctness, threshold, membership, and request binding, which are the properties the gate depends on.
+- Produces: `SignedApproval { signer_id: String, request_hash: String, signature_hex: String }` (`signer_id` is the signer's hex public key; `signature_hex` signs `request_hash`); `pub fn quorum_satisfied(req: &QuorumRequirement, request_hash: &str, approvals: &[SignedApproval]) -> bool` (at least `m` distinct authorized signers each produced a signature over this exact request hash that verifies under their key); `QuorumSatisfied { request_hash, signers }` event body. A fabricated approval carrying an authorized `signer_id` but no valid signature is not counted, so an agent cannot satisfy the quorum alone.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -607,38 +633,58 @@ git commit -m "feat(quorum): scaffold with m-of-n requirement parsing"
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chio_core_types::crypto::Keypair;
     use crate::requirement::QuorumRequirement;
 
-    fn req() -> QuorumRequirement {
-        QuorumRequirement::parse("2-of-3:aa,bb,cc").expect("parse")
+    fn key(seed: u8) -> Keypair {
+        Keypair::from_seed(&[seed; 32])
     }
 
-    fn approval(signer: &str, hash: &str) -> SignedApproval {
-        SignedApproval { signer_id: signer.to_string(), request_hash: hash.to_string() }
+    fn req(keys: &[&Keypair], m: u8) -> QuorumRequirement {
+        let signers = keys.iter().map(|k| k.public_key().to_hex()).collect();
+        QuorumRequirement { m, n: keys.len() as u8, signers }
+    }
+
+    fn approval(kp: &Keypair, hash: &str) -> SignedApproval {
+        SignedApproval {
+            signer_id: kp.public_key().to_hex(),
+            request_hash: hash.to_string(),
+            signature_hex: kp.sign(hash.as_bytes()).to_hex(),
+        }
     }
 
     #[test]
-    fn two_distinct_authorized_signers_satisfy() {
-        let approvals = vec![approval("aa", "h1"), approval("bb", "h1")];
-        assert!(quorum_satisfied(&req(), "h1", &approvals));
+    fn two_valid_distinct_signatures_satisfy() {
+        let (a, b, c) = (key(1), key(2), key(3));
+        let req = req(&[&a, &b, &c], 2);
+        assert!(quorum_satisfied(&req, "h1", &[approval(&a, "h1"), approval(&b, "h1")]));
+    }
+
+    #[test]
+    fn forged_signature_is_not_counted() {
+        let (a, b, c) = (key(1), key(2), key(3));
+        let req = req(&[&a, &b, &c], 2);
+        // Claims b as signer but carries a's signature: does not verify under b.
+        let forged = SignedApproval {
+            signer_id: b.public_key().to_hex(),
+            request_hash: "h1".to_string(),
+            signature_hex: a.sign("h1".as_bytes()).to_hex(),
+        };
+        assert!(!quorum_satisfied(&req, "h1", &[approval(&a, "h1"), forged]));
     }
 
     #[test]
     fn duplicate_signer_does_not_count_twice() {
-        let approvals = vec![approval("aa", "h1"), approval("aa", "h1")];
-        assert!(!quorum_satisfied(&req(), "h1", &approvals));
+        let (a, b, c) = (key(1), key(2), key(3));
+        let req = req(&[&a, &b, &c], 2);
+        assert!(!quorum_satisfied(&req, "h1", &[approval(&a, "h1"), approval(&a, "h1")]));
     }
 
     #[test]
     fn approval_for_other_request_is_ignored() {
-        let approvals = vec![approval("aa", "h1"), approval("bb", "OTHER")];
-        assert!(!quorum_satisfied(&req(), "h1", &approvals));
-    }
-
-    #[test]
-    fn unauthorized_signer_is_ignored() {
-        let approvals = vec![approval("aa", "h1"), approval("zz", "h1")];
-        assert!(!quorum_satisfied(&req(), "h1", &approvals));
+        let (a, b, c) = (key(1), key(2), key(3));
+        let req = req(&[&a, &b, &c], 2);
+        assert!(!quorum_satisfied(&req, "h1", &[approval(&a, "h1"), approval(&b, "OTHER")]));
     }
 }
 ```
@@ -653,31 +699,42 @@ Expected: FAIL.
 `src/envelope.rs`:
 
 ```rust
-//! A signed authorization approval. Binds a signer to the exact request hash.
+//! A signed authorization approval. Binds a signer to the exact request hash
+//! with a signature the verifier checks before counting the approval.
 
 use serde::{Deserialize, Serialize};
 
-/// One signer's approval of a specific request.
+/// One signer's approval of a specific request. `signer_id` is the signer's hex
+/// public key; `signature_hex` is its signature over `request_hash`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SignedApproval {
     pub signer_id: String,
     pub request_hash: String,
+    pub signature_hex: String,
 }
 ```
 
 `src/verify.rs`:
 
 ```rust
-//! Quorum verification: at least m distinct authorized signers approved this
-//! exact request. Fail-closed on anything short of that.
+//! Quorum verification: at least m distinct authorized signers each produced a
+//! valid signature over this exact request. Fail-closed on anything short of
+//! that, including forged or unverifiable signatures.
 
 use std::collections::BTreeSet;
+
+use chio_core_types::crypto::{PublicKey, Signature};
 
 use crate::envelope::SignedApproval;
 use crate::requirement::QuorumRequirement;
 
-/// Whether the approvals satisfy the quorum for `request_hash`.
+/// Whether the approvals satisfy the quorum for `request_hash`. An approval is
+/// counted only if its signer is authorized, it binds to this exact request,
+/// and its signature verifies under the signer's key. Distinct signers only, so
+/// duplicate approvals from one signer cannot reach the threshold, and a
+/// fabricated approval carrying an authorized id but no valid signature is
+/// ignored.
 #[must_use]
 pub fn quorum_satisfied(
     req: &QuorumRequirement,
@@ -685,13 +742,24 @@ pub fn quorum_satisfied(
     approvals: &[SignedApproval],
 ) -> bool {
     let authorized: BTreeSet<&str> = req.signers.iter().map(String::as_str).collect();
-    let distinct: BTreeSet<&str> = approvals
-        .iter()
-        .filter(|a| a.request_hash == request_hash)
-        .map(|a| a.signer_id.as_str())
-        .filter(|s| authorized.contains(s))
-        .collect();
-    distinct.len() >= req.m as usize
+    let mut counted: BTreeSet<&str> = BTreeSet::new();
+    for approval in approvals {
+        if approval.request_hash != request_hash {
+            continue;
+        }
+        let signer = approval.signer_id.as_str();
+        if !authorized.contains(signer) {
+            continue;
+        }
+        // The signer id is the signer's hex public key; verify its signature
+        // over the request hash before counting the approval.
+        let Ok(key) = PublicKey::from_hex(signer) else { continue };
+        let Ok(sig) = Signature::from_hex(&approval.signature_hex) else { continue };
+        if key.verify(request_hash.as_bytes(), &sig) {
+            counted.insert(signer);
+        }
+    }
+    counted.len() >= req.m as usize
 }
 ```
 
@@ -736,7 +804,7 @@ git commit -m "feat(quorum): verify threshold, distinctness, and request binding
 
 **Interfaces:**
 - Consumes: `chio_core_types::crypto::{PublicKey, Signature, Keypair}`.
-- Produces: `ProofEnvelope { request_hash: String, claim: String, signer: String, signature_hex: String }`; `pub fn verify(envelope: &ProofEnvelope, request_hash: &str, key: &PublicKey) -> bool` (the proof must bind to this exact request and verify under the key); `ProofVerified { request_hash, claim }` event body. This is the research-scoped primitive: one concrete signed policy-satisfaction attestation, with a trait seam left for richer proof systems.
+- Produces: `ProofEnvelope { request_hash: String, claim: String, signer: String, signature_hex: String }`; `pub fn signing_message(request_hash: &str, claim: &str) -> Vec<u8>` (length-prefixed, unambiguous) and `pub fn verify(envelope: &ProofEnvelope, request_hash: &str, key: &PublicKey) -> bool` (the proof must bind to this exact request, declare `key` as its signer, and verify under `key` over the length-prefixed message); `ProofVerified { request_hash, claim }` event body. This is the research-scoped primitive: one concrete signed policy-satisfaction attestation, with a trait seam left for richer proof systems.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -747,13 +815,11 @@ mod tests {
     use chio_core_types::crypto::Keypair;
 
     #[test]
-    fn proof_bound_to_request_verifies() {
+    fn proof_bound_to_request_and_signer_verifies() {
         let kp = Keypair::generate();
         let request_hash = "h1";
         let claim = "policy:pii-cleared";
-        let mut message = request_hash.as_bytes().to_vec();
-        message.extend_from_slice(claim.as_bytes());
-        let sig = kp.sign(&message);
+        let sig = kp.sign(&signing_message(request_hash, claim));
         let envelope = ProofEnvelope {
             request_hash: request_hash.to_string(),
             claim: claim.to_string(),
@@ -763,6 +829,9 @@ mod tests {
         assert!(verify(&envelope, "h1", &kp.public_key()));
         // A proof lifted onto a different request fails.
         assert!(!verify(&envelope, "OTHER", &kp.public_key()));
+        // A proof verified under a key other than its declared signer fails.
+        let other = Keypair::from_seed(&[9u8; 32]);
+        assert!(!verify(&envelope, "h1", &other.public_key()));
     }
 }
 ```
@@ -830,25 +899,42 @@ pub struct ProofEnvelope {
 `src/verify.rs`:
 
 ```rust
-//! Proof verification: the proof must bind to the exact request and verify
-//! under the expected key. Fail-closed on any mismatch.
+//! Proof verification: the proof must bind to the exact request, declare the
+//! expected signer, and verify under that key over an unambiguous encoding.
+//! Fail-closed on any mismatch.
 
 use chio_core_types::crypto::{PublicKey, Signature};
 
 use crate::proof::ProofEnvelope;
 
-/// Whether the proof binds to `request_hash` and verifies under `key`.
+/// The unambiguous signing message: length-prefixed request hash and claim, so
+/// no two `(request_hash, claim)` pairs share an encoding (a signature over one
+/// pair cannot be reinterpreted as another with the same concatenation).
+#[must_use]
+pub fn signing_message(request_hash: &str, claim: &str) -> Vec<u8> {
+    let mut message = Vec::new();
+    message.extend_from_slice(&(request_hash.len() as u64).to_le_bytes());
+    message.extend_from_slice(request_hash.as_bytes());
+    message.extend_from_slice(&(claim.len() as u64).to_le_bytes());
+    message.extend_from_slice(claim.as_bytes());
+    message
+}
+
+/// Whether the proof binds to `request_hash`, declares `key` as its signer, and
+/// verifies under `key`. Comparing `envelope.signer` to `key` stops a proof
+/// from claiming one signer while being verified under another.
 #[must_use]
 pub fn verify(envelope: &ProofEnvelope, request_hash: &str, key: &PublicKey) -> bool {
     if envelope.request_hash != request_hash {
         return false;
     }
+    if envelope.signer != key.to_hex() {
+        return false;
+    }
     let Ok(signature) = Signature::from_hex(&envelope.signature_hex) else {
         return false;
     };
-    let mut message = envelope.request_hash.as_bytes().to_vec();
-    message.extend_from_slice(envelope.claim.as_bytes());
-    key.verify(&message, &signature)
+    key.verify(&signing_message(&envelope.request_hash, &envelope.claim), &signature)
 }
 ```
 
@@ -882,6 +968,63 @@ git add crates/security/chio-proof-carry Cargo.toml
 git commit -m "feat(proof-carry): add request-bound signed proof verification"
 ```
 
+### Task 7b: Kernel enforcement wiring (deployment gate)
+
+Admission (Tasks 1-2) without enforcement is a bypass: a `use_limit = 1` token
+could be replayed and a `RequireQuorum` token could dispatch with no approvals.
+The existing `verify_capability_full` in `crates/kernel/chio-kernel-core/src/capability_verify.rs`
+performs base verification, delegation, chain binding, and budget admission
+only; it calls neither `try_spend` nor a quorum gate. This task wires both, so
+enforcement lands with admission rather than after it. Until it lands, Tasks 1
+and 2 keep `use_limit` and `RequireQuorum` fail-closed (rejected), so there is no
+unenforced window.
+
+**Files:**
+- Modify: `crates/kernel/chio-kernel-core/src/capability_verify.rs` (burn check), the dispatch/guard-pipeline path that admits caveats (quorum gate), and the crates' `Cargo.toml` to depend on `chio-burn` and `chio-quorum`.
+- Test: `crates/kernel/chio-kernel/tests/burn_enforcement.rs`, `.../quorum_enforcement.rs`.
+
+- [ ] **Step 1: Write the failing enforcement tests**
+
+```rust
+// burn_enforcement.rs (shape; adapt to the real kernel test harness)
+#[test]
+fn use_limit_one_token_is_denied_on_second_use() {
+    let ledger = chio_burn::ledger::InMemoryBurnLedger::new();
+    let cap_id = "cap-burn-1";
+    assert!(matches!(
+        chio_burn::check::try_spend(&ledger, cap_id, Some(1)),
+        chio_burn::check::BurnDecision::Allowed { .. }
+    ));
+    assert!(matches!(
+        chio_burn::check::try_spend(&ledger, cap_id, Some(1)),
+        chio_burn::check::BurnDecision::Denied { .. }
+    ));
+}
+```
+
+- [ ] **Step 2: Run it to verify it fails**
+
+Run: `cargo test -p chio-kernel burn_enforcement`
+Expected: FAIL until the kernel consults the ledger (the standalone `try_spend` test passes, but the kernel-path test that a second dispatch is denied fails until wired).
+
+- [ ] **Step 3: Wire enforcement**
+
+1. In `verify_capability_full` (or the dispatch step that owns a `BurnLedger`), after expiry and caveat checks, call `try_spend(ledger, &token.id, token.use_limit)` and deny on `BurnDecision::Denied`, emitting a `Burn` receipt with the returned `spend_index`.
+2. In the caveat-admission path, for a `RequireQuorum` caveat parse the requirement, collect the presented `SignedApproval`s, and deny unless `chio_quorum::verify::quorum_satisfied` returns true; emit a `QuorumSatisfied` receipt on success. A caveat-bearing capability with no registered quorum gate denies.
+3. Optionally, verify a carried `ProofEnvelope` via `chio_proof_carry::verify::verify` before dispatch.
+
+- [ ] **Step 4: Run the enforcement tests**
+
+Run: `cargo test -p chio-kernel burn_enforcement && cargo test -p chio-kernel quorum_enforcement`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add crates/kernel crates/security
+git commit -m "feat(kernel): enforce use-count burns and quorum caveats at admission"
+```
+
 ---
 
 ## Phase 4: Gates, evidence, spec
@@ -894,7 +1037,7 @@ git commit -m "feat(proof-carry): add request-bound signed proof verification"
 - Test: run each script; run the suite
 
 **Interfaces:**
-- Produces: three fail-closed gates and three adversarial cases. Also documents the kernel-gate integration invariant: the kernel must refuse to dispatch a `RequireQuorum`-bearing capability unless a quorum gate ran and returned satisfied (so a supported caveat is never silently ignored).
+- Produces: three fail-closed gates and three adversarial cases. Also documents the kernel-gate integration invariant (wired in Task 7b): the kernel refuses to dispatch a `RequireQuorum`-bearing capability unless a quorum gate ran and returned satisfied, and denies a `use_limit` token whose burn ledger is exhausted, so a supported caveat or a spent capability is never silently honored.
 
 - [ ] **Step 1: Write the three gate scripts**
 
@@ -999,7 +1142,9 @@ git commit -m "docs(spec): specify use-count burns, quorum caveat, and proof-car
 
 **Cross-arc dependency handled:** Task 2 is the shared caveat-admission change that both `Declassify` (active-defense arc) and `RequireQuorum` (this arc) require; the header calls out that the active-defense plan's `Declassify` caveat depends on it.
 
-**Deferred items made explicit (not silent gaps):** the kernel wiring that calls `try_spend` inside `verify_capability_full` and the quorum gate inside the guard pipeline are integration tasks flagged in Task 8's invariant note (the crates ship the checkable logic; the kernel-side hook is the next increment and, until it lands, a `RequireQuorum` capability is denied because Task 2 admits the caveat but no gate satisfies it, which is fail-closed); the SQLite burn ledger (Task 3 ships the trait and in-memory impl); real `Signature`-carrying quorum approvals (Task 6 checks distinctness/threshold/binding; signature verification per approval reuses `PublicKey::verify` and is the next increment); richer proof systems for `chio-proof-carry` (Task 7 ships one concrete form plus the module seam).
+**Kernel enforcement is required, not deferred:** Task 7b wires `try_spend` into `verify_capability_full` and the quorum gate into the caveat-admission path, and it lands with admission (Tasks 1-2 keep `use_limit` and `RequireQuorum` fail-closed until it does). Quorum approvals carry and verify real signatures as of Task 6 (`quorum_satisfied` checks each signature under the signer's key), so signature verification is not deferred.
+
+**Deferred items made explicit (not silent gaps):** the SQLite burn ledger (Task 3 ships the trait and in-memory impl); a dedicated approval-collection transport (Task 6 verifies presented approvals; how they are gathered from co-signers is an integration detail); richer proof systems for `chio-proof-carry` (Task 7 ships one concrete signed-attestation form plus the module seam).
 
 **Placeholder scan:** no `TBD`/`TODO`/`implement later` in any step. Tasks 1, 2, and 7 instruct the implementer to confirm exact upstream names/line numbers against cited files, which are verification instructions, not placeholders.
 

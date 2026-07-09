@@ -382,7 +382,7 @@ Expected: FAIL.
 //! Rotation with an overlap window: the previous key stays valid for
 //! `overlap_secs` after retirement so in-flight capabilities do not break.
 
-use crate::epoch::KeyEpoch;
+use crate::epoch::{KeyEpoch, KeyOperation};
 use crate::log::TransparencyLog;
 
 /// Holds the transparency log and the current active key.
@@ -398,12 +398,25 @@ impl Keyring {
         Self { log: TransparencyLog::new(), epochs: Vec::new(), overlap_secs }
     }
 
-    /// Rotate to a new key: retire the current active key at `now` and append
-    /// the new key to the log.
+    /// Rotate to a new key. Append a Retirement record for the current active
+    /// key to the transparency log first, so a verifier or restarted authority
+    /// reconstructing state from the append-only log sees the retirement (and
+    /// therefore the overlap-window expiry) rather than only in-memory state.
+    /// Then append the new key.
     pub fn rotate(&mut self, new_key: KeyEpoch, now: u64) {
-        if let Some(prev) = self.epochs.last_mut() {
+        if let Some(prev) = self.epochs.last().cloned() {
             if prev.retired_at.is_none() {
-                prev.retired_at = Some(now);
+                self.log.append(KeyEpoch {
+                    seq: prev.seq,
+                    activated_at: prev.activated_at,
+                    retired_at: Some(now),
+                    algorithm: prev.algorithm,
+                    public_key: prev.public_key.clone(),
+                    operation: KeyOperation::Retirement,
+                });
+                if let Some(entry) = self.epochs.last_mut() {
+                    entry.retired_at = Some(now);
+                }
             }
         }
         self.log.append(new_key.clone());
@@ -445,7 +458,7 @@ git commit -m "feat(keyring): add rotation with overlap window"
 
 **Interfaces:**
 - Consumes: `crate::epoch::KeyEpoch`, `chio_core_types::crypto::PublicKey`.
-- Produces: `pub fn key_in_log(epochs: &[KeyEpoch], key: &PublicKey) -> bool`. A verifier calls this against the epochs committed under a pinned root; a key absent from the log is rejected (the caller fails closed).
+- Produces: `pub fn key_in_log(epochs: &[KeyEpoch], pinned: LogRoot, key: &PublicKey) -> bool`. It recomputes the log root over `epochs` and rejects (returns false) unless they reproduce `pinned`, then checks membership; a key absent from the log, or present only in a slice that does not fold to the pinned root, is rejected (the caller fails closed).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -455,20 +468,35 @@ mod tests {
     use super::*;
     use chio_core_types::crypto::{Keypair, SigningAlgorithm};
     use crate::epoch::{KeyEpoch, KeyOperation};
+    use crate::log::TransparencyLog;
+
+    fn epoch(seq: u64, key: chio_core_types::crypto::PublicKey) -> KeyEpoch {
+        KeyEpoch {
+            seq, activated_at: seq, retired_at: None,
+            algorithm: SigningAlgorithm::Ed25519,
+            public_key: key,
+            operation: KeyOperation::Issuance,
+        }
+    }
 
     #[test]
-    fn key_present_in_log_is_accepted_absent_is_rejected() {
+    fn key_accepted_only_when_epochs_reproduce_the_pinned_root() {
         let kp = Keypair::generate();
-        let logged = KeyEpoch {
-            seq: 0, activated_at: 0, retired_at: None,
-            algorithm: SigningAlgorithm::Ed25519,
-            public_key: kp.public_key(),
-            operation: KeyOperation::Issuance,
-        };
-        let epochs = vec![logged];
-        assert!(key_in_log(&epochs, &kp.public_key()));
+        let epochs = vec![epoch(0, kp.public_key())];
+        // Pin the root the honest log would produce for these epochs.
+        let mut log = TransparencyLog::new();
+        log.append(epochs[0].clone());
+        let pinned = log.root();
+
+        assert!(key_in_log(&epochs, pinned, &kp.public_key()));
         let stranger = Keypair::from_seed(&[9u8; 32]).public_key();
-        assert!(!key_in_log(&epochs, &stranger));
+        assert!(!key_in_log(&epochs, pinned, &stranger));
+
+        // A slice with an extra, unlogged key does not reproduce the pinned
+        // root, so its key is rejected even though it is present in the slice.
+        let mut forged = epochs.clone();
+        forged.push(epoch(1, stranger.clone()));
+        assert!(!key_in_log(&forged, pinned, &stranger));
     }
 }
 ```
@@ -484,16 +512,27 @@ Expected: FAIL.
 
 ```rust
 //! Verification: a signing key is trusted only if it appears in the epochs
-//! committed under the pinned transparency-log root.
+//! that reproduce the pinned transparency-log root. Recomputing the root stops
+//! a caller from smuggling an unlogged key in via an arbitrary epoch slice.
 
 use chio_core_types::crypto::PublicKey;
 
 use crate::epoch::KeyEpoch;
+use crate::log::{LogRoot, TransparencyLog};
 
-/// Whether `key` appears in the logged epochs. Compares by hex encoding so it
-/// does not depend on `PublicKey` implementing `PartialEq`.
+/// Whether `key` appears in `epochs` AND those epochs fold to `pinned`. If the
+/// epochs do not reproduce the pinned root (size and hash), the key is rejected
+/// regardless of membership, so an injected unlogged key cannot be accepted.
 #[must_use]
-pub fn key_in_log(epochs: &[KeyEpoch], key: &PublicKey) -> bool {
+pub fn key_in_log(epochs: &[KeyEpoch], pinned: LogRoot, key: &PublicKey) -> bool {
+    let mut log = TransparencyLog::new();
+    for epoch in epochs {
+        log.append(epoch.clone());
+    }
+    let recomputed = log.root();
+    if recomputed.size != pinned.size || recomputed.root_hash != pinned.root_hash {
+        return false;
+    }
     let target = key.to_hex();
     epochs.iter().any(|e| e.public_key.to_hex() == target)
 }
@@ -638,7 +677,7 @@ git commit -m "feat(secret-broker): scaffold with capability-bound Lease"
 - Test: inline in `broker.rs`
 
 **Interfaces:**
-- Produces: `SecretBackend` trait with `fn resolve(&self, lease: &Lease) -> Option<String>` and `fn store(&mut self, key: &str, secret: String)`; `LocalBackend` implementing it; `Broker { backend, next_id, default_ttl }` with `pub fn mint(&mut self, capability_id: &str, subject: &str, now: u64) -> Lease` and `pub fn revoke(&mut self, lease_id: &str)`. A revoked or expired lease resolves to `None`.
+- Produces: `SecretBackend` trait (`resolve`/`store`) and `LocalBackend`; a `RevocationView` trait (`fn is_revoked(&self, capability_id: &str) -> bool`); `Broker` tracking issued leases, with `mint`, `revoke`, and `pub fn resolve(&self, lease: &Lease, now: u64, revocations: &dyn RevocationView) -> Option<String>`. `resolve` yields `None` unless the lease was minted by this broker and equals its stored binding, is within TTL, is not lease-revoked, and its bound capability is not revoked. The raw-secret boundary scan is wired into `resolve` in Task 7.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -648,16 +687,50 @@ mod tests {
     use super::*;
     use crate::backend::LocalBackend;
 
-    #[test]
-    fn minted_lease_is_bound_and_revocable() {
+    struct NoRevocations;
+    impl RevocationView for NoRevocations {
+        fn is_revoked(&self, _capability_id: &str) -> bool { false }
+    }
+    struct CapabilityRevoked;
+    impl RevocationView for CapabilityRevoked {
+        fn is_revoked(&self, _capability_id: &str) -> bool { true }
+    }
+
+    fn broker_with_secret() -> Broker {
         let mut backend = LocalBackend::new();
         backend.store("cap-1", "s3cr3t".to_string());
-        let mut broker = Broker::new(Box::new(backend), 60);
+        Broker::new(Box::new(backend), 60)
+    }
+
+    #[test]
+    fn minted_lease_resolves_then_revokes() {
+        let mut broker = broker_with_secret();
         let lease = broker.mint("cap-1", "did:chio:agent", 100);
-        assert_eq!(lease.capability_id, "cap-1");
         assert_eq!(lease.expires_at, 160);
+        assert_eq!(broker.resolve(&lease, 150, &NoRevocations), Some("s3cr3t".to_string()));
         broker.revoke(&lease.id);
-        assert!(broker.resolve(&lease, 150).is_none());
+        assert!(broker.resolve(&lease, 150, &NoRevocations).is_none());
+    }
+
+    #[test]
+    fn fabricated_lease_does_not_resolve() {
+        let broker = broker_with_secret();
+        // Never minted by this broker: fresh id, far-future expiry, known cap.
+        let forged = Lease {
+            id: "lease-999".to_string(),
+            capability_id: "cap-1".to_string(),
+            subject: "attacker".to_string(),
+            issued_at: 0,
+            expires_at: u64::MAX,
+        };
+        assert!(broker.resolve(&forged, 150, &NoRevocations).is_none());
+    }
+
+    #[test]
+    fn lease_dies_when_bound_capability_is_revoked() {
+        let mut broker = broker_with_secret();
+        let lease = broker.mint("cap-1", "did:chio:agent", 100);
+        assert!(broker.resolve(&lease, 150, &CapabilityRevoked).is_none());
     }
 }
 ```
@@ -714,17 +787,25 @@ impl SecretBackend for LocalBackend {
 `src/broker.rs`:
 
 ```rust
-//! The broker: mints, renews, and revokes leases. A revoked or expired lease
-//! resolves to no secret.
+//! The broker: mints, renews, and revokes leases. Only broker-minted leases
+//! resolve, and a lease dies with its capability (revocation) as well as its
+//! TTL.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::backend::SecretBackend;
 use crate::lease::Lease;
 
+/// A view over capability revocation state (backed by chio-revocation-oracle in
+/// production). A lease dies with its bound capability.
+pub trait RevocationView {
+    fn is_revoked(&self, capability_id: &str) -> bool;
+}
+
 /// Issues and tracks leases over a secret backend.
 pub struct Broker {
     backend: Box<dyn SecretBackend>,
+    issued: HashMap<String, Lease>,
     revoked: HashSet<String>,
     next_id: u64,
     default_ttl: u64,
@@ -733,20 +814,29 @@ pub struct Broker {
 impl Broker {
     #[must_use]
     pub fn new(backend: Box<dyn SecretBackend>, default_ttl: u64) -> Self {
-        Self { backend, revoked: HashSet::new(), next_id: 0, default_ttl }
+        Self {
+            backend,
+            issued: HashMap::new(),
+            revoked: HashSet::new(),
+            next_id: 0,
+            default_ttl,
+        }
     }
 
-    /// Mint a lease bound to a capability, expiring at `now + default_ttl`.
+    /// Mint a lease bound to a capability, expiring at `now + default_ttl`, and
+    /// record it so only broker-minted leases can later resolve.
     pub fn mint(&mut self, capability_id: &str, subject: &str, now: u64) -> Lease {
         let id = format!("lease-{}", self.next_id);
         self.next_id += 1;
-        Lease {
-            id,
+        let lease = Lease {
+            id: id.clone(),
             capability_id: capability_id.to_string(),
             subject: subject.to_string(),
             issued_at: now,
             expires_at: now.saturating_add(self.default_ttl),
-        }
+        };
+        self.issued.insert(id, lease.clone());
+        lease
     }
 
     /// Revoke a lease by id.
@@ -754,10 +844,26 @@ impl Broker {
         self.revoked.insert(lease_id.to_string());
     }
 
-    /// Resolve a lease to its secret, or `None` if expired or revoked.
+    /// Resolve a lease to its secret, or `None` if the lease was not minted by
+    /// this broker (unknown id, or a presented lease that does not match the
+    /// stored binding), is expired or lease-revoked, or its bound capability
+    /// has been revoked. A fabricated lease with a fresh id and far-future
+    /// expiry cannot resolve because it is absent from `issued`.
     #[must_use]
-    pub fn resolve(&self, lease: &Lease, now: u64) -> Option<String> {
+    pub fn resolve(
+        &self,
+        lease: &Lease,
+        now: u64,
+        revocations: &dyn RevocationView,
+    ) -> Option<String> {
+        let issued = self.issued.get(&lease.id)?;
+        if issued != lease {
+            return None;
+        }
         if self.revoked.contains(&lease.id) || !lease.is_live(now) {
+            return None;
+        }
+        if revocations.is_revoked(&lease.capability_id) {
             return None;
         }
         self.backend.resolve(lease)
@@ -781,11 +887,12 @@ git commit -m "feat(secret-broker): add backend trait, local backend, and broker
 
 **Files:**
 - Create: `crates/security/chio-secret-broker/src/boundary.rs`
+- Modify: `crates/security/chio-secret-broker/src/broker.rs` (call the scan in `resolve`), `src/lib.rs` (`pub mod boundary;`)
 - Test: inline
 
 **Interfaces:**
 - Consumes: `chio_guards::SecretLeakGuard` (confirm the exact export path; the exploration cites `crates/guards/chio-guards/src/secret_leak.rs` with `SecretLeakGuard::new()` and `SecretMatch { pattern_name, offset, length, redacted }`).
-- Produces: `pub fn scan_for_raw_secret(value: &str) -> bool` returning true when the value looks like a raw long-lived secret, so the broker can refuse to hand it back where a lease was expected.
+- Produces: `pub fn scan_for_raw_secret(value: &str) -> bool` returning true when the value looks like a raw long-lived secret. `Broker::resolve` calls it on the resolved value and returns `None` when it fires, so a lease never hands back a raw long-lived credential.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -831,16 +938,41 @@ pub fn scan_for_raw_secret(value: &str) -> bool {
 
 Confirm the detector method: read `crates/guards/chio-guards/src/secret_leak.rs` for the public scan method that returns `Vec<SecretMatch>` (the exploration names `SecretMatch`); if the method is named differently (for example `detect` or `find_secrets`), use that name and keep the "non-empty means secret" logic.
 
+Then wire the scan into `Broker::resolve` so a resolved raw secret is refused, and add `pub mod boundary;` to `lib.rs`. Change the tail of `resolve`:
+
+```rust
+        let secret = self.backend.resolve(lease)?;
+        // A lease must never hand back a raw long-lived secret; refuse if the
+        // resolved value looks like one.
+        if crate::boundary::scan_for_raw_secret(&secret) {
+            return None;
+        }
+        Some(secret)
+```
+
+Add a broker test proving a lease over a raw AWS-style secret refuses to resolve (it reuses the `NoRevocations` fake from Task 6's test module):
+
+```rust
+    #[test]
+    fn lease_refuses_to_return_a_raw_secret() {
+        let mut backend = LocalBackend::new();
+        backend.store("cap-raw", "AKIAIOSFODNN7EXAMPLE".to_string());
+        let mut broker = Broker::new(Box::new(backend), 60);
+        let lease = broker.mint("cap-raw", "did:chio:agent", 100);
+        assert!(broker.resolve(&lease, 150, &NoRevocations).is_none());
+    }
+```
+
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cargo test -p chio-secret-broker boundary`
+Run: `cargo test -p chio-secret-broker boundary && cargo test -p chio-secret-broker broker`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/security/chio-secret-broker/src/boundary.rs
-git commit -m "feat(secret-broker): scan lease boundary for raw secrets"
+git add crates/security/chio-secret-broker/src/boundary.rs crates/security/chio-secret-broker/src/broker.rs crates/security/chio-secret-broker/src/lib.rs
+git commit -m "feat(secret-broker): scan lease boundary and refuse raw secrets in resolve"
 ```
 
 ---
