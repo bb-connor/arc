@@ -475,6 +475,19 @@ impl SqliteBudgetStore {
     }
 
     /// The durable trusted floor for one origin (0 when none recorded).
+    ///
+    /// IMPORTANT (codex #965 Finding 4): this floor does NOT gate the budget ack
+    /// head. `budget_ack_heads` is GENESIS-anchored: it walks the contiguous global
+    /// event prefix from seq 1 (over `budget_mutation_events` UNION the recorded
+    /// abandoned seqs, from a watermark that resets to 0 on any delete) and never
+    /// reads `budget_import_floors`. Raising an origin's import floor therefore
+    /// never advances that origin's ack head, and a delta page that jumps over the
+    /// floor is still rejected as non-contiguous by the puller. The floor is written
+    /// only on snapshot install (`record_budget_import_floors`) to record the
+    /// provably-covered lower bound of an installed snapshot. This singular reader
+    /// has NO production consumer; it is a diagnostic/test surface that verifies
+    /// snapshot install persisted the floor. Do not wire it into ack-head, quorum,
+    /// or witness accounting.
     pub fn budget_import_floor(&self, authority_id: &str) -> Result<u64, BudgetStoreError> {
         let connection = self.connection()?;
         let floor: i64 = connection
