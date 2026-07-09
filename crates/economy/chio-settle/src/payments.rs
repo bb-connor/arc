@@ -767,8 +767,9 @@ pub const CHIO_OFFCHAIN_SETTLEMENT_RECEIPT_SCHEMA: &str = "chio.settle.offchain_
 /// Minted after a successful [`prepare_transfer_with_authorization`] call.
 /// No broadcast path exists in this crate: this artifact records that an
 /// authorization was prepared and binds it to the governed receipt that
-/// authorized the spend. The `execution_nonce` field is `None` until
-/// on-chain execution is implemented.
+/// authorized the spend. The `execution_nonce_ref` and `hold_ref` fields are
+/// reserved linkage fields for the comptroller surface and are `None` until
+/// the corresponding on-chain execution stage is implemented.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct OffchainSettlementReceiptArtifact {
@@ -787,10 +788,14 @@ pub struct OffchainSettlementReceiptArtifact {
     pub governed_receipt_id: String,
     /// Settled monetary amount.
     pub settled_amount: MonetaryAmount,
-    /// Reserved for the on-chain execution nonce; `None` until on-chain
-    /// execution is implemented.
+    /// Reserved linkage to the on-chain execution nonce reference used by the
+    /// comptroller surface. `None` until on-chain execution is implemented.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub execution_nonce: Option<String>,
+    pub execution_nonce_ref: Option<String>,
+    /// Reserved linkage to the budget hold that backs this settlement.
+    /// `None` until the comptroller hold-linkage stage is implemented.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hold_ref: Option<String>,
     /// Optional human-readable note.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
@@ -803,7 +808,8 @@ pub struct OffchainSettlementReceiptArtifact {
 ///   `governed_receipt_id` is empty.
 /// - `settled_amount.units` is zero.
 ///
-/// `execution_nonce` is optional and not validated.
+/// `execution_nonce_ref` and `hold_ref` are optional reserved linkage fields
+/// and are not validated here.
 pub fn validate_offchain_settlement_receipt(
     receipt: &OffchainSettlementReceiptArtifact,
 ) -> Result<(), SettlementError> {
@@ -1723,7 +1729,8 @@ mod tests {
                 units: 1_000_000,
                 currency: "USDC".to_string(),
             },
-            execution_nonce: None,
+            execution_nonce_ref: None,
+            hold_ref: None,
             note: None,
         }
     }
@@ -1765,6 +1772,48 @@ mod tests {
         assert!(
             matches!(error, SettlementError::InvalidInput(_)),
             "empty schema must produce InvalidInput, got: {error}"
+        );
+    }
+
+    #[test]
+    fn offchain_receipt_reserved_linkage_fields_are_present_and_optional() {
+        // Pins the wire names of both reserved comptroller-surface linkage
+        // fields. A present field must round-trip; absent fields must not
+        // appear in serialized JSON (skip_serializing_if = "Option::is_none").
+        let with_refs: OffchainSettlementReceiptArtifact = serde_json::from_str(
+            r#"{
+                "schema": "chio.settle.offchain_receipt.v1",
+                "settlement_receipt_id": "osr-pin-1",
+                "issued_at": 1700000000,
+                "authorization_digest": "0xdigest",
+                "governed_receipt_id": "rc-pin-1",
+                "settled_amount": { "units": 1, "currency": "USDC" },
+                "execution_nonce_ref": "nonce-ref-abc",
+                "hold_ref": "hold-ref-xyz"
+            }"#,
+        )
+        .test_unwrap();
+        assert_eq!(
+            with_refs.execution_nonce_ref.as_deref(),
+            Some("nonce-ref-abc"),
+            "execution_nonce_ref must deserialize from the wire field name"
+        );
+        assert_eq!(
+            with_refs.hold_ref.as_deref(),
+            Some("hold-ref-xyz"),
+            "hold_ref must deserialize from the wire field name"
+        );
+
+        // Absent fields must not appear in serialized output.
+        let absent = sample_offchain_receipt();
+        let json = serde_json::to_string(&absent).test_unwrap();
+        assert!(
+            !json.contains("execution_nonce_ref"),
+            "absent execution_nonce_ref must be omitted from JSON: {json}"
+        );
+        assert!(
+            !json.contains("hold_ref"),
+            "absent hold_ref must be omitted from JSON: {json}"
         );
     }
 
