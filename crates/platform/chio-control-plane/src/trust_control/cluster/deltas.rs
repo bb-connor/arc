@@ -312,27 +312,52 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
         update_peer_sync_error(state, peer_url, error.to_string());
         return Err(error);
     }
-    let mut round = PullRoundBudget::new();
     let mut delta_records = 0u64;
-    // Run each stream's puller only while round budget remains. Once a stream
-    // exhausts the shared per-peer budget (pages/records/deadline), skip the rest
-    // so we do not issue more blocking peer fetches just to rediscover the same
-    // exhausted budget and delay parked writers; the skipped streams resume next
-    // round (honest backlog, no demotion) (codex #965 round-4 P2).
+    // Lane 1: the budget/receipt/lineage streams share ONE per-peer round budget,
+    // budget FIRST (quorum-critical). Run each puller only while round budget
+    // remains; once a stream exhausts the shared budget (pages/records/deadline),
+    // skip the rest so we do not issue more blocking peer fetches just to
+    // rediscover the same exhausted budget (codex #965 round-4 P2). A Protocol
+    // violation demotes the peer; on ANY stream error the shared lane stops (break)
+    // but revocations (lane 2) still run below unless the peer was demoted.
+    let mut round = PullRoundBudget::new();
     for puller in peer_pullers() {
         if round.is_exhausted() {
             break;
         }
-        route_pull(
+        if route_pull(
             state,
             peer_url,
             puller(state, &client, peer_url, &mut round),
             &mut delta_records,
-        )?;
+        )
+        .is_err()
+        {
+            break;
+        }
     }
-    // The pull round completed without demotion (any Protocol/Transient/ForceSnapshot
-    // error short-circuits via `?` above, before this point): only now record the
-    // peer's advertised acks, mark it successful, and wake parked writers.
+    // Lane 2: revocations replicate on their OWN round budget, INDEPENDENT of the
+    // shared budget/receipt round, so a sustained budget backlog (shared-round
+    // exhaustion) or a broken/slow budget-delta endpoint can never starve
+    // security-critical revocation propagation (codex #965 Finding: avoid starving
+    // revocation pulls behind budget backlog). It is skipped ONLY when the peer was
+    // demoted by lane 1 (fail-closed: a peer that violated the wire contract is
+    // untrusted, so we pull nothing more from it).
+    if !peer_was_demoted(state, peer_url) {
+        let mut revocation_round = PullRoundBudget::new();
+        let _ = route_pull(
+            state,
+            peer_url,
+            sync_peer_revocations(state, &client, peer_url, &mut revocation_round),
+            &mut delta_records,
+        );
+    }
+    // Record the peer's advertised acks, mark it successful, and wake parked
+    // writers - fail-closed for a demoted or force-snapshot peer (see
+    // finalize_peer_sync_round). A transient/force-snapshot error on either lane
+    // leaves the peer Healthy, so its status-advertised acks (which come from
+    // cluster_status, not the delta pull) are still recorded: a broken delta
+    // endpoint must not starve budget ack convergence.
     finalize_peer_sync_round(state, peer_url, &peer_status.budget_ack_heads, delta_records);
     Ok(())
 }
@@ -1059,14 +1084,19 @@ type Puller = fn(
     &mut PullRoundBudget,
 ) -> Result<u64, PullError>;
 
-/// The per-peer pull order. Budget replication is quorum-critical (HA budget
-/// writes wait on peers' budget_ack_heads), so it is pulled FIRST: a sustained
-/// receipt/lineage backlog must not spend the shared round budget and starve the
-/// budget pull, timing out otherwise-committable writes (codex #965 round-5 P1).
-fn peer_pullers() -> [Puller; 5] {
+/// The per-peer SHARED-ROUND pull order. Budget replication is quorum-critical
+/// (HA budget writes wait on peers' budget_ack_heads), so it is pulled FIRST: a
+/// sustained receipt/lineage backlog must not spend the shared round budget and
+/// starve the budget pull, timing out otherwise-committable writes (codex #965
+/// round-5 P1).
+///
+/// Revocations are NOT in this shared list: they replicate on their own
+/// independent round budget in `sync_peer` so budget churn (shared-round
+/// exhaustion) or a broken budget endpoint cannot starve security-critical
+/// revocation propagation (codex #965 Finding: avoid starving revocation pulls).
+fn peer_pullers() -> [Puller; 4] {
     [
         sync_peer_budgets,
-        sync_peer_revocations,
         sync_peer_tool_receipts,
         sync_peer_child_receipts,
         sync_peer_lineage,
@@ -1365,6 +1395,27 @@ mod deltas_tests {
             peer_pullers()[0] as usize,
             sync_peer_budgets as Puller as usize,
             "the budget pull must run first in the per-peer pull order"
+        );
+    }
+
+    #[test]
+    fn revocations_are_not_in_the_shared_budget_round() {
+        // codex #965 Finding (avoid starving revocation pulls): revocations must
+        // replicate on their OWN round budget in sync_peer, NOT share the
+        // budget/receipt round. If they were in this shared list a sustained budget
+        // backlog (shared-round exhaustion) or a broken budget endpoint could starve
+        // security-critical revocation propagation. Budget stays first here.
+        let shared = peer_pullers();
+        assert_eq!(
+            shared[0] as usize,
+            sync_peer_budgets as Puller as usize,
+            "budget remains first in the shared round"
+        );
+        assert!(
+            !shared
+                .iter()
+                .any(|puller| *puller as usize == sync_peer_revocations as Puller as usize),
+            "revocations must be pulled on an independent round budget, not the shared one"
         );
     }
 

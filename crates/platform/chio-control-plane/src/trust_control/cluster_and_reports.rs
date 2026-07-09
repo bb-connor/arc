@@ -882,6 +882,49 @@ mod cluster_and_reports_tests {
         assert!(!commit.witness_urls.iter().any(|url| url == "http://node-b"));
     }
 
+    #[test]
+    fn a_transient_budget_error_leaves_the_peer_healthy_so_revocations_still_run() {
+        // codex #965 Finding (avoid starving revocation pulls): the independent
+        // revocation lane in sync_peer runs unless the peer was DEMOTED. A transient
+        // budget-delta error (broken/slow budget endpoint) keeps the peer Healthy,
+        // so peer_was_demoted stays false and revocations still replicate. A Protocol
+        // violation demotes the peer, so revocations are skipped (fail-closed: an
+        // untrusted peer is not pulled from).
+        let state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
+        update_peer_reachable(&state, "http://node-b");
+        assert!(!peer_was_demoted(&state, "http://node-b"));
+
+        // Transient budget error: peer stays reachable, so the revocation lane runs.
+        let mut records = 0u64;
+        let _ = route_pull(
+            &state,
+            "http://node-b",
+            Err(PullError::Transient(CliError::cli_other_error(
+                "budget endpoint slow",
+            ))),
+            &mut records,
+        );
+        assert!(
+            !peer_was_demoted(&state, "http://node-b"),
+            "a transient budget error must not demote the peer, so revocations still replicate"
+        );
+
+        // Protocol violation: peer demoted, so the revocation lane is skipped.
+        let _ = route_pull(
+            &state,
+            "http://node-b",
+            Err(PullError::Protocol(PeerProtocolError::NonContiguousPage {
+                expected_seq: 5,
+                found_seq: 9,
+            })),
+            &mut records,
+        );
+        assert!(
+            peer_was_demoted(&state, "http://node-b"),
+            "a Protocol violation demotes the peer, so its revocations are not pulled"
+        );
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn clearing_force_snapshot_then_notifying_wakes_a_parked_waiter() {
         // codex #965 round-4 P2: a peer whose acks were recorded while still
