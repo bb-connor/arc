@@ -727,25 +727,39 @@ impl SqliteBudgetStore {
             raise_budget_replication_seq_floor(transaction, usage_seq)?;
         }
 
-        let duplicate_event = if let Some(existing) =
-            Self::load_mutation_event(transaction, &record.event_id)?
-        {
-            if !Self::same_imported_mutation(&existing, record) {
-                if Self::rolled_back_authorize_can_be_replaced(transaction, &existing, record)? {
+        let duplicate_event =
+            if let Some(existing) = Self::load_mutation_event(transaction, &record.event_id)? {
+                // A rolled-back authorize that the leader re-appended at a STRICTLY
+                // HIGHER event_seq takes the replace path even when every other field
+                // matches. `same_imported_mutation` compares authority/content only and
+                // ignores event_seq, so a SAME-AUTHORITY retry (the leader kept its
+                // lease, so the re-append is byte-identical apart from its fresh seq)
+                // would otherwise be short-circuited as a duplicate below and the
+                // follower would never store the re-appended row - stalling its
+                // contiguous ack head at the rollback marker until a full snapshot
+                // rebuild (codex #965). Gating on `record.event_seq > existing.event_seq`
+                // keeps this FORWARD-ONLY: a genuine idempotent re-delivery (equal seq)
+                // or a stale lower-seq replay falls through to the duplicate no-op below
+                // and never regresses or double-tombstones the head. This also covers the
+                // cross-authority re-append (authority differs, so content differs), for
+                // which the re-append is likewise at a fresh higher seq.
+                if record.event_seq > existing.event_seq
+                    && Self::rolled_back_authorize_can_be_replaced(transaction, &existing, record)?
+                {
                     transaction.execute(
                         "DELETE FROM budget_mutation_events WHERE event_id = ?1",
                         params![record.event_id],
                     )?;
-                    // Symmetric with existing_event_allowed on the leader: the
-                    // replaced old event's seq is genuinely superseded by the higher
-                    // re-appended seq, so record it abandoned in the SAME transaction.
-                    // An ALREADY-SYNCED follower (whose pull cursor is already past
-                    // the old seq, so the delta's abandoned_seqs excludes it) then
-                    // self-heals immediately - its contiguous ack head advances past
-                    // the filled slot instead of wedging at the hole until a snapshot
-                    // (codex #965 round-5). Only the SPECIFICALLY-superseded seq is
-                    // recorded (not an arbitrary gap), so a genuine missing event
-                    // still caps the head; never over-counts.
+                    // Symmetric with existing_event_allowed on the leader: the replaced
+                    // old event's seq is genuinely superseded by the higher re-appended
+                    // seq, so record it abandoned in the SAME transaction. An
+                    // ALREADY-SYNCED follower (whose pull cursor is already past the old
+                    // seq, so the delta's abandoned_seqs excludes it) then self-heals
+                    // immediately - its contiguous ack head advances past the filled slot
+                    // instead of wedging at the hole until a snapshot (codex #965
+                    // round-5). Only the SPECIFICALLY-superseded seq is recorded (not an
+                    // arbitrary gap), so a genuine missing event still caps the head;
+                    // never over-counts.
                     if existing.event_seq > 0 && existing.event_seq != record.event_seq {
                         transaction.execute(
                             "INSERT OR IGNORE INTO budget_abandoned_event_seqs(seq) VALUES (?1)",
@@ -759,22 +773,24 @@ impl SqliteBudgetStore {
                             params![hold_id],
                         )?;
                     }
-                    // Insert the incoming re-appended event (same event_id, fresh
-                    // higher event_seq) AFTER tombstoning the superseded seq, so the
-                    // follower actually holds the retried write. Without this insert
-                    // the follower's contiguous ack head halts at the abandoned marker
-                    // and never reaches the re-appended seq, so it never witnesses the
-                    // retried write and quorum waits time out even though the delta was
-                    // applied (codex #965: insert replacement events after
-                    // tombstoning). This never over-counts: the superseded old seq
-                    // stays abandoned (a FILLED-but-not-live slot, contributing no
-                    // origin ack), while the re-appended event is a genuine
-                    // leader-committed write, so witnessing its fresh seq is correct.
-                    // A plain INSERT (mirroring the new-event path) is fail-closed: if a
-                    // corrupt stream reused this fresh seq for a different event the
-                    // unique event_seq index rejects it rather than masking it.
+                    // Insert the incoming re-appended event (same event_id, fresh higher
+                    // event_seq) AFTER tombstoning the superseded seq, so the follower
+                    // actually holds the retried write. Without this insert the follower's
+                    // contiguous ack head halts at the abandoned marker and never reaches
+                    // the re-appended seq, so it never witnesses the retried write and
+                    // quorum waits time out even though the delta was applied (codex #965:
+                    // insert replacement events after tombstoning). This never
+                    // over-counts: the superseded old seq stays abandoned (a
+                    // FILLED-but-not-live slot, contributing no origin ack), while the
+                    // re-appended event is a genuine leader-committed write, so witnessing
+                    // its fresh seq is correct. A plain INSERT (mirroring the new-event
+                    // path) is fail-closed: if a corrupt stream reused this fresh seq for a
+                    // different event the unique event_seq index rejects it rather than
+                    // masking it.
                     Self::insert_imported_mutation_event(transaction, record)?;
                     false
+                } else if Self::same_imported_mutation(&existing, record) {
+                    true
                 } else {
                     return Err(BudgetStoreError::Invariant(format!(
                         "budget event_id `{}` was reused for a different mutation",
@@ -782,12 +798,9 @@ impl SqliteBudgetStore {
                     )));
                 }
             } else {
-                true
-            }
-        } else {
-            Self::insert_imported_mutation_event(transaction, record)?;
-            false
-        };
+                Self::insert_imported_mutation_event(transaction, record)?;
+                false
+            };
 
         if duplicate_event {
             return Ok(());

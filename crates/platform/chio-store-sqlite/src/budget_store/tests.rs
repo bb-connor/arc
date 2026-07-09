@@ -2417,6 +2417,140 @@ fn follower_replace_inserts_reappended_event_and_head_reaches_new_seq() {
 }
 
 #[test]
+fn same_authority_rollback_retry_reinserts_reappended_event_and_head_advances() {
+    // codex #965 (reinsert same-authority rollback retries): TEETH-TEST for the
+    // SAME-AUTHORITY re-append. When the leader keeps its lease and retries a
+    // rolled-back authorize, the re-appended event is byte-identical to the
+    // original EXCEPT its fresh higher event_seq, so `same_imported_mutation`
+    // (authority/content-only, ignores event_seq) reports it a duplicate. Before
+    // the fix the importer short-circuited and never stored the re-appended row,
+    // so the follower's ack head stalled at the rollback marker (seq 2) and it
+    // could not witness the retried write until a full snapshot rebuild. The fix
+    // gates the replace path on `record.event_seq > existing.event_seq`, so a
+    // differing seq forces the replace + reinsert even when authority/content
+    // match. RED before the fix: the follower still holds E@1 and its head is 2.
+    let leader_path = unique_db_path("chio-same-authority-retry-leader");
+    let follower_path = unique_db_path("chio-same-authority-retry-follower");
+    let leader = SqliteBudgetStore::open(&leader_path).unwrap();
+    let follower = SqliteBudgetStore::open(&follower_path).unwrap();
+    let hold_id = "hold-sa";
+    let event_id = "evt-sa:authorize";
+    // ONE authority reused across the original authorize AND the retry: the leader
+    // never changed leases, so the re-appended event's authority is byte-identical.
+    let leased = authority("budget-primary", "lease-1", 1);
+
+    // Leader authorizes E (seq 1), then rolls it back (rollback marker at seq 2).
+    assert!(leader
+        .try_charge_cost_with_ids_and_authority(
+            "cap-sa",
+            0,
+            Some(10),
+            100,
+            Some(200),
+            Some(1000),
+            Some(hold_id),
+            Some(event_id),
+            Some(&leased),
+        )
+        .unwrap());
+    leader
+        .reverse_charge_cost_with_ids_and_authority(
+            "cap-sa",
+            0,
+            100,
+            Some(hold_id),
+            Some("evt-sa:authorize:rollback:1"),
+            Some(&leased),
+        )
+        .unwrap();
+
+    // Follower syncs the PRE-retry state (E@1 + the rollback marker) and confirms it
+    // holds the ORIGINAL authorize at seq 1 with no abandoned slot yet.
+    let pre_retry = leader.list_mutation_events_after_seq(100, 0).unwrap();
+    follower.import_snapshot_records(&[], &pre_retry).unwrap();
+    assert_eq!(
+        follower.mutation_event_seq_for_event_id(event_id).unwrap(),
+        Some(1),
+        "follower holds the ORIGINAL authorize at seq 1 pre-retry"
+    );
+    assert!(follower.list_abandoned_event_seqs().unwrap().is_empty());
+
+    // Leader retries under the SAME lease: the rollback decremented the usage
+    // counters, so this is a GENUINE re-append (not the idempotent no-op) - it
+    // deletes E@1 (abandons 1) and re-appends E@new at a fresh higher seq.
+    assert!(leader
+        .try_charge_cost_with_ids_and_authority(
+            "cap-sa",
+            0,
+            Some(10),
+            100,
+            Some(200),
+            Some(1000),
+            Some(hold_id),
+            Some(event_id),
+            Some(&leased),
+        )
+        .unwrap());
+    let reappended = leader
+        .list_mutation_events_after_seq(100, 0)
+        .unwrap()
+        .into_iter()
+        .find(|record| record.event_id == event_id)
+        .expect("the re-appended authorize event");
+    let new_seq = reappended.event_seq;
+    assert!(
+        new_seq > 2,
+        "re-appended strictly above the rollback marker (leader really re-appended, not idempotent)"
+    );
+    // Sanity: the re-appended event carries the SAME authority as the original, so
+    // `same_imported_mutation` would (wrongly) call it a duplicate without the fix.
+    assert_eq!(
+        reappended.authority.as_ref(),
+        Some(&leased),
+        "the retry kept the original lease (same-authority re-append)"
+    );
+
+    // Follower imports the same-authority re-append.
+    follower.import_mutation_record(&reappended).unwrap();
+
+    // TEETH: the re-appended event is PRESENT at its new seq (exactly one row: the
+    // unique event_seq index would reject a duplicate).
+    assert_eq!(
+        follower.mutation_event_seq_for_event_id(event_id).unwrap(),
+        Some(new_seq),
+        "the follower re-inserts the same-authority re-append at its fresh seq"
+    );
+    assert_eq!(
+        follower.max_mutation_event_seq().unwrap(),
+        new_seq,
+        "the follower's max advances to the re-appended seq"
+    );
+    // TEETH: the contiguous ack head ADVANCES to the ABSOLUTE new seq (not the
+    // rollback marker), so the follower witnesses the retried write.
+    let head = follower
+        .budget_ack_heads()
+        .unwrap()
+        .into_iter()
+        .find(|(origin, _)| origin == "budget-primary")
+        .map(|(_, seq)| seq);
+    assert_eq!(
+        head,
+        Some(new_seq),
+        "the follower's ack head reaches the re-appended seq, not the rollback marker"
+    );
+    // The superseded OLD seq stays abandoned: a FILLED-but-not-live slot that lets
+    // the head cross the hole but contributes NO origin ack, so no over-count.
+    assert_eq!(
+        follower.list_abandoned_event_seqs().unwrap(),
+        vec![1],
+        "the superseded old seq stays abandoned, never a live witness"
+    );
+
+    let _ = fs::remove_file(&leader_path);
+    let _ = fs::remove_file(&follower_path);
+}
+
+#[test]
 fn mutation_event_witness_returns_stored_origin_authority() -> Result<(), Box<dyn std::error::Error>>
 {
     // codex #965 round-5 P1: the witness identity for an idempotent retry comes
