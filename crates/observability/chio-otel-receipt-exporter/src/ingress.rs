@@ -335,8 +335,12 @@ impl BoundedOtlpGrpcIngress {
             match append_result {
                 Ok(()) => {
                     let _ = self.pop_front()?;
-                    summary.accepted_spans += spans;
-                    summary.appended_receipts += spans;
+                    // Count only receipts appended DURING THIS drain. After a
+                    // retryable partial append, `already` receipts were appended
+                    // (and summarized) in a prior drain, so adding the whole batch
+                    // size here would double-count them (Codex round-3 finding 3).
+                    summary.accepted_spans += newly;
+                    summary.appended_receipts += newly;
                 }
                 Err(error) => {
                     let remaining = spans.saturating_sub(appended);
@@ -963,6 +967,84 @@ mod tests {
         Ok(())
     }
 
+    /// A sink that appends the first `fail_after` receipts, then fails ONCE with
+    /// a retryable `Pool` error, then appends everything on the retry. Used to
+    /// exercise the partial-append resume path.
+    struct PartialThenRetrySink {
+        appended: Mutex<usize>,
+        fail_after: usize,
+        failed_once: Mutex<bool>,
+    }
+
+    impl CanonicalReceiptSink for PartialThenRetrySink {
+        fn append_chio_receipt_canonical(
+            &self,
+            _receipt: CanonicalChioReceipt,
+        ) -> Result<(), ReceiptStoreError> {
+            let mut appended = self
+                .appended
+                .lock()
+                .map_err(|_| ReceiptStoreError::Pool("appended mutex poisoned".to_string()))?;
+            let mut failed_once = self
+                .failed_once
+                .lock()
+                .map_err(|_| ReceiptStoreError::Pool("failed_once mutex poisoned".to_string()))?;
+            if !*failed_once && *appended >= self.fail_after {
+                *failed_once = true;
+                return Err(ReceiptStoreError::Pool(
+                    "forced retryable partial append failure".to_string(),
+                ));
+            }
+            *appended += 1;
+            Ok(())
+        }
+    }
+
+    /// Codex round-3 finding 3: after a retryable partial append, the retry must
+    /// count only the NEWLY appended receipts in its success summary, not the
+    /// whole batch (which would double-count the receipts appended on the first
+    /// attempt).
+    #[test]
+    fn retry_after_partial_append_counts_only_newly_appended() -> Result<(), Box<dyn Error>> {
+        let sink = ReceiptStoreSink::new_canonical(
+            Arc::new(PartialThenRetrySink {
+                appended: Mutex::new(0),
+                fail_after: 1,
+                failed_once: Mutex::new(false),
+            }),
+            ReceiptStoreSinkConfig::new(Keypair::generate()),
+        );
+        let ingress = BoundedOtlpGrpcIngress::new(sink, OtlpExporterQueueConfig::default());
+        ingress.enqueue(export_with_two_spans("span-a", "span-b"))?;
+
+        // First drain: appends 1 of 2 receipts, then fails retryably, so the
+        // batch is retained with its resume cursor at 1.
+        let first = ingress.drain();
+        assert!(
+            first.is_err(),
+            "the partial append must surface the retryable error"
+        );
+        assert_eq!(
+            ingress.snapshot()?.queued_batches,
+            1,
+            "the retryable batch is retained for redelivery"
+        );
+
+        // Second drain: appends only the remaining receipt. The summary must
+        // report the 1 newly appended receipt, not the full 2-span batch.
+        let summary = ingress.drain()?;
+        assert_eq!(
+            summary.appended_receipts, 1,
+            "the retry counts only the newly appended receipt: {summary:?}"
+        );
+        assert_eq!(
+            summary.accepted_spans, 1,
+            "the retry counts only the newly accepted span: {summary:?}"
+        );
+        assert_eq!(ingress.snapshot()?.queued_batches, 0);
+        Ok(())
+    }
+
     fn bounded_ingress(
         recorder: Arc<RecordingCanonicalSink>,
         config: OtlpExporterQueueConfig,
@@ -981,5 +1063,22 @@ mod tests {
             name,
         )
         .with_attribute("chio.verdict", serde_json::json!("allow"))])
+    }
+
+    fn export_with_two_spans(first: &str, second: &str) -> OtlpGrpcTraceExport {
+        OtlpGrpcTraceExport::from_spans(vec![
+            OtlpSpan::new(
+                "0123456789abcdef0123456789abcdef",
+                "0123456789abcdef",
+                first,
+            )
+            .with_attribute("chio.verdict", serde_json::json!("allow")),
+            OtlpSpan::new(
+                "0123456789abcdef0123456789abcdef",
+                "fedcba9876543210",
+                second,
+            )
+            .with_attribute("chio.verdict", serde_json::json!("allow")),
+        ])
     }
 }
