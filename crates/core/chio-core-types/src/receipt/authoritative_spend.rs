@@ -82,6 +82,7 @@ pub trait PresentedNonceView {
 /// at least one variant so a conformance matrix can flip them independently.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NotAuthoritativeReason {
+    ReceiptSignatureInvalid,
     SignerNotAdmitted,
     NotMediatedDecision,
     NotPreventBoundary,
@@ -112,6 +113,14 @@ pub fn is_authoritative_spend_receipt(
     admitted_kernel_keys: &[PublicKey],
     presented_nonce: &dyn PresentedNonceView,
 ) -> Result<(), NotAuthoritativeReason> {
+    // The receipt body must be signed by the embedded kernel key. The execution
+    // nonce signature covers only the nonce, so without this a holder of a
+    // signed nonce could forge receipt fields (invented reconciled-budget
+    // metadata) under an admitted key. Fail-closed on a verification error or a
+    // false result.
+    if !matches!(receipt.verify_signature(), Ok(true)) {
+        return Err(NotAuthoritativeReason::ReceiptSignatureInvalid);
+    }
     // (e) signer must be an admitted kernel key.
     if !admitted_kernel_keys.contains(&receipt.kernel_key) {
         return Err(NotAuthoritativeReason::SignerNotAdmitted);
@@ -325,12 +334,42 @@ mod tests {
         // A trusted signer stamps advisory content as Mediated with zero budget movement.
         let kp = Keypair::generate();
         let mut receipt = authoritative_receipt(&kp);
-        // Strip the budget_authority metadata but keep the Mediated label.
+        // Strip the budget_authority metadata but keep the Mediated label. The
+        // trusted signer re-signs the stripped body, so the rejection is the
+        // structural one and not the signature precondition.
         receipt.metadata = Some(serde_json::json!({}));
+        let receipt = ChioReceipt::sign(receipt.body(), &kp).unwrap();
         let nonce = good_nonce(&kp, &receipt);
         assert_eq!(
             is_authoritative_spend_receipt(&receipt, &[kp.public_key()], &nonce),
             Err(NotAuthoritativeReason::MissingBudgetAuthority)
+        );
+    }
+
+    #[test]
+    fn tampered_receipt_body_with_admitted_key_is_rejected() {
+        // A client holding a legitimately signed execution nonce cannot forge a
+        // spend receipt: inflating a signed budget field without re-signing must
+        // be rejected even though the embedded kernel key is admitted and every
+        // structural field still checks out.
+        let kp = Keypair::generate();
+        let mut receipt = authoritative_receipt(&kp);
+        if let Some(metadata) = receipt.metadata.as_mut() {
+            metadata["budget_authority"]["terminal"]["realized_spend_units"] =
+                serde_json::json!(9_999);
+        }
+        let nonce = good_nonce(&kp, &receipt);
+        assert_eq!(
+            is_authoritative_spend_receipt(&receipt, &[kp.public_key()], &nonce),
+            Err(NotAuthoritativeReason::ReceiptSignatureInvalid)
+        );
+
+        // The untampered, correctly-signed receipt still passes.
+        let receipt = authoritative_receipt(&kp);
+        let nonce = good_nonce(&kp, &receipt);
+        assert_eq!(
+            is_authoritative_spend_receipt(&receipt, &[kp.public_key()], &nonce),
+            Ok(())
         );
     }
 
@@ -516,6 +555,10 @@ mod tests {
             let mut nonce = good_nonce(&kp, &base);
             (case.patch_receipt)(&mut receipt);
             (case.patch_nonce)(&mut nonce);
+            // Re-sign after mutating the body so each structural rejection is
+            // exercised with a valid signature rather than masked by the
+            // signature precondition.
+            let receipt = ChioReceipt::sign(receipt.body(), &kp).unwrap();
             assert_eq!(
                 is_authoritative_spend_receipt(&receipt, &case.admitted, &nonce),
                 Err(case.expected.clone()),
