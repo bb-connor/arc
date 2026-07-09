@@ -338,6 +338,11 @@ pub(crate) fn cmd_chio_pheromone_relay_serve(
                         // closed to deny-all if the successor tombstones or rotates
                         // this binding (RFC-0012 F34).
                         local_transport_endpoint: mount.endpoint_id,
+                        // This node's localKernelId, so the recheck requires the
+                        // successor to bind THIS kernel to THIS endpoint (mirroring the
+                        // startup check), not merely that the endpoint resolves to some
+                        // kernel (RFC-0012 F34).
+                        local_kernel_id: mount.transport_local_kernel_id.clone(),
                     };
                     Some(tokio::spawn(run_directory_reloader(
                         mount.gate.clone(),
