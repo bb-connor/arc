@@ -749,6 +749,16 @@ impl Exporter for AlertingExporter {
         "alerting"
     }
 
+    /// Alerting is a NOTIFICATION overlay, not a durable SOC audit-export sink.
+    /// Its outcomes are recorded on the `chio_alert_dispatch_total` family by
+    /// this exporter itself, so the manager must not also count it on
+    /// `chio_soc_export_total` / `_lag` / SOC DLQ depth; otherwise a failed
+    /// PagerDuty/OpsGenie dispatch would burn the SOC export SLO while audit
+    /// export is healthy (Codex round-5).
+    fn is_soc_export_sink(&self) -> bool {
+        false
+    }
+
     fn export_batch<'a>(&'a self, events: &'a [SiemEvent]) -> ExportFuture<'a> {
         Box::pin(async move {
             if events.is_empty() || self.backends.is_empty() {

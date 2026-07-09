@@ -87,6 +87,12 @@ impl SiemCursorStore {
     /// same `raw_seq` (a redelivery after the cursor was held) is a no-op.
     /// Fail-closed: on a write failure the caller must leave the cursor behind
     /// the row rather than advance (RFC-0009 F80, Codex #6).
+    ///
+    /// Returns `true` when the row was newly inserted and `false` when it already
+    /// existed (a redelivery). Callers use this to report the malformed row (DLQ
+    /// push, `_deserialize` counters) only on first capture, so a stuck exporter
+    /// holding the read cursor behind the batch cannot re-inflate the in-memory
+    /// DLQ on every poll (Codex round-5).
     pub fn persist_dead_letter(
         &self,
         raw_seq: u64,
@@ -94,19 +100,23 @@ impl SiemCursorStore {
         raw_json: &str,
         error: &str,
         failed_at: u64,
-    ) -> Result<(), SiemError> {
+    ) -> Result<bool, SiemError> {
         let conn = self
             .conn
             .lock()
             .map_err(|_| SiemError::DbError("cursor store lock poisoned".to_string()))?;
-        conn.execute(
-            "INSERT INTO siem_dead_letters (raw_seq, exporter_name, raw_json, error, failed_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5) \
-             ON CONFLICT(raw_seq) DO NOTHING",
-            rusqlite::params![raw_seq as i64, exporter, raw_json, error, failed_at as i64],
-        )
-        .map_err(|e| SiemError::DbError(e.to_string()))?;
-        Ok(())
+        // ON CONFLICT DO NOTHING reports 0 rows affected on a duplicate raw_seq
+        // and 1 on a fresh insert, so the row count distinguishes first capture
+        // from redelivery.
+        let inserted = conn
+            .execute(
+                "INSERT INTO siem_dead_letters (raw_seq, exporter_name, raw_json, error, failed_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5) \
+                 ON CONFLICT(raw_seq) DO NOTHING",
+                rusqlite::params![raw_seq as i64, exporter, raw_json, error, failed_at as i64],
+            )
+            .map_err(|e| SiemError::DbError(e.to_string()))?;
+        Ok(inserted == 1)
     }
 
     /// Raw receipt seqs durably captured in the dead-letter table, ascending.

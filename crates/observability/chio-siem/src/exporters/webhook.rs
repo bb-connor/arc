@@ -400,6 +400,23 @@ impl Exporter for WebhookExporter {
         "webhook"
     }
 
+    /// Stable, endpoint-derived durable cursor identity (Codex round-5, the F4
+    /// follow-up). Every `WebhookExporter` reports the name "webhook", so keying
+    /// the durable cursor by registration index let a config reorder or an
+    /// inserted same-named sink inherit another instance's `acked_seq` and skip
+    /// receipts. Folding the configured endpoint into the identity keeps two
+    /// webhook sinks to different destinations on distinct cursors and makes the
+    /// key depend only on configuration, not registration order. Userinfo and
+    /// query are stripped (via `sanitize_url_for_error`) so no secret material
+    /// lands in the cursor DB; the metric label stays the bare "webhook".
+    fn cursor_identity(&self) -> String {
+        format!(
+            "{}@{}",
+            self.name(),
+            sanitize_url_for_error(&self.config.url)
+        )
+    }
+
     fn export_batch<'a>(&'a self, events: &'a [SiemEvent]) -> ExportFuture<'a> {
         Box::pin(async move {
             if events.is_empty() {
@@ -510,6 +527,40 @@ mod tests {
         assert!(
             plaintext.is_err(),
             "a plaintext http SOC endpoint must be rejected"
+        );
+    }
+
+    #[test]
+    fn cursor_identity_is_endpoint_derived_and_stable() {
+        // Codex round-5 (the F4 follow-up): the durable cursor identity is
+        // derived from the configured endpoint, not the bare name, so two webhook
+        // sinks to different destinations keep distinct cursors and a config
+        // reorder cannot remap one onto the other.
+        let a = WebhookExporter::from_endpoint("https://soc.example.test/a".to_string(), None)
+            .expect("build a");
+        let b = WebhookExporter::from_endpoint("https://soc.example.test/b".to_string(), None)
+            .expect("build b");
+        assert_ne!(
+            a.cursor_identity(),
+            b.cursor_identity(),
+            "different endpoints must get distinct cursor identities"
+        );
+        // Stable and endpoint-bearing (not the bare metric name).
+        assert_eq!(a.cursor_identity(), a.cursor_identity());
+        assert_ne!(a.cursor_identity(), a.name());
+        assert!(a.cursor_identity().starts_with("webhook@"));
+        // sanitize_url_for_error strips query/fragment, so no query-string secret
+        // material lands in the durable cursor key. (userinfo is already rejected
+        // at construction by the egress contract.)
+        let with_query = WebhookExporter::from_endpoint(
+            "https://soc.example.test/a?token=abc".to_string(),
+            None,
+        )
+        .expect("build with query string");
+        assert!(
+            !with_query.cursor_identity().contains("token=abc"),
+            "query-string material must not leak into the cursor identity: {}",
+            with_query.cursor_identity()
         );
     }
 }

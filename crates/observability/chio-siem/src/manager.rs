@@ -200,9 +200,12 @@ impl ExporterManager {
     /// baseline pin is applied here.
     pub fn add_exporter(&mut self, exporter: Box<dyn Exporter>) {
         if self.cursor_store.is_some() {
-            // Key by registration index + name so two same-named instances keep
-            // distinct high-water marks (Codex round-4 finding 4).
-            let key = exporter_cursor_key(self.exporters.len(), exporter.name());
+            // Key by the exporter's STABLE, config-derived identity (Codex
+            // round-5, the F4 follow-up), not registration index, so inserting or
+            // reordering a same-named exporter cannot let a new instance inherit a
+            // previous instance's high-water mark and skip receipts. A brand-new
+            // identity seeds at BASELINE 0; a persisted identity keeps its mark.
+            let key = exporter.cursor_identity();
             self.acked.entry(key).or_insert(0);
             self.cursor = self.acked.values().copied().min().unwrap_or(0);
         }
@@ -310,49 +313,64 @@ impl ExporterManager {
                     // and break at-least-once. On a persist failure we leave the
                     // cursor BEHIND the row (return early via `?` without touching
                     // self.cursor) so the next poll re-reads and retries it.
-                    self.metrics.record_export(
-                        "_deserialize",
-                        crate::metrics_sink::ExportOutcome::Malformed,
-                    );
                     let failed_at = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .map(|d| d.as_secs())
                         .unwrap_or(0);
                     let redacted = redact_for_operator_log(&error).to_string();
-                    if let Some(store) = &self.cursor_store {
-                        store.persist_dead_letter(
+                    // Durably capture the malformed row FIRST (fail-closed: a
+                    // persist failure returns early via `?`, leaving the cursor
+                    // behind the row). Only REPORT the malformed row on its first
+                    // durable capture: a failing exporter holds the read cursor
+                    // behind the whole batch, so the same malformed seq is parsed
+                    // again on every poll. The durable insert is idempotent, but
+                    // an unconditional in-memory `dlq.push` + `_deserialize`
+                    // counters are not, so repeated redelivery would inflate the
+                    // `_deserialize` DLQ depth and evict real exporter failures
+                    // from the bounded DLQ (Codex round-5). Legacy None mode has
+                    // no durable table and advances the cursor past the row, so it
+                    // never redelivers: report once.
+                    let newly_captured = match &self.cursor_store {
+                        Some(store) => store.persist_dead_letter(
                             *seq,
                             "_deserialize",
                             raw_json,
                             &redacted,
                             failed_at,
-                        )?;
+                        )?,
+                        None => true,
+                    };
+                    if newly_captured {
+                        self.metrics.record_export(
+                            "_deserialize",
+                            crate::metrics_sink::ExportOutcome::Malformed,
+                        );
+                        self.dlq.push(FailedEvent {
+                            event_json: format!("{{\"raw_seq\":{seq}}}"),
+                            error: redacted,
+                            failed_at,
+                            exporter_name: "_deserialize".to_string(),
+                        });
+                        // Report the DLQ depth for the malformed-row producer here
+                        // too (Codex round-2 finding 3): a batch of only malformed
+                        // rows returns before the exporter loop that refreshes
+                        // dlq_depth, so without this the `_deserialize` gauge would
+                        // stay absent/stale while the in-memory DLQ grows and the
+                        // alert-pack backstop underreports malformed-row failures.
+                        // Scope the depth to `_deserialize` entries only (Codex
+                        // round-4 finding 2): the DLQ is shared, so the global
+                        // length would fold a coexisting exporter backlog into the
+                        // malformed-row gauge (the cross-exporter attribution bug
+                        // round-3 finding 4 fixed for the exporter loop).
+                        self.metrics.set_dlq_depth(
+                            "_deserialize",
+                            self.dlq.depth_for_exporter("_deserialize") as u64,
+                        );
+                        tracing::warn!(
+                            seq = seq,
+                            "Failed to deserialize receipt -- captured to durable DLQ"
+                        );
                     }
-                    self.dlq.push(FailedEvent {
-                        event_json: format!("{{\"raw_seq\":{seq}}}"),
-                        error: redacted,
-                        failed_at,
-                        exporter_name: "_deserialize".to_string(),
-                    });
-                    // Report the DLQ depth for the malformed-row producer here
-                    // too (Codex round-2 finding 3): a batch of only malformed
-                    // rows returns before the exporter loop that refreshes
-                    // dlq_depth, so without this the `_deserialize` gauge would
-                    // stay absent/stale while the in-memory DLQ grows and the
-                    // alert-pack backstop underreports malformed-row failures.
-                    // Scope the depth to `_deserialize` entries only (Codex
-                    // round-4 finding 2): the DLQ is shared, so the global length
-                    // would fold a coexisting exporter backlog into the
-                    // malformed-row gauge (the cross-exporter attribution bug
-                    // round-3 finding 4 fixed for the exporter loop).
-                    self.metrics.set_dlq_depth(
-                        "_deserialize",
-                        self.dlq.depth_for_exporter("_deserialize") as u64,
-                    );
-                    tracing::warn!(
-                        seq = seq,
-                        "Failed to deserialize receipt -- captured to durable DLQ"
-                    );
                     // Durably captured (or legacy None mode, which replays from
                     // seq=0 on restart), so advancing past it is now safe.
                     if *seq > max_seq {
@@ -375,12 +393,8 @@ impl ExporterManager {
             // mode there is no durable cursor; the in-memory advance below
             // suffices (restart replays from seq 0, dedup'd downstream).
             if let Some(store) = &self.cursor_store {
-                let exporter_keys: Vec<String> = self
-                    .exporters
-                    .iter()
-                    .enumerate()
-                    .map(|(index, e)| exporter_cursor_key(index, e.name()))
-                    .collect();
+                let exporter_keys: Vec<String> =
+                    self.exporters.iter().map(|e| e.cursor_identity()).collect();
                 for key in exporter_keys {
                     let advanced = self.acked.get(&key).copied().unwrap_or(0).max(max_seq);
                     self.acked.insert(key.clone(), advanced);
@@ -396,9 +410,18 @@ impl ExporterManager {
         for index in 0..self.exporters.len() {
             let exporter = self.exporters[index].as_ref();
             let exporter_name = exporter.name().to_string();
-            // Ack/cursor state is keyed per-instance (index + name); metrics stay
-            // keyed by the bare name (Codex round-4 finding 4).
-            let cursor_key = exporter_cursor_key(index, &exporter_name);
+            // Ack/cursor state is keyed by the exporter's STABLE, config-derived
+            // identity (Codex round-5, the F4 follow-up), not registration index,
+            // so a config reorder cannot remap one sink's high-water mark onto
+            // another. Metrics stay keyed by the bare name to bound cardinality.
+            let cursor_key = exporter.cursor_identity();
+            // A notification overlay (alerting) is NOT a SOC export sink: its
+            // outcomes are counted on chio_alert_dispatch_total by the exporter
+            // itself, so they must not also feed chio_soc_export_total / _lag /
+            // SOC DLQ depth, or a failed page would burn the SOC export SLO while
+            // audit export is healthy (Codex round-5). Cursor/ack tracking still
+            // applies so the overlay does not stall the read cursor.
+            let records_soc = exporter.is_soc_export_sink();
             let result = Self::export_with_retry(
                 &mut self.rate_limiter,
                 self.config.max_retries,
@@ -413,17 +436,27 @@ impl ExporterManager {
                 .unwrap_or(0);
             match result {
                 Ok(_exported) => {
-                    for _ in &events {
-                        self.metrics
-                            .record_export(&exporter_name, crate::metrics_sink::ExportOutcome::Ok);
-                    }
-                    // Lag: persistence-to-ack for the newest event in the batch.
-                    if let Some(persisted) = events.iter().map(|e| e.receipt.timestamp).max() {
-                        self.metrics.observe_export_lag(
-                            &exporter_name,
-                            "info",
-                            now.saturating_sub(persisted) as f64,
-                        );
+                    if records_soc {
+                        for _ in &events {
+                            self.metrics.record_export(
+                                &exporter_name,
+                                crate::metrics_sink::ExportOutcome::Ok,
+                            );
+                        }
+                        // Lag: persistence-to-ack for the newest event in the
+                        // batch, tagged with the MAX severity present in the batch
+                        // (Codex round-5). Hard-coding "info" hid every
+                        // high/critical denial from the severity-specific
+                        // chio_soc_export_lag_seconds dashboards and alerts; a
+                        // batch containing a critical denial must record its lag
+                        // under severity="critical", not "info".
+                        if let Some(persisted) = events.iter().map(|e| e.receipt.timestamp).max() {
+                            self.metrics.observe_export_lag(
+                                &exporter_name,
+                                batch_max_severity_tag(&events),
+                                now.saturating_sub(persisted) as f64,
+                            );
+                        }
                     }
                     self.acked.insert(cursor_key.clone(), max_seq);
                     if let Some(store) = &self.cursor_store {
@@ -431,18 +464,22 @@ impl ExporterManager {
                     }
                 }
                 Err(e) => {
-                    for event in &events {
-                        self.metrics
-                            .record_export(&exporter_name, crate::metrics_sink::ExportOutcome::Dlq);
-                        let event_json = serde_json::to_string(event).unwrap_or_else(|_| {
-                            format!("{{\"serialize_error\": \"receipt {}\"}}", event.receipt.id)
-                        });
-                        self.dlq.push(FailedEvent {
-                            event_json,
-                            error: e.to_string(),
-                            failed_at: now,
-                            exporter_name: exporter_name.clone(),
-                        });
+                    if records_soc {
+                        for event in &events {
+                            self.metrics.record_export(
+                                &exporter_name,
+                                crate::metrics_sink::ExportOutcome::Dlq,
+                            );
+                            let event_json = serde_json::to_string(event).unwrap_or_else(|_| {
+                                format!("{{\"serialize_error\": \"receipt {}\"}}", event.receipt.id)
+                            });
+                            self.dlq.push(FailedEvent {
+                                event_json,
+                                error: e.to_string(),
+                                failed_at: now,
+                                exporter_name: exporter_name.clone(),
+                            });
+                        }
                     }
                     tracing::warn!(
                         exporter = exporter_name,
@@ -458,11 +495,14 @@ impl ExporterManager {
             // Report the DLQ depth attributed to THIS exporter only. Using the
             // global `self.dlq.len()` for every exporter label would report a
             // non-zero depth on a healthy exporter just because a different sink
-            // failed in the same poll (Codex round-3 finding 4).
-            self.metrics.set_dlq_depth(
-                &exporter_name,
-                self.dlq.depth_for_exporter(&exporter_name) as u64,
-            );
+            // failed in the same poll (Codex round-3 finding 4). A notification
+            // overlay is excluded from SOC DLQ accounting (Codex round-5).
+            if records_soc {
+                self.metrics.set_dlq_depth(
+                    &exporter_name,
+                    self.dlq.depth_for_exporter(&exporter_name) as u64,
+                );
+            }
         }
 
         // Advance the read cursor. In legacy None mode (no cursor store) the
@@ -476,12 +516,8 @@ impl ExporterManager {
         // acked is held at its baseline (at-least-once, RFC-0009 F78, Codex
         // round-1 finding 1). Zero registered exporters falls back to max_seq.
         self.cursor = if self.cursor_store.is_some() {
-            let exporter_keys: Vec<String> = self
-                .exporters
-                .iter()
-                .enumerate()
-                .map(|(index, e)| exporter_cursor_key(index, e.name()))
-                .collect();
+            let exporter_keys: Vec<String> =
+                self.exporters.iter().map(|e| e.cursor_identity()).collect();
             let key_refs: Vec<&str> = exporter_keys.iter().map(String::as_str).collect();
             resume_cursor(&key_refs, &self.acked, cursor, max_seq)
         } else {
@@ -558,21 +594,6 @@ impl ExporterManager {
     }
 }
 
-/// Per-instance cursor/ack key (RFC-0009 F78, Codex round-4 finding 4).
-///
-/// Built-in exporters return static names (every `WebhookExporter` is
-/// "webhook"), so keying the high-water mark by name alone would let one
-/// instance's ack advance a same-named peer's cursor and skip redelivery for a
-/// failed peer, violating at-least-once. The registration index disambiguates
-/// duplicate names. It is deterministic across restarts as long as exporters are
-/// registered in the same order (they are, from a fixed config), so the durable
-/// `siem_export_cursor` rows resume correctly. Distinct from the metric label,
-/// which stays the bare exporter name (two "webhook" instances share the
-/// "webhook" series, keeping label cardinality bounded).
-fn exporter_cursor_key(index: usize, name: &str) -> String {
-    format!("{index}:{name}")
-}
-
 /// Compute the read cursor after a poll: the minimum high-water mark across all
 /// REGISTERED exporters, so the cursor never advances past receipts the slowest
 /// exporter has not consumed (at-least-once, RFC-0009 F78).
@@ -593,6 +614,19 @@ fn resume_cursor(
         .map(|name| acked.get(*name).copied().unwrap_or(baseline))
         .min()
         .unwrap_or(max_seq)
+}
+
+/// The maximum alert severity across a batch, as a bounded metric tag
+/// (info/low/medium/high/critical). Used to tag the SOC export lag sample so a
+/// batch containing a high/critical denial records its lag under that severity
+/// instead of always "info" (Codex round-5). An empty batch defaults to "info".
+fn batch_max_severity_tag(events: &[SiemEvent]) -> &'static str {
+    events
+        .iter()
+        .map(crate::alerting::derive_event_severity)
+        .max()
+        .map(|severity| severity.as_tag())
+        .unwrap_or("info")
 }
 
 fn retry_backoff_ms(base_backoff_ms: u64, attempt: u32) -> u64 {
@@ -876,15 +910,26 @@ mod tests {
         Ok(())
     }
 
-    /// A metrics sink that records every `set_dlq_depth` call for assertions.
+    /// A metrics sink that records `set_dlq_depth`, `record_export`, and
+    /// `observe_export_lag` calls for assertions.
     #[derive(Default)]
     struct RecordingSink {
         dlq_depths: Mutex<Vec<(String, u64)>>,
+        exports: Mutex<Vec<(String, crate::metrics_sink::ExportOutcome)>>,
+        lags: Mutex<Vec<(String, String, f64)>>,
     }
 
     impl crate::metrics_sink::SiemMetricsSink for RecordingSink {
-        fn record_export(&self, _exporter: &str, _outcome: crate::metrics_sink::ExportOutcome) {}
-        fn observe_export_lag(&self, _exporter: &str, _severity: &str, _lag_seconds: f64) {}
+        fn record_export(&self, exporter: &str, outcome: crate::metrics_sink::ExportOutcome) {
+            if let Ok(mut exports) = self.exports.lock() {
+                exports.push((exporter.to_string(), outcome));
+            }
+        }
+        fn observe_export_lag(&self, exporter: &str, severity: &str, lag_seconds: f64) {
+            if let Ok(mut lags) = self.lags.lock() {
+                lags.push((exporter.to_string(), severity.to_string(), lag_seconds));
+            }
+        }
         fn set_dlq_depth(&self, exporter: &str, depth: u64) {
             if let Ok(mut depths) = self.dlq_depths.lock() {
                 depths.push((exporter.to_string(), depth));
@@ -909,6 +954,73 @@ mod tests {
         }
         fn name(&self) -> &str {
             &self.name
+        }
+    }
+
+    /// A mock exporter with an explicit, config-derived cursor identity (used to
+    /// prove the durable cursor is keyed by identity, not registration index).
+    struct IdentityExporter {
+        name: String,
+        identity: String,
+    }
+
+    impl Exporter for IdentityExporter {
+        fn export_batch<'a>(
+            &'a self,
+            events: &'a [SiemEvent],
+        ) -> crate::exporter::ExportFuture<'a> {
+            let n = events.len();
+            Box::pin(async move { Ok(n) })
+        }
+        fn name(&self) -> &str {
+            &self.name
+        }
+        fn cursor_identity(&self) -> String {
+            self.identity.clone()
+        }
+    }
+
+    /// A mock NOTIFICATION overlay: succeeds like alerting but reports it is not
+    /// a SOC export sink, so the manager must exclude it from SOC export metrics.
+    struct NotificationOverlayExporter {
+        name: String,
+    }
+
+    impl Exporter for NotificationOverlayExporter {
+        fn export_batch<'a>(
+            &'a self,
+            events: &'a [SiemEvent],
+        ) -> crate::exporter::ExportFuture<'a> {
+            let n = events.len();
+            Box::pin(async move { Ok(n) })
+        }
+        fn name(&self) -> &str {
+            &self.name
+        }
+        fn is_soc_export_sink(&self) -> bool {
+            false
+        }
+    }
+
+    /// A failing exporter with an explicit config-derived cursor identity, used
+    /// to prove two distinct-identity sinks keep distinct cursor state.
+    struct FailingIdentityExporter {
+        name: String,
+        identity: String,
+    }
+
+    impl Exporter for FailingIdentityExporter {
+        fn export_batch<'a>(
+            &'a self,
+            _events: &'a [SiemEvent],
+        ) -> crate::exporter::ExportFuture<'a> {
+            Box::pin(async move { Err(ExportError::HttpError("simulated failure".to_string())) })
+        }
+        fn name(&self) -> &str {
+            &self.name
+        }
+        fn cursor_identity(&self) -> String {
+            self.identity.clone()
         }
     }
 
@@ -965,6 +1077,245 @@ mod tests {
             .map_err(|error| format!("ChioReceipt::sign must succeed in tests: {error}").into())
     }
 
+    /// Sign a Deny receipt whose guard drives a chosen severity (e.g. a guard
+    /// containing "secret" maps to Critical).
+    fn sample_deny_receipt(
+        id: &str,
+        guard: &str,
+    ) -> Result<chio_core::receipt::body::ChioReceipt, Box<dyn Error>> {
+        use chio_core::crypto::Keypair;
+        use chio_core::receipt::{
+            body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
+        };
+        let keypair = Keypair::generate();
+        let action = ToolCallAction::from_parameters(serde_json::json!({}))
+            .map_err(|error| format!("action parameters serialize in tests: {error}"))?;
+        let body = ChioReceiptBody {
+            id: id.to_string(),
+            timestamp: 1,
+            capability_id: "cap-manager-test".to_string(),
+            tool_server: "shell".to_string(),
+            tool_name: "bash".to_string(),
+            action,
+            decision: Some(Decision::Deny {
+                reason: "denied".to_string(),
+                guard: guard.to_string(),
+            }),
+            receipt_kind: chio_core::receipt::kinds::ReceiptKind::MediatedDecision,
+            boundary_class: chio_core::receipt::kinds::BoundaryClass::Prevent,
+            observation_outcome: None,
+            tool_origin: chio_core::receipt::kinds::ToolOrigin::CallerExecuted,
+            redaction_mode: chio_core::receipt::kinds::RedactionMode::None,
+            actor_chain: Vec::new(),
+            content_hash: "content-hash".to_string(),
+            policy_hash: "policy-hash".to_string(),
+            evidence: Vec::new(),
+            metadata: None,
+            trust_level: chio_core::receipt::kinds::TrustLevel::default(),
+            tenant_id: None,
+            kernel_key: keypair.public_key(),
+            bbs_projection_version: None,
+        };
+        ChioReceipt::sign(body, &keypair)
+            .map_err(|error| format!("ChioReceipt::sign must succeed in tests: {error}").into())
+    }
+
+    /// Codex round-5: the SOC export lag sample must be tagged with the MAX
+    /// severity present in the batch, so a batch containing a high/critical
+    /// denial records its lag under that severity instead of always "info".
+    #[test]
+    fn batch_max_severity_tag_uses_the_highest_severity_present() -> TestResult {
+        let allow = SiemEvent::from_receipt(sample_receipt("allow-1")?);
+        let critical = SiemEvent::from_receipt(sample_deny_receipt("deny-1", "secret_leak")?);
+
+        assert_eq!(
+            batch_max_severity_tag(&[allow.clone(), critical]),
+            "critical",
+            "a batch containing a critical denial tags its lag under critical, not info"
+        );
+        let allow_only = batch_max_severity_tag(&[allow]);
+        assert_ne!(
+            allow_only, "critical",
+            "an allow-only batch must not be tagged critical"
+        );
+        assert!(
+            matches!(allow_only, "info" | "low"),
+            "an allow-only batch stays at a low severity tag: {allow_only}"
+        );
+        Ok(())
+    }
+
+    /// Codex round-5: a notification overlay (alerting) is NOT a SOC export sink,
+    /// so the manager must not emit chio_soc_export_total / SOC DLQ depth for it
+    /// even though it is registered in the exporter set.
+    #[tokio::test]
+    async fn notification_overlay_is_excluded_from_soc_export_metrics() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let receipt_db = dir.path().join("receipts.sqlite3");
+        seed_valid_receipt_db(&receipt_db, 2)?;
+
+        let sink = std::sync::Arc::new(RecordingSink::default());
+        let mut manager = ExporterManager::new(SiemConfig {
+            db_path: receipt_db.clone(),
+            ..SiemConfig::default()
+        })?
+        .with_metrics_sink(sink.clone());
+        manager.add_exporter(Box::new(OkExporter {
+            name: "webhook".to_string(),
+        }));
+        manager.add_exporter(Box::new(NotificationOverlayExporter {
+            name: "alerting".to_string(),
+        }));
+        manager.poll_once().await?;
+
+        let exports = sink
+            .exports
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        assert!(
+            exports.iter().any(|(exporter, _)| exporter == "webhook"),
+            "the SOC webhook sink records chio_soc_export_total: {exports:?}"
+        );
+        assert!(
+            !exports.iter().any(|(exporter, _)| exporter == "alerting"),
+            "the alerting overlay must NOT record chio_soc_export_total: {exports:?}"
+        );
+        let depths = sink
+            .dlq_depths
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        assert!(
+            !depths.iter().any(|(exporter, _)| exporter == "alerting"),
+            "the alerting overlay must NOT report a SOC DLQ depth gauge: {depths:?}"
+        );
+        let lags = sink
+            .lags
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        assert!(
+            !lags.iter().any(|(exporter, _, _)| exporter == "alerting"),
+            "the alerting overlay must NOT record SOC export lag: {lags:?}"
+        );
+        Ok(())
+    }
+
+    /// Codex round-5 (the F4 follow-up): the durable cursor must be keyed by the
+    /// exporter's STABLE, config-derived identity, not its registration index, so
+    /// a persisted high-water mark follows the exporter across config reorders.
+    #[tokio::test]
+    async fn durable_cursor_keyed_by_stable_identity_not_registration_index() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let receipt_db = dir.path().join("receipts.sqlite3");
+        seed_valid_receipt_db(&receipt_db, 5)?;
+        let cursor_db = dir.path().join("cursor.sqlite3");
+        let identity = "webhook@https://soc.example.test/ingest";
+        {
+            let store = crate::cursor_store::SiemCursorStore::open(&cursor_db)?;
+            store.set_acked(identity, 100)?;
+        }
+
+        let mut manager = ExporterManager::new(SiemConfig {
+            db_path: receipt_db.clone(),
+            cursor_db_path: Some(cursor_db.clone()),
+            ..SiemConfig::default()
+        })?;
+        // Registered at index 0, but its durable mark is looked up by its stable
+        // identity, so it inherits the persisted 100. An index-keyed cursor would
+        // look up "0:webhook", miss the persisted "webhook@..." row, and reset to
+        // baseline 0.
+        manager.add_exporter(Box::new(IdentityExporter {
+            name: "webhook".to_string(),
+            identity: identity.to_string(),
+        }));
+        assert_eq!(
+            manager.cursor, 100,
+            "an exporter resumes at the mark persisted under its stable identity"
+        );
+        Ok(())
+    }
+
+    /// Seed a receipt DB with a malformed row at seq 1 and a valid receipt at
+    /// seq 2, so a batch carries both a malformed row and a real event.
+    fn seed_malformed_then_valid_receipt_db(path: &std::path::Path) -> TestResult {
+        seed_malformed_receipt_db(path)?;
+        let receipt = sample_receipt("valid-2")?;
+        let raw_json = serde_json::to_string(&receipt)?;
+        let conn = rusqlite::Connection::open(path)?;
+        conn.execute(
+            "INSERT INTO chio_tool_receipts (receipt_id, timestamp, capability_id, \
+             tool_server, tool_name, decision_kind, policy_hash, content_hash, raw_json) \
+             VALUES (?1, 1, 'c', 's', 't', 'allow', 'p', 'h', ?2)",
+            rusqlite::params![receipt.id, raw_json],
+        )?;
+        Ok(())
+    }
+
+    /// Codex round-5: when a failing exporter holds the read cursor behind a
+    /// batch that contains a malformed row, the same malformed seq is re-parsed
+    /// every poll. The durable insert is idempotent, so the in-memory
+    /// `_deserialize` DLQ depth must NOT be re-inflated on redelivery.
+    #[tokio::test]
+    async fn malformed_row_not_re_reported_on_redelivery() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let receipt_db = dir.path().join("receipts.sqlite3");
+        seed_malformed_then_valid_receipt_db(&receipt_db)?;
+        let cursor_db = dir.path().join("cursor.sqlite3");
+
+        let sink = std::sync::Arc::new(RecordingSink::default());
+        let mut manager = ExporterManager::new(SiemConfig {
+            db_path: receipt_db.clone(),
+            cursor_db_path: Some(cursor_db.clone()),
+            max_retries: 0,
+            ..SiemConfig::default()
+        })?
+        .with_metrics_sink(sink.clone());
+        // A failing exporter never acks, so the cursor is held behind the batch
+        // and the malformed seq is re-read on the next poll.
+        manager.add_exporter(Box::new(FailExporter {
+            name: "webhook".to_string(),
+        }));
+
+        manager.poll_once().await?;
+        manager.poll_once().await?;
+
+        // The malformed row is durably captured exactly once.
+        let store = crate::cursor_store::SiemCursorStore::open(&cursor_db)?;
+        assert_eq!(store.dead_letter_seqs()?, vec![1u64]);
+
+        // Every reported _deserialize DLQ depth stays at 1: redelivery must not
+        // re-push the malformed row into the bounded in-memory DLQ.
+        let depths = sink
+            .dlq_depths
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let deserialize_depths: Vec<u64> = depths
+            .iter()
+            .filter(|(exporter, _)| exporter == "_deserialize")
+            .map(|(_, depth)| *depth)
+            .collect();
+        assert!(
+            !deserialize_depths.is_empty(),
+            "the malformed row is reported at least once"
+        );
+        assert!(
+            deserialize_depths.iter().all(|depth| *depth == 1),
+            "the malformed _deserialize DLQ depth must not grow on redelivery: {deserialize_depths:?}"
+        );
+        // The _deserialize malformed counter fires exactly once (first capture).
+        let deserialize_exports = sink
+            .exports
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .filter(|(exporter, _)| exporter == "_deserialize")
+            .count();
+        assert_eq!(
+            deserialize_exports, 1,
+            "the _deserialize malformed export outcome is recorded once, not per redelivery"
+        );
+        Ok(())
+    }
+
     /// Seed a receipt DB with `count` valid receipts (seq 1..=count).
     fn seed_valid_receipt_db(path: &std::path::Path, count: usize) -> TestResult {
         let conn = rusqlite::Connection::open(path)?;
@@ -1008,11 +1359,12 @@ mod tests {
         seed_valid_receipt_db(&receipt_db, 3)?;
         let cursor_db = dir.path().join("cursor.sqlite3");
         {
-            // "splunk" (registration index 0) has already acked up to seq 100;
-            // "webhook" has no row. The durable key is per-instance (Codex
-            // round-4 finding 4), so pre-seed under splunk's index-keyed row.
+            // "splunk" has already acked up to seq 100; "webhook" has no row. The
+            // durable key is the exporter's STABLE identity (Codex round-5, the F4
+            // follow-up); OkExporter uses the default identity (its bare name), so
+            // pre-seed under "splunk".
             let store = crate::cursor_store::SiemCursorStore::open(&cursor_db)?;
-            store.set_acked(&exporter_cursor_key(0, "splunk"), 100)?;
+            store.set_acked("splunk", 100)?;
         }
 
         let mut manager = ExporterManager::new(SiemConfig {
@@ -1266,15 +1618,15 @@ mod tests {
         Ok(())
     }
 
-    /// Codex round-4 finding 4: high-water marks must be keyed by a unique
-    /// per-instance identity, not by exporter name alone. Two exporters that
-    /// return the same static name ("webhook") - as every built-in
-    /// WebhookExporter does - must keep DISTINCT cursor state. When index 0 acks
-    /// and index 1 exhausts retries, the failed instance's range must be
-    /// redelivered (at-least-once), not skipped because its same-named peer
-    /// advanced a shared key.
+    /// Codex round-5 (the F4 follow-up): high-water marks are keyed by each
+    /// exporter's STABLE, config-derived identity (its endpoint), NOT its
+    /// registration index. Two webhook sinks that report the same name "webhook"
+    /// but point at DIFFERENT endpoints therefore keep DISTINCT cursor state that
+    /// also survives a config reorder. When one acks and the other exhausts
+    /// retries, the failed sink's range is redelivered (at-least-once), not
+    /// skipped because a peer advanced a shared key.
     #[tokio::test]
-    async fn duplicate_exporter_names_keep_distinct_cursor_state() -> TestResult {
+    async fn distinct_identity_exporters_keep_distinct_cursor_state() -> TestResult {
         let dir = tempfile::tempdir()?;
         let receipt_db = dir.path().join("receipts.sqlite3");
         seed_valid_receipt_db(&receipt_db, 3)?;
@@ -1286,32 +1638,46 @@ mod tests {
             cursor_db_path: Some(cursor_db.clone()),
             ..SiemConfig::default()
         })?;
-        // Both instances report the name "webhook": index 0 succeeds, index 1
-        // fails. Under name-only keying the succeeding instance's ack would
-        // advance the shared "webhook" mark and skip redelivery for the failed
-        // one, violating at-least-once.
-        manager.add_exporter(Box::new(OkExporter {
+        // Both report the metric name "webhook" but have distinct endpoint-derived
+        // identities: the first succeeds, the second fails. Their cursor state
+        // must stay distinct so the failed sink's range is redelivered.
+        manager.add_exporter(Box::new(IdentityExporter {
             name: "webhook".to_string(),
+            identity: "webhook@https://soc.example.test/a".to_string(),
         }));
-        manager.add_exporter(Box::new(FailExporter {
+        manager.add_exporter(Box::new(FailingIdentityExporter {
             name: "webhook".to_string(),
+            identity: "webhook@https://soc.example.test/b".to_string(),
         }));
 
         manager.poll_once().await?;
 
-        // The failed instance (index 1) never acked, so the read cursor is HELD
-        // at baseline 0 for redelivery. Name-only keying would have advanced the
-        // shared mark to 3 and permanently skipped [1..3] for the failed one.
+        // The failed sink never acked, so the read cursor is HELD at baseline 0
+        // for redelivery. A shared key would have advanced to 3 and permanently
+        // skipped [1..3] for the failed sink.
         assert_eq!(
             manager.cursor, 0,
-            "the failed same-named instance holds the cursor at baseline for redelivery"
+            "the failed distinct-identity sink holds the cursor at baseline for redelivery"
         );
-        // The succeeding instance still advanced its OWN durable high-water mark.
+        // The succeeding sink still advanced its OWN durable high-water mark.
         let store = crate::cursor_store::SiemCursorStore::open(&cursor_db)?;
         assert_eq!(
-            store.acked_seqs()?.values().copied().max(),
+            store
+                .acked_seqs()?
+                .get("webhook@https://soc.example.test/a")
+                .copied(),
             Some(3),
-            "the succeeding instance advanced its own high-water mark"
+            "the succeeding sink advanced its own identity-keyed high-water mark"
+        );
+        // The failed sink never acked durably (absent from the store) and stays
+        // pinned at its in-memory baseline 0, so its range is redelivered.
+        assert_eq!(
+            manager
+                .acked
+                .get("webhook@https://soc.example.test/b")
+                .copied(),
+            Some(0),
+            "the failed sink stays at baseline for redelivery"
         );
         Ok(())
     }
