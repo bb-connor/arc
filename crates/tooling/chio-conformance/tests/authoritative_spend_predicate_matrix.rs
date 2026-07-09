@@ -86,12 +86,17 @@ fn e_signer_not_admitted_is_rejected() {
 
 #[test]
 fn a_non_mediated_trust_level_is_rejected() {
+    // trust_level is part of the signed receipt body, and signing a
+    // mediated-decision receipt with a non-mediated trust level is refused, so a
+    // holder cannot relabel a mediated receipt to a weaker trust level: the
+    // tamper invalidates the signature and is caught at verification. This is a
+    // stronger guarantee than the defensive NotMediatedTrustLevel structural
+    // conjunct, which no validly signed receipt can reach.
     let (signer, mut receipt, nonce) = mediated_case();
     receipt.trust_level = TrustLevel::Advisory;
-    let receipt = support::resign(&signer, receipt);
     assert_eq!(
         is_authoritative_spend_receipt(&receipt, &[signer.public_key()], nonce.as_ref()),
-        Err(NotAuthoritativeReason::NotMediatedTrustLevel)
+        Err(NotAuthoritativeReason::ReceiptSignatureInvalid)
     );
 }
 
