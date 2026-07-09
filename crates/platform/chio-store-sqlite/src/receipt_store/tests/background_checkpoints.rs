@@ -570,6 +570,57 @@ fn flush_report_rejects_disconnected_checkpoint() -> Result<(), Box<dyn std::err
     Ok(())
 }
 
+/// Codex round 10, finding 1: on a shared DB a separate process can advance
+/// `kernel_checkpoints` with a latest row that PARSES (its columns match its
+/// signed body) AND is chain-connected as a valid base, yet whose signed batch
+/// was built over receipts THIS database never held (an imported/foreign
+/// checkpoint). `parse_persisted_checkpoint_row` + `latest_checkpoint_is_chain_connected`
+/// alone trust its inflated `batch_end_seq`, making `flush_receipt_writes`
+/// advertise a false `checkpointed_entry_seq` and hide the uncheckpointed range.
+/// `flush_report` must rebuild the checkpoint's Merkle range from the LOCAL claim
+/// log (`validate_checkpoint_against_claim_log`) and drop the row on mismatch,
+/// falling back to the actor's verified head. Bounded O(b) over the single latest
+/// checkpoint's own batch on the operator/health surface (F22).
+#[test]
+fn flush_report_rejects_checkpoint_foreign_to_local_claim_log(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-flush-foreign-claim-log-ckpt");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    for i in 0..3 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-foreign-{i}"), (i + 1) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+
+    // Build a base checkpoint (seq 1, batch_start 1) over SIX forged leaves this
+    // store's `claim_receipt_log_entries` (only 3 rows) never contained, so it
+    // parses and validates as a base but its `merkle_root`/`tree_size` do not
+    // match the local claim-log range [1..=6]. Persist it out of band, modelling
+    // a shared-DB separate process advancing the chain with foreign contents.
+    let foreign_leaves: Vec<Vec<u8>> = (0..6)
+        .map(|i| format!("foreign-leaf-{i}").into_bytes())
+        .collect();
+    let foreign = build_checkpoint(1, 1, 6, &foreign_leaves, &keypair)?;
+    assert_eq!(foreign.body.batch_end_seq, 6);
+    assert_eq!(foreign.body.tree_size, 6);
+    insert_checkpoint_row(&store, &foreign, foreign.body.batch_end_seq);
+
+    let report = store.flush_receipt_writes()?;
+    assert_ne!(
+        report.latest_checkpointed_entry_seq, 6,
+        "a checkpoint foreign to the local claim log must not be reported as checkpointed progress"
+    );
+    assert_eq!(report.latest_checkpointed_entry_seq, 0);
+    assert_eq!(report.latest_checkpoint_seq, None);
+    assert_eq!(report.uncheckpointed_start_seq, Some(1));
+    assert_eq!(report.uncheckpointed_end_seq, Some(3));
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
 /// Codex round 2, finding 5: the OPERATOR/IMPORT checkpoint append
 /// (store_checkpoint -> store_kernel_checkpoint_atomic) only parses the LATEST
 /// checkpoint as predecessor, so a mid-chain tamper whose latest row still

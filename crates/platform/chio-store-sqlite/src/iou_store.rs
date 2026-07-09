@@ -190,7 +190,21 @@ impl IouEnvelopeStore for SqliteIouEnvelopeStore {
                 let canonical = canonical_str.to_string();
                 writer
                     .run_write(move |connection| {
-                        Ok(insert_envelope_on_connection(
+                        // Propagate the IOU insert result to the writer (codex
+                        // round 10, finding 2). Wrapping the inner result in
+                        // `Ok(...)` made the writer actor record EVERY insert as
+                        // committed - refreshing `committed_total`/
+                        // `last_commit_unix_ms` - even when the inner insert
+                        // returned a conflict or backend error, so the receipt
+                        // writer health telemetry misreported failed IOU
+                        // persistence. Surface the failure to the actor as a
+                        // `ReceiptStoreError` (fail-closed) so it is counted as
+                        // `failed_total`. The reverse mapping below restores the
+                        // original `IouEnvelopeStoreError` variant for the caller,
+                        // so a mismatched re-insert still returns `Conflict`
+                        // exactly as the standalone path and the trait contract
+                        // require.
+                        insert_envelope_on_connection(
                             connection,
                             &receipt_id,
                             &iou_id,
@@ -200,9 +214,25 @@ impl IouEnvelopeStore for SqliteIouEnvelopeStore {
                             &currency,
                             &issuer_key,
                             &canonical,
-                        ))
+                        )
+                        .map_err(|err| match err {
+                            IouEnvelopeStoreError::Conflict(message) => {
+                                chio_kernel::ReceiptStoreError::Conflict(message)
+                            }
+                            IouEnvelopeStoreError::Backend(message) => {
+                                chio_kernel::ReceiptStoreError::Canonical(message)
+                            }
+                        })
                     })
-                    .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?
+                    .map_err(|err| match err {
+                        chio_kernel::ReceiptStoreError::Conflict(message) => {
+                            IouEnvelopeStoreError::Conflict(message)
+                        }
+                        chio_kernel::ReceiptStoreError::Canonical(message) => {
+                            IouEnvelopeStoreError::Backend(message)
+                        }
+                        other => IouEnvelopeStoreError::Backend(other.to_string()),
+                    })
             }
             None => {
                 let connection = self
@@ -409,6 +439,71 @@ mod tests {
             .unwrap()
             .expect("envelope was inserted");
         assert_eq!(fetched, envelope);
+        std::mem::forget(dir);
+    }
+
+    #[test]
+    fn failed_writer_routed_insert_is_recorded_as_a_writer_failure() {
+        // Codex round 10, finding 2: when an IOU store is opened alongside a
+        // receipt store, a failed insert routed through the shared writer must
+        // surface as a writer FAILURE, not be swallowed as a committed write, so
+        // the receipt writer health telemetry stays accurate. The caller still
+        // receives the original Conflict variant.
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("iou-writer-failure.sqlite3");
+        let receipt_store = crate::SqliteReceiptStore::open(&path).unwrap();
+        let store = SqliteIouEnvelopeStore::open_alongside(&receipt_store).unwrap();
+        assert!(store.writer.is_some());
+
+        // Two envelopes share a receipt_id but carry different bytes (different
+        // kernel signer), so the second insert conflicts.
+        let kp_a = Keypair::generate();
+        let kp_b = Keypair::generate();
+        let receipt = make_priced_receipt(&kp_a, "rcpt-writer-fail-1", 100);
+        let env_a = LocalCreditAccount::new_with_trusted_kernel_keys(
+            Ed25519Backend::new(kp_a.clone()),
+            [kp_a.public_key()],
+        )
+        .evaluate(&receipt)
+        .unwrap()
+        .unwrap();
+        let env_b = LocalCreditAccount::new_with_trusted_kernel_keys(
+            Ed25519Backend::new(kp_b),
+            [kp_a.public_key()],
+        )
+        .evaluate(&receipt)
+        .unwrap()
+        .unwrap();
+        assert_eq!(env_a.body.receipt_id, env_b.body.receipt_id);
+        assert_ne!(env_a.body.issuer_key, env_b.body.issuer_key);
+
+        assert!(store.insert(&env_a).unwrap());
+
+        // `flush_receipt_writes` is a writer barrier, so its snapshot reflects the
+        // fully-processed job outcome (no race with `record_write_job_outcome`).
+        let failed_before = receipt_store
+            .flush_receipt_writes()
+            .unwrap()
+            .writer
+            .failed_total;
+
+        // The conflicting insert must surface as a Conflict to the caller AND be
+        // recorded as a writer failure.
+        match store.insert(&env_b) {
+            Err(IouEnvelopeStoreError::Conflict(_)) => {}
+            other => panic!("expected Conflict, got {other:?}"),
+        }
+
+        let failed_after = receipt_store
+            .flush_receipt_writes()
+            .unwrap()
+            .writer
+            .failed_total;
+        assert_eq!(
+            failed_after,
+            failed_before + 1,
+            "a failed IOU insert must increment the receipt writer failed_total"
+        );
         std::mem::forget(dir);
     }
 }

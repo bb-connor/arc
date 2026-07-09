@@ -449,11 +449,16 @@ impl WriterHandle {
             Err(_) => {
                 // Accepted-then-lost: the actor took the command but exited
                 // before delivering a response (actor death; job panics are
-                // caught and answered above). The unconditional dequeue
-                // decrement never ran, so undo the speculative pre-send
-                // increment and record the failure, mirroring the append
-                // path's recv-Err handling, so writer.inflight does not
-                // report a permanently-stuck write.
+                // caught and answered above). The job-completion decrement (the
+                // `WriterInflightGuard` in the actor's `Write` arm, codex round
+                // 10 finding 3) may never have run - the command could have been
+                // lost while still queued, before the arm was entered - so undo
+                // the speculative pre-send increment and record the failure,
+                // mirroring the append path's recv-Err handling, so
+                // writer.inflight does not report a permanently-stuck write. If
+                // the actor instead died mid-arm and the guard already fired,
+                // `atomic_saturating_sub` keeps this compensating release from
+                // underflowing.
                 atomic_saturating_sub(&self.health.inflight, 1);
                 self.health.failed_total.fetch_add(1, Ordering::SeqCst);
                 Err(receipt_actor_unavailable_error())
@@ -676,9 +681,18 @@ fn handle_non_append_command(
             job,
             appends_receipts,
         } => {
-            // Unconditional decrement pairs with the pre-send increment in
-            // `WriterHandle::run_write`.
-            atomic_saturating_sub(&health.inflight, 1);
+            // Hold the writer `inflight` count for the DURATION of this Write job
+            // (codex round 10, finding 3) rather than releasing it immediately on
+            // dequeue. The pre-send increment in `WriterHandle::run_write_kind` is
+            // adopted by this RAII guard and released only when the job finishes,
+            // so a health poll during a slow or stuck liability/checkpoint write
+            // reports `inflight > 0`, mirroring the Append path (which stays
+            // inflight until `commit_receipt_batch` fans out its results). The
+            // guard decrements on every exit path (pool/pre-check `return`,
+            // poisoned head, resync error) exactly once; `atomic_saturating_sub`
+            // keeps a rare overlap with the caller's recv-Err compensation
+            // (actor-thread death) from underflowing.
+            let _inflight = WriterInflightGuard::new(&health.inflight);
             let mut connection = match pool.get() {
                 Ok(connection) => connection,
                 Err(error) => {
@@ -1159,6 +1173,33 @@ fn atomic_saturating_sub(value: &AtomicU64, amount: u64) {
             Ok(_) => return,
             Err(observed) => current = observed,
         }
+    }
+}
+
+/// Holds the writer `inflight` count for the DURATION of a writer-routed `Write`
+/// job (codex round 10, finding 3). The pre-send increment in
+/// `WriterHandle::run_write_kind` is ADOPTED by this guard and released only when
+/// the job (pool acquire, pre-check, closure, resync, catch-up build) finishes,
+/// so `receipt_store_health` reports `inflight > 0` while a slow or stuck
+/// writer-routed op is actually running - mirroring the Append path, which stays
+/// inflight until its results fan out (`commit_receipt_batch`). Drop-based, so
+/// every exit path of the `Write` arm (early pool/pre-check returns, poisoned
+/// head, resync error, or an unwinding panic) releases exactly once; a release
+/// overlap with the caller's recv-Err compensation under actor-thread death
+/// saturates at zero via `atomic_saturating_sub` rather than underflowing.
+struct WriterInflightGuard<'a> {
+    inflight: &'a AtomicU64,
+}
+
+impl<'a> WriterInflightGuard<'a> {
+    fn new(inflight: &'a AtomicU64) -> Self {
+        Self { inflight }
+    }
+}
+
+impl Drop for WriterInflightGuard<'_> {
+    fn drop(&mut self) {
+        atomic_saturating_sub(self.inflight, 1);
     }
 }
 
@@ -2114,10 +2155,26 @@ impl SqliteReceiptStore {
         // back to the actor's verified head). This is a bounded O(1) predecessor
         // read on the operator/health surface, NOT a full O(N) chain walk on the
         // per-append hot path (F22).
+        //
+        // Claim-log content guard (codex round 10, finding 1): a separate process
+        // advancing `kernel_checkpoints` on a shared DB can persist a latest row
+        // that parses (columns match its signed body) AND links to its predecessor
+        // yet whose `merkle_root`/`tree_size`/`batch_end_seq` describe a batch this
+        // database's `claim_receipt_log_entries` never actually contained (an
+        // imported/foreign checkpoint). The removed `load_latest_checkpoint()` path
+        // rebuilt the checkpoint Merkle range from the local claim log via
+        // `verify_checkpoint_chain_integrity`; without that content check here an
+        // inflated `batch_end_seq` would make this report advertise a false
+        // `checkpointed_entry_seq` and hide the uncheckpointed range. Rebuild the
+        // latest checkpoint's Merkle range from the LOCAL claim log and drop it on
+        // mismatch (fall back to the actor's verified head). Bounded O(b) over the
+        // single latest checkpoint's own batch on the operator/health surface, NOT
+        // a full O(N) chain walk on the per-append hot path (F22).
         let verified_persisted = load_latest_persisted_checkpoint_row(&connection)?
             .and_then(|row| parse_persisted_checkpoint_row(row).ok())
             .filter(|checkpoint| {
                 latest_checkpoint_is_chain_connected(&connection, checkpoint).is_ok()
+                    && validate_checkpoint_against_claim_log(&connection, checkpoint).is_ok()
             });
         let persisted_checkpoint_seq = verified_persisted
             .as_ref()
@@ -2698,5 +2755,97 @@ mod receipt_commit_actor_tests {
         );
         assert_eq!(health.saturated_total.load(Ordering::SeqCst), 1);
         Ok(())
+    }
+
+    /// Codex round 10, finding 3: a writer-routed `Write` job (liability write,
+    /// manual checkpoint creation) must keep `writer_inflight` nonzero for the
+    /// DURATION of the job, not just at enqueue. Previously the actor decremented
+    /// on dequeue, so a health poll during a slow or stuck Write reported
+    /// `inflight: 0`, hiding active writer work; the `WriterInflightGuard` now
+    /// holds the count until the job completes, mirroring the Append path.
+    #[test]
+    fn write_job_holds_inflight_for_its_duration() -> Result<(), Box<dyn std::error::Error>> {
+        let path = std::env::temp_dir().join(format!(
+            "chio-write-inflight-{}-{}.sqlite3",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let store = SqliteReceiptStore::open(&path)?;
+        let writer = store.writer_handle();
+
+        // Drain any open-time writer activity to a known baseline before running
+        // the coordinated job.
+        let drained_baseline = wait_until(|| {
+            store
+                .receipt_commit_actor
+                .health
+                .inflight
+                .load(Ordering::SeqCst)
+                == 0
+        });
+        assert!(drained_baseline, "writer failed to drain to baseline");
+
+        // Coordinate a Write job that blocks inside its closure until released.
+        let (started_tx, started_rx) = mpsc::sync_channel::<()>(1);
+        let (release_tx, release_rx) = mpsc::sync_channel::<()>(1);
+        let worker = std::thread::spawn(move || {
+            writer.run_write(move |_connection| {
+                // Signal that the job is now executing on the writer thread, then
+                // block until the test releases it.
+                let _ = started_tx.send(());
+                let _ = release_rx.recv();
+                Ok(())
+            })
+        });
+
+        // The job is running: inflight must be nonzero for the DURATION of the
+        // Write, not merely at enqueue.
+        started_rx.recv().map_err(|_| "write job never started")?;
+        assert_eq!(
+            store
+                .receipt_commit_actor
+                .health
+                .inflight
+                .load(Ordering::SeqCst),
+            1,
+            "a running Write job must report inflight > 0"
+        );
+
+        // Release the job and confirm inflight drains back to baseline. The
+        // `WriterInflightGuard` decrements at the end of the Write arm, a hair
+        // after the caller's response is delivered, so poll briefly.
+        release_tx.send(())?;
+        worker
+            .join()
+            .map_err(|_| "write worker thread panicked")??;
+        let drained = wait_until(|| {
+            store
+                .receipt_commit_actor
+                .health
+                .inflight
+                .load(Ordering::SeqCst)
+                == 0
+        });
+        assert!(
+            drained,
+            "inflight must return to baseline after the Write completes"
+        );
+
+        let _ = fs::remove_file(path);
+        Ok(())
+    }
+
+    /// Poll `predicate` for up to ~1s (1ms steps), returning whether it held.
+    fn wait_until(predicate: impl Fn() -> bool) -> bool {
+        for _ in 0..1_000 {
+            if predicate() {
+                return true;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        predicate()
     }
 }
