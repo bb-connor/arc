@@ -330,13 +330,15 @@ impl HttpAuthority {
         let elapsed_nanos = u64::try_from(started_at.elapsed().as_nanos()).unwrap_or(u64::MAX);
         match result {
             Ok((prepared, receipt)) => {
+                // A policy/capability deny is an expected fail-closed decision,
+                // NOT a dispatch failure: it must be tracked by the guard-verdict
+                // metrics only, never on chio_dispatch_failure_total, so a normal
+                // rejected request cannot page the P0 fail-open/dispatch-failure
+                // alert (Codex round-3 finding 6). Only a genuine evaluation error
+                // (the Err arm below) feeds the paging metric.
                 let outcome = if prepared.verdict.is_allowed() {
                     crate::metrics::GUARD_OUTCOME_ALLOW
                 } else {
-                    crate::metrics::record_dispatch_failure(
-                        crate::metrics::GUARD_LABEL_HTTP_AUTHORITY,
-                        "denied",
-                    );
                     crate::metrics::GUARD_OUTCOME_DENY
                 };
                 crate::metrics::observe_decision_latency_nanos_for_outcome(outcome, elapsed_nanos);

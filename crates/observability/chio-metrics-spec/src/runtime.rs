@@ -356,7 +356,9 @@ pub mod families {
 /// deployment (RFC-0009 contract rule 2, the F57 Codex fix). Idempotent.
 pub fn preregister_known_label_sets() {
     families::FAIL_OPEN_SUSPECTED.preregister(&["tower"]);
-    families::DISPATCH_FAILURE.preregister(&["http_authority", "denied"]);
+    // Only genuine evaluation errors feed chio_dispatch_failure_total; a normal
+    // deny is a fail-closed decision tracked by the guard-verdict metrics, so no
+    // "denied" outcome is seeded or produced (Codex round-3 finding 6).
     families::DISPATCH_FAILURE.preregister(&["http_authority", "error"]);
     families::CAPABILITY_REVOCATION_LAG.preregister(&["control_plane"]);
     families::SIGNING_QUEUE_BLOCK.preregister(&["channel_full"]);
@@ -567,17 +569,17 @@ mod tests {
             out.contains("chio_fail_open_suspected_total{surface=\"tower\"} 0"),
             "{out}"
         );
-        assert!(
-            out.contains(
-                "chio_dispatch_failure_total{surface=\"http_authority\",outcome=\"denied\"} 0"
-            ),
-            "{out}"
-        );
+        // Only the genuine-error outcome is seeded; a deny is not a dispatch
+        // failure and must not appear on this family (Codex round-3 finding 6).
         assert!(
             out.contains(
                 "chio_dispatch_failure_total{surface=\"http_authority\",outcome=\"error\"} 0"
             ),
             "{out}"
+        );
+        assert!(
+            !out.contains("outcome=\"denied\""),
+            "a deny must not be seeded on the dispatch-failure family: {out}"
         );
     }
 }

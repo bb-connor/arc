@@ -1289,6 +1289,52 @@ fn sign_transport_deny_receipt_signs_final_scope_deny() {
 }
 
 #[test]
+fn policy_deny_is_not_recorded_as_a_dispatch_failure() {
+    // Codex round-3 finding 6: a normal policy/capability deny is an expected
+    // fail-closed decision. It must be tracked by the guard-verdict metrics and
+    // must NOT increment chio_dispatch_failure_total, or one ordinary rejected
+    // request would page the P0 fail-open/dispatch-failure alert.
+    let query = HashMap::new();
+    let denied = authority()
+        .evaluate(HttpAuthorityInput {
+            request_id: "req-deny-no-page".to_string(),
+            method: HttpMethod::Post,
+            route_pattern: "/pets".to_string(),
+            path: "/pets",
+            query: &query,
+            caller: caller(),
+            body_hash: Some("abc".to_string()),
+            body_length: 3,
+            session_id: None,
+            capability_id_hint: None,
+            presented_capability: None,
+            requested_tool_server: None,
+            requested_tool_name: None,
+            requested_arguments: None,
+            model_metadata: None,
+            execution_nonce: None,
+            policy: HttpAuthorityPolicy::DenyByDefault,
+        })
+        .test_unwrap();
+    assert!(denied.verdict.is_denied());
+
+    // No code path produces the "denied" outcome, so the paging counter never
+    // carries a deny series regardless of how many requests are rejected.
+    let mut body = String::new();
+    chio_metrics_spec::runtime::families::DISPATCH_FAILURE.render(&mut body);
+    assert!(
+        !body.contains("outcome=\"denied\""),
+        "a policy deny must not appear on the dispatch-failure paging metric: {body}"
+    );
+
+    // The deny is still observable via the guard-verdict metric.
+    assert!(
+        crate::metrics::guard_evaluations_total(crate::metrics::GUARD_OUTCOME_DENY) >= 1,
+        "a deny must be tracked by the guard-verdict metric"
+    );
+}
+
+#[test]
 fn sign_transport_deny_receipt_rejects_non_deny_verdict() {
     let authority = authority();
     let err = authority
