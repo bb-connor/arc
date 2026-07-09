@@ -1140,4 +1140,23 @@ impl BudgetStore for SqliteBudgetStore {
     fn count_open_holds(&self) -> Result<usize, BudgetStoreError> {
         Ok(self.list_open_holds()?.len())
     }
+
+    fn get_budget_hold(
+        &self,
+        hold_id: &str,
+    ) -> Result<Option<BudgetHoldSnapshot>, BudgetStoreError> {
+        self.budget_hold_snapshot(hold_id)
+    }
+
+    fn mark_hold_reserved(
+        &self,
+        hold_id: &str,
+        reserved_until_unix_secs: i64,
+    ) -> Result<(), BudgetStoreError> {
+        self.mark_hold_reserved_until(hold_id, reserved_until_unix_secs)
+    }
+
+    fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
+        self.reap_expired_reserved_holds(now_unix_secs)
+    }
 }
