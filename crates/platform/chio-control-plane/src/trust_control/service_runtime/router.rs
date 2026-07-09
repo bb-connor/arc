@@ -555,7 +555,22 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
 /// Prometheus scrape body for the trust-control surface: the kernel guard
 /// families plus the alert-pack families, composed (never fabricated) from the
 /// chio-metrics-spec runtime families (RFC-0009 F58).
-async fn handle_trust_control_metrics() -> impl axum::response::IntoResponse {
+///
+/// The route shares the trust-control listener, which binds `config.listen` and
+/// may be externally reachable, so it fails closed: it requires the SAME
+/// service-token bearer auth the authority/receipt/passport/budget routes
+/// enforce before returning operational counters and guard labels (Codex
+/// round-2 finding 6). Prometheus scrapes it with a configured bearer token.
+async fn handle_trust_control_metrics(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+) -> Response {
+    if let Err(response) = super::super::report_validation::validate_service_auth(
+        &headers,
+        &state.config.service_token,
+    ) {
+        return response;
+    }
     let alert_pack = || {
         let mut out = String::new();
         chio_metrics_spec::runtime::render_alert_pack_families(&mut out);
@@ -572,4 +587,76 @@ async fn handle_trust_control_metrics() -> impl axum::response::IntoResponse {
         )],
         body,
     )
+        .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::super::*;
+    use super::handle_trust_control_metrics;
+    use chio_test_support::prelude::*;
+    use std::collections::BTreeMap;
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+
+    fn metrics_state(service_token: &str) -> TrustServiceState {
+        let config = TrustServiceConfig {
+            listen: "127.0.0.1:0".parse().test_unwrap(),
+            service_token: service_token.to_string(),
+            tenant_read_tokens: BTreeMap::new(),
+            receipt_db_path: None,
+            revocation_db_path: None,
+            authority_seed_path: None,
+            authority_db_path: None,
+            budget_db_path: None,
+            enterprise_providers_file: None,
+            federation_policies_file: None,
+            scim_lifecycle_file: None,
+            verifier_policies_file: None,
+            verifier_challenge_db_path: None,
+            passport_statuses_file: None,
+            passport_issuance_offers_file: None,
+            certification_registry_file: None,
+            certification_discovery_file: None,
+            issuance_policy: None,
+            runtime_assurance_policy: None,
+            advertise_url: None,
+            allow_local_peer_urls: true,
+            certification_public_metadata_ttl_seconds: 300,
+            peer_urls: Vec::new(),
+            cluster_sync_interval: Duration::from_millis(25),
+        };
+        TrustServiceState {
+            config,
+            enterprise_provider_registry: None,
+            verifier_policy_registry: None,
+            federation_admission_rate_limiter: Arc::new(Mutex::new(
+                FederationAdmissionRateLimiter::default(),
+            )),
+            cluster: None,
+        }
+    }
+
+    /// Codex round-2 finding 6: the /metrics route shares the trust-control
+    /// listener and must fail closed. An unauthenticated scrape is rejected with
+    /// 401 rather than exposing operational counters and guard labels.
+    #[tokio::test]
+    async fn trust_control_metrics_rejects_unauthenticated_request() {
+        let state = metrics_state("service-secret");
+        let response = handle_trust_control_metrics(State(state), HeaderMap::new()).await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    /// A scrape presenting the configured service token is served (200).
+    #[tokio::test]
+    async fn trust_control_metrics_accepts_valid_service_token() {
+        let state = metrics_state("service-secret");
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_static("Bearer service-secret"),
+        );
+        let response = handle_trust_control_metrics(State(state), headers).await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
 }
