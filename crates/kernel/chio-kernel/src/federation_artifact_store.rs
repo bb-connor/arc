@@ -42,26 +42,43 @@ pub struct InMemoryFederationArtifactStore {
 
 impl Default for InMemoryFederationArtifactStore {
     fn default() -> Self {
-        let dual_gauge = SizeGauge::new();
-        let dsse_gauge = SizeGauge::new();
-        Self {
-            dual: Mutex::new(BoundedMap::new(
-                IN_MEMORY_FEDERATION_ARTIFACT_STORE_CAPACITY,
-                IN_MEMORY_FEDERATION_ARTIFACT_STORE_IDLE_TTL_SECS,
-                dual_gauge.clone(),
-            )),
-            dual_gauge,
-            dsse: Mutex::new(BoundedMap::new(
-                IN_MEMORY_FEDERATION_ARTIFACT_STORE_CAPACITY,
-                IN_MEMORY_FEDERATION_ARTIFACT_STORE_IDLE_TTL_SECS,
-                dsse_gauge.clone(),
-            )),
-            dsse_gauge,
-        }
+        Self::with_capacity(
+            IN_MEMORY_FEDERATION_ARTIFACT_STORE_CAPACITY,
+            IN_MEMORY_FEDERATION_ARTIFACT_STORE_IDLE_TTL_SECS,
+        )
     }
 }
 
 impl InMemoryFederationArtifactStore {
+    /// Construct with an explicit per-map capacity and idle TTL. This is the seam
+    /// that lets a deployment wiring this reference store in from a CONFIGURED
+    /// process memory budget honor a lowered `federation_cache_capacity` instead of
+    /// the compiled-in 8192 default, so the store cannot exceed the operator's
+    /// configured federation memory budget even though the kernel's front caches
+    /// honor it (RFC-0004 F10, codex finding 3555239304). Same seam class as the
+    /// velocity/journal `from_memory_budget` constructors.
+    pub fn with_capacity(capacity: usize, idle_ttl_secs: u64) -> Self {
+        let dual_gauge = SizeGauge::new();
+        let dsse_gauge = SizeGauge::new();
+        Self {
+            dual: Mutex::new(BoundedMap::new(capacity, idle_ttl_secs, dual_gauge.clone())),
+            dual_gauge,
+            dsse: Mutex::new(BoundedMap::new(capacity, idle_ttl_secs, dsse_gauge.clone())),
+            dsse_gauge,
+        }
+    }
+
+    /// Construct from a CONFIGURED process memory budget so lowering
+    /// `federation_cache_capacity` / `federation_cache_idle_ttl_secs` actually
+    /// bounds each backing map, rather than every deployment retaining the
+    /// compiled-in 8192-entry default (RFC-0004 F10, codex finding 3555239304).
+    pub fn from_memory_budget(budget: &crate::MemoryBudgetConfig) -> Self {
+        Self::with_capacity(
+            budget.federation_cache_capacity,
+            budget.federation_cache_idle_ttl_secs,
+        )
+    }
+
     /// Live occupancy of the dual-signed-receipt backing map.
     pub fn dual_signed_len(&self) -> usize {
         self.dual_gauge.get()
@@ -209,6 +226,53 @@ mod tests {
         assert!(store.get_dual_signed("rcpt-0").unwrap().is_none());
         let last_id = format!("rcpt-{}", inserts - 1);
         assert!(store.get_dual_signed(&last_id).unwrap().is_some());
+    }
+
+    #[test]
+    fn from_memory_budget_honors_lowered_federation_cache_capacity() {
+        // codex finding 3555239304 (RFC-0004 F10): the CONFIGURED process memory
+        // budget must bound this reference store, not a hard-coded default. A budget
+        // lowering `federation_cache_capacity` to 4 must cap EACH backing map at 4,
+        // not the compiled-in 8192. RED (pre-fix): only `default()` existed, so a
+        // deployment retained 8192 entries per map regardless of the configured
+        // budget.
+        let budget = crate::MemoryBudgetConfig {
+            federation_cache_capacity: 4,
+            ..crate::MemoryBudgetConfig::defaults()
+        };
+        let store = InMemoryFederationArtifactStore::from_memory_budget(&budget);
+
+        for i in 0..64 {
+            let id = format!("rcpt-{i}");
+            store
+                .put_dual_signed(&id, &sample_dual_signed(&id))
+                .unwrap();
+            assert!(
+                store.dual_signed_len() <= 4,
+                "configured federation_cache_capacity did not take effect: dual len={}",
+                store.dual_signed_len()
+            );
+        }
+        assert_eq!(
+            store.dual_signed_len(),
+            4,
+            "dual-signed backing map should saturate at the lowered cap"
+        );
+
+        for i in 0..64 {
+            let id = format!("dsse-{i}");
+            store.put_dsse(&id, &sample_dsse(&id)).unwrap();
+            assert!(
+                store.dsse_len() <= 4,
+                "configured federation_cache_capacity did not take effect: dsse len={}",
+                store.dsse_len()
+            );
+        }
+        assert_eq!(
+            store.dsse_len(),
+            4,
+            "dsse backing map should saturate at the lowered cap"
+        );
     }
 
     #[test]
