@@ -6,14 +6,30 @@ use crate::SizeGauge;
 /// means "disabled" (stores nothing, hands each item straight back), the
 /// correct default when a durable store is authoritative.
 ///
-/// `Clone` produces a read-only snapshot sharing the same `SizeGauge` handle;
-/// the clone is never appended to, so the shared gauge is only ever written by
-/// the owning structure.
-#[derive(Clone, Debug)]
+/// `Clone` produces a snapshot with its OWN independent `SizeGauge`, seeded to
+/// the current length. `push` is public, so a clone can be appended to; giving
+/// the clone a fresh gauge guarantees that writing through a snapshot (for
+/// example the public `append` on a `receipt_log()` snapshot) can never corrupt
+/// the owning structure's telemetry gauge.
+#[derive(Debug)]
 pub struct Ring<T> {
     buf: VecDeque<T>,
     capacity: usize,
     gauge: SizeGauge,
+}
+
+impl<T: Clone> Clone for Ring<T> {
+    fn clone(&self) -> Self {
+        // Independent gauge: the snapshot tracks only its own length so pushes
+        // to the clone never write through to the owner's gauge handle.
+        let gauge = SizeGauge::new();
+        gauge.set(self.buf.len());
+        Self {
+            buf: self.buf.clone(),
+            capacity: self.capacity,
+            gauge,
+        }
+    }
 }
 
 impl<T> Ring<T> {
@@ -78,6 +94,28 @@ mod tests {
         assert_eq!(gauge.get(), 3);
         let items: Vec<u32> = ring.iter().copied().collect();
         assert_eq!(items, vec![2, 3, 4]);
+    }
+
+    #[test]
+    fn clone_has_independent_gauge_so_snapshot_pushes_do_not_corrupt_owner() {
+        let owner_gauge = SizeGauge::new();
+        let mut ring: Ring<u32> = Ring::with_capacity(4, owner_gauge.clone());
+        ring.push(1);
+        ring.push(2);
+        assert_eq!(owner_gauge.get(), 2);
+
+        // A snapshot clone must not share the owner's gauge handle.
+        let mut snapshot = ring.clone();
+        assert_eq!(snapshot.len(), 2);
+        snapshot.push(3);
+        snapshot.push(4);
+        // The clone tracks its own length; the owner's gauge is untouched.
+        assert_eq!(snapshot.len(), 4);
+        assert_eq!(
+            owner_gauge.get(),
+            2,
+            "owner gauge corrupted by a push to a snapshot clone"
+        );
     }
 
     #[test]
