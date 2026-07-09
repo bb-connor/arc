@@ -9,9 +9,11 @@
 //! that realized cost, releases the reserved-minus-realized difference back to
 //! the grant, and signs a completed, authoritative mediated-spend receipt.
 //!
-//! It also exposes the reserved-hold TTL primitives: the deadline computation
-//! used when a hold is reserved, and a reaper wrapper that releases expired,
-//! unreconciled reserved holds. Both are fail-closed on the money path.
+//! It also exposes the reserved-hold TTL reaper: a wrapper that settles expired,
+//! unreconciled reserved holds at their reserved worst-case (forfeit). The TTL
+//! deadline itself is stamped from the minted nonce's exact expiry at reserve
+//! time, so a hold never expires before its own nonce. Fail-closed on the money
+//! path.
 
 use super::*;
 
@@ -19,25 +21,16 @@ use crate::budget_store::{BudgetHoldSnapshot, BudgetReconcileHoldRequest};
 use crate::execution_nonce::{verify_execution_nonce, SignedExecutionNonce};
 
 impl ChioKernel {
-    /// Wall-clock unix second after which a hold reserved at `now_unix_secs`
-    /// becomes eligible for the TTL reaper. Reuses the execution-nonce validity
-    /// window so a reserved hold expires exactly when its nonce does; falls back
-    /// to the default nonce TTL when no config is installed.
-    pub(crate) fn reserved_hold_ttl_deadline(&self, now_unix_secs: u64) -> i64 {
-        let ttl_secs = self.execution_nonce_config.as_ref().map_or(
-            crate::execution_nonce::DEFAULT_EXECUTION_NONCE_TTL_SECS,
-            |config| config.nonce_ttl_secs,
-        );
-        let now = i64::try_from(now_unix_secs).unwrap_or(i64::MAX);
-        now.saturating_add(i64::try_from(ttl_secs).unwrap_or(i64::MAX))
-    }
-
-    /// Release every expired, unreconciled reserved budget hold, freeing its
-    /// reserved exposure back to the grant. Self-healing and fail-closed: a
+    /// Settle every expired, unreconciled reserved budget hold at its reserved
+    /// worst-case, forfeiting the reserved amount to realized spend. In the
+    /// two-phase reserve/reconcile flow the only evidence a spend occurred is the
+    /// caller's reconcile; an expired-and-unreconciled hold may correspond to a
+    /// call that executed and spent, so releasing it would under-count real spend
+    /// and fail open for a cumulative spend cap. Self-healing and fail-closed: a
     /// still-valid reserved hold and any reconciled/reversed/released hold are
-    /// never touched. Returns the number of holds released. The sidecar drives
-    /// this on a timer (startup wiring is a later task); this method is the
-    /// reachable primitive.
+    /// never touched, and a settled hold is idempotent under repeated reaps.
+    /// Returns the number of holds settled. The sidecar drives this on a timer
+    /// (startup wiring is a later task); this method is the reachable primitive.
     pub fn reap_expired_reserved_budget_holds(
         &self,
         now_unix_secs: i64,
@@ -52,17 +45,22 @@ impl ChioKernel {
     /// Order of checks:
     /// 1. The presented `arguments` must hash to the nonce's bound parameter
     ///    hash (the caller must have executed the exact call the nonce authorizes).
-    /// 2. The nonce is verified (schema, expiry, signature under the kernel key,
+    /// 2. The nonce must name a reserved hold (`reserved_hold_id`).
+    /// 3. The realized currency must equal the currency the grant/hold was
+    ///    authorized in. This is checked BEFORE the nonce is consumed, so a
+    ///    mismatch is rejected fail-closed without burning the nonce or settling,
+    ///    and an unchecked caller-supplied currency never reaches a signed receipt.
+    /// 4. The nonce is verified (schema, expiry, signature under the kernel key,
     ///    single-use replay) and CONSUMED. A second reconcile of the same nonce
     ///    is rejected as a replay; a forged or tampered nonce fails the signature
     ///    check and is never consumed.
-    /// 3. The nonce must name a reserved hold (`reserved_hold_id`), which must
-    ///    still be open. A missing or already-closed hold is rejected.
-    /// 4. The hold is settled at `min(realized_cost, reserved)` -- realized cost
+    /// 5. The named hold must still be open. A missing or already-closed hold is
+    ///    rejected.
+    /// 6. The hold is settled at `min(realized_cost, reserved)` -- realized cost
     ///    is CLAMPED to the reserved worst-case, since the payer never authorized
     ///    more than the reserved envelope. A realized cost of zero settles the
     ///    hold at zero, releasing the entire reserved amount back to the grant.
-    /// 5. A completed allow receipt is signed with the reconciled hold lineage
+    /// 7. A completed allow receipt is signed with the reconciled hold lineage
     ///    and the nonce id, so `is_authoritative_spend_receipt` accepts it.
     pub fn reconcile_reserved_authorization_by_nonce(
         &self,
@@ -84,7 +82,42 @@ impl ChioKernel {
             ));
         }
 
-        // (2) Verify and CONSUME the nonce. Verifying against the nonce's own
+        // (2) The nonce must name a reserved hold. Read the signed hold id up
+        // front so the caller-supplied realized currency can be validated against
+        // the reserved grant currency BEFORE the nonce is verified and consumed.
+        let reserved_hold_id = presented_nonce.reserved_hold_id().ok_or_else(|| {
+            KernelError::Internal(
+                "presented nonce does not name a reserved budget hold; nothing to reconcile"
+                    .to_string(),
+            )
+        })?;
+        let bound_capability_id = presented_nonce.nonce.bound_to.capability_id.clone();
+
+        // (3) Currency check (fail-closed): reject a realized currency that
+        // differs from the currency the grant/hold was authorized in, before
+        // settling or signing, so an unchecked caller-supplied currency is never
+        // stamped onto a signed authoritative receipt. Doing this ahead of nonce
+        // consumption means a mismatch does not burn the nonce (the caller can
+        // retry with the correct currency). Defers to the signature check below
+        // when the named hold is absent, so a forged/tampered nonce is still
+        // rejected as a nonce error rather than masked by hold-not-found.
+        self.with_budget_store(|store| {
+            let Some(hold) = store.get_budget_hold(reserved_hold_id)? else {
+                return Ok(());
+            };
+            match hold.reserved_currency.as_deref() {
+                Some(reserved) if reserved == realized_cost.currency => Ok(()),
+                Some(reserved) => Err(KernelError::Internal(format!(
+                    "reconcile-by-nonce realized currency `{}` does not match the reserved grant currency `{reserved}`",
+                    realized_cost.currency
+                ))),
+                None => Err(KernelError::Internal(format!(
+                    "reconcile-by-nonce cannot validate realized currency for reserved hold `{reserved_hold_id}`: no reserved grant currency recorded"
+                ))),
+            }
+        })?;
+
+        // (4) Verify and CONSUME the nonce. Verifying against the nonce's own
         // binding makes the binding self-check trivially pass while the signature
         // check (over the full body including reserved_hold_id) still rejects any
         // forgery or tamper, and the store reservation enforces single-use.
@@ -106,16 +139,7 @@ impl ChioKernel {
             KernelError::Internal(format!("reconcile-by-nonce rejected the nonce: {error}"))
         })?;
 
-        // (3) The nonce must name a reserved hold.
-        let reserved_hold_id = presented_nonce.reserved_hold_id().ok_or_else(|| {
-            KernelError::Internal(
-                "presented nonce does not name a reserved budget hold; nothing to reconcile"
-                    .to_string(),
-            )
-        })?;
-        let bound_capability_id = presented_nonce.nonce.bound_to.capability_id.clone();
-
-        // (3)+(4) Look up the exact hold and reconcile it, all under one budget
+        // (5)+(6) Look up the exact hold and reconcile it, all under one budget
         // store lock so the open-state check and the settle are atomic.
         let realized_units = realized_cost.units;
         let (hold, committed_before, reconcile, guarantee_level, budget_profile, metering_profile) =

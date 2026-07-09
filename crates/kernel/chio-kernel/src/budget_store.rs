@@ -299,6 +299,12 @@ pub struct BudgetHoldSnapshot {
     /// eligible for the TTL reaper. `None` for holds that were never marked
     /// reserved (they are reclaimed by the crash reaper, not the TTL reaper).
     pub reserved_until: Option<i64>,
+    /// Currency the grant was authorized in, recorded when the reserve-for-caller
+    /// path stamps the hold. `None` for holds that were never marked reserved.
+    /// Reconcile-by-nonce validates the caller-supplied realized currency against
+    /// this before settling or signing, so an unchecked currency is never stamped
+    /// onto a signed authoritative receipt.
+    pub reserved_currency: Option<String>,
     pub authority: Option<BudgetEventAuthority>,
 }
 
@@ -746,28 +752,38 @@ pub trait BudgetStore: Send + Sync {
     }
 
     /// Stamp an open hold with the wall-clock unix second after which the TTL
-    /// reaper may release it if it is still unreconciled. Only the
-    /// pre-execution authorization-reserving path calls this, so a normal
-    /// in-flight hold (reconciled or reversed within one evaluation) is never
-    /// marked and never touched by the TTL reaper. Stores that do not persist
-    /// hold state treat this as a no-op (the default).
+    /// reaper may settle it if it is still unreconciled, and record the currency
+    /// the grant was authorized in. Only the pre-execution
+    /// authorization-reserving path calls this, so a normal in-flight hold
+    /// (reconciled or reversed within one evaluation) is never marked and never
+    /// touched by the TTL reaper. The recorded currency lets reconcile-by-nonce
+    /// reject a caller-supplied realized currency that differs from the grant's.
+    /// Stores that do not persist hold state treat this as a no-op (the default).
     fn mark_hold_reserved(
         &self,
         hold_id: &str,
         reserved_until_unix_secs: i64,
+        currency: &str,
     ) -> Result<(), BudgetStoreError> {
-        let _ = (hold_id, reserved_until_unix_secs);
+        let _ = (hold_id, reserved_until_unix_secs, currency);
         Ok(())
     }
 
-    /// Release every reserved hold that is still `open` and whose
-    /// `reserved_until` is at or before `now_unix_secs`, freeing the reserved
-    /// exposure back to the grant. Fail-closed and self-healing: it releases
-    /// ONLY holds that were explicitly marked reserved (via
-    /// [`Self::mark_hold_reserved`]) and are past their expiry; a not-yet-expired
-    /// reserved hold and a reconciled/reversed/released hold are never touched.
-    /// Returns the number of holds released. Stores that do not persist hold
-    /// state return `Ok(0)` (the default).
+    /// Settle every reserved hold that is still `open` and whose `reserved_until`
+    /// is at or before `now_unix_secs` at its reserved worst-case, forfeiting the
+    /// reserved amount to realized spend. In the two-phase reserve/reconcile flow
+    /// the ONLY evidence a spend occurred is the caller's reconcile; an
+    /// expired-and-unreconciled hold may correspond to a call that DID execute and
+    /// spend. Releasing it (realized 0) would under-count real spend and fail open
+    /// for a cumulative spend cap, so an abandoning caller instead FORFEITS the
+    /// reserved worst-case (the grant's realized total advances by it) and must
+    /// reconcile the real cost before expiry to reclaim the difference.
+    /// Fail-closed and self-healing: it settles ONLY holds that were explicitly
+    /// marked reserved (via [`Self::mark_hold_reserved`]) and are past their
+    /// expiry; a not-yet-expired reserved hold and a reconciled/reversed/released
+    /// hold are never touched. Idempotent (a settled hold is no longer open).
+    /// Returns the number of holds settled. Stores that do not persist hold state
+    /// return `Ok(0)` (the default).
     fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
         let _ = now_unix_secs;
         Ok(0)
@@ -890,11 +906,13 @@ mod tests {
             decision,
             BudgetAuthorizeHoldDecision::Authorized(_)
         ));
-        store.mark_hold_reserved(hold_id, reserved_until).unwrap();
+        store
+            .mark_hold_reserved(hold_id, reserved_until, "USD")
+            .unwrap();
     }
 
     #[test]
-    fn ttl_reaper_releases_only_expired_unreconciled_reserved_holds() {
+    fn ttl_reaper_settles_expired_unreconciled_reserved_holds_at_worst_case() {
         let store = InMemoryBudgetStore::new();
         // Expired reserved hold on cap-a: reserved_until 100 <= now 1000.
         authorize_reserved(&store, "hold-expired", "cap-a", 100);
@@ -925,18 +943,20 @@ mod tests {
             100
         );
 
-        let released = store.reap_expired_reserved_holds(1_000).unwrap();
-        assert_eq!(released, 1, "only the expired reserved hold is released");
+        let settled = store.reap_expired_reserved_holds(1_000).unwrap();
+        assert_eq!(settled, 1, "only the expired reserved hold is settled");
 
-        // cap-a expired reserved hold released back to 0.
+        // cap-a expired reserved hold SETTLED at worst-case: the reserved amount
+        // is forfeited to realized spend (committed stays 100), not released to 0.
+        let cap_a = store.get_usage("cap-a", 0).unwrap().unwrap();
         assert_eq!(
-            store
-                .get_usage("cap-a", 0)
-                .unwrap()
-                .unwrap()
-                .committed_cost_units()
-                .unwrap(),
-            0
+            cap_a.total_cost_realized_spend, 100,
+            "the forfeited worst-case becomes realized spend"
+        );
+        assert_eq!(
+            cap_a.committed_cost_units().unwrap(),
+            100,
+            "the reserved worst-case stays consumed, the freed difference is gone"
         );
         assert_eq!(
             store
@@ -944,8 +964,10 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .disposition,
-            BudgetHoldDispositionView::Released
+            BudgetHoldDispositionView::Reconciled
         );
+        // A second reap is idempotent: the settled hold is no longer open.
+        assert_eq!(store.reap_expired_reserved_holds(1_000).unwrap(), 0);
         // cap-b not-yet-expired reserved hold untouched.
         assert_eq!(
             store

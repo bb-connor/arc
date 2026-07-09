@@ -1,5 +1,14 @@
 use super::*;
 
+/// The reserve-for-caller stamp threaded into a preflight allow response: the
+/// hold to keep reserved and the grant currency it was authorized in. The TTL
+/// reaper deadline is derived from the minted nonce's exact expiry inside the
+/// response builder so a hold never expires before its own nonce.
+pub(crate) struct ReservedHoldStamp<'a> {
+    pub(crate) hold_id: &'a str,
+    pub(crate) currency: &'a str,
+}
+
 impl ChioKernel {
     pub(crate) fn build_allow_response_with_metadata(
         &self,
@@ -121,7 +130,7 @@ impl ChioKernel {
         matched_grant_index: Option<usize>,
         extra_metadata: Option<serde_json::Value>,
         incomplete_reason: &str,
-        reserved_hold_id: Option<&str>,
+        reserved_hold: Option<ReservedHoldStamp<'_>>,
     ) -> Result<ToolCallResponse, KernelError> {
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
@@ -165,8 +174,21 @@ impl ChioKernel {
             request,
             cap,
             &receipt,
-            reserved_hold_id,
+            reserved_hold.as_ref().map(|stamp| stamp.hold_id),
         )?;
+
+        // Finding 4: stamp the reserved hold's TTL deadline from the minted
+        // nonce's exact `expires_at` (not a separately sampled evaluation clock),
+        // so an unreconciled reserved hold can never expire before its own nonce.
+        // The grant currency is recorded here too, for reconcile-time validation.
+        // Only the reserve-for-caller path supplies a stamp; the reverse-for-retry
+        // preflight passes `None` and marks nothing.
+        if let (Some(stamp), Some(nonce)) = (reserved_hold.as_ref(), execution_nonce.as_ref()) {
+            let reserved_until = nonce.expires_at();
+            self.with_budget_store(|store| {
+                Ok(store.mark_hold_reserved(stamp.hold_id, reserved_until, stamp.currency)?)
+            })?;
+        }
 
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),

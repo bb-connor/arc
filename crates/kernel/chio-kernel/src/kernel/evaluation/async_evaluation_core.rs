@@ -193,16 +193,28 @@ impl ChioKernel {
             }
         }
 
-        if let Err(e) = self.ensure_registered_tool_target(request) {
-            let msg = e.to_string();
-            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "tool target not registered");
-            return self.build_deny_response_with_metadata(
-                request,
-                &msg,
-                now,
-                None,
-                extra_metadata.clone(),
-            );
+        // Finding 2: the reserve-for-caller authorization path never dispatches a
+        // tool on this kernel, so it must not require the caller's tool server to
+        // be registered; the sidecar can then stop registering caller-arbitrary
+        // server ids (unbounded growth). Every other path -- including a
+        // ReserveForCaller request that falls through to dispatch because no nonce
+        // preflight is required -- still requires registration exactly as before.
+        let reserving_preflight = matches!(
+            preflight_disposition,
+            PreflightHoldDisposition::ReserveForCaller
+        ) && self.execution_nonce_preflight_required(request);
+        if !reserving_preflight {
+            if let Err(e) = self.ensure_registered_tool_target(request) {
+                let msg = e.to_string();
+                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "tool target not registered");
+                return self.build_deny_response_with_metadata(
+                    request,
+                    &msg,
+                    now,
+                    None,
+                    extra_metadata.clone(),
+                );
+            }
         }
 
         if let Err(error) = self.record_observed_capability_snapshot(cap) {

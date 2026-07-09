@@ -2,9 +2,7 @@ use super::*;
 
 use std::collections::HashMap;
 
-use chio_kernel::budget_store::{
-    BudgetReconcileHoldRequest, BudgetReleaseHoldRequest, BudgetReverseHoldRequest,
-};
+use chio_kernel::budget_store::{BudgetReconcileHoldRequest, BudgetReverseHoldRequest};
 
 /// Outcome of a startup reap pass over orphaned open holds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,30 +62,37 @@ impl SqliteBudgetStore {
         Ok(summary)
     }
 
-    /// Release every reserved hold that is still `open` and whose
-    /// `reserved_until` deadline is at or before `now_unix_secs`, freeing the
-    /// reserved exposure back to the grant. Fail-closed: only holds explicitly
-    /// marked reserved (a non-NULL `reserved_until`) and past expiry are
-    /// touched; a not-yet-expired reserved hold and any non-open hold are left
-    /// alone. Returns the number of holds released.
+    /// Settle every reserved hold that is still `open` and whose `reserved_until`
+    /// deadline is at or before `now_unix_secs` at its reserved worst-case,
+    /// forfeiting the reserved amount to realized spend. In the two-phase
+    /// reserve/reconcile flow the only evidence a spend occurred is the caller's
+    /// reconcile; an expired-and-unreconciled hold may correspond to a call that
+    /// executed and spent, so releasing it (realized 0) would under-count real
+    /// spend and fail open for a cumulative cap. The abandoning caller instead
+    /// forfeits the worst-case (must reconcile before expiry to reclaim the
+    /// difference). Fail-closed: only holds explicitly marked reserved (a non-NULL
+    /// `reserved_until`) and past expiry are touched; a not-yet-expired reserved
+    /// hold and any non-open hold are left alone. Idempotent (a settled hold is no
+    /// longer open). Returns the number of holds settled.
     pub fn reap_expired_reserved_holds(
         &self,
         now_unix_secs: i64,
     ) -> Result<usize, BudgetStoreError> {
         let expired = self.list_expired_reserved_holds(now_unix_secs)?;
-        let mut released = 0usize;
+        let mut settled = 0usize;
         for (hold_id, capability_id, grant_index, remaining, authority) in expired {
-            self.release_budget_hold(BudgetReleaseHoldRequest {
+            self.reconcile_budget_hold(BudgetReconcileHoldRequest {
                 capability_id,
                 grant_index: grant_index as usize,
-                released_exposure_units: remaining,
+                exposed_cost_units: remaining,
+                realized_spend_units: remaining,
                 hold_id: Some(hold_id.clone()),
-                event_id: Some(format!("{hold_id}:ttl-reap-release")),
+                event_id: Some(format!("{hold_id}:ttl-reap-settle")),
                 authority,
             })?;
-            released += 1;
+            settled += 1;
         }
-        Ok(released)
+        Ok(settled)
     }
 
     /// Open reserved holds past their expiry:
@@ -123,12 +128,13 @@ impl SqliteBudgetStore {
         Ok(holds)
     }
 
-    /// Stamp an open hold with a TTL reaper deadline. Errors fail-closed when the
-    /// hold is missing or is no longer open.
+    /// Stamp an open hold with a TTL reaper deadline and the grant currency.
+    /// Errors fail-closed when the hold is missing or is no longer open.
     pub fn mark_hold_reserved_until(
         &self,
         hold_id: &str,
         reserved_until_unix_secs: i64,
+        currency: &str,
     ) -> Result<(), BudgetStoreError> {
         let connection = self
             .connection
@@ -136,9 +142,9 @@ impl SqliteBudgetStore {
             .map_err(|_| BudgetStoreError::Invariant("budget store mutex poisoned".to_string()))?;
         let affected = connection.execute(
             "UPDATE budget_authorization_holds \
-             SET reserved_until = ?2 \
+             SET reserved_until = ?2, reserved_currency = ?3 \
              WHERE hold_id = ?1 AND disposition = 'open'",
-            params![hold_id, reserved_until_unix_secs],
+            params![hold_id, reserved_until_unix_secs, currency],
         )?;
         if affected == 0 {
             return Err(BudgetStoreError::Invariant(format!(
@@ -161,7 +167,7 @@ impl SqliteBudgetStore {
             .query_row(
                 "SELECT hold_id, capability_id, grant_index, authorized_exposure_units, \
                  remaining_exposure_units, disposition, reserved_until, \
-                 authority_id, lease_id, lease_epoch \
+                 authority_id, lease_id, lease_epoch, reserved_currency \
                  FROM budget_authorization_holds WHERE hold_id = ?1",
                 params![hold_id],
                 |row| {
@@ -193,6 +199,7 @@ impl SqliteBudgetStore {
                         remaining_exposure_units: row.get::<_, i64>(4)? as u64,
                         disposition,
                         reserved_until: row.get::<_, Option<i64>>(6)?,
+                        reserved_currency: row.get::<_, Option<String>>(10)?,
                         authority,
                     })
                 },
@@ -265,19 +272,25 @@ mod tests {
     }
 
     #[test]
-    fn ttl_reaper_releases_only_expired_unreconciled_reserved_holds() {
+    fn ttl_reaper_settles_expired_unreconciled_reserved_holds_at_worst_case() {
         use chio_kernel::budget_store::{BudgetHoldDispositionView, BudgetReconcileHoldRequest};
 
         let store = open_temp_store();
         // Expired reserved hold.
         authorize(&store, "hold-expired", "cap-a");
-        store.mark_hold_reserved_until("hold-expired", 100).unwrap();
+        store
+            .mark_hold_reserved_until("hold-expired", 100, "USD")
+            .unwrap();
         // Not-yet-expired reserved hold.
         authorize(&store, "hold-fresh", "cap-b");
-        store.mark_hold_reserved_until("hold-fresh", 5_000).unwrap();
+        store
+            .mark_hold_reserved_until("hold-fresh", 5_000, "USD")
+            .unwrap();
         // Reconciled reserved hold.
         authorize(&store, "hold-done", "cap-c");
-        store.mark_hold_reserved_until("hold-done", 100).unwrap();
+        store
+            .mark_hold_reserved_until("hold-done", 100, "USD")
+            .unwrap();
         store
             .reconcile_budget_hold(BudgetReconcileHoldRequest {
                 capability_id: "cap-c".to_string(),
@@ -290,26 +303,30 @@ mod tests {
             })
             .unwrap();
 
-        let released = store.reap_expired_reserved_holds(1_000).unwrap();
-        assert_eq!(released, 1, "only the expired reserved hold is released");
+        let settled = store.reap_expired_reserved_holds(1_000).unwrap();
+        assert_eq!(settled, 1, "only the expired reserved hold is settled");
 
-        // cap-a expired reserved hold released, exposure freed to 0.
+        // cap-a expired reserved hold SETTLED at worst-case: the reserved amount is
+        // forfeited to realized spend (committed stays 100), not released to 0.
+        let cap_a = store.get_usage("cap-a", 0).unwrap().unwrap();
         assert_eq!(
-            store
-                .get_usage("cap-a", 0)
-                .unwrap()
-                .unwrap()
-                .committed_cost_units()
-                .unwrap(),
-            0
+            cap_a.total_cost_realized_spend, 100,
+            "the forfeited worst-case becomes realized spend"
         );
+        assert_eq!(
+            cap_a.committed_cost_units().unwrap(),
+            100,
+            "the reserved worst-case stays consumed, the freed difference is gone"
+        );
+        // A second reap is idempotent: the settled hold is no longer open.
+        assert_eq!(store.reap_expired_reserved_holds(1_000).unwrap(), 0);
         assert_eq!(
             store
                 .budget_hold_snapshot("hold-expired")
                 .unwrap()
                 .unwrap()
                 .disposition,
-            BudgetHoldDispositionView::Released
+            BudgetHoldDispositionView::Reconciled
         );
         // cap-b not-yet-expired reserved hold untouched.
         assert_eq!(
@@ -359,18 +376,21 @@ mod tests {
             .budget_hold_snapshot("hold-missing")
             .unwrap()
             .is_none());
-        store.mark_hold_reserved_until("hold-snap", 4_242).unwrap();
+        store
+            .mark_hold_reserved_until("hold-snap", 4_242, "USD")
+            .unwrap();
         let snapshot = store.budget_hold_snapshot("hold-snap").unwrap().unwrap();
         assert_eq!(snapshot.capability_id, "cap-snap");
         assert_eq!(snapshot.remaining_exposure_units, 100);
         assert_eq!(snapshot.disposition, BudgetHoldDispositionView::Open);
         assert_eq!(snapshot.reserved_until, Some(4_242));
+        assert_eq!(snapshot.reserved_currency.as_deref(), Some("USD"));
     }
 
     #[test]
     fn mark_hold_reserved_on_missing_hold_fails_closed() {
         let store = open_temp_store();
-        assert!(store.mark_hold_reserved_until("nope", 100).is_err());
+        assert!(store.mark_hold_reserved_until("nope", 100, "USD").is_err());
     }
 
     #[test]

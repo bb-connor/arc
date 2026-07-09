@@ -1065,7 +1065,7 @@ fn reconcile_by_nonce_clamps_realized_above_reserved() {
 }
 
 #[test]
-fn reserved_hold_ttl_reaper_frees_expired_authorization_only_when_due() {
+fn reserved_hold_ttl_reaper_settles_expired_authorization_at_worst_case() {
     let mut kernel = make_kernel(make_monetary_config());
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
@@ -1089,6 +1089,14 @@ fn reserved_hold_ttl_reaper_frees_expired_authorization_only_when_due() {
         .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
         .unwrap();
     assert_eq!(authorized.verdict, Verdict::Allow);
+    let nonce = *authorized
+        .execution_nonce
+        .clone()
+        .expect("reserving authorization mints a nonce");
+    let hold_id = nonce
+        .reserved_hold_id()
+        .expect("reserving nonce names the reserved hold")
+        .to_string();
 
     // Not yet expired: the reaper leaves the still-valid reserved hold in place.
     let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
@@ -1106,19 +1114,226 @@ fn reserved_hold_ttl_reaper_frees_expired_authorization_only_when_due() {
         blocked.reason
     );
 
-    // Past expiry: the reaper releases the abandoned reserved hold, freeing the grant.
-    assert_eq!(kernel.reap_expired_reserved_budget_holds(i64::MAX).unwrap(), 1);
-    let now_allowed = kernel
+    // Past expiry: the reaper SETTLES the abandoned reserved hold at its reserved
+    // worst-case (forfeit). The only evidence a spend occurred is a reconcile the
+    // caller never sent, so an expired-and-unreconciled hold is treated as fully
+    // spent: realized spend advances by the reserved amount and the difference is
+    // NOT refunded. This is fail-closed for a cumulative spend cap.
+    assert_eq!(
+        kernel.reap_expired_reserved_budget_holds(i64::MAX).unwrap(),
+        1
+    );
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    assert_eq!(
+        usage.total_cost_realized_spend, 100,
+        "the forfeited reserved worst-case becomes realized spend"
+    );
+    assert_eq!(
+        usage.committed_cost_units().unwrap(),
+        100,
+        "committed spend stays at the worst-case, not released back to 0"
+    );
+    let settled = kernel
+        .budget_store
+        .get_budget_hold(&hold_id)
+        .unwrap()
+        .expect("the reaped hold is still present");
+    assert_eq!(
+        settled.disposition,
+        crate::budget_store::BudgetHoldDispositionView::Reconciled,
+        "an expired reserved hold is settled at worst-case, not released"
+    );
+
+    // The forfeited worst-case stays consumed: a new authorization is DENIED, not
+    // admitted by the freed difference the old release behavior used to give back.
+    let forfeited = kernel
         .authorize_tool_call_reserving_blocking_with_metadata(
             &reserve_request("req-reap-3", &cap, &agent_kp),
             None,
         )
         .unwrap();
     assert_eq!(
-        now_allowed.verdict,
+        forfeited.verdict,
+        Verdict::Deny,
+        "the forfeited reserved worst-case must stay consumed after reaping: {:?}",
+        forfeited.reason
+    );
+}
+
+#[test]
+fn reserved_hold_ttl_matches_minted_nonce_expiry() {
+    // Finding 4: the reserved-hold TTL deadline must be derived from the exact
+    // instant the nonce is minted (its signed `expires_at`), so a valid nonce can
+    // never expire after its hold has already been reaped. Guarantees the caller
+    // can always reconcile-before-reaper while the nonce is still valid.
+    let (kernel, agent_kp, cap, _cfg) = reconcile_kernel_and_cap();
+    let request = reserve_request("req-ttl-match", &cap, &agent_kp);
+    let authorized = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
+        .unwrap();
+    let nonce = authorized
+        .execution_nonce
+        .as_ref()
+        .expect("reserving authorization mints a nonce");
+    let hold_id = nonce
+        .reserved_hold_id()
+        .expect("reserving nonce names the reserved hold");
+    let hold = kernel
+        .budget_store
+        .get_budget_hold(hold_id)
+        .unwrap()
+        .expect("reserved hold is present");
+    assert_eq!(
+        hold.reserved_until,
+        Some(nonce.expires_at()),
+        "the reserved-hold TTL deadline must equal the minted nonce's expiry, never earlier"
+    );
+}
+
+#[test]
+fn reconcile_by_nonce_rejects_mismatched_realized_currency() {
+    // Finding 3: reconcile must reject a realized cost whose currency differs from
+    // the currency the hold/grant was authorized in, before settling or signing.
+    // A caller-supplied currency is never stamped onto a signed authoritative
+    // receipt unchecked.
+    let (kernel, agent_kp, cap, _cfg) = reconcile_kernel_and_cap();
+    let first = reserve_request("req-recon-currency", &cap, &agent_kp);
+    let authorized = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
+        .unwrap();
+    let nonce = *authorized.execution_nonce.clone().unwrap();
+
+    // Reconcile with a currency the grant was NOT authorized in (grant is USD).
+    let mismatched = ToolInvocationCost {
+        units: 30,
+        currency: "EUR".to_string(),
+        breakdown: None,
+    };
+    let err = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &first.arguments, &mismatched)
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("currency"),
+        "a realized currency that differs from the reserved grant currency must be rejected, got: {err}"
+    );
+
+    // Fail-closed: no settle occurred, so the reserved worst-case still blocks a
+    // second authorization (the whole slack is still reserved, not consumed).
+    let second = reserve_request("req-recon-currency-2", &cap, &agent_kp);
+    let blocked = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&second, None)
+        .unwrap();
+    assert_eq!(
+        blocked.verdict,
+        Verdict::Deny,
+        "a rejected reconcile must not settle the reserved hold: {:?}",
+        blocked.reason
+    );
+
+    // The nonce was not burned by the rejected reconcile, so the matching-currency
+    // reconcile still succeeds and frees the difference.
+    let matching = ToolInvocationCost {
+        units: 30,
+        currency: "USD".to_string(),
+        breakdown: None,
+    };
+    let ok = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &first.arguments, &matching)
+        .unwrap();
+    assert_eq!(ok.verdict, Verdict::Allow);
+}
+
+#[test]
+fn reserving_authorization_succeeds_for_unregistered_tool_server() {
+    // Finding 2: the reserve-for-caller authorization path never dispatches a tool
+    // on this kernel, so it must NOT require the caller's tool server to be
+    // registered. This lets the sidecar stop registering caller-arbitrary server
+    // ids (unbounded growth) into the kernel.
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    // Deliberately do NOT register "unreg-srv".
+    let cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: true,
+    };
+    kernel.set_execution_nonce_store(
+        cfg.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+    );
+    let grant = make_monetary_grant("unreg-srv", "compute", 100, 100, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    let request = ToolCallRequest {
+        request_id: "req-unreg-reserve".to_string(),
+        capability: cap.clone(),
+        tool_name: "compute".to_string(),
+        server_id: "unreg-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({ "invoice": "inv-1" }),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    };
+
+    let authorized = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
+        .unwrap();
+    assert_eq!(
+        authorized.verdict,
         Verdict::Allow,
-        "reaping the expired reserved hold must free the grant: {:?}",
-        now_allowed.reason
+        "the reserve path must not require tool-server registration: {:?}",
+        authorized.reason
+    );
+    let nonce = authorized
+        .execution_nonce
+        .as_ref()
+        .expect("the reserve authorization mints a nonce even for an unregistered server");
+    assert!(
+        nonce.reserved_hold_id().is_some(),
+        "the reserve path reserves a hold and binds it into the nonce"
+    );
+}
+
+#[test]
+fn dispatch_for_unregistered_tool_server_still_denies() {
+    // The dispatch path (and every non-reserve disposition) must still require the
+    // tool server to be registered: only the reserve-for-caller path is relaxed.
+    let kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    // Non-strict kernel so the normal dispatch path (not the reserve preflight) runs.
+    let grant = make_monetary_grant("unreg-srv", "compute", 100, 100, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    let request = ToolCallRequest {
+        request_id: "req-unreg-dispatch".to_string(),
+        capability: cap.clone(),
+        tool_name: "compute".to_string(),
+        server_id: "unreg-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({ "invoice": "inv-1" }),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    };
+
+    let denied = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    assert_eq!(denied.verdict, Verdict::Deny);
+    assert!(
+        denied
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("not registered")),
+        "dispatch to an unregistered server must deny ToolNotRegistered, got: {:?}",
+        denied.reason
     );
 }
 

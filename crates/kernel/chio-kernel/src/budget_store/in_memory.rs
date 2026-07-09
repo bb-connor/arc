@@ -43,6 +43,9 @@ struct BudgetHoldState {
     /// Set only when the reserving path marks this hold reserved; drives the
     /// TTL reaper. `None` for normal in-flight holds.
     reserved_until: Option<i64>,
+    /// Currency the grant was authorized in, recorded alongside `reserved_until`
+    /// by the reserving path. `None` for normal in-flight holds.
+    reserved_currency: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -456,6 +459,7 @@ impl InMemoryBudgetStoreInner {
                         disposition: BudgetHoldDisposition::Open,
                         authority: authority.cloned(),
                         reserved_until: None,
+                        reserved_currency: None,
                     },
                 );
             }
@@ -963,6 +967,7 @@ impl InMemoryBudgetStoreInner {
             remaining_exposure_units: hold.remaining_exposure_units,
             disposition: hold.disposition.view(),
             reserved_until: hold.reserved_until,
+            reserved_currency: hold.reserved_currency.clone(),
             authority: hold.authority.clone(),
         }))
     }
@@ -971,6 +976,7 @@ impl InMemoryBudgetStoreInner {
         &mut self,
         hold_id: &str,
         reserved_until_unix_secs: i64,
+        currency: &str,
     ) -> Result<(), BudgetStoreError> {
         let hold = self.holds.get_mut(hold_id).ok_or_else(|| {
             BudgetStoreError::Invariant(format!("missing budget hold `{hold_id}`"))
@@ -981,6 +987,7 @@ impl InMemoryBudgetStoreInner {
             )));
         }
         hold.reserved_until = Some(reserved_until_unix_secs);
+        hold.reserved_currency = Some(currency.to_string());
         Ok(())
     }
 
@@ -989,7 +996,7 @@ impl InMemoryBudgetStoreInner {
         now_unix_secs: i64,
     ) -> Result<usize, BudgetStoreError> {
         // Snapshot the expired-and-still-open reserved holds first so the
-        // release loop can mutate the map without an aliasing borrow.
+        // settle loop can mutate the map without an aliasing borrow.
         let expired: Vec<(String, String, usize, u64, Option<BudgetEventAuthority>)> = self
             .holds
             .iter()
@@ -1009,19 +1016,23 @@ impl InMemoryBudgetStoreInner {
             })
             .collect();
 
-        let mut released = 0usize;
+        let mut settled = 0usize;
         for (hold_id, capability_id, grant_index, remaining, authority) in expired {
-            self.reduce_charge_cost_with_ids_and_authority(
+            // Settle at the reserved worst-case: the abandoning caller forfeits the
+            // full reserved amount to realized spend (fail-closed), rather than
+            // releasing it back (which would under-count a spend that may have run).
+            self.settle_charge_cost_with_ids_and_authority(
                 &capability_id,
                 grant_index,
                 remaining,
+                remaining,
                 Some(&hold_id),
-                Some(&format!("{hold_id}:ttl-reap-release")),
+                Some(&format!("{hold_id}:ttl-reap-settle")),
                 authority.as_ref(),
             )?;
-            released += 1;
+            settled += 1;
         }
-        Ok(released)
+        Ok(settled)
     }
 }
 
@@ -1453,9 +1464,10 @@ impl BudgetStore for InMemoryBudgetStore {
         &self,
         hold_id: &str,
         reserved_until_unix_secs: i64,
+        currency: &str,
     ) -> Result<(), BudgetStoreError> {
         self.lock_inner()?
-            .mark_hold_reserved(hold_id, reserved_until_unix_secs)
+            .mark_hold_reserved(hold_id, reserved_until_unix_secs, currency)
     }
 
     fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {

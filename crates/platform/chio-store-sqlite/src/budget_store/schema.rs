@@ -83,6 +83,21 @@ pub(super) fn ensure_budget_hold_reserved_until_column(
     Ok(())
 }
 
+pub(super) fn ensure_budget_hold_reserved_currency_column(
+    connection: &Connection,
+) -> Result<(), BudgetStoreError> {
+    let mut statement = connection.prepare("PRAGMA table_info(budget_authorization_holds)")?;
+    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
+    let columns = columns.collect::<Result<Vec<_>, _>>()?;
+    if !columns.iter().any(|column| column == "reserved_currency") {
+        connection.execute(
+            "ALTER TABLE budget_authorization_holds ADD COLUMN reserved_currency TEXT",
+            [],
+        )?;
+    }
+    Ok(())
+}
+
 pub(super) fn ensure_budget_mutation_event_authority_columns(
     connection: &Connection,
 ) -> Result<(), BudgetStoreError> {

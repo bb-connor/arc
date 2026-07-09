@@ -1,5 +1,7 @@
 use super::*;
 
+use crate::kernel::responses::ReservedHoldStamp;
+
 /// Incomplete-decision reason for a strict-nonce preflight whose hold was
 /// reversed. The caller retries the same endpoint presenting the minted nonce,
 /// at which point the hold is re-taken and the tool dispatched.
@@ -181,18 +183,18 @@ impl ChioKernel {
             authorization_metadata,
         );
 
-        // Stamp the reserved monetary hold with a TTL equal to the minted
-        // nonce's validity window so an unreconciled reserved hold is reclaimed
-        // by the TTL reaper if the caller never presents the nonce. The hold id
-        // is also bound into the signed nonce so reconcile-by-nonce can name the
-        // exact hold to settle at the execution site.
-        let reserved_hold_id = budget_mutation
+        // The reserved monetary hold is kept open and bound into the signed nonce
+        // so reconcile-by-nonce can name the exact hold to settle at the execution
+        // site. The response builder stamps the hold's TTL deadline from the minted
+        // nonce's exact expiry (Finding 4) and records the grant currency for
+        // reconcile-time validation (Finding 3), keeping the reaper deadline and
+        // the nonce validity window consistent.
+        let reserved_hold = budget_mutation
             .charge_result()
-            .map(|charge| charge.budget_hold_id.clone());
-        if let Some(hold_id) = reserved_hold_id.as_deref() {
-            let reserved_until = self.reserved_hold_ttl_deadline(timestamp);
-            self.with_budget_store(|store| Ok(store.mark_hold_reserved(hold_id, reserved_until)?))?;
-        }
+            .map(|charge| ReservedHoldStamp {
+                hold_id: charge.budget_hold_id.as_str(),
+                currency: charge.currency.as_str(),
+            });
 
         self.build_execution_nonce_preflight_allow_response_with_metadata(
             request,
@@ -200,7 +202,7 @@ impl ChioKernel {
             Some(matched_grant_index),
             metadata,
             EXECUTION_NONCE_AUTHORIZATION_RESERVED_REASON,
-            reserved_hold_id.as_deref(),
+            reserved_hold,
         )
     }
 }
