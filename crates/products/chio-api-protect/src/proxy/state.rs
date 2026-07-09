@@ -261,7 +261,7 @@ impl ProtectProxy {
             self.config.trusted_capability_issuers.clone(),
         );
 
-        let (receipt_log, tool_receipt_log, receipt_store, revoked_capability_ids) =
+        let (receipt_log, tool_receipt_log, receipt_store, mut revoked_capability_ids) =
             if let Some(path) = &self.config.receipt_db {
                 let store = SqliteReceiptStore::open(path)?;
                 let receipts = store.load_receipts()?;
@@ -287,6 +287,28 @@ impl ProtectProxy {
                     HashSet::new(),
                 )
             };
+
+        // Enforce operator revocations recorded through the durable revocation
+        // store that `chio trust revoke --revocation-db <path>` writes. Merging
+        // them into the shared revoked set covers every path that consults it
+        // (mediated `/v1/evaluate`, validate, proxy, advisory) uniformly. This
+        // load is fail-closed: `load_revocation_db_ids` returns an error and the
+        // sidecar refuses to start if the configured store cannot be read.
+        if let Some(path) = self.config.revocation_db.as_deref() {
+            let durable = load_revocation_db_ids(&self.config)?;
+            let loaded = durable.len();
+            revoked_capability_ids.extend(durable);
+            info!(
+                revocation_db = path,
+                loaded,
+                enforced = revoked_capability_ids.len(),
+                "chio api protect: loaded durable revocations from --revocation-db; \
+                 enforced on /v1/evaluate and every revoked-capability path. \
+                 Revocations recorded after startup are not observed here: they \
+                 require a sidecar restart or the in-process \
+                 /v1/capabilities/release (or --control-url) channel"
+            );
+        }
 
         let egress_contract = default_upstream_egress_contract(&self.config.upstream)?;
         let http_client = client_builder_with_contract(&egress_contract).build()?;

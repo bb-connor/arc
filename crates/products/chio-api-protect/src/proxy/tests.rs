@@ -1661,6 +1661,57 @@ async fn sidecar_release_requires_persistent_receipt_store() {
 }
 
 #[tokio::test]
+async fn durable_revocation_db_id_is_enforced_by_proxy_state() {
+    let dir = std::env::temp_dir().join(format!("chio-revocation-state-{}", uuid::Uuid::now_v7()));
+    std::fs::create_dir_all(&dir).test_unwrap();
+    let db = dir.join("revocations.sqlite3");
+
+    // An operator revokes through the durable store that
+    // `chio trust revoke --revocation-db <path>` writes and the sidecar used to
+    // never read; the sidecar must now enforce it on every revoked path.
+    let store = chio_store_sqlite::SqliteRevocationStore::open(&db).test_unwrap();
+    assert!(chio_kernel::RevocationStore::revoke(&store, "cap-operator-revoked").test_unwrap());
+    drop(store);
+
+    let config = ProtectConfig {
+        upstream: "http://127.0.0.1:1".to_string(),
+        spec_content: Some("{}".to_string()),
+        spec_path: None,
+        listen_addr: "127.0.0.1:0".to_string(),
+        receipt_db: None,
+        sidecar_control_token: None,
+        signer_seed_hex: None,
+        trusted_capability_issuers: Vec::new(),
+        control_url: None,
+        control_token: None,
+        budget_db: None,
+        revocation_db: Some(db.to_string_lossy().to_string()),
+        require_nonce: false,
+        allow_advisory: false,
+    };
+
+    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+    // Mirror the sidecar startup merge: durable operator revocations join the
+    // shared set that the mediated, validate, and proxy paths all consult.
+    let durable = load_revocation_db_ids(&config).test_unwrap();
+    state.revoked_capability_ids.lock().await.extend(durable);
+
+    assert!(
+        state
+            .revoked_capability_ids
+            .lock()
+            .await
+            .contains("cap-operator-revoked"),
+        "durable --revocation-db revocation must land in the enforced set"
+    );
+    assert_eq!(
+        find_revoked_capability_id(&state, None, Some("cap-operator-revoked")).await,
+        Some("cap-operator-revoked".to_string()),
+        "a capability revoked via --revocation-db must be rejected on the request path"
+    );
+}
+
+#[tokio::test]
 async fn sidecar_submit_receipt_persists_submitted_job_receipt() {
     let receipt_db = temp_receipt_db_path();
     let state = test_state_with_receipt_db(

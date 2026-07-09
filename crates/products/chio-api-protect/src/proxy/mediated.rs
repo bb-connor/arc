@@ -33,6 +33,51 @@ pub(crate) fn build_budget_store(
     Ok(None)
 }
 
+/// Load the durable revocation store's revoked capability ids so operator
+/// revocations recorded through `chio trust revoke --revocation-db <path>` are
+/// enforced on `/v1/evaluate` and every other path that consults the sidecar's
+/// revoked set. Returns an empty set when no revocation-db is configured.
+///
+/// Opening or reading a configured store that fails is fatal (fail-closed): the
+/// caller must not start the sidecar advertising revocation enforcement it
+/// cannot provide. The whole table is paged into memory once at startup;
+/// revocations recorded after startup require a sidecar restart or the
+/// in-process `/v1/capabilities/release` (or `--control-url`) channel.
+pub(crate) fn load_revocation_db_ids(
+    config: &ProtectConfig,
+) -> Result<std::collections::HashSet<String>, ProtectError> {
+    let Some(path) = config.revocation_db.as_deref() else {
+        return Ok(std::collections::HashSet::new());
+    };
+    let store = chio_store_sqlite::SqliteRevocationStore::open(path).map_err(|error| {
+        ProtectError::Config(format!("cannot open revocation-db `{path}`: {error}"))
+    })?;
+
+    const PAGE_SIZE: usize = 1024;
+    let mut ids = std::collections::HashSet::new();
+    let mut cursor: Option<(i64, String)> = None;
+    loop {
+        let (after_revoked_at, after_capability_id) = match &cursor {
+            Some((revoked_at, capability_id)) => (Some(*revoked_at), Some(capability_id.as_str())),
+            None => (None, None),
+        };
+        let page = store
+            .list_revocations_after(PAGE_SIZE, after_revoked_at, after_capability_id)
+            .map_err(|error| {
+                ProtectError::Config(format!("cannot read revocation-db `{path}`: {error}"))
+            })?;
+        let page_len = page.len();
+        for record in page {
+            cursor = Some((record.revoked_at, record.capability_id.clone()));
+            ids.insert(record.capability_id);
+        }
+        if page_len < PAGE_SIZE {
+            break;
+        }
+    }
+    Ok(ids)
+}
+
 /// Build the shared execution-nonce replay store for the mediated route.
 ///
 /// The store is shared across every per-request mediation kernel so a minted
@@ -920,11 +965,74 @@ mod tests {
             control_url: None,
             control_token: None,
             budget_db: Some(db.to_string_lossy().to_string()),
+            revocation_db: None,
             require_nonce: false,
             allow_advisory: false,
         };
         let store = build_budget_store(&config).unwrap();
         assert!(store.is_some(), "local sqlite budget store must be built");
+    }
+
+    fn revocation_db_config(revocation_db: Option<String>) -> ProtectConfig {
+        ProtectConfig {
+            upstream: "http://127.0.0.1:1".to_string(),
+            spec_content: Some("{}".to_string()),
+            spec_path: None,
+            listen_addr: "127.0.0.1:0".to_string(),
+            receipt_db: None,
+            sidecar_control_token: None,
+            signer_seed_hex: None,
+            trusted_capability_issuers: Vec::new(),
+            control_url: None,
+            control_token: None,
+            budget_db: None,
+            revocation_db,
+            require_nonce: false,
+            allow_advisory: false,
+        }
+    }
+
+    #[test]
+    fn load_revocation_db_ids_is_empty_without_configured_store() {
+        let ids = load_revocation_db_ids(&revocation_db_config(None)).unwrap();
+        assert!(ids.is_empty());
+    }
+
+    #[test]
+    fn load_revocation_db_ids_reads_operator_revocations() {
+        let dir = std::env::temp_dir().join(format!("chio-revocation-{}", uuid::Uuid::now_v7()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = dir.join("revocations.sqlite3");
+        let db_path = db.to_string_lossy().to_string();
+
+        // Mirror `chio trust revoke --revocation-db <path>`: an operator writes
+        // the revocation to the durable store the sidecar never used to read.
+        let store = chio_store_sqlite::SqliteRevocationStore::open(&db).unwrap();
+        assert!(chio_kernel::RevocationStore::revoke(&store, "cap-operator-revoked").unwrap());
+        drop(store);
+
+        let ids = load_revocation_db_ids(&revocation_db_config(Some(db_path))).unwrap();
+        assert!(
+            ids.contains("cap-operator-revoked"),
+            "durable operator revocation must be loaded into the enforced set"
+        );
+    }
+
+    #[test]
+    fn load_revocation_db_ids_fails_closed_on_unreadable_store() {
+        let dir =
+            std::env::temp_dir().join(format!("chio-revocation-bad-{}", uuid::Uuid::now_v7()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = dir.join("not-a-db.sqlite3");
+        std::fs::write(&db, b"this is not a sqlite database").unwrap();
+
+        let result = load_revocation_db_ids(&revocation_db_config(Some(
+            db.to_string_lossy().to_string(),
+        )));
+        assert!(
+            result.is_err(),
+            "an unreadable revocation-db must fail closed rather than start with no revocations"
+        );
     }
 
     #[test]

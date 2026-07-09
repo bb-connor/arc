@@ -144,6 +144,7 @@ pub(crate) fn cmd_run(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_api_protect(
     upstream: &str,
     spec_path: Option<&Path>,
@@ -151,6 +152,7 @@ pub(crate) fn cmd_api_protect(
     receipt_store: Option<&Path>,
     authority_seed_path: Option<&Path>,
     budget_db: Option<&Path>,
+    revocation_db: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
@@ -184,6 +186,7 @@ pub(crate) fn cmd_api_protect(
             control_url: control_url.map(str::to_string),
             control_token: control_token.map(str::to_string),
             budget_db: budget_db.map(|path| path.display().to_string()),
+            revocation_db: revocation_db.map(|path| path.display().to_string()),
             require_nonce: false,
             allow_advisory: false,
         };
@@ -209,11 +212,13 @@ paths: {}
 
 pub(crate) const CHIO_START_NO_UPSTREAM_URL: &str = "http://127.0.0.1:1";
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_start(
     listen_addr: &str,
     receipt_store: Option<&Path>,
     authority_seed_path: Option<&Path>,
     budget_db: Option<&Path>,
+    revocation_db: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
     print_config: bool,
@@ -263,6 +268,7 @@ pub(crate) fn cmd_start(
             control_url: control_url.map(str::to_string),
             control_token: control_token.map(str::to_string),
             budget_db: budget_db.map(|path| path.display().to_string()),
+            revocation_db: revocation_db.map(|path| path.display().to_string()),
             require_nonce: false,
             allow_advisory: false,
         };

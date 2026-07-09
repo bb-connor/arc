@@ -24,6 +24,14 @@ pub struct ProtectConfig {
     pub control_token: Option<String>,
     /// Local SQLite budget-store path used when no `control_url` is configured.
     pub budget_db: Option<String>,
+    /// Optional durable SQLite revocation-store path. When set, the sidecar
+    /// loads its revoked capability ids at startup so operator revocations
+    /// recorded through `chio trust revoke --revocation-db <path>` are enforced
+    /// on `/v1/evaluate` and every other path that consults the revoked set.
+    /// Opening or reading a configured store that fails is fatal (fail-closed):
+    /// the sidecar refuses to start rather than run without the revocations it
+    /// was told to enforce.
+    pub revocation_db: Option<String>,
     /// Retained for API compatibility. The kernel-mediated `/v1/evaluate`
     /// route is a pre-execution authorization gate and always runs the
     /// mediation kernel in execution-nonce strict mode, so this flag no
@@ -61,6 +69,7 @@ impl std::fmt::Debug for ProtectConfig {
             )
             .field("control_url", &self.control_url)
             .field("budget_db", &self.budget_db)
+            .field("revocation_db", &self.revocation_db)
             .field("require_nonce", &self.require_nonce)
             .field("allow_advisory", &self.allow_advisory)
             .finish()

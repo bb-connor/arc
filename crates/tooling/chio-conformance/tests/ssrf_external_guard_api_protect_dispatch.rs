@@ -199,6 +199,7 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_link_local() {
         control_url: None,
         control_token: None,
         budget_db: None,
+        revocation_db: None,
         require_nonce: false,
         allow_advisory: false,
     };
@@ -254,6 +255,7 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_loopback_authority() {
         control_url: None,
         control_token: None,
         budget_db: None,
+        revocation_db: None,
         require_nonce: false,
         allow_advisory: false,
     };
@@ -313,6 +315,7 @@ async fn api_protect_upstream_proxy_rejects_oversized_response() {
         control_url: None,
         control_token: None,
         budget_db: None,
+        revocation_db: None,
         require_nonce: false,
         allow_advisory: false,
     };
