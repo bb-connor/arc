@@ -876,6 +876,92 @@ fn write_job_response_reflects_resync_failure() -> Result<(), Box<dyn std::error
     Ok(())
 }
 
+/// Codex round 11, P1: with incremental verification a RECEIPT-APPENDING
+/// writer-routed job (child receipt / auth-consuming append) pre-checked only
+/// the checkpoint head, NOT the claim-log rows an out-of-band writer left AHEAD
+/// of this actor's head. So a bad/orphan `claim_receipt_log_entries` row present
+/// BEFORE the job ran let the job DURABLY insert its receipt and only THEN, in
+/// `resync_head_after_write`, detect the orphan and poison the head - a
+/// fail-OPEN durable write. The fix validates the adopted claim-log delta (the
+/// same bounded `validate_adopted_claim_log_delta` the append path uses) BEFORE
+/// the job runs, so the job is denied with NO durable insert. Delta-bounded (an
+/// empty delta is the single-writer no-op), so F22 holds.
+#[test]
+fn writer_job_validates_adopted_delta_before_commit() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-writer-preval-delta");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    // Real receipts -> claim-log entries 1..=3, writer head at claim_log_max_seq 3.
+    for i in 0..3 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-preval-{i}"), (i + 1) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+
+    // An out-of-band writer leaves a bad/orphan claim-log row (no source receipt)
+    // at entry_seq 4, AHEAD of this actor's head, BEFORE any writer job runs.
+    {
+        let connection = store.connection()?;
+        connection.execute(
+            r#"
+            INSERT INTO claim_receipt_log_entries (
+                entry_seq, receipt_id, receipt_kind, source_seq, timestamp,
+                capability_id, tool_server, tool_name, raw_json
+            ) VALUES (4, 'orphan-preval-4', 'tool_receipt', 999, 1, 'cap-oob', 'shell', 'bash', '{}')
+            "#,
+            [],
+        )?;
+    }
+
+    // A RECEIPT-APPENDING writer job (`run_write_receipt`, appends_receipts =
+    // true) whose closure would DURABLY insert a new claim-log row at entry_seq
+    // 5. The pre-check must DENY the job because the adopted delta (3, 4] holds
+    // the orphan, and the closure's row must never be durably inserted.
+    let result: Result<(), ReceiptStoreError> =
+        store.writer_handle().run_write_receipt(move |connection| {
+            connection.execute(
+                r#"
+                INSERT INTO claim_receipt_log_entries (
+                    entry_seq, receipt_id, receipt_kind, source_seq, timestamp,
+                    capability_id, tool_server, tool_name, raw_json
+                ) VALUES (5, 'writer-job-row-5', 'tool_receipt', 5, 1, 'cap-job', 'shell', 'bash', '{}')
+                "#,
+                [],
+            )?;
+            Ok(())
+        });
+
+    let error = result
+        .err()
+        .ok_or("a receipt-appending writer job over a pre-existing orphan must be denied")?;
+    match &error {
+        ReceiptStoreError::Conflict(message) => assert!(
+            message.contains("chio receipt audit"),
+            "fail-closed Conflict must point at the audit CLI, got: {message}"
+        ),
+        other => return Err(format!("expected Conflict, got {other}").into()),
+    }
+
+    // TEETH (the RED/GREEN discriminator): the job's row was rejected BEFORE the
+    // durable insert. Before the fix the closure ran and entry_seq 5 persisted
+    // (the resync rejected only AFTER the commit); after the fix the pre-check
+    // denies the job so entry_seq 5 never exists.
+    let connection = store.connection()?;
+    let job_row: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE entry_seq = 5",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        job_row, 0,
+        "the writer job's receipt must NOT be durably inserted when a pre-existing orphan blocks the adopted baseline"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
 /// Codex round 6, finding 1: on the same-seq fast path
 /// `verify_head_against_latest_checkpoint` compared only the RFC 8785 body
 /// digest (statement_json) plus the signature/kernel_key columns. The

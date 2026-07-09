@@ -732,7 +732,20 @@ fn handle_non_append_command(
                     // write commits. Metadata-only Write jobs skip the O(N)
                     // scan.
                     let pre_check = if incremental_verification {
-                        verify_head_against_latest_checkpoint(&connection, head)
+                        // Verify the checkpoint head, THEN validate the adopted
+                        // claim-log delta before the job commits (codex round 11,
+                        // P1): a receipt-appending writer job must reject a
+                        // stale/invalid baseline BEFORE its durable insert, the
+                        // same way the append path does, not durably write and
+                        // only poison the head in the post-write resync.
+                        match verify_head_against_latest_checkpoint(&connection, head) {
+                            Ok(()) => validate_writer_adopted_claim_log_baseline(
+                                &connection,
+                                head,
+                                appends_receipts,
+                            ),
+                            Err(error) => Err(error),
+                        }
                     } else {
                         verify_latest_checkpoint_integrity(&connection).and_then(|()| {
                             if appends_receipts {
@@ -1345,6 +1358,37 @@ fn claim_log_delta_count_and_max_seq(
         sqlite_u64(count, "claim log delta count")?,
         sqlite_u64(max_seq, "claim log delta max entry_seq")?,
     ))
+}
+
+/// Fail-closed pre-job guard for a RECEIPT-APPENDING writer-routed job (child
+/// receipts, authorization-consuming appends; codex round 11, P1). The
+/// incremental writer pre-check only re-verified the checkpoint HEAD; it did
+/// NOT validate the `claim_receipt_log_entries` rows an out-of-band writer (a
+/// second store instance, an operator repair) may have committed AHEAD of this
+/// actor's head. Without this guard the job would DURABLY insert its receipt
+/// and only afterwards, in `resync_head_after_write`, discover the bad/orphan
+/// adopted row and poison the head - a fail-OPEN durable write. Validate the
+/// ADOPTED delta (head.claim_log_max_seq, current_max] with the SAME bounded
+/// `validate_adopted_claim_log_delta` the append path runs, BEFORE the job
+/// commits, so a stale/invalid baseline denies the write with no durable
+/// insert. Delta-bounded: single-writer no-stale-head case has an EMPTY delta
+/// (pre_delta = 0) and is a no-op, and the full-log validator is NEVER called,
+/// so the flat per-append cost holds (F22). Metadata-only writes insert no
+/// claim-log rows, so they skip this (appends_receipts = false).
+fn validate_writer_adopted_claim_log_baseline(
+    connection: &Connection,
+    head: &VerifiedHead,
+    appends_receipts: bool,
+) -> Result<(), ReceiptStoreError> {
+    if !appends_receipts {
+        return Ok(());
+    }
+    let (pre_delta, baseline_max) =
+        claim_log_delta_count_and_max_seq(connection, head.claim_log_max_seq)?;
+    if pre_delta > 0 {
+        validate_adopted_claim_log_delta(connection, head.claim_log_max_seq, baseline_max)?;
+    }
+    Ok(())
 }
 
 /// O(1) predecessor check: the persisted latest checkpoint must still match
