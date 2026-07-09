@@ -151,8 +151,13 @@ impl VelocityGuard {
     /// Create a `VelocityGuard` with an explicit total-bucket cap so a
     /// self-minted-leaf flood saturates rather than growing (RFC-0004 F38). The
     /// cap is a TOTAL across BOTH the invocation and spend maps: with both limits
-    /// enabled the combined bucket count never exceeds `bucket_cap`, not
-    /// `2 * bucket_cap`.
+    /// enabled the combined bucket count stays bounded by `bucket_cap` rather than
+    /// `2 * bucket_cap`. The sibling map's size is read as a snapshot outside the
+    /// inserting map's critical section, so under concurrent evaluations or
+    /// asymmetric growth (e.g. grants lacking `max_cost_per_invocation` never
+    /// touch the spend map) the combined total can settle at a small, fixed
+    /// overshoot (`bucket_cap + 1`); it never approaches the un-folded
+    /// `2 * bucket_cap`, so the RFC-0004 bounded-memory invariant holds.
     pub fn with_bucket_cap(config: VelocityConfig, bucket_cap: usize) -> Self {
         Self {
             invocation_buckets: Mutex::new(HashMap::new()),
@@ -190,6 +195,11 @@ impl VelocityGuard {
 /// cap check: eviction from THIS map triggers once the combined count would
 /// reach the cap, keeping `invocation + spend` buckets bounded by `bucket_cap`
 /// rather than `2 * bucket_cap` when both limits are enabled (RFC-0004 F38).
+/// `other_bucket_count` is a snapshot taken outside this map's critical section,
+/// so the combined total is held CLOSE to `bucket_cap` (a bounded `bucket_cap + 1`
+/// steady state is reachable under concurrent evaluations or asymmetric map
+/// growth), not exactly at it; the point is boundedness well below the un-folded
+/// `2 * bucket_cap`, not a strict equality.
 fn sweep_and_cap_buckets(
     buckets: &mut HashMap<(String, usize), TokenBucket>,
     inserts_since_sweep: &Mutex<usize>,
