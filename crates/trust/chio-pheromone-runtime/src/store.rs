@@ -64,7 +64,47 @@ fn is_storage_commit_error(error: &PheromoneRuntimeError) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
     use super::PheromoneRuntimeError;
+    use super::SqlitePheromoneRuntimeStore;
+    use crate::{
+        PheromoneBatchOutcome, PheromoneReceiveReport, PheromoneRuntimeStore,
+        PHEROMONE_RECEIVE_REPORT_SCHEMA,
+    };
+
+    #[test]
+    fn receive_report_is_recoverable_by_batch_sha256() {
+        let store = SqlitePheromoneRuntimeStore::open_in_memory().expect("store opens");
+
+        // A batch hash that was never recorded is not found.
+        assert!(store
+            .lookup_receive_report_by_batch("deadbeef")
+            .expect("lookup runs")
+            .is_none());
+
+        // Record a report carrying a known batch hash, then recover it by batch.
+        let report = PheromoneReceiveReport {
+            schema: PHEROMONE_RECEIVE_REPORT_SCHEMA.to_string(),
+            accepted: true,
+            batch_outcome: PheromoneBatchOutcome::Accepted,
+            accepted_frame_count: 1,
+            rejected_frame_count: 0,
+            batch_sha256: "abc123".to_string(),
+            recipient_kernel_id: "did:chio:bob".to_string(),
+            authenticated_sender_kernel_id: "did:chio:alice".to_string(),
+            received_at_unix_ms: 1,
+            frames: Vec::new(),
+        };
+        store
+            .record_receive_report(&report)
+            .expect("record report");
+        let found = store
+            .lookup_receive_report_by_batch("abc123")
+            .expect("lookup runs")
+            .expect("report recovered by batch hash");
+        assert_eq!(found.batch_sha256, "abc123");
+    }
 
     #[test]
     fn storage_commit_error_helper_selects_only_storage_failures() {
@@ -219,10 +259,12 @@ impl SqlitePheromoneRuntimeStore {
             CREATE TABLE IF NOT EXISTS chio_pheromone_receive_reports (
                 report_sha256 TEXT PRIMARY KEY,
                 received_at_unix_ms INTEGER NOT NULL,
-                json TEXT NOT NULL
+                json TEXT NOT NULL,
+                batch_sha256 TEXT
             );
             "#,
         )?;
+        ensure_receive_report_batch_sha256_column(&conn)?;
         Ok(())
     }
 
@@ -266,6 +308,28 @@ impl SqlitePheromoneRuntimeStore {
         admit_deposit_scoped_tx(&tx, &deposit, context, treaty_id)?;
         tx.commit()?;
         Ok(())
+    }
+
+    /// Recover a durably-recorded receive report by its batch hash, if the store
+    /// committed one for that batch (RFC-0012 F35). Returns None when no row for
+    /// the batch exists (pre-migration rows have a NULL batch_sha256 and are not
+    /// returned). Read-only.
+    pub fn lookup_receive_report_by_batch(
+        &self,
+        batch_sha256: &str,
+    ) -> Result<Option<PheromoneReceiveReport>, PheromoneRuntimeError> {
+        let conn = self.conn.lock()?;
+        let json: Option<String> = conn
+            .query_row(
+                "SELECT json FROM chio_pheromone_receive_reports WHERE batch_sha256 = ?1",
+                params![batch_sha256],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        match json {
+            Some(text) => Ok(Some(serde_json::from_str(&text)?)),
+            None => Ok(None),
+        }
     }
 }
 
@@ -666,6 +730,39 @@ impl PheromoneRuntimeStore for SqlitePheromoneRuntimeStore {
     }
 }
 
+/// Additive migration: the batch-hash recovery column + index for verdict
+/// recovery (RFC-0012 F35). Existing rows keep a NULL batch_sha256 and are not
+/// recoverable-by-batch (acceptable: only reports written after the migration
+/// need recovery). Idempotent.
+pub(crate) fn ensure_receive_report_batch_sha256_column(
+    conn: &rusqlite::Connection,
+) -> Result<(), PheromoneRuntimeError> {
+    let mut has_column = false;
+    let mut stmt = conn.prepare("PRAGMA table_info(chio_pheromone_receive_reports)")?;
+    let mut rows = stmt.query([])?;
+    while let Some(row) = rows.next()? {
+        let name: String = row.get(1)?;
+        if name == "batch_sha256" {
+            has_column = true;
+            break;
+        }
+    }
+    drop(rows);
+    drop(stmt);
+    if !has_column {
+        conn.execute(
+            "ALTER TABLE chio_pheromone_receive_reports ADD COLUMN batch_sha256 TEXT",
+            [],
+        )?;
+    }
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_receive_reports_batch_sha256 \
+         ON chio_pheromone_receive_reports (batch_sha256)",
+        [],
+    )?;
+    Ok(())
+}
+
 fn scarcity_bucket_count(
     tx: &rusqlite::Transaction<'_>,
     admission: &PheromoneScarcityAdmission,
@@ -789,13 +886,14 @@ fn record_receive_report_tx(
     tx.execute(
         r#"
         INSERT OR REPLACE INTO chio_pheromone_receive_reports
-            (report_sha256, received_at_unix_ms, json)
-        VALUES (?1, ?2, ?3)
+            (report_sha256, received_at_unix_ms, json, batch_sha256)
+        VALUES (?1, ?2, ?3, ?4)
         "#,
         params![
             canonical_sha256(report)?,
             i64_from_u64(report.received_at_unix_ms, "received_at_unix_ms")?,
             json,
+            report.batch_sha256,
         ],
     )?;
     Ok(())
@@ -809,13 +907,14 @@ fn record_receive_report_connection(
     conn.execute(
         r#"
         INSERT OR REPLACE INTO chio_pheromone_receive_reports
-            (report_sha256, received_at_unix_ms, json)
-        VALUES (?1, ?2, ?3)
+            (report_sha256, received_at_unix_ms, json, batch_sha256)
+        VALUES (?1, ?2, ?3, ?4)
         "#,
         params![
             canonical_sha256(report)?,
             i64_from_u64(report.received_at_unix_ms, "received_at_unix_ms")?,
             json,
+            report.batch_sha256,
         ],
     )?;
     Ok(())
