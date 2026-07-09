@@ -78,12 +78,36 @@ fn http_response(request_line: &str) -> String {
 }
 
 async fn serve_connection(mut stream: TcpStream) {
-    let mut buf = [0u8; REQUEST_READ_LIMIT];
-    let read = match stream.read(&mut buf).await {
-        Ok(0) | Err(_) => return,
-        Ok(read) => read,
-    };
-    let request = String::from_utf8_lossy(&buf[..read]);
+    // A single TcpStream::read is not guaranteed to contain the complete HTTP
+    // request line, so a fragmented scrape could parse a partial target like
+    // "GET /met" and 404, causing intermittent Prometheus scrape failures. Read
+    // until the request line terminates (the first `\n`), bounded by the 2 KiB
+    // REQUEST_READ_LIMIT, before routing (Codex round-5).
+    let mut buf: Vec<u8> = Vec::with_capacity(256);
+    let mut chunk = [0u8; 256];
+    loop {
+        let remaining = REQUEST_READ_LIMIT.saturating_sub(buf.len());
+        if remaining == 0 {
+            break;
+        }
+        let take = remaining.min(chunk.len());
+        match stream.read(&mut chunk[..take]).await {
+            Ok(0) => break,
+            Ok(read) => {
+                buf.extend_from_slice(&chunk[..read]);
+                // The request line ends at the first newline; once we have it the
+                // full target is present and further bytes are headers/body.
+                if buf.contains(&b'\n') {
+                    break;
+                }
+            }
+            Err(_) => return,
+        }
+    }
+    if buf.is_empty() {
+        return;
+    }
+    let request = String::from_utf8_lossy(&buf);
     let request_line = request.lines().next().unwrap_or("");
     let response = http_response(request_line);
     let _ = stream.write_all(response.as_bytes()).await;
@@ -137,6 +161,46 @@ mod tests {
         if std::env::var(METRICS_ADDR_ENV).is_err() {
             assert_eq!(configured_metrics_addr(), DEFAULT_METRICS_ADDR);
         }
+    }
+
+    #[tokio::test]
+    async fn fragmented_request_line_is_routed_correctly() {
+        // Codex round-5: a scrape whose request line arrives in two TCP reads
+        // must not be misrouted as a partial target ("GET /met" -> 404). The
+        // server reads until the request line is complete before routing.
+        let listener = bind_metrics_endpoint("127.0.0.1:0")
+            .await
+            .expect("bind ephemeral scrape port");
+        let addr = listener.local_addr().expect("resolve bound address");
+        let (cancel_tx, cancel_rx) = watch::channel(false);
+        let handle = spawn_metrics_endpoint(listener, cancel_rx);
+
+        let mut stream = TcpStream::connect(addr).await.expect("connect to endpoint");
+        // Send the request line split across the target, with a delay so the
+        // server's first read observes only the partial prefix.
+        stream
+            .write_all(b"GET /met")
+            .await
+            .expect("send partial request line");
+        stream.flush().await.expect("flush partial");
+        tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+        stream
+            .write_all(b"rics HTTP/1.1\r\nHost: localhost\r\n\r\n")
+            .await
+            .expect("send remainder");
+        let mut response = Vec::new();
+        stream
+            .read_to_end(&mut response)
+            .await
+            .expect("read scrape response");
+        let text = String::from_utf8_lossy(&response);
+        assert!(
+            text.starts_with("HTTP/1.1 200 OK"),
+            "a fragmented GET /metrics must still route to 200, not 404: {text}"
+        );
+
+        let _ = cancel_tx.send(true);
+        let _ = handle.await;
     }
 
     #[tokio::test]
