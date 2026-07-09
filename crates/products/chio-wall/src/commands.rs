@@ -1224,6 +1224,17 @@ fn ensure_serve_has_consumer(registered_exporters: &[String]) -> Result<(), CliE
 fn preregister_serve_metrics(registered_exporters: &[&str], alert_routes: &[&str]) {
     use chio_metrics_spec::runtime::families;
 
+    // Seed the FIXED (non-deployment-configured) alert-pack series at zero
+    // (Codex round-2 finding 4). The siem-export binary starts its own metrics
+    // server and renders the full alert pack, but it does not go through the
+    // chio-cli tracing init that normally calls this, so families like
+    // chio_fail_open_suspected_total / chio_dispatch_failure_total /
+    // chio_capability_revocation_lag_seconds are otherwise absent and their
+    // absent_over_time backstops can false-fire on a healthy-but-quiet deploy.
+    // The operator-configured soc/dlq/alert routes below are seeded only when
+    // present, since their label domain is deployment-specific.
+    chio_metrics_spec::runtime::preregister_known_label_sets();
+
     // Always-on baseline: the manager's malformed-row producer keeps the
     // soc_export family present even on a zero-exporter deploy.
     families::SOC_EXPORT_TOTAL.preregister(&[DESERIALIZE_EXPORTER, "malformed"]);
@@ -1719,6 +1730,32 @@ mod tests {
                 "chio_alert_dispatch_total{{route=\"{route}\",outcome=\"error\"}} 0"
             )),
             "configured alert route must seed error at zero: {alert}"
+        );
+    }
+
+    /// Codex round-2 finding 4: the siem-export serve path renders the full
+    /// alert pack but does not run the chio-cli tracing init that seeds the
+    /// FIXED alert-pack series. `preregister_serve_metrics` must therefore seed
+    /// them (fail-open / dispatch-failure / revocation-lag) so their
+    /// absent_over_time backstops cannot false-fire on a healthy-but-quiet
+    /// siem-export deploy.
+    #[test]
+    fn serve_metrics_preregister_seeds_fixed_alert_pack_series() {
+        preregister_serve_metrics(&[], &[]);
+
+        let mut body = String::new();
+        chio_metrics_spec::runtime::render_alert_pack_families(&mut body);
+        assert!(
+            body.contains("chio_fail_open_suspected_total{surface=\"tower\"}"),
+            "fixed fail-open series must be present at zero on the serve path: {body}"
+        );
+        assert!(
+            body.contains("chio_dispatch_failure_total{"),
+            "fixed dispatch-failure series must be present on the serve path: {body}"
+        );
+        assert!(
+            body.contains("chio_capability_revocation_lag_seconds"),
+            "fixed revocation-lag series must be present on the serve path: {body}"
         );
     }
 
