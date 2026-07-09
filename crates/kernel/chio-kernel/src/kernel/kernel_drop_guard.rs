@@ -10,8 +10,10 @@ use super::{
 };
 
 /// Builds a pending-reversal marker for a budget hold that could not be
-/// reversed on the spot. The returned value is placed under the `budget_authority`
-/// key in receipt metadata so the reaper can locate and close it.
+/// reversed on the spot. The returned value is recorded under the `budget_authority`
+/// key in receipt metadata as a durable audit breadcrumb of the failed on-the-spot
+/// reverse; the reaper locates open holds by scanning `disposition='open'` in the
+/// budget store, not by keying off this marker.
 ///
 /// The `terminal.disposition` field is nested consistently with every other
 /// terminal disposition in this codebase ("reversed", "reconciled").

@@ -1,8 +1,9 @@
 //! Frozen authoritative-spend contract (`chio.mediated_spend.v1`).
 //!
-//! Direction A freezes this shape so B and C can pin against it. Any advisory
-//! or label-only receipt fails `is_authoritative_spend_receipt`, making
-//! advisory-only consumption a machine-visible conformance failure.
+//! This module defines the stable shape that the comptroller surface-report
+//! and settlement-receipt consumers pin against. Any advisory or label-only
+//! receipt fails `is_authoritative_spend_receipt`, making advisory-only
+//! consumption a machine-visible conformance failure.
 
 use crate::crypto::PublicKey;
 use crate::receipt::body::ChioReceipt;

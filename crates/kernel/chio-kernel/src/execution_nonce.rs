@@ -603,8 +603,8 @@ mod tests {
 
     #[test]
     fn execution_nonce_schema_is_frozen() {
-        // R6 / Acceptance 7: a rename of any nonce field breaks CI so B/C pinned
-        // slots cannot silently mis-parse.
+        // A rename of any nonce field breaks this frozen-schema test, so downstream
+        // consumers that pinned this schema stay in sync.
         let kp = Keypair::generate();
         let signed = mint_execution_nonce(
             &kp,

@@ -1475,7 +1475,7 @@ mod roster_enforcement {
     // Pinned adjudication_id for fixed inputs used in the golden regression test.
     // If this value changes, verify that the id-fold tuple change was intentional
     // and update this const. Construction-time goldens change when the tuple fields
-    // change; wire-format signature goldens (Task 2) are unaffected.
+    // change; wire-format signature goldens are unaffected.
     const ADJUDICATION_ID_GOLDEN_ANCHOR_A: &str =
         "lca-96d5df5192950bcfbd3d140286c79347d800dce8d945dffd4da9752530e9a038";
 
@@ -2157,7 +2157,7 @@ mod roster_enforcement {
         // Golden: pin the derivation for the fixed-input artifact_anchor_a so any change
         // to the id-fold tuple is immediately caught.
         // Construction-time goldens change when the tuple fields change; wire-format
-        // signature goldens (Task 2) are unaffected.
+        // signature goldens are unaffected.
         assert_eq!(
             artifact_anchor_a.adjudication_id, ADJUDICATION_ID_GOLDEN_ANCHOR_A,
             "adjudication_id derivation changed for fixed inputs",

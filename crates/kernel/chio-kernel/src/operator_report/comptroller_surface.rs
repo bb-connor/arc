@@ -25,7 +25,7 @@ pub struct ComptrollerDecisionSummary {
     pub incomplete_count: u64,
 }
 
-/// Optional sha256 hash-refs to the composed source artifacts (enterprise telemetry-projection pattern).
+/// Optional sha256 hash-refs to the composed source artifacts.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ComptrollerSurfaceSourceRefs {
@@ -49,10 +49,10 @@ pub struct ComptrollerSurfaceReport {
     pub settlement_reconciliation: SettlementReconciliationSummary,
     pub budget_utilization: BudgetUtilizationSummary,
     pub source_refs: ComptrollerSurfaceSourceRefs,
-    /// Reserved Direction A linkage; None until Phase 2 (avoids a governance-gated schema v2).
+    /// Reserved for future execution-nonce linkage; omitted until a v2 schema revision to avoid a governance-gated schema bump.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_nonce_ref: Option<String>,
-    /// Reserved Direction A/C linkage; None until Phase 2.
+    /// Reserved for future hold linkage; omitted until a v2 schema revision.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hold_ref: Option<String>,
 }
@@ -158,7 +158,7 @@ mod tests {
         assert!(json.contains("\"exposurePositions\""));
         assert!(json.contains("\"governedMaxExposureUnits\""));
         assert!(json.contains("\"allowCount\""));
-        // Reserved A-linkage slots are omitted until Phase 2.
+        // Reserved linkage slots are omitted until they are populated.
         assert!(!json.contains("executionNonceRef"));
         assert!(!json.contains("holdRef"));
         let back: ComptrollerSurfaceReport = serde_json::from_str(&json).expect("deserialize");

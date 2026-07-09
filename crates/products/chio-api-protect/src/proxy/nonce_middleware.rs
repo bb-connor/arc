@@ -5,11 +5,12 @@ use chio_kernel::execution_nonce::{
     verify_execution_nonce, ExecutionNonceStore, NonceBinding, SignedExecutionNonce,
 };
 
-/// Solution C: tool servers reject executions that do not carry a valid
+/// Execution-nonce middleware for out-of-process tool-server implementations.
+/// Tool servers reject executions that do not carry a valid
 /// `X-Chio-Execution-Nonce`. In permissive (development) mode a missing nonce
 /// logs and proceeds; in strict (production) mode it is rejected.
 #[derive(Debug)]
-// Solution C middleware: kept for tool-server implementations; wired in M5 conformance harness.
+// Kept for out-of-process tool-server implementations; exercised by unit tests.
 #[allow(dead_code)]
 pub(crate) enum ToolServerNonceError {
     MissingNonce,
@@ -29,7 +30,7 @@ impl std::fmt::Display for ToolServerNonceError {
 
 impl std::error::Error for ToolServerNonceError {}
 
-// Solution C middleware: kept for tool-server implementations; wired in M5 conformance harness.
+// Kept for out-of-process tool-server implementations; exercised by unit tests.
 #[allow(dead_code)]
 pub(crate) fn require_tool_server_execution_nonce(
     headers: &HeaderMap,

@@ -1,4 +1,4 @@
-//! Golden conformance gate for Direction A: the mediated path is authoritative,
+//! Golden conformance gate for authoritative spend: the mediated path is authoritative,
 //! the advisory path is not, and consuming an advisory receipt as authorization
 //! is rejected.
 #![allow(clippy::unwrap_used, clippy::expect_used)]

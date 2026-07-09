@@ -371,7 +371,7 @@ The response envelope schema identifier is `chio.comptroller.surface-report.v1`.
 }
 ```
 
-Note: `executionNonceRef` and `holdRef` are omitted from the response when absent (the serializer applies `skip_serializing_if = is_none`). They appear only when a specific governed invocation or pre-authorization hold context is supplied.
+Note: `executionNonceRef` and `holdRef` are omitted from the JSON response when absent or null. They appear only when a specific governed invocation or pre-authorization hold context is supplied.
 
 ### Field Reference
 

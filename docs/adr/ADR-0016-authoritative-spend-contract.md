@@ -1,9 +1,9 @@
 # ADR-0016: Authoritative Spend Contract (execution nonce + atomic hold + mediated-spend profile)
 
 - Status: Proposed
-- Decision owner: kernel and spend control-plane lane (Direction A keystone)
+- Decision owner: kernel and spend control-plane lane
 - Related invariant: fail-closed enforcement; "authoritative" is a structural conjunction over the kernel signature, not a label
-- Related plan items: A-M0 (freeze), A-M1..A-M5; consumed by B (surface-report.v1) and C (settlement receipt)
+- Consumed by: the comptroller surface-report contract (`chio.comptroller.surface-report.v1`) and the settlement receipt
 
 ## Context
 
@@ -54,5 +54,6 @@ Two code-only realities are hereby reconciled with the docs: the
 
 Supersedes the "monotonic, no-refund" text of ADR-0006 (the code already refunds
 via reverse/reconcile). Advisory-only consumption becomes a machine-visible
-conformance failure (A-M3, A-M5). B and C pin to this shape only after A passes
-its own adversarial review (A-M5 golden gate).
+conformance failure, enforced by the golden conformance gate in the chio-conformance
+crate. The comptroller surface-report and settlement receipt pin to this shape once
+the authoritative-spend conformance gates pass.

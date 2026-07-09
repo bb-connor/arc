@@ -1,11 +1,11 @@
-//! (a)-(f) predicate matrix with a real kernel-signed nonce, R1-R6 negatives,
-//! and the structural signing invariant.
+//! (a)-(f) predicate matrix with a real kernel-signed nonce, negatives for
+//! each predicate leg, and the structural signing invariant.
 //!
-//! R2 (committed-cost integration): authoritative_spend_enforcement.rs
-//! R3 (reaper crash-safety): task-11 crate tests
-//! R5 (advisory visible failure): authoritative_spend_double_spend.rs +
-//!     hot_path_enforcement.rs + task-8/9/10
-//! R6 (profile freeze): task-2/3 chio-kernel crate tests
+//! Committed-cost integration: authoritative_spend_enforcement.rs
+//! Reaper crash-safety: chio-kernel crate tests
+//! Advisory visible failure: authoritative_spend_double_spend.rs +
+//!     hot_path_enforcement.rs
+//! Profile freeze: chio-kernel execution_nonce schema tests
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use chio_core::crypto::Keypair;
