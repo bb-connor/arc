@@ -498,7 +498,7 @@ pub const REGISTRY: &[MetricDescriptor] = &[
     ),
     describe!(
         name = CHIO_RECEIPT_SECONDS_SINCE_LAST_CHECKPOINT,
-        help = "Seconds since the last receipt-store commit or checkpoint on the local store.",
+        help = "Seconds since the receipt-store checkpoint last advanced while data was pending on the local store.",
         kind = Gauge,
         labels = []
     ),

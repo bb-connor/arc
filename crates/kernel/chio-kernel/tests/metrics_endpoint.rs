@@ -155,8 +155,14 @@ fn watchdog_gauges_render_from_health_report() {
         checkpoint_error: None,
         db_size_bytes: None,
     };
-    // now = 1_000_000ms + 30s
-    chio_kernel::record_receipt_health_gauges(&report, 1_030_000);
+    // Checkpoint staleness is based on checkpoint PROGRESS, not write-commit
+    // freshness (RFC-0009 Codex round-1 finding 4). The first sample seeds the
+    // staleness clock at 0; a later sample with the SAME checkpointed seq and a
+    // still-pending backlog reports the elapsed staleness, even though the write
+    // commit timestamp stayed fresh (writes keep committing while checkpointing
+    // stalls). A last-commit-based gauge would have read ~0 here.
+    chio_kernel::record_receipt_health_gauges(&report, 1_000_000);
+    chio_kernel::record_receipt_health_gauges(&report, 1_030_000); // +30s, checkpoint seq unchanged
     let body = chio_kernel::render_guard_metrics_prometheus();
     assert!(
         body.contains("chio_receipt_uncheckpointed_seq_range 9"),
@@ -164,7 +170,7 @@ fn watchdog_gauges_render_from_health_report() {
     ); // 50-41
     assert!(
         body.contains("chio_receipt_seconds_since_last_checkpoint 30"),
-        "{body}"
+        "checkpoint staleness must grow while the checkpoint high-water mark stalls: {body}"
     );
 }
 
