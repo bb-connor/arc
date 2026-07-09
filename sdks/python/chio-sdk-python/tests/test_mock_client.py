@@ -62,15 +62,15 @@ def test_top_level_chio_sdk_reexports_testing_symbols() -> None:
 
 async def test_allow_all_permits_every_tool_call() -> None:
     async with allow_all() as chio:
-        result = await chio.evaluate_tool_call(
-            capability={"id": "cap-1"},
+        receipt = await chio.evaluate_tool_call(
+            capability_id="cap-1",
             tool_server="srv",
             tool_name="read",
             parameters={"path": "/tmp"},
         )
-    assert result["verdict"] == "allow"
-    assert result["receipt"]["decision"]["verdict"] == "allow"
-    assert result["receipt"]["tool_name"] == "read"
+    assert receipt.is_allowed
+    assert receipt.decision.verdict == "allow"
+    assert receipt.tool_name == "read"
 
 
 async def test_allow_all_permits_http_request() -> None:
@@ -95,7 +95,7 @@ async def test_deny_all_raises_chio_denied_error() -> None:
     chio = deny_all(reason="session is read-only", guard="ReadOnlyGuard")
     with pytest.raises(ChioDeniedError) as exc_info:
         await chio.evaluate_tool_call(
-            capability={"id": "cap-1"},
+            capability_id="cap-1",
             tool_server="srv",
             tool_name="write",
             parameters={"data": "x"},
@@ -109,15 +109,15 @@ async def test_deny_all_raises_chio_denied_error() -> None:
 
 async def test_deny_all_returns_deny_receipt_when_not_raising() -> None:
     chio = deny_all(raise_on_deny=False)
-    result = await chio.evaluate_tool_call(
-        capability={"id": "cap-1"},
+    receipt = await chio.evaluate_tool_call(
+        capability_id="cap-1",
         tool_server="srv",
         tool_name="write",
         parameters={},
     )
-    assert result["verdict"] == "deny"
-    assert result["receipt"]["decision"]["verdict"] == "deny"
-    assert result["receipt"]["decision"]["reason"]
+    assert receipt.is_denied
+    assert receipt.decision.verdict == "deny"
+    assert receipt.decision.reason
 
 
 async def test_deny_all_blocks_http_request() -> None:
@@ -154,16 +154,16 @@ async def test_with_policy_callable_applies_allow_deny_rules() -> None:
     chio = with_policy(policy)
 
     allowed = await chio.evaluate_tool_call(
-        capability={"id": "cap-1"},
+        capability_id="cap-1",
         tool_server="srv",
         tool_name="read",
         parameters={},
     )
-    assert allowed["verdict"] == "allow"
+    assert allowed.is_allowed
 
     with pytest.raises(ChioDeniedError) as exc_info:
         await chio.evaluate_tool_call(
-            capability={"id": "cap-1"},
+            capability_id="cap-1",
             tool_server="srv",
             tool_name="write",
             parameters={},
@@ -175,15 +175,15 @@ async def test_with_policy_callable_applies_allow_deny_rules() -> None:
 async def test_with_policy_callable_accepts_bool_shorthand() -> None:
     chio = with_policy(lambda tool, _s, _c: tool == "ok")
     allowed = await chio.evaluate_tool_call(
-        capability={"id": "cap-1"},
+        capability_id="cap-1",
         tool_server="srv",
         tool_name="ok",
         parameters={},
     )
-    assert allowed["verdict"] == "allow"
+    assert allowed.is_allowed
     with pytest.raises(ChioDeniedError):
         await chio.evaluate_tool_call(
-            capability={"id": "cap-1"},
+            capability_id="cap-1",
             tool_server="srv",
             tool_name="nope",
             parameters={},
@@ -198,16 +198,16 @@ async def test_with_policy_callable_accepts_bool_shorthand() -> None:
 async def test_with_policy_dict_default_deny() -> None:
     chio = with_policy({"default": "deny", "allow": ["read", "list"]})
     ok = await chio.evaluate_tool_call(
-        capability={"id": "cap-1"},
+        capability_id="cap-1",
         tool_server="srv",
         tool_name="read",
         parameters={},
     )
-    assert ok["verdict"] == "allow"
+    assert ok.is_allowed
 
     with pytest.raises(ChioDeniedError) as exc_info:
         await chio.evaluate_tool_call(
-            capability={"id": "cap-1"},
+            capability_id="cap-1",
             tool_server="srv",
             tool_name="write",
             parameters={},
@@ -224,7 +224,7 @@ async def test_with_policy_dict_deny_takes_precedence() -> None:
     )
     with pytest.raises(ChioDeniedError) as exc_info:
         await chio.evaluate_tool_call(
-            capability={"id": "cap-1"},
+            capability_id="cap-1",
             tool_server="srv",
             tool_name="write",
             parameters={},
@@ -250,13 +250,13 @@ def test_with_policy_rejects_invalid_default() -> None:
 async def test_call_history_records_each_evaluation() -> None:
     chio = allow_all()
     await chio.evaluate_tool_call(
-        capability={"id": "cap-1"},
+        capability_id="cap-1",
         tool_server="srv",
         tool_name="read",
         parameters={"path": "/etc"},
     )
     await chio.evaluate_tool_call(
-        capability={"id": "cap-1"},
+        capability_id="cap-1",
         tool_server="srv",
         tool_name="list",
         parameters={"prefix": "/etc"},
@@ -280,7 +280,7 @@ async def test_call_history_records_denies_too() -> None:
     chio = deny_all(reason="no")
     with pytest.raises(ChioDeniedError):
         await chio.evaluate_tool_call(
-            capability={"id": "cap-1"},
+            capability_id="cap-1",
             tool_server="srv",
             tool_name="write",
             parameters={},
@@ -375,19 +375,19 @@ async def test_attenuate_capability_fails_closed_for_subset() -> None:
 async def test_set_policy_swaps_behaviour_midstream() -> None:
     chio = MockChioClient()
     first = await chio.evaluate_tool_call(
-        capability={"id": "cap-1"},
+        capability_id="cap-1",
         tool_server="srv",
         tool_name="read",
         parameters={},
     )
-    assert first["verdict"] == "allow"
+    assert first.is_allowed
 
     chio.set_policy(
         lambda _t, _s, _c: MockVerdict.deny_verdict("now denied")
     )
     with pytest.raises(ChioDeniedError) as exc_info:
         await chio.evaluate_tool_call(
-            capability={"id": "cap-1"},
+            capability_id="cap-1",
             tool_server="srv",
             tool_name="read",
             parameters={},
@@ -406,12 +406,11 @@ async def test_evidence_flows_through_to_receipt() -> None:
         )
 
     chio = with_policy(policy)
-    result = await chio.evaluate_tool_call(
-        capability={"id": "cap-1"},
+    receipt = await chio.evaluate_tool_call(
+        capability_id="cap-1",
         tool_server="srv",
         tool_name="read",
         parameters={},
     )
-    evidence_list = result["receipt"]["evidence"]
-    assert len(evidence_list) == 1
-    assert evidence_list[0]["guard_name"] == "MockGuard"
+    assert len(receipt.evidence) == 1
+    assert receipt.evidence[0].guard_name == "MockGuard"

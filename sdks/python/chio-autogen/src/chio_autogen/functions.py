@@ -249,13 +249,12 @@ class ChioFunctionRegistry:
             )
 
         try:
-            _mediated = await client.evaluate_tool_call(
-                capability={"id": self._capability_id},
+            return await client.evaluate_tool_call(
+                capability_id=self._capability_id,
                 tool_server=server_id,
                 tool_name=name,
                 parameters=parameters,
             )
-            return ChioReceipt.model_validate(_mediated["receipt"])
         except ChioDeniedError as exc:
             raise ChioToolError(
                 exc.message,

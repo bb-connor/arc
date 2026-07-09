@@ -3,6 +3,14 @@
 The Chio sidecar runs as a local process exposing a localhost HTTP API. This
 client provides a typed Python interface over that API, handling serialization,
 error mapping, and receipt verification.
+
+Authoritative enforcement uses the kernel-mediated ``/v1/evaluate`` route,
+which requires a full signed capability token and an execution nonce. The
+id-only wrappers exposed here (``evaluate_tool_call`` and the SDK adapters that
+build on it) hold only a capability id, not a signed token, so they use the
+advisory ``/v1/evaluate/advisory`` path. Their receipts are explicitly
+non-authoritative (``trust_level == "advisory"``). Callers holding a full
+signed token can drive the mediated route via ``evaluate_tool_call_mediated``.
 """
 
 from __future__ import annotations
@@ -446,6 +454,32 @@ class ChioClient:
     # Tool evaluation (sidecar proxy)
     # ------------------------------------------------------------------
 
+    async def evaluate_tool_call(
+        self,
+        *,
+        capability_id: str,
+        tool_server: str,
+        tool_name: str,
+        parameters: dict[str, Any],
+    ) -> ChioReceipt:
+        """Evaluate a tool call via the advisory (id-based) path.
+
+        This is the default the id-only SDK wrappers use. They hold a
+        capability id, not a signed capability token, so they cannot drive the
+        kernel-mediated ``/v1/evaluate`` route (which requires a full signed
+        token and an execution nonce). This delegates to
+        ``evaluate_tool_call_advisory`` and returns its non-authoritative
+        :class:`ChioReceipt` (``trust_level == "advisory"``). Use
+        ``evaluate_tool_call_mediated`` when a full signed token is available
+        and authoritative enforcement is required.
+        """
+        return await self.evaluate_tool_call_advisory(
+            capability_id=capability_id,
+            tool_server=tool_server,
+            tool_name=tool_name,
+            parameters=parameters,
+        )
+
     async def evaluate_tool_call_advisory(
         self,
         *,
@@ -488,7 +522,7 @@ class ChioClient:
             )
         return receipt
 
-    async def evaluate_tool_call(
+    async def evaluate_tool_call_mediated(
         self,
         *,
         capability: dict,
@@ -498,11 +532,15 @@ class ChioClient:
     ) -> dict:
         """Kernel-mediated, authoritative tool-call evaluation.
 
-        Posts to the reinstated ``/v1/evaluate`` route. Returns
-        ``{"verdict", "receipt", "execution_nonce"}``. Callers MUST confirm
-        the receipt is authoritative - ``trust_level`` is ``"mediated"`` and
-        the response carries a bound ``execution_nonce`` - before trusting
-        the verdict.
+        Optional helper for callers that hold a full signed capability token.
+        ``capability`` must be the complete signed ``CapabilityToken`` (not an
+        id-only ``{"id": ...}`` stub); the id-only SDK wrappers cannot drive
+        this route and use ``evaluate_tool_call`` instead. Posts to the
+        kernel-mediated ``/v1/evaluate`` route and returns
+        ``{"verdict", "receipt", "execution_nonce"}``. Callers MUST confirm the
+        receipt is authoritative - ``trust_level`` is ``"mediated"`` and the
+        response carries a bound ``execution_nonce`` - before trusting the
+        verdict.
         """
         body = {
             "capability": capability,

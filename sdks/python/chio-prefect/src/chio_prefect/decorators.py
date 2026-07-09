@@ -116,13 +116,12 @@ async def _evaluate_and_emit(
     can apply its retry policy (a transport failure is not a deny).
     """
     try:
-        _mediated = await chio_client.evaluate_tool_call(
-            capability={"id": capability_id},
+        receipt = await chio_client.evaluate_tool_call(
+            capability_id=capability_id,
             tool_server=tool_server,
             tool_name=tool_name,
             parameters=parameters,
         )
-        receipt = ChioReceipt.model_validate(_mediated["receipt"])
     except ChioDeniedError as exc:
         # HTTP 403: no receipt body; synthesise a deny event.
         emit_deny_event(

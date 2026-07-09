@@ -151,13 +151,12 @@ async def _evaluate(
 ) -> ChioReceipt:
     """Sidecar evaluate; translate HTTP-403 to :class:`ChioLangGraphError`."""
     try:
-        _mediated = await chio_client.evaluate_tool_call(
-            capability={"id": capability_id},
+        return await chio_client.evaluate_tool_call(
+            capability_id=capability_id,
             tool_server=tool_server,
             tool_name=tool_name,
             parameters=parameters,
         )
-        return ChioReceipt.model_validate(_mediated["receipt"])
     except ChioDeniedError as exc:
         raise ChioLangGraphError(
             exc.message,

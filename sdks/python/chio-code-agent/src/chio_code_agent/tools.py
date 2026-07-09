@@ -38,11 +38,11 @@ class _ChioClientLike(Protocol):
     async def evaluate_tool_call(
         self,
         *,
-        capability: dict,
+        capability_id: str,
         tool_server: str,
         tool_name: str,
-        parameters: dict,
-    ) -> dict: ...
+        parameters: dict[str, Any],
+    ) -> ChioReceipt: ...
 
 
 # ---------------------------------------------------------------------------
@@ -121,13 +121,12 @@ class _BaseChioTool:
                 guard="tool_access",
             )
         try:
-            _mediated = await self._chio_client.evaluate_tool_call(
-                capability={"id": self._capability_id},
+            receipt = await self._chio_client.evaluate_tool_call(
+                capability_id=self._capability_id,
                 tool_server=self.SERVER_ID,
                 tool_name=tool_name,
                 parameters=parameters,
             )
-            receipt = ChioReceipt.model_validate(_mediated["receipt"])
         except ChioDeniedError:
             raise
         if not receipt.is_allowed:

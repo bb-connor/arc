@@ -379,7 +379,33 @@ class TestEvaluateToolCall:
             assert getattr(receipt.boundary_class, "value", receipt.boundary_class) == "advisory_only"
 
     @respx.mock
-    async def test_evaluate_tool_call_returns_mediated_response(self) -> None:
+    async def test_evaluate_tool_call_returns_advisory_receipt(self) -> None:
+        # The id-only default delegates to the advisory route and returns a
+        # non-authoritative receipt; it must never post to /v1/evaluate.
+        advisory = _advisory_receipt_dict()
+        advisory_route = respx.post(f"{BASE}/v1/evaluate/advisory").mock(
+            return_value=httpx.Response(200, json=_advisory_wrapper(advisory))
+        )
+        mediated_route = respx.post(f"{BASE}/v1/evaluate").mock(
+            return_value=httpx.Response(200, json={})
+        )
+        respx.post(f"{BASE}/v1/receipts/verify").mock(
+            return_value=httpx.Response(200, json=_advisory_verify_report())
+        )
+        async with ChioClient(BASE) as client:
+            receipt = await client.evaluate_tool_call(
+                capability_id="cap-1",
+                tool_server="srv",
+                tool_name="read",
+                parameters={"path": "/tmp"},
+            )
+        assert isinstance(receipt, ChioReceipt)
+        assert getattr(receipt.trust_level, "value", receipt.trust_level) == "advisory"
+        assert advisory_route.called
+        assert not mediated_route.called
+
+    @respx.mock
+    async def test_evaluate_tool_call_mediated_returns_mediated_response(self) -> None:
         expected = {
             "verdict": "allow",
             "receipt": _make_receipt_dict(),
@@ -389,8 +415,8 @@ class TestEvaluateToolCall:
             return_value=httpx.Response(200, json=expected)
         )
         async with ChioClient(BASE) as client:
-            result = await client.evaluate_tool_call(
-                capability={"id": "cap-1"},
+            result = await client.evaluate_tool_call_mediated(
+                capability=_make_token_dict(),
                 tool_server="srv",
                 tool_name="read",
                 parameters={"path": "/tmp"},
@@ -451,7 +477,7 @@ class TestEvaluateToolCall:
 
     @respx.mock
     async def test_evaluate_tool_call_denied_on_403(self) -> None:
-        respx.post(f"{BASE}/v1/evaluate").mock(
+        respx.post(f"{BASE}/v1/evaluate/advisory").mock(
             return_value=httpx.Response(
                 403,
                 json={
@@ -464,7 +490,7 @@ class TestEvaluateToolCall:
         async with ChioClient(BASE) as client:
             with pytest.raises(ChioDeniedError) as exc_info:
                 await client.evaluate_tool_call(
-                    capability={"id": "cap-1"},
+                    capability_id="cap-1",
                     tool_server="srv",
                     tool_name="read",
                     parameters={"path": "/tmp"},
@@ -560,7 +586,7 @@ class TestEvaluateHttpRequest:
 class TestErrorHandling:
     @respx.mock
     async def test_denied_error(self) -> None:
-        respx.post(f"{BASE}/v1/evaluate").mock(
+        respx.post(f"{BASE}/v1/evaluate/advisory").mock(
             return_value=httpx.Response(
                 403,
                 json={
@@ -573,7 +599,7 @@ class TestErrorHandling:
         async with ChioClient(BASE) as client:
             with pytest.raises(ChioDeniedError) as exc_info:
                 await client.evaluate_tool_call(
-                    capability={"id": "cap-1"},
+                    capability_id="cap-1",
                     tool_server="srv",
                     tool_name="t",
                     parameters={},

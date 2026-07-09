@@ -340,13 +340,12 @@ class _ChioInboundInterceptor(ActivityInboundInterceptor):
 
         client = self._parent._arc()
         try:
-            _mediated = await client.evaluate_tool_call(
-                capability={"id": grant.capability_id},
+            return await client.evaluate_tool_call(
+                capability_id=grant.capability_id,
                 tool_server=tool_server,
                 tool_name=info.activity_type,
                 parameters=parameters,
             )
-            return ChioReceipt.model_validate(_mediated["receipt"])
         except ChioDeniedError as exc:
             return _deny_receipt_from_error(
                 info=info,

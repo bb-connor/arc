@@ -20,13 +20,13 @@ Example
 
     async def test_mytool() -> None:
         async with allow_all() as chio:
-            result = await chio.evaluate_tool_call(
-                capability={"id": "cap-1"},
+            receipt = await chio.evaluate_tool_call(
+                capability_id="cap-1",
                 tool_server="srv",
                 tool_name="read",
                 parameters={"path": "/tmp"},
             )
-            assert result["verdict"] == "allow"
+            assert receipt.is_allowed
 """
 
 from __future__ import annotations
@@ -394,20 +394,17 @@ class MockChioClient:
     async def evaluate_tool_call(
         self,
         *,
-        capability: dict,
+        capability_id: str,
         tool_server: str,
         tool_name: str,
         parameters: dict[str, Any],
-    ) -> dict:
+    ) -> ChioReceipt:
         """Ask the configured policy whether the tool call is allowed.
 
-        Matches the real :class:`ChioClient.evaluate_tool_call` contract:
-        ``capability`` is the full capability-token dict; returns
-        ``{"verdict", "receipt", "execution_nonce"}``. On deny, either
-        raises :class:`ChioDeniedError` (default) or returns a deny-verdict
-        dict, depending on ``raise_on_deny``.
+        On allow, returns a synthetic :class:`ChioReceipt`. On deny, either
+        raises :class:`ChioDeniedError` (default) or returns a deny receipt,
+        depending on ``raise_on_deny``.
         """
-        capability_id: str = capability.get("id", "")
         scope = {
             "tool_server": tool_server,
             "tool_name": tool_name,
@@ -438,18 +435,13 @@ class MockChioClient:
                 reason=verdict.reason,
             )
 
-        receipt = self._build_tool_receipt(
+        return self._build_tool_receipt(
             capability_id=capability_id,
             tool_server=tool_server,
             tool_name=tool_name,
             parameters=parameters,
             verdict=verdict,
         )
-        return {
-            "verdict": "allow" if verdict.allow else "deny",
-            "receipt": receipt.model_dump(exclude_none=True),
-            "execution_nonce": uuid.uuid4().hex,
-        }
 
     async def evaluate_http_request(
         self,

@@ -46,20 +46,11 @@ def _ephemeral_instance() -> DagsterInstance:
 
 
 class _DecisionlessReceiptClient:
-    """Minimal client stub that returns a decisionless (non-authorizing) receipt.
-
-    Uses the mediated /v1/evaluate contract: accepts ``capability`` dict,
-    returns ``{"verdict", "receipt", "execution_nonce"}``. The receipt has
-    ``decision=None`` so ``is_allowed`` is False, triggering the
-    fail-closed PermissionError path in the decorator.
-    """
-
-    async def evaluate_tool_call(self, **kwargs: Any) -> dict:
-        capability_id = str(kwargs["capability"].get("id", ""))
-        receipt = ChioReceipt(
+    async def evaluate_tool_call(self, **kwargs: Any) -> ChioReceipt:
+        return ChioReceipt(
             id="mock-trace-receipt",
             timestamp=1_700_000_000,
-            capability_id=capability_id,
+            capability_id=str(kwargs["capability_id"]),
             tool_server=str(kwargs["tool_server"]),
             tool_name=str(kwargs["tool_name"]),
             action=ToolCallAction(parameters=dict(kwargs["parameters"]), parameter_hash="hash"),
@@ -75,11 +66,6 @@ class _DecisionlessReceiptClient:
             kernel_key="kernel",
             signature="signature",
         )
-        return {
-            "verdict": "allow",
-            "receipt": receipt.model_dump(exclude_none=True),
-            "execution_nonce": None,
-        }
 
     async def close(self) -> None:
         return None

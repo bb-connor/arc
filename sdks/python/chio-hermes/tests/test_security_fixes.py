@@ -273,14 +273,9 @@ async def test_executor_error_recovers_receipt_id_from_context(
 
     class _ClientCapture(MockChioClient):
         async def evaluate_tool_call(self, **kw: Any) -> Any:
-            result = await super().evaluate_tool_call(**kw)
-            # evaluate_tool_call returns a mediated dict; extract the id
-            # from within the nested receipt object.
-            if isinstance(result, dict):
-                captured["receipt_id"] = result.get("receipt", {}).get("id")
-            else:
-                captured["receipt_id"] = getattr(result, "id", None)
-            return result
+            receipt = await super().evaluate_tool_call(**kw)
+            captured["receipt_id"] = receipt.id
+            return receipt
 
     client = _ClientCapture(policy=_allow_all_policy)
     _runtime._install_receipt_id_capture(client)

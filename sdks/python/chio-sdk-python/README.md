@@ -40,23 +40,26 @@ async def main() -> None:
         print(f"advisory receipt: {advisory.id}")
 
         try:
-            await client.evaluate_tool_call(
+            receipt = await client.evaluate_tool_call(
                 capability_id="cap-123",
                 tool_server="search-srv",
                 tool_name="search_documents",
                 parameters={"query": "capability-based security"},
             )
+            print(f"advisory verdict receipt: {receipt.id}")
         except ChioDeniedError as error:
             print(f"not authorized: {error}")
 ```
 
-`evaluate_tool_call` returns only for authoritative mediated tool-call
-authorization receipts. With the current advisory-only sidecar route, it
-fails closed after integrity-checking the advisory receipt. The sidecar
-advisory routes
-`POST /v1/evaluate/advisory` and deprecated `POST /v1/evaluate` return
-`authorization: false`, `authorizationBasis: "advisory_only"`, and an
-advisory receipt.
+Authoritative enforcement uses the kernel-mediated `POST /v1/evaluate` route,
+which requires a full signed capability token and an execution nonce. The
+id-only SDK wrappers hold a capability id, not a signed token, so
+`evaluate_tool_call` (and the adapters built on it) take a `capability_id` and
+delegate to the advisory `POST /v1/evaluate/advisory` route. The advisory route
+returns `authorization: false`, `authorizationBasis: "advisory_only"`, and a
+non-authoritative `ChioReceipt` (`trust_level == "advisory"`). Callers holding a
+full signed token can drive the mediated route with
+`evaluate_tool_call_mediated`.
 
 Point the client at a non-default sidecar with `ChioClient(base_url=...)`.
 

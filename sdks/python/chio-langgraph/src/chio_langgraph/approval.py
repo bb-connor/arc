@@ -164,13 +164,12 @@ def chio_approval_node(
             policy=effective_redaction_policy,
         )
         try:
-            _mediated = await config.chio_client.evaluate_tool_call(
-                capability={"id": cap_id},
+            receipt = await config.chio_client.evaluate_tool_call(
+                capability_id=cap_id,
                 tool_server=tool_server,
                 tool_name=node_name,
                 parameters=parameters,
             )
-            receipt = ChioReceipt.model_validate(_mediated["receipt"])
         except ChioDeniedError as exc:
             raise ChioLangGraphError(
                 exc.message,

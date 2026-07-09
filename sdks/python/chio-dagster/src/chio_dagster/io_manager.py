@@ -222,13 +222,12 @@ class ChioIOManager:
 
         try:
             try:
-                _mediated = await client.evaluate_tool_call(
-                    capability={"id": self._capability_id},
+                receipt = await client.evaluate_tool_call(
+                    capability_id=self._capability_id,
                     tool_server=self._tool_server,
                     tool_name=tool_name,
                     parameters=parameters,
                 )
-                receipt = ChioReceipt.model_validate(_mediated["receipt"])
             except ChioDeniedError as exc:
                 raise self._deny_permission_error(
                     reason=exc.reason or exc.message,
