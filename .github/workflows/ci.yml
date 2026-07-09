@@ -191,7 +191,7 @@ jobs:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: |
-          if cargo tree -p chio-cli -e normal 2>/dev/null | grep -q '^iroh\b'; then
+          if cargo tree -p chio-cli -e normal 2>/dev/null | grep -qE '[[:space:]]iroh v'; then
             echo "ERROR: iroh is present in the default chio-cli dependency tree" >&2
             echo "The default shipped binary must not link iroh; use --features iroh to opt in." >&2
             exit 1
