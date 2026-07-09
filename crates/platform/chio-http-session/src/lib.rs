@@ -216,11 +216,25 @@ impl JournalInner {
             .unwrap_or(ZERO_HASH)
     }
 
+    /// The externally visible head hash. Before any eviction this is the most
+    /// recent retained entry hash; once the ring has evicted a prefix, the head
+    /// folds the running `evicted_head_hash` together with the retained tail so
+    /// the exported head still commits to the dropped prefix. This keeps the
+    /// snapshot/`head_hash()` commitment consistent with the full pre-eviction
+    /// sequence, so an audit can detect truncation or tampering of the evicted
+    /// prefix (RFC-0004 F21 round-2).
+    fn exported_head_hash(&self) -> String {
+        match self.evicted_head_hash.as_deref() {
+            None => self.last_hash().to_string(),
+            Some(evicted) => fold_head_hash(Some(evicted), self.last_hash()),
+        }
+    }
+
     fn snapshot(&self, session_id: &str) -> SessionJournalSnapshot {
         SessionJournalSnapshot {
             session_id: session_id.to_string(),
             entry_count: self.entries.len(),
-            head_hash: self.last_hash().to_string(),
+            head_hash: self.exported_head_hash(),
             data_flow: self.data_flow.clone(),
             tool_sequence: self.tool_sequence.iter().cloned().collect(),
             tool_counts: self.tool_counts.clone(),
@@ -460,10 +474,13 @@ impl SessionJournal {
         Ok(())
     }
 
-    /// Return the hash of the most recent entry (or the zero hash if empty).
+    /// Return the exported head hash: the most recent entry hash before any
+    /// eviction, or (once a prefix has been evicted) a fold of the evicted
+    /// prefix and the retained tail, so the head stays committed to the full
+    /// sequence across eviction (or the zero hash if empty) (RFC-0004 F21).
     pub fn head_hash(&self) -> Result<String, SessionJournalError> {
         let inner = self.lock_inner()?;
-        Ok(inner.last_hash().to_string())
+        Ok(inner.exported_head_hash())
     }
 }
 
@@ -523,6 +540,54 @@ mod tests {
         let entries = journal.entries().unwrap();
         assert_eq!(entries.last().map(|e| e.sequence), Some(9));
         journal.verify_integrity().unwrap();
+    }
+
+    #[test]
+    fn exported_head_hash_commits_to_evicted_prefix() {
+        // RFC-0004 F21 round-2: once the ring evicts a prefix, the exported head
+        // hash must still commit to the dropped entries -- it must NOT collapse
+        // to a hash of only the retained suffix, so an audit using the snapshot
+        // can detect truncation or tampering of the evicted prefix.
+        let journal = SessionJournal::with_entry_cap("sess-head".to_string(), 2);
+
+        // Fill exactly to the cap: no eviction yet, so the head is the retained
+        // tail entry hash.
+        journal.record(test_params("t0")).unwrap();
+        journal.record(test_params("t1")).unwrap();
+        let retained_tail_before = journal
+            .entries()
+            .unwrap()
+            .last()
+            .map(|e| e.entry_hash.clone())
+            .unwrap();
+        assert_eq!(
+            journal.head_hash().unwrap(),
+            retained_tail_before,
+            "pre-eviction head must be the most recent entry hash"
+        );
+
+        // Push past the cap: this evicts the prefix (t0, then t1).
+        journal.record(test_params("t2")).unwrap();
+        journal.record(test_params("t3")).unwrap();
+
+        let head_after = journal.head_hash().unwrap();
+        let retained_tail_after = journal
+            .entries()
+            .unwrap()
+            .last()
+            .map(|e| e.entry_hash.clone())
+            .unwrap();
+        assert_ne!(
+            head_after, retained_tail_after,
+            "exported head must fold the evicted prefix, not equal the retained suffix tail"
+        );
+
+        // The snapshot's head hash stays consistent with head_hash().
+        assert_eq!(
+            journal.snapshot().unwrap().head_hash,
+            head_after,
+            "snapshot head hash diverged from head_hash()"
+        );
     }
 
     #[test]
