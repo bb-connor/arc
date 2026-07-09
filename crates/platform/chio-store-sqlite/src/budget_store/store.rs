@@ -85,11 +85,25 @@ impl SqliteBudgetStore {
                 floor_seq    INTEGER NOT NULL DEFAULT 0,
                 CHECK (floor_seq >= 0)
             );
+
+            CREATE TABLE IF NOT EXISTS budget_ack_head_watermark (
+                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                head_seq  INTEGER NOT NULL DEFAULT 0,
+                CHECK (head_seq >= 0)
+            );
             "#,
         )?;
         connection.execute(
             r#"
             INSERT INTO budget_replication_meta (singleton, next_seq)
+            VALUES (1, 0)
+            ON CONFLICT(singleton) DO NOTHING
+            "#,
+            [],
+        )?;
+        connection.execute(
+            r#"
+            INSERT INTO budget_ack_head_watermark (singleton, head_seq)
             VALUES (1, 0)
             ON CONFLICT(singleton) DO NOTHING
             "#,
@@ -145,6 +159,31 @@ impl SqliteBudgetStore {
         Ok(seq.max(0) as u64)
     }
 
+    /// The exact event_seq of the mutation event written under `event_id`, or
+    /// None if no such event exists (or it predates seq assignment). The
+    /// cluster budget-write handler waits on THIS write's own event_seq, looked
+    /// up by the write's event_id, instead of MAX(event_seq) for the authority:
+    /// a concurrent same-authority commit (or an idempotent retry while later
+    /// same-origin events already exist) can raise that MAX above this write's
+    /// seq, making the quorum wait target the wrong (higher) seq and roll back a
+    /// write that itself reached quorum. Looked up by the unique event_id, this
+    /// is race-free and, for an idempotent retry, returns the ORIGINAL event's
+    /// seq (codex #965 round-2 P1).
+    pub fn mutation_event_seq_for_event_id(
+        &self,
+        event_id: &str,
+    ) -> Result<Option<u64>, BudgetStoreError> {
+        let connection = self.connection()?;
+        let seq: Option<Option<i64>> = connection
+            .query_row(
+                "SELECT event_seq FROM budget_mutation_events WHERE event_id = ?1",
+                rusqlite::params![event_id],
+                |row| row.get::<_, Option<i64>>(0),
+            )
+            .optional()?;
+        Ok(seq.flatten().map(|value| value.max(0) as u64))
+    }
+
     /// Per-origin contiguous ack head, anchored on the peer's GLOBAL contiguous
     /// import head.
     ///
@@ -181,40 +220,93 @@ impl SqliteBudgetStore {
     /// snapshot from the holed leader carries the hole. Fail-closed (a hole
     /// withholds quorum and never over-counts). See the plan's rollback-retry
     /// residual and its seq-preserving follow-up.
+    /// PERF: this runs on every cluster status request (once per sync round, an
+    /// interval clamped as low as 50ms), so it must not rescan the whole ledger.
+    /// The GLOBAL contiguous head is maintained incrementally against a durable
+    /// watermark W (`budget_ack_head_watermark`): each call only advances W over
+    /// the rows ABOVE it (a window scan bounded to `event_seq > W`), so steady
+    /// state cost is O(new rows), not O(history). Soundness holds because W only
+    /// advances while the run stays gap-free, and any DELETE of a mutation event
+    /// resets W to 0 (`reset_budget_ack_head_watermark`), forcing the next call
+    /// to re-verify from genesis so a hole punched below W can never leave a
+    /// stale-high head that over-counts (codex #965 round-2 P2).
     pub fn budget_ack_heads(&self) -> Result<Vec<(String, u64)>, BudgetStoreError> {
-        let connection = self.connection()?;
-        let mut statement = connection.prepare(
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let watermark: i64 = transaction.query_row(
+            "SELECT head_seq FROM budget_ack_head_watermark WHERE singleton = 1",
+            [],
+            |row| row.get(0),
+        )?;
+        let watermark = watermark.max(0) as u64;
+        // Advance the head over rows ABOVE the watermark only. The contiguous run
+        // from W+1 has island == W (its first row W+1 has ROW_NUMBER 1), so the
+        // new head is MAX(event_seq) in that island, or W when W+1 is missing.
+        // NULL-authority events still occupy a global slot, so they count for
+        // contiguity here but are never reported as an ack below.
+        let head: i64 = transaction.query_row(
             r#"
             WITH seqs AS (
-                SELECT authority_id, event_seq
+                SELECT event_seq
                 FROM budget_mutation_events
-                WHERE event_seq IS NOT NULL
+                WHERE event_seq IS NOT NULL AND event_seq > ?1
             ),
-            global_run AS (
+            run AS (
                 SELECT
                     event_seq,
                     event_seq - ROW_NUMBER() OVER (ORDER BY event_seq) AS island
                 FROM seqs
-            ),
-            head AS (
-                SELECT COALESCE(MAX(event_seq), 0) AS head_seq
-                FROM global_run
-                WHERE island = 0
             )
+            SELECT COALESCE(MAX(event_seq), ?1) AS head_seq
+            FROM run
+            WHERE island = ?1
+            "#,
+            rusqlite::params![watermark as i64],
+            |row| row.get(0),
+        )?;
+        let head = head.max(0) as u64;
+        if head > watermark {
+            transaction.execute(
+                "UPDATE budget_ack_head_watermark SET head_seq = ?1 WHERE singleton = 1",
+                rusqlite::params![head as i64],
+            )?;
+        }
+        let mut statement = transaction.prepare(
+            r#"
             SELECT authority_id, MAX(event_seq) AS ack_head
-            FROM seqs
+            FROM budget_mutation_events
             WHERE authority_id IS NOT NULL
-              AND event_seq <= (SELECT head_seq FROM head)
+              AND event_seq IS NOT NULL
+              AND event_seq <= ?1
             GROUP BY authority_id
             "#,
         )?;
-        let rows = statement.query_map([], |row| {
-            let origin: String = row.get(0)?;
-            let head = budget_u64_from_row(row, 1, "ack_head")?;
-            Ok((origin, head))
-        })?;
-        rows.collect::<Result<Vec<_>, _>>()
-            .map_err(BudgetStoreError::from)
+        let rows = statement
+            .query_map(rusqlite::params![head as i64], |row| {
+                let origin: String = row.get(0)?;
+                let ack_head = budget_u64_from_row(row, 1, "ack_head")?;
+                Ok((origin, ack_head))
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(BudgetStoreError::from)?;
+        drop(statement);
+        transaction.commit()?;
+        Ok(rows)
+    }
+
+    /// Reset the durable contiguous ack-head watermark to 0, forcing the next
+    /// `budget_ack_heads` call to re-verify the global run from genesis. Called
+    /// whenever a mutation event is DELETED (a hole may have been punched at or
+    /// below the watermark): re-verification caps the head below the hole so a
+    /// stale-high watermark can never over-count a witness (codex #965 round-2 P2).
+    fn reset_budget_ack_head_watermark(
+        transaction: &rusqlite::Transaction<'_>,
+    ) -> Result<(), BudgetStoreError> {
+        transaction.execute(
+            "UPDATE budget_ack_head_watermark SET head_seq = 0 WHERE singleton = 1",
+            [],
+        )?;
+        Ok(())
     }
 
     /// The durable trusted floor for one origin (0 when none recorded).
@@ -348,6 +440,7 @@ impl SqliteBudgetStore {
             "DELETE FROM budget_mutation_events WHERE event_id = ?1",
             params![event_id],
         )?;
+        Self::reset_budget_ack_head_watermark(&transaction)?;
         transaction.commit()?;
         Ok(())
     }
@@ -403,6 +496,7 @@ impl SqliteBudgetStore {
                         "DELETE FROM budget_mutation_events WHERE event_id = ?1",
                         params![record.event_id],
                     )?;
+                    Self::reset_budget_ack_head_watermark(transaction)?;
                     if let Some(hold_id) = record.hold_id.as_deref() {
                         transaction.execute(
                             "DELETE FROM budget_authorization_holds WHERE hold_id = ?1",
@@ -1251,6 +1345,7 @@ impl SqliteBudgetStore {
                 "DELETE FROM budget_mutation_events WHERE event_id = ?1",
                 params![event_id],
             )?;
+            Self::reset_budget_ack_head_watermark(transaction)?;
             if let Some(hold_id) = hold_id {
                 transaction.execute(
                     "DELETE FROM budget_authorization_holds WHERE hold_id = ?1",

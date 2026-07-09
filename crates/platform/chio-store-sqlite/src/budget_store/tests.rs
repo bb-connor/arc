@@ -1703,3 +1703,95 @@ fn budget_ack_heads_recognizes_multi_authority_global_contiguity(
     let _ = fs::remove_file(&path);
     Ok(())
 }
+
+fn ack_head_event(seq: u64, event_id: &str, origin: &str) -> BudgetMutationRecord {
+    BudgetMutationRecord {
+        event_id: event_id.to_string(),
+        hold_id: None,
+        capability_id: "cap-w".to_string(),
+        grant_index: 0,
+        kind: BudgetMutationKind::AuthorizeExposure,
+        allowed: Some(true),
+        recorded_at: seq as i64,
+        event_seq: seq,
+        usage_seq: Some(seq),
+        exposure_units: 1,
+        realized_spend_units: 0,
+        max_invocations: None,
+        max_cost_per_invocation: None,
+        max_total_cost_units: None,
+        invocation_count_after: 1,
+        total_cost_exposed_after: 1,
+        total_cost_realized_spend_after: 0,
+        authority: Some(BudgetEventAuthority {
+            authority_id: origin.to_string(),
+            lease_id: format!("{origin}#term-1"),
+            lease_epoch: 1,
+        }),
+    }
+}
+
+#[test]
+fn mutation_event_seq_for_event_id_returns_this_events_seq_not_authority_max(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // codex #965 round-2 P1: the quorum-witness token must wait on THIS write's
+    // own event_seq (looked up by event_id), not MAX(event_seq) for the
+    // authority, which a later same-authority commit raises.
+    let path = unique_db_path("chio-event-seq-by-id");
+    let store = SqliteBudgetStore::open(&path)?;
+    // Two events under the SAME authority: e1 at seq 1, e2 at seq 2.
+    store.import_snapshot_records(
+        &[],
+        &[
+            ack_head_event(1, "e1", "http://a"),
+            ack_head_event(2, "e2", "http://a"),
+        ],
+    )?;
+    assert_eq!(store.mutation_event_seq_for_event_id("e1")?, Some(1));
+    assert_eq!(store.mutation_event_seq_for_event_id("e2")?, Some(2));
+    assert_eq!(store.mutation_event_seq_for_event_id("missing")?, None);
+    // The authority MAX is 2 - the WRONG seq for e1's quorum wait; the by-id
+    // lookup returns 1, so e1's wait targets its own event.
+    assert_eq!(store.max_mutation_event_seq_for_authority("http://a")?, 2);
+
+    let _ = fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
+fn budget_ack_head_watermark_recomputes_after_delete_caps_below_hole(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // codex #965 round-2 P2: budget_ack_heads maintains the contiguous head from
+    // a durable watermark for O(new rows) cost, but a DELETE that punches a hole
+    // below the watermark must reset it so the next call re-verifies and caps the
+    // head below the hole (never a stale-high head that over-counts).
+    let path = unique_db_path("chio-ack-watermark-delete");
+    let store = SqliteBudgetStore::open(&path)?;
+    let head_for = |heads: &[(String, u64)], origin: &str| {
+        heads.iter().find(|(o, _)| o == origin).map(|(_, seq)| *seq)
+    };
+    store.import_snapshot_records(
+        &[],
+        &[
+            ack_head_event(1, "e1", "http://o"),
+            ack_head_event(2, "e2", "http://o"),
+            ack_head_event(3, "e3", "http://o"),
+        ],
+    )?;
+    // Contiguous 1..3 -> head 3. Called twice to prove the watermark is stable
+    // (the second call is a no-op advance, not a regression).
+    assert_eq!(head_for(&store.budget_ack_heads()?, "http://o"), Some(3));
+    assert_eq!(head_for(&store.budget_ack_heads()?, "http://o"), Some(3));
+
+    // Delete the middle event (seq 2): the watermark reset forces re-verification
+    // and the head caps at 1, NOT the stale-high 3.
+    store.delete_mutation_event("e2")?;
+    assert_eq!(
+        head_for(&store.budget_ack_heads()?, "http://o"),
+        Some(1),
+        "a hole punched below the watermark must cap the head at 1, never stay at 3"
+    );
+
+    let _ = fs::remove_file(&path);
+    Ok(())
+}

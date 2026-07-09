@@ -201,21 +201,29 @@ pub(crate) fn update_peer_budget_cursor(
     update_peer_state(state, peer_url, |peer| peer.budget_cursor = Some(cursor));
 }
 
-/// Record a peer's advertised per-origin contiguous ack heads. Monotone: an ack
-/// head never regresses in local state, which is fail-safe (RFC-0011 D2, F16).
+/// Record a peer's advertised per-origin contiguous ack heads by REPLACING the
+/// stored set with the current advertisement.
+///
+/// This must NOT max-merge: if a peer restored an older budget DB or otherwise
+/// lost a previously-imported prefix, it re-advertises a LOWER head (or drops an
+/// origin entirely). A monotonic max would retain the stale higher head forever
+/// and keep counting that data-losing peer as a witness for writes it no longer
+/// durably holds, i.e. a double-spend risk. Replacing lets a regressed or absent
+/// origin drop so `budget_write_quorum_commit_view` stops counting it (codex
+/// #965 round-2 P1). Within a single advertisement, duplicate origins collapse
+/// to their max (defensive; `budget_ack_heads` already groups by origin).
 pub(crate) fn update_peer_budget_acks(
     state: &TrustServiceState,
     peer_url: &str,
     acks: &[BudgetOriginAck],
 ) {
-    update_peer_state(state, peer_url, |peer| {
-        for ack in acks {
-            let entry = peer
-                .budget_import_acks
-                .entry(ack.origin_id.clone())
-                .or_insert(0);
-            *entry = (*entry).max(ack.event_seq);
-        }
+    let mut heads = std::collections::BTreeMap::<String, u64>::new();
+    for ack in acks {
+        let entry = heads.entry(ack.origin_id.clone()).or_insert(0);
+        *entry = (*entry).max(ack.event_seq);
+    }
+    update_peer_state(state, peer_url, move |peer| {
+        peer.budget_import_acks = heads;
     });
 }
 

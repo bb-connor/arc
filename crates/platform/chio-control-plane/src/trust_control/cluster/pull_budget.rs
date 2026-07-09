@@ -105,15 +105,16 @@ pub(crate) fn require_contiguous_page(
     expected_next_seq: u64,
     seqs: &[u64],
 ) -> Result<(), PeerProtocolError> {
-    if seqs.is_empty() {
-        return Ok(());
-    }
-    // The delta endpoints order ascending, but do not trust the peer's ordering:
-    // sort locally so an out-of-order page cannot mask a skip.
-    let mut sorted = seqs.to_vec();
-    sorted.sort_unstable();
+    // Check the page IN ITS ORIGINAL ORDER (do not sort): the budget importer
+    // applies events in the order received, so a dependency-ordered stream (an
+    // authorize before its release) must arrive already ascending. Sorting here
+    // would let an out-of-order page pass the guard and then import wrong (a
+    // release before its hold exists), surfacing as a retryable store error
+    // instead of demoting the malformed peer (codex #965 round-2 P2). Requiring
+    // strictly ascending, gap-free-from-expected order rejects both a skip and a
+    // reorder as a NonContiguousPage.
     let mut expected = expected_next_seq;
-    for &seq in &sorted {
+    for &seq in seqs {
         if seq != expected {
             return Err(PeerProtocolError::NonContiguousPage {
                 expected_seq: expected,
@@ -254,8 +255,22 @@ mod pull_budget_tests {
         assert!(require_contiguous_page(11, &[11, 12, 13]).is_ok());
         // An empty page is vacuously contiguous ("caught up").
         assert!(require_contiguous_page(11, &[]).is_ok());
-        // Out-of-order but still contiguous once sorted.
-        assert!(require_contiguous_page(11, &[13, 11, 12]).is_ok());
+        // Out-of-order is REJECTED (the importer applies events in received
+        // order, so a reorder must not pass; codex #965 round-2 P2).
+        assert!(matches!(
+            require_contiguous_page(11, &[13, 11, 12]),
+            Err(PeerProtocolError::NonContiguousPage {
+                expected_seq: 11,
+                found_seq: 13
+            })
+        ));
+        assert!(matches!(
+            require_contiguous_page(11, &[12, 11, 13]),
+            Err(PeerProtocolError::NonContiguousPage {
+                expected_seq: 11,
+                found_seq: 12
+            })
+        ));
 
         // Forward cursor-jump: {110, 111} from cursor 10 would skip 11..109.
         // A max-advance-only check (110 > 10) would wrongly ACCEPT this; the

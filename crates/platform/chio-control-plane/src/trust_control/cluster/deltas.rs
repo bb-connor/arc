@@ -809,10 +809,21 @@ fn budget_write_quorum_commit_view_locked(
         }
     }
     let committed_nodes = witness_urls.len();
-    let authority_id = consensus
-        .leader_url
-        .clone()
-        .unwrap_or_else(|| cluster.self_url.clone());
+    // The commit metadata (authority_id / lease_id) must name the authority that
+    // AUTHORED this write, not the current consensus leader: leadership can change
+    // while the write waits (a lex-earlier node becomes reachable), and pairing
+    // the write's term with a different leader would mint a lease_id for an
+    // authority that never wrote the event (codex #965 round-2 P2). The write
+    // token already carries origin_id; fall back to the consensus leader only for
+    // a placeholder (unclustered) token that has no origin.
+    let authority_id = if write.origin_id.is_empty() {
+        consensus
+            .leader_url
+            .clone()
+            .unwrap_or_else(|| cluster.self_url.clone())
+    } else {
+        write.origin_id.clone()
+    };
     let lease_epoch = write.budget_term;
     let lease_id = format!("{authority_id}#term-{lease_epoch}");
     BudgetWriteCommitView {

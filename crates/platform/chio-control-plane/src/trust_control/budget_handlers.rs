@@ -110,23 +110,44 @@ pub(crate) async fn handle_try_increment_budget(
 }
 
 /// Build the quorum-witness token for a budget write from its origin authority
-/// and the highest event_seq that origin has written. The event_seq is >= this
-/// write's own seq (a concurrent same-origin write can only raise it), so the
-/// per-origin contiguous witness can only under-count witnesses, never
-/// over-count one (fail-closed). A single-node write (no authority) carries a
-/// placeholder token; the quorum wait short-circuits when unclustered
-/// (RFC-0011 D2, F16).
+/// and THIS write's own event_seq.
+///
+/// The seq is looked up by the write's `event_id` (the mutation event is stored
+/// under that id at the seq it was allocated), which is race-free and, for an
+/// idempotent retry, resolves to the ORIGINAL event's seq. Deriving it from
+/// MAX(event_seq) for the authority would be wrong: a concurrent same-authority
+/// commit (or a retry while later same-origin events exist) raises that MAX
+/// above this write's seq, so the quorum wait would target a later event and
+/// `handle_try_charge_cost` would roll back a write that itself reached quorum
+/// (codex #965 round-2 P1). When no event_id is available (or the row is not
+/// found) it falls back to the authority MAX, which can only OVER-target the seq
+/// (wait longer), never under-target it, so the witness still never over-counts
+/// (fail-closed). A single-node write (no authority) carries a placeholder token
+/// and the quorum wait short-circuits when unclustered (RFC-0011 D2, F16).
 fn budget_write_token(
     store: &SqliteBudgetStore,
     authority: Option<&BudgetEventAuthority>,
+    event_id: Option<&str>,
 ) -> Result<BudgetWriteToken, Response> {
+    let http_error = |error: BudgetStoreError| {
+        plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+    };
     match authority {
         Some(authority) => {
-            let event_seq = store
-                .max_mutation_event_seq_for_authority(&authority.authority_id)
-                .map_err(|error| {
-                    plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-                })?;
+            let event_seq = match event_id {
+                Some(event_id) => match store
+                    .mutation_event_seq_for_event_id(event_id)
+                    .map_err(http_error)?
+                {
+                    Some(seq) => seq,
+                    None => store
+                        .max_mutation_event_seq_for_authority(&authority.authority_id)
+                        .map_err(http_error)?,
+                },
+                None => store
+                    .max_mutation_event_seq_for_authority(&authority.authority_id)
+                    .map_err(http_error)?,
+            };
             Ok(BudgetWriteToken {
                 origin_id: authority.authority_id.clone(),
                 event_seq,
@@ -179,10 +200,11 @@ pub(crate) async fn handle_try_charge_cost(
         }
     };
     if allowed {
-        let write = match budget_write_token(&store, authority.as_ref()) {
-            Ok(write) => write,
-            Err(response) => return response,
-        };
+        let write =
+            match budget_write_token(&store, authority.as_ref(), payload.event_id.as_deref()) {
+                Ok(write) => write,
+                Err(response) => return response,
+            };
         let committed_response = match store.get_usage(&payload.capability_id, payload.grant_index)
         {
             Ok(Some(usage)) => Some(TryChargeCostResponse {
@@ -297,7 +319,7 @@ pub(crate) async fn handle_reverse_charge_cost(
     ) {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
     }
-    let write = match budget_write_token(&store, authority.as_ref()) {
+    let write = match budget_write_token(&store, authority.as_ref(), payload.event_id.as_deref()) {
         Ok(write) => write,
         Err(response) => return response,
     };
@@ -380,7 +402,7 @@ pub(crate) async fn handle_reduce_charge_cost(
     if let Err(error) = reconcile_result {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
     }
-    let write = match budget_write_token(&store, authority.as_ref()) {
+    let write = match budget_write_token(&store, authority.as_ref(), payload.event_id.as_deref()) {
         Ok(write) => write,
         Err(response) => return response,
     };

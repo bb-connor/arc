@@ -685,6 +685,81 @@ mod cluster_and_reports_tests {
     }
 
     #[test]
+    fn peer_ack_regression_drops_stale_head_and_stops_witnessing() {
+        // codex #965 round-2 P1: a peer that restored an older budget DB (or lost
+        // a prefix) re-advertises a LOWER or empty ack set. The stored ack must
+        // REGRESS (replace, not max-merge) so that data-losing peer stops being
+        // counted as a witness for writes it no longer durably holds.
+        let origin = "http://node-a";
+        let state = state_with_cluster(
+            "http://node-a",
+            &["http://node-b", "http://node-c"],
+            None,
+            None,
+            None,
+        );
+        update_peer_reachable(&state, "http://node-b");
+        update_peer_reachable(&state, "http://node-c");
+        let ack = |seq: u64| {
+            vec![BudgetOriginAck {
+                origin_id: origin.to_string(),
+                event_seq: seq,
+            }]
+        };
+        let write = |seq: u64| BudgetWriteToken {
+            origin_id: origin.to_string(),
+            event_seq: seq,
+            budget_term: 1,
+        };
+        // Both peers ack origin at 10: a write at 8 witnesses on self + both.
+        update_peer_budget_acks(&state, "http://node-b", &ack(10));
+        update_peer_budget_acks(&state, "http://node-c", &ack(10));
+        let commit = budget_write_quorum_commit_view(&state, &write(8)).test_unwrap();
+        assert_eq!(commit.committed_nodes, 3);
+
+        // node-b restored an older DB and re-advertises head 5: the stale 10 must
+        // DROP, so a write at 8 no longer witnesses on node-b.
+        update_peer_budget_acks(&state, "http://node-b", &ack(5));
+        let commit = budget_write_quorum_commit_view(&state, &write(8)).test_unwrap();
+        assert_eq!(
+            commit.committed_nodes, 2,
+            "node-b's regressed head 5 < 8 must not witness the write at 8"
+        );
+        // node-b still witnesses a write at 5 (5 >= 5).
+        let commit = budget_write_quorum_commit_view(&state, &write(5)).test_unwrap();
+        assert_eq!(commit.committed_nodes, 3);
+
+        // An EMPTY re-advertisement drops node-b's origin entirely.
+        update_peer_budget_acks(&state, "http://node-b", &[]);
+        let commit = budget_write_quorum_commit_view(&state, &write(1)).test_unwrap();
+        assert_eq!(
+            commit.committed_nodes, 2,
+            "an empty advertisement drops node-b's ack, so only self + node-c witness"
+        );
+    }
+
+    #[test]
+    fn commit_metadata_names_the_write_authority_not_the_current_leader() {
+        // codex #965 round-2 P2: if leadership changes while a write waits, the
+        // commit metadata must name the authority that AUTHORED the write, not
+        // the current consensus leader (which never wrote the event).
+        let state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
+        update_peer_reachable(&state, "http://node-b");
+        let write = BudgetWriteToken {
+            origin_id: "http://writer".to_string(),
+            event_seq: 4,
+            budget_term: 7,
+        };
+        let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
+        assert_eq!(
+            commit.authority_id, "http://writer",
+            "commit authority must be the write's origin, not the consensus leader"
+        );
+        assert_eq!(commit.budget_term, 7);
+        assert_eq!(commit.lease_id, "http://writer#term-7");
+    }
+
+    #[test]
     fn budget_write_progress_close_fails_closed_while_clustered() {
         // codex #962: if the ClusterProgress sender is lost mid-write, a node
         // that is STILL clustered must fail closed (503) so the caller rolls back
