@@ -37,7 +37,8 @@ use std::sync::Mutex;
 pub use chio_metrics_spec::{
     CHIO_FEDERATION_TRANSPORT_ACCEPT_DURATION_SECONDS, CHIO_FEDERATION_TRANSPORT_ACCEPT_OPEN,
     CHIO_FEDERATION_TRANSPORT_ADMISSION_TOTAL, CHIO_FEDERATION_TRANSPORT_CATCHUP_EPOCH_GAP_TOTAL,
-    CHIO_FEDERATION_TRANSPORT_LANE_TOTAL, CHIO_FEDERATION_TRANSPORT_OUTBOX_TOTAL,
+    CHIO_FEDERATION_TRANSPORT_DIRECTORY_RELOAD_TOTAL, CHIO_FEDERATION_TRANSPORT_LANE_TOTAL,
+    CHIO_FEDERATION_TRANSPORT_OUTBOX_TOTAL, CHIO_FEDERATION_TRANSPORT_ROUTER_ALIVE,
     CHIO_FEDERATION_TRANSPORT_VERIFY_FAILURES_TOTAL,
     FEDERATION_TRANSPORT_ACCEPT_DURATION_BUCKETS_SECONDS,
 };
@@ -635,6 +636,45 @@ pub fn render_iroh_transport_metrics_prometheus() -> String {
         render_accept_duration_histogram(&mut output, lane);
     }
 
+    // directory_reload_total (RFC-0012 F34). Recorded by run_directory_reloader but,
+    // until now, only reachable via the in-process getter - never emitted here, so the
+    // fail-closed expired_failclosed / binding_revoked cases operators must alert on
+    // were invisible to Prometheus on the actual serve path. Emit the full outcome set.
+    push_meta(
+        &mut output,
+        CHIO_FEDERATION_TRANSPORT_DIRECTORY_RELOAD_TOTAL,
+        "Total iroh federation-transport directory reload outcomes.",
+        "counter",
+    );
+    for outcome in [
+        RELOAD_UPDATED,
+        RELOAD_UNCHANGED,
+        RELOAD_EXPIRED_FAILCLOSED,
+        RELOAD_BINDING_REVOKED,
+        RELOAD_ERROR,
+    ] {
+        push_labeled(
+            &mut output,
+            CHIO_FEDERATION_TRANSPORT_DIRECTORY_RELOAD_TOTAL,
+            &[("outcome", outcome)],
+            directory_reload_total(outcome),
+        );
+    }
+
+    // router_alive (gauge, RFC-0012 F33d). The router-down case (a panicked accept task
+    // killing the Router while HTTP keeps serving) operators alert on was likewise never
+    // rendered. Emit the single unlabeled gauge series.
+    push_meta(
+        &mut output,
+        CHIO_FEDERATION_TRANSPORT_ROUTER_ALIVE,
+        "Iroh federation-transport router liveness (1 alive, 0 the router died).",
+        "gauge",
+    );
+    output.push_str(CHIO_FEDERATION_TRANSPORT_ROUTER_ALIVE);
+    output.push(' ');
+    output.push_str(&router_alive().to_string());
+    output.push('\n');
+
     output
 }
 
@@ -772,5 +812,42 @@ mod tests {
         assert_eq!(router_alive(), 1);
         set_router_alive(false);
         assert_eq!(router_alive(), 0);
+    }
+
+    #[test]
+    fn render_emits_the_reload_and_liveness_series() {
+        // Instruments must not lie: the F34 directory-reload counter and the F33d
+        // router-liveness gauge are RECORDED but were never RENDERED, so the
+        // expired_failclosed / binding_revoked / router-down cases operators alert on
+        // were invisible to Prometheus on the actual serve path. The render must now emit
+        // both. RED before the render wiring: the reload/liveness names are absent from
+        // the body.
+        record_directory_reload(RELOAD_BINDING_REVOKED);
+        record_directory_reload(RELOAD_EXPIRED_FAILCLOSED);
+        set_router_alive(true);
+
+        let body = render_iroh_transport_metrics_prometheus();
+        for name in [
+            CHIO_FEDERATION_TRANSPORT_DIRECTORY_RELOAD_TOTAL,
+            CHIO_FEDERATION_TRANSPORT_ROUTER_ALIVE,
+        ] {
+            assert!(body.contains(name), "render must contain {name}");
+        }
+        // The full reload outcome set is emitted, including the fail-closed series
+        // operators alert on.
+        assert!(body.contains(
+            "chio_federation_transport_directory_reload_total{outcome=\"binding_revoked\"}"
+        ));
+        assert!(body.contains(
+            "chio_federation_transport_directory_reload_total{outcome=\"expired_failclosed\"}"
+        ));
+        // The router-liveness gauge is emitted with its own TYPE line and an unlabeled
+        // value series (value is process-global, so assert the line shape, not the value).
+        assert!(body.contains("# TYPE chio_federation_transport_router_alive gauge"));
+        assert!(
+            body.lines()
+                .any(|line| line.starts_with("chio_federation_transport_router_alive ")),
+            "render must emit the router-alive gauge value line"
+        );
     }
 }
