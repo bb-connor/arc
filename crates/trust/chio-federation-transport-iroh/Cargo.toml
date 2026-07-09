@@ -52,6 +52,14 @@ tokio = { workspace = true }
 # to exercise the self-signed origin-verification path. Production code reaches the
 # deposit through `chio_federation`'s re-exported field types and needs no direct dep.
 chio-pheromone = { workspace = true }
+# RFC-0012 F35: the verdict-recovery test wires a REAL PheromoneBatchHandler with a
+# RelayBatchReceiver double. The trait's report type
+# (chio_pheromone_runtime::PheromoneReceiveReport) is not re-exported by
+# chio-pheromone-relay, so the test names it directly; async-trait implements the
+# `#[async_trait]` receiver double. Both are test-only (production reaches the report
+# only through `Arc<dyn RelayBatchReceiver>`, by inference).
+chio-pheromone-runtime = { workspace = true }
+async-trait = { workspace = true }
 
 [lints]
 workspace = true
