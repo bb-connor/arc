@@ -815,6 +815,10 @@ where
             .ok_or_else(|| HotReloadError::EpochCounterExhausted {
                 guard_id: guard_id.to_string(),
             })?;
+        // reload_with_canary replaces the module directly (not via
+        // record_reload_seq), so it must count the applied outcome itself or a
+        // canary-verified reload never increments chio_guard_reload_total.
+        chio_metrics_spec::runtime::families::GUARD_RELOAD.incr(&[guard_id, RELOAD_APPLIED]);
         let span = guard_reload_span(RELOAD_APPLIED, guard.current_reload_seq());
         let _span_guard = span.enter();
         Ok(epoch_id)

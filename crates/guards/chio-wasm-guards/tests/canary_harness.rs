@@ -176,3 +176,40 @@ fn canary_failure_increments_reload_total_canary_failed() -> TestResult {
     );
     Ok(())
 }
+
+/// Codex round-4 finding 6 residual: a canary-verified (successful) reload must
+/// also increment `chio_guard_reload_total{outcome="applied"}`. reload_with_canary
+/// replaces the module directly rather than via record_reload_seq, so before the
+/// fix a canary-success emitted an applied span but never the applied counter,
+/// leaving the alerting surface blind to successful canary reloads. A unique guard
+/// id isolates this process-global counter series from the other tests here.
+#[test]
+fn canary_success_increments_reload_total_applied() -> TestResult {
+    use chio_metrics_spec::runtime::families;
+
+    let guard_id = "reload-canary-applied-guard-f6";
+    let corpus = CanaryCorpus::from_dir(guard_id, canary_dir())?;
+    let engine = Engine::new(build_backend);
+    engine.register_guard(
+        guard_id,
+        WasmGuard::new(
+            guard_id.to_string(),
+            build_backend(b"baseline")?,
+            false,
+            Some("initial".to_string()),
+        ),
+    )?;
+
+    let epoch = engine.reload_with_canary(guard_id, b"canary-pass", &corpus)?;
+    assert_eq!(epoch, EpochId::new(1));
+
+    let mut body = String::new();
+    families::GUARD_RELOAD.render(&mut body);
+    assert!(
+        body.contains(&format!(
+            "chio_guard_reload_total{{guard_id=\"{guard_id}\",outcome=\"applied\"}} 1"
+        )),
+        "a canary-verified reload must increment the applied outcome: {body}"
+    );
+    Ok(())
+}
