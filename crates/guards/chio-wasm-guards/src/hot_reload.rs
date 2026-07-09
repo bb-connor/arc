@@ -372,6 +372,13 @@ impl ReloadWatchdog {
             .incident_writer
             .write_reload_incident(&incident)
             .map_err(|source| HotReloadError::IncidentWrite { source })?;
+        // Count the rolled-back outcome so `chio_guard_reload_total{outcome=
+        // "rolled_back"}` is a real production series the alerting surface can
+        // catch, not just a span. The descriptor already declares the outcome;
+        // only the applied path was wired before (Codex round-4 finding 6,
+        // completing the round-3 F1 fix).
+        chio_metrics_spec::runtime::families::GUARD_RELOAD
+            .incr(&[&self.guard_id, RELOAD_ROLLED_BACK]);
         let span = guard_reload_span(RELOAD_ROLLED_BACK, self.reload_seq);
         let _span_guard = span.enter();
         warn!(
@@ -750,6 +757,8 @@ where
                 Ok(verdict) => serialize_canary_verdict(&verdict)?,
                 Err(source) => {
                     let actual = format!("error:{source}");
+                    chio_metrics_spec::runtime::families::GUARD_RELOAD
+                        .incr(&[guard_id, RELOAD_CANARY_FAILED]);
                     let span = guard_reload_span(RELOAD_CANARY_FAILED, guard.current_reload_seq());
                     let _span_guard = span.enter();
                     warn!(
@@ -771,6 +780,8 @@ where
             };
             if actual != fixture.expected_verdict_bytes() {
                 let actual = String::from_utf8_lossy(&actual).into_owned();
+                chio_metrics_spec::runtime::families::GUARD_RELOAD
+                    .incr(&[guard_id, RELOAD_CANARY_FAILED]);
                 let span = guard_reload_span(RELOAD_CANARY_FAILED, guard.current_reload_seq());
                 let _span_guard = span.enter();
                 warn!(

@@ -81,3 +81,55 @@ fn watchdog_rolls_back_after_five_errors_in_sixty_seconds() -> TestResult {
     assert!(!traces.contains("secret"));
     Ok(())
 }
+
+/// Codex round-4 finding 6 (completes round-3 F1): a watchdog rollback must
+/// increment `chio_guard_reload_total{outcome="rolled_back"}`, not merely emit a
+/// span. Before the fix only the applied path incremented, so a rolled-back
+/// reload was invisible to the alerting surface. A unique guard id isolates this
+/// process-global counter series from the other tests in this binary.
+#[test]
+fn rollback_increments_reload_total_rolled_back() -> TestResult {
+    use chio_metrics_spec::runtime::families;
+
+    let guard_id = "reload-rolled-back-guard-f6";
+    let temp = tempfile::tempdir()?;
+    let engine = Engine::new(build_backend).without_blocklist();
+    engine.register_guard(
+        guard_id,
+        WasmGuard::new(
+            guard_id.to_string(),
+            build_backend(b"good")?,
+            false,
+            Some("initial".to_string()),
+        ),
+    )?;
+    let writer = IncidentWriter::from_state_home(temp.path());
+    let config = WatchdogConfig {
+        max_errors: 5,
+        window: Duration::from_secs(60),
+        incident_writer: writer,
+    };
+
+    let mut watchdog = engine.reload_with_watchdog(guard_id, b"bad", 7, config)?;
+    for i in 0..5 {
+        watchdog.record_error(EvalTrace::new(
+            format!("req-{i}"),
+            "trap",
+            "redacted backend trap",
+        ))?;
+    }
+    assert!(
+        watchdog.rolled_back(),
+        "five errors must trigger a rollback"
+    );
+
+    let mut body = String::new();
+    families::GUARD_RELOAD.render(&mut body);
+    assert!(
+        body.contains(&format!(
+            "chio_guard_reload_total{{guard_id=\"{guard_id}\",outcome=\"rolled_back\"}} 1"
+        )),
+        "a rolled-back reload must increment the rolled_back outcome: {body}"
+    );
+    Ok(())
+}

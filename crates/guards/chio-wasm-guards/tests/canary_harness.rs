@@ -137,3 +137,42 @@ fn canary_mismatch_aborts_swap() -> TestResult {
     assert_eq!(guard.current_epoch_id(), EpochId::INITIAL);
     Ok(())
 }
+
+/// Codex round-4 finding 6 (completes round-3 F1): a canary-failed reload must
+/// increment `chio_guard_reload_total{outcome="canary_failed"}`, not merely emit
+/// a span. Before the fix the counter was incremented only on the applied path,
+/// so the alerting surface never saw a failed reload. A unique guard id isolates
+/// this process-global counter series from the other tests in this binary.
+#[test]
+fn canary_failure_increments_reload_total_canary_failed() -> TestResult {
+    use chio_metrics_spec::runtime::families;
+
+    let guard_id = "reload-canary-failed-guard-f6";
+    let corpus = CanaryCorpus::from_dir(guard_id, canary_dir())?;
+    let engine = Engine::new(build_backend);
+    engine.register_guard(
+        guard_id,
+        WasmGuard::new(
+            guard_id.to_string(),
+            build_backend(b"baseline")?,
+            false,
+            Some("initial".to_string()),
+        ),
+    )?;
+
+    let outcome = engine.reload_with_canary(guard_id, b"canary-drift", &corpus);
+    assert!(
+        matches!(outcome, Err(HotReloadError::CanaryFailed { .. })),
+        "canary drift must abort the swap: {outcome:?}"
+    );
+
+    let mut body = String::new();
+    families::GUARD_RELOAD.render(&mut body);
+    assert!(
+        body.contains(&format!(
+            "chio_guard_reload_total{{guard_id=\"{guard_id}\",outcome=\"canary_failed\"}} 1"
+        )),
+        "a canary-failed reload must increment the canary_failed outcome: {body}"
+    );
+    Ok(())
+}
