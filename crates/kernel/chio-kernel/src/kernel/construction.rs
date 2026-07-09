@@ -724,6 +724,30 @@ impl ChioKernel {
         self.federation_cosigner = Some(cosigner);
     }
 
+    /// Install a durable [`crate::federation_artifact_store::FederationArtifactStore`]
+    /// for bilateral co-sign artifacts (RFC-0004 F10).
+    ///
+    /// When set, [`Self::apply_federation_cosign`] writes each
+    /// `DualSignedReceipt` / `DsseEnvelope` through to the store BEFORE inserting
+    /// it into the bounded in-memory caches, and [`Self::dual_signed_receipt`] /
+    /// [`Self::federation_dsse_envelope`] fall back to the store on a cache miss.
+    /// This closes the evidence-loss window where a federated deployment
+    /// producing more than `federation_cache_capacity` receipts would drop
+    /// evicted co-sign artifacts while the durable receipt store keeps only the
+    /// base receipt. Without a store installed, evicted co-sign artifacts are
+    /// lossy by policy (the bounded caches drop-oldest at capacity).
+    ///
+    /// A deployment requiring durable bilateral evidence installs a
+    /// database-backed impl; the bundled
+    /// [`crate::federation_artifact_store::InMemoryFederationArtifactStore`] is a
+    /// capped, idle-swept reference impl and test double.
+    pub fn set_federation_artifact_store(
+        &mut self,
+        store: Arc<dyn crate::federation_artifact_store::FederationArtifactStore>,
+    ) {
+        self.federation_artifact_store = Some(store);
+    }
+
     /// Advertise this kernel's stable identifier as seen by
     /// remote federation peers. When unset, the hex encoding of the
     /// signing public key is used. Setting this is recommended in
@@ -959,6 +983,10 @@ impl ChioKernel {
             )
             .map_err(|e| KernelError::Internal(format!("bilateral DSSE co-sign failed: {e}")))?;
 
+        // Write through to the durable artifact store (if one is installed via
+        // set_federation_artifact_store) BEFORE the bounded caches so an evicted
+        // entry is still resolvable by dual_signed_receipt / federation_dsse_envelope.
+        let artifact_store_installed = self.federation_artifact_store.is_some();
         if let Some(store) = self.federation_artifact_store.as_ref() {
             store.put_dual_signed(&receipt.id, &dual)?;
             store.put_dsse(&receipt.id, &dsse_envelope)?;
@@ -969,16 +997,31 @@ impl ChioKernel {
                 Ok(g) => g,
                 Err(poisoned) => poisoned.into_inner(),
             };
-            // Evicted entry (if any) is durable via the store above, or lossy by
-            // policy when no store is configured; dropping it is safe.
-            let _ = cache.insert(receipt.id.clone(), dual, now);
+            // Evicted entry (if any) is durable via the store above. With no
+            // store installed the drop is lossy by policy (bounded drop-oldest);
+            // log it so the evidence loss is explicit for operators (RFC-0004 F10).
+            if cache.insert(receipt.id.clone(), dual, now).is_some() && !artifact_store_installed {
+                debug!(
+                    request_id = %request.request_id,
+                    "dropping an evicted dual-signed co-sign artifact: bounded federation cache is full and no FederationArtifactStore is installed (RFC-0004 F10)"
+                );
+            }
         }
         {
             let mut cache = match self.federation_dsse_envelopes.lock() {
                 Ok(g) => g,
                 Err(poisoned) => poisoned.into_inner(),
             };
-            let _ = cache.insert(receipt.id.clone(), dsse_envelope, now);
+            if cache
+                .insert(receipt.id.clone(), dsse_envelope, now)
+                .is_some()
+                && !artifact_store_installed
+            {
+                debug!(
+                    request_id = %request.request_id,
+                    "dropping an evicted co-sign DSSE envelope: bounded federation cache is full and no FederationArtifactStore is installed (RFC-0004 F10)"
+                );
+            }
         }
         Ok(())
     }
