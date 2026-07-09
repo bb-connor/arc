@@ -151,7 +151,8 @@ pub(crate) struct ProxyState {
     pub(crate) trusted_receipt_signers: Vec<PublicKey>,
     pub(crate) sidecar_control_token: Option<String>,
     pub(crate) budget_store: Option<Arc<dyn chio_kernel::budget_store::BudgetStore>>,
-    pub(crate) mediation_kernel: Option<Arc<chio_kernel::ChioKernel>>,
+    pub(crate) mediation_nonce_store:
+        Option<Arc<dyn chio_kernel::execution_nonce::ExecutionNonceStore>>,
     pub(crate) allow_advisory: bool,
 }
 
@@ -317,17 +318,13 @@ impl ProtectProxy {
             }
         }
 
-        let mediation_kernel = match budget_store.as_ref() {
-            Some(store) => Some(build_mediation_kernel(
-                &keypair,
-                Arc::clone(store),
-                self.config.require_nonce,
-                vec![Box::new(mediated::MediatedProxyToolServer::new(
-                    self.config.upstream.clone(),
-                ))],
-            )?),
-            None => None,
-        };
+        // The mediated route builds a fresh kernel per request (registering the
+        // pass-through under the caller's requested server id), so state only
+        // holds the shared execution-nonce replay store. It is present exactly
+        // when a budget store is configured.
+        let mediation_nonce_store = budget_store
+            .as_ref()
+            .map(|_| mediated::build_mediation_nonce_store());
         let state = Arc::new(ProxyState {
             evaluator,
             signer_keypair: keypair,
@@ -343,7 +340,7 @@ impl ProtectProxy {
             trusted_receipt_signers,
             sidecar_control_token: self.config.sidecar_control_token.clone(),
             budget_store,
-            mediation_kernel,
+            mediation_nonce_store,
             allow_advisory: self.config.allow_advisory,
         });
 
@@ -361,7 +358,7 @@ impl ProtectProxy {
 
         info!(
             has_budget_store = state.budget_store.is_some(),
-            has_mediation_kernel = state.mediation_kernel.is_some(),
+            has_mediation_nonce_store = state.mediation_nonce_store.is_some(),
             "chio api protect: mediation layer ready"
         );
         info!(

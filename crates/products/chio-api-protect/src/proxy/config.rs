@@ -24,7 +24,10 @@ pub struct ProtectConfig {
     pub control_token: Option<String>,
     /// Local SQLite budget-store path used when no `control_url` is configured.
     pub budget_db: Option<String>,
-    /// When true, the mediation kernel runs execution-nonce strict mode.
+    /// Retained for API compatibility. The kernel-mediated `/v1/evaluate`
+    /// route is a pre-execution authorization gate and always runs the
+    /// mediation kernel in execution-nonce strict mode, so this flag no
+    /// longer changes mediation behavior.
     pub require_nonce: bool,
     /// When true, the `/v1/evaluate/advisory` route is active.
     /// Defaults to false; production deployments should leave this off to
