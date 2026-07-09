@@ -363,7 +363,30 @@ impl ExporterManager {
         }
 
         if events.is_empty() {
-            // Only malformed rows -- still advance cursor.
+            // Only malformed rows in this batch. Every row was durably captured
+            // in siem_dead_letters (persist_dead_letter above), so no registered
+            // exporter can ever consume them. Advance each registered exporter's
+            // durable high-water mark past the malformed range so a restart
+            // resumes AFTER them instead of re-reading and re-DLQ'ing the same
+            // seqs every boot (Codex round-4 finding 1): without this the
+            // events.is_empty() branch advanced only the in-memory cursor, and
+            // ExporterManager::new resumed from the behind siem_export_cursor.
+            // max() never regresses a peer already further ahead. In legacy None
+            // mode there is no durable cursor; the in-memory advance below
+            // suffices (restart replays from seq 0, dedup'd downstream).
+            if let Some(store) = &self.cursor_store {
+                let exporter_keys: Vec<String> = self
+                    .exporters
+                    .iter()
+                    .enumerate()
+                    .map(|(index, e)| exporter_cursor_key(index, e.name()))
+                    .collect();
+                for key in exporter_keys {
+                    let advanced = self.acked.get(&key).copied().unwrap_or(0).max(max_seq);
+                    self.acked.insert(key.clone(), advanced);
+                    store.set_acked(&key, advanced)?;
+                }
+            }
             self.cursor = max_seq;
             return Ok(());
         }
@@ -776,6 +799,80 @@ mod tests {
             manager.cursor, 0,
             "the cursor must stay behind an un-persisted malformed row (at-least-once)"
         );
+        Ok(())
+    }
+
+    /// Codex round-4 finding 1: a malformed-ONLY batch is durably captured in
+    /// siem_dead_letters, but the events.is_empty() branch advanced only the
+    /// in-memory cursor and never wrote siem_export_cursor. After a restart,
+    /// ExporterManager::new resumed from the (behind) durable cursor and re-read
+    /// and re-DLQ'd the same dead-lettered seq every boot. The durable
+    /// per-exporter mark must advance past a malformed-only batch so a restart
+    /// resumes AFTER it.
+    #[tokio::test]
+    async fn malformed_only_batch_advances_durable_cursor_across_restart() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let receipt_db = dir.path().join("receipts.sqlite3");
+        seed_malformed_receipt_db(&receipt_db)?; // single malformed row at seq 1
+        let cursor_db = dir.path().join("cursor.sqlite3");
+
+        {
+            let mut manager = ExporterManager::new(SiemConfig {
+                db_path: receipt_db.clone(),
+                cursor_db_path: Some(cursor_db.clone()),
+                ..SiemConfig::default()
+            })?;
+            manager.add_exporter(Box::new(OkExporter {
+                name: "splunk".to_string(),
+            }));
+            manager.poll_once().await?;
+            assert_eq!(
+                manager.cursor, 1,
+                "the in-memory cursor advances past the malformed row"
+            );
+        }
+
+        // The durable per-exporter mark must have advanced past the malformed row.
+        {
+            let store = crate::cursor_store::SiemCursorStore::open(&cursor_db)?;
+            assert_eq!(
+                store.acked_seqs()?.values().copied().min(),
+                Some(1),
+                "the durable high-water mark must advance past a malformed-only batch"
+            );
+        }
+
+        // Simulated restart: a fresh manager over the same DBs must resume AFTER
+        // the dead-lettered seq and not re-read it.
+        {
+            let mut manager = ExporterManager::new(SiemConfig {
+                db_path: receipt_db.clone(),
+                cursor_db_path: Some(cursor_db.clone()),
+                ..SiemConfig::default()
+            })?;
+            manager.add_exporter(Box::new(OkExporter {
+                name: "splunk".to_string(),
+            }));
+            assert_eq!(
+                manager.cursor, 1,
+                "restart resumes at the durable mark, past the malformed row"
+            );
+            manager.poll_once().await?;
+            assert_eq!(
+                manager.cursor, 1,
+                "restart poll reads nothing new; the malformed seq is not re-read"
+            );
+        }
+
+        // The malformed row is captured exactly once, not duplicated on restart.
+        {
+            let store = crate::cursor_store::SiemCursorStore::open(&cursor_db)?;
+            assert_eq!(
+                store.dead_letter_seqs()?,
+                vec![1u64],
+                "the malformed row is durably captured exactly once"
+            );
+        }
         Ok(())
     }
 
