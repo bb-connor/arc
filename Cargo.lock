@@ -3610,6 +3610,7 @@ name = "chio-http-session"
 version = "0.1.0"
 dependencies = [
  "chio-bounded",
+ "chio-kernel",
  "hex",
  "serde",
  "serde_json",
@@ -3646,6 +3647,7 @@ dependencies = [
  "dashmap 6.1.0",
  "dhat",
  "futures",
+ "libc",
  "loom",
  "lru 0.16.3",
  "opentelemetry-semantic-conventions",

@@ -155,9 +155,14 @@ pub struct SessionJournalSnapshot {
 // ---------------------------------------------------------------------------
 
 /// Default entry-ring capacity when a journal is created without an explicit
-/// budget. The `entries` and `tool_sequence` rings are bounded (RFC-0004 F21);
-/// `data_flow` and `tool_counts` remain cumulative.
-const DEFAULT_JOURNAL_ENTRY_CAP: usize = 4096;
+/// budget, single-sourced from the process memory budget
+/// ([`chio_kernel::MemoryBudgetConfig`]'s `journal_entry_cap`) rather than a
+/// duplicated literal, so lowering the budget lowers this cap. The `entries` and
+/// `tool_sequence` rings are bounded (RFC-0004 F21); `data_flow` and
+/// `tool_counts` remain cumulative.
+fn default_journal_entry_cap() -> usize {
+    chio_kernel::MemoryBudgetConfig::defaults().journal_entry_cap
+}
 
 /// Fold an evicted entry's hash into the running head hash so the dropped prefix
 /// stays committed after eviction (RFC-0004 F21).
@@ -272,7 +277,7 @@ impl SessionJournal {
 
     /// Create a new empty journal for the given session (default entry cap).
     pub fn new(session_id: String) -> Self {
-        Self::with_entry_cap(session_id, DEFAULT_JOURNAL_ENTRY_CAP)
+        Self::with_entry_cap(session_id, default_journal_entry_cap())
     }
 
     /// Create a new empty journal with an explicit entry-ring capacity. The
