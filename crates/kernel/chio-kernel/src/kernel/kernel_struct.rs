@@ -133,6 +133,11 @@ pub(crate) fn receipt_crypto_floor(
 
 pub const DEFAULT_MAX_STREAM_DURATION_SECS: u64 = 300;
 pub const DEFAULT_MAX_STREAM_TOTAL_BYTES: u64 = 256 * 1024 * 1024;
+/// Default cap on the number of chunks RETAINED from one streamed tool result
+/// (RFC-0004 F06). Bounds the accumulator `Vec<ToolCallChunk>` length and the
+/// per-chunk receipt-signing preimage even when every chunk is tiny and the byte
+/// cap is never reached. Generous for legitimate streams; `0` disables the cap.
+pub const DEFAULT_MAX_STREAM_CHUNKS: u64 = 1_048_576;
 pub const DEFAULT_CHECKPOINT_BATCH_SIZE: u64 = 100;
 pub const DEFAULT_RETENTION_DAYS: u64 = 90;
 pub const DEFAULT_MAX_SIZE_BYTES: u64 = 10_737_418_240;
@@ -149,6 +154,11 @@ pub struct MemoryBudgetConfig {
     pub velocity_bucket_cap: usize,
     pub admission_key_cap: usize,
     pub journal_entry_cap: usize,
+    /// Max number of chunks retained from one streamed tool result (RFC-0004 F06).
+    /// Bounds the retained `Vec<ToolCallChunk>` and the per-chunk signing preimage
+    /// so a flood of tiny chunks that never trips `max_stream_total_bytes` still
+    /// cannot grow memory without bound. `0` disables the cap.
+    pub max_stream_chunks: u64,
     /// Max number of DISTINCT tool names retained in each session journal's
     /// cumulative `tool_counts` map (RFC-0004 F21). Unlike the `entries` and
     /// `tool_sequence` rings, `tool_counts` is cumulative (it survives ring
@@ -175,6 +185,7 @@ impl MemoryBudgetConfig {
             velocity_bucket_cap: 65_536,
             admission_key_cap: 4096,
             journal_entry_cap: 4096,
+            max_stream_chunks: DEFAULT_MAX_STREAM_CHUNKS,
             journal_tool_counts_cap: 4096,
             rss_soft_limit_bytes: None,
             rss_sample_interval_secs: 30,

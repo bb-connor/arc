@@ -35,6 +35,7 @@ pub enum OverloadResource {
     ConcurrencyBuckets,
     SessionJournal,
     StreamBytes,
+    StreamChunks,
     Allocation,
 }
 

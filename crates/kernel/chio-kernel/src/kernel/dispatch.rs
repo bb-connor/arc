@@ -528,11 +528,13 @@ impl ChioKernel {
         //   - Accumulation is bounded by the ACCUMULATOR. In-tree connectors cap
         //     it (A2A: `parse_sse_stream_with_limit`, MAX_SSE_TOTAL_BYTES = 1 MiB).
         //     `enforce_stream_byte_limit` / `push_chunk_bounded` (crate::runtime)
-        //     are pub fail-closed Overloaded { StreamBytes } primitives so
+        //     are pub fail-closed Overloaded { StreamBytes / StreamChunks }
+        //     primitives (bounding total bytes AND retained chunk count) so
         //     out-of-tree connector authors can bound their own invoke_stream.
         //   - Retained memory is bounded at finalize by `apply_stream_limits` /
-        //     `truncate_stream_to_byte_limit`: the stream is truncated to
-        //     `max_stream_total_bytes` and the receipt is marked incomplete,
+        //     `truncate_stream_to_limits`: the stream is truncated to
+        //     `max_stream_total_bytes` / `max_stream_chunks` and the receipt is
+        //     marked incomplete,
         //     PRESERVING the charge-for-work-done and financial metadata on
         //     governed monetary streams (pinned by
         //     `governed_monetary_incomplete_receipt_keeps_financial_and_governed_metadata`

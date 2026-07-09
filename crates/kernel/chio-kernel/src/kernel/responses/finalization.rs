@@ -213,21 +213,26 @@ impl ChioKernel {
             ToolServerStreamResult::Incomplete { stream, reason } => (stream, Some(reason)),
         };
 
-        let (stream, total_bytes, truncated) =
-            truncate_stream_to_byte_limit(&stream, self.config.max_stream_total_bytes)?;
+        let (stream, total_bytes, truncation_cause) = truncate_stream_to_limits(
+            &stream,
+            self.config.max_stream_total_bytes,
+            self.config.memory_budget.max_stream_chunks,
+        )?;
 
-        let limit_reason = if truncated {
-            Some(format!(
+        let limit_reason = match truncation_cause {
+            Some(StreamTruncationCause::ByteLimit) => Some(format!(
                 "CHIO_SERVER_STREAM_LIMIT: stream exceeded max total bytes of {}",
                 self.config.max_stream_total_bytes
-            ))
-        } else if duration_exceeded {
-            Some(format!(
+            )),
+            Some(StreamTruncationCause::ChunkLimit) => Some(format!(
+                "CHIO_SERVER_STREAM_LIMIT: stream exceeded max chunk count of {}",
+                self.config.memory_budget.max_stream_chunks
+            )),
+            None if duration_exceeded => Some(format!(
                 "CHIO_SERVER_STREAM_LIMIT: stream exceeded max duration of {}s",
                 self.config.max_stream_duration_secs
-            ))
-        } else {
-            None
+            )),
+            None => None,
         };
 
         if let Some(reason) = limit_reason {

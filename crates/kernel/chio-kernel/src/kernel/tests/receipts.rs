@@ -781,6 +781,52 @@ fn apply_stream_limits_marks_duration_exceeded_stream_incomplete() {
 }
 
 #[test]
+fn apply_stream_limits_marks_chunk_count_exceeded_stream_incomplete() {
+    // codex finding 3554566278 (RFC-0004 F06): the retained-chunk count is bounded
+    // as well as the total bytes. With a huge byte cap but `max_stream_chunks = 1`,
+    // a 3-tiny-chunk stream (well under the byte cap) is TRUNCATED to one chunk and
+    // the receipt is marked incomplete with a chunk-count reason.
+    let mut config = make_config();
+    config.max_stream_total_bytes = 10_000_000; // never reached by tiny chunks
+    config.memory_budget.max_stream_chunks = 1;
+    let kernel = make_kernel(config);
+    let output = ToolServerOutput::Stream(ToolServerStreamResult::Complete(ToolCallStream {
+        chunks: vec![
+            ToolCallChunk {
+                data: serde_json::json!({"delta": "a"}),
+            },
+            ToolCallChunk {
+                data: serde_json::json!({"delta": "b"}),
+            },
+            ToolCallChunk {
+                data: serde_json::json!({"delta": "c"}),
+            },
+        ],
+    }));
+
+    let limited = kernel
+        .apply_stream_limits(output, std::time::Duration::from_secs(0))
+        .unwrap();
+
+    let (stream, reason) = match limited {
+        ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, reason }) => {
+            Some((stream, reason))
+        }
+        _ => None,
+    }
+    .expect("expected chunk-limited incomplete stream");
+    assert_eq!(
+        stream.chunk_count(),
+        1,
+        "stream must be truncated to the chunk cap"
+    );
+    assert!(
+        reason.contains("max chunk count of 1"),
+        "unexpected reason: {reason}"
+    );
+}
+
+#[test]
 fn checkpoint_triggers_at_100_receipts() {
     let path = unique_receipt_db_path("chio-checkpoint-trigger");
     let mut config = make_monetary_config();

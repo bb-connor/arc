@@ -61,15 +61,37 @@ fn stream_receipt_content(
     })
 }
 
-pub(crate) fn truncate_stream_to_byte_limit(
+/// Why a stream was truncated at finalize time (RFC-0004 F06). Reported so the
+/// caller can mark the receipt incomplete with a limit-accurate reason.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StreamTruncationCause {
+    /// Retaining the next chunk would exceed `max_stream_total_bytes`.
+    ByteLimit,
+    /// The retained-chunk count reached `max_stream_chunks`.
+    ChunkLimit,
+}
+
+/// Truncate a materialized stream to the configured retention limits, returning
+/// the retained prefix, its canonical byte total, and the truncation cause (if
+/// any). Bounds BOTH the total bytes (`max_stream_total_bytes`) and the retained
+/// chunk COUNT (`max_stream_chunks`); the chunk-count bound stops a flood of tiny
+/// chunks from growing the retained `Vec`/per-chunk signing preimage even when the
+/// byte cap is never reached (RFC-0004 F06). Both caps use `0 = unlimited`.
+pub(crate) fn truncate_stream_to_limits(
     stream: &ToolCallStream,
     max_stream_total_bytes: u64,
-) -> Result<(ToolCallStream, u64, bool), KernelError> {
+    max_stream_chunks: u64,
+) -> Result<(ToolCallStream, u64, Option<StreamTruncationCause>), KernelError> {
     let mut accepted = Vec::new();
     let mut total_bytes = 0u64;
-    let mut truncated = false;
+    let mut cause = None;
 
     for chunk in &stream.chunks {
+        // Chunk-count bound first: retaining another chunk would exceed the cap.
+        if max_stream_chunks > 0 && accepted.len() as u64 >= max_stream_chunks {
+            cause = Some(StreamTruncationCause::ChunkLimit);
+            break;
+        }
         let bytes = canonical_json_bytes(&chunk.data).map_err(|e| {
             KernelError::ReceiptSigningFailed(format!("failed to size stream chunk: {e}"))
         })?;
@@ -77,12 +99,12 @@ pub(crate) fn truncate_stream_to_byte_limit(
         if max_stream_total_bytes > 0
             && total_bytes.saturating_add(chunk_bytes) > max_stream_total_bytes
         {
-            truncated = true;
+            cause = Some(StreamTruncationCause::ByteLimit);
             break;
         }
         total_bytes += chunk_bytes;
         accepted.push(chunk.clone());
     }
 
-    Ok((ToolCallStream { chunks: accepted }, total_bytes, truncated))
+    Ok((ToolCallStream { chunks: accepted }, total_bytes, cause))
 }
