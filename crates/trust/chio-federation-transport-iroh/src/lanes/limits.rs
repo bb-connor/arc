@@ -100,6 +100,22 @@ pub const DEFAULT_SHED_WAIT: Duration = Duration::from_millis(250);
 /// builder in the wiring does.
 pub const RECOMMENDED_MAX_IDLE_TIMEOUT: Duration = Duration::from_secs(90);
 
+/// Recommended `max_concurrent_bidi_streams` for the WIRING to consume. Every
+/// direct lane uses exactly ONE bidi stream per connection, so a value of 1 is
+/// exact; the iroh (noq) default of 100 is 100x too generous and lets a peer
+/// buffer streams the handler never accepts. Any future multi-stream lane must
+/// raise this.
+pub const RECOMMENDED_MAX_BIDI_STREAMS: u32 = 1;
+
+/// Recommended per-connection QUIC `receive_window` (bytes) for the WIRING to
+/// consume, derived from the effective batch cap with two batches of headroom.
+/// Bounds per-connection buffering to roughly one in-flight batch instead of
+/// the noq default `VarInt::MAX`. Saturating: never overflows.
+#[must_use]
+pub fn recommended_receive_window_bytes(max_batch_bytes: usize) -> u64 {
+    (max_batch_bytes as u64).saturating_mul(2)
+}
+
 /// Which peer-dependent await is being bounded, selecting its timeout and naming
 /// it in diagnostics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -337,6 +353,14 @@ mod tests {
         assert!(config.linger_timeout > config.read_timeout);
         // The recommended idle backstop sits above the linger grace.
         assert!(RECOMMENDED_MAX_IDLE_TIMEOUT > config.linger_timeout);
+    }
+
+    #[test]
+    fn recommended_receive_window_has_headroom_over_batch_cap() {
+        assert_eq!(RECOMMENDED_MAX_BIDI_STREAMS, 1);
+        // Two batches of headroom, saturating (never panics on overflow).
+        assert_eq!(recommended_receive_window_bytes(256 * 1024), 512 * 1024);
+        assert_eq!(recommended_receive_window_bytes(usize::MAX), u64::MAX);
     }
 
     #[test]

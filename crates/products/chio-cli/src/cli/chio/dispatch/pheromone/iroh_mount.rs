@@ -63,6 +63,7 @@ use chio_pheromone_relay::SqlitePheromoneRelayStore;
 use iroh::endpoint::presets;
 use iroh::endpoint::IdleTimeout;
 use iroh::endpoint::QuicTransportConfig;
+use iroh::endpoint::VarInt;
 use iroh::protocol::Router;
 use iroh::Endpoint;
 use iroh::EndpointId;
@@ -514,8 +515,21 @@ pub(crate) async fn build_iroh_router(
     let idle_timeout: IdleTimeout = config.max_idle_timeout.try_into().map_err(|error| {
         CliError::cli_other_error(format!("Chio iroh transport idle timeout: {error}"))
     })?;
+    // Each direct lane uses exactly one bidi stream per connection; bound the
+    // per-connection window to the batch cap with headroom (RFC-0012 F33c).
+    let bidi_streams = VarInt::from(
+        chio_federation_transport_iroh::lanes::limits::RECOMMENDED_MAX_BIDI_STREAMS,
+    );
+    let receive_window = VarInt::from_u64(
+        chio_federation_transport_iroh::lanes::limits::recommended_receive_window_bytes(
+            max_batch_bytes,
+        ),
+    )
+    .unwrap_or(VarInt::MAX);
     let transport_config = QuicTransportConfig::builder()
         .max_idle_timeout(Some(idle_timeout))
+        .max_concurrent_bidi_streams(bidi_streams)
+        .receive_window(receive_window)
         .build();
 
     let endpoint = Endpoint::builder(presets::Minimal)
@@ -644,8 +658,22 @@ pub(crate) async fn build_iroh_outbound_endpoint(
     let idle_timeout: IdleTimeout = config.max_idle_timeout.try_into().map_err(|error| {
         CliError::cli_other_error(format!("Chio iroh transport idle timeout: {error}"))
     })?;
+    // drain endpoint: one bidi stream, batch-cap-bounded window (RFC-0012 F33c).
+    // `max_batch_bytes` is not in scope on this outbound-only path, so derive the
+    // window from the transport hard cap.
+    let bidi_streams = VarInt::from(
+        chio_federation_transport_iroh::lanes::limits::RECOMMENDED_MAX_BIDI_STREAMS,
+    );
+    let receive_window = VarInt::from_u64(
+        chio_federation_transport_iroh::lanes::limits::recommended_receive_window_bytes(
+            chio_federation_transport_iroh::lanes::pheromone::MAX_PHEROMONE_BATCH_BYTES,
+        ),
+    )
+    .unwrap_or(VarInt::MAX);
     let transport_config = QuicTransportConfig::builder()
         .max_idle_timeout(Some(idle_timeout))
+        .max_concurrent_bidi_streams(bidi_streams)
+        .receive_window(receive_window)
         .build();
     // An outbound-only TICK endpoint must NOT reuse the stable serving
     // `--iroh-bind-addr`. When a durable relay-serve process is already listening on
