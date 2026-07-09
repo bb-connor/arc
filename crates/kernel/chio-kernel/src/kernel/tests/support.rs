@@ -1749,6 +1749,43 @@ impl ReceiptStore for AppendOnlyReceiptStore {
     }
 }
 
+/// A store that appends fine (so the local mirror is populated) but fails every
+/// point load with a read-boundary error, exercising the fail-closed
+/// error-propagation path (RFC-0004 F1 round-2).
+#[derive(Default)]
+struct ErroringReceiptStore;
+
+impl ReceiptStore for ErroringReceiptStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn load_chio_receipt(
+        &self,
+        _receipt_id: &str,
+    ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
+        Err(ReceiptStoreError::ReadBoundary(
+            "simulated receipt store read failure".to_string(),
+        ))
+    }
+
+    fn load_child_receipt(
+        &self,
+        _receipt_id: &str,
+    ) -> Result<Option<ChildRequestReceipt>, ReceiptStoreError> {
+        Err(ReceiptStoreError::ReadBoundary(
+            "simulated child receipt store read failure".to_string(),
+        ))
+    }
+}
+
 #[derive(Default)]
 struct FailingCheckpointHydrationReceiptStore;
 

@@ -93,12 +93,43 @@ fn store_miss_falls_back_to_local_mirror() {
     // The receipt is in the local mirror; AppendOnlyReceiptStore's load_* miss.
     let receipt_id = kernel.receipt_log().receipts()[0].id.clone();
     assert!(
-        kernel.has_local_receipt_id(&receipt_id),
+        kernel.has_local_receipt_id(&receipt_id).unwrap(),
         "store miss must fall back to the local mirror"
     );
     assert!(
-        kernel.local_receipt_artifact(&receipt_id).is_some(),
+        kernel.local_receipt_artifact(&receipt_id).unwrap().is_some(),
         "store miss must return the mirrored artifact"
+    );
+}
+
+#[test]
+fn store_read_error_propagates_and_is_not_mirror_served() {
+    // RFC-0004 F1 (round-2): a durable store READ error must fail closed. A
+    // receipt present in the local mirror must NOT mask a store read failure;
+    // only a genuine miss (`Ok(None)`) may fall back to the mirror. Here the
+    // store appends fine (so the mirror holds the receipt) but errors on every
+    // point load, so both lookups must PROPAGATE the error, not serve the
+    // mirror copy.
+    let mut kernel = make_kernel(make_config());
+    kernel.set_receipt_store(Box::new(ErroringReceiptStore)).unwrap();
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
+
+    let agent_kp = make_keypair();
+    let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+    let request = make_request("req-store-read-error", &cap, "read_file", "srv-a");
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    assert_eq!(response.verdict, Verdict::Allow);
+
+    let receipt_id = kernel.receipt_log().receipts()[0].id.clone();
+    assert!(
+        kernel.has_local_receipt_id(&receipt_id).is_err(),
+        "store read error must propagate, not fall back to the mirror"
+    );
+    assert!(
+        kernel.local_receipt_artifact(&receipt_id).is_err(),
+        "store read error must propagate, not serve the mirrored artifact"
     );
 }
 
@@ -256,6 +287,93 @@ fn kernel_persists_child_receipts_to_sqlite_store() {
 
     drop(connection);
     let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn nested_admission_denied_while_rss_shedding() {
+    // RFC-0004 section 5 (round-2): the nested-flow admission path must gate on
+    // the RSS soft ceiling just like the top-level evaluate, so a nested tool
+    // call (sampling/elicitation) cannot allocate and run after the sampler
+    // raised the shed flag.
+    let mut config = make_config();
+    config.allow_sampling = true;
+    let mut kernel = make_kernel(config);
+    kernel.register_tool_server(Box::new(NestedFlowServer {
+        id: "nested".to_string(),
+    }));
+
+    let agent_kp = make_keypair();
+    let capability = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("nested", "sample_via_client")]),
+        300,
+    );
+    let session_id = kernel
+        .open_session(agent_kp.public_key().to_hex(), vec![capability.clone()])
+        .unwrap();
+    kernel.activate_session(&session_id).unwrap();
+    kernel
+        .set_session_peer_capabilities(
+            &session_id,
+            PeerCapabilities {
+                supports_progress: false,
+                supports_cancellation: false,
+                supports_subscriptions: false,
+                supports_chio_tool_streaming: false,
+                supports_roots: false,
+                roots_list_changed: false,
+                supports_sampling: true,
+                sampling_context: false,
+                sampling_tools: false,
+                supports_elicitation: false,
+                elicitation_form: false,
+                elicitation_url: false,
+            },
+        )
+        .unwrap();
+
+    // Raise the RSS soft-ceiling shed flag, mirroring the sampler crossing the
+    // configured limit.
+    kernel.set_rss_shed_for_test(true);
+
+    let mut client = MockNestedFlowClient {
+        roots: Vec::new(),
+        sampled_message: CreateMessageResult {
+            role: "assistant".to_string(),
+            content: serde_json::json!({ "type": "text", "text": "must never run" }),
+            model: "gpt-test".to_string(),
+            stop_reason: None,
+        },
+        elicited_content: make_elicited_content(),
+        cancel_parent_on_create_message: false,
+        cancel_child_on_create_message: false,
+        completed_elicitation_ids: Vec::new(),
+        resource_updates: Vec::new(),
+        resources_list_changed_count: 0,
+    };
+    let context =
+        make_operation_context(&session_id, "nested-rss-shed", &agent_kp.public_key().to_hex());
+    let operation = ToolCallOperation {
+        capability,
+        server_id: "nested".to_string(),
+        tool_name: "sample_via_client".to_string(),
+        arguments: serde_json::json!({}),
+        governed_intent: None,
+        execution_nonce: None,
+        model_metadata: None,
+        extra_metadata: None,
+    };
+
+    let result = kernel.evaluate_tool_call_operation_with_nested_flow_client(
+        &context,
+        &operation,
+        &mut client,
+    );
+    assert!(
+        matches!(result, Err(KernelError::Overloaded { .. })),
+        "nested admission must be denied Overloaded while RSS-shedding, got {result:?}"
+    );
 }
 
 #[test]

@@ -352,7 +352,7 @@ impl ChioKernel {
                     validated_governed_admission
                         .as_ref()
                         .and_then(|admission| admission.call_chain_proof.clone()),
-                ),
+                )?,
             );
 
         let pre_invocation_guard_evidence = match self.run_guards(

@@ -35,30 +35,29 @@ impl ChioKernel {
         })
     }
 
-    pub(crate) fn has_local_receipt_id(&self, receipt_id: &str) -> bool {
+    pub(crate) fn has_local_receipt_id(&self, receipt_id: &str) -> Result<bool, KernelError> {
         // Store-authoritative: a durable store is a point lookup by id (F22
         // hot-path budget), not an O(n) mirror scan (RFC-0004 F03/F25). On a
         // store MISS fall back to the local mirror below: a store may implement
         // append without point loads (for example an append-only or remote
         // store), so a receipt appended and mirrored locally must still resolve.
+        // A store READ ERROR fails closed and PROPAGATES; only a genuine miss
+        // (`Ok(None)`) falls through to the mirror, so a store verification
+        // failure is never masked by a mirror hit (RFC-0004 F1 round-2).
         if self.receipt_store.is_some() {
-            let tool_hit = self
-                .with_receipt_store(|store| Ok(store.load_chio_receipt(receipt_id)?))
-                .ok()
+            if self
+                .with_receipt_store(|store| Ok(store.load_chio_receipt(receipt_id)?))?
                 .flatten()
-                .flatten()
-                .is_some();
-            if tool_hit {
-                return true;
+                .is_some()
+            {
+                return Ok(true);
             }
-            let child_hit = self
-                .with_receipt_store(|store| Ok(store.load_child_receipt(receipt_id)?))
-                .ok()
+            if self
+                .with_receipt_store(|store| Ok(store.load_child_receipt(receipt_id)?))?
                 .flatten()
-                .flatten()
-                .is_some();
-            if child_hit {
-                return true;
+                .is_some()
+            {
+                return Ok(true);
             }
             // Store miss: fall through to the local mirror scan.
         }
@@ -71,38 +70,41 @@ impl ChioKernel {
                 .any(|receipt| receipt.id == receipt_id),
         };
         if chio_receipt_match {
-            return true;
+            return Ok(true);
         }
 
-        match self.child_receipt_log.lock() {
+        Ok(match self.child_receipt_log.lock() {
             Ok(log) => log.iter().any(|receipt| receipt.id == receipt_id),
             Err(poisoned) => poisoned
                 .into_inner()
                 .iter()
                 .any(|receipt| receipt.id == receipt_id),
-        }
+        })
     }
 
-    pub(crate) fn local_receipt_artifact(&self, receipt_id: &str) -> Option<LocalReceiptArtifact> {
+    pub(crate) fn local_receipt_artifact(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<LocalReceiptArtifact>, KernelError> {
         // Consult the durable store first; on a MISS fall back to the local
         // mirror (append-only / remote stores may not implement point loads, so
-        // a receipt appended and mirrored locally must still resolve).
+        // a receipt appended and mirrored locally must still resolve). A store
+        // READ ERROR fails closed and PROPAGATES; only a genuine miss
+        // (`Ok(None)`) falls through to the mirror, so a store verification
+        // failure can never be accepted from the bounded mirror
+        // (RFC-0004 F1 round-2).
         if self.receipt_store.is_some() {
             if let Some(receipt) = self
-                .with_receipt_store(|store| Ok(store.load_chio_receipt(receipt_id)?))
-                .ok()
-                .flatten()
+                .with_receipt_store(|store| Ok(store.load_chio_receipt(receipt_id)?))?
                 .flatten()
             {
-                return Some(LocalReceiptArtifact::Tool(Box::new(receipt)));
+                return Ok(Some(LocalReceiptArtifact::Tool(Box::new(receipt))));
             }
             if let Some(child) = self
-                .with_receipt_store(|store| Ok(store.load_child_receipt(receipt_id)?))
-                .ok()
-                .flatten()
+                .with_receipt_store(|store| Ok(store.load_child_receipt(receipt_id)?))?
                 .flatten()
             {
-                return Some(LocalReceiptArtifact::Child(Box::new(child)));
+                return Ok(Some(LocalReceiptArtifact::Child(Box::new(child))));
             }
             // Store miss: fall through to the local mirror scan.
         }
@@ -120,10 +122,10 @@ impl ChioKernel {
                 .map(|receipt| LocalReceiptArtifact::Tool(Box::new(receipt))),
         };
         if tool_match.is_some() {
-            return tool_match;
+            return Ok(tool_match);
         }
 
-        match self.child_receipt_log.lock() {
+        Ok(match self.child_receipt_log.lock() {
             Ok(log) => log
                 .iter()
                 .find(|receipt| receipt.id == receipt_id)
@@ -135,7 +137,7 @@ impl ChioKernel {
                 .find(|receipt| receipt.id == receipt_id)
                 .cloned()
                 .map(|receipt| LocalReceiptArtifact::Child(Box::new(receipt))),
-        }
+        })
     }
 
     pub(crate) fn is_trusted_governed_continuation_signer(

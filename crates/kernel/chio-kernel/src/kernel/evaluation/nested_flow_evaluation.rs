@@ -52,6 +52,21 @@ impl ChioKernel {
             );
         }
 
+        // RSS soft ceiling: shed new admissions before the OS OOM-kills the
+        // mediator. The nested-flow path gates on the same atomic-load fast
+        // path as the top-level evaluate, right after the emergency stop, so
+        // sampling/elicitation-bearing tool calls cannot allocate and run after
+        // the sampler raised the soft-ceiling flag (RFC-0004 section 5).
+        if self.is_rss_shedding() {
+            warn!(
+                request_id = %request.request_id,
+                "rss soft ceiling exceeded -- shedding evaluate_tool_call (nested flow)"
+            );
+            return Err(KernelError::Overloaded {
+                resource: crate::OverloadResource::Allocation,
+            });
+        }
+
         // The pre-dispatch receipt-version admission gate must run on the
         // nested-flow path too. The admission snapshot is scoped for the
         // receipt builders below so a peer that expires during nested tool
@@ -270,7 +285,7 @@ impl ChioKernel {
                     validated_governed_admission
                         .as_ref()
                         .and_then(|admission| admission.call_chain_proof.clone()),
-                ),
+                )?,
             );
 
         let session_roots =
