@@ -1121,3 +1121,134 @@ fn reserved_hold_ttl_reaper_frees_expired_authorization_only_when_due() {
         now_allowed.reason
     );
 }
+
+// ---------------------------------------------------------------------------
+// Preflight terminal-state reasons stay consistent with their receipt decision.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn reserving_authorization_terminal_state_matches_receipt_decision_reason() {
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+    let cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: true,
+    };
+    kernel.set_execution_nonce_store(
+        cfg.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+    );
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    let request = reserve_request("req-reserve-reason", &cap, &agent_kp);
+
+    let authorized = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
+        .unwrap();
+    assert_eq!(authorized.verdict, Verdict::Allow);
+
+    let terminal_reason = match &authorized.terminal_state {
+        OperationTerminalState::Incomplete { reason } => reason.clone(),
+        other => panic!("reserving authorization must be incomplete, got {other:?}"),
+    };
+    let decision_reason = match authorized.receipt.decision.as_ref() {
+        Some(Decision::Incomplete { reason }) => reason.clone(),
+        other => panic!("reserving authorization receipt must be incomplete, got {other:?}"),
+    };
+    assert_eq!(
+        terminal_reason, decision_reason,
+        "the reserve path terminal_state reason must match its receipt decision reason"
+    );
+    assert!(
+        decision_reason.contains("reserved")
+            && decision_reason.contains("present the minted execution nonce"),
+        "the reserve path must report the reservation reason, got: {decision_reason}"
+    );
+    assert!(
+        !terminal_reason.contains("retry with presented nonce"),
+        "the reserve path must not borrow the retry-path terminal reason"
+    );
+}
+
+#[test]
+fn preflight_retry_terminal_state_matches_receipt_decision_reason() {
+    let mut kernel = make_kernel(make_config());
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
+    let cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: true,
+    };
+    kernel.set_execution_nonce_store(
+        cfg.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+    );
+    let agent_kp = make_keypair();
+    let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+    let request = make_request("req-preflight-reason", &cap, "read_file", "srv-a");
+
+    let preflight = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    assert_eq!(preflight.verdict, Verdict::Allow);
+
+    let terminal_reason = match &preflight.terminal_state {
+        OperationTerminalState::Incomplete { reason } => reason.clone(),
+        other => panic!("strict preflight must be incomplete, got {other:?}"),
+    };
+    let decision_reason = match preflight.receipt.decision.as_ref() {
+        Some(Decision::Incomplete { reason }) => reason.clone(),
+        other => panic!("strict preflight receipt must be incomplete, got {other:?}"),
+    };
+    assert_eq!(
+        terminal_reason, decision_reason,
+        "the retry path terminal_state reason must match its receipt decision reason"
+    );
+    assert_eq!(
+        terminal_reason, "execution nonce preflight requires retry with presented nonce",
+        "the reverse-for-retry preflight reason must be unchanged"
+    );
+}
+
+#[test]
+fn reserving_authorization_rejects_presented_execution_nonce() {
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+    let cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: true,
+    };
+    kernel.set_execution_nonce_store(
+        cfg.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+    );
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    // No presented nonce: the mint-only reserve entry point authorizes.
+    let clean = reserve_request("req-reserve-clean", &cap, &agent_kp);
+    let authorized = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&clean, None)
+        .unwrap();
+    assert_eq!(authorized.verdict, Verdict::Allow);
+
+    // A presented nonce is a settlement artifact. The mint-only reserve entry
+    // point must fail closed rather than silently skip the reserve path and fall
+    // through to dispatch (the documented MUST-NOT invariant).
+    let mut presented = reserve_request("req-reserve-presented", &cap, &agent_kp);
+    presented.execution_nonce = Some(mint_nonce_for_request(&kernel, &cap, &presented, &cfg));
+    let err = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&presented, None)
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("execution nonce"),
+        "presenting a nonce at the reserve entry point must fail closed, got: {err}"
+    );
+}

@@ -201,6 +201,16 @@ pub enum KernelError {
          Tokio runtime; switch the host to a multi-thread Tokio runtime"
     )]
     SyncBridgeIncompatibleWithCurrentThreadRuntime,
+
+    /// The reserving pre-execution authorization entry point received a request
+    /// carrying a presented execution nonce. That entry point mints nonces; it
+    /// never settles them. Accepting a presented nonce would silently skip the
+    /// reserve path and fall through to dispatch, so it is rejected fail-closed.
+    #[error(
+        "reserving authorization must not receive a presented execution nonce; this entry \
+         point mints nonces, it does not settle them"
+    )]
+    ReservingAuthorizationRejectsPresentedNonce,
 }
 
 impl KernelError {
@@ -470,6 +480,11 @@ impl KernelError {
                 "CHIO-KERNEL-SYNC-BRIDGE-INCOMPATIBLE",
                 serde_json::json!({}),
                 "Move the host process to a multi-thread Tokio runtime so block_in_place can drive async tool dispatch. The public async evaluate_tool_call path is still backed by the blocking evaluator on this branch and is not a current-thread runtime workaround.",
+            ),
+            Self::ReservingAuthorizationRejectsPresentedNonce => self.report_with_context(
+                "CHIO-KERNEL-RESERVING-AUTHORIZATION-PRESENTED-NONCE",
+                serde_json::json!({}),
+                "Submit the reserving authorization request without a presented execution nonce; present the minted nonce to the tool server for settlement instead.",
             ),
         }
     }

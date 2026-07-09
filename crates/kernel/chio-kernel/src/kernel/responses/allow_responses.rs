@@ -174,7 +174,7 @@ impl ChioKernel {
             output: None,
             reason: None,
             terminal_state: OperationTerminalState::Incomplete {
-                reason: "execution nonce preflight requires retry with presented nonce".to_string(),
+                reason: incomplete_reason.to_string(),
             },
             receipt,
             execution_nonce,

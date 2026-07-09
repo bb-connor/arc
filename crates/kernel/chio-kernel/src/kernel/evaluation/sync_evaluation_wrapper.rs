@@ -88,12 +88,20 @@ impl ChioKernel {
     /// reconciles the reserved hold at the execution site.
     ///
     /// The request MUST NOT carry a presented execution nonce: this entry point
-    /// mints nonces, it does not settle them.
+    /// mints nonces, it does not settle them. The invariant is enforced here
+    /// fail-closed: a request with a presented nonce is rejected with
+    /// [`KernelError::ReservingAuthorizationRejectsPresentedNonce`] rather than
+    /// silently skipping the reserve path (a presented nonce makes
+    /// `execution_nonce_preflight_required` return false) and falling through to
+    /// dispatch, which is the opposite of the documented reserve behavior.
     pub fn authorize_tool_call_reserving_blocking_with_metadata(
         &self,
         request: &ToolCallRequest,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
+        if request.execution_nonce.is_some() {
+            return Err(KernelError::ReservingAuthorizationRejectsPresentedNonce);
+        }
         block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
             request,
             None,
