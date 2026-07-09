@@ -459,9 +459,25 @@ fn collect_budget_views(store: &SqliteBudgetStore) -> Result<Vec<BudgetUsageView
 fn collect_budget_mutation_event_views(
     store: &SqliteBudgetStore,
 ) -> Result<Vec<BudgetMutationEventView>, CliError> {
-    Ok(store
-        .list_mutation_events(i64::MAX as usize, None, None)?
-        .into_iter()
-        .map(budget_mutation_event_view)
-        .collect())
+    // Page the FULL mutation-event history in MAX_LIST_LIMIT chunks (like the
+    // receipt/lineage/usage collectors above) rather than one unbounded
+    // i64::MAX-limit query, so a very large budget history does not load in a
+    // single giant query (codex #965 Finding 3). Semantics are unchanged: the
+    // dense event_seq column is strictly increasing and unique, and both
+    // `list_mutation_events` and `list_mutation_events_after_seq` order by
+    // event_seq ASC, so this yields the identical full, ascending event set.
+    let mut after_seq = 0u64;
+    let mut records = Vec::new();
+    loop {
+        let batch = store.list_mutation_events_after_seq(MAX_LIST_LIMIT, after_seq)?;
+        if batch.is_empty() {
+            break;
+        }
+        after_seq = batch
+            .last()
+            .map(|record| record.event_seq)
+            .unwrap_or(after_seq);
+        records.extend(batch.into_iter().map(budget_mutation_event_view));
+    }
+    Ok(records)
 }
