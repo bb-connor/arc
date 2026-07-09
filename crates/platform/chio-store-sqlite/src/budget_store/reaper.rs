@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn reaper_reconciles_admitted_hold_and_reverses_orphan() {
-        // R3: SIGKILL after authorize commits but before reconcile. A naive
+        // SIGKILL after authorize commits but before reconcile. A naive
         // "release Open on restart" would enable double-spend; instead the
         // durable receipt log arbitrates.
         let store = open_temp_store();

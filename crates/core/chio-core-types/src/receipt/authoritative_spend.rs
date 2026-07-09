@@ -322,7 +322,7 @@ mod tests {
 
     #[test]
     fn r1_forged_mediated_label_without_budget_authority_is_rejected() {
-        // R1: a trusted signer stamps advisory content as Mediated with zero budget movement.
+        // A trusted signer stamps advisory content as Mediated with zero budget movement.
         let kp = Keypair::generate();
         let mut receipt = authoritative_receipt(&kp);
         // Strip the budget_authority metadata but keep the Mediated label.
@@ -393,7 +393,7 @@ mod tests {
 
     #[test]
     fn r4_receipt_claiming_ha_linearizable_fails_single_node_operator_floor() {
-        // R4: HaLinearizable is a labeled claim; a single-node store must not be
+        // HaLinearizable is a labeled claim; a single-node store must not be
         // accepted where the operator requires linearizable, and a receipt must
         // not claim a level above the backing store.
         let kp = Keypair::generate();

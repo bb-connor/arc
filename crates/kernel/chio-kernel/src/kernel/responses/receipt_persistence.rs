@@ -316,7 +316,7 @@ mod tests {
 
     #[test]
     fn signing_mediated_for_cost_bearing_grant_without_reconciled_hold_fails_closed() {
-        // R1: refuse to stamp Mediated on a cost-bearing receipt that carries a
+        // Refuse to stamp Mediated on a cost-bearing receipt that carries a
         // financial charge but no reconciled budget-authority hold.
         let metadata = serde_json::json!({
             "financial": { "cost_charged": 50, "grant_index": 0, "currency": "USD" }

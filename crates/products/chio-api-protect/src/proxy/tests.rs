@@ -2984,7 +2984,7 @@ async fn sidecar_evaluate_tool_call_denies_parameter_hash_mismatch() {
 
 #[tokio::test]
 async fn advisory_route_is_non_authorizing_when_advisory_disabled() {
-    // R5: advisory is off by default; production stops emitting advisory
+    // Advisory is off by default; production stops emitting advisory
     // receipts that agents could skip the sidecar with.
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
     let payload = serde_json::json!({

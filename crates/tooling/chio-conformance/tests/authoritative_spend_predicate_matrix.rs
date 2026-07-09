@@ -108,7 +108,7 @@ fn b_missing_budget_authority_is_rejected() {
 
 #[test]
 fn r1_forged_label_with_real_signer_but_no_hold_is_rejected() {
-    // R1: even an admitted-key signature over a Mediated label fails without a
+    // Even an admitted-key signature over a Mediated label fails without a
     // reconciled hold + bound nonce.
     let (signer, mut receipt, nonce) = mediated_case();
     if let Some(obj) = receipt.metadata.as_mut().and_then(|m| m.as_object_mut()) {
