@@ -335,8 +335,42 @@ impl ChioKernel {
         let _governed_call_chain_receipt_evidence_scope =
             scope_governed_call_chain_receipt_evidence(governed_call_chain_receipt_evidence);
 
-        let session_roots =
-            self.session_enforceable_filesystem_root_paths_owned(&parent_context.session_id)?;
+        // The session's enforceable filesystem roots scope the guards below. A
+        // parent session that was closed or evicted concurrently (or a poisoned
+        // session lock) surfaces here as an error, but check_and_increment_budget
+        // above already consumed the pre-execution budget (invocation count /
+        // monetary hold). Route the error through the same reversal + deny path
+        // the governed, call-chain, and guard denial branches use so a transient
+        // session-lookup failure never burns quota or holds funds for a call that
+        // never dispatches (codex round-7 follow-up). The top-level async path is
+        // unaffected: it receives session_filesystem_roots as a parameter.
+        let session_roots = match self
+            .session_enforceable_filesystem_root_paths_owned(&parent_context.session_id)
+        {
+            Ok(roots) => roots,
+            Err(error) => {
+                let msg = error.to_string();
+                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "session filesystem roots lookup failed pre-dispatch (nested flow)");
+                let reverse = self.reverse_pre_execution_budget_mutation(cap, &budget_mutation)?;
+                if let (Some(charge), Some(reverse)) =
+                    (budget_mutation.charge_result(), reverse.as_ref())
+                {
+                    return self.build_pre_execution_monetary_deny_response_with_metadata(
+                        request,
+                        &msg,
+                        now,
+                        charge,
+                        reverse.committed_cost_units_after,
+                        cap,
+                        Some(self.budget_execution_receipt_metadata(
+                            charge,
+                            Some(("reversed", reverse)),
+                        )),
+                    );
+                }
+                return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
+            }
+        };
 
         let pre_invocation_guard_evidence = match self.run_guards(
             request,

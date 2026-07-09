@@ -1499,3 +1499,95 @@ fn nested_governed_call_chain_evidence_store_error_reverses_pre_execution_budget
         "nested evidence-lookup store error must reverse the invocation reservation, got {usage:?}"
     );
 }
+
+#[test]
+fn nested_missing_session_roots_lookup_reverses_pre_execution_budget() {
+    // RFC-0004 / codex round-7 follow-up: on the nested-flow admission path the
+    // session filesystem-roots lookup (session_enforceable_filesystem_root_paths_owned)
+    // sits AFTER check_and_increment_budget and BEFORE dispatch. A parent session
+    // closed or evicted concurrently surfaces as UnknownSession there. That error
+    // must reverse the pre-execution budget and fail closed as a deny, never
+    // propagate, so a transient session-lookup failure never burns invocation
+    // quota for a call that never dispatched. Before the fix the bare `?` on the
+    // roots lookup skipped the reversal and burned the invocation count.
+    let mut kernel = make_kernel(make_config());
+    let agent_kp = make_keypair();
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-echo", vec!["delegate"])));
+
+    // An invocation-limited grant so the budget store tracks (and can reverse)
+    // an invocation count.
+    let grant = make_invocation_limited_grant("srv-echo", "delegate", 5);
+    let capability = make_capability(&kernel, &agent_kp, make_scope(vec![grant]), 300);
+    let cap_id = capability.id.clone();
+
+    // A parent context whose session was never opened (models a session closed
+    // or evicted concurrently between admission and the roots lookup). No
+    // governed_intent, so validate_governed_transaction and the call-chain
+    // evidence lookup short-circuit without touching the session, and the
+    // roots lookup is the first (and only) session-dependent step to fail.
+    let parent_context = make_operation_context(
+        &SessionId::new("sess-nested-missing-roots"),
+        "req-parent-missing-roots",
+        &agent_kp.public_key().to_hex(),
+    );
+
+    let mut client = MockNestedFlowClient {
+        roots: Vec::new(),
+        sampled_message: CreateMessageResult {
+            role: "assistant".to_string(),
+            content: serde_json::json!({ "type": "text", "text": "unused" }),
+            model: "unused".to_string(),
+            stop_reason: None,
+        },
+        elicited_content: make_elicited_content(),
+        cancel_parent_on_create_message: false,
+        cancel_child_on_create_message: false,
+        completed_elicitation_ids: Vec::new(),
+        resource_updates: Vec::new(),
+        resources_list_changed_count: 0,
+    };
+
+    let response = kernel
+        .evaluate_tool_call_with_nested_flow_client(
+            &parent_context,
+            &ToolCallRequest {
+                request_id: "req-child-missing-roots".to_string(),
+                capability,
+                tool_name: "delegate".to_string(),
+                server_id: "srv-echo".to_string(),
+                agent_id: agent_kp.public_key().to_hex(),
+                arguments: serde_json::json!({ "stage": "child" }),
+                dpop_proof: None,
+                execution_nonce: None,
+                governed_intent: None,
+                approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
+            },
+            &mut client,
+            None,
+        )
+        // Before the fix the roots-lookup `?` propagated UnknownSession out of
+        // evaluate; after the fix it fails closed as a clean deny instead.
+        .expect("missing-session roots lookup must fail closed as a deny, not propagate");
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    // Pin that the deny comes from the session-roots lookup (UnknownSession), so
+    // the test actually exercises the fixed line.
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("unknown session")),
+        "nested deny must be the session-roots lookup UnknownSession error, got {:?}",
+        response.reason
+    );
+
+    let usage = kernel.budget_store.get_usage(&cap_id, 0).unwrap();
+    // The invocation reservation must have been released: no quota burned for a
+    // call that never dispatched.
+    assert!(
+        usage.as_ref().map_or(0, |usage| usage.invocation_count) == 0,
+        "missing-session roots lookup must reverse the invocation reservation, got {usage:?}"
+    );
+}
