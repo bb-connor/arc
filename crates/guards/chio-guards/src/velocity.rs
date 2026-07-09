@@ -135,10 +135,17 @@ pub struct VelocityGuard {
 }
 
 impl VelocityGuard {
-    /// Create a new `VelocityGuard` with the given configuration and the default
-    /// bucket cap (65536).
+    /// Create a new `VelocityGuard` with the given configuration and the
+    /// bounded-memory default bucket cap, sourced from
+    /// [`chio_kernel::MemoryBudgetConfig`]'s `velocity_bucket_cap` so the cap is
+    /// single-sourced with the process memory budget rather than a duplicated
+    /// literal. Deployments that need a tighter cap use
+    /// [`Self::with_bucket_cap`] (RFC-0004 F38).
     pub fn new(config: VelocityConfig) -> Self {
-        Self::with_bucket_cap(config, 65_536)
+        Self::with_bucket_cap(
+            config,
+            chio_kernel::MemoryBudgetConfig::defaults().velocity_bucket_cap,
+        )
     }
 
     /// Create a `VelocityGuard` with an explicit total-bucket cap so a
@@ -171,6 +178,7 @@ fn sweep_and_cap_buckets(
     inserts_since_sweep: &Mutex<usize>,
     window_secs: u64,
     bucket_cap: usize,
+    key: &(String, usize),
 ) {
     let do_sweep = {
         let mut counter = match inserts_since_sweep.lock() {
@@ -190,7 +198,13 @@ fn sweep_and_cap_buckets(
     if do_sweep {
         buckets.retain(|_, bucket| bucket.last_refill.elapsed() < idle);
     }
-    if buckets.len() >= bucket_cap {
+    // Enforce the cap only when INSERTING a genuinely new key. Updating an
+    // existing bucket must never evict: otherwise, once the table is full, a
+    // repeat request for an already-tracked capability could evict and recreate
+    // its own bucket with a full token balance, defeating the per-window limit
+    // (RFC-0004 F38). Because eviction runs only when `key` is absent, the
+    // victim is never the bucket being consumed.
+    if !buckets.contains_key(key) && buckets.len() >= bucket_cap {
         // Evict the most-idle key (largest elapsed since last_refill).
         if let Some(victim) = buckets
             .iter()
@@ -226,6 +240,7 @@ impl Guard for VelocityGuard {
                 &self.invocation_inserts_since_sweep,
                 window_secs,
                 self.bucket_cap,
+                &key,
             );
             let bucket = buckets
                 .entry(key.clone())
@@ -248,6 +263,7 @@ impl Guard for VelocityGuard {
                 &self.spend_inserts_since_sweep,
                 window_secs,
                 self.bucket_cap,
+                &key,
             );
             let bucket = buckets
                 .entry(key)
@@ -403,6 +419,45 @@ mod tests {
             guard.invocation_bucket_count() <= 8,
             "bucket map grew past cap: {}",
             guard.invocation_bucket_count()
+        );
+    }
+
+    #[test]
+    fn updating_existing_bucket_at_cap_is_not_evicted() {
+        // Cap of 1 with a 1-per-window limit: the first request for a capability
+        // consumes its only token; a second request for the SAME capability must
+        // find the preserved (now empty) bucket and be denied, not evict and
+        // recreate it with a full balance (RFC-0004 F38 / cap-on-update).
+        let config = VelocityConfig {
+            max_invocations_per_window: Some(1),
+            window_secs: 60,
+            ..VelocityConfig::default()
+        };
+        let guard = VelocityGuard::with_bucket_cap(config, 1);
+        let kp = Keypair::generate();
+        let cap = signed_cap(&kp, "cap-update");
+        let scope = ChioScope::default();
+        let agent = kp.public_key().to_hex();
+        let server = "srv".to_string();
+        let request = make_request(&cap, &agent, &server);
+
+        let first = guard
+            .evaluate(&guard_ctx(&request, &scope, &agent, &server, None))
+            .expect("first request should not error");
+        assert_eq!(first, Verdict::Allow, "first request should be allowed");
+
+        let second = guard
+            .evaluate(&guard_ctx(&request, &scope, &agent, &server, None))
+            .expect("second request should not error");
+        assert_eq!(
+            second,
+            Verdict::Deny,
+            "second request must hit the preserved (empty) bucket, not a fresh one"
+        );
+        assert_eq!(
+            guard.invocation_bucket_count(),
+            1,
+            "the bucket being consumed must not be evicted and recreated"
         );
     }
 
