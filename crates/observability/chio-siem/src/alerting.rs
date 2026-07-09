@@ -656,10 +656,10 @@ impl AlertingExporterBuilder {
 pub struct AlertingExporter {
     config: AlertingConfig,
     backends: Vec<Arc<dyn AlertBackend>>,
-    // Consumed by the SIEM serve-mode host wiring (RFC-0009 Part F) to emit
-    // alert-dispatch outcome/latency metrics; the scaffold installs it via
-    // with_metrics_sink and defaults to no-op.
-    #[allow(dead_code)]
+    // Consumed by `export_batch` to emit alert-dispatch outcome/latency metrics
+    // on every real dispatch (RFC-0009 Part F / F77). The SIEM serve-mode host
+    // installs a registry-backed sink via `with_metrics_sink`; headless callers
+    // keep the no-op default.
     metrics: std::sync::Arc<dyn crate::metrics_sink::SiemMetricsSink>,
 }
 

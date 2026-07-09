@@ -957,11 +957,33 @@ fn export_control_path(output: &Path) -> Result<ChioWallExportSummary, CliError>
     Ok(summary)
 }
 
+/// Environment keys an operator sets to enable SIEM alert dispatch in the serve
+/// mode. Alerting is OPERATOR-CONFIGURED (RFC-0009 F77): each backend needs a
+/// secret routing key, so absent keys mean "alerting disabled" (a legitimate
+/// deploy), not a fault. When set, the configured backends drive a real
+/// `AlertingExporter` wired to the registry metrics sink.
+const PAGERDUTY_ROUTING_KEY_ENV: &str = "CHIO_SIEM_ALERT_PAGERDUTY_ROUTING_KEY";
+const PAGERDUTY_ENDPOINT_ENV: &str = "CHIO_SIEM_ALERT_PAGERDUTY_ENDPOINT";
+const OPSGENIE_API_KEY_ENV: &str = "CHIO_SIEM_ALERT_OPSGENIE_API_KEY";
+const OPSGENIE_ENDPOINT_ENV: &str = "CHIO_SIEM_ALERT_OPSGENIE_ENDPOINT";
+
+/// The manager's always-on malformed-row producer. Seeding its soc_export
+/// series at zero keeps the `chio_soc_export_total` family present from serve
+/// start so `ChioSocExportMetricsMissing` fires only on a true scrape gap,
+/// never on a healthy-but-quiet (or zero-SOC-exporter) deploy.
+const DESERIALIZE_EXPORTER: &str = "_deserialize";
+
 /// Opt-in production SIEM export serve mode (RFC-0009 F79). Runs the
 /// ExporterManager cursor-pull loop against `receipt_db` with a persisted
 /// per-exporter high-water mark in `cursor_db` (at-least-once delivery) and a
 /// registry-backed metrics sink, until an interrupt. This is the non-test
 /// counterpart of the integration-test spawn: a real, long-running serve path.
+///
+/// Alerting (PagerDuty/OpsGenie) is OPERATOR-CONFIGURED via the
+/// `CHIO_SIEM_ALERT_*` environment keys: when a backend is configured the serve
+/// path installs the same registry metrics sink into a real `AlertingExporter`
+/// (so `chio_alert_dispatch_total`/`_latency` become real production instruments,
+/// not test-only) and pre-registers the alert-dispatch series at zero.
 pub fn cmd_chio_wall_siem_export(receipt_db: &Path, cursor_db: &Path) -> Result<(), CliError> {
     let runtime = tokio::runtime::Runtime::new().map_err(|error| {
         CliError::cli_other_error(format!("tokio runtime init failed: {error}"))
@@ -975,14 +997,41 @@ async fn serve_siem_export(receipt_db: &Path, cursor_db: &Path) -> Result<(), Cl
         cursor_db_path: Some(cursor_db.to_path_buf()),
         ..chio_siem::SiemConfig::default()
     };
+    let metrics_sink: std::sync::Arc<dyn chio_siem::SiemMetricsSink> =
+        std::sync::Arc::new(crate::registry_metrics_sink::RegistryMetricsSink);
     let mut manager = chio_siem::ExporterManager::new(config)
         .map_err(|error| CliError::cli_other_error(format!("open ExporterManager: {error}")))?
-        .with_metrics_sink(std::sync::Arc::new(
-            crate::registry_metrics_sink::RegistryMetricsSink,
-        ));
-    // Deployment-configured exporters are registered here via
-    // `manager.add_exporter(..)`; the loop still advances the cursor and emits
-    // export/dlq metrics when none are configured.
+        .with_metrics_sink(metrics_sink.clone());
+
+    // Operator-configured alerting (RFC-0009 F77). Alerting is NOT always-on:
+    // each backend needs a secret routing key, so it runs only when configured.
+    // When configured, the SAME registry metrics sink is installed into the
+    // AlertingExporter so chio_alert_dispatch_total/_latency emit REAL values on
+    // real dispatches (not just in tests), and the exporter is registered with
+    // the manager so its per-poll dispatch loop drives those metrics. Additional
+    // deployment-configured SOC exporters are registered here the same way.
+    use chio_siem::Exporter as _;
+    let mut registered_exporters: Vec<String> = Vec::new();
+    let mut alert_routes: Vec<String> = Vec::new();
+    let alert_backends = configured_alert_backends()?;
+    if let Some((alerting, routes)) =
+        build_serve_alerting_exporter(alert_backends, metrics_sink.clone())
+    {
+        registered_exporters.push(alerting.name().to_string());
+        alert_routes = routes;
+        manager.add_exporter(Box::new(alerting));
+    }
+
+    // Pre-register the soc/dlq/alert-dispatch series at zero so the
+    // absent_over_time backstops fire only on a true scrape gap (RFC-0009
+    // contract rule 2). alert_dispatch is seeded ONLY when alerting is
+    // configured; an alerting-disabled deploy leaves it intentionally absent (a
+    // deploy that runs no alert pipeline must not load the pagerduty-dispatch
+    // SLO rules).
+    let registered_refs: Vec<&str> = registered_exporters.iter().map(String::as_str).collect();
+    let route_refs: Vec<&str> = alert_routes.iter().map(String::as_str).collect();
+    preregister_serve_metrics(&registered_refs, &route_refs);
+
     let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
 
     // Receipt-log gap/lag watchdog (RFC-0009 F83): sample the receipt store's
@@ -1049,6 +1098,105 @@ fn sample_receipt_health(
     store
         .receipt_store_health()
         .map_err(|error| error.to_string())
+}
+
+/// Read the operator-configured SIEM alert backends from the environment
+/// (RFC-0009 F77). Returns an empty vec when alerting is disabled (no secrets
+/// set); returns an error (fail-closed) when a backend is requested but cannot
+/// be constructed, so a misconfigured endpoint denies the serve start rather
+/// than silently dropping the alert pipeline.
+fn configured_alert_backends() -> Result<Vec<Box<dyn chio_siem::AlertBackend>>, CliError> {
+    let mut backends: Vec<Box<dyn chio_siem::AlertBackend>> = Vec::new();
+
+    if let Some(routing_key) = non_empty_env(PAGERDUTY_ROUTING_KEY_ENV) {
+        let endpoint = non_empty_env(PAGERDUTY_ENDPOINT_ENV)
+            .unwrap_or_else(|| "https://events.pagerduty.com".to_string());
+        let backend =
+            chio_siem::PagerDutyBackend::with_endpoint(routing_key, endpoint).map_err(|error| {
+                CliError::cli_other_error(format!("configure PagerDuty alert backend: {error}"))
+            })?;
+        backends.push(Box::new(backend));
+    }
+
+    if let Some(api_key) = non_empty_env(OPSGENIE_API_KEY_ENV) {
+        let endpoint = non_empty_env(OPSGENIE_ENDPOINT_ENV)
+            .unwrap_or_else(|| "https://api.opsgenie.com".to_string());
+        let backend =
+            chio_siem::OpsGenieBackend::with_endpoint(api_key, endpoint).map_err(|error| {
+                CliError::cli_other_error(format!("configure OpsGenie alert backend: {error}"))
+            })?;
+        backends.push(Box::new(backend));
+    }
+
+    Ok(backends)
+}
+
+/// Read a trimmed, non-empty environment value, treating unset/blank as absent.
+fn non_empty_env(key: &str) -> Option<String> {
+    match std::env::var(key) {
+        Ok(value) if !value.trim().is_empty() => Some(value),
+        _ => None,
+    }
+}
+
+/// Build the operator-configured alerting exporter with the registry metrics
+/// sink installed, alongside the backend route names to pre-register at zero.
+///
+/// Returns `None` when no alert backend is configured (alerting disabled). When
+/// backends are present, the shared `RegistryMetricsSink` is installed into the
+/// exporter so `chio_alert_dispatch_total` / `chio_alert_dispatch_latency_seconds`
+/// emit REAL values on every real dispatch (RFC-0009 F77). This is the non-test
+/// production wiring the serve mode drives, not the test-only path.
+fn build_serve_alerting_exporter(
+    backends: Vec<Box<dyn chio_siem::AlertBackend>>,
+    metrics_sink: std::sync::Arc<dyn chio_siem::SiemMetricsSink>,
+) -> Option<(chio_siem::AlertingExporter, Vec<String>)> {
+    if backends.is_empty() {
+        return None;
+    }
+    let routes: Vec<String> = backends
+        .iter()
+        .map(|backend| backend.name().to_string())
+        .collect();
+    let mut builder = chio_siem::AlertingExporter::builder(chio_siem::AlertingConfig::default())
+        .with_metrics_sink(metrics_sink);
+    for backend in backends {
+        builder = builder.with_backend(backend);
+    }
+    Some((builder.build(), routes))
+}
+
+/// Pre-register the SIEM serve-mode metric series at zero so the absent-metric
+/// backstops fire only on a true scrape gap (RFC-0009 contract rule 2).
+///
+/// The soc_export/dlq_depth families are seeded from the always-on
+/// `_deserialize` producer plus every registered exporter, so
+/// `ChioSocExportMetricsMissing` stays quiet on a healthy-but-quiet (or
+/// zero-SOC-exporter) deploy. The alert_dispatch family is seeded ONLY for the
+/// configured alert routes: an unconfigured alerting pipeline deliberately does
+/// NOT seed `chio_alert_dispatch_total`, so when alerting IS configured the
+/// series is present at zero and `ChioAlertDispatchMetricsMissing` reflects
+/// "alerting configured but silent" (a real scrape gap), never a healthy quiet
+/// deploy or a legitimately alerting-disabled one.
+fn preregister_serve_metrics(registered_exporters: &[&str], alert_routes: &[&str]) {
+    use chio_metrics_spec::runtime::families;
+
+    // Always-on baseline: the manager's malformed-row producer keeps the
+    // soc_export family present even on a zero-exporter deploy.
+    families::SOC_EXPORT_TOTAL.preregister(&[DESERIALIZE_EXPORTER, "malformed"]);
+
+    for exporter in registered_exporters {
+        // The manager records `ok` on success and manages a per-exporter DLQ
+        // depth gauge; seed both so the families exist before the first poll.
+        families::SOC_EXPORT_TOTAL.preregister(&[exporter, "ok"]);
+        families::DLQ_DEPTH.preregister(&[exporter]);
+    }
+
+    for route in alert_routes {
+        // The AlertingExporter records `success`/`error` per dispatch.
+        families::ALERT_DISPATCH_TOTAL.preregister(&[route, "success"]);
+        families::ALERT_DISPATCH_TOTAL.preregister(&[route, "error"]);
+    }
 }
 
 pub fn cmd_chio_wall_control_path_export(output: &Path, json: bool) -> Result<(), CliError> {
@@ -1374,5 +1522,169 @@ mod tests {
         assert_eq!(manager.dlq_len(), 0, "successful export should not DLQ");
 
         let _ = fs::remove_dir_all(output);
+    }
+
+    /// A no-network alert backend so serve-mode alerting wiring can be exercised
+    /// without an external PagerDuty/OpsGenie endpoint.
+    struct StubAlertBackend {
+        route: String,
+    }
+
+    impl chio_siem::AlertBackend for StubAlertBackend {
+        fn name(&self) -> &str {
+            &self.route
+        }
+
+        fn dispatch<'a>(
+            &'a self,
+            _alert: &'a chio_siem::Alert,
+        ) -> std::pin::Pin<
+            Box<dyn std::future::Future<Output = Result<(), chio_siem::ExportError>> + Send + 'a>,
+        > {
+            Box::pin(async { Ok(()) })
+        }
+    }
+
+    fn serve_deny_event(guard: &str) -> SiemEvent {
+        use chio_core::receipt::kinds;
+        use chio_core::receipt::metadata::GuardEvidence;
+
+        let keypair = Keypair::generate();
+        let action = ToolCallAction::from_parameters(serde_json::json!({}))
+            .expect("hash receipt parameters");
+        let receipt = ChioReceipt::sign(
+            ChioReceiptBody {
+                id: "serve-alert-rcpt".to_string(),
+                timestamp: 1_700_000_000,
+                capability_id: "cap".to_string(),
+                tool_server: "shell".to_string(),
+                tool_name: "bash".to_string(),
+                action,
+                decision: Some(Decision::Deny {
+                    reason: "denied".to_string(),
+                    guard: guard.to_string(),
+                }),
+                receipt_kind: kinds::ReceiptKind::MediatedDecision,
+                boundary_class: kinds::BoundaryClass::Prevent,
+                observation_outcome: None,
+                tool_origin: kinds::ToolOrigin::CallerExecuted,
+                redaction_mode: kinds::RedactionMode::None,
+                actor_chain: Vec::new(),
+                content_hash: "c".to_string(),
+                policy_hash: "p".to_string(),
+                evidence: vec![GuardEvidence {
+                    guard_name: guard.to_string(),
+                    verdict: false,
+                    details: None,
+                }],
+                metadata: None,
+                trust_level: kinds::TrustLevel::default(),
+                tenant_id: None,
+                kernel_key: keypair.public_key(),
+                bbs_projection_version: None,
+            },
+            &keypair,
+        )
+        .expect("sign serve-mode deny receipt");
+        SiemEvent::from_receipt(receipt)
+    }
+
+    /// The serve-mode alerting wiring installs the registry metrics sink into a
+    /// real AlertingExporter, so a real (non-test-cfg) dispatch emits
+    /// chio_alert_dispatch_total. This is the proof the metric is a production
+    /// instrument, not test-only.
+    #[tokio::test]
+    async fn serve_alerting_wiring_emits_real_alert_dispatch_metric() {
+        use chio_siem::Exporter;
+
+        // Unique route so the process-global counter is not shared with any
+        // other test in this binary.
+        let route = "chio-wall-serve-alert-dispatch-test";
+        let sink: std::sync::Arc<dyn chio_siem::SiemMetricsSink> =
+            std::sync::Arc::new(crate::registry_metrics_sink::RegistryMetricsSink);
+        let backend = Box::new(StubAlertBackend {
+            route: route.to_string(),
+        });
+
+        let (exporter, routes) = build_serve_alerting_exporter(vec![backend], sink)
+            .expect("a configured backend yields an alerting exporter");
+        assert_eq!(routes, vec![route.to_string()]);
+
+        // ForbiddenPathGuard derives High severity, meeting the default alerting
+        // threshold, so the exporter dispatches to the stub backend.
+        let event = serve_deny_event("ForbiddenPathGuard");
+        let processed = exporter
+            .export_batch(std::slice::from_ref(&event))
+            .await
+            .expect("stub dispatch succeeds");
+        assert_eq!(processed, 1, "the single deny event is dispatched");
+
+        let mut body = String::new();
+        chio_metrics_spec::runtime::families::ALERT_DISPATCH_TOTAL.render(&mut body);
+        assert!(
+            body.contains(&format!(
+                "chio_alert_dispatch_total{{route=\"{route}\",outcome=\"success\"}} 1"
+            )),
+            "the wired serve-mode sink must emit a real alert_dispatch value: {body}"
+        );
+    }
+
+    /// The serve path seeds soc_export/dlq_depth (always) and alert_dispatch
+    /// (only when alerting is configured) at zero, so the absent-metric
+    /// backstops fire only on a true scrape gap.
+    #[test]
+    fn serve_metrics_preregister_seeds_series_at_zero() {
+        let exporter = "chio-wall-serve-seed-exporter";
+        let route = "chio-wall-serve-seed-route";
+
+        preregister_serve_metrics(&[exporter], &[route]);
+
+        let mut soc = String::new();
+        chio_metrics_spec::runtime::families::SOC_EXPORT_TOTAL.render(&mut soc);
+        assert!(
+            soc.contains(&format!(
+                "chio_soc_export_total{{exporter=\"{exporter}\",outcome=\"ok\"}} 0"
+            )),
+            "configured exporter soc_export must seed at zero: {soc}"
+        );
+        assert!(
+            soc.contains(
+                "chio_soc_export_total{exporter=\"_deserialize\",outcome=\"malformed\"} 0"
+            ),
+            "the always-on _deserialize baseline must seed at zero: {soc}"
+        );
+
+        let mut dlq = String::new();
+        chio_metrics_spec::runtime::families::DLQ_DEPTH.render(&mut dlq);
+        assert!(
+            dlq.contains(&format!("chio_dlq_depth{{exporter=\"{exporter}\"}} 0")),
+            "configured exporter dlq_depth must seed at zero: {dlq}"
+        );
+
+        let mut alert = String::new();
+        chio_metrics_spec::runtime::families::ALERT_DISPATCH_TOTAL.render(&mut alert);
+        assert!(
+            alert.contains(&format!(
+                "chio_alert_dispatch_total{{route=\"{route}\",outcome=\"success\"}} 0"
+            )),
+            "configured alert route must seed success at zero: {alert}"
+        );
+        assert!(
+            alert.contains(&format!(
+                "chio_alert_dispatch_total{{route=\"{route}\",outcome=\"error\"}} 0"
+            )),
+            "configured alert route must seed error at zero: {alert}"
+        );
+    }
+
+    /// Alerting is operator-configured: with no alert backend, the serve wiring
+    /// builds no AlertingExporter (and thus seeds no alert_dispatch series), so a
+    /// legitimately alerting-disabled deploy does not falsely advertise the
+    /// pipeline.
+    #[test]
+    fn serve_alerting_disabled_builds_no_exporter() {
+        let sink: std::sync::Arc<dyn chio_siem::SiemMetricsSink> =
+            std::sync::Arc::new(crate::registry_metrics_sink::RegistryMetricsSink);
+        assert!(build_serve_alerting_exporter(Vec::new(), sink).is_none());
     }
 }
