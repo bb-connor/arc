@@ -141,8 +141,6 @@ pub struct VelocityGuard {
 struct VelocityState {
     invocation_buckets: HashMap<(String, usize), TokenBucket>,
     spend_buckets: HashMap<(String, usize), TokenBucket>,
-    invocation_inserts_since_sweep: usize,
-    spend_inserts_since_sweep: usize,
 }
 
 /// Which of the two combined maps an operation targets.
@@ -171,16 +169,16 @@ impl VelocityGuard {
     /// cap is a TOTAL across BOTH the invocation and spend maps. Because both maps
     /// share one mutex, the combined-cap check and the insert are atomic: no
     /// evaluate() reads a stale sibling-map size, so the combined bucket count is
-    /// bounded by `bucket_cap` (a tight, provable bound for `bucket_cap >= 3`)
-    /// even under concurrent evaluate() calls for distinct capability ids, rather
-    /// than the un-folded `2 * bucket_cap` or an unbounded concurrent overshoot.
+    /// bounded by `bucket_cap` even under concurrent evaluate() calls for distinct
+    /// capability ids, rather than the un-folded `2 * bucket_cap` or an unbounded
+    /// concurrent overshoot. When the table is full of in-window buckets a new key
+    /// is DENIED fail-closed rather than evicting an active bucket, so the bound is
+    /// tight for all `bucket_cap >= 1`.
     pub fn with_bucket_cap(config: VelocityConfig, bucket_cap: usize) -> Self {
         Self {
             state: Mutex::new(VelocityState {
                 invocation_buckets: HashMap::new(),
                 spend_buckets: HashMap::new(),
-                invocation_inserts_since_sweep: 0,
-                spend_inserts_since_sweep: 0,
             }),
             config,
             bucket_cap: bucket_cap.max(1),
@@ -225,112 +223,64 @@ impl VelocityState {
             .saturating_add(self.spend_buckets.len())
     }
 
-    /// Amortized idle-sweep of both maps plus COMBINED-cap enforcement before a
-    /// new key is inserted into `kind`'s map. Run under the single state lock, so
+    /// Drop EXPIRED (out-of-window) buckets from BOTH maps to reclaim slots. A
+    /// bucket that has not been refilled/consumed for a full window has fully
+    /// refilled back to capacity, so it is semantically identical to a fresh
+    /// bucket: dropping it can never reset an in-flight (in-window) rate/spend
+    /// limit. Bounded: touches at most the live buckets (<= `bucket_cap` once
+    /// saturated).
+    fn prune_expired(&mut self, window_secs: u64) {
+        let idle = std::time::Duration::from_secs(window_secs);
+        self.invocation_buckets
+            .retain(|_, bucket| bucket.last_refill.elapsed() < idle);
+        self.spend_buckets
+            .retain(|_, bucket| bucket.last_refill.elapsed() < idle);
+    }
+
+    /// Reserve a slot for a genuinely new key in `kind`'s map without exceeding the
+    /// COMBINED cap. Returns `true` when the caller may insert the new key, `false`
+    /// when the guard must DENY fail-closed. Run under the single state lock, so
     /// `combined_len()` is always the true current total (never a stale sibling
-    /// snapshot). A full-and-idle bucket is semantically a fresh one, so idle
-    /// buckets are periodically dropped from BOTH maps.
+    /// snapshot).
     ///
-    /// The cap is enforced only when INSERTING a genuinely new key: updating an
-    /// existing bucket must never evict, otherwise a repeat request for an
-    /// already-tracked capability could evict and recreate its own bucket with a
-    /// full token balance, defeating the per-window limit (RFC-0004 F38). When a
-    /// new insert would reach the combined cap, the most-idle bucket across BOTH
-    /// maps is evicted -- excluding the active `key` in either map so the bucket
-    /// being consumed by this evaluate is never reset. Because the combined size
-    /// is the true total under one lock, the combined count stays bounded by
-    /// `bucket_cap` (tight for `bucket_cap >= 3`) rather than overshooting under
-    /// concurrency (codex finding 3553826793).
-    fn sweep_and_enforce_combined_cap(
+    /// Updating an EXISTING key never needs a slot and returns `true` immediately,
+    /// so a repeat request for an already-tracked capability never evicts and
+    /// recreates its own bucket with a full token balance (RFC-0004 F38). For a
+    /// genuinely new key at the combined cap, EXPIRED (out-of-window) buckets are
+    /// pruned from BOTH maps first; if only ACTIVE (in-window) buckets remain, the
+    /// new key is DENIED rather than evicting an active bucket. Evicting an active
+    /// bucket would reset its per-window rate/spend limit, letting a caller who can
+    /// mint many distinct capability ids force a depleted bucket out and reuse the
+    /// id within the same window for a fresh `TokenBucket` (the same fail-open
+    /// bypass class fixed in the admission guard, RFC-0004 F39, codex finding
+    /// 3554566269). Denying keeps memory bounded (cap unchanged) without the bypass:
+    /// a distinct-capability flood saturates at `bucket_cap` and is denied instead
+    /// of growing.
+    fn reserve_slot_for_new_key(
         &mut self,
         kind: BucketKind,
         window_secs: u64,
         bucket_cap: usize,
         key: &(String, usize),
-    ) {
-        let do_sweep = {
-            let counter = match kind {
-                BucketKind::Invocation => &mut self.invocation_inserts_since_sweep,
-                BucketKind::Spend => &mut self.spend_inserts_since_sweep,
-            };
-            *counter = counter.saturating_add(1);
-            if *counter >= 256 {
-                *counter = 0;
-                true
-            } else {
-                false
-            }
-        };
-        if do_sweep {
-            let idle = std::time::Duration::from_secs(window_secs);
-            self.invocation_buckets
-                .retain(|_, bucket| bucket.last_refill.elapsed() < idle);
-            self.spend_buckets
-                .retain(|_, bucket| bucket.last_refill.elapsed() < idle);
-        }
-
+    ) -> bool {
         let target_has_key = match kind {
             BucketKind::Invocation => self.invocation_buckets.contains_key(key),
             BucketKind::Spend => self.spend_buckets.contains_key(key),
         };
         if target_has_key {
-            return;
+            return true;
         }
 
-        // Evict until inserting one new bucket keeps the combined total within
-        // `bucket_cap`. `combined_len()` is the true total under this lock, so
-        // there is no stale-snapshot overshoot. The loop stops only when the
-        // combined total is below the cap or when the only remaining buckets are
-        // the excluded active `key` (bounded: at most two such entries).
-        while self.combined_len() >= bucket_cap {
-            if !self.evict_most_idle_excluding(key) {
-                break;
+        // Inserting one new bucket must keep the combined total within `bucket_cap`.
+        // `combined_len()` is the true total under this lock, so there is no
+        // stale-snapshot overshoot.
+        if self.combined_len() >= bucket_cap {
+            self.prune_expired(window_secs);
+            if self.combined_len() >= bucket_cap {
+                return false;
             }
         }
-    }
-
-    /// Evict the single most-idle bucket (largest elapsed since `last_refill`)
-    /// across BOTH maps whose map-key is not `exclude`. Returns true if a bucket
-    /// was removed.
-    fn evict_most_idle_excluding(&mut self, exclude: &(String, usize)) -> bool {
-        let mut victim: Option<(BucketKind, (String, usize), std::time::Duration)> = None;
-        for (k, b) in self.invocation_buckets.iter() {
-            if k == exclude {
-                continue;
-            }
-            let idle = b.last_refill.elapsed();
-            let better = match &victim {
-                None => true,
-                Some((_, _, best)) => idle > *best,
-            };
-            if better {
-                victim = Some((BucketKind::Invocation, k.clone(), idle));
-            }
-        }
-        for (k, b) in self.spend_buckets.iter() {
-            if k == exclude {
-                continue;
-            }
-            let idle = b.last_refill.elapsed();
-            let better = match &victim {
-                None => true,
-                Some((_, _, best)) => idle > *best,
-            };
-            if better {
-                victim = Some((BucketKind::Spend, k.clone(), idle));
-            }
-        }
-        match victim {
-            Some((BucketKind::Invocation, k, _)) => {
-                self.invocation_buckets.remove(&k);
-                true
-            }
-            Some((BucketKind::Spend, k, _)) => {
-                self.spend_buckets.remove(&k);
-                true
-            }
-            None => false,
-        }
+        true
     }
 }
 
@@ -361,12 +311,16 @@ impl Guard for VelocityGuard {
         if let Some(max_inv) = self.config.max_invocations_per_window {
             // Burst capacity: max_inv * burst_factor, rounded to nearest integer.
             let capacity = ((max_inv as f64 * self.config.burst_factor).round() as u64).max(1);
-            state.sweep_and_enforce_combined_cap(
+            // Deny fail-closed if the combined table is full of ACTIVE buckets and
+            // this is a new key: never evict an active bucket (RFC-0004 F38/F39).
+            if !state.reserve_slot_for_new_key(
                 BucketKind::Invocation,
                 window_secs,
                 self.bucket_cap,
                 &key,
-            );
+            ) {
+                return Ok(GuardDecision::deny(Vec::new()));
+            }
             let bucket = state
                 .invocation_buckets
                 .entry(key.clone())
@@ -380,12 +334,14 @@ impl Guard for VelocityGuard {
         if let Some(max_spend) = self.config.max_spend_per_window {
             let capacity = ((max_spend as f64 * self.config.burst_factor).round() as u64).max(1);
             let spend_units = planned_spend_units(ctx)?;
-            state.sweep_and_enforce_combined_cap(
+            if !state.reserve_slot_for_new_key(
                 BucketKind::Spend,
                 window_secs,
                 self.bucket_cap,
                 &key,
-            );
+            ) {
+                return Ok(GuardDecision::deny(Vec::new()));
+            }
             let bucket = state
                 .spend_buckets
                 .entry(key)
@@ -686,6 +642,125 @@ mod tests {
             guard.invocation_bucket_count(),
             1,
             "the bucket being consumed must not be evicted and recreated"
+        );
+    }
+
+    #[test]
+    fn full_table_of_active_buckets_denies_new_key_without_eviction() {
+        // codex finding 3554566269 (fail-open bypass, RFC-0004 F38/F39): when the
+        // combined bucket table is full of IN-WINDOW (active) buckets, a new
+        // distinct capability must be DENIED fail-closed, NOT admitted by evicting
+        // an active victim. Evicting an active bucket would reset the victim's
+        // per-window limit, letting a caller who mints many distinct capability ids
+        // force a depleted bucket out and reuse the id within the same window for a
+        // fresh TokenBucket. Two in-window capabilities fill a cap of 2; a third is
+        // denied and the two actives keep their (depleted) buckets intact.
+        let config = VelocityConfig {
+            max_invocations_per_window: Some(1),
+            window_secs: 60,
+            ..VelocityConfig::default()
+        };
+        let guard = VelocityGuard::with_bucket_cap(config, 2);
+        let kp = Keypair::generate();
+        let agent = kp.public_key().to_hex();
+        let server = "srv".to_string();
+        let scope = ChioScope::default();
+
+        let cap_a = signed_cap(&kp, "cap-a");
+        let cap_b = signed_cap(&kp, "cap-b");
+        let cap_c = signed_cap(&kp, "cap-c");
+        let req_a = make_request(&cap_a, &agent, &server);
+        let req_b = make_request(&cap_b, &agent, &server);
+        let req_c = make_request(&cap_c, &agent, &server);
+
+        // a and b each spend their single token; the table is now full of two
+        // active buckets.
+        let a1 = guard
+            .evaluate(&guard_ctx(&req_a, &scope, &agent, &server, None))
+            .expect("a first");
+        assert_eq!(a1, Verdict::Allow);
+        let b1 = guard
+            .evaluate(&guard_ctx(&req_b, &scope, &agent, &server, None))
+            .expect("b first");
+        assert_eq!(b1, Verdict::Allow);
+        assert_eq!(guard.combined_bucket_count(), 2);
+
+        // c trips the cap while a and b are both in-window: c must be DENIED and no
+        // active bucket may be evicted.
+        let c1 = guard
+            .evaluate(&guard_ctx(&req_c, &scope, &agent, &server, None))
+            .expect("c");
+        assert_eq!(
+            c1,
+            Verdict::Deny,
+            "new key must be denied when the table is full of active buckets, not admitted by eviction"
+        );
+        assert_eq!(
+            guard.combined_bucket_count(),
+            2,
+            "an active bucket was wrongly evicted to admit the new key"
+        );
+
+        // a retained its (now empty) bucket: re-evaluating it must still be denied.
+        // RED (pre-fix): c evicted a, so this returned a fresh allowed bucket.
+        let a2 = guard
+            .evaluate(&guard_ctx(&req_a, &scope, &agent, &server, None))
+            .expect("a replay");
+        assert_eq!(
+            a2,
+            Verdict::Deny,
+            "active bucket a was reset by eviction (rate-limit bypass regressed)"
+        );
+    }
+
+    #[test]
+    fn expired_bucket_is_pruned_to_admit_new_key() {
+        // The bounded path still reclaims slots from EXPIRED (out-of-window)
+        // buckets: a bucket idle for a full window has refilled to capacity and is
+        // semantically fresh, so pruning it to admit a new key is safe (it cannot
+        // reset an in-flight limit). With a 1s window and a cap of 1, the first
+        // capability's bucket expires after the window, so a second distinct
+        // capability is admitted (not denied).
+        let config = VelocityConfig {
+            max_invocations_per_window: Some(1),
+            window_secs: 1,
+            ..VelocityConfig::default()
+        };
+        let guard = VelocityGuard::with_bucket_cap(config, 1);
+        let kp = Keypair::generate();
+        let agent = kp.public_key().to_hex();
+        let server = "srv".to_string();
+        let scope = ChioScope::default();
+
+        let cap_a = signed_cap(&kp, "cap-a");
+        let cap_b = signed_cap(&kp, "cap-b");
+        let req_a = make_request(&cap_a, &agent, &server);
+        let req_b = make_request(&cap_b, &agent, &server);
+
+        let a1 = guard
+            .evaluate(&guard_ctx(&req_a, &scope, &agent, &server, None))
+            .expect("a first");
+        assert_eq!(a1, Verdict::Allow);
+        assert_eq!(guard.combined_bucket_count(), 1);
+
+        // Idle strictly past the window so a's bucket is out-of-window (expired).
+        thread::sleep(Duration::from_millis(1200));
+
+        // b is a new distinct key at the cap: prune_expired reclaims a's slot, so b
+        // is admitted rather than denied, and the table still holds exactly one
+        // bucket (bounded).
+        let b1 = guard
+            .evaluate(&guard_ctx(&req_b, &scope, &agent, &server, None))
+            .expect("b first");
+        assert_eq!(
+            b1,
+            Verdict::Allow,
+            "an expired bucket must be pruned to make room for a new key"
+        );
+        assert_eq!(
+            guard.combined_bucket_count(),
+            1,
+            "the expired bucket was not pruned; table exceeded the cap"
         );
     }
 
