@@ -23,16 +23,27 @@ impl PaymentAdapterConfig {
     /// `CHIO_PAYMENT_BASE_URL`: required when the adapter is `http-x402` or `http-acp`.
     /// `CHIO_PAYMENT_BEARER_TOKEN`: optional bearer token for http adapters.
     ///
-    /// Returns `None` when `CHIO_PAYMENT_ADAPTER` is absent or `sim`.
-    #[must_use]
-    pub fn from_env() -> Option<Self> {
-        let kind = std::env::var("CHIO_PAYMENT_ADAPTER").ok()?;
+    /// Returns `Ok(None)` when `CHIO_PAYMENT_ADAPTER` is absent or set to `sim`
+    /// (the caller then uses the documented default). Returns `Err` when the
+    /// variable is present but its value is not a recognized adapter kind -
+    /// an unrecognized value would otherwise silently mask a misconfigured
+    /// real payment rail.
+    pub fn from_env() -> Result<Option<Self>, String> {
+        let kind = match std::env::var("CHIO_PAYMENT_ADAPTER") {
+            Ok(value) => value,
+            Err(_) => return Ok(None),
+        };
         let base_url = std::env::var("CHIO_PAYMENT_BASE_URL").unwrap_or_default();
         let bearer_token = std::env::var("CHIO_PAYMENT_BEARER_TOKEN").ok();
         match kind.as_str() {
-            "http-x402" => Some(Self::HttpX402 { base_url, bearer_token }),
-            "http-acp" => Some(Self::HttpAcp { base_url, bearer_token }),
-            _ => None,
+            "sim" | "" => Ok(None),
+            "http-x402" => Ok(Some(Self::HttpX402 { base_url, bearer_token })),
+            "http-acp" => Ok(Some(Self::HttpAcp { base_url, bearer_token })),
+            other => Err(format!(
+                "CHIO_PAYMENT_ADAPTER: unrecognized adapter kind {:?}; \
+                 expected one of: sim, http-x402, http-acp",
+                other
+            )),
         }
     }
 
@@ -81,6 +92,21 @@ mod tests {
     #[test]
     fn default_is_sim_and_safe() {
         assert!(matches!(PaymentAdapterConfig::default_safe(), PaymentAdapterConfig::Sim));
+    }
+
+    #[test]
+    fn unknown_adapter_kind_errors_at_load_time_not_silently_downgrades() {
+        // A present-but-unrecognized CHIO_PAYMENT_ADAPTER must produce an error,
+        // not silently fall back to Sim. This prevents a misconfigured real rail
+        // from being masked by a silent default.
+        std::env::set_var("CHIO_PAYMENT_ADAPTER", "mystery-rail");
+        let result = PaymentAdapterConfig::from_env();
+        std::env::remove_var("CHIO_PAYMENT_ADAPTER");
+        let error = result.test_expect_err("unknown adapter kind must fail at load time");
+        assert!(
+            error.contains("mystery-rail") && error.contains("unrecognized"),
+            "error must identify the unknown kind: {error}"
+        );
     }
 
     #[test]

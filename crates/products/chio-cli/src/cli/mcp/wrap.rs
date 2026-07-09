@@ -317,6 +317,7 @@ impl KernelMediatedMcpTransport {
             retention_config: None,
         });
         let payment_adapter_config = PaymentAdapterConfig::from_env()
+            .map_err(CliError::cli_other_error)?
             .unwrap_or_else(PaymentAdapterConfig::default_safe);
         payment_adapter_config
             .validate()
