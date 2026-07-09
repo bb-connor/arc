@@ -172,6 +172,36 @@ impl WebhookExporter {
         Ok(Self { config, client })
     }
 
+    /// Construct a webhook SOC export sink from an operator-configured endpoint
+    /// URL, deriving the required [`HttpEgressContract`] from the URL authority
+    /// the same way the alert backends do (RFC-0009 F78/F79). This is the
+    /// env-driven production constructor the `chio-wall siem-export` serve path
+    /// uses to register a real durable audit-export consumer.
+    ///
+    /// The generic webhook is the most general SOC receiver: with the default
+    /// `WebhookConfig` (no `min_severity`, no guard filters) it forwards EVERY
+    /// audit row, not just high-severity denials, so it is a complete SOC export
+    /// sink rather than a notification overlay.
+    ///
+    /// `url` must be `https://`. `bearer_token`, when present, is sent as
+    /// `Authorization: Bearer` and wrapped in [`Zeroizing`] so its bytes are
+    /// cleared on drop. Returns an error (fail-closed) when the URL is not HTTPS,
+    /// the derived contract rejects the URL, or the HTTP client cannot be built.
+    pub fn from_endpoint(url: String, bearer_token: Option<String>) -> Result<Self, ExportError> {
+        let egress_contract = crate::alerting::siem_endpoint_egress_contract("webhook", &url)?;
+        let auth = match bearer_token {
+            Some(token) => WebhookAuth::Bearer(Zeroizing::new(token)),
+            None => WebhookAuth::None,
+        };
+        let config = WebhookConfig {
+            url,
+            auth,
+            egress_contract: Some(egress_contract),
+            ..WebhookConfig::default()
+        };
+        Self::new(config)
+    }
+
     /// Create a `WebhookExporter` without TLS scheme validation.
     ///
     /// This constructor is intended for integration tests that run against a
@@ -419,6 +449,7 @@ impl Exporter for WebhookExporter {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
@@ -447,5 +478,38 @@ mod tests {
     #[test]
     fn default_auth_is_none() {
         assert!(matches!(WebhookAuth::default(), WebhookAuth::None));
+    }
+
+    #[test]
+    fn from_endpoint_builds_a_real_https_soc_consumer() {
+        // The env-driven serve constructor derives the egress contract from the
+        // URL and yields a real, named "webhook" SOC export consumer offline (no
+        // DNS resolution at construction).
+        let exporter =
+            WebhookExporter::from_endpoint("https://soc.example.test/ingest".to_string(), None)
+                .expect("https endpoint builds a webhook SOC sink");
+        assert_eq!(exporter.name(), "webhook");
+        // The default config forwards EVERY audit row (no severity/guard filter),
+        // so it is a complete SOC export sink, not a notification overlay.
+        assert!(exporter.config.min_severity.is_none());
+        assert!(exporter.config.include_guards.is_empty());
+        assert!(matches!(exporter.config.auth, WebhookAuth::None));
+    }
+
+    #[test]
+    fn from_endpoint_carries_bearer_token_and_rejects_plaintext() {
+        let with_token = WebhookExporter::from_endpoint(
+            "https://soc.example.test/ingest".to_string(),
+            Some("soc-secret".to_string()),
+        )
+        .expect("bearer-authenticated https endpoint builds");
+        assert!(matches!(with_token.config.auth, WebhookAuth::Bearer(_)));
+
+        let plaintext =
+            WebhookExporter::from_endpoint("http://soc.example.test/ingest".to_string(), None);
+        assert!(
+            plaintext.is_err(),
+            "a plaintext http SOC endpoint must be rejected"
+        );
     }
 }

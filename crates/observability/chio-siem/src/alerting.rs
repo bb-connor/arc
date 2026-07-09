@@ -256,7 +256,7 @@ impl PagerDutyBackend {
     /// 30s timeout is intentional and must not be silently dropped on
     /// builder failure.
     pub fn with_endpoint(routing_key: String, endpoint: String) -> Result<Self, ExportError> {
-        let egress_contract = alert_endpoint_egress_contract("pagerduty", &endpoint)?;
+        let egress_contract = siem_endpoint_egress_contract("pagerduty", &endpoint)?;
         Self::with_endpoint_and_contract(routing_key, endpoint, egress_contract)
     }
 
@@ -381,7 +381,7 @@ impl OpsGenieBackend {
     /// 30s timeout is intentional and must not be silently dropped on
     /// builder failure.
     pub fn with_endpoint(api_key: String, endpoint: String) -> Result<Self, ExportError> {
-        let egress_contract = alert_endpoint_egress_contract("opsgenie", &endpoint)?;
+        let egress_contract = siem_endpoint_egress_contract("opsgenie", &endpoint)?;
         Self::with_endpoint_and_contract(api_key, endpoint, egress_contract)
     }
 
@@ -422,7 +422,14 @@ impl OpsGenieBackend {
     }
 }
 
-fn alert_endpoint_egress_contract(
+/// Build the required [`HttpEgressContract`] for a SIEM egress endpoint by
+/// deriving the allowed scheme/authority from the endpoint URL (RFC-0009). Used
+/// by both the alert-backend endpoints (PagerDuty/OpsGenie) and the SOC export
+/// sinks (e.g. the generic webhook) so every SIEM egress path derives its
+/// contract the same way. `namespace_prefix` scopes the tenant egress namespace
+/// (`siem:{prefix}:{authority}`); loopback/link-local/ULA denials are relaxed
+/// only when the endpoint explicitly targets such an address.
+pub(crate) fn siem_endpoint_egress_contract(
     namespace_prefix: &str,
     endpoint: &str,
 ) -> Result<HttpEgressContract, ExportError> {

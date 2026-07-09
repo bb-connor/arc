@@ -967,6 +967,15 @@ const PAGERDUTY_ENDPOINT_ENV: &str = "CHIO_SIEM_ALERT_PAGERDUTY_ENDPOINT";
 const OPSGENIE_API_KEY_ENV: &str = "CHIO_SIEM_ALERT_OPSGENIE_API_KEY";
 const OPSGENIE_ENDPOINT_ENV: &str = "CHIO_SIEM_ALERT_OPSGENIE_ENDPOINT";
 
+/// Environment keys an operator sets to enable a SOC export sink in the serve
+/// mode (RFC-0009 F78/F79). A SOC export sink is a real durable audit-export
+/// consumer (unlike alerting, which is a notification overlay); at least one is
+/// required before serving. The generic webhook sink is the most general SOC
+/// receiver: with default config it forwards EVERY audit row. Absent keys mean
+/// "no webhook SOC sink configured" (another sink may still be wired later).
+const WEBHOOK_URL_ENV: &str = "CHIO_SIEM_WEBHOOK_URL";
+const WEBHOOK_BEARER_TOKEN_ENV: &str = "CHIO_SIEM_WEBHOOK_BEARER_TOKEN";
+
 /// The manager's always-on malformed-row producer. Seeding its soc_export
 /// series at zero keeps the `chio_soc_export_total` family present from serve
 /// start so `ChioSocExportMetricsMissing` fires only on a true scrape gap,
@@ -1003,16 +1012,29 @@ async fn serve_siem_export(receipt_db: &Path, cursor_db: &Path) -> Result<(), Cl
         .map_err(|error| CliError::cli_other_error(format!("open ExporterManager: {error}")))?
         .with_metrics_sink(metrics_sink.clone());
 
+    use chio_siem::Exporter as _;
+    let mut registered_exporters: Vec<String> = Vec::new();
+    let mut alert_routes: Vec<String> = Vec::new();
+
+    // Operator-configured SOC export sinks (RFC-0009 F78/F79). Each is a real
+    // durable audit-export consumer (the generic webhook forwards EVERY audit
+    // row); registering at least one is what satisfies the fail-closed gate
+    // below. Wired from the CHIO_SIEM_* endpoint env exactly the way the alert
+    // backends are, so serve is actually functional (not gated shut in every
+    // config).
+    for exporter in configured_soc_exporters()? {
+        registered_exporters.push(exporter.name().to_string());
+        manager.add_exporter(exporter);
+    }
+
     // Operator-configured alerting (RFC-0009 F77). Alerting is NOT always-on:
     // each backend needs a secret routing key, so it runs only when configured.
     // When configured, the SAME registry metrics sink is installed into the
     // AlertingExporter so chio_alert_dispatch_total/_latency emit REAL values on
     // real dispatches (not just in tests), and the exporter is registered with
-    // the manager so its per-poll dispatch loop drives those metrics. Additional
-    // deployment-configured SOC exporters are registered here the same way.
-    use chio_siem::Exporter as _;
-    let mut registered_exporters: Vec<String> = Vec::new();
-    let mut alert_routes: Vec<String> = Vec::new();
+    // the manager so its per-poll dispatch loop drives those metrics. Alerting
+    // is a notification overlay, so it runs ALONGSIDE a SOC sink and never
+    // satisfies the gate on its own.
     let alert_backends = configured_alert_backends()?;
     if let Some((alerting, routes)) =
         build_serve_alerting_exporter(alert_backends, metrics_sink.clone())
@@ -1160,6 +1182,34 @@ fn configured_alert_backends() -> Result<Vec<Box<dyn chio_siem::AlertBackend>>, 
     }
 
     Ok(backends)
+}
+
+/// Read the operator-configured SOC export sinks from the environment (RFC-0009
+/// F78/F79). Returns an empty vec when no SOC endpoint is configured; returns an
+/// error (fail-closed) when a sink is requested but cannot be constructed, so a
+/// misconfigured endpoint denies the serve start rather than silently dropping
+/// audit-export coverage.
+///
+/// Currently wires the generic webhook sink, the most general SOC receiver: with
+/// default config it forwards EVERY audit row (not just high-severity denials),
+/// so it is a complete SOC export sink. A deployment sets `CHIO_SIEM_WEBHOOK_URL`
+/// (https) and optionally `CHIO_SIEM_WEBHOOK_BEARER_TOKEN`. Splunk/Elastic/etc.
+/// are registered here the same way as they gain endpoint env keys.
+fn configured_soc_exporters() -> Result<Vec<Box<dyn chio_siem::Exporter>>, CliError> {
+    let mut exporters: Vec<Box<dyn chio_siem::Exporter>> = Vec::new();
+
+    if let Some(url) = non_empty_env(WEBHOOK_URL_ENV) {
+        let bearer_token = non_empty_env(WEBHOOK_BEARER_TOKEN_ENV);
+        let exporter =
+            chio_siem::WebhookExporter::from_endpoint(url, bearer_token).map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "configure SIEM webhook SOC export sink: {error}"
+                ))
+            })?;
+        exporters.push(Box::new(exporter));
+    }
+
+    Ok(exporters)
 }
 
 /// Read a trimmed, non-empty environment value, treating unset/blank as absent.
@@ -1811,6 +1861,43 @@ mod tests {
         assert!(ensure_serve_has_consumer(&["splunk".to_string()]).is_ok());
         // Alerting running ALONGSIDE a SOC sink is also fine.
         assert!(ensure_serve_has_consumer(&["alerting".to_string(), "splunk".to_string()]).is_ok());
+    }
+
+    /// RFC-0009 F78/F79 (completing Codex round-4 finding 3): the serve path
+    /// actually wires a real SOC export sink from the CHIO_SIEM_WEBHOOK_* env, so
+    /// a deploy that configures a webhook endpoint builds a real "webhook"
+    /// consumer that satisfies the fail-closed gate. Before this, NO code path
+    /// registered a SOC sink, so ensure_serve_has_consumer was unsatisfiable in
+    /// every config and siem-export errored before serving. Only this test
+    /// touches CHIO_SIEM_WEBHOOK_URL, so the set/remove cannot race another
+    /// test's configured_soc_exporters() call.
+    #[test]
+    fn serve_soc_webhook_wiring_builds_a_real_consumer_and_passes_the_gate() {
+        // Unconfigured: no SOC sink is fabricated, so the gate still fails closed.
+        std::env::remove_var(WEBHOOK_URL_ENV);
+        assert!(
+            configured_soc_exporters()
+                .expect("no SOC endpoint configured is not an error")
+                .is_empty(),
+            "no phantom consumer when unconfigured"
+        );
+
+        // Configured: a real "webhook" SOC consumer is built and satisfies the
+        // gate that alerting alone cannot.
+        std::env::set_var(WEBHOOK_URL_ENV, "https://soc.example.test/ingest");
+        let exporters = configured_soc_exporters().expect("a webhook endpoint builds a SOC sink");
+        std::env::remove_var(WEBHOOK_URL_ENV);
+
+        let names: Vec<String> = exporters.iter().map(|e| e.name().to_string()).collect();
+        assert_eq!(
+            names,
+            vec!["webhook".to_string()],
+            "one real webhook SOC sink is registered"
+        );
+        assert!(
+            ensure_serve_has_consumer(&names).is_ok(),
+            "a wired SOC sink satisfies the fail-closed gate"
+        );
     }
 
     /// Codex round-4 finding 3: alerting is a notification overlay, not a SOC
