@@ -419,8 +419,14 @@ impl ExporterManager {
                     // (ADR-0009) dedups downstream.
                 }
             }
-            self.metrics
-                .set_dlq_depth(&exporter_name, self.dlq.len() as u64);
+            // Report the DLQ depth attributed to THIS exporter only. Using the
+            // global `self.dlq.len()` for every exporter label would report a
+            // non-zero depth on a healthy exporter just because a different sink
+            // failed in the same poll (Codex round-3 finding 4).
+            self.metrics.set_dlq_depth(
+                &exporter_name,
+                self.dlq.depth_for_exporter(&exporter_name) as u64,
+            );
         }
 
         // Advance the read cursor. In legacy None mode (no cursor store) the
@@ -982,6 +988,52 @@ mod tests {
         assert!(
             depths.contains(&("_deserialize".to_string(), 1)),
             "the deserialize DLQ depth must be reported for a malformed row: {depths:?}"
+        );
+        Ok(())
+    }
+
+    /// Codex round-3 finding 4: when one exporter fails and another succeeds in
+    /// the same poll, the DLQ depth must be attributed to the FAILING exporter
+    /// only. A healthy exporter must report depth 0 even though a different sink
+    /// filled the shared DLQ.
+    #[tokio::test]
+    async fn dlq_depth_is_attributed_to_the_failing_exporter_only() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let receipt_db = dir.path().join("receipts.sqlite3");
+        seed_valid_receipt_db(&receipt_db, 2)?;
+
+        let sink = std::sync::Arc::new(RecordingSink::default());
+        let mut manager = ExporterManager::new(SiemConfig {
+            db_path: receipt_db.clone(),
+            max_retries: 0,
+            cursor_db_path: None,
+            ..SiemConfig::default()
+        })?
+        .with_metrics_sink(sink.clone());
+        // Register the failing exporter FIRST so the shared DLQ is already
+        // non-empty when the succeeding exporter's depth is reported.
+        manager.add_exporter(Box::new(FailExporter {
+            name: "fail-sink".to_string(),
+        }));
+        manager.add_exporter(Box::new(OkExporter {
+            name: "ok-sink".to_string(),
+        }));
+
+        manager.poll_once().await?;
+
+        let depths = sink
+            .dlq_depths
+            .lock()
+            .map_err(|_| std::io::Error::other("dlq depth lock poisoned"))?;
+        assert!(
+            depths.contains(&("ok-sink".to_string(), 0)),
+            "the succeeding exporter must report DLQ depth 0: {depths:?}"
+        );
+        assert!(
+            depths
+                .iter()
+                .any(|(name, depth)| name == "fail-sink" && *depth > 0),
+            "the failing exporter must report its own non-zero DLQ depth: {depths:?}"
         );
         Ok(())
     }
