@@ -506,16 +506,40 @@ impl ChioKernel {
 
         // Try streaming first regardless of monetary mode.
         //
-        // RFC-0004 F06 note: the kernel's stream byte-limit is enforced at
-        // finalize by `apply_stream_limits` / `truncate_stream_to_byte_limit`,
-        // which bounds the stream to `max_stream_total_bytes` and marks the
-        // receipt incomplete (preserving the charge-for-work-done and financial
-        // metadata on governed monetary streams). The reusable TCB primitives
-        // `enforce_stream_byte_limit` and `push_chunk_bounded`
-        // (crate::runtime) provide a fail-closed Overloaded { StreamBytes }
-        // byte-accumulation check for KernelError-returning accumulators and
-        // out-of-tree connectors; in-tree connectors (A2A caps at 1 MiB) bound
-        // the worst case, so the dispatch seam does not hard-deny here.
+        // RFC-0004 F06: why the kernel cannot bound stream memory "as chunks
+        // arrive" at THIS seam, and where the actual bounds live.
+        //
+        // `ToolServerConnection::invoke_stream` returns a FULLY MATERIALIZED
+        // `ToolServerStreamResult` (which owns a `ToolCallStream { chunks: Vec<..>
+        // }`). The connector is in-process trusted code that drains its transport
+        // and builds the entire Vec BEFORE returning; the kernel receives control
+        // only after materialization. There is no incremental per-chunk arrival at
+        // this seam, so `push_chunk_bounded` cannot be driven here to bound the
+        // stream as it accumulates. True accumulation-time bounding would require
+        // changing the trait contract to a kernel-driven pull model (invoke_stream
+        // yielding a chunk source the kernel pulls), a public runtime-API change
+        // affecting every implementor; and even then a malicious in-process
+        // connector could allocate before yielding. So the transient peak
+        // allocation of a non-cooperating out-of-tree connector is a genuine
+        // connector-trust-boundary limit, bounded only by the process RSS ceiling
+        // (cgroup/ulimit).
+        //
+        // Layered bounds that DO apply:
+        //   - Accumulation is bounded by the ACCUMULATOR. In-tree connectors cap
+        //     it (A2A: `parse_sse_stream_with_limit`, MAX_SSE_TOTAL_BYTES = 1 MiB).
+        //     `enforce_stream_byte_limit` / `push_chunk_bounded` (crate::runtime)
+        //     are pub fail-closed Overloaded { StreamBytes } primitives so
+        //     out-of-tree connector authors can bound their own invoke_stream.
+        //   - Retained memory is bounded at finalize by `apply_stream_limits` /
+        //     `truncate_stream_to_byte_limit`: the stream is truncated to
+        //     `max_stream_total_bytes` and the receipt is marked incomplete,
+        //     PRESERVING the charge-for-work-done and financial metadata on
+        //     governed monetary streams (pinned by
+        //     `governed_monetary_incomplete_receipt_keeps_financial_and_governed_metadata`
+        //     and `streamed_tool_byte_limit_truncates_output_and_marks_receipt_incomplete`).
+        //     A hard-deny (Err) here was deliberately reverted because it unwinds
+        //     the monetary charge for an already-executed stream, so this seam
+        //     does not hard-deny.
         if let Some(stream) = server
             .invoke_stream(&request.tool_name, request.arguments.clone(), None)
             .await?
