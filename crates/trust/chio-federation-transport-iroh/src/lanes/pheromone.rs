@@ -532,49 +532,98 @@ impl PheromoneBatchHandler {
                         slot.release()?;
                         stored
                     } else {
-                        let now = (self.now)();
-                        // The report type (chio-pheromone-runtime PheromoneReceiveReport)
-                        // is not nameable here; it flows through by inference. The per-frame
-                        // verifier (pheromone_gossip.rs:236/244) runs inside this call,
-                        // unchanged, and only ever on a batch not already in the inbox.
-                        let fresh = match self
+                        // WINNER-PATH DURABLE-VERDICT RECOVERY (RFC-0012 F35, symmetric
+                        // with the loser path below). Winning the reservation and finding no
+                        // recorded inbox verdict does NOT prove the batch is unreceived across
+                        // the two-store boundary. receive_batch self-commits its runtime
+                        // mutation (deposits + receive-report) in the RUNTIME store; slot.commit()
+                        // marks the RELAY reservation committed in a SEPARATE durable write, with
+                        // a cross-store fsync between the two. A hard crash (SIGKILL / OOM /
+                        // power) in that window leaves the batch ADMITTED in the runtime store
+                        // but the relay reservation committed = 0, which the store reclaims at
+                        // open; a redelivery then re-wins the reservation and reaches HERE.
+                        // Consult the runtime store by batch hash BEFORE re-running
+                        // receive_batch: if it already holds a committed receive-report, ADOPT
+                        // that durable verdict rather than re-running the receiver (which would
+                        // re-enter the runtime replay window and reject the already-admitted
+                        // deposits - a spurious "rejected" verdict that dead-letters an accepted
+                        // batch). The hash is sha256_hex over the same canonical batch bytes the
+                        // runtime store keys on (batch_sha256 == sha256_hex(canonical_json_bytes)),
+                        // identical to the loser path.
+                        let batch_sha256 = sha256_hex(&batch_bytes);
+                        if let Some(recovered) = self
                             .receiver
-                            .receive_batch(batch.clone(), authenticated_sender.clone(), now)
-                            .await
+                            .recorded_report_for_batch(&batch_sha256)
+                            .await?
                         {
-                            // receive_batch self-commits its runtime mutation only on Ok; an
-                            // Err admitted nothing. The still-ARMED guard drops on this
-                            // `?`-return and RELEASES the slot so a redelivery can re-claim
-                            // and re-receive. Fail-closed.
-                            Err(error) => return Err(error.into()),
-                            Ok(fresh) => fresh,
-                        };
-                        // Deposits are now committed. COMMIT the slot: disarm (a cancel/panic
-                        // in the committed-but-unrecorded window below must NOT release, or a
-                        // redelivery would re-receive an already-admitted batch, yielding a
-                        // spurious "rejected" durable verdict for deposits that were in fact
-                        // admitted) AND persist the durable commit marker so a PROCESS crash in
-                        // this window leaves a reservation that survives the store's
-                        // clear-at-open, forcing redelivery down the fail-closed loser path.
-                        slot.commit()?;
-                        match self
-                            .store
-                            .record_inbox(&authenticated_sender, &nonce, &batch, &fresh)
-                        {
-                            // Durable verdict recorded: it now short-circuits any redelivery
-                            // at lookup_inbox_report BEFORE the reservation is consulted, so
-                            // the reservation is redundant. Release it to bound
-                            // reservation-table growth (fail-closed on the store error; the
-                            // recorded verdict still short-circuits the peer's retry).
-                            Ok(_) => slot.release()?,
-                            // A committed batch whose verdict failed to record must NOT be
-                            // re-received. Leave the slot HELD (already disarmed): a
-                            // redelivery loses the reservation and takes the loser /
-                            // fail-closed path, never re-running the receiver. The peer retry
-                            // fail-closes pending operational recovery.
-                            Err(error) => return Err(error.into()),
+                            // Adopt the durable verdict as the inbox record so both peers
+                            // converge. record_inbox is idempotent (ON CONFLICT), so a
+                            // concurrent handler recording first is harmless. RELEASE the
+                            // committed residual reservation via the guard (disarming it so the
+                            // Drop does not release again) now that the durable inbox row
+                            // short-circuits any later redelivery at lookup_inbox_report before
+                            // the reservation is consulted. NEVER re-run receive_batch. Count
+                            // the recovered accept, mirroring the loser path.
+                            let _ = self.store.record_inbox(
+                                &authenticated_sender,
+                                &nonce,
+                                &batch,
+                                &recovered,
+                            )?;
+                            slot.release()?;
+                            crate::metrics::record_lane_frame(
+                                crate::metrics::LANE_PHEROMONE,
+                                crate::metrics::LANE_OUTCOME_ACCEPT,
+                            );
+                            recovered
+                        } else {
+                            let now = (self.now)();
+                            // The report type (chio-pheromone-runtime PheromoneReceiveReport)
+                            // is not nameable here; it flows through by inference. The per-frame
+                            // verifier (pheromone_gossip.rs:236/244) runs inside this call,
+                            // unchanged, and only ever on a batch neither already in the inbox
+                            // nor durably committed in the runtime store.
+                            let fresh = match self
+                                .receiver
+                                .receive_batch(batch.clone(), authenticated_sender.clone(), now)
+                                .await
+                            {
+                                // receive_batch self-commits its runtime mutation only on Ok; an
+                                // Err admitted nothing. The still-ARMED guard drops on this
+                                // `?`-return and RELEASES the slot so a redelivery can re-claim
+                                // and re-receive. Fail-closed.
+                                Err(error) => return Err(error.into()),
+                                Ok(fresh) => fresh,
+                            };
+                            // Deposits are now committed. COMMIT the slot: disarm (a cancel/panic
+                            // in the committed-but-unrecorded window below must NOT release, or a
+                            // redelivery would re-receive an already-admitted batch, yielding a
+                            // spurious "rejected" durable verdict for deposits that were in fact
+                            // admitted) AND persist the durable commit marker so a PROCESS crash
+                            // in this window leaves a reservation that survives the store's
+                            // clear-at-open, forcing redelivery down the fail-closed loser path.
+                            slot.commit()?;
+                            match self.store.record_inbox(
+                                &authenticated_sender,
+                                &nonce,
+                                &batch,
+                                &fresh,
+                            ) {
+                                // Durable verdict recorded: it now short-circuits any redelivery
+                                // at lookup_inbox_report BEFORE the reservation is consulted, so
+                                // the reservation is redundant. Release it to bound
+                                // reservation-table growth (fail-closed on the store error; the
+                                // recorded verdict still short-circuits the peer's retry).
+                                Ok(_) => slot.release()?,
+                                // A committed batch whose verdict failed to record must NOT be
+                                // re-received. Leave the slot HELD (already disarmed): a
+                                // redelivery loses the reservation and takes the loser /
+                                // fail-closed path, never re-running the receiver. The peer retry
+                                // fail-closes pending operational recovery.
+                                Err(error) => return Err(error.into()),
+                            }
+                            fresh
                         }
-                        fresh
                     }
                 } else {
                     // Loser: a concurrent handler is receiving this exact batch. Do
@@ -1701,9 +1750,11 @@ mod tests {
         router.shutdown().await.ok();
     }
 
-    /// A receiver double for the F35 loser-path recovery test: its `receive_batch`
-    /// must never run (the loser path does not re-receive), and its
-    /// `recorded_report_for_batch` surfaces the durably-committed verdict.
+    /// A receiver double shared by BOTH F35 recovery tests (loser and winner path):
+    /// its `receive_batch` must never run (neither recovery path re-receives an
+    /// already-admitted batch), and its `recorded_report_for_batch` surfaces the
+    /// durably-committed runtime verdict. The panic is the teeth: any recovery path
+    /// that re-runs the receiver trips it.
     struct RecoveringReceiver {
         report: chio_pheromone_runtime::PheromoneReceiveReport,
     }
@@ -1716,7 +1767,7 @@ mod tests {
             _authenticated_sender_kernel_id: String,
             _received_at_unix_ms: u64,
         ) -> Result<chio_pheromone_runtime::PheromoneReceiveReport, PheromoneRelayError> {
-            panic!("loser path must not re-run receive_batch");
+            panic!("recovery path must not re-run receive_batch");
         }
 
         async fn recorded_report_for_batch(
@@ -1825,6 +1876,126 @@ mod tests {
                 crate::metrics::LANE_OUTCOME_ACCEPT,
             ) > before,
             "recovery counts an accept, never a dead-letter"
+        );
+
+        router.shutdown().await.ok();
+    }
+
+    #[tokio::test]
+    async fn winner_path_adopts_durable_verdict_after_commit_before_mark_crash() {
+        // RFC-0012 F35 (WINNER path, symmetric with the loser-path recovery above).
+        // The winner and loser paths cover two DIFFERENT crash windows, distinguished
+        // solely by the reservation's committed flag at open:
+        //  - LOSER window (test above): a crash AFTER slot.commit() leaves a
+        //    committed = 1 reservation that SURVIVES clear-at-open, so a redelivery
+        //    LOSES reserve_inbox_slot and takes the loser path.
+        //  - WINNER window (this test): a crash BETWEEN receive_batch self-committing
+        //    its runtime deposits (in the RUNTIME store) and slot.commit() marking the
+        //    RELAY reservation committed leaves committed = 0, which the store reclaims
+        //    at open. A redelivery therefore WINS reserve_inbox_slot, re-reads the RELAY
+        //    inbox (still None), and - WITHOUT the fix - re-runs receive_batch on an
+        //    already-admitted batch. The runtime replay-nonce idempotency then turns
+        //    every frame into ReplayWindowExceeded, recording + returning a spurious
+        //    REJECTED verdict that dead-letters an accepted batch. WITH the fix the
+        //    winner path consults the RUNTIME store by batch_sha256 first and ADOPTS the
+        //    durable verdict, never re-running receive_batch.
+        //
+        // TEETH: the shared RecoveringReceiver double PANICS if receive_batch is called,
+        // so the RED (pre-fix) winner path trips the panic (the delivery fails / never
+        // returns the accepted report); the GREEN (post-fix) path adopts the durable
+        // verdict without touching the receiver.
+        let dialer_seed = 44u8;
+        let gate = verified_gate("did:chio:bob", 1, dialer_seed, false);
+
+        // The batch the dialer redelivers, and the (sender, nonce) it keys on.
+        let batch = direct_batch("did:chio:bob");
+        let batch_bytes = canonical_json_bytes(&batch).unwrap();
+        let nonce = inbox_nonce(&batch_bytes);
+        let sender = "did:chio:bob";
+
+        // Reproduce the crash-before-mark residual: an EMPTY relay reservation table
+        // (the committed = 0 reservation was reclaimed at open) and NO recorded inbox
+        // verdict, so the handler's own reserve_inbox_slot WINS and the post-win re-read
+        // finds None - the winner path. Only the RUNTIME store (via the receiver double)
+        // holds the durable verdict.
+        let store = Arc::new(SqlitePheromoneRelayStore::open_in_memory().unwrap());
+        assert!(
+            store.lookup_inbox_report(sender, &nonce).unwrap().is_none(),
+            "no relay inbox verdict is recorded before recovery (winner-path premise)"
+        );
+
+        // The durable verdict the runtime store committed before the crash, surfaced by
+        // the receiver double. Its batch_sha256 matches the handler's lookup key
+        // (canonical sha256 of the batch), though the double returns it regardless.
+        let canned = chio_pheromone_runtime::PheromoneReceiveReport {
+            schema: "chio.pheromone-receive-report.v1".to_string(),
+            accepted: true,
+            batch_outcome: chio_pheromone_runtime::PheromoneBatchOutcome::Accepted,
+            accepted_frame_count: batch.frames.len() as u64,
+            rejected_frame_count: 0,
+            batch_sha256: core_sha256_hex(&batch_bytes),
+            recipient_kernel_id: RECIPIENT.to_string(),
+            authenticated_sender_kernel_id: sender.to_string(),
+            received_at_unix_ms: NOW,
+            frames: Vec::new(),
+        };
+
+        // The SHARED double: receive_batch PANICS (teeth), recorded_report_for_batch
+        // returns the durable verdict. If the winner path re-ran the receiver (the bug),
+        // this panics; the fix must adopt the durable verdict instead.
+        let receiver: Arc<dyn RelayBatchReceiver> = Arc::new(RecoveringReceiver { report: canned });
+        let scope_check: InboundBatchScopeCheck = Arc::new(
+            |_sender: &str, _batch: &PheromoneGossipBatch| -> Result<(), PheromoneRelayError> {
+                Ok(())
+            },
+        );
+        let now: Arc<dyn Fn() -> u64 + Send + Sync> = Arc::new(|| NOW);
+        let handler = PheromoneBatchHandler::new(
+            gate.clone(),
+            receiver,
+            Arc::clone(&store),
+            now,
+            scope_check,
+        );
+
+        let before = crate::metrics::lane_total(
+            crate::metrics::LANE_PHEROMONE,
+            crate::metrics::LANE_OUTCOME_ACCEPT,
+        );
+
+        let acceptor = bind_endpoint(45, Some(gate.clone())).await;
+        let router = Router::builder(acceptor)
+            .accept(ALPN_PHEROMONE_BATCH, handler)
+            .spawn();
+        let acceptor_addr = direct_addr(router.endpoint());
+
+        let dialer = bind_endpoint(dialer_seed, None).await;
+        let outcome = tokio::time::timeout(
+            Duration::from_secs(20),
+            deliver_batch_over_iroh(&dialer, acceptor_addr, &batch),
+        )
+        .await
+        .expect("delivery completes before timeout")
+        .expect("the winner path adopts the durable verdict (never re-runs receive_batch)");
+
+        // Convergence: the dialer reads the recovered ACCEPTED verdict (not a spurious
+        // ReplayWindowExceeded REJECTED), the durable inbox now records it so a further
+        // redelivery short-circuits, and the recovery counts an accept, never a
+        // dead-letter.
+        assert!(
+            outcome.accepted,
+            "the winner path returns the recovered accepted verdict, not a spurious rejection"
+        );
+        assert!(
+            store.lookup_inbox_report(sender, &nonce).unwrap().is_some(),
+            "winner-path recovery adopts the durable verdict as the inbox record"
+        );
+        assert!(
+            crate::metrics::lane_total(
+                crate::metrics::LANE_PHEROMONE,
+                crate::metrics::LANE_OUTCOME_ACCEPT,
+            ) > before,
+            "winner-path recovery counts an accept, never a dead-letter"
         );
 
         router.shutdown().await.ok();
