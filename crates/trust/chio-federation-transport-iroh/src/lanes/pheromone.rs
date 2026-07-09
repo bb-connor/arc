@@ -551,10 +551,30 @@ impl PheromoneBatchHandler {
                         // runtime store keys on (batch_sha256 == sha256_hex(canonical_json_bytes)),
                         // identical to the loser path.
                         let batch_sha256 = sha256_hex(&batch_bytes);
+                        // SCOPE THE RECOVERED VERDICT TO THE AUTHENTICATED SENDER
+                        // (fail-closed): the runtime store keys receive reports by
+                        // batch_sha256 ALONE, which is NOT sender-scoped. A DIFFERENT
+                        // authenticated sender can durably record a verdict for these exact
+                        // batch bytes - either an envelope-rejected report (any peer that
+                        // replays the bytes with the WRONG identity trips
+                        // gossiping_peer_kernel_id != authenticated_sender), or, for a batch
+                        // whose gossiping_peer_kernel_id it legitimately owns, an accepted
+                        // one. Adopting it verbatim would attribute that sender's verdict to
+                        // OUR (authenticated_sender, nonce) inbox key, bypassing the
+                        // per-frame verifier's gossiping_peer_kernel_id == authenticated_sender
+                        // binding: a wrong sender could POISON this batch hash with a rejected
+                        // verdict before the real sender arrives, or RECEIVE an accepted verdict
+                        // for another sender's batch. Only adopt a verdict the runtime store
+                        // recorded UNDER THIS authenticated sender; any other recovered report
+                        // is discarded and falls through to receive_batch, which re-runs that
+                        // verifier under THIS sender.
                         if let Some(recovered) = self
                             .receiver
                             .recorded_report_for_batch(&batch_sha256)
                             .await?
+                            .filter(|recovered| {
+                                recovered.authenticated_sender_kernel_id == authenticated_sender
+                            })
                         {
                             // Adopt the durable verdict as the inbox record so both peers
                             // converge. record_inbox is idempotent (ON CONFLICT), so a
@@ -656,10 +676,23 @@ impl PheromoneBatchHandler {
                             // sha256_hex over the same canonical batch bytes the runtime
                             // store keys on (batch_sha256 == sha256_hex(canonical_json_bytes)).
                             let batch_sha256 = sha256_hex(&batch_bytes);
+                            // SCOPE THE RECOVERED VERDICT TO THE AUTHENTICATED SENDER
+                            // (fail-closed), identically to the winner path above: the
+                            // runtime store keys receive reports by batch_sha256 ALONE, so a
+                            // report the store holds for these bytes may belong to a DIFFERENT
+                            // authenticated sender. Adopting it would attribute another sender's
+                            // verdict to OUR (authenticated_sender, nonce), bypassing the
+                            // per-frame gossiping_peer_kernel_id == authenticated_sender binding.
+                            // Only adopt a verdict recorded UNDER THIS sender; a wrong-sender (or
+                            // absent) report denies here so the peer retries and the durable inbox
+                            // short-circuits once THIS sender's own verdict is recorded.
                             if let Some(recovered) = self
                                 .receiver
                                 .recorded_report_for_batch(&batch_sha256)
                                 .await?
+                                .filter(|recovered| {
+                                    recovered.authenticated_sender_kernel_id == authenticated_sender
+                                })
                             {
                                 // Adopt the durable verdict as the inbox record so both
                                 // peers converge. record_inbox is idempotent (ON CONFLICT),
@@ -681,9 +714,9 @@ impl PheromoneBatchHandler {
                                 );
                                 recovered
                             } else {
-                                // Fail-closed if there is no durable verdict to recover:
-                                // the peer retries and the durable inbox short-circuits the
-                                // retry once the winner records.
+                                // Fail-closed if there is no durable verdict FOR THIS SENDER
+                                // to recover: the peer retries and the durable inbox
+                                // short-circuits the retry once the winner records.
                                 return Err(IrohLaneError::DedupInFlight(format!(
                                     "sender {authenticated_sender} nonce {nonce} still receiving"
                                 )));
@@ -1996,6 +2029,241 @@ mod tests {
                 crate::metrics::LANE_OUTCOME_ACCEPT,
             ) > before,
             "winner-path recovery counts an accept, never a dead-letter"
+        );
+
+        router.shutdown().await.ok();
+    }
+
+    /// A receiver double for the F35 sender-scoping teeth-tests: its
+    /// `recorded_report_for_batch` returns a durable verdict recorded under a
+    /// DIFFERENT authenticated sender, and its `receive_batch` records that it ran
+    /// (via `received`) and returns a distinguishable FRESH verdict. A recovery
+    /// path that (wrongly) adopts the cross-sender verdict never runs receive_batch;
+    /// the SCOPED path discards it and either falls through to receive_batch (winner)
+    /// or denies (loser).
+    struct WrongSenderRecoveringReceiver {
+        recovered: chio_pheromone_runtime::PheromoneReceiveReport,
+        fresh: chio_pheromone_runtime::PheromoneReceiveReport,
+        received: Arc<std::sync::atomic::AtomicBool>,
+    }
+
+    #[async_trait::async_trait]
+    impl RelayBatchReceiver for WrongSenderRecoveringReceiver {
+        async fn receive_batch(
+            &self,
+            _batch: PheromoneGossipBatch,
+            _authenticated_sender_kernel_id: String,
+            _received_at_unix_ms: u64,
+        ) -> Result<chio_pheromone_runtime::PheromoneReceiveReport, PheromoneRelayError> {
+            self.received
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(self.fresh.clone())
+        }
+
+        async fn recorded_report_for_batch(
+            &self,
+            _batch_sha256: &str,
+        ) -> Result<Option<chio_pheromone_runtime::PheromoneReceiveReport>, PheromoneRelayError>
+        {
+            Ok(Some(self.recovered.clone()))
+        }
+    }
+
+    /// Build a `PheromoneReceiveReport` for these `batch` bytes under `sender` with
+    /// the given `accepted` outcome, for the sender-scoping teeth-tests.
+    fn scoping_report(
+        batch: &PheromoneGossipBatch,
+        batch_bytes: &[u8],
+        sender: &str,
+        accepted: bool,
+    ) -> chio_pheromone_runtime::PheromoneReceiveReport {
+        let frame_count = batch.frames.len() as u64;
+        chio_pheromone_runtime::PheromoneReceiveReport {
+            schema: "chio.pheromone-receive-report.v1".to_string(),
+            accepted,
+            batch_outcome: if accepted {
+                chio_pheromone_runtime::PheromoneBatchOutcome::Accepted
+            } else {
+                chio_pheromone_runtime::PheromoneBatchOutcome::Rejected
+            },
+            accepted_frame_count: if accepted { frame_count } else { 0 },
+            rejected_frame_count: if accepted { 0 } else { frame_count },
+            batch_sha256: core_sha256_hex(batch_bytes),
+            recipient_kernel_id: RECIPIENT.to_string(),
+            authenticated_sender_kernel_id: sender.to_string(),
+            received_at_unix_ms: NOW,
+            frames: Vec::new(),
+        }
+    }
+
+    #[tokio::test]
+    async fn winner_path_rejects_recovered_verdict_from_a_different_sender() {
+        // RFC-0012 F35 sender-scoping (SECURITY). The runtime store keys receive
+        // reports by batch_sha256 ALONE, so a verdict it holds for these batch bytes
+        // may have been recorded under a DIFFERENT authenticated sender. The winner
+        // path must NOT adopt such a verdict verbatim: that would attribute another
+        // sender's accept/reject to THIS (sender, nonce), bypassing the per-frame
+        // gossiping_peer_kernel_id == authenticated_sender binding. It must discard the
+        // cross-sender verdict and fall through to receive_batch, re-verifying under
+        // THIS sender.
+        //
+        // TEETH: recorded_report_for_batch returns an ACCEPTED verdict recorded under
+        // "did:chio:alice"; the authenticated sender is "did:chio:bob"; the fresh
+        // receive_batch verdict for bob is a distinguishable REJECTED one.
+        //  - RED (pre-fix): the winner path adopts alice's accepted verdict, so the
+        //    dialer reads accepted == true and receive_batch never runs.
+        //  - GREEN (post-fix): the scoped winner path discards alice's verdict, runs
+        //    receive_batch under bob, and returns bob's rejected verdict.
+        let dialer_seed = 46u8;
+        let gate = verified_gate("did:chio:bob", 1, dialer_seed, false);
+
+        let batch = direct_batch("did:chio:bob");
+        let batch_bytes = canonical_json_bytes(&batch).unwrap();
+        let nonce = inbox_nonce(&batch_bytes);
+        let sender = "did:chio:bob";
+
+        // Empty reservation table + no recorded inbox verdict => the handler wins its
+        // own reserve_inbox_slot and the post-win re-read finds None: the winner path.
+        let store = Arc::new(SqlitePheromoneRelayStore::open_in_memory().unwrap());
+        assert!(store.lookup_inbox_report(sender, &nonce).unwrap().is_none());
+
+        // The runtime store holds an ACCEPTED verdict for these bytes recorded under a
+        // DIFFERENT authenticated sender (alice); the fresh receive_batch verdict for
+        // bob is a distinguishable REJECTED one.
+        let recovered = scoping_report(&batch, &batch_bytes, "did:chio:alice", true);
+        let fresh = scoping_report(&batch, &batch_bytes, sender, false);
+        let received = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let receiver: Arc<dyn RelayBatchReceiver> = Arc::new(WrongSenderRecoveringReceiver {
+            recovered,
+            fresh,
+            received: Arc::clone(&received),
+        });
+        let scope_check: InboundBatchScopeCheck = Arc::new(
+            |_sender: &str, _batch: &PheromoneGossipBatch| -> Result<(), PheromoneRelayError> {
+                Ok(())
+            },
+        );
+        let now: Arc<dyn Fn() -> u64 + Send + Sync> = Arc::new(|| NOW);
+        let handler = PheromoneBatchHandler::new(
+            gate.clone(),
+            receiver,
+            Arc::clone(&store),
+            now,
+            scope_check,
+        );
+
+        let acceptor = bind_endpoint(47, Some(gate.clone())).await;
+        let router = Router::builder(acceptor)
+            .accept(ALPN_PHEROMONE_BATCH, handler)
+            .spawn();
+        let acceptor_addr = direct_addr(router.endpoint());
+
+        let dialer = bind_endpoint(dialer_seed, None).await;
+        let outcome = tokio::time::timeout(
+            Duration::from_secs(20),
+            deliver_batch_over_iroh(&dialer, acceptor_addr, &batch),
+        )
+        .await
+        .expect("delivery completes before timeout")
+        .expect("the scoped winner path returns the fresh verdict, not the cross-sender one");
+
+        assert!(
+            !outcome.accepted,
+            "a verdict recorded under a DIFFERENT sender is NOT adopted; the fresh receive_batch verdict (rejected) is returned"
+        );
+        assert!(
+            received.load(std::sync::atomic::Ordering::SeqCst),
+            "the scoped winner path falls through to receive_batch under THIS sender"
+        );
+        let stored = store.lookup_inbox_report(sender, &nonce).unwrap().unwrap();
+        assert_eq!(
+            stored.authenticated_sender_kernel_id, sender,
+            "the recorded inbox verdict is scoped to THIS authenticated sender, not the recovered one"
+        );
+
+        router.shutdown().await.ok();
+    }
+
+    #[tokio::test]
+    async fn loser_path_rejects_recovered_verdict_from_a_different_sender() {
+        // RFC-0012 F35 sender-scoping (SECURITY), loser path. Symmetric with the
+        // winner-path teeth-test: a committed residual reservation with no recorded
+        // inbox verdict sends the redelivery down the loser path, where the runtime
+        // store holds a verdict for these bytes recorded under a DIFFERENT sender.
+        // The loser path must NOT adopt it (that would hand THIS sender another
+        // sender's accepted verdict); it must deny (fail-closed DedupInFlight).
+        //
+        // TEETH: recorded_report_for_batch returns an ACCEPTED verdict recorded under
+        // "did:chio:alice"; the authenticated sender is "did:chio:bob". The loser path
+        // never calls receive_batch, so `received` stays false either way.
+        //  - RED (pre-fix): the loser path adopts alice's accepted verdict; the dialer
+        //    reads accepted == true.
+        //  - GREEN (post-fix): the scoped loser path denies; the delivery fails closed.
+        let dialer_seed = 48u8;
+        let gate = verified_gate("did:chio:bob", 1, dialer_seed, false);
+
+        let batch = direct_batch("did:chio:bob");
+        let batch_bytes = canonical_json_bytes(&batch).unwrap();
+        let nonce = inbox_nonce(&batch_bytes);
+        let sender = "did:chio:bob";
+
+        // Seed the crash-after-commit residual: a COMMITTED reservation for
+        // (sender, nonce) with NO recorded verdict, so reserve_inbox_slot LOSES and
+        // the redelivery takes the loser path.
+        let store = Arc::new(SqlitePheromoneRelayStore::open_in_memory().unwrap());
+        assert!(store.reserve_inbox_slot(sender, &nonce).unwrap().won);
+        store
+            .mark_inbox_reservation_committed(sender, &nonce)
+            .unwrap();
+        assert!(store.lookup_inbox_report(sender, &nonce).unwrap().is_none());
+
+        let recovered = scoping_report(&batch, &batch_bytes, "did:chio:alice", true);
+        let fresh = scoping_report(&batch, &batch_bytes, sender, false);
+        let received = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let receiver: Arc<dyn RelayBatchReceiver> = Arc::new(WrongSenderRecoveringReceiver {
+            recovered,
+            fresh,
+            received: Arc::clone(&received),
+        });
+        let scope_check: InboundBatchScopeCheck = Arc::new(
+            |_sender: &str, _batch: &PheromoneGossipBatch| -> Result<(), PheromoneRelayError> {
+                Ok(())
+            },
+        );
+        let now: Arc<dyn Fn() -> u64 + Send + Sync> = Arc::new(|| NOW);
+        let handler = PheromoneBatchHandler::new(
+            gate.clone(),
+            receiver,
+            Arc::clone(&store),
+            now,
+            scope_check,
+        );
+
+        let acceptor = bind_endpoint(49, Some(gate.clone())).await;
+        let router = Router::builder(acceptor)
+            .accept(ALPN_PHEROMONE_BATCH, handler)
+            .spawn();
+        let acceptor_addr = direct_addr(router.endpoint());
+
+        let dialer = bind_endpoint(dialer_seed, None).await;
+        let result = tokio::time::timeout(
+            Duration::from_secs(20),
+            deliver_batch_over_iroh(&dialer, acceptor_addr, &batch),
+        )
+        .await
+        .expect("delivery completes before timeout");
+
+        assert!(
+            result.is_err(),
+            "the scoped loser path denies a cross-sender recovered verdict (fail-closed), never adopts it"
+        );
+        assert!(
+            !received.load(std::sync::atomic::Ordering::SeqCst),
+            "the loser path never re-runs receive_batch"
+        );
+        assert!(
+            store.lookup_inbox_report(sender, &nonce).unwrap().is_none(),
+            "no cross-sender verdict is recorded as THIS sender's inbox record"
         );
 
         router.shutdown().await.ok();
