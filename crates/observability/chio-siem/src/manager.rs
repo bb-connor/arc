@@ -188,7 +188,21 @@ impl ExporterManager {
     }
 
     /// Register an exporter to receive receipt batches.
+    ///
+    /// With a configured cursor store, a registered exporter that has no
+    /// persisted high-water mark row is seeded at BASELINE (0): it must receive
+    /// every receipt persisted before it was registered, so it pins the resume
+    /// cursor at 0 until its first ack rather than inheriting an already-advanced
+    /// cursor from a faster peer and silently skipping the backlog (RFC-0009 F78,
+    /// Codex round-2 finding 1). The read cursor is then recomputed as the
+    /// minimum high-water mark across the known exporter set. In legacy None mode
+    /// the cursor is not persisted and always advances past the batch, so no
+    /// baseline pin is applied here.
     pub fn add_exporter(&mut self, exporter: Box<dyn Exporter>) {
+        if self.cursor_store.is_some() {
+            self.acked.entry(exporter.name().to_string()).or_insert(0);
+            self.cursor = self.acked.values().copied().min().unwrap_or(0);
+        }
         self.exporters.push(exporter);
     }
 
@@ -317,6 +331,14 @@ impl ExporterManager {
                         failed_at,
                         exporter_name: "_deserialize".to_string(),
                     });
+                    // Report the DLQ depth for the malformed-row producer here
+                    // too (Codex round-2 finding 3): a batch of only malformed
+                    // rows returns before the exporter loop that refreshes
+                    // dlq_depth, so without this the `_deserialize` gauge would
+                    // stay absent/stale while the in-memory DLQ grows and the
+                    // alert-pack backstop underreports malformed-row failures.
+                    self.metrics
+                        .set_dlq_depth("_deserialize", self.dlq.len() as u64);
                     tracing::warn!(
                         seq = seq,
                         "Failed to deserialize receipt -- captured to durable DLQ"
@@ -401,14 +423,22 @@ impl ExporterManager {
                 .set_dlq_depth(&exporter_name, self.dlq.len() as u64);
         }
 
-        // Read cursor resumes at the slowest REGISTERED exporter so nothing is
-        // skipped. A registered exporter that has NEVER acked (failed before its
-        // first ack) is held at the pre-poll cursor `cursor`, so the read cursor
-        // does not advance past receipts it has not consumed (at-least-once,
-        // RFC-0009 F78, Codex round-1 finding 1). With zero registered exporters
-        // this falls back to max_seq (legacy headless / malformed-only behavior).
-        let exporter_names: Vec<&str> = self.exporters.iter().map(|e| e.name()).collect();
-        self.cursor = resume_cursor(&exporter_names, &self.acked, cursor, max_seq);
+        // Advance the read cursor. In legacy None mode (no cursor store) the
+        // cursor ALWAYS advances past the batch: delivery is not persisted and
+        // downstream ingest dedups idempotently, so a failed exporter must not
+        // hold the cursor or the next tick re-reads the same batch and pushes
+        // duplicate DLQ entries indefinitely until it recovers (Codex round-2
+        // finding 2 -- preserve the pre-F78 advance-regardless behavior). With a
+        // configured cursor store the cursor resumes at the slowest REGISTERED
+        // exporter so nothing is skipped: a registered exporter that has never
+        // acked is held at its baseline (at-least-once, RFC-0009 F78, Codex
+        // round-1 finding 1). Zero registered exporters falls back to max_seq.
+        self.cursor = if self.cursor_store.is_some() {
+            let exporter_names: Vec<&str> = self.exporters.iter().map(|e| e.name()).collect();
+            resume_cursor(&exporter_names, &self.acked, cursor, max_seq)
+        } else {
+            max_seq
+        };
 
         Ok(())
     }
@@ -705,6 +735,253 @@ mod tests {
         assert_eq!(
             manager.cursor, 0,
             "the cursor must stay behind an un-persisted malformed row (at-least-once)"
+        );
+        Ok(())
+    }
+
+    /// A metrics sink that records every `set_dlq_depth` call for assertions.
+    #[derive(Default)]
+    struct RecordingSink {
+        dlq_depths: Mutex<Vec<(String, u64)>>,
+    }
+
+    impl crate::metrics_sink::SiemMetricsSink for RecordingSink {
+        fn record_export(&self, _exporter: &str, _outcome: crate::metrics_sink::ExportOutcome) {}
+        fn observe_export_lag(&self, _exporter: &str, _severity: &str, _lag_seconds: f64) {}
+        fn set_dlq_depth(&self, exporter: &str, depth: u64) {
+            if let Ok(mut depths) = self.dlq_depths.lock() {
+                depths.push((exporter.to_string(), depth));
+            }
+        }
+        fn record_alert_dispatch(&self, _route: &str, _outcome: &str) {}
+        fn observe_alert_dispatch_latency(&self, _route: &str, _outcome: &str, _latency: f64) {}
+    }
+
+    /// A mock exporter that always succeeds (records nothing).
+    struct OkExporter {
+        name: String,
+    }
+
+    impl Exporter for OkExporter {
+        fn export_batch<'a>(
+            &'a self,
+            events: &'a [SiemEvent],
+        ) -> crate::exporter::ExportFuture<'a> {
+            let n = events.len();
+            Box::pin(async move { Ok(n) })
+        }
+        fn name(&self) -> &str {
+            &self.name
+        }
+    }
+
+    /// A mock exporter that always fails, forcing the batch into the DLQ.
+    struct FailExporter {
+        name: String,
+    }
+
+    impl Exporter for FailExporter {
+        fn export_batch<'a>(
+            &'a self,
+            _events: &'a [SiemEvent],
+        ) -> crate::exporter::ExportFuture<'a> {
+            Box::pin(async move { Err(ExportError::HttpError("simulated failure".to_string())) })
+        }
+        fn name(&self) -> &str {
+            &self.name
+        }
+    }
+
+    /// Sign a minimal-but-valid receipt so the poll loop parses it into an event.
+    fn sample_receipt(id: &str) -> Result<chio_core::receipt::body::ChioReceipt, Box<dyn Error>> {
+        use chio_core::crypto::Keypair;
+        use chio_core::receipt::{
+            body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
+        };
+        let keypair = Keypair::generate();
+        let action = ToolCallAction::from_parameters(serde_json::json!({}))
+            .map_err(|error| format!("action parameters serialize in tests: {error}"))?;
+        let body = ChioReceiptBody {
+            id: id.to_string(),
+            timestamp: 1,
+            capability_id: "cap-manager-test".to_string(),
+            tool_server: "shell".to_string(),
+            tool_name: "bash".to_string(),
+            action,
+            decision: Some(Decision::Allow),
+            receipt_kind: chio_core::receipt::kinds::ReceiptKind::MediatedDecision,
+            boundary_class: chio_core::receipt::kinds::BoundaryClass::Prevent,
+            observation_outcome: None,
+            tool_origin: chio_core::receipt::kinds::ToolOrigin::CallerExecuted,
+            redaction_mode: chio_core::receipt::kinds::RedactionMode::None,
+            actor_chain: Vec::new(),
+            content_hash: "content-hash".to_string(),
+            policy_hash: "policy-hash".to_string(),
+            evidence: Vec::new(),
+            metadata: None,
+            trust_level: chio_core::receipt::kinds::TrustLevel::default(),
+            tenant_id: None,
+            kernel_key: keypair.public_key(),
+            bbs_projection_version: None,
+        };
+        ChioReceipt::sign(body, &keypair)
+            .map_err(|error| format!("ChioReceipt::sign must succeed in tests: {error}").into())
+    }
+
+    /// Seed a receipt DB with `count` valid receipts (seq 1..=count).
+    fn seed_valid_receipt_db(path: &std::path::Path, count: usize) -> TestResult {
+        let conn = rusqlite::Connection::open(path)?;
+        conn.execute_batch(
+            "CREATE TABLE chio_tool_receipts (
+                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                 receipt_id TEXT NOT NULL UNIQUE,
+                 timestamp INTEGER NOT NULL,
+                 capability_id TEXT NOT NULL,
+                 tool_server TEXT NOT NULL,
+                 tool_name TEXT NOT NULL,
+                 decision_kind TEXT NOT NULL,
+                 policy_hash TEXT NOT NULL,
+                 content_hash TEXT NOT NULL,
+                 raw_json TEXT NOT NULL
+             );",
+        )?;
+        for i in 0..count {
+            let receipt = sample_receipt(&format!("rcpt-{i:04}"))?;
+            let raw_json = serde_json::to_string(&receipt)?;
+            conn.execute(
+                "INSERT INTO chio_tool_receipts (receipt_id, timestamp, capability_id, \
+                 tool_server, tool_name, decision_kind, policy_hash, content_hash, raw_json) \
+                 VALUES (?1, 1, 'c', 's', 't', 'allow', 'p', 'h', ?2)",
+                rusqlite::params![receipt.id, raw_json],
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Codex round-2 finding 1: on startup with a cursor store, a registered
+    /// exporter that has NO persisted cursor row is treated as baseline (0), so
+    /// it pins the resume cursor at 0 until it acks -- even when a peer exporter
+    /// has already persisted an advanced high-water mark. Without the fix, the
+    /// startup cursor would resume at the persisted peer's mark and the newly
+    /// registered exporter would permanently skip the earlier backlog.
+    #[tokio::test]
+    async fn missing_exporter_cursor_pins_resume_at_baseline_on_startup() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let receipt_db = dir.path().join("receipts.sqlite3");
+        seed_valid_receipt_db(&receipt_db, 3)?;
+        let cursor_db = dir.path().join("cursor.sqlite3");
+        {
+            // "splunk" has already acked up to seq 100; "webhook" has no row.
+            let store = crate::cursor_store::SiemCursorStore::open(&cursor_db)?;
+            store.set_acked("splunk", 100)?;
+        }
+
+        let mut manager = ExporterManager::new(SiemConfig {
+            db_path: receipt_db.clone(),
+            cursor_db_path: Some(cursor_db.clone()),
+            ..SiemConfig::default()
+        })?;
+        assert_eq!(
+            manager.cursor, 100,
+            "before webhook registers, the cursor resumes at the persisted mark"
+        );
+        manager.add_exporter(Box::new(OkExporter {
+            name: "splunk".to_string(),
+        }));
+        manager.add_exporter(Box::new(OkExporter {
+            name: "webhook".to_string(),
+        }));
+        assert_eq!(
+            manager.cursor, 0,
+            "a registered exporter with no persisted cursor row pins resume at baseline 0"
+        );
+        Ok(())
+    }
+
+    /// Codex round-2 finding 2: in the default None mode (no cursor store) a
+    /// failed exporter must NOT hold the read cursor. The cursor advances to
+    /// max_seq (legacy advance-regardless) so the next poll does not re-read and
+    /// re-DLQ the same batch forever.
+    #[tokio::test]
+    async fn legacy_none_mode_advances_cursor_past_failed_batch() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let receipt_db = dir.path().join("receipts.sqlite3");
+        seed_valid_receipt_db(&receipt_db, 3)?;
+
+        let mut manager = ExporterManager::new(SiemConfig {
+            db_path: receipt_db.clone(),
+            max_retries: 0,
+            cursor_db_path: None,
+            ..SiemConfig::default()
+        })?;
+        manager.add_exporter(Box::new(FailExporter {
+            name: "webhook".to_string(),
+        }));
+
+        manager.poll_once().await?;
+        assert_eq!(
+            manager.cursor, 3,
+            "None mode advances past the DLQ'd batch (legacy behavior preserved)"
+        );
+        Ok(())
+    }
+
+    /// Codex round-2 finding 2 (paired): WITH a cursor store, the same failed
+    /// exporter holds the cursor at its baseline so the un-acked batch is
+    /// redelivered (at-least-once), the behavior that must be gated on a
+    /// configured store.
+    #[tokio::test]
+    async fn configured_store_holds_cursor_for_failed_never_acked_exporter() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let receipt_db = dir.path().join("receipts.sqlite3");
+        seed_valid_receipt_db(&receipt_db, 3)?;
+        let cursor_db = dir.path().join("cursor.sqlite3");
+
+        let mut manager = ExporterManager::new(SiemConfig {
+            db_path: receipt_db.clone(),
+            max_retries: 0,
+            cursor_db_path: Some(cursor_db.clone()),
+            ..SiemConfig::default()
+        })?;
+        manager.add_exporter(Box::new(FailExporter {
+            name: "webhook".to_string(),
+        }));
+
+        manager.poll_once().await?;
+        assert_eq!(
+            manager.cursor, 0,
+            "with a cursor store the failed never-acked exporter holds the cursor at baseline"
+        );
+        Ok(())
+    }
+
+    /// Codex round-2 finding 3: a batch of only malformed rows returns before the
+    /// exporter loop, so the `_deserialize` DLQ-depth gauge must be reported from
+    /// the malformed-capture path itself or it stays absent while the DLQ grows.
+    #[tokio::test]
+    async fn malformed_row_reports_deserialize_dlq_depth() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let receipt_db = dir.path().join("receipts.sqlite3");
+        seed_malformed_receipt_db(&receipt_db)?;
+        let cursor_db = dir.path().join("cursor.sqlite3");
+
+        let sink = std::sync::Arc::new(RecordingSink::default());
+        let mut manager = ExporterManager::new(SiemConfig {
+            db_path: receipt_db.clone(),
+            cursor_db_path: Some(cursor_db.clone()),
+            ..SiemConfig::default()
+        })?
+        .with_metrics_sink(sink.clone());
+
+        manager.poll_once().await?;
+
+        let depths = sink
+            .dlq_depths
+            .lock()
+            .map_err(|_| std::io::Error::other("dlq depth lock poisoned"))?;
+        assert!(
+            depths.contains(&("_deserialize".to_string(), 1)),
+            "the deserialize DLQ depth must be reported for a malformed row: {depths:?}"
         );
         Ok(())
     }
