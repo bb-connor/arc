@@ -680,26 +680,53 @@ impl SqliteReceiptStore {
             }
         })?;
         let latest_committed_entry_seq = latest_claim_log_entry_seq(&connection)?;
-        let latest = verify_checkpoint_chain_integrity(&connection)?;
-        let latest_checkpoint_seq = latest
-            .as_ref()
-            .map(|checkpoint| checkpoint.body.checkpoint_seq);
-        let latest_checkpointed_entry_seq = latest
-            .as_ref()
-            .map_or(0, |checkpoint| checkpoint.body.batch_end_seq);
-        let (uncheckpointed_start_seq, uncheckpointed_end_seq) =
-            uncheckpointed_range(latest_checkpointed_entry_seq, latest_committed_entry_seq);
-        Ok(ReceiptStoreHealthReport {
-            healthy: latest_committed_entry_seq >= latest_checkpointed_entry_seq,
-            writer: ReceiptWriterCounters::default(),
-            latest_committed_entry_seq,
-            latest_checkpoint_seq,
-            latest_checkpointed_entry_seq,
-            uncheckpointed_start_seq,
-            uncheckpointed_end_seq,
-            checkpoint_error: None,
-            db_size_bytes: None,
-        })
+        // Catch a checkpoint-chain-integrity failure into a report with the
+        // checkpoint_error set rather than propagating Err (RFC-0009 N1). The
+        // watchdog samples this on a fixed interval; if corruption made this
+        // return Err, the sampler would log-and-skip with NO gauge update, so a
+        // corrupt store would look silent instead of alarming. Mirror the
+        // fail-open shape of `receipt_checkpoint_status` so the watchdog still
+        // emits a large-backlog gauge (checkpointed defaults to 0 -> the
+        // uncheckpointed range spans the whole committed log) with the
+        // checkpoint_error attached.
+        match verify_checkpoint_chain_integrity(&connection) {
+            Ok(latest) => {
+                let latest_checkpoint_seq = latest
+                    .as_ref()
+                    .map(|checkpoint| checkpoint.body.checkpoint_seq);
+                let latest_checkpointed_entry_seq = latest
+                    .as_ref()
+                    .map_or(0, |checkpoint| checkpoint.body.batch_end_seq);
+                let (uncheckpointed_start_seq, uncheckpointed_end_seq) =
+                    uncheckpointed_range(latest_checkpointed_entry_seq, latest_committed_entry_seq);
+                Ok(ReceiptStoreHealthReport {
+                    healthy: latest_committed_entry_seq >= latest_checkpointed_entry_seq,
+                    writer: ReceiptWriterCounters::default(),
+                    latest_committed_entry_seq,
+                    latest_checkpoint_seq,
+                    latest_checkpointed_entry_seq,
+                    uncheckpointed_start_seq,
+                    uncheckpointed_end_seq,
+                    checkpoint_error: None,
+                    db_size_bytes: None,
+                })
+            }
+            Err(error) => {
+                let (uncheckpointed_start_seq, uncheckpointed_end_seq) =
+                    uncheckpointed_range(0, latest_committed_entry_seq);
+                Ok(ReceiptStoreHealthReport {
+                    healthy: false,
+                    writer: ReceiptWriterCounters::default(),
+                    latest_committed_entry_seq,
+                    latest_checkpoint_seq: None,
+                    latest_checkpointed_entry_seq: 0,
+                    uncheckpointed_start_seq,
+                    uncheckpointed_end_seq,
+                    checkpoint_error: Some(error.to_string()),
+                    db_size_bytes: None,
+                })
+            }
+        }
     }
 
     pub fn latest_committed_entry_seq(&self) -> Result<u64, ReceiptStoreError> {
