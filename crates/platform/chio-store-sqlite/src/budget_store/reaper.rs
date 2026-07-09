@@ -59,7 +59,9 @@ impl SqliteBudgetStore {
     }
 
     /// Rows still `open`: `(hold_id, capability_id, grant_index, remaining_exposure_units)`.
-    fn list_open_holds(&self) -> Result<Vec<(String, String, u32, u64)>, BudgetStoreError> {
+    pub(super) fn list_open_holds(
+        &self,
+    ) -> Result<Vec<(String, String, u32, u64)>, BudgetStoreError> {
         let connection = self
             .connection
             .lock()

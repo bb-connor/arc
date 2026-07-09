@@ -666,15 +666,26 @@ pub trait BudgetStore: Send + Sync {
     /// are reversed. Stores that do not persist hold state return `Ok((0, 0))`
     /// (the default). Returns `(reconciled, reversed)` counts.
     ///
-    /// Invoke once at sidecar/control-plane startup before accepting traffic.
-    /// Passing an empty map reverses all open holds, which is the correct
-    /// fail-closed behavior when the arbitration source is unavailable.
+    /// Callers must supply a realized-spend map built from the durable receipt
+    /// log (ADR-0013). Passing an empty map reverses all open holds, which
+    /// enables double-spend: a hold left open by a crash after the spend but
+    /// before reconcile represents real spent budget. Use `count_open_holds`
+    /// to log the hold count and leave holds reserved (fail-closed) when the
+    /// durable receipt log is not available at startup.
     fn reap_orphaned_holds(
         &self,
         realized_by_hold: &std::collections::HashMap<String, u64>,
     ) -> Result<(usize, usize), BudgetStoreError> {
         let _ = realized_by_hold;
         Ok((0, 0))
+    }
+
+    /// Return the number of holds still in the `open` state. Stores that do
+    /// not persist hold state return `Ok(0)` (the default). Use at startup to
+    /// log the number of holds that will remain reserved under the fail-closed
+    /// policy when the durable receipt log arbitration map is unavailable.
+    fn count_open_holds(&self) -> Result<usize, BudgetStoreError> {
+        Ok(0)
     }
 }
 

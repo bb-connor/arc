@@ -1556,3 +1556,50 @@ fn reap_orphaned_holds_is_reachable_through_budget_store_trait() {
         "reversed hold must leave committed cost at zero"
     );
 }
+
+#[test]
+fn open_hold_stays_reserved_without_reap() {
+    // Fail-closed property: an open hold is not reversed unless
+    // reap_orphaned_holds is called with an arbitration map that contains it.
+    // count_open_holds reports the hold count without modifying state, letting
+    // startup log the warning and leave holds reserved (no double-spend).
+    use chio_kernel::budget_store::{
+        BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetStore,
+    };
+    use std::sync::Arc;
+
+    let dir = std::env::temp_dir().join(format!("chio-noreap-{}", uuid::Uuid::now_v7()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let store: Arc<dyn BudgetStore> =
+        Arc::new(SqliteBudgetStore::open(dir.join("budget.sqlite")).unwrap());
+
+    let decision = store
+        .authorize_budget_hold(BudgetAuthorizeHoldRequest {
+            capability_id: "cap-noreap".to_string(),
+            grant_index: 0,
+            max_invocations: Some(5),
+            requested_exposure_units: 100,
+            max_cost_per_invocation: Some(100),
+            max_total_cost_units: Some(500),
+            hold_id: Some("hold-noreap".to_string()),
+            event_id: Some("hold-noreap:authorize".to_string()),
+            authority: None,
+        })
+        .unwrap();
+    assert!(matches!(
+        decision,
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ));
+
+    // count_open_holds reads hold state without modifying it.
+    let count = store.count_open_holds().unwrap();
+    assert_eq!(count, 1, "one open hold must be reported");
+
+    // Without calling reap_orphaned_holds the hold remains reserved.
+    let usage = store.get_usage("cap-noreap", 0).unwrap().unwrap();
+    assert_eq!(
+        usage.committed_cost_units().unwrap(),
+        100,
+        "open hold must remain reserved when startup does not call reap_orphaned_holds"
+    );
+}

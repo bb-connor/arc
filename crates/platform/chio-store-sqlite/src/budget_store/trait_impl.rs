@@ -1136,4 +1136,8 @@ impl BudgetStore for SqliteBudgetStore {
         let summary = self.reap_holds_by_map(realized_by_hold)?;
         Ok((summary.reconciled, summary.reversed))
     }
+
+    fn count_open_holds(&self) -> Result<usize, BudgetStoreError> {
+        Ok(self.list_open_holds()?.len())
+    }
 }

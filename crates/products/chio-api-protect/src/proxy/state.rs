@@ -291,23 +291,28 @@ impl ProtectProxy {
         let http_client = client_builder_with_contract(&egress_contract).build()?;
         let budget_store = build_budget_store(&self.config)?;
 
-        // Reverse any hold left open by a prior crash. Full integration with
-        // the durable receipt log (ADR-0013) for arbitration is not yet wired;
-        // an empty map is passed so all open holds are reversed, which is the
-        // correct fail-closed default when realized amounts are unknown.
+        // Automatic reconcile/reverse of open holds requires the durable receipt
+        // log (ADR-0013) to build the realized-spend arbitration map. Without
+        // that map, calling reap_orphaned_holds with an empty map would reverse
+        // every open hold, enabling double-spend: a hold left open by a crash
+        // after the spend but before reconcile represents real spent budget.
+        // Holds are left reserved (fail-closed) until receipt-log arbitration
+        // is wired at this startup point. Use reap_orphaned_holds via the
+        // control plane with a realized-spend map from the durable receipt log
+        // to reconcile crash-orphaned holds.
         if let Some(store) = budget_store.as_ref() {
-            match store.reap_orphaned_holds(&HashMap::new()) {
-                Ok((reconciled, reversed)) => {
-                    info!(
-                        reconciled,
-                        reversed,
-                        "startup hold reap: open holds cleared (receipt-log arbitration pending)"
+            match store.count_open_holds() {
+                Ok(0) => {}
+                Ok(count) => {
+                    warn!(
+                        count,
+                        "startup: open budget hold(s) left reserved pending \
+                         receipt-log arbitration; automatic reconcile requires \
+                         the durable receipt log (ADR-0013) arbitration map"
                     );
                 }
                 Err(error) => {
-                    return Err(ProtectError::Config(format!(
-                        "startup hold reap failed: {error}"
-                    )));
+                    warn!("startup: failed to count open budget holds: {error}");
                 }
             }
         }

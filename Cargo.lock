@@ -3638,6 +3638,7 @@ dependencies = [
  "dashmap 6.1.0",
  "dhat",
  "futures",
+ "jsonschema",
  "loom",
  "lru 0.16.3",
  "opentelemetry-semantic-conventions",
