@@ -61,6 +61,10 @@ pub(crate) fn build_app(state: Arc<ProxyState>) -> Router {
             "/v1/evaluate",
             post(mediated::sidecar_evaluate_tool_call_mediated_handler),
         )
+        // Settle a reserved authorization by the execution nonce that names its
+        // hold, producing an authoritative mediated-spend receipt and freeing the
+        // reserved-minus-realized difference back to the grant.
+        .route("/v1/reconcile", post(mediated::sidecar_reconcile_handler))
         .route("/{*path}", any(proxy_handler))
         .route("/", any(proxy_handler))
         .with_state(state)

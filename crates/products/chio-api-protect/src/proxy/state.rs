@@ -1,5 +1,10 @@
 use super::*;
 
+/// Interval between reserved-hold reaper sweeps. A hold reserved on
+/// `/v1/evaluate` but never reconciled is released once its execution-nonce TTL
+/// lapses; sweeping on this cadence bounds how long abandoned budget stays held.
+const RESERVED_HOLD_REAP_INTERVAL_SECS: u64 = 30;
+
 /// Stored receipts for inspection and querying.
 pub(crate) struct ReceiptLog {
     pub(crate) receipts: Vec<HttpReceipt>,
@@ -150,6 +155,18 @@ pub(crate) struct ProxyState {
     pub(crate) trusted_receipt_signers: Vec<PublicKey>,
     pub(crate) sidecar_control_token: Option<String>,
     pub(crate) budget_store: Option<Arc<dyn chio_kernel::budget_store::BudgetStore>>,
+    /// The process-lifetime kernel-mediation authority, built once when a budget
+    /// store is configured. Held behind a `Mutex` because admitting the
+    /// caller-named tool server (registration) needs `&mut self`, and reused
+    /// across requests so the approval-token and DPoP replay stores stay
+    /// authoritative, and so the nonce it mints on `/v1/evaluate` is the one it
+    /// verifies and consumes on `/v1/reconcile`.
+    pub(crate) mediation_kernel: Option<Mutex<chio_kernel::ChioKernel>>,
+    /// Request ids already claimed for a reservation on `/v1/evaluate`. The
+    /// kernel derives the durable budget hold identity from the request id, so
+    /// each id is admitted at most once; a reuse is rejected fail-closed (409) to
+    /// preserve the over-subscription guard.
+    pub(crate) minted_request_ids: Mutex<HashSet<String>>,
     pub(crate) allow_advisory: bool,
 }
 
@@ -337,11 +354,22 @@ impl ProtectProxy {
             }
         }
 
-        // The mediated route builds a fresh kernel per request (registering a
-        // placeholder under the caller's requested server id and its own
-        // mint-only execution-nonce store). It is available exactly when a
-        // budget store is configured, so no separate nonce-store handle is held
-        // in shared state.
+        // Build the kernel-mediation authority once, for the process lifetime, so
+        // the approval-token and DPoP replay stores it carries stay authoritative
+        // across `/v1/evaluate` requests and the nonce it mints is the one it
+        // verifies and consumes on `/v1/reconcile`. It exists exactly when a
+        // budget store is configured; without one, `/v1/evaluate` and
+        // `/v1/reconcile` deny fail-closed.
+        let mediation_kernel = match budget_store.as_ref() {
+            Some(store) => Some(Mutex::new(build_mediation_kernel(
+                &keypair,
+                Arc::clone(store),
+                &trusted_capability_issuers,
+                Vec::new(),
+            )?)),
+            None => None,
+        };
+
         let state = Arc::new(ProxyState {
             evaluator,
             signer_keypair: keypair,
@@ -357,8 +385,37 @@ impl ProtectProxy {
             trusted_receipt_signers,
             sidecar_control_token: self.config.sidecar_control_token.clone(),
             budget_store,
+            mediation_kernel,
+            minted_request_ids: Mutex::new(HashSet::new()),
             allow_advisory: self.config.allow_advisory,
         });
+
+        // Release expired, unreconciled reserved budget holds on an interval so a
+        // caller that authorizes but never reconciles does not permanently burn
+        // budget. Runs only when a mediation kernel exists (budget store
+        // configured). The task is aborted when the server task ends.
+        if state.mediation_kernel.is_some() {
+            let reaper_state = Arc::clone(&state);
+            tokio::spawn(async move {
+                let mut ticker = tokio::time::interval(std::time::Duration::from_secs(
+                    RESERVED_HOLD_REAP_INTERVAL_SECS,
+                ));
+                ticker.tick().await;
+                loop {
+                    ticker.tick().await;
+                    let now = chrono::Utc::now().timestamp();
+                    match reap_expired_reserved_holds_once(&reaper_state, now).await {
+                        Ok(0) => {}
+                        Ok(released) => {
+                            info!(released, "reaped expired reserved budget holds");
+                        }
+                        Err(error) => {
+                            warn!("reserved-hold reaper failed: {error}");
+                        }
+                    }
+                }
+            });
+        }
 
         let app = build_app(Arc::clone(&state));
 

@@ -48,6 +48,8 @@ fn strict_nonce_state_with_upstream(routes: Vec<RouteEntry>, upstream: String) -
         trusted_receipt_signers,
         sidecar_control_token: None,
         budget_store: None,
+        mediation_kernel: None,
+        minted_request_ids: Mutex::new(HashSet::new()),
         allow_advisory: false,
     })
 }

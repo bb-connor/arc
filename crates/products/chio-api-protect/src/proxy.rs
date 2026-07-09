@@ -77,7 +77,10 @@ pub(crate) use self::attenuation::*;
 pub(crate) use self::decision::*;
 pub(crate) use self::errors::*;
 pub(crate) use self::http::*;
-pub(crate) use self::mediated::{build_budget_store, load_revocation_db_ids};
+pub(crate) use self::mediated::{
+    build_budget_store, build_mediation_kernel, load_revocation_db_ids,
+    reap_expired_reserved_holds_once,
+};
 pub(crate) use self::receipts::*;
 pub(crate) use self::router::*;
 pub(crate) use self::scope_subset::*;
