@@ -318,6 +318,10 @@ impl BoundedOtlpGrpcIngress {
                     }
                     if !error.is_retryable_batch_error() {
                         let _ = self.pop_front()?;
+                        // Terminal, non-retryable: the unappended spans are lost.
+                        if remaining > 0 {
+                            self.record_sink_drop();
+                        }
                     }
                     return Err(error);
                 }
@@ -342,10 +346,14 @@ impl BoundedOtlpGrpcIngress {
                     if error.is_retryable_batch_error() {
                         // Keep the batch AND its prepared receipts AND its resume
                         // cursor, so the next drain re-appends only appended..n
-                        // with the SAME ids.
+                        // with the SAME ids. This is NOT a drop: no drop counter.
                         self.set_front_appended(appended)?;
                     } else {
                         let _ = self.pop_front()?;
+                        // Terminal, non-retryable: the unappended spans are lost.
+                        if remaining > 0 {
+                            self.record_sink_drop();
+                        }
                     }
                     return Err(error);
                 }
@@ -377,10 +385,16 @@ impl BoundedOtlpGrpcIngress {
             .lock()
             .map_err(|_| OTelReceiptExportError::Queue("OTEL queue mutex poisoned".to_string()))?;
         queue.record_append_error(spans);
-        // RFC-0009 F75: count a batch dropped before append, reconciling with
-        // the snapshot's append_error_batches field.
-        chio_metrics_spec::runtime::families::OTEL_SINK_DROP.incr(&[]);
         Ok(())
+    }
+
+    /// Count a terminal, non-retryable batch drop (RFC-0009 F75, Codex round-1
+    /// finding 5). Distinct from `record_append_error`: a retryable append error
+    /// retains the batch with its resume cursor and re-appends it on the next
+    /// drain, so it is NOT a drop and must not increment this counter, otherwise
+    /// transient store saturation reads as real data loss.
+    fn record_sink_drop(&self) {
+        chio_metrics_spec::runtime::families::OTEL_SINK_DROP.incr(&[]);
     }
 }
 
@@ -615,6 +629,24 @@ mod tests {
 
     use super::*;
 
+    /// Serializes the tests that read/advance the process-global
+    /// `chio_otel_sink_drop_total` counter, so before/after deltas are
+    /// deterministic under the parallel test harness (RFC-0009 Codex round-1
+    /// finding 5).
+    static SINK_DROP_COUNTER_LOCK: Mutex<()> = Mutex::new(());
+
+    /// Read the current process-global sink-drop counter value.
+    fn sink_drop_count() -> u64 {
+        let mut rendered = String::new();
+        chio_metrics_spec::runtime::families::OTEL_SINK_DROP.render(&mut rendered);
+        rendered
+            .lines()
+            .find(|line| line.starts_with("chio_otel_sink_drop_total "))
+            .and_then(|line| line.rsplit(' ').next())
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or(0)
+    }
+
     #[derive(Default)]
     struct RecordingCanonicalSink {
         receipts: Mutex<Vec<CanonicalChioReceipt>>,
@@ -836,6 +868,9 @@ mod tests {
 
     #[test]
     fn bounded_ingress_drops_non_retryable_failed_batch() -> Result<(), Box<dyn Error>> {
+        let _guard = SINK_DROP_COUNTER_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let recorder = Arc::new(RecordingCanonicalSink::default());
         let ingress = bounded_ingress(recorder, OtlpExporterQueueConfig::default());
         let invalid = OtlpGrpcTraceExport::from_spans(vec![OtlpSpan::new(
@@ -859,6 +894,72 @@ mod tests {
         assert_eq!(snapshot.append_error_spans, 1);
         assert_eq!(snapshot.appended_batches, 0);
 
+        Ok(())
+    }
+
+    /// RFC-0009 Codex round-1 finding 5: a RETRYABLE append error retains the
+    /// batch for redelivery, so it must NOT increment the sink-drop counter.
+    /// A `Pool` error is retryable.
+    #[test]
+    fn retryable_append_error_does_not_count_a_sink_drop() -> Result<(), Box<dyn Error>> {
+        let _guard = SINK_DROP_COUNTER_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let sink = ReceiptStoreSink::new_canonical(
+            Arc::new(FailingCanonicalSink),
+            ReceiptStoreSinkConfig::new(Keypair::generate()),
+        );
+        let ingress = BoundedOtlpGrpcIngress::new(sink, OtlpExporterQueueConfig::default());
+        ingress.enqueue(export_with_span("span-retry"))?;
+
+        let before = sink_drop_count();
+        // A retryable append failure keeps the batch queued; nothing is dropped.
+        let _ = ingress.drain();
+
+        assert_eq!(
+            sink_drop_count(),
+            before,
+            "a retryable append error must not advance chio_otel_sink_drop_total"
+        );
+        assert_eq!(
+            ingress.snapshot()?.queued_batches,
+            1,
+            "the retryable batch is retained for redelivery, not dropped"
+        );
+        Ok(())
+    }
+
+    /// RFC-0009 Codex round-1 finding 5: a TERMINAL, non-retryable append error
+    /// drops the batch (data lost), so it must increment the sink-drop counter
+    /// exactly once. An `InvalidSpan` error is non-retryable.
+    #[test]
+    fn terminal_append_error_counts_exactly_one_sink_drop() -> Result<(), Box<dyn Error>> {
+        let _guard = SINK_DROP_COUNTER_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let recorder = Arc::new(RecordingCanonicalSink::default());
+        let ingress = bounded_ingress(recorder, OtlpExporterQueueConfig::default());
+        let invalid = OtlpGrpcTraceExport::from_spans(vec![OtlpSpan::new(
+            "not-a-trace-id",
+            "0123456789abcdef",
+            "span-invalid-drop",
+        )
+        .with_attribute("chio.verdict", serde_json::json!("allow"))]);
+        ingress.enqueue(invalid)?;
+
+        let before = sink_drop_count();
+        let _ = ingress.drain();
+
+        assert_eq!(
+            sink_drop_count(),
+            before + 1,
+            "a terminal, non-retryable drop must advance chio_otel_sink_drop_total once"
+        );
+        assert_eq!(
+            ingress.snapshot()?.queued_batches,
+            0,
+            "the terminally-failed batch is removed from the queue"
+        );
         Ok(())
     }
 
