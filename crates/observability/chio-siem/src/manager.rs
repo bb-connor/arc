@@ -207,9 +207,22 @@ impl ExporterManager {
             // identity seeds at BASELINE 0; a persisted identity keeps its mark.
             let key = exporter.cursor_identity();
             self.acked.entry(key).or_insert(0);
-            self.cursor = self.acked.values().copied().min().unwrap_or(0);
+            self.exporters.push(exporter);
+            // Recompute the resume cursor over ONLY currently-registered exporter
+            // identities. Orphaned rows from a prior identity scheme (e.g. old
+            // index-keyed "0:webhook" rows superseded by stable-identity keying)
+            // remain in self.acked but must NOT drag the read cursor down to their
+            // stale low mark (Codex round-6): a min() over EVERY loaded row would
+            // resume at an orphan's 0 even though the current exporters durably
+            // acked far ahead, re-exporting history until they catch up. Every
+            // registered key has an entry (or_insert above), so the baseline/
+            // max_seq arguments are unused here.
+            let keys: Vec<String> = self.exporters.iter().map(|e| e.cursor_identity()).collect();
+            let key_refs: Vec<&str> = keys.iter().map(String::as_str).collect();
+            self.cursor = resume_cursor(&key_refs, &self.acked, 0, 0);
+        } else {
+            self.exporters.push(exporter);
         }
-        self.exporters.push(exporter);
     }
 
     /// Return the current number of entries in the dead-letter queue.
@@ -1300,6 +1313,44 @@ mod tests {
         assert_eq!(
             manager.cursor, 100,
             "an exporter resumes at the mark persisted under its stable identity"
+        );
+        Ok(())
+    }
+
+    /// Codex round-6 (the cursor-identity migration follow-up): resuming
+    /// exporters must IGNORE orphaned/stale cursor rows from a prior identity
+    /// scheme. An old index-keyed "0:webhook" row left at 0 must not drag the
+    /// read cursor down to its stale low mark when the current stable-identity
+    /// exporter has durably acked far ahead; otherwise the first duplicate batch
+    /// re-exports history until it catches up.
+    #[tokio::test]
+    async fn orphan_cursor_row_does_not_regress_the_resume_cursor() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let receipt_db = dir.path().join("receipts.sqlite3");
+        seed_valid_receipt_db(&receipt_db, 3)?;
+        let cursor_db = dir.path().join("cursor.sqlite3");
+        let current_identity = "webhook@https://soc.example.test/ingest";
+        {
+            let store = crate::cursor_store::SiemCursorStore::open(&cursor_db)?;
+            // Orphan row from the OLD index-keyed scheme, still at baseline 0.
+            store.set_acked("0:webhook", 0)?;
+            // The CURRENT stable-identity exporter durably acked seq 1_000_000.
+            store.set_acked(current_identity, 1_000_000)?;
+        }
+
+        let mut manager = ExporterManager::new(SiemConfig {
+            db_path: receipt_db.clone(),
+            cursor_db_path: Some(cursor_db.clone()),
+            ..SiemConfig::default()
+        })?;
+        manager.add_exporter(Box::new(IdentityExporter {
+            name: "webhook".to_string(),
+            identity: current_identity.to_string(),
+        }));
+        assert_eq!(
+            manager.cursor, 1_000_000,
+            "an orphan cursor row must not drag the resume cursor below the current \
+             exporter's durable mark"
         );
         Ok(())
     }
