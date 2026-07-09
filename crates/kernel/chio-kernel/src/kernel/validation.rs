@@ -892,6 +892,107 @@ impl ChioKernel {
         }
     }
 
+    /// Whether the registered tool server for `server_id` measures the realized
+    /// cost of an invocation it dispatches.
+    ///
+    /// An absent server defaults to `true` (measured), preserving
+    /// reconcile-and-settle behavior for every real server. The server is
+    /// always present here because dispatch resolved it before finalization, so
+    /// the default is unreachable in practice.
+    pub(crate) fn tool_server_measures_realized_cost(&self, server_id: &str) -> bool {
+        self.tool_servers
+            .get(server_id)
+            .is_none_or(|server| server.measures_realized_cost())
+    }
+
+    /// Finalize a tool output whose realized cost was not measured on this path.
+    ///
+    /// A tool server that reports `measures_realized_cost() == false` did not
+    /// execute the target tool, so no realized cost exists here. The kernel must
+    /// not sign a settled, reconciled authoritative spend for it: instead it
+    /// reverses the pre-execution hold (nothing was spent on this path) and
+    /// emits a provisional allow receipt whose budget authority carries a
+    /// `reversed` terminal and whose settlement stays `pending`. Such a receipt
+    /// is rejected by `is_authoritative_spend_receipt` (the hold is not
+    /// reconciled). Real reconciliation happens at the execution site.
+    fn finalize_unmeasured_cost_provisional_allow(
+        &self,
+        request: &ToolCallRequest,
+        output: ToolServerOutput,
+        elapsed: Duration,
+        timestamp: u64,
+        charge: BudgetChargeResult,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let cap = &request.capability;
+        let reverse = self.reverse_budget_charge(&cap.id, &charge)?;
+        let running_committed_cost_units = reverse.committed_cost_units_after;
+        let budget_remaining = charge
+            .budget_total
+            .saturating_sub(running_committed_cost_units);
+        let delegation_depth = cap.delegation_chain.len() as u32;
+        let root_budget_holder = cap.issuer.to_hex();
+
+        let financial_meta = FinancialReceiptMetadata {
+            grant_index: charge.grant_index as u32,
+            cost_charged: 0,
+            currency: charge.currency.clone(),
+            budget_remaining,
+            budget_total: charge.budget_total,
+            delegation_depth,
+            root_budget_holder,
+            payment_reference: None,
+            settlement_status: SettlementStatus::Pending,
+            cost_breakdown: None,
+            oracle_evidence: None,
+            attempted_cost: None,
+        };
+        let financial_json = Some(serde_json::json!({ "financial": financial_meta }));
+
+        let limited_output = self.apply_stream_limits(output, elapsed)?;
+        let tool_call_output = match &limited_output {
+            ToolServerOutput::Value(value) => ToolCallOutput::Value(value.clone()),
+            ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => {
+                ToolCallOutput::Stream(stream.clone())
+            }
+            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, .. }) => {
+                ToolCallOutput::Stream(stream.clone())
+            }
+        };
+
+        // The nonce id is intentionally omitted from the budget authority so the
+        // receipt makes no `mediated_spend` profile claim: this is a provisional
+        // confirmation, not an authoritative spend.
+        let budget_metadata =
+            self.budget_execution_receipt_metadata(&charge, Some(("reversed", &reverse)), None);
+        let merged = merge_metadata_objects(
+            financial_json,
+            self.merge_budget_receipt_metadata(extra_metadata, budget_metadata),
+        );
+
+        match limited_output {
+            ToolServerOutput::Value(_)
+            | ToolServerOutput::Stream(ToolServerStreamResult::Complete(_)) => self
+                .build_allow_response_with_metadata(
+                    request,
+                    tool_call_output,
+                    timestamp,
+                    Some(charge.grant_index),
+                    merged,
+                    None,
+                ),
+            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => self
+                .build_incomplete_response_with_output_and_metadata(
+                    request,
+                    Some(tool_call_output),
+                    &reason,
+                    timestamp,
+                    Some(charge.grant_index),
+                    merged,
+                ),
+        }
+    }
+
     fn reconcile_budget_charge(
         &self,
         capability_id: &str,
@@ -972,6 +1073,27 @@ impl ChioKernel {
                 metadata,
             );
         };
+
+        // A tool server that does not measure realized cost (a pre-execution
+        // authorization gate that dispatches a pass-through while the real tool
+        // runs elsewhere) never yields a settled, reconciled authoritative
+        // spend: nothing executed here, so there is no realized cost to
+        // reconcile. Reverse the pre-execution hold and emit a provisional
+        // receipt. Guarded on the absence of a payment authorization because
+        // such gates carry no prepayment; a prepaid invocation always runs
+        // through the measured settlement path below.
+        if payment_authorization.is_none()
+            && !self.tool_server_measures_realized_cost(&request.server_id)
+        {
+            return self.finalize_unmeasured_cost_provisional_allow(
+                request,
+                output,
+                elapsed,
+                timestamp,
+                charge,
+                extra_metadata,
+            );
+        }
 
         let reported_cost_ref = reported_cost.as_ref();
         let mut oracle_evidence = None;

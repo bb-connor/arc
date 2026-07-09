@@ -7,6 +7,37 @@ struct FailingMonetaryServer {
     id: String,
 }
 
+/// A monetary tool server that dispatches a pass-through but reports that it
+/// does not measure realized cost, mirroring the sidecar mediated route's
+/// pre-execution authorization gate.
+struct UnmeasuredCostServer {
+    id: String,
+}
+
+#[async_trait::async_trait]
+impl ToolServerConnection for UnmeasuredCostServer {
+    fn server_id(&self) -> &str {
+        &self.id
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["compute".to_string()]
+    }
+
+    fn measures_realized_cost(&self) -> bool {
+        false
+    }
+
+    async fn invoke(
+        &self,
+        _tool_name: &str,
+        _arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        Ok(serde_json::json!({ "upstream": "https://example.test" }))
+    }
+}
+
 struct CountingMonetaryServer {
     id: String,
     invocations: std::sync::Arc<std::sync::atomic::AtomicUsize>,

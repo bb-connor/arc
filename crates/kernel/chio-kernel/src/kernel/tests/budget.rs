@@ -1079,6 +1079,66 @@ fn monetary_server_not_reporting_cost_charges_max_cost_per_invocation() {
 }
 
 #[test]
+fn unmeasured_cost_server_reverses_hold_and_signs_provisional_receipt() {
+    // A tool server that does not measure realized cost (a pre-execution
+    // authorization gate that dispatches a pass-through while the real tool
+    // runs elsewhere) must not yield a settled, reconciled authoritative spend.
+    // The kernel reverses the pre-execution hold and signs a provisional,
+    // unreconciled receipt: settlement is pending, the terminal disposition is
+    // "reversed", and no committed cost is moved.
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(UnmeasuredCostServer {
+        id: "gate-srv".to_string(),
+    }));
+
+    let grant = make_monetary_grant("gate-srv", "compute", 100, 1000, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let resp = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: "req-unmeasured".to_string(),
+            capability: cap.clone(),
+            tool_name: "compute".to_string(),
+            server_id: "gate-srv".to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({}),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        })
+        .unwrap();
+
+    assert_eq!(resp.verdict, Verdict::Allow);
+    let metadata = resp
+        .receipt
+        .metadata
+        .as_ref()
+        .expect("should have metadata");
+    let financial = metadata
+        .get("financial")
+        .expect("should have 'financial' key");
+    // No realized cost measured: nothing charged and settlement stays pending.
+    assert_eq!(financial["cost_charged"].as_u64().unwrap(), 0);
+    assert_eq!(financial["settlement_status"], "pending");
+
+    let budget_authority = metadata
+        .get("budget_authority")
+        .expect("should have 'budget_authority' key");
+    assert_eq!(budget_authority["terminal"]["disposition"], "reversed");
+    assert_ne!(budget_authority["terminal"]["disposition"], "reconciled");
+
+    // The hold is reversed, so no committed cost is moved.
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    assert_eq!(usage.committed_cost_units().unwrap(), 0);
+}
+
+#[test]
 fn monetary_tool_server_error_releases_precharged_budget() {
     let mut kernel = make_kernel(make_monetary_config());
     let agent_kp = Keypair::generate();
