@@ -580,16 +580,22 @@ class ChioClient:
         ``{"verdict", "receipt", "execution_nonce"}``.
 
         The route is strict-nonce and completes in two phases. The first call
-        omits ``execution_nonce`` (a preflight); its response carries a freshly
-        minted ``execution_nonce`` as a ``SignedExecutionNonce`` object. The
-        follow-up call presents that object back, unchanged, via
+        omits ``execution_nonce`` (a preflight); its response has top-level
+        ``verdict`` ``"pending_nonce"`` and carries a freshly minted
+        ``execution_nonce`` as a ``SignedExecutionNonce`` object, but authorizes
+        no spend. The follow-up call presents that object back, unchanged, via
         ``execution_nonce`` so the kernel can dispatch and settle. The nonce is
         forwarded as an object (not a re-encoded string), matching the shape the
         preflight returned.
 
-        Callers MUST confirm the receipt is authoritative - ``trust_level`` is
-        ``"mediated"`` and the response carries a bound ``execution_nonce`` -
-        before trusting the verdict.
+        A ``"pending_nonce"`` preflight is not authorization to execute. Before
+        trusting the verdict, callers MUST confirm the completed result is
+        authoritative: the top-level ``verdict`` is ``"allow"`` and the receipt
+        is a settled, reconciled mediated spend (it passes the kernel
+        authoritative-spend predicate). ``trust_level == "mediated"`` and a
+        bound ``execution_nonce`` are necessary but NOT sufficient; a preflight
+        and a provisional receipt (one produced by a tool server that does not
+        measure realized cost) carry those too yet authorize no final spend.
 
         Parameters
         ----------
