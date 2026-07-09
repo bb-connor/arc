@@ -200,7 +200,10 @@ impl ExporterManager {
     /// baseline pin is applied here.
     pub fn add_exporter(&mut self, exporter: Box<dyn Exporter>) {
         if self.cursor_store.is_some() {
-            self.acked.entry(exporter.name().to_string()).or_insert(0);
+            // Key by registration index + name so two same-named instances keep
+            // distinct high-water marks (Codex round-4 finding 4).
+            let key = exporter_cursor_key(self.exporters.len(), exporter.name());
+            self.acked.entry(key).or_insert(0);
             self.cursor = self.acked.values().copied().min().unwrap_or(0);
         }
         self.exporters.push(exporter);
@@ -370,6 +373,9 @@ impl ExporterManager {
         for index in 0..self.exporters.len() {
             let exporter = self.exporters[index].as_ref();
             let exporter_name = exporter.name().to_string();
+            // Ack/cursor state is keyed per-instance (index + name); metrics stay
+            // keyed by the bare name (Codex round-4 finding 4).
+            let cursor_key = exporter_cursor_key(index, &exporter_name);
             let result = Self::export_with_retry(
                 &mut self.rate_limiter,
                 self.config.max_retries,
@@ -396,9 +402,9 @@ impl ExporterManager {
                             now.saturating_sub(persisted) as f64,
                         );
                     }
-                    self.acked.insert(exporter_name.clone(), max_seq);
+                    self.acked.insert(cursor_key.clone(), max_seq);
                     if let Some(store) = &self.cursor_store {
-                        store.set_acked(&exporter_name, max_seq)?;
+                        store.set_acked(&cursor_key, max_seq)?;
                     }
                 }
                 Err(e) => {
@@ -447,8 +453,14 @@ impl ExporterManager {
         // acked is held at its baseline (at-least-once, RFC-0009 F78, Codex
         // round-1 finding 1). Zero registered exporters falls back to max_seq.
         self.cursor = if self.cursor_store.is_some() {
-            let exporter_names: Vec<&str> = self.exporters.iter().map(|e| e.name()).collect();
-            resume_cursor(&exporter_names, &self.acked, cursor, max_seq)
+            let exporter_keys: Vec<String> = self
+                .exporters
+                .iter()
+                .enumerate()
+                .map(|(index, e)| exporter_cursor_key(index, e.name()))
+                .collect();
+            let key_refs: Vec<&str> = exporter_keys.iter().map(String::as_str).collect();
+            resume_cursor(&key_refs, &self.acked, cursor, max_seq)
         } else {
             max_seq
         };
@@ -521,6 +533,21 @@ impl ExporterManager {
             tokio::time::sleep(delay).await;
         }
     }
+}
+
+/// Per-instance cursor/ack key (RFC-0009 F78, Codex round-4 finding 4).
+///
+/// Built-in exporters return static names (every `WebhookExporter` is
+/// "webhook"), so keying the high-water mark by name alone would let one
+/// instance's ack advance a same-named peer's cursor and skip redelivery for a
+/// failed peer, violating at-least-once. The registration index disambiguates
+/// duplicate names. It is deterministic across restarts as long as exporters are
+/// registered in the same order (they are, from a fixed config), so the durable
+/// `siem_export_cursor` rows resume correctly. Distinct from the metric label,
+/// which stays the bare exporter name (two "webhook" instances share the
+/// "webhook" series, keeping label cardinality bounded).
+fn exporter_cursor_key(index: usize, name: &str) -> String {
+    format!("{index}:{name}")
 }
 
 /// Compute the read cursor after a poll: the minimum high-water mark across all
@@ -884,9 +911,11 @@ mod tests {
         seed_valid_receipt_db(&receipt_db, 3)?;
         let cursor_db = dir.path().join("cursor.sqlite3");
         {
-            // "splunk" has already acked up to seq 100; "webhook" has no row.
+            // "splunk" (registration index 0) has already acked up to seq 100;
+            // "webhook" has no row. The durable key is per-instance (Codex
+            // round-4 finding 4), so pre-seed under splunk's index-keyed row.
             let store = crate::cursor_store::SiemCursorStore::open(&cursor_db)?;
-            store.set_acked("splunk", 100)?;
+            store.set_acked(&exporter_cursor_key(0, "splunk"), 100)?;
         }
 
         let mut manager = ExporterManager::new(SiemConfig {
@@ -1136,6 +1165,56 @@ mod tests {
                 .iter()
                 .any(|(name, depth)| name == "fail-sink" && *depth > 0),
             "the failing exporter must report its own non-zero DLQ depth: {depths:?}"
+        );
+        Ok(())
+    }
+
+    /// Codex round-4 finding 4: high-water marks must be keyed by a unique
+    /// per-instance identity, not by exporter name alone. Two exporters that
+    /// return the same static name ("webhook") - as every built-in
+    /// WebhookExporter does - must keep DISTINCT cursor state. When index 0 acks
+    /// and index 1 exhausts retries, the failed instance's range must be
+    /// redelivered (at-least-once), not skipped because its same-named peer
+    /// advanced a shared key.
+    #[tokio::test]
+    async fn duplicate_exporter_names_keep_distinct_cursor_state() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let receipt_db = dir.path().join("receipts.sqlite3");
+        seed_valid_receipt_db(&receipt_db, 3)?;
+        let cursor_db = dir.path().join("cursor.sqlite3");
+
+        let mut manager = ExporterManager::new(SiemConfig {
+            db_path: receipt_db.clone(),
+            max_retries: 0,
+            cursor_db_path: Some(cursor_db.clone()),
+            ..SiemConfig::default()
+        })?;
+        // Both instances report the name "webhook": index 0 succeeds, index 1
+        // fails. Under name-only keying the succeeding instance's ack would
+        // advance the shared "webhook" mark and skip redelivery for the failed
+        // one, violating at-least-once.
+        manager.add_exporter(Box::new(OkExporter {
+            name: "webhook".to_string(),
+        }));
+        manager.add_exporter(Box::new(FailExporter {
+            name: "webhook".to_string(),
+        }));
+
+        manager.poll_once().await?;
+
+        // The failed instance (index 1) never acked, so the read cursor is HELD
+        // at baseline 0 for redelivery. Name-only keying would have advanced the
+        // shared mark to 3 and permanently skipped [1..3] for the failed one.
+        assert_eq!(
+            manager.cursor, 0,
+            "the failed same-named instance holds the cursor at baseline for redelivery"
+        );
+        // The succeeding instance still advanced its OWN durable high-water mark.
+        let store = crate::cursor_store::SiemCursorStore::open(&cursor_db)?;
+        assert_eq!(
+            store.acked_seqs()?.values().copied().max(),
+            Some(3),
+            "the succeeding instance advanced its own high-water mark"
         );
         Ok(())
     }
