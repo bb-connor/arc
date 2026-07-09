@@ -108,17 +108,24 @@ impl Guard for BehavioralSequenceGuard {
             }
         }
 
-        // Check max consecutive.
+        // Check max consecutive. The count of prior consecutive same-tool
+        // invocations comes from the journal's cumulative O(1) streak counter
+        // (`current_streak_tool` + `current_streak_len`), NOT the bounded
+        // `tool_sequence` tail. When `journal_entry_cap` is smaller than
+        // `max_consecutive`, the ring evicts the older part of a same-tool streak,
+        // so counting the retained tail would undercount and ALLOW a call that
+        // must be DENIED. The cumulative counter survives ring eviction (RFC-0004
+        // F21), so the streak limit holds regardless of the entry cap. If the
+        // request tool differs from the current-streak tool, no prior consecutive
+        // run exists for it (it would start a fresh streak).
         if let Some(max_consec) = self.policy.max_consecutive {
-            let mut count: u32 = 0;
-            for t in sequence.iter().rev() {
-                if t == tool_name {
-                    count = count.saturating_add(1);
+            let prior_streak =
+                if snapshot.current_streak_tool.as_deref() == Some(tool_name.as_str()) {
+                    snapshot.current_streak_len
                 } else {
-                    break;
-                }
-            }
-            if count >= max_consec {
+                    0
+                };
+            if prior_streak >= u64::from(max_consec) {
                 return Ok(GuardDecision::deny(Vec::new()));
             }
         }
@@ -465,6 +472,51 @@ mod tests {
         let (request, scope, agent_id, server_id) = make_ctx_for_tool("read_file");
         let ctx = guard_ctx(&request, &scope, &agent_id, &server_id);
         assert_eq!(guard.evaluate(&ctx).expect("ok"), Verdict::Allow);
+    }
+
+    #[test]
+    fn max_consecutive_survives_journal_ring_eviction() {
+        // RFC-0004 F21 (codex finding 3553826789, fail-open): when
+        // `journal_entry_cap` is smaller than `max_consecutive`, the bounded
+        // `tool_sequence` ring evicts the older part of a same-tool streak. If the
+        // guard counted only the retained tail it would undercount and ALLOW a
+        // call that must be DENIED. The cumulative O(1) streak counter survives
+        // ring eviction, so the streak limit is enforced regardless of the cap.
+        let cap = 4;
+        let journal = Arc::new(SessionJournal::with_entry_cap(
+            "sess-streak-evict".to_string(),
+            cap,
+        ));
+        // 10 consecutive calls: max_consecutive allows exactly 10, the 11th must
+        // deny. The ring only retains `cap` (4) of them.
+        for _ in 0..10 {
+            record(&journal, "read_file");
+        }
+
+        // Precondition: the retained ring holds only `cap` entries, far fewer than
+        // the 10-long streak, but the cumulative streak counter records all 10.
+        let snapshot = journal.snapshot().expect("snapshot");
+        assert_eq!(
+            snapshot.tool_sequence.len(),
+            cap,
+            "test precondition: the ring must have evicted the older streak prefix"
+        );
+        assert_eq!(snapshot.current_streak_tool.as_deref(), Some("read_file"));
+        assert_eq!(snapshot.current_streak_len, 10);
+
+        let guard = BehavioralSequenceGuard::new(
+            journal,
+            SequencePolicy {
+                max_consecutive: Some(10),
+                ..SequencePolicy::default()
+            },
+        );
+
+        // The 11th consecutive read_file must be DENIED. Counting the retained
+        // 4-entry tail (4 >= 10 is false) would falsely ALLOW it (RED before fix).
+        let (request, scope, agent_id, server_id) = make_ctx_for_tool("read_file");
+        let ctx = guard_ctx(&request, &scope, &agent_id, &server_id);
+        assert_eq!(guard.evaluate(&ctx).expect("ok"), Verdict::Deny);
     }
 
     #[test]

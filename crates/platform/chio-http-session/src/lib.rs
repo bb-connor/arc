@@ -148,6 +148,15 @@ pub struct SessionJournalSnapshot {
     pub tool_sequence: Vec<String>,
     /// Per-tool invocation counts.
     pub tool_counts: HashMap<String, u64>,
+    /// The tool name of the current consecutive run (the last tool recorded), or
+    /// `None` if nothing has been recorded. Cumulative and O(1): it survives ring
+    /// eviction so a same-tool streak longer than `journal_entry_cap` is still
+    /// counted in full (RFC-0004 F21).
+    pub current_streak_tool: Option<String>,
+    /// Length of the current consecutive run of `current_streak_tool`. Resets to
+    /// 1 whenever a different tool is recorded, so it stays bounded semantically
+    /// (a single running count, not a growing collection).
+    pub current_streak_len: u64,
 }
 
 // ---------------------------------------------------------------------------
@@ -210,6 +219,17 @@ struct JournalInner {
     /// counting so legitimate (registry-bounded) predecessor checks stay
     /// correct across ring eviction.
     tool_counts_cap: usize,
+    /// The tool name of the current consecutive run, or `None` before the first
+    /// record. Together with `current_streak_len` this is an O(1), bounded
+    /// cumulative streak counter (last-tool plus consecutive-count) that survives
+    /// entry-ring eviction, so a `max_consecutive` check can be enforced even when
+    /// the streak is longer than `journal_entry_cap` and the older part of the
+    /// streak has been evicted from `tool_sequence` (RFC-0004 F21).
+    current_streak_tool: Option<String>,
+    /// Length of the current consecutive run of `current_streak_tool`. Reset to 1
+    /// when a different tool is recorded, so it never accumulates unboundedly as a
+    /// collection: it is a single running scalar.
+    current_streak_len: u64,
 }
 
 impl JournalInner {
@@ -225,6 +245,8 @@ impl JournalInner {
             ),
             tool_counts: HashMap::new(),
             tool_counts_cap,
+            current_streak_tool: None,
+            current_streak_len: 0,
         }
     }
 
@@ -258,6 +280,8 @@ impl JournalInner {
             data_flow: self.data_flow.clone(),
             tool_sequence: self.tool_sequence.iter().cloned().collect(),
             tool_counts: self.tool_counts.clone(),
+            current_streak_tool: self.current_streak_tool.clone(),
+            current_streak_len: self.current_streak_len,
         }
     }
 }
@@ -404,6 +428,20 @@ impl SessionJournal {
         // legitimate tool set. The append-only entry, sequence ring, and
         // data-flow totals above are unaffected by the overflow.
         let _ = inner.tool_sequence.push(tool_name.clone());
+
+        // Maintain the cumulative consecutive-run counter (O(1), bounded scalar).
+        // This survives entry-ring eviction so a `max_consecutive` policy is
+        // enforced even when the streak is longer than `journal_entry_cap` and the
+        // older part of the streak has been evicted from `tool_sequence`
+        // (RFC-0004 F21 fail-closed): the guard consults this counter, not the
+        // truncated ring tail.
+        if inner.current_streak_tool.as_deref() == Some(tool_name.as_str()) {
+            inner.current_streak_len = inner.current_streak_len.saturating_add(1);
+        } else {
+            inner.current_streak_tool = Some(tool_name.clone());
+            inner.current_streak_len = 1;
+        }
+
         if inner.tool_counts.contains_key(&tool_name) {
             if let Some(count) = inner.tool_counts.get_mut(&tool_name) {
                 *count = count.saturating_add(1);
