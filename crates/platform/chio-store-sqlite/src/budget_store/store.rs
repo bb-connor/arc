@@ -91,6 +91,23 @@ impl SqliteBudgetStore {
                 head_seq  INTEGER NOT NULL DEFAULT 0,
                 CHECK (head_seq >= 0)
             );
+
+            -- Structural (trigger-enforced) mirror of reset_budget_ack_head_watermark:
+            -- ANY delete from budget_mutation_events - whether through a known call
+            -- site, a future call site added without remembering the reset, or an
+            -- out-of-band/operator delete - forces the watermark back to genesis so
+            -- budget_ack_heads always re-verifies contiguity instead of trusting a
+            -- watermark that may now sit above a freshly punched hole. This fires in
+            -- the same transaction as the DELETE (SQLite AFTER triggers run within the
+            -- statement that fired them), so it can never observe a partial delete.
+            -- The manual reset_budget_ack_head_watermark calls at each known delete
+            -- site are kept as belt-and-suspenders; this trigger is what makes the
+            -- invariant hold even if one of them is ever missed.
+            CREATE TRIGGER IF NOT EXISTS budget_mutation_events_reset_ack_head_watermark
+            AFTER DELETE ON budget_mutation_events
+            BEGIN
+                UPDATE budget_ack_head_watermark SET head_seq = 0 WHERE singleton = 1;
+            END;
             "#,
         )?;
         connection.execute(
@@ -227,9 +244,11 @@ impl SqliteBudgetStore {
     /// the rows ABOVE it (a window scan bounded to `event_seq > W`), so steady
     /// state cost is O(new rows), not O(history). Soundness holds because W only
     /// advances while the run stays gap-free, and any DELETE of a mutation event
-    /// resets W to 0 (`reset_budget_ack_head_watermark`), forcing the next call
-    /// to re-verify from genesis so a hole punched below W can never leave a
-    /// stale-high head that over-counts (codex #965 round-2 P2).
+    /// resets W to 0 (`reset_budget_ack_head_watermark`, backstopped structurally
+    /// by the `budget_mutation_events_reset_ack_head_watermark` AFTER DELETE
+    /// trigger so a future or out-of-band delete site cannot skip the reset),
+    /// forcing the next call to re-verify from genesis so a hole punched below W
+    /// can never leave a stale-high head that over-counts (codex #965 round-2 P2).
     pub fn budget_ack_heads(&self) -> Result<Vec<(String, u64)>, BudgetStoreError> {
         let mut connection = self.connection()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -299,6 +318,12 @@ impl SqliteBudgetStore {
     /// whenever a mutation event is DELETED (a hole may have been punched at or
     /// below the watermark): re-verification caps the head below the hole so a
     /// stale-high watermark can never over-count a witness (codex #965 round-2 P2).
+    ///
+    /// This is redundant with the `budget_mutation_events_reset_ack_head_watermark`
+    /// AFTER DELETE trigger created in `open` (defense-in-depth): the trigger fires
+    /// structurally on every delete against the table, so this manual call is a
+    /// belt-and-suspenders in-transaction reset at each known call site, not the
+    /// sole enforcement point.
     fn reset_budget_ack_head_watermark(
         transaction: &rusqlite::Transaction<'_>,
     ) -> Result<(), BudgetStoreError> {

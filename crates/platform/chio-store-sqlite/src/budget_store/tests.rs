@@ -1795,3 +1795,85 @@ fn budget_ack_head_watermark_recomputes_after_delete_caps_below_hole(
     let _ = fs::remove_file(&path);
     Ok(())
 }
+
+#[test]
+fn budget_mutation_events_delete_trigger_resets_watermark_even_without_manual_call(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Defense-in-depth: every known DELETE FROM budget_mutation_events call site
+    // pairs the delete with a manual reset_budget_ack_head_watermark call in the
+    // same transaction. This test proves the invariant does NOT depend on that
+    // discipline: a raw SQL delete that deliberately bypasses the manual reset
+    // path (simulating a future call site that forgets it, or an out-of-band /
+    // operator delete) must still zero the watermark, because the
+    // budget_mutation_events_reset_ack_head_watermark AFTER DELETE trigger fires
+    // structurally on the table itself.
+    //
+    // Without the trigger this test fails: head_seq would stay stale-high at 3
+    // and budget_ack_heads would over-count origin "http://o" up to a seq (3)
+    // whose row 2 no longer exists - a witness over-count / data-loss double-spend.
+    let path = unique_db_path("chio-ack-watermark-trigger-raw-delete");
+    let store = SqliteBudgetStore::open(&path)?;
+    let head_for = |heads: &[(String, u64)], origin: &str| {
+        heads.iter().find(|(o, _)| o == origin).map(|(_, seq)| *seq)
+    };
+
+    store.import_snapshot_records(
+        &[],
+        &[
+            ack_head_event(1, "e1", "http://o"),
+            ack_head_event(2, "e2", "http://o"),
+            ack_head_event(3, "e3", "http://o"),
+        ],
+    )?;
+    // Advance the watermark to 3 via the normal incremental path.
+    assert_eq!(head_for(&store.budget_ack_heads()?, "http://o"), Some(3));
+    {
+        let connection = store.connection()?;
+        let watermark: i64 = connection.query_row(
+            "SELECT head_seq FROM budget_ack_head_watermark WHERE singleton = 1",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(watermark, 3, "watermark must have advanced to 3");
+    }
+
+    // Delete row seq 2 directly via raw SQL, bypassing delete_mutation_event
+    // (and therefore bypassing reset_budget_ack_head_watermark entirely) to
+    // isolate the trigger as the sole thing that can reset the watermark here.
+    {
+        let connection = store.connection()?;
+        let deleted = connection.execute(
+            "DELETE FROM budget_mutation_events WHERE event_id = ?1",
+            params!["e2"],
+        )?;
+        assert_eq!(deleted, 1, "raw delete must remove exactly one row");
+    }
+
+    // The trigger fired in the same transaction as the raw DELETE (SQLite AFTER
+    // triggers run within the firing statement), so head_seq is already 0 with
+    // no further application-level call.
+    {
+        let connection = store.connection()?;
+        let watermark: i64 = connection.query_row(
+            "SELECT head_seq FROM budget_ack_head_watermark WHERE singleton = 1",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(
+            watermark, 0,
+            "the AFTER DELETE trigger must reset head_seq to 0 on any delete, \
+             even one that bypasses reset_budget_ack_head_watermark"
+        );
+    }
+
+    // budget_ack_heads must therefore re-verify from genesis and cap at 1, not
+    // report a stale-high (or worse, unreset) head past the punched hole at 2.
+    assert_eq!(
+        head_for(&store.budget_ack_heads()?, "http://o"),
+        Some(1),
+        "re-verification from a reset watermark must cap the head at 1, not stay at 3"
+    );
+
+    let _ = fs::remove_file(&path);
+    Ok(())
+}
