@@ -425,6 +425,36 @@ pub(crate) fn latest_checkpoint_is_chain_connected(
     checkpoint: &KernelCheckpoint,
 ) -> Result<(), ReceiptStoreError> {
     let checkpoint_seq = checkpoint.body.checkpoint_seq;
+    // Prefix-completeness guard (codex round 11, P3): the immediate-predecessor
+    // link below proves only that the LATEST checkpoint connects to seq - 1. An
+    // EARLIER checkpoint row missing from the persisted chain (a partial import,
+    // an out-of-band delete) leaves seq-1..seq intact yet the range that earlier
+    // checkpoint attested is no longer covered, and `flush_report` would still
+    // report this checkpoint's `batch_end_seq` as checkpointed - hiding an
+    // uncheckpointed range and letting retention prune unattested entries. The
+    // persisted chain must therefore hold EVERY seq 1..=checkpoint_seq with no
+    // gap. Because `checkpoint_seq` values are unique and positive and this is
+    // the LATEST checkpoint (its seq is the max), `COUNT(*) == checkpoint_seq`
+    // together with `MAX(checkpoint_seq) == checkpoint_seq` proves the prefix is
+    // gap-free. This is one aggregate over the checkpoint table (its row count is
+    // ~ entries / batch, and there is NO per-checkpoint parse, signature verify,
+    // or Merkle rebuild), so it stays bounded and never re-verifies whole history
+    // (F22); the removed full `verify_checkpoint_chain_integrity` parsed and
+    // re-validated every checkpoint. A genuine earlier-row TAMPER (an interior
+    // predecessor/projection corrupted while all rows remain present) is not a
+    // gap and stays the domain of the O(N) `chio receipt audit`.
+    let (present, max_seq) = connection.query_row(
+        "SELECT COUNT(*), COALESCE(MAX(checkpoint_seq), 0) FROM kernel_checkpoints",
+        [],
+        |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+    )?;
+    let present = sqlite_u64(present, "persisted checkpoint count")?;
+    let max_seq = sqlite_u64(max_seq, "persisted checkpoint max seq")?;
+    if max_seq != checkpoint_seq || present != checkpoint_seq {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint chain prefix is incomplete: latest checkpoint is {checkpoint_seq} but the persisted chain holds {present} checkpoints up to {max_seq}; run `chio receipt audit`"
+        )));
+    }
     if checkpoint_seq <= 1 {
         return validate_checkpoint_base(checkpoint);
     }

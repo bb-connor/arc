@@ -621,6 +621,75 @@ fn flush_report_rejects_checkpoint_foreign_to_local_claim_log(
     Ok(())
 }
 
+/// Codex round 11, P3: `latest_checkpoint_is_chain_connected` (the `flush_report`
+/// filter guarding a trusted `batch_end_seq`) verified only that the LATEST
+/// checkpoint links to its IMMEDIATE predecessor. An EARLIER checkpoint row
+/// missing from the persisted chain (a partial import, an out-of-band delete)
+/// left the seq-1..seq link intact, so the helper still accepted the latest
+/// checkpoint even though the prefix was not actually complete - hiding an
+/// unattested range from the flush report. The fix requires the persisted chain
+/// to hold every seq 1..=latest with no gap (one bounded COUNT aggregate over
+/// the checkpoint table, no per-checkpoint parse/signature/Merkle work, so it
+/// stays bounded and never re-verifies whole history, F22). A DEEPER gap (not
+/// the immediate predecessor, which the existing predecessor check already
+/// catches) must now fail closed.
+#[test]
+fn chain_connected_rejects_missing_earlier_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-chain-connected-gap");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    // Four receipts -> four single-entry checkpoints (seq 1..=4).
+    for i in 0..4 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-gap-{i}"), (i + 1) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    for _ in 0..4 {
+        store.create_next_receipt_checkpoint(1, &keypair)?;
+    }
+    let latest = store
+        .load_checkpoint_by_seq(4)?
+        .ok_or("checkpoint 4 missing")?;
+
+    let connection = store.connection()?;
+    // Baseline: an intact 1..=4 chain is chain-connected.
+    latest_checkpoint_is_chain_connected(&connection, &latest)?;
+
+    // Delete an EARLIER checkpoint row (seq 2) out of band - NOT the immediate
+    // predecessor (seq 3), which stays present so the predecessor-link check
+    // alone would still accept seq 4. Disable foreign keys so removing the
+    // kernel_checkpoints row does not cascade into (immutable) projection tables;
+    // the gap guard only counts kernel_checkpoints rows.
+    connection.execute_batch(
+        "PRAGMA foreign_keys = OFF; DROP TRIGGER IF EXISTS kernel_checkpoints_reject_delete;",
+    )?;
+    let deleted = connection.execute(
+        "DELETE FROM kernel_checkpoints WHERE checkpoint_seq = 2",
+        [],
+    )?;
+    assert_eq!(deleted, 1, "expected to remove exactly one checkpoint row");
+
+    // The immediate predecessor (seq 3) is still present, so before the fix the
+    // helper returned Ok; the prefix-completeness guard now fails closed on the
+    // missing seq 2.
+    let error = latest_checkpoint_is_chain_connected(&connection, &latest)
+        .err()
+        .ok_or("a chain with a missing earlier checkpoint must be rejected")?;
+    match &error {
+        ReceiptStoreError::Conflict(message) => {
+            assert!(
+                message.contains("prefix is incomplete") && message.contains("chio receipt audit"),
+                "Conflict must name the incomplete prefix and the audit CLI, got: {message}"
+            );
+        }
+        other => return Err(format!("expected Conflict, got {other}").into()),
+    }
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
 /// Codex round 2, finding 5: the OPERATOR/IMPORT checkpoint append
 /// (store_checkpoint -> store_kernel_checkpoint_atomic) only parses the LATEST
 /// checkpoint as predecessor, so a mid-chain tamper whose latest row still
