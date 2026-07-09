@@ -1022,6 +1022,12 @@ async fn serve_siem_export(receipt_db: &Path, cursor_db: &Path) -> Result<(), Cl
         manager.add_exporter(Box::new(alerting));
     }
 
+    // Fail closed when no consumer is configured (RFC-0009 Codex round-1 finding
+    // 6). With zero exporters the manager still parses batches and advances its
+    // cursor, silently consuming receipts without exporting them anywhere. Refuse
+    // to start so a misconfigured deploy is loud, not silently lossy.
+    ensure_serve_has_consumer(&registered_exporters)?;
+
     // Pre-register the soc/dlq/alert-dispatch series at zero so the
     // absent_over_time backstops fire only on a true scrape gap (RFC-0009
     // contract rule 2). alert_dispatch is seeded ONLY when alerting is
@@ -1039,6 +1045,22 @@ async fn serve_siem_export(receipt_db: &Path, cursor_db: &Path) -> Result<(), Cl
     // checkpoint-age gauges. Never panics; logs and continues on error.
     let watchdog = spawn_receipt_watchdog(receipt_db.to_path_buf(), cancel_rx.clone());
 
+    // Prometheus scrape endpoint (RFC-0009 F57, Codex round-1 finding 7): serve
+    // the SOC-export / DLQ / alert-dispatch / checkpoint families this process
+    // records so a co-located agent can scrape them. A bind failure logs and the
+    // serve continues without the endpoint rather than aborting the export loop.
+    let metrics_addr = crate::metrics_server::configured_metrics_addr();
+    let metrics_endpoint = match crate::metrics_server::bind_metrics_endpoint(&metrics_addr).await {
+        Ok(listener) => Some(crate::metrics_server::spawn_metrics_endpoint(
+            listener,
+            cancel_rx.clone(),
+        )),
+        Err(error) => {
+            eprintln!("SIEM metrics scrape endpoint bind failed on {metrics_addr}: {error}");
+            None
+        }
+    };
+
     let handle = tokio::spawn(async move {
         manager.run(cancel_rx).await;
     });
@@ -1047,6 +1069,9 @@ async fn serve_siem_export(receipt_db: &Path, cursor_db: &Path) -> Result<(), Cl
     let _ = cancel_tx.send(true);
     let _ = handle.await;
     let _ = watchdog.await;
+    if let Some(metrics_endpoint) = metrics_endpoint {
+        let _ = metrics_endpoint.await;
+    }
     Ok(())
 }
 
@@ -1166,6 +1191,24 @@ fn build_serve_alerting_exporter(
     Some((builder.build(), routes))
 }
 
+/// Fail closed unless the serve mode has at least one configured consumer
+/// (RFC-0009 F78/F79, Codex round-1 finding 6). With zero registered exporters
+/// the manager parses batches and advances its cursor, silently discarding
+/// receipts; refusing to start makes that misconfiguration loud instead. SOC
+/// exporters (Splunk/Elastic/Webhook) and alerting backends both register here.
+fn ensure_serve_has_consumer(registered_exporters: &[String]) -> Result<(), CliError> {
+    if registered_exporters.is_empty() {
+        return Err(CliError::cli_other_error(
+            "chio-wall siem-export requires at least one configured consumer: set \
+             CHIO_SIEM_ALERT_* to enable an alerting backend, or register a SOC \
+             exporter. Refusing to start so the read cursor never advances past \
+             receipts no exporter has consumed (RFC-0009 F78/F79)."
+                .to_string(),
+        ));
+    }
+    Ok(())
+}
+
 /// Pre-register the SIEM serve-mode metric series at zero so the absent-metric
 /// backstops fire only on a true scrape gap (RFC-0009 contract rule 2).
 ///
@@ -1186,9 +1229,11 @@ fn preregister_serve_metrics(registered_exporters: &[&str], alert_routes: &[&str
     families::SOC_EXPORT_TOTAL.preregister(&[DESERIALIZE_EXPORTER, "malformed"]);
 
     for exporter in registered_exporters {
-        // The manager records `ok` on success and manages a per-exporter DLQ
-        // depth gauge; seed both so the families exist before the first poll.
-        families::SOC_EXPORT_TOTAL.preregister(&[exporter, "ok"]);
+        // The manager records `success` on success (aligned with the
+        // soc_export_error_ratio recording rules, Codex round-1 finding 3) and
+        // manages a per-exporter DLQ depth gauge; seed both so the families exist
+        // before the first poll.
+        families::SOC_EXPORT_TOTAL.preregister(&[exporter, "success"]);
         families::DLQ_DEPTH.preregister(&[exporter]);
     }
 
@@ -1643,9 +1688,9 @@ mod tests {
         chio_metrics_spec::runtime::families::SOC_EXPORT_TOTAL.render(&mut soc);
         assert!(
             soc.contains(&format!(
-                "chio_soc_export_total{{exporter=\"{exporter}\",outcome=\"ok\"}} 0"
+                "chio_soc_export_total{{exporter=\"{exporter}\",outcome=\"success\"}} 0"
             )),
-            "configured exporter soc_export must seed at zero: {soc}"
+            "configured exporter soc_export must seed the success outcome at zero: {soc}"
         );
         assert!(
             soc.contains(
@@ -1686,5 +1731,26 @@ mod tests {
         let sink: std::sync::Arc<dyn chio_siem::SiemMetricsSink> =
             std::sync::Arc::new(crate::registry_metrics_sink::RegistryMetricsSink);
         assert!(build_serve_alerting_exporter(Vec::new(), sink).is_none());
+    }
+
+    /// RFC-0009 Codex round-1 finding 6: the serve mode must fail closed when no
+    /// consumer is configured, rather than silently advancing the cursor over
+    /// receipts nothing exports.
+    #[test]
+    fn serve_fails_closed_with_no_configured_consumer() {
+        let error = ensure_serve_has_consumer(&[])
+            .err()
+            .expect("zero consumers must fail closed");
+        assert!(
+            error
+                .to_string()
+                .contains("at least one configured consumer"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn serve_accepts_any_configured_consumer() {
+        assert!(ensure_serve_has_consumer(&["pagerduty".to_string()]).is_ok());
     }
 }

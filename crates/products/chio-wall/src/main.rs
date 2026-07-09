@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 mod commands;
+mod metrics_server;
 mod registry_metrics_sink;
 
 /// Chio-Wall control-path tooling on top of Chio.
