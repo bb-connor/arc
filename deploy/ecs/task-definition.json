@@ -51,7 +51,6 @@
         { "containerPort": 9090, "hostPort": 9090, "protocol": "tcp" }
       ],
       "dockerLabels": {
-        "prometheus.io/scrape": "true",
         "prometheus.io/path": "/metrics",
         "prometheus.io/port": "9090"
       },
@@ -76,6 +75,10 @@
         {
           "name": "CHIO_CAPABILITY_AUTHORITY_URL",
           "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:chio/capability-authority-url"
+        },
+        {
+          "name": "CHIO_SIDECAR_CONTROL_TOKEN",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:chio/sidecar-control-token"
         }
       ],
       "mountPoints": [
