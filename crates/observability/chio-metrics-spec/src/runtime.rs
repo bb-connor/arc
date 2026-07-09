@@ -15,7 +15,16 @@ use std::sync::{Arc, Mutex};
 use crate::descriptor_for;
 
 fn escape_label_value(value: &str) -> String {
-    value.replace('\\', "\\\\").replace('"', "\\\"")
+    // Prometheus text exposition requires backslash, double-quote, and line-feed
+    // to be escaped in a label value. Dynamic values (guard_id, exporter, alert
+    // route, etc.) can contain any of these; an unescaped newline would split
+    // the sample across physical lines and inject a bogus series (RFC-0009 Codex
+    // round-1 finding 2). Escape backslash FIRST so the backslashes introduced by
+    // the quote/newline escapes are not double-escaped.
+    value
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
 }
 
 fn render_label_set(labels: &[&'static str], values: &[String]) -> String {
@@ -158,9 +167,18 @@ impl LabeledGauge {
 
 struct HistogramCell {
     bucket_counts: Vec<AtomicU64>,
-    sum_millis: AtomicU64,
+    // Accumulated observation total in NANOSECONDS. Several families bucket fast
+    // paths below 1ms (guard host calls bucket down to 10us), so a millisecond
+    // sum would truncate any observation under 0.5ms to 0 and make
+    // `_sum / _count` averages underreport latency (RFC-0009 Codex round-1
+    // finding 8). Nanosecond precision preserves sub-millisecond observations.
+    sum_nanos: AtomicU64,
     count: AtomicU64,
 }
+
+/// Nanoseconds per second, used to convert an f64-seconds observation into the
+/// integer-nanosecond accumulator without truncating sub-millisecond values.
+const NANOS_PER_SECOND: f64 = 1_000_000_000.0;
 
 /// A process-global histogram over the registry-declared bucket bounds.
 pub struct LabeledHistogram {
@@ -202,7 +220,7 @@ impl LabeledHistogram {
             }
             Arc::new(HistogramCell {
                 bucket_counts,
-                sum_millis: AtomicU64::new(0),
+                sum_nanos: AtomicU64::new(0),
                 count: AtomicU64::new(0),
             })
         })))
@@ -224,8 +242,8 @@ impl LabeledHistogram {
         if let Some(inf) = cell.bucket_counts.last() {
             inf.fetch_add(1, Ordering::Relaxed);
         }
-        cell.sum_millis.fetch_add(
-            (seconds * 1000.0).round().max(0.0) as u64,
+        cell.sum_nanos.fetch_add(
+            (seconds * NANOS_PER_SECOND).round().max(0.0) as u64,
             Ordering::Relaxed,
         );
         cell.count.fetch_add(1, Ordering::Relaxed);
@@ -264,7 +282,7 @@ impl LabeledHistogram {
                 "{}_bucket{{{inner}{separator}le=\"+Inf\"}} {inf}\n",
                 self.name
             ));
-            let sum = cell.sum_millis.load(Ordering::Relaxed) as f64 / 1000.0;
+            let sum = cell.sum_nanos.load(Ordering::Relaxed) as f64 / NANOS_PER_SECOND;
             out.push_str(&format!("{}_sum{base} {sum}\n", self.name));
             out.push_str(&format!(
                 "{}_count{base} {}\n",
@@ -484,6 +502,58 @@ mod tests {
                 "chio_soc_export_lag_seconds_count{exporter=\"splunk\",severity=\"info\"} 1"
             ),
             "{out}"
+        );
+    }
+
+    #[test]
+    fn label_values_escape_backslash_quote_and_newline() {
+        // RFC-0009 Codex round-1 finding 2: a dynamic label value containing a
+        // newline, quote, or backslash must be escaped so the Prometheus text
+        // exposition is not split into a bogus second sample line.
+        let counter =
+            LabeledCounter::new(crate::CHIO_GUARD_VERDICT_TOTAL, &["guard_id", "verdict"]);
+        counter.incr(&["a\nb\"c\\d", "allow"]);
+        let mut out = String::new();
+        counter.render(&mut out);
+        assert!(
+            out.contains("guard_id=\"a\\nb\\\"c\\\\d\""),
+            "label values must escape newline, quote, and backslash: {out}"
+        );
+        let sample_lines: Vec<&str> = out
+            .lines()
+            .filter(|line| line.contains("chio_guard_verdict_total{"))
+            .collect();
+        assert_eq!(
+            sample_lines.len(),
+            1,
+            "an embedded newline must not create a second physical sample line: {out}"
+        );
+    }
+
+    #[test]
+    fn histogram_sum_preserves_sub_millisecond_observations() {
+        // RFC-0009 Codex round-1 finding 8: a fast-path observation below 1ms
+        // must still contribute to `_sum`. Millisecond truncation would record 0.
+        let hist = LabeledHistogram::new(
+            crate::CHIO_GUARD_HOST_CALL_DURATION_SECONDS,
+            &["guard_id", "host_fn"],
+        );
+        hist.observe(&["subms", "read"], 0.0003);
+        let mut out = String::new();
+        hist.render(&mut out);
+        let sum_value = out
+            .lines()
+            .find(|line| line.contains("_sum{guard_id=\"subms\",host_fn=\"read\"}"))
+            .and_then(|line| line.rsplit(' ').next())
+            .and_then(|value| value.parse::<f64>().ok())
+            .unwrap_or(0.0);
+        assert!(
+            sum_value > 0.0,
+            "a sub-millisecond observation must contribute to _sum, not truncate to 0: {out}"
+        );
+        assert!(
+            (sum_value - 0.0003).abs() < 1e-9,
+            "sub-millisecond _sum must be preserved with microsecond precision: {sum_value}"
         );
     }
 
