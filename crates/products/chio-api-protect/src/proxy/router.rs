@@ -51,9 +51,8 @@ pub(crate) fn build_app(state: Arc<ProxyState>) -> Router {
         // Advisory tool-call evaluation. The SDK posts a
         // `{capability_id, tool_server, tool_name, parameters,
         // parameter_hash}` body and receives an explicit advisory wrapper
-        // with `authorization: false`. The kernel-driven evaluation that
-        // `/chio/evaluate` performs for HTTP requests is not wired for
-        // tool-call bodies; callers must not treat this as authorization.
+        // with `authorization: false`. Advisory output is non-authoritative;
+        // use /v1/evaluate (kernel-mediated) for tool-call authorization.
         .route(
             "/v1/evaluate/advisory",
             post(sidecar_evaluate_tool_call_handler),

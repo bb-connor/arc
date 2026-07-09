@@ -1111,7 +1111,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_handler(
                 "evaluation_kind": "sidecar_tool_call_advisory",
                 "advisory_check_outcome": advisory_check_outcome,
                 "execution_nonce": "not_minted",
-                "limitation": "kernel-driven tool-call evaluation is not yet wired through the sidecar; this receipt records cap-revocation and parameter-hash checks only, does not mint an execution nonce, and must not be treated as kernel-mediated authorization",
+                "limitation": "advisory evaluation is explicitly non-authoritative; kernel-mediated tool-call authorization is available at /v1/evaluate. This receipt records cap-revocation and parameter-hash checks only and must not be treated as kernel-mediated authorization.",
             })),
             trust_level: TrustLevel::Advisory,
             tenant_id: None,
