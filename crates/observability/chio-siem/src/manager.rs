@@ -285,9 +285,14 @@ impl ExporterManager {
                     }
                 }
                 Err(error) => {
-                    // RFC-0009 F80: capture the malformed row (record the outcome
-                    // and land a replayable FailedEvent carrying its raw seq)
-                    // rather than advancing past it with only a warn.
+                    // RFC-0009 F80 + Codex #6: durably persist the malformed row
+                    // to the SIEM cursor DB's dead_letters table BEFORE advancing
+                    // past it. The in-memory DLQ is best-effort (drop-oldest, lost
+                    // on restart/overflow), so advancing acked_seq past a row
+                    // captured only in memory would skip the receipt permanently
+                    // and break at-least-once. On a persist failure we leave the
+                    // cursor BEHIND the row (return early via `?` without touching
+                    // self.cursor) so the next poll re-reads and retries it.
                     self.metrics.record_export(
                         "_deserialize",
                         crate::metrics_sink::ExportOutcome::Malformed,
@@ -296,17 +301,28 @@ impl ExporterManager {
                         .duration_since(UNIX_EPOCH)
                         .map(|d| d.as_secs())
                         .unwrap_or(0);
+                    let redacted = redact_for_operator_log(&error).to_string();
+                    if let Some(store) = &self.cursor_store {
+                        store.persist_dead_letter(
+                            *seq,
+                            "_deserialize",
+                            raw_json,
+                            &redacted,
+                            failed_at,
+                        )?;
+                    }
                     self.dlq.push(FailedEvent {
                         event_json: format!("{{\"raw_seq\":{seq}}}"),
-                        error: redact_for_operator_log(&error).to_string(),
+                        error: redacted,
                         failed_at,
                         exporter_name: "_deserialize".to_string(),
                     });
                     tracing::warn!(
                         seq = seq,
-                        "Failed to deserialize receipt -- captured to DLQ"
+                        "Failed to deserialize receipt -- captured to durable DLQ"
                     );
-                    // Captured in the DLQ, so advancing past it is safe.
+                    // Durably captured (or legacy None mode, which replays from
+                    // seq=0 on restart), so advancing past it is now safe.
                     if *seq > max_seq {
                         max_seq = *seq;
                     }
@@ -532,6 +548,99 @@ mod tests {
 
         assert!(
             matches!(error, SiemError::ConfigError(message) if message.contains("admin receipt read authority"))
+        );
+        Ok(())
+    }
+
+    /// Seed a receipt DB carrying a single malformed row at seq=1.
+    fn seed_malformed_receipt_db(path: &std::path::Path) -> TestResult {
+        let conn = rusqlite::Connection::open(path)?;
+        conn.execute_batch(
+            "CREATE TABLE chio_tool_receipts (
+                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                 receipt_id TEXT NOT NULL UNIQUE,
+                 timestamp INTEGER NOT NULL,
+                 capability_id TEXT NOT NULL,
+                 tool_server TEXT NOT NULL,
+                 tool_name TEXT NOT NULL,
+                 decision_kind TEXT NOT NULL,
+                 policy_hash TEXT NOT NULL,
+                 content_hash TEXT NOT NULL,
+                 raw_json TEXT NOT NULL
+             );",
+        )?;
+        conn.execute(
+            "INSERT INTO chio_tool_receipts (receipt_id, timestamp, capability_id, \
+             tool_server, tool_name, decision_kind, policy_hash, content_hash, raw_json) \
+             VALUES ('m1', 1, 'c', 's', 't', 'allow', 'p', 'h', 'not valid receipt json')",
+            [],
+        )?;
+        Ok(())
+    }
+
+    /// Codex #6 / RFC-0009 F80: a malformed row is durably persisted to the
+    /// cursor DB's dead_letters table BEFORE the read cursor advances past it.
+    #[tokio::test]
+    async fn malformed_row_persisted_durably_before_cursor_advances() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let receipt_db = dir.path().join("receipts.sqlite3");
+        seed_malformed_receipt_db(&receipt_db)?;
+        let cursor_db = dir.path().join("cursor.sqlite3");
+
+        let mut manager = ExporterManager::new(SiemConfig {
+            db_path: receipt_db.clone(),
+            cursor_db_path: Some(cursor_db.clone()),
+            ..SiemConfig::default()
+        })?;
+
+        // No exporters: a malformed-only batch. A healthy poll must persist the
+        // malformed row durably and only then advance the read cursor.
+        manager.poll_once().await?;
+
+        assert_eq!(
+            manager.cursor, 1,
+            "cursor advances past a durably-persisted malformed row"
+        );
+        let store = crate::cursor_store::SiemCursorStore::open(&cursor_db)?;
+        assert_eq!(
+            store.dead_letter_seqs()?,
+            vec![1u64],
+            "the malformed row must be durably captured in dead_letters"
+        );
+        Ok(())
+    }
+
+    /// Codex #6 / RFC-0009 F80: if the durable persist fails, the cursor is left
+    /// BEHIND the malformed row (not advanced), so at-least-once is preserved and
+    /// the next poll re-reads it.
+    #[tokio::test]
+    async fn malformed_row_persist_failure_leaves_cursor_behind() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let receipt_db = dir.path().join("receipts.sqlite3");
+        seed_malformed_receipt_db(&receipt_db)?;
+        let cursor_db = dir.path().join("cursor.sqlite3");
+
+        let mut manager = ExporterManager::new(SiemConfig {
+            db_path: receipt_db.clone(),
+            cursor_db_path: Some(cursor_db.clone()),
+            ..SiemConfig::default()
+        })?;
+
+        // Force the durable persist to fail: drop the dead_letters table out from
+        // under the manager's cursor-store connection via a second connection.
+        {
+            let conn = rusqlite::Connection::open(&cursor_db)?;
+            conn.execute("DROP TABLE siem_dead_letters", [])?;
+        }
+
+        let result = manager.poll_once().await;
+        assert!(
+            result.is_err(),
+            "a durable-persist failure must propagate and hold the cursor"
+        );
+        assert_eq!(
+            manager.cursor, 0,
+            "the cursor must stay behind an un-persisted malformed row (at-least-once)"
         );
         Ok(())
     }
