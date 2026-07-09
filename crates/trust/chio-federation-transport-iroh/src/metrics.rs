@@ -285,6 +285,7 @@ pub fn accept_outcome_for_code(code: &str) -> &'static str {
     match code {
         "accept_timeout" => LANE_OUTCOME_TIMEOUT,
         "accept_busy" => LANE_OUTCOME_BUSY,
+        "accept_peer_busy" => LANE_OUTCOME_BUSY,
         _ => LANE_OUTCOME_REJECT,
     }
 }

@@ -27,11 +27,14 @@
 //! live exchange is not killed underneath these bounds. See
 //! [`RECOMMENDED_MAX_IDLE_TIMEOUT`] for the value the wiring can consume.
 
+use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::time::Duration;
 
 use iroh::endpoint::Connection;
+use iroh::EndpointId;
 use tokio::sync::OwnedSemaphorePermit;
 use tokio::sync::Semaphore;
 
@@ -85,6 +88,12 @@ pub const DEFAULT_LINGER_TIMEOUT: Duration = Duration::from_secs(60);
 /// while bounding the tasks a single hostile peer (or a thundering herd) can
 /// force into existence.
 pub const DEFAULT_MAX_IN_FLIGHT: usize = 1024;
+
+/// Max concurrently admitted handlers for ONE peer (EndpointId) on ONE lane. A
+/// single admitted peer can never hold more than this many of the lane's
+/// `max_in_flight` permits, so it cannot starve other operators. `0` is clamped
+/// to `1` (a zero per-peer cap would deny every peer, a fail-closed footgun).
+pub const DEFAULT_MAX_IN_FLIGHT_PER_PEER: usize = 16;
 
 /// Default bounded wait for an in-flight permit before shedding. A brief burst
 /// above the cap waits this long for a slot; a sustained overload sheds fast
@@ -164,6 +173,8 @@ pub struct AcceptLimitConfig {
     pub linger_timeout: Duration,
     /// Maximum concurrently admitted accept handlers for the lane.
     pub max_in_flight: usize,
+    /// Max concurrently admitted handlers for a single peer (EndpointId).
+    pub max_in_flight_per_peer: usize,
     /// Bounded wait for an in-flight permit before shedding.
     pub shed_wait: Duration,
 }
@@ -176,6 +187,7 @@ impl Default for AcceptLimitConfig {
             write_timeout: DEFAULT_WRITE_TIMEOUT,
             linger_timeout: DEFAULT_LINGER_TIMEOUT,
             max_in_flight: DEFAULT_MAX_IN_FLIGHT,
+            max_in_flight_per_peer: DEFAULT_MAX_IN_FLIGHT_PER_PEER,
             shed_wait: DEFAULT_SHED_WAIT,
         }
     }
@@ -212,6 +224,14 @@ pub enum AcceptLimitError {
         /// The bound that was exceeded, in milliseconds.
         timeout_ms: u64,
     },
+    /// The peer is at its per-peer in-flight cap: shed (shares the busy code).
+    #[error("accept handler shed: peer {peer} at its per-peer cap of {cap}")]
+    PeerBusy {
+        /// The peer's short endpoint id (never a full key).
+        peer: String,
+        /// The configured per-peer cap that was saturated.
+        cap: usize,
+    },
 }
 
 impl AcceptLimitError {
@@ -221,6 +241,7 @@ impl AcceptLimitError {
         match self {
             AcceptLimitError::Busy { .. } => "accept_busy",
             AcceptLimitError::Timeout { .. } => "accept_timeout",
+            AcceptLimitError::PeerBusy { .. } => "accept_peer_busy",
         }
     }
 
@@ -230,6 +251,7 @@ impl AcceptLimitError {
         match self {
             AcceptLimitError::Busy { .. } => ACCEPT_BUSY_CLOSE_CODE,
             AcceptLimitError::Timeout { .. } => ACCEPT_TIMEOUT_CLOSE_CODE,
+            AcceptLimitError::PeerBusy { .. } => ACCEPT_BUSY_CLOSE_CODE,
         }
     }
 }
@@ -245,6 +267,9 @@ impl AcceptLimitError {
 pub struct AcceptLimiter {
     config: AcceptLimitConfig,
     semaphore: Arc<Semaphore>,
+    /// Per-peer in-flight counts keyed by the authenticated remote EndpointId.
+    /// Entries are removed at zero so a churn of peers cannot grow the map.
+    per_peer: Arc<Mutex<HashMap<EndpointId, usize>>>,
 }
 
 impl Default for AcceptLimiter {
@@ -263,6 +288,7 @@ impl AcceptLimiter {
         Self {
             config,
             semaphore: Arc::new(Semaphore::new(permits)),
+            per_peer: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -291,6 +317,46 @@ impl AcceptLimiter {
             Ok(Err(_closed)) => Err(AcceptLimitError::Busy { cap }),
             // The bounded wait elapsed under sustained load: shed.
             Err(_elapsed) => Err(AcceptLimitError::Busy { cap }),
+        }
+    }
+
+    /// Admit one handler for `peer`, enforcing the per-peer cap BEFORE the shared
+    /// lane semaphore. Returns a guard that releases the per-peer slot on drop and
+    /// carries the shared permit. Fail-closed: over-cap or a saturated lane sheds,
+    /// and a poisoned per-peer lock is treated as at-cap (never admits).
+    pub async fn admit_peer(
+        &self,
+        peer: &EndpointId,
+    ) -> Result<PeerAdmitGuard, AcceptLimitError> {
+        let cap = self.config.max_in_flight_per_peer.max(1);
+        // 1. Reserve the per-peer slot (bounded, no await under the lock). A
+        //    poisoned lock fails closed (treated as at-cap).
+        {
+            let mut counts = self.per_peer.lock().map_err(|_| AcceptLimitError::PeerBusy {
+                peer: peer.fmt_short().to_string(),
+                cap,
+            })?;
+            let entry = counts.entry(*peer).or_insert(0);
+            if *entry >= cap {
+                return Err(AcceptLimitError::PeerBusy {
+                    peer: peer.fmt_short().to_string(),
+                    cap,
+                });
+            }
+            *entry += 1;
+        }
+        // 2. Acquire the shared permit under the existing bounded shed wait. On a
+        //    shed, release the per-peer slot so it is not leaked.
+        match self.admit().await {
+            Ok(permit) => Ok(PeerAdmitGuard {
+                _permit: permit,
+                per_peer: Arc::clone(&self.per_peer),
+                peer: *peer,
+            }),
+            Err(busy) => {
+                release_peer_slot(&self.per_peer, peer);
+                Err(busy)
+            }
         }
     }
 
@@ -324,6 +390,41 @@ impl AcceptLimiter {
         tokio::time::timeout(self.config.linger_timeout, conn.closed())
             .await
             .is_ok()
+    }
+}
+
+/// Decrement (and prune at zero) the per-peer in-flight count. A poisoned lock
+/// logs and leaves the count (fail-closed: the peer stays capped) rather than
+/// panicking in a hot path.
+fn release_peer_slot(per_peer: &Arc<Mutex<HashMap<EndpointId, usize>>>, peer: &EndpointId) {
+    match per_peer.lock() {
+        Ok(mut counts) => {
+            if let Some(entry) = counts.get_mut(peer) {
+                *entry = entry.saturating_sub(1);
+                if *entry == 0 {
+                    counts.remove(peer);
+                }
+            }
+        }
+        Err(_poisoned) => tracing::warn!(
+            peer = %peer.fmt_short(),
+            "per-peer accept counter lock poisoned; slot held fail-closed"
+        ),
+    }
+}
+
+/// RAII guard: holds the shared lane permit for the handler's lifetime and
+/// releases the per-peer slot on drop.
+#[derive(Debug)]
+pub struct PeerAdmitGuard {
+    _permit: OwnedSemaphorePermit,
+    per_peer: Arc<Mutex<HashMap<EndpointId, usize>>>,
+    peer: EndpointId,
+}
+
+impl Drop for PeerAdmitGuard {
+    fn drop(&mut self) {
+        release_peer_slot(&self.per_peer, &self.peer);
     }
 }
 
@@ -361,6 +462,47 @@ mod tests {
         // Two batches of headroom, saturating (never panics on overflow).
         assert_eq!(recommended_receive_window_bytes(256 * 1024), 512 * 1024);
         assert_eq!(recommended_receive_window_bytes(usize::MAX), u64::MAX);
+    }
+
+    fn endpoint(seed: u8) -> iroh::EndpointId {
+        iroh::SecretKey::from_bytes(&[seed; 32]).public()
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn per_peer_cap_bounds_single_peer_below_lane_cap() {
+        // Lane cap 8, per-peer cap 2: peer A can hold at most 2 permits and its
+        // 3rd sheds PeerBusy, while peer B is still admitted (fairness, not just a
+        // global cap).
+        let config = AcceptLimitConfig {
+            max_in_flight: 8,
+            max_in_flight_per_peer: 2,
+            shed_wait: Duration::from_millis(50),
+            ..AcceptLimitConfig::default()
+        };
+        let limiter = AcceptLimiter::new(config);
+        let a = endpoint(1);
+        let b = endpoint(2);
+
+        let g1 = limiter.admit_peer(&a).await.expect("A #1 admitted");
+        let g2 = limiter.admit_peer(&a).await.expect("A #2 admitted");
+        // A's 3rd is shed by the PER-PEER cap even though 6 lane permits are free.
+        let shed = limiter
+            .admit_peer(&a)
+            .await
+            .expect_err("A #3 sheds at the per-peer cap");
+        assert!(matches!(shed, AcceptLimitError::PeerBusy { cap: 2, .. }));
+        assert_eq!(shed.code(), "accept_peer_busy");
+        assert_eq!(shed.close_code(), ACCEPT_BUSY_CLOSE_CODE);
+
+        // A different peer is unaffected.
+        let gb = limiter.admit_peer(&b).await.expect("B admitted while A capped");
+
+        // Releasing one of A's guards frees a per-peer slot immediately.
+        drop(g1);
+        let g3 = limiter.admit_peer(&a).await.expect("A slot re-opens after release");
+        drop(g2);
+        drop(g3);
+        drop(gb);
     }
 
     #[test]
