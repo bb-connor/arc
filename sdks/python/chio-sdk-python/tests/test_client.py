@@ -468,12 +468,15 @@ class TestEvaluateToolCall:
         )
         async with ChioClient(BASE) as client:
             result = await client.reconcile_mediated_authorization(
+                control_token="ctl-secret",
                 execution_nonce=nonce,
                 arguments=arguments,
                 realized_cost=realized_cost,
             )
         assert result == expected
-        body = json.loads(route.calls.last.request.content)
+        request = route.calls.last.request
+        assert request.headers["authorization"] == "Bearer ctl-secret"
+        body = json.loads(request.content)
         assert body["execution_nonce"] == nonce
         assert body["arguments"] == arguments
         assert body["realized_cost"] == realized_cost

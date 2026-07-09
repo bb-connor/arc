@@ -653,27 +653,33 @@ class ChioClient:
     async def reconcile_mediated_authorization(
         self,
         *,
+        control_token: str,
         execution_nonce: dict[str, Any],
         arguments: dict[str, Any],
         realized_cost: dict[str, Any],
     ) -> dict:
         """Reconcile a reserved mediated authorization at its realized cost.
 
-        After executing the tool that ``evaluate_tool_call_mediated`` authorized,
-        present the minted ``execution_nonce`` unchanged, the same ``arguments``
-        (which must match the nonce's parameter hash), and the ``realized_cost``
-        (``{"units", "currency", "breakdown"}``). Posts to ``/v1/reconcile``,
-        which settles the exact reserved budget hold at ``min(realized, reserved)``,
-        frees the difference back to the grant, and returns
-        ``{"status", "receipt"}`` with the authoritative reconciled receipt. The
-        nonce is single-use: a second reconcile of the same nonce is rejected.
+        Called by the TRUSTED tool server (not the controlled agent) after it
+        executes the tool that ``evaluate_tool_call_mediated`` authorized. The
+        ``/v1/reconcile`` route is gated by the sidecar-control token, so
+        ``control_token`` is sent as an ``Authorization: Bearer`` header;
+        realized cost is tool-server-reported. Present the minted
+        ``execution_nonce`` unchanged, the same ``arguments`` (which must match
+        the nonce's parameter hash), and the ``realized_cost``
+        (``{"units", "currency", "breakdown"}``, whose currency must match the
+        grant). The sidecar settles the exact reserved budget hold at
+        ``min(realized, reserved)``, frees the difference back to the grant, and
+        returns ``{"status", "receipt"}`` with the authoritative reconciled
+        receipt. The nonce is single-use: a second reconcile is rejected.
         """
         body = {
             "execution_nonce": execution_nonce,
             "arguments": arguments,
             "realized_cost": realized_cost,
         }
-        return await self._post("/v1/reconcile", body)
+        headers = {"Authorization": f"Bearer {control_token}"}
+        return await self._post("/v1/reconcile", body, headers=headers)
 
     async def evaluate_http_request(
         self,
