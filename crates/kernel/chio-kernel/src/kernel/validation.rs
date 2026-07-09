@@ -931,19 +931,38 @@ impl ChioKernel {
         } = cost_context;
         let Some(charge) = charge_result else {
             // When a payment was authorized but the grant carries no monetary ceiling,
-            // fold the authorization reference into the receipt so the invocation is
-            // auditable as prepaid.
-            let metadata = if let Some(auth) = payment_authorization.as_ref() {
-                let payment_meta = serde_json::json!({
-                    "financial": {
-                        "payment_reference": auth.authorization_id,
-                        "settlement_status": SettlementStatus::Pending,
-                    }
-                });
-                merge_metadata_objects(Some(payment_meta), extra_metadata)
-            } else {
-                extra_metadata
+            // the realized spend is the prepaid quote. Settle the authorization so the
+            // invocation is recorded as a completed prepayment; fail closed if it
+            // cannot be settled rather than admit the tool against a perpetual hold.
+            let Some(auth) = payment_authorization.as_ref() else {
+                return self.finalize_tool_output_with_metadata(
+                    request,
+                    output,
+                    elapsed,
+                    timestamp,
+                    matched_grant_index,
+                    extra_metadata,
+                );
             };
+            let Some(settlement) =
+                self.settle_prepaid_authorization_without_charge(request, auth)?
+            else {
+                return self.build_deny_response_with_metadata(
+                    request,
+                    "MustPrepay authorization could not be settled after execution",
+                    timestamp,
+                    Some(matched_grant_index),
+                    extra_metadata,
+                );
+            };
+            let (payment_reference, settlement_status) = settlement.into_receipt_parts();
+            let payment_meta = serde_json::json!({
+                "financial": {
+                    "payment_reference": payment_reference,
+                    "settlement_status": settlement_status,
+                }
+            });
+            let metadata = merge_metadata_objects(Some(payment_meta), extra_metadata);
             return self.finalize_tool_output_with_metadata(
                 request,
                 output,
@@ -1307,19 +1326,10 @@ impl ChioKernel {
         let (amount_units, currency) = if let Some(charge) = charge_result {
             (charge.cost_charged, charge.currency.clone())
         } else {
-            let Some(quoted_cost) = request
-                .governed_intent
-                .as_ref()
-                .and_then(|intent| intent.metered_billing.as_ref())
-                .filter(|metered| {
-                    metered.settlement_mode
-                        == chio_core::capability::governance::MeteredSettlementMode::MustPrepay
-                })
-                .map(|metered| &metered.quote.quoted_cost)
-            else {
+            let Some(amount) = Self::mustprepay_quoted_amount(request) else {
                 return Ok(None);
             };
-            (quoted_cost.units, quoted_cost.currency.clone())
+            amount
         };
 
         let Some(adapter) = self.payment_adapter.as_ref() else {
@@ -1381,5 +1391,83 @@ impl ChioKernel {
                 commerce,
             })
             .map(Some)
+    }
+
+    /// Prepaid quote amount for a MustPrepay intent, if one applies.
+    ///
+    /// This is the authorization amount when the grant carries no monetary
+    /// ceiling, so the same figure settles the hold after execution.
+    fn mustprepay_quoted_amount(request: &ToolCallRequest) -> Option<(u64, String)> {
+        request
+            .governed_intent
+            .as_ref()
+            .and_then(|intent| intent.metered_billing.as_ref())
+            .filter(|metered| {
+                metered.settlement_mode
+                    == chio_core::capability::governance::MeteredSettlementMode::MustPrepay
+            })
+            .map(|metered| {
+                (
+                    metered.quote.quoted_cost.units,
+                    metered.quote.quoted_cost.currency.clone(),
+                )
+            })
+    }
+
+    /// Settle a prepaid authorization for a MustPrepay call whose grant carries
+    /// no monetary ceiling (no budget charge to reconcile).
+    ///
+    /// An adapter that already settled the hold is folded through unchanged. An
+    /// unsettled hold is captured at the prepaid quote amount. Returns `None`
+    /// when the hold cannot be settled so the caller fails closed.
+    fn settle_prepaid_authorization_without_charge(
+        &self,
+        request: &ToolCallRequest,
+        authorization: &PaymentAuthorization,
+    ) -> Result<Option<ReceiptSettlement>, KernelError> {
+        if authorization.settled {
+            return Ok(Some(ReceiptSettlement::from_authorization(authorization)));
+        }
+        let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
+            KernelError::Internal(
+                "payment authorization present without configured adapter".to_string(),
+            )
+        })?;
+        let Some((amount_units, currency)) = Self::mustprepay_quoted_amount(request) else {
+            warn!(
+                request_id = %request.request_id,
+                authorization_id = %authorization.authorization_id,
+                "prepaid authorization lacks a resolvable quote amount; denying fail-closed"
+            );
+            return Ok(None);
+        };
+        match adapter.capture(
+            &authorization.authorization_id,
+            amount_units,
+            &currency,
+            &request.request_id,
+        ) {
+            Ok(result) => {
+                let settlement = ReceiptSettlement::from_payment_result(&result);
+                if settlement.settlement_status == SettlementStatus::Settled {
+                    Ok(Some(settlement))
+                } else {
+                    warn!(
+                        request_id = %request.request_id,
+                        authorization_id = %authorization.authorization_id,
+                        "prepaid authorization capture did not settle; denying fail-closed"
+                    );
+                    Ok(None)
+                }
+            }
+            Err(error) => {
+                warn!(
+                    request_id = %request.request_id,
+                    reason = %redacted!(&error),
+                    "prepaid authorization capture failed; denying fail-closed"
+                );
+                Ok(None)
+            }
+        }
     }
 }

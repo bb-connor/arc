@@ -1026,6 +1026,7 @@ fn make_governed_approval_token(
 #[derive(Clone)]
 struct TrackingPaymentAdapter {
     authorized: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    captured: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     released: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     refunded: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
@@ -1034,6 +1035,7 @@ impl TrackingPaymentAdapter {
     fn new() -> Self {
         Self {
             authorized: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            captured: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             released: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             refunded: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         }
@@ -1061,6 +1063,8 @@ impl PaymentAdapter for TrackingPaymentAdapter {
         _currency: &str,
         _reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
+        self.captured
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Ok(PaymentResult {
             transaction_id: authorization_id.to_string(),
             settlement_status: RailSettlementStatus::Settled,

@@ -271,22 +271,10 @@ async fn sim_adapter_abort_unwinds_authorization() {
     );
 }
 
-// Governed MustPrepay where the grant carries no monetary ceiling:
-// the budget layer yields PreExecutionBudgetMutation::None (charge_result == None),
-// bypassing the cost path. The payment adapter must still be called and the
-// receipt must carry the authorization reference.
-#[test]
-fn mustprepay_no_budget_charge_authorizes_payment_and_stamps_receipt() {
-    let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
-    // Server reports a cost; the grant has no monetary ceiling so charge_result is None.
-    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
-
-    let agent_kp = Keypair::generate();
-    // Grant without monetary limits: GovernedIntentRequired + approval threshold
-    // ensure validate_governed_transaction runs, but no cost ceiling means the budget
-    // layer returns PreExecutionBudgetMutation::None.
-    let grant = ToolGrant {
+// A grant without monetary ceiling whose approval threshold forces governed
+// admission. Shared by the no-charge MustPrepay settlement tests below.
+fn make_no_ceiling_mustprepay_grant() -> ToolGrant {
+    ToolGrant {
         server_id: "cost-srv".to_string(),
         tool_name: "compute".to_string(),
         operations: vec![Operation::Invoke],
@@ -298,9 +286,31 @@ fn mustprepay_no_budget_charge_authorizes_payment_and_stamps_receipt() {
         max_cost_per_invocation: None,
         max_total_cost: None,
         dpop_required: None,
-    };
+    }
+}
+
+// Governed MustPrepay where the grant carries no monetary ceiling:
+// the budget layer yields PreExecutionBudgetMutation::None (charge_result == None),
+// bypassing the cost path. The unsettled authorization the adapter returns must be
+// captured post-execution so the receipt records a genuinely settled prepayment
+// rather than a perpetual pending hold.
+#[test]
+fn mustprepay_no_budget_charge_authorizes_payment_and_stamps_receipt() {
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
+    // Server reports a cost; the grant has no monetary ceiling so charge_result is None.
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+
+    let agent_kp = Keypair::generate();
+    // Grant without monetary limits: GovernedIntentRequired + approval threshold
+    // ensure validate_governed_transaction runs, but no cost ceiling means the budget
+    // layer returns PreExecutionBudgetMutation::None.
     let cap = kernel
-        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .issue_capability(
+            &agent_kp.public_key(),
+            make_scope(vec![make_no_ceiling_mustprepay_grant()]),
+            3600,
+        )
         .unwrap();
 
     // Intent quotes 100 USD (above threshold 50), so an approval token is required.
@@ -319,8 +329,141 @@ fn mustprepay_no_budget_charge_authorizes_payment_and_stamps_receipt() {
         "payment_reference must be a sim- id; got {payment_reference}"
     );
     let status = financial["settlement_status"].as_str().unwrap_or("");
-    assert!(
-        status == "settled" || status == "pending",
-        "settlement_status must be settled or pending; got {status}"
+    assert_eq!(
+        status, "settled",
+        "no-ceiling MustPrepay must capture the hold to a settled prepayment; got {status}"
     );
+}
+
+// The no-charge MustPrepay settlement must invoke the adapter's capture exactly
+// once on the unsettled authorization the adapter returned.
+#[test]
+fn mustprepay_no_budget_charge_captures_unsettled_authorization() {
+    let payment = TrackingPaymentAdapter::new();
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+
+    let agent_kp = Keypair::generate();
+    let cap = kernel
+        .issue_capability(
+            &agent_kp.public_key(),
+            make_scope(vec![make_no_ceiling_mustprepay_grant()]),
+            3600,
+        )
+        .unwrap();
+
+    let intent =
+        make_mustprepay_intent("intent-no-charge-cap", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-no-charge-cap", &cap, &agent_kp, intent, &kernel);
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(
+        payment.authorized.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "adapter.authorize() must have been called once"
+    );
+    assert_eq!(
+        payment.captured.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "adapter.capture() must settle the unsettled prepayment exactly once"
+    );
+    assert_eq!(
+        payment.released.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "a captured prepayment must not be released"
+    );
+    let financial = expect_financial_meta(&response);
+    assert_eq!(
+        financial["settlement_status"].as_str().unwrap_or(""),
+        "settled",
+        "captured no-ceiling prepayment must record settled"
+    );
+}
+
+// Fail-closed: when the adapter returns an unsettled authorization whose capture
+// cannot settle, the no-charge MustPrepay call is DENIED rather than admitted with
+// a perpetual pending receipt.
+#[test]
+fn mustprepay_no_budget_charge_uncapturable_authorization_denies() {
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.set_payment_adapter(Box::new(UncapturablePaymentAdapter));
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+
+    let agent_kp = Keypair::generate();
+    let cap = kernel
+        .issue_capability(
+            &agent_kp.public_key(),
+            make_scope(vec![make_no_ceiling_mustprepay_grant()]),
+            3600,
+        )
+        .unwrap();
+
+    let intent =
+        make_mustprepay_intent("intent-no-charge-deny", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-no-charge-deny", &cap, &agent_kp, intent, &kernel);
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    assert_eq!(
+        response.verdict,
+        Verdict::Deny,
+        "an unsettled prepayment that cannot be captured must fail closed"
+    );
+}
+
+// Authorizes an unsettled hold whose capture always fails, exercising the
+// fail-closed settlement path.
+#[derive(Debug, Clone, Default)]
+struct UncapturablePaymentAdapter;
+
+impl PaymentAdapter for UncapturablePaymentAdapter {
+    fn authorize(
+        &self,
+        _request: &PaymentAuthorizeRequest,
+    ) -> Result<PaymentAuthorization, PaymentError> {
+        Ok(PaymentAuthorization {
+            authorization_id: "sim-uncapturable".to_string(),
+            settled: false,
+            metadata: serde_json::json!({ "adapter": "uncapturable" }),
+        })
+    }
+
+    fn capture(
+        &self,
+        _authorization_id: &str,
+        _amount_units: u64,
+        _currency: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        Err(PaymentError::Declined("capture unavailable".to_string()))
+    }
+
+    fn release(
+        &self,
+        authorization_id: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        Ok(PaymentResult {
+            transaction_id: authorization_id.to_string(),
+            settlement_status: RailSettlementStatus::Released,
+            metadata: serde_json::json!({ "adapter": "uncapturable" }),
+        })
+    }
+
+    fn refund(
+        &self,
+        transaction_id: &str,
+        _amount_units: u64,
+        _currency: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        Ok(PaymentResult {
+            transaction_id: transaction_id.to_string(),
+            settlement_status: RailSettlementStatus::Refunded,
+            metadata: serde_json::json!({ "adapter": "uncapturable" }),
+        })
+    }
 }
