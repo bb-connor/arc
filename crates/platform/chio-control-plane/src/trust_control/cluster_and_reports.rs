@@ -920,6 +920,82 @@ mod cluster_and_reports_tests {
     }
 
     #[test]
+    fn peer_applying_a_snapshot_does_not_witness_at_its_old_high_ack() {
+        // codex #965 Finding (clear stale budget acks on snapshot recovery): a peer
+        // that is force_snapshot carries a stale-high ack head that is excluded from
+        // witnesses ONLY by the force_snapshot flag. apply_cluster_snapshot clears
+        // force_snapshot; if it left the old ack in place, any early return before
+        // finalize_peer_sync_round (an authority-sync error, a puller error) would
+        // leave the peer Healthy, NOT force_snapshot, and WITNESSING at an ack head
+        // this round never validated - an OVER-COUNT / budget double-spend. The fix
+        // clears budget_import_acks atomically with force_snapshot in
+        // apply_cluster_snapshot, so a peer coming out of snapshot recovery witnesses
+        // NOTHING until a completed pull round's finalize re-records a validated ack.
+        let origin = "http://node-a";
+        // A 2-node cluster (quorum 2): self + node-a is quorum, so node-a's witness
+        // decision alone flips quorum_committed.
+        let source_state =
+            state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
+        let state = state_with_cluster("http://node-b", &["http://node-a"], None, None, None);
+
+        // node-a previously validated a high ack and is now pending a forced snapshot
+        // (e.g. an oversized delta window routed it to snapshot recovery).
+        update_peer_reachable(&state, "http://node-a");
+        update_peer_budget_acks(
+            &state,
+            "http://node-a",
+            &[BudgetOriginAck {
+                origin_id: origin.to_string(),
+                event_seq: 100,
+            }],
+        );
+        update_peer_state(&state, "http://node-a", |peer| peer.force_snapshot = true);
+
+        let write = BudgetWriteToken {
+            origin_id: origin.to_string(),
+            event_seq: 100,
+            budget_term: 1,
+        };
+        // While force_snapshot, the stale ack is already excluded (existing guard).
+        assert!(
+            !budget_write_quorum_commit_view(&state, &write)
+                .test_unwrap()
+                .quorum_committed,
+            "a force_snapshot peer must not witness"
+        );
+
+        // Apply a snapshot: force_snapshot clears. RED (pre-fix): the stale ack
+        // survives and node-a now witnesses at 100, committing quorum on an ack this
+        // round never validated. GREEN (fix): the ack map is cleared with it.
+        let snapshot = build_cluster_state_snapshot(&source_state).test_unwrap();
+        apply_cluster_snapshot(&state, "http://node-a", snapshot).test_unwrap();
+
+        assert_eq!(
+            with_peer_state(&state, "http://node-a", |peer| peer
+                .budget_import_acks
+                .get(origin)
+                .copied()),
+            Some(None),
+            "snapshot recovery must clear the peer's cached witness ack"
+        );
+        assert!(
+            !peer_should_force_snapshot(&state, "http://node-a"),
+            "the snapshot cleared force_snapshot"
+        );
+        // TEETH: the peer is Healthy and no longer force_snapshot, yet it must NOT
+        // witness at its old-high ack until a validated finalize re-records one.
+        let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
+        assert!(
+            !commit.quorum_committed,
+            "a peer coming out of snapshot recovery must not witness at its stale old-high ack head"
+        );
+        assert_eq!(
+            commit.committed_nodes, 1,
+            "only self witnesses; the just-resynced peer holds no validated ack yet"
+        );
+    }
+
+    #[test]
     fn finalize_records_fresh_acks_only_when_the_peer_was_not_demoted() {
         // codex #965 Finding P1 (do not commit on acks before validation): a peer's
         // freshly-advertised budget acks must become countable for a quorum commit

@@ -270,6 +270,22 @@ pub(crate) fn apply_cluster_snapshot(
         peer.snapshot_applied_count = peer.snapshot_applied_count.saturating_add(1);
         peer.last_snapshot_at = Some(generated_at);
         peer.delta_records_since_snapshot = 0;
+        // Clear the peer's cached witness acks ATOMICALLY with clearing
+        // `force_snapshot` (codex #965 Finding: clear stale budget acks on snapshot
+        // recovery). `force_snapshot` was the ONLY thing excluding this peer's stale
+        // ack head from the witness set (`budget_write_quorum_commit_view`), and this
+        // is the single site that clears it WITHOUT going through
+        // `finalize_peer_sync_round` (which re-records a validated ack via
+        // `update_peer_budget_acks`). If we cleared `force_snapshot` here but left the
+        // old (stale-high) ack map in place, ANY early return after this point (an
+        // authority-sync error, a puller error, a transient failure) would skip
+        // finalize and leave a Healthy, not-force_snapshot peer WITNESSING at an ack
+        // head that this round never validated - an OVER-COUNT / budget double-spend.
+        // Snapshot recovery is precisely our admission that our incremental view of
+        // this peer was broken, so the peer must start witnessing NOTHING until a
+        // completed pull round's finalize re-records a validated ack. Fail-closed and
+        // strictly under-count-safe: this can only SHRINK the witness set.
+        peer.budget_import_acks.clear();
         peer.force_snapshot = false;
     });
 
