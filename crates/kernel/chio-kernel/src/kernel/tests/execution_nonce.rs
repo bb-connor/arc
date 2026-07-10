@@ -1467,3 +1467,372 @@ fn reserving_authorization_rejects_presented_execution_nonce() {
         "presenting a nonce at the reserve entry point must fail closed, got: {err}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Delegated reserve-for-caller: an outstanding reservation keeps its child's
+// sibling-sum share admitted, so a sibling cannot over-subscribe the parent
+// while the reservation is open. The share is freed only when the hold closes
+// (reconcile-by-nonce or TTL reap).
+// ---------------------------------------------------------------------------
+
+fn delegated_reserve_request(
+    request_id: &str,
+    child: &CapabilityToken,
+    child_kp: &Keypair,
+) -> ToolCallRequest {
+    ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability: child.clone(),
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: child_kp.public_key().to_hex(),
+        arguments: serde_json::json!({}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    }
+}
+
+fn install_strict_nonce_store(kernel: &mut ChioKernel) {
+    let cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: true,
+    };
+    kernel.set_execution_nonce_store(
+        cfg.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+    );
+}
+
+#[test]
+fn delegated_reserving_child_holds_sibling_share_until_reconciled() {
+    // Parent share 5000 bps, child A and child B each 4000 bps: either child
+    // fits alone, but A+B (8000) over-subscribes the parent. While child A's
+    // reservation hold is open, child A's admitted share must still count so a
+    // second delegated child under the same parent is denied.
+    let fixture = make_sibling_sum_monetary_fixture("delegated-reserve-reconcile");
+    let mut kernel = fixture.kernel;
+    install_strict_nonce_store(&mut kernel);
+
+    let first = delegated_reserve_request("req-a-reserve", &fixture.child_a, &fixture.child_a_kp);
+    let reserved_a = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
+        .unwrap();
+    assert_eq!(
+        reserved_a.verdict,
+        Verdict::Allow,
+        "child A reservation should be admitted: {:?}",
+        reserved_a.reason
+    );
+    let nonce = *reserved_a
+        .execution_nonce
+        .clone()
+        .expect("child A reservation mints a nonce");
+
+    let second = delegated_reserve_request("req-b-reserve", &fixture.child_b, &fixture.child_b_kp);
+    let denied_b = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&second, None)
+        .unwrap();
+    assert_eq!(
+        denied_b.verdict,
+        Verdict::Deny,
+        "child B must be denied while child A's reservation is open: {:?}",
+        denied_b.reason
+    );
+    assert!(
+        denied_b.reason.as_deref().is_some_and(|reason| {
+            reason.contains("sibling-sum") || reason.contains("sibling sum")
+        }),
+        "child B denial must cite sibling-sum over-subscription: {:?}",
+        denied_b.reason
+    );
+
+    // Reconcile child A's hold: closing it releases child A's sibling share.
+    let realized = ToolInvocationCost {
+        units: 30,
+        currency: "USD".to_string(),
+        breakdown: None,
+    };
+    let reconciled = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &first.arguments, &realized)
+        .unwrap();
+    assert_eq!(reconciled.verdict, Verdict::Allow);
+
+    let third =
+        delegated_reserve_request("req-b-reserve-2", &fixture.child_b, &fixture.child_b_kp);
+    let admitted_b = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&third, None)
+        .unwrap();
+    assert_eq!(
+        admitted_b.verdict,
+        Verdict::Allow,
+        "child B must be admitted after child A's reservation is reconciled: {:?}",
+        admitted_b.reason
+    );
+
+    let _ = std::fs::remove_file(fixture.path);
+}
+
+#[test]
+fn delegated_reserving_child_sibling_share_freed_after_ttl_reap() {
+    let fixture = make_sibling_sum_monetary_fixture("delegated-reserve-reap");
+    let mut kernel = fixture.kernel;
+    install_strict_nonce_store(&mut kernel);
+
+    let first = delegated_reserve_request("req-a-reserve", &fixture.child_a, &fixture.child_a_kp);
+    let reserved_a = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
+        .unwrap();
+    assert_eq!(
+        reserved_a.verdict,
+        Verdict::Allow,
+        "child A reservation should be admitted: {:?}",
+        reserved_a.reason
+    );
+
+    let second = delegated_reserve_request("req-b-reserve", &fixture.child_b, &fixture.child_b_kp);
+    let denied_b = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&second, None)
+        .unwrap();
+    assert_eq!(
+        denied_b.verdict,
+        Verdict::Deny,
+        "child B must be denied while child A's reservation is open: {:?}",
+        denied_b.reason
+    );
+
+    // The TTL reaper forfeits child A's abandoned reservation, closing the hold
+    // and freeing child A's sibling-sum share back to the parent.
+    assert_eq!(
+        kernel.reap_expired_reserved_budget_holds(i64::MAX).unwrap(),
+        1,
+        "the reaper settles child A's expired reserved hold"
+    );
+
+    let third =
+        delegated_reserve_request("req-b-reserve-2", &fixture.child_b, &fixture.child_b_kp);
+    let admitted_b = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&third, None)
+        .unwrap();
+    assert_eq!(
+        admitted_b.verdict,
+        Verdict::Allow,
+        "child B must be admitted after child A's reservation is reaped: {:?}",
+        admitted_b.reason
+    );
+
+    let _ = std::fs::remove_file(fixture.path);
+}
+
+// ---------------------------------------------------------------------------
+// Finding 2: a failed reservation stamp must reverse the authorized hold, not
+// strand it open-and-unstamped where the TTL reaper (which only settles stamped
+// holds) would never reclaim it.
+// ---------------------------------------------------------------------------
+
+struct StampFailingBudgetStore {
+    inner: InMemoryBudgetStore,
+    fail_mark: std::sync::Arc<AtomicBool>,
+}
+
+impl BudgetStore for StampFailingBudgetStore {
+    fn try_increment(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+    ) -> Result<bool, BudgetStoreError> {
+        self.inner
+            .try_increment(capability_id, grant_index, max_invocations)
+    }
+
+    fn try_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+    ) -> Result<bool, BudgetStoreError> {
+        self.inner.try_charge_cost(
+            capability_id,
+            grant_index,
+            max_invocations,
+            cost_units,
+            max_cost_per_invocation,
+            max_total_cost_units,
+        )
+    }
+
+    fn reverse_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner
+            .reverse_charge_cost(capability_id, grant_index, cost_units)
+    }
+
+    fn reduce_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner
+            .reduce_charge_cost(capability_id, grant_index, cost_units)
+    }
+
+    fn settle_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        exposed_cost_units: u64,
+        realized_cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.settle_charge_cost(
+            capability_id,
+            grant_index,
+            exposed_cost_units,
+            realized_cost_units,
+        )
+    }
+
+    fn list_usages(
+        &self,
+        limit: usize,
+        capability_id: Option<&str>,
+    ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
+        self.inner.list_usages(limit, capability_id)
+    }
+
+    fn get_usage(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+    ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
+        self.inner.get_usage(capability_id, grant_index)
+    }
+
+    fn authorize_budget_hold(
+        &self,
+        request: crate::budget_store::BudgetAuthorizeHoldRequest,
+    ) -> Result<crate::budget_store::BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        self.inner.authorize_budget_hold(request)
+    }
+
+    fn reverse_budget_hold(
+        &self,
+        request: crate::budget_store::BudgetReverseHoldRequest,
+    ) -> Result<crate::budget_store::BudgetReverseHoldDecision, BudgetStoreError> {
+        self.inner.reverse_budget_hold(request)
+    }
+
+    fn reconcile_budget_hold(
+        &self,
+        request: crate::budget_store::BudgetReconcileHoldRequest,
+    ) -> Result<crate::budget_store::BudgetReconcileHoldDecision, BudgetStoreError> {
+        self.inner.reconcile_budget_hold(request)
+    }
+
+    fn release_budget_hold(
+        &self,
+        request: crate::budget_store::BudgetReleaseHoldRequest,
+    ) -> Result<crate::budget_store::BudgetReleaseHoldDecision, BudgetStoreError> {
+        self.inner.release_budget_hold(request)
+    }
+
+    fn get_budget_hold(
+        &self,
+        hold_id: &str,
+    ) -> Result<Option<crate::budget_store::BudgetHoldSnapshot>, BudgetStoreError> {
+        self.inner.get_budget_hold(hold_id)
+    }
+
+    fn mark_hold_reserved(
+        &self,
+        hold_id: &str,
+        reserved_until_unix_secs: i64,
+        currency: &str,
+    ) -> Result<(), BudgetStoreError> {
+        if self.fail_mark.load(Ordering::SeqCst) {
+            return Err(BudgetStoreError::Invariant(
+                "reservation stamp write failed (test double)".to_string(),
+            ));
+        }
+        self.inner
+            .mark_hold_reserved(hold_id, reserved_until_unix_secs, currency)
+    }
+
+    fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
+        self.inner.reap_expired_reserved_holds(now_unix_secs)
+    }
+}
+
+#[test]
+fn reserving_stamp_failure_reverses_authorized_hold() {
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
+    let fail_mark = std::sync::Arc::new(AtomicBool::new(true));
+    kernel.set_budget_store(Box::new(StampFailingBudgetStore {
+        inner: InMemoryBudgetStore::new(),
+        fail_mark: std::sync::Arc::clone(&fail_mark),
+    }));
+    install_strict_nonce_store(&mut kernel);
+
+    // The whole grant is reservable by one authorization, so a stranded hold
+    // would block every later reservation on the grant.
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let request = reserve_request("req-stamp-fail", &cap, &agent_kp);
+    let err = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("stamp") || err.to_string().contains("reservation"),
+        "the reservation stamp failure must surface: {err}"
+    );
+
+    // The authorized hold was reversed, not left open-and-unstamped.
+    let hold_id = format!("budget-hold:req-stamp-fail:{}:0", cap.id);
+    let hold = kernel
+        .budget_store
+        .get_budget_hold(&hold_id)
+        .unwrap()
+        .expect("the authorized hold is recorded");
+    assert_eq!(
+        hold.disposition,
+        crate::budget_store::BudgetHoldDispositionView::Reversed,
+        "a failed reservation stamp must reverse the hold, not strand it open"
+    );
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    assert_eq!(
+        usage.committed_cost_units().unwrap(),
+        0,
+        "the reversed hold leaves no committed exposure"
+    );
+
+    // Once the stamp write recovers, a later reservation on the same fully-bounded
+    // grant succeeds: nothing was stranded by the failed stamp.
+    fail_mark.store(false, Ordering::SeqCst);
+    let retry = reserve_request("req-stamp-recover", &cap, &agent_kp);
+    let reserved = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&retry, None)
+        .unwrap();
+    assert_eq!(
+        reserved.verdict,
+        Verdict::Allow,
+        "a later reservation must succeed after the failed stamp was unwound: {:?}",
+        reserved.reason
+    );
+}

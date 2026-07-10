@@ -222,6 +222,7 @@ impl ChioKernel {
             settlement_observer: None,
             revocation_view: None,
             budget_registry: Mutex::new(chio_kernel_core::InMemoryBudgetRegistry::new()),
+            reserved_sibling_shares: Mutex::new(HashMap::new()),
         }
     }
 

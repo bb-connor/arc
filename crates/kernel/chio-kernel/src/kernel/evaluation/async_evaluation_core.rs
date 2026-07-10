@@ -486,7 +486,6 @@ impl ChioKernel {
                             request,
                             now,
                             matched_grant_index,
-                            cap,
                             &budget_mutation,
                             extra_metadata,
                         ),

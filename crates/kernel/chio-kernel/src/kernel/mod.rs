@@ -28,7 +28,9 @@ pub(crate) use kernel_scopes::{
     scope_receipt_tenant_id, ReceiptFederationAdmission, ScopedKernelReceiptFederationAdmission,
     ScopedKernelReceiptTenantId,
 };
-pub(crate) use kernel_struct::{capability_crypto_floor, receipt_crypto_floor};
+pub(crate) use kernel_struct::{
+    capability_crypto_floor, receipt_crypto_floor, ReservedSiblingShare,
+};
 
 pub type AgentId = String;
 

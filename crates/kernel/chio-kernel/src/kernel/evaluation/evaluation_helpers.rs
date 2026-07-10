@@ -138,10 +138,14 @@ impl ChioKernel {
     ///
     /// Unlike [`Self::build_execution_nonce_preflight_allow_response_after_cleanup`],
     /// this KEEPS the pre-execution budget hold reserved (open): it does not
-    /// call `reverse_pre_execution_budget_mutation`. Only the in-memory,
-    /// per-dispatch reservations are released (the runtime-admission slot and
-    /// the sibling-sum share) because the tool never dispatches on this kernel.
-    /// The durable hold stays open so it enforces `max_total_cost` against
+    /// call `reverse_pre_execution_budget_mutation`. Only the in-memory
+    /// per-dispatch runtime-admission slot is released, because the tool never
+    /// dispatches on this kernel. The delegated child's sibling-sum share stays
+    /// admitted in `budget_registry` and is recorded against the reserved hold
+    /// (see `build_execution_nonce_preflight_allow_response_with_metadata`), so
+    /// an outstanding reservation still counts against the parent; it is
+    /// released only when the hold closes (reconciled by nonce or reaped). The
+    /// durable hold stays open so it also enforces `max_total_cost` against
     /// concurrent authorizations; it is reconciled at the execution site when
     /// the caller presents the minted nonce, or reclaimed by the crash reaper
     /// if the caller never executes (fail-closed, never over-subscribed).
@@ -154,7 +158,6 @@ impl ChioKernel {
         request: &ToolCallRequest,
         timestamp: u64,
         matched_grant_index: usize,
-        cap: &CapabilityToken,
         budget_mutation: &PreExecutionBudgetMutation,
         runtime_admission_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
@@ -162,8 +165,6 @@ impl ChioKernel {
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
                 runtime_admission_metadata,
             );
-        self.release_admitted_capability_budget(cap)
-            .map_err(KernelError::DelegationInvalid)?;
 
         // Record the reserved hold's authorize block with NO terminal event:
         // the hold is open, neither reversed nor reconciled. This is what keeps
@@ -191,10 +192,7 @@ impl ChioKernel {
         // consistent.
         let reserved_hold = budget_mutation
             .charge_result()
-            .map(|charge| ReservedHoldStamp {
-                hold_id: charge.budget_hold_id.as_str(),
-                currency: charge.currency.as_str(),
-            });
+            .map(|charge| ReservedHoldStamp { charge });
 
         self.build_execution_nonce_preflight_allow_response_with_metadata(
             request,

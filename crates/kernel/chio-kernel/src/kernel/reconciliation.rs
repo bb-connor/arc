@@ -35,7 +35,33 @@ impl ChioKernel {
         &self,
         now_unix_secs: i64,
     ) -> Result<usize, KernelError> {
-        self.with_budget_store(|store| Ok(store.reap_expired_reserved_holds(now_unix_secs)?))
+        // Reserved holds this reap will settle (open, past their reserved expiry)
+        // still hold their delegated child's sibling-sum share admitted. Capture
+        // that set before settling so the parent's headroom is released once, and
+        // only, for the holds the store actually forfeits. The predicate mirrors
+        // the store reaper's contract (open + reserved_until <= now).
+        let tracked = self.tracked_reserved_sibling_hold_ids();
+        let expiring = self.with_budget_store(|store| {
+            let mut expiring = Vec::new();
+            for hold_id in &tracked {
+                if let Some(hold) = store.get_budget_hold(hold_id)? {
+                    if hold.disposition.is_open()
+                        && hold
+                            .reserved_until
+                            .is_some_and(|until| until <= now_unix_secs)
+                    {
+                        expiring.push(hold_id.clone());
+                    }
+                }
+            }
+            Ok(expiring)
+        })?;
+        let settled =
+            self.with_budget_store(|store| Ok(store.reap_expired_reserved_holds(now_unix_secs)?))?;
+        for hold_id in expiring {
+            self.release_reserved_sibling_share_for_hold(&hold_id);
+        }
+        Ok(settled)
     }
 
     /// Reconcile the reserved budget hold named by a presented execution nonce
@@ -187,6 +213,12 @@ impl ChioKernel {
                     store.budget_metering_profile(),
                 ))
             })?;
+
+        // The reserved hold is now settled (closed), so release the sibling-sum
+        // share it kept admitted, freeing the parent's headroom for a sibling.
+        // Done before the receipt is built so a later signing error still frees
+        // the headroom; a no-op for a root hold that never held a share.
+        self.release_reserved_sibling_share_for_hold(reserved_hold_id);
 
         let exposed = hold.remaining_exposure_units;
         let realized = realized_units.min(exposed);

@@ -346,6 +346,73 @@ impl ChioKernel {
         Ok(())
     }
 
+    fn lock_reserved_sibling_shares(
+        &self,
+    ) -> std::sync::MutexGuard<'_, HashMap<String, ReservedSiblingShare>> {
+        match self.reserved_sibling_shares.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        }
+    }
+
+    /// Budget hold ids that currently hold a reserve-for-caller sibling share
+    /// open. The TTL reaper uses this to release the parent's headroom for the
+    /// exact holds it settles.
+    pub(crate) fn tracked_reserved_sibling_hold_ids(&self) -> Vec<String> {
+        self.lock_reserved_sibling_shares()
+            .keys()
+            .cloned()
+            .collect()
+    }
+
+    /// Record that a reserve-for-caller hold keeps `cap`'s sibling-sum share
+    /// admitted until the hold closes, keyed by the hold id. Roots hold no
+    /// sibling share (empty delegation chain) and record nothing.
+    pub(crate) fn record_reserved_sibling_share(&self, hold_id: &str, cap: &CapabilityToken) {
+        let Some(parent_link) = cap.delegation_chain.last() else {
+            return;
+        };
+        let share_bps = cap
+            .budget_share_bps
+            .unwrap_or(chio_kernel_core::MAX_BUDGET_SHARE_BPS);
+        self.lock_reserved_sibling_shares().insert(
+            hold_id.to_string(),
+            ReservedSiblingShare {
+                parent_token_id: parent_link.capability_id.clone(),
+                child_token_id: cap.id.clone(),
+                share_bps,
+            },
+        );
+    }
+
+    /// Release the sibling-sum share a reserve-for-caller hold kept admitted,
+    /// once the hold has closed (reconciled by nonce or reaped). Idempotent: an
+    /// unknown hold id is a no-op. A registry release error is logged rather
+    /// than propagated so hold settlement is never blocked by admission
+    /// bookkeeping (release cannot mismatch because the exact admitted share was
+    /// recorded).
+    pub(crate) fn release_reserved_sibling_share_for_hold(&self, hold_id: &str) {
+        let Some(entry) = self.lock_reserved_sibling_shares().remove(hold_id) else {
+            return;
+        };
+        use chio_kernel_core::BudgetRegistry;
+        let mut budgets = match self.budget_registry.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if let Err(error) = budgets.release_child(
+            &entry.parent_token_id,
+            &entry.child_token_id,
+            entry.share_bps,
+        ) {
+            warn!(
+                hold_id = %hold_id,
+                reason = %redacted!(&error),
+                "failed to release reserved sibling share for a closed hold"
+            );
+        }
+    }
+
     /// Run the portable pure-compute verdict path provided by
     /// `chio-kernel-core`.
     ///

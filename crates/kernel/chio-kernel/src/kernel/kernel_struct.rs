@@ -264,6 +264,26 @@ pub struct ChioKernel {
     /// shape stays feature-flag agnostic.
     pub(super) revocation_view: Option<std::sync::Arc<chio_kernel_core::RevocationView>>,
     pub(super) budget_registry: Mutex<chio_kernel_core::InMemoryBudgetRegistry>,
+    /// Sibling-sum shares held open by reserve-for-caller authorizations.
+    ///
+    /// A mediated authorization keeps its delegated child's admitted share in
+    /// `budget_registry` while the reserved hold is open, so an outstanding
+    /// reservation still counts against the parent and a sibling cannot
+    /// over-subscribe it. Keyed by budget hold id, each entry carries the
+    /// `(parent, child, share)` needed to release that headroom when the hold
+    /// closes (reconciled by nonce or forfeited by the TTL reaper).
+    pub(super) reserved_sibling_shares: Mutex<HashMap<String, ReservedSiblingShare>>,
+}
+
+/// The parent/child/share triple a reserve-for-caller hold keeps admitted in
+/// the sibling-sum `budget_registry` while its durable hold stays open. It is
+/// recorded when the reservation is stamped and consumed to release the
+/// parent's headroom once the hold is reconciled or reaped.
+#[derive(Debug, Clone)]
+pub(crate) struct ReservedSiblingShare {
+    pub(crate) parent_token_id: String,
+    pub(crate) child_token_id: String,
+    pub(crate) share_bps: u16,
 }
 
 impl ChioKernel {
