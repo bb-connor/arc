@@ -175,6 +175,9 @@ impl chio_core_types::receipt::authoritative_spend::PresentedNonceView for Signe
     fn bound_parameter_hash(&self) -> &str {
         &self.nonce.bound_to.parameter_hash
     }
+    fn bound_reserved_hold_id(&self) -> Option<&str> {
+        self.nonce.reserved_hold_id.as_deref()
+    }
     fn verify_signed_by(&self, key: &PublicKey) -> bool {
         match canonical_json_bytes(&self.nonce) {
             Ok(bytes) => key.verify(&bytes, &self.signature),
@@ -747,6 +750,13 @@ mod tests {
             Some("budget-hold:req-1:cap-123:0")
         );
         assert_eq!(signed.reserving_request_id(), Some("req-1"));
+        // The presented-nonce view surfaces the same signed reserved hold id so
+        // the authoritative-spend predicate can cross-bind it to the receipt.
+        use chio_core_types::receipt::authoritative_spend::PresentedNonceView;
+        assert_eq!(
+            PresentedNonceView::bound_reserved_hold_id(&signed),
+            Some("budget-hold:req-1:cap-123:0")
+        );
         // The reservation fields ride inside the signed body and verify cleanly.
         verify_execution_nonce(&signed, &kp.public_key(), &binding, now + 1, &store).unwrap();
     }
@@ -789,6 +799,8 @@ mod tests {
         assert_eq!(signed.bound_capability_id(), "cap-123");
         assert_eq!(signed.bound_tool_server(), "fs");
         assert_eq!(signed.bound_tool_name(), "read_file");
+        // A non-reserving mint names no reserved hold through the view.
+        assert_eq!(signed.bound_reserved_hold_id(), None);
         assert!(signed.verify_signed_by(&kp.public_key()));
         assert!(!signed.verify_signed_by(&Keypair::generate().public_key()));
     }

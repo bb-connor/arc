@@ -959,6 +959,43 @@ fn reconcile_by_nonce_settles_reserved_hold_and_frees_difference() {
 }
 
 #[test]
+fn reconcile_by_nonce_receipt_binds_reserved_hold_into_authoritative_predicate() {
+    use chio_core_types::receipt::authoritative_spend::{
+        is_authoritative_spend_receipt, BudgetAuthorityReceiptRef, PresentedNonceView,
+    };
+
+    let (kernel, agent_kp, cap, _cfg) = reconcile_kernel_and_cap();
+    let first = reserve_request("req-recon-bind", &cap, &agent_kp);
+    let authorized = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
+        .unwrap();
+    let nonce = *authorized.execution_nonce.clone().unwrap();
+    let realized = ToolInvocationCost {
+        units: 30,
+        currency: "USD".to_string(),
+        breakdown: None,
+    };
+    let reconciled = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &first.arguments, &realized)
+        .unwrap();
+
+    // The reconcile-by-nonce receipt commits the exact hold the nonce reserved,
+    // so the nonce's signed reserved hold id equals the receipt's committed hold.
+    let budget = BudgetAuthorityReceiptRef::from_receipt(&reconciled.receipt)
+        .expect("reconciled receipt carries budget authority");
+    assert_eq!(
+        PresentedNonceView::bound_reserved_hold_id(&nonce),
+        Some(budget.hold_id.as_str()),
+        "the reconciled hold must equal the hold the nonce reserved"
+    );
+    let admitted = [kernel.config.keypair.public_key()];
+    assert_eq!(
+        is_authoritative_spend_receipt(&reconciled.receipt, &admitted, &nonce),
+        Ok(())
+    );
+}
+
+#[test]
 fn reconcile_by_nonce_second_time_is_rejected_as_replay() {
     let (kernel, agent_kp, cap, _cfg) = reconcile_kernel_and_cap();
     let first = reserve_request("req-recon-replay", &cap, &agent_kp);

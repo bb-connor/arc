@@ -75,6 +75,14 @@ pub trait PresentedNonceView {
     fn bound_tool_server(&self) -> &str;
     fn bound_tool_name(&self) -> &str;
     fn bound_parameter_hash(&self) -> &str;
+    /// The reserved budget hold this nonce cryptographically names, or `None`
+    /// when the nonce was minted on a non-reserving allow path. The
+    /// reconcile-by-nonce path binds the settled hold's id into the signed nonce
+    /// body, so an authoritative reconciled receipt built from such a nonce must
+    /// commit that exact hold. Non-reserving allow paths (single-shot mediated
+    /// spend, strict-retry completion) return `None` and bind the nonce to the
+    /// receipt through the nonce-id link alone.
+    fn bound_reserved_hold_id(&self) -> Option<&str>;
     fn verify_signed_by(&self, key: &PublicKey) -> bool;
 }
 
@@ -94,6 +102,12 @@ pub enum NotAuthoritativeReason {
     ExposureNotCommitted,
     NonceLinkMissing,
     NonceLinkMismatch,
+    /// The presented nonce cryptographically names a reserved budget hold that
+    /// differs from the receipt's committed `budget_authority.hold_id`. The
+    /// nonce id links the two artifacts, but the hold the nonce reserved is not
+    /// the hold this receipt settled, so the receipt is not authoritative for
+    /// the presented nonce. Fail-closed on this cross-binding inconsistency.
+    ReservedHoldMismatch,
     NonceBindingMismatch {
         field: &'static str,
     },
@@ -189,6 +203,20 @@ pub fn is_authoritative_spend_receipt(
     if linked_nonce_id != presented_nonce.nonce_id() {
         return Err(NotAuthoritativeReason::NonceLinkMismatch);
     }
+    // (d cont.) reserved-hold cross-binding. When the presented nonce
+    // cryptographically names a reserved hold (the reconcile-by-nonce path binds
+    // the settled hold's id into the signed nonce body), it MUST equal the
+    // receipt's committed hold. A nonce that reserved a different hold links this
+    // receipt by id yet is authoritative for a hold this receipt did not settle,
+    // so accepting it would break the advertised hold <-> nonce binding. A nonce
+    // that names no reserved hold (single-shot mediated spend and strict-retry
+    // completion mint a nonce with no reserved hold) is bound to the receipt
+    // through the nonce-id link alone and is permitted here.
+    if let Some(reserved_hold_id) = presented_nonce.bound_reserved_hold_id() {
+        if reserved_hold_id != budget.hold_id {
+            return Err(NotAuthoritativeReason::ReservedHoldMismatch);
+        }
+    }
     // (c) the nonce binding must match the exact call the receipt authorized.
     if presented_nonce.bound_capability_id() != receipt.capability_id {
         return Err(NotAuthoritativeReason::NonceBindingMismatch {
@@ -282,6 +310,7 @@ mod tests {
         tool_server: String,
         tool_name: String,
         parameter_hash: String,
+        reserved_hold_id: Option<String>,
         signer: Option<PublicKey>,
     }
 
@@ -300,6 +329,9 @@ mod tests {
         }
         fn bound_parameter_hash(&self) -> &str {
             &self.parameter_hash
+        }
+        fn bound_reserved_hold_id(&self) -> Option<&str> {
+            self.reserved_hold_id.as_deref()
         }
         fn verify_signed_by(&self, key: &PublicKey) -> bool {
             self.signer.as_ref() == Some(key)
@@ -355,12 +387,17 @@ mod tests {
     }
 
     fn good_nonce(kp: &Keypair, receipt: &ChioReceipt) -> FakeNonce {
+        // A reconcile-by-nonce nonce names the exact hold the receipt commits,
+        // so the good baseline carries the receipt's committed hold id.
+        let reserved_hold_id =
+            BudgetAuthorityReceiptRef::from_receipt(receipt).map(|budget| budget.hold_id);
         FakeNonce {
             nonce_id: "nonce-1".to_string(),
             capability_id: receipt.capability_id.clone(),
             tool_server: receipt.tool_server.clone(),
             tool_name: receipt.tool_name.clone(),
             parameter_hash: receipt.action.parameter_hash.clone(),
+            reserved_hold_id,
             signer: Some(kp.public_key()),
         }
     }
@@ -370,6 +407,56 @@ mod tests {
         let kp = Keypair::generate();
         let receipt = authoritative_receipt(&kp);
         let nonce = good_nonce(&kp, &receipt);
+        assert_eq!(
+            is_authoritative_spend_receipt(&receipt, &[kp.public_key()], &nonce),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn nonce_reserving_a_different_hold_is_rejected() {
+        // The presented nonce is signed, its id links the receipt, and its call
+        // binding matches, but it cryptographically reserved a DIFFERENT hold
+        // than the one this receipt committed. The receipt is authoritative for
+        // the hold the nonce reserved, not for this one, so it must be rejected
+        // even though every other conjunct holds.
+        let kp = Keypair::generate();
+        let receipt = authoritative_receipt(&kp);
+        let mut nonce = good_nonce(&kp, &receipt);
+        nonce.reserved_hold_id = Some("budget-hold:attacker:cap-1:0".to_string());
+        assert_eq!(
+            is_authoritative_spend_receipt(&receipt, &[kp.public_key()], &nonce),
+            Err(NotAuthoritativeReason::ReservedHoldMismatch)
+        );
+    }
+
+    #[test]
+    fn nonce_reserving_the_committed_hold_passes() {
+        // A reconcile-by-nonce nonce names exactly the committed hold id.
+        let kp = Keypair::generate();
+        let receipt = authoritative_receipt(&kp);
+        let nonce = good_nonce(&kp, &receipt);
+        assert_eq!(
+            nonce.reserved_hold_id.as_deref(),
+            Some("budget-hold:req-1:cap-1:0")
+        );
+        assert_eq!(
+            is_authoritative_spend_receipt(&receipt, &[kp.public_key()], &nonce),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn nonce_without_reserved_hold_is_permitted() {
+        // Non-reserving allow paths (single-shot mediated spend, strict-retry
+        // completion) mint a nonce that names no reserved hold and bind it to
+        // the receipt through the nonce-id link alone. Such a nonce stays
+        // authoritative: the reserved-hold cross-binding only constrains a nonce
+        // that DOES claim a reserved hold.
+        let kp = Keypair::generate();
+        let receipt = authoritative_receipt(&kp);
+        let mut nonce = good_nonce(&kp, &receipt);
+        nonce.reserved_hold_id = None;
         assert_eq!(
             is_authoritative_spend_receipt(&receipt, &[kp.public_key()], &nonce),
             Ok(())
