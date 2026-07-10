@@ -163,6 +163,73 @@ mod tests {
     }
 
     #[test]
+    fn recovery_prefers_the_committed_acceptance_over_a_later_replay_rejection() {
+        // After `receive_batch` commits an accepted report but before the relay inbox is
+        // recorded, a retry over the same batch bytes after a crash records a replay-window
+        // REJECTION with a LATER `received_at`. Recovery must return the committed ACCEPTED
+        // verdict, never the later rejection, or it would dead-letter deposits the batch
+        // already admitted.
+        let store = SqlitePheromoneRuntimeStore::open_in_memory().expect("store opens");
+        // The committed accepted verdict lands first.
+        let accepted = receive_report("batch-1", "did:chio:alice", true, 10);
+        store
+            .record_receive_report(&accepted)
+            .expect("record accepted");
+        // A retry after a crash records a replay rejection for the same batch LATER.
+        let rejection = receive_report("batch-1", "did:chio:alice", false, 20);
+        store
+            .record_receive_report(&rejection)
+            .expect("record rejection");
+
+        let recovered = store
+            .lookup_receive_report_by_batch("batch-1", "did:chio:alice")
+            .expect("lookup runs")
+            .expect("the committed verdict is recoverable");
+        assert!(
+            recovered.accepted,
+            "recovery returns the committed accepted verdict, not the later replay rejection"
+        );
+    }
+
+    #[test]
+    fn recovery_prefers_a_committed_partial_over_a_later_replay_rejection() {
+        // A PARTIAL batch admitted some frames, so its committed verdict must also win over
+        // a later replay rejection even though `accepted` is false for a partial outcome.
+        // Preferring on the batch OUTCOME (not the accepted flag) keeps partially-admitted
+        // deposits from being dead-lettered on crash recovery.
+        let store = SqlitePheromoneRuntimeStore::open_in_memory().expect("store opens");
+        let partial = PheromoneReceiveReport {
+            schema: PHEROMONE_RECEIVE_REPORT_SCHEMA.to_string(),
+            accepted: false,
+            batch_outcome: PheromoneBatchOutcome::Partial,
+            accepted_frame_count: 1,
+            rejected_frame_count: 1,
+            batch_sha256: "batch-2".to_string(),
+            recipient_kernel_id: "did:chio:bob".to_string(),
+            authenticated_sender_kernel_id: "did:chio:alice".to_string(),
+            received_at_unix_ms: 10,
+            frames: Vec::new(),
+        };
+        store
+            .record_receive_report(&partial)
+            .expect("record partial");
+        let rejection = receive_report("batch-2", "did:chio:alice", false, 20);
+        store
+            .record_receive_report(&rejection)
+            .expect("record rejection");
+
+        let recovered = store
+            .lookup_receive_report_by_batch("batch-2", "did:chio:alice")
+            .expect("lookup runs")
+            .expect("the committed partial verdict is recoverable");
+        assert_eq!(
+            recovered.batch_outcome,
+            PheromoneBatchOutcome::Partial,
+            "recovery returns the committed partial verdict, not the later replay rejection"
+        );
+    }
+
+    #[test]
     fn storage_commit_error_helper_selects_only_storage_failures() {
         assert!(super::is_storage_commit_error(
             &PheromoneRuntimeError::Sqlite("disk full".to_string())
@@ -375,28 +442,43 @@ impl SqlitePheromoneRuntimeStore {
     /// `SELECT` could return an arbitrary cross-sender row. Filtering by
     /// `sender_kernel_id` returns the correct sender's durable verdict; the adoption site
     /// re-checks the deserialized `authenticated_sender_kernel_id` as belt-and-suspenders.
-    /// The most-recent matching row wins (deterministic). Returns None when no row for the
-    /// (batch, sender) pair exists (pre-migration rows have NULL columns and are not
-    /// returned). Read-only.
+    ///
+    /// An ADMITTING verdict (accepted or partial) wins over a rejection, then recency
+    /// breaks ties. `receive_batch` also records replay-window rejections for the same
+    /// (batch, sender), and a retry after a crash (a fresh relay nonce over the same batch
+    /// bytes) records that rejection with a LATER `received_at_unix_ms` than the original
+    /// committed verdict. Ordering by recency alone would recover the replay rejection and
+    /// dead-letter deposits the committed report already admitted, so any report that
+    /// admitted a frame is preferred over a later rejection of the same batch. When no
+    /// admitting verdict exists, the most recent (rejected) row is returned, keeping
+    /// crash recovery idempotent. Returns None when no row for the (batch, sender) pair
+    /// exists (pre-migration rows have NULL columns and are not returned). Read-only.
     pub fn lookup_receive_report_by_batch(
         &self,
         batch_sha256: &str,
         authenticated_sender_kernel_id: &str,
     ) -> Result<Option<PheromoneReceiveReport>, PheromoneRuntimeError> {
         let conn = self.conn.lock()?;
-        let json: Option<String> = conn
-            .query_row(
-                "SELECT json FROM chio_pheromone_receive_reports \
-                 WHERE batch_sha256 = ?1 AND sender_kernel_id = ?2 \
-                 ORDER BY received_at_unix_ms DESC LIMIT 1",
-                params![batch_sha256, authenticated_sender_kernel_id],
-                |row| row.get::<_, String>(0),
-            )
-            .optional()?;
-        match json {
-            Some(text) => Ok(Some(serde_json::from_str(&text)?)),
-            None => Ok(None),
+        let mut stmt = conn.prepare(
+            "SELECT json FROM chio_pheromone_receive_reports \
+             WHERE batch_sha256 = ?1 AND sender_kernel_id = ?2 \
+             ORDER BY received_at_unix_ms DESC",
+        )?;
+        let rows = stmt.query_map(
+            params![batch_sha256, authenticated_sender_kernel_id],
+            |row| row.get::<_, String>(0),
+        )?;
+        let mut most_recent: Option<PheromoneReceiveReport> = None;
+        for row in rows {
+            let report: PheromoneReceiveReport = serde_json::from_str(&row?)?;
+            if report.batch_outcome != PheromoneBatchOutcome::Rejected {
+                return Ok(Some(report));
+            }
+            if most_recent.is_none() {
+                most_recent = Some(report);
+            }
         }
+        Ok(most_recent)
     }
 }
 
