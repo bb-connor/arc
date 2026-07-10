@@ -1,6 +1,6 @@
 //! Registry-backed SiemMetricsSink: forwards SIEM emission into the
-//! chio-metrics-spec runtime families (RFC-0009 Part E). Kept in the host so
-//! chio-siem stays decoupled from the metric registry (ADR-0009).
+//! chio-metrics-spec runtime families. Kept in the host so chio-siem stays
+//! decoupled from the metric registry.
 
 use chio_siem::{ExportOutcome, SiemMetricsSink};
 

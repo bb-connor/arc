@@ -503,8 +503,7 @@ pub(crate) async fn handle_revoke_capability(
             if newly_revoked {
                 // A locally originated capability revoke: the revoke instant is
                 // now, so the propagation lag is ~0. Emit so the
-                // capability-revocation SLO reflects real capability revokes
-                // (Codex round-3 finding 5).
+                // capability-revocation SLO reflects real capability revokes.
                 let revoked_now = i64::try_from(unix_timestamp_now()).unwrap_or(0);
                 super::cluster::observe_capability_revocation_lag(revoked_now);
             }

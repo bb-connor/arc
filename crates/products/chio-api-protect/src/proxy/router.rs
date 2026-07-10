@@ -59,9 +59,9 @@ pub(crate) fn build_app(state: Arc<ProxyState>) -> Router {
             post(sidecar_evaluate_tool_call_handler),
         )
         .route("/v1/evaluate", post(sidecar_removed_evaluate_handler))
-        // Admin-gated Prometheus scrape endpoint (RFC-0009 F58). Mounted before
-        // the catch-all so axum prefers this specific route, and gated by the
-        // same sidecar-control posture as the approval routes.
+        // Admin-gated Prometheus scrape endpoint. Mounted before the catch-all
+        // so axum prefers this specific route, and gated by the same
+        // sidecar-control posture as the approval routes.
         .route(
             "/metrics",
             get(handle_metrics).route_layer(middleware::from_fn_with_state(
@@ -75,8 +75,7 @@ pub(crate) fn build_app(state: Arc<ProxyState>) -> Router {
 }
 
 /// Compose the Prometheus scrape body from the kernel guard families, the
-/// http-core mediation-edge families, and the alert-pack families (RFC-0009
-/// F58). Serving surfaces compose but never fabricate values.
+/// http-core mediation-edge families, and the alert-pack families.
 async fn handle_metrics() -> impl axum::response::IntoResponse {
     let alert_pack = || {
         let mut out = String::new();

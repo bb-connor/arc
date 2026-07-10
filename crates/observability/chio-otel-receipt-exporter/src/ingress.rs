@@ -241,9 +241,9 @@ impl BoundedOtlpGrpcIngress {
             .lock()
             .map_err(|_| OTelReceiptExportError::Queue("OTEL queue mutex poisoned".to_string()))?;
         let summary = queue.push_drop_oldest(item, self.config.queue_limits());
-        // RFC-0009 F75: count every batch dropped by bounded-queue admission
-        // (drop-oldest to make room, or drop-incoming when full), reconciling
-        // with the snapshot's dropped_*_batches fields.
+        // Count every batch dropped by bounded-queue admission (drop-oldest to
+        // make room, or drop-incoming when full), reconciling with the
+        // snapshot's dropped_*_batches fields.
         let dropped_batches = summary.dropped_oldest_batches + summary.dropped_incoming_batches;
         if dropped_batches > 0 {
             chio_metrics_spec::runtime::families::OTEL_INGRESS_DROP
@@ -255,7 +255,7 @@ impl BoundedOtlpGrpcIngress {
     /// Ensure the front item's receipts are generated once (cached on the item)
     /// and return a clone of (prepared receipts, resume cursor, span count).
     /// Generation is pure (no store append), so doing it under the queue lock is
-    /// safe (RFC-0009 F81).
+    /// safe.
     #[allow(clippy::type_complexity)]
     fn prepare_front(
         &self,
@@ -285,8 +285,8 @@ impl BoundedOtlpGrpcIngress {
                 Ok(receipts) => {
                     // Charge the cached signed receipts against the queue byte
                     // budget so a batch held open during a store outage cannot
-                    // exceed the 64 MiB limit while snapshots report it in budget
-                    // (Codex round-5).
+                    // exceed the 64 MiB limit while snapshots report it in
+                    // budget.
                     newly_cached_bytes = estimate_prepared_bytes(&receipts);
                     item.prepared_bytes = newly_cached_bytes;
                     item.prepared = Some(receipts);
@@ -347,22 +347,21 @@ impl BoundedOtlpGrpcIngress {
             if newly > 0 {
                 // Span accounting only: a partial append records the spans it
                 // managed to write, but the BATCH is not counted as completed
-                // until the whole batch drains on the Ok path below (Codex
-                // round-5). This keeps one batch resumed across retries from
-                // being counted as several completed batches, or as completed
-                // while it is still queued.
+                // until the whole batch drains on the Ok path below. This keeps
+                // one batch resumed across retries from being counted as several
+                // completed batches, or as completed while it is still queued.
                 self.record_appended_spans(newly)?;
             }
             match append_result {
                 Ok(()) => {
                     // The whole batch drained: count exactly one completed batch
-                    // here, never per partial append (Codex round-5).
+                    // here, never per partial append.
                     self.record_appended_batch()?;
                     let _ = self.pop_front()?;
                     // Count only receipts appended DURING THIS drain. After a
                     // retryable partial append, `already` receipts were appended
-                    // (and summarized) in a prior drain, so adding the whole batch
-                    // size here would double-count them (Codex round-3 finding 3).
+                    // (and summarized) in a prior drain, so adding the whole
+                    // batch size here would double-count them.
                     summary.accepted_spans += newly;
                     summary.appended_receipts += newly;
                 }
@@ -425,9 +424,9 @@ impl BoundedOtlpGrpcIngress {
         Ok(())
     }
 
-    /// Count a terminal, non-retryable batch drop (RFC-0009 F75, Codex round-1
-    /// finding 5). Distinct from `record_append_error`: a retryable append error
-    /// retains the batch with its resume cursor and re-appends it on the next
+    /// Count a terminal, non-retryable batch drop. Distinct from
+    /// `record_append_error`: a retryable append error retains the batch with
+    /// its resume cursor and re-appends it on the next
     /// drain, so it is NOT a drop and must not increment this counter, otherwise
     /// transient store saturation reads as real data loss.
     fn record_sink_drop(&self) {
@@ -441,14 +440,14 @@ struct QueuedOtlpExport {
     export: OtlpGrpcTraceExport,
     spans: usize,
     bytes: usize,
-    /// Signed receipts generated once for this batch (RFC-0009 F81). Kept so a
-    /// retryable append failure resumes with the SAME ids rather than re-signing.
+    /// Signed receipts generated once for this batch. Kept so a retryable append
+    /// failure resumes with the SAME ids rather than re-signing.
     prepared: Option<Vec<CanonicalChioReceipt>>,
     /// Resident bytes of the cached `prepared` receipts, counted toward the
-    /// queue byte budget (Codex round-5). Zero until the receipts are prepared;
-    /// mirrored into the queue's `queued_bytes` when they are cached so the
-    /// bounded queue accounts a batch retained during a store outage at its real
-    /// memory footprint, not just its original OTLP estimate.
+    /// queue byte budget. Zero until the receipts are prepared; mirrored into
+    /// the queue's `queued_bytes` when they are cached so the bounded queue
+    /// accounts a batch retained during a store outage at its real memory
+    /// footprint, not just its original OTLP estimate.
     prepared_bytes: usize,
     /// Resume cursor: how many of `prepared` have been appended so far.
     appended: usize,
@@ -470,8 +469,8 @@ impl QueuedOtlpExport {
 }
 
 /// Estimate the resident bytes of a prepared receipt batch from the length of
-/// each receipt's canonical serialization (Codex round-5). Used to charge the
-/// cached signed receipts against the bounded queue's byte budget.
+/// each receipt's canonical serialization. Used to charge the cached signed
+/// receipts against the bounded queue's byte budget.
 fn estimate_prepared_bytes(receipts: &[CanonicalChioReceipt]) -> usize {
     receipts
         .iter()
@@ -689,8 +688,7 @@ mod tests {
 
     /// Serializes the tests that read/advance the process-global
     /// `chio_otel_sink_drop_total` counter, so before/after deltas are
-    /// deterministic under the parallel test harness (RFC-0009 Codex round-1
-    /// finding 5).
+    /// deterministic under the parallel test harness.
     static SINK_DROP_COUNTER_LOCK: Mutex<()> = Mutex::new(());
 
     /// Read the current process-global sink-drop counter value.
@@ -955,9 +953,8 @@ mod tests {
         Ok(())
     }
 
-    /// RFC-0009 Codex round-1 finding 5: a RETRYABLE append error retains the
-    /// batch for redelivery, so it must NOT increment the sink-drop counter.
-    /// A `Pool` error is retryable.
+    /// A RETRYABLE append error retains the batch for redelivery, so it must NOT
+    /// increment the sink-drop counter. A `Pool` error is retryable.
     #[test]
     fn retryable_append_error_does_not_count_a_sink_drop() -> Result<(), Box<dyn Error>> {
         let _guard = SINK_DROP_COUNTER_LOCK
@@ -987,9 +984,9 @@ mod tests {
         Ok(())
     }
 
-    /// RFC-0009 Codex round-1 finding 5: a TERMINAL, non-retryable append error
-    /// drops the batch (data lost), so it must increment the sink-drop counter
-    /// exactly once. An `InvalidSpan` error is non-retryable.
+    /// A TERMINAL, non-retryable append error drops the batch (data lost), so it
+    /// must increment the sink-drop counter exactly once. An `InvalidSpan` error
+    /// is non-retryable.
     #[test]
     fn terminal_append_error_counts_exactly_one_sink_drop() -> Result<(), Box<dyn Error>> {
         let _guard = SINK_DROP_COUNTER_LOCK
@@ -1054,10 +1051,9 @@ mod tests {
         }
     }
 
-    /// Codex round-3 finding 3: after a retryable partial append, the retry must
-    /// count only the NEWLY appended receipts in its success summary, not the
-    /// whole batch (which would double-count the receipts appended on the first
-    /// attempt).
+    /// After a retryable partial append, the retry must count only the NEWLY
+    /// appended receipts in its success summary, not the whole batch (which
+    /// would double-count the receipts appended on the first attempt).
     #[test]
     fn retry_after_partial_append_counts_only_newly_appended() -> Result<(), Box<dyn Error>> {
         let sink = ReceiptStoreSink::new_canonical(
@@ -1099,10 +1095,9 @@ mod tests {
         Ok(())
     }
 
-    /// Codex round-5: a partial append that fails retryably must NOT count the
-    /// batch as completed (it is still queued for retry), and the batch must be
-    /// counted exactly once when it finally drains, never once per partial
-    /// append.
+    /// A partial append that fails retryably must NOT count the batch as
+    /// completed (it is still queued for retry), and the batch must be counted
+    /// exactly once when it finally drains, never once per partial append.
     #[test]
     fn partial_append_counts_the_batch_once_on_completion() -> Result<(), Box<dyn Error>> {
         let sink = ReceiptStoreSink::new_canonical(
@@ -1148,9 +1143,9 @@ mod tests {
         Ok(())
     }
 
-    /// Codex round-5: a batch retained after a retryable append error keeps its
-    /// signed receipts cached in the queue, so those bytes must count toward the
-    /// bounded queue's byte budget rather than being invisible to `queued_bytes`.
+    /// A batch retained after a retryable append error keeps its signed receipts
+    /// cached in the queue, so those bytes must count toward the bounded queue's
+    /// byte budget rather than being invisible to `queued_bytes`.
     #[test]
     fn retained_batch_accounts_cached_receipt_bytes_in_queue_budget() -> Result<(), Box<dyn Error>>
     {

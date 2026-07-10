@@ -1,6 +1,6 @@
-//! Fail-open detector emission (RFC-0009 Part B, F57). The counter instance
-//! lives in chio-metrics-spec so serving surfaces can render it without a
-//! chio-tower dependency; this module is the tower-side producer.
+//! Fail-open detector emission. The counter instance lives in chio-metrics-spec
+//! so serving surfaces can render it without a chio-tower dependency; this
+//! module is the tower-side producer.
 
 use std::sync::Once;
 

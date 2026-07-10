@@ -82,16 +82,15 @@ fn watchdog_rolls_back_after_five_errors_in_sixty_seconds() -> TestResult {
     Ok(())
 }
 
-/// Codex round-4 finding 6 (completes round-3 F1): a watchdog rollback must
-/// increment `chio_guard_reload_total{outcome="rolled_back"}`, not merely emit a
-/// span. Before the fix only the applied path incremented, so a rolled-back
-/// reload was invisible to the alerting surface. A unique guard id isolates this
-/// process-global counter series from the other tests in this binary.
+/// A watchdog rollback increments `chio_guard_reload_total{outcome="rolled_back"}`,
+/// not merely emits a span, so a rolled-back reload is visible to the alerting
+/// surface. A unique guard id isolates this process-global counter series from
+/// the other tests in this binary.
 #[test]
 fn rollback_increments_reload_total_rolled_back() -> TestResult {
     use chio_metrics_spec::runtime::families;
 
-    let guard_id = "reload-rolled-back-guard-f6";
+    let guard_id = "reload-rolled-back-guard";
     let temp = tempfile::tempdir()?;
     let engine = Engine::new(build_backend).without_blocklist();
     engine.register_guard(
@@ -134,17 +133,17 @@ fn rollback_increments_reload_total_rolled_back() -> TestResult {
     Ok(())
 }
 
-/// RFC-0009 N2 (instruments-must-not-lie): a rollback whose incident write fails
-/// is still a REAL rollback (the module was restored and `rolled_back` set), so
-/// `chio_guard_reload_total{outcome="rolled_back"}` must still increment. Before
-/// the fix the counter incremented only AFTER a successful incident write, so an
-/// incident-write failure under I/O pressure silently under-counted a genuine
-/// rollback. A unique guard id isolates this process-global counter series.
+/// A rollback whose incident write fails is still a REAL rollback (the module was
+/// restored and `rolled_back` set), so
+/// `chio_guard_reload_total{outcome="rolled_back"}` must still increment. If the
+/// counter incremented only AFTER a successful incident write, an incident-write
+/// failure under I/O pressure would silently under-count a genuine rollback. A
+/// unique guard id isolates this process-global counter series.
 #[test]
 fn rollback_counts_even_when_incident_write_fails() -> TestResult {
     use chio_metrics_spec::runtime::families;
 
-    let guard_id = "reload-rolled-back-incident-write-fail-n2";
+    let guard_id = "reload-rolled-back-incident-write-fail";
     let temp = tempfile::tempdir()?;
     // Root the incident writer at a REGULAR FILE so `create_dir_all` inside
     // `write_reload_incident` fails and the incident write returns Err on the

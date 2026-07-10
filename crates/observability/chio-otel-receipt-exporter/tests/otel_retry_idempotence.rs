@@ -1,5 +1,5 @@
-//! RFC-0009 F81: a partial OTEL batch retry never mints a duplicate signed
-//! receipt; ids are stable across attempts and per-span accounting reconciles.
+//! A partial OTEL batch retry never mints a duplicate signed receipt; ids are
+//! stable across attempts and per-span accounting reconciles.
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
@@ -75,8 +75,8 @@ proptest! {
         let mut distinct = ids.clone();
         distinct.sort();
         distinct.dedup();
-        // Fixed behavior: exactly n appends, all distinct (no re-mint of the
-        // first k with fresh otel-<uuid> ids on retry).
+        // Exactly n appends, all distinct (no re-mint of the first k with fresh
+        // otel-<uuid> ids on retry).
         prop_assert_eq!(ids.len(), n, "no duplicate appends: {:?}", ids);
         prop_assert_eq!(distinct.len(), n, "ids stable and unique: {:?}", ids);
     }

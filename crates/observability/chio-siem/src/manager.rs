@@ -55,8 +55,8 @@ pub struct SiemConfig {
     /// Optional path to the SIEM-owned RW cursor store (per-exporter high-water
     /// mark). When set, delivery is at-least-once: the read cursor resumes at
     /// min(acked_seq) so a failed exporter forces bounded redelivery instead of
-    /// a silent skip (RFC-0009 F78). None keeps the legacy advance-regardless
-    /// behavior. Distinct from the read-only receipt DB (ADR-0009).
+    /// a silent skip. None keeps the legacy advance-regardless behavior. Distinct
+    /// from the read-only receipt DB.
     pub cursor_db_path: Option<PathBuf>,
 }
 
@@ -88,7 +88,7 @@ impl Default for SiemConfig {
 /// on restart the manager re-exports all receipts from seq=0 (both Splunk HEC
 /// timestamp dedup and Elasticsearch _id upsert handle duplicates idempotently).
 /// When set, a per-exporter high-water mark is persisted and the cursor resumes
-/// at min(acked_seq) for at-least-once delivery (RFC-0009 F78).
+/// at min(acked_seq) for at-least-once delivery.
 ///
 /// A single read-only SQLite connection is opened at construction time and
 /// reused across all poll cycles. This avoids the overhead of re-opening the
@@ -106,11 +106,11 @@ pub struct ExporterManager {
     rate_limiter: Option<ExportRateLimiter>,
     /// Persistent read-only connection to the receipt database.
     conn: Mutex<rusqlite::Connection>,
-    // The poll loop emits export/lag/dlq metrics through this sink (RFC-0009
-    // Part F). Defaults to no-op so chio-siem stays decoupled from the metric
-    // registry (ADR-0009); the host installs a registry-backed sink.
+    // The poll loop emits export/lag/dlq metrics through this sink. Defaults to
+    // no-op so chio-siem stays decoupled from the metric registry; the host
+    // installs a registry-backed sink.
     metrics: std::sync::Arc<dyn crate::metrics_sink::SiemMetricsSink>,
-    /// SIEM-owned RW high-water-mark store (RFC-0009 F78). None keeps the legacy
+    /// SIEM-owned RW high-water-mark store. None keeps the legacy
     /// advance-regardless behavior.
     cursor_store: Option<crate::cursor_store::SiemCursorStore>,
     /// In-memory per-exporter high-water mark, seeded from the store at open and
@@ -153,7 +153,7 @@ impl ExporterManager {
 
         let dlq = DeadLetterQueue::new(config.dlq_capacity);
         // Open the SIEM-owned cursor store when configured and resume the read
-        // cursor at the slowest exporter's high-water mark (RFC-0009 F78).
+        // cursor at the slowest exporter's high-water mark.
         let cursor_store = match &config.cursor_db_path {
             Some(path) => Some(crate::cursor_store::SiemCursorStore::open(path)?),
             None => None,
@@ -176,7 +176,7 @@ impl ExporterManager {
         })
     }
 
-    /// Attach a metrics sink (RFC-0009). Defaults to no-op so headless callers
+    /// Attach a metrics sink. Defaults to no-op so headless callers
     /// are unchanged.
     #[must_use]
     pub fn with_metrics_sink(
@@ -193,18 +193,18 @@ impl ExporterManager {
     /// persisted high-water mark row is seeded at BASELINE (0): it must receive
     /// every receipt persisted before it was registered, so it pins the resume
     /// cursor at 0 until its first ack rather than inheriting an already-advanced
-    /// cursor from a faster peer and silently skipping the backlog (RFC-0009 F78,
-    /// Codex round-2 finding 1). The read cursor is then recomputed as the
+    /// cursor from a faster peer and silently skipping the backlog. The read
+    /// cursor is then recomputed as the
     /// minimum high-water mark across the known exporter set. In legacy None mode
     /// the cursor is not persisted and always advances past the batch, so no
     /// baseline pin is applied here.
     pub fn add_exporter(&mut self, exporter: Box<dyn Exporter>) {
         if self.cursor_store.is_some() {
-            // Key by the exporter's STABLE, config-derived identity (Codex
-            // round-5, the F4 follow-up), not registration index, so inserting or
-            // reordering a same-named exporter cannot let a new instance inherit a
-            // previous instance's high-water mark and skip receipts. A brand-new
-            // identity seeds at BASELINE 0; a persisted identity keeps its mark.
+            // Key by the exporter's STABLE, config-derived identity, not
+            // registration index, so inserting or reordering a same-named
+            // exporter cannot let a new instance inherit a previous instance's
+            // high-water mark and skip receipts. A brand-new identity seeds at
+            // BASELINE 0; a persisted identity keeps its mark.
             let key = exporter.cursor_identity();
             self.acked.entry(key).or_insert(0);
             self.exporters.push(exporter);
@@ -212,7 +212,7 @@ impl ExporterManager {
             // identities. Orphaned rows from a prior identity scheme (e.g. old
             // index-keyed "0:webhook" rows superseded by stable-identity keying)
             // remain in self.acked but must NOT drag the read cursor down to their
-            // stale low mark (Codex round-6): a min() over EVERY loaded row would
+            // stale low mark: a min() over EVERY loaded row would
             // resume at an orphan's 0 even though the current exporters durably
             // acked far ahead, re-exporting history until they catch up. Every
             // registered key has an entry (or_insert above), so the baseline/
@@ -303,9 +303,9 @@ impl ExporterManager {
         }
 
         // Parse rows into SiemEvents. `event_seqs` mirrors `events` (seq
-        // ascending) so a short/partial export can ack ONLY the delivered prefix
-        // (Codex round-6): a malformed row is skipped from both, so the index
-        // into `events` maps back to its DB seq via `event_seqs`.
+        // ascending) so a short/partial export can ack ONLY the delivered prefix:
+        // a malformed row is skipped from both, so the index into `events` maps
+        // back to its DB seq via `event_seqs`.
         let mut events: Vec<SiemEvent> = Vec::with_capacity(rows.len());
         let mut event_seqs: Vec<u64> = Vec::with_capacity(rows.len());
         let mut max_seq = self.cursor;
@@ -323,14 +323,14 @@ impl ExporterManager {
                     }
                 }
                 Err(error) => {
-                    // RFC-0009 F80 + Codex #6: durably persist the malformed row
-                    // to the SIEM cursor DB's dead_letters table BEFORE advancing
-                    // past it. The in-memory DLQ is best-effort (drop-oldest, lost
-                    // on restart/overflow), so advancing acked_seq past a row
-                    // captured only in memory would skip the receipt permanently
-                    // and break at-least-once. On a persist failure we leave the
-                    // cursor BEHIND the row (return early via `?` without touching
-                    // self.cursor) so the next poll re-reads and retries it.
+                    // Durably persist the malformed row to the SIEM cursor DB's
+                    // dead_letters table BEFORE advancing past it. The in-memory
+                    // DLQ is best-effort (drop-oldest, lost on restart/overflow),
+                    // so advancing acked_seq past a row captured only in memory
+                    // would skip the receipt permanently and break at-least-once.
+                    // On a persist failure we leave the cursor BEHIND the row
+                    // (return early via `?` without touching self.cursor) so the
+                    // next poll re-reads and retries it.
                     let failed_at = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .map(|d| d.as_secs())
@@ -345,7 +345,7 @@ impl ExporterManager {
                     // an unconditional in-memory `dlq.push` + `_deserialize`
                     // counters are not, so repeated redelivery would inflate the
                     // `_deserialize` DLQ depth and evict real exporter failures
-                    // from the bounded DLQ (Codex round-5). Legacy None mode has
+                    // from the bounded DLQ. Legacy None mode has
                     // no durable table and advances the cursor past the row, so it
                     // never redelivers: report once.
                     let newly_captured = match &self.cursor_store {
@@ -370,16 +370,15 @@ impl ExporterManager {
                             exporter_name: "_deserialize".to_string(),
                         });
                         // Report the DLQ depth for the malformed-row producer here
-                        // too (Codex round-2 finding 3): a batch of only malformed
-                        // rows returns before the exporter loop that refreshes
-                        // dlq_depth, so without this the `_deserialize` gauge would
-                        // stay absent/stale while the in-memory DLQ grows and the
-                        // alert-pack backstop underreports malformed-row failures.
-                        // Scope the depth to `_deserialize` entries only (Codex
-                        // round-4 finding 2): the DLQ is shared, so the global
-                        // length would fold a coexisting exporter backlog into the
-                        // malformed-row gauge (the cross-exporter attribution bug
-                        // round-3 finding 4 fixed for the exporter loop).
+                        // too: a batch of only malformed rows returns before the
+                        // exporter loop that refreshes dlq_depth, so without this
+                        // the `_deserialize` gauge would stay absent/stale while
+                        // the in-memory DLQ grows and the alert-pack backstop
+                        // underreports malformed-row failures. Scope the depth to
+                        // `_deserialize` entries only: the DLQ is shared, so the
+                        // global length would fold a coexisting exporter backlog
+                        // into the malformed-row gauge, the same cross-exporter
+                        // attribution the exporter loop avoids.
                         self.metrics.set_dlq_depth(
                             "_deserialize",
                             self.dlq.depth_for_exporter("_deserialize") as u64,
@@ -404,9 +403,8 @@ impl ExporterManager {
             // exporter can ever consume them. Advance each registered exporter's
             // durable high-water mark past the malformed range so a restart
             // resumes AFTER them instead of re-reading and re-DLQ'ing the same
-            // seqs every boot (Codex round-4 finding 1): without this the
-            // events.is_empty() branch advanced only the in-memory cursor, and
-            // ExporterManager::new resumed from the behind siem_export_cursor.
+            // seqs every boot: advancing only the in-memory cursor would leave
+            // siem_export_cursor behind, so a restart would re-read the range.
             // max() never regresses a peer already further ahead. In legacy None
             // mode there is no durable cursor; the in-memory advance below
             // suffices (restart replays from seq 0, dedup'd downstream).
@@ -424,21 +422,21 @@ impl ExporterManager {
         }
 
         // Fan out to each registered exporter with retry. The high-water mark
-        // for an exporter advances only on confirmed acceptance (RFC-0009 F78).
+        // for an exporter advances only on confirmed acceptance.
         for index in 0..self.exporters.len() {
             let exporter = self.exporters[index].as_ref();
             let exporter_name = exporter.name().to_string();
             // Ack/cursor state is keyed by the exporter's STABLE, config-derived
-            // identity (Codex round-5, the F4 follow-up), not registration index,
-            // so a config reorder cannot remap one sink's high-water mark onto
-            // another. Metrics stay keyed by the bare name to bound cardinality.
+            // identity, not registration index, so a config reorder cannot remap
+            // one sink's high-water mark onto another. Metrics stay keyed by the
+            // bare name to bound cardinality.
             let cursor_key = exporter.cursor_identity();
             // A notification overlay (alerting) is NOT a SOC export sink: its
             // outcomes are counted on chio_alert_dispatch_total by the exporter
             // itself, so they must not also feed chio_soc_export_total / _lag /
             // SOC DLQ depth, or a failed page would burn the SOC export SLO while
-            // audit export is healthy (Codex round-5). Cursor/ack tracking still
-            // applies so the overlay does not stall the read cursor.
+            // audit export is healthy. Cursor/ack tracking still applies so the
+            // overlay does not stall the read cursor.
             let records_soc = exporter.is_soc_export_sink();
             let result = Self::export_with_retry(
                 &mut self.rate_limiter,
@@ -458,7 +456,7 @@ impl ExporterManager {
                     // events of the batch (a short/partial success distinct from
                     // ExportError::PartialFailure). Treat the un-exported tail as
                     // UNACKED: ack only through the delivered prefix so
-                    // at-least-once redelivers the tail next poll (Codex round-6).
+                    // at-least-once redelivers the tail next poll.
                     // `events`/`event_seqs` are seq-ascending, so the delivered
                     // prefix is events[..delivered], acked at event_seqs[delivered-1].
                     let delivered = exported.min(events.len());
@@ -472,7 +470,7 @@ impl ExporterManager {
                         }
                         // Lag: persistence-to-ack for the newest DELIVERED event,
                         // tagged with the MAX severity present among the delivered
-                        // events (Codex round-5). An un-exported tail records no Ok
+                        // events. An un-exported tail records no Ok
                         // sample and no lag: it is redelivered, not acked, so
                         // counting it as delivered would let a short success mask
                         // the tail's real export latency.
@@ -493,8 +491,7 @@ impl ExporterManager {
                     // nothing (whole batch redelivered). Never regress the
                     // in-memory ack: the durable set_acked is already MAX-monotonic
                     // in SQLite, but a plain insert of a stale/duplicate low batch
-                    // would regress the in-memory mark and re-export history
-                    // (Codex round-6, the resume follow-up).
+                    // would regress the in-memory mark and re-export history.
                     let ack_target = if delivered == events.len() {
                         Some(max_seq)
                     } else if delivered > 0 {
@@ -541,14 +538,14 @@ impl ExporterManager {
                     );
                     // acked_seq for this exporter is NOT advanced: the range is
                     // redelivered next poll (at-least-once). Idempotent ingest
-                    // (ADR-0009) dedups downstream.
+                    // dedups downstream.
                 }
             }
             // Report the DLQ depth attributed to THIS exporter only. Using the
             // global `self.dlq.len()` for every exporter label would report a
             // non-zero depth on a healthy exporter just because a different sink
-            // failed in the same poll (Codex round-3 finding 4). A notification
-            // overlay is excluded from SOC DLQ accounting (Codex round-5).
+            // failed in the same poll. A notification overlay is excluded from
+            // SOC DLQ accounting.
             if records_soc {
                 self.metrics.set_dlq_depth(
                     &exporter_name,
@@ -561,12 +558,11 @@ impl ExporterManager {
         // cursor ALWAYS advances past the batch: delivery is not persisted and
         // downstream ingest dedups idempotently, so a failed exporter must not
         // hold the cursor or the next tick re-reads the same batch and pushes
-        // duplicate DLQ entries indefinitely until it recovers (Codex round-2
-        // finding 2 -- preserve the pre-F78 advance-regardless behavior). With a
-        // configured cursor store the cursor resumes at the slowest REGISTERED
-        // exporter so nothing is skipped: a registered exporter that has never
-        // acked is held at its baseline (at-least-once, RFC-0009 F78, Codex
-        // round-1 finding 1). Zero registered exporters falls back to max_seq.
+        // duplicate DLQ entries indefinitely until it recovers (the
+        // advance-regardless behavior). With a configured cursor store the cursor
+        // resumes at the slowest REGISTERED exporter so nothing is skipped: a
+        // registered exporter that has never acked is held at its baseline
+        // (at-least-once). Zero registered exporters falls back to max_seq.
         self.cursor = if self.cursor_store.is_some() {
             let exporter_keys: Vec<String> =
                 self.exporters.iter().map(|e| e.cursor_identity()).collect();
@@ -648,12 +644,12 @@ impl ExporterManager {
 
 /// Compute the read cursor after a poll: the minimum high-water mark across all
 /// REGISTERED exporters, so the cursor never advances past receipts the slowest
-/// exporter has not consumed (at-least-once, RFC-0009 F78).
+/// exporter has not consumed (at-least-once).
 ///
 /// A registered exporter absent from `acked` has never acked (it failed before
 /// its first successful export); it is held at `baseline` (the pre-poll cursor)
-/// so the un-acked batch is redelivered rather than skipped (Codex round-1
-/// finding 1). With zero registered exporters the cursor advances to `max_seq`,
+/// so the un-acked batch is redelivered rather than skipped. With zero
+/// registered exporters the cursor advances to `max_seq`,
 /// matching the legacy headless / malformed-only advance-regardless behavior.
 fn resume_cursor(
     exporter_names: &[&str],
@@ -671,7 +667,7 @@ fn resume_cursor(
 /// The maximum alert severity across a batch, as a bounded metric tag
 /// (info/low/medium/high/critical). Used to tag the SOC export lag sample so a
 /// batch containing a high/critical denial records its lag under that severity
-/// instead of always "info" (Codex round-5). An empty batch defaults to "info".
+/// instead of always "info". An empty batch defaults to "info".
 fn batch_max_severity_tag(events: &[SiemEvent]) -> &'static str {
     events
         .iter()
@@ -821,8 +817,8 @@ mod tests {
         Ok(())
     }
 
-    /// Codex #6 / RFC-0009 F80: a malformed row is durably persisted to the
-    /// cursor DB's dead_letters table BEFORE the read cursor advances past it.
+    /// A malformed row is durably persisted to the cursor DB's dead_letters
+    /// table BEFORE the read cursor advances past it.
     #[tokio::test]
     async fn malformed_row_persisted_durably_before_cursor_advances() -> TestResult {
         let dir = tempfile::tempdir()?;
@@ -853,9 +849,8 @@ mod tests {
         Ok(())
     }
 
-    /// Codex #6 / RFC-0009 F80: if the durable persist fails, the cursor is left
-    /// BEHIND the malformed row (not advanced), so at-least-once is preserved and
-    /// the next poll re-reads it.
+    /// If the durable persist fails, the cursor is left BEHIND the malformed row
+    /// (not advanced), so at-least-once is preserved and the next poll re-reads it.
     #[tokio::test]
     async fn malformed_row_persist_failure_leaves_cursor_behind() -> TestResult {
         let dir = tempfile::tempdir()?;
@@ -888,13 +883,10 @@ mod tests {
         Ok(())
     }
 
-    /// Codex round-4 finding 1: a malformed-ONLY batch is durably captured in
-    /// siem_dead_letters, but the events.is_empty() branch advanced only the
-    /// in-memory cursor and never wrote siem_export_cursor. After a restart,
-    /// ExporterManager::new resumed from the (behind) durable cursor and re-read
-    /// and re-DLQ'd the same dead-lettered seq every boot. The durable
-    /// per-exporter mark must advance past a malformed-only batch so a restart
-    /// resumes AFTER it.
+    /// A malformed-ONLY batch is durably captured in siem_dead_letters, and its
+    /// durable per-exporter mark must advance past the malformed range so a
+    /// restart resumes AFTER it instead of re-reading and re-DLQ'ing the same
+    /// dead-lettered seq every boot.
     #[tokio::test]
     async fn malformed_only_batch_advances_durable_cursor_across_restart() -> TestResult {
         let dir = tempfile::tempdir()?;
@@ -1203,9 +1195,9 @@ mod tests {
             .map_err(|error| format!("ChioReceipt::sign must succeed in tests: {error}").into())
     }
 
-    /// Codex round-5: the SOC export lag sample must be tagged with the MAX
-    /// severity present in the batch, so a batch containing a high/critical
-    /// denial records its lag under that severity instead of always "info".
+    /// The SOC export lag sample must be tagged with the MAX severity present in
+    /// the batch, so a batch containing a high/critical denial records its lag
+    /// under that severity instead of always "info".
     #[test]
     fn batch_max_severity_tag_uses_the_highest_severity_present() -> TestResult {
         let allow = SiemEvent::from_receipt(sample_receipt("allow-1")?);
@@ -1228,9 +1220,9 @@ mod tests {
         Ok(())
     }
 
-    /// Codex round-5: a notification overlay (alerting) is NOT a SOC export sink,
-    /// so the manager must not emit chio_soc_export_total / SOC DLQ depth for it
-    /// even though it is registered in the exporter set.
+    /// A notification overlay (alerting) is NOT a SOC export sink, so the manager
+    /// must not emit chio_soc_export_total / SOC DLQ depth for it even though it
+    /// is registered in the exporter set.
     #[tokio::test]
     async fn notification_overlay_is_excluded_from_soc_export_metrics() -> TestResult {
         let dir = tempfile::tempdir()?;
@@ -1282,9 +1274,9 @@ mod tests {
         Ok(())
     }
 
-    /// Codex round-5 (the F4 follow-up): the durable cursor must be keyed by the
-    /// exporter's STABLE, config-derived identity, not its registration index, so
-    /// a persisted high-water mark follows the exporter across config reorders.
+    /// The durable cursor must be keyed by the exporter's STABLE, config-derived
+    /// identity, not its registration index, so a persisted high-water mark
+    /// follows the exporter across config reorders.
     #[tokio::test]
     async fn durable_cursor_keyed_by_stable_identity_not_registration_index() -> TestResult {
         let dir = tempfile::tempdir()?;
@@ -1317,9 +1309,9 @@ mod tests {
         Ok(())
     }
 
-    /// Codex round-6 (the cursor-identity migration follow-up): resuming
-    /// exporters must IGNORE orphaned/stale cursor rows from a prior identity
-    /// scheme. An old index-keyed "0:webhook" row left at 0 must not drag the
+    /// Resuming exporters must IGNORE orphaned/stale cursor rows from a prior
+    /// identity scheme. An old index-keyed "0:webhook" row left at 0 must not drag
+    /// the
     /// read cursor down to its stale low mark when the current stable-identity
     /// exporter has durably acked far ahead; otherwise the first duplicate batch
     /// re-exports history until it catches up.
@@ -1355,11 +1347,10 @@ mod tests {
         Ok(())
     }
 
-    /// Codex round-6: a SHORT success (a backend returns Ok(n) after accepting
-    /// only the first n of a larger batch) must advance the cursor ONLY past the
-    /// delivered events; the un-exported tail stays unacked and at-least-once
-    /// redelivers it. Without the fix the success arm acked the whole batch's
-    /// max_seq and the tail was permanently skipped on restart.
+    /// A SHORT success (a backend returns Ok(n) after accepting only the first n
+    /// of a larger batch) must advance the cursor ONLY past the delivered events;
+    /// the un-exported tail stays unacked and at-least-once redelivers it rather
+    /// than being permanently skipped on restart.
     #[tokio::test]
     async fn short_success_leaves_the_undelivered_tail_unacked_for_redelivery() -> TestResult {
         let dir = tempfile::tempdir()?;
@@ -1444,10 +1435,10 @@ mod tests {
         Ok(())
     }
 
-    /// Codex round-5: when a failing exporter holds the read cursor behind a
-    /// batch that contains a malformed row, the same malformed seq is re-parsed
-    /// every poll. The durable insert is idempotent, so the in-memory
-    /// `_deserialize` DLQ depth must NOT be re-inflated on redelivery.
+    /// When a failing exporter holds the read cursor behind a batch that contains
+    /// a malformed row, the same malformed seq is re-parsed every poll. The
+    /// durable insert is idempotent, so the in-memory `_deserialize` DLQ depth
+    /// must NOT be re-inflated on redelivery.
     #[tokio::test]
     async fn malformed_row_not_re_reported_on_redelivery() -> TestResult {
         let dir = tempfile::tempdir()?;
@@ -1540,12 +1531,12 @@ mod tests {
         Ok(())
     }
 
-    /// Codex round-2 finding 1: on startup with a cursor store, a registered
-    /// exporter that has NO persisted cursor row is treated as baseline (0), so
-    /// it pins the resume cursor at 0 until it acks -- even when a peer exporter
-    /// has already persisted an advanced high-water mark. Without the fix, the
-    /// startup cursor would resume at the persisted peer's mark and the newly
-    /// registered exporter would permanently skip the earlier backlog.
+    /// On startup with a cursor store, a registered exporter that has NO
+    /// persisted cursor row is treated as baseline (0), so it pins the resume
+    /// cursor at 0 until it acks -- even when a peer exporter has already
+    /// persisted an advanced high-water mark. Otherwise the startup cursor would
+    /// resume at the persisted peer's mark and the newly registered exporter
+    /// would permanently skip the earlier backlog.
     #[tokio::test]
     async fn missing_exporter_cursor_pins_resume_at_baseline_on_startup() -> TestResult {
         let dir = tempfile::tempdir()?;
@@ -1554,9 +1545,8 @@ mod tests {
         let cursor_db = dir.path().join("cursor.sqlite3");
         {
             // "splunk" has already acked up to seq 100; "webhook" has no row. The
-            // durable key is the exporter's STABLE identity (Codex round-5, the F4
-            // follow-up); OkExporter uses the default identity (its bare name), so
-            // pre-seed under "splunk".
+            // durable key is the exporter's STABLE identity; OkExporter uses the
+            // default identity (its bare name), so pre-seed under "splunk".
             let store = crate::cursor_store::SiemCursorStore::open(&cursor_db)?;
             store.set_acked("splunk", 100)?;
         }
@@ -1583,10 +1573,9 @@ mod tests {
         Ok(())
     }
 
-    /// Codex round-2 finding 2: in the default None mode (no cursor store) a
-    /// failed exporter must NOT hold the read cursor. The cursor advances to
-    /// max_seq (legacy advance-regardless) so the next poll does not re-read and
-    /// re-DLQ the same batch forever.
+    /// In the default None mode (no cursor store) a failed exporter must NOT hold
+    /// the read cursor. The cursor advances to max_seq (legacy advance-regardless)
+    /// so the next poll does not re-read and re-DLQ the same batch forever.
     #[tokio::test]
     async fn legacy_none_mode_advances_cursor_past_failed_batch() -> TestResult {
         let dir = tempfile::tempdir()?;
@@ -1611,10 +1600,9 @@ mod tests {
         Ok(())
     }
 
-    /// Codex round-2 finding 2 (paired): WITH a cursor store, the same failed
-    /// exporter holds the cursor at its baseline so the un-acked batch is
-    /// redelivered (at-least-once), the behavior that must be gated on a
-    /// configured store.
+    /// WITH a cursor store, the same failed exporter holds the cursor at its
+    /// baseline so the un-acked batch is redelivered (at-least-once); this
+    /// behavior is gated on a configured store.
     #[tokio::test]
     async fn configured_store_holds_cursor_for_failed_never_acked_exporter() -> TestResult {
         let dir = tempfile::tempdir()?;
@@ -1640,9 +1628,9 @@ mod tests {
         Ok(())
     }
 
-    /// Codex round-2 finding 3: a batch of only malformed rows returns before the
-    /// exporter loop, so the `_deserialize` DLQ-depth gauge must be reported from
-    /// the malformed-capture path itself or it stays absent while the DLQ grows.
+    /// A batch of only malformed rows returns before the exporter loop, so the
+    /// `_deserialize` DLQ-depth gauge must be reported from the malformed-capture
+    /// path itself or it stays absent while the DLQ grows.
     #[tokio::test]
     async fn malformed_row_reports_deserialize_dlq_depth() -> TestResult {
         let dir = tempfile::tempdir()?;
@@ -1708,11 +1696,10 @@ mod tests {
         Ok(())
     }
 
-    /// Codex round-4 finding 2: the `_deserialize` DLQ-depth gauge must count only
-    /// `_deserialize` entries, never the global queue length. A coexisting
-    /// exporter backlog must not inflate the malformed-row gauge (the
-    /// cross-exporter attribution bug round-3 F4 fixed for the exporter path, but
-    /// which the malformed-capture path still exhibited).
+    /// The `_deserialize` DLQ-depth gauge must count only `_deserialize` entries,
+    /// never the global queue length. A coexisting exporter backlog must not
+    /// inflate the malformed-row gauge, the same cross-exporter attribution the
+    /// exporter path avoids.
     #[tokio::test]
     async fn deserialize_dlq_depth_excludes_other_exporter_backlog() -> TestResult {
         let dir = tempfile::tempdir()?;
@@ -1766,10 +1753,9 @@ mod tests {
         Ok(())
     }
 
-    /// Codex round-3 finding 4: when one exporter fails and another succeeds in
-    /// the same poll, the DLQ depth must be attributed to the FAILING exporter
-    /// only. A healthy exporter must report depth 0 even though a different sink
-    /// filled the shared DLQ.
+    /// When one exporter fails and another succeeds in the same poll, the DLQ
+    /// depth must be attributed to the FAILING exporter only. A healthy exporter
+    /// must report depth 0 even though a different sink filled the shared DLQ.
     #[tokio::test]
     async fn dlq_depth_is_attributed_to_the_failing_exporter_only() -> TestResult {
         let dir = tempfile::tempdir()?;
@@ -1812,9 +1798,9 @@ mod tests {
         Ok(())
     }
 
-    /// Codex round-5 (the F4 follow-up): high-water marks are keyed by each
-    /// exporter's STABLE, config-derived identity (its endpoint), NOT its
-    /// registration index. Two webhook sinks that report the same name "webhook"
+    /// High-water marks are keyed by each exporter's STABLE, config-derived
+    /// identity (its endpoint), NOT its registration index. Two webhook sinks
+    /// that report the same name "webhook"
     /// but point at DIFFERENT endpoints therefore keep DISTINCT cursor state that
     /// also survives a config reorder. When one acks and the other exhausts
     /// retries, the failed sink's range is redelivered (at-least-once), not

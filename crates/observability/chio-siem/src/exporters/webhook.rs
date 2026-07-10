@@ -174,7 +174,7 @@ impl WebhookExporter {
 
     /// Construct a webhook SOC export sink from an operator-configured endpoint
     /// URL, deriving the required [`HttpEgressContract`] from the URL authority
-    /// the same way the alert backends do (RFC-0009 F78/F79). This is the
+    /// the same way the alert backends do. This is the
     /// env-driven production constructor the `chio-wall siem-export` serve path
     /// uses to register a real durable audit-export consumer.
     ///
@@ -400,11 +400,11 @@ impl Exporter for WebhookExporter {
         "webhook"
     }
 
-    /// Stable, endpoint-derived durable cursor identity (Codex round-5, the F4
-    /// follow-up). Every `WebhookExporter` reports the name "webhook", so keying
-    /// the durable cursor by registration index let a config reorder or an
-    /// inserted same-named sink inherit another instance's `acked_seq` and skip
-    /// receipts. Folding the configured endpoint into the identity keeps two
+    /// Stable, endpoint-derived durable cursor identity. Every `WebhookExporter`
+    /// reports the name "webhook", so keying the durable cursor by registration
+    /// index would let a config reorder or an inserted same-named sink inherit
+    /// another instance's `acked_seq` and skip receipts. Folding the configured
+    /// endpoint into the identity keeps two
     /// webhook sinks to different destinations on distinct cursors and makes the
     /// key depend only on configuration, not registration order. Userinfo and
     /// query are stripped (via `sanitize_url_for_error`) so no secret material
@@ -532,10 +532,9 @@ mod tests {
 
     #[test]
     fn cursor_identity_is_endpoint_derived_and_stable() {
-        // Codex round-5 (the F4 follow-up): the durable cursor identity is
-        // derived from the configured endpoint, not the bare name, so two webhook
-        // sinks to different destinations keep distinct cursors and a config
-        // reorder cannot remap one onto the other.
+        // The durable cursor identity is derived from the configured endpoint,
+        // not the bare name, so two webhook sinks to different destinations keep
+        // distinct cursors and a config reorder cannot remap one onto the other.
         let a = WebhookExporter::from_endpoint("https://soc.example.test/a".to_string(), None)
             .expect("build a");
         let b = WebhookExporter::from_endpoint("https://soc.example.test/b".to_string(), None)

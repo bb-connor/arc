@@ -5,14 +5,13 @@ fn internal_cluster_http_error(context: &'static str, error: &dyn std::fmt::Disp
     plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, context)
 }
 
-/// Observe capability-revocation propagation lag (RFC-0009 F57, Codex round-3
-/// finding 5) from a capability revoke path. `revoked_at` is the unix-seconds
-/// instant the capability was revoked; the lag is how long ago that was relative
-/// to now, clamped at zero. A locally originated revoke is ~0; a revoke
-/// propagated from a peer carries the real propagation delay. This is emitted
-/// from the capability revoke paths (local revoke and cluster-delta upserts) so
-/// the capability-revocation SLO reflects real capability revocations rather
-/// than passport lifecycle events.
+/// Observe capability-revocation propagation lag from a capability revoke path.
+/// `revoked_at` is the unix-seconds instant the capability was revoked; the lag
+/// is how long ago that was relative to now, clamped at zero. A locally
+/// originated revoke is ~0; a revoke propagated from a peer carries the real
+/// propagation delay. This is emitted from the capability revoke paths (local
+/// revoke and cluster-delta upserts) so the capability-revocation SLO reflects
+/// real capability revocations rather than passport lifecycle events.
 pub(crate) fn observe_capability_revocation_lag(revoked_at: i64) {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -336,7 +335,7 @@ fn sync_peer_revocations(
             })?;
             // A cluster-delta upsert applies a capability revoke propagated from a
             // peer; observe the propagation lag against its recorded revoke
-            // instant (Codex round-3 finding 5).
+            // instant.
             observe_capability_revocation_lag(record.revoked_at);
             applied = applied.saturating_add(1);
             last_cursor = Some(RevocationCursor {
@@ -925,9 +924,8 @@ mod capability_revocation_lag_tests {
             .unwrap_or(0)
     }
 
-    /// Codex round-3 finding 5: a capability revoke path observes the
-    /// capability-revocation lag family, so a backdated (propagated) revoke
-    /// advances the SLO histogram.
+    /// A capability revoke path observes the capability-revocation lag family, so
+    /// a backdated (propagated) revoke advances the SLO histogram.
     #[test]
     fn capability_revoke_observes_revocation_lag() {
         let before = lag_count();

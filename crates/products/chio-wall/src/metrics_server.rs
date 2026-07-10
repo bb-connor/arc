@@ -1,12 +1,12 @@
 //! Minimal Prometheus scrape endpoint for the `chio-wall siem-export` serve
-//! process (RFC-0009 F57, Codex round-1 finding 7).
+//! process.
 //!
 //! The SIEM serve process records SOC-export, DLQ-depth, alert-dispatch, lag,
 //! and receipt-checkpoint metrics into the process-global chio-metrics-spec
 //! registry via `RegistryMetricsSink`. But when `siem-export` runs as its own
 //! process, nothing else binds an HTTP surface, so a co-located Prometheus agent
-//! could never scrape those families and the whole F57 wiring is unobservable.
-//! This module serves the registry over a small HTTP/1.1 `GET /metrics` endpoint.
+//! could never scrape those families and the metrics would be unobservable. This
+//! module serves the registry over a small HTTP/1.1 `GET /metrics` endpoint.
 //!
 //! It is intentionally dependency-free (tokio only): chio-wall is a CLI and does
 //! not carry axum/hyper. The endpoint composes, never fabricates, values (it
@@ -82,7 +82,7 @@ async fn serve_connection(mut stream: TcpStream) {
     // request line, so a fragmented scrape could parse a partial target like
     // "GET /met" and 404, causing intermittent Prometheus scrape failures. Read
     // until the request line terminates (the first `\n`), bounded by the 2 KiB
-    // REQUEST_READ_LIMIT, before routing (Codex round-5).
+    // REQUEST_READ_LIMIT, before routing.
     let mut buf: Vec<u8> = Vec::with_capacity(256);
     let mut chunk = [0u8; 256];
     loop {
@@ -165,9 +165,9 @@ mod tests {
 
     #[tokio::test]
     async fn fragmented_request_line_is_routed_correctly() {
-        // Codex round-5: a scrape whose request line arrives in two TCP reads
-        // must not be misrouted as a partial target ("GET /met" -> 404). The
-        // server reads until the request line is complete before routing.
+        // A scrape whose request line arrives in two TCP reads must not be
+        // misrouted as a partial target ("GET /met" -> 404). The server reads
+        // until the request line is complete before routing.
         let listener = bind_metrics_endpoint("127.0.0.1:0")
             .await
             .expect("bind ephemeral scrape port");

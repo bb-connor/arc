@@ -89,33 +89,33 @@ fn descriptors_lock_kinds_labels_and_buckets() {
 #[test]
 fn guard_metrics_report_driven_counts() {
     use chio_metrics_spec::runtime::families;
-    families::GUARD_VERDICT.incr(&["driven-guard-6", "allow"]);
-    families::GUARD_VERDICT.incr(&["driven-guard-6", "deny"]);
-    families::GUARD_DENY.incr(&["driven-guard-6", "blocking"]);
-    families::GUARD_EVAL_DURATION.observe(&["driven-guard-6", "allow"], 0.002);
+    families::GUARD_VERDICT.incr(&["driven-guard", "allow"]);
+    families::GUARD_VERDICT.incr(&["driven-guard", "deny"]);
+    families::GUARD_DENY.incr(&["driven-guard", "blocking"]);
+    families::GUARD_EVAL_DURATION.observe(&["driven-guard", "allow"], 0.002);
 
     let body = render_guard_metrics_prometheus();
     assert!(
-        body.contains("chio_guard_verdict_total{guard_id=\"driven-guard-6\",verdict=\"allow\"} 1"),
+        body.contains("chio_guard_verdict_total{guard_id=\"driven-guard\",verdict=\"allow\"} 1"),
         "{body}"
     );
     assert!(
-        body.contains("chio_guard_verdict_total{guard_id=\"driven-guard-6\",verdict=\"deny\"} 1"),
+        body.contains("chio_guard_verdict_total{guard_id=\"driven-guard\",verdict=\"deny\"} 1"),
         "{body}"
     );
     assert!(
         body.contains(
-            "chio_guard_deny_total{guard_id=\"driven-guard-6\",reason_class=\"blocking\"} 1"
+            "chio_guard_deny_total{guard_id=\"driven-guard\",reason_class=\"blocking\"} 1"
         ),
         "{body}"
     );
     assert!(
         body.contains(
-            "chio_guard_eval_duration_seconds_count{guard_id=\"driven-guard-6\",verdict=\"allow\"} 1"
+            "chio_guard_eval_duration_seconds_count{guard_id=\"driven-guard\",verdict=\"allow\"} 1"
         ),
         "{body}"
     );
-    // F75: no family renders a hardcoded empty-label zero placeholder anymore.
+    // No family renders a hardcoded empty-label zero placeholder.
     assert!(
         !body.contains("guard_id=\"\""),
         "no empty-label placeholder: {body}"
@@ -131,7 +131,7 @@ fn signing_block_counter_reports_reason_label() {
         body.contains("chio_signing_queue_block_total{reason=\"byte_budget\"}"),
         "signing family must render the reason label: {body}"
     );
-    // The unlabeled placeholder line is gone.
+    // No unlabeled placeholder line is rendered.
     assert!(
         !body.contains("chio_signing_queue_block_total{} 0\n"),
         "{body}"
@@ -156,11 +156,11 @@ fn watchdog_gauges_render_from_health_report() {
         db_size_bytes: None,
     };
     // Checkpoint staleness is based on checkpoint PROGRESS, not write-commit
-    // freshness (RFC-0009 Codex round-1 finding 4). The first sample seeds the
-    // staleness clock at 0; a later sample with the SAME checkpointed seq and a
-    // still-pending backlog reports the elapsed staleness, even though the write
-    // commit timestamp stayed fresh (writes keep committing while checkpointing
-    // stalls). A last-commit-based gauge would have read ~0 here.
+    // freshness. The first sample seeds the staleness clock at 0; a later sample
+    // with the SAME checkpointed seq and a still-pending backlog reports the
+    // elapsed staleness, even though the write commit timestamp stayed fresh
+    // (writes keep committing while checkpointing stalls). A last-commit-based
+    // gauge would have read ~0 here.
     chio_kernel::record_receipt_health_gauges(&report, 1_000_000);
     chio_kernel::record_receipt_health_gauges(&report, 1_030_000); // +30s, checkpoint seq unchanged
     let body = chio_kernel::render_guard_metrics_prometheus();

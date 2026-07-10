@@ -554,11 +554,11 @@ async fn shutdown_before_send_rejects_request_no_post_shutdown_enqueue() {
 
 #[tokio::test(flavor = "current_thread")]
 async fn signing_block_counter_covers_all_inline_fallbacks() {
-    // RFC-0009 F82: every signing-queue block path records
-    // chio_signing_queue_block_total{reason} with the right reason. Drive all
-    // three inline-fallback branches (byte_budget via an exhausted aggregate
-    // semaphore, channel_full via a full bounded channel, oversized via a
-    // single preimage larger than the aggregate budget) through the async
+    // Every signing-queue block path records chio_signing_queue_block_total{reason}
+    // with the right reason. Drive all three inline-fallback branches (byte_budget
+    // via an exhausted aggregate semaphore, channel_full via a full bounded
+    // channel, oversized via a single preimage larger than the aggregate budget)
+    // through the async
     // `sign` path (try_sign does not record). On the current-thread runtime the
     // spawned task does not run until awaited, so a first request enqueued via
     // `try_sign` keeps its permit/channel slot held while the second request

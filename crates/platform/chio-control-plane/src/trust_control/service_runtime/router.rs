@@ -9,12 +9,12 @@ use super::super::*;
 
 pub(crate) fn build_router(state: TrustServiceState) -> Router {
     // Seed the fixed alert-pack label sets at zero before this serve process can
-    // be scraped (Codex round-5). The trust-control /metrics route renders the
-    // fail-open / dispatch-failure / capability-revocation families, but unlike
-    // the chio-cli, chio-wall, and tower startup paths the service-runtime never
-    // called preregister_known_label_sets. On a fresh, healthy-but-quiet control
-    // plane those families were absent, so the shipped absent_over_time backstops
-    // would page on a true scrape gap that never happened. Idempotent.
+    // be scraped. The trust-control /metrics route renders the fail-open /
+    // dispatch-failure / capability-revocation families, but unlike the chio-cli,
+    // chio-wall, and tower startup paths the service-runtime does not otherwise
+    // call preregister_known_label_sets. On a fresh, healthy-but-quiet control
+    // plane those families would be absent, so the shipped absent_over_time
+    // backstops would page on a scrape gap that never happened. Idempotent.
     chio_metrics_spec::runtime::preregister_known_label_sets();
 
     let router = trust_control_health::install_health_routes(Router::new())
@@ -525,9 +525,9 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
         .route(LINEAGE_PATH, get(handle_get_lineage))
         .route(LINEAGE_CHAIN_PATH, get(handle_get_delegation_chain))
         .route(AGENT_RECEIPTS_PATH, get(handle_agent_receipts))
-        // Prometheus scrape endpoint (RFC-0009 F58), composed from the kernel
-        // guard families and the alert-pack families. Inherits the same serving
-        // posture as the other trust-control routes.
+        // Prometheus scrape endpoint, composed from the kernel guard families and
+        // the alert-pack families. Inherits the same serving posture as the other
+        // trust-control routes.
         .route("/metrics", get(handle_trust_control_metrics));
 
     // Wire the dashboard SPA after all API routes so it acts as a catch-all.
@@ -563,13 +563,13 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
 
 /// Prometheus scrape body for the trust-control surface: the kernel guard
 /// families plus the alert-pack families, composed (never fabricated) from the
-/// chio-metrics-spec runtime families (RFC-0009 F58).
+/// chio-metrics-spec runtime families.
 ///
 /// The route shares the trust-control listener, which binds `config.listen` and
 /// may be externally reachable, so it fails closed: it requires the SAME
 /// service-token bearer auth the authority/receipt/passport/budget routes
-/// enforce before returning operational counters and guard labels (Codex
-/// round-2 finding 6). Prometheus scrapes it with a configured bearer token.
+/// enforce before returning operational counters and guard labels. Prometheus
+/// scrapes it with a configured bearer token.
 async fn handle_trust_control_metrics(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
@@ -646,9 +646,9 @@ mod tests {
         }
     }
 
-    /// Codex round-2 finding 6: the /metrics route shares the trust-control
-    /// listener and must fail closed. An unauthenticated scrape is rejected with
-    /// 401 rather than exposing operational counters and guard labels.
+    /// The /metrics route shares the trust-control listener and must fail closed.
+    /// An unauthenticated scrape is rejected with 401 rather than exposing
+    /// operational counters and guard labels.
     #[tokio::test]
     async fn trust_control_metrics_rejects_unauthenticated_request() {
         let state = metrics_state("service-secret");
@@ -669,11 +669,11 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
     }
 
-    /// Codex round-5: building the trust-control serve router must seed the fixed
-    /// alert-pack label sets, so a fresh, healthy-but-quiet control plane renders
-    /// the fail-open / dispatch-failure / capability-revocation families at zero
-    /// and the shipped absent_over_time backstops fire only on a true scrape gap,
-    /// not on a control plane that simply has not had an event yet.
+    /// Building the trust-control serve router must seed the fixed alert-pack
+    /// label sets, so a fresh, healthy-but-quiet control plane renders the
+    /// fail-open / dispatch-failure / capability-revocation families at zero and
+    /// the shipped absent_over_time backstops fire only on a true scrape gap, not
+    /// on a control plane that simply has not had an event yet.
     #[tokio::test]
     async fn build_router_seeds_alert_pack_series_for_absent_over_time_backstops() {
         let state = metrics_state("service-secret");

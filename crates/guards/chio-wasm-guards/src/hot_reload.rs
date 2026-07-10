@@ -360,13 +360,10 @@ impl ReloadWatchdog {
         // the incident write, so `chio_guard_reload_total{outcome="rolled_back"}`
         // reflects every genuine rollback even when the incident write fails and
         // this method returns Err below. Counting after the write would let the
-        // instrument under-count (lie) on an incident-write failure, hiding a
-        // real rollback from the alerting surface. The `self.rolled_back`
-        // early-return at the top of this method makes the increment run exactly
-        // once per rollback, so hoisting it here cannot double-count. The
-        // descriptor already declares the outcome; only the applied path was
-        // wired before (Codex round-4 finding 6, completing the round-3 F1 fix;
-        // RFC-0009 N2).
+        // instrument under-count on an incident-write failure, hiding a real
+        // rollback from the alerting surface. The `self.rolled_back` early-return
+        // at the top of this method makes the increment run exactly once per
+        // rollback, so hoisting it here cannot double-count.
         chio_metrics_spec::runtime::families::GUARD_RELOAD
             .incr(&[&self.guard_id, RELOAD_ROLLED_BACK]);
         let incident = ReloadIncident {

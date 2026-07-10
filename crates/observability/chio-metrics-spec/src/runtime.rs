@@ -1,4 +1,4 @@
-//! Process-global metric emission primitives (RFC-0009 Part A).
+//! Process-global metric emission primitives.
 //!
 //! `LabeledCounter`/`LabeledGauge`/`LabeledHistogram` are lock-free on read of a
 //! resolved cell and mutex-guarded only when a new label set first appears (cold
@@ -18,9 +18,9 @@ fn escape_label_value(value: &str) -> String {
     // Prometheus text exposition requires backslash, double-quote, and line-feed
     // to be escaped in a label value. Dynamic values (guard_id, exporter, alert
     // route, etc.) can contain any of these; an unescaped newline would split
-    // the sample across physical lines and inject a bogus series (RFC-0009 Codex
-    // round-1 finding 2). Escape backslash FIRST so the backslashes introduced by
-    // the quote/newline escapes are not double-escaped.
+    // the sample across physical lines and inject a bogus series. Escape
+    // backslash FIRST so the backslashes introduced by the quote/newline escapes
+    // are not double-escaped.
     value
         .replace('\\', "\\\\")
         .replace('"', "\\\"")
@@ -94,8 +94,8 @@ impl LabeledCounter {
         }
     }
 
-    /// Seed the series at zero so it exists before its first event (RFC-0009
-    /// contract rule 2). Idempotent: leaves an existing cell untouched.
+    /// Seed the series at zero so it exists before its first event. Idempotent:
+    /// leaves an existing cell untouched.
     pub fn preregister(&self, values: &[&str]) {
         let _ = self.cell(values);
     }
@@ -170,8 +170,8 @@ struct HistogramCell {
     // Accumulated observation total in NANOSECONDS. Several families bucket fast
     // paths below 1ms (guard host calls bucket down to 10us), so a millisecond
     // sum would truncate any observation under 0.5ms to 0 and make
-    // `_sum / _count` averages underreport latency (RFC-0009 Codex round-1
-    // finding 8). Nanosecond precision preserves sub-millisecond observations.
+    // `_sum / _count` averages underreport latency. Nanosecond precision
+    // preserves sub-millisecond observations.
     sum_nanos: AtomicU64,
     count: AtomicU64,
 }
@@ -201,8 +201,8 @@ impl LabeledHistogram {
     /// form (e.g. `"1.0"`, `"5.0"`, `"10.0"`).
     ///
     /// Rendered verbatim as the `le=` label so the runtime exposition matches
-    /// the locked registry labels (Codex round-6): parsing to `f64` first would
-    /// emit `le="1"` for a `"1.0"` descriptor bucket, and Prometheus treats `1`
+    /// the locked registry labels: parsing to `f64` first would emit `le="1"`
+    /// for a `"1.0"` descriptor bucket, and Prometheus treats `1`
     /// and `1.0` as distinct buckets, so `sum by (le)` / `histogram_quantile`
     /// split across the runtime renderer and any dashboard/renderer keyed on the
     /// registry strings. A numeric copy is parsed inline only for the
@@ -238,9 +238,9 @@ impl LabeledHistogram {
         };
         for (index, bound) in bounds.iter().enumerate() {
             // Parse a numeric copy ONLY for the bucket comparison; the exposition
-            // le= label is rendered from the original string form (Codex
-            // round-6). A bucket that cannot parse is skipped for counting but
-            // still occupies its index so render stays aligned.
+            // le= label is rendered from the original string form. A bucket that
+            // cannot parse is skipped for counting but still occupies its index
+            // so render stays aligned.
             let Ok(bound) = bound.parse::<f64>() else {
                 continue;
             };
@@ -305,9 +305,8 @@ impl LabeledHistogram {
     }
 }
 
-/// Process-global family instances (RFC-0009 Part A). Their sole producers are
-/// named in the design; renderers read them here. Names/labels are verified
-/// against the registry descriptors this session.
+/// Process-global family instances. Each family has a single producer;
+/// renderers read them here.
 pub mod families {
     use super::{LabeledCounter, LabeledGauge, LabeledHistogram};
     use crate::*;
@@ -349,14 +348,13 @@ pub mod families {
         LabeledCounter::new(CHIO_OTEL_INGRESS_DROP_TOTAL, &[]);
     pub static OTEL_SINK_DROP: LabeledCounter = LabeledCounter::new(CHIO_OTEL_SINK_DROP_TOTAL, &[]);
 
-    // Signing gains a `reason` label in Task 8 (descriptor edit); constructed
-    // with the label here so the producer and renderer agree from the start.
+    // Constructed with the `reason` label here so the producer and renderer
+    // agree from the start.
     pub static SIGNING_QUEUE_BLOCK: LabeledCounter =
         LabeledCounter::new(CHIO_SIGNING_QUEUE_BLOCK_TOTAL, &["reason"]);
 
-    // Receipt-log watchdog gauges (RFC-0009 F83). Producer: the serve-mode
-    // watchdog loop sampling ReceiptStoreHealthReport; renderer: the kernel
-    // /metrics endpoint.
+    // Receipt-log watchdog gauges. Producer: the serve-mode watchdog loop
+    // sampling ReceiptStoreHealthReport; renderer: the kernel /metrics endpoint.
     pub static RECEIPT_UNCHECKPOINTED_RANGE: LabeledGauge =
         LabeledGauge::new(CHIO_RECEIPT_UNCHECKPOINTED_SEQ_RANGE, &[]);
     pub static RECEIPT_CHECKPOINT_AGE_SECONDS: LabeledGauge =
@@ -365,12 +363,12 @@ pub mod families {
 
 /// Seed every KNOWN label set at zero once at startup so `absent_over_time`
 /// alerts fire only on a true scrape gap, never on a healthy-but-quiet
-/// deployment (RFC-0009 contract rule 2, the F57 Codex fix). Idempotent.
+/// deployment. Idempotent.
 pub fn preregister_known_label_sets() {
     families::FAIL_OPEN_SUSPECTED.preregister(&["tower"]);
     // Only genuine evaluation errors feed chio_dispatch_failure_total; a normal
     // deny is a fail-closed decision tracked by the guard-verdict metrics, so no
-    // "denied" outcome is seeded or produced (Codex round-3 finding 6).
+    // "denied" outcome is seeded or produced.
     families::DISPATCH_FAILURE.preregister(&["http_authority", "error"]);
     families::CAPABILITY_REVOCATION_LAG.preregister(&["control_plane"]);
     families::SIGNING_QUEUE_BLOCK.preregister(&["channel_full"]);
@@ -379,8 +377,8 @@ pub fn preregister_known_label_sets() {
     families::OTEL_INGRESS_DROP.preregister(&[]);
     families::OTEL_SINK_DROP.preregister(&[]);
     // DLQ/SOC/alert-dispatch known exporters and routes are seeded by the SIEM
-    // serve mode (Task 12) from configured exporter/backend names, because their
-    // label domain is deployment-configured rather than fixed.
+    // serve mode from configured exporter/backend names, because their label
+    // domain is deployment-configured rather than fixed.
 }
 
 /// Render the 7 guard families the kernel `/metrics` endpoint owns. One
@@ -521,12 +519,12 @@ mod tests {
 
     #[test]
     fn histogram_render_preserves_registry_bucket_label_strings() {
-        // Codex round-6: the le= label must be the registry descriptor's ORIGINAL
-        // string form. CHIO_GUARD_EVAL_DURATION_SECONDS declares a "1.0" bucket;
-        // rendering the parsed f64 would collapse "1.0"->le="1", which Prometheus
-        // treats as a different bucket than the locked "1.0" label, splitting
-        // sum by (le) / histogram_quantile across the runtime renderer and any
-        // dashboard keyed on the registry strings.
+        // The le= label must be the registry descriptor's ORIGINAL string form.
+        // CHIO_GUARD_EVAL_DURATION_SECONDS declares a "1.0" bucket; rendering the
+        // parsed f64 would collapse "1.0"->le="1", which Prometheus treats as a
+        // different bucket than the locked "1.0" label, splitting sum by (le) /
+        // histogram_quantile across the runtime renderer and any dashboard keyed
+        // on the registry strings.
         let hist = LabeledHistogram::new(
             crate::CHIO_GUARD_EVAL_DURATION_SECONDS,
             &["guard_id", "verdict"],
@@ -554,9 +552,9 @@ mod tests {
 
     #[test]
     fn label_values_escape_backslash_quote_and_newline() {
-        // RFC-0009 Codex round-1 finding 2: a dynamic label value containing a
-        // newline, quote, or backslash must be escaped so the Prometheus text
-        // exposition is not split into a bogus second sample line.
+        // A dynamic label value containing a newline, quote, or backslash must be
+        // escaped so the Prometheus text exposition is not split into a bogus
+        // second sample line.
         let counter =
             LabeledCounter::new(crate::CHIO_GUARD_VERDICT_TOTAL, &["guard_id", "verdict"]);
         counter.incr(&["a\nb\"c\\d", "allow"]);
@@ -579,8 +577,8 @@ mod tests {
 
     #[test]
     fn histogram_sum_preserves_sub_millisecond_observations() {
-        // RFC-0009 Codex round-1 finding 8: a fast-path observation below 1ms
-        // must still contribute to `_sum`. Millisecond truncation would record 0.
+        // A fast-path observation below 1ms must still contribute to `_sum`.
+        // Millisecond truncation would record 0.
         let hist = LabeledHistogram::new(
             crate::CHIO_GUARD_HOST_CALL_DURATION_SECONDS,
             &["guard_id", "host_fn"],
@@ -615,7 +613,7 @@ mod tests {
             "{out}"
         );
         // Only the genuine-error outcome is seeded; a deny is not a dispatch
-        // failure and must not appear on this family (Codex round-3 finding 6).
+        // failure and must not appear on this family.
         assert!(
             out.contains(
                 "chio_dispatch_failure_total{surface=\"http_authority\",outcome=\"error\"} 0"

@@ -133,11 +133,11 @@ pub fn guard_metrics_endpoint(path: &str) -> Option<MetricsEndpointResponse> {
 }
 
 /// Render the kernel `/metrics` body from the chio-metrics-spec runtime
-/// families (RFC-0009 F75). The kernel renders the guard families and the two
-/// OTEL-drop families (whose sole producers are chio-wasm-guards and the OTLP
-/// ingress, which cannot be depended on by the kernel) plus the signing-queue
-/// block family, so every sample is a real, correctly-labeled counter rather
-/// than a hardcoded zero placeholder.
+/// families. The kernel renders the guard families and the two OTEL-drop
+/// families (whose sole producers are chio-wasm-guards and the OTLP ingress,
+/// which cannot be depended on by the kernel) plus the signing-queue block
+/// family, so every sample is a real, correctly-labeled counter rather than a
+/// hardcoded zero placeholder.
 #[must_use]
 pub fn render_guard_metrics_prometheus() -> String {
     let mut output = String::new();
@@ -148,11 +148,11 @@ pub fn render_guard_metrics_prometheus() -> String {
     output
 }
 
-/// Turn a receipt-store health report into the watchdog gauges (RFC-0009 F83):
-/// the uncheckpointed entry_seq range and the seconds since the last commit.
-/// A serve-mode watchdog loop calls this on an interval so uncheckpointed
-/// growth and checkpoint staleness are observable without a human `chio receipt
-/// health` run.
+/// Turn a receipt-store health report into the watchdog gauges: the
+/// uncheckpointed entry_seq range and the seconds since the last commit. A
+/// serve-mode watchdog loop calls this on an interval so uncheckpointed growth
+/// and checkpoint staleness are observable without a human `chio receipt health`
+/// run.
 pub fn record_receipt_health_gauges(
     report: &crate::receipt_store::ReceiptStoreHealthReport,
     now_unix_ms: u64,
@@ -171,9 +171,8 @@ pub fn record_receipt_health_gauges(
     // committing while checkpointing stalls, the last-commit timestamp stays
     // fresh, so a commit-based gauge would read near zero and the
     // ChioReceiptCheckpointStale alert would never fire even as the
-    // uncheckpointed range grows (RFC-0009 F83, Codex round-1 finding 4). Track
-    // when the checkpointed high-water mark last advanced while a backlog was
-    // pending instead.
+    // uncheckpointed range grows. Track when the checkpointed high-water mark
+    // last advanced while a backlog was pending instead.
     let has_backlog = report.latest_committed_entry_seq > report.latest_checkpointed_entry_seq;
     let age_seconds = match CHECKPOINT_PROGRESS.lock() {
         Ok(mut state) => checkpoint_staleness_seconds(
@@ -191,7 +190,7 @@ pub fn record_receipt_health_gauges(
 
 /// Process-global record of when the receipt checkpoint high-water mark last
 /// advanced, so `chio_receipt_seconds_since_last_checkpoint` measures
-/// checkpoint staleness rather than write-commit freshness (RFC-0009 F83).
+/// checkpoint staleness rather than write-commit freshness.
 struct CheckpointProgress {
     /// The latest checkpointed entry seq observed on the previous sample.
     checkpointed_entry_seq: u64,
@@ -206,9 +205,8 @@ static CHECKPOINT_PROGRESS: std::sync::Mutex<Option<CheckpointProgress>> =
 /// Seconds since the checkpoint high-water mark last advanced while a backlog is
 /// pending. Resets to 0 whenever the checkpoint advances OR there is no
 /// uncheckpointed backlog (a healthy, quiet store is never "stale"). Grows only
-/// while committed data sits uncheckpointed and the checkpoint seq does not move
-/// (RFC-0009 Codex round-1 finding 4). Pure over `state` so it is unit-testable
-/// without the process-global.
+/// while committed data sits uncheckpointed and the checkpoint seq does not move.
+/// Pure over `state` so it is unit-testable without the process-global.
 fn checkpoint_staleness_seconds(
     state: &mut Option<CheckpointProgress>,
     checkpointed_entry_seq: u64,

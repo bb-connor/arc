@@ -27,7 +27,7 @@ enum Commands {
     },
 
     /// Run the SIEM export serve loop (at-least-once, persisted high-water mark)
-    /// against a receipt database until interrupted (RFC-0009 F79).
+    /// against a receipt database until interrupted.
     SiemExport {
         /// Path to the Chio kernel receipt SQLite database (read-only).
         #[arg(long)]

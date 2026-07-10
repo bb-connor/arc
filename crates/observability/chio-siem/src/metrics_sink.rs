@@ -1,11 +1,11 @@
-//! Metric emission seam for the SIEM path (RFC-0009 Part F). Keeps chio-siem
-//! decoupled from the metric registry (ADR-0009 isolation): the manager and the
-//! alerting exporter call this trait; the host installs a registry-backed sink.
+//! Metric emission seam for the SIEM path. Keeps chio-siem decoupled from the
+//! metric registry: the manager and the alerting exporter call this trait; the
+//! host installs a registry-backed sink.
 
 use std::sync::Arc;
 
 /// Per-row export outcome. Every export path (including malformed/dlq/error)
-/// records one outcome, never only `Ok` (RFC-0009 contract rule 1).
+/// records one outcome, never only `Ok`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExportOutcome {
     Ok,
@@ -22,8 +22,7 @@ impl ExportOutcome {
             // with the shipped `chio:soc_export_error_ratio_*` recording rules,
             // whose numerator is `chio_soc_export_total{outcome!="success"}`. An
             // "ok" label would be counted as an error and drive the SOC export
-            // error-budget alerts to 100% even when every export succeeds
-            // (RFC-0009 Codex round-1 finding 3).
+            // error-budget alerts to 100% even when every export succeeds.
             ExportOutcome::Ok => "success",
             ExportOutcome::Malformed => "malformed",
             ExportOutcome::Dlq => "dlq",
@@ -33,7 +32,7 @@ impl ExportOutcome {
 }
 
 /// Infallible by contract: a metric write never aborts export (fail-closed at
-/// the system level, RFC-0009 error taxonomy).
+/// the system level).
 pub trait SiemMetricsSink: Send + Sync {
     fn record_export(&self, exporter: &str, outcome: ExportOutcome);
     fn observe_export_lag(&self, exporter: &str, severity: &str, lag_seconds: f64);
@@ -87,8 +86,7 @@ mod tests {
     fn successful_export_uses_success_outcome_for_recording_rules() {
         // The soc_export_error_ratio recording rules count outcome!="success" as
         // an error, so a successful export MUST carry the "success" outcome or
-        // the SOC export error budget reads as 100% while everything succeeds
-        // (RFC-0009 Codex round-1 finding 3).
+        // the SOC export error budget reads as 100% while everything succeeds.
         assert_eq!(ExportOutcome::Ok.as_label(), "success");
     }
 

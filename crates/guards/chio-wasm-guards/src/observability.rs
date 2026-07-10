@@ -6,10 +6,9 @@ use tracing::{field, Span};
 /// `chio.guard.evaluate` etc., but a span's tracing TARGET defaults to the Rust
 /// module path (`chio_wasm_guards::observability`), and `EnvFilter` directives
 /// (e.g. the CLI default `chio.guard=info`) match on the TARGET, not the name.
-/// Without an explicit target these info-level spans stayed under the module
-/// path and were dropped by the default `warn` filter, so the telemetry the
-/// `chio.guard=info` default was meant to enable never emitted (Codex round-6).
-/// Pinning every guard span to this single target makes `chio.guard=info` match.
+/// Pinning every guard span to this single target is what makes `chio.guard=info`
+/// enable them; without an explicit target these info-level spans would sit under
+/// the module path and be dropped by the default `warn` filter.
 pub const GUARD_SPAN_TARGET: &str = "chio.guard";
 
 pub const SPAN_GUARD_EVALUATE: &str = "chio.guard.evaluate";
@@ -111,11 +110,11 @@ mod tests {
     use super::*;
     use tracing_subscriber::layer::SubscriberExt;
 
-    /// Codex round-6: the guard spans must emit under the `chio.guard` TARGET so
-    /// the CLI default filter `warn,chio.guard=info` actually enables them. A
-    /// span's target defaults to the Rust module path, which the default `warn`
-    /// filter drops at info level; the control span below proves the filter is
-    /// genuinely filtering, and each guard span proves it survives it.
+    /// The guard spans must emit under the `chio.guard` TARGET so the CLI default
+    /// filter `warn,chio.guard=info` actually enables them. A span's target
+    /// defaults to the Rust module path, which the default `warn` filter drops at
+    /// info level; the control span below proves the filter is genuinely
+    /// filtering, and each guard span proves it survives it.
     #[test]
     fn guard_spans_are_enabled_by_the_default_chio_guard_filter() {
         let filter = tracing_subscriber::EnvFilter::new("warn,chio.guard=info");

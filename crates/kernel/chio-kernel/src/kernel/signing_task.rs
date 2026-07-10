@@ -163,7 +163,7 @@ const fn clamp_u64_to_usize(value: u64) -> usize {
 pub use chio_metrics_spec::CHIO_SIGNING_QUEUE_BLOCK_TOTAL as METRIC_CHIO_SIGNING_QUEUE_BLOCK_TOTAL;
 
 /// +1 on chio_signing_queue_block_total{reason}. `reason` is one of
-/// "byte_budget", "channel_full", "oversized" (RFC-0009 F82).
+/// "byte_budget", "channel_full", "oversized".
 fn record_signing_queue_block(reason: &str) {
     chio_metrics_spec::runtime::families::SIGNING_QUEUE_BLOCK.incr(&[reason]);
 }

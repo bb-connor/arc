@@ -1,6 +1,6 @@
-//! Persisted per-exporter high-water mark (RFC-0009 F78). A SIEM-owned RW SQLite
-//! file, distinct from the read-only receipt DB (ADR-0009: the receipt DB stays
-//! read-only). Fail-closed: a write failure denies advancing the mark.
+//! Persisted per-exporter high-water mark. A SIEM-owned RW SQLite file, distinct
+//! from the read-only receipt DB (the receipt DB stays read-only). Fail-closed: a
+//! write failure denies advancing the mark.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -21,7 +21,7 @@ impl SiemCursorStore {
         // raw receipt seq) BEFORE the read cursor is allowed to advance past
         // them, so at-least-once holds across restart/overflow: the in-memory
         // drop-oldest DLQ loses the raw_seq marker on restart while acked_seq
-        // would skip the receipt permanently (RFC-0009 F80, Codex #6).
+        // would skip the receipt permanently.
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS siem_export_cursor (
                  exporter_name TEXT PRIMARY KEY,
@@ -86,13 +86,13 @@ impl SiemCursorStore {
     /// read cursor may safely advance past it. Idempotent: re-persisting the
     /// same `raw_seq` (a redelivery after the cursor was held) is a no-op.
     /// Fail-closed: on a write failure the caller must leave the cursor behind
-    /// the row rather than advance (RFC-0009 F80, Codex #6).
+    /// the row rather than advance.
     ///
     /// Returns `true` when the row was newly inserted and `false` when it already
     /// existed (a redelivery). Callers use this to report the malformed row (DLQ
     /// push, `_deserialize` counters) only on first capture, so a stuck exporter
     /// holding the read cursor behind the batch cannot re-inflate the in-memory
-    /// DLQ on every poll (Codex round-5).
+    /// DLQ on every poll.
     pub fn persist_dead_letter(
         &self,
         raw_seq: u64,

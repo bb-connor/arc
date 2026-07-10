@@ -1,5 +1,5 @@
-//! RFC-0009 F78/F80: at-least-once SIEM delivery with a persisted high-water
-//! mark, and malformed rows captured (not silently skipped).
+//! At-least-once SIEM delivery with a persisted high-water mark, and malformed
+//! rows captured (not silently skipped).
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use std::path::PathBuf;

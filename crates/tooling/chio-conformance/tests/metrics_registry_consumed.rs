@@ -1237,14 +1237,13 @@ async fn iroh_transport_lane_and_outbox_families_emit() -> Result<(), Box<dyn Er
 /// the emission gate with a documented reason. `chio_sidecar_requests_total` is
 /// referenced by the sidecar burn-rate recording rules and the
 /// `ChioSidecarMetricsMissing` alert but has no producer in the codebase; it is
-/// a pre-existing gap RFC-0009 does not own (wiring the sidecar request counter
-/// is deferred). The gate still asserts the family has a registry descriptor.
+/// a pre-existing gap (wiring the sidecar request counter is deferred). The gate
+/// still asserts the family has a registry descriptor.
 const GATE_EXEMPT_UNPRODUCED: &[&str] = &["chio_sidecar_requests_total"];
 
-/// RFC-0009 F57/F77 emission gate: every metric name referenced by the shipped
-/// alert or recording rules must have a production emission path that renders a
-/// non-zero sample. A registered, rule-referenced family with no producer fails
-/// the build (the gate that would have caught F57/F77).
+/// Emission gate: every metric name referenced by the shipped alert or recording
+/// rules must have a production emission path that renders a non-zero sample. A
+/// registered, rule-referenced family with no producer fails the build.
 #[test]
 fn rule_pack_metrics_have_production_emitters() -> Result<(), Box<dyn Error>> {
     // Receipt-write and the runtime families are process-global; serialize with
@@ -1262,9 +1261,8 @@ fn rule_pack_metrics_have_production_emitters() -> Result<(), Box<dyn Error>> {
         if GATE_EXEMPT_UNPRODUCED.contains(&name.as_str()) {
             continue;
         }
-        let rendered = drive_and_render(name)?.unwrap_or_else(|| {
-            panic!("rule-referenced metric {name} has NO production emitter (F57/F77)")
-        });
+        let rendered = drive_and_render(name)?
+            .unwrap_or_else(|| panic!("rule-referenced metric {name} has NO production emitter"));
         assert!(
             rendered.lines().any(|line| sample_is_nonzero(line, name)),
             "metric {name} rendered no non-zero sample after driving its producer: {rendered}"
@@ -1362,9 +1360,9 @@ fn drive_and_render(name: &str) -> Result<Option<String>, Box<dyn Error>> {
     Ok(Some(out))
 }
 
-/// Drive the pre-existing (non-RFC-0009) infra families through the same
-/// production entry points the dedicated per-edge tests use, returning None only
-/// for a name with no driver here.
+/// Drive the pre-existing infra families through the same production entry
+/// points the dedicated per-edge tests use, returning None only for a name with
+/// no driver here.
 fn existing_infra_driver(name: &str) -> Result<Option<String>, Box<dyn Error>> {
     if name == CHIO_KERNEL_DECISION_LATENCY_SECONDS {
         let authority = chio_http_core::HttpAuthority::new(

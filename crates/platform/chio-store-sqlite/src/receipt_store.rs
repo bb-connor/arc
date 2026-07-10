@@ -646,16 +646,15 @@ impl SqliteReceiptStore {
         })
     }
 
-    /// Sample receipt-store health from a READ-ONLY connection (RFC-0009 F83,
-    /// Codex round-4 finding 5).
+    /// Sample receipt-store health from a READ-ONLY connection.
     ///
     /// The SIEM serve-mode watchdog observes a receipt DB the kernel owns; it
-    /// must not create it, switch it to WAL, or spin a writer pool on it -
-    /// matching the read-only receipt-polling contract (ADR-0009). `open` does
-    /// all three, so on a read-only mount every watchdog sample failed and a
-    /// mistyped path created an empty DB. This opens a single READ_ONLY
-    /// connection instead: a missing file reports `NotFound` rather than being
-    /// created, and a read-only mount is sampled without any write attempt.
+    /// must not create it, switch it to WAL, or spin a writer pool on it,
+    /// matching the read-only receipt-polling contract. `open` does all three, so
+    /// it cannot be used on a read-only mount and would create an empty DB on a
+    /// mistyped path. This opens a single READ_ONLY connection instead: a missing
+    /// file reports `NotFound` rather than being created, and a read-only mount
+    /// is sampled without any write attempt.
     ///
     /// A read-only observer cannot see the owning writer's in-memory counters, so
     /// `writer` is defaulted; the checkpoint-progress fields the watchdog gauges
@@ -681,10 +680,10 @@ impl SqliteReceiptStore {
         })?;
         let latest_committed_entry_seq = latest_claim_log_entry_seq(&connection)?;
         // Catch a checkpoint-chain-integrity failure into a report with the
-        // checkpoint_error set rather than propagating Err (RFC-0009 N1). The
-        // watchdog samples this on a fixed interval; if corruption made this
-        // return Err, the sampler would log-and-skip with NO gauge update, so a
-        // corrupt store would look silent instead of alarming. Mirror the
+        // checkpoint_error set rather than propagating Err. The watchdog samples
+        // this on a fixed interval; if corruption made this return Err, the
+        // sampler would log-and-skip with NO gauge update, so a corrupt store
+        // would look silent instead of alarming. Mirror the
         // fail-open shape of `receipt_checkpoint_status` so the watchdog still
         // emits a large-backlog gauge (checkpointed defaults to 0 -> the
         // uncheckpointed range spans the whole committed log) with the

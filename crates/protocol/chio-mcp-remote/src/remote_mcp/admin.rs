@@ -698,8 +698,8 @@ async fn handle_admin_session_shutdown(
     .into_response()
 }
 
-/// Admin-gated Prometheus scrape endpoint (RFC-0009 F58), composed from the
-/// kernel guard families and the alert-pack families.
+/// Admin-gated Prometheus scrape endpoint, composed from the kernel guard
+/// families and the alert-pack families.
 async fn handle_admin_metrics(State(state): State<RemoteAppState>, request: Request) -> Response {
     if let Err(response) = validate_admin_request(request.headers(), state.admin_token.as_deref()) {
         return response;

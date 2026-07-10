@@ -122,11 +122,11 @@ fn flush_receipt_writes_reports_prior_committed_entries() {
     let _ = fs::remove_file(path);
 }
 
-/// Codex round-4 finding 5: the SIEM watchdog samples receipt health via a
-/// READ-ONLY open (no create/WAL/writer-pool). Against a live store the sampler
-/// reads the same committed/checkpointed progress as `receipt_store_health`. The
-/// writer is kept alive (WAL/-shm in place), matching the production deployment
-/// where the kernel owns the DB and the watchdog only reads.
+/// The SIEM watchdog samples receipt health via a READ-ONLY open (no
+/// create/WAL/writer-pool). Against a live store the sampler reads the same
+/// committed/checkpointed progress as `receipt_store_health`. The writer is kept
+/// alive (WAL/-shm in place), matching the production deployment where the
+/// kernel owns the DB and the watchdog only reads.
 #[test]
 fn receipt_store_health_read_only_samples_a_live_store() {
     let path = unique_db_path("chio-receipts-health-ro");
@@ -148,9 +148,9 @@ fn receipt_store_health_read_only_samples_a_live_store() {
     let _ = fs::remove_file(path);
 }
 
-/// Codex round-4 finding 5: a missing receipt DB must report NotFound and must
-/// NOT be created. `open` creates a fresh empty DB on a mistyped path; the
-/// read-only sampler never writes.
+/// A missing receipt DB must report NotFound and must NOT be created. `open`
+/// creates a fresh empty DB on a mistyped path; the read-only sampler never
+/// writes.
 #[test]
 fn receipt_store_health_read_only_missing_db_reports_not_found_without_creating() {
     let path = unique_db_path("chio-receipts-health-ro-missing");

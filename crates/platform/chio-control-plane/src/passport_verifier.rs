@@ -369,8 +369,7 @@ impl PassportStatusRegistry {
         // Passport lifecycle revocation is NOT a capability revocation, so it
         // must not emit chio_capability_revocation_lag_seconds. That family is
         // observed from the actual capability revoke paths instead, keeping the
-        // capability-revocation SLO measured on real capability revokes (Codex
-        // round-3 finding 5).
+        // capability-revocation SLO measured on real capability revokes.
         Ok(entry.clone())
     }
 
@@ -1561,9 +1560,9 @@ mod revocation_lag_tests {
 
     #[test]
     fn passport_lifecycle_revoke_does_not_observe_capability_revocation_lag() {
-        // Codex round-3 finding 5: a passport lifecycle revoke must NOT emit the
-        // capability-revocation lag family; that SLO is observed from the actual
-        // capability revoke paths (see the cluster delta module).
+        // A passport lifecycle revoke must NOT emit the capability-revocation lag
+        // family; that SLO is observed from the actual capability revoke paths
+        // (see the cluster delta module).
         let mut registry = PassportStatusRegistry::default();
         let passport_id = seed_one_passport(&mut registry);
 

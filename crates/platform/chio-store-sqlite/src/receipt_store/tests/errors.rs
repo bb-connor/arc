@@ -754,9 +754,9 @@ fn open_existing_checkpoint_status_does_not_repair_missing_projection() {
     let _ = fs::remove_file(path);
 }
 
-/// RFC-0009 N1: the read-only health sampler the SIEM serve-mode watchdog uses
-/// must NOT propagate a checkpoint-chain-integrity Err. On the fixed interval
-/// the watchdog logs-and-skips a sample error with no gauge update, so a corrupt
+/// The read-only health sampler the SIEM serve-mode watchdog uses must NOT
+/// propagate a checkpoint-chain-integrity Err. On the fixed interval the
+/// watchdog logs-and-skips a sample error with no gauge update, so a corrupt
 /// store would look silent instead of alarming. Under chain corruption the
 /// read-only path must instead return a report carrying the checkpoint_error and
 /// a large-backlog range (checkpointed defaults to 0, spanning the whole

@@ -34,9 +34,9 @@ spec:
         run.googleapis.com/container-dependencies: '{"app":["chio-sidecar"]}'
         run.googleapis.com/execution-environment: gen2
         # The sidecar serves /metrics on the ingress port (:9090) carrying the
-        # kernel/edge/alert-pack families (RFC-0009 F58), but the route is
-        # sidecar-control-gated: it answers ONLY a loopback caller or a request
-        # bearing `Authorization: Bearer $CHIO_SIDECAR_CONTROL_TOKEN`. A bare
+        # kernel/edge/alert-pack families, but the route is sidecar-control-gated:
+        # it answers ONLY a loopback caller or a request bearing
+        # `Authorization: Bearer $CHIO_SIDECAR_CONTROL_TOKEN`. A bare
         # `prometheus.io/scrape: "true"` would point an unauthenticated scraper at
         # public ingress and get 403, so it is intentionally omitted. Scrape with
         # that auth instead: a Managed Prometheus PodMonitoring / scrape_config
@@ -117,7 +117,7 @@ spec:
                   name: chio-signing-key
                   key: latest
             # Sidecar-control bearer token that gates /metrics and the control
-            # endpoints (RFC-0009 F58). A remote metrics scraper must send it as
+            # endpoints. A remote metrics scraper must send it as
             # `Authorization: Bearer <token>`; a co-located loopback collector
             # needs no token. Without it, only loopback callers can reach
             # /metrics.

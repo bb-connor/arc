@@ -256,10 +256,10 @@ impl PagerDutyBackend {
     /// 30s timeout is intentional and must not be silently dropped on
     /// builder failure.
     pub fn with_endpoint(routing_key: String, endpoint: String) -> Result<Self, ExportError> {
-        // Fail closed on a plaintext endpoint, exactly like the webhook SOC sink
-        // (Codex round-6): the production serve wiring passes
-        // CHIO_SIEM_ALERT_PAGERDUTY_ENDPOINT straight here, and an http:// value
-        // would send the PagerDuty routing key over the wire in the clear. The
+        // Fail closed on a plaintext endpoint, exactly like the webhook SOC sink:
+        // the production serve wiring passes CHIO_SIEM_ALERT_PAGERDUTY_ENDPOINT
+        // straight here, and an http:// value would send the PagerDuty routing
+        // key over the wire in the clear. The
         // egress contract otherwise derives its allowed scheme FROM the endpoint,
         // so http:// would be accepted. Tests that need a plaintext loopback
         // wiremock target construct via with_endpoint_and_contract instead.
@@ -393,10 +393,10 @@ impl OpsGenieBackend {
     /// 30s timeout is intentional and must not be silently dropped on
     /// builder failure.
     pub fn with_endpoint(api_key: String, endpoint: String) -> Result<Self, ExportError> {
-        // Fail closed on a plaintext endpoint, exactly like the webhook SOC sink
-        // (Codex round-6): the production serve wiring passes
-        // CHIO_SIEM_ALERT_OPSGENIE_ENDPOINT straight here, and an http:// value
-        // would send the OpsGenie API key in the clear. The egress contract
+        // Fail closed on a plaintext endpoint, exactly like the webhook SOC sink:
+        // the production serve wiring passes CHIO_SIEM_ALERT_OPSGENIE_ENDPOINT
+        // straight here, and an http:// value would send the OpsGenie API key in
+        // the clear. The egress contract
         // otherwise derives its allowed scheme FROM the endpoint. Tests needing a
         // plaintext loopback wiremock target use with_endpoint_and_contract.
         crate::exporters::require_https_endpoint(
@@ -446,7 +446,7 @@ impl OpsGenieBackend {
 }
 
 /// Build the required [`HttpEgressContract`] for a SIEM egress endpoint by
-/// deriving the allowed scheme/authority from the endpoint URL (RFC-0009). Used
+/// deriving the allowed scheme/authority from the endpoint URL. Used
 /// by both the alert-backend endpoints (PagerDuty/OpsGenie) and the SOC export
 /// sinks (e.g. the generic webhook) so every SIEM egress path derives its
 /// contract the same way. `namespace_prefix` scopes the tenant egress namespace
@@ -659,7 +659,7 @@ impl AlertingExporterBuilder {
         self
     }
 
-    /// Attach a metrics sink (RFC-0009). Defaults to no-op.
+    /// Attach a metrics sink. Defaults to no-op.
     #[must_use]
     pub fn with_metrics_sink(
         mut self,
@@ -687,9 +687,8 @@ pub struct AlertingExporter {
     config: AlertingConfig,
     backends: Vec<Arc<dyn AlertBackend>>,
     // Consumed by `export_batch` to emit alert-dispatch outcome/latency metrics
-    // on every real dispatch (RFC-0009 Part F / F77). The SIEM serve-mode host
-    // installs a registry-backed sink via `with_metrics_sink`; headless callers
-    // keep the no-op default.
+    // on every real dispatch. The SIEM serve-mode host installs a registry-backed
+    // sink via `with_metrics_sink`; headless callers keep the no-op default.
     metrics: std::sync::Arc<dyn crate::metrics_sink::SiemMetricsSink>,
 }
 
@@ -777,7 +776,7 @@ impl Exporter for AlertingExporter {
     /// this exporter itself, so the manager must not also count it on
     /// `chio_soc_export_total` / `_lag` / SOC DLQ depth; otherwise a failed
     /// PagerDuty/OpsGenie dispatch would burn the SOC export SLO while audit
-    /// export is healthy (Codex round-5).
+    /// export is healthy.
     fn is_soc_export_sink(&self) -> bool {
         false
     }
@@ -813,9 +812,9 @@ impl Exporter for AlertingExporter {
                     } else {
                         "error"
                     };
-                    // RFC-0009 F77: record every dispatch outcome and latency so
-                    // the p1 ChioAlertDispatchMetricsMissing backstop and the
-                    // PagerDuty dispatch SLO have a real producer.
+                    // Record every dispatch outcome and latency so the p1
+                    // ChioAlertDispatchMetricsMissing backstop and the PagerDuty
+                    // dispatch SLO have a real producer.
                     self.metrics.record_alert_dispatch(&route, outcome);
                     self.metrics.observe_alert_dispatch_latency(
                         &route,
@@ -873,7 +872,7 @@ mod tests {
         metadata::ReceiptSemanticFields,
     };
 
-    /// Codex round-6 (SECURITY): the production serve wiring passes the operator
+    /// The production serve wiring passes the operator
     /// `CHIO_SIEM_ALERT_*_ENDPOINT` value straight to `with_endpoint`, so a
     /// plaintext http:// endpoint must fail closed the same way the webhook SOC
     /// sink does, or the routing key / API key would be sent without TLS.

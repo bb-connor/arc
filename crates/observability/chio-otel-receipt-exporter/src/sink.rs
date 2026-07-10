@@ -173,7 +173,7 @@ impl ReceiptStoreSink {
 
     /// Generate the signed receipts for a batch once (pure, no store append).
     /// The caller caches the result so a retry never re-signs and never mints a
-    /// fresh id for a span that was already prepared (RFC-0009 F81).
+    /// fresh id for a span that was already prepared.
     pub fn prepare_receipts(
         &self,
         export: &OtlpGrpcTraceExport,

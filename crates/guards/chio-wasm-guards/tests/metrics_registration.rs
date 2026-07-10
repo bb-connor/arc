@@ -126,7 +126,7 @@ fn runtime_metric_descriptors_lock_counter_names_and_units() {
 
     // The signing family carries the `reason` label so the exported descriptor
     // matches the workspace descriptor and the kernel renderer, which emit
-    // chio_signing_queue_block_total{reason="..."} (Codex round-2 finding 5).
+    // chio_signing_queue_block_total{reason="..."}.
     let signing = family(
         RUNTIME_METRIC_FAMILIES,
         METRIC_CHIO_SIGNING_QUEUE_BLOCK_TOTAL,

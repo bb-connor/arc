@@ -98,13 +98,12 @@ pub fn record_guard_evaluation(outcome: &str) {
     }
 }
 
-/// +1 on chio_dispatch_failure_total for a GENUINE mediation-edge failure: the
+/// +1 on chio_dispatch_failure_total for a genuine mediation-edge failure: the
 /// request could not be evaluated (a fail-open/dispatch condition). `outcome` is
 /// "error". A normal policy/capability deny is an expected fail-closed decision,
 /// NOT a dispatch failure, and must never feed this counter or it would page the
-/// P0 alert on every rejected request (RFC-0009 F57, Codex round-3 finding 6).
-/// Denies are tracked by the guard-verdict metrics instead. Never called on
-/// allow.
+/// P0 alert on every rejected request. Denies are tracked by the guard-verdict
+/// metrics instead. Never called on allow.
 pub fn record_dispatch_failure(surface: &str, outcome: &str) {
     chio_metrics_spec::runtime::families::DISPATCH_FAILURE.incr(&[surface, outcome]);
 }
@@ -265,8 +264,8 @@ mod tests {
     #[test]
     fn dispatch_failure_records_error_never_deny_or_allow() {
         // Only a genuine evaluation error feeds the paging counter. A normal
-        // deny is NOT a dispatch failure (Codex round-3 finding 6), so the
-        // "denied" outcome is no longer produced anywhere.
+        // deny is NOT a dispatch failure, so the "denied" outcome is not
+        // produced anywhere.
         record_dispatch_failure(GUARD_LABEL_HTTP_AUTHORITY, "error");
         let mut body = String::new();
         chio_metrics_spec::runtime::families::DISPATCH_FAILURE.render(&mut body);

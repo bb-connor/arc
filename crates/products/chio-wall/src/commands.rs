@@ -958,21 +958,21 @@ fn export_control_path(output: &Path) -> Result<ChioWallExportSummary, CliError>
 }
 
 /// Environment keys an operator sets to enable SIEM alert dispatch in the serve
-/// mode. Alerting is OPERATOR-CONFIGURED (RFC-0009 F77): each backend needs a
-/// secret routing key, so absent keys mean "alerting disabled" (a legitimate
-/// deploy), not a fault. When set, the configured backends drive a real
-/// `AlertingExporter` wired to the registry metrics sink.
+/// mode. Alerting is operator-configured: each backend needs a secret routing
+/// key, so absent keys mean "alerting disabled" (a legitimate deploy), not a
+/// fault. When set, the configured backends drive a real `AlertingExporter`
+/// wired to the registry metrics sink.
 const PAGERDUTY_ROUTING_KEY_ENV: &str = "CHIO_SIEM_ALERT_PAGERDUTY_ROUTING_KEY";
 const PAGERDUTY_ENDPOINT_ENV: &str = "CHIO_SIEM_ALERT_PAGERDUTY_ENDPOINT";
 const OPSGENIE_API_KEY_ENV: &str = "CHIO_SIEM_ALERT_OPSGENIE_API_KEY";
 const OPSGENIE_ENDPOINT_ENV: &str = "CHIO_SIEM_ALERT_OPSGENIE_ENDPOINT";
 
 /// Environment keys an operator sets to enable a SOC export sink in the serve
-/// mode (RFC-0009 F78/F79). A SOC export sink is a real durable audit-export
-/// consumer (unlike alerting, which is a notification overlay); at least one is
-/// required before serving. The generic webhook sink is the most general SOC
-/// receiver: with default config it forwards EVERY audit row. Absent keys mean
-/// "no webhook SOC sink configured" (another sink may still be wired later).
+/// mode. A SOC export sink is a real durable audit-export consumer (unlike
+/// alerting, which is a notification overlay); at least one is required before
+/// serving. The generic webhook sink is the most general SOC receiver: with
+/// default config it forwards EVERY audit row. Absent keys mean "no webhook SOC
+/// sink configured" (another sink may still be wired later).
 const WEBHOOK_URL_ENV: &str = "CHIO_SIEM_WEBHOOK_URL";
 const WEBHOOK_BEARER_TOKEN_ENV: &str = "CHIO_SIEM_WEBHOOK_BEARER_TOKEN";
 
@@ -982,17 +982,16 @@ const WEBHOOK_BEARER_TOKEN_ENV: &str = "CHIO_SIEM_WEBHOOK_BEARER_TOKEN";
 /// never on a healthy-but-quiet (or zero-SOC-exporter) deploy.
 const DESERIALIZE_EXPORTER: &str = "_deserialize";
 
-/// Opt-in production SIEM export serve mode (RFC-0009 F79). Runs the
-/// ExporterManager cursor-pull loop against `receipt_db` with a persisted
-/// per-exporter high-water mark in `cursor_db` (at-least-once delivery) and a
-/// registry-backed metrics sink, until an interrupt. This is the non-test
-/// counterpart of the integration-test spawn: a real, long-running serve path.
+/// Opt-in production SIEM export serve mode. Runs the ExporterManager
+/// cursor-pull loop against `receipt_db` with a persisted per-exporter
+/// high-water mark in `cursor_db` (at-least-once delivery) and a registry-backed
+/// metrics sink, until an interrupt.
 ///
-/// Alerting (PagerDuty/OpsGenie) is OPERATOR-CONFIGURED via the
+/// Alerting (PagerDuty/OpsGenie) is operator-configured via the
 /// `CHIO_SIEM_ALERT_*` environment keys: when a backend is configured the serve
 /// path installs the same registry metrics sink into a real `AlertingExporter`
-/// (so `chio_alert_dispatch_total`/`_latency` become real production instruments,
-/// not test-only) and pre-registers the alert-dispatch series at zero.
+/// (so `chio_alert_dispatch_total`/`_latency` emit real production values) and
+/// pre-registers the alert-dispatch series at zero.
 pub fn cmd_chio_wall_siem_export(receipt_db: &Path, cursor_db: &Path) -> Result<(), CliError> {
     let runtime = tokio::runtime::Runtime::new().map_err(|error| {
         CliError::cli_other_error(format!("tokio runtime init failed: {error}"))
@@ -1015,25 +1014,23 @@ async fn serve_siem_export(receipt_db: &Path, cursor_db: &Path) -> Result<(), Cl
     let mut registered_exporters: Vec<String> = Vec::new();
     let mut alert_routes: Vec<String> = Vec::new();
 
-    // Operator-configured SOC export sinks (RFC-0009 F78/F79). Each is a real
-    // durable audit-export consumer (the generic webhook forwards EVERY audit
-    // row); registering at least one is what satisfies the fail-closed gate
-    // below. Wired from the CHIO_SIEM_* endpoint env exactly the way the alert
-    // backends are, so serve is actually functional (not gated shut in every
-    // config).
+    // Operator-configured SOC export sinks. Each is a real durable audit-export
+    // consumer (the generic webhook forwards EVERY audit row); registering at
+    // least one is what satisfies the fail-closed gate below. Wired from the
+    // CHIO_SIEM_* endpoint env the same way the alert backends are.
     for exporter in configured_soc_exporters()? {
         registered_exporters.push(exporter.name().to_string());
         manager.add_exporter(exporter);
     }
 
-    // Operator-configured alerting (RFC-0009 F77). Alerting is NOT always-on:
-    // each backend needs a secret routing key, so it runs only when configured.
-    // When configured, the SAME registry metrics sink is installed into the
+    // Operator-configured alerting. Alerting is NOT always-on: each backend
+    // needs a secret routing key, so it runs only when configured. When
+    // configured, the SAME registry metrics sink is installed into the
     // AlertingExporter so chio_alert_dispatch_total/_latency emit REAL values on
-    // real dispatches (not just in tests), and the exporter is registered with
-    // the manager so its per-poll dispatch loop drives those metrics. Alerting
-    // is a notification overlay, so it runs ALONGSIDE a SOC sink and never
-    // satisfies the gate on its own.
+    // real dispatches, and the exporter is registered with the manager so its
+    // per-poll dispatch loop drives those metrics. Alerting is a notification
+    // overlay, so it runs ALONGSIDE a SOC sink and never satisfies the gate on
+    // its own.
     let alert_backends = configured_alert_backends()?;
     if let Some((alerting, routes)) =
         build_serve_alerting_exporter(alert_backends, metrics_sink.clone())
@@ -1041,42 +1038,40 @@ async fn serve_siem_export(receipt_db: &Path, cursor_db: &Path) -> Result<(), Cl
         // Alerting is registered with the manager so its per-poll dispatch loop
         // runs, but it is NOT added to `registered_exporters` (the SOC-export
         // sink list): it is a notification overlay, not a SOC export sink, so it
-        // must not seed or feed the chio_soc_export_total / SOC DLQ families
-        // (Codex round-5). Its own alert-dispatch series is seeded from
-        // `alert_routes` below.
+        // must not seed or feed the chio_soc_export_total / SOC DLQ families. Its
+        // own alert-dispatch series is seeded from `alert_routes` below.
         alert_routes = routes;
         manager.add_exporter(Box::new(alerting));
     }
 
-    // Fail closed unless a real SOC export sink is configured (RFC-0009 Codex
-    // round-1 finding 6 + round-4 finding 3). With zero exporters the manager
-    // advances its cursor while exporting nowhere; with ONLY alerting it advances
-    // past allow/low-severity audit rows the notification overlay never exports.
-    // Refuse to start so a misconfigured deploy is loud, not silently lossy.
+    // Fail closed unless a real SOC export sink is configured. With zero
+    // exporters the manager advances its cursor while exporting nowhere; with
+    // ONLY alerting it advances past allow/low-severity audit rows the
+    // notification overlay never exports. Refuse to start so a misconfigured
+    // deploy is loud, not silently lossy.
     ensure_serve_has_consumer(&registered_exporters)?;
 
     // Pre-register the soc/dlq/alert-dispatch series at zero so the
-    // absent_over_time backstops fire only on a true scrape gap (RFC-0009
-    // contract rule 2). alert_dispatch is ALWAYS seeded: per configured route
-    // when alerting is enabled, or under a `disabled` sentinel for a SOC-only
-    // serve, because the shipped alert pack's ChioAlertDispatchMetricsMissing is
-    // unconditional and would otherwise page a legitimate SOC-only deploy (Codex
-    // round-5).
+    // absent_over_time backstops fire only on a true scrape gap. alert_dispatch
+    // is ALWAYS seeded: per configured route when alerting is enabled, or under a
+    // `disabled` sentinel for a SOC-only serve, because the shipped alert pack's
+    // ChioAlertDispatchMetricsMissing is unconditional and would otherwise page a
+    // legitimate SOC-only deploy.
     let registered_refs: Vec<&str> = registered_exporters.iter().map(String::as_str).collect();
     let route_refs: Vec<&str> = alert_routes.iter().map(String::as_str).collect();
     preregister_serve_metrics(&registered_refs, &route_refs);
 
     let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
 
-    // Receipt-log gap/lag watchdog (RFC-0009 F83): sample the receipt store's
-    // health on an interval and publish the uncheckpointed-range and
-    // checkpoint-age gauges. Never panics; logs and continues on error.
+    // Receipt-log gap/lag watchdog: sample the receipt store's health on an
+    // interval and publish the uncheckpointed-range and checkpoint-age gauges.
+    // Never panics; logs and continues on error.
     let watchdog = spawn_receipt_watchdog(receipt_db.to_path_buf(), cancel_rx.clone());
 
-    // Prometheus scrape endpoint (RFC-0009 F57, Codex round-1 finding 7): serve
-    // the SOC-export / DLQ / alert-dispatch / checkpoint families this process
-    // records so a co-located agent can scrape them. A bind failure logs and the
-    // serve continues without the endpoint rather than aborting the export loop.
+    // Prometheus scrape endpoint: serve the SOC-export / DLQ / alert-dispatch /
+    // checkpoint families this process records so a co-located agent can scrape
+    // them. A bind failure logs and the serve continues without the endpoint
+    // rather than aborting the export loop.
     let metrics_addr = crate::metrics_server::configured_metrics_addr();
     let metrics_endpoint = match crate::metrics_server::bind_metrics_endpoint(&metrics_addr).await {
         Ok(listener) => Some(crate::metrics_server::spawn_metrics_endpoint(
@@ -1103,10 +1098,10 @@ async fn serve_siem_export(receipt_db: &Path, cursor_db: &Path) -> Result<(), Cl
     Ok(())
 }
 
-/// Spawn the receipt-log watchdog loop for the serve path (RFC-0009 F83). Each
-/// tick samples `receipt_store_health()` off the async runtime (SQLite is
-/// blocking) and records the watchdog gauges; a sampling failure logs and the
-/// loop continues rather than aborting the serve.
+/// Spawn the receipt-log watchdog loop for the serve path. Each tick samples
+/// `receipt_store_health()` off the async runtime (SQLite is blocking) and
+/// records the watchdog gauges; a sampling failure logs and the loop continues
+/// rather than aborting the serve.
 fn spawn_receipt_watchdog(
     receipt_db: std::path::PathBuf,
     mut cancel: tokio::sync::watch::Receiver<bool>,
@@ -1148,21 +1143,20 @@ fn sample_receipt_health(
     receipt_db: &Path,
 ) -> Result<chio_kernel::receipt_store::ReceiptStoreHealthReport, String> {
     // Sample via a READ-ONLY open (no create/WAL/writer-pool), matching the
-    // read-only receipt-polling contract (ADR-0009, Codex round-4 finding 5). The
-    // watchdog observes a receipt DB the kernel owns: `open` would create a
-    // mistyped path, switch the mount to WAL, and spin a writer pool, so every
-    // sample failed on a read-only mount. The read-only sampler reports a missing
-    // DB as missing (NotFound) instead of creating it; the caller logs and
-    // continues on any error.
+    // read-only receipt-polling contract. The watchdog observes a receipt DB the
+    // kernel owns: `open` would create a mistyped path, switch the mount to WAL,
+    // spin a writer pool, and fail outright on a read-only mount. The read-only
+    // sampler reports a missing DB as missing (NotFound) instead of creating it;
+    // the caller logs and continues on any error.
     SqliteReceiptStore::receipt_store_health_read_only(receipt_db)
         .map_err(|error| error.to_string())
 }
 
-/// Read the operator-configured SIEM alert backends from the environment
-/// (RFC-0009 F77). Returns an empty vec when alerting is disabled (no secrets
-/// set); returns an error (fail-closed) when a backend is requested but cannot
-/// be constructed, so a misconfigured endpoint denies the serve start rather
-/// than silently dropping the alert pipeline.
+/// Read the operator-configured SIEM alert backends from the environment.
+/// Returns an empty vec when alerting is disabled (no secrets set); returns an
+/// error (fail-closed) when a backend is requested but cannot be constructed, so
+/// a misconfigured endpoint denies the serve start rather than silently dropping
+/// the alert pipeline.
 fn configured_alert_backends() -> Result<Vec<Box<dyn chio_siem::AlertBackend>>, CliError> {
     let mut backends: Vec<Box<dyn chio_siem::AlertBackend>> = Vec::new();
 
@@ -1189,9 +1183,9 @@ fn configured_alert_backends() -> Result<Vec<Box<dyn chio_siem::AlertBackend>>, 
     Ok(backends)
 }
 
-/// Read the operator-configured SOC export sinks from the environment (RFC-0009
-/// F78/F79). Returns an empty vec when no SOC endpoint is configured; returns an
-/// error (fail-closed) when a sink is requested but cannot be constructed, so a
+/// Read the operator-configured SOC export sinks from the environment. Returns
+/// an empty vec when no SOC endpoint is configured; returns an error
+/// (fail-closed) when a sink is requested but cannot be constructed, so a
 /// misconfigured endpoint denies the serve start rather than silently dropping
 /// audit-export coverage.
 ///
@@ -1219,9 +1213,9 @@ fn configured_soc_exporters() -> Result<Vec<Box<dyn chio_siem::Exporter>>, CliEr
 
 /// Read a trimmed, non-empty environment value, treating unset/blank as absent.
 ///
-/// Returns the TRIMMED value (Codex round-5): a mounted secret with a trailing
-/// newline would otherwise pass the non-empty check but be handed back verbatim,
-/// so `CHIO_SIEM_WEBHOOK_URL` could fail URL/egress validation or a bearer token
+/// Returns the TRIMMED value: a mounted secret with a trailing newline would
+/// otherwise pass the non-empty check but be handed back verbatim, so
+/// `CHIO_SIEM_WEBHOOK_URL` could fail URL/egress validation or a bearer token
 /// could be sent with an embedded newline.
 fn non_empty_env(key: &str) -> Option<String> {
     match std::env::var(key) {
@@ -1236,8 +1230,7 @@ fn non_empty_env(key: &str) -> Option<String> {
 /// Returns `None` when no alert backend is configured (alerting disabled). When
 /// backends are present, the shared `RegistryMetricsSink` is installed into the
 /// exporter so `chio_alert_dispatch_total` / `chio_alert_dispatch_latency_seconds`
-/// emit REAL values on every real dispatch (RFC-0009 F77). This is the non-test
-/// production wiring the serve mode drives, not the test-only path.
+/// emit REAL values on every real dispatch.
 fn build_serve_alerting_exporter(
     backends: Vec<Box<dyn chio_siem::AlertBackend>>,
     metrics_sink: std::sync::Arc<dyn chio_siem::SiemMetricsSink>,
@@ -1267,12 +1260,11 @@ const ALERTING_EXPORTER_NAME: &str = "alerting";
 /// alert pack carries an unconditional `ChioAlertDispatchMetricsMissing`
 /// (`absent_over_time`), so the family must be present-at-zero even with no
 /// backends, or a legitimate SOC-only deployment pages on an intentionally
-/// silent alert pipeline (Codex round-5). The series is honest: zero alert
-/// dispatches occurred because alerting is disabled.
+/// silent alert pipeline. The zero value is accurate: no alert dispatches
+/// occurred because alerting is disabled.
 const ALERT_ROUTE_DISABLED: &str = "disabled";
 
-/// Fail closed unless the serve mode has at least one real SOC EXPORT sink
-/// (RFC-0009 F78/F79, Codex round-1 finding 6 + round-4 finding 3).
+/// Fail closed unless the serve mode has at least one real SOC EXPORT sink.
 ///
 /// With zero registered exporters the manager parses batches and advances its
 /// cursor, silently discarding receipts. An alerting-only deploy is lossy in a
@@ -1294,7 +1286,7 @@ fn ensure_serve_has_consumer(registered_exporters: &[String]) -> Result<(), CliE
              alerting alone is a notification overlay that delivers only high-severity denials \
              and drops every other receipt, so advancing the read cursor past receipts it did \
              not export would silently lose SOC export coverage. Configure a SOC export sink \
-             (alerting may run alongside one) before serving (RFC-0009 F78/F79)."
+             (alerting may run alongside one) before serving."
                 .to_string(),
         ));
     }
@@ -1302,30 +1294,30 @@ fn ensure_serve_has_consumer(registered_exporters: &[String]) -> Result<(), CliE
 }
 
 /// Pre-register the SIEM serve-mode metric series at zero so the absent-metric
-/// backstops fire only on a true scrape gap (RFC-0009 contract rule 2).
+/// backstops fire only on a true scrape gap.
 ///
 /// The soc_export/dlq_depth families are seeded from the always-on
 /// `_deserialize` producer plus every registered SOC exporter, so
 /// `ChioSocExportMetricsMissing` stays quiet on a healthy-but-quiet (or
 /// zero-SOC-exporter) deploy. The alert_dispatch family is ALWAYS seeded at
 /// zero: for each configured alert route when alerting is enabled, or under a
-/// single `disabled` sentinel route for a SOC-only serve (Codex round-5). The
-/// shipped alert pack carries an unconditional `ChioAlertDispatchMetricsMissing`
+/// single `disabled` sentinel route for a SOC-only serve. The shipped alert pack
+/// carries an unconditional `ChioAlertDispatchMetricsMissing`
 /// (`absent_over_time`), so leaving the family absent when alerting is disabled
 /// would page a legitimate SOC-only deployment; a present-at-zero series makes
 /// `absent_over_time` fire only on a true scrape gap.
 fn preregister_serve_metrics(registered_exporters: &[&str], alert_routes: &[&str]) {
     use chio_metrics_spec::runtime::families;
 
-    // Seed the FIXED (non-deployment-configured) alert-pack series at zero
-    // (Codex round-2 finding 4). The siem-export binary starts its own metrics
-    // server and renders the full alert pack, but it does not go through the
-    // chio-cli tracing init that normally calls this, so families like
-    // chio_fail_open_suspected_total / chio_dispatch_failure_total /
-    // chio_capability_revocation_lag_seconds are otherwise absent and their
-    // absent_over_time backstops can false-fire on a healthy-but-quiet deploy.
-    // The operator-configured soc/dlq/alert routes below are seeded only when
-    // present, since their label domain is deployment-specific.
+    // Seed the FIXED (non-deployment-configured) alert-pack series at zero. The
+    // siem-export binary starts its own metrics server and renders the full alert
+    // pack, but it does not go through the chio-cli tracing init that normally
+    // calls this, so families like chio_fail_open_suspected_total /
+    // chio_dispatch_failure_total / chio_capability_revocation_lag_seconds are
+    // otherwise absent and their absent_over_time backstops can false-fire on a
+    // healthy-but-quiet deploy. The operator-configured soc/dlq/alert routes
+    // below are seeded only when present, since their label domain is
+    // deployment-specific.
     chio_metrics_spec::runtime::preregister_known_label_sets();
 
     // Always-on baseline: the manager's malformed-row producer keeps the
@@ -1334,9 +1326,8 @@ fn preregister_serve_metrics(registered_exporters: &[&str], alert_routes: &[&str
 
     for exporter in registered_exporters {
         // The manager records `success` on success (aligned with the
-        // soc_export_error_ratio recording rules, Codex round-1 finding 3) and
-        // manages a per-exporter DLQ depth gauge; seed both so the families exist
-        // before the first poll.
+        // soc_export_error_ratio recording rules) and manages a per-exporter DLQ
+        // depth gauge; seed both so the families exist before the first poll.
         families::SOC_EXPORT_TOTAL.preregister(&[exporter, "success"]);
         families::DLQ_DEPTH.preregister(&[exporter]);
     }
@@ -1345,7 +1336,7 @@ fn preregister_serve_metrics(registered_exporters: &[&str], alert_routes: &[&str
         // SOC-only serve (no PagerDuty/OpsGenie configured): seed a zero baseline
         // under the `disabled` sentinel so the unconditional
         // ChioAlertDispatchMetricsMissing rule does not page an intentionally
-        // silent alert pipeline (Codex round-5).
+        // silent alert pipeline.
         families::ALERT_DISPATCH_TOTAL.preregister(&[ALERT_ROUTE_DISABLED, "success"]);
         families::ALERT_DISPATCH_TOTAL.preregister(&[ALERT_ROUTE_DISABLED, "error"]);
     } else {
@@ -1748,9 +1739,7 @@ mod tests {
     }
 
     /// The serve-mode alerting wiring installs the registry metrics sink into a
-    /// real AlertingExporter, so a real (non-test-cfg) dispatch emits
-    /// chio_alert_dispatch_total. This is the proof the metric is a production
-    /// instrument, not test-only.
+    /// real AlertingExporter, so a real dispatch emits chio_alert_dispatch_total.
     #[tokio::test]
     async fn serve_alerting_wiring_emits_real_alert_dispatch_metric() {
         use chio_siem::Exporter;
@@ -1835,12 +1824,11 @@ mod tests {
         );
     }
 
-    /// Codex round-2 finding 4: the siem-export serve path renders the full
-    /// alert pack but does not run the chio-cli tracing init that seeds the
-    /// FIXED alert-pack series. `preregister_serve_metrics` must therefore seed
-    /// them (fail-open / dispatch-failure / revocation-lag) so their
-    /// absent_over_time backstops cannot false-fire on a healthy-but-quiet
-    /// siem-export deploy.
+    /// The siem-export serve path renders the full alert pack but does not run
+    /// the chio-cli tracing init that seeds the FIXED alert-pack series.
+    /// `preregister_serve_metrics` must therefore seed them (fail-open /
+    /// dispatch-failure / revocation-lag) so their absent_over_time backstops
+    /// cannot false-fire on a healthy-but-quiet siem-export deploy.
     #[test]
     fn serve_metrics_preregister_seeds_fixed_alert_pack_series() {
         preregister_serve_metrics(&[], &[]);
@@ -1872,9 +1860,8 @@ mod tests {
         assert!(build_serve_alerting_exporter(Vec::new(), sink).is_none());
     }
 
-    /// RFC-0009 Codex round-1 finding 6: the serve mode must fail closed when no
-    /// consumer is configured, rather than silently advancing the cursor over
-    /// receipts nothing exports.
+    /// The serve mode must fail closed when no consumer is configured, rather
+    /// than silently advancing the cursor over receipts nothing exports.
     #[test]
     fn serve_fails_closed_with_no_configured_consumer() {
         let error = ensure_serve_has_consumer(&[]).expect_err("zero consumers must fail closed");
@@ -1892,12 +1879,9 @@ mod tests {
         assert!(ensure_serve_has_consumer(&["alerting".to_string(), "splunk".to_string()]).is_ok());
     }
 
-    /// RFC-0009 F78/F79 (completing Codex round-4 finding 3): the serve path
-    /// actually wires a real SOC export sink from the CHIO_SIEM_WEBHOOK_* env, so
-    /// a deploy that configures a webhook endpoint builds a real "webhook"
-    /// consumer that satisfies the fail-closed gate. Before this, NO code path
-    /// registered a SOC sink, so ensure_serve_has_consumer was unsatisfiable in
-    /// every config and siem-export errored before serving. Only this test
+    /// The serve path wires a real SOC export sink from the CHIO_SIEM_WEBHOOK_*
+    /// env, so a deploy that configures a webhook endpoint builds a real
+    /// "webhook" consumer that satisfies the fail-closed gate. Only this test
     /// touches CHIO_SIEM_WEBHOOK_URL, so the set/remove cannot race another
     /// test's configured_soc_exporters() call.
     #[test]
@@ -1929,12 +1913,11 @@ mod tests {
         );
     }
 
-    /// Codex round-4 finding 3: alerting is a notification overlay, not a SOC
-    /// export sink. It returns every event as "processed" (so the manager
-    /// advances the high-water mark) but only delivers high-severity denials and
-    /// drops every allow/low-severity receipt. An alerting-ONLY serve config must
-    /// be rejected at startup so the cursor never advances past audit rows no
-    /// durable SOC export sink received.
+    /// Alerting is a notification overlay, not a SOC export sink. It returns
+    /// every event as "processed" (so the manager advances the high-water mark)
+    /// but only delivers high-severity denials and drops every allow/low-severity
+    /// receipt. An alerting-ONLY serve config must be rejected at startup so the
+    /// cursor never advances past audit rows no durable SOC export sink received.
     #[test]
     fn serve_fails_closed_when_only_alerting_is_configured() {
         let error = ensure_serve_has_consumer(&["alerting".to_string()])
@@ -1945,10 +1928,10 @@ mod tests {
         );
     }
 
-    /// Codex round-4 finding 5: the receipt-log watchdog samples health via a
-    /// READ-ONLY open. A missing receipt DB must be reported as missing and must
-    /// NOT be created; the old `open` path created an empty DB on a mistyped
-    /// path (and failed outright on a read-only mount).
+    /// The receipt-log watchdog samples health via a READ-ONLY open. A missing
+    /// receipt DB must be reported as missing and must NOT be created (a
+    /// create-on-open path would spawn an empty DB on a mistyped path and fail
+    /// outright on a read-only mount).
     #[test]
     fn watchdog_sample_receipt_health_does_not_create_a_missing_db() {
         let nonce = std::time::SystemTime::now()
@@ -1979,9 +1962,9 @@ mod tests {
         let _ = std::fs::remove_file(&missing);
     }
 
-    /// Codex round-5: `non_empty_env` documented a trimmed value but returned the
-    /// raw one, so a mounted secret with a trailing newline passed the non-empty
-    /// check and was handed back verbatim. Uses a unique key so it cannot race.
+    /// `non_empty_env` returns a trimmed value, so a mounted secret with a
+    /// trailing newline is not handed back verbatim. Uses a unique key so it
+    /// cannot race.
     #[test]
     fn non_empty_env_returns_trimmed_value() {
         const KEY: &str = "CHIO_SIEM_TEST_TRIM_1218_UNIQUE";
@@ -2000,11 +1983,11 @@ mod tests {
         assert_eq!(blank, None, "a whitespace-only value is treated as absent");
     }
 
-    /// Codex round-5: a SOC-only serve (no PagerDuty/OpsGenie configured) still
-    /// ships the alert pack, whose ChioAlertDispatchMetricsMissing rule is
-    /// unconditional, so preregister_serve_metrics must seed a zero
-    /// chio_alert_dispatch_total baseline (under the `disabled` sentinel route)
-    /// or the deployment pages on an intentionally silent alert pipeline.
+    /// A SOC-only serve (no PagerDuty/OpsGenie configured) still ships the alert
+    /// pack, whose ChioAlertDispatchMetricsMissing rule is unconditional, so
+    /// preregister_serve_metrics must seed a zero chio_alert_dispatch_total
+    /// baseline (under the `disabled` sentinel route) or the deployment pages on
+    /// an intentionally silent alert pipeline.
     #[test]
     fn soc_only_serve_seeds_a_disabled_alert_dispatch_baseline() {
         preregister_serve_metrics(&["webhook"], &[]);

@@ -132,10 +132,9 @@ fn expected_signed_id(body: &ChioReceiptBody) -> Result<String, String> {
 }
 
 fn rendered_signing_queue_block_total() -> Result<u64, String> {
-    // The signing-queue block counter now carries a `reason` label (RFC-0009
-    // F82); a full bounded channel records reason="channel_full". An absent
-    // series means zero blocks so far (the runtime family only renders series
-    // that exist).
+    // The signing-queue block counter carries a `reason` label; a full bounded
+    // channel records reason="channel_full". An absent series means zero blocks
+    // so far (the runtime family only renders series that exist).
     let body = chio_kernel::render_guard_metrics_prometheus();
     match body.lines().find_map(|line| {
         line.strip_prefix("chio_signing_queue_block_total{reason=\"channel_full\"} ")

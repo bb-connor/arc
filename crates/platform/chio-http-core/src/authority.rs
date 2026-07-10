@@ -155,8 +155,8 @@ pub enum HttpAuthorityError {
 /// must feed `chio_dispatch_failure_total` and the error-outcome latency/guard
 /// evaluation series. A [`HttpAuthorityError::PendingApproval`] is NOT a dispatch
 /// failure: it is the normal HITL approval-required flow (surfaced as a 409),
-/// so it must be excluded from the paging metric and the error series (Codex
-/// round-5). Every other error is a real evaluation failure.
+/// so it is excluded from the paging metric and the error series. Every other
+/// error is a real evaluation failure.
 fn is_dispatch_failure(error: &HttpAuthorityError) -> bool {
     !matches!(error, HttpAuthorityError::PendingApproval { .. })
 }
@@ -341,11 +341,11 @@ impl HttpAuthority {
         match result {
             Ok((prepared, receipt)) => {
                 // A policy/capability deny is an expected fail-closed decision,
-                // NOT a dispatch failure: it must be tracked by the guard-verdict
+                // NOT a dispatch failure: it is tracked by the guard-verdict
                 // metrics only, never on chio_dispatch_failure_total, so a normal
                 // rejected request cannot page the P0 fail-open/dispatch-failure
-                // alert (Codex round-3 finding 6). Only a genuine evaluation error
-                // (the Err arm below) feeds the paging metric.
+                // alert. Only a genuine evaluation error (the Err arm below) feeds
+                // the paging metric.
                 let outcome = if prepared.verdict.is_allowed() {
                     crate::metrics::GUARD_OUTCOME_ALLOW
                 } else {
@@ -367,9 +367,8 @@ impl HttpAuthority {
                 // feed chio_dispatch_failure_total (paging the P0 fail-open alert
                 // on every governed approval prompt) and skew the error-outcome
                 // latency/guard-eval series, which fold every unknown outcome into
-                // the error bucket. Only a GENUINE evaluation error feeds these
-                // instruments (Codex round-5). A pending approval is honestly
-                // absent from the error metrics.
+                // the error bucket. Only a genuine evaluation error feeds these
+                // instruments.
                 if is_dispatch_failure(&error) {
                     crate::metrics::observe_decision_latency_nanos_for_outcome(
                         crate::metrics::GUARD_OUTCOME_ERROR,

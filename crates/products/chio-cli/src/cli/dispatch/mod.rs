@@ -74,7 +74,7 @@ fn escape_log_field(value: &str) -> String {
 
 /// Format a redacted tracing event into one stderr line. Both field names and
 /// values are control-encoded so no field can introduce a line break and forge
-/// an additional log record (Codex round-5 log-injection hardening).
+/// an additional log record.
 fn format_redacted_event_line(event: &chio_log_redact::RedactedEvent) -> String {
     let mut line = format!("{} {}", event.level, event.target);
     for field in &event.fields {
@@ -138,9 +138,8 @@ mod redacted_format_tests {
 /// still redacted before it reaches an operator (subscriber-level backstop).
 /// Also seeds the known metric label sets so `absent_over_time` alerts fire
 /// only on a true scrape gap, and defaults `chio.guard=info` so guard telemetry
-/// is not dropped by the default `warn` filter (RFC-0009 F79). Fail-closed: a
-/// redaction construction failure aborts startup rather than serving unredacted
-/// logs.
+/// is not dropped by the default `warn` filter. Fail-closed: a redaction
+/// construction failure aborts startup rather than serving unredacted logs.
 fn init_redacted_tracing() {
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;

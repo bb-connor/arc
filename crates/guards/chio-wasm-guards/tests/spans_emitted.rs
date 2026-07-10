@@ -295,7 +295,7 @@ fn evaluation_emits_verdict_duration_and_fuel() {
     use chio_metrics_spec::runtime::families;
     // Build a guard named uniquely for this test and drive one allow eval.
     let guard = WasmGuard::new_with_metadata(
-        "emit-test-guard-7".to_string(),
+        "emit-test-guard".to_string(),
         "1.2.3".to_string(),
         Box::new(loaded_allowing_backend()),
         false,
@@ -326,19 +326,17 @@ fn evaluation_emits_verdict_duration_and_fuel() {
     families::GUARD_EVAL_DURATION.render(&mut body);
     families::GUARD_FUEL_CONSUMED.render(&mut body);
     assert!(
-        body.contains(
-            "chio_guard_verdict_total{guard_id=\"emit-test-guard-7\",verdict=\"allow\"} 1"
-        ),
+        body.contains("chio_guard_verdict_total{guard_id=\"emit-test-guard\",verdict=\"allow\"} 1"),
         "{body}"
     );
     assert!(
         body.contains(
-            "chio_guard_eval_duration_seconds_count{guard_id=\"emit-test-guard-7\",verdict=\"allow\"} 1"
+            "chio_guard_eval_duration_seconds_count{guard_id=\"emit-test-guard\",verdict=\"allow\"} 1"
         ),
         "{body}"
     );
     assert!(
-        body.contains("chio_guard_fuel_consumed_total{guard_id=\"emit-test-guard-7\"}"),
+        body.contains("chio_guard_fuel_consumed_total{guard_id=\"emit-test-guard\"}"),
         "{body}"
     );
 }
@@ -372,14 +370,14 @@ fn reload_path_emits_applied_span() {
     assert_eq!(field(span, "reload_seq"), "0");
 }
 
-/// Codex round-3 finding 1: `record_reload_seq` (called on the successful apply)
-/// increments `chio_guard_reload_total` under the documented `applied` outcome,
-/// never an undeclared `ok` series that dashboards aggregating `applied` miss.
+/// `record_reload_seq` (called on the successful apply) increments
+/// `chio_guard_reload_total` under the documented `applied` outcome, never an
+/// undeclared `ok` series that dashboards aggregating `applied` miss.
 #[test]
 fn record_reload_seq_uses_documented_applied_outcome() {
     use chio_metrics_spec::runtime::families;
     let guard = WasmGuard::new_with_metadata(
-        "reload-outcome-guard-f1".to_string(),
+        "reload-outcome-guard".to_string(),
         "1.0.0".to_string(),
         Box::new(loaded_allowing_backend()),
         false,
@@ -391,12 +389,12 @@ fn record_reload_seq_uses_documented_applied_outcome() {
     families::GUARD_RELOAD.render(&mut body);
     assert!(
         body.contains(
-            "chio_guard_reload_total{guard_id=\"reload-outcome-guard-f1\",outcome=\"applied\"} 1"
+            "chio_guard_reload_total{guard_id=\"reload-outcome-guard\",outcome=\"applied\"} 1"
         ),
         "successful reload must use the documented applied outcome: {body}"
     );
     assert!(
-        !body.contains("guard_id=\"reload-outcome-guard-f1\",outcome=\"ok\""),
+        !body.contains("guard_id=\"reload-outcome-guard\",outcome=\"ok\""),
         "reload must not record an undeclared ok outcome: {body}"
     );
 }
@@ -448,14 +446,14 @@ fn make_malformed_request() -> ToolCallRequest {
     request
 }
 
-/// Codex round-3 finding 7: a deny reason is recorded under a bounded reason
-/// class (never a raw/free-form string), so `chio_guard_deny_total{reason_class}`
-/// has finite cardinality and reflects WHY the guard denied.
+/// A deny reason is recorded under a bounded reason class (never a raw/free-form
+/// string), so `chio_guard_deny_total{reason_class}` has finite cardinality and
+/// reflects WHY the guard denied.
 #[test]
 fn deny_records_bounded_reason_class_from_reason_string() {
     use chio_metrics_spec::runtime::families;
     let guard = WasmGuard::new_with_metadata(
-        "reason-class-guard-f7".to_string(),
+        "reason-class-guard".to_string(),
         "1.0.0".to_string(),
         Box::new(loaded_denying_backend(
             "prompt injection detected in arguments",
@@ -486,25 +484,25 @@ fn deny_records_bounded_reason_class_from_reason_string() {
     families::GUARD_DENY.render(&mut body);
     assert!(
         body.contains(
-            "chio_guard_deny_total{guard_id=\"reason-class-guard-f7\",reason_class=\"prompt_injection\"} 1"
+            "chio_guard_deny_total{guard_id=\"reason-class-guard\",reason_class=\"prompt_injection\"} 1"
         ),
         "deny reason must map to the bounded prompt_injection class: {body}"
     );
-    // The old enforcement-mode labels must no longer appear on this series.
+    // The enforcement-mode labels must not appear on this series.
     assert!(
-        !body.contains("guard_id=\"reason-class-guard-f7\",reason_class=\"blocking\""),
+        !body.contains("guard_id=\"reason-class-guard\",reason_class=\"blocking\""),
         "reason_class must not carry enforcement mode: {body}"
     );
 }
 
-/// Codex round-3 finding 2: a malformed-argument deny (extraction failed before
-/// the module ran) still records the verdict/deny/duration families under the
-/// bounded `malformed` reason class instead of returning unobserved.
+/// A malformed-argument deny (extraction failed before the module ran) still
+/// records the verdict/deny/duration families under the bounded `malformed`
+/// reason class instead of returning unobserved.
 #[test]
 fn malformed_argument_deny_records_metrics() {
     use chio_metrics_spec::runtime::families;
     let guard = WasmGuard::new_with_metadata(
-        "malformed-guard-f2".to_string(),
+        "malformed-guard".to_string(),
         "1.0.0".to_string(),
         Box::new(loaded_allowing_backend()),
         false,
@@ -534,20 +532,18 @@ fn malformed_argument_deny_records_metrics() {
     families::GUARD_DENY.render(&mut body);
     families::GUARD_EVAL_DURATION.render(&mut body);
     assert!(
-        body.contains(
-            "chio_guard_verdict_total{guard_id=\"malformed-guard-f2\",verdict=\"deny\"} 1"
-        ),
+        body.contains("chio_guard_verdict_total{guard_id=\"malformed-guard\",verdict=\"deny\"} 1"),
         "malformed deny must record a deny verdict: {body}"
     );
     assert!(
         body.contains(
-            "chio_guard_deny_total{guard_id=\"malformed-guard-f2\",reason_class=\"malformed\"} 1"
+            "chio_guard_deny_total{guard_id=\"malformed-guard\",reason_class=\"malformed\"} 1"
         ),
         "malformed deny must record the bounded malformed reason class: {body}"
     );
     assert!(
         body.contains(
-            "chio_guard_eval_duration_seconds_count{guard_id=\"malformed-guard-f2\",verdict=\"deny\"} 1"
+            "chio_guard_eval_duration_seconds_count{guard_id=\"malformed-guard\",verdict=\"deny\"} 1"
         ),
         "malformed deny must observe an evaluation duration sample: {body}"
     );

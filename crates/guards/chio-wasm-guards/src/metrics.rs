@@ -61,13 +61,11 @@ pub const REASON_CLASS_OVERSIZE: &str = "oversize";
 pub const REASON_CLASS_FUEL: &str = "fuel";
 pub const REASON_CLASS_TRAP: &str = "trap";
 /// Host-side argument extraction failed before the guard module ran (a
-/// fail-closed deny). Bounded reason class for the malformed-argument deny path
-/// (RFC-0009 F75, Codex round-3 finding 2).
+/// fail-closed deny). Bounded reason class for the malformed-argument deny path.
 pub const REASON_CLASS_MALFORMED: &str = "malformed";
 /// Fallback bounded class for any deny reason that does not match a known,
 /// documented class. Guarantees `chio_guard_deny_total{reason_class}` has a
-/// finite label domain even when a guard emits a novel free-form reason string
-/// (RFC-0009 F75, Codex round-3 finding 7).
+/// finite label domain even when a guard emits a novel free-form reason string.
 pub const REASON_CLASS_OTHER: &str = "other";
 
 pub const REASON_CLASS_LABEL_VALUES: &[&str] = &[
@@ -83,10 +81,10 @@ pub const REASON_CLASS_LABEL_VALUES: &[&str] = &[
 ];
 
 /// Map a free-form guard deny reason to a bounded, fixed reason class so the
-/// `chio_guard_deny_total{reason_class}` series stays finite in cardinality
-/// (RFC-0009 F75, Codex round-3 finding 7). Never returns a raw reason string:
-/// an unrecognized or absent reason maps to [`REASON_CLASS_OTHER`], and every
-/// return value is one of [`REASON_CLASS_LABEL_VALUES`].
+/// `chio_guard_deny_total{reason_class}` series stays finite in cardinality.
+/// Never returns a raw reason string: an unrecognized or absent reason maps to
+/// [`REASON_CLASS_OTHER`], and every return value is one of
+/// [`REASON_CLASS_LABEL_VALUES`].
 #[must_use]
 pub fn classify_deny_reason_class(reason: Option<&str>) -> &'static str {
     let Some(reason) = reason else {
@@ -240,8 +238,7 @@ pub const RUNTIME_METRIC_FAMILIES: &[MetricFamilyDescriptor] = &[
         // The workspace descriptor and the kernel renderer emit this family with
         // a `reason` label (chio_signing_queue_block_total{reason="..."}); the
         // exported descriptor table must declare the same label set so consumers
-        // that document/validate runtime metrics agree with what is emitted
-        // (Codex round-2 finding 5).
+        // that document/validate runtime metrics agree with what is emitted.
         labels: LABELS_SIGNING_REASON,
         unit: Some("count"),
         buckets: &[],
@@ -582,7 +579,7 @@ mod reason_class_tests {
     #[test]
     fn novel_or_absent_reason_maps_to_other_and_domain_is_finite() {
         // An arbitrary, never-before-seen free-form reason collapses to `other`
-        // rather than minting a new high-cardinality series (finding 7).
+        // rather than minting a new high-cardinality series.
         assert_eq!(
             classify_deny_reason_class(Some("xyzzy-9f3a-unclassifiable-reason")),
             REASON_CLASS_OTHER

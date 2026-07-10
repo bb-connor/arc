@@ -398,7 +398,7 @@ mod tests {
         let (_kp, evaluator) = make_service();
         // An unsupported HTTP method makes prepare() return Err (parse_method
         // rejects it); with fail-open enabled the request forwards unenforced
-        // through the branch at service.rs:135.
+        // through the fail-open branch.
         let evaluator = evaluator.with_fail_open(true);
         let inner = tower::service_fn(|_req: http::Request<TestBody>| async {
             Ok::<http::Response<TestBody>, Box<dyn std::error::Error + Send + Sync>>(

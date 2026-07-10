@@ -76,7 +76,7 @@ impl DeadLetterQueue {
     ///
     /// The DLQ is shared across all exporters, so the per-exporter DLQ-depth
     /// gauge must count only the entries produced by that exporter rather than
-    /// the global length (Codex round-3 finding 4).
+    /// the global length.
     pub fn depth_for_exporter(&self, exporter: &str) -> usize {
         self.inner
             .iter()

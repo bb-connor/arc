@@ -138,16 +138,15 @@ fn canary_mismatch_aborts_swap() -> TestResult {
     Ok(())
 }
 
-/// Codex round-4 finding 6 (completes round-3 F1): a canary-failed reload must
-/// increment `chio_guard_reload_total{outcome="canary_failed"}`, not merely emit
-/// a span. Before the fix the counter was incremented only on the applied path,
-/// so the alerting surface never saw a failed reload. A unique guard id isolates
-/// this process-global counter series from the other tests in this binary.
+/// A canary-failed reload increments
+/// `chio_guard_reload_total{outcome="canary_failed"}`, not merely emits a span,
+/// so the alerting surface sees a failed reload. A unique guard id isolates this
+/// process-global counter series from the other tests in this binary.
 #[test]
 fn canary_failure_increments_reload_total_canary_failed() -> TestResult {
     use chio_metrics_spec::runtime::families;
 
-    let guard_id = "reload-canary-failed-guard-f6";
+    let guard_id = "reload-canary-failed-guard";
     let corpus = CanaryCorpus::from_dir(guard_id, canary_dir())?;
     let engine = Engine::new(build_backend);
     engine.register_guard(
@@ -177,17 +176,17 @@ fn canary_failure_increments_reload_total_canary_failed() -> TestResult {
     Ok(())
 }
 
-/// Codex round-4 finding 6 residual: a canary-verified (successful) reload must
-/// also increment `chio_guard_reload_total{outcome="applied"}`. reload_with_canary
-/// replaces the module directly rather than via record_reload_seq, so before the
-/// fix a canary-success emitted an applied span but never the applied counter,
-/// leaving the alerting surface blind to successful canary reloads. A unique guard
-/// id isolates this process-global counter series from the other tests here.
+/// A canary-verified (successful) reload also increments
+/// `chio_guard_reload_total{outcome="applied"}`. reload_with_canary replaces the
+/// module directly rather than via record_reload_seq, so it must count the
+/// applied outcome itself; otherwise the alerting surface stays blind to
+/// successful canary reloads. A unique guard id isolates this process-global
+/// counter series from the other tests here.
 #[test]
 fn canary_success_increments_reload_total_applied() -> TestResult {
     use chio_metrics_spec::runtime::families;
 
-    let guard_id = "reload-canary-applied-guard-f6";
+    let guard_id = "reload-canary-applied-guard";
     let corpus = CanaryCorpus::from_dir(guard_id, canary_dir())?;
     let engine = Engine::new(build_backend);
     engine.register_guard(

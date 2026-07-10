@@ -133,7 +133,7 @@ impl WasmGuard {
     /// Only the successful hot-reload apply path calls this, so the reload
     /// counter uses the documented `applied` outcome (matching the
     /// `RELOAD_APPLIED` span and the descriptor's declared outcome values) rather
-    /// than an undeclared `ok` series (RFC-0009 F3, Codex round-3 finding 1).
+    /// than an undeclared `ok` series.
     pub fn record_reload_seq(&self, reload_seq: u64) {
         self.reload_seq.store(reload_seq, Ordering::SeqCst);
         chio_metrics_spec::runtime::families::GUARD_RELOAD.incr(&[&self.name, RELOAD_APPLIED]);
@@ -328,9 +328,9 @@ impl std::fmt::Debug for WasmGuard {
     }
 }
 
-/// Emit the per-evaluation guard families (RFC-0009 F75): verdict count,
-/// evaluation duration, and fuel consumed. Called from every verdict arm so
-/// allow, deny, and error all record (contract rule 1).
+/// Emit the per-evaluation guard families: verdict count, evaluation duration,
+/// and fuel consumed. Called from every verdict arm so allow, deny, and error
+/// all record.
 fn emit_guard_eval_metrics(guard_id: &str, verdict: &str, elapsed: std::time::Duration, fuel: u64) {
     use chio_metrics_spec::runtime::families;
     families::GUARD_VERDICT.incr(&[guard_id, verdict]);
@@ -354,9 +354,9 @@ impl Guard for WasmGuard {
                 "WASM guard host action extraction failed, failing closed"
             );
             // Record the fail-closed deny so malformed-argument denials are
-            // observable in the F75 verdict/deny/duration families instead of
-            // silently returning before the metrics path (Codex round-3 finding
-            // 2). The bounded `malformed` reason class keeps cardinality finite.
+            // observable in the verdict/deny/duration families instead of
+            // silently returning before the metrics path. The bounded `malformed`
+            // reason class keeps cardinality finite.
             emit_guard_eval_metrics(&self.name, VERDICT_DENY, eval_started.elapsed(), 0);
             chio_metrics_spec::runtime::families::GUARD_DENY
                 .incr(&[&self.name, REASON_CLASS_MALFORMED]);
@@ -419,8 +419,7 @@ impl Guard for WasmGuard {
                 // Classify the guard-provided reason into a bounded reason class
                 // so `chio_guard_deny_total{reason_class}` cannot explode series
                 // cardinality on free-form strings, and so the breakdown reflects
-                // WHY the guard denied rather than the enforcement mode (Codex
-                // round-3 finding 7).
+                // WHY the guard denied rather than the enforcement mode.
                 let reason_class = classify_deny_reason_class(reason.as_deref());
                 chio_metrics_spec::runtime::families::GUARD_DENY.incr(&[&self.name, reason_class]);
                 if self.advisory {
