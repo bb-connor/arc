@@ -280,15 +280,19 @@ pub(crate) fn cmd_start(
             .transpose()?
             .map(|keypair| keypair.seed_hex());
         let trusted_capability_issuers = parse_trusted_capability_issuers_from_env()?;
-        // The mediated `/v1/evaluate` route needs a budget store, which the
-        // proxy builds only from a control-plane URL or a local SQLite budget
-        // path. `chio start` keeps other optional stores in-memory so the first
-        // run leaves no on-disk artifacts, so it does not fabricate a default
-        // on-disk budget store here: the route is advertised only when the
-        // operator supplies one of these backends. Otherwise the banner omits
-        // the route rather than advertising one that always fails closed with
-        // chio_mediation_unavailable.
-        let mediation_available = control_url.is_some() || budget_db.is_some();
+        // The mediated `/v1/evaluate` route reserves a durable budget hold and
+        // mints an execution nonce the trusted tool server settles on
+        // `/v1/reconcile`. That works only when a hold-capable local SQLite
+        // budget store (`--budget-db`) backs it AND a sidecar-control token gates
+        // reconcile: a remote `--control-url` store cannot persist a reserved
+        // hold, and a missing control token rejects every reconcile, so either
+        // alone leaves mediation failing closed. `chio start` keeps other optional
+        // stores in-memory so the first run leaves no on-disk artifacts, and does
+        // not fabricate a default budget store here. Advertise the route only when
+        // both backers are present; otherwise the banner omits it rather than
+        // advertising one that always fails closed.
+        let mediation_available =
+            sidecar_mediation_available(budget_db, sidecar_control_token.as_deref());
         let payment_adapter = resolve_sidecar_payment_adapter()?;
         let config = ProtectConfig {
             // The chio-start shape never proxies upstream traffic; the
@@ -338,13 +342,38 @@ pub(crate) fn cmd_start(
     })
 }
 
+/// Whether the sidecar can actually serve the mediated `/v1/evaluate` route,
+/// and therefore whether the startup banner advertises it. Mediation reserves a
+/// durable budget hold and mints an execution nonce that the trusted tool server
+/// later settles on `/v1/reconcile`, so it works only when BOTH backing pieces
+/// are present:
+///
+/// - a hold-capable budget store, which only the local SQLite `--budget-db`
+///   provides. A remote `--control-url` store forwards charge/reverse/reconcile
+///   and falls back to the no-op hold APIs, so it cannot persist a reserved hold
+///   and every mediated authorization rejects fail-closed. This mirrors the
+///   proxy's `build_budget_store` hold-capability determination
+///   (hold-capable exactly when `--budget-db` is configured).
+/// - a sidecar-control token, without which every `/v1/reconcile` is rejected by
+///   the reconcile control gate and a minted reservation could only expire and
+///   forfeit budget.
+///
+/// Requiring both keeps the advertised surface matched to what the running
+/// configuration can actually authorize, rather than listing a route that always
+/// denies.
+pub(crate) fn sidecar_mediation_available(
+    budget_db: Option<&Path>,
+    sidecar_control_token: Option<&str>,
+) -> bool {
+    budget_db.is_some() && sidecar_control_token.is_some()
+}
+
 /// Build the `chio start` route banner. The mediated `/v1/evaluate` route is
-/// advertised only when `mediation_available`, which mirrors the proxy's own
-/// budget-store predicate (a budget store exists exactly when a control-plane
-/// URL or a local SQLite budget path is configured). When it is absent the
-/// banner omits the route and explains how to enable it, so the advertised
-/// surface always matches the running configuration instead of listing a route
-/// that fails closed with chio_mediation_unavailable.
+/// advertised only when `mediation_available` (see `sidecar_mediation_available`):
+/// a hold-capable local budget store (`--budget-db`) AND a sidecar-control token
+/// must both be configured. When it is absent the banner omits the route and
+/// explains how to enable it, so the advertised surface always matches the
+/// running configuration instead of listing a route that always fails closed.
 pub(crate) fn start_sidecar_route_banner(mediation_available: bool) -> Vec<String> {
     let evaluate_route = if mediation_available {
         ", /v1/evaluate"
@@ -356,7 +385,7 @@ pub(crate) fn start_sidecar_route_banner(mediation_available: bool) -> Vec<Strin
     )];
     if !mediation_available {
         lines.push(
-            "  note: mediated /v1/evaluate is disabled without a budget store; pass --budget-db <path> or --control-url <url> to enable tool-call budget mediation"
+            "  note: mediated /v1/evaluate is disabled without a hold-capable budget store and a sidecar-control token; pass --budget-db <path> and set CHIO_SIDECAR_CONTROL_TOKEN to enable tool-call budget mediation"
                 .to_string(),
         );
     }
@@ -1439,8 +1468,42 @@ mod runtime_local_error_domain_tests {
                 .iter()
                 .any(|line| line.contains("mediated /v1/evaluate is disabled")
                     && line.contains("--budget-db")
-                    && line.contains("--control-url")),
+                    && line.contains("CHIO_SIDECAR_CONTROL_TOKEN")),
             "banner must explain how to enable mediation when it is unavailable: {without_store:?}"
+        );
+    }
+
+    #[test]
+    fn mediation_advertised_only_with_hold_capable_store_and_control_token() {
+        let budget = Path::new("/var/lib/chio/budget.sqlite");
+
+        // Both backers present: a hold-capable local budget store and a
+        // sidecar-control token. Only then can a reservation be reconciled, so
+        // only then is /v1/evaluate advertised.
+        assert!(
+            sidecar_mediation_available(Some(budget), Some("control-token")),
+            "a hold-capable --budget-db with a control token must advertise mediation"
+        );
+
+        // A remote-only `--control-url` store is not hold-capable, so even with a
+        // control token every mediated authorization rejects fail-closed: do not
+        // advertise it.
+        assert!(
+            !sidecar_mediation_available(None, Some("control-token")),
+            "a remote-only store (no --budget-db) must not advertise mediation"
+        );
+
+        // A hold-capable store with no control token cannot settle a reservation
+        // (reconcile is rejected), so do not advertise it either.
+        assert!(
+            !sidecar_mediation_available(Some(budget), None),
+            "a hold-capable store without a control token must not advertise mediation"
+        );
+
+        // Neither backer present.
+        assert!(
+            !sidecar_mediation_available(None, None),
+            "no backing store or token must not advertise mediation"
         );
     }
 }

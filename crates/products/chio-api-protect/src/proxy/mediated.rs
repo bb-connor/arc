@@ -295,6 +295,20 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
              a remote control-plane budget store (--control-url) cannot persist a reserved hold",
         );
     }
+    // A reserved hold is settled only through `/v1/reconcile`, which the
+    // reconcile control gate restricts to the trusted tool server presenting the
+    // sidecar-control token. Without a configured token every reconcile is
+    // rejected, so a reservation minted here could only expire and forfeit
+    // budget. Reject fail-closed before reserving budget or minting a nonce,
+    // mirroring the reconcile gate's own configured-token requirement.
+    if state.sidecar_control_token.is_none() {
+        return internal_json_error_response(
+            "chio_mediation_requires_reconcile_token",
+            "mediated authorization requires a configured sidecar-control token so the reserved \
+             hold can be settled on /v1/reconcile; without one the reservation could only expire \
+             and forfeit budget",
+        );
+    }
     // Fail-closed: a capability released via `/v1/capabilities/release` is
     // recorded in the sidecar revocation set. Reject a revoked capability here,
     // mirroring the validate, proxy, and advisory paths, so a revoked token
@@ -1693,6 +1707,42 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_authorization_requires_reconcile_control_token() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
+        let cap_id = cap.id.clone();
+        // A hold-capable store but NO sidecar-control token: every /v1/reconcile
+        // is rejected by the reconcile control gate, so a minted reservation could
+        // only expire and forfeit budget. The evaluate route must fail closed
+        // before reserving budget or minting a nonce.
+        let state =
+            mediated_test_state_with_control_token(signer, Arc::clone(&budget), Vec::new(), None);
+        let body = serde_json::json!({
+            "capability": cap,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-1" }
+        });
+        let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(json["error"], "chio_mediation_requires_reconcile_token");
+        assert_ne!(json["status"], "authorized");
+        assert!(
+            json["execution_nonce"].is_null(),
+            "a fail-closed rejection must not mint a reserved nonce"
+        );
+
+        // No hold is placed against the grant: the route fails closed before any
+        // budget interaction.
+        let usage = budget.get_usage(&cap_id, 0).unwrap();
+        assert!(usage.is_none() || usage.unwrap().committed_cost_units().unwrap() == 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn reconcile_requires_hold_capable_budget_store() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
@@ -2811,11 +2861,13 @@ mod tests {
         let cap =
             issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 150, "USD");
         let cap_value = serde_json::to_value(&cap).unwrap();
-        // No sidecar-control token configured.
-        let state =
-            mediated_test_state_with_control_token(signer, Arc::clone(&budget), Vec::new(), None);
         let params = serde_json::json!({ "invoice": "inv-1" });
 
+        // Mint a genuine reserved nonce on a control-token-bearing sidecar so the
+        // reconcile body deserializes; the reconcile is then attempted against a
+        // sidecar with no configured control token. Evaluate itself fails closed
+        // without a control token, so the nonce must come from a configured one.
+        let with_token = mediated_test_state(signer.clone(), Arc::clone(&budget), Vec::new());
         let body = serde_json::json!({
             "capability": cap_value,
             "tool_server": "cost-srv",
@@ -2823,8 +2875,12 @@ mod tests {
             "parameters": params,
             "request_id": "recon-no-token",
         });
-        let (_, authorized) = post_evaluate(Arc::clone(&state), &body).await;
+        let (_, authorized) = post_evaluate(with_token, &body).await;
         let nonce_json = authorized["execution_nonce"].clone();
+        assert!(nonce_json.is_object());
+
+        // No sidecar-control token configured on this sidecar.
+        let state = mediated_test_state_with_control_token(signer, budget, Vec::new(), None);
 
         // Fail-closed: with no control token configured there is no trusted
         // caller, so reconcile is rejected outright rather than left open.
@@ -2834,7 +2890,7 @@ mod tests {
             "arguments": params,
             "realized_cost": { "units": 0, "currency": "USD" },
         });
-        let (status, denied) = post_reconcile(Arc::clone(&state), &reconcile_body).await;
+        let (status, denied) = post_reconcile(state, &reconcile_body).await;
         assert_eq!(status, StatusCode::FORBIDDEN);
         assert_eq!(denied["error"], "chio_control_forbidden");
     }
