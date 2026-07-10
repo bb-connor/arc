@@ -436,11 +436,18 @@ pub const RELOAD_BELOW_MIN_VERSION: &str = "below_min_version";
 /// an alarm, exactly as a restart would reject it. Operators alert on this being
 /// non-zero.
 pub const RELOAD_TRUST_ROOTS_CHANGED: &str = "trust_roots_changed";
+/// Reload outcome: the on-disk bundle carries the running version but a DIFFERENT
+/// canonical body (the file was replaced without a version bump); it cannot be a
+/// monotone successor, so the reloader failed closed to deny-all with an alarm rather
+/// than keep the loaded directory admitting peers the replacement dropped. Operators
+/// alert on this being non-zero.
+pub const RELOAD_CURRENT_BODY_REPLACED: &str = "current_body_replaced";
 /// Reload outcome: a transient read/verify/rollback error; last-good is kept.
 pub const RELOAD_ERROR: &str = "error";
-const NUM_RELOAD_OUTCOME: usize = 7;
+const NUM_RELOAD_OUTCOME: usize = 8;
 
 static DIRECTORY_RELOAD: [AtomicU64; NUM_RELOAD_OUTCOME] = [
+    AtomicU64::new(0),
     AtomicU64::new(0),
     AtomicU64::new(0),
     AtomicU64::new(0),
@@ -458,7 +465,8 @@ fn reload_outcome_index(outcome: &str) -> usize {
         "binding_revoked" => 3,
         "below_min_version" => 4,
         "trust_roots_changed" => 5,
-        _ => 6, // error
+        "current_body_replaced" => 6,
+        _ => 7, // error
     }
 }
 
@@ -669,6 +677,7 @@ pub fn render_iroh_transport_metrics_prometheus() -> String {
         RELOAD_BINDING_REVOKED,
         RELOAD_BELOW_MIN_VERSION,
         RELOAD_TRUST_ROOTS_CHANGED,
+        RELOAD_CURRENT_BODY_REPLACED,
         RELOAD_ERROR,
     ] {
         push_labeled(

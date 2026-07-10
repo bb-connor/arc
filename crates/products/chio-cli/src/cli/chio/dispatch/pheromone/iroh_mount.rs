@@ -507,6 +507,12 @@ pub(crate) enum ReloadOutcome {
     /// unchanged fast path must fail closed to deny-all identically rather than keep
     /// admitting under a signer the federation no longer trusts until expiry.
     TrustRootsChanged,
+    /// The on-disk bundle carries the running version but a DIFFERENT canonical body: the
+    /// file was replaced without a version bump (a tampered or out-of-band rotated body).
+    /// It cannot be a monotone successor at the same version, and treating it as Unchanged
+    /// would keep the loaded directory admitting peers the replacement dropped. Fail closed
+    /// to deny-all; a proper versioned successor chained onto last-good self-heals.
+    CurrentBodyReplaced,
 }
 
 /// Inputs for the bounded poll reloader. The reloader deliberately advances its
@@ -540,6 +546,16 @@ fn read_bundle_document(path: &Path) -> Result<TransportDirectoryBundleDocument,
     let json = read_utf8_json_file(path, "Chio iroh transport directory bundle")
         .map_err(|error| error.to_string())?;
     serde_json::from_str(&json).map_err(|error| error.to_string())
+}
+
+/// The canonical sha256 of a parsed bundle document. This matches the value the gate
+/// reports as `current_body_sha256` and that a successor pins as `previousVersionSha256`
+/// (`VerifiedDirectory::body_sha256` hashes the same whole document), so the reloader can
+/// tell a byte-unchanged bundle from a same-version replacement without re-verifying.
+fn bundle_body_sha256(bundle: &TransportDirectoryBundleDocument) -> Result<String, String> {
+    let bytes =
+        chio_core_types::canonical_json_bytes(bundle).map_err(|error| error.to_string())?;
+    Ok(chio_core_types::sha256_hex(&bytes))
 }
 
 /// Read + parse the trusted-issuers file into the verifier's issuer list PLUS the
@@ -598,6 +614,20 @@ pub(crate) fn reload_verified_directory(
     // bundle needs no re-verify. Guarded by `!expired` so an expired bundle can
     // never be short-circuited as Unchanged.
     if !expired && bundle.body.version == current_version {
+        // The unchanged fast path is only sound when the on-disk body is BYTE-identical to
+        // the loaded one. A same-version file whose canonical body differs (a tampered or
+        // out-of-band rotated body, possibly re-signed by rotated trust roots) is a
+        // substitution, not the running directory: it cannot be a monotone successor at the
+        // same version, and reporting it Unchanged would keep the loaded directory admitting
+        // peers the replacement dropped. Fail closed to deny-all instead; a proper versioned
+        // successor chained onto last-good self-heals. Compare hashes BEFORE the fast path.
+        match bundle_body_sha256(&bundle) {
+            Ok(on_disk) if on_disk != current_body_sha256 => {
+                return Ok(ReloadOutcome::CurrentBodyReplaced);
+            }
+            Ok(_) => {}
+            Err(error) => return Err(DirectoryReloadError::Verify(error)),
+        }
         // The unchanged fast path must be exactly as strict as a restart: an operator can
         // change the trusted-issuer set (raise `minVersion`, or rotate/remove the signing
         // issuer) while the on-disk bundle is byte-unchanged. Re-read the current trust so
@@ -874,6 +904,25 @@ fn directory_reload_step(
                 target: chio_federation_transport_iroh::observability::TARGET_ADMISSION,
                 "transport directory signing issuer is no longer trusted; admitting nothing \
                  until a successor signed by a currently trusted issuer is published"
+            );
+        }
+        Ok(ReloadOutcome::CurrentBodyReplaced) => {
+            // The on-disk bundle carries the running version but a different body: the file
+            // was replaced without a version bump, so it cannot be trusted as a monotone
+            // successor. Fail closed to deny-all rather than keep the loaded directory
+            // admitting. last-good is KEPT (state untouched): a properly versioned successor
+            // chained onto the running directory self-heals admission without a restart.
+            gate.swap(Arc::new(
+                chio_federation_transport_iroh::identity::VerifiedDirectory::empty_deny_all(),
+            ));
+            alive.store(false, Ordering::SeqCst);
+            chio_federation_transport_iroh::metrics::record_directory_reload(
+                chio_federation_transport_iroh::metrics::RELOAD_CURRENT_BODY_REPLACED,
+            );
+            tracing::error!(
+                target: chio_federation_transport_iroh::observability::TARGET_ADMISSION,
+                "transport directory file was replaced at the running version with a different \
+                 body; admitting nothing until a properly versioned successor is published"
             );
         }
         Err(error) => {
@@ -1759,6 +1808,69 @@ mod tests {
             matches!(outcome, ReloadOutcome::TrustRootsChanged),
             "an unchanged bundle whose signing issuer left the trust roots must fail closed, \
              got {outcome:?}"
+        );
+    }
+
+    #[test]
+    fn reload_denies_same_version_bundle_whose_body_was_replaced() {
+        // A same-version bundle whose canonical body differs from the loaded one (the file
+        // was replaced without a version bump) must fail closed, not take the unchanged fast
+        // path. Reporting it Unchanged would keep the loaded directory admitting peers the
+        // replacement dropped. Here v1 is overwritten in place by a different v1 that
+        // tombstones the peer, still signed by the trusted issuer so it verifies but hashes
+        // differently.
+        let dir = tempfile::tempdir().unwrap();
+        let (_original_path, _original_issuers, expires_at, loaded_hash) =
+            write_test_bundle(dir.path(), 1, false, None);
+        // Overwrite bundle-1.json in place with a different v1 (peer tombstoned).
+        let (bundle_path, issuers_path, _expires, replaced_hash) =
+            write_test_bundle(dir.path(), 1, true, None);
+        assert_ne!(
+            loaded_hash, replaced_hash,
+            "the replacement body must differ so the hash gate can catch it"
+        );
+        let config = DirectoryReloadConfig {
+            interval: Duration::from_secs(60),
+            bundle_path,
+            trusted_issuers_path: issuers_path,
+            local_transport_endpoint: endpoint_from_seed(LOCAL_TRANSPORT_SEED),
+            local_kernel_id: LOCAL_KERNEL_ID.to_string(),
+        };
+        let now_in_window = expires_at - 1;
+
+        // Outcome-level: the loaded directory is the ORIGINAL v1 (loaded_hash); the on-disk
+        // file is now a different v1, so the fast path fails closed rather than Unchanged.
+        let outcome =
+            reload_verified_directory(&config, now_in_window, 1, expires_at, &loaded_hash)
+                .expect("reload runs");
+        assert!(
+            matches!(outcome, ReloadOutcome::CurrentBodyReplaced),
+            "a same-version bundle whose body was replaced must fail closed, got {outcome:?}"
+        );
+
+        // Step-level: the gate flips to deny-all, the alarm is raised, and last-good is
+        // preserved so a properly versioned successor can self-heal.
+        let gate = DirectoryGate::new(verified_directory("did:chio:bob", 24));
+        assert_eq!(gate.current_version(), 1);
+        let alive = AtomicBool::new(true);
+        let mut state = ReloadState {
+            version: 1,
+            body_sha256: loaded_hash.clone(),
+            expires_at_unix_ms: expires_at,
+        };
+        directory_reload_step(&gate, &config, now_in_window, &mut state, &alive);
+        assert_eq!(
+            gate.current_version(),
+            0,
+            "a replaced same-version body fails closed to deny-all"
+        );
+        assert!(
+            !alive.load(Ordering::SeqCst),
+            "a replaced same-version body raises the fail-closed alarm"
+        );
+        assert_eq!(
+            state.version, 1,
+            "last-good is preserved so a properly versioned successor can self-heal"
         );
     }
 
