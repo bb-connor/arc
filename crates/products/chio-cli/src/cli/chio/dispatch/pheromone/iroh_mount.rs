@@ -491,6 +491,11 @@ pub(crate) enum ReloadOutcome {
     /// NOT proceed as an admit; fail closed to deny-all (RFC-0012 F34 local-binding
     /// recheck, mirroring the startup binding check).
     LocalBindingRevoked,
+    /// The on-disk bundle is UNCHANGED and still in-window, but its version is below a
+    /// trusted `minVersion` that operators raised above it. A restart would reject it
+    /// via `transport_bundle_trust`; the unchanged fast path must fail closed to
+    /// deny-all identically rather than keep admitting until expiry.
+    BelowMinVersionFloor,
 }
 
 /// Inputs for the bounded poll reloader. The reloader deliberately advances its
@@ -582,6 +587,24 @@ pub(crate) fn reload_verified_directory(
     // bundle needs no re-verify. Guarded by `!expired` so an expired bundle can
     // never be short-circuited as Unchanged.
     if !expired && bundle.body.version == current_version {
+        // Honor the trusted minVersion floor on the UNCHANGED path too.
+        // If operators raise `minVersion` above the running version while the bundle is
+        // otherwise unchanged, a restart would reject the directory via
+        // `transport_bundle_trust`; the fast path must fail closed identically rather than
+        // keep admitting under a below-floor directory until expiry. Read the trusted
+        // issuers to learn the current floor. A transient read error must NOT tear down a
+        // still-in-window directory, so keep last-good (`Err(Read)`) exactly as the
+        // strictly-newer path does.
+        let (_issuers, trusted_min_version) =
+            match read_trusted_issuers(&config.trusted_issuers_path) {
+                Ok(parsed) => parsed,
+                Err(error) => return Err(DirectoryReloadError::Read(error)),
+            };
+        // minVersion is INCLUSIVE: a directory at `current_version` is admissible only
+        // when `current_version >= trusted_min_version`. Below that floor, fail closed.
+        if current_version < trusted_min_version {
+            return Ok(ReloadOutcome::BelowMinVersionFloor);
+        }
         return Ok(ReloadOutcome::Unchanged);
     }
 
@@ -750,8 +773,7 @@ fn directory_reload_step(
             // bound transport endpoint (tombstone, endpoint rotation, or endpoint
             // reassignment). The endpoint is still bound with the old key, so admitting
             // peers from the successor would serve ingress under a revoked identity. Fail
-            // closed to deny-all and raise the same alarm as expiry (RFC-0012 F34
-            // local-binding recheck). last-good is KEPT: a later successor that re-binds
+            // closed to deny-all and raise the same alarm as expiry. last-good is KEPT: a later successor that re-binds
             // this node self-heals admission without a restart.
             gate.swap(Arc::new(
                 chio_federation_transport_iroh::identity::VerifiedDirectory::empty_deny_all(),
@@ -765,6 +787,26 @@ fn directory_reload_step(
                 "transport directory successor no longer binds this node's local transport \
                  endpoint (tombstoned, rotated, or reassigned); admitting nothing until a \
                  successor rebinds this node"
+            );
+        }
+        Ok(ReloadOutcome::BelowMinVersionFloor) => {
+            // The running directory is unchanged and in-window but its version is below a
+            // trusted minVersion operators raised above it. A restart would reject it, so
+            // fail closed to deny-all rather than keep admitting on the fast path until
+            // expiry. last-good is KEPT (state untouched): a later successor at or above the
+            // floor, chained onto the running directory, self-heals admission without a
+            // restart.
+            gate.swap(Arc::new(
+                chio_federation_transport_iroh::identity::VerifiedDirectory::empty_deny_all(),
+            ));
+            alive.store(false, Ordering::SeqCst);
+            chio_federation_transport_iroh::metrics::record_directory_reload(
+                chio_federation_transport_iroh::metrics::RELOAD_BELOW_MIN_VERSION,
+            );
+            tracing::error!(
+                target: chio_federation_transport_iroh::observability::TARGET_ADMISSION,
+                "transport directory version is below the trusted minVersion floor operators \
+                 raised; admitting nothing until a successor at or above the floor is published"
             );
         }
         Err(error) => {
@@ -1775,6 +1817,63 @@ mod tests {
         assert!(
             matches!(error, DirectoryReloadError::Verify(_)),
             "a version-2 successor is rejected once minVersion is raised to 10, got {error:?}"
+        );
+    }
+
+    #[test]
+    fn directory_reload_denies_unchanged_directory_below_raised_min_version() {
+        // Raising minVersion above the running version must fail the running directory
+        // closed on the next reload even when the on-disk bundle is unchanged (same
+        // version): the unchanged fast path must not short-circuit to Unchanged before
+        // honoring the minVersion floor a restart would enforce via transport_bundle_trust.
+        // A version-1 directory whose issuers now pin minVersion 5 is below the floor, so
+        // the reload fails closed to BelowMinVersionFloor and the gate flips to deny-all.
+        let dir = tempfile::tempdir().unwrap();
+        let (bundle_path, _issuers, expires_at, body_hash) =
+            write_test_bundle(dir.path(), 1, false, None);
+        // Raise minVersion to 5 while the running (and on-disk) version stays 1.
+        let issuers_path = write_issuers_with_min_version(dir.path(), 5);
+        let config = DirectoryReloadConfig {
+            interval: Duration::from_secs(60),
+            bundle_path,
+            trusted_issuers_path: issuers_path,
+            local_transport_endpoint: endpoint_from_seed(LOCAL_TRANSPORT_SEED),
+            local_kernel_id: LOCAL_KERNEL_ID.to_string(),
+        };
+        let now_in_window = expires_at - 1;
+
+        // Outcome-level: the unchanged (v1 == on-disk) directory below the raised floor
+        // fails closed rather than short-circuiting to Unchanged.
+        let outcome = reload_verified_directory(&config, now_in_window, 1, expires_at, &body_hash)
+            .expect("reload runs");
+        assert!(
+            matches!(outcome, ReloadOutcome::BelowMinVersionFloor),
+            "an unchanged directory below a raised minVersion must fail closed, not Unchanged"
+        );
+
+        // Step-level: the gate flips to deny-all, the alarm is raised, and last-good is
+        // preserved so a successor at or above the floor can self-heal.
+        let gate = DirectoryGate::new(verified_directory("did:chio:bob", 24));
+        assert_eq!(gate.current_version(), 1);
+        let alive = AtomicBool::new(true);
+        let mut state = ReloadState {
+            version: 1,
+            body_sha256: body_hash.clone(),
+            expires_at_unix_ms: expires_at,
+        };
+        directory_reload_step(&gate, &config, now_in_window, &mut state, &alive);
+        assert_eq!(
+            gate.current_version(),
+            0,
+            "a below-min-version directory fails closed to deny-all"
+        );
+        assert!(
+            !alive.load(Ordering::SeqCst),
+            "a below-min-version directory raises the fail-closed alarm"
+        );
+        assert_eq!(
+            state.version, 1,
+            "last-good is preserved so a successor at/above the floor can self-heal"
         );
     }
 

@@ -423,11 +423,18 @@ pub const RELOAD_EXPIRED_FAILCLOSED: &str = "expired_failclosed";
 /// the gate was swapped to deny-all (fail-closed) and an alarm raised. Operators
 /// alert on this being non-zero (RFC-0012 F34 local-binding recheck).
 pub const RELOAD_BINDING_REVOKED: &str = "binding_revoked";
+/// Reload outcome: the running directory is UNCHANGED but its version is below a
+/// trusted `minVersion` that operators raised above it; the unchanged fast path
+/// honored the raised floor and swapped the gate to deny-all (fail-closed) with an
+/// alarm, exactly as a restart would reject it. Operators alert on this being
+/// non-zero.
+pub const RELOAD_BELOW_MIN_VERSION: &str = "below_min_version";
 /// Reload outcome: a transient read/verify/rollback error; last-good is kept.
 pub const RELOAD_ERROR: &str = "error";
-const NUM_RELOAD_OUTCOME: usize = 5;
+const NUM_RELOAD_OUTCOME: usize = 6;
 
 static DIRECTORY_RELOAD: [AtomicU64; NUM_RELOAD_OUTCOME] = [
+    AtomicU64::new(0),
     AtomicU64::new(0),
     AtomicU64::new(0),
     AtomicU64::new(0),
@@ -441,7 +448,8 @@ fn reload_outcome_index(outcome: &str) -> usize {
         "unchanged" => 1,
         "expired_failclosed" => 2,
         "binding_revoked" => 3,
-        _ => 4, // error
+        "below_min_version" => 4,
+        _ => 5, // error
     }
 }
 
@@ -651,6 +659,7 @@ pub fn render_iroh_transport_metrics_prometheus() -> String {
         RELOAD_UNCHANGED,
         RELOAD_EXPIRED_FAILCLOSED,
         RELOAD_BINDING_REVOKED,
+        RELOAD_BELOW_MIN_VERSION,
         RELOAD_ERROR,
     ] {
         push_labeled(
