@@ -787,6 +787,90 @@ fn streamed_tool_byte_limit_truncates_output_and_marks_receipt_incomplete() {
 }
 
 #[test]
+fn redaction_reapplies_stream_chunk_cap() {
+    // codex finding 3555410410 (RFC-0004 F06): apply_stream_limits runs on the
+    // ORIGINAL tool output, before the post-invocation pipeline. A Redact hook that
+    // emits a stream with more chunks than `max_stream_chunks` would otherwise
+    // bypass the retained-chunk cap and grow the final signed output and receipt
+    // preimage past the configured budget. The redacted stream must be re-capped.
+    struct OversizeRedactHook;
+    impl crate::post_invocation::PostInvocationHook for OversizeRedactHook {
+        fn name(&self) -> &str {
+            "oversize-redact"
+        }
+        fn inspect(
+            &self,
+            _ctx: &crate::post_invocation::PostInvocationContext<'_>,
+            _response: &serde_json::Value,
+        ) -> crate::post_invocation::PostInvocationVerdict {
+            // Redact to a 5-chunk COMPLETE stream regardless of the input.
+            crate::post_invocation::PostInvocationVerdict::Redact(serde_json::json!({
+                "kind": "stream",
+                "stream": {
+                    "complete": true,
+                    "chunks": [ {"n": 0}, {"n": 1}, {"n": 2}, {"n": 3}, {"n": 4} ],
+                }
+            }))
+        }
+    }
+
+    let mut config = make_config();
+    config.max_stream_total_bytes = 0; // unlimited bytes: isolate the chunk cap
+    config.memory_budget.max_stream_chunks = 2;
+    let mut kernel = make_kernel(config);
+    kernel.add_post_invocation_hook(Box::new(OversizeRedactHook));
+
+    let agent_kp = make_keypair();
+    let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+    let request = make_request("req-redact-recap", &cap, "read_file", "srv-a");
+
+    // The ORIGINAL output is a small 1-chunk stream that passes the first cap pass.
+    let output = ToolServerOutput::Stream(ToolServerStreamResult::Complete(ToolCallStream {
+        chunks: vec![ToolCallChunk {
+            data: serde_json::json!({"orig": true}),
+        }],
+    }));
+
+    let response = kernel
+        .finalize_tool_output_with_metadata(
+            &request,
+            output,
+            std::time::Duration::from_secs(0),
+            100,
+            0,
+            None,
+        )
+        .unwrap();
+
+    // RED (pre-fix): the redacted 5-chunk stream was signed and receipted verbatim.
+    // GREEN: it is truncated to the 2-chunk cap and marked incomplete.
+    let output_stream = tool_call_stream_output(response.output).expect("expected stream output");
+    assert!(
+        output_stream.chunk_count() <= 2,
+        "redacted stream bypassed the chunk cap: {} chunks",
+        output_stream.chunk_count()
+    );
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .unwrap_or("")
+            .contains("max chunk count of 2"),
+        "unexpected reason: {:?}",
+        response.reason
+    );
+    // The receipt preimage is bounded to the same retained-chunk count.
+    let stream_metadata = response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("stream"))
+        .expect("stream metadata");
+    assert_eq!(stream_metadata["chunks_received"].as_u64(), Some(2));
+}
+
+#[test]
 fn apply_stream_limits_marks_duration_exceeded_stream_incomplete() {
     let mut config = make_config();
     config.max_stream_duration_secs = 1;

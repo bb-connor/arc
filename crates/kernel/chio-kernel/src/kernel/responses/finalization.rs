@@ -117,8 +117,16 @@ impl ChioKernel {
                 })
             }
             crate::post_invocation::PostInvocationVerdict::Redact(redacted) => {
+                // Redaction replaces the retained stream with hook-supplied
+                // content that never passed `apply_stream_limits` (that ran on the
+                // ORIGINAL output, before this hook). Re-apply the byte + chunk
+                // caps to the redacted stream so a sanitizer/custom hook that emits
+                // more than `max_stream_total_bytes` / `max_stream_chunks` cannot
+                // grow the final signed output and receipt preimage past the
+                // configured budget (RFC-0004 F06, codex finding 3555410410).
+                let redacted_output = self.apply_redacted_output(redacted)?;
                 Ok(PostInvocationHandling {
-                    output: self.apply_redacted_output(redacted)?,
+                    output: self.reapply_stream_caps_after_redaction(redacted_output)?,
                     extra_metadata: metadata,
                     blocked_reason: None,
                     evidence: outcome.evidence,
@@ -160,6 +168,60 @@ impl ChioKernel {
         redacted: serde_json::Value,
     ) -> Result<ToolServerOutput, KernelError> {
         parse_redacted_output(redacted)
+    }
+
+    /// Re-apply the byte + chunk stream caps to output produced by a
+    /// post-invocation `Redact` hook.
+    ///
+    /// `apply_stream_limits` runs on the ORIGINAL tool output, before the
+    /// post-invocation pipeline. A `Redact` verdict swaps in hook-supplied content
+    /// that has not been capped, so without this pass a hook could emit a stream
+    /// with more than `max_stream_chunks` retained chunks (or more than
+    /// `max_stream_total_bytes`) and grow the signed output and receipt preimage
+    /// past the configured budget (RFC-0004 F06, codex finding 3555410410).
+    ///
+    /// Only the retention caps are re-applied. The stream-duration limit is
+    /// intentionally NOT re-evaluated: it bounds tool execution time, not redacted
+    /// content, and was already decided on the original output. A non-stream
+    /// redacted output (a value) is returned unchanged. Any pre-existing
+    /// incomplete reason on the redacted stream is preserved unless a cap fires.
+    fn reapply_stream_caps_after_redaction(
+        &self,
+        output: ToolServerOutput,
+    ) -> Result<ToolServerOutput, KernelError> {
+        let ToolServerOutput::Stream(stream_result) = output else {
+            return Ok(output);
+        };
+
+        let (stream, base_reason) = match stream_result {
+            ToolServerStreamResult::Complete(stream) => (stream, None),
+            ToolServerStreamResult::Incomplete { stream, reason } => (stream, Some(reason)),
+        };
+
+        let (stream, _total_bytes, truncation_cause) = truncate_stream_to_limits(
+            &stream,
+            self.config.max_stream_total_bytes,
+            self.config.memory_budget.max_stream_chunks,
+        )?;
+
+        let reason = match truncation_cause {
+            Some(StreamTruncationCause::ByteLimit) => Some(format!(
+                "CHIO_SERVER_STREAM_LIMIT: stream exceeded max total bytes of {}",
+                self.config.max_stream_total_bytes
+            )),
+            Some(StreamTruncationCause::ChunkLimit) => Some(format!(
+                "CHIO_SERVER_STREAM_LIMIT: stream exceeded max chunk count of {}",
+                self.config.memory_budget.max_stream_chunks
+            )),
+            None => base_reason,
+        };
+
+        Ok(match reason {
+            Some(reason) => {
+                ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, reason })
+            }
+            None => ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)),
+        })
     }
 
     fn post_invocation_metadata(
