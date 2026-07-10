@@ -32,6 +32,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
+use subtle::ConstantTimeEq;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -199,7 +200,36 @@ pub trait RelayBatchReceiver: Send + Sync {
         authenticated_sender_kernel_id: String,
         received_at_unix_ms: u64,
     ) -> Result<PheromoneReceiveReport, PheromoneRelayError>;
+
+    /// Return a previously durably-recorded receive report for `batch_sha256` SCOPED
+    /// to `authenticated_sender_kernel_id`, if the runtime store committed one for that
+    /// (batch, sender) pair. Used to recover the verdict after a crash in the
+    /// commit-to-record window WITHOUT re-running `receive_batch` (which would re-enter
+    /// the replay window and reject already-accepted deposits). The sender scope is
+    /// mandatory: a batch hash is not sender-unique, so an unscoped lookup could return a
+    /// cross-sender verdict and adopt it under the wrong (sender, nonce) inbox key.
+    /// Default: `Ok(None)` (a receiver with no durable report cannot recover; the handler
+    /// then keeps its fail-closed loser path).
+    async fn recorded_report_for_batch(
+        &self,
+        _batch_sha256: &str,
+        _authenticated_sender_kernel_id: &str,
+    ) -> Result<Option<PheromoneReceiveReport>, PheromoneRelayError> {
+        Ok(None)
+    }
 }
+
+/// Optional process-wide metrics hook whose Prometheus output is appended to the
+/// relay `/metrics` body.
+///
+/// DEPLOYABILITY (iroh DUAL transport): the iroh federation-transport metric
+/// families live in `chio-federation-transport-iroh`, which already depends on
+/// this crate. Naming that crate here would be a dependency cycle, so this crate
+/// never references it. Instead the serving binary (`chio-cli`) injects a callback
+/// that renders those process-global families, and [`handle_metrics`] appends the
+/// callback output to its own Prometheus body. `None` (the default) keeps the
+/// `/metrics` response byte-identical to the pre-hook behavior.
+pub type ExtraMetricsHook = Arc<dyn Fn() -> String + Send + Sync>;
 
 #[derive(Clone)]
 pub struct PheromoneRelayService {
@@ -207,6 +237,7 @@ pub struct PheromoneRelayService {
     directory: PeerDirectory,
     receiver: Arc<dyn RelayBatchReceiver>,
     store: Arc<SqlitePheromoneRelayStore>,
+    extra_metrics: Option<ExtraMetricsHook>,
 }
 
 impl PheromoneRelayService {
@@ -222,7 +253,22 @@ impl PheromoneRelayService {
             directory,
             receiver,
             store,
+            extra_metrics: None,
         }
+    }
+
+    /// Attach an optional extra-metrics hook whose Prometheus output is appended to
+    /// the relay `/metrics` body.
+    ///
+    /// Additive by construction: callers that never invoke this keep the default
+    /// `None` and the `/metrics` response is byte-identical. Used to expose the
+    /// iroh federation-transport metric families on the live relay `/metrics`
+    /// surface WITHOUT this crate depending on the iroh transport crate (which
+    /// already depends on this crate, so such a dependency would be a cycle).
+    #[must_use]
+    pub fn with_extra_metrics_hook(mut self, hook: ExtraMetricsHook) -> Self {
+        self.extra_metrics = Some(hook);
+        self
     }
 
     pub async fn serve(self, listener: tokio::net::TcpListener) -> Result<(), PheromoneRelayError> {
@@ -367,11 +413,15 @@ async fn handle_metrics(
         .store
         .relay_metrics_snapshot(&service.config.local_kernel_id, now)
         .map_err(|error| relay_http_error(&service, error))?;
-    Ok((
-        [(header::CONTENT_TYPE, "text/plain; version=0.0.4")],
-        snapshot.render(RelayMetricsFormat::Prometheus),
-    )
-        .into_response())
+    let mut body = snapshot.render(RelayMetricsFormat::Prometheus);
+    if let Some(extra_metrics) = service.extra_metrics.as_ref() {
+        // Append the injected metric families (e.g. the iroh federation-transport
+        // process-global families) on the SAME scrape surface. Additive: with no
+        // hook set this branch is skipped and the body is unchanged.
+        body.push('\n');
+        body.push_str(&extra_metrics());
+    }
+    Ok(([(header::CONTENT_TYPE, "text/plain; version=0.0.4")], body).into_response())
 }
 
 async fn handle_batch_relay(
@@ -418,7 +468,15 @@ async fn handle_batch_relay(
     Ok(Json(report))
 }
 
-fn enforce_peer_batch_directory_scope(
+/// Enforce the inbound per-peer directory scope for a submitted batch: the sender
+/// must be an `Origin`/`Hub`, within its per-peer frame cap, subscribed to the
+/// batch treaty, and carry only directory-pinned transit ladders. Fail-closed.
+///
+/// Exposed (in addition to its use by [`handle_batch_relay`]) so a second ingress
+/// transport (the iroh federation-transport pheromone lane) can enforce the SAME
+/// scope gate against the SAME peer directory before it hands a batch to
+/// [`RelayBatchReceiver::receive_batch`]. Both transports therefore apply one gate.
+pub fn enforce_peer_batch_directory_scope(
     directory: &PeerDirectory,
     sender_kernel_id: &str,
     batch: &PheromoneGossipBatch,
@@ -563,7 +621,8 @@ pub(crate) fn authorize_operator(
     let authorized = headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| value == format!("Bearer {token}"));
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .is_some_and(|provided| provided.as_bytes().ct_eq(token.as_bytes()).into());
     if authorized {
         Ok(())
     } else {
@@ -679,7 +738,17 @@ pub async fn deliver_due_batches(
     Ok(report)
 }
 
-fn enforce_outbound_peer_batch_directory_scope(
+/// Enforce the OUTBOUND per-peer directory scope for a queued batch before it is
+/// dialed: the recipient must be a `Receiver`/`Hub` in the CURRENT directory, within
+/// its per-peer frame cap, subscribed to the batch treaty, and within its pinned
+/// transit ladders. Mirrors [`enforce_peer_batch_directory_scope`] (the inbound gate)
+/// on the send side.
+///
+/// The HTTP relay tick (`deliver_due_batches`) applies this before every
+/// `post_batch`; it is exposed so an iroh outbound drain (the relay tick's
+/// `--iroh-enable` path) applies the IDENTICAL scope gate against the same peer
+/// directory before it dials a recipient over the transport (fail-closed).
+pub fn enforce_outbound_peer_batch_directory_scope(
     directory: &PeerDirectory,
     recipient_kernel_id: &str,
     batch: &PheromoneGossipBatch,
@@ -788,4 +857,41 @@ pub(crate) fn sanitize_event_part(value: &str) -> String {
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use super::{PheromoneReceiveReport, RelayBatchReceiver};
+    use crate::PheromoneRelayError;
+    use async_trait::async_trait;
+    use chio_federation::pheromone_gossip::PheromoneGossipBatch;
+
+    struct SilentReceiver;
+
+    #[async_trait]
+    impl RelayBatchReceiver for SilentReceiver {
+        async fn receive_batch(
+            &self,
+            _batch: PheromoneGossipBatch,
+            _authenticated_sender_kernel_id: String,
+            _received_at_unix_ms: u64,
+        ) -> Result<PheromoneReceiveReport, PheromoneRelayError> {
+            unreachable!("not exercised by this test")
+        }
+    }
+
+    #[tokio::test]
+    async fn recorded_report_for_batch_defaults_to_none() {
+        let receiver = SilentReceiver;
+        let recovered = receiver
+            .recorded_report_for_batch("any-batch-hash", "did:chio:alice")
+            .await
+            .expect("default recovery method runs");
+        assert!(
+            recovered.is_none(),
+            "a receiver with no durable report cannot recover"
+        );
+    }
 }

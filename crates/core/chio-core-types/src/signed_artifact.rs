@@ -78,6 +78,7 @@ pub const CHIO_TRANSPARENCY_INCLUSION_PROOF_V1_SCHEMA: &str =
 pub const CHIO_POLICY_ACTIVATION_RECEIPT_V1_SCHEMA: &str = "chio.policy.activation-receipt.v1";
 pub const CHIO_RUNTIME_EXECUTION_LEASE_V1_SCHEMA: &str = "chio.runtime.execution-lease.v1";
 pub const CHIO_RUNTIME_TOOL_SERVER_ACK_V1_SCHEMA: &str = "chio.runtime.tool-server-ack.v1";
+pub const CHIO_RUNTIME_TRUSTED_TIME_PROOF_V1_SCHEMA: &str = "chio.runtime.trusted-time-proof.v1";
 pub const CHIO_RUNTIME_REVOCATION_FRESHNESS_PROOF_V1_SCHEMA: &str =
     "chio.runtime.revocation-freshness-proof.v1";
 pub const CHIO_RUNTIME_SANDBOX_ATTESTATION_V1_SCHEMA: &str = "chio.runtime.sandbox-attestation.v1";
@@ -123,6 +124,9 @@ pub const CHIO_RUNTIME_TERMINAL_RECEIPT_V1_SCHEMA: &str = "chio.runtime.terminal
 pub const CHIO_WEB3_SETTLEMENT_DISPATCH_V1_SCHEMA: &str = "chio.web3-settlement-dispatch.v1";
 pub const CHIO_WEB3_SETTLEMENT_EXECUTION_RECEIPT_V1_SCHEMA: &str =
     "chio.web3-settlement-execution-receipt.v1";
+pub const CHIO_WEB3_SETTLEMENT_DISPATCH_V2_SCHEMA: &str = "chio.web3-settlement-dispatch.v2";
+pub const CHIO_WEB3_SETTLEMENT_EXECUTION_RECEIPT_V2_SCHEMA: &str =
+    "chio.web3-settlement-execution-receipt.v2";
 pub const CHIO_WEB3_SETTLEMENT_PROOF_BUNDLE_V1_SCHEMA: &str =
     "chio.web3-settlement-proof-bundle.v1";
 pub const CHIO_PUBLIC_SETTLEMENT_VERIFIER_REPORT_V1_SCHEMA: &str =
@@ -152,15 +156,15 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     ),
     (
         CHIO_CAPABILITY_SCHEMA,
-        Some(("capability_token", "schema-registry/v1/capability-token")),
+        Some(("capability_token", "schema-registry/v1/capability-token-v1")),
     ),
     (
         CHIO_RECEIPT_SCHEMA,
-        Some(("receipt", "schema-registry/v1/receipt")),
+        Some(("receipt", "schema-registry/v1/receipt-v1")),
     ),
     (
         CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA,
-        Some(("receipt_lineage", "schema-registry/v1/receipt-lineage")),
+        Some(("receipt_lineage", "schema-registry/v1/receipt-lineage-v1")),
     ),
     (
         CHIO_ANCHOR_BATCH_V1_SCHEMA,
@@ -324,7 +328,7 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         CHIO_ATTEST_SELECTIVE_DISCLOSURE_PROOF_V1_SCHEMA,
         Some((
             "chio_attest_selective_disclosure_proof",
-            "crypto-context-v1",
+            "chio-final-architecture/v1",
         )),
     ),
     (
@@ -365,6 +369,10 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
         CHIO_RUNTIME_TOOL_SERVER_ACK_V1_SCHEMA,
         Some(("runtime_tool_server_ack", "runtime-security-v1")),
+    ),
+    (
+        CHIO_RUNTIME_TRUSTED_TIME_PROOF_V1_SCHEMA,
+        Some(("runtime_trusted_time_proof", "runtime-security-v1")),
     ),
     (
         CHIO_RUNTIME_REVOCATION_FRESHNESS_PROOF_V1_SCHEMA,
@@ -488,6 +496,14 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
         CHIO_WEB3_SETTLEMENT_EXECUTION_RECEIPT_V1_SCHEMA,
         Some(("web3_settlement_execution_receipt", "public-settlement-v1")),
+    ),
+    (
+        CHIO_WEB3_SETTLEMENT_DISPATCH_V2_SCHEMA,
+        Some(("web3_settlement_dispatch", "public-settlement-v2")),
+    ),
+    (
+        CHIO_WEB3_SETTLEMENT_EXECUTION_RECEIPT_V2_SCHEMA,
+        Some(("web3_settlement_execution_receipt", "public-settlement-v2")),
     ),
     (
         CHIO_WEB3_SETTLEMENT_PROOF_BUNDLE_V1_SCHEMA,

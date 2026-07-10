@@ -15,6 +15,18 @@ pub(crate) struct ClusterStatusResponse {
     pub(crate) authority_lease: Option<ClusterAuthorityLeaseView>,
     pub(crate) replication: ClusterReplicationHeadsView,
     pub(crate) peers: Vec<PeerStatusView>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) budget_ack_heads: Vec<BudgetOriginAck>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BudgetOriginAck {
+    pub(crate) origin_id: String,
+    /// Contiguous ack head: the highest event_seq S from origin_id such that
+    /// every event in (floor..S] is present (no gap) down to the durable
+    /// trusted floor. NOT MAX(event_seq), NOT anchored on MIN(present).
+    pub(crate) event_seq: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -70,6 +82,31 @@ pub(crate) struct ClusterStateSnapshotResponse {
     pub(crate) budgets: Vec<BudgetUsageView>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) budget_mutation_events: Vec<BudgetMutationEventView>,
+    /// Abandoned/tombstoned budget event_seqs (rolled-back-then-re-appended
+    /// writes' original seqs), range-encoded as inclusive `(start, end)` runs.
+    /// Carried so a fresh follower treats these slots as filled and its contiguous
+    /// ack head does not stall at the hole. Range-encoded rather than one entry per
+    /// seq so a rollback storm - which abandons a long contiguous run - stays a
+    /// handful of small pairs instead of millions of integers that would push the
+    /// snapshot body past MAX_PEER_RESPONSE_BYTES and permanently break the
+    /// force-snapshot recovery path. Additive and default-empty: a mixed-version
+    /// peer that omits it simply relies on the delete-trigger path, never on a
+    /// wrong value.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) budget_abandoned_seq_ranges: Vec<AbandonedSeqRange>,
+}
+
+/// A contiguous run of abandoned/tombstoned budget event_seqs, inclusive on both
+/// ends. The cluster snapshot carries the abandoned set as a list of these runs so
+/// a rollback storm collapses to a few small pairs rather than an unbounded integer
+/// list that could exceed MAX_PEER_RESPONSE_BYTES. Lossless: a follower expands each
+/// run to the identical seq set, preserving the filled-or-abandoned head-advance
+/// semantics.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AbandonedSeqRange {
+    pub(crate) start: u64,
+    pub(crate) end: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -301,6 +338,12 @@ pub(crate) struct BudgetDeltaResponse {
     pub(crate) records: Vec<BudgetUsageView>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) mutation_events: Vec<BudgetMutationEventView>,
+    /// Abandoned/tombstoned event_seqs above the cursor, so the puller can treat
+    /// those slots as filled when verifying the pulled page is gap-free and does
+    /// not demote a leader whose stream legitimately skips a rolled-back seq.
+    /// Additive and default-empty for mixed-version peers.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) abandoned_seqs: Vec<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -486,7 +529,10 @@ impl<'de> Deserialize<'de> for TryChargeCostRequest {
             capability_id: wire.capability_id,
             grant_index: wire.grant_index,
             max_invocations: wire.max_invocations,
-            cost_units: require_budget_amount(wire.exposure_units, "`exposureUnits`")?,
+            cost_units: super::responses::require_budget_amount(
+                wire.exposure_units,
+                "`exposureUnits`",
+            )?,
             max_cost_per_invocation: wire.max_exposure_per_invocation,
             max_total_cost_units: wire.max_total_exposure_units,
             hold_id: wire.hold_id,
@@ -619,7 +665,10 @@ impl<'de> Deserialize<'de> for ReverseChargeCostRequest {
         Ok(Self {
             capability_id: wire.capability_id,
             grant_index: wire.grant_index,
-            cost_units: require_budget_amount(wire.exposure_units, "`exposureUnits`")?,
+            cost_units: super::responses::require_budget_amount(
+                wire.exposure_units,
+                "`exposureUnits`",
+            )?,
             hold_id: wire.hold_id,
             event_id: wire.event_id,
         })
@@ -865,5 +914,106 @@ impl<'de> Deserialize<'de> for ReduceChargeCostResponse {
             budget_authority: wire.budget_authority,
             budget_commit: wire.budget_commit,
         })
+    }
+}
+
+#[cfg(test)]
+mod cluster_lease_rpc_tests {
+    use chio_test_support::prelude::*;
+
+    use super::{LeaseHeartbeatRequest, LeaseTerminateRequest, LeaseTerminationReason};
+
+    #[test]
+    fn lease_heartbeat_request_round_trips_camel_case() {
+        let request = LeaseHeartbeatRequest {
+            lease_id: "lease-7".to_string(),
+            lease_epoch: 3,
+            leader_url: "https://node-a.example/v1".to_string(),
+            observed_at: 1_700_000_000_000,
+            proposed_expires_at: Some(1_700_000_030_000),
+        };
+        let value = serde_json::to_value(&request).test_unwrap();
+        assert_eq!(value["leaseId"], "lease-7");
+        assert_eq!(value["leaseEpoch"], 3);
+        assert_eq!(value["leaderUrl"], "https://node-a.example/v1");
+        assert_eq!(value["observedAt"], 1_700_000_000_000u64);
+        assert_eq!(value["proposedExpiresAt"], 1_700_000_030_000u64);
+
+        let decoded: LeaseHeartbeatRequest = serde_json::from_value(value).test_unwrap();
+        assert_eq!(decoded.lease_id, request.lease_id);
+        assert_eq!(decoded.lease_epoch, request.lease_epoch);
+        assert_eq!(decoded.proposed_expires_at, request.proposed_expires_at);
+    }
+
+    #[test]
+    fn lease_heartbeat_request_optional_expiry_is_omitted_when_absent() {
+        let json =
+            r#"{"leaseId":"lease-1","leaseEpoch":0,"leaderUrl":"https://n/1","observedAt":1}"#;
+        let decoded: LeaseHeartbeatRequest = serde_json::from_str(json).test_unwrap();
+        assert!(decoded.proposed_expires_at.is_none());
+        let reserialized = serde_json::to_value(&decoded).test_unwrap();
+        assert!(reserialized.get("proposedExpiresAt").is_none());
+    }
+
+    #[test]
+    fn lease_heartbeat_request_rejects_unknown_field() {
+        let json = r#"{"leaseId":"lease-1","leaseEpoch":0,"leaderUrl":"https://n/1","observedAt":1,"rogue":true}"#;
+        assert!(serde_json::from_str::<LeaseHeartbeatRequest>(json).is_err());
+    }
+
+    #[test]
+    fn lease_heartbeat_request_rejects_negative_epoch() {
+        let json =
+            r#"{"leaseId":"lease-1","leaseEpoch":-1,"leaderUrl":"https://n/1","observedAt":1}"#;
+        assert!(serde_json::from_str::<LeaseHeartbeatRequest>(json).is_err());
+    }
+
+    #[test]
+    fn lease_terminate_request_round_trips_with_typed_reason() {
+        let request = LeaseTerminateRequest {
+            lease_id: "lease-9".to_string(),
+            lease_epoch: 5,
+            leader_url: "https://node-b.example/v1".to_string(),
+            reason: LeaseTerminationReason::LeaderHandoff,
+            observed_at: 1_700_000_100_000,
+            successor_leader_url: Some("https://node-c.example/v1".to_string()),
+        };
+        let value = serde_json::to_value(&request).test_unwrap();
+        assert_eq!(value["reason"], "leader_handoff");
+        assert_eq!(value["successorLeaderUrl"], "https://node-c.example/v1");
+
+        let decoded: LeaseTerminateRequest = serde_json::from_value(value).test_unwrap();
+        assert_eq!(decoded.reason, LeaseTerminationReason::LeaderHandoff);
+        assert_eq!(decoded.successor_leader_url, request.successor_leader_url);
+    }
+
+    #[test]
+    fn lease_termination_reason_variants_use_snake_case() {
+        for (reason, wire) in [
+            (LeaseTerminationReason::LeaderHandoff, "leader_handoff"),
+            (LeaseTerminationReason::QuorumLost, "quorum_lost"),
+            (
+                LeaseTerminationReason::OperatorStepdown,
+                "operator_stepdown",
+            ),
+            (LeaseTerminationReason::TermAdvanced, "term_advanced"),
+        ] {
+            assert_eq!(serde_json::to_value(reason).test_unwrap(), wire);
+            let decoded: LeaseTerminationReason =
+                serde_json::from_value(serde_json::json!(wire)).test_unwrap();
+            assert_eq!(decoded, reason);
+        }
+    }
+
+    #[test]
+    fn lease_terminate_request_rejects_unknown_reason() {
+        let json = r#"{"leaseId":"l","leaseEpoch":0,"leaderUrl":"https://n/1","reason":"mutiny","observedAt":1}"#;
+        assert!(serde_json::from_str::<LeaseTerminateRequest>(json).is_err());
+    }
+
+    #[test]
+    fn lease_terminate_request_rejects_unknown_field() {
+        let json = r#"{"leaseId":"l","leaseEpoch":0,"leaderUrl":"https://n/1","reason":"quorum_lost","observedAt":1,"rogue":1}"#;
+        assert!(serde_json::from_str::<LeaseTerminateRequest>(json).is_err());
     }
 }

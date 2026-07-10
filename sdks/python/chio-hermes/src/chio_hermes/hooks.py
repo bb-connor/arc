@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import logging
 import time
-import warnings
 from collections.abc import Callable
 from typing import Any
 
@@ -30,6 +29,20 @@ def _is_chio_tool(tool_name: str | None) -> bool:
     return isinstance(tool_name, str) and tool_name.startswith("chio_")
 
 
+def _block_pre_tool_call(
+    message: str,
+    *,
+    guard: str | None = None,
+    reason: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "action": "block",
+        "message": message,
+        "guard": guard,
+        "reason": reason,
+    }
+
+
 def make_pre_tool_call(handle: RuntimeHandle) -> PreHook:
     def pre_tool_call(
         tool_name: str | None = None,
@@ -46,8 +59,12 @@ def make_pre_tool_call(handle: RuntimeHandle) -> PreHook:
 
         try:
             from chio_code_agent.errors import ChioCodeAgentDeniedError
-        except Exception:
-            return None
+        except Exception as exc:
+            return _block_pre_tool_call(
+                f"Chio local policy unavailable: {exc}",
+                guard="chio_policy_error",
+                reason="policy_unavailable",
+            )
 
         try:
             if tool_name in {"chio_file_read", "chio_file_list", "chio_file_search"}:
@@ -76,18 +93,32 @@ def make_pre_tool_call(handle: RuntimeHandle) -> PreHook:
                 handle.policy.check_git(shell_form)
                 handle.policy.check_shell(shell_form)
             elif tool_name == "chio_git_add":
-                for path in params.get("paths", []) or []:
+                paths = params.get("paths", []) or []
+                if isinstance(paths, str):
+                    paths = [paths]
+                if not isinstance(paths, list) or not all(
+                    isinstance(path, str) for path in paths
+                ):
+                    return _block_pre_tool_call(
+                        "chio_git_add requires paths to be an array of strings",
+                        guard="chio_policy_error",
+                        reason="invalid_paths",
+                    )
+                for path in paths:
                     handle.policy.check_write(path, cwd=handle.cwd)
         except ChioCodeAgentDeniedError as exc:
             _ = task_id  # reserved for future telemetry
-            return {
-                "action": "block",
-                "message": str(exc),
-                "guard": getattr(exc, "guard", None),
-                "reason": getattr(exc, "reason", None),
-            }
-        except Exception:  # noqa: BLE001 - never crash Hermes from a hook
-            return None
+            return _block_pre_tool_call(
+                str(exc),
+                guard=getattr(exc, "guard", None),
+                reason=getattr(exc, "reason", None),
+            )
+        except Exception as exc:  # noqa: BLE001 - never crash Hermes from a hook
+            return _block_pre_tool_call(
+                f"Chio local policy check failed: {exc}",
+                guard="chio_policy_error",
+                reason="policy_error",
+            )
         return None
 
     return pre_tool_call
@@ -143,57 +174,10 @@ def _truncate_receipt_result(
     return head, True
 
 
-# Backwards-compat shims for the in-tree redaction helpers. The canonical
-# implementations now live in :mod:`chio_adapter_base.redact`. Internal
-# call sites within chio-hermes use :data:`_DEFAULT_REDACTION_POLICY`
-# directly so they do not trigger the deprecation warning. External
-# consumers that imported ``chio_hermes.hooks._BODY_REDACT_FIELDS`` or
-# ``chio_hermes.hooks._redact_args`` keep working for one release; both
-# will be removed in chio-hermes 0.2.0.
-
 _DEFAULT_REDACTION_POLICY: RedactionPolicy = RedactionPolicy.chio_default()
 """Module-private policy used by the post-tool-call hook."""
 
-
-def _deprecation_warn(symbol: str, replacement: str) -> None:
-    warnings.warn(
-        (
-            f"chio_hermes.hooks.{symbol} is deprecated; "
-            f"use {replacement}. Will be removed in chio-hermes 0.2.0."
-        ),
-        DeprecationWarning,
-        stacklevel=3,
-    )
-
-
-class _BodyRedactFieldsShim(dict):
-    """Dict subclass that warns on every external lookup.
-
-    Returning a real ``dict`` keeps ``_BODY_REDACT_FIELDS["chio_file_write"]``
-    and ``in`` checks working unchanged for any external caller that was
-    reaching into the table directly.
-    """
-
-    def _warn(self) -> None:
-        _deprecation_warn(
-            "_BODY_REDACT_FIELDS",
-            "chio_adapter_base.redact.RedactionPolicy.chio_default",
-        )
-
-    def __getitem__(self, key: str) -> tuple[str, ...]:
-        self._warn()
-        return super().__getitem__(key)
-
-    def get(self, key: str, default: Any = None) -> Any:
-        self._warn()
-        return super().get(key, default)
-
-    def __contains__(self, key: object) -> bool:
-        self._warn()
-        return super().__contains__(key)
-
-
-_BODY_REDACT_FIELDS: _BodyRedactFieldsShim = _BodyRedactFieldsShim(
+_BODY_REDACT_FIELDS: dict[str, tuple[str, ...]] = dict(
     _DEFAULT_REDACTION_POLICY.body_fields
 )
 
@@ -201,10 +185,7 @@ _BODY_REDACT_FIELDS: _BodyRedactFieldsShim = _BodyRedactFieldsShim(
 def _redact_args(
     tool_name: str | None, args: dict[str, Any]
 ) -> dict[str, Any]:
-    """Deprecated. Use ``chio_adapter_base.redact.redact_args`` instead."""
-    _deprecation_warn(
-        "_redact_args", "chio_adapter_base.redact.redact_args"
-    )
+    """Delegates to ``chio_adapter_base.redact.redact_args``."""
     return _adapter_base_redact_args(
         tool_name, args, policy=_DEFAULT_REDACTION_POLICY
     )
