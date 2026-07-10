@@ -1628,10 +1628,78 @@ fn delegated_reserving_child_sibling_share_freed_after_ttl_reap() {
     let _ = std::fs::remove_file(fixture.path);
 }
 
+fn delegated_invocation_reserve_request(
+    request_id: &str,
+    child: &CapabilityToken,
+    child_kp: &Keypair,
+) -> ToolCallRequest {
+    ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability: child.clone(),
+        tool_name: "compute".to_string(),
+        server_id: "limited-srv".to_string(),
+        agent_id: child_kp.public_key().to_hex(),
+        arguments: serde_json::json!({}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    }
+}
+
+#[test]
+fn delegated_reserving_child_with_non_monetary_grant_releases_sibling_share() {
+    // A non-monetary grant (max_invocations only, no cost ceiling) yields no
+    // durable reserved hold to record a sibling share against. Child A's
+    // reserve-for-caller authorization must therefore release its admitted
+    // sibling-sum share immediately: there is nothing to reconcile or reap that
+    // would ever release it later. A second delegated child under the same
+    // parent must then still be admitted. Retaining the share would leak it for
+    // the parent's entire lifetime and wrongly deny later siblings.
+    let fixture = make_sibling_sum_invocation_fixture("delegated-reserve-non-monetary");
+    let mut kernel = fixture.kernel;
+    install_strict_nonce_store(&mut kernel);
+
+    let first = delegated_invocation_reserve_request(
+        "req-a-reserve",
+        &fixture.child_a,
+        &fixture.child_a_kp,
+    );
+    let reserved_a = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
+        .unwrap();
+    assert_eq!(
+        reserved_a.verdict,
+        Verdict::Allow,
+        "child A non-monetary reservation should be admitted: {:?}",
+        reserved_a.reason
+    );
+
+    let second = delegated_invocation_reserve_request(
+        "req-b-reserve",
+        &fixture.child_b,
+        &fixture.child_b_kp,
+    );
+    let admitted_b = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&second, None)
+        .unwrap();
+    assert_eq!(
+        admitted_b.verdict,
+        Verdict::Allow,
+        "child B must still be admitted: a non-monetary reserve has no hold to \
+         hold child A's share against, so the share must be released, not leaked: {:?}",
+        admitted_b.reason
+    );
+
+    let _ = std::fs::remove_file(fixture.path);
+}
+
 // ---------------------------------------------------------------------------
-// Finding 2: a failed reservation stamp must reverse the authorized hold, not
-// strand it open-and-unstamped where the TTL reaper (which only settles stamped
-// holds) would never reclaim it.
+// A failed reservation stamp must reverse the authorized hold, not strand it
+// open-and-unstamped where the TTL reaper (which only settles stamped holds)
+// would never reclaim it.
 // ---------------------------------------------------------------------------
 
 struct StampFailingBudgetStore {

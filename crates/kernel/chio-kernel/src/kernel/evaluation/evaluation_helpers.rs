@@ -137,18 +137,23 @@ impl ChioKernel {
     /// the tool itself (the sidecar mediated `/v1/evaluate` route).
     ///
     /// Unlike [`Self::build_execution_nonce_preflight_allow_response_after_cleanup`],
-    /// this KEEPS the pre-execution budget hold reserved (open): it does not
-    /// call `reverse_pre_execution_budget_mutation`. Only the in-memory
-    /// per-dispatch runtime-admission slot is released, because the tool never
-    /// dispatches on this kernel. The delegated child's sibling-sum share stays
-    /// admitted in `budget_registry` and is recorded against the reserved hold
-    /// (see `build_execution_nonce_preflight_allow_response_with_metadata`), so
-    /// an outstanding reservation still counts against the parent; it is
+    /// a monetary reservation KEEPS the pre-execution budget hold reserved
+    /// (open): it does not call `reverse_pre_execution_budget_mutation`. Only the
+    /// in-memory per-dispatch runtime-admission slot is released, because the tool
+    /// never dispatches on this kernel. The delegated child's sibling-sum share
+    /// stays admitted in `budget_registry` and is recorded against the reserved
+    /// hold (see `build_execution_nonce_preflight_allow_response_with_metadata`),
+    /// so an outstanding reservation still counts against the parent; it is
     /// released only when the hold closes (reconciled by nonce or reaped). The
     /// durable hold stays open so it also enforces `max_total_cost` against
     /// concurrent authorizations; it is reconciled at the execution site when
     /// the caller presents the minted nonce, or reclaimed by the crash reaper
     /// if the caller never executes (fail-closed, never over-subscribed).
+    ///
+    /// A non-monetary grant authorizes no reserved hold, so there is nothing to
+    /// record the sibling-sum share against or ever close; the share is released
+    /// immediately (as the reverse-for-retry preflight does) rather than leaked
+    /// for the parent's lifetime.
     ///
     /// The receipt records the reserved hold's authorize block with no terminal
     /// disposition, so it is truthfully non-authoritative: the hold is reserved,
@@ -165,6 +170,19 @@ impl ChioKernel {
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
                 runtime_admission_metadata,
             );
+
+        // A non-monetary grant (max_invocations-only or unlimited) authorizes no
+        // reserved monetary hold, so nothing durable exists to record the
+        // delegated child's admitted sibling-sum share against and later release
+        // it (reconcile-by-nonce and the TTL reaper both key off a hold). Release
+        // the share now, matching the reverse-for-retry preflight; otherwise it
+        // would stay admitted for the parent's whole lifetime, permanently
+        // shrinking its sibling-sum headroom. Only a monetary reserved hold below
+        // retains the share, recorded against the hold and released when it closes.
+        if budget_mutation.charge_result().is_none() {
+            self.release_admitted_capability_budget(&request.capability)
+                .map_err(KernelError::DelegationInvalid)?;
+        }
 
         // Record the reserved hold's authorize block with NO terminal event:
         // the hold is open, neither reversed nor reconciled. This is what keeps
