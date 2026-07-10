@@ -346,6 +346,18 @@ impl Guard for VelocityGuard {
             None => None,
         };
 
+        // A planned spend larger than the spend bucket's burst ceiling can never
+        // be admitted, however long the caller waits. Deny it before reserving or
+        // creating any bucket: a bucket for a spend that can never fit would only
+        // occupy a slot in the bounded table until the idle sweep reclaims it, and
+        // creating one here would also burn a reservation for a call that is
+        // certain to be denied.
+        if let (Some(max_spend), Some(cost)) = (spend_limit, spend_units) {
+            if cost > burst_capacity(max_spend, self.config.burst_factor) {
+                return Ok(GuardDecision::deny(Vec::new()));
+            }
+        }
+
         // Phase 1 - RESERVE. Secure a slot for EVERY genuinely-new bucket this
         // request needs across BOTH maps before consuming from EITHER. A brand-new
         // key with both limits enabled needs two slots (one per map); reserving
@@ -366,8 +378,7 @@ impl Guard for VelocityGuard {
         let state = &mut *state;
         let mut inv_bucket: Option<&mut TokenBucket> = match inv_limit {
             Some(max_inv) => {
-                // Burst capacity: max_inv * burst_factor, rounded to nearest integer.
-                let capacity = ((max_inv as f64 * self.config.burst_factor).round() as u64).max(1);
+                let capacity = burst_capacity(max_inv as u64, self.config.burst_factor);
                 Some(
                     state
                         .invocation_buckets
@@ -379,8 +390,7 @@ impl Guard for VelocityGuard {
         };
         let mut spend_bucket: Option<&mut TokenBucket> = match spend_limit {
             Some(max_spend) => {
-                let capacity =
-                    ((max_spend as f64 * self.config.burst_factor).round() as u64).max(1);
+                let capacity = burst_capacity(max_spend, self.config.burst_factor);
                 Some(
                     state
                         .spend_buckets
@@ -415,6 +425,13 @@ impl Guard for VelocityGuard {
 
         Ok(GuardDecision::allow())
     }
+}
+
+/// Burst ceiling in whole tokens: the steady per-window allowance scaled by the
+/// configured burst factor, rounded to the nearest token and floored at 1 so a
+/// bucket can always hold at least one token.
+fn burst_capacity(per_window: u64, burst_factor: f64) -> u64 {
+    ((per_window as f64 * burst_factor).round() as u64).max(1)
 }
 
 fn planned_spend_units(ctx: &GuardContext) -> Result<u64, KernelError> {
@@ -911,6 +928,85 @@ mod tests {
         );
         assert_eq!(guard.spend_bucket_count(), 2);
         assert_eq!(guard.combined_bucket_count(), 4);
+    }
+
+    #[test]
+    fn impossible_spend_denies_without_creating_a_bucket() {
+        // When a grant's per-invocation cost exceeds the spend bucket's burst
+        // ceiling the spend can never fit, so the request is always denied. It must
+        // NOT create a bucket: a bucket for a never-allowable spend would occupy a
+        // slot in the bounded table for a limit that can never fire.
+        let config = VelocityConfig {
+            max_invocations_per_window: None,
+            max_spend_per_window: Some(10),
+            window_secs: 60,
+            burst_factor: 1.0,
+        };
+        let guard = VelocityGuard::with_bucket_cap(config, 4);
+        let kp = Keypair::generate();
+        let agent = kp.public_key().to_hex();
+        let server = "srv".to_string();
+        // Cost 100 exceeds the burst ceiling of 10 (max_spend 10 * burst 1.0).
+        let scope = spend_scope(100);
+
+        let cap = signed_cap(&kp, "cap-impossible");
+        let request = make_request(&cap, &agent, &server);
+        let ctx = guard_ctx(&request, &scope, &agent, &server, Some(0));
+        assert_eq!(
+            guard.evaluate(&ctx).expect("impossible spend eval"),
+            Verdict::Deny,
+            "a spend larger than the burst ceiling can never fit and must be denied"
+        );
+        assert_eq!(
+            guard.spend_bucket_count(),
+            0,
+            "a never-allowable spend must not leave a bucket occupying a slot"
+        );
+        assert_eq!(guard.combined_bucket_count(), 0);
+    }
+
+    #[test]
+    fn impossible_spend_flood_does_not_populate_the_bounded_table() {
+        // A flood of distinct capability keys whose spend can never fit must not
+        // consume the bounded bucket table. Because no bucket is created for an
+        // impossible spend, a later affordable key still finds a free slot.
+        let config = VelocityConfig {
+            max_invocations_per_window: None,
+            max_spend_per_window: Some(10),
+            window_secs: 60,
+            burst_factor: 1.0,
+        };
+        let guard = VelocityGuard::with_bucket_cap(config, 2);
+        let kp = Keypair::generate();
+        let agent = kp.public_key().to_hex();
+        let server = "srv".to_string();
+        let impossible = spend_scope(100);
+
+        for i in 0..100u64 {
+            let cap = signed_cap(&kp, &format!("cap-impossible-{i}"));
+            let request = make_request(&cap, &agent, &server);
+            let ctx = guard_ctx(&request, &impossible, &agent, &server, Some(0));
+            assert_eq!(
+                guard.evaluate(&ctx).expect("impossible spend eval"),
+                Verdict::Deny,
+            );
+        }
+        assert_eq!(
+            guard.spend_bucket_count(),
+            0,
+            "a flood of never-allowable spends populated the bounded table"
+        );
+
+        // An affordable key (cost 5 <= ceiling 10) still fits and is allowed.
+        let affordable = spend_scope(5);
+        let cap = signed_cap(&kp, "cap-affordable");
+        let request = make_request(&cap, &agent, &server);
+        let ctx = guard_ctx(&request, &affordable, &agent, &server, Some(0));
+        assert_eq!(
+            guard.evaluate(&ctx).expect("affordable spend eval"),
+            Verdict::Allow,
+            "an affordable key must not be starved by never-allowable spends"
+        );
     }
 
     #[test]
