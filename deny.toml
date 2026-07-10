@@ -41,6 +41,10 @@ ignore = [
     # private-key signing is confined to tests. No upstream fix yet (tracked
     # in rsa#19).
     "RUSTSEC-2023-0071",
+    # last-checked = 2026-07-10; atomic-polyfill 1.0.3 is unmaintained (superseded by portable-atomic).
+    # It is pulled only transitively through heapless and ships no code Chio calls directly. Clears when
+    # the heapless chain migrates to portable-atomic.
+    "RUSTSEC-2023-0089",
     # last-checked = 2026-05-02; ansi_term is pulled only by dudect-bencher's legacy clap 2 harness for
     # local timing experiments. It is not linked into production binaries.
     "RUSTSEC-2021-0139",
