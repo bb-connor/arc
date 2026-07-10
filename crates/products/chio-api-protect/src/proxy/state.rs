@@ -241,6 +241,14 @@ pub(crate) struct ProxyState {
     pub(crate) trusted_receipt_signers: Vec<PublicKey>,
     pub(crate) sidecar_control_token: Option<String>,
     pub(crate) budget_store: Option<Arc<dyn chio_kernel::budget_store::BudgetStore>>,
+    /// Whether the configured `budget_store` implements the pre-execution hold
+    /// APIs the mediated reservation path depends on. `true` for the local SQLite
+    /// store, `false` for the remote control-plane store (which forwards only
+    /// charge/reverse/reconcile and cannot persist a durable reserved hold). The
+    /// mediated `/v1/evaluate` and `/v1/reconcile` routes reject fail-closed when
+    /// this is `false`, rather than mint a reserved nonce that can never be
+    /// reconciled by nonce or reclaimed by the TTL reaper.
+    pub(crate) mediation_hold_capable: bool,
     /// The process-lifetime kernel-mediation authority, built once when a budget
     /// store is configured. Held behind a `Mutex` because admitting the
     /// caller-named tool server (registration) needs `&mut self`, and reused
@@ -420,7 +428,12 @@ impl ProtectProxy {
 
         let egress_contract = default_upstream_egress_contract(&self.config.upstream)?;
         let http_client = client_builder_with_contract(&egress_contract).build()?;
-        let budget_store = build_budget_store(&self.config)?;
+        let configured_budget_store = build_budget_store(&self.config)?;
+        let mediation_hold_capable = configured_budget_store
+            .as_ref()
+            .map(|configured| configured.hold_capable)
+            .unwrap_or(false);
+        let budget_store = configured_budget_store.map(|configured| configured.store);
 
         // Automatic reconcile/reverse of open holds requires the durable receipt
         // log (ADR-0013) to build the realized-spend arbitration map. Without
@@ -479,6 +492,7 @@ impl ProtectProxy {
             trusted_receipt_signers,
             sidecar_control_token: self.config.sidecar_control_token.clone(),
             budget_store,
+            mediation_hold_capable,
             mediation_kernel,
             minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
                 chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,

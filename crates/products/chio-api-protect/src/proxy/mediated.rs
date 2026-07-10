@@ -12,11 +12,31 @@ use chio_kernel::{
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 
+/// A configured budget store together with whether it supports the pre-execution
+/// hold APIs the mediated reservation path depends on.
+///
+/// The local SQLite store implements `get_budget_hold`, `mark_hold_reserved`, and
+/// `reap_expired_reserved_holds`, so a reserved hold can be resolved by nonce on
+/// `/v1/reconcile` and reclaimed by the TTL reaper. The remote control-plane
+/// store forwards only charge/reverse/reconcile and falls back to the no-op trait
+/// defaults for those hold APIs, so a reservation minted against it could never
+/// be reconciled by nonce or reaped. Tracking hold-capability at the point of
+/// construction lets the mediated routes fail closed rather than mint an
+/// unreconcilable reserved nonce.
+pub(crate) struct ConfiguredBudgetStore {
+    pub(crate) store: Arc<dyn BudgetStore>,
+    pub(crate) hold_capable: bool,
+}
+
 /// Build the sidecar's budget store: remote under `--control-url`, else a local
 /// SQLite store, else `None` (the mediated route then denies fail-closed).
+///
+/// The remote store is not hold-capable and the local SQLite store is; the
+/// mediated authorization and reconcile routes reject fail-closed when the
+/// configured store cannot back a durable reserved hold.
 pub(crate) fn build_budget_store(
     config: &ProtectConfig,
-) -> Result<Option<Arc<dyn BudgetStore>>, ProtectError> {
+) -> Result<Option<ConfiguredBudgetStore>, ProtectError> {
     if let Some(control_url) = config.control_url.as_deref() {
         let token = config.control_token.as_deref().unwrap_or("");
         let store =
@@ -25,12 +45,18 @@ pub(crate) fn build_budget_store(
                 token,
             )
             .map_err(|error| ProtectError::Config(error.to_string()))?;
-        return Ok(Some(Arc::from(store)));
+        return Ok(Some(ConfiguredBudgetStore {
+            store: Arc::from(store),
+            hold_capable: false,
+        }));
     }
     if let Some(path) = config.budget_db.as_deref() {
         let store = chio_store_sqlite::budget_store::SqliteBudgetStore::open(path)
             .map_err(|error| ProtectError::Config(error.to_string()))?;
-        return Ok(Some(Arc::new(store)));
+        return Ok(Some(ConfiguredBudgetStore {
+            store: Arc::new(store),
+            hold_capable: true,
+        }));
     }
     Ok(None)
 }
@@ -238,6 +264,18 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
             "mediated tool-call route requires a configured budget store (--control-url or --budget-db)",
         );
     };
+    // A mediated reservation requires a hold-capable budget store. The remote
+    // control-plane store forwards only charge/reverse/reconcile and falls back to
+    // the no-op hold-API defaults, so a reservation minted against it could never
+    // be reconciled by nonce or reclaimed by the TTL reaper. Reject fail-closed
+    // rather than mint an unreconcilable reserved nonce.
+    if !state.mediation_hold_capable {
+        return internal_json_error_response(
+            "chio_mediation_requires_local_budget_store",
+            "mediated authorization requires a hold-capable local budget store (--budget-db); \
+             a remote control-plane budget store (--control-url) cannot persist a reserved hold",
+        );
+    }
     // Fail-closed: a capability released via `/v1/capabilities/release` is
     // recorded in the sidecar revocation set. Reject a revoked capability here,
     // mirroring the validate, proxy, and advisory paths, so a revoked token
@@ -263,6 +301,44 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     let request_id = parsed
         .request_id
         .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
+    // Durable over-subscription guard that survives a restart, which the
+    // in-memory window below cannot: after a restart the window is empty, but a
+    // reservation opened before the restart persists as an open budget hold. The
+    // kernel derives the hold id from (request_id, capability id, matched grant
+    // index), so reconstruct each candidate and reject fail-closed (409) when the
+    // hold-capable store already carries an open hold under this request_id. This
+    // stops a reused id from collapsing into an idempotent authorize that mints a
+    // second nonce against one open reservation without reserving more budget.
+    let Some(budget_store) = state.budget_store.as_ref() else {
+        return internal_json_error_response(
+            "chio_mediation_requires_local_budget_store",
+            "mediated authorization requires a configured hold-capable budget store",
+        );
+    };
+    for grant_index in 0..parsed.capability.scope.grants.len() {
+        let hold_id = format!(
+            "budget-hold:{}:{}:{}",
+            request_id, parsed.capability.id, grant_index
+        );
+        match budget_store.get_budget_hold(&hold_id) {
+            Ok(Some(hold)) if hold.disposition.is_open() => {
+                return (
+                    StatusCode::CONFLICT,
+                    axum::Json(serde_json::json!({
+                        "error": "chio_request_id_reused",
+                        "message":
+                            "request_id already backs an open reservation; choose a fresh request_id",
+                    })),
+                )
+                    .into_response();
+            }
+            Ok(_) => {}
+            Err(error) => {
+                warn!("durable hold lookup failed: {error}");
+                return internal_json_error_response("chio_mediation_failed", &error.to_string());
+            }
+        }
+    }
     // Fail-closed over-subscription guard: the kernel derives the durable budget
     // hold identity from `request_id`, so a reused id inside a live reservation
     // window would collapse into an idempotent authorize with no fresh
@@ -409,6 +485,17 @@ pub(crate) async fn sidecar_reconcile_handler(
             "reconcile route requires a configured budget store (--control-url or --budget-db)",
         );
     };
+    // A reserved hold can only be resolved by nonce when the budget store
+    // implements the hold APIs. The remote control-plane store cannot, so a
+    // reconcile against it could never settle the reserved hold the nonce names.
+    // Reject fail-closed rather than attempt a settle that cannot succeed.
+    if !state.mediation_hold_capable {
+        return internal_json_error_response(
+            "chio_mediation_requires_local_budget_store",
+            "mediated reconcile requires a hold-capable local budget store (--budget-db); \
+             a remote control-plane budget store (--control-url) cannot resolve a reserved hold",
+        );
+    }
     // Settle on the shared kernel. The same instance minted the nonce, so its
     // execution-nonce store is the single-use authority here: a forged, tampered,
     // or already-reconciled nonce is rejected. The lock releases at the end of
@@ -554,6 +641,28 @@ mod tests {
         trusted_capability_issuers: Vec<PublicKey>,
         sidecar_control_token: Option<String>,
     ) -> Arc<ProxyState> {
+        // The default in-memory budget store implements the hold APIs, so it is
+        // treated as hold-capable (matching a local `--budget-db` deployment).
+        mediated_test_state_inner(
+            signer,
+            budget,
+            trusted_capability_issuers,
+            sidecar_control_token,
+            true,
+        )
+    }
+
+    /// Build proxy state for the mediated route with an explicit hold-capability
+    /// flag. `hold_capable == false` models a remote `--control-url` budget store
+    /// whose hold APIs fall back to the no-op trait defaults, so the mediated
+    /// routes must fail closed rather than mint an unreconcilable reserved nonce.
+    fn mediated_test_state_inner(
+        signer: Keypair,
+        budget: Arc<dyn BudgetStore>,
+        trusted_capability_issuers: Vec<PublicKey>,
+        sidecar_control_token: Option<String>,
+        hold_capable: bool,
+    ) -> Arc<ProxyState> {
         let approval_store: Arc<dyn ApprovalStore> = Arc::new(InMemoryApprovalStore::new());
         let signer_public_key = signer.public_key();
         let mut trusted_capability_issuers = trusted_capability_issuers;
@@ -603,6 +712,7 @@ mod tests {
             trusted_receipt_signers,
             sidecar_control_token,
             budget_store: Some(budget),
+            mediation_hold_capable: hold_capable,
             mediation_kernel: Some(mediation_kernel),
             minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
                 chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
@@ -1290,6 +1400,153 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_authorization_requires_hold_capable_budget_store() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
+        let cap_id = cap.id.clone();
+        // hold_capable == false models a remote `--control-url` budget store whose
+        // hold APIs fall back to the no-op trait defaults, so a reserved hold can
+        // never be reconciled by nonce or reclaimed by the TTL reaper.
+        let state = mediated_test_state_inner(
+            signer,
+            Arc::clone(&budget),
+            Vec::new(),
+            Some(MEDIATED_CONTROL_TOKEN.to_string()),
+            false,
+        );
+        let body = serde_json::json!({
+            "capability": cap,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-1" }
+        });
+        let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+        // Fail-closed: the mediated route rejects rather than mint an
+        // unreconcilable reserved nonce.
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(json["error"], "chio_mediation_requires_local_budget_store");
+        assert_ne!(json["status"], "authorized");
+        assert!(
+            json["execution_nonce"].is_null(),
+            "a fail-closed rejection must not mint a reserved nonce"
+        );
+
+        // No hold is placed against the grant: the route fails closed before any
+        // budget interaction.
+        let usage = budget.get_usage(&cap_id, 0).unwrap();
+        assert!(usage.is_none() || usage.unwrap().committed_cost_units().unwrap() == 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn reconcile_requires_hold_capable_budget_store() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 150, "USD");
+        let cap_value = serde_json::to_value(&cap).unwrap();
+        let params = serde_json::json!({ "invoice": "inv-1" });
+
+        // Mint a genuine reserved nonce on a hold-capable sidecar so the reconcile
+        // body deserializes; the reconcile is then attempted against a
+        // non-hold-capable sidecar.
+        let hold_capable = mediated_test_state(signer.clone(), Arc::clone(&budget), Vec::new());
+        let body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": params,
+            "request_id": "recon-remote",
+        });
+        let (_, authorized) = post_evaluate(hold_capable, &body).await;
+        let nonce_json = authorized["execution_nonce"].clone();
+        assert!(nonce_json.is_object());
+
+        // A remote (non-hold-capable) sidecar cannot resolve the reserved hold the
+        // nonce names, so reconcile fails closed rather than attempt a settle.
+        let remote = mediated_test_state_inner(
+            signer,
+            budget,
+            Vec::new(),
+            Some(MEDIATED_CONTROL_TOKEN.to_string()),
+            false,
+        );
+        let reconcile_body = serde_json::json!({
+            "execution_nonce": nonce_json,
+            "arguments": params,
+            "realized_cost": { "units": 30, "currency": "USD" },
+        });
+        let (status, json) = post_reconcile(remote, &reconcile_body).await;
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(json["error"], "chio_mediation_requires_local_budget_store");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_durable_hold_rejects_request_id_reuse_across_restart() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        // The durable budget store survives a restart; the ProxyState (and its
+        // in-memory request-id window) is rebuilt fresh.
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
+        let cap_value = serde_json::to_value(&cap).unwrap();
+
+        // Pre-restart sidecar: reserve a hold under a caller-chosen request_id. The
+        // kernel derives the durable hold id from it and marks the hold reserved.
+        let before = mediated_test_state(signer.clone(), Arc::clone(&budget), Vec::new());
+        let body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-1" },
+            "request_id": "restart-req",
+        });
+        let (status, authorized) = post_evaluate(Arc::clone(&before), &body).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(authorized["status"], "authorized");
+
+        // Restart: a fresh ProxyState with an EMPTY in-memory window, sharing only
+        // the durable budget store. The seeded sidecar signer survives, so the
+        // rebuilt mediation kernel still trusts the capability.
+        let after = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+
+        // Reusing the same request_id must be rejected fail-closed via the DURABLE
+        // check: the in-memory fast path is empty after the restart, so only the
+        // open hold recorded in the budget store closes the gap. Without it the
+        // reused id would collapse into an idempotent authorize that mints a second
+        // nonce against the same open reservation.
+        let (status, replay) = post_evaluate(Arc::clone(&after), &body).await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_ne!(replay["status"], "authorized");
+        assert!(
+            replay["execution_nonce"].is_null(),
+            "no second nonce is minted against the open hold"
+        );
+        assert_eq!(replay["error"], "chio_request_id_reused");
+
+        // A fresh request_id still authorizes on the restarted sidecar: the durable
+        // check rejects only a reused id that already backs an open hold.
+        let fresh_body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-2" },
+            "request_id": "restart-req-fresh",
+        });
+        let (status, fresh) = post_evaluate(after, &fresh_body).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(fresh["status"], "authorized");
+        assert!(fresh["execution_nonce"].is_object());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn reconcile_settles_reserved_hold_and_frees_budget() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
@@ -1525,8 +1782,42 @@ mod tests {
             require_nonce: false,
             allow_advisory: false,
         };
-        let store = build_budget_store(&config).unwrap();
-        assert!(store.is_some(), "local sqlite budget store must be built");
+        let configured = build_budget_store(&config).unwrap();
+        let configured = configured.expect("local sqlite budget store must be built");
+        assert!(
+            configured.hold_capable,
+            "the local sqlite budget store implements the hold APIs and must be hold-capable"
+        );
+    }
+
+    #[test]
+    fn build_budget_store_remote_is_not_hold_capable() {
+        // A remote control-plane budget store forwards only
+        // charge/reverse/reconcile and falls back to the no-op hold-API defaults,
+        // so it must be flagged not hold-capable; the mediated routes then fail
+        // closed rather than mint a reservation it can never reconcile or reap.
+        let config = ProtectConfig {
+            upstream: "http://127.0.0.1:1".to_string(),
+            spec_content: Some("{}".to_string()),
+            spec_path: None,
+            listen_addr: "127.0.0.1:0".to_string(),
+            receipt_db: None,
+            sidecar_control_token: None,
+            signer_seed_hex: None,
+            trusted_capability_issuers: Vec::new(),
+            control_url: Some("http://127.0.0.1:1".to_string()),
+            control_token: Some("token".to_string()),
+            budget_db: None,
+            revocation_db: None,
+            require_nonce: false,
+            allow_advisory: false,
+        };
+        let configured = build_budget_store(&config).unwrap();
+        let configured = configured.expect("remote budget store must be built");
+        assert!(
+            !configured.hold_capable,
+            "the remote control-plane budget store does not implement the hold APIs"
+        );
     }
 
     fn revocation_db_config(revocation_db: Option<String>) -> ProtectConfig {

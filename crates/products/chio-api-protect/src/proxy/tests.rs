@@ -222,6 +222,7 @@ fn make_test_state(
         trusted_receipt_signers,
         sidecar_control_token: None,
         budget_store: None,
+        mediation_hold_capable: false,
         mediation_kernel: None,
         minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
             chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
