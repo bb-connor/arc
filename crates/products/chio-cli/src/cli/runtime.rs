@@ -1,5 +1,39 @@
 use super::*;
 
+use crate::mcp_cli::payment_config::PaymentAdapterConfig;
+
+/// Resolve the operator's payment adapter for the kernel-mediated sidecar route
+/// from the environment. Reuses the shared `CHIO_PAYMENT_ADAPTER` selection: an
+/// absent variable or `sim` leaves the sidecar with no adapter (governed
+/// MustPrepay stays denied fail-closed), `http-x402`/`http-acp` install the
+/// configured facilitator rail, and an unrecognized kind fails closed at load.
+pub(crate) fn resolve_sidecar_payment_adapter(
+) -> Result<Option<Box<dyn chio_kernel::PaymentAdapter>>, CliError> {
+    let config = PaymentAdapterConfig::from_env().map_err(|error| {
+        CliError::cli_other_error(format!("invalid payment adapter configuration: {error}"))
+    })?;
+    sidecar_payment_adapter_from_config(config)
+}
+
+/// Build the boxed payment adapter for a resolved adapter selection, validating
+/// its shape at load time (house rule: invalid configuration rejects at load).
+/// `None` yields no adapter, so governed MustPrepay stays denied fail-closed.
+fn sidecar_payment_adapter_from_config(
+    config: Option<PaymentAdapterConfig>,
+) -> Result<Option<Box<dyn chio_kernel::PaymentAdapter>>, CliError> {
+    match config {
+        Some(config) => {
+            config.validate().map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "invalid payment adapter configuration: {error}"
+                ))
+            })?;
+            Ok(Some(config.build_adapter()))
+        }
+        None => Ok(None),
+    }
+}
+
 pub(crate) fn cmd_run(
     policy_path: &Path,
     command: &[String],
@@ -174,6 +208,7 @@ pub(crate) fn cmd_api_protect(
             .transpose()?
             .map(|keypair| keypair.seed_hex());
         let trusted_capability_issuers = parse_trusted_capability_issuers_from_env()?;
+        let payment_adapter = resolve_sidecar_payment_adapter()?;
         let config = ProtectConfig {
             upstream: upstream.to_string(),
             spec_content: None,
@@ -190,9 +225,13 @@ pub(crate) fn cmd_api_protect(
             require_nonce: false,
             allow_advisory: false,
         };
-        ProtectProxy::new(config).run().await.map_err(|error| {
-            CliError::transport_error(format!("failed to start chio api protect: {error}"))
-        })
+        ProtectProxy::new(config)
+            .with_payment_adapter(payment_adapter)
+            .run()
+            .await
+            .map_err(|error| {
+                CliError::transport_error(format!("failed to start chio api protect: {error}"))
+            })
     })
 }
 
@@ -250,6 +289,7 @@ pub(crate) fn cmd_start(
         // the route rather than advertising one that always fails closed with
         // chio_mediation_unavailable.
         let mediation_available = control_url.is_some() || budget_db.is_some();
+        let payment_adapter = resolve_sidecar_payment_adapter()?;
         let config = ProtectConfig {
             // The chio-start shape never proxies upstream traffic; the
             // catch-all route exists only because the underlying axum
@@ -274,6 +314,7 @@ pub(crate) fn cmd_start(
         };
 
         ProtectProxy::new(config)
+            .with_payment_adapter(payment_adapter)
             .run_with_observer(move |bound_addr| {
                 let base_url = format!("http://{bound_addr}");
                 println!("chio sidecar listening on {base_url}");
@@ -1337,6 +1378,40 @@ mod runtime_local_error_domain_tests {
         assert!(contract.allowed_schemes.contains("http"));
         assert!(contract.allowed_authority_set.contains("127.0.0.1:18080"));
         assert!(!contract.deny_loopback);
+    }
+
+    #[test]
+    fn sidecar_payment_adapter_threads_configured_rail_and_fails_closed() {
+        // A configured http facilitator rail resolves to an installable adapter
+        // that cmd_start / cmd_api_protect thread into the sidecar proxy via
+        // `ProtectProxy::with_payment_adapter`.
+        let configured = sidecar_payment_adapter_from_config(Some(PaymentAdapterConfig::HttpX402 {
+            base_url: "https://facilitator.example".to_string(),
+            bearer_token: Some("token".to_string()),
+        }));
+        assert!(
+            matches!(configured, Ok(Some(_))),
+            "a configured http payment rail must thread an installable adapter into the sidecar"
+        );
+
+        // Absent / `sim` selection (from_env yields None) leaves the sidecar with
+        // no adapter, so governed MustPrepay stays denied fail-closed.
+        let default = sidecar_payment_adapter_from_config(None);
+        assert!(
+            matches!(default, Ok(None)),
+            "no configured adapter must leave governed MustPrepay denied fail-closed"
+        );
+
+        // A malformed rail (blank base_url) rejects at load rather than starting a
+        // sidecar whose payment rail can never authorize.
+        let rejected = sidecar_payment_adapter_from_config(Some(PaymentAdapterConfig::HttpAcp {
+            base_url: "   ".to_string(),
+            bearer_token: None,
+        }));
+        assert!(
+            rejected.is_err(),
+            "a malformed payment rail must fail closed at load"
+        );
     }
 
     #[test]

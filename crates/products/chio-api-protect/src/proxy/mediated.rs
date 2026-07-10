@@ -140,11 +140,18 @@ pub(crate) fn load_revocation_db_ids(
 /// `trusted_capability_issuers` are trusted as capability authorities in
 /// addition to the sidecar signer, so an externally minted capability that the
 /// sidecar's other endpoints accept is not rejected here as untrusted.
+///
+/// `payment_adapter` is the operator-configured payment rail. When present it is
+/// installed on the kernel so a governed `MustPrepay` (x402/ACP) quote is
+/// authorized and captured before the reserve-for-caller path mints a nonce.
+/// When `None` the kernel carries no adapter, so the governed prepayment gate
+/// denies `MustPrepay` fail-closed: only a configured adapter enables it.
 pub(crate) fn build_mediation_kernel(
     signer: &Keypair,
     budget_store: Arc<dyn BudgetStore>,
     trusted_capability_issuers: &[PublicKey],
     tool_servers: Vec<Box<dyn ToolServerConnection>>,
+    payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
 ) -> Result<ChioKernel, ProtectError> {
     let mut ca_public_keys = vec![signer.public_key()];
     for issuer in trusted_capability_issuers {
@@ -188,6 +195,13 @@ pub(crate) fn build_mediation_kernel(
         ),
         DpopConfig::default(),
     );
+    // Install the operator's payment rail so the governed prepayment gate can
+    // authorize and capture a MustPrepay (x402/ACP) quote before the
+    // reserve-for-caller path mints a nonce. Absent an adapter the gate denies
+    // MustPrepay fail-closed, so only a configured adapter enables prepayment.
+    if let Some(payment_adapter) = payment_adapter {
+        kernel.set_payment_adapter(payment_adapter);
+    }
     for server in tool_servers {
         kernel.register_tool_server(server);
     }
@@ -679,7 +693,7 @@ mod tests {
         trusted_capability_issuers: &[PublicKey],
     ) -> Arc<ChioKernel> {
         Arc::new(
-            build_mediation_kernel(signer, budget, trusted_capability_issuers, Vec::new())
+            build_mediation_kernel(signer, budget, trusted_capability_issuers, Vec::new(), None)
                 .test_unwrap(),
         )
     }
@@ -774,6 +788,32 @@ mod tests {
         receipt_store: Option<SqliteReceiptStore>,
         hold_capable: bool,
     ) -> Arc<ProxyState> {
+        // No payment adapter by default, so governed MustPrepay stays denied
+        // fail-closed; the prepayment tests build the mediation kernel with one.
+        mediated_test_state_core(
+            signer,
+            budget,
+            trusted_capability_issuers,
+            sidecar_control_token,
+            receipt_store,
+            hold_capable,
+            None,
+        )
+    }
+
+    /// Build proxy state for the mediated route with an explicit payment adapter
+    /// for the shared mediation kernel. A configured adapter lets an approved
+    /// governed `MustPrepay` request authorize (the quote is prepaid before a
+    /// reserved nonce is minted); `None` keeps it denied fail-closed.
+    fn mediated_test_state_core(
+        signer: Keypair,
+        budget: Arc<dyn BudgetStore>,
+        trusted_capability_issuers: Vec<PublicKey>,
+        sidecar_control_token: Option<String>,
+        receipt_store: Option<SqliteReceiptStore>,
+        hold_capable: bool,
+        payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
+    ) -> Arc<ProxyState> {
         let approval_store: Arc<dyn ApprovalStore> = Arc::new(InMemoryApprovalStore::new());
         let signer_public_key = signer.public_key();
         let mut trusted_capability_issuers = trusted_capability_issuers;
@@ -801,6 +841,7 @@ mod tests {
                 Arc::clone(&budget),
                 &trusted_capability_issuers,
                 Vec::new(),
+                payment_adapter,
             )
             .test_unwrap(),
         );
@@ -849,7 +890,8 @@ mod tests {
 
     use chio_core_types::capability::governance::{
         GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-        GovernedTransactionIntent,
+        GovernedTransactionIntent, MeteredBillingContext, MeteredBillingQuote,
+        MeteredSettlementMode,
     };
     use chio_core_types::capability::scope::{Constraint, MonetaryAmount};
     use chio_core_types::receipt::authoritative_spend::is_authoritative_spend_receipt;
@@ -962,6 +1004,41 @@ mod tests {
             autonomy: None,
             context: None,
         }
+    }
+
+    /// A governed intent that mandates prepayment: it carries a metered-billing
+    /// context in `MustPrepay` settlement mode with a quote for `units`. The
+    /// kernel denies it unless a payment adapter is configured to prepay the
+    /// quote before the reserve-for-caller path mints a nonce.
+    fn governed_mustprepay_intent(
+        id: &str,
+        server: &str,
+        tool: &str,
+        units: u64,
+        currency: &str,
+    ) -> GovernedTransactionIntent {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .test_unwrap()
+            .as_secs();
+        let mut intent = governed_intent(id, server, tool, units, currency);
+        intent.metered_billing = Some(MeteredBillingContext {
+            settlement_mode: MeteredSettlementMode::MustPrepay,
+            quote: MeteredBillingQuote {
+                quote_id: format!("quote-{id}"),
+                provider: "billing.chio".to_string(),
+                billing_unit: "call".to_string(),
+                quoted_units: 1,
+                quoted_cost: MonetaryAmount {
+                    units,
+                    currency: currency.to_string(),
+                },
+                issued_at: now.saturating_sub(5),
+                expires_at: Some(now + 300),
+            },
+            max_billed_units: Some(2),
+        });
+        intent
     }
 
     fn governed_approval_token(
@@ -1386,6 +1463,102 @@ mod tests {
             "a governed grant with a valid intent and approval must be authorized"
         );
         assert!(authorized["execution_nonce"].is_object());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_governed_mustprepay_authorizes_with_payment_adapter() {
+        // An approved governed MustPrepay request authorizes only because a payment
+        // adapter is installed on the mediation kernel: the kernel prepays the
+        // quoted cost through the adapter before the reserve-for-caller path mints
+        // a nonce.
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        // Worst-case charge (100) crosses the approval threshold (50), so an
+        // approval token is required alongside the governed intent.
+        let cap = issue_governed_capability(&kernel, &agent, "cost-srv", "compute", 100, "USD", 50);
+        let cap_value = serde_json::to_value(&cap).unwrap();
+        let approver = signer.clone();
+        let state = mediated_test_state_core(
+            signer,
+            Arc::clone(&budget),
+            Vec::new(),
+            Some(MEDIATED_CONTROL_TOKEN.to_string()),
+            None,
+            true,
+            Some(Box::new(chio_kernel::SimPaymentAdapter::new())),
+        );
+
+        let request_id = "req-mustprepay-adapter";
+        let intent =
+            governed_mustprepay_intent("intent-prepay-1", "cost-srv", "compute", 100, "USD");
+        let approval = governed_approval_token(&approver, &agent.public_key(), &intent, request_id);
+        let body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-1" },
+            "request_id": request_id,
+            "governed_intent": intent,
+            "approval_token": approval,
+        });
+        let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            json["status"], "authorized",
+            "a configured payment adapter must let an approved governed MustPrepay authorize"
+        );
+        assert!(
+            json["execution_nonce"].is_object(),
+            "an authorized MustPrepay reservation must mint an execution nonce"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_governed_mustprepay_denied_without_payment_adapter() {
+        // The same approved governed MustPrepay request is denied fail-closed when
+        // no payment adapter is configured: the kernel has no rail to prepay the
+        // quote, so the prepayment gate rejects it before any reservation.
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap = issue_governed_capability(&kernel, &agent, "cost-srv", "compute", 100, "USD", 50);
+        let cap_id = cap.id.clone();
+        let cap_value = serde_json::to_value(&cap).unwrap();
+        let approver = signer.clone();
+        // No payment adapter is installed on the mediation kernel.
+        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+
+        let request_id = "req-mustprepay-no-adapter";
+        let intent =
+            governed_mustprepay_intent("intent-prepay-2", "cost-srv", "compute", 100, "USD");
+        let approval = governed_approval_token(&approver, &agent.public_key(), &intent, request_id);
+        let body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-1" },
+            "request_id": request_id,
+            "governed_intent": intent,
+            "approval_token": approval,
+        });
+        let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            json["status"], "deny",
+            "governed MustPrepay must deny fail-closed without a configured payment adapter"
+        );
+        assert!(
+            json["execution_nonce"].is_null(),
+            "a denied MustPrepay must not mint a reserved nonce"
+        );
+
+        // The governed prepayment gate denies before any reserve, so no budget is
+        // committed against the grant.
+        let usage = budget.get_usage(&cap_id, 0).unwrap();
+        assert!(usage.is_none() || usage.unwrap().committed_cost_units().unwrap() == 0);
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -2243,7 +2416,8 @@ mod tests {
         let signer = Keypair::generate();
         let budget: Arc<dyn BudgetStore> =
             Arc::new(chio_kernel::budget_store::InMemoryBudgetStore::new());
-        let kernel = build_mediation_kernel(&signer, Arc::clone(&budget), &[], Vec::new()).unwrap();
+        let kernel =
+            build_mediation_kernel(&signer, Arc::clone(&budget), &[], Vec::new(), None).unwrap();
         // Strict nonce mode is what routes every mediated request through the
         // authorization-reserve path. DPoP verification state is installed here
         // too; the `mediated_dpop_capability_requires_valid_proof` integration

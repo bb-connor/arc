@@ -275,11 +275,35 @@ pub(crate) struct ProxyState {
 /// The protect proxy.
 pub struct ProtectProxy {
     config: ProtectConfig,
+    /// Operator-configured payment rail for the kernel-mediated authorization
+    /// path. Installed on the mediation kernel so a governed `MustPrepay`
+    /// (x402/ACP) quote is authorized before a reserved nonce is minted. `None`
+    /// by default, which keeps governed `MustPrepay` denied fail-closed: only a
+    /// configured adapter enables prepayment.
+    payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
 }
 
 impl ProtectProxy {
     pub fn new(config: ProtectConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            payment_adapter: None,
+        }
+    }
+
+    /// Install the operator's payment adapter for the kernel-mediated route.
+    ///
+    /// The sidecar CLI resolves this from the operator's payment configuration
+    /// and threads it here before `run`. With an adapter installed, an approved
+    /// governed `MustPrepay`/x402 request authorizes (the quote is prepaid before
+    /// a reserved nonce is minted); with `None` it stays denied fail-closed.
+    #[must_use]
+    pub fn with_payment_adapter(
+        mut self,
+        payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
+    ) -> Self {
+        self.payment_adapter = payment_adapter;
+        self
     }
 
     async fn load_spec_content(&self) -> Result<String, ProtectError> {
@@ -467,12 +491,14 @@ impl ProtectProxy {
         // verifies and consumes on `/v1/reconcile`. It exists exactly when a
         // budget store is configured; without one, `/v1/evaluate` and
         // `/v1/reconcile` deny fail-closed.
+        let payment_adapter = self.payment_adapter;
         let mediation_kernel = match budget_store.as_ref() {
             Some(store) => Some(Mutex::new(build_mediation_kernel(
                 &keypair,
                 Arc::clone(store),
                 &trusted_capability_issuers,
                 Vec::new(),
+                payment_adapter,
             )?)),
             None => None,
         };
@@ -553,5 +579,49 @@ impl ProtectProxy {
     /// Build routes from spec content for testing.
     pub fn routes_from_spec(spec_content: &str) -> Result<Vec<RouteEntry>, ProtectError> {
         Self::build_routes(spec_content)
+    }
+}
+
+#[cfg(test)]
+mod proxy_builder_tests {
+    use super::*;
+
+    fn minimal_config() -> ProtectConfig {
+        ProtectConfig {
+            upstream: "http://127.0.0.1:1".to_string(),
+            spec_content: Some("{}".to_string()),
+            spec_path: None,
+            listen_addr: "127.0.0.1:0".to_string(),
+            receipt_db: None,
+            sidecar_control_token: None,
+            signer_seed_hex: None,
+            trusted_capability_issuers: Vec::new(),
+            control_url: None,
+            control_token: None,
+            budget_db: None,
+            revocation_db: None,
+            require_nonce: false,
+            allow_advisory: false,
+        }
+    }
+
+    #[test]
+    fn with_payment_adapter_threads_adapter_and_defaults_none() {
+        // The sidecar CLI threads the operator's resolved payment adapter here so
+        // the proxy installs it on the mediation kernel and governed MustPrepay
+        // can be prepaid. Absent the builder call the adapter defaults to `None`,
+        // which keeps governed MustPrepay denied fail-closed.
+        let default = ProtectProxy::new(minimal_config());
+        assert!(
+            default.payment_adapter.is_none(),
+            "a proxy defaults to no payment adapter, keeping governed MustPrepay denied"
+        );
+
+        let configured = ProtectProxy::new(minimal_config())
+            .with_payment_adapter(Some(Box::new(chio_kernel::SimPaymentAdapter::new())));
+        assert!(
+            configured.payment_adapter.is_some(),
+            "with_payment_adapter must thread the configured adapter into the proxy"
+        );
     }
 }
