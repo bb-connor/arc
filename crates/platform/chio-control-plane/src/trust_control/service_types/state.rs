@@ -93,9 +93,39 @@ pub(crate) struct PeerSyncState {
     pub(crate) force_snapshot: bool,
 }
 
+/// One subject's in-window attempt timestamps together with the window (in
+/// seconds) of the policy that recorded them. The window is stored PER BUCKET so
+/// cross-policy pruning uses each bucket's own window rather than the current
+/// request's: when the limiter is shared across federation policies with
+/// different `window_seconds`, a short-window request must not delete timestamps
+/// that are still active for a longer-window policy, which would reset that
+/// subject's limit and let more admissions through in the long window (RFC-0004
+/// F5 prune-then-deny extended across policies, codex finding 3555410397).
+#[derive(Debug, Default)]
+struct SubjectAttempts {
+    window_seconds: u64,
+    timestamps: Vec<u64>,
+}
+
+impl SubjectAttempts {
+    /// Lower bound below which this bucket's timestamps are out-of-window, using
+    /// THIS bucket's own window (not the caller's).
+    fn lower_bound(&self, now: u64) -> u64 {
+        now.saturating_sub(self.window_seconds)
+    }
+
+    /// Drop this bucket's out-of-window timestamps using its own window.
+    fn prune(&mut self, now: u64) {
+        let lower_bound = self.lower_bound(now);
+        self.timestamps.retain(|t| *t > lower_bound);
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct FederationAdmissionRateLimiter {
-    // Per-subject in-window attempt timestamps, keyed by `policy:subject`. The
+    // Per-subject in-window attempt timestamps, keyed by `policy:subject`. Each
+    // bucket carries the window of the policy that recorded it, so pruning across
+    // policies respects each bucket's own window (see [`SubjectAttempts`]). The
     // distinct-key set is bounded fail-closed by `key_cap`: EXPIRED (out-of-
     // window) subjects are pruned first, and once the table holds `key_cap`
     // ACTIVE (in-window) subjects a new subject is DENIED rather than evicting an
@@ -105,7 +135,7 @@ pub(crate) struct FederationAdmissionRateLimiter {
     // (RFC-0004 F39, codex finding 3553826807), while still saturating instead of
     // growing under a distinct-subject flood. A subject is removed only when its
     // window fully empties.
-    attempts: HashMap<String, Vec<u64>>,
+    attempts: HashMap<String, SubjectAttempts>,
     key_cap: usize,
 }
 
@@ -140,12 +170,15 @@ impl FederationAdmissionRateLimiter {
     }
 
     /// Drop subjects whose entire attempt window has expired, freeing slots for
-    /// new subjects. Bounded: touches at most the live keys (<= `key_cap` once
-    /// saturated).
-    fn prune_expired(&mut self, lower_bound: u64) {
-        self.attempts.retain(|_, timestamps| {
-            timestamps.retain(|t| *t > lower_bound);
-            !timestamps.is_empty()
+    /// new subjects. Each bucket is pruned against ITS OWN window (not the
+    /// caller's `now - window`), so a short-window policy request never evicts
+    /// timestamps that are still active for a longer-window policy sharing this
+    /// limiter (codex finding 3555410397). Bounded: touches at most the live keys
+    /// (<= `key_cap` once saturated).
+    fn prune_expired(&mut self, now: u64) {
+        self.attempts.retain(|_, entry| {
+            entry.prune(now);
+            !entry.timestamps.is_empty()
         });
     }
 
@@ -162,16 +195,18 @@ impl FederationAdmissionRateLimiter {
         let is_new_key = !self.attempts.contains_key(&key);
         // Key cap (RFC-0004 F39). When the table is full and this is a new
         // subject, prune EXPIRED (out-of-window) subjects first to reclaim slots.
-        // If every remaining slot still holds an ACTIVE (in-window) subject, DENY
-        // the new subject fail-closed rather than evicting an active bucket:
-        // evicting an active bucket would reset its per-window limit, so an
+        // Each bucket is pruned against its OWN window, so a short-window request
+        // does not evict a longer-window policy's still-active subject (finding
+        // 3555410397). If every remaining slot still holds an ACTIVE (in-window)
+        // subject, DENY the new subject fail-closed rather than evicting an active
+        // bucket: evicting an active bucket would reset its per-window limit, so an
         // attacker could reset its own limit by flooding throwaway subjects to
         // force its eviction, then reusing its subject in the same window (codex
         // finding 3553826807, FAIL-OPEN). Denying keeps memory bounded (cap
         // unchanged) without the bypass, and a distinct-subject flood still
         // saturates instead of growing.
         if is_new_key && self.attempts.len() >= self.key_cap {
-            self.prune_expired(lower_bound);
+            self.prune_expired(now);
             if self.attempts.len() >= self.key_cap {
                 return FederationAdmissionRateLimitStatus {
                     limit: limit.max_requests,
@@ -183,9 +218,15 @@ impl FederationAdmissionRateLimiter {
         }
 
         let entry = self.attempts.entry(key.clone()).or_default();
-        entry.retain(|timestamp| *timestamp > lower_bound);
-        if entry.len() >= limit.max_requests as usize {
+        // Record this bucket's window so later cross-policy prunes use it rather
+        // than an unrelated policy's window.
+        entry.window_seconds = limit.window_seconds;
+        entry
+            .timestamps
+            .retain(|timestamp| *timestamp > lower_bound);
+        if entry.timestamps.len() >= limit.max_requests as usize {
             let retry_after_seconds = entry
+                .timestamps
                 .first()
                 .map(|oldest| {
                     oldest
@@ -200,21 +241,25 @@ impl FederationAdmissionRateLimiter {
                 retry_after_seconds: Some(retry_after_seconds.max(1)),
             };
         }
-        entry.push(now);
+        entry.timestamps.push(now);
 
         // Drop-empty maintenance: prune any subject whose window has fully
         // emptied so a fresh subject costs nothing once its window empties
-        // (RFC-0004 F39, F21 rate-limiter half). Bounded: touches at most
-        // `key_cap` keys. The subject just recorded above retains its `now`
-        // timestamp, so it survives.
-        self.prune_expired(lower_bound);
+        // (RFC-0004 F39, F21 rate-limiter half). Each bucket uses its own window,
+        // so this never resets a longer-window policy's active subject. Bounded:
+        // touches at most `key_cap` keys. The subject just recorded above retains
+        // its `now` timestamp, so it survives.
+        self.prune_expired(now);
 
         FederationAdmissionRateLimitStatus {
             limit: limit.max_requests,
             window_seconds: limit.window_seconds,
-            remaining: limit
-                .max_requests
-                .saturating_sub(self.attempts.get(&key).map(|v| v.len()).unwrap_or(0) as u32),
+            remaining: limit.max_requests.saturating_sub(
+                self.attempts
+                    .get(&key)
+                    .map(|v| v.timestamps.len())
+                    .unwrap_or(0) as u32,
+            ),
             retry_after_seconds: None,
         }
     }
@@ -406,6 +451,50 @@ mod admission_bound_tests {
         // attempts (remaining = 5 - 2 = 3), proving it was not reset by eviction.
         let a2 = limiter.check_and_record("policy", "a", &l, 100);
         assert_eq!(a2.remaining, 3, "active subject a was reset by eviction");
+    }
+
+    #[test]
+    fn cross_policy_prune_preserves_longer_window_active_subject() {
+        // codex finding 3555410397 (RFC-0004 F5 across policies): when one limiter
+        // is shared by policies with different windows, a short-window request must
+        // not prune timestamps that are still active for a longer-window policy and
+        // thereby reset that subject's limit. A big cap keeps this about the WINDOW,
+        // not the key cap.
+        let mut limiter = FederationAdmissionRateLimiter::with_key_cap(4096);
+        let long = FederationAdmissionRateLimit {
+            max_requests: 1,
+            window_seconds: 3600,
+        };
+        let short = FederationAdmissionRateLimit {
+            max_requests: 5,
+            window_seconds: 10,
+        };
+
+        // Subject S under the long-window policy spends its single allowed request.
+        let first = limiter.check_and_record("policy-long", "S", &long, 100);
+        assert_eq!(first.remaining, 0);
+        assert!(
+            first.retry_after_seconds.is_none(),
+            "the first long-window request must be allowed"
+        );
+
+        // A later short-window request for a DIFFERENT subject triggers the
+        // drop-empty maintenance prune. With the per-request lower bound applied to
+        // every bucket, S's timestamp (100) would be deleted (200 - 10 = 190 > 100),
+        // resetting the long-window limit. Per-bucket windows keep S (100 is well
+        // inside the 3600s window).
+        let _ = limiter.check_and_record("policy-short", "T", &short, 200);
+
+        // S reused under the long-window policy IN THE SAME 3600s window must stay
+        // rate-limited. RED (pre-fix): the short-window prune reset S, so this
+        // returned a fresh allowed bucket (retry_after_seconds = None). GREEN: S is
+        // still denied.
+        let replay = limiter.check_and_record("policy-long", "S", &long, 210);
+        assert_eq!(replay.remaining, 0);
+        assert!(
+            replay.retry_after_seconds.is_some(),
+            "long-window subject was reset by a short-window policy's prune (cross-policy bypass)"
+        );
     }
 
     #[test]
