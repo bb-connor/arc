@@ -47,7 +47,10 @@ def main() -> int:
     checks += 1
 
     status = fin.get("settlement_status")
-    assert status in ("settled", "pending"), f"bad status {status!r}"
+    assert status == "settled", (
+        "positive governed-x402-sim lane must prove settlement: SimPaymentAdapter "
+        f"captures after execution, so settlement_status must be settled, got {status!r}"
+    )
     checks += 1
 
     # Governed binding round-trips into the payment breakdown (exact nesting
