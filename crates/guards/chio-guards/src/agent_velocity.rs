@@ -72,6 +72,24 @@ impl TokenBucket {
         self.tokens_mt = self.tokens_mt.saturating_add(added).min(self.capacity_mt);
         self.last_refill = Instant::now();
     }
+
+    /// Report whether the bucket has refilled back to its full capacity,
+    /// projecting the pending refill from elapsed time without mutating state
+    /// (mirrors the arithmetic in [`Self::refill`]). A bucket at capacity carries
+    /// no live rate-limit history: it is indistinguishable from a freshly created
+    /// bucket, so it is the only state in which dropping and later recreating the
+    /// bucket cannot hand its subject an unearned allowance. A bucket that spent
+    /// part of its burst allowance and then sat idle is only partially refilled --
+    /// recovering a burst of `capacity` tokens takes `capacity / refill_rate` of
+    /// elapsed time, which exceeds one window whenever the burst ceiling sits above
+    /// the steady per-window rate -- so it still carries live state.
+    fn is_fully_refilled(&self) -> bool {
+        let elapsed_ms = self.last_refill.elapsed().as_millis() as u64;
+        let projected = self
+            .tokens_mt
+            .saturating_add(elapsed_ms.saturating_mul(self.refill_rate_mpm));
+        projected >= self.capacity_mt
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -115,12 +133,12 @@ impl Default for AgentVelocityConfig {
 ///
 /// Both bucket maps live behind ONE mutex and the COMBINED distinct-key count is
 /// bounded by `bucket_cap`, so a flood of distinct agent/capability ids saturates
-/// rather than growing memory without bound. When the table is full of in-window
-/// buckets a new key is DENIED
-/// fail-closed rather than evicting an active bucket (evicting an active bucket
-/// would reset its per-window limit, the same reset-by-eviction bypass class
-/// closed in [`crate::velocity::VelocityGuard`]). EXPIRED (out-of-window) buckets
-/// are pruned first to reclaim slots.
+/// rather than growing memory without bound. When the table is full of buckets
+/// still carrying live rate-limit state a new key is DENIED fail-closed rather
+/// than evicting one (evicting a bucket that still holds live state would reset
+/// its per-window limit, the same reset-by-eviction bypass class closed in
+/// [`crate::velocity::VelocityGuard`]). Buckets that have refilled back to full
+/// capacity are pruned first to reclaim slots.
 pub struct AgentVelocityGuard {
     state: Mutex<AgentVelocityState>,
     config: AgentVelocityConfig,
@@ -195,16 +213,19 @@ impl AgentVelocityState {
             .saturating_add(self.session_buckets.len())
     }
 
-    /// Drop EXPIRED (out-of-window) buckets from BOTH maps to reclaim slots. A
-    /// bucket idle for a full window has refilled to capacity and is semantically
-    /// fresh, so dropping it can never reset an in-flight limit. Bounded: touches
-    /// at most the live buckets (<= `bucket_cap` once saturated).
-    fn prune_expired(&mut self, window_secs: u64) {
-        let idle = std::time::Duration::from_secs(window_secs);
+    /// Drop buckets that have refilled back to full capacity from BOTH maps to
+    /// reclaim slots. A bucket at capacity carries no live rate-limit state, so it
+    /// is semantically identical to a fresh bucket: dropping it can never reset an
+    /// in-flight limit, and recreating its key later cannot hand the subject an
+    /// unearned burst. A bucket that is only partially refilled (it spent part of
+    /// its burst allowance and has not yet recovered to capacity) is retained, so a
+    /// drained burst cannot be reset by reaping and recreating the key. Bounded:
+    /// touches at most the live buckets (<= `bucket_cap` once saturated).
+    fn prune_refilled(&mut self) {
         self.agent_buckets
-            .retain(|_, bucket| bucket.last_refill.elapsed() < idle);
+            .retain(|_, bucket| !bucket.is_fully_refilled());
         self.session_buckets
-            .retain(|_, bucket| bucket.last_refill.elapsed() < idle);
+            .retain(|_, bucket| !bucket.is_fully_refilled());
     }
 
     /// Reserve `new_slots` free slots in the COMBINED table (across both maps)
@@ -212,15 +233,16 @@ impl AgentVelocityState {
     /// that many genuinely-new keys, `false` when the guard must DENY fail-closed.
     /// A request with both limits enabled needs TWO new slots for a brand-new
     /// (agent, session) pair, so they are reserved TOGETHER; a request that cannot
-    /// fit both is denied before inserting either. EXPIRED buckets are pruned
-    /// first; if only ACTIVE buckets remain the request is DENIED rather than
-    /// evicting an active bucket.
-    fn reserve_slots(&mut self, new_slots: usize, window_secs: u64, bucket_cap: usize) -> bool {
+    /// fit both is denied before inserting either. Buckets that have refilled back
+    /// to capacity are pruned first; if only buckets still carrying live rate-limit
+    /// state remain the request is DENIED rather than evicting one and resetting
+    /// its per-window limit.
+    fn reserve_slots(&mut self, new_slots: usize, bucket_cap: usize) -> bool {
         if new_slots == 0 {
             return true;
         }
         if self.combined_len().saturating_add(new_slots) > bucket_cap {
-            self.prune_expired(window_secs);
+            self.prune_refilled();
             if self.combined_len().saturating_add(new_slots) > bucket_cap {
                 return false;
             }
@@ -257,7 +279,7 @@ impl Guard for AgentVelocityGuard {
         let session_new =
             session_limit.is_some() && !state.session_buckets.contains_key(&session_key);
         let new_slots = usize::from(agent_new) + usize::from(session_new);
-        if !state.reserve_slots(new_slots, window_secs, self.bucket_cap) {
+        if !state.reserve_slots(new_slots, self.bucket_cap) {
             return Ok(GuardDecision::deny(Vec::new()));
         }
 
@@ -627,6 +649,87 @@ mod tests {
             guard.combined_bucket_count() <= 4,
             "configured velocity_bucket_cap did not bound the agent-velocity table: {} buckets",
             guard.combined_bucket_count()
+        );
+    }
+
+    #[test]
+    fn burst_drained_agent_bucket_is_not_reset_after_one_idle_window() {
+        // A drained agent burst refills only at the steady per-window rate, so with
+        // a burst ceiling above that rate it needs several idle windows to recover
+        // to capacity, not one. Reaping it after a single idle window and recreating
+        // the agent key would hand the agent a fresh full burst, bypassing the
+        // per-agent limit. The partially refilled bucket must survive a prune
+        // triggered by a competing agent key, which is denied instead.
+        let config = AgentVelocityConfig {
+            max_requests_per_agent: Some(2),
+            max_requests_per_session: None,
+            window_secs: 1,
+            burst_factor: 2.0, // capacity 4, steady refill 2 per window
+        };
+        let guard = AgentVelocityGuard::with_bucket_cap(config, 1);
+        let kp = Keypair::generate();
+        let scope = ChioScope::default();
+        let server = "srv".to_string();
+        let agent_x = format!("{}-x", kp.public_key().to_hex());
+        let cap = signed_cap(&kp, "cap-1");
+        let req_x = make_request(&cap, &agent_x, &server);
+
+        // Drain the full burst of 4 tokens.
+        for _ in 0..4 {
+            assert_eq!(
+                guard
+                    .evaluate(&guard_ctx(&req_x, &scope, &agent_x, &server))
+                    .expect("burst request"),
+                Verdict::Allow,
+            );
+        }
+        assert_eq!(
+            guard
+                .evaluate(&guard_ctx(&req_x, &scope, &agent_x, &server))
+                .expect("drained request"),
+            Verdict::Deny,
+            "the burst is drained",
+        );
+        assert_eq!(guard.combined_bucket_count(), 1);
+
+        // Idle for exactly one window: the bucket refills to 2 of 4 tokens, still
+        // short of its burst ceiling.
+        thread::sleep(Duration::from_millis(1100));
+
+        // A competing new agent trips the cap and attempts a prune. The partially
+        // refilled bucket carries live state, so it is retained and the new agent is
+        // denied rather than reaping the burst victim.
+        let agent_y = format!("{}-y", kp.public_key().to_hex());
+        let req_y = make_request(&cap, &agent_y, &server);
+        assert_eq!(
+            guard
+                .evaluate(&guard_ctx(&req_y, &scope, &agent_y, &server))
+                .expect("competing agent"),
+            Verdict::Deny,
+            "a partially refilled burst bucket must not be reaped to admit a new agent",
+        );
+        assert_eq!(
+            guard.combined_bucket_count(),
+            1,
+            "the burst victim was reaped to admit the competing agent",
+        );
+
+        // The victim regained only the steady per-window amount (2 tokens), not a
+        // fresh full burst (4): exactly two more requests succeed before it denies.
+        for _ in 0..2 {
+            assert_eq!(
+                guard
+                    .evaluate(&guard_ctx(&req_x, &scope, &agent_x, &server))
+                    .expect("refilled request"),
+                Verdict::Allow,
+            );
+        }
+        assert_eq!(
+            guard
+                .evaluate(&guard_ctx(&req_x, &scope, &agent_x, &server))
+                .expect("post-refill request"),
+            Verdict::Deny,
+            "the agent burst was reset to full capacity instead of the steady refill",
         );
     }
 }
