@@ -889,20 +889,34 @@ fn directory_reload_step(
     }
 }
 
-/// The reloader's next wake delay: at most `interval`, but no later than the running
-/// directory's `expires_at_unix_ms` so a bundle that expires BETWEEN two fixed polls
-/// fails closed AT the deadline rather than continuing to admit for up to a full
-/// interval (`DirectoryGate::decide` is not itself time-aware, so nothing else revokes
-/// an expired directory between polls). Once the directory has ALREADY expired (the
-/// deny-all state, awaiting a valid successor) the fixed interval governs, so this
-/// never busy-loops on a past deadline.
-fn next_reload_delay(interval: Duration, now: u64, expires_at_unix_ms: u64) -> Duration {
-    if expires_at_unix_ms > now {
-        // Still in-window: wake at whichever comes first, the next fixed poll or expiry.
-        std::cmp::min(interval, Duration::from_millis(expires_at_unix_ms - now))
-    } else {
-        // Already at/past expiry (deny-all): poll on the fixed interval for a successor.
+/// The reloader's next wake delay, driven by the LIVE admission gate's directory rather
+/// than the reloader's last-good chain (which can point past a deny-all gate at an
+/// already-advanced successor). `live_directory_expires_at_unix_ms` is
+/// `DirectoryGate::current_expires_at_unix_ms`: `0` is the deny-all sentinel (admits
+/// nothing), and any positive value is a live directory's validity-window end.
+///
+/// - Deny-all gate: poll on the fixed `interval` for a valid successor. No live directory
+///   is admitting, so there is no expiry to enforce and never a zero-delay busy-loop.
+/// - Live directory still in-window: wake at whichever comes first, the next fixed poll or
+///   the expiry deadline, so a bundle that expires between two fixed polls fails closed AT
+///   the deadline (`DirectoryGate::decide` is not itself time-aware).
+/// - Live directory whose deadline elapsed mid-cycle (the step ran while it was in-window,
+///   so the gate is still admitting it): recheck IMMEDIATELY so the next step fails it
+///   closed at the deadline rather than after another full interval.
+fn next_reload_delay(
+    interval: Duration,
+    now: u64,
+    live_directory_expires_at_unix_ms: u64,
+) -> Duration {
+    if live_directory_expires_at_unix_ms == 0 {
         interval
+    } else if live_directory_expires_at_unix_ms > now {
+        std::cmp::min(
+            interval,
+            Duration::from_millis(live_directory_expires_at_unix_ms - now),
+        )
+    } else {
+        Duration::ZERO
     }
 }
 
@@ -922,9 +936,15 @@ pub(crate) async fn run_directory_reloader(
     loop {
         let now = now_fn();
         directory_reload_step(&gate, &config, now, &mut state, &alive);
-        // Schedule the next wake no later than the (possibly just-advanced) directory's
-        // expiry, so expiry between fixed polls fails closed at the deadline.
-        let delay = next_reload_delay(config.interval, now_fn(), state.expires_at_unix_ms);
+        // Schedule off the LIVE gate's expiry (re-read after the step and with a fresh
+        // clock): if the directory was still admitting at the step but its deadline elapsed
+        // before this delay is computed, the gate expiry is now in the past and the reloader
+        // rechecks immediately to fail it closed, rather than admitting for another interval.
+        let delay = next_reload_delay(
+            config.interval,
+            now_fn(),
+            gate.current_expires_at_unix_ms(),
+        );
         tokio::time::sleep(delay).await;
     }
 }
@@ -2337,19 +2357,34 @@ mod tests {
             interval,
             "the fixed interval caps the wake when expiry is far off"
         );
-        // Already expired (deny-all, awaiting a successor) -> the fixed interval governs;
-        // never a zero/past-deadline busy-loop.
+        // Deny-all sentinel (gate expiry 0, admitting nothing) -> the fixed interval
+        // governs the poll for a successor; never a zero-delay busy-loop.
+        assert_eq!(
+            next_reload_delay(interval, 2_000, 0),
+            interval,
+            "a deny-all gate polls on the fixed interval, not a busy-loop"
+        );
+    }
+
+    #[test]
+    fn reloader_rechecks_immediately_when_a_live_directory_expires_mid_cycle() {
+        // A LIVE directory (positive expiry) whose deadline elapsed between the reload step
+        // and this delay computation is still admitting through the gate, so it must be
+        // rechecked IMMEDIATELY to flip it closed at the deadline, not admit for another
+        // full interval. This is the distinction between "still-admitting-but-just-expired"
+        // and the "already-deny-all" sentinel, which polls on the interval.
+        let interval = Duration::from_secs(60);
         assert_eq!(
             next_reload_delay(interval, 2_000, 1_000),
-            interval,
-            "an already-expired directory polls on the fixed interval, not a busy-loop"
+            Duration::ZERO,
+            "a live directory whose expiry already passed rechecks immediately"
         );
-        // Expiry exactly at `now` is already expired (decide uses `expires_at <= now`), so
-        // it too polls on the interval rather than scheduling a zero-delay spin.
+        // Expiry exactly at `now` is already past (decide uses `expires_at <= now`), so a
+        // live directory at that boundary also rechecks immediately.
         assert_eq!(
             next_reload_delay(interval, 1_000, 1_000),
-            interval,
-            "expiry exactly at now polls on the fixed interval, not a zero-delay spin"
+            Duration::ZERO,
+            "a live directory whose expiry equals now rechecks immediately"
         );
     }
 
