@@ -70,6 +70,7 @@ url = "2"
 chio-anchor = { workspace = true }
 chio-link = { workspace = true }
 chio-test-support = { workspace = true }
+proptest = { workspace = true }
 rcgen = "0.13"
 
 [lints]

@@ -240,27 +240,8 @@ PY
 positive_count=0
 negative_count=0
 proof_room_count=0
-while IFS=$'\t' read -r kind fixture_id fixture_path metadata_path; do
-  case "$kind" in
-    transaction-passport)
-      verify_positive "$fixture_id" "$ROOT/$fixture_path"
-      positive_count=$((positive_count + 1))
-      ;;
-    negative-transaction-passport)
-      verify_negative "$fixture_id" "$ROOT/$fixture_path" "${metadata_path:+$ROOT/$metadata_path}"
-      negative_count=$((negative_count + 1))
-      ;;
-    proof-room)
-      verify_proof_room "$fixture_id" "$ROOT/$fixture_path"
-      proof_room_count=$((proof_room_count + 1))
-      ;;
-    *)
-      echo "unexpected proof fixture kind: $kind" >&2
-      exit 1
-      ;;
-  esac
-done < <(
-  python3 - "$ROOT" "$CATALOG" <<'PY'
+fixture_rows="$tmpdir/transaction-passport-fixtures.tsv"
+python3 - "$ROOT" "$CATALOG" >"$fixture_rows" <<'PY'
 import json
 import pathlib
 import sys
@@ -286,7 +267,27 @@ for entry in catalog.get("fixtures", []):
             raise SystemExit(f"missing fixture passport: {rel}")
     print(f"{kind}\t{fixture_id}\t{rel}\t{metadata}")
 PY
-)
+
+while IFS=$'\t' read -r kind fixture_id fixture_path metadata_path; do
+  case "$kind" in
+    transaction-passport)
+      verify_positive "$fixture_id" "$ROOT/$fixture_path"
+      positive_count=$((positive_count + 1))
+      ;;
+    negative-transaction-passport)
+      verify_negative "$fixture_id" "$ROOT/$fixture_path" "${metadata_path:+$ROOT/$metadata_path}"
+      negative_count=$((negative_count + 1))
+      ;;
+    proof-room)
+      verify_proof_room "$fixture_id" "$ROOT/$fixture_path"
+      proof_room_count=$((proof_room_count + 1))
+      ;;
+    *)
+      echo "unexpected proof fixture kind: $kind" >&2
+      exit 1
+      ;;
+  esac
+done <"$fixture_rows"
 
 printf 'OK transaction-passport verifier gate: %s positive, %s negative, %s proof-room\n' \
   "$positive_count" "$negative_count" "$proof_room_count"

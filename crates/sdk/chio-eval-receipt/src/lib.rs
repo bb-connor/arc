@@ -47,8 +47,10 @@ mod contract_freeze {
     #[test]
     fn adr_0016_and_protocol_document_the_profile() {
         let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../..");
-        let adr = std::fs::read_to_string(format!("{root}/docs/adr/ADR-0016-authoritative-spend-contract.md"))
-            .expect("ADR-0016 must exist");
+        let adr = std::fs::read_to_string(format!(
+            "{root}/docs/adr/ADR-0016-authoritative-spend-contract.md"
+        ))
+        .expect("ADR-0016 must exist");
         assert!(adr.contains("chio.mediated_spend.v1"));
         assert!(adr.contains("chio.execution_nonce.v1"));
         assert!(adr.contains("quote.quoted_cost"));
