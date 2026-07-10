@@ -776,7 +776,16 @@ pub(crate) fn reload_verified_directory(
                 }
             }
             Err(error) => {
-                if expired {
+                // A successor at or above the floor that fails verification (partially
+                // written or bad) must NOT mask a running directory that is ITSELF below the
+                // raised floor: a restart would reject the running directory via
+                // `transport_bundle_trust`, so fail closed to deny-all rather than keep the
+                // below-floor directory admitting until expiry. Order this ahead of the
+                // transient paths so a bad successor cannot leave a below-floor directory
+                // live. last-good is KEPT so a valid successor chained onto it self-heals.
+                if current_version < trusted_min_version {
+                    Ok(ReloadOutcome::BelowMinVersionFloor(None))
+                } else if expired {
                     Ok(ReloadOutcome::ExpiredWhileRunning)
                 } else {
                     Err(DirectoryReloadError::Verify(error.to_string()))
@@ -2448,6 +2457,62 @@ mod tests {
         assert_eq!(
             state.version, 3,
             "last-good advances to the recovered successor"
+        );
+    }
+
+    #[test]
+    fn directory_reload_fails_closed_when_below_floor_running_directory_has_an_invalid_successor() {
+        // Operators raised minVersion above the running directory, so a restart would reject
+        // it. An on-disk successor at or above the floor that FAILS verification (partially
+        // written or bad) must not mask that: the reloader must fail closed to deny-all
+        // rather than keep the below-floor directory admitting until expiry.
+        let dir = tempfile::tempdir().unwrap();
+        // v1 is the running directory; its hash is the chain pin.
+        let (_v1_path, _v1_issuers, expires_at, v1_hash) =
+            write_test_bundle(dir.path(), 1, false, None);
+        // An on-disk v3 at or above the raised floor but that does NOT chain onto v1 (a
+        // bad/partial successor), so it fails verification.
+        let (bundle_path, _v3_issuers, _v3_expires, _v3_hash) =
+            write_test_bundle(dir.path(), 3, false, Some("00".repeat(32)));
+        // Raise minVersion to 3: the running v1 is below the floor, the on-disk v3 is at it.
+        let issuers_path = write_issuers_with_min_version(dir.path(), 3);
+        let config = DirectoryReloadConfig {
+            interval: Duration::from_secs(60),
+            bundle_path,
+            trusted_issuers_path: issuers_path,
+            local_transport_endpoint: endpoint_from_seed(LOCAL_TRANSPORT_SEED),
+            local_kernel_id: LOCAL_KERNEL_ID.to_string(),
+        };
+        let now_in_window = expires_at - 1;
+
+        // Outcome-level: the invalid at-floor successor does not mask the below-floor running
+        // directory; the reload fails closed rather than returning a transient verify error.
+        let outcome = reload_verified_directory(&config, now_in_window, 1, expires_at, &v1_hash)
+            .expect("reload runs");
+        assert!(
+            matches!(outcome, ReloadOutcome::BelowMinVersionFloor(None)),
+            "a below-floor running directory with an invalid successor must fail closed, got \
+             {outcome:?}"
+        );
+
+        // Step-level: the gate flips to deny-all and the alarm is raised.
+        let gate = DirectoryGate::new(verified_directory("did:chio:bob", 24));
+        assert_eq!(gate.current_version(), 1);
+        let alive = AtomicBool::new(true);
+        let mut state = ReloadState {
+            version: 1,
+            body_sha256: v1_hash.clone(),
+            expires_at_unix_ms: expires_at,
+        };
+        directory_reload_step(&gate, &config, now_in_window, &mut state, &alive);
+        assert_eq!(
+            gate.current_version(),
+            0,
+            "a below-floor directory with a bad successor fails closed to deny-all"
+        );
+        assert!(
+            !alive.load(Ordering::SeqCst),
+            "the fail-closed alarm is raised"
         );
     }
 
