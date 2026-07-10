@@ -98,12 +98,34 @@ pub enum NotAuthoritativeReason {
         field: &'static str,
     },
     NonceSignatureInvalid,
+    /// The receipt's budget-authority block does not pin the frozen
+    /// `MEDIATED_SPEND_PROFILE`, so its contract shape is unversioned or a
+    /// different version than the consumer requires.
+    MissingOrWrongMediatedSpendProfile,
     /// The receipt's guarantee level is weaker than the operator-configured
     /// floor (R4 truthfulness). Unrelated to `TrustLevel::Mediated`.
     GuaranteeLevelBelowFloor {
         minimum: String,
         actual: String,
     },
+    /// The operator-configured guarantee floor is not a recognized level, so it
+    /// cannot be ranked. Fail-closed rather than admitting every receipt.
+    UnknownGuaranteeFloor {
+        minimum: String,
+    },
+}
+
+/// Project the raw `budget_authority.mediated_spend.profile` string from a
+/// receipt's metadata. `None` when any level of that path is absent or the
+/// leaf is not a string.
+fn mediated_spend_profile(receipt: &ChioReceipt) -> Option<&str> {
+    receipt
+        .metadata
+        .as_ref()?
+        .get("budget_authority")?
+        .get("mediated_spend")?
+        .get("profile")?
+        .as_str()
 }
 
 /// Structurally checkable conjunction over the kernel signature. Fail-closed:
@@ -146,6 +168,12 @@ pub fn is_authoritative_spend_receipt(
         .ok_or(NotAuthoritativeReason::MissingBudgetAuthority)?;
     if budget.hold_id.is_empty() {
         return Err(NotAuthoritativeReason::MissingBudgetAuthority);
+    }
+    // The budget-authority block must pin the frozen contract profile exactly.
+    // A missing or differently versioned profile means the consumer would be
+    // accepting an unversioned or foreign contract shape.
+    if mediated_spend_profile(receipt) != Some(MEDIATED_SPEND_PROFILE) {
+        return Err(NotAuthoritativeReason::MissingOrWrongMediatedSpendProfile);
     }
     if budget.reconcile_event_id.is_none() {
         return Err(NotAuthoritativeReason::HoldNotReconciled);
@@ -200,12 +228,31 @@ pub fn guarantee_level_rank(level: &str) -> u8 {
     }
 }
 
+/// Whether `level` names a defined guarantee level. `advisory_posthoc` is the
+/// weakest defined level and ranks 0, so a bare rank cannot distinguish it from
+/// an unrecognized string; callers pinning an operator floor must use this to
+/// fail closed on a misconfigured level.
+#[must_use]
+pub fn is_recognized_guarantee_level(level: &str) -> bool {
+    matches!(
+        level,
+        "advisory_posthoc" | "single_node_atomic" | "partition_escrowed" | "ha_linearizable"
+    )
+}
+
 /// Returns `Ok(())` only when the receipt's guarantee level is at least the
-/// operator floor. Fail-closed on a missing budget-authority block.
+/// operator floor. Fail-closed on a missing budget-authority block or on an
+/// unrecognized floor (a misconfigured floor must not silently admit every
+/// receipt by ranking as the weakest level).
 pub fn receipt_meets_guarantee_floor(
     receipt: &ChioReceipt,
     minimum_level: &str,
 ) -> Result<(), NotAuthoritativeReason> {
+    if !is_recognized_guarantee_level(minimum_level) {
+        return Err(NotAuthoritativeReason::UnknownGuaranteeFloor {
+            minimum: minimum_level.to_string(),
+        });
+    }
     let budget = BudgetAuthorityReceiptRef::from_receipt(receipt)
         .ok_or(NotAuthoritativeReason::MissingBudgetAuthority)?;
     if guarantee_level_rank(&budget.guarantee_level) < guarantee_level_rank(minimum_level) {
@@ -330,6 +377,54 @@ mod tests {
     }
 
     #[test]
+    fn mediated_spend_profile_absent_is_rejected() {
+        // A reconciled receipt carrying budget_authority + nonce link but no
+        // pinned mediated_spend profile must not be accepted as authoritative.
+        let kp = Keypair::generate();
+        let mut receipt = authoritative_receipt(&kp);
+        if let Some(obj) = receipt
+            .metadata
+            .as_mut()
+            .and_then(|m| m.get_mut("budget_authority"))
+            .and_then(|b| b.as_object_mut())
+        {
+            obj.remove("mediated_spend");
+        }
+        let receipt = ChioReceipt::sign(receipt.body(), &kp).unwrap();
+        let nonce = good_nonce(&kp, &receipt);
+        assert_eq!(
+            is_authoritative_spend_receipt(&receipt, &[kp.public_key()], &nonce),
+            Err(NotAuthoritativeReason::MissingOrWrongMediatedSpendProfile)
+        );
+    }
+
+    #[test]
+    fn mediated_spend_profile_mismatch_is_rejected() {
+        // A different (or unversioned) contract shape must not satisfy a
+        // consumer pinned to the frozen profile.
+        let kp = Keypair::generate();
+        let mut receipt = authoritative_receipt(&kp);
+        if let Some(obj) = receipt
+            .metadata
+            .as_mut()
+            .and_then(|m| m.get_mut("budget_authority"))
+            .and_then(|b| b.get_mut("mediated_spend"))
+            .and_then(|b| b.as_object_mut())
+        {
+            obj.insert(
+                "profile".to_string(),
+                serde_json::json!("chio.mediated_spend.v2"),
+            );
+        }
+        let receipt = ChioReceipt::sign(receipt.body(), &kp).unwrap();
+        let nonce = good_nonce(&kp, &receipt);
+        assert_eq!(
+            is_authoritative_spend_receipt(&receipt, &[kp.public_key()], &nonce),
+            Err(NotAuthoritativeReason::MissingOrWrongMediatedSpendProfile)
+        );
+    }
+
+    #[test]
     fn r1_forged_mediated_label_without_budget_authority_is_rejected() {
         // A trusted signer stamps advisory content as Mediated with zero budget movement.
         let kp = Keypair::generate();
@@ -426,6 +521,28 @@ mod tests {
             Err(NotAuthoritativeReason::GuaranteeLevelBelowFloor {
                 minimum: "partition_escrowed".to_string(),
                 actual: "single_node_atomic".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn guarantee_floor_with_unrecognized_minimum_is_rejected() {
+        // A misspelled or unversioned operator floor must fail closed rather
+        // than silently ranking as the weakest level and admitting everything.
+        let kp = Keypair::generate();
+        let receipt = authoritative_receipt(&kp);
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "ha_lienarizable"),
+            Err(NotAuthoritativeReason::UnknownGuaranteeFloor {
+                minimum: "ha_lienarizable".to_string(),
+            })
+        );
+        // An unrecognized floor fails closed even when the receipt would clear a
+        // valid floor at the same intended strength.
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "linearizable"),
+            Err(NotAuthoritativeReason::UnknownGuaranteeFloor {
+                minimum: "linearizable".to_string(),
             })
         );
     }
