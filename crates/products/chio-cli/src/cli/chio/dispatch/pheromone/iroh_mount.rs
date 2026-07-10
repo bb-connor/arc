@@ -651,18 +651,19 @@ pub(crate) fn reload_verified_directory(
                     return Err(DirectoryReloadError::Read(error));
                 }
             };
-        // Honor the trusted minVersion, mirroring the startup loader.
-        // minVersion is INCLUSIVE but `verify_bundle` treats `version_floor` as
-        // EXCLUSIVE (`version <= version_floor` rejects), so map the inclusive minimum
-        // onto the exclusive floor with `saturating_sub(1)` and `max` it into the
-        // running version. Without this, a relay at version 1 would accept a signed
-        // version 2 successor even after operators set minVersion to 10, whereas
-        // startup would reject it.
-        let inclusive_min_as_floor = trusted_min_version.saturating_sub(1);
-        let version_floor = current_version.max(inclusive_min_as_floor);
+        // minVersion is INCLUSIVE: a successor is admissible only when its version is at
+        // or above the trusted floor. A successor that is newer than the running version
+        // but STILL BELOW that floor (operators raised minVersion past this staged
+        // version) must fail closed to deny-all, exactly as the unchanged path and a
+        // restart would. Folding the floor into `verify_bundle` instead would surface as a
+        // rollback/verify error the reloader treats as transient, leaving the stale,
+        // now below-floor directory admitting until expiry.
+        if bundle.body.version < trusted_min_version {
+            return Ok(ReloadOutcome::BelowMinVersionFloor);
+        }
         let trust = TransportDirectoryBundleTrust {
             issuers,
-            version_floor,
+            version_floor: current_version,
             expected_previous_version_sha256: Some(current_body_sha256.to_string()),
             now_unix_ms: now,
         };
@@ -1993,21 +1994,20 @@ mod tests {
     }
 
     #[test]
-    fn directory_reload_honors_trusted_min_version() {
-        // Raising minVersion on a RUNNING relay must be honored on the next reload,
-        // exactly as startup honors it. A version-1 relay must reject a signed version-2
-        // successor once operators pin minVersion = 10.
-        //
-        // With a floor of only `current_version` (1) the successor v2 > 1 would be
-        // Updated; with `floor == max(current, minVersion - 1)` the floor is max(1, 9) = 9,
-        // so v2 <= 9 is rejected.
+    fn directory_reload_denies_newer_successor_below_raised_min_version() {
+        // A staged successor that is NEWER than the running directory but STILL BELOW a
+        // minVersion operators raised above it must fail closed to deny-all, exactly as
+        // the unchanged path and a restart would. It must NOT surface as a transient
+        // verify error that keeps the stale, now below-floor directory admitting until
+        // expiry: the running version stays below the floor, so continued admission would
+        // violate the operator's minVersion.
         let dir = tempfile::tempdir().unwrap();
         let (_v1_path, _v1_issuers, _v1_expires, v1_hash) =
             write_test_bundle(dir.path(), 1, false, None);
         let (bundle_path, _v2_issuers, expires_at, _v2_hash) =
             write_test_bundle(dir.path(), 2, false, Some(v1_hash.clone()));
-        // Pin minVersion = 10 AFTER the bundles are written (write_test_bundle leaves an
-        // issuers file with no minVersion).
+        // Pin minVersion = 10 AFTER the bundles are written; the on-disk successor (v2) is
+        // newer than the running v1 but still below the floor.
         let issuers_path = write_issuers_with_min_version(dir.path(), 10);
         let config = DirectoryReloadConfig {
             interval: Duration::from_secs(60),
@@ -2017,11 +2017,39 @@ mod tests {
             local_kernel_id: LOCAL_KERNEL_ID.to_string(),
         };
         let now_in_window = expires_at - 1;
-        let error = reload_verified_directory(&config, now_in_window, 1, expires_at, &v1_hash)
-            .expect_err("a successor below the trusted minVersion is rejected");
+
+        // Outcome-level: the newer-but-still-below-floor successor fails closed rather
+        // than returning a transient verify error.
+        let outcome = reload_verified_directory(&config, now_in_window, 1, expires_at, &v1_hash)
+            .expect("reload runs");
         assert!(
-            matches!(error, DirectoryReloadError::Verify(_)),
-            "a version-2 successor is rejected once minVersion is raised to 10, got {error:?}"
+            matches!(outcome, ReloadOutcome::BelowMinVersionFloor),
+            "a newer successor below the raised minVersion must fail closed, got {outcome:?}"
+        );
+
+        // Step-level: the gate flips to deny-all, the alarm is raised, and last-good is
+        // preserved so a successor at or above the floor can self-heal.
+        let gate = DirectoryGate::new(verified_directory("did:chio:bob", 24));
+        assert_eq!(gate.current_version(), 1);
+        let alive = AtomicBool::new(true);
+        let mut state = ReloadState {
+            version: 1,
+            body_sha256: v1_hash.clone(),
+            expires_at_unix_ms: expires_at,
+        };
+        directory_reload_step(&gate, &config, now_in_window, &mut state, &alive);
+        assert_eq!(
+            gate.current_version(),
+            0,
+            "a newer-but-below-floor successor fails closed to deny-all"
+        );
+        assert!(
+            !alive.load(Ordering::SeqCst),
+            "a below-min-version successor raises the fail-closed alarm"
+        );
+        assert_eq!(
+            state.version, 1,
+            "last-good is preserved so a successor at/above the floor can self-heal"
         );
     }
 
