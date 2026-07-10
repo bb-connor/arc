@@ -15,6 +15,10 @@ pub struct ReapSummary {
 /// `(hold_id, capability_id, grant_index, remaining_exposure_units, authority)`.
 type ExpiredReservedHold = (String, String, u32, u64, Option<BudgetEventAuthority>);
 
+/// A hold still `open` at startup:
+/// `(hold_id, capability_id, grant_index, remaining_exposure_units, authority)`.
+type OpenHold = (String, String, u32, u64, Option<BudgetEventAuthority>);
+
 impl SqliteBudgetStore {
     /// Reconcile or reverse every hold still `open` at startup. Holds present in
     /// `realized_by_hold` (arbitrated by the ADR-0013 durable receipt log) are
@@ -32,7 +36,12 @@ impl SqliteBudgetStore {
             reconciled: 0,
             reversed: 0,
         };
-        for (hold_id, capability_id, grant_index, exposure) in open_holds {
+        for (hold_id, capability_id, grant_index, exposure, authority) in open_holds {
+            // Kernel-authored holds carry a BudgetEventAuthority lease that the
+            // reconcile/reverse authority check enforces. Present each hold's stored
+            // authority so orphaned kernel holds are reclaimed rather than rejected;
+            // a hold whose authority columns cannot be loaded fails closed in
+            // `list_open_holds` rather than silently reaping with no authority.
             match realized_by_hold.get(&hold_id) {
                 Some(&realized) => {
                     self.reconcile_budget_hold(BudgetReconcileHoldRequest {
@@ -42,7 +51,7 @@ impl SqliteBudgetStore {
                         realized_spend_units: realized.min(exposure),
                         hold_id: Some(hold_id.clone()),
                         event_id: Some(format!("{hold_id}:reap-reconcile")),
-                        authority: None,
+                        authority,
                     })?;
                     summary.reconciled += 1;
                 }
@@ -53,7 +62,7 @@ impl SqliteBudgetStore {
                         reversed_exposure_units: exposure,
                         hold_id: Some(hold_id.clone()),
                         event_id: Some(format!("{hold_id}:reap-reverse")),
-                        authority: None,
+                        authority,
                     })?;
                     summary.reversed += 1;
                 }
@@ -208,24 +217,27 @@ impl SqliteBudgetStore {
             .map_err(Into::into)
     }
 
-    /// Rows still `open`: `(hold_id, capability_id, grant_index, remaining_exposure_units)`.
-    pub(super) fn list_open_holds(
-        &self,
-    ) -> Result<Vec<(String, String, u32, u64)>, BudgetStoreError> {
+    /// Rows still `open`:
+    /// `(hold_id, capability_id, grant_index, remaining_exposure_units, authority)`.
+    /// A hold with inconsistent authority lease columns is rejected fail-closed.
+    pub(super) fn list_open_holds(&self) -> Result<Vec<OpenHold>, BudgetStoreError> {
         let connection = self
             .connection
             .lock()
             .map_err(|_| BudgetStoreError::Invariant("budget store mutex poisoned".to_string()))?;
         let mut statement = connection.prepare(
-            "SELECT hold_id, capability_id, grant_index, remaining_exposure_units \
+            "SELECT hold_id, capability_id, grant_index, remaining_exposure_units, \
+             authority_id, lease_id, lease_epoch \
              FROM budget_authorization_holds WHERE disposition = 'open'",
         )?;
         let rows = statement.query_map([], |row| {
+            let authority = sqlite_budget_event_authority(row.get(4)?, row.get(5)?, row.get(6)?)?;
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
                 row.get::<_, i64>(2)? as u32,
                 row.get::<_, i64>(3)? as u64,
+                authority,
             ))
         })?;
         let mut holds = Vec::new();
@@ -252,6 +264,15 @@ mod tests {
     }
 
     fn authorize(store: &SqliteBudgetStore, hold_id: &str, cap: &str) {
+        authorize_with_authority(store, hold_id, cap, None);
+    }
+
+    fn authorize_with_authority(
+        store: &SqliteBudgetStore,
+        hold_id: &str,
+        cap: &str,
+        authority: Option<BudgetEventAuthority>,
+    ) {
         let decision = store
             .authorize_budget_hold(BudgetAuthorizeHoldRequest {
                 capability_id: cap.to_string(),
@@ -262,7 +283,7 @@ mod tests {
                 max_total_cost_units: Some(1000),
                 hold_id: Some(hold_id.to_string()),
                 event_id: Some(format!("{hold_id}:authorize")),
-                authority: None,
+                authority,
             })
             .unwrap();
         assert!(matches!(
@@ -419,6 +440,48 @@ mod tests {
         assert_eq!(summary.reversed, 1);
 
         // cap-a reconciled down to realized 40; cap-b reversed back to 0.
+        assert_eq!(
+            store
+                .get_usage("cap-a", 0)
+                .unwrap()
+                .unwrap()
+                .committed_cost_units()
+                .unwrap(),
+            40
+        );
+        assert_eq!(
+            store
+                .get_usage("cap-b", 0)
+                .unwrap()
+                .unwrap()
+                .committed_cost_units()
+                .unwrap(),
+            0
+        );
+    }
+
+    #[test]
+    fn reaper_reclaims_kernel_authored_holds_bearing_authority() {
+        // Kernel-authored holds carry a BudgetEventAuthority lease. A crash after
+        // authorize leaves them open; the reaper must load and present each hold's
+        // stored authority so the store's authority check passes and the orphaned
+        // holds are reclaimed rather than left reserved indefinitely.
+        let store = open_temp_store();
+        let authority = BudgetEventAuthority {
+            authority_id: "kernel-authority".to_string(),
+            lease_id: "lease-1".to_string(),
+            lease_epoch: 0,
+        };
+        authorize_with_authority(&store, "hold-admitted", "cap-a", Some(authority.clone()));
+        authorize_with_authority(&store, "hold-orphan", "cap-b", Some(authority));
+
+        let mut realized = HashMap::new();
+        realized.insert("hold-admitted".to_string(), 40u64);
+        let summary = store.reap_holds_by_map(&realized).unwrap();
+        assert_eq!(summary.reconciled, 1);
+        assert_eq!(summary.reversed, 1);
+
+        // cap-a reconciled to realized 40; cap-b orphan reversed to 0.
         assert_eq!(
             store
                 .get_usage("cap-a", 0)
