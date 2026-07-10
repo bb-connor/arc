@@ -280,17 +280,27 @@ impl ChioKernel {
 
         // Report the GRANT's budget and delegation lineage, recorded on the reserved
         // hold at reserve time, so dashboards and reports see the grant ceiling and
-        // true lineage rather than this single reservation's exposure. `budget_total`
-        // is the grant ceiling; `budget_remaining` is that ceiling minus the realized
-        // spend. A hold reserved before these fields existed (or a zero-exposure
-        // invocation reserve with no ceiling) falls back to the reservation exposure
-        // and the nonce subject.
-        let grant_budget_total = hold.reserved_budget_total.unwrap_or(exposed);
+        // true lineage rather than this single reservation's exposure. A grant with a
+        // per-invocation cap but no `max_total_cost` records u64::MAX as its sentinel
+        // ceiling; that sentinel must never surface on a signed receipt, so treat it
+        // (and a hold reserved before these fields existed, or a zero-exposure
+        // invocation reserve) as having no recorded ceiling and fall back to this
+        // reservation's bounded exposure and the nonce subject.
+        let grant_budget_total = hold
+            .reserved_budget_total
+            .filter(|&total| total != u64::MAX)
+            .unwrap_or(exposed);
+        // Remaining is the grant ceiling minus the grant's TOTAL committed spend
+        // after this settle (committed_before - exposed + realized), not just this
+        // reconcile's realized cost. Subtracting only the realized cost would ignore
+        // every other reservation or spend already committed on the grant and
+        // overstate the remaining budget. Mirrors the inline unmeasured-cost path.
+        let committed_after = reconcile.committed_cost_units_after;
         let financial = FinancialReceiptMetadata {
             grant_index: hold.grant_index as u32,
             cost_charged: realized,
             currency: receipt_currency,
-            budget_remaining: grant_budget_total.saturating_sub(realized),
+            budget_remaining: grant_budget_total.saturating_sub(committed_after),
             budget_total: grant_budget_total,
             delegation_depth: hold.reserved_delegation_depth.unwrap_or(0),
             root_budget_holder: hold

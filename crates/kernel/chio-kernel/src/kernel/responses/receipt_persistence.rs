@@ -31,19 +31,27 @@ pub(crate) fn require_earned_mediated_trust_level(
         == Some("reconciled");
     // A prepaid spend under a grant with no budget ceiling carries no reconciled
     // budget hold: its cost is earned by an external settlement, not a mediated
-    // hold. A fully settled prepayment (a `settled` status carrying a payment
-    // reference) is therefore also earned cost-bearing status. Still fail closed
-    // when neither a reconciled hold nor a settled prepayment backs the cost.
-    let settled_prepayment = metadata.get("financial").is_some_and(|financial| {
-        financial
-            .get("settlement_status")
-            .and_then(serde_json::Value::as_str)
-            == Some("settled")
-            && financial
-                .get("payment_reference")
+    // hold, and such a receipt carries NO `budget_authority` block (the budget
+    // layer took no charge). A fully settled prepayment (a `settled` status
+    // carrying a payment reference) in that no-hold context is therefore earned
+    // cost-bearing status. When a `budget_authority` (monetary-hold) context IS
+    // present, the cost must be earned by that hold's `reconciled` terminal above,
+    // not two free-form financial strings, so the carve-out is gated on the
+    // absence of the hold context to keep this sign-site a structural proof. The
+    // `financial` block is kernel-constructed and never merged from caller-supplied
+    // metadata on any Mediated-signing path. Still fail closed when neither a
+    // reconciled hold nor a settled no-ceiling prepayment backs the cost.
+    let settled_prepayment = metadata.get("budget_authority").is_none()
+        && metadata.get("financial").is_some_and(|financial| {
+            financial
+                .get("settlement_status")
                 .and_then(serde_json::Value::as_str)
-                .is_some()
-    });
+                == Some("settled")
+                && financial
+                    .get("payment_reference")
+                    .and_then(serde_json::Value::as_str)
+                    .is_some()
+        });
     if reconciled || settled_prepayment {
         Ok(())
     } else {
@@ -356,6 +364,27 @@ mod tests {
             }
         });
         assert!(require_earned_mediated_trust_level(Some(&metadata), TrustLevel::Mediated).is_ok());
+    }
+
+    #[test]
+    fn signing_mediated_settled_strings_under_a_hold_context_fails_closed() {
+        // The settled-prepayment carve-out is only for a genuine no-monetary-ceiling
+        // MustPrepay spend, which carries NO budget_authority block. A cost-bearing
+        // receipt that DOES carry a budget-authority (monetary-hold) context must
+        // earn Mediated through that hold's `reconciled` terminal, not two free-form
+        // financial strings; a non-reconciled hold with settled strings fails closed.
+        let metadata = serde_json::json!({
+            "financial": {
+                "cost_charged": 100,
+                "grant_index": 0,
+                "currency": "USD",
+                "settlement_status": "settled",
+                "payment_reference": "sim-abc123"
+            },
+            "budget_authority": { "terminal": { "disposition": "reversed" } }
+        });
+        let result = require_earned_mediated_trust_level(Some(&metadata), TrustLevel::Mediated);
+        assert!(matches!(result, Err(KernelError::ReceiptSigningFailed(_))));
     }
 
     #[test]

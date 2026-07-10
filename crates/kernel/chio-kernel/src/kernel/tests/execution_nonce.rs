@@ -2126,7 +2126,7 @@ impl ReceiptStore for TogglingSnapshotReceiptStore {
 }
 
 #[test]
-fn reserving_receipt_persist_failure_reverses_stamped_monetary_hold() {
+fn reserving_receipt_persist_failure_is_nonfatal_and_reservation_reconcilable() {
     let mut kernel = make_kernel(make_monetary_config());
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
@@ -2136,60 +2136,75 @@ fn reserving_receipt_persist_failure_reverses_stamped_monetary_hold() {
             fail: std::sync::Arc::clone(&fail),
         }))
         .unwrap();
-    install_strict_nonce_store(&mut kernel);
+    let cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: true,
+    };
+    kernel.set_execution_nonce_store(
+        cfg.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+    );
 
-    // The whole grant is reservable by one authorization, so a stranded hold would
-    // block every later reservation on the grant.
-    let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 150, "USD");
     let cap = kernel
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
         .unwrap();
 
+    // The reserve preflight's durable receipt persist fails. The reservation is
+    // already durable in the budget store and the caller receives the minted nonce
+    // to reconcile downstream, so a persistence-log failure must NOT void the
+    // reservation: the response is a normal Allow carrying the nonce.
     let request = reserve_request("req-persist-fail", &cap, &agent_kp);
-    let err = kernel
+    let reserved = kernel
         .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
-        .unwrap_err();
-    assert!(
-        err.to_string().contains("append") || err.to_string().contains("receipt"),
-        "the receipt persist failure must surface: {err}"
-    );
+        .expect("a reserve receipt persist failure must not void the durable reservation");
+    assert_eq!(reserved.verdict, Verdict::Allow);
+    let nonce = *reserved
+        .execution_nonce
+        .clone()
+        .expect("the caller receives the minted nonce to reconcile the durable reservation");
 
-    // The stamped hold was reversed, not left open over a failed persist.
+    // The stamped hold stays OPEN (reserved), never reversed: it is reconcilable
+    // and its worst-case exposure stays committed against the grant.
     let hold_id = format!("budget-hold:req-persist-fail:{}:0", cap.id);
     let hold = kernel
         .budget_store
         .get_budget_hold(&hold_id)
         .unwrap()
-        .expect("the authorized hold is recorded");
+        .expect("the reserved hold is recorded");
     assert_eq!(
         hold.disposition,
-        crate::budget_store::BudgetHoldDispositionView::Reversed,
-        "a receipt persist failure after the stamp must reverse the hold"
+        crate::budget_store::BudgetHoldDispositionView::Open,
+        "a receipt persist failure must NOT reverse the durable reservation"
+    );
+    assert!(
+        hold.reserved_until.is_some(),
+        "the hold stays stamped/reserved so the TTL reaper can settle it if abandoned"
     );
     let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
     assert_eq!(
         usage.committed_cost_units().unwrap(),
-        0,
-        "the reversed hold leaves no committed exposure"
+        100,
+        "the reserved worst-case exposure stays committed"
     );
 
-    // Once the receipt store recovers, a later reservation on the same
-    // fully-bounded grant succeeds: nothing was stranded by the failed persist.
+    // The caller reconciles the durable reservation with the returned nonce once
+    // the receipt store recovers, proving the reservation was never lost.
     fail.store(false, Ordering::SeqCst);
-    let retry = reserve_request("req-persist-recover", &cap, &agent_kp);
-    let reserved = kernel
-        .authorize_tool_call_reserving_blocking_with_metadata(&retry, None)
-        .unwrap();
-    assert_eq!(
-        reserved.verdict,
-        Verdict::Allow,
-        "a later reservation must succeed after the failed persist was unwound: {:?}",
-        reserved.reason
-    );
+    let realized = ToolInvocationCost {
+        units: 30,
+        currency: "USD".to_string(),
+        breakdown: None,
+    };
+    let reconciled = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &request.arguments, &realized)
+        .expect("the durable reservation must be reconcilable by the returned nonce");
+    assert_eq!(reconciled.verdict, Verdict::Allow);
 }
 
 #[test]
-fn reserving_receipt_persist_failure_releases_delegated_sibling_share() {
+fn reserving_receipt_persist_failure_keeps_delegated_reservation_and_share() {
     let fixture = make_sibling_sum_monetary_fixture("reserve-persist-sibling");
     let path = fixture.path.clone();
     let mut kernel = fixture.kernel;
@@ -2203,29 +2218,56 @@ fn reserving_receipt_persist_failure_releases_delegated_sibling_share() {
     install_strict_nonce_store(&mut kernel);
 
     // Child A's reserve stamps a monetary hold and records its sibling-sum share,
-    // then the durable receipt persist fails. The tear-down must reverse the hold
-    // AND release the recorded share so a sibling is not permanently blocked.
+    // then the durable receipt persist fails. That persistence-log failure is
+    // NON-FATAL: child A's reservation is durable in the budget store and child A
+    // receives the nonce to reconcile, so the hold is NOT reversed and its share
+    // stays held.
     let first = delegated_reserve_request("req-a-reserve", &fixture.child_a, &fixture.child_a_kp);
-    let err = kernel
+    let reserved_a = kernel
         .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
-        .unwrap_err();
-    assert!(
-        err.to_string().contains("append") || err.to_string().contains("receipt"),
-        "the receipt persist failure must surface: {err}"
-    );
+        .expect("a reserve receipt persist failure must not void child A's reservation");
+    assert_eq!(reserved_a.verdict, Verdict::Allow);
+    let nonce_a = *reserved_a
+        .execution_nonce
+        .clone()
+        .expect("child A receives its reconcile nonce");
 
-    // The receipt store recovers; child B must now be admitted, proving child A's
-    // sibling share was released by the tear-down (not leaked over the failed
-    // persist).
+    // The receipt store recovers, but child B stays denied: child A's share is
+    // still held by its durable reservation, not released by the failed persist.
     fail.store(false, Ordering::SeqCst);
     let second = delegated_reserve_request("req-b-reserve", &fixture.child_b, &fixture.child_b_kp);
-    let admitted_b = kernel
+    let denied_b = kernel
         .authorize_tool_call_reserving_blocking_with_metadata(&second, None)
+        .unwrap();
+    assert_eq!(
+        denied_b.verdict,
+        Verdict::Deny,
+        "child B must stay denied while child A's persisted-but-unreceipted reservation holds its share: {:?}",
+        denied_b.reason
+    );
+
+    // Reconciling child A's reservation by its nonce closes the hold and releases
+    // the share, after which child B is admitted: the reservation lifecycle is
+    // intact, the persist failure neither lost it nor leaked its share.
+    let realized = ToolInvocationCost {
+        units: 30,
+        currency: "USD".to_string(),
+        breakdown: None,
+    };
+    let reconciled = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce_a, &first.arguments, &realized)
+        .expect("child A's durable reservation must reconcile by its nonce");
+    assert_eq!(reconciled.verdict, Verdict::Allow);
+
+    let third =
+        delegated_reserve_request("req-b-reserve-2", &fixture.child_b, &fixture.child_b_kp);
+    let admitted_b = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&third, None)
         .unwrap();
     assert_eq!(
         admitted_b.verdict,
         Verdict::Allow,
-        "child B must be admitted after child A's failed reservation released its share: {:?}",
+        "child B must be admitted after child A's reservation is reconciled: {:?}",
         admitted_b.reason
     );
 
@@ -2272,12 +2314,146 @@ fn reconcile_by_nonce_stamps_grant_budget_not_reservation_exposure() {
     );
     assert_eq!(
         parsed.budget_remaining, 120,
-        "budget_remaining must be the grant ceiling minus realized"
+        "budget_remaining must be the grant ceiling minus the grant's committed spend \
+         after settle (a single reservation settled at 30 leaves 150 - 30)"
     );
     assert_eq!(parsed.cost_charged, 30);
     // A root reservation carries no delegation: depth 0, root is the grant holder.
     assert_eq!(parsed.delegation_depth, 0);
     assert_eq!(parsed.root_budget_holder, cap.issuer.to_hex());
+}
+
+#[test]
+fn reconcile_by_nonce_budget_remaining_accounts_for_other_committed_spend() {
+    // Grant: max_cost_per_invocation 40, max_total 150. Two reservations coexist
+    // (40 + 40 = 80 <= 150). Reconciling the first at realized 10 must report
+    // budget_remaining against the grant's TOTAL committed spend after settle
+    // (150 - (80 - 40 + 10) = 100), NOT the grant ceiling minus this reconcile's
+    // realized cost (150 - 10 = 140), which would ignore reservation B's held 40.
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
+    let cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: true,
+    };
+    kernel.set_execution_nonce_store(
+        cfg.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+    );
+    let grant = make_monetary_grant("cost-srv", "compute", 40, 150, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let reserve_a = reserve_request("req-recon-a", &cap, &agent_kp);
+    let authorized_a = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&reserve_a, None)
+        .unwrap();
+    let nonce_a = *authorized_a.execution_nonce.clone().unwrap();
+
+    // Reservation B stays open, committing another 40 against the grant.
+    let reserve_b = reserve_request("req-recon-b", &cap, &agent_kp);
+    let authorized_b = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&reserve_b, None)
+        .unwrap();
+    assert_eq!(authorized_b.verdict, Verdict::Allow);
+
+    let realized = ToolInvocationCost {
+        units: 10,
+        currency: "USD".to_string(),
+        breakdown: None,
+    };
+    let reconciled = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce_a, &reserve_a.arguments, &realized)
+        .unwrap();
+    let financial = reconciled
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|m| m.get("financial"))
+        .expect("reconciled receipt carries financial metadata")
+        .clone();
+    let parsed: crate::FinancialReceiptMetadata = serde_json::from_value(financial).unwrap();
+    assert_eq!(parsed.budget_total, 150);
+    assert_eq!(
+        parsed.budget_remaining, 100,
+        "budget_remaining must subtract the grant's total committed spend after \
+         settle (50), not just this reconcile's realized cost (10)"
+    );
+    assert_eq!(parsed.cost_charged, 10);
+}
+
+#[test]
+fn reconcile_by_nonce_no_total_cap_grant_does_not_stamp_sentinel() {
+    // A grant with a per-invocation cap but NO max_total_cost carries no monetary
+    // ceiling; the budget layer records u64::MAX as its sentinel ceiling. That
+    // sentinel must never surface on a signed authoritative receipt as
+    // budget_total / budget_remaining.
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
+    let cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: true,
+    };
+    kernel.set_execution_nonce_store(
+        cfg.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+    );
+    let grant = {
+        use chio_core::capability::scope::MonetaryAmount;
+        let mut grant = make_monetary_grant("cost-srv", "compute", 100, 999, "USD");
+        grant.max_cost_per_invocation = Some(MonetaryAmount {
+            units: 100,
+            currency: "USD".to_string(),
+        });
+        grant.max_total_cost = None;
+        grant
+    };
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let reserve = reserve_request("req-recon-no-cap", &cap, &agent_kp);
+    let authorized = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&reserve, None)
+        .unwrap();
+    let nonce = *authorized.execution_nonce.clone().unwrap();
+
+    let realized = ToolInvocationCost {
+        units: 30,
+        currency: "USD".to_string(),
+        breakdown: None,
+    };
+    let reconciled = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &reserve.arguments, &realized)
+        .unwrap();
+    let financial = reconciled
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|m| m.get("financial"))
+        .expect("reconciled receipt carries financial metadata")
+        .clone();
+    let parsed: crate::FinancialReceiptMetadata = serde_json::from_value(financial).unwrap();
+    assert_ne!(
+        parsed.budget_total,
+        u64::MAX,
+        "a no-total-cap grant must not stamp the u64::MAX sentinel as budget_total"
+    );
+    assert_ne!(
+        parsed.budget_remaining,
+        u64::MAX,
+        "budget_remaining must not carry the u64::MAX sentinel"
+    );
+    // With no real ceiling the receipt falls back to this reservation's bounded
+    // exposure (100), settled at realized 30.
+    assert_eq!(parsed.budget_total, 100);
+    assert_eq!(parsed.budget_remaining, 70);
+    assert_eq!(parsed.cost_charged, 30);
 }
 
 #[test]

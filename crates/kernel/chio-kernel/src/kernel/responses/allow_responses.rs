@@ -288,18 +288,24 @@ impl ChioKernel {
             }
         }
 
-        // Persist the receipt only after the hold is successfully stamped, so a
-        // stamp failure (which reverses the hold) leaves no reserved receipt. If
-        // the durable receipt (or its federation co-signature) fails here, the
-        // stamp already landed: reverse it before surfacing the error. Otherwise
-        // the open, stamped hold burns budget for an authorization the caller
-        // never received until the TTL reaper forfeits it. Mirrors the
-        // stamp-failure cleanup above.
+        // Persist the receipt only after the hold is successfully stamped. The
+        // reservation is now durable in the budget store and the minted nonce binds
+        // it, so a durable-receipt (or federation co-signature) failure here is
+        // NON-FATAL: reversing the stamped hold would strand the receipt persist's
+        // partial state and void a valid reservation the caller could otherwise
+        // reconcile downstream with the nonce. Log the failure and return the
+        // response with the nonce instead; the reservation stands, and if the caller
+        // never reconciles the TTL reaper forfeits it. A stamp failure above (no
+        // durable hold, no returned nonce) still reverses, fail-closed.
         if let Err(error) = self.record_chio_receipt_with_federation(request, &receipt) {
-            if let Some(stamp) = reserved_hold.as_ref() {
-                self.reverse_stamped_reserved_hold(cap, stamp)?;
-            }
-            return Err(error);
+            warn!(
+                request_id = %request.request_id,
+                hold_id = reserved_hold.as_ref().map(ReservedHoldStamp::hold_id),
+                receipt_id = %receipt.id,
+                reason = %redacted!(&error),
+                "durable receipt persistence failed for a stamped reservation; returning the \
+                 minted nonce so the caller can reconcile the durable reservation"
+            );
         }
 
         Ok(ToolCallResponse {
@@ -313,40 +319,6 @@ impl ChioKernel {
             receipt,
             execution_nonce,
         })
-    }
-
-    /// Reverse a reserved hold whose durable receipt failed to persist after the
-    /// reservation stamp landed. A monetary reserve reverses its budget charge and
-    /// releases the sibling-sum share the stamp recorded against the hold; an
-    /// invocation reserve reverses the adopted invocation hold, returning the
-    /// debited invocation. Fail-closed: leaves no committed exposure and no
-    /// stranded parent budget for an authorization the caller never received.
-    fn reverse_stamped_reserved_hold(
-        &self,
-        cap: &CapabilityToken,
-        stamp: &ReservedHoldStamp<'_>,
-    ) -> Result<(), KernelError> {
-        match stamp {
-            ReservedHoldStamp::Monetary { charge, .. } => {
-                self.reverse_budget_charge(&cap.id, charge)?;
-                self.release_reserved_sibling_share_for_hold(charge.budget_hold_id.as_str());
-            }
-            ReservedHoldStamp::Invocation {
-                hold_id,
-                grant_index,
-            } => {
-                self.with_budget_store(|store| {
-                    Ok(store.reverse_charge_cost_with_ids(
-                        &cap.id,
-                        *grant_index,
-                        0,
-                        Some(hold_id.as_str()),
-                        Some(&format!("{hold_id}:reserve-teardown-reverse")),
-                    )?)
-                })?;
-            }
-        }
-        Ok(())
     }
 
     /// Build receipt metadata describing the provenance record that governs
