@@ -469,6 +469,21 @@ impl PheromoneBatchHandler {
         // the HTTP path, so a sender that has since fallen out of scope cannot replay.
         (self.scope_check)(&authenticated_sender, &batch)?;
 
+        // RE-RESOLVE AGAINST THE CURRENT DIRECTORY BEFORE TOUCHING RECEIVER STATE
+        // (fail-closed). The admission gate authorized this endpoint at `after_handshake`,
+        // but the directory reloader can publish a deny-all (expiry, revoked local binding,
+        // below-minVersion, or an untrusted signing issuer) - or a successor that tombstones
+        // this sender - DURING the accept_bi + request-frame read this handler just awaited.
+        // Resolving the sender only once at accept would let a peer that connected just
+        // before that swap still deliver a batch under a directory that is no longer valid.
+        // Resolve again now, immediately before any receiver/inbox mutation: an endpoint the
+        // current directory no longer admits (or now binds to a different kernel) is reset
+        // here rather than received under a stale directory.
+        let remote = conn.remote_id();
+        if resolve_authenticated_sender(&self.gate, &remote)? != authenticated_sender {
+            return Err(IrohLaneError::Unadmitted(remote.fmt_short().to_string()));
+        }
+
         // DEDUP BEFORE RECEIVE (fail-closed idempotency): compute the deterministic
         // inbox nonce and consult the store BEFORE mutating receiver state. On a
         // retry of an already-admitted batch, re-running receive_batch would re-enter
@@ -1154,6 +1169,8 @@ mod tests {
     use chio_federation::pheromone_gossip::PHEROMONE_GOSSIP_SCHEMA;
     use chio_federation::pheromone_gossip::PHEROMONE_TRANSIT_POLICY_SCHEMA;
     use iroh::SecretKey;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::atomic::Ordering;
 
     const NOW: u64 = 1_766_000_000_500;
     const RECIPIENT: &str = "did:chio:buyer-kernel";
@@ -1819,6 +1836,93 @@ mod tests {
         .expect("delivery completes before timeout")
         .expect("admitted dialer delivers its batch");
         assert!(outcome.accepted, "admitted dialer's batch is accepted");
+
+        router.shutdown().await.ok();
+    }
+
+    /// A receiver double that records whether `receive_batch` ever ran, so a deny-all
+    /// swap between admission and receive can be proven to admit nothing.
+    struct ReceiveProbe {
+        received: Arc<AtomicBool>,
+    }
+
+    #[async_trait::async_trait]
+    impl RelayBatchReceiver for ReceiveProbe {
+        async fn receive_batch(
+            &self,
+            _batch: PheromoneGossipBatch,
+            _authenticated_sender_kernel_id: String,
+            _received_at_unix_ms: u64,
+        ) -> Result<chio_pheromone_runtime::PheromoneReceiveReport, PheromoneRelayError> {
+            self.received.store(true, Ordering::SeqCst);
+            Err(PheromoneRelayError::Json(
+                "receiver must not run after a deny-all swap".to_string(),
+            ))
+        }
+    }
+
+    #[tokio::test]
+    async fn deny_all_swap_between_admission_and_receive_admits_nothing() {
+        // A peer admitted at the handshake must not deliver a batch once the directory has
+        // swapped to deny-all. The swap is published mid-handle - after the connection was
+        // admitted and the request frame read, but before any receiver state is touched -
+        // modeling the reloader publishing deny-all while a peer is already in flight. The
+        // handler must re-resolve against the live directory and refuse to receive, so the
+        // batch never reaches the receiver.
+        let dialer_seed = 60u8;
+        let gate = verified_gate("did:chio:bob", 1, dialer_seed, false);
+
+        let received = Arc::new(AtomicBool::new(false));
+        let receiver: Arc<dyn RelayBatchReceiver> = Arc::new(ReceiveProbe {
+            received: Arc::clone(&received),
+        });
+
+        // Swap the shared directory to deny-all at the exact instant the batch is scoped.
+        let swap_gate = gate.clone();
+        let scope_check: InboundBatchScopeCheck = Arc::new(
+            move |_sender: &str,
+                  _batch: &PheromoneGossipBatch|
+                  -> Result<(), PheromoneRelayError> {
+                swap_gate.swap(Arc::new(
+                    crate::identity::VerifiedDirectory::empty_deny_all(),
+                ));
+                Ok(())
+            },
+        );
+
+        let store = Arc::new(SqlitePheromoneRelayStore::open_in_memory().unwrap());
+        let now: Arc<dyn Fn() -> u64 + Send + Sync> = Arc::new(|| NOW);
+        let handler = PheromoneBatchHandler::new(
+            gate.clone(),
+            receiver,
+            Arc::clone(&store),
+            now,
+            scope_check,
+        );
+
+        let acceptor = bind_endpoint(61, Some(gate.clone())).await;
+        let router = Router::builder(acceptor)
+            .accept(ALPN_PHEROMONE_BATCH, handler)
+            .spawn();
+        let acceptor_addr = direct_addr(router.endpoint());
+
+        let dialer = bind_endpoint(dialer_seed, None).await;
+        let batch = direct_batch("did:chio:bob");
+        let outcome = tokio::time::timeout(
+            Duration::from_secs(20),
+            deliver_batch_over_iroh(&dialer, acceptor_addr, &batch),
+        )
+        .await
+        .expect("delivery attempt completes before timeout");
+
+        assert!(
+            outcome.is_err(),
+            "a batch delivered after the directory swapped to deny-all must fail closed"
+        );
+        assert!(
+            !received.load(Ordering::SeqCst),
+            "the receiver must never run once the directory has swapped to deny-all"
+        );
 
         router.shutdown().await.ok();
     }
