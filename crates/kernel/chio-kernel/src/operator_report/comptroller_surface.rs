@@ -90,9 +90,18 @@ impl ComptrollerSurfaceReport {
             if position.governed_max_exposure_units == 0 {
                 continue;
             }
-            let outstanding = position
-                .reserved_units
-                .saturating_add(position.pending_units);
+            // Fail-closed: an outstanding sum that overflows u64 must be reported
+            // as an inconsistency, not clamped. A saturating add would pin
+            // `outstanding` to the u64 ceiling and pass the comparison below even
+            // though the true reserved + pending exposure exceeds the governed
+            // limit, masking an over-limit position.
+            let Some(outstanding) = position.reserved_units.checked_add(position.pending_units)
+            else {
+                return Err(format!(
+                    "exposure position {} outstanding holds overflow u64 (reserved {} + pending {})",
+                    position.currency, position.reserved_units, position.pending_units
+                ));
+            };
             if outstanding > position.governed_max_exposure_units {
                 return Err(format!(
                     "exposure position {} outstanding holds {} exceed governed ceiling {}",
@@ -185,5 +194,18 @@ mod tests {
         let mut report = sample();
         report.exposure_positions = vec![position("USD", 0, u64::MAX / 2, u64::MAX / 2)];
         assert!(report.validate_consistency().is_ok());
+    }
+
+    #[test]
+    fn validate_consistency_rejects_outstanding_overflow_over_ceiling() {
+        let mut report = sample();
+        // reserved + pending overflows u64, so a saturating clamp would pin
+        // outstanding to the u64 ceiling and silently pass a governed limit that
+        // the true exposure exceeds. A fail-closed validator must reject it.
+        report.exposure_positions = vec![position("USD", u64::MAX, u64::MAX, 1)];
+        let err = report
+            .validate_consistency()
+            .expect_err("overflowing outstanding must fail closed");
+        assert!(err.contains("overflow"), "unexpected error: {err}");
     }
 }
