@@ -634,6 +634,7 @@ mod tests {
             certification_public_metadata_ttl_seconds: 300,
             peer_urls: Vec::new(),
             cluster_sync_interval: Duration::from_millis(25),
+            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         };
         TrustServiceState {
             config,
@@ -643,6 +644,7 @@ mod tests {
                 FederationAdmissionRateLimiter::default(),
             )),
             cluster: None,
+            cluster_progress: None,
         }
     }
 

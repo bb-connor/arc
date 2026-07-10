@@ -117,6 +117,9 @@ class JsonTextCanonicalParser {
       const key = this.parseString();
       this.skipWhitespace();
       this.expect(":");
+      if (entries.has(key)) {
+        throw new ChioInvariantError("json", `input contains duplicate object key: ${key}`);
+      }
       entries.set(key, this.parseValue());
       this.skipWhitespace();
       if (this.consumeIf("}")) {
@@ -227,7 +230,17 @@ export function canonicalizeJson(value: unknown): string {
         return `[${value.map((item) => canonicalizeJson(item)).join(",")}]`;
       }
 
-      return `{${Object.entries(value as Record<string, unknown>)
+      const entries = Object.entries(value as Record<string, unknown>);
+      for (const [, entryValue] of entries) {
+        if (entryValue === undefined) {
+          throw new ChioInvariantError(
+            "canonical_json",
+            "canonical JSON does not support undefined object fields",
+          );
+        }
+      }
+
+      return `{${entries
         .sort(([left], [right]) => compareUtf16(left, right))
         .map(([key, entryValue]) => `${JSON.stringify(key)}:${canonicalizeJson(entryValue)}`)
         .join(",")}}`;

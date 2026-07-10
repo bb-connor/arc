@@ -775,9 +775,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.102"
+version = "1.0.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
+checksum = "2a4385e2e34eb35d6b3efe798b9eb88096925d87726c0798709bf56d9ed84af3"
 
 [[package]]
 name = "ar_archive_writer"
@@ -2827,6 +2827,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-bounded"
+version = "0.1.0"
+dependencies = [
+ "loom",
+ "proptest",
+]
+
+[[package]]
 name = "chio-cli"
 version = "0.1.0"
 dependencies = [
@@ -3073,6 +3081,7 @@ dependencies = [
  "hex",
  "p384",
  "percent-encoding",
+ "proptest",
  "rcgen 0.13.2",
  "reqwest 0.13.2",
  "rsa",
@@ -3431,6 +3440,8 @@ dependencies = [
 name = "chio-federation-transport-iroh"
 version = "0.1.0"
 dependencies = [
+ "arc-swap",
+ "async-trait",
  "blake3",
  "bytes",
  "chio-core-types",
@@ -3438,11 +3449,14 @@ dependencies = [
  "chio-metrics-spec",
  "chio-pheromone",
  "chio-pheromone-relay",
+ "chio-pheromone-runtime",
  "chio-revocation-oracle",
  "iroh",
  "iroh-blobs",
  "iroh-gossip",
+ "loom",
  "n0-future",
+ "proptest",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -3605,6 +3619,8 @@ dependencies = [
 name = "chio-http-session"
 version = "0.1.0"
 dependencies = [
+ "chio-bounded",
+ "chio-kernel",
  "hex",
  "serde",
  "serde_json",
@@ -3620,6 +3636,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chio-appraisal",
+ "chio-bounded",
  "chio-core",
  "chio-core-types",
  "chio-credit",
@@ -3640,6 +3657,7 @@ dependencies = [
  "dashmap 6.1.0",
  "dhat",
  "futures",
+ "libc",
  "loom",
  "lru 0.16.3",
  "opentelemetry-semantic-conventions",
@@ -4041,6 +4059,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "subtle",
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
@@ -4390,6 +4409,8 @@ dependencies = [
  "chio-settle",
  "chio-test-support",
  "criterion",
+ "loom",
+ "proptest",
  "r2d2",
  "r2d2_sqlite",
  "rusqlite",
@@ -4621,6 +4642,7 @@ dependencies = [
 name = "chio-web3"
 version = "0.1.0"
 dependencies = [
+ "alloy-primitives",
  "chio-core-types",
  "chio-credit",
  "serde",
