@@ -825,6 +825,8 @@ pub struct OffchainSettlementReceiptArtifact {
 /// - Any of `schema`, `settlement_receipt_id`, `authorization_digest`, or
 ///   `governed_receipt_id` is empty.
 /// - `settled_amount.units` is zero.
+/// - `settled_amount.units` is positive but `settled_amount.currency` is blank
+///   (empty or whitespace-only), leaving the paid amount without a denomination.
 ///
 /// `execution_nonce_ref` and `hold_ref` are optional reserved linkage fields
 /// and are not validated here.
@@ -855,6 +857,13 @@ pub fn validate_offchain_settlement_receipt(
     if receipt.settled_amount.units == 0 {
         return Err(SettlementError::InvalidInput(
             "off-chain settlement receipt requires a positive settled_amount".to_string(),
+        ));
+    }
+    // A settled amount with positive units but no denomination cannot be
+    // reconciled: downstream ledgers and dashboards cannot tell what was paid.
+    if receipt.settled_amount.currency.trim().is_empty() {
+        return Err(SettlementError::InvalidInput(
+            "off-chain settlement receipt requires a non-empty settled_amount.currency".to_string(),
         ));
     }
     Ok(())
@@ -1790,6 +1799,32 @@ mod tests {
         assert!(
             matches!(error, SettlementError::InvalidInput(_)),
             "empty schema must produce InvalidInput, got: {error}"
+        );
+    }
+
+    #[test]
+    fn validate_offchain_settlement_receipt_rejects_blank_currency_on_positive_units() {
+        // A settled amount with positive units but no denomination cannot be
+        // reconciled: dashboards and ledgers cannot tell what was paid.
+        let valid = sample_offchain_receipt();
+        validate_offchain_settlement_receipt(&valid).test_unwrap();
+
+        let mut empty_currency = sample_offchain_receipt();
+        empty_currency.settled_amount.currency = String::new();
+        let error = validate_offchain_settlement_receipt(&empty_currency)
+            .test_expect_err("empty currency with positive units must fail");
+        assert!(
+            matches!(error, SettlementError::InvalidInput(_)),
+            "empty currency must produce InvalidInput, got: {error}"
+        );
+
+        let mut whitespace_currency = sample_offchain_receipt();
+        whitespace_currency.settled_amount.currency = "   ".to_string();
+        let error = validate_offchain_settlement_receipt(&whitespace_currency)
+            .test_expect_err("whitespace currency with positive units must fail");
+        assert!(
+            matches!(error, SettlementError::InvalidInput(_)),
+            "whitespace currency must produce InvalidInput, got: {error}"
         );
     }
 
