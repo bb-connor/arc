@@ -245,6 +245,32 @@ pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     execution_nonce: Option<SignedExecutionNonce>,
 }
 
+/// Return the first revoked capability id found on the presented capability or
+/// anywhere in its delegation chain, or `None` when neither the leaf nor any
+/// ancestor is revoked.
+///
+/// A revocation severs the whole delegated subtree: revoking a root or
+/// intermediate capability must reject every descendant that carries it in its
+/// `delegation_chain`, not only the exact token that was revoked. The presented
+/// leaf id is checked first, then each ancestor recorded on the chain, matching
+/// the kernel's own `check_revocation` walk. The mediation kernel's revocation
+/// store starts empty, so this sidecar-side walk over `state.revoked_capability_ids`
+/// is the authority; checking only the leaf id would let a delegated child of a
+/// revoked ancestor keep earning mediated reservations until expiry.
+fn revoked_id_in_capability_chain<'a>(
+    capability: &'a CapabilityToken,
+    revoked_capability_ids: &HashSet<String>,
+) -> Option<&'a str> {
+    if revoked_capability_ids.contains(&capability.id) {
+        return Some(capability.id.as_str());
+    }
+    capability
+        .delegation_chain
+        .iter()
+        .map(|link| link.capability_id.as_str())
+        .find(|capability_id| revoked_capability_ids.contains(*capability_id))
+}
+
 pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
@@ -309,15 +335,17 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
              and forfeit budget",
         );
     }
-    // Fail-closed: a capability released via `/v1/capabilities/release` is
-    // recorded in the sidecar revocation set. Reject a revoked capability here,
-    // mirroring the validate, proxy, and advisory paths, so a revoked token
-    // cannot keep earning mediated authorizations until expiry.
-    let revoked = state
-        .revoked_capability_ids
-        .lock()
-        .await
-        .contains(&parsed.capability.id);
+    // Fail-closed: a capability released via `/v1/capabilities/release` (or an
+    // operator revocation) is recorded in the sidecar revocation set. Reject the
+    // presented capability when its own id OR any ancestor in its delegation
+    // chain is revoked, so a delegated child of a revoked root cannot keep
+    // earning mediated reservations until expiry. Walk the chain, not just the
+    // leaf id, because the mediation kernel's revocation store starts empty and
+    // cannot match a revoked ancestor on its own.
+    let revoked = {
+        let revoked_capability_ids = state.revoked_capability_ids.lock().await;
+        revoked_id_in_capability_chain(&parsed.capability, &revoked_capability_ids).is_some()
+    };
     if revoked {
         return (
             StatusCode::FORBIDDEN,
@@ -1299,6 +1327,182 @@ mod tests {
         // The revoked capability never reaches the kernel, so no hold is placed.
         let usage = budget.get_usage(&cap_id, 0).unwrap();
         assert!(usage.is_none() || usage.unwrap().committed_cost_units().unwrap() == 0);
+    }
+
+    /// Build a well-formed capability whose single delegation-chain link names
+    /// `ancestor_id` as the delegated ancestor. The leaf is signed by `issuer`
+    /// and the link by `delegator`, so the token is structurally valid; the
+    /// presented leaf carries a fresh, distinct id.
+    fn delegated_child_capability(
+        issuer: &Keypair,
+        delegator: &Keypair,
+        subject: &Keypair,
+        ancestor_id: &str,
+        server: &str,
+        tool: &str,
+    ) -> CapabilityToken {
+        use chio_core_types::capability::attenuation::{DelegationLink, DelegationLinkBody};
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .test_unwrap()
+            .as_secs();
+        let grant = ToolGrant {
+            server_id: server.to_string(),
+            tool_name: tool.to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: vec![],
+            max_invocations: None,
+            max_cost_per_invocation: Some(MonetaryAmount {
+                units: 100,
+                currency: "USD".to_string(),
+            }),
+            max_total_cost: Some(MonetaryAmount {
+                units: 1000,
+                currency: "USD".to_string(),
+            }),
+            dpop_required: None,
+        };
+        let scope = ChioScope {
+            grants: vec![grant],
+            ..ChioScope::default()
+        };
+        let link = DelegationLink::sign(
+            DelegationLinkBody {
+                capability_id: ancestor_id.to_string(),
+                delegator: delegator.public_key(),
+                delegatee: subject.public_key(),
+                attenuations: vec![],
+                timestamp: now,
+                scope_hash: None,
+            },
+            delegator,
+        )
+        .test_unwrap();
+        let body = CapabilityTokenBody {
+            id: uuid::Uuid::now_v7().to_string(),
+            issuer: issuer.public_key(),
+            subject: subject.public_key(),
+            scope,
+            issued_at: now,
+            expires_at: now + 3600,
+            delegation_chain: vec![link],
+        };
+        CapabilityToken::sign(body, issuer).test_unwrap()
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_revoked_delegation_ancestor_rejects_delegated_child() {
+        let signer = Keypair::generate();
+        let root = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        // Revoke only the ROOT ancestor; the presented leaf id is never revoked,
+        // so a leaf-only guard would admit this delegated child.
+        let ancestor_id = "cap-root-revoked".to_string();
+        let child =
+            delegated_child_capability(&signer, &root, &agent, &ancestor_id, "cost-srv", "compute");
+        let child_id = child.id.clone();
+        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+        state
+            .revoked_capability_ids
+            .lock()
+            .await
+            .insert(ancestor_id.clone());
+        assert!(
+            !state
+                .revoked_capability_ids
+                .lock()
+                .await
+                .contains(&child_id),
+            "the presented leaf id must not itself be revoked"
+        );
+
+        let body = serde_json::json!({
+            "capability": child,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-1" }
+        });
+        let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+        // A delegated child of a revoked ancestor is rejected fail-closed before
+        // the kernel, exactly as a revoked leaf is.
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_ne!(json["status"], "authorized");
+        assert_eq!(json["error"], "chio_capability_revoked");
+
+        // The severed child never reserved a hold under its own id.
+        let usage = budget.get_usage(&child_id, 0).unwrap();
+        assert!(usage.is_none() || usage.unwrap().committed_cost_units().unwrap() == 0);
+    }
+
+    #[test]
+    fn revoked_id_in_capability_chain_walks_leaf_and_every_ancestor() {
+        use chio_core_types::capability::attenuation::{DelegationLink, DelegationLinkBody};
+        let issuer = Keypair::generate();
+        let root_kp = Keypair::generate();
+        let mid_kp = Keypair::generate();
+        let leaf_kp = Keypair::generate();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .test_unwrap()
+            .as_secs();
+        let sign_link = |capability_id: &str, delegator: &Keypair, delegatee: &Keypair| {
+            DelegationLink::sign(
+                DelegationLinkBody {
+                    capability_id: capability_id.to_string(),
+                    delegator: delegator.public_key(),
+                    delegatee: delegatee.public_key(),
+                    attenuations: vec![],
+                    timestamp: now,
+                    scope_hash: None,
+                },
+                delegator,
+            )
+            .test_unwrap()
+        };
+        let root_link = sign_link("cap-root", &root_kp, &mid_kp);
+        let mid_link = sign_link("cap-mid", &mid_kp, &leaf_kp);
+        let cap = CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "cap-leaf".to_string(),
+                issuer: issuer.public_key(),
+                subject: leaf_kp.public_key(),
+                scope: ChioScope::default(),
+                issued_at: now,
+                expires_at: now + 3600,
+                delegation_chain: vec![root_link, mid_link],
+            },
+            &issuer,
+        )
+        .test_unwrap();
+
+        let set = |ids: &[&str]| {
+            ids.iter()
+                .map(|id| id.to_string())
+                .collect::<HashSet<String>>()
+        };
+
+        // No revoked id on the chain: the presented child admits.
+        assert_eq!(revoked_id_in_capability_chain(&cap, &set(&[])), None);
+        assert_eq!(
+            revoked_id_in_capability_chain(&cap, &set(&["cap-unrelated"])),
+            None
+        );
+        // Leaf revoked: existing behavior is preserved.
+        assert_eq!(
+            revoked_id_in_capability_chain(&cap, &set(&["cap-leaf"])),
+            Some("cap-leaf")
+        );
+        // Root ancestor revoked: the delegated child is severed.
+        assert_eq!(
+            revoked_id_in_capability_chain(&cap, &set(&["cap-root"])),
+            Some("cap-root")
+        );
+        // Intermediate ancestor revoked: also severed.
+        assert_eq!(
+            revoked_id_in_capability_chain(&cap, &set(&["cap-mid"])),
+            Some("cap-mid")
+        );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
