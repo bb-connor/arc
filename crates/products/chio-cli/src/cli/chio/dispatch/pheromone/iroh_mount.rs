@@ -838,10 +838,29 @@ fn directory_reload_step(
     }
 }
 
-/// Bounded poll loop: every `interval`, re-verify the directory and either swap
-/// in a successor, alarm + deny-all on expiry, or keep last-good. Reuses the
-/// dedicated-liveness-task pattern (a task feeding shared state, joined on
-/// shutdown).
+/// The reloader's next wake delay: at most `interval`, but no later than the running
+/// directory's `expires_at_unix_ms` so a bundle that expires BETWEEN two fixed polls
+/// fails closed AT the deadline rather than continuing to admit for up to a full
+/// interval (`DirectoryGate::decide` is not itself time-aware, so nothing else revokes
+/// an expired directory between polls). Once the directory has ALREADY expired (the
+/// deny-all state, awaiting a valid successor) the fixed interval governs, so this
+/// never busy-loops on a past deadline.
+fn next_reload_delay(interval: Duration, now: u64, expires_at_unix_ms: u64) -> Duration {
+    if expires_at_unix_ms > now {
+        // Still in-window: wake at whichever comes first, the next fixed poll or expiry.
+        std::cmp::min(interval, Duration::from_millis(expires_at_unix_ms - now))
+    } else {
+        // Already at/past expiry (deny-all): poll on the fixed interval for a successor.
+        interval
+    }
+}
+
+/// Bounded poll loop: re-verify the directory and either swap in a successor, alarm +
+/// deny-all on expiry, or keep last-good. Wakes at most every `interval`, but also
+/// exactly at the running directory's expiry deadline (see [`next_reload_delay`]) so an
+/// expired directory fails closed promptly instead of admitting until the next fixed
+/// poll. Reuses the dedicated-liveness-task pattern (a task feeding shared state, joined
+/// on shutdown).
 // RFC-0012: implemented inline; reconcile to RFC-0001's canonical liveness-task
 // pattern when it lands.
 pub(crate) async fn run_directory_reloader(
@@ -850,12 +869,14 @@ pub(crate) async fn run_directory_reloader(
     now_fn: Arc<dyn Fn() -> u64 + Send + Sync>,
     alive: Arc<std::sync::atomic::AtomicBool>,
 ) {
-    let mut ticker = tokio::time::interval(config.interval);
     let mut state = ReloadState::from_gate(&gate);
     loop {
-        ticker.tick().await;
         let now = now_fn();
         directory_reload_step(&gate, &config, now, &mut state, &alive);
+        // Schedule the next wake no later than the (possibly just-advanced) directory's
+        // expiry, so expiry between fixed polls fails closed at the deadline.
+        let delay = next_reload_delay(config.interval, now_fn(), state.expires_at_unix_ms);
+        tokio::time::sleep(delay).await;
     }
 }
 
@@ -2098,6 +2119,41 @@ mod tests {
         assert_eq!(
             state.version, 3,
             "last-good advances to the recovered successor"
+        );
+    }
+
+    #[test]
+    fn reloader_wakes_at_expiry_before_the_fixed_interval() {
+        // The reloader must re-check expiry at the deadline, not wait the full fixed
+        // interval. With a 60s interval, a bundle that expires just after a poll would
+        // otherwise keep admitting for almost a minute (the gate's decide() is not itself
+        // time-aware). next_reload_delay caps the wake at the expiry deadline: in-window
+        // with expiry sooner than the interval it wakes at expiry, not 60s.
+        let interval = Duration::from_secs(60);
+        assert_eq!(
+            next_reload_delay(interval, 1_000, 1_005),
+            Duration::from_millis(5),
+            "wake at the expiry deadline when it precedes the next fixed poll"
+        );
+        // Expiry farther off than the interval -> the fixed interval caps the wake.
+        assert_eq!(
+            next_reload_delay(interval, 1_000, 1_000 + 120_000),
+            interval,
+            "the fixed interval caps the wake when expiry is far off"
+        );
+        // Already expired (deny-all, awaiting a successor) -> the fixed interval governs;
+        // never a zero/past-deadline busy-loop.
+        assert_eq!(
+            next_reload_delay(interval, 2_000, 1_000),
+            interval,
+            "an already-expired directory polls on the fixed interval, not a busy-loop"
+        );
+        // Expiry exactly at `now` is already expired (decide uses `expires_at <= now`), so
+        // it too polls on the interval rather than scheduling a zero-delay spin.
+        assert_eq!(
+            next_reload_delay(interval, 1_000, 1_000),
+            interval,
+            "expiry exactly at now polls on the fixed interval, not a zero-delay spin"
         );
     }
 
