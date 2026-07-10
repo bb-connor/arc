@@ -165,6 +165,7 @@ impl ChioKernel {
         matched_grant_index: usize,
         budget_mutation: &PreExecutionBudgetMutation,
         runtime_admission_metadata: Option<serde_json::Value>,
+        reserved_payment_reference: Option<String>,
     ) -> Result<ToolCallResponse, KernelError> {
         let runtime_admission_metadata = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
@@ -211,9 +212,10 @@ impl ChioKernel {
         // already-debited invocation into a durable zero-exposure reserved hold so
         // the reaper and reconcile/reverse paths handle it uniformly.
         let reserved_hold = match budget_mutation {
-            PreExecutionBudgetMutation::Charge(charge) => {
-                Some(ReservedHoldStamp::Monetary { charge })
-            }
+            PreExecutionBudgetMutation::Charge(charge) => Some(ReservedHoldStamp::Monetary {
+                charge,
+                payment_reference: reserved_payment_reference,
+            }),
             PreExecutionBudgetMutation::Invocation { grant_index } => {
                 let hold_id = format!(
                     "budget-hold:{}:{}:{}",

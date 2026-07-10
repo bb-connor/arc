@@ -14,6 +14,20 @@ use crate::budget_store::{
     BudgetReverseHoldDecision, BudgetReverseHoldRequest,
 };
 
+/// A settled MustPrepay prepayment captured before a reserve-for-caller execution
+/// nonce is minted, paired with the rail reference that funded it.
+///
+/// The `authorization` is retained so a reservation tear-down can refund the
+/// capture (the payer must not stay charged for a reservation that was denied).
+/// The `payment_reference` is the rail transaction id of the capture (or the
+/// authorization id when the rail settled at authorize time); it is carried onto
+/// the reserved budget hold so the downstream `/v1/reconcile` receipt can name
+/// the transaction that paid for the spend.
+pub(crate) struct ReservedPrepayment {
+    pub(crate) authorization: PaymentAuthorization,
+    pub(crate) payment_reference: Option<String>,
+}
+
 impl ChioKernel {
     /// Issue a new capability for an agent.
     ///
@@ -1643,7 +1657,7 @@ impl ChioKernel {
     pub(crate) fn ensure_reserved_mustprepay_prepaid(
         &self,
         request: &ToolCallRequest,
-    ) -> Result<Option<PaymentAuthorization>, KernelError> {
+    ) -> Result<Option<ReservedPrepayment>, KernelError> {
         if !Self::is_governed_mustprepay_request(request) {
             return Ok(None);
         }
@@ -1662,10 +1676,14 @@ impl ChioKernel {
         match self.settle_prepaid_authorization_without_charge(request, &authorization)? {
             // The prepayment is now captured. Report it as settled so a later
             // reservation tear-down refunds it rather than releasing an already
-            // captured hold.
-            Some(_) => Ok(Some(PaymentAuthorization {
-                settled: true,
-                ..authorization
+            // captured hold, and carry the rail reference so the downstream
+            // reconcile receipt can name the transaction that funded the spend.
+            Some(settlement) => Ok(Some(ReservedPrepayment {
+                authorization: PaymentAuthorization {
+                    settled: true,
+                    ..authorization
+                },
+                payment_reference: settlement.payment_reference,
             })),
             None => Err(KernelError::GovernedTransactionDenied(
                 "MustPrepay prepayment could not be settled before reserving an execution nonce"

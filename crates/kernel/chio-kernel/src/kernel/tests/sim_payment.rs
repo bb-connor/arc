@@ -1060,13 +1060,136 @@ fn reserving_authorization_leaves_non_mustprepay_path_unchanged() {
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Allow);
-    assert!(
-        response.execution_nonce.is_some(),
-        "a non-MustPrepay reserve must still mint an execution nonce"
-    );
+    let nonce = *response
+        .execution_nonce
+        .clone()
+        .expect("a non-MustPrepay reserve must still mint an execution nonce");
     assert_eq!(
         payment.authorized.load(std::sync::atomic::Ordering::SeqCst),
         0,
         "a non-MustPrepay reserve must not authorize a prepayment"
+    );
+
+    // Reconciling the non-MustPrepay reserve stamps no payment reference: nothing
+    // was prepaid, so there is no rail transaction to name on the receipt.
+    let realized = ToolInvocationCost {
+        units: 40,
+        currency: "USD".to_string(),
+        breakdown: None,
+    };
+    let reconciled = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &request.arguments, &realized)
+        .unwrap();
+    assert_eq!(reconciled.verdict, Verdict::Allow);
+    let financial = expect_financial_meta(&reconciled);
+    assert!(
+        financial.get("payment_reference").is_none()
+            || financial["payment_reference"].is_null(),
+        "a non-MustPrepay reconcile must not carry a payment_reference: {financial}"
+    );
+}
+
+// A distinct-id adapter: the authorization hold id and the capture (rail
+// settlement) transaction id differ, so a reconcile receipt that echoes the
+// capture transaction id can be told apart from one that merely echoes the hold
+// id.
+struct DistinctCapturePaymentAdapter;
+
+impl PaymentAdapter for DistinctCapturePaymentAdapter {
+    fn authorize(
+        &self,
+        _request: &PaymentAuthorizeRequest,
+    ) -> Result<PaymentAuthorization, PaymentError> {
+        Ok(PaymentAuthorization {
+            authorization_id: "auth_hold_ref".to_string(),
+            settled: false,
+            metadata: serde_json::json!({ "adapter": "distinct" }),
+        })
+    }
+
+    fn capture(
+        &self,
+        _authorization_id: &str,
+        _amount_units: u64,
+        _currency: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        Ok(PaymentResult {
+            transaction_id: "rail_txn_ref".to_string(),
+            settlement_status: RailSettlementStatus::Settled,
+            metadata: serde_json::json!({ "adapter": "distinct" }),
+        })
+    }
+
+    fn release(
+        &self,
+        _authorization_id: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        Ok(PaymentResult {
+            transaction_id: "rail_release_ref".to_string(),
+            settlement_status: RailSettlementStatus::Released,
+            metadata: serde_json::json!({ "adapter": "distinct" }),
+        })
+    }
+
+    fn refund(
+        &self,
+        transaction_id: &str,
+        _amount_units: u64,
+        _currency: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        Ok(PaymentResult {
+            transaction_id: transaction_id.to_string(),
+            settlement_status: RailSettlementStatus::Refunded,
+            metadata: serde_json::json!({ "adapter": "distinct" }),
+        })
+    }
+}
+
+// A governed MustPrepay mediated reserve captures a prepayment before minting the
+// nonce; the later authoritative reconcile receipt must name the rail transaction
+// that funded the spend so operators can tie the settlement to its payment. The
+// stamped reference is the capture transaction id, not the authorization hold id.
+#[test]
+fn reconcile_stamps_mustprepay_prepayment_rail_reference() {
+    let MustPrepayFixture { mut kernel, cap, agent_kp } = build_mustprepay_fixture(75);
+    kernel.set_payment_adapter(Box::new(DistinctCapturePaymentAdapter));
+    install_strict_nonce_store(&mut kernel);
+
+    let intent = make_mustprepay_intent("intent-reserve-recon", "cost-srv", "compute", 100, "USD");
+    let request =
+        mustprepay_tool_call("req-reserve-mustprepay-recon", &cap, &agent_kp, intent, &kernel);
+
+    let reserved = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
+        .unwrap();
+    assert_eq!(
+        reserved.verdict,
+        Verdict::Allow,
+        "a settled MustPrepay prepayment must admit the reserve: {:?}",
+        reserved.reason
+    );
+    let nonce = *reserved
+        .execution_nonce
+        .clone()
+        .expect("a settled MustPrepay reserve mints a nonce");
+
+    let realized = ToolInvocationCost {
+        units: 40,
+        currency: "USD".to_string(),
+        breakdown: None,
+    };
+    let reconciled = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &request.arguments, &realized)
+        .unwrap();
+    assert_eq!(reconciled.verdict, Verdict::Allow);
+
+    let financial = expect_financial_meta(&reconciled);
+    assert_eq!(
+        financial["payment_reference"].as_str(),
+        Some("rail_txn_ref"),
+        "the reconcile receipt must carry the rail transaction id that funded the prepayment: {financial}"
     );
 }

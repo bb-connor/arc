@@ -9,7 +9,13 @@ pub(crate) enum ReservedHoldStamp<'a> {
     /// A monetary reserve: the durable hold was already authorized during
     /// `check_and_increment_budget` and is kept open; the builder marks it
     /// reserved with the grant currency and reverses the charge on stamp failure.
-    Monetary { charge: &'a BudgetChargeResult },
+    /// `payment_reference` carries the rail transaction id of a prepaid MustPrepay
+    /// reservation so reconcile-by-nonce can stamp it onto the authoritative
+    /// receipt; `None` for a mediated reserve with no prepayment.
+    Monetary {
+        charge: &'a BudgetChargeResult,
+        payment_reference: Option<String>,
+    },
     /// An invocation-only reserve: the invocation was already debited by
     /// `try_increment`. The builder adopts it into a durable zero-exposure
     /// reserved hold so the TTL reaper and reconcile-by-nonce can settle it, and
@@ -20,7 +26,7 @@ pub(crate) enum ReservedHoldStamp<'a> {
 impl ReservedHoldStamp<'_> {
     fn hold_id(&self) -> &str {
         match self {
-            Self::Monetary { charge } => charge.budget_hold_id.as_str(),
+            Self::Monetary { charge, .. } => charge.budget_hold_id.as_str(),
             Self::Invocation { hold_id, .. } => hold_id.as_str(),
         }
     }
@@ -206,12 +212,16 @@ impl ChioKernel {
         if let (Some(stamp), Some(nonce)) = (reserved_hold.as_ref(), execution_nonce.as_ref()) {
             let reserved_until = nonce.expires_at();
             match stamp {
-                ReservedHoldStamp::Monetary { charge } => {
+                ReservedHoldStamp::Monetary {
+                    charge,
+                    payment_reference,
+                } => {
                     if let Err(error) = self.with_budget_store(|store| {
                         Ok(store.mark_hold_reserved(
                             charge.budget_hold_id.as_str(),
                             reserved_until,
                             charge.currency.as_str(),
+                            payment_reference.as_deref(),
                         )?)
                     }) {
                         // The hold was authorized but the reservation stamp did not

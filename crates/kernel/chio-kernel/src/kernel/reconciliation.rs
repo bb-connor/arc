@@ -287,7 +287,11 @@ impl ChioKernel {
             budget_total: exposed,
             delegation_depth: 0,
             root_budget_holder: presented_nonce.nonce.bound_to.subject_id.clone(),
-            payment_reference: None,
+            // Stamp the rail transaction id captured for a prepaid MustPrepay
+            // reservation (recorded on the reserved hold at reserve time), so the
+            // authoritative reconciled receipt ties the spend to the payment that
+            // funded it. `None` for a mediated reserve that carried no prepayment.
+            payment_reference: hold.reserved_payment_reference.clone(),
             settlement_status: SettlementStatus::Settled,
             cost_breakdown: realized_cost.breakdown.clone(),
             oracle_evidence: None,

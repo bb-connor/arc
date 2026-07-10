@@ -513,25 +513,34 @@ impl ChioKernel {
                                 }
                             };
                         // A settled MustPrepay prepayment is captured before the
-                        // reservation is minted. If minting the nonce, stamping the
-                        // reserved hold, or persisting the reserved receipt fails, the
-                        // hold is reversed but the captured prepayment would otherwise
-                        // stay charged for a reservation the caller never received.
-                        // Refund it on that tear-down so a denied reservation leaves
-                        // the payer net-unbilled; a non-MustPrepay reserve has no
-                        // captured prepayment and nothing to refund.
+                        // reservation is minted. Carry its rail reference onto the
+                        // reserved hold so the downstream reconcile receipt can name
+                        // the transaction that funded the spend. If minting the nonce,
+                        // stamping the reserved hold, or persisting the reserved
+                        // receipt fails, the hold is reversed but the captured
+                        // prepayment would otherwise stay charged for a reservation the
+                        // caller never received. Refund it on that tear-down so a
+                        // denied reservation leaves the payer net-unbilled; a
+                        // non-MustPrepay reserve has no captured prepayment and nothing
+                        // to carry or refund.
+                        let reserved_payment_reference = settled_prepayment
+                            .as_ref()
+                            .and_then(|prepayment| prepayment.payment_reference.clone());
                         match self.build_execution_nonce_authorization_reserving_response(
                             request,
                             now,
                             matched_grant_index,
                             &budget_mutation,
                             extra_metadata,
+                            reserved_payment_reference,
                         ) {
                             Ok(response) => Ok(response),
                             Err(error) => {
                                 if let Some(prepayment) = settled_prepayment.as_ref() {
                                     self.refund_reserved_mustprepay_prepayment(
-                                        request, cap, prepayment,
+                                        request,
+                                        cap,
+                                        &prepayment.authorization,
                                     );
                                 }
                                 Err(error)

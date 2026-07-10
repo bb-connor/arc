@@ -137,13 +137,16 @@ impl SqliteBudgetStore {
         Ok(holds)
     }
 
-    /// Stamp an open hold with a TTL reaper deadline and the grant currency.
-    /// Errors fail-closed when the hold is missing or is no longer open.
+    /// Stamp an open hold with a TTL reaper deadline, the grant currency, and the
+    /// rail transaction id of a prepaid MustPrepay reservation (`None` when the
+    /// reserve carried no prepayment). Errors fail-closed when the hold is missing
+    /// or is no longer open.
     pub fn mark_hold_reserved_until(
         &self,
         hold_id: &str,
         reserved_until_unix_secs: i64,
         currency: &str,
+        payment_reference: Option<&str>,
     ) -> Result<(), BudgetStoreError> {
         let connection = self
             .connection
@@ -151,9 +154,14 @@ impl SqliteBudgetStore {
             .map_err(|_| BudgetStoreError::Invariant("budget store mutex poisoned".to_string()))?;
         let affected = connection.execute(
             "UPDATE budget_authorization_holds \
-             SET reserved_until = ?2, reserved_currency = ?3 \
+             SET reserved_until = ?2, reserved_currency = ?3, reserved_payment_reference = ?4 \
              WHERE hold_id = ?1 AND disposition = 'open'",
-            params![hold_id, reserved_until_unix_secs, currency],
+            params![
+                hold_id,
+                reserved_until_unix_secs,
+                currency,
+                payment_reference
+            ],
         )?;
         if affected == 0 {
             return Err(BudgetStoreError::Invariant(format!(
@@ -186,8 +194,9 @@ impl SqliteBudgetStore {
                  hold_id, capability_id, grant_index, \
                  authorized_exposure_units, remaining_exposure_units, invocation_count_debited, \
                  disposition, authority_id, lease_id, lease_epoch, \
-                 created_at, updated_at, reserved_until, reserved_currency \
-             ) VALUES (?1, ?2, ?3, 0, 0, 1, 'open', NULL, NULL, NULL, ?4, ?4, ?5, NULL)",
+                 created_at, updated_at, reserved_until, reserved_currency, \
+                 reserved_payment_reference \
+             ) VALUES (?1, ?2, ?3, 0, 0, 1, 'open', NULL, NULL, NULL, ?4, ?4, ?5, NULL, NULL)",
             params![
                 hold_id,
                 capability_id,
@@ -217,7 +226,8 @@ impl SqliteBudgetStore {
             .query_row(
                 "SELECT hold_id, capability_id, grant_index, authorized_exposure_units, \
                  remaining_exposure_units, disposition, reserved_until, \
-                 authority_id, lease_id, lease_epoch, reserved_currency \
+                 authority_id, lease_id, lease_epoch, reserved_currency, \
+                 reserved_payment_reference \
                  FROM budget_authorization_holds WHERE hold_id = ?1",
                 params![hold_id],
                 |row| {
@@ -250,6 +260,7 @@ impl SqliteBudgetStore {
                         disposition,
                         reserved_until: row.get::<_, Option<i64>>(6)?,
                         reserved_currency: row.get::<_, Option<String>>(10)?,
+                        reserved_payment_reference: row.get::<_, Option<String>>(11)?,
                         authority,
                     })
                 },
@@ -341,17 +352,17 @@ mod tests {
         // Expired reserved hold.
         authorize(&store, "hold-expired", "cap-a");
         store
-            .mark_hold_reserved_until("hold-expired", 100, "USD")
+            .mark_hold_reserved_until("hold-expired", 100, "USD", None)
             .unwrap();
         // Not-yet-expired reserved hold.
         authorize(&store, "hold-fresh", "cap-b");
         store
-            .mark_hold_reserved_until("hold-fresh", 5_000, "USD")
+            .mark_hold_reserved_until("hold-fresh", 5_000, "USD", None)
             .unwrap();
         // Reconciled reserved hold.
         authorize(&store, "hold-done", "cap-c");
         store
-            .mark_hold_reserved_until("hold-done", 100, "USD")
+            .mark_hold_reserved_until("hold-done", 100, "USD", None)
             .unwrap();
         store
             .reconcile_budget_hold(BudgetReconcileHoldRequest {
@@ -439,7 +450,7 @@ mod tests {
             .unwrap()
             .is_none());
         store
-            .mark_hold_reserved_until("hold-snap", 4_242, "USD")
+            .mark_hold_reserved_until("hold-snap", 4_242, "USD", Some("rail_txn_ref"))
             .unwrap();
         let snapshot = store.budget_hold_snapshot("hold-snap").unwrap().unwrap();
         assert_eq!(snapshot.capability_id, "cap-snap");
@@ -447,12 +458,19 @@ mod tests {
         assert_eq!(snapshot.disposition, BudgetHoldDispositionView::Open);
         assert_eq!(snapshot.reserved_until, Some(4_242));
         assert_eq!(snapshot.reserved_currency.as_deref(), Some("USD"));
+        assert_eq!(
+            snapshot.reserved_payment_reference.as_deref(),
+            Some("rail_txn_ref"),
+            "a prepaid reservation records its rail transaction id durably"
+        );
     }
 
     #[test]
     fn mark_hold_reserved_on_missing_hold_fails_closed() {
         let store = open_temp_store();
-        assert!(store.mark_hold_reserved_until("nope", 100, "USD").is_err());
+        assert!(store
+            .mark_hold_reserved_until("nope", 100, "USD", None)
+            .is_err());
     }
 
     #[test]

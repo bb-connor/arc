@@ -1921,14 +1921,19 @@ impl BudgetStore for StampFailingBudgetStore {
         hold_id: &str,
         reserved_until_unix_secs: i64,
         currency: &str,
+        payment_reference: Option<&str>,
     ) -> Result<(), BudgetStoreError> {
         if self.fail_mark.load(Ordering::SeqCst) {
             return Err(BudgetStoreError::Invariant(
                 "reservation stamp write failed (test double)".to_string(),
             ));
         }
-        self.inner
-            .mark_hold_reserved(hold_id, reserved_until_unix_secs, currency)
+        self.inner.mark_hold_reserved(
+            hold_id,
+            reserved_until_unix_secs,
+            currency,
+            payment_reference,
+        )
     }
 
     fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {

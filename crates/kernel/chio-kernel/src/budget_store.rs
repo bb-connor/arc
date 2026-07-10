@@ -305,6 +305,13 @@ pub struct BudgetHoldSnapshot {
     /// this before settling or signing, so an unchecked currency is never stamped
     /// onto a signed authoritative receipt.
     pub reserved_currency: Option<String>,
+    /// Rail transaction id that funded a prepaid MustPrepay reservation, recorded
+    /// when the reserve-for-caller path stamps the hold. `None` for holds that
+    /// carried no prepayment (an ordinary mediated reserve billed at reconcile
+    /// time downstream). Reconcile-by-nonce stamps it as the authoritative
+    /// receipt's `payment_reference` so operators can tie the reconciled spend to
+    /// the transaction that paid for it, and it survives a fresh-kernel reconcile.
+    pub reserved_payment_reference: Option<String>,
     pub authority: Option<BudgetEventAuthority>,
 }
 
@@ -758,14 +765,23 @@ pub trait BudgetStore: Send + Sync {
     /// (reconciled or reversed within one evaluation) is never marked and never
     /// touched by the TTL reaper. The recorded currency lets reconcile-by-nonce
     /// reject a caller-supplied realized currency that differs from the grant's.
-    /// Stores that do not persist hold state treat this as a no-op (the default).
+    /// `payment_reference` records the rail transaction id of a prepaid MustPrepay
+    /// reservation (`None` for a reserve with no prepayment) so reconcile-by-nonce
+    /// can stamp it onto the authoritative receipt. Stores that do not persist hold
+    /// state treat this as a no-op (the default).
     fn mark_hold_reserved(
         &self,
         hold_id: &str,
         reserved_until_unix_secs: i64,
         currency: &str,
+        payment_reference: Option<&str>,
     ) -> Result<(), BudgetStoreError> {
-        let _ = (hold_id, reserved_until_unix_secs, currency);
+        let _ = (
+            hold_id,
+            reserved_until_unix_secs,
+            currency,
+            payment_reference,
+        );
         Ok(())
     }
 
@@ -932,7 +948,7 @@ mod tests {
             BudgetAuthorizeHoldDecision::Authorized(_)
         ));
         store
-            .mark_hold_reserved(hold_id, reserved_until, "USD")
+            .mark_hold_reserved(hold_id, reserved_until, "USD", None)
             .unwrap();
     }
 

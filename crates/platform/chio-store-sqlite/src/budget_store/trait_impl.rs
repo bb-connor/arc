@@ -1153,8 +1153,14 @@ impl BudgetStore for SqliteBudgetStore {
         hold_id: &str,
         reserved_until_unix_secs: i64,
         currency: &str,
+        payment_reference: Option<&str>,
     ) -> Result<(), BudgetStoreError> {
-        self.mark_hold_reserved_until(hold_id, reserved_until_unix_secs, currency)
+        self.mark_hold_reserved_until(
+            hold_id,
+            reserved_until_unix_secs,
+            currency,
+            payment_reference,
+        )
     }
 
     fn reserve_invocation_hold(

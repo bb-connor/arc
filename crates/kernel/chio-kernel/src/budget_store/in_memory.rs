@@ -46,6 +46,10 @@ struct BudgetHoldState {
     /// Currency the grant was authorized in, recorded alongside `reserved_until`
     /// by the reserving path. `None` for normal in-flight holds.
     reserved_currency: Option<String>,
+    /// Rail transaction id that funded a prepaid MustPrepay reservation, recorded
+    /// alongside `reserved_until` by the reserving path. `None` when the reserve
+    /// carried no prepayment.
+    reserved_payment_reference: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -460,6 +464,7 @@ impl InMemoryBudgetStoreInner {
                         authority: authority.cloned(),
                         reserved_until: None,
                         reserved_currency: None,
+                        reserved_payment_reference: None,
                     },
                 );
             }
@@ -968,6 +973,7 @@ impl InMemoryBudgetStoreInner {
             disposition: hold.disposition.view(),
             reserved_until: hold.reserved_until,
             reserved_currency: hold.reserved_currency.clone(),
+            reserved_payment_reference: hold.reserved_payment_reference.clone(),
             authority: hold.authority.clone(),
         }))
     }
@@ -977,6 +983,7 @@ impl InMemoryBudgetStoreInner {
         hold_id: &str,
         reserved_until_unix_secs: i64,
         currency: &str,
+        payment_reference: Option<&str>,
     ) -> Result<(), BudgetStoreError> {
         let hold = self.holds.get_mut(hold_id).ok_or_else(|| {
             BudgetStoreError::Invariant(format!("missing budget hold `{hold_id}`"))
@@ -988,6 +995,7 @@ impl InMemoryBudgetStoreInner {
         }
         hold.reserved_until = Some(reserved_until_unix_secs);
         hold.reserved_currency = Some(currency.to_string());
+        hold.reserved_payment_reference = payment_reference.map(str::to_string);
         Ok(())
     }
 
@@ -1015,6 +1023,7 @@ impl InMemoryBudgetStoreInner {
                 authority: None,
                 reserved_until: Some(reserved_until_unix_secs),
                 reserved_currency: None,
+                reserved_payment_reference: None,
             },
         );
         Ok(())
@@ -1494,9 +1503,14 @@ impl BudgetStore for InMemoryBudgetStore {
         hold_id: &str,
         reserved_until_unix_secs: i64,
         currency: &str,
+        payment_reference: Option<&str>,
     ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?
-            .mark_hold_reserved(hold_id, reserved_until_unix_secs, currency)
+        self.lock_inner()?.mark_hold_reserved(
+            hold_id,
+            reserved_until_unix_secs,
+            currency,
+            payment_reference,
+        )
     }
 
     fn reserve_invocation_hold(
