@@ -383,6 +383,50 @@ fn mustprepay_no_budget_charge_captures_unsettled_authorization() {
     );
 }
 
+// A no-ceiling MustPrepay whose tool ran and whose payment was captured must write
+// the full financial envelope: the receipt `financial` object must deserialize as
+// `FinancialReceiptMetadata` and carry the prepaid quote amount, currency, and a
+// settled status. A partial fragment (payment_reference + settlement_status only)
+// fails to deserialize and drops the prepaid spend from receipt queries and
+// dashboards.
+#[test]
+fn mustprepay_no_budget_charge_receipt_financial_deserializes_with_quote() {
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+
+    let agent_kp = Keypair::generate();
+    let cap = kernel
+        .issue_capability(
+            &agent_kp.public_key(),
+            make_scope(vec![make_no_ceiling_mustprepay_grant()]),
+            3600,
+        )
+        .unwrap();
+
+    // The intent quotes 100 USD (quoted_cost.units == max_units).
+    let intent =
+        make_mustprepay_intent("intent-no-charge-full", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-no-charge-full", &cap, &agent_kp, intent, &kernel);
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    assert_eq!(response.verdict, Verdict::Allow);
+
+    let financial = expect_financial_meta(&response);
+    let parsed: crate::FinancialReceiptMetadata = serde_json::from_value(financial.clone())
+        .expect("no-ceiling MustPrepay financial must deserialize as FinancialReceiptMetadata");
+    assert_eq!(
+        parsed.cost_charged, 100,
+        "the prepaid quote amount must be recorded as the realized spend"
+    );
+    assert_eq!(parsed.currency, "USD");
+    assert_eq!(parsed.settlement_status, crate::SettlementStatus::Settled);
+    assert!(
+        parsed.payment_reference.is_some(),
+        "the settled prepayment reference must be present"
+    );
+}
+
 // Fail-closed: when the adapter returns an unsettled authorization whose capture
 // cannot settle, the no-charge MustPrepay call is DENIED rather than admitted with
 // a perpetual pending receipt.

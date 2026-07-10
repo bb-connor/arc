@@ -1138,12 +1138,29 @@ impl ChioKernel {
                 );
             };
             let (payment_reference, settlement_status) = settlement.into_receipt_parts();
-            let payment_meta = serde_json::json!({
-                "financial": {
-                    "payment_reference": payment_reference,
-                    "settlement_status": settlement_status,
-                }
-            });
+            // A grant with no monetary ceiling carries no budget charge, so the
+            // realized spend is the prepaid quote. Populate the full financial
+            // envelope from the quote (amount, currency, settlement, lineage) so
+            // the receipt deserializes as `FinancialReceiptMetadata` and reflects
+            // the completed prepaid spend, not a partial fragment that receipt
+            // queries and dashboards cannot read.
+            let (quoted_units, quoted_currency) = Self::mustprepay_quoted_amount(request)
+                .unwrap_or_else(|| (0, "USD".to_string()));
+            let financial_meta = FinancialReceiptMetadata {
+                grant_index: matched_grant_index as u32,
+                cost_charged: quoted_units,
+                currency: quoted_currency,
+                budget_remaining: 0,
+                budget_total: quoted_units,
+                delegation_depth: cap.delegation_chain.len() as u32,
+                root_budget_holder: cap.issuer.to_hex(),
+                payment_reference,
+                settlement_status,
+                cost_breakdown: None,
+                oracle_evidence: None,
+                attempted_cost: None,
+            };
+            let payment_meta = serde_json::json!({ "financial": financial_meta });
             let metadata = merge_metadata_objects(Some(payment_meta), extra_metadata);
             return self.finalize_tool_output_with_metadata(
                 request,
