@@ -924,6 +924,118 @@ fn reserving_authorization_admits_governed_mustprepay_with_settled_prepayment() 
     );
 }
 
+// A governed MustPrepay reserve captures the prepayment before the reservation
+// nonce is minted. If the reservation stamp then fails, the budget hold is
+// reversed and the caller receives no nonce, so the captured prepayment must be
+// refunded: otherwise a retry re-captures and the payer is charged for a
+// reservation that was never handed out (money loss and double-charge). Once the
+// stamp write recovers, the success path still captures the prepayment exactly
+// once and mints the nonce, with no refund or release.
+#[test]
+fn reserving_mustprepay_stamp_failure_refunds_captured_prepayment() {
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+    let payment = TrackingPaymentAdapter::new();
+    kernel.set_payment_adapter(Box::new(payment.clone()));
+    let fail_mark = std::sync::Arc::new(AtomicBool::new(true));
+    kernel.set_budget_store(Box::new(StampFailingBudgetStore {
+        inner: InMemoryBudgetStore::new(),
+        fail_mark: std::sync::Arc::clone(&fail_mark),
+    }));
+    install_strict_nonce_store(&mut kernel);
+
+    let agent_kp = Keypair::generate();
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50);
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let intent =
+        make_mustprepay_intent("intent-reserve-stamp-fail", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call(
+        "req-reserve-mustprepay-stamp-fail",
+        &cap,
+        &agent_kp,
+        intent,
+        &kernel,
+    );
+
+    // The reservation stamp fails after the prepayment is captured.
+    let err = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("stamp") || err.to_string().contains("reservation"),
+        "the reservation stamp failure must surface: {err}"
+    );
+
+    assert_eq!(
+        payment.captured.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "the prepayment must have been captured once before the stamp failed"
+    );
+    assert_eq!(
+        payment.refunded.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "a captured prepayment must be refunded when the reservation tears down, \
+         so the payer is not left net-charged for a reservation that was denied"
+    );
+    assert_eq!(
+        payment.released.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "a captured prepayment must be refunded, never released, on tear-down"
+    );
+
+    // The reserved budget hold was reversed, not stranded open.
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    assert_eq!(
+        usage.committed_cost_units().unwrap(),
+        0,
+        "a torn-down MustPrepay reserve must leave no committed exposure"
+    );
+
+    // Once the stamp write recovers, the success path captures the prepayment
+    // exactly once more and mints a nonce, with no further refund or release.
+    fail_mark.store(false, Ordering::SeqCst);
+    let intent_ok =
+        make_mustprepay_intent("intent-reserve-stamp-ok", "cost-srv", "compute", 100, "USD");
+    let request_ok = mustprepay_tool_call(
+        "req-reserve-mustprepay-stamp-ok",
+        &cap,
+        &agent_kp,
+        intent_ok,
+        &kernel,
+    );
+    let reserved = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&request_ok, None)
+        .unwrap();
+    assert_eq!(
+        reserved.verdict,
+        Verdict::Allow,
+        "the recovered reservation must be admitted: {:?}",
+        reserved.reason
+    );
+    assert!(
+        reserved.execution_nonce.is_some(),
+        "a settled MustPrepay reserve must mint an execution nonce for the downstream caller"
+    );
+    assert_eq!(
+        payment.captured.load(std::sync::atomic::Ordering::SeqCst),
+        2,
+        "the recovered success path must capture the prepayment exactly once more"
+    );
+    assert_eq!(
+        payment.refunded.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "the success path must not refund the captured prepayment"
+    );
+    assert_eq!(
+        payment.released.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "the success path must not release the settled prepayment"
+    );
+}
+
 // The reserve-for-caller prepayment gate is scoped to governed MustPrepay intents.
 // A plain monetary reserve with a payment adapter configured is unchanged: it
 // reserves the hold and mints a nonce without authorizing any prepayment (the tool

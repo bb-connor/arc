@@ -1633,16 +1633,19 @@ impl ChioKernel {
     /// actually be prepaid), independently of the reserved budget hold that stays
     /// open for `max_total_cost` accounting and is reconciled downstream.
     ///
-    /// Returns `Ok(())` when the request is not a governed MustPrepay intent
-    /// (nothing to prepay) or the prepayment settled. Returns `Err` so the caller
-    /// denies fail-closed when the prepayment cannot be authorized or settled; any
+    /// Returns `Ok(None)` when the request is not a governed MustPrepay intent
+    /// (nothing to prepay). Returns `Ok(Some(authorization))` carrying the settled
+    /// prepayment so the caller can refund it if minting or persisting the
+    /// reservation then fails, which would otherwise leave the payer captured for a
+    /// reservation that was never handed out. Returns `Err` so the caller denies
+    /// fail-closed when the prepayment cannot be authorized or settled; any
     /// unsettled hold is released so the payer's funds are not left frozen.
     pub(crate) fn ensure_reserved_mustprepay_prepaid(
         &self,
         request: &ToolCallRequest,
-    ) -> Result<(), KernelError> {
+    ) -> Result<Option<PaymentAuthorization>, KernelError> {
         if !Self::is_governed_mustprepay_request(request) {
-            return Ok(());
+            return Ok(None);
         }
         let authorization = self
             .authorize_payment_if_needed(request, None)
@@ -1657,7 +1660,13 @@ impl ChioKernel {
             ));
         };
         match self.settle_prepaid_authorization_without_charge(request, &authorization)? {
-            Some(_) => Ok(()),
+            // The prepayment is now captured. Report it as settled so a later
+            // reservation tear-down refunds it rather than releasing an already
+            // captured hold.
+            Some(_) => Ok(Some(PaymentAuthorization {
+                settled: true,
+                ..authorization
+            })),
             None => Err(KernelError::GovernedTransactionDenied(
                 "MustPrepay prepayment could not be settled before reserving an execution nonce"
                     .to_string(),
@@ -1740,6 +1749,34 @@ impl ChioKernel {
                 authorization_id = %authorization.authorization_id,
                 reason = %redacted!(&error),
                 "failed to release unsettled prepaid authorization on fail-closed deny"
+            );
+        }
+    }
+
+    /// Refund a captured MustPrepay prepayment when a reserve-for-caller
+    /// reservation tears down after the prepayment settled but before the caller
+    /// receives a usable nonce (the reservation stamp reversed the budget hold, or
+    /// the reserved receipt failed to persist). The prepayment was captured at the
+    /// quoted cost before the nonce could be minted, so without this the payer
+    /// would stay charged for a reservation that was denied. Refunds the prepaid
+    /// quote through the same unwind path a mid-execution abort uses, with no
+    /// budget charge to reverse. Logs on failure and never propagates: the
+    /// reservation is denied regardless, and the original tear-down error is the
+    /// one surfaced to the caller.
+    pub(crate) fn refund_reserved_mustprepay_prepayment(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        prepayment: &PaymentAuthorization,
+    ) {
+        if let Err(error) =
+            self.unwind_aborted_monetary_invocation(request, cap, None, Some(prepayment))
+        {
+            warn!(
+                request_id = %request.request_id,
+                authorization_id = %prepayment.authorization_id,
+                reason = %redacted!(&error),
+                "failed to refund captured MustPrepay prepayment after reserve tear-down"
             );
         }
     }

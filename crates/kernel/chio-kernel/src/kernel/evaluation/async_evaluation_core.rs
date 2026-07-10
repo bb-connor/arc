@@ -488,33 +488,55 @@ impl ChioKernel {
                         // settle the payment. Deny fail-closed (reversing the hold and
                         // releasing the admitted share) when the prepayment cannot be
                         // authorized or settled, so no nonce is handed out unpaid.
-                        if let Err(error) = self.ensure_reserved_mustprepay_prepaid(request) {
-                            let msg = error.to_string();
-                            warn!(
-                                request_id = %request.request_id,
-                                reason = %redacted!(&msg),
-                                "reserve-for-caller prepayment gate denied"
-                            );
-                            return self.build_pre_dispatch_cleanup_deny_response(
-                                PreDispatchCleanupDeny {
-                                    request,
-                                    reason: &msg,
-                                    timestamp: now,
-                                    matched_grant_index,
-                                    cap,
-                                    budget_mutation: &budget_mutation,
-                                    payment_authorization: None,
-                                    runtime_admission_metadata: extra_metadata,
-                                },
-                            );
-                        }
-                        self.build_execution_nonce_authorization_reserving_response(
+                        let settled_prepayment =
+                            match self.ensure_reserved_mustprepay_prepaid(request) {
+                                Ok(settled_prepayment) => settled_prepayment,
+                                Err(error) => {
+                                    let msg = error.to_string();
+                                    warn!(
+                                        request_id = %request.request_id,
+                                        reason = %redacted!(&msg),
+                                        "reserve-for-caller prepayment gate denied"
+                                    );
+                                    return self.build_pre_dispatch_cleanup_deny_response(
+                                        PreDispatchCleanupDeny {
+                                            request,
+                                            reason: &msg,
+                                            timestamp: now,
+                                            matched_grant_index,
+                                            cap,
+                                            budget_mutation: &budget_mutation,
+                                            payment_authorization: None,
+                                            runtime_admission_metadata: extra_metadata,
+                                        },
+                                    );
+                                }
+                            };
+                        // A settled MustPrepay prepayment is captured before the
+                        // reservation is minted. If minting the nonce, stamping the
+                        // reserved hold, or persisting the reserved receipt fails, the
+                        // hold is reversed but the captured prepayment would otherwise
+                        // stay charged for a reservation the caller never received.
+                        // Refund it on that tear-down so a denied reservation leaves
+                        // the payer net-unbilled; a non-MustPrepay reserve has no
+                        // captured prepayment and nothing to refund.
+                        match self.build_execution_nonce_authorization_reserving_response(
                             request,
                             now,
                             matched_grant_index,
                             &budget_mutation,
                             extra_metadata,
-                        )
+                        ) {
+                            Ok(response) => Ok(response),
+                            Err(error) => {
+                                if let Some(prepayment) = settled_prepayment.as_ref() {
+                                    self.refund_reserved_mustprepay_prepayment(
+                                        request, cap, prepayment,
+                                    );
+                                }
+                                Err(error)
+                            }
+                        }
                     }
                 }
             });
