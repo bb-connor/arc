@@ -668,26 +668,31 @@ pub(crate) fn reload_verified_directory(
         };
         return match bundle.verify_bundle(&trust) {
             Ok(verified) => {
-                // RECHECK THE LOCAL TRANSPORT BINDING BEFORE SWAPPING (fail-closed).
-                // The successor verified as a valid, in-window, monotone
-                // directory, but that does NOT prove it still binds THIS node's local
-                // kernel id to THIS node's bound transport endpoint. Mirror the STARTUP
-                // check EXACTLY: require `resolve_transport_endpoint(local_kernel_id) ==
-                // local_transport_endpoint`. This denies three distinct successors that a
-                // bare `authorize(endpoint).is_some()` would wrongly admit:
-                //   - the successor TOMBSTONES this node (its entry removed) -> resolve None;
-                //   - the successor ROTATES this node's endpoint to a different `EndpointId`
-                //     -> resolve returns the new endpoint, not the bound one;
-                //   - the successor REASSIGNS the bound endpoint to a DIFFERENT kernel id
-                //     -> `authorize(endpoint)` still returns Some(other), but resolving THIS
-                //     kernel yields a different (or no) endpoint.
-                // In every case the already-bound endpoint would keep serving iroh ingress
-                // under the OLD `SecretKey` for an identity the successor no longer binds to
-                // this node. Fail closed to deny-all rather than admit under a revoked local
-                // identity.
-                if verified.resolve_transport_endpoint(&config.local_kernel_id)
-                    == Some(config.local_transport_endpoint)
-                {
+                // RECHECK THE LOCAL IDENTITY BINDING BEFORE SWAPPING (fail-closed).
+                // The successor verified as a valid, in-window, monotone directory, but that
+                // does NOT prove it still binds THIS node's local identity the way the startup
+                // path (`load_iroh_serve_inputs` + `build_iroh_router`) requires. Mirror BOTH
+                // startup checks EXACTLY, or a successor a restart would reject could be swapped
+                // in live:
+                //   - `resolve_transport_endpoint(local_kernel_id) == local_transport_endpoint`
+                //     denies a successor that TOMBSTONES this node (resolve None), ROTATES its
+                //     endpoint to a different `EndpointId` (resolve returns the new endpoint), or
+                //     REASSIGNS the bound endpoint to a DIFFERENT kernel id (resolving THIS kernel
+                //     yields a different or no endpoint); and
+                //   - `directory.localKernelId == local_kernel_id` denies a successor that keeps
+                //     this node's endpoint binding but REASSIGNS the directory's declared local
+                //     identity: `build_iroh_router` requires the bundle's own `localKernelId` to
+                //     equal the relay's configured local kernel id, so a restart would reject
+                //     such a bundle even though the endpoint binding survives.
+                // In every case the already-bound endpoint would keep serving iroh ingress under
+                // the OLD `SecretKey` for a local identity the successor no longer binds to this
+                // node. Fail closed to deny-all rather than admit under a revoked local identity.
+                let binds_local_endpoint = verified
+                    .resolve_transport_endpoint(&config.local_kernel_id)
+                    == Some(config.local_transport_endpoint);
+                let declares_local_kernel =
+                    bundle.directory.local_kernel_id == config.local_kernel_id;
+                if binds_local_endpoint && declares_local_kernel {
                     Ok(ReloadOutcome::Updated(verified))
                 } else {
                     Ok(ReloadOutcome::LocalBindingRevoked(verified))
@@ -797,11 +802,12 @@ fn directory_reload_step(
             );
         }
         Ok(ReloadOutcome::LocalBindingRevoked(revoking)) => {
-            // The successor verified but no longer binds this node's local kernel to its
-            // bound transport endpoint (tombstone, endpoint rotation, or endpoint
-            // reassignment). The endpoint is still bound with the old key, so admitting
-            // peers from the successor would serve ingress under a revoked identity. Fail
-            // closed to deny-all and raise the same alarm as expiry.
+            // The successor verified but no longer binds this node's local identity the way
+            // startup requires: it tombstoned this node, rotated or reassigned its bound
+            // transport endpoint, or reassigned the directory's declared `localKernelId` away
+            // from this node. The endpoint is still bound with the old key, so admitting peers
+            // from the successor would serve ingress under a revoked identity. Fail closed to
+            // deny-all and raise the same alarm as expiry.
             //
             // ADVANCE the last-good chain onto the revoking directory FIRST. The revoker is
             // a validly-signed, in-window, monotone directory: it is now the federation's
@@ -824,9 +830,9 @@ fn directory_reload_step(
             );
             tracing::error!(
                 target: chio_federation_transport_iroh::observability::TARGET_ADMISSION,
-                "transport directory successor no longer binds this node's local transport \
-                 endpoint (tombstoned, rotated, or reassigned); admitting nothing until a \
-                 successor rebinds this node"
+                "transport directory successor no longer binds this node's local identity \
+                 (tombstoned, endpoint rotated or reassigned, or declared local kernel id \
+                 changed); admitting nothing until a successor rebinds this node"
             );
         }
         Ok(ReloadOutcome::BelowMinVersionFloor) => {
@@ -1557,6 +1563,45 @@ mod tests {
         )
     }
 
+    /// Build a signed successor whose directory DECLARES `local_kernel_id` as its owner
+    /// while STILL binding the local relay's own transport endpoint. Used to prove the
+    /// reloader rejects a successor that reassigns this node's declared local identity even
+    /// though the endpoint binding survives (the startup path would reject the same bundle).
+    fn signed_bundle_with_local_kernel_id(
+        local_kernel_id: &str,
+        version: u64,
+        previous_version_sha256: Option<String>,
+    ) -> String {
+        let issuer = Keypair::from_seed(&[240u8; 32]);
+        let directory = TransportDirectoryDocument {
+            schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
+            local_kernel_id: local_kernel_id.to_string(),
+            peers: vec![
+                local_relay_entry(LOCAL_TRANSPORT_SEED),
+                directory_entry("did:chio:bob", 7, 24),
+            ],
+            treaties: Vec::new(),
+        };
+        let directory_sha256 = sha256_hex(&canonical_json_bytes(&directory).unwrap());
+        let body = TransportDirectoryBundleBody {
+            schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
+            issuer: "did:chio:issuer".to_string(),
+            key_id: "issuer-key-1".to_string(),
+            directory_sha256,
+            version,
+            previous_version_sha256,
+            issued_at_unix_ms: NOW - 1,
+            expires_at_unix_ms: NOW + 1,
+        };
+        let (signature, _) = issuer.sign_canonical(&body).unwrap();
+        let bundle = TransportDirectoryBundleDocument {
+            schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
+            body,
+            directory,
+            signature,
+        };
+        serde_json::to_string(&bundle).unwrap()
+    }
 
     /// Overwrite the trusted-issuers file at `path` to pin a SINGLE issuer identity/key
     /// that is NOT the one the test bundles are signed with (issuer seed 240,
@@ -1696,6 +1741,37 @@ mod tests {
         );
     }
 
+    #[test]
+    fn reload_rejects_successor_that_reassigns_local_kernel_id() {
+        let dir = tempfile::tempdir().unwrap();
+        let (bundle_path, issuers_path, expires_at, genesis_hash) =
+            write_test_bundle(dir.path(), 1, false, None);
+        let config = DirectoryReloadConfig {
+            interval: Duration::from_secs(60),
+            bundle_path: bundle_path.clone(),
+            trusted_issuers_path: issuers_path,
+            local_transport_endpoint: endpoint_from_seed(LOCAL_TRANSPORT_SEED),
+            local_kernel_id: LOCAL_KERNEL_ID.to_string(),
+        };
+
+        // A strictly-newer, validly-signed, in-window successor that STILL binds this node's
+        // transport endpoint but DECLARES a different local kernel as the directory owner.
+        // The startup path (`build_iroh_router`) rejects such a bundle because its declared
+        // local kernel id no longer matches the relay's, so the live reloader must fail closed
+        // to deny-all rather than swap it in under a changed identity binding.
+        let successor =
+            signed_bundle_with_local_kernel_id("did:chio:usurper", 2, Some(genesis_hash.clone()));
+        std::fs::write(&bundle_path, successor).unwrap();
+
+        let now_in_window = expires_at - 1;
+        let outcome = reload_verified_directory(&config, now_in_window, 1, expires_at, &genesis_hash)
+            .expect("reload runs");
+        assert!(
+            matches!(outcome, ReloadOutcome::LocalBindingRevoked(_)),
+            "a successor reassigning this node's declared local kernel id must fail closed, \
+             got {outcome:?}"
+        );
+    }
 
     #[test]
     fn directory_reload_swaps_in_successor_and_evicts_tombstoned_peer() {
