@@ -31,6 +31,7 @@ SLICES: tuple[ReviewSlice, ...] = (
         (
             "**/ARCHITECTURE.md",
             "README.md",
+            "CONTRIBUTING.md",
             "AGENTS.md",
             "CLAUDE.md",
             "docs/**",
@@ -218,6 +219,7 @@ SLICES: tuple[ReviewSlice, ...] = (
             "compliance/**",
             "supply-chain/**",
             "tools/knowledge-base/**",
+            "CHANGELOG.md",
             "releases.toml",
             "deploy/**",
             "packaging/**",

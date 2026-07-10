@@ -19,12 +19,14 @@ pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliErr
     let federation_admission_rate_limiter = Arc::new(Mutex::new(
         FederationAdmissionRateLimiter::from_memory_budget(&config.memory_budget),
     ));
+    let cluster_progress = cluster.as_ref().map(|_| Arc::new(ClusterProgress::new()));
     let state = TrustServiceState {
         config,
         enterprise_provider_registry,
         verifier_policy_registry,
         federation_admission_rate_limiter,
         cluster,
+        cluster_progress,
     };
     if state.cluster.is_some() {
         tokio::spawn(run_cluster_sync_loop(state.clone()));
