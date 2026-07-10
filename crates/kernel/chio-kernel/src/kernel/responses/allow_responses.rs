@@ -169,7 +169,11 @@ impl ChioKernel {
             tenant_id: None,
         })?;
 
-        self.record_chio_receipt_with_federation(request, &receipt)?;
+        // Mint the nonce and stamp the reserved hold BEFORE persisting the
+        // receipt. A failed stamp reverses the hold, so the receipt must not
+        // already be recorded: a persisted `hold_disposition: reserved` receipt
+        // with no terminal event standing over a reversed hold is a corrupted
+        // audit view.
         let execution_nonce = self.mint_execution_nonce_for_allow_reserving(
             request,
             cap,
@@ -199,7 +203,8 @@ impl ChioKernel {
                 // hold would stay reserved forever, blocking later authorizations
                 // on the grant. Reverse the hold and release the sibling-sum
                 // headroom it was holding before surfacing the error, leaving no
-                // committed exposure and no stranded parent budget.
+                // committed exposure and no stranded parent budget. The receipt is
+                // not yet persisted, so a reversed hold leaves no orphaned receipt.
                 self.reverse_budget_charge(&cap.id, stamp.charge)?;
                 self.release_admitted_capability_budget(cap)
                     .map_err(KernelError::DelegationInvalid)?;
@@ -210,6 +215,10 @@ impl ChioKernel {
             // nonce or the TTL reaper releases the parent's headroom when it closes.
             self.record_reserved_sibling_share(stamp.charge.budget_hold_id.as_str(), cap);
         }
+
+        // Persist the receipt only after the hold is successfully stamped, so a
+        // stamp failure (which reverses the hold) leaves no reserved receipt.
+        self.record_chio_receipt_with_federation(request, &receipt)?;
 
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),

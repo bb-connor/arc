@@ -1904,3 +1904,56 @@ fn reserving_stamp_failure_reverses_authorized_hold() {
         reserved.reason
     );
 }
+
+// A failed reservation stamp reverses the hold, so the reserved preflight receipt
+// must not have been persisted first: a `hold_disposition: reserved` receipt with
+// no terminal event standing over a reversed hold is a corrupted audit view. The
+// receipt is persisted only after the hold is successfully stamped.
+#[test]
+fn reserving_stamp_failure_persists_no_reserved_receipt() {
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
+    let fail_mark = std::sync::Arc::new(AtomicBool::new(true));
+    kernel.set_budget_store(Box::new(StampFailingBudgetStore {
+        inner: InMemoryBudgetStore::new(),
+        fail_mark: std::sync::Arc::clone(&fail_mark),
+    }));
+    install_strict_nonce_store(&mut kernel);
+
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let request = reserve_request("req-stamp-no-receipt", &cap, &agent_kp);
+    let err = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("stamp") || err.to_string().contains("reservation"),
+        "the reservation stamp failure must surface: {err}"
+    );
+
+    // No orphaned reserved receipt: the stamp failed and reversed the hold, so the
+    // preflight receipt must never have been persisted.
+    assert_eq!(
+        kernel.receipt_log().len(),
+        0,
+        "a failed reservation stamp must leave no persisted reserved receipt"
+    );
+
+    // Once the stamp write recovers, the success path persists exactly one reserved
+    // receipt: the persist follows a successfully stamped hold.
+    fail_mark.store(false, Ordering::SeqCst);
+    let retry = reserve_request("req-stamp-receipt-ok", &cap, &agent_kp);
+    let reserved = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&retry, None)
+        .unwrap();
+    assert_eq!(reserved.verdict, Verdict::Allow);
+    assert_eq!(
+        kernel.receipt_log().len(),
+        1,
+        "a successful reservation persists exactly one reserved receipt"
+    );
+}
