@@ -15,6 +15,8 @@
 //! time, so a hold never expires before its own nonce. Fail-closed on the money
 //! path.
 
+use chio_log_redact::redacted;
+
 use super::*;
 
 use crate::budget_store::{BudgetHoldSnapshot, BudgetReconcileHoldRequest};
@@ -276,17 +278,25 @@ impl ChioKernel {
             Some(presented_nonce.nonce_id()),
         );
 
+        // Report the GRANT's budget and delegation lineage, recorded on the reserved
+        // hold at reserve time, so dashboards and reports see the grant ceiling and
+        // true lineage rather than this single reservation's exposure. `budget_total`
+        // is the grant ceiling; `budget_remaining` is that ceiling minus the realized
+        // spend. A hold reserved before these fields existed (or a zero-exposure
+        // invocation reserve with no ceiling) falls back to the reservation exposure
+        // and the nonce subject.
+        let grant_budget_total = hold.reserved_budget_total.unwrap_or(exposed);
         let financial = FinancialReceiptMetadata {
             grant_index: hold.grant_index as u32,
             cost_charged: realized,
             currency: receipt_currency,
-            // Framed on the reconciled hold's reserved envelope: reconcile-by-nonce
-            // settles a single hold from the nonce alone, without the originating
-            // grant's full ceiling. `budget_remaining` is the amount released back.
-            budget_remaining: exposed.saturating_sub(realized),
-            budget_total: exposed,
-            delegation_depth: 0,
-            root_budget_holder: presented_nonce.nonce.bound_to.subject_id.clone(),
+            budget_remaining: grant_budget_total.saturating_sub(realized),
+            budget_total: grant_budget_total,
+            delegation_depth: hold.reserved_delegation_depth.unwrap_or(0),
+            root_budget_holder: hold
+                .reserved_root_budget_holder
+                .clone()
+                .unwrap_or_else(|| presented_nonce.nonce.bound_to.subject_id.clone()),
             // Stamp the rail transaction id captured for a prepaid MustPrepay
             // reservation (recorded on the reserved hold at reserve time), so the
             // authoritative reconciled receipt ties the spend to the payment that
@@ -317,12 +327,31 @@ impl ChioKernel {
             trust_level: chio_core::receipt::kinds::TrustLevel::Mediated,
             tenant_id: None,
         })?;
-        self.record_chio_receipt(&receipt)?;
 
         let request_id = presented_nonce
             .reserving_request_id()
             .map(str::to_string)
             .unwrap_or_else(|| receipt.id.clone());
+
+        // The nonce is already consumed and the hold closed: settlement is
+        // IRREVERSIBLE by this point. If the durable receipt persist fails now, a
+        // retry cannot recreate the receipt (the nonce is a replay, the hold is
+        // closed), so the caller would be left with no authoritative receipt for a
+        // spend that really settled. Return the signed authoritative receipt and log
+        // the persist failure rather than surfacing only the error. A settlement
+        // FAILURE earlier (forged/replayed nonce, closed hold, currency mismatch)
+        // still fails closed above, before this point.
+        if let Err(error) = self.record_chio_receipt(&receipt) {
+            warn!(
+                request_id = %request_id,
+                hold_id = %hold.hold_id,
+                nonce_id = %presented_nonce.nonce_id(),
+                receipt_id = %receipt.id,
+                reason = %redacted!(&error),
+                "durable receipt persistence failed after an irreversible reconcile settlement; \
+                 returning the signed authoritative receipt"
+            );
+        }
 
         info!(
             request_id = %request_id,

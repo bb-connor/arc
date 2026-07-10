@@ -147,6 +147,7 @@ impl SqliteBudgetStore {
         reserved_until_unix_secs: i64,
         currency: &str,
         payment_reference: Option<&str>,
+        envelope: &ReservedHoldEnvelope,
     ) -> Result<(), BudgetStoreError> {
         let connection = self
             .connection
@@ -154,13 +155,18 @@ impl SqliteBudgetStore {
             .map_err(|_| BudgetStoreError::Invariant("budget store mutex poisoned".to_string()))?;
         let affected = connection.execute(
             "UPDATE budget_authorization_holds \
-             SET reserved_until = ?2, reserved_currency = ?3, reserved_payment_reference = ?4 \
+             SET reserved_until = ?2, reserved_currency = ?3, reserved_payment_reference = ?4, \
+                 reserved_budget_total = ?5, reserved_delegation_depth = ?6, \
+                 reserved_root_budget_holder = ?7 \
              WHERE hold_id = ?1 AND disposition = 'open'",
             params![
                 hold_id,
                 reserved_until_unix_secs,
                 currency,
-                payment_reference
+                payment_reference,
+                envelope.budget_total.map(|value| value as i64),
+                envelope.delegation_depth as i64,
+                envelope.root_budget_holder,
             ],
         )?;
         if affected == 0 {
@@ -183,6 +189,7 @@ impl SqliteBudgetStore {
         capability_id: &str,
         grant_index: usize,
         reserved_until_unix_secs: i64,
+        envelope: &ReservedHoldEnvelope,
     ) -> Result<(), BudgetStoreError> {
         let connection = self
             .connection
@@ -195,14 +202,19 @@ impl SqliteBudgetStore {
                  authorized_exposure_units, remaining_exposure_units, invocation_count_debited, \
                  disposition, authority_id, lease_id, lease_epoch, \
                  created_at, updated_at, reserved_until, reserved_currency, \
-                 reserved_payment_reference \
-             ) VALUES (?1, ?2, ?3, 0, 0, 1, 'open', NULL, NULL, NULL, ?4, ?4, ?5, NULL, NULL)",
+                 reserved_payment_reference, reserved_budget_total, \
+                 reserved_delegation_depth, reserved_root_budget_holder \
+             ) VALUES (?1, ?2, ?3, 0, 0, 1, 'open', NULL, NULL, NULL, ?4, ?4, ?5, NULL, NULL, \
+                 ?6, ?7, ?8)",
             params![
                 hold_id,
                 capability_id,
                 grant_index as i64,
                 now,
                 reserved_until_unix_secs,
+                envelope.budget_total.map(|value| value as i64),
+                envelope.delegation_depth as i64,
+                envelope.root_budget_holder,
             ],
         )?;
         if inserted == 0 {
@@ -227,7 +239,8 @@ impl SqliteBudgetStore {
                 "SELECT hold_id, capability_id, grant_index, authorized_exposure_units, \
                  remaining_exposure_units, disposition, reserved_until, \
                  authority_id, lease_id, lease_epoch, reserved_currency, \
-                 reserved_payment_reference \
+                 reserved_payment_reference, reserved_budget_total, \
+                 reserved_delegation_depth, reserved_root_budget_holder \
                  FROM budget_authorization_holds WHERE hold_id = ?1",
                 params![hold_id],
                 |row| {
@@ -261,6 +274,13 @@ impl SqliteBudgetStore {
                         reserved_until: row.get::<_, Option<i64>>(6)?,
                         reserved_currency: row.get::<_, Option<String>>(10)?,
                         reserved_payment_reference: row.get::<_, Option<String>>(11)?,
+                        reserved_budget_total: row
+                            .get::<_, Option<i64>>(12)?
+                            .map(|value| value as u64),
+                        reserved_delegation_depth: row
+                            .get::<_, Option<i64>>(13)?
+                            .map(|value| value as u32),
+                        reserved_root_budget_holder: row.get::<_, Option<String>>(14)?,
                         authority,
                     })
                 },
@@ -352,17 +372,35 @@ mod tests {
         // Expired reserved hold.
         authorize(&store, "hold-expired", "cap-a");
         store
-            .mark_hold_reserved_until("hold-expired", 100, "USD", None)
+            .mark_hold_reserved_until(
+                "hold-expired",
+                100,
+                "USD",
+                None,
+                &ReservedHoldEnvelope::default(),
+            )
             .unwrap();
         // Not-yet-expired reserved hold.
         authorize(&store, "hold-fresh", "cap-b");
         store
-            .mark_hold_reserved_until("hold-fresh", 5_000, "USD", None)
+            .mark_hold_reserved_until(
+                "hold-fresh",
+                5_000,
+                "USD",
+                None,
+                &ReservedHoldEnvelope::default(),
+            )
             .unwrap();
         // Reconciled reserved hold.
         authorize(&store, "hold-done", "cap-c");
         store
-            .mark_hold_reserved_until("hold-done", 100, "USD", None)
+            .mark_hold_reserved_until(
+                "hold-done",
+                100,
+                "USD",
+                None,
+                &ReservedHoldEnvelope::default(),
+            )
             .unwrap();
         store
             .reconcile_budget_hold(BudgetReconcileHoldRequest {
@@ -450,7 +488,17 @@ mod tests {
             .unwrap()
             .is_none());
         store
-            .mark_hold_reserved_until("hold-snap", 4_242, "USD", Some("rail_txn_ref"))
+            .mark_hold_reserved_until(
+                "hold-snap",
+                4_242,
+                "USD",
+                Some("rail_txn_ref"),
+                &ReservedHoldEnvelope {
+                    budget_total: Some(1_000),
+                    delegation_depth: 2,
+                    root_budget_holder: "root-holder".to_string(),
+                },
+            )
             .unwrap();
         let snapshot = store.budget_hold_snapshot("hold-snap").unwrap().unwrap();
         assert_eq!(snapshot.capability_id, "cap-snap");
@@ -463,13 +511,24 @@ mod tests {
             Some("rail_txn_ref"),
             "a prepaid reservation records its rail transaction id durably"
         );
+        assert_eq!(
+            snapshot.reserved_budget_total,
+            Some(1_000),
+            "the grant ceiling is recorded durably on the reserved hold"
+        );
+        assert_eq!(snapshot.reserved_delegation_depth, Some(2));
+        assert_eq!(
+            snapshot.reserved_root_budget_holder.as_deref(),
+            Some("root-holder"),
+            "the delegation root is recorded durably on the reserved hold"
+        );
     }
 
     #[test]
     fn mark_hold_reserved_on_missing_hold_fails_closed() {
         let store = open_temp_store();
         assert!(store
-            .mark_hold_reserved_until("nope", 100, "USD", None)
+            .mark_hold_reserved_until("nope", 100, "USD", None, &ReservedHoldEnvelope::default())
             .is_err());
     }
 
@@ -530,7 +589,17 @@ mod tests {
         // it into a durable zero-exposure reserved hold.
         assert!(store.try_increment("cap-inv", 0, Some(1)).unwrap());
         store
-            .reserve_invocation_hold("hold-inv", "cap-inv", 0, 4_242)
+            .reserve_invocation_hold(
+                "hold-inv",
+                "cap-inv",
+                0,
+                4_242,
+                &ReservedHoldEnvelope {
+                    budget_total: None,
+                    delegation_depth: 1,
+                    root_budget_holder: "inv-root".to_string(),
+                },
+            )
             .unwrap();
 
         let snapshot = store.budget_hold_snapshot("hold-inv").unwrap().unwrap();
@@ -541,6 +610,16 @@ mod tests {
         assert_eq!(
             snapshot.reserved_currency, None,
             "an invocation reservation records no currency"
+        );
+        assert_eq!(
+            snapshot.reserved_budget_total, None,
+            "an invocation reservation carries no monetary ceiling"
+        );
+        assert_eq!(snapshot.reserved_delegation_depth, Some(1));
+        assert_eq!(
+            snapshot.reserved_root_budget_holder.as_deref(),
+            Some("inv-root"),
+            "an invocation reservation still records its delegation root"
         );
         assert_eq!(
             store
@@ -582,7 +661,13 @@ mod tests {
 
         // A duplicate reserve under the same id fails closed.
         assert!(store
-            .reserve_invocation_hold("hold-inv", "cap-inv", 0, 9_000)
+            .reserve_invocation_hold(
+                "hold-inv",
+                "cap-inv",
+                0,
+                9_000,
+                &ReservedHoldEnvelope::default()
+            )
             .is_err());
     }
 
@@ -593,7 +678,13 @@ mod tests {
         let store = open_temp_store();
         assert!(store.try_increment("cap-inv", 0, Some(1)).unwrap());
         store
-            .reserve_invocation_hold("hold-inv", "cap-inv", 0, 100)
+            .reserve_invocation_hold(
+                "hold-inv",
+                "cap-inv",
+                0,
+                100,
+                &ReservedHoldEnvelope::default(),
+            )
             .unwrap();
 
         let settled = store.reap_expired_reserved_holds(1_000).unwrap();

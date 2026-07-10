@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_kernel::budget_store::{
     BudgetEventAuthority, BudgetHoldDispositionView, BudgetHoldSnapshot, BudgetMutationKind,
-    BudgetMutationRecord,
+    BudgetMutationRecord, ReservedHoldEnvelope,
 };
 use chio_kernel::{BudgetStore, BudgetStoreError, BudgetUsageRecord};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};

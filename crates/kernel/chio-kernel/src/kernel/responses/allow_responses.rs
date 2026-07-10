@@ -216,12 +216,21 @@ impl ChioKernel {
                     charge,
                     payment_reference,
                 } => {
+                    // Record the grant ceiling and delegation lineage on the hold
+                    // so reconcile-by-nonce stamps the grant's budget total/remaining
+                    // and the true depth/root, not the reservation's own exposure.
+                    let envelope = crate::budget_store::ReservedHoldEnvelope {
+                        budget_total: Some(charge.budget_total),
+                        delegation_depth: cap.delegation_chain.len() as u32,
+                        root_budget_holder: cap.issuer.to_hex(),
+                    };
                     if let Err(error) = self.with_budget_store(|store| {
                         Ok(store.mark_hold_reserved(
                             charge.budget_hold_id.as_str(),
                             reserved_until,
                             charge.currency.as_str(),
                             payment_reference.as_deref(),
+                            &envelope,
                         )?)
                     }) {
                         // The hold was authorized but the reservation stamp did not
@@ -247,12 +256,21 @@ impl ChioKernel {
                     hold_id,
                     grant_index,
                 } => {
+                    // An invocation reserve carries no monetary ceiling, but its
+                    // delegation lineage is still recorded so reconcile-by-nonce
+                    // stamps the true depth/root rather than zero.
+                    let envelope = crate::budget_store::ReservedHoldEnvelope {
+                        budget_total: None,
+                        delegation_depth: cap.delegation_chain.len() as u32,
+                        root_budget_holder: cap.issuer.to_hex(),
+                    };
                     if let Err(error) = self.with_budget_store(|store| {
                         Ok(store.reserve_invocation_hold(
                             hold_id.as_str(),
                             &cap.id,
                             *grant_index,
                             reserved_until,
+                            &envelope,
                         )?)
                     }) {
                         // The invocation was already debited by `try_increment`;

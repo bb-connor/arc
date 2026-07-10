@@ -284,6 +284,22 @@ impl BudgetHoldDispositionView {
     }
 }
 
+/// Grant-level financial envelope recorded on a reserved hold at reserve time so
+/// reconcile-by-nonce can stamp the originating grant's total/remaining budget and
+/// delegation lineage onto the authoritative receipt, rather than the
+/// reservation's own exposure and a lost lineage. Persisted alongside
+/// `reserved_until` by the reserve-for-caller path.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ReservedHoldEnvelope {
+    /// Grant ceiling (`max_total_cost`) in currency minor units. `None` for a
+    /// zero-exposure invocation reserve, which carries no monetary ceiling.
+    pub budget_total: Option<u64>,
+    /// Delegation depth of the reserving capability's chain.
+    pub delegation_depth: u32,
+    /// Root budget holder of the reserving capability's delegation chain.
+    pub root_budget_holder: String,
+}
+
 /// Read-only projection of a single authorization hold, used by the
 /// reconcile-by-nonce entry point to look up the exact reserved hold a signed
 /// execution nonce names.
@@ -312,6 +328,19 @@ pub struct BudgetHoldSnapshot {
     /// receipt's `payment_reference` so operators can tie the reconciled spend to
     /// the transaction that paid for it, and it survives a fresh-kernel reconcile.
     pub reserved_payment_reference: Option<String>,
+    /// Grant ceiling (`max_total_cost`) recorded when the reserve-for-caller path
+    /// stamps a monetary hold, so reconcile-by-nonce reports the grant's total
+    /// budget rather than the reservation's exposure. `None` for holds never
+    /// marked reserved and for zero-exposure invocation reserves.
+    pub reserved_budget_total: Option<u64>,
+    /// Delegation depth of the reserving capability, recorded at reserve time so
+    /// reconcile-by-nonce stamps the true lineage depth rather than zero. `None`
+    /// for holds never marked reserved.
+    pub reserved_delegation_depth: Option<u32>,
+    /// Root budget holder of the reserving capability's delegation chain, recorded
+    /// at reserve time so reconcile-by-nonce stamps the true lineage root rather
+    /// than the nonce subject. `None` for holds never marked reserved.
+    pub reserved_root_budget_holder: Option<String>,
     pub authority: Option<BudgetEventAuthority>,
 }
 
@@ -767,20 +796,25 @@ pub trait BudgetStore: Send + Sync {
     /// reject a caller-supplied realized currency that differs from the grant's.
     /// `payment_reference` records the rail transaction id of a prepaid MustPrepay
     /// reservation (`None` for a reserve with no prepayment) so reconcile-by-nonce
-    /// can stamp it onto the authoritative receipt. Stores that do not persist hold
-    /// state treat this as a no-op (the default).
+    /// can stamp it onto the authoritative receipt. `envelope` records the grant
+    /// ceiling and delegation lineage so reconcile-by-nonce reports the grant's
+    /// budget total/remaining and true lineage instead of the reservation's own
+    /// exposure. Stores that do not persist hold state treat this as a no-op (the
+    /// default).
     fn mark_hold_reserved(
         &self,
         hold_id: &str,
         reserved_until_unix_secs: i64,
         currency: &str,
         payment_reference: Option<&str>,
+        envelope: &ReservedHoldEnvelope,
     ) -> Result<(), BudgetStoreError> {
         let _ = (
             hold_id,
             reserved_until_unix_secs,
             currency,
             payment_reference,
+            envelope,
         );
         Ok(())
     }
@@ -792,20 +826,25 @@ pub trait BudgetStore: Send + Sync {
     /// hold WITHOUT touching the invocation count, marks it reserved with the TTL
     /// deadline, and records no currency (there is no monetary envelope to
     /// validate on reconcile). Reversing the hold returns the invocation;
-    /// reconciling or reaping it keeps the invocation consumed. Stores that do not
-    /// persist hold state treat this as a no-op (the default).
+    /// reconciling or reaping it keeps the invocation consumed. `envelope` records
+    /// the delegation lineage so reconcile-by-nonce stamps the true depth/root
+    /// (its `budget_total` is `None`: an invocation reserve carries no monetary
+    /// ceiling). Stores that do not persist hold state treat this as a no-op (the
+    /// default).
     fn reserve_invocation_hold(
         &self,
         hold_id: &str,
         capability_id: &str,
         grant_index: usize,
         reserved_until_unix_secs: i64,
+        envelope: &ReservedHoldEnvelope,
     ) -> Result<(), BudgetStoreError> {
         let _ = (
             hold_id,
             capability_id,
             grant_index,
             reserved_until_unix_secs,
+            envelope,
         );
         Ok(())
     }
@@ -948,7 +987,13 @@ mod tests {
             BudgetAuthorizeHoldDecision::Authorized(_)
         ));
         store
-            .mark_hold_reserved(hold_id, reserved_until, "USD", None)
+            .mark_hold_reserved(
+                hold_id,
+                reserved_until,
+                "USD",
+                None,
+                &ReservedHoldEnvelope::default(),
+            )
             .unwrap();
     }
 

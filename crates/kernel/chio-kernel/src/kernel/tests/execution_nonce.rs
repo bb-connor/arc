@@ -1922,6 +1922,7 @@ impl BudgetStore for StampFailingBudgetStore {
         reserved_until_unix_secs: i64,
         currency: &str,
         payment_reference: Option<&str>,
+        envelope: &crate::budget_store::ReservedHoldEnvelope,
     ) -> Result<(), BudgetStoreError> {
         if self.fail_mark.load(Ordering::SeqCst) {
             return Err(BudgetStoreError::Invariant(
@@ -1933,6 +1934,7 @@ impl BudgetStore for StampFailingBudgetStore {
             reserved_until_unix_secs,
             currency,
             payment_reference,
+            envelope,
         )
     }
 
@@ -2228,4 +2230,175 @@ fn reserving_receipt_persist_failure_releases_delegated_sibling_share() {
     );
 
     let _ = std::fs::remove_file(path);
+}
+
+// ---------------------------------------------------------------------------
+// Reconcile-by-nonce stamps the GRANT budget and delegation lineage recorded on
+// the reserved hold, not the reservation exposure and a lost lineage.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn reconcile_by_nonce_stamps_grant_budget_not_reservation_exposure() {
+    // Grant: max_cost_per_invocation 100, max_total 150. One reserve exposes 100
+    // but the grant ceiling is 150. Reconcile at realized 30 must stamp
+    // budget_total == 150 (grant ceiling) and budget_remaining == 150 - 30.
+    let (kernel, agent_kp, cap, _cfg) = reconcile_kernel_and_cap();
+    let first = reserve_request("req-recon-grant-total", &cap, &agent_kp);
+    let authorized = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
+        .unwrap();
+    let nonce = *authorized.execution_nonce.clone().unwrap();
+
+    let realized = ToolInvocationCost {
+        units: 30,
+        currency: "USD".to_string(),
+        breakdown: None,
+    };
+    let reconciled = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &first.arguments, &realized)
+        .unwrap();
+
+    let financial = reconciled
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|m| m.get("financial"))
+        .expect("reconciled receipt carries financial metadata")
+        .clone();
+    let parsed: crate::FinancialReceiptMetadata = serde_json::from_value(financial).unwrap();
+    assert_eq!(
+        parsed.budget_total, 150,
+        "budget_total must reflect the grant ceiling, not the reservation exposure"
+    );
+    assert_eq!(
+        parsed.budget_remaining, 120,
+        "budget_remaining must be the grant ceiling minus realized"
+    );
+    assert_eq!(parsed.cost_charged, 30);
+    // A root reservation carries no delegation: depth 0, root is the grant holder.
+    assert_eq!(parsed.delegation_depth, 0);
+    assert_eq!(parsed.root_budget_holder, cap.issuer.to_hex());
+}
+
+#[test]
+fn reconcile_by_nonce_stamps_delegated_lineage() {
+    // A delegated reservation must stamp its true delegation depth and root
+    // budget holder, not depth 0 with the nonce subject as root.
+    let fixture = make_sibling_sum_monetary_fixture("reconcile-lineage");
+    let path = fixture.path.clone();
+    let mut kernel = fixture.kernel;
+    install_strict_nonce_store(&mut kernel);
+
+    let first = delegated_reserve_request("req-a-reserve", &fixture.child_a, &fixture.child_a_kp);
+    let authorized = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
+        .unwrap();
+    let nonce = *authorized.execution_nonce.clone().unwrap();
+
+    let realized = ToolInvocationCost {
+        units: 30,
+        currency: "USD".to_string(),
+        breakdown: None,
+    };
+    let reconciled = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &first.arguments, &realized)
+        .unwrap();
+
+    let financial = reconciled
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|m| m.get("financial"))
+        .expect("reconciled receipt carries financial metadata")
+        .clone();
+    let parsed: crate::FinancialReceiptMetadata = serde_json::from_value(financial).unwrap();
+    let expected_depth = fixture.child_a.delegation_chain.len() as u32;
+    assert!(
+        expected_depth > 0,
+        "the fixture child must actually be delegated"
+    );
+    assert_eq!(
+        parsed.delegation_depth, expected_depth,
+        "a delegated reservation must stamp its true delegation depth, not zero"
+    );
+    assert_eq!(
+        parsed.root_budget_holder,
+        fixture.child_a.issuer.to_hex(),
+        "a delegated reservation must stamp the true root budget holder"
+    );
+
+    let _ = std::fs::remove_file(path);
+}
+
+// ---------------------------------------------------------------------------
+// A durable receipt persist failure AFTER an irreversible reconcile settlement
+// must still return the signed authoritative receipt (the nonce is already
+// consumed and the hold closed, so a retry cannot recreate it), while a
+// forged/replayed nonce still fails closed BEFORE settlement.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn reconcile_by_nonce_receipt_persist_failure_still_returns_authoritative_receipt() {
+    use chio_core_types::receipt::authoritative_spend::is_authoritative_spend_receipt;
+
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+    let fail = std::sync::Arc::new(AtomicBool::new(false));
+    kernel
+        .set_receipt_store(Box::new(TogglingAppendReceiptStore {
+            fail: std::sync::Arc::clone(&fail),
+        }))
+        .unwrap();
+    let cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: true,
+    };
+    kernel.set_execution_nonce_store(
+        cfg.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+    );
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 150, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    // Reserve succeeds (persist not failing yet), minting a nonce bound to the hold.
+    let first = reserve_request("req-recon-persist-fail", &cap, &agent_kp);
+    let authorized = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
+        .unwrap();
+    let nonce = *authorized.execution_nonce.clone().unwrap();
+
+    // The durable receipt persist fails during reconcile, AFTER the nonce is
+    // consumed and the hold settled (irreversible). The signed authoritative
+    // receipt must still be returned rather than surfacing only the persist error.
+    fail.store(true, Ordering::SeqCst);
+    let realized = ToolInvocationCost {
+        units: 30,
+        currency: "USD".to_string(),
+        breakdown: None,
+    };
+    let reconciled = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &first.arguments, &realized)
+        .expect("a persist failure after settlement must still return the signed receipt");
+    assert_eq!(reconciled.verdict, Verdict::Allow);
+    let admitted = [kernel.config.keypair.public_key()];
+    assert_eq!(
+        is_authoritative_spend_receipt(&reconciled.receipt, &admitted, &nonce),
+        Ok(()),
+        "the returned receipt must be an authoritative spend receipt"
+    );
+
+    // The settlement is irreversible: a second reconcile of the same nonce is a
+    // replay and still fails closed.
+    fail.store(false, Ordering::SeqCst);
+    let replay = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &first.arguments, &realized)
+        .unwrap_err();
+    assert!(
+        replay.to_string().contains("nonce"),
+        "a second reconcile of the settled nonce must fail closed as replay: {replay}"
+    );
 }

@@ -9,7 +9,7 @@ use super::{
     BudgetHoldMutationDecision, BudgetHoldSnapshot, BudgetMutationKind, BudgetMutationRecord,
     BudgetReconcileHoldDecision, BudgetReconcileHoldRequest, BudgetReleaseHoldDecision,
     BudgetReleaseHoldRequest, BudgetReverseHoldDecision, BudgetReverseHoldRequest, BudgetStore,
-    BudgetStoreError, BudgetUsageRecord, DeniedBudgetHold,
+    BudgetStoreError, BudgetUsageRecord, DeniedBudgetHold, ReservedHoldEnvelope,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,6 +50,13 @@ struct BudgetHoldState {
     /// alongside `reserved_until` by the reserving path. `None` when the reserve
     /// carried no prepayment.
     reserved_payment_reference: Option<String>,
+    /// Grant ceiling and delegation lineage recorded alongside `reserved_until` by
+    /// the reserving path, so reconcile-by-nonce reports the grant's budget and
+    /// true lineage rather than the reservation exposure. `None` for holds never
+    /// marked reserved.
+    reserved_budget_total: Option<u64>,
+    reserved_delegation_depth: Option<u32>,
+    reserved_root_budget_holder: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -465,6 +472,9 @@ impl InMemoryBudgetStoreInner {
                         reserved_until: None,
                         reserved_currency: None,
                         reserved_payment_reference: None,
+                        reserved_budget_total: None,
+                        reserved_delegation_depth: None,
+                        reserved_root_budget_holder: None,
                     },
                 );
             }
@@ -974,6 +984,9 @@ impl InMemoryBudgetStoreInner {
             reserved_until: hold.reserved_until,
             reserved_currency: hold.reserved_currency.clone(),
             reserved_payment_reference: hold.reserved_payment_reference.clone(),
+            reserved_budget_total: hold.reserved_budget_total,
+            reserved_delegation_depth: hold.reserved_delegation_depth,
+            reserved_root_budget_holder: hold.reserved_root_budget_holder.clone(),
             authority: hold.authority.clone(),
         }))
     }
@@ -984,6 +997,7 @@ impl InMemoryBudgetStoreInner {
         reserved_until_unix_secs: i64,
         currency: &str,
         payment_reference: Option<&str>,
+        envelope: &ReservedHoldEnvelope,
     ) -> Result<(), BudgetStoreError> {
         let hold = self.holds.get_mut(hold_id).ok_or_else(|| {
             BudgetStoreError::Invariant(format!("missing budget hold `{hold_id}`"))
@@ -996,6 +1010,9 @@ impl InMemoryBudgetStoreInner {
         hold.reserved_until = Some(reserved_until_unix_secs);
         hold.reserved_currency = Some(currency.to_string());
         hold.reserved_payment_reference = payment_reference.map(str::to_string);
+        hold.reserved_budget_total = envelope.budget_total;
+        hold.reserved_delegation_depth = Some(envelope.delegation_depth);
+        hold.reserved_root_budget_holder = Some(envelope.root_budget_holder.clone());
         Ok(())
     }
 
@@ -1005,6 +1022,7 @@ impl InMemoryBudgetStoreInner {
         capability_id: &str,
         grant_index: usize,
         reserved_until_unix_secs: i64,
+        envelope: &ReservedHoldEnvelope,
     ) -> Result<(), BudgetStoreError> {
         if self.holds.contains_key(hold_id) {
             return Err(BudgetStoreError::Invariant(format!(
@@ -1024,6 +1042,9 @@ impl InMemoryBudgetStoreInner {
                 reserved_until: Some(reserved_until_unix_secs),
                 reserved_currency: None,
                 reserved_payment_reference: None,
+                reserved_budget_total: envelope.budget_total,
+                reserved_delegation_depth: Some(envelope.delegation_depth),
+                reserved_root_budget_holder: Some(envelope.root_budget_holder.clone()),
             },
         );
         Ok(())
@@ -1504,12 +1525,14 @@ impl BudgetStore for InMemoryBudgetStore {
         reserved_until_unix_secs: i64,
         currency: &str,
         payment_reference: Option<&str>,
+        envelope: &ReservedHoldEnvelope,
     ) -> Result<(), BudgetStoreError> {
         self.lock_inner()?.mark_hold_reserved(
             hold_id,
             reserved_until_unix_secs,
             currency,
             payment_reference,
+            envelope,
         )
     }
 
@@ -1519,12 +1542,14 @@ impl BudgetStore for InMemoryBudgetStore {
         capability_id: &str,
         grant_index: usize,
         reserved_until_unix_secs: i64,
+        envelope: &ReservedHoldEnvelope,
     ) -> Result<(), BudgetStoreError> {
         self.lock_inner()?.reserve_invocation_hold(
             hold_id,
             capability_id,
             grant_index,
             reserved_until_unix_secs,
+            envelope,
         )
     }
 
