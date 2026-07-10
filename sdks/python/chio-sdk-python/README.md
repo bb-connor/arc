@@ -39,14 +39,20 @@ async def main() -> None:
         )
         print(f"advisory receipt: {advisory.id}")
 
+        # `evaluate_tool_call` is fail-closed for id-only callers: it runs
+        # advisory evaluation for audit, then always raises `ChioDeniedError`,
+        # because a capability id alone is not execution authorization. It never
+        # returns a receipt. Wrappers gate on this raise; use
+        # `evaluate_tool_call_advisory` for a non-authoritative observation, or
+        # `evaluate_tool_call_mediated` with a full signed token for
+        # authoritative enforcement.
         try:
-            receipt = await client.evaluate_tool_call(
+            await client.evaluate_tool_call(
                 capability_id="cap-123",
                 tool_server="search-srv",
                 tool_name="search_documents",
                 parameters={"query": "capability-based security"},
             )
-            print(f"advisory verdict receipt: {receipt.id}")
         except ChioDeniedError as error:
             print(f"not authorized: {error}")
 ```
