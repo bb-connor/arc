@@ -489,8 +489,12 @@ pub(crate) enum ReloadOutcome {
     /// node's local transport endpoint (it tombstoned or rotated this node). The
     /// already-bound endpoint would keep serving with the old key, so the swap must
     /// NOT proceed as an admit; fail closed to deny-all (RFC-0012 F34 local-binding
-    /// recheck, mirroring the startup binding check).
-    LocalBindingRevoked,
+    /// recheck, mirroring the startup binding check). Carries the (validly-signed,
+    /// in-window, monotone) revoking directory so the reloader ADVANCES its last-good
+    /// chain onto it: the revoker is now the federation's canonical directory, so a
+    /// later successor that rebinds this node chains onto THIS revoker (not the
+    /// pre-revoke version) and must be able to self-heal admission.
+    LocalBindingRevoked(VerifiedDirectory),
     /// The on-disk bundle is UNCHANGED and still in-window, but its version is below a
     /// trusted `minVersion` that operators raised above it. A restart would reject it
     /// via `transport_bundle_trust`; the unchanged fast path must fail closed to
@@ -662,7 +666,7 @@ pub(crate) fn reload_verified_directory(
                 {
                     Ok(ReloadOutcome::Updated(verified))
                 } else {
-                    Ok(ReloadOutcome::LocalBindingRevoked)
+                    Ok(ReloadOutcome::LocalBindingRevoked(verified))
                 }
             }
             Err(error) => {
@@ -768,13 +772,25 @@ fn directory_reload_step(
                  valid in-window successor is published"
             );
         }
-        Ok(ReloadOutcome::LocalBindingRevoked) => {
+        Ok(ReloadOutcome::LocalBindingRevoked(revoking)) => {
             // The successor verified but no longer binds this node's local kernel to its
             // bound transport endpoint (tombstone, endpoint rotation, or endpoint
             // reassignment). The endpoint is still bound with the old key, so admitting
             // peers from the successor would serve ingress under a revoked identity. Fail
-            // closed to deny-all and raise the same alarm as expiry. last-good is KEPT: a later successor that re-binds
-            // this node self-heals admission without a restart.
+            // closed to deny-all and raise the same alarm as expiry.
+            //
+            // ADVANCE the last-good chain onto the revoking directory FIRST. The revoker is
+            // a validly-signed, in-window, monotone directory: it is now the federation's
+            // canonical successor, so a later directory that rebinds this node chains onto
+            // THIS revoker's hash/version, not the pre-revoke version. Leaving the chain
+            // pinned to the pre-revoke version would reject that correctly-chained rebinding
+            // successor (predecessor mismatch) and strand the relay in deny-all until a
+            // restart. The gate stays deny-all (we do NOT swap the revoker in, since it does
+            // not bind this node); only the chain reference advances, so the documented
+            // self-heal path works after a rebind.
+            state.version = revoking.version();
+            state.body_sha256 = revoking.body_sha256().to_string();
+            state.expires_at_unix_ms = revoking.expires_at_unix_ms();
             gate.swap(Arc::new(
                 chio_federation_transport_iroh::identity::VerifiedDirectory::empty_deny_all(),
             ));
@@ -1686,7 +1702,7 @@ mod tests {
         let outcome = reload_verified_directory(&config, now_in_window, 1, expires_at, &v1_hash)
             .expect("reload runs");
         assert!(
-            matches!(outcome, ReloadOutcome::LocalBindingRevoked),
+            matches!(outcome, ReloadOutcome::LocalBindingRevoked(_)),
             "a successor that no longer binds this node's local endpoint fails closed, never Updated"
         );
     }
@@ -1764,7 +1780,7 @@ mod tests {
         let outcome = reload_verified_directory(&config, now_in_window, 1, expires_at, &v1_hash)
             .expect("reload runs");
         assert!(
-            matches!(outcome, ReloadOutcome::LocalBindingRevoked),
+            matches!(outcome, ReloadOutcome::LocalBindingRevoked(_)),
             "a successor that reassigns this node's bound endpoint to another kernel fails closed"
         );
     }
@@ -1989,6 +2005,98 @@ mod tests {
         );
         assert_eq!(
             state.version, 2,
+            "last-good advances to the recovered successor"
+        );
+    }
+
+    /// Write a signed successor to a FIXED `path` (so successive versions overwrite one
+    /// bundle the reloader re-reads), binding the LOCAL node at `local_transport_seed`
+    /// (pass [`LOCAL_TRANSPORT_SEED`] to REBIND this node, any other seed to ROTATE it
+    /// away), peer `did:chio:bob` live, chaining onto `previous_version_sha256`. Returns
+    /// the full-document body hash (the successor's chain pin).
+    fn write_local_binding_bundle_at(
+        path: &std::path::Path,
+        version: u64,
+        local_transport_seed: u8,
+        previous_version_sha256: Option<String>,
+    ) -> String {
+        let (bundle_json, _issuer) = build_signed_bundle_json(
+            vec![
+                local_relay_entry(local_transport_seed),
+                directory_entry("did:chio:bob", 7, 24),
+            ],
+            version,
+            previous_version_sha256,
+        );
+        std::fs::write(path, &bundle_json).unwrap();
+        let bundle: TransportDirectoryBundleDocument = serde_json::from_str(&bundle_json).unwrap();
+        sha256_hex(&canonical_json_bytes(&bundle).unwrap())
+    }
+
+    #[test]
+    fn directory_reload_advances_chain_after_local_binding_revoked() {
+        // When a valid v2 successor rotates or tombstones this node (LocalBindingRevoked
+        // -> deny-all), the reload chain must advance to v2 so a later v3 that rebinds this
+        // node - chaining onto v2, the canonical successor - can self-heal admission,
+        // rather than staying pinned to v1 and rejecting the correctly-chained v3 forever.
+        // Here v2 revokes the local binding (the chain must advance to v2), then v3 chained
+        // onto v2 rebinds this node and restores admission through the gate.
+        let dir = tempfile::tempdir().unwrap();
+        let bundle_path = dir.path().join("bundle.json");
+        let issuers_path = write_issuers_with_min_version(dir.path(), 0);
+        let config = DirectoryReloadConfig {
+            interval: Duration::from_secs(60),
+            bundle_path: bundle_path.clone(),
+            trusted_issuers_path: issuers_path,
+            local_transport_endpoint: endpoint_from_seed(LOCAL_TRANSPORT_SEED),
+            local_kernel_id: LOCAL_KERNEL_ID.to_string(),
+        };
+
+        // v1 binds this node (0x11); the reloader's last-good starts here.
+        let v1_hash = write_local_binding_bundle_at(&bundle_path, 1, LOCAL_TRANSPORT_SEED, None);
+        let gate = DirectoryGate::new(verified_directory("did:chio:bob", 24));
+        assert_eq!(gate.current_version(), 1);
+        let alive = AtomicBool::new(true);
+        let mut state = ReloadState {
+            version: 1,
+            body_sha256: v1_hash.clone(),
+            expires_at_unix_ms: NOW + 1,
+        };
+
+        // v2 ROTATES this node away (LOCAL -> 0x22), chaining onto v1 -> LocalBindingRevoked.
+        let v2_hash = write_local_binding_bundle_at(&bundle_path, 2, 0x22, Some(v1_hash.clone()));
+        directory_reload_step(&gate, &config, NOW, &mut state, &alive);
+        assert_eq!(
+            gate.current_version(),
+            0,
+            "a revoked local binding fails closed to deny-all"
+        );
+        assert!(
+            !alive.load(Ordering::SeqCst),
+            "a revoked local binding raises the fail-closed alarm"
+        );
+        assert_eq!(
+            state.version, 2,
+            "the chain advances to the revoking successor so a rebind can self-heal"
+        );
+        assert_eq!(
+            state.body_sha256, v2_hash,
+            "the chain pin advances to the revoking successor's hash"
+        );
+
+        // v3 REBINDS this node (LOCAL -> 0x11), chaining onto v2. Self-heal must restore
+        // admission without a restart.
+        let _v3_hash =
+            write_local_binding_bundle_at(&bundle_path, 3, LOCAL_TRANSPORT_SEED, Some(v2_hash));
+        alive.store(true, Ordering::SeqCst);
+        directory_reload_step(&gate, &config, NOW, &mut state, &alive);
+        assert_eq!(
+            gate.current_version(),
+            3,
+            "a rebinding successor chained onto the revoker self-heals admission"
+        );
+        assert_eq!(
+            state.version, 3,
             "last-good advances to the recovered successor"
         );
     }
