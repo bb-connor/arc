@@ -315,6 +315,14 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
             "mediated authorization requires a configured hold-capable budget store",
         );
     };
+    // Bound the pre-verification durable lookup: the capability signature is
+    // verified inside the kernel below, so cap the number of grants scanned to a
+    // sane maximum and reject an oversized scope fail-closed, rather than fan out
+    // one store read per grant for an unverified, caller-supplied capability.
+    const MAX_MEDIATED_SCOPE_GRANTS: usize = 64;
+    if parsed.capability.scope.grants.len() > MAX_MEDIATED_SCOPE_GRANTS {
+        return sidecar_bad_request("capability scope carries too many grants").into_response();
+    }
     for grant_index in 0..parsed.capability.scope.grants.len() {
         let hold_id = format!(
             "budget-hold:{}:{}:{}",
