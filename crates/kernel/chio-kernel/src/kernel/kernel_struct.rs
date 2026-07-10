@@ -502,6 +502,11 @@ impl ChioKernel {
 /// The config travels via the fallible [`ChioKernel::with_free_tier_pool`]
 /// builder rather than `KernelConfig`, so `ChioKernel::new` stays infallible and
 /// misconfiguration is rejected at install time.
+///
+/// Ceiling scope: the ceiling is enforced against the kernel's budget store, so
+/// it is exactly as global as that store. The default in-memory store bounds one
+/// process; a horizontally-scaled fleet must share one transactionally-atomic
+/// budget store or each replica keeps its own `freetier:global` row.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FreeTierPoolConfig {
     /// Hard monthly ceiling, in allotment units, on aggregate free-tier spend
