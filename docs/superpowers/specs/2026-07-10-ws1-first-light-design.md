@@ -130,15 +130,17 @@ caveat (F74). `chio-config` has no economic fields today: `ChioConfig`
   identity, persists it idempotently through `IouEnvelopeStore`
   (`crates/economy/chio-credit/src/store_binding.rs:48`), writes the reconciliation
   record (`crates/platform/chio-store-sqlite/src/receipt_store/reports/reconciliation.rs:29`),
-  and re-runs `classify_and_persist` (`crates/economy/chio-settle/src/retry.rs:123`)
-  on failure. Records are local by default; a configured `control_url` additionally
+  and on failure classifies the attempt with the pure `classify_attempt`
+  (`crates/economy/chio-settle/src/retry.rs`) and persists it through the
+  kernel-side settlement-attempt store. Records are local by default; a configured `control_url` additionally
   dispatches to `POST /v1/settlements/reconcile` (`docs/reference/AGENT_ECONOMY.md:753`).
   On-chain dispatch is never on this path. Unsigned, untrusted-signer, or zero-price
   receipts mint nothing (`crates/economy/chio-credit/src/hook.rs:132`).
 - Durability layer: the RFC-0013 `payment_journal` state machine (`HoldPlaced ->
   Authorized -> Settling -> Settled -> Closed`, or `ReconcileFailed`), boot
   reconciliation, the open-hold sweeper, the F68 routing consumer
-  (`route_settlement_observer_status` + `classify_and_persist` + `settle_attempts`),
+  (`route_settlement_observer_status` + `persist_settlement_outcome` +
+  `settle_attempts`),
   the F72 currency-mismatch deny, the F73 nonce store, and the F74 snapshot seam.
   These follow RFC-0013 verbatim; implementation-cycle decisions are recorded here.
 
