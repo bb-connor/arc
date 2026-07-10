@@ -188,7 +188,7 @@ pub trait ReceiptStore: Send + Sync {
     fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError>;
     /// Load a chio receipt by id. The provided default returns `None`; a store
     /// backing a store-authoritative deployment MUST override this (and
-    /// `load_child_receipt`) with a real point lookup (RFC-0004 F03/F25).
+    /// `load_child_receipt`) with a real point lookup.
     ///
     /// The kernel consults this BEFORE the bounded in-memory receipt mirror and
     /// falls back to the mirror only on a genuine `Ok(None)` miss. An append-only
@@ -207,7 +207,7 @@ pub trait ReceiptStore: Send + Sync {
     }
     /// Load a child-request receipt by id. Provided default returns `None`; a
     /// store used for a store-authoritative deployment must override both this
-    /// and `load_chio_receipt` (RFC-0004 F03/F25). A miss is a fail-closed deny
+    /// and `load_chio_receipt`. A miss is a fail-closed deny
     /// of the dependent call-chain claim, never a false allow. The same
     /// bounded-mirror eviction caveat documented on `load_chio_receipt` applies.
     fn load_child_receipt(

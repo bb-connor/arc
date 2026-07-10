@@ -107,8 +107,7 @@ pub struct ChildReceiptQuery {
     /// Point-load a single child receipt by its `receipt_id`. When set, the
     /// handler resolves exactly this receipt from the durable store (bounded to
     /// one row), so a store-authoritative `--control-url` deployment can resolve
-    /// a child receipt that the kernel's bounded mirror has evicted (RFC-0004
-    /// F03/F25).
+    /// a child receipt that the kernel's bounded mirror has evicted.
     #[serde(default)]
     pub receipt_id: Option<String>,
     #[serde(default)]

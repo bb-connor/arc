@@ -174,14 +174,14 @@ impl ChioKernel {
             ),
         );
         // Read the memory-budget-driven caps before `config` is moved into the
-        // struct literal (RFC-0004 section 5).
+        // struct literal.
         let receipt_mirror_capacity = config.memory_budget_receipt_mirror_capacity();
         let federation_cache_capacity = config.memory_budget_federation_cache_capacity();
         let federation_cache_idle_ttl = config.memory_budget_federation_cache_idle_ttl_secs();
         let rss_soft_limit_bytes = config.memory_budget.rss_soft_limit_bytes;
         let rss_sample_interval_secs = config.memory_budget.rss_sample_interval_secs;
         // Build the bounded-structure gauges first so they can be shared between
-        // each structure and the telemetry / registry readers (RFC-0004).
+        // each structure and the telemetry / registry readers.
         let receipt_mirror_gauge;
         let child_receipt_mirror_gauge;
         let federation_dual_receipts_gauge;
@@ -270,8 +270,8 @@ impl ChioKernel {
             rss_shed: Arc::new(AtomicBool::new(false)),
             rss_sampler: None,
         };
-        // Start the RSS soft-ceiling sampler only when a limit is configured
-        // (Stage A ships None, so no thread is spawned by default) (RFC-0004).
+        // Start the RSS soft-ceiling sampler only when a limit is configured; with
+        // no limit set, no thread is spawned.
         if let Some(limit) = rss_soft_limit_bytes {
             kernel.rss_sampler = Some(kernel_struct::RssSamplerHandle::spawn(
                 Arc::clone(&kernel.rss_shed),
@@ -725,7 +725,7 @@ impl ChioKernel {
     }
 
     /// Install a durable [`crate::federation_artifact_store::FederationArtifactStore`]
-    /// for bilateral co-sign artifacts (RFC-0004 F10).
+    /// for bilateral co-sign artifacts.
     ///
     /// When set, [`Self::apply_federation_cosign`] writes each
     /// `DualSignedReceipt` / `DsseEnvelope` through to the store BEFORE inserting
@@ -803,7 +803,7 @@ impl ChioKernel {
             // A store READ error is not an admission gate (writes fail closed via
             // `?` elsewhere), but collapsing Err to None silently makes a transient
             // read failure indistinguishable from an absent artifact. Log it so the
-            // read-through fallback is observable (RFC-0004 / codex round-7 nit).
+            // read-through fallback is observable.
             match store.get_dual_signed(receipt_id) {
                 Ok(hit) => hit,
                 Err(error) => {
@@ -835,7 +835,7 @@ impl ChioKernel {
         self.federation_artifact_store.as_ref().and_then(|store| {
             // As with the dual-signed read above: log a swallowed store read error
             // so a transient failure is not silently reported as an absent DSSE
-            // envelope (RFC-0004 / codex round-7 nit).
+            // envelope.
             match store.get_dsse(receipt_id) {
                 Ok(hit) => hit,
                 Err(error) => {
@@ -1026,11 +1026,11 @@ impl ChioKernel {
             };
             // Evicted entry (if any) is durable via the store above. With no
             // store installed the drop is lossy by policy (bounded drop-oldest);
-            // log it so the evidence loss is explicit for operators (RFC-0004 F10).
+            // log it so the evidence loss is explicit for operators.
             if cache.insert(receipt.id.clone(), dual, now).is_some() && !artifact_store_installed {
                 debug!(
                     request_id = %request.request_id,
-                    "dropping an evicted dual-signed co-sign artifact: bounded federation cache is full and no FederationArtifactStore is installed (RFC-0004 F10)"
+                    "dropping an evicted dual-signed co-sign artifact: bounded federation cache is full and no FederationArtifactStore is installed"
                 );
             }
         }
@@ -1046,7 +1046,7 @@ impl ChioKernel {
             {
                 debug!(
                     request_id = %request.request_id,
-                    "dropping an evicted co-sign DSSE envelope: bounded federation cache is full and no FederationArtifactStore is installed (RFC-0004 F10)"
+                    "dropping an evicted co-sign DSSE envelope: bounded federation cache is full and no FederationArtifactStore is installed"
                 );
             }
         }
@@ -1109,16 +1109,16 @@ impl ChioKernel {
     }
 
     /// Return `true` when the RSS soft-ceiling sampler has flagged that process
-    /// RSS crossed `memory_budget.rss_soft_limit_bytes` (RFC-0004 section 5).
-    /// A single relaxed atomic load on the admission fast path.
+    /// RSS crossed `memory_budget.rss_soft_limit_bytes`. A single relaxed atomic
+    /// load on the admission fast path.
     #[must_use]
     pub fn is_rss_shedding(&self) -> bool {
         self.rss_shed.load(Ordering::Relaxed)
     }
 
     /// Enumerate each long-lived bounded structure's telemetry label and its
-    /// current live entry count (RFC-0004 sections 4 and 6). This is the
-    /// registry the size-metric convention and the soak harness read; adding a
+    /// current live entry count. This is the registry the size-metric convention
+    /// and the soak harness read; adding a
     /// new long-lived collection without a gauge here fails the registry test.
     #[must_use]
     pub fn bounded_structure_gauges(&self) -> Vec<(&'static str, usize)> {

@@ -61,8 +61,8 @@ fn stream_receipt_content(
     })
 }
 
-/// Why a stream was truncated at finalize time (RFC-0004 F06). Reported so the
-/// caller can mark the receipt incomplete with a limit-accurate reason.
+/// Why a stream was truncated at finalize time. Reported so the caller can mark
+/// the receipt incomplete with a limit-accurate reason.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum StreamTruncationCause {
     /// Retaining the next chunk would exceed `max_stream_total_bytes`.
@@ -76,7 +76,7 @@ pub(crate) enum StreamTruncationCause {
 /// any). Bounds BOTH the total bytes (`max_stream_total_bytes`) and the retained
 /// chunk COUNT (`max_stream_chunks`); the chunk-count bound stops a flood of tiny
 /// chunks from growing the retained `Vec`/per-chunk signing preimage even when the
-/// byte cap is never reached (RFC-0004 F06). Both caps use `0 = unlimited`.
+/// byte cap is never reached. Both caps use `0 = unlimited`.
 pub(crate) fn truncate_stream_to_limits(
     stream: &ToolCallStream,
     max_stream_total_bytes: u64,

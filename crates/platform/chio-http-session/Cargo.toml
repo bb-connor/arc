@@ -13,9 +13,9 @@ name = "chio_http_session"
 
 [dependencies]
 chio-bounded = { workspace = true }
-# Journal entry cap is single-sourced from the kernel's MemoryBudgetConfig
-# (RFC-0004 section 5). chio-kernel already coexists with this crate in every
-# consumer via chio-guards, so this edge adds no new crate to the build graph.
+# Journal entry cap is single-sourced from the kernel's MemoryBudgetConfig.
+# chio-kernel already coexists with this crate in every consumer via
+# chio-guards, so this edge adds no new crate to the build graph.
 chio-kernel = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

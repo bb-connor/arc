@@ -40,7 +40,7 @@ impl ChioKernel {
 
         // RSS soft ceiling: shed new admissions before the OS OOM-kills the
         // mediator. Checked on the same atomic-load fast path as the emergency
-        // stop, right after it (RFC-0004 section 5).
+        // stop, right after it.
         if self.is_rss_shedding() {
             warn!(
                 request_id = %request.request_id,
@@ -366,7 +366,7 @@ impl ChioKernel {
         // consumed the pre-execution budget (invocation count / monetary hold).
         // Route the error through the same reversal + deny path the governed and
         // guard denial branches use so a transient store failure never burns
-        // quota or holds funds for a call that never dispatches (codex round-7).
+        // quota or holds funds for a call that never dispatches.
         let governed_call_chain_receipt_evidence = match self.governed_call_chain_receipt_evidence(
             request,
             cap,

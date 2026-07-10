@@ -54,9 +54,9 @@ impl ReceiptStore for RemoteReceiptStore {
 
     /// Point-load a tool receipt by id over the control-plane remote protocol so
     /// a store-authoritative `--control-url` deployment resolves a parent receipt
-    /// that the kernel's bounded in-memory mirror has evicted, instead of falling
-    /// back to the `Ok(None)` default and falsely denying a governed call-chain
-    /// continuation (RFC-0004 F03/F25). The query is bounded to a single row.
+    /// that the kernel's bounded in-memory mirror has evicted, rather than
+    /// falsely denying a governed call-chain continuation. The query is bounded
+    /// to a single row.
     fn load_chio_receipt(
         &self,
         receipt_id: &str,
@@ -80,8 +80,7 @@ impl ReceiptStore for RemoteReceiptStore {
                 // governed parent-receipt existence check pass on the WRONG receipt
                 // after the mirror evicts the real one. A mismatch is treated as a
                 // miss (fail-closed): the caller then denies the dependent claim
-                // rather than trusting a substituted receipt (RFC-0004 F03/F25,
-                // codex finding 3555410415).
+                // rather than trusting a substituted receipt.
                 if receipt.id != receipt_id {
                     return Ok(None);
                 }
@@ -111,8 +110,7 @@ impl ReceiptStore for RemoteReceiptStore {
                 // Same returned-id-must-match-requested-id check as
                 // [`Self::load_chio_receipt`]: a non-conforming control-plane that
                 // ignores the filter cannot substitute a different child receipt
-                // for a governed existence check. A mismatch is a fail-closed miss
-                // (codex finding 3555410415).
+                // for a governed existence check. A mismatch is a fail-closed miss.
                 if receipt.id != receipt_id {
                     return Ok(None);
                 }

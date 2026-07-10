@@ -57,13 +57,13 @@ pub(super) fn compile_rule_guards(
             if let Some(cfg) = velocity_cfg {
                 // Thread the CONFIGURED process memory budget so a lowered
                 // `velocity_bucket_cap` tightens this long-lived collection instead
-                // of silently using the default (RFC-0004 F38, finding 3554566274).
+                // of silently using the default.
                 builder.add(VelocityGuard::from_memory_budget(cfg, memory_budget));
             }
             if let Some(cfg) = agent_cfg {
                 // Thread the CONFIGURED process memory budget so a lowered
                 // `velocity_bucket_cap` bounds this guard's agent/session bucket
-                // maps too (RFC-0004 F38, finding 3555410392).
+                // maps too.
                 builder.add(AgentVelocityGuard::from_memory_budget(cfg, memory_budget));
             }
         }

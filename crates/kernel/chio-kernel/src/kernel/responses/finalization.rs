@@ -138,7 +138,7 @@ impl ChioKernel {
                 // caps to the redacted stream so a sanitizer/custom hook that emits
                 // more than `max_stream_total_bytes` / `max_stream_chunks` cannot
                 // grow the final signed output and receipt preimage past the
-                // configured budget (RFC-0004 F06, codex finding 3555410410).
+                // configured budget.
                 let redacted_output = self.apply_redacted_output(redacted)?;
                 Ok(PostInvocationHandling {
                     output: self.reapply_stream_caps_after_redaction(redacted_output)?,
@@ -193,7 +193,7 @@ impl ChioKernel {
     /// that has not been capped, so without this pass a hook could emit a stream
     /// with more than `max_stream_chunks` retained chunks (or more than
     /// `max_stream_total_bytes`) and grow the signed output and receipt preimage
-    /// past the configured budget (RFC-0004 F06, codex finding 3555410410).
+    /// past the configured budget.
     ///
     /// Only the retention caps are re-applied. The stream-duration limit is
     /// intentionally NOT re-evaluated: it bounds tool execution time, not redacted

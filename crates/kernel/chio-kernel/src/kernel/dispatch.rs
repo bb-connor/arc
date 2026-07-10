@@ -36,17 +36,16 @@ impl ChioKernel {
     }
 
     pub(crate) fn has_local_receipt_id(&self, receipt_id: &str) -> Result<bool, KernelError> {
-        // Store-authoritative: a durable store is a point lookup by id (F22
-        // hot-path budget), not an O(n) mirror scan (RFC-0004 F03/F25). On a
-        // store MISS fall back to the local mirror below: a store may implement
-        // append without point loads (for example an append-only or remote
-        // store), so a receipt appended and mirrored locally must still resolve.
-        // A store READ ERROR fails closed and PROPAGATES; only a genuine miss
-        // (`Ok(None)`) falls through to the mirror, so a store verification
-        // failure is never masked by a mirror hit (RFC-0004 F1 round-2).
+        // Store-authoritative: a durable store is a point lookup by id, not an
+        // O(n) mirror scan. On a store MISS fall back to the local mirror below: a
+        // store may implement append without point loads (for example an
+        // append-only or remote store), so a receipt appended and mirrored locally
+        // must still resolve. A store READ ERROR fails closed and PROPAGATES; only
+        // a genuine miss (`Ok(None)`) falls through to the mirror, so a store
+        // verification failure is never masked by a mirror hit.
         //
-        // Boundary (RFC-0004 F03/F25): if that append-only/remote store does not
-        // implement point loads, the bounded mirror is the ONLY lookup source.
+        // Boundary: if that append-only/remote store does not implement point
+        // loads, the bounded mirror is the ONLY lookup source.
         // Once the mirror evicts a receipt past `receipt_mirror_capacity`, this
         // returns `Ok(false)` and the dependent call-chain claim is denied
         // (fail-closed, never a false allow). Such deployments must implement
@@ -99,8 +98,7 @@ impl ChioKernel {
         // a receipt appended and mirrored locally must still resolve). A store
         // READ ERROR fails closed and PROPAGATES; only a genuine miss
         // (`Ok(None)`) falls through to the mirror, so a store verification
-        // failure can never be accepted from the bounded mirror
-        // (RFC-0004 F1 round-2).
+        // failure can never be accepted from the bounded mirror.
         if self.receipt_store.is_some() {
             if let Some(receipt) = self
                 .with_receipt_store(|store| Ok(store.load_chio_receipt(receipt_id)?))?
@@ -572,8 +570,8 @@ impl ChioKernel {
 
         // Try streaming first regardless of monetary mode.
         //
-        // RFC-0004 F06: why the kernel cannot bound stream memory "as chunks
-        // arrive" at THIS seam, and where the actual bounds live.
+        // Why the kernel cannot bound stream memory "as chunks arrive" at THIS
+        // seam, and where the actual bounds live.
         //
         // `ToolServerConnection::invoke_stream` returns a FULLY MATERIALIZED
         // `ToolServerStreamResult` (which owns a `ToolCallStream { chunks: Vec<..>

@@ -1,15 +1,16 @@
-# Memory deployment guidance (RFC-0004, closes F63 OS half)
+# Memory deployment guidance
 
 The goal, following the Ubicloud PostgreSQL/OOM-killer lesson, is that
 allocations fail early and locally (returning to the `try_reserve` and shed
-paths) rather than the OOM killer picking a victim later. RFC-0004 gives the
-mediator two in-process backstops: bounded collections (every long-lived
+paths) rather than the OOM killer picking a victim later. The mediator has
+two in-process backstops: bounded collections (every long-lived
 serving collection has a capacity policy and a live `SizeGauge`, enumerated by
 `ChioKernel::bounded_structure_gauges`) and an RSS soft ceiling
 (`MemoryBudgetConfig::rss_soft_limit_bytes`) that sheds new admissions with
 `KernelError::Overloaded { resource: Allocation }` before the process is killed.
 This appendix covers the OS-level configuration that makes those backstops
-effective. RFC-0010 owns the systemd/restart-policy half.
+effective. Restart-policy and process-supervision configuration is out of scope
+here.
 
 ## cgroup v2 memory limits
 

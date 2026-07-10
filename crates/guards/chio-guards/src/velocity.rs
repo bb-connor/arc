@@ -68,10 +68,9 @@ impl TokenBucket {
     /// WITHOUT consuming them. Split from [`Self::consume`] so a guard evaluating
     /// two buckets under one lock can check BOTH can satisfy the request before
     /// consuming from EITHER (reserve-both-then-consume), avoiding partial
-    /// consumption when one limit denies (RFC-0004 F38, codex finding 3555239296).
-    /// Refilling here and again inside the paired [`Self::consume`] adds ~0 tokens
-    /// (near-zero elapsed under the same lock), so the peek cannot inflate the
-    /// balance.
+    /// consumption when one limit denies. Refilling here and again inside the
+    /// paired [`Self::consume`] adds ~0 tokens (near-zero elapsed under the same
+    /// lock), so the peek cannot inflate the balance.
     fn can_consume(&mut self, amount_tokens: u64) -> bool {
         self.refill();
         let cost_mt = amount_tokens.saturating_mul(MT_PER_TOKEN);
@@ -138,8 +137,8 @@ pub struct VelocityGuard {
     /// insert are atomic across both maps: no evaluate() ever samples a stale
     /// sibling-map size, so the combined `invocation + spend` bucket count stays
     /// bounded by `bucket_cap` even under concurrent evaluate() calls for
-    /// distinct capability ids (RFC-0004 F38, codex finding 3553826793). A single
-    /// lock also removes any cross-map lock ordering, so there is no deadlock.
+    /// distinct capability ids. A single lock also removes any cross-map lock
+    /// ordering, so there is no deadlock.
     state: Mutex<VelocityState>,
     config: VelocityConfig,
     bucket_cap: usize,
@@ -157,7 +156,7 @@ impl VelocityGuard {
     /// [`chio_kernel::MemoryBudgetConfig`]'s `velocity_bucket_cap` so the cap is
     /// single-sourced with the process memory budget rather than a duplicated
     /// literal. Deployments that need a tighter cap use
-    /// [`Self::with_bucket_cap`] (RFC-0004 F38).
+    /// [`Self::with_bucket_cap`].
     pub fn new(config: VelocityConfig) -> Self {
         Self::with_bucket_cap(
             config,
@@ -166,11 +165,11 @@ impl VelocityGuard {
     }
 
     /// Create a `VelocityGuard` whose total-bucket cap comes from a CONFIGURED
-    /// process memory budget (RFC-0004 F38). Threading the operator's
+    /// process memory budget. Threading the operator's
     /// [`chio_kernel::MemoryBudgetConfig`] (rather than a fresh `defaults()` read
     /// inside [`Self::new`]) means lowering `velocity_bucket_cap` on the process
     /// memory budget actually tightens this long-lived collection instead of being
-    /// silently ignored on the policy-compiled path (codex finding 3554566274).
+    /// silently ignored on the policy-compiled path.
     pub fn from_memory_budget(
         config: VelocityConfig,
         budget: &chio_kernel::MemoryBudgetConfig,
@@ -179,8 +178,8 @@ impl VelocityGuard {
     }
 
     /// Create a `VelocityGuard` with an explicit total-bucket cap so a
-    /// self-minted-leaf flood saturates rather than growing (RFC-0004 F38). The
-    /// cap is a TOTAL across BOTH the invocation and spend maps. Because both maps
+    /// self-minted-leaf flood saturates rather than growing. The cap is a TOTAL
+    /// across BOTH the invocation and spend maps. Because both maps
     /// share one mutex, the combined-cap check and the insert are atomic: no
     /// evaluate() reads a stale sibling-map size, so the combined bucket count is
     /// bounded by `bucket_cap` even under concurrent evaluate() calls for distinct
@@ -262,20 +261,18 @@ impl VelocityState {
     /// checking one slot at a time would let a request pass the invocation check
     /// on the last free slot and then fail the spend check, wedging an unpaired
     /// invocation bucket in the final slot and burning a token for a call that
-    /// never ran (codex finding 3555239296). Reserving 0 slots (all keys already
-    /// exist) always succeeds, so a repeat request for an already-tracked
-    /// capability never evicts and recreates its own bucket with a full token
-    /// balance (RFC-0004 F38).
+    /// never ran. Reserving 0 slots (all keys already exist) always succeeds, so
+    /// a repeat request for an already-tracked capability never evicts and
+    /// recreates its own bucket with a full token balance.
     ///
     /// When the reservation would exceed the cap, EXPIRED (out-of-window) buckets
     /// are pruned from BOTH maps first; if only ACTIVE (in-window) buckets remain,
     /// the request is DENIED rather than evicting an active bucket. Evicting an
     /// active bucket would reset its per-window rate/spend limit, letting a caller
     /// who can mint many distinct capability ids force a depleted bucket out and
-    /// reuse the id within the same window for a fresh `TokenBucket` (the same
-    /// fail-open bypass class fixed in the admission guard, RFC-0004 F39, codex
-    /// finding 3554566269). Denying keeps memory bounded (cap unchanged) without
-    /// the bypass: a distinct-capability flood saturates at `bucket_cap`.
+    /// reuse the id within the same window for a fresh `TokenBucket`, a fail-open
+    /// rate-limit bypass. Denying keeps memory bounded (cap unchanged) without the
+    /// bypass: a distinct-capability flood saturates at `bucket_cap`.
     fn reserve_slots(&mut self, new_slots: usize, window_secs: u64, bucket_cap: usize) -> bool {
         if new_slots == 0 {
             return true;
@@ -307,10 +304,9 @@ impl Guard for VelocityGuard {
         // Both maps share ONE lock, held for the whole evaluate, so the
         // combined-cap check and the insert are atomic across both maps: no
         // evaluate() ever reads a stale sibling-map size, so the combined bucket
-        // count cannot overshoot under concurrency (RFC-0004 F38, codex finding
-        // 3553826793). A single lock means no cross-map lock ordering and no
-        // deadlock. If spend limiting fails closed below, the guard drops cleanly
-        // (no panic, no poison).
+        // count cannot overshoot under concurrency. A single lock means no
+        // cross-map lock ordering and no deadlock. If spend limiting fails closed
+        // below, the guard drops cleanly (no panic, no poison).
         let mut state = self
             .state
             .lock()
@@ -334,7 +330,7 @@ impl Guard for VelocityGuard {
         // them together means a request that will be denied for lack of capacity
         // never inserts an unpaired invocation bucket into the final slot or burns
         // an invocation token for a call denied at the spend limit (reserve-both,
-        // no partial consumption -- RFC-0004 F38, codex finding 3555239296).
+        // no partial consumption).
         let inv_new = inv_limit.is_some() && !state.invocation_buckets.contains_key(&key);
         let spend_new = spend_limit.is_some() && !state.spend_buckets.contains_key(&key);
         let new_slots = usize::from(inv_new) + usize::from(spend_new);
@@ -546,11 +542,10 @@ mod tests {
 
     #[test]
     fn both_bucket_maps_together_stay_within_total_cap() {
-        // RFC-0004 F38 round-2: with both invocation and spend limits enabled the
-        // documented bucket cap is a TOTAL across both maps. Flooding distinct
-        // capability ids (each mints an invocation AND a spend bucket) must not
-        // let invocation + spend buckets exceed the cap (the per-map bug would
-        // reach 2x the cap).
+        // With both invocation and spend limits enabled the bucket cap is a TOTAL
+        // across both maps. Flooding distinct capability ids (each mints an
+        // invocation AND a spend bucket) must not let invocation + spend buckets
+        // exceed the cap; a per-map cap would reach twice the intended total.
         let config = VelocityConfig {
             max_invocations_per_window: Some(1000),
             max_spend_per_window: Some(1000),
@@ -586,14 +581,12 @@ mod tests {
 
     #[test]
     fn combined_cap_holds_under_concurrent_distinct_capability_flood() {
-        // RFC-0004 F38 (codex finding 3553826793, REAL fix not docs): concurrent
-        // evaluate() calls for distinct capability ids used to sample a stale
-        // sibling-map size, so both maps could grow past the combined cap. With
-        // both maps under one lock the combined-cap check and insert are atomic,
-        // so the combined bucket count never exceeds `bucket_cap`. This test
-        // hammers the guard from many threads with distinct capability ids (each
-        // mints an invocation AND a spend bucket) and asserts the combined count
-        // stays within the cap at every observation.
+        // With both maps under one lock the combined-cap check and insert are
+        // atomic, so the combined bucket count never exceeds `bucket_cap` even
+        // when concurrent evaluate() calls race on distinct capability ids. This
+        // test hammers the guard from many threads with distinct capability ids
+        // (each mints an invocation AND a spend bucket) and asserts the combined
+        // count stays within the cap at every observation.
         use std::sync::atomic::{AtomicUsize, Ordering};
         use std::sync::Arc;
 
@@ -626,8 +619,7 @@ mod tests {
                         let ctx = guard_ctx(&request, &scope, &agent, &server, Some(0));
                         let _ = guard.evaluate(&ctx);
                         // Observe the combined count under the single lock: it must
-                        // never exceed the cap. Before the fix the stale sibling
-                        // snapshot let concurrent inserts overshoot this bound.
+                        // never exceed the cap under concurrent inserts.
                         let combined = guard.combined_bucket_count();
                         max_observed.fetch_max(combined, Ordering::Relaxed);
                     }
@@ -655,7 +647,7 @@ mod tests {
         // Cap of 1 with a 1-per-window limit: the first request for a capability
         // consumes its only token; a second request for the SAME capability must
         // find the preserved (now empty) bucket and be denied, not evict and
-        // recreate it with a full balance (RFC-0004 F38 / cap-on-update).
+        // recreate it with a full balance.
         let config = VelocityConfig {
             max_invocations_per_window: Some(1),
             window_secs: 60,
@@ -691,10 +683,10 @@ mod tests {
 
     #[test]
     fn full_table_of_active_buckets_denies_new_key_without_eviction() {
-        // codex finding 3554566269 (fail-open bypass, RFC-0004 F38/F39): when the
-        // combined bucket table is full of IN-WINDOW (active) buckets, a new
-        // distinct capability must be DENIED fail-closed, NOT admitted by evicting
-        // an active victim. Evicting an active bucket would reset the victim's
+        // When the combined bucket table is full of IN-WINDOW (active) buckets, a
+        // new distinct capability must be DENIED fail-closed, NOT admitted by
+        // evicting an active victim. Evicting an active bucket would reset the
+        // victim's
         // per-window limit, letting a caller who mints many distinct capability ids
         // force a depleted bucket out and reuse the id within the same window for a
         // fresh TokenBucket. Two in-window capabilities fill a cap of 2; a third is
@@ -746,7 +738,7 @@ mod tests {
         );
 
         // a retained its (now empty) bucket: re-evaluating it must still be denied.
-        // RED (pre-fix): c evicted a, so this returned a fresh allowed bucket.
+        // Were c allowed to evict a, this would return a fresh allowed bucket.
         let a2 = guard
             .evaluate(&guard_ctx(&req_a, &scope, &agent, &server, None))
             .expect("a replay");
@@ -759,15 +751,14 @@ mod tests {
 
     #[test]
     fn spend_denial_does_not_wedge_or_deplete_invocation_bucket() {
-        // codex finding 3555239296 (RFC-0004 F38, no partial consumption): with
-        // both limits enabled and a combined cap that has only one free slot, a
-        // brand-new key needs TWO slots (one invocation, one spend). The guard must
-        // reserve both BEFORE consuming from either, so a request that will be
+        // With both limits enabled and a combined cap that has only one free slot,
+        // a brand-new key needs TWO slots (one invocation, one spend). The guard
+        // must reserve both BEFORE consuming from either, so a request that will be
         // denied at the spend reservation never inserts an invocation-only bucket
         // into the final slot or burns an invocation token for a call that never
-        // ran. RED (pre-fix): the invocation bucket was inserted + consumed before
-        // the spend reservation failed, wedging the table at the cap with an
-        // unpaired invocation bucket (combined = 5, inv = 3).
+        // ran. Without reserve-both, the invocation bucket would be inserted and
+        // consumed before the spend reservation failed, wedging the table at the
+        // cap with an unpaired invocation bucket.
         let config = VelocityConfig {
             max_invocations_per_window: Some(1000),
             max_spend_per_window: Some(1000),
@@ -775,8 +766,7 @@ mod tests {
             burst_factor: 1.0,
         };
         // Odd cap: two fully tracked keys use four slots (inv+spend each), leaving
-        // exactly one free slot -- codex's "odd cap such as 5 after two fully
-        // tracked keys" scenario.
+        // exactly one free slot.
         let guard = VelocityGuard::with_bucket_cap(config, 5);
         let kp = Keypair::generate();
         let agent = kp.public_key().to_hex();
@@ -871,10 +861,10 @@ mod tests {
 
     #[test]
     fn from_memory_budget_honors_lowered_velocity_bucket_cap() {
-        // codex finding 3554566274 (RFC-0004 F38): the CONFIGURED process memory
-        // budget must reach this guard. A budget that lowers `velocity_bucket_cap`
-        // to 4 must cap the combined bucket table at 4, not the compiled-in default
-        // of 65_536. RED (pre-fix): `new` reads `defaults()` and ignores the budget.
+        // The CONFIGURED process memory budget must reach this guard. A budget that
+        // lowers `velocity_bucket_cap` to 4 must cap the combined bucket table at
+        // 4, not the compiled-in default of 65_536. `from_memory_budget` threads
+        // the budget through where `new` would read `defaults()`.
         let budget = chio_kernel::MemoryBudgetConfig {
             velocity_bucket_cap: 4,
             ..chio_kernel::MemoryBudgetConfig::defaults()

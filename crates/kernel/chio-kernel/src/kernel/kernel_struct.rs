@@ -133,19 +133,18 @@ pub(crate) fn receipt_crypto_floor(
 
 pub const DEFAULT_MAX_STREAM_DURATION_SECS: u64 = 300;
 pub const DEFAULT_MAX_STREAM_TOTAL_BYTES: u64 = 256 * 1024 * 1024;
-/// Default cap on the number of chunks RETAINED from one streamed tool result
-/// (RFC-0004 F06). Bounds the accumulator `Vec<ToolCallChunk>` length and the
-/// per-chunk receipt-signing preimage even when every chunk is tiny and the byte
-/// cap is never reached. Generous for legitimate streams; `0` disables the cap.
+/// Default cap on the number of chunks RETAINED from one streamed tool result.
+/// Bounds the accumulator `Vec<ToolCallChunk>` length and the per-chunk
+/// receipt-signing preimage even when every chunk is tiny and the byte cap is
+/// never reached. Generous for legitimate streams; `0` disables the cap.
 pub const DEFAULT_MAX_STREAM_CHUNKS: u64 = 1_048_576;
 pub const DEFAULT_CHECKPOINT_BATCH_SIZE: u64 = 100;
 pub const DEFAULT_RETENTION_DAYS: u64 = 90;
 pub const DEFAULT_MAX_SIZE_BYTES: u64 = 10_737_418_240;
 
-/// Per-process memory budget (RFC-0004 section 5). Bounded-structure capacities
-/// plus a process RSS soft ceiling. The soft ceiling is the in-process analog
-/// of the cgroup hard limit: the kernel sheds (Overloaded) before the OS
-/// OOM-kills it.
+/// Per-process memory budget: bounded-structure capacities plus a process RSS
+/// soft ceiling. The soft ceiling is the in-process analog of the cgroup hard
+/// limit: the kernel sheds (Overloaded) before the OS OOM-kills it.
 #[derive(Debug, Clone)]
 pub struct MemoryBudgetConfig {
     pub receipt_mirror_capacity: usize,
@@ -154,13 +153,13 @@ pub struct MemoryBudgetConfig {
     pub velocity_bucket_cap: usize,
     pub admission_key_cap: usize,
     pub journal_entry_cap: usize,
-    /// Max number of chunks retained from one streamed tool result (RFC-0004 F06).
-    /// Bounds the retained `Vec<ToolCallChunk>` and the per-chunk signing preimage
-    /// so a flood of tiny chunks that never trips `max_stream_total_bytes` still
-    /// cannot grow memory without bound. `0` disables the cap.
+    /// Max number of chunks retained from one streamed tool result. Bounds the
+    /// retained `Vec<ToolCallChunk>` and the per-chunk signing preimage so a flood
+    /// of tiny chunks that never trips `max_stream_total_bytes` still cannot grow
+    /// memory without bound. `0` disables the cap.
     pub max_stream_chunks: u64,
     /// Max number of DISTINCT tool names retained in each session journal's
-    /// cumulative `tool_counts` map (RFC-0004 F21). Unlike the `entries` and
+    /// cumulative `tool_counts` map. Unlike the `entries` and
     /// `tool_sequence` rings, `tool_counts` is cumulative (it survives ring
     /// eviction so the behavioral-sequence guard can answer "was this tool ever
     /// invoked"), so a ring cannot bound it. Once a session reaches this many
@@ -296,8 +295,8 @@ pub struct ChioKernel {
     pub(super) sessions: DashMap<SessionId, Arc<Session>>,
     pub(super) receipt_log: Mutex<ReceiptLog>,
     pub(super) child_receipt_log: Mutex<ChildReceiptLog>,
-    /// Live entry-count gauges for the two receipt mirrors (RFC-0004 section 4).
-    /// Cloned from the ring's gauge at construction so telemetry and the
+    /// Live entry-count gauges for the two receipt mirrors. Cloned from the
+    /// ring's gauge at construction so telemetry and the
     /// bounded-structure registry (`bounded_structure_gauges`) can read the
     /// count without locking the log.
     pub(super) receipt_mirror_gauge: chio_bounded::SizeGauge,
@@ -381,8 +380,8 @@ pub struct ChioKernel {
     /// Populated only when the post-sign hook fires successfully. Kept
     /// in-memory; persistent storage plugs in via the federation-state
     /// APIs already in chio-federation.
-    /// Capped, idle-swept, gauged instead of an unbounded DashMap (RFC-0004
-    /// F10): federated calls no longer grow kernel RSS without bound.
+    /// Capped, idle-swept, gauged instead of an unbounded DashMap: federated
+    /// calls no longer grow kernel RSS without bound.
     pub(super) federation_dual_receipts:
         Mutex<chio_bounded::BoundedMap<String, chio_federation::bilateral::DualSignedReceipt>>,
     pub(super) federation_dual_receipts_gauge: chio_bounded::SizeGauge,
@@ -392,8 +391,8 @@ pub struct ChioKernel {
     pub(super) federation_dsse_envelopes:
         Mutex<chio_bounded::BoundedMap<String, chio_federation::bilateral_dsse::DsseEnvelope>>,
     pub(super) federation_dsse_envelopes_gauge: chio_bounded::SizeGauge,
-    /// Optional durable backing for bilateral co-sign artifacts (RFC-0004 F10).
-    /// When set, the co-sign hook writes through to it before caching and the
+    /// Optional durable backing for bilateral co-sign artifacts. When set, the
+    /// co-sign hook writes through to it before caching and the
     /// accessors fall through to it on a cache miss.
     pub(super) federation_artifact_store:
         Option<std::sync::Arc<dyn crate::federation_artifact_store::FederationArtifactStore>>,
@@ -432,8 +431,8 @@ pub struct ChioKernel {
     /// shape stays feature-flag agnostic.
     pub(super) revocation_view: Option<std::sync::Arc<chio_kernel_core::RevocationView>>,
     pub(super) budget_registry: Mutex<chio_kernel_core::InMemoryBudgetRegistry>,
-    /// RSS soft-ceiling shed flag (RFC-0004 section 5). Set by the sampler when
-    /// process RSS exceeds `memory_budget.rss_soft_limit_bytes`; read on the
+    /// RSS soft-ceiling shed flag. Set by the sampler when process RSS exceeds
+    /// `memory_budget.rss_soft_limit_bytes`; read on the
     /// admission fast path alongside the emergency stop.
     pub(super) rss_shed: Arc<AtomicBool>,
     /// Owns the sampler thread when a soft limit is configured; joins on drop.

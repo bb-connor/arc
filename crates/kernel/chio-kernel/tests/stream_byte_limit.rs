@@ -1,4 +1,4 @@
-//! RFC-0004 F06: the kernel enforces max_stream_total_bytes at the invoke seam.
+//! The kernel enforces max_stream_total_bytes at the invoke seam.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use chio_kernel::runtime::{
@@ -44,10 +44,10 @@ fn within_budget_stream_is_allowed() {
 
 #[test]
 fn push_chunk_bounded_sheds_on_chunk_count_even_under_byte_cap() {
-    // codex finding 3554566278 (RFC-0004 F06): the byte-only bound lets a flood of
-    // tiny chunks that never trips `max_total_bytes` grow the accumulator without
-    // bound. With a generous byte cap but a chunk cap of 2, the 3rd tiny chunk must
-    // shed with Overloaded { StreamChunks } rather than being retained.
+    // A byte-only bound lets a flood of tiny chunks that never trips
+    // `max_total_bytes` grow the accumulator without bound. With a generous byte cap
+    // but a chunk cap of 2, the 3rd tiny chunk must shed with
+    // Overloaded { StreamChunks } rather than being retained.
     let mut acc: Vec<ToolCallChunk> = Vec::new();
     let mut running_bytes = 0u64;
     let byte_cap = 1_000_000u64; // never reached by tiny chunks

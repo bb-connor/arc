@@ -409,7 +409,7 @@ pub struct ToolReceiptQuery {
     /// handler resolves exactly this receipt from the durable store (bounded to
     /// one row) rather than a filtered list, so a store-authoritative
     /// `--control-url` deployment can resolve a parent receipt that the kernel's
-    /// bounded in-memory mirror has evicted (RFC-0004 F03/F25).
+    /// bounded in-memory mirror has evicted.
     #[serde(default)]
     pub receipt_id: Option<String>,
     #[serde(default)]

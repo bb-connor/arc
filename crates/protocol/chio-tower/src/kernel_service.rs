@@ -75,7 +75,7 @@ pub enum KernelServiceError {
     Overloaded,
     /// The per-tenant bucket table is at capacity and this tenant has no bucket.
     /// Distinct from `Overloaded` (a per-tenant concurrency shed) so a full table
-    /// is observable separately; maps to the same shed edge (RFC-0004 F12).
+    /// is observable separately; maps to the same shed edge.
     #[error("tenant bucket table is full")]
     TenantTableFull,
     /// Request exceeded the configured tower timeout.
@@ -115,13 +115,13 @@ impl Service<KernelRequest> for KernelService {
 /// Translate a kernel evaluation error into the tower service error.
 ///
 /// The RSS soft ceiling sheds new admissions with
-/// [`chio_kernel::KernelError::Overloaded`] (RFC-0004 section 5). The blanket
-/// `From<KernelError>` maps that into the opaque [`KernelServiceError::Kernel`],
-/// which callers keying retry/backpressure on [`KernelServiceError::Overloaded`]
-/// (the variant tower load shedding produces) would treat as an ordinary kernel
-/// failure. Map `Overloaded` explicitly to the retryable service overload variant
-/// so an RSS shed reaches the same shed edge as tower-side load shedding (codex
-/// finding 3555410403). Every other kernel error keeps the `Kernel` shape.
+/// [`chio_kernel::KernelError::Overloaded`]. The blanket `From<KernelError>` maps
+/// that into the opaque [`KernelServiceError::Kernel`], which callers keying
+/// retry/backpressure on [`KernelServiceError::Overloaded`] (the variant tower
+/// load shedding produces) would treat as an ordinary kernel failure. Map
+/// `Overloaded` explicitly to the retryable service overload variant so an RSS
+/// shed reaches the same shed edge as tower-side load shedding. Every other
+/// kernel error keeps the `Kernel` shape.
 fn map_kernel_error(error: chio_kernel::KernelError) -> KernelServiceError {
     match error {
         chio_kernel::KernelError::Overloaded { .. } => KernelServiceError::Overloaded,
@@ -207,7 +207,7 @@ where
 }
 
 /// Default idle window after which an unused tenant bucket may be reaped to make
-/// room for a new tenant (RFC-0004 F12).
+/// room for a new tenant.
 const DEFAULT_TENANT_IDLE_REAP_SECS: u64 = 3600;
 
 /// Per-tenant concurrency limiter for kernel requests.
@@ -239,7 +239,7 @@ impl TenantConcurrencyLimitLayer {
     }
 
     /// Set the idle window after which an unused tenant bucket may be reaped so
-    /// a new tenant is not permanently blocked by a full table (RFC-0004 F12).
+    /// a new tenant is not permanently blocked by a full table.
     pub fn with_tenant_idle_reap_secs(mut self, secs: u64) -> Self {
         self.tenant_idle_reap_secs = secs;
         self
@@ -278,8 +278,8 @@ type TenantBucketEntry<S> = (TenantBucketService<S>, std::time::Instant, Arc<Ato
 /// RAII guard that decrements a tenant bucket's in-flight counter when a
 /// dispatched call finishes (or its future is dropped/cancelled). Held for the
 /// full duration of `call` so an idle-reap sweep skips buckets with active
-/// calls (RFC-0004 F12): reaping an active bucket and recreating a fresh
-/// semaphore would let a tenant exceed `per_tenant_limit`.
+/// calls: reaping an active bucket and recreating a fresh semaphore would let a
+/// tenant exceed `per_tenant_limit`.
 #[derive(Debug)]
 struct InFlightGuard(Arc<AtomicUsize>);
 
@@ -309,8 +309,8 @@ where
 
         if tenants.len() >= self.max_tenants {
             // Reap the most-idle tenant so a new tenant is not permanently
-            // blocked; only then declare the table full (RFC-0004 F12). Never
-            // reap a bucket that still has in-flight calls: recreating its
+            // blocked; only then declare the table full. Never reap a bucket that
+            // still has in-flight calls: recreating its
             // semaphore would let that tenant exceed `per_tenant_limit`.
             let idle = std::time::Duration::from_secs(self.tenant_idle_reap_secs);
             let victim = tenants
@@ -500,9 +500,9 @@ mod tests {
 
     #[test]
     fn table_full_is_distinct_from_per_tenant_overload() {
-        // RFC-0004 F12: at cap, a third distinct tenant sees the distinct
-        // TenantTableFull (not the per-tenant Overloaded), and a non-idle table
-        // does not reap, so the third tenant is refused rather than admitted.
+        // At cap, a third distinct tenant sees the distinct TenantTableFull (not
+        // the per-tenant Overloaded), and a non-idle table does not reap, so the
+        // third tenant is refused rather than admitted.
         #[derive(Clone, Debug)]
         struct MockInner;
 
@@ -538,8 +538,8 @@ mod tests {
 
     #[test]
     fn in_flight_tenant_is_not_reaped_even_when_idle_timed() {
-        // RFC-0004 F12: a bucket with an in-flight call must never be reaped.
-        // Recreating its semaphore would let the tenant exceed per_tenant_limit.
+        // A bucket with an in-flight call must never be reaped. Recreating its
+        // semaphore would let the tenant exceed per_tenant_limit.
         #[derive(Clone, Debug)]
         struct MockInner;
 
@@ -685,10 +685,10 @@ mod tests {
 
     #[test]
     fn rss_shed_kernel_overload_maps_to_service_overloaded() {
-        // codex finding 3555410403 (RFC-0004 section 5): an RSS soft-ceiling shed
-        // surfaces as KernelError::Overloaded and must reach the RETRYABLE service
-        // overload variant, not the opaque Kernel wrapper, so callers keying
-        // retry/backpressure on Overloaded treat the shed as backpressure.
+        // An RSS soft-ceiling shed surfaces as KernelError::Overloaded and must
+        // reach the RETRYABLE service overload variant, not the opaque Kernel
+        // wrapper, so callers keying retry/backpressure on Overloaded treat the
+        // shed as backpressure.
         let mapped = map_kernel_error(KernelError::Overloaded {
             resource: chio_kernel::OverloadResource::Allocation,
         });
@@ -697,8 +697,8 @@ mod tests {
             "an RSS shed must map to the retryable Overloaded variant, got {mapped:?}"
         );
 
-        // RED contrast: the blanket `From`/`?` conversion the call path used before
-        // this fix maps the same shed to the opaque Kernel variant.
+        // The blanket `From`/`?` conversion maps the same shed to the opaque
+        // Kernel variant, which is why call() must use map_kernel_error instead.
         let via_from: KernelServiceError = KernelError::Overloaded {
             resource: chio_kernel::OverloadResource::Allocation,
         }

@@ -87,7 +87,7 @@ pub struct CompiledPolicy {
 /// Uses the DEFAULT process memory budget for bounded-collection caps (e.g. the
 /// velocity guard's bucket cap). Deployments that lower the process memory budget
 /// should use [`compile_policy_with_memory_budget`] so the configured caps reach
-/// the compiled guards (RFC-0004 F38).
+/// the compiled guards.
 pub fn compile_policy(policy: &HushSpec) -> Result<CompiledPolicy, CompileError> {
     compile_policy_with_source(policy, None)
 }
@@ -105,7 +105,7 @@ pub fn compile_policy_with_source(
 /// Compile a HushSpec policy threading a CONFIGURED process memory budget into
 /// the bounded-collection guards. Lowering `velocity_bucket_cap` on `budget`
 /// tightens the compiled velocity guard's bucket cap instead of it silently
-/// using the compiled-in default (RFC-0004 F38, codex finding 3554566274).
+/// using the compiled-in default.
 pub fn compile_policy_with_memory_budget(
     policy: &HushSpec,
     source_path: Option<&Path>,

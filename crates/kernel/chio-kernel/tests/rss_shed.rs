@@ -1,5 +1,5 @@
-//! RFC-0004 section 5: a declared RSS soft ceiling sheds new admissions with
-//! Overloaded { Allocation } before the OS OOM-kills the process.
+//! A declared RSS soft ceiling sheds new admissions with Overloaded { Allocation }
+//! before the OS OOM-kills the process.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use chio_kernel::MemoryBudgetConfig;

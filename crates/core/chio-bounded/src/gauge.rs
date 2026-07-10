@@ -1,8 +1,8 @@
 use crate::sync::{Arc, AtomicUsize, Ordering};
 
 /// Live entry-count gauge for a bounded structure. Cloneable handle so a
-/// telemetry exporter (RFC-0009) can read the count without locking the
-/// structure that owns it.
+/// telemetry exporter can read the count without locking the structure that
+/// owns it.
 #[derive(Clone, Debug)]
 pub struct SizeGauge(Arc<AtomicUsize>);
 

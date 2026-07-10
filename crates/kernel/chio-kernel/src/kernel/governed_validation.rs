@@ -1100,7 +1100,7 @@ impl ChioKernel {
                 })
             });
         // A store READ ERROR fails closed and propagates; only a genuine
-        // presence check (`Ok(false)`) omits the id (RFC-0004 F1 round-2).
+        // presence check (`Ok(false)`) omits the id.
         let local_parent_receipt_id = match call_chain.parent_receipt_id.as_ref() {
             Some(receipt_id) if self.has_local_receipt_id(receipt_id)? => Some(receipt_id.clone()),
             _ => None,

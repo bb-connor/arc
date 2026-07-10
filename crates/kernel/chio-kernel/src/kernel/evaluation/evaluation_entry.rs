@@ -32,7 +32,7 @@ impl ChioKernel {
             ));
         }
         // RSS soft ceiling: shed new admissions before the OS OOM-kills the
-        // mediator. The tool-call fast path sheds here (RFC-0004 section 5); a
+        // mediator. The tool-call fast path sheds here; a
         // resource/prompt/completion or any other non-tool capability-backed
         // operation that flows through this helper must shed on the SAME soft
         // ceiling, or a large read_resource / prompt completion could still

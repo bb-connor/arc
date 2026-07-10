@@ -74,10 +74,9 @@ fn receipt_log_basics() {
 
 #[test]
 fn store_miss_falls_back_to_local_mirror() {
-    // RFC-0004 F03/F25: a durable store that appends but cannot point-load (an
-    // append-only / remote store, like RemoteReceiptStore) must not disable the
-    // local mirror. A receipt appended and mirrored locally has to resolve on a
-    // store miss.
+    // A durable store that appends but cannot point-load (an append-only or remote
+    // store, like RemoteReceiptStore) must not disable the local mirror. A receipt
+    // appended and mirrored locally has to resolve on a store miss.
     let mut kernel = make_kernel(make_config());
     kernel.set_receipt_store(Box::new(AppendOnlyReceiptStore)).unwrap();
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
@@ -104,12 +103,11 @@ fn store_miss_falls_back_to_local_mirror() {
 
 #[test]
 fn store_read_error_propagates_and_is_not_mirror_served() {
-    // RFC-0004 F1 (round-2): a durable store READ error must fail closed. A
-    // receipt present in the local mirror must NOT mask a store read failure;
-    // only a genuine miss (`Ok(None)`) may fall back to the mirror. Here the
-    // store appends fine (so the mirror holds the receipt) but errors on every
-    // point load, so both lookups must PROPAGATE the error, not serve the
-    // mirror copy.
+    // A durable store READ error must fail closed. A receipt present in the local
+    // mirror must NOT mask a store read failure; only a genuine miss (`Ok(None)`)
+    // may fall back to the mirror. Here the store appends fine (so the mirror holds
+    // the receipt) but errors on every point load, so both lookups must PROPAGATE
+    // the error, not serve the mirror copy.
     let mut kernel = make_kernel(make_config());
     kernel.set_receipt_store(Box::new(ErroringReceiptStore)).unwrap();
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
@@ -135,13 +133,11 @@ fn store_read_error_propagates_and_is_not_mirror_served() {
 
 #[test]
 fn point_load_store_resolves_parent_receipt_after_mirror_eviction() {
-    // RFC-0004 F03/F25 (codex round-7): the receipt mirror is bounded, so it is
-    // NOT a durable point-lookup source. A store-authoritative deployment whose
-    // store implements point loads (here SqliteReceiptStore) must still resolve a
-    // parent receipt by id AFTER the bounded mirror has evicted it, so governed
-    // call-chain validation of an older parent_receipt_id does not falsely deny.
-    // This pins that RFC-0004's bounded mirror does not break the supported
-    // store-authoritative path.
+    // The receipt mirror is bounded, so it is NOT a durable point-lookup source. A
+    // store-authoritative deployment whose store implements point loads (here
+    // SqliteReceiptStore) must still resolve a parent receipt by id AFTER the
+    // bounded mirror has evicted it, so governed call-chain validation of an older
+    // parent_receipt_id does not falsely deny.
     let mut config = make_config();
     config.memory_budget.receipt_mirror_capacity = 2;
     let mut kernel = make_kernel(config);
@@ -196,12 +192,12 @@ fn point_load_store_resolves_parent_receipt_after_mirror_eviction() {
 
 #[test]
 fn append_only_store_fails_closed_for_parent_receipt_after_mirror_eviction() {
-    // RFC-0004 F03/F25 (codex round-7): the documented boundary. An append-only
-    // / remote store that does NOT implement point loads relies entirely on the
-    // bounded mirror. Once the mirror evicts a receipt, an older parent_receipt_id
-    // resolves in neither the store nor the mirror, so governed call-chain
-    // validation fails closed (a safe deny, never a false allow). Deployments
-    // that must avoid this MUST implement ReceiptStore::load_chio_receipt.
+    // The documented boundary for an append-only or remote store that does NOT
+    // implement point loads: it relies entirely on the bounded mirror. Once the
+    // mirror evicts a receipt, an older parent_receipt_id resolves in neither the
+    // store nor the mirror, so governed call-chain validation fails closed (a safe
+    // deny, never a false allow). Deployments that must avoid this MUST implement
+    // ReceiptStore::load_chio_receipt.
     let mut config = make_config();
     config.memory_budget.receipt_mirror_capacity = 2;
     let mut kernel = make_kernel(config);
@@ -225,7 +221,7 @@ fn append_only_store_fails_closed_for_parent_receipt_after_mirror_eviction() {
         .unwrap();
     let first_id = first.receipt.id.clone();
 
-    // While still in the mirror, the receipt resolves (round-2 mirror fallback).
+    // While still in the mirror, the receipt resolves via the mirror fallback.
     assert!(
         kernel.has_local_receipt_id(&first_id).unwrap(),
         "receipt must resolve from the mirror before eviction"
@@ -264,9 +260,9 @@ fn append_only_store_fails_closed_for_parent_receipt_after_mirror_eviction() {
 
 #[test]
 fn kernel_bounded_registry_lists_every_labelled_structure() {
-    // RFC-0004 sections 4/6: every kernel-held bounded structure has a live
-    // gauge; the registry enumerates them so the soak harness and a future
-    // long-lived-collection lint can read them. Fails if a label is dropped.
+    // Every kernel-held bounded structure has a live gauge; the registry enumerates
+    // them so the soak harness and a future long-lived-collection lint can read
+    // them. Fails if a label is dropped.
     let kernel = make_kernel(make_config());
     let labels: Vec<&'static str> = kernel
         .bounded_structure_gauges()
@@ -288,8 +284,8 @@ fn kernel_bounded_registry_lists_every_labelled_structure() {
 
 #[test]
 fn receipt_log_ring_caps_and_reports_gauge() {
-    // RFC-0004 F03/F25: the mirror is a capacity-bounded ring reporting a live
-    // gauge; appends past the cap evict the oldest, they never grow the Vec.
+    // The mirror is a capacity-bounded ring reporting a live gauge; appends past
+    // the cap evict the oldest, they never grow the Vec.
     let gauge = chio_bounded::SizeGauge::new();
     let kp = make_keypair();
     let mut log = ReceiptLog::with_capacity(4, gauge.clone());
@@ -420,10 +416,9 @@ fn kernel_persists_child_receipts_to_sqlite_store() {
 
 #[test]
 fn nested_admission_denied_while_rss_shedding() {
-    // RFC-0004 section 5 (round-2): the nested-flow admission path must gate on
-    // the RSS soft ceiling just like the top-level evaluate, so a nested tool
-    // call (sampling/elicitation) cannot allocate and run after the sampler
-    // raised the shed flag.
+    // The nested-flow admission path must gate on the RSS soft ceiling just like
+    // the top-level evaluate, so a nested tool call (sampling/elicitation) cannot
+    // allocate and run after the sampler raised the shed flag.
     let mut config = make_config();
     config.allow_sampling = true;
     let mut kernel = make_kernel(config);
@@ -504,8 +499,8 @@ fn nested_admission_denied_while_rss_shedding() {
         "nested admission must be denied Overloaded while RSS-shedding, got {result:?}"
     );
 
-    // Receipt-totality (codex round-7): the nested shed must still persist a
-    // signed deny receipt naming the shed resource, like every other denial.
+    // Receipt totality: the nested shed must still persist a signed deny receipt
+    // naming the shed resource, like every other denial.
     let receipts = kernel.receipt_log().receipts();
     let shed_receipt = receipts
         .iter()
@@ -531,12 +526,11 @@ fn nested_admission_denied_while_rss_shedding() {
 
 #[test]
 fn rss_shed_persists_signed_overload_deny_receipt() {
-    // RFC-0004 receipt-totality (codex round-7): an RSS soft-ceiling shed is a
-    // denied admission and must persist a signed deny receipt naming the shed
-    // resource, exactly like the emergency-stop fast path, even though it also
-    // returns Overloaded to the caller for backpressure. Before the fix the shed
-    // returned a bare Err with no receipt, contradicting error.rs's claim that
-    // the OverloadResource appears in a receipt deny reason.
+    // Receipt totality: an RSS soft-ceiling shed is a denied admission and must
+    // persist a signed deny receipt naming the shed resource, exactly like the
+    // emergency-stop fast path, even though it also returns Overloaded to the
+    // caller for backpressure. error.rs guarantees the OverloadResource appears in
+    // a receipt deny reason.
     let mut kernel = make_kernel(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
     let agent_kp = make_keypair();
@@ -581,14 +575,12 @@ fn rss_shed_persists_signed_overload_deny_receipt() {
 
 #[test]
 fn non_tool_admission_denied_while_rss_shedding() {
-    // RFC-0004 section 5 (codex finding 3555239302): the RSS soft-ceiling shed
-    // must also apply to NON-TOOL admissions. Resource reads, prompt gets, and
-    // completions all funnel through `validate_non_tool_capability`, which pre-fix
-    // only checked the emergency stop before continuing. Under RSS pressure a large
-    // read_resource or prompt completion could still allocate and execute while
-    // tool calls were being shed, so the soft ceiling did not actually shed all new
-    // admissions. The helper must shed uniformly (fail-closed Overloaded). RED
-    // (pre-fix): the helper returned Ok for a valid capability while shedding.
+    // The RSS soft-ceiling shed must also apply to NON-TOOL admissions. Resource
+    // reads, prompt gets, and completions all funnel through
+    // `validate_non_tool_capability`. Under RSS pressure a large read_resource or
+    // prompt completion must not allocate and execute while tool calls are being
+    // shed, or the soft ceiling would not shed all new admissions. The helper must
+    // shed uniformly (fail-closed Overloaded).
     let kernel = make_kernel(make_config());
     let agent_kp = make_keypair();
     let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
@@ -788,11 +780,11 @@ fn streamed_tool_byte_limit_truncates_output_and_marks_receipt_incomplete() {
 
 #[test]
 fn redaction_reapplies_stream_chunk_cap() {
-    // codex finding 3555410410 (RFC-0004 F06): apply_stream_limits runs on the
-    // ORIGINAL tool output, before the post-invocation pipeline. A Redact hook that
-    // emits a stream with more chunks than `max_stream_chunks` would otherwise
-    // bypass the retained-chunk cap and grow the final signed output and receipt
-    // preimage past the configured budget. The redacted stream must be re-capped.
+    // apply_stream_limits runs on the ORIGINAL tool output, before the
+    // post-invocation pipeline. A Redact hook that emits a stream with more chunks
+    // than `max_stream_chunks` would otherwise bypass the retained-chunk cap and
+    // grow the final signed output and receipt preimage past the configured budget.
+    // The redacted stream must be re-capped.
     struct OversizeRedactHook;
     impl crate::post_invocation::PostInvocationHook for OversizeRedactHook {
         fn name(&self) -> &str {
@@ -843,8 +835,8 @@ fn redaction_reapplies_stream_chunk_cap() {
         )
         .unwrap();
 
-    // RED (pre-fix): the redacted 5-chunk stream was signed and receipted verbatim.
-    // GREEN: it is truncated to the 2-chunk cap and marked incomplete.
+    // The redacted 5-chunk stream must be truncated to the 2-chunk cap and marked
+    // incomplete, not signed and receipted verbatim.
     let output_stream = tool_call_stream_output(response.output).expect("expected stream output");
     assert!(
         output_stream.chunk_count() <= 2,
@@ -898,10 +890,10 @@ fn apply_stream_limits_marks_duration_exceeded_stream_incomplete() {
 
 #[test]
 fn apply_stream_limits_marks_chunk_count_exceeded_stream_incomplete() {
-    // codex finding 3554566278 (RFC-0004 F06): the retained-chunk count is bounded
-    // as well as the total bytes. With a huge byte cap but `max_stream_chunks = 1`,
-    // a 3-tiny-chunk stream (well under the byte cap) is TRUNCATED to one chunk and
-    // the receipt is marked incomplete with a chunk-count reason.
+    // The retained-chunk count is bounded as well as the total bytes. With a huge
+    // byte cap but `max_stream_chunks = 1`, a 3-tiny-chunk stream (well under the
+    // byte cap) is TRUNCATED to one chunk and the receipt is marked incomplete with
+    // a chunk-count reason.
     let mut config = make_config();
     config.max_stream_total_bytes = 10_000_000; // never reached by tiny chunks
     config.memory_budget.max_stream_chunks = 1;

@@ -115,8 +115,8 @@ impl Default for AgentVelocityConfig {
 ///
 /// Both bucket maps live behind ONE mutex and the COMBINED distinct-key count is
 /// bounded by `bucket_cap`, so a flood of distinct agent/capability ids saturates
-/// rather than growing memory without bound (RFC-0004 F38, codex finding
-/// 3555410392). When the table is full of in-window buckets a new key is DENIED
+/// rather than growing memory without bound. When the table is full of in-window
+/// buckets a new key is DENIED
 /// fail-closed rather than evicting an active bucket (evicting an active bucket
 /// would reset its per-window limit, the same reset-by-eviction bypass class
 /// closed in [`crate::velocity::VelocityGuard`]). EXPIRED (out-of-window) buckets
@@ -138,7 +138,7 @@ impl AgentVelocityGuard {
     /// default bucket cap sourced from
     /// [`chio_kernel::MemoryBudgetConfig`]'s `velocity_bucket_cap`, so the cap is
     /// single-sourced with the process memory budget. Deployments that thread a
-    /// configured budget use [`Self::from_memory_budget`] (RFC-0004 F38).
+    /// configured budget use [`Self::from_memory_budget`].
     pub fn new(config: AgentVelocityConfig) -> Self {
         Self::with_bucket_cap(
             config,
@@ -147,11 +147,11 @@ impl AgentVelocityGuard {
     }
 
     /// Create an `AgentVelocityGuard` whose combined-bucket cap comes from a
-    /// CONFIGURED process memory budget (RFC-0004 F38). Threading the operator's
+    /// CONFIGURED process memory budget. Threading the operator's
     /// [`chio_kernel::MemoryBudgetConfig`] (rather than a fresh `defaults()` read
     /// inside [`Self::new`]) means lowering `velocity_bucket_cap` actually tightens
     /// this long-lived collection on the policy-compiled and origin-budget paths
-    /// instead of being silently ignored (codex finding 3555410392).
+    /// instead of being silently ignored.
     pub fn from_memory_budget(
         config: AgentVelocityConfig,
         budget: &chio_kernel::MemoryBudgetConfig,
@@ -594,12 +594,10 @@ mod tests {
 
     #[test]
     fn from_memory_budget_bounds_combined_bucket_table() {
-        // codex finding 3555410392 (RFC-0004 F38): the origin-budget / policy-
-        // compiled AgentVelocityGuard was unbounded. The CONFIGURED process memory
-        // budget must now bound the COMBINED agent+session bucket table. A budget
-        // that lowers `velocity_bucket_cap` to 4 must cap the table at 4 even under
-        // a flood of distinct agent + capability ids. RED (pre-fix): the maps grew
-        // one entry per distinct id without bound.
+        // The CONFIGURED process memory budget must bound the COMBINED agent+session
+        // bucket table. A budget that lowers `velocity_bucket_cap` to 4 must cap the
+        // table at 4 even under a flood of distinct agent + capability ids;
+        // otherwise the maps grow one entry per distinct id without bound.
         let budget = chio_kernel::MemoryBudgetConfig {
             velocity_bucket_cap: 4,
             ..chio_kernel::MemoryBudgetConfig::defaults()

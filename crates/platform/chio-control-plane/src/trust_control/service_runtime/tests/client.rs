@@ -854,12 +854,10 @@ fn receipt_list_response_body(kind: &str, receipts: Vec<serde_json::Value>) -> S
 
 #[test]
 fn remote_receipt_store_point_loads_tool_receipt_by_id() {
-    // RFC-0004 F03/F25 (codex finding 3553826797): the RemoteReceiptStore point
-    // load must issue a real by-id query over the control-plane protocol and
-    // resolve the receipt, so a store-authoritative --control-url deployment can
-    // recover a parent receipt evicted from the kernel's bounded mirror. Before
-    // the fix the default returned Ok(None) unconditionally, so the receipt was
-    // never resolved (RED).
+    // The RemoteReceiptStore point load must issue a real by-id query over the
+    // control-plane protocol and resolve the receipt, so a store-authoritative
+    // --control-url deployment can recover a parent receipt evicted from the
+    // kernel's bounded mirror.
     let receipt = sample_tool_receipt("receipt-evicted-1");
     // `ChioReceipt::sign` content-addresses the id, so resolve it from the signed
     // receipt rather than the body seed string.
@@ -918,12 +916,12 @@ fn remote_receipt_store_point_load_miss_returns_none() {
 
 #[test]
 fn remote_tool_point_load_rejects_mismatched_receipt_id() {
-    // codex finding 3555410415 (SECURITY, RFC-0004 F03/F25): a rolling-upgrade or
-    // non-conforming control-plane can ignore the `receiptId` filter and return an
-    // unrelated receipt as the first row. `has_local_receipt_id` treats any Some(_)
-    // as "the requested parent exists", so accepting a mismatched id would let a
-    // governed parent-receipt existence check pass on the WRONG receipt. The store
-    // must verify the returned id and treat a mismatch as a fail-closed miss.
+    // A rolling-upgrade or non-conforming control-plane can ignore the
+    // `receiptId` filter and return an unrelated receipt as the first row.
+    // `has_local_receipt_id` treats any Some(_) as "the requested parent exists",
+    // so accepting a mismatched id would let a governed parent-receipt existence
+    // check pass on the WRONG receipt. The store must verify the returned id and
+    // treat a mismatch as a fail-closed miss.
     let receipt = sample_tool_receipt("actually-returned-receipt");
     let returned_id = receipt.id.clone();
     let value = serde_json::to_value(&receipt).test_expect("serialize tool receipt");
@@ -937,8 +935,8 @@ fn remote_tool_point_load_rejects_mismatched_receipt_id() {
     let loaded = store
         .load_chio_receipt(&requested_id)
         .test_expect("point load must not error");
-    // RED (pre-fix): the first row was accepted verbatim, so this returned the
-    // mismatched receipt. GREEN: a mismatched id is a fail-closed miss.
+    // A mismatched id is a fail-closed miss, not accepted verbatim as the first
+    // row.
     assert!(
         loaded.is_none(),
         "a receipt whose id does not match the requested id must be rejected as a miss"

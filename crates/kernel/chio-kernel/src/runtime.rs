@@ -138,8 +138,7 @@ impl ToolCallStream {
 /// Sum the canonical byte size of a materialized stream and deny with
 /// `Overloaded { StreamBytes }` if it exceeds `max_total_bytes` (0 = unlimited).
 /// Uses the same per-chunk measurement as truncate_stream_to_limits, so the
-/// at-arrival count and the finalize-time count agree by construction
-/// (RFC-0004 F06).
+/// at-arrival count and the finalize-time count agree by construction.
 pub fn enforce_stream_byte_limit(
     stream: &ToolCallStream,
     max_total_bytes: u64,
@@ -164,7 +163,7 @@ pub fn enforce_stream_byte_limit(
 /// Fallible per-chunk push for KernelError-returning accumulators. Denies before
 /// materializing past `max_total_bytes` (StreamBytes) OR past `max_chunks`
 /// retained chunks (StreamChunks), and maps a failed allocation under strict
-/// overcommit to a typed deny (Allocation) rather than an abort (RFC-0004 F06).
+/// overcommit to a typed deny (Allocation) rather than an abort.
 ///
 /// The chunk-count bound closes the tiny-chunk gap in the byte-only bound: a
 /// connector using this as its advertised accumulation-time limit could otherwise

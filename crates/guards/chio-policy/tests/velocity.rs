@@ -220,13 +220,13 @@ rules:
 
 #[test]
 fn velocity_compile_threads_configured_memory_budget() {
-    // codex finding 3554566274 (RFC-0004 F38): the policy-compiled velocity guard
-    // must honor the CONFIGURED process memory budget's `velocity_bucket_cap`, not
-    // the compiled-in default. `compile_policy_with_memory_budget` threads a
-    // lowered budget into `VelocityGuard::from_memory_budget`; here we assert the
-    // new entry point compiles and still emits the velocity guard with a tightened
-    // budget. The cap-is-honored behavior itself is pinned by the guard-level
-    // teeth-test `from_memory_budget_honors_lowered_velocity_bucket_cap`.
+    // The policy-compiled velocity guard must honor the CONFIGURED process memory
+    // budget's `velocity_bucket_cap`, not the compiled-in default.
+    // `compile_policy_with_memory_budget` threads a lowered budget into
+    // `VelocityGuard::from_memory_budget`; here we assert that entry point compiles
+    // and still emits the velocity guard with a tightened budget. The
+    // cap-is-honored behavior itself is pinned by the guard-level test
+    // `from_memory_budget_honors_lowered_velocity_bucket_cap`.
     let spec = rule(
         r#"
 hushspec: "0.1.0"

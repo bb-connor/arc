@@ -56,7 +56,7 @@ impl ChioKernel {
         // mediator. The nested-flow path gates on the same atomic-load fast
         // path as the top-level evaluate, right after the emergency stop, so
         // sampling/elicitation-bearing tool calls cannot allocate and run after
-        // the sampler raised the soft-ceiling flag (RFC-0004 section 5).
+        // the sampler raised the soft-ceiling flag.
         if self.is_rss_shedding() {
             warn!(
                 request_id = %request.request_id,
@@ -299,7 +299,7 @@ impl ChioKernel {
         // consumed the pre-execution budget (invocation count / monetary hold).
         // Route the error through the same reversal + deny path the governed and
         // guard denial branches use so a transient store failure never burns
-        // quota or holds funds for a call that never dispatches (codex round-7).
+        // quota or holds funds for a call that never dispatches.
         let governed_call_chain_receipt_evidence = match self.governed_call_chain_receipt_evidence(
             request,
             cap,
@@ -342,8 +342,8 @@ impl ChioKernel {
         // monetary hold). Route the error through the same reversal + deny path
         // the governed, call-chain, and guard denial branches use so a transient
         // session-lookup failure never burns quota or holds funds for a call that
-        // never dispatches (codex round-7 follow-up). The top-level async path is
-        // unaffected: it receives session_filesystem_roots as a parameter.
+        // never dispatches. The top-level async path is unaffected: it receives
+        // session_filesystem_roots as a parameter.
         let session_roots = match self
             .session_enforceable_filesystem_root_paths_owned(&parent_context.session_id)
         {

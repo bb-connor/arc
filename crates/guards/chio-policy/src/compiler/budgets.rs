@@ -48,8 +48,7 @@ pub(super) fn compile_budget_guards(
         };
         // Thread the CONFIGURED process memory budget so a lowered
         // `velocity_bucket_cap` bounds this origin-budget guard's agent/session
-        // bucket maps instead of them growing unbounded (RFC-0004 F38, codex
-        // finding 3555410392).
+        // bucket maps instead of them growing unbounded.
         builder.add(AgentVelocityGuard::from_memory_budget(
             config,
             memory_budget,

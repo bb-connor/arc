@@ -691,14 +691,13 @@ fn federated_request_with_fresh_peer_but_missing_cosigner_fails_closed_post_disp
 
 #[test]
 fn installed_artifact_store_preserves_cosign_evidence_across_cache_eviction() {
-    // RFC-0004 F10 (codex round-7): a federated deployment producing more than
-    // federation_cache_capacity receipts drops evicted DualSignedReceipt / DSSE
-    // artifacts from the bounded in-memory caches. Before this fix there was no
-    // public setter to install a durable FederationArtifactStore, so evicted
-    // co-sign evidence was lost and dual_signed_receipt / federation_dsse_envelope
-    // returned None for older receipts. With set_federation_artifact_store the
-    // co-sign hook writes through to the store before the cache, so an evicted
-    // artifact still resolves from the store.
+    // A federated deployment producing more than federation_cache_capacity receipts
+    // drops evicted DualSignedReceipt / DSSE artifacts from the bounded in-memory
+    // caches. Installing a durable FederationArtifactStore via
+    // set_federation_artifact_store makes the co-sign hook write through to the
+    // store before the cache, so an evicted artifact still resolves from the store
+    // and dual_signed_receipt / federation_dsse_envelope keep resolving older
+    // receipts instead of returning None.
     let origin_kp = Keypair::generate();
     let origin_kernel_id = "kernel.org-a";
 

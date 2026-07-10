@@ -1,7 +1,7 @@
-//! Additive durable seam for bilateral co-sign artifacts (RFC-0004 F10). The
-//! kernel caches DualSignedReceipt / DsseEnvelope in a capped, idle-swept
-//! BoundedMap; when a FederationArtifactStore is configured, the co-sign hook
-//! writes through to it first, and accessors fall through to it on a cache miss.
+//! Additive durable seam for bilateral co-sign artifacts. The kernel caches
+//! DualSignedReceipt / DsseEnvelope in a capped, idle-swept BoundedMap; when a
+//! FederationArtifactStore is configured, the co-sign hook writes through to it
+//! first, and accessors fall through to it on a cache miss.
 
 use std::sync::Mutex;
 
@@ -21,18 +21,17 @@ pub trait FederationArtifactStore: Send + Sync {
 
 /// Hard cap and idle sweep for [`InMemoryFederationArtifactStore`]'s backing
 /// maps. Mirrors the kernel's own federation cache defaults
-/// (`MemoryBudgetConfig::federation_cache_capacity`, RFC-0004 section 5) so
-/// the reference store carries the same footprint discipline as the caches
-/// it sits behind.
+/// (`MemoryBudgetConfig::federation_cache_capacity`) so the reference store
+/// carries the same footprint discipline as the caches it sits behind.
 const IN_MEMORY_FEDERATION_ARTIFACT_STORE_CAPACITY: usize = 8192;
 const IN_MEMORY_FEDERATION_ARTIFACT_STORE_IDLE_TTL_SECS: u64 = 3600;
 
 /// Reference in-memory implementation (test double and default backing when a
 /// deployment wants durable bilateral evidence without a database). Capped,
-/// idle-swept, gauged instead of an unbounded HashMap (RFC-0004 F10): even
-/// though this store has no install seam today, it must not become a
-/// footgun once a follow-on wires one up. A deployment requiring persistence
-/// installs a database-backed impl instead.
+/// idle-swept, gauged instead of an unbounded HashMap: even though this store
+/// has no install seam today, it must not become a footgun once a follow-on
+/// wires one up. A deployment requiring persistence installs a database-backed
+/// impl instead.
 pub struct InMemoryFederationArtifactStore {
     dual: Mutex<BoundedMap<String, DualSignedReceipt>>,
     dual_gauge: SizeGauge,
@@ -55,8 +54,8 @@ impl InMemoryFederationArtifactStore {
     /// process memory budget honor a lowered `federation_cache_capacity` instead of
     /// the compiled-in 8192 default, so the store cannot exceed the operator's
     /// configured federation memory budget even though the kernel's front caches
-    /// honor it (RFC-0004 F10, codex finding 3555239304). Same seam class as the
-    /// velocity/journal `from_memory_budget` constructors.
+    /// honor it. Same seam class as the velocity/journal `from_memory_budget`
+    /// constructors.
     pub fn with_capacity(capacity: usize, idle_ttl_secs: u64) -> Self {
         let dual_gauge = SizeGauge::new();
         let dsse_gauge = SizeGauge::new();
@@ -71,7 +70,7 @@ impl InMemoryFederationArtifactStore {
     /// Construct from a CONFIGURED process memory budget so lowering
     /// `federation_cache_capacity` / `federation_cache_idle_ttl_secs` actually
     /// bounds each backing map, rather than every deployment retaining the
-    /// compiled-in 8192-entry default (RFC-0004 F10, codex finding 3555239304).
+    /// compiled-in 8192-entry default.
     pub fn from_memory_budget(budget: &crate::MemoryBudgetConfig) -> Self {
         Self::with_capacity(
             budget.federation_cache_capacity,
@@ -230,11 +229,10 @@ mod tests {
 
     #[test]
     fn from_memory_budget_honors_lowered_federation_cache_capacity() {
-        // codex finding 3555239304 (RFC-0004 F10): the CONFIGURED process memory
-        // budget must bound this reference store, not a hard-coded default. A budget
-        // lowering `federation_cache_capacity` to 4 must cap EACH backing map at 4,
-        // not the compiled-in 8192. RED (pre-fix): only `default()` existed, so a
-        // deployment retained 8192 entries per map regardless of the configured
+        // The CONFIGURED process memory budget must bound this reference store, not
+        // a hard-coded default. A budget lowering `federation_cache_capacity` to 4
+        // must cap EACH backing map at 4, not the compiled-in 8192; otherwise a
+        // deployment retains 8192 entries per map regardless of the configured
         // budget.
         let budget = crate::MemoryBudgetConfig {
             federation_cache_capacity: 4,

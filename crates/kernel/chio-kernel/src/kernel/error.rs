@@ -25,7 +25,7 @@ impl StructuredErrorReport {
 }
 
 /// Which bounded resource shed. Included in the receipt deny reason and the
-/// structured error report so operators can see which policy fired (RFC-0004).
+/// structured error report so operators can see which policy fired.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OverloadResource {
     ReceiptMirror,
@@ -217,8 +217,8 @@ pub enum KernelError {
     )]
     SyncBridgeIncompatibleWithCurrentThreadRuntime,
 
-    /// The kernel shed load to stay within its memory budget (RFC-0004). Always
-    /// a deny; never admits a call and never grows a collection.
+    /// The kernel shed load to stay within its memory budget. Always a deny;
+    /// never admits a call and never grows a collection.
     #[error("kernel overloaded: {resource:?} at capacity")]
     Overloaded { resource: OverloadResource },
 }

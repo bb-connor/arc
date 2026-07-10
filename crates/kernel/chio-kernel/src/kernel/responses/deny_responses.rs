@@ -374,8 +374,8 @@ impl ChioKernel {
     /// emergency stop, which already records a signed deny receipt. Recording
     /// one here keeps overload denials inside the same receipt-totality audit
     /// trail every other admission decision has, and makes the `OverloadResource`
-    /// actually appear in a receipt deny reason as `error.rs` documents
-    /// (RFC-0004). The caller still returns [`KernelError::Overloaded`] so the
+    /// actually appear in a receipt deny reason as `error.rs` documents. The
+    /// caller still returns [`KernelError::Overloaded`] so the
     /// tower load-shed edge surfaces backpressure; this only records evidence and
     /// never changes the error. A receipt-persist failure is surfaced to the
     /// caller, which logs it without masking the shed decision (fail-closed).

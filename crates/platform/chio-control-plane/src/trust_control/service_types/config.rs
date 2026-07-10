@@ -26,10 +26,10 @@ pub struct TrustServiceConfig {
     pub certification_public_metadata_ttl_seconds: u64,
     pub peer_urls: Vec<String>,
     pub cluster_sync_interval: Duration,
-    /// Process memory budget for the trust control service (RFC-0004 section 5).
-    /// Its `admission_key_cap` bounds the federation admission rate limiter, so
+    /// Process memory budget for the trust control service. Its
+    /// `admission_key_cap` bounds the federation admission rate limiter, so
     /// lowering it here actually tightens that guard rather than being silently
-    /// overridden by the compiled-in default (F7).
+    /// overridden by the compiled-in default.
     pub memory_budget: chio_kernel::MemoryBudgetConfig,
 }
 

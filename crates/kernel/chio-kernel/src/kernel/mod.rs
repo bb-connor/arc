@@ -419,7 +419,7 @@ pub trait PromptProvider: Send + Sync {
 const DEFAULT_RECEIPT_MIRROR_CAPACITY: usize = 4096;
 
 /// In-memory bounded ring of signed receipts. Process-local inspection mirror;
-/// a durable receipt store is authoritative for id lookups (RFC-0004 F03/F25).
+/// a durable receipt store is authoritative for id lookups.
 ///
 /// `Clone` yields a read-only snapshot (used by the `receipt_log()` accessor).
 #[derive(Clone)]
@@ -444,9 +444,9 @@ impl ReceiptLog {
     pub fn append(&mut self, receipt: ChioReceipt) {
         // Evicted receipts are already durably persisted (the store write in
         // record_chio_receipt precedes this mirror append) or ephemeral by
-        // policy, so dropping the evicted item is safe. Caveat (RFC-0004
-        // F03/F25): for an append-only/remote store that does NOT implement
-        // point lookups, this mirror is the only lookup source, so eviction here
+        // policy, so dropping the evicted item is safe. Caveat: for an
+        // append-only/remote store that does NOT implement point lookups, this
+        // mirror is the only lookup source, so eviction here
         // makes an older receipt unresolvable and parent-receipt call-chain
         // validation fails closed. Such deployments must implement
         // ReceiptStore::load_chio_receipt (see has_local_receipt_id).

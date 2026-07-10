@@ -75,7 +75,7 @@ impl Guard for BehavioralSequenceGuard {
         // NOT the bounded `tool_sequence` ring. When `journal_entry_cap` is 0 the
         // ring stores no tool names (capacity 0 = disabled), so `tool_sequence`
         // would report EVERY call as the first and mis-fire this check; the
-        // cumulative field is correct at any entry cap (RFC-0004 F21).
+        // cumulative field is correct at any entry cap.
         if snapshot.current_streak_tool.is_none() {
             if let Some(ref required_first) = self.policy.required_first_tool {
                 if tool_name != required_first {
@@ -86,16 +86,17 @@ impl Guard for BehavioralSequenceGuard {
 
         // Check required predecessors. "Has this tool ever been invoked" is a
         // cumulative property, so consult the journal's cumulative `tool_counts`
-        // (which survives ring eviction under RFC-0004 F21) rather than the
+        // (which survives ring eviction) rather than the
         // bounded `tool_sequence` tail. A predecessor invoked once and then
         // pushed out of the retained window is still known to have run, so a
         // workflow that runs setup once and then more than `journal_entry_cap`
         // other calls is no longer falsely denied when a dependent tool needs
         // that evicted predecessor. `tool_counts` cannot grow without bound: the
-        // journal caps its distinct-key set fail-closed (`journal_tool_counts_cap`,
-        // RFC-0004 F21). Legitimate registry-bounded predecessors stay recorded,
-        // but a predecessor that overflowed the cap is absent here and therefore
-        // denies (fail-closed) rather than being falsely treated as invoked.
+        // journal caps its distinct-key set fail-closed
+        // (`journal_tool_counts_cap`). Legitimate registry-bounded predecessors
+        // stay recorded, but a predecessor that overflowed the cap is absent here
+        // and therefore denies (fail-closed) rather than being falsely treated as
+        // invoked.
         if let Some(required) = self.policy.required_predecessors.get(tool_name) {
             for req in required {
                 if !snapshot.tool_counts.contains_key(req) {
@@ -110,9 +111,8 @@ impl Guard for BehavioralSequenceGuard {
         // stores no tool names (capacity 0 = disabled), so `tool_sequence.last()`
         // is always None and a forbidden transition would silently never fire
         // (fail-OPEN), letting a memory-budget setting disable a transition-deny
-        // policy (codex finding 3555239290). The cumulative field tracks the most
-        // recent recorded tool at any entry cap, so the check holds fail-closed
-        // (RFC-0004 F21).
+        // policy. The cumulative field tracks the most recent recorded tool at any
+        // entry cap, so the check holds fail-closed.
         if let Some(last_tool) = snapshot.current_streak_tool.as_deref() {
             for (from, to) in &self.policy.forbidden_transitions {
                 if last_tool == from && tool_name == to {
@@ -127,8 +127,8 @@ impl Guard for BehavioralSequenceGuard {
         // `tool_sequence` tail. When `journal_entry_cap` is smaller than
         // `max_consecutive`, the ring evicts the older part of a same-tool streak,
         // so counting the retained tail would undercount and ALLOW a call that
-        // must be DENIED. The cumulative counter survives ring eviction (RFC-0004
-        // F21), so the streak limit holds regardless of the entry cap. If the
+        // must be DENIED. The cumulative counter survives ring eviction, so the
+        // streak limit holds regardless of the entry cap. If the
         // request tool differs from the current-streak tool, no prior consecutive
         // run exists for it (it would start a fresh streak).
         if let Some(max_consec) = self.policy.max_consecutive {
@@ -281,8 +281,8 @@ mod tests {
 
     #[test]
     fn required_predecessor_survives_journal_ring_eviction() {
-        // RFC-0004 F21 (codex round-7): the required-predecessor check asks
-        // "has this tool ever been invoked", which is cumulative. Once the
+        // The required-predecessor check asks "has this tool ever been invoked",
+        // which is cumulative. Once the
         // bounded tool_sequence ring evicts the setup call, the check must still
         // resolve it via the cumulative tool_counts, so a long workflow (setup
         // once, then more than journal_entry_cap other calls) is not falsely
@@ -325,8 +325,8 @@ mod tests {
         );
 
         // write_file requires read_file, which ran once but was evicted; it must
-        // still be ALLOWED because the predecessor is cumulatively known. Before
-        // the fix (sequence-based check) this would falsely DENY.
+        // still be ALLOWED because the predecessor is cumulatively known; a
+        // sequence-based check would falsely DENY here.
         let (request, scope, agent_id, server_id) = make_ctx_for_tool("write_file");
         let ctx = guard_ctx(&request, &scope, &agent_id, &server_id);
         assert_eq!(guard.evaluate(&ctx).expect("ok"), Verdict::Allow);
@@ -334,11 +334,11 @@ mod tests {
 
     #[test]
     fn required_predecessor_denies_when_predecessor_overflowed_tool_counts_cap() {
-        // RFC-0004 F21: the cumulative tool_counts map is distinct-key bounded
-        // fail-closed. A predecessor whose tool name overflowed the cap is absent
-        // from tool_counts, so the required-predecessor check must DENY (treat it
-        // as never-invoked) rather than falsely allow. This is the fail-closed
-        // teeth for the bound the round-7 predecessor fix now depends on.
+        // The cumulative tool_counts map is distinct-key bounded fail-closed. A
+        // predecessor whose tool name overflowed the cap is absent from
+        // tool_counts, so the required-predecessor check must DENY (treat it as
+        // never-invoked) rather than falsely allow. This gives the distinct-key
+        // bound fail-closed teeth that the cumulative predecessor check depends on.
         let journal = Arc::new(SessionJournal::with_caps(
             "sess-overflow".to_string(),
             1024,
@@ -441,13 +441,12 @@ mod tests {
 
     #[test]
     fn forbidden_transition_enforced_at_zero_entry_cap() {
-        // codex finding 3555239290 (RFC-0004 F21, fail-closed): a memory budget
-        // that sets journal_entry_cap = 0 disables the entries/tool_sequence rings
-        // (capacity 0 = stores nothing), so snapshot.tool_sequence.last() is always
-        // None. The forbidden-transition check must NOT silently stop firing: it
-        // reads the journal's cumulative O(1) last-tool field, which survives at any
-        // cap. RED (pre-fix, reading sequence.last()): at cap 0 the transition never
-        // denied and `bash` then `write_file` was allowed.
+        // A memory budget that sets journal_entry_cap = 0 disables the
+        // entries/tool_sequence rings (capacity 0 = stores nothing), so
+        // snapshot.tool_sequence.last() is always None. The forbidden-transition
+        // check must NOT silently stop firing: it reads the journal's cumulative
+        // O(1) last-tool field, which survives at any cap. Reading
+        // sequence.last() instead would let cap 0 disable the transition deny.
         let journal = Arc::new(SessionJournal::with_entry_cap(
             "sess-zero-cap".to_string(),
             0,
@@ -536,8 +535,7 @@ mod tests {
 
     #[test]
     fn max_consecutive_survives_journal_ring_eviction() {
-        // RFC-0004 F21 (codex finding 3553826789, fail-open): when
-        // `journal_entry_cap` is smaller than `max_consecutive`, the bounded
+        // When `journal_entry_cap` is smaller than `max_consecutive`, the bounded
         // `tool_sequence` ring evicts the older part of a same-tool streak. If the
         // guard counted only the retained tail it would undercount and ALLOW a
         // call that must be DENIED. The cumulative O(1) streak counter survives
@@ -573,7 +571,7 @@ mod tests {
         );
 
         // The 11th consecutive read_file must be DENIED. Counting the retained
-        // 4-entry tail (4 >= 10 is false) would falsely ALLOW it (RED before fix).
+        // 4-entry tail (4 >= 10 is false) would falsely ALLOW it.
         let (request, scope, agent_id, server_id) = make_ctx_for_tool("read_file");
         let ctx = guard_ctx(&request, &scope, &agent_id, &server_id);
         assert_eq!(guard.evaluate(&ctx).expect("ok"), Verdict::Deny);

@@ -14,8 +14,8 @@ pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliErr
         load_verifier_policy_registry(config.verifier_policies_file.as_deref(), "trust_control")?;
     let cluster = build_cluster_state(&config, local_addr)?;
     // Thread the operator-configured memory budget into the admission guard so a
-    // lowered `admission_key_cap` actually tightens it (RFC-0004 F7). Read the
-    // cap before `config` is moved into the state.
+    // lowered `admission_key_cap` actually tightens it. Read the cap before
+    // `config` is moved into the state.
     let federation_admission_rate_limiter = Arc::new(Mutex::new(
         FederationAdmissionRateLimiter::from_memory_budget(&config.memory_budget),
     ));

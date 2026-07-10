@@ -99,8 +99,7 @@ pub(crate) struct PeerSyncState {
 /// request's: when the limiter is shared across federation policies with
 /// different `window_seconds`, a short-window request must not delete timestamps
 /// that are still active for a longer-window policy, which would reset that
-/// subject's limit and let more admissions through in the long window (RFC-0004
-/// F5 prune-then-deny extended across policies, codex finding 3555410397).
+/// subject's limit and let more admissions through in the long window.
 #[derive(Debug, Default)]
 struct SubjectAttempts {
     window_seconds: u64,
@@ -131,18 +130,17 @@ pub(crate) struct FederationAdmissionRateLimiter {
     // ACTIVE (in-window) subjects a new subject is DENIED rather than evicting an
     // active bucket. Never evicting an ACTIVE bucket closes the reset-by-eviction
     // bypass (an attacker cannot force its own active bucket out with throwaway
-    // subjects and then reuse its subject with a fresh limit in the same window)
-    // (RFC-0004 F39, codex finding 3553826807), while still saturating instead of
-    // growing under a distinct-subject flood. A subject is removed only when its
-    // window fully empties.
+    // subjects and then reuse its subject with a fresh limit in the same window),
+    // while still saturating instead of growing under a distinct-subject flood. A
+    // subject is removed only when its window fully empties.
     attempts: HashMap<String, SubjectAttempts>,
     key_cap: usize,
 }
 
 impl Default for FederationAdmissionRateLimiter {
     fn default() -> Self {
-        // Single-sourced with the process memory budget (RFC-0004 section 5)
-        // instead of a duplicated literal; tighter caps use `with_key_cap`.
+        // Single-sourced with the process memory budget instead of a duplicated
+        // literal; tighter caps use `with_key_cap`.
         Self::from_memory_budget(&chio_kernel::MemoryBudgetConfig::defaults())
     }
 }
@@ -152,7 +150,7 @@ impl FederationAdmissionRateLimiter {
     /// budget. Threading the operator's `MemoryBudgetConfig` (rather than a
     /// fresh `defaults()` read) means lowering `admission_key_cap` on the trust
     /// service config actually tightens this guard instead of being silently
-    /// ignored (RFC-0004 F7).
+    /// ignored.
     pub(crate) fn from_memory_budget(budget: &chio_kernel::MemoryBudgetConfig) -> Self {
         Self::with_key_cap(budget.admission_key_cap)
     }
@@ -173,8 +171,8 @@ impl FederationAdmissionRateLimiter {
     /// new subjects. Each bucket is pruned against ITS OWN window (not the
     /// caller's `now - window`), so a short-window policy request never evicts
     /// timestamps that are still active for a longer-window policy sharing this
-    /// limiter (codex finding 3555410397). Bounded: touches at most the live keys
-    /// (<= `key_cap` once saturated).
+    /// limiter. Bounded: touches at most the live keys (<= `key_cap` once
+    /// saturated).
     fn prune_expired(&mut self, now: u64) {
         self.attempts.retain(|_, entry| {
             entry.prune(now);
@@ -193,17 +191,16 @@ impl FederationAdmissionRateLimiter {
         let lower_bound = now.saturating_sub(limit.window_seconds);
 
         let is_new_key = !self.attempts.contains_key(&key);
-        // Key cap (RFC-0004 F39). When the table is full and this is a new
-        // subject, prune EXPIRED (out-of-window) subjects first to reclaim slots.
-        // Each bucket is pruned against its OWN window, so a short-window request
-        // does not evict a longer-window policy's still-active subject (finding
-        // 3555410397). If every remaining slot still holds an ACTIVE (in-window)
-        // subject, DENY the new subject fail-closed rather than evicting an active
-        // bucket: evicting an active bucket would reset its per-window limit, so an
-        // attacker could reset its own limit by flooding throwaway subjects to
-        // force its eviction, then reusing its subject in the same window (codex
-        // finding 3553826807, FAIL-OPEN). Denying keeps memory bounded (cap
-        // unchanged) without the bypass, and a distinct-subject flood still
+        // Key cap. When the table is full and this is a new subject, prune
+        // EXPIRED (out-of-window) subjects first to reclaim slots. Each bucket is
+        // pruned against its OWN window, so a short-window request does not evict
+        // a longer-window policy's still-active subject. If every remaining slot
+        // still holds an ACTIVE (in-window) subject, DENY the new subject
+        // fail-closed rather than evicting an active bucket: evicting an active
+        // bucket would reset its per-window limit, so an attacker could reset its
+        // own limit by flooding throwaway subjects to force its eviction, then
+        // reusing its subject in the same window. Denying keeps memory bounded
+        // (cap unchanged) without the bypass, and a distinct-subject flood still
         // saturates instead of growing.
         if is_new_key && self.attempts.len() >= self.key_cap {
             self.prune_expired(now);
@@ -244,11 +241,10 @@ impl FederationAdmissionRateLimiter {
         entry.timestamps.push(now);
 
         // Drop-empty maintenance: prune any subject whose window has fully
-        // emptied so a fresh subject costs nothing once its window empties
-        // (RFC-0004 F39, F21 rate-limiter half). Each bucket uses its own window,
-        // so this never resets a longer-window policy's active subject. Bounded:
-        // touches at most `key_cap` keys. The subject just recorded above retains
-        // its `now` timestamp, so it survives.
+        // emptied so a fresh subject costs nothing once its window empties. Each
+        // bucket uses its own window, so this never resets a longer-window
+        // policy's active subject. Bounded: touches at most `key_cap` keys. The
+        // subject just recorded above retains its `now` timestamp, so it survives.
         self.prune_expired(now);
 
         FederationAdmissionRateLimitStatus {
@@ -362,7 +358,7 @@ mod admission_bound_tests {
         // Distinct subjects, each in its own window (1000s apart, far past the
         // 60s window), stay below `key_cap`. The drop-empty maintenance pass must
         // prune expired subjects from `attempts` or the map grows one key per
-        // subject without bound (RFC-0004 F39).
+        // subject without bound.
         let mut limiter = FederationAdmissionRateLimiter::with_key_cap(4096);
         for i in 0..1000u64 {
             let subject = format!("subject-{i}");
@@ -390,9 +386,9 @@ mod admission_bound_tests {
 
     #[test]
     fn lowered_admission_key_cap_from_memory_budget_takes_effect() {
-        // F7: the CONFIGURED process memory budget must reach this guard. A
-        // budget that lowers `admission_key_cap` to 3 must cap the limiter at 3
-        // live keys, not the compiled-in default of 4096.
+        // The CONFIGURED process memory budget must reach this guard. A budget
+        // that lowers `admission_key_cap` to 3 must cap the limiter at 3 live
+        // keys, not the compiled-in default of 4096.
         let budget = chio_kernel::MemoryBudgetConfig {
             admission_key_cap: 3,
             ..chio_kernel::MemoryBudgetConfig::defaults()
@@ -426,7 +422,7 @@ mod admission_bound_tests {
         // The cap must never evict an ACTIVE (in-window) subject to admit a new
         // one; the new subject is DENIED fail-closed instead. Two in-window
         // subjects fill a cap of 2, so a third distinct subject is denied and the
-        // two actives keep their buckets intact (RFC-0004 F39, finding 3553826807).
+        // two actives keep their buckets intact.
         let l = limit();
         let mut limiter = FederationAdmissionRateLimiter::with_key_cap(2);
         let a = limiter.check_and_record("policy", "a", &l, 100);
@@ -455,11 +451,10 @@ mod admission_bound_tests {
 
     #[test]
     fn cross_policy_prune_preserves_longer_window_active_subject() {
-        // codex finding 3555410397 (RFC-0004 F5 across policies): when one limiter
-        // is shared by policies with different windows, a short-window request must
-        // not prune timestamps that are still active for a longer-window policy and
-        // thereby reset that subject's limit. A big cap keeps this about the WINDOW,
-        // not the key cap.
+        // When one limiter is shared by policies with different windows, a
+        // short-window request must not prune timestamps that are still active
+        // for a longer-window policy and thereby reset that subject's limit. A big
+        // cap keeps this about the WINDOW, not the key cap.
         let mut limiter = FederationAdmissionRateLimiter::with_key_cap(4096);
         let long = FederationAdmissionRateLimit {
             max_requests: 1,
@@ -486,9 +481,7 @@ mod admission_bound_tests {
         let _ = limiter.check_and_record("policy-short", "T", &short, 200);
 
         // S reused under the long-window policy IN THE SAME 3600s window must stay
-        // rate-limited. RED (pre-fix): the short-window prune reset S, so this
-        // returned a fresh allowed bucket (retry_after_seconds = None). GREEN: S is
-        // still denied.
+        // rate-limited: the short-window prune must not have reset S.
         let replay = limiter.check_and_record("policy-long", "S", &long, 210);
         assert_eq!(replay.remaining, 0);
         assert!(
@@ -499,10 +492,10 @@ mod admission_bound_tests {
 
     #[test]
     fn active_bucket_not_evicted_by_throwaway_subject_flood() {
-        // codex finding 3553826807 (FAIL-OPEN): with max_requests=1 and a small
-        // key cap, a subject must not be able to reset its own in-window rate
-        // limit by flooding a throwaway subject to force its bucket's eviction,
-        // then reusing its own subject in the same window.
+        // With max_requests=1 and a small key cap, a subject must not be able to
+        // reset its own in-window rate limit by flooding a throwaway subject to
+        // force its bucket's eviction, then reusing its own subject in the same
+        // window.
         let l = FederationAdmissionRateLimit {
             max_requests: 1,
             window_seconds: 1000,
@@ -533,9 +526,8 @@ mod admission_bound_tests {
         );
 
         // The attacker reuses its subject in the SAME window: it must stay
-        // rate-limited. Before the fix the throwaway evicted the attacker, so this
-        // returned a fresh allowed bucket (retry_after_seconds = None) -- the
-        // bypass (RED). After the fix the attacker is still denied (GREEN).
+        // rate-limited. The throwaway flood must not have evicted the attacker's
+        // active bucket and reset its limit.
         let replay = limiter.check_and_record("policy", "attacker", &l, now);
         assert_eq!(replay.remaining, 0);
         assert!(

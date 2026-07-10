@@ -1311,12 +1311,12 @@ fn governed_request_rejects_empty_call_chain_chain_id() {
 
 #[test]
 fn governed_call_chain_evidence_store_error_reverses_pre_execution_budget() {
-    // RFC-0004 / codex round-7: a receipt-store READ error while resolving the
-    // parent call-chain receipt fails closed, but check_and_increment_budget has
-    // already consumed the invocation count and monetary hold. The error must be
-    // routed through the same reversal + deny path the governed/guard denials
-    // use, never propagated raw, so a transient store failure never burns quota
-    // or holds funds for a call that never dispatches.
+    // A receipt-store READ error while resolving the parent call-chain receipt
+    // fails closed, but check_and_increment_budget has already consumed the
+    // invocation count and monetary hold. The error must be routed through the same
+    // reversal + deny path the governed/guard denials use, never propagated raw, so
+    // a transient store failure never burns quota or holds funds for a call that
+    // never dispatches.
     let mut kernel = make_kernel(make_monetary_config());
     // Appends fine (so the request's own receipt persists) but errors on every
     // point load; the governed call-chain evidence lookup is the first (and
@@ -1367,8 +1367,8 @@ fn governed_call_chain_evidence_store_error_reverses_pre_execution_budget() {
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
-        // Before the fix the evidence-lookup `?` propagated the store error out
-        // of evaluate; after the fix it fails closed as a clean deny instead.
+        // The evidence-lookup store error must fail closed as a clean deny here,
+        // not propagate out of evaluate.
         .expect("evidence-lookup store error must fail closed as a deny, not propagate");
 
     assert_eq!(response.verdict, Verdict::Deny);
@@ -1390,10 +1390,10 @@ fn governed_call_chain_evidence_store_error_reverses_pre_execution_budget() {
 
 #[test]
 fn nested_governed_call_chain_evidence_store_error_reverses_pre_execution_budget() {
-    // RFC-0004 / codex round-7: the nested-flow admission path has the same
-    // evidence-lookup `?` as the top-level evaluate. A store read error there
-    // must reverse the pre-execution budget before denying, on the nested arm
-    // too, so a transient store failure never burns invocation quota.
+    // The nested-flow admission path has the same evidence-lookup `?` as the
+    // top-level evaluate. A store read error there must reverse the pre-execution
+    // budget before denying, on the nested arm too, so a transient store failure
+    // never burns invocation quota.
     let mut kernel = make_kernel(make_config());
     kernel.set_receipt_store(Box::new(ErroringReceiptStore)).unwrap();
     let agent_kp = make_keypair();
@@ -1476,13 +1476,13 @@ fn nested_governed_call_chain_evidence_store_error_reverses_pre_execution_budget
             &mut client,
             None,
         )
-        // Before the fix the nested evidence-lookup `?` propagated the store
-        // error; after the fix it fails closed as a clean deny.
+        // The nested evidence-lookup store error must fail closed as a clean deny
+        // here, not propagate.
         .expect("nested evidence-lookup store error must fail closed as a deny, not propagate");
 
     assert_eq!(response.verdict, Verdict::Deny);
     // Pin that the deny comes from the evidence-lookup store read (not some
-    // earlier validation), so the test actually exercises the fixed path.
+    // earlier validation), so the test actually exercises that path.
     assert!(
         response
             .reason
@@ -1502,14 +1502,13 @@ fn nested_governed_call_chain_evidence_store_error_reverses_pre_execution_budget
 
 #[test]
 fn nested_missing_session_roots_lookup_reverses_pre_execution_budget() {
-    // RFC-0004 / codex round-7 follow-up: on the nested-flow admission path the
-    // session filesystem-roots lookup (session_enforceable_filesystem_root_paths_owned)
-    // sits AFTER check_and_increment_budget and BEFORE dispatch. A parent session
-    // closed or evicted concurrently surfaces as UnknownSession there. That error
-    // must reverse the pre-execution budget and fail closed as a deny, never
-    // propagate, so a transient session-lookup failure never burns invocation
-    // quota for a call that never dispatched. Before the fix the bare `?` on the
-    // roots lookup skipped the reversal and burned the invocation count.
+    // On the nested-flow admission path the session filesystem-roots lookup
+    // (session_enforceable_filesystem_root_paths_owned) sits AFTER
+    // check_and_increment_budget and BEFORE dispatch. A parent session closed or
+    // evicted concurrently surfaces as UnknownSession there. That error must
+    // reverse the pre-execution budget and fail closed as a deny, never propagate,
+    // so a transient session-lookup failure never burns invocation quota for a call
+    // that never dispatched.
     let mut kernel = make_kernel(make_config());
     let agent_kp = make_keypair();
     kernel.register_tool_server(Box::new(EchoServer::new("srv-echo", vec!["delegate"])));
@@ -1567,13 +1566,13 @@ fn nested_missing_session_roots_lookup_reverses_pre_execution_budget() {
             &mut client,
             None,
         )
-        // Before the fix the roots-lookup `?` propagated UnknownSession out of
-        // evaluate; after the fix it fails closed as a clean deny instead.
+        // The roots-lookup UnknownSession error must fail closed as a clean deny
+        // here, not propagate out of evaluate.
         .expect("missing-session roots lookup must fail closed as a deny, not propagate");
 
     assert_eq!(response.verdict, Verdict::Deny);
     // Pin that the deny comes from the session-roots lookup (UnknownSession), so
-    // the test actually exercises the fixed line.
+    // the test actually exercises that line.
     assert!(
         response
             .reason

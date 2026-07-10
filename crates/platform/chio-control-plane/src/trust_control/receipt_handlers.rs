@@ -29,9 +29,9 @@ pub(crate) async fn handle_list_tool_receipts(
     };
     // Point-load by receipt id: resolve exactly one receipt from the durable
     // store (bounded to one row) so a bounded in-memory mirror eviction on the
-    // kernel does not cause a false denial of a governed call-chain continuation
-    // (RFC-0004 F03/F25). A by-id load is not tenant-scoped, so it is restricted
-    // to the admin service principal (fail-closed): a tenant read token must use
+    // kernel does not cause a false denial of a governed call-chain
+    // continuation. A by-id load is not tenant-scoped, so it is restricted to
+    // the admin service principal (fail-closed): a tenant read token must use
     // the tenant-filtered list surface instead.
     if let Some(receipt_id) = query.receipt_id.as_deref() {
         if !matches!(principal, ResolvedControlReadPrincipal::AdminService) {
@@ -185,7 +185,7 @@ pub(crate) async fn handle_list_child_receipts(
     // Point-load by receipt id (admin service only: tenant read tokens are
     // already rejected above). Resolves exactly one child receipt from the
     // durable store so bounded-mirror eviction on the kernel does not falsely
-    // deny a governed call-chain continuation (RFC-0004 F03/F25).
+    // deny a governed call-chain continuation.
     if let Some(receipt_id) = query.receipt_id.as_deref() {
         let receipts = match store.load_child_receipt(receipt_id) {
             Ok(Some(receipt)) => match serde_json::to_value(receipt) {

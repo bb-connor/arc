@@ -151,7 +151,7 @@ pub struct SessionJournalSnapshot {
     /// The tool name of the current consecutive run (the last tool recorded), or
     /// `None` if nothing has been recorded. Cumulative and O(1): it survives ring
     /// eviction so a same-tool streak longer than `journal_entry_cap` is still
-    /// counted in full (RFC-0004 F21).
+    /// counted in full.
     pub current_streak_tool: Option<String>,
     /// Length of the current consecutive run of `current_streak_tool`. Resets to
     /// 1 whenever a different tool is recorded, so it stays bounded semantically
@@ -167,8 +167,8 @@ pub struct SessionJournalSnapshot {
 /// budget, single-sourced from the process memory budget
 /// ([`chio_kernel::MemoryBudgetConfig`]'s `journal_entry_cap`) rather than a
 /// duplicated literal, so lowering the budget lowers this cap. The `entries` and
-/// `tool_sequence` rings are bounded (RFC-0004 F21); `data_flow` stays
-/// cumulative and `tool_counts` is cumulative but distinct-key bounded (see
+/// `tool_sequence` rings are bounded; `data_flow` stays cumulative and
+/// `tool_counts` is cumulative but distinct-key bounded (see
 /// [`default_journal_tool_counts_cap`]).
 fn default_journal_entry_cap() -> usize {
     chio_kernel::MemoryBudgetConfig::defaults().journal_entry_cap
@@ -177,13 +177,13 @@ fn default_journal_entry_cap() -> usize {
 /// Default distinct-tool-name cap for the cumulative `tool_counts` map,
 /// single-sourced from the process memory budget
 /// ([`chio_kernel::MemoryBudgetConfig`]'s `journal_tool_counts_cap`) so lowering
-/// the budget lowers this cap (RFC-0004 F21).
+/// the budget lowers this cap.
 fn default_journal_tool_counts_cap() -> usize {
     chio_kernel::MemoryBudgetConfig::defaults().journal_tool_counts_cap
 }
 
 /// Fold an evicted entry's hash into the running head hash so the dropped prefix
-/// stays committed after eviction (RFC-0004 F21).
+/// stays committed after eviction.
 fn fold_head_hash(prev: Option<&str>, evicted_entry_hash: &str) -> String {
     let mut hasher = Sha256::new();
     update_len_prefixed(&mut hasher, prev.unwrap_or(""));
@@ -194,7 +194,7 @@ fn fold_head_hash(prev: Option<&str>, evicted_entry_hash: &str) -> String {
 /// Inner journal state (not thread-safe -- wrapped by `SessionJournal`).
 #[derive(Debug)]
 struct JournalInner {
-    /// The capacity-bounded ring of retained entries (RFC-0004 F21).
+    /// The capacity-bounded ring of retained entries.
     entries: chio_bounded::Ring<JournalEntry>,
     /// Running fold over the hashes of entries evicted from the ring, so the
     /// chain stays committed after the prefix is dropped. `None` until the first
@@ -210,12 +210,12 @@ struct JournalInner {
     /// Per-tool invocation counts (cumulative). The counts survive entry-ring
     /// eviction so the behavioral-sequence guard can answer "was this tool ever
     /// invoked", but the set of DISTINCT keys is bounded fail-closed by
-    /// `tool_counts_cap` (RFC-0004 F21). See `record` for the overflow rule.
+    /// `tool_counts_cap`. See `record` for the overflow rule.
     tool_counts: HashMap<String, u64>,
     /// Maximum number of distinct tool names retained in `tool_counts`. Once
     /// reached, a previously-unseen tool name is dropped from the cumulative
     /// counts (fail-closed): a dependent required-predecessor check then treats
-    /// it as never-invoked and denies (RFC-0004 F21). Already-seen tools keep
+    /// it as never-invoked and denies. Already-seen tools keep
     /// counting so legitimate (registry-bounded) predecessor checks stay
     /// correct across ring eviction.
     tool_counts_cap: usize,
@@ -224,7 +224,7 @@ struct JournalInner {
     /// cumulative streak counter (last-tool plus consecutive-count) that survives
     /// entry-ring eviction, so a `max_consecutive` check can be enforced even when
     /// the streak is longer than `journal_entry_cap` and the older part of the
-    /// streak has been evicted from `tool_sequence` (RFC-0004 F21).
+    /// streak has been evicted from `tool_sequence`.
     current_streak_tool: Option<String>,
     /// Length of the current consecutive run of `current_streak_tool`. Reset to 1
     /// when a different tool is recorded, so it never accumulates unboundedly as a
@@ -264,7 +264,7 @@ impl JournalInner {
     /// the exported head still commits to the dropped prefix. This keeps the
     /// snapshot/`head_hash()` commitment consistent with the full pre-eviction
     /// sequence, so an audit can detect truncation or tampering of the evicted
-    /// prefix (RFC-0004 F21 round-2).
+    /// prefix.
     fn exported_head_hash(&self) -> String {
         match self.evicted_head_hash.as_deref() {
             None => self.last_hash().to_string(),
@@ -339,8 +339,7 @@ impl SessionJournal {
     /// Session-aware guards that hold a CONFIGURED process memory budget should
     /// prefer [`Self::from_memory_budget`] so lowering `journal_entry_cap` (or
     /// `journal_tool_counts_cap`) actually tightens each per-session journal
-    /// instead of every caller silently retaining the compiled-in default
-    /// (RFC-0004 F21, codex finding 3554566285).
+    /// instead of every caller silently retaining the compiled-in default.
     pub fn new(session_id: String) -> Self {
         Self::with_caps(
             session_id,
@@ -355,8 +354,7 @@ impl SessionJournal {
     /// inside [`Self::new`]) means lowering `journal_entry_cap` /
     /// `journal_tool_counts_cap` on the process budget actually bounds each
     /// per-session journal, so a multi-session workload stays within the configured
-    /// budget instead of every session retaining the default 4096 entries
-    /// (RFC-0004 F21, codex finding 3554566285).
+    /// budget instead of every session retaining the default 4096 entries.
     pub fn from_memory_budget(
         session_id: String,
         budget: &chio_kernel::MemoryBudgetConfig,
@@ -371,7 +369,7 @@ impl SessionJournal {
     /// Create a new empty journal with an explicit entry-ring capacity and the
     /// default distinct-tool-name cap. The `entries` and `tool_sequence` rings
     /// are bounded to `entry_cap`; `data_flow` stays cumulative and
-    /// `tool_counts` is cumulative but distinct-key bounded (RFC-0004 F21).
+    /// `tool_counts` is cumulative but distinct-key bounded.
     pub fn with_entry_cap(session_id: String, entry_cap: usize) -> Self {
         Self::with_caps(session_id, entry_cap, default_journal_tool_counts_cap())
     }
@@ -379,7 +377,7 @@ impl SessionJournal {
     /// Create a new empty journal with explicit entry-ring and distinct-tool-name
     /// caps. `entry_cap` bounds the `entries` and `tool_sequence` rings;
     /// `tool_counts_cap` bounds the number of DISTINCT tool names retained in the
-    /// cumulative `tool_counts` map fail-closed (RFC-0004 F21).
+    /// cumulative `tool_counts` map fail-closed.
     pub fn with_caps(session_id: String, entry_cap: usize, tool_counts_cap: usize) -> Self {
         Self {
             inner: Mutex::new(JournalInner::new(entry_cap, tool_counts_cap)),
@@ -443,8 +441,8 @@ impl SessionJournal {
             .max(params.delegation_depth);
 
         // Update tool sequence and counts. tool_sequence is a bounded ring; the
-        // cumulative tool_counts survive ring eviction (RFC-0004 F21) so the
-        // "ever invoked" predecessor check stays correct. The distinct-key set
+        // cumulative tool_counts survive ring eviction so the "ever invoked"
+        // predecessor check stays correct. The distinct-key set
         // is bounded fail-closed by tool_counts_cap: an already-seen tool keeps
         // counting, but once the cap is reached a previously-unseen tool name is
         // NOT inserted, so a dependent required-predecessor check treats it as
@@ -459,8 +457,8 @@ impl SessionJournal {
         // This survives entry-ring eviction so a `max_consecutive` policy is
         // enforced even when the streak is longer than `journal_entry_cap` and the
         // older part of the streak has been evicted from `tool_sequence`
-        // (RFC-0004 F21 fail-closed): the guard consults this counter, not the
-        // truncated ring tail.
+        // (fail-closed): the guard consults this counter, not the truncated ring
+        // tail.
         if inner.current_streak_tool.as_deref() == Some(tool_name.as_str()) {
             inner.current_streak_len = inner.current_streak_len.saturating_add(1);
         } else {
@@ -478,7 +476,7 @@ impl SessionJournal {
 
         if let Some(evicted) = inner.entries.push(entry) {
             // Fold the evicted prefix into a running head hash so the chain
-            // remains committed after the prefix is dropped (RFC-0004 F21).
+            // remains committed after the prefix is dropped.
             let folded = fold_head_hash(inner.evicted_head_hash.as_deref(), &evicted.entry_hash);
             inner.evicted_head_hash = Some(folded);
         }
@@ -515,8 +513,8 @@ impl SessionJournal {
     }
 
     /// Number of DISTINCT tool names currently retained in the cumulative
-    /// `tool_counts` map. Bounded above by the journal's `tool_counts_cap`
-    /// (RFC-0004 F21). Exposed so a telemetry exporter or the kernel's
+    /// `tool_counts` map. Bounded above by the journal's `tool_counts_cap`.
+    /// Exposed so a telemetry exporter or the kernel's
     /// bounded-structure registry can observe how close the per-session
     /// distinct-key set is to saturation once the journal is wired into a live
     /// dispatch path.
@@ -565,7 +563,7 @@ impl SessionJournal {
                     // The oldest retained entry links into the evicted prefix,
                     // which we no longer hold; that prefix is committed via
                     // evicted_head_hash. Accept this boundary link and verify only
-                    // the entry hash (RFC-0004 F21).
+                    // the entry hash.
                     entry.prev_hash.as_str()
                 } else {
                     ZERO_HASH
@@ -599,7 +597,7 @@ impl SessionJournal {
     /// Return the exported head hash: the most recent entry hash before any
     /// eviction, or (once a prefix has been evicted) a fold of the evicted
     /// prefix and the retained tail, so the head stays committed to the full
-    /// sequence across eviction (or the zero hash if empty) (RFC-0004 F21).
+    /// sequence across eviction (or the zero hash if empty).
     pub fn head_hash(&self) -> Result<String, SessionJournalError> {
         let inner = self.lock_inner()?;
         Ok(inner.exported_head_hash())
@@ -636,8 +634,8 @@ mod tests {
 
     #[test]
     fn journal_entries_ring_caps_but_counts_stay_cumulative() {
-        // RFC-0004 F21: the entries ring is bounded, but data_flow / tool_counts
-        // remain cumulative, and the retained window stays hash-verifiable.
+        // The entries ring is bounded, but data_flow / tool_counts remain
+        // cumulative, and the retained window stays hash-verifiable.
         let journal = SessionJournal::with_entry_cap("sess-cap".to_string(), 4);
         for i in 0..10u32 {
             journal
@@ -666,11 +664,11 @@ mod tests {
 
     #[test]
     fn from_memory_budget_honors_lowered_journal_caps() {
-        // codex finding 3554566285 (RFC-0004 F21): the CONFIGURED process memory
-        // budget must reach each per-session journal. A budget lowering
-        // `journal_entry_cap` to 4 and `journal_tool_counts_cap` to 3 must bound
-        // this journal at those caps, not the compiled-in default of 4096. RED
-        // (pre-fix): a caller using `new` reads `defaults()` and retains 4096.
+        // The CONFIGURED process memory budget must reach each per-session
+        // journal. A budget lowering `journal_entry_cap` to 4 and
+        // `journal_tool_counts_cap` to 3 must bound this journal at those caps, not
+        // the compiled-in default of 4096; `from_memory_budget` threads the budget
+        // through where `new` would read `defaults()`.
         let budget = chio_kernel::MemoryBudgetConfig {
             journal_entry_cap: 4,
             journal_tool_counts_cap: 3,
@@ -702,8 +700,8 @@ mod tests {
 
     #[test]
     fn tool_counts_distinct_keys_are_capped_fail_closed() {
-        // RFC-0004 F21: tool_counts is cumulative (survives ring eviction) but its
-        // DISTINCT-KEY set must be bounded, or a writer that can influence tool
+        // tool_counts is cumulative (survives ring eviction) but its DISTINCT-KEY
+        // set must be bounded, or a writer that can influence tool
         // names (the journal only validates non-empty/trimmed/control-free, not
         // registry membership) could grow one long-lived per-session map without
         // bound. Cap the distinct keys fail-closed: already-seen tools keep
@@ -753,8 +751,8 @@ mod tests {
 
     #[test]
     fn exported_head_hash_commits_to_evicted_prefix() {
-        // RFC-0004 F21 round-2: once the ring evicts a prefix, the exported head
-        // hash must still commit to the dropped entries -- it must NOT collapse
+        // Once the ring evicts a prefix, the exported head hash must still commit
+        // to the dropped entries -- it must NOT collapse
         // to a hash of only the retained suffix, so an audit using the snapshot
         // can detect truncation or tampering of the evicted prefix.
         let journal = SessionJournal::with_entry_cap("sess-head".to_string(), 2);
