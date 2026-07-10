@@ -6,7 +6,7 @@
 
 use chio_log_redact::redacted;
 
-use self::responses::FinalizeToolOutputCostContext;
+use self::responses::{AllowResponseNonce, FinalizeToolOutputCostContext};
 use super::*;
 use crate::budget_store::{
     BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetEventAuthority,
@@ -1085,7 +1085,13 @@ impl ChioKernel {
                     timestamp,
                     Some(charge.grant_index),
                     merged,
-                    None,
+                    // This provisional allow already reversed the budget hold and
+                    // did not execute the tool at the kernel, so there is no
+                    // reserved hold to reconcile and nothing to authorize
+                    // downstream. Emit no execution nonce: a spendable nonce here
+                    // would carry no reserved hold, letting a gate deployment
+                    // execute against a refunded hold and spend outside the cap.
+                    AllowResponseNonce::Suppressed,
                 ),
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => self
                 .build_incomplete_response_with_output_and_metadata(
@@ -1470,7 +1476,14 @@ impl ChioKernel {
                     timestamp,
                     Some(charge.grant_index),
                     merged,
-                    preminted_execution_nonce,
+                    // Reuse the nonce minted before signing when one was minted;
+                    // otherwise mint after signing. On a strict retry the request
+                    // already carries a nonce, so the mint path early-returns None
+                    // and no fresh nonce is issued, preserving current behavior.
+                    match preminted_execution_nonce {
+                        Some(nonce) => AllowResponseNonce::Preminted(nonce),
+                        None => AllowResponseNonce::MintForAllow,
+                    },
                 )
             }
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => {

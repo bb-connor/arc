@@ -32,6 +32,19 @@ impl ReservedHoldStamp<'_> {
     }
 }
 
+/// How `build_allow_response_with_metadata` populates the response execution nonce.
+pub(crate) enum AllowResponseNonce {
+    /// Use a nonce the caller already minted (cost-bearing reserving paths that
+    /// need the nonce id in the receipt metadata before signing).
+    Preminted(Box<crate::execution_nonce::SignedExecutionNonce>),
+    /// Mint a fresh allow nonce after signing (the standard measured-cost path).
+    MintForAllow,
+    /// Emit no execution nonce. For provisional allow paths that reversed the
+    /// budget hold and did not execute the tool at the kernel: there is no
+    /// reserved hold to reconcile and nothing to authorize downstream.
+    Suppressed,
+}
+
 impl ChioKernel {
     pub(crate) fn build_allow_response_with_metadata(
         &self,
@@ -40,7 +53,7 @@ impl ChioKernel {
         timestamp: u64,
         matched_grant_index: Option<usize>,
         extra_metadata: Option<serde_json::Value>,
-        preminted_nonce: Option<Box<crate::execution_nonce::SignedExecutionNonce>>,
+        nonce: AllowResponseNonce,
     ) -> Result<ToolCallResponse, KernelError> {
         let cap = &request.capability;
         let expected_chunks = match &output {
@@ -127,12 +140,17 @@ impl ChioKernel {
             )?;
         }
 
-        // Use a pre-minted nonce when the caller already minted one (cost-bearing
-        // allow paths that need the nonce id in the receipt metadata before signing).
-        // Otherwise fall back to minting after the receipt is signed.
-        let execution_nonce = match preminted_nonce {
-            Some(nonce) => Some(nonce),
-            None => self.mint_execution_nonce_for_allow(request, cap, &receipt)?,
+        // Populate the response execution nonce per the caller's disposition:
+        // reuse a pre-minted nonce (cost-bearing paths that recorded the nonce id
+        // in the receipt metadata before signing), mint a fresh allow nonce after
+        // signing (the standard measured path), or emit none for a provisional
+        // path that reversed its hold and authorizes nothing downstream.
+        let execution_nonce = match nonce {
+            AllowResponseNonce::Preminted(nonce) => Some(nonce),
+            AllowResponseNonce::MintForAllow => {
+                self.mint_execution_nonce_for_allow(request, cap, &receipt)?
+            }
+            AllowResponseNonce::Suppressed => None,
         };
 
         Ok(ToolCallResponse {
