@@ -500,6 +500,13 @@ pub(crate) enum ReloadOutcome {
     /// via `transport_bundle_trust`; the unchanged fast path must fail closed to
     /// deny-all identically rather than keep admitting until expiry.
     BelowMinVersionFloor,
+    /// The on-disk bundle is UNCHANGED and still in-window, but it no longer verifies
+    /// against the CURRENT trusted-issuer set: operators rotated or removed the issuer
+    /// that signed it (or rotated its key) since the last verification. A restart would
+    /// reject it via `transport_bundle_trust` (unknown issuer / invalid signature); the
+    /// unchanged fast path must fail closed to deny-all identically rather than keep
+    /// admitting under a signer the federation no longer trusts until expiry.
+    TrustRootsChanged,
 }
 
 /// Inputs for the bounded poll reloader. The reloader deliberately advances its
@@ -591,15 +598,13 @@ pub(crate) fn reload_verified_directory(
     // bundle needs no re-verify. Guarded by `!expired` so an expired bundle can
     // never be short-circuited as Unchanged.
     if !expired && bundle.body.version == current_version {
-        // Honor the trusted minVersion floor on the UNCHANGED path too.
-        // If operators raise `minVersion` above the running version while the bundle is
-        // otherwise unchanged, a restart would reject the directory via
-        // `transport_bundle_trust`; the fast path must fail closed identically rather than
-        // keep admitting under a below-floor directory until expiry. Read the trusted
-        // issuers to learn the current floor. A transient read error must NOT tear down a
-        // still-in-window directory, so keep last-good (`Err(Read)`) exactly as the
-        // strictly-newer path does.
-        let (_issuers, trusted_min_version) =
+        // The unchanged fast path must be exactly as strict as a restart: an operator can
+        // change the trusted-issuer set (raise `minVersion`, or rotate/remove the signing
+        // issuer) while the on-disk bundle is byte-unchanged. Re-read the current trust so
+        // the fast path enforces it rather than serving a stale-but-now-untrusted directory
+        // until expiry. A transient read error must NOT tear down a still-in-window
+        // directory, so keep last-good (`Err(Read)`) exactly as the strictly-newer path.
+        let (issuers, trusted_min_version) =
             match read_trusted_issuers(&config.trusted_issuers_path) {
                 Ok(parsed) => parsed,
                 Err(error) => return Err(DirectoryReloadError::Read(error)),
@@ -609,7 +614,26 @@ pub(crate) fn reload_verified_directory(
         if current_version < trusted_min_version {
             return Ok(ReloadOutcome::BelowMinVersionFloor);
         }
-        return Ok(ReloadOutcome::Unchanged);
+        // RE-VERIFY THE UNCHANGED BUNDLE AGAINST THE CURRENT TRUST ROOTS (fail-closed).
+        // The gate authorized this bundle against the issuer set that was trusted when it
+        // was last verified; that set can shrink underneath a running relay (an operator
+        // rotates or removes the issuer that signed it). A bundle signed by an issuer the
+        // federation no longer trusts must stop admitting immediately, exactly as a restart
+        // would reject it via `transport_bundle_trust`. Chain onto the bundle's own recorded
+        // predecessor (its identity is unchanged, so this re-check is a pure signature/issuer
+        // re-validation, not a rollback re-evaluation) and floor just below the running
+        // version so the current version is still admissible. Any verification failure
+        // (unknown issuer, invalid signature) fails closed to deny-all.
+        let trust = TransportDirectoryBundleTrust {
+            issuers,
+            version_floor: current_version.saturating_sub(1),
+            expected_previous_version_sha256: bundle.body.previous_version_sha256.clone(),
+            now_unix_ms: now,
+        };
+        return match bundle.verify_bundle(&trust) {
+            Ok(_verified) => Ok(ReloadOutcome::Unchanged),
+            Err(_error) => Ok(ReloadOutcome::TrustRootsChanged),
+        };
     }
 
     if bundle.body.version > current_version {
@@ -823,6 +847,26 @@ fn directory_reload_step(
                 target: chio_federation_transport_iroh::observability::TARGET_ADMISSION,
                 "transport directory version is below the trusted minVersion floor operators \
                  raised; admitting nothing until a successor at or above the floor is published"
+            );
+        }
+        Ok(ReloadOutcome::TrustRootsChanged) => {
+            // The running directory is unchanged and in-window but its signing issuer is no
+            // longer trusted (operators rotated or removed it). A restart would reject it, so
+            // fail closed to deny-all rather than keep admitting under an untrusted signer.
+            // last-good is KEPT (state untouched): a later successor signed by a currently
+            // trusted issuer, chained onto the running directory, self-heals admission without
+            // a restart.
+            gate.swap(Arc::new(
+                chio_federation_transport_iroh::identity::VerifiedDirectory::empty_deny_all(),
+            ));
+            alive.store(false, Ordering::SeqCst);
+            chio_federation_transport_iroh::metrics::record_directory_reload(
+                chio_federation_transport_iroh::metrics::RELOAD_TRUST_ROOTS_CHANGED,
+            );
+            tracing::error!(
+                target: chio_federation_transport_iroh::observability::TARGET_ADMISSION,
+                "transport directory signing issuer is no longer trusted; admitting nothing \
+                 until a successor signed by a currently trusted issuer is published"
             );
         }
         Err(error) => {
@@ -1513,6 +1557,23 @@ mod tests {
         )
     }
 
+
+    /// Overwrite the trusted-issuers file at `path` to pin a SINGLE issuer identity/key
+    /// that is NOT the one the test bundles are signed with (issuer seed 240,
+    /// `did:chio:issuer#issuer-key-1`), modeling operators rotating the signing issuer out
+    /// of the trust set on a running relay.
+    fn write_rotated_trusted_issuers(path: &std::path::Path) {
+        let other_issuer = Keypair::from_seed(&[241u8; 32]);
+        let issuers = serde_json::json!({
+            "issuers": [{
+                "issuer": "did:chio:issuer-2",
+                "keyId": "issuer-key-2",
+                "publicKey": other_issuer.public_key(),
+            }],
+        });
+        std::fs::write(path, serde_json::to_string(&issuers).unwrap()).unwrap();
+    }
+
     /// Write a signed, verifiable transport-directory bundle (peer did:chio:bob at
     /// transport seed 24, optionally tombstoned) plus its trusted-issuers file to
     /// `dir`. Returns (bundle_path, issuers_path, expires_at, body_sha256). The body
@@ -1598,6 +1659,43 @@ mod tests {
             ReloadOutcome::ExpiredWhileRunning
         ));
     }
+
+    #[test]
+    fn reload_rejects_unchanged_bundle_when_signing_issuer_leaves_trust_roots() {
+        let dir = tempfile::tempdir().unwrap();
+        let (bundle_path, issuers_path, expires_at, body_hash) =
+            write_test_bundle(dir.path(), 1, false, None);
+        let config = DirectoryReloadConfig {
+            interval: Duration::from_secs(60),
+            bundle_path,
+            trusted_issuers_path: issuers_path.clone(),
+            local_transport_endpoint: endpoint_from_seed(LOCAL_TRANSPORT_SEED),
+            local_kernel_id: LOCAL_KERNEL_ID.to_string(),
+        };
+        let now_in_window = expires_at - 1;
+
+        // Baseline: while the signing issuer is still trusted, the unchanged in-window
+        // bundle takes the fast path.
+        assert!(matches!(
+            reload_verified_directory(&config, now_in_window, 1, expires_at, &body_hash)
+                .expect("reload runs"),
+            ReloadOutcome::Unchanged
+        ));
+
+        // Rotate the trust set so the bundle's signing issuer is no longer pinned. The
+        // on-disk bundle is byte-unchanged, but a restart would now reject it (unknown
+        // issuer); the unchanged fast path must fail closed identically rather than keep
+        // admitting under a signer the federation no longer trusts.
+        write_rotated_trusted_issuers(&issuers_path);
+        let outcome = reload_verified_directory(&config, now_in_window, 1, expires_at, &body_hash)
+            .expect("reload runs");
+        assert!(
+            matches!(outcome, ReloadOutcome::TrustRootsChanged),
+            "an unchanged bundle whose signing issuer left the trust roots must fail closed, \
+             got {outcome:?}"
+        );
+    }
+
 
     #[test]
     fn directory_reload_swaps_in_successor_and_evicts_tombstoned_peer() {

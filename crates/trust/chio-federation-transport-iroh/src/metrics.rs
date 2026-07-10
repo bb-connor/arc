@@ -429,11 +429,19 @@ pub const RELOAD_BINDING_REVOKED: &str = "binding_revoked";
 /// alarm, exactly as a restart would reject it. Operators alert on this being
 /// non-zero.
 pub const RELOAD_BELOW_MIN_VERSION: &str = "below_min_version";
+/// Reload outcome: the running directory is UNCHANGED and in-window, but its
+/// signing issuer is no longer in the current trusted-issuer set (operators rotated
+/// or removed it); the unchanged fast path re-verified against the current roots,
+/// found the bundle untrusted, and swapped the gate to deny-all (fail-closed) with
+/// an alarm, exactly as a restart would reject it. Operators alert on this being
+/// non-zero.
+pub const RELOAD_TRUST_ROOTS_CHANGED: &str = "trust_roots_changed";
 /// Reload outcome: a transient read/verify/rollback error; last-good is kept.
 pub const RELOAD_ERROR: &str = "error";
-const NUM_RELOAD_OUTCOME: usize = 6;
+const NUM_RELOAD_OUTCOME: usize = 7;
 
 static DIRECTORY_RELOAD: [AtomicU64; NUM_RELOAD_OUTCOME] = [
+    AtomicU64::new(0),
     AtomicU64::new(0),
     AtomicU64::new(0),
     AtomicU64::new(0),
@@ -449,7 +457,8 @@ fn reload_outcome_index(outcome: &str) -> usize {
         "expired_failclosed" => 2,
         "binding_revoked" => 3,
         "below_min_version" => 4,
-        _ => 5, // error
+        "trust_roots_changed" => 5,
+        _ => 6, // error
     }
 }
 
@@ -659,6 +668,7 @@ pub fn render_iroh_transport_metrics_prometheus() -> String {
         RELOAD_EXPIRED_FAILCLOSED,
         RELOAD_BINDING_REVOKED,
         RELOAD_BELOW_MIN_VERSION,
+        RELOAD_TRUST_ROOTS_CHANGED,
         RELOAD_ERROR,
     ] {
         push_labeled(
