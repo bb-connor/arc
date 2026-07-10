@@ -82,11 +82,36 @@ pub(crate) fn truncate_stream_to_limits(
     max_stream_total_bytes: u64,
     max_stream_chunks: u64,
 ) -> Result<(ToolCallStream, u64, Option<StreamTruncationCause>), KernelError> {
+    accumulate_stream_under_caps(
+        stream.chunks.iter().cloned(),
+        max_stream_total_bytes,
+        max_stream_chunks,
+    )
+}
+
+/// Accumulate stream chunks under the retention limits, pulling from `chunks`
+/// lazily and stopping the moment retaining the next chunk would breach a cap.
+/// Consuming the source as an iterator means only the retained prefix (plus the
+/// single boundary chunk that trips the cap) is ever materialized, so an
+/// oversized source is bounded DURING accumulation rather than after the whole
+/// stream is built. Bounds BOTH the total canonical bytes
+/// (`max_stream_total_bytes`) and the retained chunk COUNT (`max_stream_chunks`);
+/// the chunk-count bound stops a flood of tiny chunks from growing the retained
+/// `Vec`/per-chunk signing preimage even when the byte cap is never reached. Both
+/// caps use `0 = unlimited`.
+pub(crate) fn accumulate_stream_under_caps<I>(
+    chunks: I,
+    max_stream_total_bytes: u64,
+    max_stream_chunks: u64,
+) -> Result<(ToolCallStream, u64, Option<StreamTruncationCause>), KernelError>
+where
+    I: IntoIterator<Item = ToolCallChunk>,
+{
     let mut accepted = Vec::new();
     let mut total_bytes = 0u64;
     let mut cause = None;
 
-    for chunk in &stream.chunks {
+    for chunk in chunks {
         // Chunk-count bound first: retaining another chunk would exceed the cap.
         if max_stream_chunks > 0 && accepted.len() as u64 >= max_stream_chunks {
             cause = Some(StreamTruncationCause::ChunkLimit);
@@ -103,8 +128,25 @@ pub(crate) fn truncate_stream_to_limits(
             break;
         }
         total_bytes += chunk_bytes;
-        accepted.push(chunk.clone());
+        accepted.push(chunk);
     }
 
     Ok((ToolCallStream { chunks: accepted }, total_bytes, cause))
+}
+
+/// Limit-accurate reason for marking a stream incomplete after a retention
+/// truncation, so the receipt records which cap was hit.
+pub(crate) fn stream_limit_reason(
+    cause: StreamTruncationCause,
+    max_stream_total_bytes: u64,
+    max_stream_chunks: u64,
+) -> String {
+    match cause {
+        StreamTruncationCause::ByteLimit => format!(
+            "CHIO_SERVER_STREAM_LIMIT: stream exceeded max total bytes of {max_stream_total_bytes}"
+        ),
+        StreamTruncationCause::ChunkLimit => format!(
+            "CHIO_SERVER_STREAM_LIMIT: stream exceeded max chunk count of {max_stream_chunks}"
+        ),
+    }
 }
