@@ -442,11 +442,18 @@ pub const RELOAD_TRUST_ROOTS_CHANGED: &str = "trust_roots_changed";
 /// than keep the loaded directory admitting peers the replacement dropped. Operators
 /// alert on this being non-zero.
 pub const RELOAD_CURRENT_BODY_REPLACED: &str = "current_body_replaced";
+/// Reload outcome: the trusted-issuers file parsed but pins NO issuer (operators removed
+/// every issuer). Trusting no signer must admit nothing, so the reloader failed closed to
+/// deny-all with an alarm rather than fold it into the keep-last-good read-error path, in
+/// lockstep with startup rejecting the same empty configuration. Operators alert on this
+/// being non-zero.
+pub const RELOAD_TRUST_ROOTS_EMPTY: &str = "trust_roots_empty";
 /// Reload outcome: a transient read/verify/rollback error; last-good is kept.
 pub const RELOAD_ERROR: &str = "error";
-const NUM_RELOAD_OUTCOME: usize = 8;
+const NUM_RELOAD_OUTCOME: usize = 9;
 
 static DIRECTORY_RELOAD: [AtomicU64; NUM_RELOAD_OUTCOME] = [
+    AtomicU64::new(0),
     AtomicU64::new(0),
     AtomicU64::new(0),
     AtomicU64::new(0),
@@ -466,7 +473,8 @@ fn reload_outcome_index(outcome: &str) -> usize {
         "below_min_version" => 4,
         "trust_roots_changed" => 5,
         "current_body_replaced" => 6,
-        _ => 7, // error
+        "trust_roots_empty" => 7,
+        _ => 8, // error
     }
 }
 
@@ -678,6 +686,7 @@ pub fn render_iroh_transport_metrics_prometheus() -> String {
         RELOAD_BELOW_MIN_VERSION,
         RELOAD_TRUST_ROOTS_CHANGED,
         RELOAD_CURRENT_BODY_REPLACED,
+        RELOAD_TRUST_ROOTS_EMPTY,
         RELOAD_ERROR,
     ] {
         push_labeled(

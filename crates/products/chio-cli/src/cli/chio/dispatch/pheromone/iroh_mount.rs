@@ -513,6 +513,12 @@ pub(crate) enum ReloadOutcome {
     /// would keep the loaded directory admitting peers the replacement dropped. Fail closed
     /// to deny-all; a proper versioned successor chained onto last-good self-heals.
     CurrentBodyReplaced,
+    /// The trusted-issuers file parsed but pins NO issuer (operators removed every issuer).
+    /// Trusting no signer must admit nothing, and startup rejects the same empty
+    /// configuration; the reload must fail closed to deny-all rather than fold it into the
+    /// transient keep-last-good read-error path (which would keep the previous signer active
+    /// until expiry). Chain is KEPT so a successor under a restored issuer self-heals.
+    TrustRootsEmpty,
 }
 
 /// Inputs for the bounded poll reloader. The reloader deliberately advances its
@@ -558,17 +564,30 @@ fn bundle_body_sha256(bundle: &TransportDirectoryBundleDocument) -> Result<Strin
     Ok(chio_core_types::sha256_hex(&bytes))
 }
 
+/// A trusted-issuers reload failure. `Empty` is a DISTINCT fail-closed condition (the
+/// file parsed but pins no issuer, so no signer is trusted) kept apart from a transient
+/// `Read`/parse error that keeps last-good.
+enum TrustedIssuersReloadError {
+    /// The file could not be read or parsed (transient); keep last-good.
+    Read(String),
+    /// The file parsed but pins NO issuer. Trusting no signer must admit nothing, so this
+    /// fails closed to deny-all rather than keeping the previous signer active until expiry.
+    Empty,
+}
+
 /// Read + parse the trusted-issuers file into the verifier's issuer list PLUS the
 /// trusted `minVersion` (absent -> 0). The reload path honors this floor identically
 /// to the startup loader: operators that raise `minVersion` on a running relay
-/// must have it enforced on the NEXT reload, not only at restart.
+/// must have it enforced on the NEXT reload, not only at restart. An empty issuer set is
+/// surfaced as [`TrustedIssuersReloadError::Empty`] so callers fail closed rather than
+/// folding it into the transient keep-last-good read-error path.
 fn read_trusted_issuers(
     path: &Path,
-) -> Result<(Vec<TrustedTransportDirectoryIssuer>, u64), String> {
+) -> Result<(Vec<TrustedTransportDirectoryIssuer>, u64), TrustedIssuersReloadError> {
     let json = read_utf8_json_file(path, "Chio iroh transport trusted issuers")
-        .map_err(|error| error.to_string())?;
-    let document: super::relay::RelayTrustedIssuersDocument =
-        serde_json::from_str(&json).map_err(|error| error.to_string())?;
+        .map_err(|error| TrustedIssuersReloadError::Read(error.to_string()))?;
+    let document: super::relay::RelayTrustedIssuersDocument = serde_json::from_str(&json)
+        .map_err(|error| TrustedIssuersReloadError::Read(error.to_string()))?;
     let trusted_min_version = document.min_version.unwrap_or(0);
     let issuers: Vec<TrustedTransportDirectoryIssuer> = document
         .issuers
@@ -580,7 +599,7 @@ fn read_trusted_issuers(
         })
         .collect();
     if issuers.is_empty() {
-        return Err("no issuers configured".to_string());
+        return Err(TrustedIssuersReloadError::Empty);
     }
     Ok((issuers, trusted_min_version))
 }
@@ -637,7 +656,12 @@ pub(crate) fn reload_verified_directory(
         let (issuers, trusted_min_version) =
             match read_trusted_issuers(&config.trusted_issuers_path) {
                 Ok(parsed) => parsed,
-                Err(error) => return Err(DirectoryReloadError::Read(error)),
+                Err(TrustedIssuersReloadError::Empty) => {
+                    return Ok(ReloadOutcome::TrustRootsEmpty)
+                }
+                Err(TrustedIssuersReloadError::Read(error)) => {
+                    return Err(DirectoryReloadError::Read(error))
+                }
             };
         // minVersion is INCLUSIVE: a directory at `current_version` is admissible only
         // when `current_version >= trusted_min_version`. Below that floor, fail closed.
@@ -674,7 +698,10 @@ pub(crate) fn reload_verified_directory(
         let (issuers, trusted_min_version) =
             match read_trusted_issuers(&config.trusted_issuers_path) {
                 Ok(parsed) => parsed,
-                Err(error) => {
+                Err(TrustedIssuersReloadError::Empty) => {
+                    return Ok(ReloadOutcome::TrustRootsEmpty)
+                }
+                Err(TrustedIssuersReloadError::Read(error)) => {
                     if expired {
                         return Ok(ReloadOutcome::ExpiredWhileRunning);
                     }
@@ -923,6 +950,25 @@ fn directory_reload_step(
                 target: chio_federation_transport_iroh::observability::TARGET_ADMISSION,
                 "transport directory file was replaced at the running version with a different \
                  body; admitting nothing until a properly versioned successor is published"
+            );
+        }
+        Ok(ReloadOutcome::TrustRootsEmpty) => {
+            // The trusted-issuers file now pins no issuer: operators removed every issuer.
+            // Trusting no signer must admit nothing, and startup rejects the same empty
+            // configuration, so fail closed to deny-all rather than keep the previous signer
+            // active until expiry. last-good is KEPT (state untouched): a successor under a
+            // restored trusted issuer, chained onto the running directory, self-heals.
+            gate.swap(Arc::new(
+                chio_federation_transport_iroh::identity::VerifiedDirectory::empty_deny_all(),
+            ));
+            alive.store(false, Ordering::SeqCst);
+            chio_federation_transport_iroh::metrics::record_directory_reload(
+                chio_federation_transport_iroh::metrics::RELOAD_TRUST_ROOTS_EMPTY,
+            );
+            tracing::error!(
+                target: chio_federation_transport_iroh::observability::TARGET_ADMISSION,
+                "transport directory trusted-issuer set is empty; admitting nothing until a \
+                 trusted issuer is restored and a successor it signs is published"
             );
         }
         Err(error) => {
@@ -1808,6 +1854,67 @@ mod tests {
             matches!(outcome, ReloadOutcome::TrustRootsChanged),
             "an unchanged bundle whose signing issuer left the trust roots must fail closed, \
              got {outcome:?}"
+        );
+    }
+
+    #[test]
+    fn reload_fails_closed_when_trusted_issuers_becomes_empty() {
+        // Removing every trusted issuer on a running relay must trust no signer and admit
+        // nothing, in lockstep with startup rejecting the same empty configuration. It must
+        // NOT fold into the transient keep-last-good read-error path, which would keep the
+        // previous signer active until expiry.
+        let dir = tempfile::tempdir().unwrap();
+        let (bundle_path, issuers_path, expires_at, body_hash) =
+            write_test_bundle(dir.path(), 1, false, None);
+        let config = DirectoryReloadConfig {
+            interval: Duration::from_secs(60),
+            bundle_path,
+            trusted_issuers_path: issuers_path.clone(),
+            local_transport_endpoint: endpoint_from_seed(LOCAL_TRANSPORT_SEED),
+            local_kernel_id: LOCAL_KERNEL_ID.to_string(),
+        };
+        let now_in_window = expires_at - 1;
+
+        // Baseline: with the issuer still pinned, the unchanged in-window bundle is Unchanged.
+        assert!(matches!(
+            reload_verified_directory(&config, now_in_window, 1, expires_at, &body_hash)
+                .expect("reload runs"),
+            ReloadOutcome::Unchanged
+        ));
+
+        // Empty the trusted-issuer set while the on-disk bundle stays byte-unchanged.
+        std::fs::write(&issuers_path, r#"{"issuers":[]}"#).unwrap();
+        let outcome =
+            reload_verified_directory(&config, now_in_window, 1, expires_at, &body_hash)
+                .expect("reload runs");
+        assert!(
+            matches!(outcome, ReloadOutcome::TrustRootsEmpty),
+            "an empty trusted-issuer set must fail closed, got {outcome:?}"
+        );
+
+        // Step-level: the gate flips to deny-all, the alarm is raised, and last-good is
+        // preserved so a successor under a restored issuer can self-heal.
+        let gate = DirectoryGate::new(verified_directory("did:chio:bob", 24));
+        assert_eq!(gate.current_version(), 1);
+        let alive = AtomicBool::new(true);
+        let mut state = ReloadState {
+            version: 1,
+            body_sha256: body_hash.clone(),
+            expires_at_unix_ms: expires_at,
+        };
+        directory_reload_step(&gate, &config, now_in_window, &mut state, &alive);
+        assert_eq!(
+            gate.current_version(),
+            0,
+            "an empty issuer set fails closed to deny-all"
+        );
+        assert!(
+            !alive.load(Ordering::SeqCst),
+            "an empty issuer set raises the fail-closed alarm"
+        );
+        assert_eq!(
+            state.version, 1,
+            "last-good is preserved so a restored issuer can self-heal"
         );
     }
 
