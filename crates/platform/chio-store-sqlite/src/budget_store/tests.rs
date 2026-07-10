@@ -1716,6 +1716,75 @@ fn list_abandoned_event_seqs_in_range_bounds_upper_and_limit(
 }
 
 #[test]
+fn abandoned_seq_ranges_round_trip_and_advance_the_head() -> Result<(), Box<dyn std::error::Error>>
+{
+    // codex #965 Finding (bound abandoned seqs in snapshots): the cluster snapshot
+    // carries abandoned seqs RANGE-ENCODED so a rollback storm's long contiguous run
+    // stays a handful of small pairs instead of an unbounded integer list that could
+    // exceed MAX_PEER_RESPONSE_BYTES and wedge recovery. list_abandoned_event_seq_ranges
+    // must COLLAPSE contiguous runs, and record_abandoned_event_seq_ranges must EXPAND
+    // them back to the identical seq set so the filled-or-abandoned head advance is
+    // preserved bit-for-bit.
+    let head_for = |heads: &[(String, u64)], origin: &str| {
+        heads.iter().find(|(o, _)| o == origin).map(|(_, seq)| *seq)
+    };
+
+    // Enumerated form -> range-encoded runs: {2,3,4},{7},{9,10} collapse to 3 pairs.
+    let source_path = unique_db_path("chio-abandoned-ranges-source");
+    let source = SqliteBudgetStore::open(&source_path)?;
+    source.record_abandoned_event_seqs(&[2, 3, 4, 7, 9, 10])?;
+    assert_eq!(
+        source.list_abandoned_event_seq_ranges()?,
+        vec![(2, 4), (7, 7), (9, 10)],
+        "contiguous abandoned seqs must collapse to inclusive runs"
+    );
+
+    // Range form -> enumerated set on a fresh follower (lossless expansion).
+    let follower_path = unique_db_path("chio-abandoned-ranges-follower");
+    let follower = SqliteBudgetStore::open(&follower_path)?;
+    follower.record_abandoned_event_seq_ranges(&[(2, 4), (7, 7), (9, 10)])?;
+    assert_eq!(
+        follower.list_abandoned_event_seqs()?,
+        vec![2, 3, 4, 7, 9, 10],
+        "a follower expands the runs to the identical abandoned seq set"
+    );
+
+    // A single LARGE contiguous run collapses to ONE pair (the rollback-storm case):
+    // recorded cheaply via the range insert (a recursive CTE, not per-seq round-trips).
+    let storm_path = unique_db_path("chio-abandoned-ranges-storm");
+    let storm = SqliteBudgetStore::open(&storm_path)?;
+    storm.record_abandoned_event_seq_ranges(&[(2, 50_001)])?;
+    let ranges = storm.list_abandoned_event_seq_ranges()?;
+    assert_eq!(
+        ranges,
+        vec![(2, 50_001)],
+        "a 50k-seq rollback storm stays a single (start, end) pair"
+    );
+    assert_eq!(storm.list_abandoned_event_seqs()?.len(), 50_000);
+
+    // Head advance: present {1, 50002} with the whole (2, 50001) run abandoned makes
+    // [1..=50002] contiguous, so the head advances across the run - exactly as if each
+    // seq had been recorded individually.
+    storm.import_snapshot_records(
+        &[],
+        &[
+            ack_head_event(1, "e1", "http://o"),
+            ack_head_event(50_002, "e-tail", "http://o"),
+        ],
+    )?;
+    assert_eq!(
+        head_for(&storm.budget_ack_heads()?, "http://o"),
+        Some(50_002),
+        "the abandoned RANGE fills every hole so the head advances past the whole run"
+    );
+
+    let _ = fs::remove_file(&source_path);
+    let _ = fs::remove_file(&follower_path);
+    let _ = fs::remove_file(&storm_path);
+    Ok(())
+}
+
+#[test]
 fn budget_ack_heads_recognizes_multi_authority_global_contiguity(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // event_seq is a single store-wide sequence, so multiple authorities share

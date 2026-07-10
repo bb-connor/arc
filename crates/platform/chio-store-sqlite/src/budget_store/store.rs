@@ -421,6 +421,45 @@ impl SqliteBudgetStore {
             .map_err(BudgetStoreError::from)
     }
 
+    /// The abandoned event_seqs RANGE-ENCODED as inclusive `(start, end)` runs of
+    /// consecutive seqs (ascending, non-overlapping).
+    ///
+    /// The cluster snapshot carries the abandoned set this way instead of one entry
+    /// per seq (codex #965 Finding: bound abandoned seqs in snapshots). A rollback
+    /// storm abandons a long CONTIGUOUS run of seqs; enumerated, that is millions of
+    /// integers that push the snapshot body past MAX_PEER_RESPONSE_BYTES, so the
+    /// force-snapshot recovery path fails to decode cluster_snapshot() and the peer
+    /// wedges in force_snapshot forever (unlike the delta path, the snapshot backstop
+    /// has no further fallback). Range-encoded, each contiguous run collapses to one
+    /// small pair, and the run count is bounded by the number of live mutation events
+    /// (a run is separated from the next by a filled non-abandoned slot), which the
+    /// snapshot already carries and which dominate the byte budget - so if the events
+    /// fit under the cap the ranges do too. The encoding is LOSSLESS: a follower
+    /// expands the runs to the identical seq set, so the filled-or-abandoned
+    /// head-advance semantics are preserved bit-for-bit. Computed in SQL
+    /// (gaps-and-islands) so the full seq set is never materialized here either.
+    pub fn list_abandoned_event_seq_ranges(&self) -> Result<Vec<(u64, u64)>, BudgetStoreError> {
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            r#"
+            SELECT MIN(seq) AS start_seq, MAX(seq) AS end_seq
+            FROM (
+                SELECT seq, seq - ROW_NUMBER() OVER (ORDER BY seq) AS island
+                FROM budget_abandoned_event_seqs
+            )
+            GROUP BY island
+            ORDER BY start_seq ASC
+            "#,
+        )?;
+        let rows = statement.query_map([], |row| {
+            let start: i64 = row.get(0)?;
+            let end: i64 = row.get(1)?;
+            Ok((start.max(0) as u64, end.max(0) as u64))
+        })?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(BudgetStoreError::from)
+    }
+
     /// The quorum-witness identity of the mutation event stored under `event_id`:
     /// `(event_seq, authority_id, lease_epoch)`, or None when no such event exists
     /// or it predates seq assignment. The witness must target the event's STORED
@@ -532,6 +571,54 @@ impl SqliteBudgetStore {
             )?;
         }
         Self::reset_budget_ack_head_watermark(&transaction)?;
+        transaction.commit()?;
+        Ok(())
+    }
+
+    /// Record snapshot-carried abandoned event_seqs given as inclusive `(start, end)`
+    /// RANGES (see `list_abandoned_event_seq_ranges`).
+    ///
+    /// Each range is expanded to its individual seqs IN SQL via a recursive CTE, so a
+    /// follower never materializes a huge run (a rollback-storm range covering
+    /// millions of seqs) as an in-memory Vec just to insert it row by row. The stored
+    /// rows are identical to `record_abandoned_event_seqs` fed the enumerated set, so
+    /// the head-advance semantics are unchanged; this is purely how the WIRE avoids
+    /// the per-seq blow-up (codex #965 Finding: bound abandoned seqs in snapshots).
+    /// Fail-closed: an abandoned seq is never a live write, so it can only ADD filled
+    /// slots, and the watermark is reset so `budget_ack_heads` recomputes.
+    pub fn record_abandoned_event_seq_ranges(
+        &self,
+        ranges: &[(u64, u64)],
+    ) -> Result<(), BudgetStoreError> {
+        if ranges.is_empty() {
+            return Ok(());
+        }
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let mut recorded_any = false;
+        for &(start, end) in ranges {
+            // Skip seq 0 (never a real event slot) and any malformed inverted range.
+            let start = start.max(1);
+            if end < start {
+                continue;
+            }
+            transaction.execute(
+                r#"
+                INSERT OR IGNORE INTO budget_abandoned_event_seqs(seq)
+                WITH RECURSIVE run(s) AS (
+                    SELECT ?1
+                    UNION ALL
+                    SELECT s + 1 FROM run WHERE s < ?2
+                )
+                SELECT s FROM run
+                "#,
+                rusqlite::params![start as i64, end as i64],
+            )?;
+            recorded_any = true;
+        }
+        if recorded_any {
+            Self::reset_budget_ack_head_watermark(&transaction)?;
+        }
         transaction.commit()?;
         Ok(())
     }

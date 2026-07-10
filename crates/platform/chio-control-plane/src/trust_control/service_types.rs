@@ -20,12 +20,12 @@ mod responses;
 mod state;
 
 pub(crate) use self::cluster_budget::{
-    AuthoritySnapshotView, AuthorityTrustedKeyView, BudgetAuthorityMetadataView, BudgetCursorView,
-    BudgetDeltaQuery, BudgetDeltaResponse, BudgetMutationAuthorityView, BudgetMutationEventView,
-    BudgetOriginAck, BudgetWriteCommitView, ClusterAuthorityLeaseView, ClusterPartitionRequest,
-    ClusterPartitionResponse, ClusterReplicationHeadsView, ClusterStateSnapshotResponse,
-    ClusterStatusResponse, LineageDeltaResponse, PeerStatusView, ReceiptDeltaQuery,
-    ReceiptDeltaResponse, ReduceChargeCostRequest, ReduceChargeCostResponse,
+    AbandonedSeqRange, AuthoritySnapshotView, AuthorityTrustedKeyView, BudgetAuthorityMetadataView,
+    BudgetCursorView, BudgetDeltaQuery, BudgetDeltaResponse, BudgetMutationAuthorityView,
+    BudgetMutationEventView, BudgetOriginAck, BudgetWriteCommitView, ClusterAuthorityLeaseView,
+    ClusterPartitionRequest, ClusterPartitionResponse, ClusterReplicationHeadsView,
+    ClusterStateSnapshotResponse, ClusterStatusResponse, LineageDeltaResponse, PeerStatusView,
+    ReceiptDeltaQuery, ReceiptDeltaResponse, ReduceChargeCostRequest, ReduceChargeCostResponse,
     ReverseChargeCostRequest, ReverseChargeCostResponse, RevocationCursorView,
     RevocationDeltaQuery, RevocationDeltaResponse, StoredLineageView, StoredReceiptView,
     TryChargeCostRequest, TryChargeCostResponse, TryIncrementBudgetRequest,

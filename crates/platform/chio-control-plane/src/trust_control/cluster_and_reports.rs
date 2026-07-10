@@ -1944,6 +1944,129 @@ mod cluster_and_reports_tests {
     }
 
     #[test]
+    fn cluster_snapshot_range_encodes_a_huge_abandoned_run_and_the_follower_advances() {
+        // codex #965 Finding (bound abandoned seqs in snapshots): the snapshot's
+        // abandoned-seq field is RANGE-ENCODED, so a rollback storm's long contiguous
+        // abandoned run stays a single small (start, end) pair instead of an unbounded
+        // integer list. Enumerated, a real storm's millions-to-billions of seqs blow
+        // past MAX_PEER_RESPONSE_BYTES, the client fails to decode cluster_snapshot(),
+        // and the force-snapshot recovery path wedges the peer forever (the snapshot
+        // backstop has no further fallback like the delta path does). Range-encoded,
+        // the snapshot stays tiny AND a fresh follower still learns every abandoned
+        // slot, so its contiguous ack head advances across the whole run.
+        let source_budget_db = unique_temp_path("cluster-source-abandoned-storm", "sqlite3");
+        let target_budget_db = unique_temp_path("cluster-target-abandoned-storm", "sqlite3");
+
+        let source_state = state_with_cluster(
+            "http://node-a",
+            &["http://node-b"],
+            None,
+            None,
+            Some(source_budget_db.clone()),
+        );
+        let target_state = state_with_cluster(
+            "http://node-b",
+            &["http://node-a"],
+            None,
+            None,
+            Some(target_budget_db.clone()),
+        );
+
+        // The abandoned run is (2, RUN_END); boundary events sit at seq 1 and
+        // RUN_END + 1, so [1..=RUN_END + 1] is contiguous once the run is recorded.
+        const RUN_END: u64 = 100_000;
+        let event = |seq: u64| BudgetMutationEventView {
+            event_id: format!("evt-{seq}"),
+            hold_id: None,
+            capability_id: "cap-storm".to_string(),
+            grant_index: 0,
+            kind: "authorize_exposure".to_string(),
+            allowed: Some(true),
+            recorded_at: seq as i64,
+            event_seq: seq,
+            usage_seq: Some(seq),
+            exposure_units: 1,
+            realized_spend_units: 0,
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost_units: None,
+            invocation_count_after: 1,
+            total_cost_exposed_after: 1,
+            total_cost_realized_spend_after: 0,
+            authority: Some(BudgetMutationAuthorityView {
+                authority_id: "http://node-a".to_string(),
+                lease_id: "http://node-a#term-1".to_string(),
+                lease_epoch: 1,
+            }),
+        };
+
+        {
+            let store = SqliteBudgetStore::open(&source_budget_db).test_unwrap();
+            let records = [event(1), event(RUN_END + 1)]
+                .iter()
+                .map(|view| budget_mutation_record_from_view(view).test_unwrap())
+                .collect::<Vec<_>>();
+            store.import_snapshot_records(&[], &records).test_unwrap();
+            // A rollback storm abandons the whole (2, RUN_END) window.
+            store
+                .record_abandoned_event_seq_ranges(&[(2, RUN_END)])
+                .test_unwrap();
+        }
+
+        let snapshot = build_cluster_state_snapshot(&source_state).test_unwrap();
+
+        // The huge run is a SINGLE pair, not RUN_END - 1 integers.
+        assert_eq!(snapshot.budget_abandoned_seq_ranges.len(), 1);
+        assert_eq!(
+            (
+                snapshot.budget_abandoned_seq_ranges[0].start,
+                snapshot.budget_abandoned_seq_ranges[0].end,
+            ),
+            (2, RUN_END)
+        );
+
+        // The whole range-encoded snapshot fits well under the peer-response cap.
+        let encoded = serde_json::to_vec(&snapshot).test_unwrap();
+        assert!(
+            (encoded.len() as u64) < MAX_PEER_RESPONSE_BYTES,
+            "range-encoded snapshot must fit under the peer-response cap, got {} bytes",
+            encoded.len()
+        );
+        // The SAME run enumerated (the pre-fix wire) is orders of magnitude larger and
+        // grows linearly with the run length; a real storm crosses the 64 MiB cap and
+        // wedges recovery. Here the abandoned field ALONE dwarfs the whole ranged
+        // snapshot.
+        let enumerated_len = serde_json::to_vec(&(2..=RUN_END).collect::<Vec<u64>>())
+            .test_unwrap()
+            .len();
+        assert!(
+            enumerated_len > 10 * encoded.len(),
+            "enumerated abandoned seqs ({enumerated_len} bytes) must dwarf the range-encoded snapshot ({} bytes)",
+            encoded.len()
+        );
+
+        apply_cluster_snapshot(&target_state, "http://node-a", snapshot).test_unwrap();
+
+        // TEETH: the follower learned every abandoned slot, so its contiguous ack head
+        // advances across the whole run to the tail event (no wedge at the hole).
+        let target_store = SqliteBudgetStore::open(&target_budget_db).test_unwrap();
+        let head = target_store
+            .budget_ack_heads()
+            .test_unwrap()
+            .into_iter()
+            .find(|(origin, _)| origin == "http://node-a")
+            .map(|(_, seq)| seq);
+        assert_eq!(
+            head,
+            Some(RUN_END + 1),
+            "the follower's contiguous ack head must advance across the abandoned run to the tail event"
+        );
+
+        let _ = std::fs::remove_file(&source_budget_db);
+        let _ = std::fs::remove_file(&target_budget_db);
+    }
+
+    #[test]
     fn cluster_snapshot_round_trip_preserves_budget_usage_rows_without_mutation_events() {
         let source_budget_db = unique_temp_path("cluster-source-budget-usage-only", "sqlite3");
         let target_budget_db = unique_temp_path("cluster-target-budget-usage-only", "sqlite3");

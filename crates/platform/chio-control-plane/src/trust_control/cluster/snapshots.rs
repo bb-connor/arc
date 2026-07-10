@@ -132,8 +132,18 @@ pub(crate) fn build_cluster_state_snapshot(
     } else {
         Vec::new()
     };
-    let budget_abandoned_seqs = if let Some(path) = state.config.budget_db_path.as_deref() {
-        SqliteBudgetStore::open(path)?.list_abandoned_event_seqs()?
+    // Range-encode the abandoned seqs (inclusive (start, end) runs) so a rollback
+    // storm's long contiguous abandoned window stays a few small pairs rather than an
+    // unbounded integer list that would push the snapshot body past
+    // MAX_PEER_RESPONSE_BYTES and wedge force-snapshot recovery forever (codex #965
+    // Finding: bound abandoned seqs in snapshots). Computed in SQL, so the full seq
+    // set is never materialized here either.
+    let budget_abandoned_seq_ranges = if let Some(path) = state.config.budget_db_path.as_deref() {
+        SqliteBudgetStore::open(path)?
+            .list_abandoned_event_seq_ranges()?
+            .into_iter()
+            .map(|(start, end)| AbandonedSeqRange { start, end })
+            .collect()
     } else {
         Vec::new()
     };
@@ -167,7 +177,7 @@ pub(crate) fn build_cluster_state_snapshot(
         lineage,
         budgets,
         budget_mutation_events,
-        budget_abandoned_seqs,
+        budget_abandoned_seq_ranges,
     })
 }
 
@@ -188,7 +198,7 @@ pub(crate) fn apply_cluster_snapshot(
         lineage,
         budgets,
         budget_mutation_events,
-        budget_abandoned_seqs,
+        budget_abandoned_seq_ranges,
     } = snapshot;
 
     if let (Some(path), Some(authority_view)) =
@@ -244,9 +254,15 @@ pub(crate) fn apply_cluster_snapshot(
             .map_err(|error| CliError::cli_other_error(error.to_string()))?;
         // Learn the leader's abandoned/tombstoned seqs so a fresh follower's
         // contiguous ack head treats those holes as filled instead of wedging at
-        // them (codex #965 round-5 P1).
+        // them (codex #965 round-5 P1). Carried range-encoded and expanded in SQL, so
+        // a rollback-storm run is never materialized as a huge in-memory list here
+        // (codex #965 Finding: bound abandoned seqs in snapshots).
+        let abandoned_ranges = budget_abandoned_seq_ranges
+            .iter()
+            .map(|range| (range.start, range.end))
+            .collect::<Vec<_>>();
         store
-            .record_abandoned_event_seqs(&budget_abandoned_seqs)
+            .record_abandoned_event_seq_ranges(&abandoned_ranges)
             .map_err(|error| CliError::cli_other_error(error.to_string()))?;
         for event in &budget_mutation_events {
             budget_cursor = Some(merge_budget_cursor(
