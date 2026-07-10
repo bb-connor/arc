@@ -742,6 +742,14 @@ fn push_accept_duration_bucket(output: &mut String, lane: &str, le: &str, count:
 mod tests {
     use super::*;
 
+    /// Serializes every test that ASSERTS on the process-global `ROUTER_ALIVE` gauge, so
+    /// the exact-value assertions cannot be perturbed by another test that mutates the same
+    /// gauge under the default parallel test harness. Any NEW test that reads or writes
+    /// `router_alive`/`set_router_alive` and asserts on it MUST acquire this guard. Poison
+    /// is recovered (a panicking guard-holder already fails its own test) so the serialized
+    /// siblings stay deterministic rather than cascade-failing.
+    static ROUTER_ALIVE_GAUGE_SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn registry_constants_match_spec() {
         assert_eq!(
@@ -817,6 +825,12 @@ mod tests {
 
     #[test]
     fn router_alive_gauge_reflects_liveness() {
+        // Serialize against the sibling render test that also mutates ROUTER_ALIVE, so these
+        // exact-value assertions are not flipped between the set and the read under the
+        // parallel harness.
+        let _serial = ROUTER_ALIVE_GAUGE_SERIAL
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         set_router_alive(true);
         assert_eq!(router_alive(), 1);
         set_router_alive(false);
@@ -831,6 +845,11 @@ mod tests {
         // were invisible to Prometheus on the actual serve path. The render must now emit
         // both. RED before the render wiring: the reload/liveness names are absent from
         // the body.
+        // Hold the same serial guard as router_alive_gauge_reflects_liveness: this test
+        // MUTATES ROUTER_ALIVE, which would otherwise race that test's exact assertions.
+        let _serial = ROUTER_ALIVE_GAUGE_SERIAL
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         record_directory_reload(RELOAD_BINDING_REVOKED);
         record_directory_reload(RELOAD_EXPIRED_FAILCLOSED);
         set_router_alive(true);
