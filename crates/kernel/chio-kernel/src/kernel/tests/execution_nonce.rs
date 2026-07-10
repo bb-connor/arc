@@ -1688,13 +1688,14 @@ fn delegated_invocation_reserve_request(
 
 #[test]
 fn delegated_reserving_child_with_non_monetary_grant_releases_sibling_share() {
-    // A non-monetary grant (max_invocations only, no cost ceiling) yields no
-    // durable reserved hold to record a sibling share against. Child A's
+    // A non-monetary grant (max_invocations only, no cost ceiling) adopts its
+    // debited invocation into a durable reserved hold, but records no sibling
+    // share against it (there is no monetary envelope to share). Child A's
     // reserve-for-caller authorization must therefore release its admitted
-    // sibling-sum share immediately: there is nothing to reconcile or reap that
-    // would ever release it later. A second delegated child under the same
-    // parent must then still be admitted. Retaining the share would leak it for
-    // the parent's entire lifetime and wrongly deny later siblings.
+    // sibling-sum share immediately: nothing that closes the hold would ever
+    // release it later. A second delegated child under the same parent must then
+    // still be admitted. Retaining the share would leak it for the parent's
+    // entire lifetime and wrongly deny later siblings.
     let fixture = make_sibling_sum_invocation_fixture("delegated-reserve-non-monetary");
     let mut kernel = fixture.kernel;
     install_strict_nonce_store(&mut kernel);

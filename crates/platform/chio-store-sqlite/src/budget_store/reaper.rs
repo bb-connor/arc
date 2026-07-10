@@ -163,6 +163,47 @@ impl SqliteBudgetStore {
         Ok(())
     }
 
+    /// Adopt an already-debited invocation into a durable zero-exposure reserved
+    /// hold, stamped with the TTL deadline and no currency. The invocation was
+    /// already counted by `try_increment`, so this only records the open hold
+    /// (never touching the invocation count); reversing it by hold id returns the
+    /// invocation, while reconciling or reaping it keeps the invocation consumed.
+    /// Fails closed when a hold already exists under the id.
+    pub fn reserve_invocation_hold(
+        &self,
+        hold_id: &str,
+        capability_id: &str,
+        grant_index: usize,
+        reserved_until_unix_secs: i64,
+    ) -> Result<(), BudgetStoreError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| BudgetStoreError::Invariant("budget store mutex poisoned".to_string()))?;
+        let now = unix_now();
+        let inserted = connection.execute(
+            "INSERT OR IGNORE INTO budget_authorization_holds ( \
+                 hold_id, capability_id, grant_index, \
+                 authorized_exposure_units, remaining_exposure_units, invocation_count_debited, \
+                 disposition, authority_id, lease_id, lease_epoch, \
+                 created_at, updated_at, reserved_until, reserved_currency \
+             ) VALUES (?1, ?2, ?3, 0, 0, 1, 'open', NULL, NULL, NULL, ?4, ?4, ?5, NULL)",
+            params![
+                hold_id,
+                capability_id,
+                grant_index as i64,
+                now,
+                reserved_until_unix_secs,
+            ],
+        )?;
+        if inserted == 0 {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` already exists"
+            )));
+        }
+        Ok(())
+    }
+
     /// Project a single hold by id, including its reserved-until deadline.
     pub fn budget_hold_snapshot(
         &self,
@@ -458,6 +499,106 @@ mod tests {
                 .unwrap(),
             0
         );
+    }
+
+    #[test]
+    fn reserve_invocation_hold_is_reversible_and_returns_the_invocation() {
+        use chio_kernel::budget_store::{
+            BudgetHoldDispositionView, BudgetReverseHoldRequest, BudgetStore,
+        };
+
+        let store = open_temp_store();
+        // Debit the single invocation exactly as the reserve path does, then adopt
+        // it into a durable zero-exposure reserved hold.
+        assert!(store.try_increment("cap-inv", 0, Some(1)).unwrap());
+        store
+            .reserve_invocation_hold("hold-inv", "cap-inv", 0, 4_242)
+            .unwrap();
+
+        let snapshot = store.budget_hold_snapshot("hold-inv").unwrap().unwrap();
+        assert_eq!(snapshot.authorized_exposure_units, 0);
+        assert_eq!(snapshot.remaining_exposure_units, 0);
+        assert_eq!(snapshot.disposition, BudgetHoldDispositionView::Open);
+        assert_eq!(snapshot.reserved_until, Some(4_242));
+        assert_eq!(
+            snapshot.reserved_currency, None,
+            "an invocation reservation records no currency"
+        );
+        assert_eq!(
+            store
+                .get_usage("cap-inv", 0)
+                .unwrap()
+                .unwrap()
+                .invocation_count,
+            1
+        );
+
+        // Reversing the hold returns the invocation to the grant.
+        store
+            .reverse_budget_hold(BudgetReverseHoldRequest {
+                capability_id: "cap-inv".to_string(),
+                grant_index: 0,
+                reversed_exposure_units: snapshot.remaining_exposure_units,
+                hold_id: Some("hold-inv".to_string()),
+                event_id: Some("hold-inv:reverse".to_string()),
+                authority: snapshot.authority,
+            })
+            .unwrap();
+        assert_eq!(
+            store
+                .get_usage("cap-inv", 0)
+                .unwrap()
+                .unwrap()
+                .invocation_count,
+            0,
+            "reversing an invocation reservation returns the debited invocation"
+        );
+        assert_eq!(
+            store
+                .budget_hold_snapshot("hold-inv")
+                .unwrap()
+                .unwrap()
+                .disposition,
+            BudgetHoldDispositionView::Reversed
+        );
+
+        // A duplicate reserve under the same id fails closed.
+        assert!(store
+            .reserve_invocation_hold("hold-inv", "cap-inv", 0, 9_000)
+            .is_err());
+    }
+
+    #[test]
+    fn reaper_forfeits_expired_invocation_reserve_keeping_it_consumed() {
+        use chio_kernel::budget_store::{BudgetHoldDispositionView, BudgetStore};
+
+        let store = open_temp_store();
+        assert!(store.try_increment("cap-inv", 0, Some(1)).unwrap());
+        store
+            .reserve_invocation_hold("hold-inv", "cap-inv", 0, 100)
+            .unwrap();
+
+        let settled = store.reap_expired_reserved_holds(1_000).unwrap();
+        assert_eq!(settled, 1, "the expired invocation reservation is settled");
+        assert_eq!(
+            store
+                .get_usage("cap-inv", 0)
+                .unwrap()
+                .unwrap()
+                .invocation_count,
+            1,
+            "reaping forfeits the invocation (stays consumed), matching monetary reap"
+        );
+        assert_eq!(
+            store
+                .budget_hold_snapshot("hold-inv")
+                .unwrap()
+                .unwrap()
+                .disposition,
+            BudgetHoldDispositionView::Reconciled
+        );
+        // Idempotent: a settled hold is no longer open.
+        assert_eq!(store.reap_expired_reserved_holds(1_000).unwrap(), 0);
     }
 
     #[test]

@@ -1,12 +1,29 @@
 use super::*;
 
-/// The reserve-for-caller charge threaded into a preflight allow response: the
-/// authorized hold to keep reserved (its id, grant currency, and the accounting
-/// needed to reverse it if the reservation stamp fails). The TTL reaper deadline
-/// is derived from the minted nonce's exact expiry inside the response builder
-/// so a hold never expires before its own nonce.
-pub(crate) struct ReservedHoldStamp<'a> {
-    pub(crate) charge: &'a BudgetChargeResult,
+/// The reserve-for-caller hold threaded into a preflight allow response: the
+/// authorized reservation to keep open, plus the accounting needed to reverse it
+/// if the reservation stamp fails. The TTL reaper deadline is derived from the
+/// minted nonce's exact expiry inside the response builder so a hold never
+/// expires before its own nonce.
+pub(crate) enum ReservedHoldStamp<'a> {
+    /// A monetary reserve: the durable hold was already authorized during
+    /// `check_and_increment_budget` and is kept open; the builder marks it
+    /// reserved with the grant currency and reverses the charge on stamp failure.
+    Monetary { charge: &'a BudgetChargeResult },
+    /// An invocation-only reserve: the invocation was already debited by
+    /// `try_increment`. The builder adopts it into a durable zero-exposure
+    /// reserved hold so the TTL reaper and reconcile-by-nonce can settle it, and
+    /// reverse-by-nonce or a stamp failure can return the invocation.
+    Invocation { hold_id: String, grant_index: usize },
+}
+
+impl ReservedHoldStamp<'_> {
+    fn hold_id(&self) -> &str {
+        match self {
+            Self::Monetary { charge } => charge.budget_hold_id.as_str(),
+            Self::Invocation { hold_id, .. } => hold_id.as_str(),
+        }
+    }
 }
 
 impl ChioKernel {
@@ -178,42 +195,69 @@ impl ChioKernel {
             request,
             cap,
             &receipt,
-            reserved_hold
-                .as_ref()
-                .map(|stamp| stamp.charge.budget_hold_id.as_str()),
+            reserved_hold.as_ref().map(ReservedHoldStamp::hold_id),
         )?;
 
         // Stamp the reserved hold's TTL deadline from the minted nonce's exact
         // `expires_at` (not a separately sampled evaluation clock), so an
-        // unreconciled reserved hold can never expire before its own nonce.
-        // The grant currency is recorded here too, for reconcile-time validation.
-        // Only the reserve-for-caller path supplies a stamp; the reverse-for-retry
+        // unreconciled reserved hold can never expire before its own nonce. Only
+        // the reserve-for-caller path supplies a stamp; the reverse-for-retry
         // preflight passes `None` and marks nothing.
         if let (Some(stamp), Some(nonce)) = (reserved_hold.as_ref(), execution_nonce.as_ref()) {
             let reserved_until = nonce.expires_at();
-            if let Err(error) = self.with_budget_store(|store| {
-                Ok(store.mark_hold_reserved(
-                    stamp.charge.budget_hold_id.as_str(),
-                    reserved_until,
-                    stamp.charge.currency.as_str(),
-                )?)
-            }) {
-                // The hold was authorized but the reservation stamp did not land.
-                // The TTL reaper only settles stamped holds, so an unstamped open
-                // hold would stay reserved forever, blocking later authorizations
-                // on the grant. Reverse the hold and release the sibling-sum
-                // headroom it was holding before surfacing the error, leaving no
-                // committed exposure and no stranded parent budget. The receipt is
-                // not yet persisted, so a reversed hold leaves no orphaned receipt.
-                self.reverse_budget_charge(&cap.id, stamp.charge)?;
-                self.release_admitted_capability_budget(cap)
-                    .map_err(KernelError::DelegationInvalid)?;
-                return Err(error);
+            match stamp {
+                ReservedHoldStamp::Monetary { charge } => {
+                    if let Err(error) = self.with_budget_store(|store| {
+                        Ok(store.mark_hold_reserved(
+                            charge.budget_hold_id.as_str(),
+                            reserved_until,
+                            charge.currency.as_str(),
+                        )?)
+                    }) {
+                        // The hold was authorized but the reservation stamp did not
+                        // land. The TTL reaper only settles stamped holds, so an
+                        // unstamped open hold would stay reserved forever, blocking
+                        // later authorizations on the grant. Reverse the hold and
+                        // release the sibling-sum headroom it was holding before
+                        // surfacing the error, leaving no committed exposure and no
+                        // stranded parent budget. The receipt is not yet persisted,
+                        // so a reversed hold leaves no orphaned receipt.
+                        self.reverse_budget_charge(&cap.id, charge)?;
+                        self.release_admitted_capability_budget(cap)
+                            .map_err(KernelError::DelegationInvalid)?;
+                        return Err(error);
+                    }
+                    // The stamp landed: keep the delegated child's sibling-sum share
+                    // admitted and remember it against the reserved hold so
+                    // reconcile-by-nonce or the TTL reaper releases the parent's
+                    // headroom when it closes.
+                    self.record_reserved_sibling_share(charge.budget_hold_id.as_str(), cap);
+                }
+                ReservedHoldStamp::Invocation {
+                    hold_id,
+                    grant_index,
+                } => {
+                    if let Err(error) = self.with_budget_store(|store| {
+                        Ok(store.reserve_invocation_hold(
+                            hold_id.as_str(),
+                            &cap.id,
+                            *grant_index,
+                            reserved_until,
+                        )?)
+                    }) {
+                        // The invocation was already debited by `try_increment`;
+                        // adopting it into a durable reserved hold failed, so no hold
+                        // exists to reap or reconcile. Reverse the bare invocation
+                        // debit (no hold id) so the grant is not left permanently
+                        // short an invocation, then surface the error. The sibling
+                        // share was already released for this non-monetary grant.
+                        self.with_budget_store(|store| {
+                            Ok(store.reverse_charge_cost(&cap.id, *grant_index, 0)?)
+                        })?;
+                        return Err(error);
+                    }
+                }
             }
-            // The stamp landed: keep the delegated child's sibling-sum share
-            // admitted and remember it against the reserved hold so reconcile-by-
-            // nonce or the TTL reaper releases the parent's headroom when it closes.
-            self.record_reserved_sibling_share(stamp.charge.budget_hold_id.as_str(), cap);
         }
 
         // Persist the receipt only after the hold is successfully stamped, so a

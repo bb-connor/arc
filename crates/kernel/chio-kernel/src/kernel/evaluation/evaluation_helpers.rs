@@ -202,15 +202,30 @@ impl ChioKernel {
             authorization_metadata,
         );
 
-        // The reserved monetary hold is kept open and bound into the signed nonce
-        // so reconcile-by-nonce can name the exact hold to settle at the execution
-        // site. The response builder stamps the hold's TTL deadline from the minted
-        // nonce's exact expiry and records the grant currency for reconcile-time
-        // validation, keeping the reaper deadline and the nonce validity window
-        // consistent.
-        let reserved_hold = budget_mutation
-            .charge_result()
-            .map(|charge| ReservedHoldStamp { charge });
+        // The reserved hold is kept open and bound into the signed nonce so
+        // reconcile-by-nonce (and reverse-by-nonce) can name the exact hold to
+        // settle at the execution site. The response builder stamps the hold's TTL
+        // deadline from the minted nonce's exact expiry, keeping the reaper
+        // deadline and the nonce validity window consistent. A monetary grant
+        // keeps its already-authorized charge; an invocation-only grant adopts its
+        // already-debited invocation into a durable zero-exposure reserved hold so
+        // the reaper and reconcile/reverse paths handle it uniformly.
+        let reserved_hold = match budget_mutation {
+            PreExecutionBudgetMutation::Charge(charge) => {
+                Some(ReservedHoldStamp::Monetary { charge })
+            }
+            PreExecutionBudgetMutation::Invocation { grant_index } => {
+                let hold_id = format!(
+                    "budget-hold:{}:{}:{}",
+                    request.request_id, request.capability.id, grant_index
+                );
+                Some(ReservedHoldStamp::Invocation {
+                    hold_id,
+                    grant_index: *grant_index,
+                })
+            }
+            PreExecutionBudgetMutation::None => None,
+        };
 
         self.build_execution_nonce_preflight_allow_response_with_metadata(
             request,

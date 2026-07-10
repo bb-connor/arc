@@ -540,9 +540,19 @@ async fn release_unpersisted_reservation(
             }
         }
         None => {
-            warn!(
-                "reserved hold `{hold_id}` carries no recorded currency; leaving it for the TTL reaper"
-            );
+            // A reserved hold with no recorded currency is a non-monetary
+            // invocation reservation: there is no reserved money to reconcile at
+            // zero. Reverse the invocation debit through the minted nonce so the
+            // consumed invocation is returned to the grant, closing the hold so
+            // the TTL reaper never forfeits it for a request the API reported as
+            // failed.
+            let kernel = mediation_kernel.lock().await;
+            if let Err(error) = kernel.reverse_reserved_invocation_by_nonce(minted_nonce, arguments)
+            {
+                warn!(
+                    "failed to reverse invocation reservation `{hold_id}` after receipt-persistence failure: {error}"
+                );
+            }
         }
     }
     state.minted_request_ids.lock().await.release(request_id);
@@ -722,6 +732,36 @@ mod tests {
                 units: max_total,
                 currency: currency.to_string(),
             }),
+            dpop_required: None,
+        };
+        let scope = ChioScope {
+            grants: vec![grant],
+            ..ChioScope::default()
+        };
+        kernel
+            .issue_capability(&agent.public_key(), scope, 3600)
+            .test_unwrap()
+    }
+
+    /// Issue a capability whose single grant caps invocations only, with no
+    /// monetary ceiling. The mediated reserve path debits an invocation but
+    /// authorizes no monetary hold, so its reversal on tear-down and TTL reap is
+    /// exercised separately from the monetary reserve.
+    fn issue_invocation_capability(
+        kernel: &Arc<ChioKernel>,
+        agent: &Keypair,
+        server: &str,
+        tool: &str,
+        max_invocations: u32,
+    ) -> CapabilityToken {
+        let grant = ToolGrant {
+            server_id: server.to_string(),
+            tool_name: tool.to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: vec![],
+            max_invocations: Some(max_invocations),
+            max_cost_per_invocation: None,
+            max_total_cost: None,
             dpop_required: None,
         };
         let scope = ChioScope {
@@ -2247,6 +2287,224 @@ mod tests {
             state.minted_request_ids.lock().await.len(),
             1,
             "a persisted authorization must retain its request-id claim"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_invocation_receipt_persistence_failure_reverses_invocation() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        // An invocation-only grant with a single invocation: the reserve debits it,
+        // so a hold left un-reversed would permanently consume the only invocation
+        // for a request the API reported as failed.
+        let cap = issue_invocation_capability(&kernel, &agent, "cost-srv", "compute", 1);
+        let cap_id = cap.id.clone();
+        let cap_value = serde_json::to_value(&cap).unwrap();
+        let state = mediated_test_state_inner(
+            signer.clone(),
+            Arc::clone(&budget),
+            Vec::new(),
+            Some(MEDIATED_CONTROL_TOKEN.to_string()),
+            Some(failing_receipt_store()),
+            true,
+        );
+        let body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-1" },
+            "request_id": "invoke-persist-fail",
+        });
+
+        // The kernel Allowed (reserved, debiting the invocation) but the receipt
+        // append fails: the handler returns 500 and must reverse the invocation.
+        let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(json["error"], "chio_receipt_persistence_failed");
+
+        // The debited invocation is returned to the grant: the adopted reserved
+        // hold is reversed, so the grant shows zero consumed invocations again.
+        let usage = budget.get_usage(&cap_id, 0).unwrap();
+        assert!(
+            usage.map(|usage| usage.invocation_count).unwrap_or(0) == 0,
+            "a failed receipt persistence must reverse the debited invocation"
+        );
+        let hold_id = format!("budget-hold:invoke-persist-fail:{cap_id}:0");
+        let hold = budget.get_budget_hold(&hold_id).unwrap();
+        assert!(
+            hold.map(|hold| !hold.disposition.is_open()).unwrap_or(true),
+            "a failed receipt persistence must not leave an open reserved invocation hold"
+        );
+
+        // A subsequent authorization on the same grant succeeds where the open
+        // reservation would have blocked it: a second sidecar sharing the same
+        // budget (with a working receipt store) authorizes the reclaimed invocation.
+        let working_state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+        let retry_body = serde_json::json!({
+            "capability": serde_json::to_value(&cap).unwrap(),
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-2" },
+            "request_id": "invoke-retry",
+        });
+        let (retry_status, retry_json) = post_evaluate(working_state, &retry_body).await;
+        assert_eq!(retry_status, StatusCode::OK);
+        assert_eq!(
+            retry_json["status"], "authorized",
+            "the reversed invocation must be available for a later authorization"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_invocation_reconcile_keeps_invocation_consumed() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap = issue_invocation_capability(&kernel, &agent, "cost-srv", "compute", 1);
+        let cap_id = cap.id.clone();
+        let cap_value = serde_json::to_value(&cap).unwrap();
+        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+        let params = serde_json::json!({ "invoice": "inv-1" });
+
+        let reserve_body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": params,
+            "request_id": "invoke-reconcile",
+        });
+        let (_, authorized) = post_evaluate(Arc::clone(&state), &reserve_body).await;
+        assert_eq!(authorized["status"], "authorized");
+        let nonce_json = authorized["execution_nonce"].clone();
+
+        // A legitimate reconcile settles the invocation reservation: the debited
+        // invocation stays consumed (the call ran), it is not refunded.
+        let reconcile_body = serde_json::json!({
+            "execution_nonce": nonce_json,
+            "arguments": params,
+            "realized_cost": { "units": 0, "currency": "USD" },
+        });
+        let (status, reconciled) = post_reconcile(Arc::clone(&state), &reconcile_body).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(reconciled["status"], "reconciled");
+
+        let usage = budget.get_usage(&cap_id, 0).unwrap();
+        assert_eq!(
+            usage.map(|usage| usage.invocation_count).unwrap_or(0),
+            1,
+            "a legitimate reconcile must keep the invocation consumed, not refund it"
+        );
+
+        // The single invocation stays consumed: a later authorization is denied.
+        let after_body = serde_json::json!({
+            "capability": serde_json::to_value(&cap).unwrap(),
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": params,
+            "request_id": "invoke-reconcile-after",
+        });
+        let (_, after) = post_evaluate(state, &after_body).await;
+        assert_eq!(
+            after["status"], "deny",
+            "a reconciled invocation stays consumed against max_invocations"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn reaper_forfeits_expired_invocation_reserve() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap = issue_invocation_capability(&kernel, &agent, "cost-srv", "compute", 1);
+        let cap_id = cap.id.clone();
+        let cap_value = serde_json::to_value(&cap).unwrap();
+        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+        let params = serde_json::json!({ "invoice": "inv-1" });
+
+        let reserve_body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": params,
+            "request_id": "invoke-reap",
+        });
+        let (_, authorized) = post_evaluate(Arc::clone(&state), &reserve_body).await;
+        assert_eq!(authorized["status"], "authorized");
+
+        // Sweep with a far-future clock: the abandoned invocation reservation is
+        // past its execution-nonce TTL and is settled at its (zero-money)
+        // worst-case, forfeiting the invocation the same way the monetary reaper
+        // forfeits reserved money.
+        let settled = reap_expired_reserved_holds_once(&state, i64::MAX)
+            .await
+            .unwrap();
+        assert_eq!(
+            settled, 1,
+            "the expired invocation reservation must be settled"
+        );
+
+        // Fail-closed: the forfeited invocation stays consumed, so a new
+        // authorization on the single-invocation grant is still denied.
+        let usage = budget.get_usage(&cap_id, 0).unwrap();
+        assert_eq!(
+            usage.map(|usage| usage.invocation_count).unwrap_or(0),
+            1,
+            "reaping an abandoned invocation reservation forfeits it (stays consumed)"
+        );
+        let after_body = serde_json::json!({
+            "capability": serde_json::to_value(&cap).unwrap(),
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": params,
+            "request_id": "invoke-reap-after",
+        });
+        let (_, after) = post_evaluate(state, &after_body).await;
+        assert_eq!(
+            after["status"], "deny",
+            "a forfeited invocation reservation must keep the grant committed"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_open_invocation_reserve_blocks_oversubscription() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap = issue_invocation_capability(&kernel, &agent, "cost-srv", "compute", 1);
+        let cap_value = serde_json::to_value(&cap).unwrap();
+        let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+        let params = serde_json::json!({ "invoice": "inv-1" });
+
+        let first_body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": params,
+            "request_id": "invoke-open-1",
+        });
+        let (_, first) = post_evaluate(Arc::clone(&state), &first_body).await;
+        assert_eq!(first["status"], "authorized");
+
+        // While the first invocation reservation is OPEN (debited, not yet
+        // reconciled or reaped), a second reserve that would exceed
+        // max_invocations is denied: an in-flight reservation still counts, so
+        // there is no over-subscription.
+        let second_body = serde_json::json!({
+            "capability": serde_json::to_value(&cap).unwrap(),
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": params,
+            "request_id": "invoke-open-2",
+        });
+        let (_, second) = post_evaluate(state, &second_body).await;
+        assert_eq!(
+            second["status"], "deny",
+            "an open invocation reservation must block a second reserve past max_invocations"
         );
     }
 

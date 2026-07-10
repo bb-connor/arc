@@ -991,6 +991,35 @@ impl InMemoryBudgetStoreInner {
         Ok(())
     }
 
+    fn reserve_invocation_hold(
+        &mut self,
+        hold_id: &str,
+        capability_id: &str,
+        grant_index: usize,
+        reserved_until_unix_secs: i64,
+    ) -> Result<(), BudgetStoreError> {
+        if self.holds.contains_key(hold_id) {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` already exists"
+            )));
+        }
+        self.holds.insert(
+            hold_id.to_string(),
+            BudgetHoldState {
+                capability_id: capability_id.to_string(),
+                grant_index,
+                authorized_exposure_units: 0,
+                remaining_exposure_units: 0,
+                invocation_count_debited: true,
+                disposition: BudgetHoldDisposition::Open,
+                authority: None,
+                reserved_until: Some(reserved_until_unix_secs),
+                reserved_currency: None,
+            },
+        );
+        Ok(())
+    }
+
     fn reap_expired_reserved_holds(
         &mut self,
         now_unix_secs: i64,
@@ -1468,6 +1497,21 @@ impl BudgetStore for InMemoryBudgetStore {
     ) -> Result<(), BudgetStoreError> {
         self.lock_inner()?
             .mark_hold_reserved(hold_id, reserved_until_unix_secs, currency)
+    }
+
+    fn reserve_invocation_hold(
+        &self,
+        hold_id: &str,
+        capability_id: &str,
+        grant_index: usize,
+        reserved_until_unix_secs: i64,
+    ) -> Result<(), BudgetStoreError> {
+        self.lock_inner()?.reserve_invocation_hold(
+            hold_id,
+            capability_id,
+            grant_index,
+            reserved_until_unix_secs,
+        )
     }
 
     fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {

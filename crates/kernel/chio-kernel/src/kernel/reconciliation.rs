@@ -17,7 +17,9 @@
 
 use super::*;
 
-use crate::budget_store::{BudgetHoldSnapshot, BudgetReconcileHoldRequest};
+use crate::budget_store::{
+    BudgetHoldSnapshot, BudgetReconcileHoldRequest, BudgetReverseHoldRequest,
+};
 use crate::execution_nonce::{verify_execution_nonce, SignedExecutionNonce};
 
 impl ChioKernel {
@@ -137,6 +139,13 @@ impl ChioKernel {
                     "reconcile-by-nonce realized currency `{}` does not match the reserved grant currency `{reserved}`",
                     realized_cost.currency
                 ))),
+                // A non-monetary invocation reservation carries zero exposure and
+                // no currency, so there is no monetary envelope to validate; it
+                // settles the invocation at zero. A monetary hold always records
+                // its currency when reserved, so a missing currency alongside a
+                // non-zero exposure is a corrupted reserved hold and stays
+                // fail-closed.
+                None if hold.authorized_exposure_units == 0 => Ok(()),
                 None => Err(KernelError::Internal(format!(
                     "reconcile-by-nonce cannot validate realized currency for reserved hold `{reserved_hold_id}`: no reserved grant currency recorded"
                 ))),
@@ -311,5 +320,108 @@ impl ChioKernel {
             receipt,
             execution_nonce: None,
         })
+    }
+
+    /// Reverse the invocation debit of a reserved invocation-only authorization
+    /// named by a presented execution nonce, returning the invocation to the
+    /// grant. This is the tear-down counterpart to
+    /// [`Self::reconcile_reserved_authorization_by_nonce`] for a non-monetary
+    /// reserve: where a monetary tear-down reconciles the hold at zero (releasing
+    /// the reserved money), an invocation tear-down must reverse the debit so the
+    /// consumed invocation is reclaimed. The sidecar calls it from its
+    /// receipt-persistence rollback when the reserved hold carries no currency
+    /// (an invocation reservation). Fail-closed at every step and single-use:
+    /// the nonce is verified and consumed, so it cannot later be reconciled.
+    ///
+    /// Order of checks mirrors reconcile-by-nonce: the presented `arguments` must
+    /// hash to the nonce's bound parameter hash; the nonce must name a reserved
+    /// hold; the nonce is verified (schema, expiry, signature, single-use replay)
+    /// and CONSUMED; the named hold must still be open and match the nonce's
+    /// capability binding; the hold's remaining exposure is reversed, which
+    /// returns the debited invocation to the grant.
+    pub fn reverse_reserved_invocation_by_nonce(
+        &self,
+        presented_nonce: &SignedExecutionNonce,
+        arguments: &serde_json::Value,
+    ) -> Result<(), KernelError> {
+        let action = ToolCallAction::from_parameters(arguments.clone()).map_err(|e| {
+            KernelError::ReceiptSigningFailed(format!(
+                "failed to hash arguments for reverse-by-nonce binding: {e}"
+            ))
+        })?;
+        if action.parameter_hash != presented_nonce.nonce.bound_to.parameter_hash {
+            return Err(KernelError::Internal(
+                "reverse-by-nonce arguments do not match the nonce parameter binding".to_string(),
+            ));
+        }
+
+        let reserved_hold_id = presented_nonce.reserved_hold_id().ok_or_else(|| {
+            KernelError::Internal(
+                "presented nonce does not name a reserved budget hold; nothing to reverse"
+                    .to_string(),
+            )
+        })?;
+        let bound_capability_id = presented_nonce.nonce.bound_to.capability_id.clone();
+
+        let store = self.execution_nonce_store.as_deref().ok_or_else(|| {
+            KernelError::Internal(
+                "execution nonce store is not installed; cannot reverse by nonce".to_string(),
+            )
+        })?;
+        let now_unix = current_unix_timestamp();
+        let now = i64::try_from(now_unix).unwrap_or(i64::MAX);
+        verify_execution_nonce(
+            presented_nonce,
+            &self.config.keypair.public_key(),
+            &presented_nonce.nonce.bound_to,
+            now,
+            store,
+        )
+        .map_err(|error| {
+            KernelError::Internal(format!("reverse-by-nonce rejected the nonce: {error}"))
+        })?;
+
+        self.with_budget_store(|store| {
+            let hold: BudgetHoldSnapshot =
+                store.get_budget_hold(reserved_hold_id)?.ok_or_else(|| {
+                    KernelError::Internal(format!(
+                        "reserved budget hold `{reserved_hold_id}` not found for reverse-by-nonce"
+                    ))
+                })?;
+            if !hold.disposition.is_open() {
+                return Err(KernelError::Internal(format!(
+                    "reserved budget hold `{reserved_hold_id}` is {} and cannot be reversed",
+                    hold.disposition.as_str()
+                )));
+            }
+            if hold.capability_id != bound_capability_id {
+                return Err(KernelError::Internal(format!(
+                    "reserved budget hold `{reserved_hold_id}` capability does not match the nonce binding"
+                )));
+            }
+            store.reverse_budget_hold(BudgetReverseHoldRequest {
+                capability_id: hold.capability_id.clone(),
+                grant_index: hold.grant_index,
+                reversed_exposure_units: hold.remaining_exposure_units,
+                hold_id: Some(hold.hold_id.clone()),
+                event_id: Some(format!("{}:reverse", hold.hold_id)),
+                authority: hold.authority.clone(),
+            })?;
+            Ok(())
+        })?;
+
+        // Release any sibling-sum share the reserved hold kept admitted. An
+        // invocation reserve records none (a no-op here), matching the immediate
+        // release at reserve time; the call keeps the contract uniform with
+        // reconcile-by-nonce.
+        self.release_reserved_sibling_share_for_hold(reserved_hold_id);
+
+        info!(
+            hold_id = %reserved_hold_id,
+            nonce_id = %presented_nonce.nonce_id(),
+            "reversed reserved invocation authorization by nonce"
+        );
+
+        Ok(())
     }
 }

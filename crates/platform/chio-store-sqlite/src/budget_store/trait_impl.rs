@@ -1157,6 +1157,21 @@ impl BudgetStore for SqliteBudgetStore {
         self.mark_hold_reserved_until(hold_id, reserved_until_unix_secs, currency)
     }
 
+    fn reserve_invocation_hold(
+        &self,
+        hold_id: &str,
+        capability_id: &str,
+        grant_index: usize,
+        reserved_until_unix_secs: i64,
+    ) -> Result<(), BudgetStoreError> {
+        self.reserve_invocation_hold(
+            hold_id,
+            capability_id,
+            grant_index,
+            reserved_until_unix_secs,
+        )
+    }
+
     fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
         self.reap_expired_reserved_holds(now_unix_secs)
     }

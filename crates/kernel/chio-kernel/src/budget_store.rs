@@ -769,6 +769,31 @@ pub trait BudgetStore: Send + Sync {
         Ok(())
     }
 
+    /// Adopt an already-debited invocation into a durable reserved hold that
+    /// carries zero monetary exposure, so a `max_invocations`-only reservation is
+    /// reversible and reapable by hold id exactly like a monetary reserve. The
+    /// invocation was already counted by [`Self::try_increment`]; this records the
+    /// hold WITHOUT touching the invocation count, marks it reserved with the TTL
+    /// deadline, and records no currency (there is no monetary envelope to
+    /// validate on reconcile). Reversing the hold returns the invocation;
+    /// reconciling or reaping it keeps the invocation consumed. Stores that do not
+    /// persist hold state treat this as a no-op (the default).
+    fn reserve_invocation_hold(
+        &self,
+        hold_id: &str,
+        capability_id: &str,
+        grant_index: usize,
+        reserved_until_unix_secs: i64,
+    ) -> Result<(), BudgetStoreError> {
+        let _ = (
+            hold_id,
+            capability_id,
+            grant_index,
+            reserved_until_unix_secs,
+        );
+        Ok(())
+    }
+
     /// Settle every reserved hold that is still `open` and whose `reserved_until`
     /// is at or before `now_unix_secs` at its reserved worst-case, forfeiting the
     /// reserved amount to realized spend. In the two-phase reserve/reconcile flow
