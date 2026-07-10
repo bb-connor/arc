@@ -231,3 +231,237 @@ fn genuine_pass_xcc_denied_when_no_pool_configured() {
         "a genuine XCC Pass charge must fail closed when no aggregate pool is configured"
     );
 }
+
+// ---------------------------------------------------------------------------
+// CONTROL-1 ceiling evidence: the aggregate pool holds under concurrency and
+// denies fail-closed at exhaustion, so the treasury never overspends.
+
+const FT_SERVER: &str = "chio.pass.compute";
+const FT_TOOL: &str = "compute";
+const FT_UNIT: &str = "XCC";
+const FT_BOARD_REF: &str = "board-2026-06-freetier";
+
+// 2026-06-15 UTC. Pinning issued_at keeps the derived pool window deterministic
+// and independent of the wall clock (no month-boundary flake).
+const WINDOW_JUNE_ISSUED_AT: u64 = 1_781_481_600;
+
+fn make_grant_in(per_invocation: u64, total: u64, currency: &str) -> ToolGrant {
+    ToolGrant {
+        server_id: FT_SERVER.to_string(),
+        tool_name: FT_TOOL.to_string(),
+        operations: vec![Operation::Invoke],
+        constraints: vec![],
+        max_invocations: None,
+        max_cost_per_invocation: Some(MonetaryAmount {
+            units: per_invocation,
+            currency: currency.to_string(),
+        }),
+        max_total_cost: Some(MonetaryAmount {
+            units: total,
+            currency: currency.to_string(),
+        }),
+        dpop_required: None,
+    }
+}
+
+/// Build a self-signed capability with full control over id, issued_at, and
+/// scope. `check_and_increment_budget` never verifies the signature, so a fresh
+/// keypair (distinct subject) per call is sufficient and keeps each Pass distinct.
+fn make_freetier_cap(id: &str, issued_at: u64, grant: ToolGrant) -> CapabilityToken {
+    let kp = make_keypair();
+    CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: id.to_string(),
+            issuer: kp.public_key(),
+            subject: kp.public_key(),
+            scope: make_scope(vec![grant]),
+            issued_at,
+            expires_at: issued_at.saturating_add(30 * 24 * 3600),
+            delegation_chain: Vec::new(),
+        },
+        &kp,
+    )
+    .expect("sign free-tier capability")
+}
+
+fn one_grant(cap: &CapabilityToken) -> Vec<MatchingGrant<'_>> {
+    vec![MatchingGrant {
+        index: 0,
+        grant: &cap.scope.grants[0],
+        specificity: (1, 1, 0),
+    }]
+}
+
+fn pool_kernel(monthly_pool_units: u64) -> ChioKernel {
+    make_kernel(make_config())
+        .with_free_tier_pool(FreeTierPoolConfig {
+            monthly_pool_units,
+            allotment_unit: FT_UNIT.to_string(),
+            board_approval_ref: FT_BOARD_REF.to_string(),
+        })
+        .expect("install board-approved free-tier pool")
+}
+
+
+/// Committed (held) cost units for `(capability_id, grant_index 0)`. Both the
+/// per-Pass row and the aggregate pool row key off grant index 0, so this helper
+/// serves both. A missing row reads as zero.
+fn committed_units(kernel: &ChioKernel, capability_id: &str) -> u64 {
+    kernel
+        .budget_store
+        .get_usage(capability_id, FREETIER_GLOBAL_GRANT_INDEX)
+        .expect("budget usage lookup")
+        .map(|record| record.committed_cost_units().expect("committed cost units"))
+        .unwrap_or(0)
+}
+
+
+/// Assert a charge fail-closed denies and return the error. Used instead of
+/// `Result::expect_err` because the `Ok` payload (`PreExecutionBudgetMutation`)
+/// is not `Debug`.
+fn expect_denied(
+    result: Result<(usize, PreExecutionBudgetMutation), KernelError>,
+    context: &str,
+) -> KernelError {
+    match result {
+        Ok(_) => panic!("expected a fail-closed deny ({context}), got an admitted charge"),
+        Err(err) => err,
+    }
+}
+
+// 1. Pool-disabled additive no-op: with no pool installed the existing monetary
+//    path is byte-identical to before the mechanism (Allow then exhaustion Deny)
+
+#[test]
+fn concurrent_free_tier_charges_are_atomic_against_the_pool_ceiling() {
+    use std::sync::{Arc, Barrier};
+
+    const ALLOT: u64 = 70;
+    let kernel = Arc::new(pool_kernel(ALLOT));
+    let term =
+        FreeTierPoolConfig::window_ym_from_issued_at(WINDOW_JUNE_ISSUED_AT).expect("window term");
+    let barrier = Arc::new(Barrier::new(2));
+
+    let mut handles = Vec::new();
+    for i in 0..2 {
+        let kernel = kernel.clone();
+        let barrier = barrier.clone();
+        handles.push(std::thread::spawn(move || {
+            let cap = make_freetier_cap(
+                &format!("cap-race-{i}"),
+                WINDOW_JUNE_ISSUED_AT,
+                make_grant_in(ALLOT, ALLOT, FT_UNIT),
+            );
+            let grants = one_grant(&cap);
+            barrier.wait();
+            kernel
+                .check_and_increment_budget(&format!("req-race-{i}"), &cap, &grants)
+                .is_ok()
+        }));
+    }
+
+    let admitted = handles
+        .into_iter()
+        .map(|handle| handle.join().expect("race thread joins"))
+        .filter(|ok| *ok)
+        .count();
+    assert_eq!(
+        admitted, 1,
+        "exactly one of the two racing charges is admitted"
+    );
+    assert_eq!(
+        committed_units(&kernel, &term),
+        ALLOT,
+        "the pool committed total never exceeds the one-allotment ceiling"
+    );
+}
+
+// 7. Symmetric reversal: cancelling a free-tier charge releases BOTH the per-Pass
+
+#[test]
+fn gate_1_pool_exhaustion_fails_closed_treasury_never_overspends() {
+    const ALLOT: u64 = 100;
+    const POOL: u64 = 3 * ALLOT;
+    let kernel = pool_kernel(POOL);
+    let term =
+        FreeTierPoolConfig::window_ym_from_issued_at(WINDOW_JUNE_ISSUED_AT).expect("window term");
+
+    for i in 0..3 {
+        let cap = make_freetier_cap(
+            &format!("cap-gate1-{i}"),
+            WINDOW_JUNE_ISSUED_AT,
+            make_grant_in(ALLOT, ALLOT, FT_UNIT),
+        );
+        let grants = one_grant(&cap);
+        let (_idx, mutation) = kernel
+            .check_and_increment_budget(&format!("req-gate1-{i}"), &cap, &grants)
+            .unwrap_or_else(|e| panic!("pass {i} must be admitted, got {e}"));
+        match &mutation {
+            PreExecutionBudgetMutation::Charge(charge) => {
+                assert_eq!(
+                    charge.cost_charged, ALLOT,
+                    "pass {i} charges exactly one allotment"
+                );
+                let hold = charge
+                    .free_tier_pool_hold
+                    .as_ref()
+                    .expect("each admitted Pass debits the shared pool");
+                assert_eq!(
+                    hold.term_id, term,
+                    "every Pass in the window debits the same pool row"
+                );
+                assert_eq!(hold.units, ALLOT);
+            }
+            _ => panic!("pass {i} expected a free-tier monetary charge"),
+        }
+    }
+    assert_eq!(
+        committed_units(&kernel, &term),
+        POOL,
+        "the pool is now exactly full (three allotments held)"
+    );
+
+    // The fourth distinct Pass: the gift is insolvent for this window.
+    let cap4 = make_freetier_cap(
+        "cap-gate1-3",
+        WINDOW_JUNE_ISSUED_AT,
+        make_grant_in(ALLOT, ALLOT, FT_UNIT),
+    );
+    let grants4 = one_grant(&cap4);
+    let committed_before = committed_units(&kernel, &cap4.id);
+
+    let err = expect_denied(
+        kernel.check_and_increment_budget("req-gate1-3", &cap4, &grants4),
+        "the fourth Pass must be denied (Verdict::Deny at the pipeline)",
+    );
+    // BudgetExhausted is the pre-execution deny the pipeline renders as
+    // Verdict::Deny with cost_charged == 0.
+    assert!(
+        matches!(&err, KernelError::BudgetExhausted(id) if *id == cap4.id),
+        "the deny is scoped to the fourth Pass, got {err}"
+    );
+
+    // cost_charged == 0: nothing stuck to the denied Pass. Its committed row is
+    // unchanged at zero (the per-Pass hold was authorized then reversed).
+    assert_eq!(
+        committed_units(&kernel, &cap4.id),
+        committed_before,
+        "the denying (cap.id, grant_index 0) row is unchanged"
+    );
+    assert_eq!(
+        committed_units(&kernel, &cap4.id),
+        0,
+        "the denied Pass keeps a zero committed balance"
+    );
+
+    // The pool row is UNCHANGED by the denied charge: committed == ceiling.
+    assert_eq!(
+        committed_units(&kernel, &term),
+        POOL,
+        "pool committed == monthly_pool_units exactly; the treasury never overspends"
+    );
+
+    // budget_remaining == 0: the pool is fully drawn and admits nothing further.
+    let remaining = POOL - committed_units(&kernel, &term);
+    assert_eq!(remaining, 0, "the pool budget_remaining is 0");
+}
