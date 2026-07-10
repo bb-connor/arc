@@ -1612,6 +1612,59 @@ impl ChioKernel {
             })
     }
 
+    /// Whether `request` carries a governed MustPrepay intent, i.e. one whose
+    /// metered billing mandates prepayment before the tool executes.
+    pub(crate) fn is_governed_mustprepay_request(request: &ToolCallRequest) -> bool {
+        Self::mustprepay_quoted_amount(request).is_some()
+    }
+
+    /// Satisfy the governed MustPrepay prepayment gate before a reserve-for-caller
+    /// authorization nonce is minted.
+    ///
+    /// The reserve-for-caller path never dispatches the tool on this kernel: the
+    /// caller presents the minted nonce to a downstream tool server, which
+    /// reconciles the reserved budget hold without re-entering payment
+    /// authorization. A MustPrepay intent therefore has no later settlement point,
+    /// so the prepayment must be authorized AND settled here, before the nonce
+    /// exists. Otherwise a reserved nonce would let the caller execute a MustPrepay
+    /// spend downstream with no payment ever occurring.
+    ///
+    /// The prepayment is settled at the intent's quoted cost (the amount that will
+    /// actually be prepaid), independently of the reserved budget hold that stays
+    /// open for `max_total_cost` accounting and is reconciled downstream.
+    ///
+    /// Returns `Ok(())` when the request is not a governed MustPrepay intent
+    /// (nothing to prepay) or the prepayment settled. Returns `Err` so the caller
+    /// denies fail-closed when the prepayment cannot be authorized or settled; any
+    /// unsettled hold is released so the payer's funds are not left frozen.
+    pub(crate) fn ensure_reserved_mustprepay_prepaid(
+        &self,
+        request: &ToolCallRequest,
+    ) -> Result<(), KernelError> {
+        if !Self::is_governed_mustprepay_request(request) {
+            return Ok(());
+        }
+        let authorization = self
+            .authorize_payment_if_needed(request, None)
+            .map_err(|error| {
+                KernelError::GovernedTransactionDenied(format!(
+                    "MustPrepay prepayment authorization failed before reserving an execution nonce: {error}"
+                ))
+            })?;
+        let Some(authorization) = authorization else {
+            return Err(KernelError::GovernedTransactionDenied(
+                "MustPrepay intent reached the reserve-for-caller path without an authorized prepayment".to_string(),
+            ));
+        };
+        match self.settle_prepaid_authorization_without_charge(request, &authorization)? {
+            Some(_) => Ok(()),
+            None => Err(KernelError::GovernedTransactionDenied(
+                "MustPrepay prepayment could not be settled before reserving an execution nonce"
+                    .to_string(),
+            )),
+        }
+    }
+
     /// Settle a prepaid authorization for a MustPrepay call whose grant carries
     /// no monetary ceiling (no budget charge to reconcile).
     ///

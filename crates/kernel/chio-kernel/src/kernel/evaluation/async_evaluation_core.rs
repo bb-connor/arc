@@ -481,14 +481,41 @@ impl ChioKernel {
                             &budget_mutation,
                             extra_metadata,
                         ),
-                    PreflightHoldDisposition::ReserveForCaller => self
-                        .build_execution_nonce_authorization_reserving_response(
+                    PreflightHoldDisposition::ReserveForCaller => {
+                        // A governed MustPrepay intent must have prepaid before a
+                        // reserved nonce is minted: this kernel never dispatches the
+                        // tool on the reserve path, so there is no later point to
+                        // settle the payment. Deny fail-closed (reversing the hold and
+                        // releasing the admitted share) when the prepayment cannot be
+                        // authorized or settled, so no nonce is handed out unpaid.
+                        if let Err(error) = self.ensure_reserved_mustprepay_prepaid(request) {
+                            let msg = error.to_string();
+                            warn!(
+                                request_id = %request.request_id,
+                                reason = %redacted!(&msg),
+                                "reserve-for-caller prepayment gate denied"
+                            );
+                            return self.build_pre_dispatch_cleanup_deny_response(
+                                PreDispatchCleanupDeny {
+                                    request,
+                                    reason: &msg,
+                                    timestamp: now,
+                                    matched_grant_index,
+                                    cap,
+                                    budget_mutation: &budget_mutation,
+                                    payment_authorization: None,
+                                    runtime_admission_metadata: extra_metadata,
+                                },
+                            );
+                        }
+                        self.build_execution_nonce_authorization_reserving_response(
                             request,
                             now,
                             matched_grant_index,
                             &budget_mutation,
                             extra_metadata,
-                        ),
+                        )
+                    }
                 }
             });
         }

@@ -723,3 +723,135 @@ fn settled_no_charge_mustprepay_abort_refunds_prepaid_quote() {
         "an aborted dispatch must not capture the hold again"
     );
 }
+
+// The reserve-for-caller path never dispatches the tool on this kernel: the
+// caller presents the minted nonce to a downstream tool server, which reconciles
+// the reserved hold without re-entering payment authorization. A governed
+// MustPrepay intent therefore has no later settlement point, so a nonce must not
+// be minted until the prepayment is settled here. A prepayment that cannot be
+// settled must fail closed with no nonce and no reserved hold, or the caller could
+// execute a MustPrepay spend downstream with no payment ever occurring.
+#[test]
+fn reserving_authorization_denies_governed_mustprepay_without_settled_prepayment() {
+    let MustPrepayFixture { mut kernel, cap, agent_kp } = build_mustprepay_fixture(75);
+    let payment = UncapturablePaymentAdapter::default();
+    kernel.set_payment_adapter(Box::new(payment.clone()));
+    install_strict_nonce_store(&mut kernel);
+
+    let intent = make_mustprepay_intent("intent-reserve-deny", "cost-srv", "compute", 100, "USD");
+    let request =
+        mustprepay_tool_call("req-reserve-mustprepay-deny", &cap, &agent_kp, intent, &kernel);
+
+    let response = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
+        .unwrap();
+
+    assert_eq!(
+        response.verdict,
+        Verdict::Deny,
+        "a MustPrepay reserve whose prepayment cannot settle must fail closed: {:?}",
+        response.reason
+    );
+    assert!(
+        response.execution_nonce.is_none(),
+        "no execution nonce may be minted for an unpaid MustPrepay reserve"
+    );
+    assert_eq!(
+        payment.released.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "the unsettled prepaid hold must be released so the payer's funds are not frozen"
+    );
+    // The reserved budget hold was reversed, not stranded open: a later
+    // authorization on the fully-bounded grant is not blocked by a dead reservation.
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    assert_eq!(
+        usage.committed_cost_units().unwrap(),
+        0,
+        "a denied MustPrepay reserve must leave no committed exposure"
+    );
+}
+
+// A governed MustPrepay reserve whose prepayment settles is admitted: the budget
+// hold stays reserved and an execution nonce is minted for the downstream caller.
+// The prepayment is authorized AND captured before the nonce exists, so the spend
+// the caller later executes has already been paid.
+#[test]
+fn reserving_authorization_admits_governed_mustprepay_with_settled_prepayment() {
+    let MustPrepayFixture { mut kernel, cap, agent_kp } = build_mustprepay_fixture(75);
+    let payment = TrackingPaymentAdapter::new();
+    kernel.set_payment_adapter(Box::new(payment.clone()));
+    install_strict_nonce_store(&mut kernel);
+
+    let intent = make_mustprepay_intent("intent-reserve-allow", "cost-srv", "compute", 100, "USD");
+    let request =
+        mustprepay_tool_call("req-reserve-mustprepay-allow", &cap, &agent_kp, intent, &kernel);
+
+    let response = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
+        .unwrap();
+
+    assert_eq!(
+        response.verdict,
+        Verdict::Allow,
+        "a settled MustPrepay prepayment must admit the reserve: {:?}",
+        response.reason
+    );
+    assert!(matches!(
+        response.terminal_state,
+        OperationTerminalState::Incomplete { .. }
+    ));
+    assert!(
+        response.execution_nonce.is_some(),
+        "a settled MustPrepay reserve must mint an execution nonce for the downstream caller"
+    );
+    assert_eq!(
+        payment.authorized.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "the prepayment must be authorized before the nonce is minted"
+    );
+    assert_eq!(
+        payment.captured.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "the prepayment must be settled (captured) before the nonce is minted"
+    );
+    assert_eq!(
+        payment.released.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "a settled prepayment must not be released"
+    );
+}
+
+// The reserve-for-caller prepayment gate is scoped to governed MustPrepay intents.
+// A plain monetary reserve with a payment adapter configured is unchanged: it
+// reserves the hold and mints a nonce without authorizing any prepayment (the tool
+// is billed at reconcile time downstream).
+#[test]
+fn reserving_authorization_leaves_non_mustprepay_path_unchanged() {
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+    let payment = TrackingPaymentAdapter::new();
+    kernel.set_payment_adapter(Box::new(payment.clone()));
+    install_strict_nonce_store(&mut kernel);
+
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    let request = reserve_request("req-reserve-plain", &cap, &agent_kp);
+
+    let response = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
+        .unwrap();
+
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert!(
+        response.execution_nonce.is_some(),
+        "a non-MustPrepay reserve must still mint an execution nonce"
+    );
+    assert_eq!(
+        payment.authorized.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "a non-MustPrepay reserve must not authorize a prepayment"
+    );
+}
