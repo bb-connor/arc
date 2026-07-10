@@ -1144,8 +1144,8 @@ impl ChioKernel {
             // the receipt deserializes as `FinancialReceiptMetadata` and reflects
             // the completed prepaid spend, not a partial fragment that receipt
             // queries and dashboards cannot read.
-            let (quoted_units, quoted_currency) = Self::mustprepay_quoted_amount(request)
-                .unwrap_or_else(|| (0, "USD".to_string()));
+            let (quoted_units, quoted_currency) =
+                Self::mustprepay_quoted_amount(request).unwrap_or_else(|| (0, "USD".to_string()));
             let financial_meta = FinancialReceiptMetadata {
                 grant_index: matched_grant_index as u32,
                 cost_charged: quoted_units,

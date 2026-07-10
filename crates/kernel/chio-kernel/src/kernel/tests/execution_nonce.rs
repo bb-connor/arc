@@ -2055,3 +2055,177 @@ fn reserving_stamp_failure_persists_no_reserved_receipt() {
         "a successful reservation persists exactly one reserved receipt"
     );
 }
+
+// ---------------------------------------------------------------------------
+// A durable receipt persist failure AFTER a successful reservation stamp must
+// reverse the stamped hold and release the sibling-sum share, mirroring the
+// stamp-failure cleanup. Otherwise the open, stamped hold burns budget for an
+// authorization the caller never received until the TTL reaper forfeits it.
+// ---------------------------------------------------------------------------
+
+/// A receipt store whose `append` fails on demand, so a reservation stamp lands
+/// but the durable receipt persist that follows it fails.
+struct TogglingAppendReceiptStore {
+    fail: std::sync::Arc<AtomicBool>,
+}
+
+impl ReceiptStore for TogglingAppendReceiptStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        if self.fail.load(Ordering::SeqCst) {
+            return Err(ReceiptStoreError::Conflict(
+                "receipt append failed (test double)".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn append_child_receipt(&self, _receipt: &ChildRequestReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+}
+
+/// A receipt store that forwards capability-snapshot reads to a real store (so
+/// delegation validation still resolves ancestors) but fails receipt `append` on
+/// demand, so a delegated reservation stamp lands and its durable persist fails.
+struct TogglingSnapshotReceiptStore {
+    inner: SqliteReceiptStore,
+    fail: std::sync::Arc<AtomicBool>,
+}
+
+impl ReceiptStore for TogglingSnapshotReceiptStore {
+    fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        if self.fail.load(Ordering::SeqCst) {
+            return Err(ReceiptStoreError::Conflict(
+                "receipt append failed (test double)".to_string(),
+            ));
+        }
+        self.inner.append_chio_receipt(receipt)
+    }
+
+    fn append_child_receipt(&self, receipt: &ChildRequestReceipt) -> Result<(), ReceiptStoreError> {
+        self.inner.append_child_receipt(receipt)
+    }
+
+    fn record_capability_snapshot(
+        &self,
+        token: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+    ) -> Result<(), ReceiptStoreError> {
+        self.inner
+            .record_capability_snapshot(token, parent_capability_id)
+    }
+
+    fn get_capability_snapshot(
+        &self,
+        capability_id: &str,
+    ) -> Result<Option<CapabilitySnapshot>, ReceiptStoreError> {
+        self.inner.get_capability_snapshot(capability_id)
+    }
+}
+
+#[test]
+fn reserving_receipt_persist_failure_reverses_stamped_monetary_hold() {
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
+    let fail = std::sync::Arc::new(AtomicBool::new(true));
+    kernel
+        .set_receipt_store(Box::new(TogglingAppendReceiptStore {
+            fail: std::sync::Arc::clone(&fail),
+        }))
+        .unwrap();
+    install_strict_nonce_store(&mut kernel);
+
+    // The whole grant is reservable by one authorization, so a stranded hold would
+    // block every later reservation on the grant.
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let request = reserve_request("req-persist-fail", &cap, &agent_kp);
+    let err = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("append") || err.to_string().contains("receipt"),
+        "the receipt persist failure must surface: {err}"
+    );
+
+    // The stamped hold was reversed, not left open over a failed persist.
+    let hold_id = format!("budget-hold:req-persist-fail:{}:0", cap.id);
+    let hold = kernel
+        .budget_store
+        .get_budget_hold(&hold_id)
+        .unwrap()
+        .expect("the authorized hold is recorded");
+    assert_eq!(
+        hold.disposition,
+        crate::budget_store::BudgetHoldDispositionView::Reversed,
+        "a receipt persist failure after the stamp must reverse the hold"
+    );
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    assert_eq!(
+        usage.committed_cost_units().unwrap(),
+        0,
+        "the reversed hold leaves no committed exposure"
+    );
+
+    // Once the receipt store recovers, a later reservation on the same
+    // fully-bounded grant succeeds: nothing was stranded by the failed persist.
+    fail.store(false, Ordering::SeqCst);
+    let retry = reserve_request("req-persist-recover", &cap, &agent_kp);
+    let reserved = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&retry, None)
+        .unwrap();
+    assert_eq!(
+        reserved.verdict,
+        Verdict::Allow,
+        "a later reservation must succeed after the failed persist was unwound: {:?}",
+        reserved.reason
+    );
+}
+
+#[test]
+fn reserving_receipt_persist_failure_releases_delegated_sibling_share() {
+    let fixture = make_sibling_sum_monetary_fixture("reserve-persist-sibling");
+    let path = fixture.path.clone();
+    let mut kernel = fixture.kernel;
+    let fail = std::sync::Arc::new(AtomicBool::new(true));
+    kernel
+        .set_receipt_store(Box::new(TogglingSnapshotReceiptStore {
+            inner: SqliteReceiptStore::open(&path).unwrap(),
+            fail: std::sync::Arc::clone(&fail),
+        }))
+        .unwrap();
+    install_strict_nonce_store(&mut kernel);
+
+    // Child A's reserve stamps a monetary hold and records its sibling-sum share,
+    // then the durable receipt persist fails. The tear-down must reverse the hold
+    // AND release the recorded share so a sibling is not permanently blocked.
+    let first = delegated_reserve_request("req-a-reserve", &fixture.child_a, &fixture.child_a_kp);
+    let err = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("append") || err.to_string().contains("receipt"),
+        "the receipt persist failure must surface: {err}"
+    );
+
+    // The receipt store recovers; child B must now be admitted, proving child A's
+    // sibling share was released by the tear-down (not leaked over the failed
+    // persist).
+    fail.store(false, Ordering::SeqCst);
+    let second = delegated_reserve_request("req-b-reserve", &fixture.child_b, &fixture.child_b_kp);
+    let admitted_b = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&second, None)
+        .unwrap();
+    assert_eq!(
+        admitted_b.verdict,
+        Verdict::Allow,
+        "child B must be admitted after child A's failed reservation released its share: {:?}",
+        admitted_b.reason
+    );
+
+    let _ = std::fs::remove_file(path);
+}
