@@ -505,7 +505,7 @@ impl VerifiedDirectory {
 
     /// The bundle validity-window end this directory was verified against (the
     /// same field the load-time validity check reads). The reloader compares this
-    /// against `now` BEFORE any unchanged fast path (RFC-0012 F34).
+    /// against `now` BEFORE any unchanged fast path.
     #[must_use]
     pub fn expires_at_unix_ms(&self) -> u64 {
         self.expires_at_unix_ms
@@ -513,7 +513,7 @@ impl VerifiedDirectory {
 
     /// A deny-all directory: admits nothing, is party to no treaty. Used as the
     /// fail-closed terminal state when the running bundle expires with no valid
-    /// successor (RFC-0012 F34). version 0, expiry 0, empty indices.
+    /// successor. version 0, expiry 0, empty indices.
     #[must_use]
     pub fn empty_deny_all() -> Self {
         Self {

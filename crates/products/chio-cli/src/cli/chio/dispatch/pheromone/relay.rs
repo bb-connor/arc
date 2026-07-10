@@ -51,8 +51,8 @@ impl chio_pheromone_relay::RelayBatchReceiver for CliRelayBatchReceiver {
         chio_pheromone_relay::PheromoneRelayError,
     > {
         // Consult the same runtime store receive_batch opens: surface a
-        // durably-committed verdict for this (batch, sender) pair (RFC-0012 F35)
-        // without re-running receive_batch. The sender scope is applied at the query
+        // durably-committed verdict for this (batch, sender) pair without re-running
+        // receive_batch. The sender scope is applied at the query
         // level so a cross-sender verdict for the same bytes is never returned. Store
         // errors map to the Json variant, the same internal-error shape receive_batch
         // uses for a store-open failure above.
@@ -321,10 +321,9 @@ pub(crate) fn cmd_chio_pheromone_relay_serve(
                 CliError::cli_other_error(format!("Chio pheromone relay bind: {error}"))
             })?;
 
-        // RFC-0012: spawn the directory reloader (F34) and the router-liveness
-        // watchdog (F33d) alongside the serve when the iroh transport is mounted.
-        // Both reuse the dedicated liveness-task pattern and are aborted before the
-        // router teardown below.
+        // Spawn the directory reloader and the router-liveness watchdog alongside the
+        // serve when the iroh transport is mounted. Both are dedicated tasks feeding
+        // shared state, aborted before the router teardown below.
         let iroh_background = iroh_mount.as_ref().map(|mount| {
             let alive = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
             chio_federation_transport_iroh::metrics::set_router_alive(true);
@@ -339,12 +338,12 @@ pub(crate) fn cmd_chio_pheromone_relay_serve(
                         // This node's actual bound transport endpoint. The reloader
                         // rechecks every re-verified successor against it and fails
                         // closed to deny-all if the successor tombstones or rotates
-                        // this binding (RFC-0012 F34).
+                        // this binding.
                         local_transport_endpoint: mount.endpoint_id,
                         // This node's localKernelId, so the recheck requires the
                         // successor to bind THIS kernel to THIS endpoint (mirroring the
                         // startup check), not merely that the endpoint resolves to some
-                        // kernel (RFC-0012 F34).
+                        // kernel.
                         local_kernel_id: mount.transport_local_kernel_id.clone(),
                     };
                     Some(tokio::spawn(run_directory_reloader(
@@ -1335,8 +1334,8 @@ mod tests {
 
         #[test]
         fn direct_address_book_threads_the_socket_onto_the_resolved_endpoint() {
-            // FINDING 1 (codex round-7): in a relay-disabled / direct-address deployment
-            // the resolver must thread the --iroh-peer-addr socket onto the resolved
+            // In a relay-disabled / direct-address deployment the resolver must thread
+            // the --iroh-peer-addr socket onto the resolved
             // EndpointId so the drain can dial a peer known only by EndpointId + socket,
             // while an id-only resolution still works where discovery/relay is configured.
             let directory = verified_directory("did:chio:buyer", 24);

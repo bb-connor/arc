@@ -119,16 +119,15 @@ mod tests {
 
     #[test]
     fn receive_report_lookup_is_scoped_to_the_authenticated_sender() {
-        // RFC-0012 F35: a batch hash is NOT sender-unique. A wrong-sender replay can record
-        // a REJECTED verdict for the same bytes BEFORE the correct sender's crash-recovery
-        // report. The lookup must return the row for the QUERIED sender, never an arbitrary
+        // A batch hash is NOT sender-unique. A wrong-sender replay can record a REJECTED
+        // verdict for the same bytes BEFORE the correct sender's crash-recovery report.
+        // The lookup must return the row for the QUERIED sender, never an arbitrary
         // cross-sender row, or recovery would adopt the wrong verdict and re-run receive on
         // an already-committed batch.
         //
-        // TEETH:
-        //  - RED (unqualified `SELECT ... WHERE batch_sha256 = ?`): returns whichever row
-        //    the engine yields first (here the wrong-sender REJECTED report, recorded first).
-        //  - GREEN (sender-scoped query): returns each sender's own row.
+        // An unqualified `SELECT ... WHERE batch_sha256 = ?` returns whichever row the
+        // engine yields first (here the wrong-sender REJECTED report, recorded first); the
+        // sender-scoped query returns each sender's own row.
         let store = SqlitePheromoneRuntimeStore::open_in_memory().expect("store opens");
         // Wrong sender records a rejected verdict for the batch FIRST (earlier timestamp).
         let wrong = receive_report("shared-batch", "did:chio:mallory", false, 1);
@@ -369,8 +368,8 @@ impl SqlitePheromoneRuntimeStore {
     }
 
     /// Recover a durably-recorded receive report by its batch hash SCOPED to the
-    /// authenticated sender, if the store committed one for that (batch, sender) pair
-    /// (RFC-0012 F35). The sender scope is applied AT THE QUERY LEVEL: a batch hash is
+    /// authenticated sender, if the store committed one for that (batch, sender) pair.
+    /// The sender scope is applied AT THE QUERY LEVEL: a batch hash is
     /// NOT sender-unique (a wrong-sender replay can record a rejected report for the same
     /// bytes before the correct sender's crash-recovery report), so an unqualified
     /// `SELECT` could return an arbitrary cross-sender row. Filtering by
@@ -798,8 +797,8 @@ impl PheromoneRuntimeStore for SqlitePheromoneRuntimeStore {
     }
 }
 
-/// Additive migration: the recovery columns + index for verdict recovery (RFC-0012
-/// F35). `batch_sha256` keys the recovery lookup; `sender_kernel_id` SCOPES it to the
+/// Additive migration: the recovery columns + index for verdict recovery.
+/// `batch_sha256` keys the recovery lookup; `sender_kernel_id` SCOPES it to the
 /// authenticated sender, so a lookup for a batch that several senders recorded reports
 /// for (for example a wrong-sender replay that recorded a rejected verdict alongside the
 /// correct sender's crash-recovery report) returns the CORRECT sender's row rather than

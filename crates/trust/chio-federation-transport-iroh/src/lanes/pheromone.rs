@@ -532,8 +532,8 @@ impl PheromoneBatchHandler {
                         slot.release()?;
                         stored
                     } else {
-                        // WINNER-PATH DURABLE-VERDICT RECOVERY (RFC-0012 F35, symmetric
-                        // with the loser path below). Winning the reservation and finding no
+                        // WINNER-PATH DURABLE-VERDICT RECOVERY (symmetric with the loser
+                        // path below). Winning the reservation and finding no
                         // recorded inbox verdict does NOT prove the batch is unreceived across
                         // the two-store boundary. receive_batch self-commits its runtime
                         // mutation (deposits + receive-report) in the RUNTIME store; slot.commit()
@@ -587,7 +587,7 @@ impl PheromoneBatchHandler {
                             // recovery, and `accept` counts LANE_OUTCOME_ACCEPT once for every
                             // Ok(()), exactly as it does for a fresh delivery or an inbox hit.
                             // Counting here too would emit TWO accept samples for one recovered
-                            // redelivery (RFC-0012 F35 metric dedupe).
+                            // redelivery (metric dedupe).
                             let _ = self.store.record_inbox(
                                 &authenticated_sender,
                                 &nonce,
@@ -665,8 +665,8 @@ impl PheromoneBatchHandler {
                     match verdict {
                         Some(stored) => stored,
                         None => {
-                            // Durable-verdict recovery (RFC-0012 F35): the bounded poll
-                            // found no recorded inbox verdict, but the runtime store may
+                            // Durable-verdict recovery: the bounded poll found no recorded
+                            // inbox verdict, but the runtime store may
                             // have durably committed this batch before a crash in the
                             // commit-to-record window (receive_batch self-committed the
                             // deposits; the process died before record_inbox wrote the
@@ -710,8 +710,7 @@ impl PheromoneBatchHandler {
                                 // The lane accept counter is NOT incremented here: `handle`
                                 // returns Ok on this recovery and `accept` counts
                                 // LANE_OUTCOME_ACCEPT once for every Ok(()), so counting here too
-                                // would double-count one recovered redelivery (RFC-0012 F35
-                                // metric dedupe).
+                                // would double-count one recovered redelivery (metric dedupe).
                                 self.store
                                     .release_inbox_slot(&authenticated_sender, &nonce)?;
                                 recovered
@@ -1161,8 +1160,8 @@ mod tests {
     const TREATY: &str = "treaty:buyer-llamaworks:support-ops";
     const NAMESPACE: &str = "dev.chio.support";
 
-    /// Serializes every test that records a pheromone-lane ACCEPT so the F35
-    /// double-count teeth-tests can assert an EXACT delta on the process-global metric
+    /// Serializes every test that records a pheromone-lane ACCEPT so the double-count
+    /// tests can assert an EXACT delta on the process-global metric
     /// statics. Without it, the ~8 parallel accept-counting tests in this module would
     /// perturb the shared counter between a test's before/after reads. Any NEW test that
     /// drives a successful delivery (a lane ACCEPT) MUST acquire this guard.
@@ -1824,7 +1823,7 @@ mod tests {
         router.shutdown().await.ok();
     }
 
-    /// A receiver double shared by BOTH F35 recovery tests (loser and winner path):
+    /// A receiver double shared by BOTH recovery tests (loser and winner path):
     /// its `receive_batch` must never run (neither recovery path re-receives an
     /// already-admitted batch), and its `recorded_report_for_batch` surfaces the
     /// durably-committed runtime verdict. The panic is the teeth: any recovery path
@@ -1857,15 +1856,11 @@ mod tests {
     #[tokio::test]
     async fn verdict_recovery_converges_after_commit_before_record_crash() {
         let _serial = COUNTED_ACCEPT_SERIAL.lock().await;
-        // RFC-0012 F35: a crash after receive_batch self-commits its deposits but
-        // before record_inbox writes the durable verdict leaves the reservation
-        // committed=1. A redelivery loses the slot and reaches the loser path; it
-        // must recover the durable verdict (via recorded_report_for_batch) and
-        // converge, never dead-letter the accepted batch.
-        //
-        // RFC-0012: implemented inline; reconcile to RFC-0003's canonical
-        // durable-intent-recovery acceptance harness when it lands (this is a
-        // self-contained durable-verdict-recovery harness standing in for it).
+        // A crash after receive_batch self-commits its deposits but before record_inbox
+        // writes the durable verdict leaves the reservation committed=1. A redelivery
+        // loses the slot and reaches the loser path; it must recover the durable verdict
+        // (via recorded_report_for_batch) and converge, never dead-letter the accepted
+        // batch.
         let dialer_seed = 40u8;
         let gate = verified_gate("did:chio:bob", 1, dialer_seed, false);
 
@@ -1946,10 +1941,10 @@ mod tests {
             store.lookup_inbox_report(sender, &nonce).unwrap().is_some(),
             "recovery adopts the durable verdict as the inbox record"
         );
-        // TEETH (RFC-0012 F35 metric dedupe): a recovered redelivery must count EXACTLY
-        // ONE accept, like a fresh delivery or an inbox hit. `accept` counts one accept for
-        // every Ok(()); a stray inner count in handle's loser-path recovery would emit a
-        // SECOND sample. RED (pre-fix): delta == 2. GREEN (post-fix): delta == 1.
+        // Metric dedupe: a recovered redelivery must count EXACTLY ONE accept, like a
+        // fresh delivery or an inbox hit. `accept` counts one accept for every Ok(()); a
+        // stray inner count in handle's loser-path recovery would emit a SECOND sample
+        // (delta == 2 instead of 1).
         let after = settled_pheromone_accept_total(before, 1).await;
         assert_eq!(
             after - before,
@@ -1963,7 +1958,7 @@ mod tests {
     #[tokio::test]
     async fn winner_path_adopts_durable_verdict_after_commit_before_mark_crash() {
         let _serial = COUNTED_ACCEPT_SERIAL.lock().await;
-        // RFC-0012 F35 (WINNER path, symmetric with the loser-path recovery above).
+        // WINNER path, symmetric with the loser-path recovery above.
         // The winner and loser paths cover two DIFFERENT crash windows, distinguished
         // solely by the reservation's committed flag at open:
         //  - LOSER window (test above): a crash AFTER slot.commit() leaves a
@@ -1973,16 +1968,16 @@ mod tests {
         //    its runtime deposits (in the RUNTIME store) and slot.commit() marking the
         //    RELAY reservation committed leaves committed = 0, which the store reclaims
         //    at open. A redelivery therefore WINS reserve_inbox_slot, re-reads the RELAY
-        //    inbox (still None), and - WITHOUT the fix - re-runs receive_batch on an
-        //    already-admitted batch. The runtime replay-nonce idempotency then turns
-        //    every frame into ReplayWindowExceeded, recording + returning a spurious
-        //    REJECTED verdict that dead-letters an accepted batch. WITH the fix the
-        //    winner path consults the RUNTIME store by batch_sha256 first and ADOPTS the
-        //    durable verdict, never re-running receive_batch.
+        //    inbox (still None), and, absent the runtime-store consult, would re-run
+        //    receive_batch on an already-admitted batch. The runtime replay-nonce
+        //    idempotency then turns every frame into ReplayWindowExceeded, recording +
+        //    returning a spurious REJECTED verdict that dead-letters an accepted batch.
+        //    The winner path instead consults the RUNTIME store by batch_sha256 first and
+        //    ADOPTS the durable verdict, never re-running receive_batch.
         //
-        // TEETH: the shared RecoveringReceiver double PANICS if receive_batch is called,
-        // so the RED (pre-fix) winner path trips the panic (the delivery fails / never
-        // returns the accepted report); the GREEN (post-fix) path adopts the durable
+        // The shared RecoveringReceiver double PANICS if receive_batch is called: a winner
+        // path that re-ran the receiver would trip the panic (the delivery fails / never
+        // returns the accepted report). The recovery path instead adopts the durable
         // verdict without touching the receiver.
         let dialer_seed = 44u8;
         let gate = verified_gate("did:chio:bob", 1, dialer_seed, false);
@@ -2021,8 +2016,8 @@ mod tests {
         };
 
         // The SHARED double: receive_batch PANICS (teeth), recorded_report_for_batch
-        // returns the durable verdict. If the winner path re-ran the receiver (the bug),
-        // this panics; the fix must adopt the durable verdict instead.
+        // returns the durable verdict. A winner path that re-ran the receiver would panic
+        // here; the recovery path adopts the durable verdict instead.
         let receiver: Arc<dyn RelayBatchReceiver> = Arc::new(RecoveringReceiver { report: canned });
         let scope_check: InboundBatchScopeCheck = Arc::new(
             |_sender: &str, _batch: &PheromoneGossipBatch| -> Result<(), PheromoneRelayError> {
@@ -2070,9 +2065,8 @@ mod tests {
             store.lookup_inbox_report(sender, &nonce).unwrap().is_some(),
             "winner-path recovery adopts the durable verdict as the inbox record"
         );
-        // TEETH (RFC-0012 F35 metric dedupe): a recovered redelivery must count EXACTLY
-        // ONE accept. RED (pre-fix): the winner-path inner count made delta == 2. GREEN
-        // (post-fix): delta == 1.
+        // Metric dedupe: a recovered redelivery must count EXACTLY ONE accept. A stray
+        // winner-path inner count would make delta == 2 instead of 1.
         let after = settled_pheromone_accept_total(before, 1).await;
         assert_eq!(
             after - before,
@@ -2083,7 +2077,7 @@ mod tests {
         router.shutdown().await.ok();
     }
 
-    /// A receiver double for the F35 sender-scoping teeth-tests: its
+    /// A receiver double for the sender-scoping tests: its
     /// `recorded_report_for_batch` returns a durable verdict recorded under a
     /// DIFFERENT authenticated sender, and its `receive_batch` records that it ran
     /// (via `received`) and returns a distinguishable FRESH verdict. A recovery
@@ -2120,7 +2114,7 @@ mod tests {
     }
 
     /// Build a `PheromoneReceiveReport` for these `batch` bytes under `sender` with
-    /// the given `accepted` outcome, for the sender-scoping teeth-tests.
+    /// the given `accepted` outcome, for the sender-scoping tests.
     fn scoping_report(
         batch: &PheromoneGossipBatch,
         batch_bytes: &[u8],
@@ -2149,22 +2143,20 @@ mod tests {
     #[tokio::test]
     async fn winner_path_rejects_recovered_verdict_from_a_different_sender() {
         let _serial = COUNTED_ACCEPT_SERIAL.lock().await;
-        // RFC-0012 F35 sender-scoping (SECURITY). The runtime store keys receive
-        // reports by batch_sha256 ALONE, so a verdict it holds for these batch bytes
-        // may have been recorded under a DIFFERENT authenticated sender. The winner
-        // path must NOT adopt such a verdict verbatim: that would attribute another
-        // sender's accept/reject to THIS (sender, nonce), bypassing the per-frame
-        // gossiping_peer_kernel_id == authenticated_sender binding. It must discard the
-        // cross-sender verdict and fall through to receive_batch, re-verifying under
-        // THIS sender.
+        // Sender-scoping (SECURITY). The runtime store keys receive reports by
+        // batch_sha256 ALONE, so a verdict it holds for these batch bytes may have been
+        // recorded under a DIFFERENT authenticated sender. The winner path must NOT adopt
+        // such a verdict verbatim: that would attribute another sender's accept/reject to
+        // THIS (sender, nonce), bypassing the per-frame gossiping_peer_kernel_id ==
+        // authenticated_sender binding. It must discard the cross-sender verdict and fall
+        // through to receive_batch, re-verifying under THIS sender.
         //
-        // TEETH: recorded_report_for_batch returns an ACCEPTED verdict recorded under
+        // recorded_report_for_batch returns an ACCEPTED verdict recorded under
         // "did:chio:alice"; the authenticated sender is "did:chio:bob"; the fresh
-        // receive_batch verdict for bob is a distinguishable REJECTED one.
-        //  - RED (pre-fix): the winner path adopts alice's accepted verdict, so the
-        //    dialer reads accepted == true and receive_batch never runs.
-        //  - GREEN (post-fix): the scoped winner path discards alice's verdict, runs
-        //    receive_batch under bob, and returns bob's rejected verdict.
+        // receive_batch verdict for bob is a distinguishable REJECTED one. An unscoped
+        // winner path would adopt alice's accepted verdict (the dialer reads accepted ==
+        // true and receive_batch never runs); the scoped winner path discards alice's
+        // verdict, runs receive_batch under bob, and returns bob's rejected verdict.
         let dialer_seed = 46u8;
         let gate = verified_gate("did:chio:bob", 1, dialer_seed, false);
 
@@ -2238,19 +2230,18 @@ mod tests {
     #[tokio::test]
     async fn loser_path_rejects_recovered_verdict_from_a_different_sender() {
         let _serial = COUNTED_ACCEPT_SERIAL.lock().await;
-        // RFC-0012 F35 sender-scoping (SECURITY), loser path. Symmetric with the
-        // winner-path teeth-test: a committed residual reservation with no recorded
-        // inbox verdict sends the redelivery down the loser path, where the runtime
-        // store holds a verdict for these bytes recorded under a DIFFERENT sender.
-        // The loser path must NOT adopt it (that would hand THIS sender another
-        // sender's accepted verdict); it must deny (fail-closed DedupInFlight).
+        // Sender-scoping (SECURITY), loser path. Symmetric with the winner-path test: a
+        // committed residual reservation with no recorded inbox verdict sends the
+        // redelivery down the loser path, where the runtime store holds a verdict for
+        // these bytes recorded under a DIFFERENT sender. The loser path must NOT adopt it
+        // (that would hand THIS sender another sender's accepted verdict); it must deny
+        // (fail-closed DedupInFlight).
         //
-        // TEETH: recorded_report_for_batch returns an ACCEPTED verdict recorded under
+        // recorded_report_for_batch returns an ACCEPTED verdict recorded under
         // "did:chio:alice"; the authenticated sender is "did:chio:bob". The loser path
-        // never calls receive_batch, so `received` stays false either way.
-        //  - RED (pre-fix): the loser path adopts alice's accepted verdict; the dialer
-        //    reads accepted == true.
-        //  - GREEN (post-fix): the scoped loser path denies; the delivery fails closed.
+        // never calls receive_batch, so `received` stays false either way. An unscoped
+        // loser path would adopt alice's accepted verdict (the dialer reads accepted ==
+        // true); the scoped loser path denies and the delivery fails closed.
         let dialer_seed = 48u8;
         let gate = verified_gate("did:chio:bob", 1, dialer_seed, false);
 
@@ -2342,8 +2333,8 @@ mod tests {
     async fn per_peer_cap_one_still_admits_a_single_dialer() {
         let _serial = COUNTED_ACCEPT_SERIAL.lock().await;
         // A per-peer cap of 1 must not break a single, sequential dialer: the guard
-        // releases when the handler task ends, so the exchange completes (RFC-0012
-        // F33a wiring: the accept site now calls admit_peer, not admit).
+        // releases when the handler task ends, so the exchange completes (the accept site
+        // calls admit_peer, not admit).
         let dialer_seed = 42u8;
         let gate = verified_gate("did:chio:bob", 1, dialer_seed, false);
         let batch = direct_batch("did:chio:bob");

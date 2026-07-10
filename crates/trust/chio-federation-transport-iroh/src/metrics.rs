@@ -408,7 +408,7 @@ pub fn verify_failures_total(seam: &'static str, reason: &'static str) -> u64 {
     }
 }
 
-// -- Directory reload outcomes (RFC-0012 F34) --------------------------------
+// -- Directory reload outcomes -----------------------------------------------
 
 /// Reload outcome: a strictly-newer, in-window bundle re-verified and swapped in.
 pub const RELOAD_UPDATED: &str = "updated";
@@ -421,7 +421,7 @@ pub const RELOAD_EXPIRED_FAILCLOSED: &str = "expired_failclosed";
 /// Reload outcome: a strictly-newer, in-window successor re-verified but no longer
 /// binds THIS node's local transport endpoint (it tombstoned or rotated this node);
 /// the gate was swapped to deny-all (fail-closed) and an alarm raised. Operators
-/// alert on this being non-zero (RFC-0012 F34 local-binding recheck).
+/// alert on this being non-zero (local-binding recheck).
 pub const RELOAD_BINDING_REVOKED: &str = "binding_revoked";
 /// Reload outcome: the running directory is UNCHANGED but its version is below a
 /// trusted `minVersion` that operators raised above it; the unchanged fast path
@@ -464,11 +464,11 @@ pub fn directory_reload_total(outcome: &str) -> u64 {
     DIRECTORY_RELOAD[reload_outcome_index(outcome)].load(Ordering::Relaxed)
 }
 
-// -- Router-liveness gauge (RFC-0012 F33d) -----------------------------------
+// -- Router-liveness gauge ---------------------------------------------------
 
 static ROUTER_ALIVE: AtomicU64 = AtomicU64::new(1);
 
-/// Set the router-liveness gauge (RFC-0012 F33d): 1 = the iroh Router run loop
+/// Set the router-liveness gauge: 1 = the iroh Router run loop
 /// and endpoint are live, 0 = the router died (a panicked accept task killed it)
 /// while HTTP may keep serving. Operators alert on 0.
 pub fn set_router_alive(alive: bool) {
@@ -644,10 +644,9 @@ pub fn render_iroh_transport_metrics_prometheus() -> String {
         render_accept_duration_histogram(&mut output, lane);
     }
 
-    // directory_reload_total (RFC-0012 F34). Recorded by run_directory_reloader but,
-    // until now, only reachable via the in-process getter - never emitted here, so the
-    // fail-closed expired_failclosed / binding_revoked cases operators must alert on
-    // were invisible to Prometheus on the actual serve path. Emit the full outcome set.
+    // directory_reload_total. Recorded by run_directory_reloader; emit the full outcome
+    // set here so the fail-closed expired_failclosed / binding_revoked cases operators
+    // must alert on are visible to Prometheus on the serve path.
     push_meta(
         &mut output,
         CHIO_FEDERATION_TRANSPORT_DIRECTORY_RELOAD_TOTAL,
@@ -670,9 +669,9 @@ pub fn render_iroh_transport_metrics_prometheus() -> String {
         );
     }
 
-    // router_alive (gauge, RFC-0012 F33d). The router-down case (a panicked accept task
-    // killing the Router while HTTP keeps serving) operators alert on was likewise never
-    // rendered. Emit the single unlabeled gauge series.
+    // router_alive (gauge). Emit the single unlabeled gauge series so the router-down
+    // case (a panicked accept task killing the Router while HTTP keeps serving) operators
+    // alert on is visible to Prometheus.
     push_meta(
         &mut output,
         CHIO_FEDERATION_TRANSPORT_ROUTER_ALIVE,
@@ -814,7 +813,7 @@ mod tests {
     #[test]
     fn directory_reload_fail_closed_outcome_is_counted() {
         // Observe-only monotone lower bound: an expired-with-no-successor reload
-        // increments its counter so operators can alert on it (RFC-0012 F34).
+        // increments its counter so operators can alert on it.
         let before = directory_reload_total(RELOAD_EXPIRED_FAILCLOSED);
         record_directory_reload(RELOAD_EXPIRED_FAILCLOSED);
         assert!(
@@ -839,12 +838,11 @@ mod tests {
 
     #[test]
     fn render_emits_the_reload_and_liveness_series() {
-        // Instruments must not lie: the F34 directory-reload counter and the F33d
-        // router-liveness gauge are RECORDED but were never RENDERED, so the
-        // expired_failclosed / binding_revoked / router-down cases operators alert on
-        // were invisible to Prometheus on the actual serve path. The render must now emit
-        // both. RED before the render wiring: the reload/liveness names are absent from
-        // the body.
+        // Instruments must not lie: the directory-reload counter and the router-liveness
+        // gauge are RECORDED, so the render must also EMIT both or the expired_failclosed
+        // / binding_revoked / router-down cases operators alert on stay invisible to
+        // Prometheus on the serve path. Without the render wiring the reload/liveness
+        // names are absent from the body.
         // Hold the same serial guard as router_alive_gauge_reflects_liveness: this test
         // MUTATES ROUTER_ALIVE, which would otherwise race that test's exact assertions.
         let _serial = ROUTER_ALIVE_GAUGE_SERIAL

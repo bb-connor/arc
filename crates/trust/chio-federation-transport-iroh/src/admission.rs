@@ -39,7 +39,7 @@ pub const NOT_ADMITTED_REASON: &[u8] = b"not admitted";
 /// an unverified bundle. The directory lives behind an [`ArcSwap`] so
 /// `authorize`/`decide`/`resolve` read the CURRENT directory lock-free while a
 /// single-writer [`swap`](Self::swap) publishes a freshly re-verified directory
-/// (RFC-0012 F34: eviction, rotation, and expiry take effect without a restart).
+/// (eviction, rotation, and expiry take effect without a restart).
 /// Cloning is cheap (shares one `Arc<ArcSwap<..>>`), so every gate clone observes
 /// the reloader's swaps immediately.
 #[derive(Debug, Clone)]
@@ -347,7 +347,7 @@ mod tests {
     fn swap_flips_admission_without_reconstructing_the_gate() {
         // Gate at version N admits alice at E_old. Swapping in a directory that
         // tombstones alice flips decide(E_old) to a 403 through the SAME gate
-        // clone, with no reconstruction (RFC-0012 F34 live reload).
+        // clone, with no reconstruction.
         let gate = DirectoryGate::new(verified_directory("did:chio:alice", 1, 10, false));
         let clone = gate.clone();
         let e_old = endpoint_from_seed(10);

@@ -1080,7 +1080,7 @@ impl FanoutTopic {
                     // The receiver fell behind and iroh-gossip dropped messages.
                     // Meter, log, and surface it as a dropped-message signal (never
                     // an accepted frame) so a subscriber that fell behind cannot
-                    // silently lose frames (RFC-0012 F36).
+                    // silently lose frames.
                     crate::metrics::record_lane_frame(
                         crate::metrics::LANE_FANOUT,
                         crate::metrics::LANE_OUTCOME_LAGGED,
@@ -1283,8 +1283,8 @@ mod tests {
     use iroh_gossip::proto::DeliveryScope;
     use std::net::Ipv4Addr;
 
-    // RFC-0012 F37: build a real issuer-signed VerifiedDirectory as the membership
-    // oracle to pin the production treaty-party gate.
+    // Build a real issuer-signed VerifiedDirectory as the membership oracle to pin
+    // the production treaty-party gate.
     use crate::identity::transport_endorsement_preimage;
     use crate::identity::TransportDirectoryBundleBody;
     use crate::identity::TransportDirectoryBundleDocument;
@@ -1383,8 +1383,8 @@ mod tests {
 
     /// An issuer-signed, load-time-verified directory whose treaty `TREATY_ALPHA`
     /// party set is exactly {did:chio:alice}. This is the PRODUCTION membership
-    /// oracle (a `VerifiedDirectory`), so it pins the real F37 gate rather than a
-    /// `StaticTreatyMembership` stand-in.
+    /// oracle (a `VerifiedDirectory`), so it pins the real treaty-party gate rather
+    /// than a `StaticTreatyMembership` stand-in.
     fn party_verified_directory() -> crate::identity::VerifiedDirectory {
         let passport = Keypair::from_seed(&[50; 32]);
         let issuer = Keypair::from_seed(&[240; 32]);
@@ -1444,8 +1444,8 @@ mod tests {
 
     #[test]
     fn fanout_membership_gate_rejects_non_party_at_join_and_receive() {
-        // F37 regression pin (already-closed behavior): the per-treaty membership
-        // gate is enforced against the issuer-signed VerifiedDirectory party set.
+        // Regression pin: the per-treaty membership gate is enforced against the
+        // issuer-signed VerifiedDirectory party set.
         let directory = party_verified_directory();
 
         // JOIN precondition the swarm-join gate reads: is_treaty_party is fail-closed

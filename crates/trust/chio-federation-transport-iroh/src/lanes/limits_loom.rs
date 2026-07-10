@@ -1,7 +1,7 @@
-//! loom (nightly) concurrency models for RFC-0012. Run with:
+//! Nightly loom concurrency models. Run with:
 //!   RUSTFLAGS="--cfg chio_iroh_transport_loom" cargo test -p \
 //!     chio-federation-transport-iroh --lib loom_ -- --nocapture
-//! NOT part of the default PR gate.
+//! Off by default.
 //!
 //! loom models require the code under test to use loom's `Arc`/`Mutex`/atomics
 //! under the cfg. The production `AcceptLimiter`/`DirectoryGate` use `std::sync`

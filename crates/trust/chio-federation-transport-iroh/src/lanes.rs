@@ -17,7 +17,7 @@ pub mod limits;
 pub mod pheromone;
 pub mod revocation;
 
-/// loom (nightly) concurrency models for RFC-0012. Cfg-gated behind
-/// `chio_iroh_transport_loom`, so NOT part of the default PR gate.
+/// Nightly loom concurrency models. Cfg-gated behind `chio_iroh_transport_loom`,
+/// so off by default.
 #[cfg(all(test, chio_iroh_transport_loom))]
 mod limits_loom;

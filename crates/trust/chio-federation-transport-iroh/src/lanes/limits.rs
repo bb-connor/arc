@@ -556,18 +556,18 @@ mod tests {
 
     #[tokio::test]
     async fn cancelled_admission_releases_the_per_peer_slot() {
-        // RFC-0012 F33 per-peer fairness (cancel-safety). admit_peer reserves the
-        // per-peer slot, then AWAITS the shared lane permit. If the accept future is
-        // CANCELLED (dropped - a Router shutdown or connection close cancels it) during
-        // that await, the reservation must be RELEASED; otherwise the per-peer count leaks
-        // and later connections from the same peer shed accept_peer_busy until restart.
+        // Per-peer fairness under cancellation. admit_peer reserves the per-peer slot,
+        // then AWAITS the shared lane permit. If the accept future is CANCELLED (dropped
+        // - a Router shutdown or connection close cancels it) during that await, the
+        // reservation must be RELEASED; otherwise the per-peer count leaks and later
+        // connections from the same peer shed accept_peer_busy until restart.
         //
-        // TEETH: saturate the SHARED lane cap (1 permit, held) so admit_peer blocks on the
+        // Saturate the SHARED lane cap (1 permit, held) so admit_peer blocks on the
         // shared semaphore AFTER reserving the per-peer slot (the per-peer cap of 4 is not
         // the binding constraint). Cancel that future before shed_wait elapses. The peer's
-        // count must return to its prior value (absent / 0).
-        //  - RED (pre-fix): the cancelled await leaks the reservation; the count stays 1.
-        //  - GREEN (post-fix): the reservation guard releases on drop; the count is 0.
+        // count must return to its prior value (absent / 0): without the reservation guard
+        // the cancelled await would leak the reservation and the count would stay 1; the
+        // guard releases on drop, so the count is 0.
         let config = AcceptLimitConfig {
             max_in_flight: 1,
             max_in_flight_per_peer: 4,

@@ -177,13 +177,13 @@ pub(crate) struct IrohMount {
     pub(crate) enabled_lanes: Vec<&'static str>,
     /// The admission gate installed on the endpoint (shares one Arc<ArcSwap> with
     /// the installed hook), so the directory reloader can publish re-verified
-    /// directories that every lane observes immediately (RFC-0012 F34).
+    /// directories that every lane observes immediately.
     pub(crate) gate: DirectoryGate,
     /// This node's `localKernelId` (the identity the bound endpoint authenticates AS).
     /// Threaded into the reloader's `DirectoryReloadConfig` so the live binding recheck
     /// mirrors the startup check EXACTLY (`resolve_transport_endpoint(local_kernel_id)
     /// == endpoint_id`) rather than merely confirming the endpoint resolves to some
-    /// kernel (RFC-0012 F34).
+    /// kernel.
     pub(crate) transport_local_kernel_id: String,
 }
 
@@ -462,7 +462,7 @@ pub(crate) fn load_iroh_serve_inputs(
     }))
 }
 
-// -- Live directory reload (RFC-0012 F34) ------------------------------------
+// -- Live directory reload ---------------------------------------------------
 
 /// A directory-reload failure. Never crosses the trust boundary as an admit: the
 /// reloader keeps last-good on a transient error and fails closed on expiry.
@@ -488,8 +488,8 @@ pub(crate) enum ReloadOutcome {
     /// A strictly-newer, in-window successor re-verified but no longer binds THIS
     /// node's local transport endpoint (it tombstoned or rotated this node). The
     /// already-bound endpoint would keep serving with the old key, so the swap must
-    /// NOT proceed as an admit; fail closed to deny-all (RFC-0012 F34 local-binding
-    /// recheck, mirroring the startup binding check). Carries the (validly-signed,
+    /// NOT proceed as an admit; fail closed to deny-all (local-binding recheck,
+    /// mirroring the startup binding check). Carries the (validly-signed,
     /// in-window, monotone) revoking directory so the reloader ADVANCES its last-good
     /// chain onto it: the revoker is now the federation's canonical directory, so a
     /// later successor that rebinds this node chains onto THIS revoker (not the
@@ -512,7 +512,7 @@ pub(crate) struct DirectoryReloadConfig {
     pub trusted_issuers_path: PathBuf,
     /// This node's LOCAL transport binding: the `EndpointId` the running endpoint is
     /// actually bound to (the public half of the configured `--iroh-transport-key`).
-    /// Rechecked against every re-verified successor BEFORE the swap (RFC-0012 F34):
+    /// Rechecked against every re-verified successor BEFORE the swap:
     /// the startup path rejects a directory that does not endorse this binding, and a
     /// live successor that tombstones or rotates this node must not be swapped in while
     /// the endpoint keeps serving with the old key. The recheck fails closed to deny-all.
@@ -524,7 +524,7 @@ pub(crate) struct DirectoryReloadConfig {
     /// == local_transport_endpoint`). Checking only that the endpoint resolves to SOME
     /// kernel is insufficient: a successor that reassigns this endpoint to a DIFFERENT
     /// kernel id would still `authorize` it, yet the relay would keep serving under the
-    /// old secret for an identity the directory no longer binds to this node (RFC-0012 F34).
+    /// old secret for an identity the directory no longer binds to this node.
     pub local_kernel_id: String,
 }
 
@@ -537,8 +537,8 @@ fn read_bundle_document(path: &Path) -> Result<TransportDirectoryBundleDocument,
 
 /// Read + parse the trusted-issuers file into the verifier's issuer list PLUS the
 /// trusted `minVersion` (absent -> 0). The reload path honors this floor identically
-/// to the startup loader (RFC-0012 F34): operators that raise `minVersion` on a
-/// running relay must have it enforced on the NEXT reload, not only at restart.
+/// to the startup loader: operators that raise `minVersion` on a running relay
+/// must have it enforced on the NEXT reload, not only at restart.
 fn read_trusted_issuers(
     path: &Path,
 ) -> Result<(Vec<TrustedTransportDirectoryIssuer>, u64), String> {
@@ -563,9 +563,9 @@ fn read_trusted_issuers(
 }
 
 /// Re-verify the directory bundle, fail-closed. EXPIRY IS CHECKED BEFORE THE
-/// UNCHANGED FAST PATH (RFC-0012 F34, absorbed Codex fix): an unchanged-but-
-/// expired bundle must not be treated as valid; with no strictly-newer in-window
-/// successor it fails closed as `ExpiredWhileRunning`.
+/// UNCHANGED FAST PATH: an unchanged-but-expired bundle must not be treated as
+/// valid; with no strictly-newer in-window successor it fails closed as
+/// `ExpiredWhileRunning`.
 pub(crate) fn reload_verified_directory(
     config: &DirectoryReloadConfig,
     now: u64,
@@ -627,7 +627,7 @@ pub(crate) fn reload_verified_directory(
                     return Err(DirectoryReloadError::Read(error));
                 }
             };
-        // Honor the trusted minVersion (RFC-0012 F34), mirroring the startup loader.
+        // Honor the trusted minVersion, mirroring the startup loader.
         // minVersion is INCLUSIVE but `verify_bundle` treats `version_floor` as
         // EXCLUSIVE (`version <= version_floor` rejects), so map the inclusive minimum
         // onto the exclusive floor with `saturating_sub(1)` and `max` it into the
@@ -644,8 +644,8 @@ pub(crate) fn reload_verified_directory(
         };
         return match bundle.verify_bundle(&trust) {
             Ok(verified) => {
-                // RECHECK THE LOCAL TRANSPORT BINDING BEFORE SWAPPING (fail-closed,
-                // RFC-0012 F34). The successor verified as a valid, in-window, monotone
+                // RECHECK THE LOCAL TRANSPORT BINDING BEFORE SWAPPING (fail-closed).
+                // The successor verified as a valid, in-window, monotone
                 // directory, but that does NOT prove it still binds THIS node's local
                 // kernel id to THIS node's bound transport endpoint. Mirror the STARTUP
                 // check EXACTLY: require `resolve_transport_endpoint(local_kernel_id) ==
@@ -699,7 +699,7 @@ pub(crate) fn reload_verified_directory(
 /// (version 0, empty hash), and a later successor chained onto the last good bundle
 /// would then fail verification (predecessor version/hash mismatch), stranding the
 /// relay in deny-all until a restart. Holding last-good here lets the reloader SELF-HEAL
-/// back to admission when a valid in-window successor appears (RFC-0012 F34).
+/// back to admission when a valid in-window successor appears.
 struct ReloadState {
     version: u64,
     body_sha256: String,
@@ -859,10 +859,8 @@ fn next_reload_delay(interval: Duration, now: u64, expires_at_unix_ms: u64) -> D
 /// deny-all on expiry, or keep last-good. Wakes at most every `interval`, but also
 /// exactly at the running directory's expiry deadline (see [`next_reload_delay`]) so an
 /// expired directory fails closed promptly instead of admitting until the next fixed
-/// poll. Reuses the dedicated-liveness-task pattern (a task feeding shared state, joined
-/// on shutdown).
-// RFC-0012: implemented inline; reconcile to RFC-0001's canonical liveness-task
-// pattern when it lands.
+/// poll. A dedicated task feeds shared state (the admission gate and the alive flag)
+/// and is joined on shutdown.
 pub(crate) async fn run_directory_reloader(
     gate: DirectoryGate,
     config: DirectoryReloadConfig,
@@ -880,12 +878,10 @@ pub(crate) async fn run_directory_reloader(
     }
 }
 
-/// Per-tick router-liveness step (RFC-0012 F33d), testable without a live router:
-/// flip the `chio_iroh_router_alive` gauge and, on the transition to dead, log an
-/// alarm so a panicked accept task that silently kills the router (while HTTP keeps
-/// serving) becomes loud. Returns the liveness it was given.
-// RFC-0012: implemented inline; reconcile to RFC-0001's canonical liveness-task
-// pattern when it lands.
+/// Per-tick router-liveness step, testable without a live router: flip the
+/// `chio_iroh_router_alive` gauge and, on the transition to dead, log an alarm so a
+/// panicked accept task that silently kills the router (while HTTP keeps serving)
+/// becomes loud. Returns the liveness it was given.
 pub(crate) fn note_router_liveness(alive: bool) -> bool {
     chio_federation_transport_iroh::metrics::set_router_alive(alive);
     if !alive {
@@ -928,10 +924,10 @@ pub(crate) async fn build_iroh_router(
         config,
     } = inputs;
 
-    // FAIL-CLOSED WIRING GUARD (RFC-0012 F37): only the pheromone lane is wireable
-    // on this serve hook. Enabling lane c (fan-out) here is a fail-closed error and
-    // MUST stay so until BOTH are satisfied: (1) the F36 Lagged handling has an
-    // anti-entropy path or an explicit accepted-loss decision, and (2) any lane-c
+    // FAIL-CLOSED WIRING GUARD: only the pheromone lane is wireable on this serve
+    // hook. Enabling lane c (fan-out) here is a fail-closed error and MUST stay so
+    // until BOTH are satisfied: (1) the gossip Lagged handling has an anti-entropy
+    // path or an explicit accepted-loss decision, and (2) any lane-c
     // mount passes the issuer-signed VerifiedDirectory (never a StaticTreatyMembership
     // and never the raw topic id) as the TreatyMembership oracle and derives origin
     // keys from the same trusted admission set. The per-treaty membership gate is
@@ -970,7 +966,7 @@ pub(crate) async fn build_iroh_router(
         CliError::cli_other_error(format!("Chio iroh transport idle timeout: {error}"))
     })?;
     // Each direct lane uses exactly one bidi stream per connection; bound the
-    // per-connection window to the batch cap with headroom (RFC-0012 F33c).
+    // per-connection window to the batch cap with headroom.
     let bidi_streams = VarInt::from(
         chio_federation_transport_iroh::lanes::limits::RECOMMENDED_MAX_BIDI_STREAMS,
     );
@@ -1116,9 +1112,9 @@ pub(crate) async fn build_iroh_outbound_endpoint(
     let idle_timeout: IdleTimeout = config.max_idle_timeout.try_into().map_err(|error| {
         CliError::cli_other_error(format!("Chio iroh transport idle timeout: {error}"))
     })?;
-    // drain endpoint: one bidi stream, batch-cap-bounded window (RFC-0012 F33c).
-    // `max_batch_bytes` is not in scope on this outbound-only path, so derive the
-    // window from the transport hard cap.
+    // Drain endpoint: one bidi stream, batch-cap-bounded window. `max_batch_bytes`
+    // is not in scope on this outbound-only path, so derive the window from the
+    // transport hard cap.
     let bidi_streams = VarInt::from(
         chio_federation_transport_iroh::lanes::limits::RECOMMENDED_MAX_BIDI_STREAMS,
     );
@@ -1592,9 +1588,9 @@ mod tests {
             ReloadOutcome::Unchanged
         ));
 
-        // CODEX FIX: same (unchanged) version on disk but now PAST expiry must NOT
-        // short-circuit to Unchanged; with no strictly-newer in-window successor it
-        // fails closed as ExpiredWhileRunning.
+        // Same (unchanged) version on disk but now PAST expiry must NOT short-circuit
+        // to Unchanged; with no strictly-newer in-window successor it fails closed as
+        // ExpiredWhileRunning.
         let now_expired = expires_at + 1;
         assert!(matches!(
             reload_verified_directory(&config, now_expired, 1, expires_at, &body_hash)
@@ -1689,19 +1685,18 @@ mod tests {
 
     #[test]
     fn directory_reload_fails_closed_when_successor_rotates_local_binding() {
-        // RFC-0012 F34 local-binding recheck (SECURITY). A strictly-newer, in-window,
-        // validly-signed successor that ROTATES this node's local transport endpoint (or
-        // tombstones it) no longer endorses the endpoint this node is bound to. Swapping
-        // it in would leave the already-bound endpoint serving iroh ingress under the old
-        // key for peers admitted in the new directory. The reloader must fail closed to
+        // Local-binding recheck (SECURITY). A strictly-newer, in-window, validly-signed
+        // successor that ROTATES this node's local transport endpoint (or tombstones it)
+        // no longer endorses the endpoint this node is bound to. Swapping it in would
+        // leave the already-bound endpoint serving iroh ingress under the old key for
+        // peers admitted in the new directory. The reloader must fail closed to
         // LocalBindingRevoked (deny-all), never Updated.
         //
-        // TEETH: the successor rotates the LOCAL entry from LOCAL_TRANSPORT_SEED (0x11)
-        // to a DIFFERENT seed (0x22); the reloader's config pins the currently-bound
-        // endpoint (endpoint_from_seed(LOCAL_TRANSPORT_SEED)).
-        //  - RED (pre-fix, no recheck): the successor verifies and returns Updated,
-        //    admitting under a revoked local identity.
-        //  - GREEN (post-fix): the recheck denies the bound endpoint -> LocalBindingRevoked.
+        // The successor rotates the LOCAL entry from LOCAL_TRANSPORT_SEED (0x11) to a
+        // DIFFERENT seed (0x22); the reloader's config pins the currently-bound endpoint
+        // (endpoint_from_seed(LOCAL_TRANSPORT_SEED)). Without the recheck the successor
+        // verifies and returns Updated, admitting under a revoked local identity; the
+        // recheck instead denies the bound endpoint and returns LocalBindingRevoked.
         let dir = tempfile::tempdir().unwrap();
         let (_v1_path, _v1_issuers, _v1_expires, v1_hash) =
             write_test_bundle(dir.path(), 1, false, None);
@@ -1765,8 +1760,8 @@ mod tests {
 
     #[test]
     fn directory_reload_fails_closed_when_successor_reassigns_bound_endpoint() {
-        // RFC-0012 F34 local-binding recheck (SECURITY, deeper than the rotation case).
-        // A strictly-newer, in-window, validly-signed successor that REASSIGNS this node's
+        // Local-binding recheck (SECURITY, deeper than the rotation case). A
+        // strictly-newer, in-window, validly-signed successor that REASSIGNS this node's
         // bound transport endpoint to a DIFFERENT kernel id still `authorize`s the endpoint
         // (it resolves to the OTHER kernel), so a recheck that only asks "does the endpoint
         // resolve to some kernel?" would wrongly swap it in - leaving the relay serving iroh
@@ -1774,12 +1769,12 @@ mod tests {
         // The recheck must mirror STARTUP: require the successor to bind THIS kernel id to
         // THIS endpoint.
         //
-        // TEETH: v2 rotates the LOCAL node to seed 0x22 AND reassigns the peer to
-        // LOCAL_TRANSPORT_SEED (0x11 = this node's bound endpoint).
-        //  - RED (authorize(endpoint).is_none() recheck): authorize(0x11) == Some(bob) is not
-        //    None -> Updated, admitting under a reassigned local endpoint.
-        //  - GREEN (resolve_transport_endpoint(local_kernel_id) == endpoint): resolves
-        //    LOCAL_KERNEL_ID to 0x22 != 0x11 -> LocalBindingRevoked.
+        // v2 rotates the LOCAL node to seed 0x22 AND reassigns the peer to
+        // LOCAL_TRANSPORT_SEED (0x11 = this node's bound endpoint). An
+        // `authorize(endpoint).is_none()` recheck would see authorize(0x11) == Some(bob)
+        // (not None) and swap it in, admitting under a reassigned local endpoint. The
+        // `resolve_transport_endpoint(local_kernel_id) == endpoint` recheck instead
+        // resolves LOCAL_KERNEL_ID to 0x22 != 0x11 and returns LocalBindingRevoked.
         let dir = tempfile::tempdir().unwrap();
         let (_v1_path, _v1_issuers, _v1_expires, v1_hash) =
             write_test_bundle(dir.path(), 1, false, None);
@@ -1825,14 +1820,13 @@ mod tests {
 
     #[test]
     fn directory_reload_honors_trusted_min_version() {
-        // RFC-0012 F34: raising minVersion on a RUNNING relay must be honored on the next
-        // reload, exactly as startup honors it. A version-1 relay must reject a signed
-        // version-2 successor once operators pin minVersion = 10.
+        // Raising minVersion on a RUNNING relay must be honored on the next reload,
+        // exactly as startup honors it. A version-1 relay must reject a signed version-2
+        // successor once operators pin minVersion = 10.
         //
-        // TEETH:
-        //  - RED (floor == current_version only): floor 1, so v2 > 1 -> Updated.
-        //  - GREEN (floor == max(current, minVersion - 1)): floor max(1, 9) = 9, so v2 <= 9
-        //    -> the successor is rejected.
+        // With a floor of only `current_version` (1) the successor v2 > 1 would be
+        // Updated; with `floor == max(current, minVersion - 1)` the floor is max(1, 9) = 9,
+        // so v2 <= 9 is rejected.
         let dir = tempfile::tempdir().unwrap();
         let (_v1_path, _v1_issuers, _v1_expires, v1_hash) =
             write_test_bundle(dir.path(), 1, false, None);
@@ -1959,8 +1953,8 @@ mod tests {
 
     #[test]
     fn directory_reloader_self_heals_after_expiry_lapse() {
-        // RFC-0012 F34: after an expiry lapses the gate to deny-all, a valid in-window
-        // successor must be able to swap back in WITHOUT a restart. The reloader keeps the
+        // After an expiry lapses the gate to deny-all, a valid in-window successor must
+        // be able to swap back in WITHOUT a restart. The reloader keeps the
         // last-good version + hash chain SEPARATELY from the admission gate, so the deny-all
         // sentinel (version 0, empty predecessor hash) never becomes the chain the successor
         // must verify against.
@@ -2006,9 +2000,9 @@ mod tests {
         let _v2_hash =
             write_test_bundle_windowed(&bundle_path, 2, NOW + 1, NOW + 100, Some(v1_hash.clone()));
 
-        // RED counterfactual: had the reloader re-derived last-good FROM THE GATE (the
-        // pre-fix behavior), the deny-all sentinel (version 0, empty hash) would be the
-        // predecessor and the same successor would NOT swap in.
+        // Counterfactual: had the reloader re-derived last-good FROM THE GATE, the
+        // deny-all sentinel (version 0, empty hash) would be the predecessor and the same
+        // successor would NOT swap in.
         let denied = reload_verified_directory(&config, now_expired, 0, 0, "")
             .expect("reload runs against the deny-all sentinel");
         assert!(
@@ -2016,7 +2010,7 @@ mod tests {
             "a successor chained onto last-good cannot recover from the deny-all sentinel"
         );
 
-        // Tick 2 (GREEN): the same successor verified against the PRESERVED last-good chain
+        // Tick 2: the same successor verified against the PRESERVED last-good chain
         // self-heals admission back to v2.
         directory_reload_step(&gate, &config, now_expired, &mut state, &alive);
         assert_eq!(
@@ -2160,7 +2154,7 @@ mod tests {
     #[test]
     fn watchdog_flips_gauge_and_alarms_on_death() {
         // A liveness probe reporting dead flips the router-alive gauge to 0 (the
-        // testable per-tick step the spawned watchdog loops over) (RFC-0012 F33d).
+        // testable per-tick step the spawned watchdog loops over).
         chio_federation_transport_iroh::metrics::set_router_alive(true);
         let dead = true;
         note_router_liveness(!dead); // alive = false

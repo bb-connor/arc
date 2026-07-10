@@ -705,8 +705,8 @@ impl BilateralCoSignHandler {
                 request.org_a_kernel_id.clone(),
             ));
         }
-        // ONE directory snapshot for the WHOLE verification (RFC-0012 F34 / Task 9).
-        // Load the current verified directory ONCE and use it for BOTH the transport-origin
+        // ONE directory snapshot for the WHOLE verification. Load the current verified
+        // directory ONCE and use it for BOTH the transport-origin
         // authorization AND the passport-key lookup. Consulting the gate twice (a
         // `resolve` for the endpoint, then a separate `directory()` for the key) could
         // straddle a live directory reload: the endpoint might authorize against the OLD
@@ -1316,8 +1316,8 @@ mod tests {
 
     #[test]
     fn cosign_unit_rejects_endpoint_absent_from_the_current_directory_snapshot() {
-        // RFC-0012 F34 / Task 9 (single-snapshot verification). Endpoint authorization AND
-        // the passport-key lookup are read from ONE `directory()` snapshot, so a directory
+        // Single-snapshot verification. Endpoint authorization AND the passport-key
+        // lookup are read from ONE `directory()` snapshot, so a directory
         // reload can never authorize the endpoint against one directory while reading the key
         // from another. This locks in that authorization is sourced from the CURRENT
         // directory snapshot: if that snapshot no longer binds the remote endpoint (rotated
