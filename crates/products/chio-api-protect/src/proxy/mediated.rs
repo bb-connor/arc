@@ -438,29 +438,30 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         state.minted_request_ids.lock().await.release(&request_id);
     }
     if let Err(error) = record_tool_receipt(&state, &response.receipt).await {
-        warn!("failed to persist mediated receipt: {error}");
-        // A successful reservation opened a durable hold and minted a nonce the
-        // caller will never receive, since this path returns an error. Leaving
-        // the hold open would let the TTL reaper later forfeit it at the reserved
-        // worst case for a request the API reported as failed. Reconcile it at
-        // zero through the minted nonce so the hold closes and the reserved
-        // budget is freed, and release the in-memory request-id claim. The closed
-        // hold still backs this request-id durably, so a retry must use a fresh
-        // request-id. A denied or pending verdict placed no hold, so it needs no
-        // rollback.
-        if let (chio_kernel::Verdict::Allow, Some(nonce)) =
-            (&response.verdict, response.execution_nonce.as_deref())
-        {
-            release_unpersisted_reservation(
-                &state,
-                mediation_kernel,
-                nonce,
-                &kernel_request.arguments,
-                &request_id,
-            )
-            .await;
+        // The reserve receipt persisted here is a local audit entry, not the
+        // authoritative record. When the reserve SUCCEEDED (Verdict::Allow with a
+        // minted nonce) the reservation is durable in the budget store and the
+        // caller holds the signed nonce, which reconciles at /v1/reconcile (that
+        // route persists its own authoritative receipt). Any governed MustPrepay
+        // prepayment was already captured to back this exact reservation. Tearing
+        // the reservation down here would refund nothing on the prepaid path (direct
+        // financial loss) and strand the caller without the nonce it paid for, so
+        // return the nonce and log the persistence failure, mirroring the accepted
+        // /v1/reconcile behavior. A denied or pending verdict placed no hold and
+        // minted no nonce, so its unpersisted receipt still fails closed.
+        if !matches!(
+            (&response.verdict, response.execution_nonce.as_deref()),
+            (chio_kernel::Verdict::Allow, Some(_))
+        ) {
+            warn!("failed to persist mediated receipt: {error}");
+            return internal_json_error_response(
+                "chio_receipt_persistence_failed",
+                &error.to_string(),
+            );
         }
-        return internal_json_error_response("chio_receipt_persistence_failed", &error.to_string());
+        warn!(
+            "mediated reserve receipt persistence failed; returning minted nonce to caller: {error}"
+        );
     }
     // A successful authorization is `Verdict::Allow` with an incomplete terminal
     // state (the tool has not run) and a minted nonce. It maps to the wire
@@ -481,81 +482,6 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         })),
     )
         .into_response()
-}
-
-/// Release the reserved budget hold a successful mediated authorization opened
-/// when the sidecar cannot persist its receipt, so a request the API reports as
-/// failed leaves no reservation the caller can never reconcile.
-///
-/// The authorization minted a nonce the caller will not receive (the handler is
-/// about to return an error), so the caller can never reconcile the hold and the
-/// TTL reaper would otherwise forfeit it at the reserved worst case. Reconciling
-/// at zero through that nonce consumes it and settles the hold at zero, releasing
-/// the full reserved amount back to the grant, and releases the in-memory
-/// request-id claim. The settled hold still backs this request-id durably, so a
-/// retry must use a fresh request-id. Best-effort and fail-closed: any step that
-/// cannot complete is logged and leaves the TTL reaper as the backstop.
-async fn release_unpersisted_reservation(
-    state: &Arc<ProxyState>,
-    mediation_kernel: &Mutex<ChioKernel>,
-    minted_nonce: &SignedExecutionNonce,
-    arguments: &serde_json::Value,
-    request_id: &str,
-) {
-    let Some(hold_id) = minted_nonce.reserved_hold_id() else {
-        warn!("mediated authorization minted a nonce with no reserved hold id to release");
-        state.minted_request_ids.lock().await.release(request_id);
-        return;
-    };
-    // The reconcile-at-zero realized currency must equal the reserved grant
-    // currency, so read it from the open hold the nonce names.
-    let reserved_currency =
-        state
-            .budget_store
-            .as_ref()
-            .and_then(|store| match store.get_budget_hold(hold_id) {
-                Ok(Some(hold)) => hold.reserved_currency,
-                Ok(None) => None,
-                Err(error) => {
-                    warn!("failed to read reserved hold `{hold_id}` for release: {error}");
-                    None
-                }
-            });
-    match reserved_currency {
-        Some(currency) => {
-            let zero_cost = ToolInvocationCost {
-                units: 0,
-                currency,
-                breakdown: None,
-            };
-            let kernel = mediation_kernel.lock().await;
-            if let Err(error) = kernel.reconcile_reserved_authorization_by_nonce(
-                minted_nonce,
-                arguments,
-                &zero_cost,
-            ) {
-                warn!(
-                    "failed to release reserved hold `{hold_id}` after receipt-persistence failure: {error}"
-                );
-            }
-        }
-        None => {
-            // A reserved hold with no recorded currency is a non-monetary
-            // invocation reservation: there is no reserved money to reconcile at
-            // zero. Reverse the invocation debit through the minted nonce so the
-            // consumed invocation is returned to the grant, closing the hold so
-            // the TTL reaper never forfeits it for a request the API reported as
-            // failed.
-            let kernel = mediation_kernel.lock().await;
-            if let Err(error) = kernel.reverse_reserved_invocation_by_nonce(minted_nonce, arguments)
-            {
-                warn!(
-                    "failed to reverse invocation reservation `{hold_id}` after receipt-persistence failure: {error}"
-                );
-            }
-        }
-    }
-    state.minted_request_ids.lock().await.release(request_id);
 }
 
 /// `POST /v1/reconcile` request shape. The caller presents the execution nonce
@@ -2183,15 +2109,68 @@ mod tests {
         store
     }
 
+    /// A payment adapter that counts each rail action, so a test can assert a
+    /// captured MustPrepay prepayment is neither refunded nor re-charged. The
+    /// settlement behavior is delegated to the deterministic sim adapter.
+    #[derive(Clone, Default)]
+    struct RecordingPaymentAdapter {
+        inner: chio_kernel::SimPaymentAdapter,
+        captures: Arc<std::sync::atomic::AtomicUsize>,
+        releases: Arc<std::sync::atomic::AtomicUsize>,
+        refunds: Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    impl chio_kernel::PaymentAdapter for RecordingPaymentAdapter {
+        fn authorize(
+            &self,
+            request: &chio_kernel::PaymentAuthorizeRequest,
+        ) -> Result<chio_kernel::PaymentAuthorization, chio_kernel::PaymentError> {
+            self.inner.authorize(request)
+        }
+
+        fn capture(
+            &self,
+            authorization_id: &str,
+            amount_units: u64,
+            currency: &str,
+            reference: &str,
+        ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+            self.captures
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.inner
+                .capture(authorization_id, amount_units, currency, reference)
+        }
+
+        fn release(
+            &self,
+            authorization_id: &str,
+            reference: &str,
+        ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+            self.releases
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.inner.release(authorization_id, reference)
+        }
+
+        fn refund(
+            &self,
+            transaction_id: &str,
+            amount_units: u64,
+            currency: &str,
+            reference: &str,
+        ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+            self.refunds
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.inner
+                .refund(transaction_id, amount_units, currency, reference)
+        }
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn mediated_receipt_persistence_failure_releases_reservation() {
+    async fn mediated_receipt_persistence_failure_returns_nonce_and_keeps_reservation() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
         let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
         let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
-        // One reservation reserves the whole grant, so a hold left open would
-        // block every later authorization until the reaper forfeits it at the
-        // worst case for a request the API reported as failed.
         let cap =
             issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 100, "USD");
         let cap_id = cap.id.clone();
@@ -2212,33 +2191,41 @@ mod tests {
             "request_id": "persist-fail",
         });
 
-        // The kernel Allowed (reserved) but the receipt append fails: the handler
-        // returns 500 and must not leave the reservation dangling.
+        // The kernel Allowed (reserved) and minted a nonce, but the local receipt
+        // append fails. The reservation is durable in the budget store and the caller
+        // reconciles it at /v1/reconcile (which persists its own authoritative
+        // receipt), so the handler returns 200 with the nonce rather than a 500 that
+        // would strand a reservation the caller can never use.
         let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
-        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
-        assert_eq!(json["error"], "chio_receipt_persistence_failed");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(json["status"], "authorized");
+        assert!(
+            json["execution_nonce"].is_object(),
+            "a persistence failure after a successful reserve must still return the nonce"
+        );
 
-        // The reserved hold was reconciled at zero, closing it and freeing the
-        // reserved budget: a request the API reported as failed leaves nothing
-        // for the reaper to forfeit at worst case.
+        // The reserved hold stays OPEN with its budget committed: the caller holds a
+        // real reservation backing the downstream execution.
         let hold_id = format!("budget-hold:persist-fail:{cap_id}:0");
         let hold = budget.get_budget_hold(&hold_id).unwrap();
         assert!(
-            hold.map(|hold| !hold.disposition.is_open()).unwrap_or(true),
-            "a failed receipt persistence must not leave an open reserved hold"
+            hold.map(|hold| hold.disposition.is_open()).unwrap_or(false),
+            "a returned reservation must keep its reserved hold open"
         );
         let usage = budget.get_usage(&cap_id, 0).unwrap();
-        assert!(
-            usage.is_none() || usage.unwrap().committed_cost_units().unwrap() == 0,
-            "the released hold must leave no committed budget against the grant"
+        let usage = usage.expect("the reserved hold must remain recorded in the budget store");
+        assert_eq!(
+            usage.committed_cost_units().unwrap(),
+            100,
+            "the returned reservation must keep its reserved budget committed"
         );
 
-        // The request-id claim was released, so no live claim lingers and the
-        // caller may retry the same id without a spurious 409.
+        // The request-id claim is retained: the id backs a live reservation, so a
+        // reuse must still collide rather than mint a second nonce.
         assert_eq!(
             state.minted_request_ids.lock().await.len(),
-            0,
-            "a failed receipt persistence must release the request-id claim"
+            1,
+            "a returned reservation must retain its request-id claim"
         );
     }
 
@@ -2291,69 +2278,153 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn mediated_invocation_receipt_persistence_failure_reverses_invocation() {
+    async fn mediated_invocation_receipt_persistence_failure_returns_nonce_and_keeps_reservation() {
         let signer = Keypair::generate();
         let agent = Keypair::generate();
         let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
         let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
-        // An invocation-only grant with a single invocation: the reserve debits it,
-        // so a hold left un-reversed would permanently consume the only invocation
-        // for a request the API reported as failed.
         let cap = issue_invocation_capability(&kernel, &agent, "cost-srv", "compute", 1);
         let cap_id = cap.id.clone();
         let cap_value = serde_json::to_value(&cap).unwrap();
         let state = mediated_test_state_inner(
-            signer.clone(),
+            signer,
             Arc::clone(&budget),
             Vec::new(),
             Some(MEDIATED_CONTROL_TOKEN.to_string()),
             Some(failing_receipt_store()),
             true,
         );
+        let params = serde_json::json!({ "invoice": "inv-1" });
+        let body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": params,
+            "request_id": "invoke-persist-fail",
+        });
+
+        // An invocation-only reserve debits the single invocation and mints a nonce.
+        // The receipt append fails, but the caller can still present the nonce and
+        // reconcile downstream, so the handler returns 200 with the nonce and keeps
+        // the invocation reserved instead of a 500 that would permanently burn the
+        // invocation for a caller that never received the nonce.
+        let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(json["status"], "authorized");
+        let nonce_json = json["execution_nonce"].clone();
+        assert!(
+            nonce_json.is_object(),
+            "an invocation reserve whose receipt fails to persist must still return the nonce"
+        );
+
+        // The invocation stays consumed and the reserved hold stays open: the caller
+        // holds the nonce that backs it.
+        let usage = budget.get_usage(&cap_id, 0).unwrap();
+        assert_eq!(
+            usage.map(|usage| usage.invocation_count).unwrap_or(0),
+            1,
+            "the returned invocation reservation stays consumed against the grant"
+        );
+        let hold_id = format!("budget-hold:invoke-persist-fail:{cap_id}:0");
+        let hold = budget.get_budget_hold(&hold_id).unwrap();
+        assert!(
+            hold.map(|hold| hold.disposition.is_open()).unwrap_or(false),
+            "the returned invocation reservation must keep its reserved hold open"
+        );
+
+        // The returned nonce is usable: reconciling it downstream settles the
+        // reservation and produces a `reconciled` receipt.
+        let reconcile_body = serde_json::json!({
+            "execution_nonce": nonce_json,
+            "arguments": params,
+            "realized_cost": { "units": 0, "currency": "USD" },
+        });
+        let (recon_status, reconciled) = post_reconcile(state, &reconcile_body).await;
+        assert_eq!(recon_status, StatusCode::OK);
+        assert_eq!(reconciled["status"], "reconciled");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_mustprepay_receipt_persistence_failure_returns_nonce_without_refund() {
+        // Money-loss guard: a governed MustPrepay reserve authorizes AND captures the
+        // quoted prepayment before minting the nonce. If the sidecar's local receipt
+        // append then fails, tearing the reservation down would leave the captured
+        // prepayment charged for a reservation the caller never received (direct
+        // financial loss). The handler must return 200 with the nonce so the captured
+        // prepayment backs a usable authorization, and must not refund or re-charge.
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap = issue_governed_capability(&kernel, &agent, "cost-srv", "compute", 100, "USD", 50);
+        let cap_id = cap.id.clone();
+        let cap_value = serde_json::to_value(&cap).unwrap();
+        let approver = signer.clone();
+
+        let captures = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let refunds = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let adapter = RecordingPaymentAdapter {
+            inner: chio_kernel::SimPaymentAdapter::new(),
+            captures: Arc::clone(&captures),
+            releases: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            refunds: Arc::clone(&refunds),
+        };
+        let state = mediated_test_state_core(
+            signer,
+            Arc::clone(&budget),
+            Vec::new(),
+            Some(MEDIATED_CONTROL_TOKEN.to_string()),
+            Some(failing_receipt_store()),
+            true,
+            Some(Box::new(adapter)),
+        );
+
+        let request_id = "req-mustprepay-persist-fail";
+        let intent =
+            governed_mustprepay_intent("intent-prepay-persist", "cost-srv", "compute", 100, "USD");
+        let approval = governed_approval_token(&approver, &agent.public_key(), &intent, request_id);
         let body = serde_json::json!({
             "capability": cap_value,
             "tool_server": "cost-srv",
             "tool_name": "compute",
             "parameters": { "invoice": "inv-1" },
-            "request_id": "invoke-persist-fail",
+            "request_id": request_id,
+            "governed_intent": intent,
+            "approval_token": approval,
         });
 
-        // The kernel Allowed (reserved, debiting the invocation) but the receipt
-        // append fails: the handler returns 500 and must reverse the invocation.
         let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
-        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
-        assert_eq!(json["error"], "chio_receipt_persistence_failed");
-
-        // The debited invocation is returned to the grant: the adopted reserved
-        // hold is reversed, so the grant shows zero consumed invocations again.
-        let usage = budget.get_usage(&cap_id, 0).unwrap();
-        assert!(
-            usage.map(|usage| usage.invocation_count).unwrap_or(0) == 0,
-            "a failed receipt persistence must reverse the debited invocation"
+        assert_eq!(
+            status,
+            StatusCode::OK,
+            "a captured MustPrepay reserve whose receipt fails to persist must not 500"
         );
-        let hold_id = format!("budget-hold:invoke-persist-fail:{cap_id}:0");
+        assert_eq!(json["status"], "authorized");
+        assert!(
+            json["execution_nonce"].is_object(),
+            "the caller must receive the nonce the captured prepayment backs"
+        );
+
+        // The prepayment was captured exactly once and never refunded: the payer is
+        // billed for the authorization the caller now holds, with no money lost to a
+        // torn-down reservation.
+        assert_eq!(
+            captures.load(std::sync::atomic::Ordering::SeqCst),
+            1,
+            "the MustPrepay quote must be captured exactly once"
+        );
+        assert_eq!(
+            refunds.load(std::sync::atomic::Ordering::SeqCst),
+            0,
+            "the captured prepayment must not be refunded: it backs the returned nonce"
+        );
+
+        // The reservation is intact: the reserved hold stays open.
+        let hold_id = format!("budget-hold:{request_id}:{cap_id}:0");
         let hold = budget.get_budget_hold(&hold_id).unwrap();
         assert!(
-            hold.map(|hold| !hold.disposition.is_open()).unwrap_or(true),
-            "a failed receipt persistence must not leave an open reserved invocation hold"
-        );
-
-        // A subsequent authorization on the same grant succeeds where the open
-        // reservation would have blocked it: a second sidecar sharing the same
-        // budget (with a working receipt store) authorizes the reclaimed invocation.
-        let working_state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
-        let retry_body = serde_json::json!({
-            "capability": serde_json::to_value(&cap).unwrap(),
-            "tool_server": "cost-srv",
-            "tool_name": "compute",
-            "parameters": { "invoice": "inv-2" },
-            "request_id": "invoke-retry",
-        });
-        let (retry_status, retry_json) = post_evaluate(working_state, &retry_body).await;
-        assert_eq!(retry_status, StatusCode::OK);
-        assert_eq!(
-            retry_json["status"], "authorized",
-            "the reversed invocation must be available for a later authorization"
+            hold.map(|hold| hold.disposition.is_open()).unwrap_or(false),
+            "the captured MustPrepay reservation must stay open, backing the returned nonce"
         );
     }
 
