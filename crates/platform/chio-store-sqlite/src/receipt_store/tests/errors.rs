@@ -202,14 +202,14 @@ fn append_child_receipt_fails_closed_on_existing_claim_log_projection_drift() {
         receipt.tool_name = "sh".to_string();
     });
 
-    // RFC-0006: the default incremental append fast path replaces the O(N)
-    // claim-log content re-derive-and-compare on every append with an O(1)
-    // checkpoint-predecessor check plus an O(b) delta cross-check, neither of
-    // which rescans an existing row's content. An append that does not touch
-    // the tampered row therefore succeeds; the store still fails closed on
-    // the drift, just observed through the audit surfaces
-    // (`receipt_store_health` / `receipt_checkpoint_status`), which keep the
-    // full per-row verification on purpose.
+    // The default incremental append fast path uses an O(1) checkpoint-
+    // predecessor check plus an O(b) delta cross-check instead of an O(N)
+    // claim-log content re-derive-and-compare on every append; neither rescans
+    // an existing row's content. An append that does not touch the tampered row
+    // therefore succeeds; the store still fails closed on the drift, just
+    // observed through the audit surfaces (`receipt_store_health` /
+    // `receipt_checkpoint_status`), which keep the full per-row verification on
+    // purpose.
     store
         .append_child_receipt(&sample_child_receipt_with_id_and_timestamp(
             "child-after-claim-log-drift",

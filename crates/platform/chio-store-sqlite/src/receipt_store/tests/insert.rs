@@ -266,13 +266,10 @@ fn duplicate_child_receipt_id_with_different_bytes_conflicts() {
     let _ = fs::remove_file(path);
 }
 
-/// Codex round 11, P2: a per-receipt failure in a coalesced group-commit batch
-/// is now ISOLATED to that record via per-record savepoints - the valid sibling
-/// still commits and persists rather than the whole batch rolling back and
-/// failing every caller. This replaces the pre-P2 whole-batch-rollback contract
-/// (formerly `append_receipt_batch_rolls_back_all_receipts_on_batch_error`) the
-/// finding corrected: independent producers keep independent success/failure
-/// semantics.
+/// A per-receipt failure in a coalesced group-commit batch is isolated to that
+/// record via per-record savepoints: the valid sibling still commits and
+/// persists instead of the whole batch rolling back and failing every caller.
+/// Independent producers keep independent success/failure semantics.
 #[test]
 fn append_receipt_batch_isolates_per_record_error() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-receipts-group-isolation");
@@ -399,10 +396,8 @@ fn receipt_commit_flush_reports_queued_batch_error() -> Result<(), Box<dyn std::
     Ok(())
 }
 
-/// Codex round 11, P2: only the ONE invalid receipt in a full group-commit batch
-/// fails; every valid sibling still commits (per-record savepoint isolation).
-/// This replaces the pre-P2 whole-batch-rollback contract (formerly
-/// `append_receipt_batch_rolls_back_full_batch_error`).
+/// In a full group-commit batch, only the one invalid receipt fails; every
+/// valid sibling still commits, via per-record savepoint isolation.
 #[test]
 fn append_receipt_batch_isolates_trailing_invalid_in_full_batch(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -764,7 +759,7 @@ fn receipt_and_lineage_commit_atomically() -> Result<(), Box<dyn std::error::Err
     Ok(())
 }
 
-/// RFC-0006 group-commit idempotency: when the SAME receipt is appended
+/// Group-commit idempotency: when the SAME receipt is appended
 /// concurrently and both requests land in one group-commit batch, the first
 /// insert creates entry_seq E and the second (byte-identical duplicate)
 /// returns that SAME E from `append_chio_receipt_tx`'s idempotent branch while
@@ -829,14 +824,12 @@ fn batched_duplicate_receipts_commit_without_false_drift() -> Result<(), Box<dyn
     Ok(())
 }
 
-/// Codex round 11, P2: a coalesced group-commit batch used to abort ENTIRELY
-/// when any one request hit a per-receipt error (a conflicting duplicate raw
-/// JSON, a lineage insert failure). Dropping the shared transaction rolled back
-/// every earlier successful insert and returned the same error to every caller,
-/// so an unrelated valid append from another producer was lost solely because it
-/// was coalesced with a bad receipt. The fix wraps each record in its own
-/// SAVEPOINT so a per-receipt failure is isolated to that record and independent
-/// callers keep independent success/failure semantics.
+/// A coalesced group-commit batch must not abort entirely when one request
+/// hits a per-receipt error (a conflicting duplicate raw JSON, a lineage insert
+/// failure). Each record is wrapped in its own SAVEPOINT so a per-receipt
+/// failure is isolated to that record: earlier successful inserts still commit,
+/// and an unrelated valid append coalesced into the same batch is never lost.
+/// Independent callers keep independent success/failure semantics.
 #[test]
 fn group_commit_isolates_per_record_failure() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-group-commit-isolation");
@@ -851,9 +844,8 @@ fn group_commit_isolates_per_record_failure() -> Result<(), Box<dyn std::error::
 
     // One group-commit batch from three independent producers: two fresh valid
     // appends bracketing ONE bad request that reuses `base`'s receipt_id with
-    // DIFFERENT raw JSON (the conflicting duplicate the finding names).
-    // `append_chio_receipt_tx` rejects it with "already exists with different
-    // content".
+    // DIFFERENT raw JSON (a conflicting duplicate). `append_chio_receipt_tx`
+    // rejects it with "already exists with different content".
     let good_one = sample_receipt_with_keypair("rcpt-p2-good-1", 2, &keypair);
     let good_two = sample_receipt_with_keypair("rcpt-p2-good-2", 3, &keypair);
     let (r0_tx, _r0) = std::sync::mpsc::sync_channel(1);
@@ -891,9 +883,9 @@ fn group_commit_isolates_per_record_failure() -> Result<(), Box<dyn std::error::
         &requests,
     );
 
-    // TEETH: the two valid appends COMMIT; only the conflicting middle request
-    // fails. Before the fix, the bad record aborted the whole batch, so all three
-    // returned Err and neither good receipt persisted.
+    // The two valid appends COMMIT; only the conflicting middle request fails.
+    // A whole-batch rollback would instead fail all three and persist neither
+    // good receipt.
     assert!(
         results[0].is_ok(),
         "first valid append must commit: {:?}",
@@ -919,8 +911,8 @@ fn group_commit_isolates_per_record_failure() -> Result<(), Box<dyn std::error::
         }
     }
 
-    // TEETH: both good receipts are DURABLY persisted, not rolled back with the
-    // bad sibling.
+    // Both good receipts are DURABLY persisted, not rolled back with the bad
+    // sibling.
     let connection = store.connection()?;
     let good_one_rows: i64 = connection.query_row(
         "SELECT COUNT(*) FROM chio_tool_receipts WHERE receipt_id = ?1",

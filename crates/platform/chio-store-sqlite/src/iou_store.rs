@@ -190,14 +190,14 @@ impl IouEnvelopeStore for SqliteIouEnvelopeStore {
                 let canonical = canonical_str.to_string();
                 writer
                     .run_write(move |connection| {
-                        // Propagate the IOU insert result to the writer (codex
-                        // round 10, finding 2). Wrapping the inner result in
-                        // `Ok(...)` made the writer actor record EVERY insert as
-                        // committed - refreshing `committed_total`/
-                        // `last_commit_unix_ms` - even when the inner insert
-                        // returned a conflict or backend error, so the receipt
-                        // writer health telemetry misreported failed IOU
-                        // persistence. Surface the failure to the actor as a
+                        // Propagate the IOU insert result to the writer.
+                        // Wrapping the inner result in `Ok(...)` would make the
+                        // writer actor record EVERY insert as committed -
+                        // refreshing `committed_total`/`last_commit_unix_ms` -
+                        // even when the inner insert returned a conflict or
+                        // backend error, so the receipt writer health telemetry
+                        // would misreport failed IOU persistence. Surface the
+                        // failure to the actor as a
                         // `ReceiptStoreError` (fail-closed) so it is counted as
                         // `failed_total`. The reverse mapping below restores the
                         // original `IouEnvelopeStoreError` variant for the caller,
@@ -444,7 +444,7 @@ mod tests {
 
     #[test]
     fn failed_writer_routed_insert_is_recorded_as_a_writer_failure() {
-        // Codex round 10, finding 2: when an IOU store is opened alongside a
+        // When an IOU store is opened alongside a
         // receipt store, a failed insert routed through the shared writer must
         // surface as a writer FAILURE, not be swallowed as a committed write, so
         // the receipt writer health telemetry stays accurate. The caller still

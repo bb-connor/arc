@@ -422,7 +422,7 @@ impl ChioKernel {
                 )));
             }
         }
-        // Honor disabled checkpointing (codex round 5, finding 3): KernelConfig
+        // Honor disabled checkpointing: KernelConfig
         // documents `checkpoint_batch_size = 0` as DISABLING automatic
         // checkpointing (non-web3 deployments). Only require a background signer
         // when checkpointing is enabled (batch_size > 0); with 0 the store

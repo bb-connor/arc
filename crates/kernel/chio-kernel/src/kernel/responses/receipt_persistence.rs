@@ -163,9 +163,12 @@ impl ChioKernel {
 
     pub(crate) fn record_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), KernelError> {
         // Scope the receipt-store write lock so it is released before the
-        // settlement observer runs (see the original comment). Checkpoint
-        // construction moved to the store's writer actor (RFC-0006); the
-        // critical section now holds NO checkpoint work.
+        // settlement observer runs. Holding the mutex across
+        // `run_settlement_observer` would serialize all concurrent receipt
+        // persistence behind potentially I/O-bound hook latency; the observer
+        // needs only a fully-persisted receipt, so the guard is dropped first.
+        // Checkpoint construction runs on the store's writer actor, so this
+        // critical section holds no checkpoint work.
         {
             let _receipt_store_write = self.receipt_store_write_lock.lock().map_err(|_| {
                 KernelError::Internal("receipt store write lock poisoned".to_string())

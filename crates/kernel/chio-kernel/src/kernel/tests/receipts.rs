@@ -822,7 +822,7 @@ fn background_checkpoints_are_installed_at_store_attach_and_fire_off_the_request
     let _ = std::fs::remove_file(&path);
 }
 
-/// RFC-0006 fail-closed attach: a receipt store that reports
+/// Fail-closed attach: a receipt store that reports
 /// `supports_kernel_signed_checkpoints() = true` but relies on the DEFAULT
 /// `enable_background_checkpoints` hook (which returns `Ok(false)`, i.e. never
 /// installs a background signer) would append forever without producing
@@ -896,7 +896,7 @@ impl ReceiptStore for CheckpointCapableWithBackgroundStore {
     }
 }
 
-/// Codex (RFC-0006 PLAN review): with the synchronous request-path checkpoint
+/// With the synchronous request-path checkpoint
 /// trigger removed, a background signer installed at store attach is the ONLY
 /// producer of kernel-signed checkpoints. So when checkpointing is enabled
 /// (`checkpoint_batch_size > 0`) and the store claims checkpoint support, the
@@ -942,11 +942,11 @@ fn attach_requires_checkpoint_install_when_supported() {
         .expect("batch_size 0 disables checkpointing; attach must not require a signer");
 }
 
-/// Codex round 5, finding 3: KernelConfig documents `checkpoint_batch_size = 0`
-/// as DISABLING automatic checkpointing (non-web3 deployments). The round-4
-/// attach-time fail-closed check must not reject such a configuration: with
-/// batch_size 0 the store attaches without requiring a background signer, while
-/// batch_size > 0 still enforces the check.
+/// KernelConfig documents `checkpoint_batch_size = 0` as DISABLING automatic
+/// checkpointing (non-web3 deployments). The attach-time fail-closed check must
+/// not reject such a configuration: with batch_size 0 the store attaches
+/// without requiring a background signer, while batch_size > 0 still enforces
+/// the check.
 #[test]
 fn attach_honors_disabled_checkpointing() {
     // Disabled (batch_size 0): attach must succeed even though the store is

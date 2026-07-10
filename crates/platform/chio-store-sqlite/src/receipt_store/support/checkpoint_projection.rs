@@ -513,13 +513,13 @@ pub(crate) fn load_child_claim_receipt_projection_row_by_id(
 }
 
 /// Bounded projection cross-check over the (`floor_entry_seq`,
-/// `max_entry_seq`] delta range ONLY (codex round 3, finding 2). Every
+/// `max_entry_seq`] delta range ONLY. Every
 /// claim_receipt_log_entries row an append adopts as pre-existing baseline
 /// (rows a shared-DB writer committed past this actor's head) must project
 /// EXACTLY from its source receipt row. Scoped to the delta (O(delta) indexed
 /// lookups); the full-log validator (`validate_claim_receipt_log_entries`) is
 /// NEVER invoked, so the single-writer no-stale-head path (empty delta) is a
-/// no-op and the flat per-append cost (F22) holds. Runs inside the caller's
+/// no-op and the flat per-append cost holds. Runs inside the caller's
 /// already-open transaction (no nested transaction).
 pub(crate) fn validate_adopted_claim_log_delta(
     connection: &Connection,
@@ -561,7 +561,7 @@ pub(crate) fn validate_adopted_claim_log_delta(
         })
         .collect::<Result<Vec<_>, _>>()?
     };
-    // Contiguity (codex round 6, finding 2): the adopted range must be exactly
+    // Contiguity: the adopted range must be exactly
     // floor+1, floor+2, ..., max_entry_seq with no missing entry_seq. The
     // projection loop below only inspects rows that CURRENTLY EXIST, so a hole
     // (an append or resync adopting a non-contiguous shared-DB delta) would

@@ -340,7 +340,7 @@ pub trait ReceiptStore: Send + Sync {
     }
 
     /// Install a background checkpoint signer on stores that build their own
-    /// checkpoints on the writer thread (RFC-0006). Returns `Ok(false)` when
+    /// checkpoints on the writer thread. Returns `Ok(false)` when
     /// the store does not support background checkpointing (default).
     fn enable_background_checkpoints(
         &self,

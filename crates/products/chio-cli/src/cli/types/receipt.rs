@@ -51,7 +51,7 @@ pub(crate) enum ReceiptCommands {
         timeout_ms: u64,
     },
     /// Run the full receipt-log audit: claim-log projection validation plus a
-    /// complete checkpoint-chain verification (the RFC-0006 deep check).
+    /// complete checkpoint-chain verification (the deep check).
     Audit {
         /// OFFLINE on-disk repair: revalidate the on-disk receipt chain on a
         /// local connection before reporting. Run this with the kernel STOPPED.

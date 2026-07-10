@@ -72,7 +72,7 @@ impl Default for SqlitePoolConfig {
     }
 }
 
-/// Receipt-store construction options (RFC-0006).
+/// Receipt-store construction options.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SqliteStoreOptions {
     pub pool: SqlitePoolConfig,

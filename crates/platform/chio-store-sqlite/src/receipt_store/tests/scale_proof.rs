@@ -45,8 +45,8 @@ fn mean_append_nanos_at_history(
     Ok(elapsed.as_nanos() as f64 / MEASURED_APPENDS as f64)
 }
 
-/// RFC-0006 scale proof: per-append cost is batch-bounded (O(b)), not
-/// history-bounded. Run explicitly:
+/// Scale proof: per-append cost is batch-bounded (O(b)), not history-bounded.
+/// Run explicitly:
 ///   cargo test -p chio-store-sqlite --release -- --ignored append_scale_proof
 #[test]
 #[ignore = "scale proof; seeds up to 1e6 receipts, run with --release -- --ignored"]

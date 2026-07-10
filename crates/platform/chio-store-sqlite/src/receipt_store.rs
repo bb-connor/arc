@@ -109,7 +109,7 @@ pub struct SqliteReceiptStore {
     /// `tenant_id = id OR tenant_id IS NULL`, which keeps pre-multitenant
     /// (NULL-tagged) receipts visible during explicit compatibility mode.
     pub(crate) strict_tenant_isolation: std::sync::atomic::AtomicBool,
-    /// RFC-0006 staged-rollout flag: read-only after open.
+    /// Staged-rollout flag: read-only after open.
     pub(crate) incremental_verification: bool,
 }
 
@@ -139,7 +139,7 @@ struct ReceiptCommitWriterHealth {
     last_commit_unix_ms: AtomicU64,
     last_error: Mutex<Option<String>>,
     // Verified-head snapshot, written only by the actor thread; read by
-    // flush_report / receipt_store_health / kernel counters (RFC-0006).
+    // flush_report / receipt_store_health / kernel counters.
     head_checkpoint_seq: AtomicU64,
     head_checkpointed_entry_seq: AtomicU64,
     head_claim_log_count: AtomicU64,
@@ -164,12 +164,12 @@ struct ReceiptCommitRequest {
     raw_json: String,
     /// When true, `ensure_receipt_lineage_statement_for_receipt_id_tx` runs
     /// inside the same batch transaction as the receipt insert (trait-append
-    /// paths). Canonical inherent paths keep `false` (today's behavior).
+    /// paths). Canonical inherent paths pass `false`.
     ensure_lineage: bool,
     response: mpsc::SyncSender<Result<u64, ReceiptStoreError>>,
 }
 
-/// Deferred response sender for a `Write` job (codex round 5, finding 2). The
+/// Deferred response sender for a `Write` job. The
 /// actor invokes it AFTER `resync_head_after_write` so a committed write whose
 /// head resync then fails returns the resync error instead of a stale `Ok`.
 /// Called with `Ok(())` when resync succeeded (or never ran) to send the job's
@@ -178,7 +178,7 @@ struct ReceiptCommitRequest {
 ///
 /// Returns `true` when the job's FINAL outcome (after any resync override) was
 /// `Ok`, so the actor can reconcile `committed_total` / `failed_total` for
-/// writer-routed receipts (codex round 9, finding 1). This responder is the
+/// writer-routed receipts. This responder is the
 /// only place that knows the resync-adjusted outcome, so it reports the signal
 /// out of band (the actual `Result` still travels to the caller's channel).
 type WriterResponder = Box<dyn FnOnce(Result<(), ReceiptStoreError>) -> bool + Send + 'static>;
@@ -204,9 +204,8 @@ enum ReceiptCommitCommand {
     /// (child receipts, authorization-consuming appends), which populate
     /// `claim_receipt_log_entries` via the projection triggers. On a
     /// non-incremental (full-verification) store, the pre-write check runs the
-    /// full claim-log validation for these, restoring the pre-refactor
-    /// guarantee. Metadata-only Write jobs leave it false and skip the O(N)
-    /// scan.
+    /// full claim-log validation for these. Metadata-only Write jobs leave it
+    /// false and skip the O(N) scan.
     Write {
         job: WriterClosure,
         appends_receipts: bool,
@@ -361,7 +360,7 @@ impl WriterHandle {
     /// Run one receipt-appending write job (child receipts,
     /// authorization-consuming appends). These insert `claim_receipt_log_entries`
     /// rows via the projection triggers, so the non-incremental fallback
-    /// pre-check runs the full claim-log validation (RFC-0006 fail-closed).
+    /// pre-check runs the full claim-log validation (fail-closed).
     pub(crate) fn run_write_receipt<T, F>(&self, job: F) -> Result<T, ReceiptStoreError>
     where
         F: FnOnce(&mut SqliteStoreConnection) -> Result<T, ReceiptStoreError> + Send + 'static,
@@ -378,8 +377,8 @@ impl WriterHandle {
         let (response, result) = mpsc::sync_channel(1);
         let boxed: WriterClosure = Box::new(move |connection| {
             let outcome = match connection {
-                // Panic isolation (RFC-0006 whole-store-death fix): `job` is
-                // one of ~30 rerouted write families (lineage, liability,
+                // Panic isolation: `job` is one of the many rerouted write
+                // families (lineage, liability,
                 // underwriting, reconciliation, capability, federated, IOU,
                 // checkpoint, reseed) now running on the single writer
                 // thread. `AssertUnwindSafe` is sound here because the
@@ -393,7 +392,7 @@ impl WriterHandle {
                 }
                 Err(error) => Err(error),
             };
-            // Defer the send (codex round 5, finding 2): the actor calls this
+            // Defer the send: the actor calls this
             // responder with the post-write head resync outcome. A resync
             // failure overrides a committed job's `Ok` with the resync error; a
             // job that already failed keeps its own error.
@@ -404,9 +403,9 @@ impl WriterHandle {
                         (Err(job_error), Err(_)) => Err(job_error),
                         (Ok(_), Err(resync_error)) => Err(resync_error),
                     };
-                    // Report the resync-adjusted outcome to the actor (codex
-                    // round 9, finding 1) so it can reconcile committed/failed
-                    // for this writer-routed job, then send the caller's result.
+                    // Report the resync-adjusted outcome to the actor so it can
+                    // reconcile committed/failed for this writer-routed job,
+                    // then send the caller's result.
                     let committed = final_outcome.is_ok();
                     let _ = response.send(final_outcome);
                     committed
@@ -423,8 +422,8 @@ impl WriterHandle {
             appends_receipts,
         }) {
             Ok(()) => {
-                // Count writer-routed writes in health (codex round 8, finding
-                // 3). A successful enqueue mirrors the Append path's
+                // Count writer-routed writes in health. A successful enqueue
+                // mirrors the Append path's
                 // `accepted_total` bump (see `append`): child receipts and
                 // authorization-consuming receipts now go through
                 // `run_write_receipt`, so without this a store dominated by
@@ -450,8 +449,8 @@ impl WriterHandle {
                 // Accepted-then-lost: the actor took the command but exited
                 // before delivering a response (actor death; job panics are
                 // caught and answered above). The job-completion decrement (the
-                // `WriterInflightGuard` in the actor's `Write` arm, codex round
-                // 10 finding 3) may never have run - the command could have been
+                // `WriterInflightGuard` in the actor's `Write` arm) may never
+                // have run - the command could have been
                 // lost while still queued, before the arm was entered - so undo
                 // the speculative pre-send increment and record the failure,
                 // mirroring the append path's recv-Err handling, so
@@ -490,13 +489,13 @@ fn receipt_actor_flush_timeout_error(timeout: Duration) -> ReceiptStoreError {
 }
 
 /// Last verified position of the writer connection's view of the receipt
-/// chain, owned exclusively by the commit-actor thread (RFC-0006).
+/// chain, owned exclusively by the commit-actor thread.
 enum WriterHeadState {
     // Boxed: `VerifiedHead` embeds an `Option<KernelCheckpoint>`, which makes
     // this variant far larger than `Poisoned(String)` (clippy::large_enum_variant).
     Verified(Box<VerifiedHead>),
     /// Seeding or resync failed: every write is rejected with Conflict until
-    /// `chio receipt audit --repair` reseeds (fail-closed, RFC-0006).
+    /// `chio receipt audit --repair` reseeds (fail-closed).
     Poisoned(String),
 }
 
@@ -560,8 +559,8 @@ fn receipt_commit_actor_loop(
                         Err(mpsc::RecvTimeoutError::Disconnected) => break,
                     }
                 }
-                // Panic isolation (RFC-0006 whole-store-death fix):
-                // `commit_receipt_batch` runs on the single writer thread. A
+                // Panic isolation: `commit_receipt_batch` runs on the single
+                // writer thread. A
                 // panic anywhere inside it (the append transaction, the
                 // lineage fold) must fail THIS batch, not kill the thread.
                 // Clone the response channels before handing `requests` /
@@ -574,8 +573,8 @@ fn receipt_commit_actor_loop(
                     .collect();
                 // The co-drained Flush waiters are NOT passed into
                 // `commit_receipt_batch`; they are released below, AFTER the
-                // checkpoint build, so a flush is a genuine checkpoint barrier
-                // (codex round 4, finding 3). Keeping them in the loop lets the
+                // checkpoint build, so a flush is a genuine checkpoint
+                // barrier. Keeping them in the loop lets the
                 // success and panic paths fan them out at one point, and
                 // because they are not moved into the panicking call they
                 // survive an unwind untouched.
@@ -601,7 +600,7 @@ fn receipt_commit_actor_loop(
                 // append latency is not extended by checkpoint building; but it
                 // runs BEFORE the co-drained Flush waiters are released, so a
                 // flush cannot return until the owed checkpoints for the drained
-                // appends are built (flush-as-checkpoint-barrier, finding 3). A
+                // appends are built (the flush-as-checkpoint barrier). A
                 // build failure is recorded via `last_error` and does not poison
                 // the head, and is surfaced to the co-drained Flush waiters of
                 // THIS batch via `flush_barrier_error`. It is deliberately NOT
@@ -681,34 +680,32 @@ fn handle_non_append_command(
             job,
             appends_receipts,
         } => {
-            // Hold the writer `inflight` count for the DURATION of this Write job
-            // (codex round 10, finding 3) rather than releasing it immediately on
-            // dequeue, so a health poll during a slow or stuck liability/checkpoint
-            // write reports `inflight > 0`. The pre-send increment in
+            // Hold the writer `inflight` count for the DURATION of this Write
+            // job rather than releasing it immediately on dequeue, so a health
+            // poll during a slow or stuck liability/checkpoint write reports
+            // `inflight > 0`. The pre-send increment in
             // `WriterHandle::run_write_kind` is adopted by this RAII guard.
             //
-            // Ordering (pre-review F1): the guard is released (`drop`) IMMEDIATELY
-            // BEFORE each `respond(...)` on every exit path, so a caller that
-            // observes its own response never sees itself still counted inflight.
-            // This mirrors the Append path, which decrements in
-            // `commit_receipt_batch` BEFORE fanning out its responses; the round-10
-            // guard instead dropped at the END of this arm, AFTER `respond(...)`
-            // had already unblocked the caller, so `run_write` could return while
-            // `inflight` was still 1. The decrement stays deferred until here, so
-            // inflight remains up through the job body and the head resync (the
-            // response itself is deferred until then). The guard's Drop still
-            // backstops any exit that panics before a respond runs;
-            // `atomic_saturating_sub` keeps a rare overlap with the caller's
-            // recv-Err compensation (actor-thread death) from underflowing.
+            // The guard is released (`drop`) IMMEDIATELY BEFORE each
+            // `respond(...)` on every exit path, so a caller that observes its
+            // own response never sees itself still counted inflight. This
+            // mirrors the Append path, which decrements in `commit_receipt_batch`
+            // BEFORE fanning out its responses. The decrement stays deferred
+            // until each respond, so inflight remains up through the job body and
+            // the head resync (the response itself is deferred until then). The
+            // guard's Drop still backstops any exit that panics before a respond
+            // runs; `atomic_saturating_sub` keeps a rare overlap with the
+            // caller's recv-Err compensation (actor-thread death) from
+            // underflowing.
             let inflight_guard = WriterInflightGuard::new(&health.inflight);
             let mut connection = match pool.get() {
                 Ok(connection) => connection,
                 Err(error) => {
                     // No write ran (no connection), so there is no resync to
                     // gate on: send the pool error now (`Ok(())` = nothing to
-                    // override). Count the failed outcome (round 9, finding 1).
+                    // override). Count the failed outcome.
                     let respond = job(Err(ReceiptStoreError::Pool(error.to_string())));
-                    // Decrement before the response reaches the caller (F1).
+                    // Decrement before the response reaches the caller.
                     drop(inflight_guard);
                     record_write_job_outcome(health, respond(Ok(())));
                     return;
@@ -717,7 +714,7 @@ fn handle_non_append_command(
             match head_state {
                 WriterHeadState::Poisoned(message) => {
                     let respond = job(Err(poisoned_head_error(message)));
-                    // Decrement before the response reaches the caller (F1).
+                    // Decrement before the response reaches the caller.
                     drop(inflight_guard);
                     record_write_job_outcome(health, respond(Ok(())));
                 }
@@ -727,14 +724,14 @@ fn handle_non_append_command(
                     // receipts, consuming auth) are equally protected. On the
                     // non-incremental (full-verification) fallback, a
                     // receipt-appending job also runs the full claim-log
-                    // validation the pre-refactor path guaranteed, so
-                    // uncheckpointed projection drift is caught before the
+                    // validation, so uncheckpointed projection drift is caught
+                    // before the
                     // write commits. Metadata-only Write jobs skip the O(N)
                     // scan.
                     let pre_check = if incremental_verification {
                         // Verify the checkpoint head, THEN validate the adopted
-                        // claim-log delta before the job commits (codex round 11,
-                        // P1): a receipt-appending writer job must reject a
+                        // claim-log delta before the job commits: a
+                        // receipt-appending writer job must reject a
                         // stale/invalid baseline BEFORE its durable insert, the
                         // same way the append path does, not durably write and
                         // only poison the head in the post-write resync.
@@ -757,18 +754,18 @@ fn handle_non_append_command(
                     };
                     if let Err(error) = pre_check {
                         let respond = job(Err(error));
-                        // Decrement before the response reaches the caller (F1).
+                        // Decrement before the response reaches the caller.
                         drop(inflight_guard);
                         record_write_job_outcome(health, respond(Ok(())));
                         return;
                     }
-                    // Capture the head's checkpoint position BEFORE the job runs
-                    // (codex round 9, finding 3): a writer-routed recovery
+                    // Capture the head's checkpoint position BEFORE the job
+                    // runs: a writer-routed recovery
                     // (`create_next_receipt_checkpoint`) that creates/adopts the
                     // missing checkpoint advances this during the resync below.
                     let pre_checkpoint_seq = head.checkpoint_seq();
-                    // Run the job but DEFER its response (codex round 5, finding
-                    // 2): the caller must not observe `Ok` until
+                    // Run the job but DEFER its response: the caller must not
+                    // observe `Ok` until
                     // `resync_head_after_write` confirms the head. A committed
                     // write whose resync then fails receives the resync error,
                     // not a stale `Ok`.
@@ -780,15 +777,15 @@ fn handle_non_append_command(
                     match resync_head_after_write(&connection, head) {
                         Ok(()) => {
                             // Reconcile committed/failed for this writer-routed
-                            // job (codex round 9, finding 1) using the responder's
-                            // resync-adjusted outcome signal. Decrement before the
-                            // response reaches the caller (F1); the post-response
-                            // catch-up build below reads no inflight state.
+                            // job using the responder's resync-adjusted outcome
+                            // signal. Decrement before the response reaches the
+                            // caller; the post-response catch-up build below
+                            // reads no inflight state.
                             drop(inflight_guard);
                             record_write_job_outcome(health, respond(Ok(())));
                             health.store_head_snapshot(head);
                             // Clear a stale checkpoint error after a manual
-                            // recovery (codex round 9, finding 3): a writer-routed
+                            // recovery: a writer-routed
                             // op such as `create_next_receipt_checkpoint` can
                             // build/adopt the missing checkpoint inside the job,
                             // advancing the head's checkpoint seq during the resync
@@ -797,10 +794,9 @@ fn handle_non_append_command(
                             // prior background-build `last_error` in place, so
                             // `receipt_store_health` keeps reporting the store
                             // unhealthy after the repair. Clear it here when the
-                            // checkpoint chain actually advanced (mirrors the
-                            // round-2 "clear only on an actual build" and the
-                            // round-7 reseed-clears-flush-error fix); a real later
-                            // build failure re-sets it below.
+                            // checkpoint chain actually advanced (clear only on
+                            // an actual advance, never on an idle refresh); a
+                            // real later build failure re-sets it below.
                             if head.checkpoint_seq() > pre_checkpoint_seq {
                                 if let Ok(mut last_error) = health.last_error.lock() {
                                     *last_error = None;
@@ -815,9 +811,9 @@ fn handle_non_append_command(
                             // acquires its own, or `pool.get()` would block on
                             // itself.
                             drop(connection);
-                            // Gate the catch-up build on a full-verified head
-                            // (codex round 9, finding 4), mirroring the round-5
-                            // InstallSigner defer. On a non-incremental (suspect)
+                            // Gate the catch-up build on a full-verified head,
+                            // mirroring the InstallSigner defer. On a
+                            // non-incremental (suspect)
                             // store `seed_head_snapshot` leaves the head
                             // UNVALIDATED; only a receipt-appending Write reran the
                             // full claim-log validation in the pre-check above, so
@@ -845,8 +841,8 @@ fn handle_non_append_command(
                             // Surface the resync failure to the caller: a write
                             // that returned `Ok` from its closure must NOT report
                             // success when the head is now poisoned. Count the
-                            // failed outcome (codex round 9, finding 1). Decrement
-                            // before the response reaches the caller (F1).
+                            // failed outcome. Decrement before the response
+                            // reaches the caller.
                             drop(inflight_guard);
                             record_write_job_outcome(health, respond(Err(error)));
                             *head_state = WriterHeadState::Poisoned(poison_message);
@@ -857,7 +853,7 @@ fn handle_non_append_command(
         }
         ReceiptCommitCommand::InstallSigner(signer) => {
             *checkpoint_signer = Some(signer);
-            // Install-time catch-up (codex round 4, finding 1). The store can
+            // Install-time catch-up. The store can
             // open on a DB that already has >= max_batch uncheckpointed
             // claim-log entries (a crash between the durable append response and
             // the background build, or enabling checkpointing on an existing
@@ -867,11 +863,11 @@ fn handle_non_append_command(
             // Run the existing bounded builder now so any already-owed
             // checkpoints (head.claim_log_max_seq - checkpointed_entry_seq >=
             // max_batch) are built at install time (O(b) per checkpoint, loops
-            // until caught up; NOT a full verify, so F22 holds). Fail-closed:
+            // until caught up; NOT a full verify). Fail-closed:
             // build_due_checkpoints_and_record records last_error and never
             // panics the actor.
             //
-            // Deferred-seed gate (codex round 5, finding 1): only build at
+            // Deferred-seed gate: only build at
             // install when the head has actually been VALIDATED. With
             // `incremental_verification = false` the actor seeds via
             // `seed_head_snapshot`, which INTENTIONALLY skips the full claim-log
@@ -882,7 +878,7 @@ fn handle_non_append_command(
             // receipt-appending append/Write runs the deferred full validation
             // and THEN builds the owed checkpoints. In the normal incremental
             // mode the seeded head is genuinely verified, so the owed
-            // checkpoints still build here (preserves round-4 finding 1).
+            // checkpoints still build here.
             if incremental_verification {
                 if let WriterHeadState::Verified(head) = head_state {
                     build_due_checkpoints_and_record(pool, head, checkpoint_signer, health);
@@ -894,8 +890,8 @@ fn handle_non_append_command(
                 .get()
                 .map_err(|error| ReceiptStoreError::Pool(error.to_string()))
                 .and_then(|connection| {
-                    // Reseed always runs the FULL verification (codex round 8,
-                    // finding 2). This is the `chio receipt audit --repair`
+                    // Reseed always runs the FULL verification. This is the
+                    // `chio receipt audit --repair`
                     // recovery path: it clears a poisoned head and must establish
                     // a genuinely CLEAN, fully-verified head, so it runs
                     // `seed_verified_head` (full claim-log validation +
@@ -904,9 +900,9 @@ fn handle_non_append_command(
                     // `seed_head_snapshot` here would let `--repair` clear
                     // `last_error` and mark the head `Verified` while the on-disk
                     // log is still corrupt (repair theater). This is the recovery
-                    // path, not per-append, so it is not F22-bound. NOTE the
-                    // deliberate difference from the InstallSigner catch-up (codex
-                    // round 5, finding 1): that path DEFERS in
+                    // path, not per-append, so it is a recovery-path cost. NOTE
+                    // the deliberate difference from the InstallSigner catch-up:
+                    // that path DEFERS in
                     // `incremental_verification = false` because `seed_head_snapshot`
                     // leaves the head UNVALIDATED; reseed full-verifies, so it does
                     // not defer.
@@ -918,8 +914,8 @@ fn handle_non_append_command(
                     if let Ok(mut last_error) = health.last_error.lock() {
                         *last_error = None;
                     }
-                    // Clear the actor loop's stale flush error (codex round 7,
-                    // finding 3): a prior append poisoned the head and set
+                    // Clear the actor loop's stale flush error: a prior append
+                    // poisoned the head and set
                     // `pending_flush_error`, but this reseed has just revalidated
                     // the DB and replaced the head. Without clearing it, a
                     // subsequent STANDALONE `flush_receipt_writes()` (no queued
@@ -928,19 +924,19 @@ fn handle_non_append_command(
                     // real later batch failure re-sets `pending_flush_error`.
                     *pending_flush_error = None;
                     *head_state = WriterHeadState::Verified(Box::new(head));
-                    // Build owed checkpoints after a successful reseed (codex
-                    // round 8, finding 4). If the background signer was installed
+                    // Build owed checkpoints after a successful reseed. If the
+                    // background signer was installed
                     // while the head was poisoned, its install-time catch-up
-                    // (round 4) was skipped, so a quiet store with >= max_batch
+                    // was skipped, so a quiet store with >= max_batch
                     // uncheckpointed claim-log entries would stay uncheckpointed
                     // until some future write. Run the SAME bounded builder now.
                     // Unlike the InstallSigner catch-up (which gates on
                     // `incremental_verification` because its deferred seed is
                     // unvalidated), this is unconditional: the reseed just
-                    // full-verified the head (finding 2), so building over that
-                    // range never checkpoints unaudited data. Bounded (O(b) per
-                    // owed checkpoint), a recovery-path build (not per-append, so
-                    // not F22-bound). No-op when no signer is present. Fail-closed:
+                    // full-verified the head, so building over that range never
+                    // checkpoints unaudited data. Bounded (O(b) per owed
+                    // checkpoint), a recovery-path build (not per-append).
+                    // No-op when no signer is present. Fail-closed:
                     // `build_due_checkpoints_and_record` records `last_error` on a
                     // build failure and never re-poisons the freshly verified head.
                     if let WriterHeadState::Verified(head) = head_state {
@@ -974,11 +970,10 @@ fn handle_non_append_command(
 /// Build every checkpoint the head owes and, on success, refresh the health
 /// head snapshot; on failure, record the error without poisoning the head or
 /// failing the append/write that triggered it (checkpoint construction never
-/// blocks an already-durable commit, RFC-0006 stage 4). Returns the recorded
+/// blocks an already-durable commit). Returns the recorded
 /// error (if any) so a flush-as-checkpoint-barrier caller can surface it to its
-/// co-drained flush waiters (codex round 4, finding 3); the durable append/write
-/// path ignores the return, matching the pre-existing fail-closed-via-last_error
-/// behavior.
+/// co-drained flush waiters; the durable append/write path ignores the return
+/// and stays fail-closed via `last_error`.
 fn build_due_checkpoints_and_record(
     pool: &Pool<SqliteConnectionManager>,
     head: &mut VerifiedHead,
@@ -986,7 +981,7 @@ fn build_due_checkpoints_and_record(
     health: &ReceiptCommitWriterHealth,
 ) -> Option<ReceiptStoreError> {
     let signer = checkpoint_signer.as_ref()?;
-    // Panic isolation (RFC-0006 whole-store-death fix): a panic mid-build
+    // Panic isolation: a panic mid-build
     // (Merkle build, Ed25519 sign, serde) must not kill the writer thread.
     // `head.latest_checkpoint` is only ever assigned AFTER the per-checkpoint
     // transaction commits (see `maybe_build_checkpoint`), so a panic
@@ -1000,7 +995,7 @@ fn build_due_checkpoints_and_record(
     match result {
         Ok(built) => {
             health.store_head_snapshot(head);
-            // Recovery signal (codex round 2, finding 2): a prior background
+            // Recovery signal: a prior background
             // checkpoint build may have set `last_error`. A later SUCCESSFUL
             // build is reached here through a writer-routed op (a `Write` job
             // crossing the threshold), which does NOT run the append batch's
@@ -1035,7 +1030,7 @@ fn build_due_checkpoints(
     let mut connection = pool
         .get()
         .map_err(|error| ReceiptStoreError::Pool(error.to_string()))?;
-    // Shared-file freshness (codex round 2, finding 1): on a shared receipt DB
+    // Shared-file freshness: on a shared receipt DB
     // another writer can commit a checkpoint AFTER this actor's append
     // pre-check but BEFORE its batch tx. `append_receipt_batch` then adopts that
     // writer's claim-log rows via the baseline delta yet leaves
@@ -1045,8 +1040,8 @@ fn build_due_checkpoints(
     // identical guard does not cover). Refresh the head against the latest
     // persisted checkpoint first so that checkpoint is ADOPTED, not rebuilt.
     // This is an O(1) latest-row read + digest adopt (plus bounded catch-up),
-    // NOT a full chain verify, so the RFC-0006 incremental hot path (F22)
-    // stays intact.
+    // NOT a full chain verify, so the incremental hot path stays flat per
+    // append.
     verify_head_against_latest_checkpoint(&connection, head)?;
     maybe_build_checkpoint(&mut connection, head, signer)
 }
@@ -1115,7 +1110,7 @@ fn maybe_build_checkpoint(
     Ok(built)
 }
 
-/// RFC-0006 head-resync rule: one indexed delta aggregate plus one
+/// Head-resync rule: one indexed delta aggregate plus one
 /// latest-checkpoint row read after every Write closure.
 fn resync_head_after_write(
     connection: &Connection,
@@ -1123,8 +1118,8 @@ fn resync_head_after_write(
 ) -> Result<(), ReceiptStoreError> {
     let pre_resync_max = head.claim_log_max_seq;
     let (delta_count, post_max) = claim_log_delta_count_and_max_seq(connection, pre_resync_max)?;
-    // Validate the ADOPTED resync delta before advancing the head (codex round
-    // 4, finding 2). A Write closure can commit claim_receipt_log_entries rows
+    // Validate the ADOPTED resync delta before advancing the head. A Write
+    // closure can commit claim_receipt_log_entries rows
     // past this actor's head (another shared-DB writer, or a receipt-appending
     // Write job), and this resync absorbs them via COUNT/MAX. Without
     // validating them, an orphan/divergent row would be trusted and later
@@ -1132,7 +1127,7 @@ fn resync_head_after_write(
     // could cover an unaudited entry. Re-validate JUST the
     // (pre_resync_max, post_max] delta against the source receipt tables
     // (O(delta)); the full-log validator is NOT called. Single-writer common
-    // case: no other writer, empty delta, no-op (F22). Fail-closed: an
+    // case: no other writer, empty delta, no-op. Fail-closed: an
     // orphan/divergent delta returns the error, which the Write arm turns into
     // a poisoned head.
     if delta_count > 0 {
@@ -1183,7 +1178,7 @@ fn commit_receipt_batch(
     // APPEND durability responses fan out here (ADR-0013): a durable append
     // response is never delayed by checkpoint construction. The co-drained
     // Flush waiters are released by the caller AFTER the checkpoint build, so a
-    // flush is a genuine checkpoint barrier (codex round 4, finding 3).
+    // flush is a genuine checkpoint barrier.
     for (request, result) in requests.into_iter().zip(results) {
         let _ = request.response.send(result);
     }
@@ -1209,19 +1204,16 @@ fn atomic_saturating_sub(value: &AtomicU64, amount: u64) {
 }
 
 /// Holds the writer `inflight` count for the DURATION of a writer-routed `Write`
-/// job (codex round 10, finding 3). The pre-send increment in
-/// `WriterHandle::run_write_kind` is ADOPTED by this guard, so
-/// `receipt_store_health` reports `inflight > 0` while a slow or stuck
-/// writer-routed op (pool acquire, pre-check, closure, resync) is actually
+/// job. The pre-send increment in `WriterHandle::run_write_kind` is ADOPTED by
+/// this guard, so `receipt_store_health` reports `inflight > 0` while a slow or
+/// stuck writer-routed op (pool acquire, pre-check, closure, resync) is actually
 /// running. The `Write` arm releases it (`drop`) IMMEDIATELY BEFORE each
-/// `respond(...)` (pre-review F1), so a caller that observes its own response
-/// never sees itself still counted inflight - mirroring the Append path, which
-/// decrements in `commit_receipt_batch` BEFORE fanning out its results (the
-/// round-10 guard instead dropped at the END of the arm, AFTER the response had
-/// already unblocked the caller). Still Drop-based, so any exit that panics
-/// before a respond runs releases exactly once; a release overlap with the
-/// caller's recv-Err compensation under actor-thread death saturates at zero via
-/// `atomic_saturating_sub` rather than underflowing.
+/// `respond(...)`, so a caller that observes its own response never sees itself
+/// still counted inflight, mirroring the Append path, which decrements in
+/// `commit_receipt_batch` BEFORE fanning out its results. Still Drop-based, so
+/// any exit that panics before a respond runs releases exactly once; a release
+/// overlap with the caller's recv-Err compensation under actor-thread death
+/// saturates at zero via `atomic_saturating_sub` rather than underflowing.
 struct WriterInflightGuard<'a> {
     inflight: &'a AtomicU64,
 }
@@ -1238,8 +1230,8 @@ impl Drop for WriterInflightGuard<'_> {
     }
 }
 
-/// Reconcile a writer-routed `Write` job's health counters (codex round 9,
-/// finding 1). Child receipts and authorization-consuming appends run through
+/// Reconcile a writer-routed `Write` job's health counters. Child receipts
+/// and authorization-consuming appends run through
 /// `WriterHandle::run_write_receipt`, and metadata-only writes through
 /// `run_write`; both are `accepted_total`-counted at enqueue, but their
 /// success/failure OUTCOME was never folded into `committed_total` /
@@ -1260,7 +1252,7 @@ fn record_write_job_outcome(health: &ReceiptCommitWriterHealth, committed: bool)
 }
 
 /// Background checkpoint signer, installed once by the kernel after `open`
-/// and before serving (RFC-0006 stage 4). `max_batch = 0` disables
+/// and before serving. `max_batch = 0` disables
 /// checkpointing (ADR-0008 semantics).
 #[derive(Clone)]
 pub struct BackgroundCheckpointSigner {
@@ -1269,7 +1261,7 @@ pub struct BackgroundCheckpointSigner {
 }
 
 /// Last verified position of the receipt chain. Owned exclusively by the
-/// commit-actor thread; never shared, never locked (RFC-0006).
+/// commit-actor thread; never shared, never locked.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct VerifiedHead {
     /// The newest checkpoint the actor has verified, already parsed and
@@ -1295,8 +1287,8 @@ impl VerifiedHead {
     }
 }
 
-/// Writer-actor head snapshot exposed to `flush_report` and diagnostics
-/// (RFC-0006). Values are read from the health struct's atomics, written
+/// Writer-actor head snapshot exposed to `flush_report` and diagnostics.
+/// Values are read from the health struct's atomics, written
 /// only by the actor thread.
 pub(crate) struct WriterHeadSnapshot {
     pub(crate) checkpoint_seq: u64,
@@ -1361,7 +1353,7 @@ fn claim_log_delta_count_and_max_seq(
 }
 
 /// Fail-closed pre-job guard for a RECEIPT-APPENDING writer-routed job (child
-/// receipts, authorization-consuming appends; codex round 11, P1). The
+/// receipts, authorization-consuming appends). The
 /// incremental writer pre-check only re-verified the checkpoint HEAD; it did
 /// NOT validate the `claim_receipt_log_entries` rows an out-of-band writer (a
 /// second store instance, an operator repair) may have committed AHEAD of this
@@ -1373,7 +1365,7 @@ fn claim_log_delta_count_and_max_seq(
 /// commits, so a stale/invalid baseline denies the write with no durable
 /// insert. Delta-bounded: single-writer no-stale-head case has an EMPTY delta
 /// (pre_delta = 0) and is a no-op, and the full-log validator is NEVER called,
-/// so the flat per-append cost holds (F22). Metadata-only writes insert no
+/// so the flat per-append cost holds. Metadata-only writes insert no
 /// claim-log rows, so they skip this (appends_receipts = false).
 fn validate_writer_adopted_claim_log_baseline(
     connection: &Connection,
@@ -1434,8 +1426,7 @@ fn verify_head_against_latest_checkpoint(
                         .to_string(),
                 ));
             }
-            // Full-column tamper catch (codex round 6, finding 1; extends round
-            // 3, finding 3): the body digest above covers ONLY what
+            // Full-column tamper catch: the body digest above covers ONLY what
             // statement_json serializes. The kernel_checkpoints row also stores
             // batch_start_seq/batch_end_seq/tree_size/merkle_root/issued_at/
             // kernel_key as their own columns; any one of them corrupted out of
@@ -1444,7 +1435,7 @@ fn verify_head_against_latest_checkpoint(
             // column diverged. `ensure_checkpoint_columns_match_body` reconciles
             // every such column against the (signature-verified) signed body it
             // is meant to mirror. This is O(1) int/string equality over the one
-            // already-read row, NOT a per-append Ed25519 re-verify, so F22 holds.
+            // already-read row, NOT a per-append Ed25519 re-verify.
             ensure_checkpoint_columns_match_body(&row, &persisted_body)?;
             // The `signature` column is the signature OVER the body, not a body
             // field, so it is not covered above; compare it against the cached
@@ -1456,8 +1447,8 @@ fn verify_head_against_latest_checkpoint(
                         .to_string(),
                 ));
             }
-            // Recheck the latest checkpoint's transparency projection rows
-            // (codex round 9, finding 2). The body-digest / column / signature
+            // Recheck the latest checkpoint's transparency projection rows.
+            // The body-digest / column / signature
             // checks above re-verify the `kernel_checkpoints` row on every
             // append, but the projection rows (`checkpoint_tree_heads`,
             // `checkpoint_predecessor_witnesses`,
@@ -1469,9 +1460,8 @@ fn verify_head_against_latest_checkpoint(
             // here closes that gap symmetrically with the per-append column
             // recheck: O(1) (three indexed single-row projection lookups plus an
             // O(1) derivation from the already-parsed checkpoint body, NO
-            // batch/leaf scan and NO full-history walk), so the RFC-0006
-            // incremental hot path stays flat per append (F22). Fail-closed on
-            // any divergence.
+            // batch/leaf scan and NO full-history walk), so the incremental
+            // hot path stays flat per append. Fail-closed on any divergence.
             validate_checkpoint_projection_rows(connection, &row, cached)?;
             Ok(())
         }
@@ -1482,12 +1472,12 @@ fn verify_head_against_latest_checkpoint(
 /// Verify and adopt checkpoints `head.checkpoint_seq()+1 ..= latest_seq`.
 /// O(new checkpoints): each row is parsed (one signature check), predecessor-
 /// linked to the cached head, range-checked against the claim log, AND its
-/// transparency projection rows validated (codex round 7, finding 2) before it
+/// transparency projection rows validated before it
 /// advances the head. Used when another writer instance (second kernel on the
 /// same file, operator CLI) legitimately extended the chain. In the single-
 /// writer hot path the head is never behind, so this loop body does not run
 /// (zero added per-append cost); each caught-up checkpoint is O(b) for its own
-/// batch, never a full-history walk (F22).
+/// batch, never a full-history walk.
 fn catch_up_verified_head_to(
     connection: &Connection,
     head: &mut VerifiedHead,
@@ -1510,7 +1500,7 @@ fn catch_up_verified_head_to(
             None => validate_checkpoint_base(&checkpoint)?,
         }
         validate_checkpoint_against_claim_log(connection, &checkpoint)?;
-        // Projection validation before adoption (codex round 7, finding 2): the
+        // Projection validation before adoption: the
         // catch-up path verified signature + predecessor + claim-log range but
         // not the transparency projection rows that full
         // `verify_checkpoint_chain_integrity` rejects. Adopting a checkpoint with
@@ -1527,8 +1517,8 @@ fn catch_up_verified_head_to(
 
 /// Insert one receipt (and, when requested, its lineage statement) within the
 /// caller's transaction, returning the claim-log `entry_seq`. Split out of
-/// `append_receipt_batch` so each record can run inside its own SAVEPOINT (codex
-/// round 11, P2): a per-receipt failure is returned as this record's `Err`
+/// `append_receipt_batch` so each record can run inside its own SAVEPOINT: a
+/// per-receipt failure is returned as this record's `Err`
 /// instead of aborting the whole coalesced batch. Receipt + lineage stay one
 /// unit - a lineage failure returns `Err`, and the caller's savepoint rollback
 /// undoes the receipt too, so no receipt-without-lineage state is possible.
@@ -1594,15 +1584,15 @@ fn append_receipt_batch(
             Ok(pair) => pair,
             Err(error) => return receipt_batch_error_results(requests.len(), error),
         };
-    // Validate the ADOPTED baseline delta before trusting it (codex round 3,
-    // finding 2). Rows another store instance committed since our last look
+    // Validate the ADOPTED baseline delta before trusting it. Rows another
+    // store instance committed since our last look
     // (head.claim_log_max_seq + 1 ..= baseline_max) are absorbed as
-    // pre-existing baseline; the removed per-append full validation would have
-    // rejected an out-of-band mismatched/orphan claim_receipt_log_entries row
+    // pre-existing baseline. A full per-append validation would reject an
+    // out-of-band mismatched/orphan claim_receipt_log_entries row
     // in that range. Re-validate JUST that bounded delta against the source
     // receipt tables (O(delta)); the full-log validator is NOT called. In the
     // single-writer hot path the head is never stale, so pre_delta is 0 and
-    // this is a no-op (zero added cost, F22 intact).
+    // this is a no-op (zero added cost).
     if pre_delta > 0 {
         if let Err(error) =
             validate_adopted_claim_log_delta(&tx, head.claim_log_max_seq, baseline_max)
@@ -1616,7 +1606,7 @@ fn append_receipt_batch(
         if test_hooks::panic_during_append_batch(&request.receipt.content_hash) {
             panic!("injected test panic during append batch");
         }
-        // Per-record SAVEPOINT (codex round 11, P2): a coalesced group-commit
+        // Per-record SAVEPOINT: a coalesced group-commit
         // batch mixes independent producers. A per-receipt failure (a conflicting
         // duplicate raw JSON, a lineage insert failure) must fail ONLY that
         // record, not roll back and error every unrelated valid append sharing
@@ -1626,7 +1616,7 @@ fn append_receipt_batch(
         // which SQLite restores with the savepoint so surviving rows stay
         // contiguous - and the loop continues with the others. Two extra SQL
         // statements per record: O(1) per record, O(b) per batch, never a
-        // full-history scan, so the flat per-append cost holds (F22).
+        // full-history scan, so the flat per-append cost holds.
         if let Err(error) = tx.execute_batch("SAVEPOINT chio_append_record") {
             return receipt_batch_error_results(requests.len(), ReceiptStoreError::Sqlite(error));
         }
@@ -1690,19 +1680,19 @@ fn append_receipt_batch(
             ),
         );
     }
-    // Validate the NEWLY-projected rows before advancing the head (codex round
-    // 8, finding 1). The count/MAX cross-check above only proves the projection
+    // Validate the NEWLY-projected rows before advancing the head. The
+    // count/MAX cross-check above only proves the projection
     // advanced by the right NUMBER of rows; `append_chio_receipt_tx` verifies
     // only the projected `receipt_id`/`raw_json`, so a tampered projection
     // trigger could emit one row per insert whose `timestamp`, `tool_name`, or
     // attribution columns diverge from the source receipt and still pass here.
-    // The removed per-append full validation would have rejected that drift on
-    // the next append; without validating it now the head advances and future
+    // A full per-append validation would reject that drift on the next
+    // append; without validating it now the head advances and future
     // appends treat the bad row as already verified. Re-validate JUST the
     // (baseline_max, post_max] delta this batch projected with the same
     // full-field validator (O(delta): the batch inserts a bounded number of
     // rows, so the flat per-append cost holds and the full-log validator is
-    // NEVER called; F22 intact). Gated on a non-empty delta (an all-idempotent
+    // NEVER called). Gated on a non-empty delta (an all-idempotent
     // batch projects nothing, so this is a no-op). Fail-closed: a divergent row
     // returns the Conflict before `tx.commit()`, so the head never advances.
     if delta_count > 0 {
@@ -1788,13 +1778,13 @@ fn receipt_writer_job_panic_error(payload: &(dyn std::any::Any + Send)) -> Recei
     ReceiptStoreError::Canonical(format!("receipt writer job panicked: {message}"))
 }
 
-/// Panic isolation (RFC-0006 whole-store-death fix): `commit_receipt_batch`
+/// Panic isolation: `commit_receipt_batch`
 /// runs on the single writer thread, so a panic anywhere inside it (append
 /// transaction, lineage fold) must not kill that thread. By the time this
 /// runs, `requests` has already been moved into the panicking call and dropped
 /// during unwind, so the pre-cloned request response senders are the only way
 /// left to answer every appender in the batch. The co-drained Flush waiters are
-/// NOT moved into the panicking call (codex round 4, finding 3): they survive
+/// NOT moved into the panicking call: they survive
 /// the unwind in the actor loop, which fans out the returned error to them
 /// after this. This mirrors `receipt_batch_error_results`'s uniform fan-out and
 /// the health bookkeeping `commit_receipt_batch` would otherwise have performed
@@ -1849,8 +1839,8 @@ pub(crate) mod test_hooks {
     /// When set, `maybe_build_checkpoint` returns a fail-closed `Err` (a
     /// NON-panic checkpoint-build failure) for a signer using
     /// `FAIL_CHECKPOINT_BUILD_MARKER_MAX_BATCH`, proving a build failure is
-    /// surfaced to a co-drained flush waiter (flush-as-checkpoint-barrier,
-    /// codex round 4 finding 3). It uses a DISTINCT marker from
+    /// surfaced to a co-drained flush waiter (the flush-as-checkpoint
+    /// barrier). It uses a DISTINCT marker from
     /// `PANIC_DURING_CHECKPOINT_BUILD` so the two process-global flags cannot
     /// interfere across the crate's parallel tests.
     pub(crate) static FAIL_CHECKPOINT_BUILD: AtomicBool = AtomicBool::new(false);
@@ -1912,8 +1902,8 @@ pub(crate) use support::{decode_verified_child_receipt, decode_verified_chio_rec
 
 impl SqliteReceiptStore {
     /// Reader-pool connection. READS ONLY: every write transaction must go
-    /// through `writer_handle().run_write` (single-writer discipline,
-    /// RFC-0006). The reader pool is asserted read-only by
+    /// through `writer_handle().run_write` (single-writer discipline). The
+    /// reader pool is asserted read-only by
     /// `reader_pool_never_begins_a_write_transaction` in tests.
     pub(crate) fn connection(&self) -> Result<SqliteStoreConnection, ReceiptStoreError> {
         self.pool
@@ -1954,7 +1944,7 @@ impl SqliteReceiptStore {
             .load(std::sync::atomic::Ordering::SeqCst)
     }
 
-    /// Read-only after open (RFC-0006 staged-rollout flag).
+    /// Read-only after open (staged-rollout flag).
     #[must_use]
     pub fn incremental_verification_enabled(&self) -> bool {
         self.incremental_verification
@@ -2243,40 +2233,40 @@ impl SqliteReceiptStore {
         // uncheckpointed range. Read the persisted checkpoint head from the DB
         // (read-only reader-pool query, not a writer-head mutation) and take
         // the higher of the two so the report reflects the current chain.
-        // Only trust the persisted latest checkpoint if its signed body VERIFIES
-        // (codex round 2, finding 4): `parse_persisted_checkpoint_row` checks
+        // Only trust the persisted latest checkpoint if its signed body
+        // VERIFIES: `parse_persisted_checkpoint_row` checks
         // column/body agreement AND the signature, so a tampered or out-of-band
         // row with an inflated `batch_end_seq` cannot make the flush report a
         // false `checkpointed_entry_seq` and hide the uncheckpointed range. On a
         // verification failure fall back to ONLY the actor's verified head (via
-        // the `.max` below). Reader-pool READ, no write (F29); single latest-row
+        // the `.max` below). Reader-pool READ, no write; single latest-row
         // body verification, not a full chain verify.
         //
-        // Chain-connectivity guard (codex round 7, finding 1): a single-row parse
+        // Chain-connectivity guard: a single-row parse
         // does NOT catch a latest checkpoint that individually verifies yet is
         // DISCONNECTED from the chain (skipped `checkpoint_seq` or wrong
-        // predecessor), which the removed `load_latest_checkpoint()` path rejected
-        // via the full `verify_checkpoint_chain_integrity`. Additionally require
+        // predecessor), which a full `verify_checkpoint_chain_integrity`
+        // catches. Additionally require
         // the latest checkpoint to link to its immediate predecessor before
         // trusting its `batch_end_seq`; a disconnected latest is dropped (fall
         // back to the actor's verified head). This is a bounded O(1) predecessor
         // read on the operator/health surface, NOT a full O(N) chain walk on the
-        // per-append hot path (F22).
+        // per-append hot path.
         //
-        // Claim-log content guard (codex round 10, finding 1): a separate process
+        // Claim-log content guard: a separate process
         // advancing `kernel_checkpoints` on a shared DB can persist a latest row
         // that parses (columns match its signed body) AND links to its predecessor
         // yet whose `merkle_root`/`tree_size`/`batch_end_seq` describe a batch this
         // database's `claim_receipt_log_entries` never actually contained (an
-        // imported/foreign checkpoint). The removed `load_latest_checkpoint()` path
-        // rebuilt the checkpoint Merkle range from the local claim log via
-        // `verify_checkpoint_chain_integrity`; without that content check here an
+        // imported/foreign checkpoint). A full `verify_checkpoint_chain_integrity`
+        // rebuilds the checkpoint Merkle range from the local claim log; without
+        // that content check here an
         // inflated `batch_end_seq` would make this report advertise a false
         // `checkpointed_entry_seq` and hide the uncheckpointed range. Rebuild the
         // latest checkpoint's Merkle range from the LOCAL claim log and drop it on
         // mismatch (fall back to the actor's verified head). Bounded O(b) over the
         // single latest checkpoint's own batch on the operator/health surface, NOT
-        // a full O(N) chain walk on the per-append hot path (F22).
+        // a full O(N) chain walk on the per-append hot path.
         let verified_persisted = load_latest_persisted_checkpoint_row(&connection)?
             .and_then(|row| parse_persisted_checkpoint_row(row).ok())
             .filter(|checkpoint| {
@@ -2864,11 +2854,10 @@ mod receipt_commit_actor_tests {
         Ok(())
     }
 
-    /// Codex round 10, finding 3: a writer-routed `Write` job (liability write,
-    /// manual checkpoint creation) must keep `writer_inflight` nonzero for the
-    /// DURATION of the job, not just at enqueue. Previously the actor decremented
-    /// on dequeue, so a health poll during a slow or stuck Write reported
-    /// `inflight: 0`, hiding active writer work; the `WriterInflightGuard` now
+    /// A writer-routed `Write` job (liability write, manual checkpoint creation)
+    /// must keep `writer_inflight` nonzero for the DURATION of the job, not just
+    /// at enqueue, so a health poll during a slow or stuck Write does not report
+    /// `inflight: 0` and hide active writer work. The `WriterInflightGuard`
     /// holds the count until the job completes, mirroring the Append path.
     #[test]
     fn write_job_holds_inflight_for_its_duration() -> Result<(), Box<dyn std::error::Error>> {
@@ -2922,9 +2911,9 @@ mod receipt_commit_actor_tests {
         );
 
         // Release the job and confirm inflight drains back to baseline. The
-        // `WriterInflightGuard` now decrements just BEFORE the caller's response
-        // is delivered (pre-review F1), so this is already at baseline once the
-        // worker join returns; poll defensively regardless.
+        // `WriterInflightGuard` decrements just BEFORE the caller's response is
+        // delivered, so this is already at baseline once the worker join
+        // returns; poll defensively regardless.
         release_tx.send(())?;
         worker
             .join()
@@ -2946,19 +2935,17 @@ mod receipt_commit_actor_tests {
         Ok(())
     }
 
-    /// Pre-review F1: the `WriterInflightGuard` decrement must be SYNCHRONOUS with
-    /// caller-return. The round-10 guard dropped at the END of the Write arm,
-    /// AFTER `respond(...)` had delivered the caller's response and unblocked
-    /// `run_write`, so a caller could return while `inflight` was still counted -
-    /// the exact window that made
-    /// `run_write_executes_jobs_serially_on_the_writer_thread` intermittently
-    /// observe `inflight == 1`. The fix drops the guard IMMEDIATELY BEFORE each
-    /// `respond(...)`, matching the Append path's decrement-then-fan-out ordering
+    /// The `WriterInflightGuard` decrement must be SYNCHRONOUS with
+    /// caller-return: the guard drops IMMEDIATELY BEFORE each `respond(...)`,
+    /// matching the Append path's decrement-then-fan-out ordering
     /// (`commit_receipt_batch`), so caller-return implies the decrement already
-    /// happened. This asserts that guarantee DIRECTLY and deterministically (no
-    /// `wait_until`): right after `run_write` returns, `inflight` reads 0 on every
-    /// one of many iterations. RED before the fix (the caller can observe
-    /// `inflight == 1` while the writer thread is still finishing the arm).
+    /// happened. If the guard instead dropped at the END of the Write arm (after
+    /// `respond(...)` unblocked `run_write`), a caller could return while
+    /// `inflight` was still counted, the exact window that would make
+    /// `run_write_executes_jobs_serially_on_the_writer_thread` intermittently
+    /// observe `inflight == 1`. This asserts the guarantee DIRECTLY and
+    /// deterministically (no `wait_until`): right after `run_write` returns,
+    /// `inflight` reads 0 on every one of many iterations.
     #[test]
     fn write_decrements_inflight_before_returning_to_caller(
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -2984,11 +2971,11 @@ mod receipt_commit_actor_tests {
         });
         assert!(drained_baseline, "writer failed to drain to baseline");
 
-        // Many iterations to expose the ordering race: the pre-fix guard dropped
-        // AFTER the response reached the caller (and the writer thread still had
-        // the head snapshot, error clear, connection drop and catch-up build to
-        // run), so this load would intermittently observe 1. With the fix the
-        // decrement precedes the response, so caller-return happens-before this
+        // Many iterations to expose the ordering race: if the guard dropped
+        // AFTER the response reached the caller (while the writer thread still
+        // had the head snapshot, error clear, connection drop and catch-up build
+        // to run), this load could intermittently observe 1. Because the
+        // decrement precedes the response, caller-return happens-before this
         // load and it must read 0 on EVERY iteration with no polling.
         for iteration in 0..512 {
             writer.run_write(|_connection| Ok(()))?;

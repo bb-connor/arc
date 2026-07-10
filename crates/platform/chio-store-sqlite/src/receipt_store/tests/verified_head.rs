@@ -316,8 +316,7 @@ fn reseed_clears_a_poisoned_head_after_repairing_the_database(
 /// `Poisoned`, and the next append is denied via the poisoned-head Conflict
 /// (not silently readopted as healthy). This is the counterpart to
 /// `reseed_clears_a_poisoned_head_after_repairing_the_database`, which proves
-/// the success path; this test proves the fail-closed path the review
-/// flagged as untested.
+/// the success path; this test proves the fail-closed path.
 #[test]
 fn reseed_on_still_corrupt_store_stays_poisoned() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-head-reseed-fail");
@@ -433,12 +432,11 @@ fn reseed_on_still_corrupt_store_stays_poisoned() -> Result<(), Box<dyn std::err
     Ok(())
 }
 
-/// Codex round 7, finding 3: `reseed_verified_head()` success clears
-/// `last_error` and replaces the head, but the actor loop's separate
-/// `pending_flush_error` (set by the earlier poisoned append) was left
-/// untouched, so a subsequent STANDALONE `flush_receipt_writes()` (no queued
-/// writes) kept returning the stale append error even though the reseed
-/// revalidated the DB. The fix clears `pending_flush_error` on reseed success.
+/// `reseed_verified_head()` success clears `last_error` and replaces the head,
+/// and must ALSO clear the actor loop's separate `pending_flush_error` (set by
+/// an earlier poisoned append). Otherwise a subsequent STANDALONE
+/// `flush_receipt_writes()` (no queued writes) keeps returning the stale append
+/// error even though the reseed revalidated the DB.
 #[test]
 fn reseed_clears_stale_flush_error() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-reseed-clears-flush-error");
@@ -472,8 +470,8 @@ fn reseed_clears_stale_flush_error() -> Result<(), Box<dyn std::error::Error>> {
 
     let denied = sample_receipt_with_keypair("rcpt-reseed-flush-denied", 50, &keypair);
     assert!(store.append_chio_receipt_returning_seq(&denied).is_err());
-    // A standalone flush now surfaces the stale append error (the bug this fix
-    // targets: the flush error outlives the failed append).
+    // A standalone flush now surfaces the stale append error (the flush error
+    // outlives the failed append).
     assert!(
         store.flush_receipt_writes().is_err(),
         "a poisoned append must leave the standalone flush returning the stale error"
@@ -490,8 +488,8 @@ fn reseed_clears_stale_flush_error() -> Result<(), Box<dyn std::error::Error>> {
     drop(connection);
     store.reseed_verified_head()?;
 
-    // The finding: a subsequent STANDALONE flush (no intervening append that
-    // would itself reset the error) returns Ok, not the stale append error.
+    // A subsequent STANDALONE flush (no intervening append that would itself
+    // reset the error) returns Ok, not the stale append error.
     let report = store.flush_receipt_writes();
     assert!(
         report.is_ok(),
@@ -502,13 +500,13 @@ fn reseed_clears_stale_flush_error() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Codex round 7, finding 2: when another writer extends the checkpoint chain
-/// out of band, the catch-up adoption path verifies signature + predecessor +
-/// claim-log range but must ALSO validate the adopted checkpoint's transparency
-/// projection rows (which full `verify_checkpoint_chain_integrity` checks)
-/// before advancing `head.latest_checkpoint`. A checkpoint with missing /
-/// divergent projection rows must NOT be adopted; a valid extension still is
-/// (bounded per-checkpoint, not a full-history walk, F22).
+/// When another writer extends the checkpoint chain out of band, the catch-up
+/// adoption path verifies signature + predecessor + claim-log range but must
+/// ALSO validate the adopted checkpoint's transparency projection rows (which
+/// full `verify_checkpoint_chain_integrity` checks) before advancing
+/// `head.latest_checkpoint`. A checkpoint with missing / divergent projection
+/// rows must NOT be adopted; a valid extension still is (bounded per-checkpoint,
+/// not a full-history walk).
 #[test]
 fn catch_up_validates_checkpoint_projections() -> Result<(), Box<dyn std::error::Error>> {
     // REJECT: an externally persisted checkpoint whose kernel_checkpoints row is
@@ -588,15 +586,15 @@ fn catch_up_validates_checkpoint_projections() -> Result<(), Box<dyn std::error:
     Ok(())
 }
 
-/// RFC-0006 fail-closed parity: a writer-routed (Write path) receipt append
-/// (child receipt / consuming-auth append) on an `incremental_verification =
-/// false` store must run the SAME full claim-log validation the append batch
-/// path runs, so uncheckpointed projection drift is denied at append time.
-/// Before the fix the fallback pre-check ran only
-/// `verify_latest_checkpoint_integrity`, which returns Ok when no checkpoint
-/// exists, so a writer-routed append silently committed over tampered rows.
-/// Sibling of `full_verification_fallback_still_catches_projection_drift`
-/// (which covers the append batch path).
+/// Fail-closed parity: a writer-routed (Write path) receipt append (child
+/// receipt / consuming-auth append) on an `incremental_verification = false`
+/// store must run the SAME full claim-log validation the append batch path
+/// runs, so uncheckpointed projection drift is denied at append time. A
+/// fallback pre-check that ran only `verify_latest_checkpoint_integrity`
+/// (which returns Ok when no checkpoint exists) would let a writer-routed
+/// append silently commit over tampered rows. Sibling of
+/// `full_verification_fallback_still_catches_projection_drift` (which covers
+/// the append batch path).
 #[test]
 fn writer_routed_fallback_append_catches_uncheckpointed_drift(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -642,13 +640,13 @@ fn writer_routed_fallback_append_catches_uncheckpointed_drift(
     Ok(())
 }
 
-/// Codex round 3, finding 2: `append_receipt_batch` adopts every
-/// claim_receipt_log_entries row past a STALE actor head as trusted baseline
-/// (the pre_delta), cross-checking only the rows THIS batch inserts. A shared-DB
-/// out-of-band orphan/mismatched row in that adopted range would be trusted; the
-/// removed per-append full validation would have rejected it. The fix validates
-/// JUST that bounded delta range against the source tables. The single-writer
-/// no-stale-head case (empty delta) adds no validation, so F22 holds.
+/// `append_receipt_batch` adopts every claim_receipt_log_entries row past a
+/// STALE actor head as trusted baseline (the pre_delta), cross-checking only
+/// the rows THIS batch inserts. A shared-DB out-of-band orphan/mismatched row
+/// in that adopted range must not be blindly trusted: the batch validates JUST
+/// that bounded delta range against the source tables. The single-writer
+/// no-stale-head case (empty delta) adds no validation, so per-append cost
+/// stays bounded by the batch, not total history.
 #[test]
 fn stale_head_validates_adopted_delta_before_trusting() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-stale-head-delta");
@@ -711,9 +709,9 @@ fn stale_head_validates_adopted_delta_before_trusting() -> Result<(), Box<dyn st
         other => return Err(format!("expected Conflict, got {other}").into()),
     }
 
-    // NO-OP (F22): a FRESH head whose claim_log_max_seq already covers the
-    // orphan (= 4) has an EMPTY delta, so the range validator does NOT re-scan
-    // the below-floor orphan; appending a brand-new receipt succeeds.
+    // NO-OP: a FRESH head whose claim_log_max_seq already covers the orphan
+    // (= 4) has an EMPTY delta, so the range validator does NOT re-scan the
+    // below-floor orphan; appending a brand-new receipt succeeds.
     let mut fresh_head = VerifiedHead {
         latest_checkpoint: None,
         claim_log_count: 4,
@@ -738,16 +736,15 @@ fn stale_head_validates_adopted_delta_before_trusting() -> Result<(), Box<dyn st
     Ok(())
 }
 
-/// Codex round 4, finding 2: `resync_head_after_write` advances the head after a
-/// Write closure by COUNT/MAX over `claim_receipt_log_entries`. When another
-/// process (or a receipt-appending Write job) commits rows PAST this actor's
-/// head, resync adopts them without validation, so an out-of-band
-/// orphan/divergent row is trusted and later appends skip it as
-/// already-verified (a background checkpoint could then cover an unaudited
-/// entry). The fix validates JUST the adopted delta (the same bounded
-/// `validate_adopted_claim_log_delta` the append path uses) before advancing.
-/// The single-writer common case (empty delta) adds no validation, so F22
-/// holds.
+/// `resync_head_after_write` advances the head after a Write closure by
+/// COUNT/MAX over `claim_receipt_log_entries`. When another process (or a
+/// receipt-appending Write job) commits rows PAST this actor's head, blindly
+/// adopting them would trust an out-of-band orphan/divergent row that later
+/// appends then skip as already-verified (a background checkpoint could then
+/// cover an unaudited entry). Resync must validate JUST the adopted delta (the
+/// same bounded `validate_adopted_claim_log_delta` the append path uses) before
+/// advancing. The single-writer common case (empty delta) adds no validation,
+/// so per-append cost stays bounded by the batch, not total history.
 #[test]
 fn resync_validates_adopted_delta() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-resync-delta");
@@ -778,8 +775,8 @@ fn resync_validates_adopted_delta() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // FAIL-CLOSED: a head at claim_log_max_seq = 3 puts the orphan at entry_seq 4
-    // inside the adopted resync delta. The resync must REJECT it (finding 2), not
-    // silently absorb it, and must not advance the head.
+    // inside the adopted resync delta. The resync must REJECT it, not silently
+    // absorb it, and must not advance the head.
     let mut stale_head = VerifiedHead {
         latest_checkpoint: None,
         claim_log_count: 3,
@@ -801,7 +798,7 @@ fn resync_validates_adopted_delta() -> Result<(), Box<dyn std::error::Error>> {
         "a rejected resync must not adopt the divergent delta"
     );
 
-    // NO-OP (F22): a head already covering the orphan (max_seq = 4) has an EMPTY
+    // NO-OP: a head already covering the orphan (max_seq = 4) has an EMPTY
     // resync delta, so the range validator does NOT re-scan the below-floor
     // orphan and the resync is a no-op.
     let mut fresh_head = VerifiedHead {
@@ -819,13 +816,13 @@ fn resync_validates_adopted_delta() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Codex round 5, finding 2: for a writer-routed Write job the actor used to
-/// send the caller's result BEFORE running `resync_head_after_write`. Round-4's
-/// finding 2 made that resync able to FAIL (poison the head on a divergent
-/// adopted delta), so a write whose closure COMMITTED but whose resync then
-/// failed still returned `Ok` while the head was left poisoned. The fix defers
-/// the response until AFTER resync: a committed write whose resync fails returns
-/// the resync error, not a stale `Ok`.
+/// For a writer-routed Write job the actor must send the caller's result only
+/// AFTER running `resync_head_after_write`. Because that resync can FAIL (it
+/// poisons the head on a divergent adopted delta), a write whose closure
+/// COMMITTED but whose resync then failed would otherwise return `Ok` while the
+/// head was left poisoned. Deferring the response until after resync means a
+/// committed write whose resync fails returns the resync error, not a stale
+/// `Ok`.
 #[test]
 fn write_job_response_reflects_resync_failure() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-write-resync-fail");
@@ -876,16 +873,17 @@ fn write_job_response_reflects_resync_failure() -> Result<(), Box<dyn std::error
     Ok(())
 }
 
-/// Codex round 11, P1: with incremental verification a RECEIPT-APPENDING
-/// writer-routed job (child receipt / auth-consuming append) pre-checked only
-/// the checkpoint head, NOT the claim-log rows an out-of-band writer left AHEAD
-/// of this actor's head. So a bad/orphan `claim_receipt_log_entries` row present
-/// BEFORE the job ran let the job DURABLY insert its receipt and only THEN, in
-/// `resync_head_after_write`, detect the orphan and poison the head - a
-/// fail-OPEN durable write. The fix validates the adopted claim-log delta (the
-/// same bounded `validate_adopted_claim_log_delta` the append path uses) BEFORE
-/// the job runs, so the job is denied with NO durable insert. Delta-bounded (an
-/// empty delta is the single-writer no-op), so F22 holds.
+/// With incremental verification a RECEIPT-APPENDING writer-routed job (child
+/// receipt / auth-consuming append) that pre-checked only the checkpoint head,
+/// NOT the claim-log rows an out-of-band writer left AHEAD of this actor's
+/// head, would let a bad/orphan `claim_receipt_log_entries` row present BEFORE
+/// the job ran DURABLY insert its receipt and only THEN, in
+/// `resync_head_after_write`, detect the orphan and poison the head (a
+/// fail-OPEN durable write). Validating the adopted claim-log delta (the same
+/// bounded `validate_adopted_claim_log_delta` the append path uses) BEFORE the
+/// job runs denies the job with NO durable insert. The validation is
+/// delta-bounded (an empty delta is the single-writer no-op), so per-append
+/// cost stays bounded by the batch, not total history.
 #[test]
 fn writer_job_validates_adopted_delta_before_commit() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-writer-preval-delta");
@@ -943,10 +941,10 @@ fn writer_job_validates_adopted_delta_before_commit() -> Result<(), Box<dyn std:
         other => return Err(format!("expected Conflict, got {other}").into()),
     }
 
-    // TEETH (the RED/GREEN discriminator): the job's row was rejected BEFORE the
-    // durable insert. Before the fix the closure ran and entry_seq 5 persisted
-    // (the resync rejected only AFTER the commit); after the fix the pre-check
-    // denies the job so entry_seq 5 never exists.
+    // TEETH: the job's row must be rejected BEFORE the durable insert. A
+    // post-commit resync check would let the closure run and persist entry_seq
+    // 5 before rejecting; the pre-check denies the job so entry_seq 5 never
+    // exists.
     let connection = store.connection()?;
     let job_row: i64 = connection.query_row(
         "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE entry_seq = 5",
@@ -962,15 +960,14 @@ fn writer_job_validates_adopted_delta_before_commit() -> Result<(), Box<dyn std:
     Ok(())
 }
 
-/// Codex round 6, finding 1: on the same-seq fast path
-/// `verify_head_against_latest_checkpoint` compared only the RFC 8785 body
-/// digest (statement_json) plus the signature/kernel_key columns. The
-/// kernel_checkpoints row ALSO stores batch_start_seq/batch_end_seq/tree_size/
-/// merkle_root/issued_at as their own columns; a signed-body-bound column
-/// tampered out of band while statement_json is untouched passed the digest
-/// check. The fix reconciles EVERY such column against the signed body
-/// (`ensure_checkpoint_columns_match_body`, O(1) over one row, no Ed25519), so
-/// the column tamper now fails closed.
+/// On the same-seq fast path `verify_head_against_latest_checkpoint` compares
+/// the RFC 8785 body digest (statement_json) plus the signature/kernel_key
+/// columns. The kernel_checkpoints row ALSO stores batch_start_seq/
+/// batch_end_seq/tree_size/merkle_root/issued_at as their own columns; a
+/// signed-body-bound column tampered out of band while statement_json is
+/// untouched would pass a digest-only check. Reconciling EVERY such column
+/// against the signed body (`ensure_checkpoint_columns_match_body`, O(1) over
+/// one row, no Ed25519) makes the column tamper fail closed.
 #[test]
 fn head_trust_checks_all_checkpoint_columns() -> Result<(), Box<dyn std::error::Error>> {
     let (path, store, keypair) = open_seeded_store("chio-head-allcols", 3)?;
@@ -1012,12 +1009,12 @@ fn head_trust_checks_all_checkpoint_columns() -> Result<(), Box<dyn std::error::
     Ok(())
 }
 
-/// Codex round 6, finding 2: `validate_adopted_claim_log_delta` iterated only
-/// the claim-log rows that CURRENTLY EXIST in the adopted range, so an interior
-/// GAP (a missing entry_seq) passed unnoticed. The fix requires the adopted
-/// range to be CONTIGUOUS (floor+1..=max with no hole), an O(delta) ordered
-/// scan over the already-loaded delta, and rejects fail-closed on a gap while a
-/// contiguous delta still passes.
+/// `validate_adopted_claim_log_delta` that iterated only the claim-log rows
+/// that CURRENTLY EXIST in the adopted range would let an interior GAP (a
+/// missing entry_seq) pass unnoticed. The adopted range must therefore be
+/// CONTIGUOUS (floor+1..=max with no hole), an O(delta) ordered scan over the
+/// already-loaded delta, rejecting fail-closed on a gap while a contiguous
+/// delta still passes.
 #[test]
 fn adopted_delta_rejects_interior_gap() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-adopted-delta-gap");
@@ -1049,8 +1046,8 @@ fn adopted_delta_rejects_interior_gap() -> Result<(), Box<dyn std::error::Error>
     assert_eq!(deleted, 1, "expected to remove exactly one claim-log row");
 
     // Now (0, 4] = {1,2,4} is non-contiguous. Without the contiguity check the
-    // projection loop would accept the surviving rows and return Ok; the fix
-    // detects the gap at entry_seq 3 and fails closed.
+    // projection loop would accept the surviving rows and return Ok; the
+    // contiguity scan detects the gap at entry_seq 3 and fails closed.
     let error = validate_adopted_claim_log_delta(&connection, 0, 4)
         .err()
         .ok_or("a non-contiguous adopted delta must be rejected")?;
@@ -1072,13 +1069,12 @@ fn adopted_delta_rejects_interior_gap() -> Result<(), Box<dyn std::error::Error>
     Ok(())
 }
 
-/// Codex round 3, finding 3: `verify_head_against_latest_checkpoint` compares
-/// only the RFC 8785 body digest for a same-seq checkpoint (to keep the Ed25519
-/// verify off the per-append hot path, F22). A persisted `signature` COLUMN
-/// corrupted out of band while statement_json is untouched passes that digest
-/// check. The fix also compares the signature/kernel_key COLUMNS against the
-/// signature-verified cached head (O(1) string compare, no crypto), so the
-/// column tamper is caught fail-closed.
+/// `verify_head_against_latest_checkpoint` compares the RFC 8785 body digest for
+/// a same-seq checkpoint (keeping the Ed25519 verify off the per-append hot
+/// path). A persisted `signature` COLUMN corrupted out of band while
+/// statement_json is untouched would pass a digest-only check. Comparing the
+/// signature/kernel_key COLUMNS against the signature-verified cached head (O(1)
+/// string compare, no crypto) catches the column tamper fail-closed.
 #[test]
 fn tampered_checkpoint_signature_column_denies_append() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-head-sig-column-tamper");
@@ -1143,16 +1139,16 @@ fn tampered_checkpoint_signature_column_denies_append() -> Result<(), Box<dyn st
     Ok(())
 }
 
-/// Codex round 8, finding 1: with incremental verification the per-append
-/// count/MAX cross-check only proves the projection advanced by the right
-/// NUMBER of rows; `append_chio_receipt_tx` verifies only the projected
-/// `receipt_id`/`raw_json`. A projection trigger that emits one row per insert
-/// whose OTHER columns (here `tool_name`) diverge from the source receipt would
-/// slip past the count/MAX gate and advance the head, after which later appends
-/// treat the bad row as already verified. The fix validates the NEWLY-projected
-/// (baseline_max, post_max] delta with the full-field validator BEFORE the head
-/// advances (O(delta), single-batch bounded, F22 intact), so the divergent row
-/// is rejected fail-closed and the head does not move.
+/// With incremental verification the per-append count/MAX cross-check only
+/// proves the projection advanced by the right NUMBER of rows;
+/// `append_chio_receipt_tx` verifies only the projected `receipt_id`/`raw_json`.
+/// A projection trigger that emits one row per insert whose OTHER columns (here
+/// `tool_name`) diverge from the source receipt would slip past the count/MAX
+/// gate and advance the head, after which later appends treat the bad row as
+/// already verified. Validating the NEWLY-projected (baseline_max, post_max]
+/// delta with the full-field validator BEFORE the head advances (O(delta),
+/// single-batch bounded) rejects the divergent row fail-closed and the head
+/// does not move.
 #[test]
 fn divergent_newly_projected_row_is_rejected_before_head_advance(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -1239,14 +1235,13 @@ fn divergent_newly_projected_row_is_rejected_before_head_advance(
     Ok(())
 }
 
-/// Codex round 8, finding 2: `reseed_verified_head()` is the
-/// `chio receipt audit --repair` recovery path. Even when the store was opened
-/// with `incremental_verification = false` (where the hot path defers the full
-/// claim-log audit to the next append), a RESEED must run the FULL verification
-/// so it cannot clear `last_error` and mark a still-corrupt log as `Verified`
-/// (repair theater). This is the deliberate opposite of the InstallSigner
-/// catch-up, which legitimately DEFERS in the same mode because its seed is
-/// unvalidated.
+/// `reseed_verified_head()` is the `chio receipt audit --repair` recovery path.
+/// Even when the store was opened with `incremental_verification = false`
+/// (where the hot path defers the full claim-log audit to the next append), a
+/// RESEED must run the FULL verification so it cannot clear `last_error` and
+/// mark a still-corrupt log as `Verified` (repair theater). This is the
+/// deliberate opposite of the InstallSigner catch-up, which legitimately DEFERS
+/// in the same mode because its seed is unvalidated.
 #[test]
 fn reseed_runs_full_verification_in_non_incremental_mode() -> Result<(), Box<dyn std::error::Error>>
 {
@@ -1270,8 +1265,8 @@ fn reseed_runs_full_verification_in_non_incremental_mode() -> Result<(), Box<dyn
         first_id
     };
 
-    // Reopen with incremental_verification = false: the hot path (and the
-    // pre-fix reseed) would only run the cheap `seed_head_snapshot`.
+    // Reopen with incremental_verification = false: the hot path would only run
+    // the cheap `seed_head_snapshot`.
     let store = SqliteReceiptStore::open_existing_with_options(
         &path,
         crate::SqliteStoreOptions {
@@ -1301,12 +1296,12 @@ fn reseed_runs_full_verification_in_non_incremental_mode() -> Result<(), Box<dyn
     Ok(())
 }
 
-/// Codex round 8, finding 3: a successfully-enqueued writer-routed
-/// (`run_write`/`run_write_receipt`) write must increment the writer
-/// `accepted_total` health counter, mirroring the Append path. Child receipts
-/// and authorization-consuming receipts flow through `run_write_receipt`, so
-/// without this a store dominated by writer-routed receipts would advance the
-/// log while `accepted_total` stayed at zero.
+/// A successfully-enqueued writer-routed (`run_write`/`run_write_receipt`)
+/// write must increment the writer `accepted_total` health counter, mirroring
+/// the Append path. Child receipts and authorization-consuming receipts flow
+/// through `run_write_receipt`, so without this a store dominated by
+/// writer-routed receipts would advance the log while `accepted_total` stayed
+/// at zero.
 #[test]
 fn writer_routed_write_increments_accepted_total() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-writer-routed-accepted");
@@ -1335,14 +1330,14 @@ fn writer_routed_write_increments_accepted_total() -> Result<(), Box<dyn std::er
     Ok(())
 }
 
-/// Codex round 9, finding 1: writer-routed writes (`run_write_receipt` child
-/// receipts / consuming auth, and the general `run_write` path) were
-/// `accepted_total`-counted at enqueue, but their success/failure OUTCOME was
-/// never folded into `committed_total` / `failed_total`, so accepted / committed
-/// / failed did not reconcile and a store dominated by writer-routed receipts
-/// undercounted commits. The actor now records each writer-routed job's
-/// resync-adjusted outcome (O(1) per write): a success increments
-/// committed_total, a failure increments failed_total.
+/// Writer-routed writes (`run_write_receipt` child receipts / consuming auth,
+/// and the general `run_write` path) are `accepted_total`-counted at enqueue,
+/// but their success/failure OUTCOME must ALSO be folded into `committed_total`
+/// / `failed_total`; otherwise accepted / committed / failed do not reconcile
+/// and a store dominated by writer-routed receipts undercounts commits. The
+/// actor records each writer-routed job's resync-adjusted outcome (O(1) per
+/// write): a success increments committed_total, a failure increments
+/// failed_total.
 #[test]
 fn writer_routed_write_outcome_updates_committed_and_failed(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -1395,16 +1390,15 @@ fn writer_routed_write_outcome_updates_committed_and_failed(
     Ok(())
 }
 
-/// Codex round 9, finding 2: when the latest checkpoint seq is UNCHANGED, the
-/// append pre-check hot path (`verify_head_against_latest_checkpoint`'s
-/// seq-equal branch) re-verified the `kernel_checkpoints` row's body digest,
-/// columns, and signature on every append but did NOT recheck the checkpoint's
-/// transparency projection rows. A projection row tampered out of band (guards
-/// momentarily absent, then restored) while the seq is unchanged was therefore
-/// trusted as verified until the next open/health/audit. The recheck closes that
-/// gap symmetrically with the per-append column recheck (O(1) - three indexed
-/// single-row projection lookups, no batch/leaf scan, F22 intact). A valid
-/// projection still passes.
+/// When the latest checkpoint seq is UNCHANGED, the append pre-check hot path
+/// (`verify_head_against_latest_checkpoint`'s seq-equal branch) re-verifies the
+/// `kernel_checkpoints` row's body digest, columns, and signature on every
+/// append but must ALSO recheck the checkpoint's transparency projection rows.
+/// A projection row tampered out of band (guards momentarily absent, then
+/// restored) while the seq is unchanged would otherwise be trusted as verified
+/// until the next open/health/audit. The recheck closes that gap symmetrically
+/// with the per-append column recheck (O(1), three indexed single-row
+/// projection lookups, no batch/leaf scan). A valid projection still passes.
 #[test]
 fn seq_unchanged_recheck_catches_projection_tamper() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-seq-unchanged-projection-tamper");

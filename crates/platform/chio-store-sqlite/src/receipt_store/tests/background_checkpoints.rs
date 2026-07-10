@@ -8,13 +8,13 @@ fn signer(keypair: &Keypair, max_batch: u64) -> BackgroundCheckpointSigner {
     }
 }
 
-/// RFC-0006 whole-store-death fix: a panic mid checkpoint-build (Merkle
-/// build, Ed25519 sign, serde) must not kill the writer thread and must not
-/// leave `head.latest_checkpoint` pointing at a half-built checkpoint. Uses
-/// the `test_hooks::PANIC_DURING_CHECKPOINT_BUILD` fault hook, which fires
-/// after the checkpoint body is computed but before its write transaction
-/// opens (`maybe_build_checkpoint`), mirroring the Task 9/10 fault-hook
-/// pattern used elsewhere in this suite.
+/// A panic mid checkpoint-build (Merkle build, Ed25519 sign, serde) must not
+/// kill the writer thread and must not leave `head.latest_checkpoint` pointing
+/// at a half-built checkpoint. Uses the
+/// `test_hooks::PANIC_DURING_CHECKPOINT_BUILD` fault hook, which fires after the
+/// checkpoint body is computed but before its write transaction opens
+/// (`maybe_build_checkpoint`), mirroring the fault-hook pattern used elsewhere
+/// in this suite.
 ///
 /// This crate's tests run in parallel and the fault-hook flag is
 /// process-global, so this test uses
@@ -57,9 +57,9 @@ fn background_build_panic_is_isolated() -> Result<(), Box<dyn std::error::Error>
     );
     // `receipt_store_health` folds `writer.last_error.is_some()` into
     // `healthy` (same as a non-panic checkpoint-build `Err` would), so the
-    // caught panic is visible here too -- it is NOT swallowed. This is
-    // distinct from head poisoning, which is proven below by the recovery
-    // append succeeding (a poisoned head fails every subsequent write).
+    // caught panic is visible here too: it is NOT swallowed. This is distinct
+    // from head poisoning, which is proven below by the recovery append
+    // succeeding (a poisoned head fails every subsequent write).
     assert!(
         !health.healthy,
         "a recorded writer error must still surface through receipt_store_health"
@@ -213,14 +213,13 @@ fn background_and_writer_routed_child_appends_share_the_threshold(
     Ok(())
 }
 
-/// RFC-0006 idempotent background-checkpoint convergence: two kernels/store
-/// instances sharing one receipt DB can each build the same due checkpoint
-/// before either head catches up. The loser reaches
-/// `insert_checkpoint_incremental_tx` after the winner already committed a
-/// byte-identical row. It must be treated as success (like
-/// `store_kernel_checkpoint_tx`), not a conflict that records
-/// `writer.last_error` and reports the store UNHEALTHY even though the
-/// persisted chain is valid.
+/// Idempotent background-checkpoint convergence: two kernels/store instances
+/// sharing one receipt DB can each build the same due checkpoint before either
+/// head catches up. The loser reaches `insert_checkpoint_incremental_tx` after
+/// the winner already committed a byte-identical row. It must be treated as
+/// success (like `store_kernel_checkpoint_tx`), not a conflict that records
+/// `writer.last_error` and reports the store UNHEALTHY even though the persisted
+/// chain is valid.
 #[test]
 fn identical_background_checkpoint_is_idempotent() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-bg-idempotent");
@@ -238,9 +237,9 @@ fn identical_background_checkpoint_is_idempotent() -> Result<(), Box<dyn std::er
         .load_checkpoint_by_seq(1)?
         .ok_or("winner checkpoint 1 missing")?;
 
-    // The "loser" rebuilds and re-inserts the byte-identical checkpoint 1.
-    // Before the fix the raw INSERT hit the primary-key conflict and errored;
-    // now it is adopted as success.
+    // The "loser" rebuilds and re-inserts the byte-identical checkpoint 1. A
+    // byte-identical re-insert is adopted as success rather than hitting the
+    // primary-key conflict.
     {
         let mut connection = store.connection()?;
         let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
@@ -266,11 +265,10 @@ fn identical_background_checkpoint_is_idempotent() -> Result<(), Box<dyn std::er
     Ok(())
 }
 
-/// RFC-0006 flush-report freshness: when a second handle extends the
-/// checkpoint chain out of band and this handle has had no intervening append,
-/// a Flush must reflect the CURRENT persisted checkpoint (read from the DB),
-/// not the stale writer-head atomics that would overstate the uncheckpointed
-/// range.
+/// Flush-report freshness: when a second handle extends the checkpoint chain
+/// out of band and this handle has had no intervening append, a Flush must
+/// reflect the CURRENT persisted checkpoint (read from the DB), not the stale
+/// writer-head atomics that would overstate the uncheckpointed range.
 #[test]
 fn flush_report_reflects_externally_extended_checkpoint() -> Result<(), Box<dyn std::error::Error>>
 {
@@ -309,16 +307,17 @@ fn flush_report_reflects_externally_extended_checkpoint() -> Result<(), Box<dyn 
     Ok(())
 }
 
-/// Codex round 2, finding 1: on a shared receipt DB another writer can commit a
-/// due checkpoint AFTER this actor's append pre-check but BEFORE its batch tx.
-/// The batch adopts that writer's claim-log rows via the baseline delta yet
-/// leaves `head.latest_checkpoint` stale, so building from the stale position
-/// would try to rebuild the already-committed checkpoint with THIS actor's own
-/// issued_at (clock skew) -> "already exists with different content", recording
+/// On a shared receipt DB another writer can commit a due checkpoint AFTER this
+/// actor's append pre-check but BEFORE its batch tx. The batch adopts that
+/// writer's claim-log rows via the baseline delta yet leaves
+/// `head.latest_checkpoint` stale, so building from the stale position would try
+/// to rebuild the already-committed checkpoint with THIS actor's own issued_at
+/// (clock skew) -> "already exists with different content", recording
 /// writer.last_error and reporting the store UNHEALTHY even though the persisted
 /// chain is valid (the idempotent-identical guard does not cover this skew
-/// case). The fix refreshes the head against the latest persisted checkpoint
-/// before building, ADOPTING the external checkpoint instead of rebuilding it.
+/// case). The background builder must refresh the head against the latest
+/// persisted checkpoint before building, ADOPTING the external checkpoint
+/// instead of rebuilding it.
 #[test]
 fn shared_db_background_build_adopts_external_checkpoint() -> Result<(), Box<dyn std::error::Error>>
 {
@@ -349,7 +348,8 @@ fn shared_db_background_build_adopts_external_checkpoint() -> Result<(), Box<dyn
     // claim-log counters already cover entries 1..=3 (adopted via the baseline
     // delta). Building due checkpoints from this stale head drives the exact
     // production path. (The reader pool is used only as a connection source for
-    // this off-thread reproduction; the fix lives in build_due_checkpoints.)
+    // this off-thread reproduction; the adoption logic lives in
+    // build_due_checkpoints.)
     let mut stale_head = VerifiedHead {
         latest_checkpoint: None,
         claim_log_count: max_batch,
@@ -379,10 +379,10 @@ fn shared_db_background_build_adopts_external_checkpoint() -> Result<(), Box<dyn
     Ok(())
 }
 
-/// Codex round 2, finding 2: a prior background checkpoint build that failed set
-/// writer.last_error. A later SUCCESSFUL build reached via a writer-routed op
-/// (a `Write` job crossing the threshold) refreshes the head snapshot but, on
-/// the append batch's clearing path being skipped, must ALSO clear last_error so
+/// A prior background checkpoint build that failed sets writer.last_error. A
+/// later successful build reached via a writer-routed op (a `Write` job crossing
+/// the threshold) refreshes the head snapshot but, on the append batch's
+/// clearing path being skipped, must also clear last_error so
 /// receipt_store_health reflects the recovered state instead of staying
 /// unhealthy until the next normal append.
 #[test]
@@ -437,12 +437,11 @@ fn successful_checkpoint_build_clears_stale_error() -> Result<(), Box<dyn std::e
     Ok(())
 }
 
-/// Codex round 2, finding 4: flush_report reads the persisted latest
-/// checkpoint's batch_end_seq to reflect an externally extended chain. It must
-/// only trust that row if its signed body VERIFIES; a tampered/out-of-band row
-/// with an inflated batch_end_seq must not make the report advertise a false
-/// checkpointed_entry_seq and hide the uncheckpointed range. A VALID external
-/// checkpoint is still reflected (F5 preserved).
+/// flush_report reads the persisted latest checkpoint's batch_end_seq to reflect
+/// an externally extended chain. It must only trust that row if its signed body
+/// VERIFIES; a tampered/out-of-band row with an inflated batch_end_seq must not
+/// make the report advertise a false checkpointed_entry_seq and hide the
+/// uncheckpointed range. A VALID external checkpoint is still reflected.
 #[test]
 fn flush_report_ignores_unverified_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-flush-ignore-forged-ckpt");
@@ -489,15 +488,14 @@ fn flush_report_ignores_unverified_checkpoint() -> Result<(), Box<dyn std::error
     Ok(())
 }
 
-/// Codex round 7, finding 1: `flush_report` trusts the persisted latest
-/// checkpoint's `batch_end_seq` after `parse_persisted_checkpoint_row`, which
-/// validates only ONE row's columns/body/signature. A latest checkpoint that is
-/// individually well-formed but DISCONNECTED from the chain (skipped
-/// `checkpoint_seq` or wrong predecessor) - which the removed
-/// `load_latest_checkpoint()` path rejected via the full chain integrity check -
-/// must NOT be reported as checkpointed progress; the report must fall back to
-/// the last chain-connected checkpoint. A properly chain-connected latest IS
-/// reported. Bounded O(1) predecessor check on the health surface (F22).
+/// `flush_report` trusts the persisted latest checkpoint's `batch_end_seq` after
+/// `parse_persisted_checkpoint_row`, which validates only ONE row's
+/// columns/body/signature. A latest checkpoint that is individually well-formed
+/// but DISCONNECTED from the chain (skipped `checkpoint_seq` or wrong
+/// predecessor) must NOT be reported as checkpointed progress; the report must
+/// fall back to the last chain-connected checkpoint. A properly chain-connected
+/// latest IS reported. The predecessor check stays bounded O(1) on the health
+/// surface, never walking full history.
 #[test]
 fn flush_report_rejects_disconnected_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
     let keypair = receipt_test_keypair();
@@ -570,17 +568,18 @@ fn flush_report_rejects_disconnected_checkpoint() -> Result<(), Box<dyn std::err
     Ok(())
 }
 
-/// Codex round 10, finding 1: on a shared DB a separate process can advance
-/// `kernel_checkpoints` with a latest row that PARSES (its columns match its
-/// signed body) AND is chain-connected as a valid base, yet whose signed batch
-/// was built over receipts THIS database never held (an imported/foreign
-/// checkpoint). `parse_persisted_checkpoint_row` + `latest_checkpoint_is_chain_connected`
+/// On a shared DB a separate process can advance `kernel_checkpoints` with a
+/// latest row that PARSES (its columns match its signed body) AND is
+/// chain-connected as a valid base, yet whose signed batch was built over
+/// receipts THIS database never held (an imported/foreign checkpoint).
+/// `parse_persisted_checkpoint_row` + `latest_checkpoint_is_chain_connected`
 /// alone trust its inflated `batch_end_seq`, making `flush_receipt_writes`
 /// advertise a false `checkpointed_entry_seq` and hide the uncheckpointed range.
 /// `flush_report` must rebuild the checkpoint's Merkle range from the LOCAL claim
 /// log (`validate_checkpoint_against_claim_log`) and drop the row on mismatch,
-/// falling back to the actor's verified head. Bounded O(b) over the single latest
-/// checkpoint's own batch on the operator/health surface (F22).
+/// falling back to the actor's verified head. Bounded O(b) over the single
+/// latest checkpoint's own batch on the operator/health surface, never
+/// re-verifying whole history.
 #[test]
 fn flush_report_rejects_checkpoint_foreign_to_local_claim_log(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -621,18 +620,18 @@ fn flush_report_rejects_checkpoint_foreign_to_local_claim_log(
     Ok(())
 }
 
-/// Codex round 11, P3: `latest_checkpoint_is_chain_connected` (the `flush_report`
-/// filter guarding a trusted `batch_end_seq`) verified only that the LATEST
-/// checkpoint links to its IMMEDIATE predecessor. An EARLIER checkpoint row
-/// missing from the persisted chain (a partial import, an out-of-band delete)
-/// left the seq-1..seq link intact, so the helper still accepted the latest
-/// checkpoint even though the prefix was not actually complete - hiding an
-/// unattested range from the flush report. The fix requires the persisted chain
-/// to hold every seq 1..=latest with no gap (one bounded COUNT aggregate over
-/// the checkpoint table, no per-checkpoint parse/signature/Merkle work, so it
-/// stays bounded and never re-verifies whole history, F22). A DEEPER gap (not
-/// the immediate predecessor, which the existing predecessor check already
-/// catches) must now fail closed.
+/// `latest_checkpoint_is_chain_connected` (the `flush_report` filter guarding a
+/// trusted `batch_end_seq`) must verify more than that the LATEST checkpoint
+/// links to its IMMEDIATE predecessor. An EARLIER checkpoint row missing from the
+/// persisted chain (a partial import, an out-of-band delete) leaves the
+/// seq-1..seq link intact, so a predecessor-only check would still accept the
+/// latest checkpoint even though the prefix is not actually complete, hiding an
+/// unattested range from the flush report. The check requires the persisted
+/// chain to hold every seq 1..=latest with no gap (one bounded COUNT aggregate
+/// over the checkpoint table, no per-checkpoint parse/signature/Merkle work, so
+/// it stays bounded and never re-verifies whole history). A DEEPER gap (not the
+/// immediate predecessor, which the existing predecessor check already catches)
+/// must fail closed.
 #[test]
 fn chain_connected_rejects_missing_earlier_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-chain-connected-gap");
@@ -670,9 +669,9 @@ fn chain_connected_rejects_missing_earlier_checkpoint() -> Result<(), Box<dyn st
     )?;
     assert_eq!(deleted, 1, "expected to remove exactly one checkpoint row");
 
-    // The immediate predecessor (seq 3) is still present, so before the fix the
-    // helper returned Ok; the prefix-completeness guard now fails closed on the
-    // missing seq 2.
+    // The immediate predecessor (seq 3) is still present, so a predecessor-only
+    // check would return Ok; the prefix-completeness guard instead fails closed
+    // on the missing seq 2.
     let error = latest_checkpoint_is_chain_connected(&connection, &latest)
         .err()
         .ok_or("a chain with a missing earlier checkpoint must be rejected")?;
@@ -690,12 +689,12 @@ fn chain_connected_rejects_missing_earlier_checkpoint() -> Result<(), Box<dyn st
     Ok(())
 }
 
-/// Codex round 2, finding 5: the OPERATOR/IMPORT checkpoint append
-/// (store_checkpoint -> store_kernel_checkpoint_atomic) only parses the LATEST
-/// checkpoint as predecessor, so a mid-chain tamper whose latest row still
-/// parses would let an operator extend an already-corrupt chain. The operator
-/// path must re-verify the full chain and fail closed. (This does NOT touch the
-/// RFC-0006 background builder, which stays on the incremental head, F22.)
+/// The OPERATOR/IMPORT checkpoint append (store_checkpoint ->
+/// store_kernel_checkpoint_atomic) only parses the LATEST checkpoint as
+/// predecessor, so a mid-chain tamper whose latest row still parses would let an
+/// operator extend an already-corrupt chain. The operator path must re-verify the
+/// full chain and fail closed. (This does NOT touch the background builder, which
+/// stays on the incremental head and never walks full history.)
 #[test]
 fn operator_checkpoint_append_reverifies_chain() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-operator-reverify-chain");
@@ -755,16 +754,15 @@ fn operator_checkpoint_append_reverifies_chain() -> Result<(), Box<dyn std::erro
     Ok(())
 }
 
-/// Codex round 3, finding 1: two shared-DB builders stamp different wall-clock
-/// `issued_at`, so the loser can reach `insert_checkpoint_incremental_tx` AFTER
-/// the winner already committed a byte-DIFFERENT (but valid) checkpoint at the
-/// same seq (the race window past the head refresh). Round 2 made a
-/// byte-identical row idempotent; this makes a clock-skew winner ADOPTED
-/// (validated BOUNDED: its signature, predecessor linkage, its own claim-log
-/// range, and its projections - one checkpoint, not the whole chain) instead of
-/// failing the primary-key conflict and reporting the store UNHEALTHY though
-/// the persisted chain is valid. A genuinely INVALID same-seq checkpoint still
-/// fails closed.
+/// Two shared-DB builders stamp different wall-clock `issued_at`, so the loser
+/// can reach `insert_checkpoint_incremental_tx` AFTER the winner already
+/// committed a byte-DIFFERENT (but valid) checkpoint at the same seq (the race
+/// window past the head refresh). A byte-identical row is adopted idempotently; a
+/// clock-skew winner is likewise ADOPTED (validated BOUNDED: its signature,
+/// predecessor linkage, its own claim-log range, and its projections - one
+/// checkpoint, not the whole chain) instead of failing the primary-key conflict
+/// and reporting the store UNHEALTHY though the persisted chain is valid. A
+/// genuinely INVALID same-seq checkpoint still fails closed.
 #[test]
 fn concurrent_valid_checkpoint_is_adopted_not_conflicted() -> Result<(), Box<dyn std::error::Error>>
 {
@@ -864,12 +862,12 @@ fn concurrent_valid_checkpoint_is_adopted_not_conflicted() -> Result<(), Box<dyn
     Ok(())
 }
 
-/// Codex round 4, finding 1: the `InstallSigner` handler only STORED the signer;
-/// an already-owed checkpoint (the store opened on a DB that already has
-/// at least max_batch uncheckpointed claim-log entries, e.g. a crash between the
-/// durable append response and the background build, or enabling checkpointing
-/// on an existing store) was not built until some future Append/Write. A quiet
-/// restarted store stayed uncheckpointed indefinitely. The fix runs the bounded
+/// If the `InstallSigner` handler only STORED the signer, an already-owed
+/// checkpoint (the store opened on a DB that already has at least max_batch
+/// uncheckpointed claim-log entries, e.g. a crash between the durable append
+/// response and the background build, or enabling checkpointing on an existing
+/// store) would not be built until some future Append/Write, leaving a quiet
+/// restarted store uncheckpointed indefinitely. The handler must run the bounded
 /// catch-up builder at install time.
 #[test]
 fn install_signer_builds_owed_checkpoints() -> Result<(), Box<dyn std::error::Error>> {
@@ -890,7 +888,7 @@ fn install_signer_builds_owed_checkpoints() -> Result<(), Box<dyn std::error::Er
     );
 
     // Install the signer. The InstallSigner handler must build the owed
-    // checkpoint IMMEDIATELY (finding 1), not wait for a future append.
+    // checkpoint IMMEDIATELY, not wait for a future append.
     store.enable_background_checkpoints(signer(&keypair, max_batch))?;
     // Flush is only a synchronization barrier here: it makes the InstallSigner
     // command observably processed. It does NOT itself append or build.
@@ -916,17 +914,15 @@ fn install_signer_builds_owed_checkpoints() -> Result<(), Box<dyn std::error::Er
     Ok(())
 }
 
-/// Codex round 5, finding 1: the round-4 install-time catch-up builds owed
-/// checkpoints when the signer is installed. But with
-/// `incremental_verification = false` the actor seeds via `seed_head_snapshot`,
-/// which INTENTIONALLY skips the full claim-log + checkpoint-chain audit
-/// (deferred to the next append/verify), so the seeded head is
-/// `Verified`-but-UNVALIDATED. Building catch-up checkpoints at install over
-/// that range would checkpoint unaudited data (fail-closed violation), so the
-/// install-time build must DEFER in this mode: the next append runs the full
-/// per-append validation and THEN the owed checkpoints build. The normal
-/// verified mode (`install_signer_builds_owed_checkpoints`) still builds at
-/// install.
+/// Install-time catch-up builds owed checkpoints when the signer is installed.
+/// But with `incremental_verification = false` the actor seeds via
+/// `seed_head_snapshot`, which INTENTIONALLY skips the full claim-log +
+/// checkpoint-chain audit (deferred to the next append/verify), so the seeded
+/// head is `Verified`-but-UNVALIDATED. Building catch-up checkpoints at install
+/// over that range would checkpoint unaudited data (fail-closed violation), so
+/// the install-time build must DEFER in this mode: the next append runs the full
+/// per-append validation and THEN the owed checkpoints build. The normal verified
+/// mode (`install_signer_builds_owed_checkpoints`) still builds at install.
 #[test]
 fn install_catch_up_respects_deferred_validation() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-install-deferred");
@@ -949,7 +945,7 @@ fn install_catch_up_respects_deferred_validation() -> Result<(), Box<dyn std::er
 
     // Install the signer. In deferred-seed mode the head is
     // Verified-but-UNVALIDATED, so the install-time catch-up MUST NOT build over
-    // it (finding 1).
+    // it.
     store.enable_background_checkpoints(signer(&keypair, max_batch))?;
     // Flush is only a synchronization barrier: it makes the InstallSigner
     // command observably processed. It does NOT itself append or build.
@@ -986,8 +982,7 @@ fn install_catch_up_respects_deferred_validation() -> Result<(), Box<dyn std::er
 /// released. The actor drains the whole queue in ONE batch iteration, so the
 /// Flush lands inside the group-commit coalescing window (co-drained) instead
 /// of arriving as a standalone barrier afterward. Returns the flush waiter's
-/// result once the actor releases it (AFTER the checkpoint build, with the
-/// finding-3 fix).
+/// result once the actor releases it (AFTER the checkpoint build).
 fn co_drain_flush_with_appends(
     store: &SqliteReceiptStore,
     keypair: &Keypair,
@@ -1042,13 +1037,13 @@ fn co_drain_flush_with_appends(
     Ok(flush_result)
 }
 
-/// Codex round 4, finding 3: a Flush co-drained with a group-commit batch was
-/// answered by `commit_receipt_batch` BEFORE the (newly added) checkpoint build
-/// step ran, so a flush-as-barrier caller could observe a missing checkpoint /
-/// stale uncheckpointed range. The fix releases the co-drained Flush waiters
-/// only AFTER `build_due_checkpoints` has run for that batch, and surfaces a
-/// build failure to the flush caller as an error. Append durability responses
-/// still fan out before the build (ADR-0013).
+/// A Flush co-drained with a group-commit batch must not be answered by
+/// `commit_receipt_batch` BEFORE the checkpoint build step runs, or a
+/// flush-as-barrier caller could observe a missing checkpoint / stale
+/// uncheckpointed range. The co-drained Flush waiters are released only AFTER
+/// `build_due_checkpoints` has run for that batch, and a build failure surfaces
+/// to the flush caller as an error. Append durability responses still fan out
+/// before the build (ADR-0013).
 #[test]
 fn flush_is_a_checkpoint_barrier() -> Result<(), Box<dyn std::error::Error>> {
     let keypair = receipt_test_keypair();
@@ -1104,14 +1099,14 @@ fn flush_is_a_checkpoint_barrier() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Codex round 8, finding 4: when the background signer is installed while the
-/// writer head is POISONED, the InstallSigner install-time catch-up is skipped
-/// (it only builds for a Verified head). After the operator repairs the database
-/// and the reseed succeeds, the owed checkpoints must be built: the reseed just
-/// full-verified the head (finding 2), so the SAME bounded catch-up used by
-/// InstallSigner (round 4) runs here (O(b) per owed checkpoint, recovery-path,
-/// not F22-bound). Without the fix a quiet reseeded store with owed
-/// uncheckpointed entries stays uncheckpointed until some future write.
+/// When the background signer is installed while the writer head is POISONED, the
+/// InstallSigner install-time catch-up is skipped (it only builds for a Verified
+/// head). After the operator repairs the database and the reseed succeeds, the
+/// owed checkpoints must be built: the reseed just full-verified the head, so the
+/// SAME bounded catch-up used by InstallSigner runs here (O(b) per owed
+/// checkpoint, a recovery path rather than the steady-state bounded per-append
+/// cost). Otherwise a quiet reseeded store with owed uncheckpointed entries stays
+/// uncheckpointed until some future write.
 #[test]
 fn reseed_builds_owed_checkpoints_after_repair() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-reseed-owed-ckpt");
@@ -1185,8 +1180,8 @@ fn reseed_builds_owed_checkpoints_after_repair() -> Result<(), Box<dyn std::erro
         )?;
     }
 
-    // Reseed now succeeds (full verify) and builds the owed checkpoint (finding 4)
-    // WITHOUT any further append.
+    // Reseed now succeeds (full verify) and builds the owed checkpoint WITHOUT
+    // any further append.
     store.reseed_verified_head()?;
     let checkpoint = store
         .load_checkpoint_by_seq(1)?
@@ -1203,15 +1198,13 @@ fn reseed_builds_owed_checkpoints_after_repair() -> Result<(), Box<dyn std::erro
     Ok(())
 }
 
-/// Codex round 9, finding 3: a background checkpoint build that previously failed
-/// set `writer.last_error`. A later manual recovery via
-/// `create_next_receipt_checkpoint` creates/adopts the missing checkpoint so
-/// there is no due work left; the follow-up `build_due_checkpoints_and_record`
-/// then returns `Ok(false)` and would leave the stale error in place, so
-/// `receipt_store_health` keeps reporting the store UNHEALTHY after the repair.
-/// The recovery must clear the stale error when the checkpoint chain actually
-/// advanced (mirroring the round-7 reseed-clears-flush-error fix). A real later
-/// failure re-sets it.
+/// A background checkpoint build that previously failed set `writer.last_error`.
+/// A later manual recovery via `create_next_receipt_checkpoint` creates/adopts
+/// the missing checkpoint so there is no due work left; the follow-up
+/// `build_due_checkpoints_and_record` then returns `Ok(false)` and would leave
+/// the stale error in place, so `receipt_store_health` keeps reporting the store
+/// UNHEALTHY after the repair. The recovery must clear the stale error when the
+/// checkpoint chain actually advanced. A real later failure re-sets it.
 #[test]
 fn manual_recovery_clears_stale_checkpoint_error() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-manual-recovery-clear-error");
@@ -1229,7 +1222,7 @@ fn manual_recovery_clears_stale_checkpoint_error() -> Result<(), Box<dyn std::er
     );
 
     // Simulate a PRIOR background-checkpoint build failure that set the actor's
-    // last_error and was never cleared (same precondition as the round-2
+    // last_error and was never cleared (same precondition as the
     // successful_checkpoint_build_clears_stale_error fixture, exercised through
     // the real writer-routed recovery path here).
     if let Ok(mut last_error) = store.receipt_commit_actor.health.last_error.lock() {
@@ -1263,16 +1256,16 @@ fn manual_recovery_clears_stale_checkpoint_error() -> Result<(), Box<dyn std::er
     Ok(())
 }
 
-/// Codex round 9, finding 4: on a non-incremental (suspect) store the head is
-/// seeded UNVALIDATED (`seed_head_snapshot`), and the round-5 InstallSigner
-/// defer already skips the install-time catch-up. But the Write resync path then
-/// called `build_due_checkpoints_and_record` UNCONDITIONALLY after every
-/// successful Write, including a metadata-only `run_write` that never ran the
-/// full claim-log validation. On a store with already-due uncheckpointed
-/// entries, that metadata write would checkpoint unaudited claim-log rows before
-/// the deferred full validation ever runs. The build must be gated on a
-/// full-verified head (incremental mode OR a receipt-appending job that just ran
-/// the full validation), fail-closed. A receipt-appending write still builds.
+/// On a non-incremental (suspect) store the head is seeded UNVALIDATED
+/// (`seed_head_snapshot`), and the InstallSigner defer already skips the
+/// install-time catch-up. If the Write resync path then called
+/// `build_due_checkpoints_and_record` UNCONDITIONALLY after every successful
+/// Write, including a metadata-only `run_write` that never ran the full claim-log
+/// validation, then on a store with already-due uncheckpointed entries that
+/// metadata write would checkpoint unaudited claim-log rows before the deferred
+/// full validation ever runs. The build must be gated on a full-verified head
+/// (incremental mode OR a receipt-appending job that just ran the full
+/// validation), fail-closed. A receipt-appending write still builds.
 #[test]
 fn metadata_write_does_not_checkpoint_unvalidated_data() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-metadata-defer-build");
@@ -1293,8 +1286,8 @@ fn metadata_write_does_not_checkpoint_unvalidated_data() -> Result<(), Box<dyn s
     }
     store.flush_receipt_writes()?;
 
-    // Install the signer: deferred-seed mode skips the install-time catch-up
-    // (round 5), so no checkpoint yet.
+    // Install the signer: deferred-seed mode skips the install-time catch-up, so
+    // no checkpoint yet.
     store.enable_background_checkpoints(signer(&keypair, max_batch))?;
     store.flush_receipt_writes()?;
     assert!(

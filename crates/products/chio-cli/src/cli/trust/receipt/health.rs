@@ -130,10 +130,10 @@ pub(crate) fn cmd_receipt_checkpoint_verify(backend: QueryBackend<'_>) -> Result
 }
 
 /// `chio receipt audit [--repair]`: the promoted full-verification surface
-/// (RFC-0006 rollout step 3). Runs validate_claim_receipt_log_entries plus a
+/// (rollout step 3). Runs validate_claim_receipt_log_entries plus a
 /// complete checkpoint-chain verification via receipt_checkpoint_status.
 ///
-/// `--repair` is an OFFLINE operation (codex round 2, finding 3). It opens a
+/// `--repair` is an OFFLINE operation. It opens a
 /// LOCAL throwaway store and revalidates/reseeds the ON-DISK state on that
 /// connection. The CLI runs in a separate process from a live kernel and cannot
 /// reach that kernel's in-memory writer head, so `--repair` does NOT clear a
@@ -144,7 +144,7 @@ pub(crate) fn cmd_receipt_audit(repair: bool, backend: QueryBackend<'_>) -> Resu
 }
 
 /// Honest, cross-process description of what `chio receipt audit --repair`
-/// actually does (codex round 2, finding 3): it validates the on-disk receipt
+/// actually does: it validates the on-disk receipt
 /// state OFFLINE and cannot reseed a running kernel's in-memory writer head.
 /// Kept as a pure function so the wording is unit-testable.
 pub(crate) fn offline_repair_notice() -> &'static str {
@@ -573,7 +573,7 @@ mod receipt_operator_tests {
         Ok(())
     }
 
-    /// Codex round 2, finding 3: `chio receipt audit --repair` cannot reach a
+    /// `chio receipt audit --repair` cannot reach a
     /// running kernel's in-memory writer head (a separate process), so its
     /// operator-facing wording must be honest about being an OFFLINE on-disk
     /// operation and must instruct restarting the kernel to clear a live poison

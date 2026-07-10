@@ -24,8 +24,8 @@ proptest! {
         .. ProptestConfig::default()
     })]
 
-    /// RFC-0006: for any interleaving of appends and checkpoint thresholds,
-    /// the incremental head after replay equals the value seed_verified_head
+    /// For any interleaving of appends and checkpoint thresholds, the
+    /// incremental head after replay equals the value seed_verified_head
     /// computes by full verification.
     #[test]
     fn prop_incremental_head_matches_full_audit(ops in proptest::collection::vec(head_op_strategy(), 1..16)) {

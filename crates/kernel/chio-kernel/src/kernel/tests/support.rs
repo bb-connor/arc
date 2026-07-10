@@ -34,7 +34,7 @@ use rusqlite::{params, Connection, OptionalExtension, Row};
 struct SqliteReceiptStore {
     connection: Mutex<Connection>,
     // Test-double analogue of the real store's writer-actor signer install
-    // (RFC-0006 `enable_background_checkpoints`). `None` until installed;
+    // (`enable_background_checkpoints`). `None` until installed;
     // `max_batch == 0` disables checkpointing (ADR-0008).
     background_checkpoint_signer: Mutex<Option<(std::sync::Arc<Keypair>, u64)>>,
 }
@@ -300,7 +300,7 @@ impl SqliteReceiptStore {
     }
 
     /// Test-double analogue of the real store's writer-actor checkpoint
-    /// construction (RFC-0006): synchronous, but performed under the same
+    /// construction: synchronous, but performed under the same
     /// connection lock as the triggering append, so concurrent callers see
     /// contiguous batches without needing a conflict-retry loop.
     fn maybe_build_background_checkpoint_locked(
@@ -486,7 +486,7 @@ impl ReceiptStore for SqliteReceiptStore {
         )?;
         let seq = (rows > 0).then(|| connection.last_insert_rowid().max(0) as u64);
         if let Some(seq) = seq {
-            // Test-double analogue of RFC-0006's writer-actor checkpoint
+            // Test-double analogue of the real store's writer-actor checkpoint
             // construction: performed synchronously, still under the
             // connection lock this append holds, so it never observes a
             // concurrent writer's half-committed state.

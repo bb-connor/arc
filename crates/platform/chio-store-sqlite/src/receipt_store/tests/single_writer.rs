@@ -2,7 +2,7 @@ use super::super::*;
 use super::support::*;
 use chio_kernel::ReceiptStore;
 
-/// RFC-0006 whole-store-death fix: a panic inside a Write-routed job (one of
+/// A panic inside a Write-routed job (one of
 /// the ~30 rerouted write families: lineage, liability, underwriting,
 /// reconciliation, capability, federated, IOU, checkpoint, reseed) must not
 /// take down the single writer thread for the rest of the process lifetime.
@@ -61,7 +61,7 @@ fn writer_job_panic_does_not_kill_the_actor() -> Result<(), Box<dyn std::error::
     Ok(())
 }
 
-/// RFC-0006 whole-store-death fix: a panic inside `commit_receipt_batch`
+/// A panic inside `commit_receipt_batch`
 /// (the append path itself, not a Write-routed job) must not take down the
 /// writer thread either. Uses the `test_hooks::PANIC_DURING_APPEND_BATCH`
 /// fault hook, which fires inside the per-request insert loop, before the
@@ -188,11 +188,10 @@ fn writer_commands_serialize_and_never_lose_inflight_accounting(
     store.flush_receipt_writes()?;
     let health = store.receipt_store_health()?;
     assert_eq!(health.writer.inflight, 0, "inflight must drain to zero");
-    // Committed now reconciles BOTH commit paths (codex round 9, finding 1):
-    // the Append path (i % 3 == 0 on 9 of 25 iterations per worker) AND the
-    // writer-routed `run_write` path (i % 3 == 1 on 8 of 25 iterations per
-    // worker), whose successful outcome is now folded into committed_total.
-    // Flushes (i % 3 == 2) are not commits.
+    // committed_total reconciles BOTH commit paths: the Append path (i % 3 == 0
+    // on 9 of 25 iterations per worker) AND the writer-routed `run_write` path
+    // (i % 3 == 1 on 8 of 25 iterations per worker), whose successful outcome is
+    // folded into committed_total. Flushes (i % 3 == 2) are not commits.
     assert_eq!(health.writer.committed_total, 4 * 9 + 4 * 8);
     assert_eq!(health.writer.failed_total, 0);
     // Only the Append path inserts claim-log entries; the run_write closures
