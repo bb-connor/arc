@@ -285,11 +285,10 @@ impl FanoutError {
     }
 }
 
-/// OBSERVE-ONLY: count + log a fan-out frame rejection alongside the unchanged
-/// fail-closed drop. The receive path previously delegated logging away ("the
-/// caller can log-and-drop it") and did none itself, so a `TreatyMismatch`
-/// cross-treaty injection campaign or a `DepositSignatureInvalid` flood produced
-/// zero local signal.
+/// Observe-only: count and log a fan-out frame rejection alongside the fail-closed
+/// drop. The receive path drops an invalid frame without emitting any local signal
+/// of its own, so a `TreatyMismatch` cross-treaty injection campaign or a
+/// `DepositSignatureInvalid` flood would otherwise go unobserved.
 fn note_fanout_failure(error: &FanoutError) {
     let reason = error.code();
     crate::metrics::record_verify_failure(crate::metrics::SEAM_FANOUT, reason);
@@ -1762,7 +1761,7 @@ mod tests {
             .expect("endpoint binds on loopback");
         let local_id = endpoint.id();
         let gossip = Gossip::builder().spawn(endpoint.clone());
-        // The lane DERIVES its local endpoint id from &endpoint (finding 1), so it
+        // The lane derives its local endpoint id from &endpoint, so it
         // must be built before the endpoint is moved into the router.
         let lane = FanoutLane::new(gossip.clone(), &endpoint);
         let _router = Router::builder(endpoint)
@@ -2078,7 +2077,7 @@ mod tests {
             .expect("endpoint binds on loopback");
         let local_id = endpoint.id();
         let gossip = Gossip::builder().spawn(endpoint.clone());
-        // The lane DERIVES its local endpoint id from &endpoint (finding 1), so it
+        // The lane derives its local endpoint id from &endpoint, so it
         // must be built before the endpoint is moved into the router.
         let lane = FanoutLane::new(gossip.clone(), &endpoint);
         let router = Router::builder(endpoint)
@@ -2108,9 +2107,9 @@ mod tests {
         // The gate fires BEFORE any neighbor dial: even with a NON-empty bootstrap
         // (an unreachable fabricated endpoint) and a short join bound, a non-party is
         // still denied with TreatyMembershipDenied rather than attempting the dial and
-        // timing out. This pins finding 1's "before any neighbor is dialed" claim and,
-        // with the raw gossip handle now private (finding 2), leaves no path that
-        // reaches subscribe_and_join without this check.
+        // timing out. This confirms the gate fires before any neighbor is dialed, and
+        // with the raw gossip handle private, no path reaches subscribe_and_join
+        // without this check.
         let denied_with_bootstrap = lane
             .subscribe_treaty_with_timeout(
                 TREATY_ALPHA,
@@ -2146,7 +2145,7 @@ mod tests {
             .expect("endpoint binds on loopback");
         let local_id = endpoint.id();
         let gossip = Gossip::builder().spawn(endpoint.clone());
-        // The lane DERIVES its local endpoint id from &endpoint (finding 1), so it
+        // The lane derives its local endpoint id from &endpoint, so it
         // must be built before the endpoint is moved into the router.
         let lane = FanoutLane::new(gossip.clone(), &endpoint);
         let router = Router::builder(endpoint)
@@ -2176,13 +2175,13 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn subscribe_rejects_a_non_party_spoofing_a_real_party_kernel_id() {
-        // SPOOFING CASE (codex P1 follow-up): the JOIN gate must bind to the node's
-        // AUTHENTICATED endpoint identity, not the caller-supplied `local_kernel_id`
-        // string. A globally-admitted operator that is NOT a party to the treaty
-        // calls subscribe_treaty passing a REAL party's kernel id as the argument;
-        // because that string is a genuine party, the OLD `is_party(treaty, arg)`
-        // check would have admitted it and leaked the treaty's traffic. The gate now
-        // resolves the LOCAL endpoint to its admitted kernel id and rejects the spoof.
+        // The JOIN gate must bind to the node's AUTHENTICATED endpoint identity, not
+        // the caller-supplied `local_kernel_id` string, to prevent spoofing. A
+        // globally-admitted operator that is NOT a party to the treaty calls
+        // subscribe_treaty passing a REAL party's kernel id as the argument; because
+        // that string is a genuine party, binding on `is_party(treaty, arg)` alone
+        // would admit it and leak the treaty's traffic. The gate instead resolves the
+        // LOCAL endpoint to its admitted kernel id and rejects the spoof.
         let endpoint = Endpoint::builder(presets::Minimal)
             .secret_key(SecretKey::from_bytes(&[78u8; 32]))
             .relay_mode(RelayMode::Disabled)
@@ -2193,7 +2192,7 @@ mod tests {
             .expect("endpoint binds on loopback");
         let local_id = endpoint.id();
         let gossip = Gossip::builder().spawn(endpoint.clone());
-        // The lane DERIVES its local endpoint id from &endpoint (finding 1), so it
+        // The lane derives its local endpoint id from &endpoint, so it
         // must be built before the endpoint is moved into the router.
         let lane = FanoutLane::new(gossip.clone(), &endpoint);
         let router = Router::builder(endpoint)
@@ -2252,9 +2251,9 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn new_derives_local_identity_from_the_spawned_endpoint() {
-        // FINDING 1: the constructor DERIVES local_endpoint_id from the passed
-        // Endpoint (endpoint.id()); it no longer accepts a raw caller-supplied
-        // EndpointId. Proof: the directory binds a DIFFERENT (foreign) endpoint to
+        // The constructor DERIVES local_endpoint_id from the passed Endpoint
+        // (endpoint.id()) rather than a raw caller-supplied EndpointId. Proof: the
+        // directory binds a DIFFERENT (foreign) endpoint to
         // the party and admits that party to the treaty, but does NOT bind THIS
         // node's endpoint.id(). Because the JOIN gate resolves the lane's OWN derived
         // endpoint id, it finds it unbound and fails closed - a caller cannot make
@@ -2326,7 +2325,7 @@ mod tests {
 
     #[test]
     fn receive_rejects_a_resolver_key_that_lags_the_directory() {
-        // FINDING 2: origin-key resolution is bound to the SAME verified directory
+        // Origin-key resolution is bound to the SAME verified directory
         // snapshot membership authorizes against. A caller resolver that still lists
         // a rotated-away key (disagreeing with the directory's CURRENT binding) is
         // refused BEFORE any signature work, so a stale key cannot launder a frame

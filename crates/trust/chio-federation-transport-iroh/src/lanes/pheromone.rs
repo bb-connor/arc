@@ -1086,8 +1086,8 @@ where
             Ok(outcome) if outcome.accepted => {
                 store.mark_delivered(&entry.outbox_id)?;
                 report.delivered = report.delivered.saturating_add(1);
-                // OBSERVE-ONLY: the iroh outbox drain emits the delivery outcome the
-                // shipped HTTP relay already meters; this path was previously dark.
+                // Observe-only: the iroh outbox drain emits the delivery outcome the
+                // shipped HTTP relay already meters.
                 crate::metrics::record_outbox(crate::metrics::OUTBOX_DELIVERED);
             }
             Ok(_) => {
@@ -1484,7 +1484,7 @@ mod tests {
     async fn read_len_delimited_enforces_the_configured_ingress_cap() {
         // A frame WITHIN the transport hard cap but OVER the configured body limit is
         // rejected before allocation, so the iroh ingress is no laxer than the HTTP
-        // relay's DefaultBodyLimit (the FINDING 3 parity fix).
+        // relay's DefaultBodyLimit.
         let configured = 256_000usize; // production relay max_body_bytes
         let mut framed: Vec<u8> = Vec::new();
         let over_configured = (configured as u32).saturating_add(1);
@@ -1621,7 +1621,7 @@ mod tests {
 
     #[test]
     fn winning_the_reservation_does_not_prove_the_batch_is_unreceived() {
-        // Premise of handle()'s post-win RE-READ (FINDING 2, the "reservation won after
+        // Premise of handle()'s post-win RE-READ (the "reservation won after
         // another handler recorded+released" race): because the winner RELEASES its slot
         // after recording the durable verdict (to bound reservation-table growth), a later
         // redelivery can WIN the SAME (sender, nonce) reservation AGAIN even though the
@@ -2660,7 +2660,7 @@ mod tests {
         router.shutdown().await.ok();
     }
 
-    // -- Client-side slowloris bound (finding B) --
+    // -- Client-side slowloris bound --
     //
     // A recipient that completes the handshake and reads the batch but never
     // returns the report frame must not hang the dialer forever (which would
@@ -2724,7 +2724,7 @@ mod tests {
         router.shutdown().await.ok();
     }
 
-    // -- Sender-mismatch rows are re-queued, never dead-lettered (finding D) --
+    // -- Sender-mismatch rows are re-queued, never dead-lettered --
 
     #[tokio::test]
     async fn sender_mismatch_row_is_requeued_not_dead_lettered() {
@@ -2777,7 +2777,7 @@ mod tests {
         }
     }
 
-    // -- Outbound directory-scope enforcement on the drain (finding C) --
+    // -- Outbound directory-scope enforcement on the drain --
 
     #[tokio::test]
     async fn outbound_scope_rejection_skips_dial_and_folds_into_retry() {

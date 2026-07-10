@@ -569,10 +569,10 @@ impl TransportDirectoryBundleDocument {
         &self,
         trust: &TransportDirectoryBundleTrust,
     ) -> Result<VerifiedDirectory, IdentityError> {
-        // OBSERVE-ONLY wrapper: the fail-closed verification logic is unchanged in
-        // `verify_bundle_inner`; here we count + log a rejection ALONGSIDE it and
-        // return the SAME `Result` (a tampered/rolled-back directory bundle was
-        // previously indistinguishable from a healthy load in the telemetry).
+        // Observe-only wrapper: `verify_bundle_inner` holds the fail-closed
+        // verification logic; here we count and log a rejection alongside it and
+        // return the same `Result`, so a tampered or rolled-back directory bundle
+        // is distinguishable from a healthy load in the telemetry.
         let result = self.verify_bundle_inner(trust);
         if let Err(error) = &result {
             crate::metrics::record_verify_failure(crate::metrics::SEAM_IDENTITY, error.code());
@@ -1017,10 +1017,10 @@ mod tests {
 
     #[test]
     fn out_of_window_bundle_bumps_identity_verify_failure_and_is_still_rejected() {
-        // OBSERVE-ONLY proof: a bundle presented outside its validity window is
-        // still rejected fail-closed AND the failure is now counted + logged (a
-        // tampered / out-of-window directory bundle was previously indistinguishable
-        // from a healthy load in the telemetry). The returned Err is unchanged.
+        // Observe-only proof: a bundle presented outside its validity window is
+        // still rejected fail-closed and the failure is counted and logged, so a
+        // tampered or out-of-window directory bundle is distinguishable from a
+        // healthy load in the telemetry. The returned Err is unchanged.
         let alice = EntrySpec::admitted("did:chio:alice", 1, 10);
         let (mut bundle, trust) = signed_bundle(&[alice]);
         // Push the window start past `now` so the validity check fails closed.

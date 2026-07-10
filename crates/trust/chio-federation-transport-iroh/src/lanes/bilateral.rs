@@ -1354,7 +1354,7 @@ mod tests {
 
     #[test]
     fn lagging_pinned_passport_key_is_rejected_without_signing() {
-        // Finding 2: the DSSE-verification key must be bound to the SAME verified
+        // The DSSE-verification key must be bound to the same verified
         // directory the gate admitted on. If an out-of-band pinned map LAGS the
         // signed directory (pins a different passport key than the directory's
         // current binding for Org B), Org A must refuse to co-sign - otherwise an
