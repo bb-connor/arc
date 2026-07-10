@@ -172,6 +172,7 @@ pub struct FakePresentedNonce {
     tool_server: String,
     tool_name: String,
     parameter_hash: String,
+    reserved_hold_id: Option<String>,
     signer: PublicKey,
 }
 
@@ -194,6 +195,10 @@ impl PresentedNonceView for FakePresentedNonce {
 
     fn bound_parameter_hash(&self) -> &str {
         &self.parameter_hash
+    }
+
+    fn bound_reserved_hold_id(&self) -> Option<&str> {
+        self.reserved_hold_id.as_deref()
     }
 
     fn verify_signed_by(&self, key: &PublicKey) -> bool {
@@ -265,6 +270,7 @@ pub fn fake_bound_nonce(
         tool_server: server.to_string(),
         tool_name: tool.to_string(),
         parameter_hash: parameter_hash.to_string(),
+        reserved_hold_id: None,
         signer: signer.public_key(),
     }
 }
@@ -288,6 +294,7 @@ pub fn fake_nonce_with_id(
         tool_server: server.to_string(),
         tool_name: tool.to_string(),
         parameter_hash: parameter_hash.to_string(),
+        reserved_hold_id: None,
         signer: signer.public_key(),
     }
 }
