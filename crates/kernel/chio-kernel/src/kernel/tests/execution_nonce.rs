@@ -1281,6 +1281,61 @@ fn reconcile_by_nonce_rejects_mismatched_realized_currency() {
 }
 
 #[test]
+fn reconcile_by_nonce_normalizes_currency_for_zero_exposure_invocation() {
+    // A non-monetary invocation reserve carries zero exposure and no reserved
+    // currency, so its realized currency is never validated (step 3). The
+    // unchecked, caller-supplied currency must not reach the signed receipt: it is
+    // normalized to the canonical inert value instead.
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    let cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: true,
+    };
+    kernel.set_execution_nonce_store(
+        cfg.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+    );
+    let grant = make_invocation_limited_grant("cost-srv", "compute", 1);
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    let request = reserve_request("req-recon-invocation-currency", &cap, &agent_kp);
+    let authorized = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&request, None)
+        .unwrap();
+    assert_eq!(authorized.verdict, Verdict::Allow);
+    let nonce = *authorized.execution_nonce.clone().unwrap();
+
+    // Reconcile with an arbitrary, attacker-controlled currency string. The
+    // invocation reserve has zero exposure, so the currency is not validated and
+    // the realized cost is clamped to zero.
+    let realized = ToolInvocationCost {
+        units: 0,
+        currency: "ATTACKER-CONTROLLED".to_string(),
+        breakdown: None,
+    };
+    let reconciled = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &request.arguments, &realized)
+        .unwrap();
+    assert_eq!(reconciled.verdict, Verdict::Allow);
+
+    // The signed receipt carries the canonical inert currency, never the caller
+    // string, on any field.
+    let meta = reconciled.receipt.metadata.as_ref().unwrap();
+    assert_eq!(
+        meta["financial"]["currency"], "",
+        "a zero-exposure invocation reconcile must normalize the receipt currency to the inert value"
+    );
+    let serialized = serde_json::to_string(&reconciled.receipt).unwrap();
+    assert!(
+        !serialized.contains("ATTACKER-CONTROLLED"),
+        "the unchecked caller-supplied currency must never reach the signed receipt"
+    );
+}
+
+#[test]
 fn reserving_authorization_succeeds_for_unregistered_tool_server() {
     // The reserve-for-caller authorization path never dispatches a tool
     // on this kernel, so it must NOT require the caller's tool server to be

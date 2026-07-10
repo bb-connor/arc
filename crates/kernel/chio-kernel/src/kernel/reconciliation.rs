@@ -20,6 +20,14 @@ use super::*;
 use crate::budget_store::{BudgetHoldSnapshot, BudgetReconcileHoldRequest};
 use crate::execution_nonce::{verify_execution_nonce, SignedExecutionNonce};
 
+/// Canonical inert currency stamped onto the signed receipt for a zero-exposure
+/// invocation reconcile. Such a reserve carries no reserved currency, so its
+/// realized currency is never validated (see step 3); using this fixed,
+/// attacker-uncontrollable value keeps an unchecked caller-supplied string off
+/// the signed artifact while still marking the receipt as carrying no monetary
+/// envelope.
+const INVOCATION_RECONCILE_RECEIPT_CURRENCY: &str = "";
+
 impl ChioKernel {
     /// Settle every expired, unreconciled reserved budget hold at its reserved
     /// worst-case, forfeiting the reserved amount to realized spend. In the
@@ -230,6 +238,18 @@ impl ChioKernel {
         let exposed = hold.remaining_exposure_units;
         let realized = realized_units.min(exposed);
 
+        // Currency stamped onto the signed receipt. A monetary hold validated the
+        // realized currency against the reserved grant currency in step 3, so it is
+        // safe to echo. A zero-exposure invocation reserve carries no reserved
+        // currency and never validated the realized currency, so normalize it to the
+        // inert value rather than land an unchecked caller-supplied string on a
+        // signed artifact (the step-3 guarantee).
+        let receipt_currency = if hold.reserved_currency.is_some() {
+            realized_cost.currency.clone()
+        } else {
+            INVOCATION_RECONCILE_RECEIPT_CURRENCY.to_string()
+        };
+
         // Reconstruct the authorize lineage from the reserved hold so the
         // receipt records the same guarantee/authority context the reserving
         // authorization committed, plus the reconcile terminal and the nonce id.
@@ -244,7 +264,7 @@ impl ChioKernel {
         let charge = BudgetChargeResult {
             grant_index: hold.grant_index,
             cost_charged: exposed,
-            currency: realized_cost.currency.clone(),
+            currency: receipt_currency.clone(),
             budget_total: exposed,
             new_committed_cost_units: committed_before,
             budget_hold_id: hold.hold_id.clone(),
@@ -259,7 +279,7 @@ impl ChioKernel {
         let financial = FinancialReceiptMetadata {
             grant_index: hold.grant_index as u32,
             cost_charged: realized,
-            currency: realized_cost.currency.clone(),
+            currency: receipt_currency,
             // Framed on the reconciled hold's reserved envelope: reconcile-by-nonce
             // settles a single hold from the nonce alone, without the originating
             // grant's full ceiling. `budget_remaining` is the amount released back.
