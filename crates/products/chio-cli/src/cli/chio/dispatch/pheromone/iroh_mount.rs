@@ -495,11 +495,16 @@ pub(crate) enum ReloadOutcome {
     /// later successor that rebinds this node chains onto THIS revoker (not the
     /// pre-revoke version) and must be able to self-heal admission.
     LocalBindingRevoked(VerifiedDirectory),
-    /// The on-disk bundle is UNCHANGED and still in-window, but its version is below a
-    /// trusted `minVersion` that operators raised above it. A restart would reject it
-    /// via `transport_bundle_trust`; the unchanged fast path must fail closed to
-    /// deny-all identically rather than keep admitting until expiry.
-    BelowMinVersionFloor,
+    /// The directory is below a trusted `minVersion` operators raised above it, so it can
+    /// never be admitted (a restart would reject it via `transport_bundle_trust`); fail
+    /// closed to deny-all. `Some(successor)` is a strictly-newer, validly-signed, in-window
+    /// successor that is itself below the raised floor: it cannot admit, but the reloader
+    /// ADVANCES its last-good chain onto it (like [`ReloadOutcome::LocalBindingRevoked`]) so
+    /// a later at-or-above-floor bundle - which chains onto THIS successor - self-heals
+    /// rather than being stranded against a dropped chain. `None` is the running directory
+    /// itself below the floor (the unchanged fast path, or a below-floor running directory
+    /// whose on-disk successor did not verify): deny-all, chain KEPT.
+    BelowMinVersionFloor(Option<VerifiedDirectory>),
     /// The on-disk bundle is UNCHANGED and still in-window, but it no longer verifies
     /// against the CURRENT trusted-issuer set: operators rotated or removed the issuer
     /// that signed it (or rotated its key) since the last verification. A restart would
@@ -664,9 +669,11 @@ pub(crate) fn reload_verified_directory(
                 }
             };
         // minVersion is INCLUSIVE: a directory at `current_version` is admissible only
-        // when `current_version >= trusted_min_version`. Below that floor, fail closed.
+        // when `current_version >= trusted_min_version`. Below that floor, fail closed. The
+        // running directory is unchanged (no successor to advance the chain onto), so keep
+        // last-good (`None`) and let a successor at or above the floor self-heal.
         if current_version < trusted_min_version {
-            return Ok(ReloadOutcome::BelowMinVersionFloor);
+            return Ok(ReloadOutcome::BelowMinVersionFloor(None));
         }
         // RE-VERIFY THE UNCHANGED BUNDLE AGAINST THE CURRENT TRUST ROOTS (fail-closed).
         // The gate authorized this bundle against the issuer set that was trusted when it
@@ -708,15 +715,27 @@ pub(crate) fn reload_verified_directory(
                     return Err(DirectoryReloadError::Read(error));
                 }
             };
-        // minVersion is INCLUSIVE: a successor is admissible only when its version is at
-        // or above the trusted floor. A successor that is newer than the running version
-        // but STILL BELOW that floor (operators raised minVersion past this staged
-        // version) must fail closed to deny-all, exactly as the unchanged path and a
-        // restart would. Folding the floor into `verify_bundle` instead would surface as a
-        // rollback/verify error the reloader treats as transient, leaving the stale,
-        // now below-floor directory admitting until expiry.
+        // minVersion is INCLUSIVE: a successor is admissible only when its version is at or
+        // above the trusted floor. A successor newer than the running version but STILL
+        // BELOW that floor (operators raised minVersion past this staged version) can never
+        // be admitted. It is still VERIFIED against the preserved chain so a valid one
+        // ADVANCES last-good onto it (deny-all, like `LocalBindingRevoked`): a below-floor
+        // successor is the immediate predecessor a later at-or-above-floor bundle chains
+        // onto, so dropping it here would strand that recovery bundle (predecessor mismatch)
+        // in deny-all until restart. A below-floor successor implies the running directory
+        // is below the floor too, so a successor that does NOT verify still fails closed to
+        // deny-all rather than keeping the below-floor directory admitting.
         if bundle.body.version < trusted_min_version {
-            return Ok(ReloadOutcome::BelowMinVersionFloor);
+            let trust = TransportDirectoryBundleTrust {
+                issuers,
+                version_floor: current_version,
+                expected_previous_version_sha256: Some(current_body_sha256.to_string()),
+                now_unix_ms: now,
+            };
+            return Ok(match bundle.verify_bundle(&trust) {
+                Ok(verified) => ReloadOutcome::BelowMinVersionFloor(Some(verified)),
+                Err(_error) => ReloadOutcome::BelowMinVersionFloor(None),
+            });
         }
         let trust = TransportDirectoryBundleTrust {
             issuers,
@@ -893,13 +912,22 @@ fn directory_reload_step(
                  changed); admitting nothing until a successor rebinds this node"
             );
         }
-        Ok(ReloadOutcome::BelowMinVersionFloor) => {
-            // The running directory is unchanged and in-window but its version is below a
-            // trusted minVersion operators raised above it. A restart would reject it, so
-            // fail closed to deny-all rather than keep admitting on the fast path until
-            // expiry. last-good is KEPT (state untouched): a later successor at or above the
-            // floor, chained onto the running directory, self-heals admission without a
-            // restart.
+        Ok(ReloadOutcome::BelowMinVersionFloor(maybe_successor)) => {
+            // The directory is below a trusted minVersion operators raised above it. A
+            // restart would reject it, so fail closed to deny-all rather than keep admitting
+            // until expiry.
+            //
+            // If a strictly-newer, validly-signed successor is present, it is itself below
+            // the raised floor: it cannot admit, but ADVANCE the last-good chain onto it (as
+            // `LocalBindingRevoked` does) so a later at-or-above-floor bundle chained onto
+            // THIS successor self-heals instead of being stranded against a dropped chain.
+            // Absent a successor (the unchanged running directory, or a below-floor running
+            // directory whose successor did not verify), last-good is KEPT.
+            if let Some(successor) = maybe_successor {
+                state.version = successor.version();
+                state.body_sha256 = successor.body_sha256().to_string();
+                state.expires_at_unix_ms = successor.expires_at_unix_ms();
+            }
             gate.swap(Arc::new(
                 chio_federation_transport_iroh::identity::VerifiedDirectory::empty_deny_all(),
             ));
@@ -2236,14 +2264,15 @@ mod tests {
     fn directory_reload_denies_newer_successor_below_raised_min_version() {
         // A staged successor that is NEWER than the running directory but STILL BELOW a
         // minVersion operators raised above it must fail closed to deny-all, exactly as
-        // the unchanged path and a restart would. It must NOT surface as a transient
-        // verify error that keeps the stale, now below-floor directory admitting until
-        // expiry: the running version stays below the floor, so continued admission would
-        // violate the operator's minVersion.
+        // the unchanged path and a restart would. It must NOT surface as a transient verify
+        // error that keeps the stale, now below-floor directory admitting until expiry. The
+        // successor is still verified and CAPTURED so the last-good chain advances onto it,
+        // letting a later at-or-above-floor bundle (which chains onto this successor)
+        // self-heal.
         let dir = tempfile::tempdir().unwrap();
         let (_v1_path, _v1_issuers, _v1_expires, v1_hash) =
             write_test_bundle(dir.path(), 1, false, None);
-        let (bundle_path, _v2_issuers, expires_at, _v2_hash) =
+        let (bundle_path, _v2_issuers, expires_at, v2_hash) =
             write_test_bundle(dir.path(), 2, false, Some(v1_hash.clone()));
         // Pin minVersion = 10 AFTER the bundles are written; the on-disk successor (v2) is
         // newer than the running v1 but still below the floor.
@@ -2257,17 +2286,17 @@ mod tests {
         };
         let now_in_window = expires_at - 1;
 
-        // Outcome-level: the newer-but-still-below-floor successor fails closed rather
-        // than returning a transient verify error.
+        // Outcome-level: the newer-but-still-below-floor successor fails closed and is
+        // captured for chain advancement rather than returning a transient verify error.
         let outcome = reload_verified_directory(&config, now_in_window, 1, expires_at, &v1_hash)
             .expect("reload runs");
         assert!(
-            matches!(outcome, ReloadOutcome::BelowMinVersionFloor),
+            matches!(outcome, ReloadOutcome::BelowMinVersionFloor(Some(_))),
             "a newer successor below the raised minVersion must fail closed, got {outcome:?}"
         );
 
-        // Step-level: the gate flips to deny-all, the alarm is raised, and last-good is
-        // preserved so a successor at or above the floor can self-heal.
+        // Step-level: the gate flips to deny-all, the alarm is raised, and the chain advances
+        // onto the below-floor successor so a later at-or-above-floor bundle can self-heal.
         let gate = DirectoryGate::new(verified_directory("did:chio:bob", 24));
         assert_eq!(gate.current_version(), 1);
         let alive = AtomicBool::new(true);
@@ -2287,8 +2316,12 @@ mod tests {
             "a below-min-version successor raises the fail-closed alarm"
         );
         assert_eq!(
-            state.version, 1,
-            "last-good is preserved so a successor at/above the floor can self-heal"
+            state.version, 2,
+            "the chain advances onto the below-floor successor so a later bundle can chain on"
+        );
+        assert_eq!(
+            state.body_sha256, v2_hash,
+            "the chain pin advances to the below-floor successor's hash"
         );
     }
 
@@ -2319,7 +2352,7 @@ mod tests {
         let outcome = reload_verified_directory(&config, now_in_window, 1, expires_at, &body_hash)
             .expect("reload runs");
         assert!(
-            matches!(outcome, ReloadOutcome::BelowMinVersionFloor),
+            matches!(outcome, ReloadOutcome::BelowMinVersionFloor(None)),
             "an unchanged directory below a raised minVersion must fail closed, not Unchanged"
         );
 
@@ -2346,6 +2379,75 @@ mod tests {
         assert_eq!(
             state.version, 1,
             "last-good is preserved so a successor at/above the floor can self-heal"
+        );
+    }
+
+    #[test]
+    fn directory_reload_self_heals_across_below_floor_successors() {
+        // When operators raise minVersion above an intermediate successor, that successor is
+        // denied admission but its hash must still advance the chain, so a later
+        // at-or-above-floor bundle - which chains onto it - self-heals instead of being
+        // stranded in deny-all against a dropped chain. minVersion is 3 here: v2 is below the
+        // floor (deny-all, chain advances to v2), then v3 at the floor chains onto v2 and
+        // restores admission without a restart.
+        let dir = tempfile::tempdir().unwrap();
+        let bundle_path = dir.path().join("bundle.json");
+        let issuers_path = write_issuers_with_min_version(dir.path(), 3);
+        let config = DirectoryReloadConfig {
+            interval: Duration::from_secs(60),
+            bundle_path: bundle_path.clone(),
+            trusted_issuers_path: issuers_path,
+            local_transport_endpoint: endpoint_from_seed(LOCAL_TRANSPORT_SEED),
+            local_kernel_id: LOCAL_KERNEL_ID.to_string(),
+        };
+
+        // v1 binds this node; the reloader's last-good starts here.
+        let v1_hash = write_local_binding_bundle_at(&bundle_path, 1, LOCAL_TRANSPORT_SEED, None);
+        let gate = DirectoryGate::new(verified_directory("did:chio:bob", 24));
+        assert_eq!(gate.current_version(), 1);
+        let alive = AtomicBool::new(true);
+        let mut state = ReloadState {
+            version: 1,
+            body_sha256: v1_hash.clone(),
+            expires_at_unix_ms: NOW + 1,
+        };
+
+        // v2 is a valid successor (chains onto v1) but below the raised floor: deny-all, and
+        // the chain advances onto v2 so v3 can chain onto it.
+        let v2_hash =
+            write_local_binding_bundle_at(&bundle_path, 2, LOCAL_TRANSPORT_SEED, Some(v1_hash));
+        directory_reload_step(&gate, &config, NOW, &mut state, &alive);
+        assert_eq!(
+            gate.current_version(),
+            0,
+            "a below-floor successor fails closed to deny-all"
+        );
+        assert!(
+            !alive.load(Ordering::SeqCst),
+            "a below-floor successor raises the fail-closed alarm"
+        );
+        assert_eq!(
+            state.version, 2,
+            "the chain advances onto the below-floor successor"
+        );
+        assert_eq!(
+            state.body_sha256, v2_hash,
+            "the chain pin advances to the below-floor successor's hash"
+        );
+
+        // v3 at the floor chains onto v2; self-heal must restore admission without a restart.
+        let _v3_hash =
+            write_local_binding_bundle_at(&bundle_path, 3, LOCAL_TRANSPORT_SEED, Some(v2_hash));
+        alive.store(true, Ordering::SeqCst);
+        directory_reload_step(&gate, &config, NOW, &mut state, &alive);
+        assert_eq!(
+            gate.current_version(),
+            3,
+            "an at-floor successor chained onto the below-floor one self-heals admission"
+        );
+        assert_eq!(
+            state.version, 3,
+            "last-good advances to the recovered successor"
         );
     }
 
