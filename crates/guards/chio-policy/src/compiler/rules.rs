@@ -61,7 +61,10 @@ pub(super) fn compile_rule_guards(
                 builder.add(VelocityGuard::from_memory_budget(cfg, memory_budget));
             }
             if let Some(cfg) = agent_cfg {
-                builder.add(AgentVelocityGuard::new(cfg));
+                // Thread the CONFIGURED process memory budget so a lowered
+                // `velocity_bucket_cap` bounds this guard's agent/session bucket
+                // maps too (RFC-0004 F38, finding 3555410392).
+                builder.add(AgentVelocityGuard::from_memory_budget(cfg, memory_budget));
             }
         }
     }

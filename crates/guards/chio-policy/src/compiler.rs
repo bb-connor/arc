@@ -118,7 +118,7 @@ pub fn compile_policy_with_memory_budget(
     let source_dir = source_path.and_then(|path| path.parent());
     compile_rule_guards(policy, &mut builder, &mut post_invocation, budget)?;
     compile_detection_guards(policy, &mut builder, source_dir)?;
-    compile_budget_guards(policy, &mut builder)?;
+    compile_budget_guards(policy, &mut builder, budget)?;
     let default_scope = compile_scope(policy)?;
     let (guards, guard_names) = builder.finish();
     Ok(CompiledPolicy {

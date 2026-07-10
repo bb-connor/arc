@@ -46,15 +46,21 @@ impl TokenBucket {
         }
     }
 
-    fn try_consume(&mut self, amount_tokens: u64) -> bool {
+    /// Refill, then report whether `amount_tokens` are available WITHOUT
+    /// consuming them. Split from [`Self::consume`] so the guard can peek BOTH the
+    /// agent and session buckets before consuming from EITHER (reserve-both-then-
+    /// consume), avoiding partial consumption when one limit denies.
+    fn can_consume(&mut self, amount_tokens: u64) -> bool {
         self.refill();
         let cost_mt = amount_tokens.saturating_mul(MT_PER_TOKEN);
-        if self.tokens_mt >= cost_mt {
-            self.tokens_mt -= cost_mt;
-            true
-        } else {
-            false
-        }
+        self.tokens_mt >= cost_mt
+    }
+
+    /// Deduct `amount_tokens`, saturating at zero. Only call after
+    /// [`Self::can_consume`] returned true for the same amount under the same lock.
+    fn consume(&mut self, amount_tokens: u64) {
+        let cost_mt = amount_tokens.saturating_mul(MT_PER_TOKEN);
+        self.tokens_mt = self.tokens_mt.saturating_sub(cost_mt);
     }
 
     fn refill(&mut self) {
@@ -106,20 +112,120 @@ impl Default for AgentVelocityConfig {
 /// by `(agent_id, capability_id)` as a session proxy (since the guard context
 /// does not directly expose session IDs, the capability ID serves as a
 /// session-scoped discriminator).
+///
+/// Both bucket maps live behind ONE mutex and the COMBINED distinct-key count is
+/// bounded by `bucket_cap`, so a flood of distinct agent/capability ids saturates
+/// rather than growing memory without bound (RFC-0004 F38, codex finding
+/// 3555410392). When the table is full of in-window buckets a new key is DENIED
+/// fail-closed rather than evicting an active bucket (evicting an active bucket
+/// would reset its per-window limit, the same reset-by-eviction bypass class
+/// closed in [`crate::velocity::VelocityGuard`]). EXPIRED (out-of-window) buckets
+/// are pruned first to reclaim slots.
 pub struct AgentVelocityGuard {
-    agent_buckets: Mutex<HashMap<String, TokenBucket>>,
-    session_buckets: Mutex<HashMap<(String, String), TokenBucket>>,
+    state: Mutex<AgentVelocityState>,
     config: AgentVelocityConfig,
+    bucket_cap: usize,
+}
+
+/// Combined bucket state guarded by a single mutex (see [`AgentVelocityGuard`]).
+struct AgentVelocityState {
+    agent_buckets: HashMap<String, TokenBucket>,
+    session_buckets: HashMap<(String, String), TokenBucket>,
 }
 
 impl AgentVelocityGuard {
-    /// Create a new guard with the given configuration.
+    /// Create a new guard with the given configuration and the bounded-memory
+    /// default bucket cap sourced from
+    /// [`chio_kernel::MemoryBudgetConfig`]'s `velocity_bucket_cap`, so the cap is
+    /// single-sourced with the process memory budget. Deployments that thread a
+    /// configured budget use [`Self::from_memory_budget`] (RFC-0004 F38).
     pub fn new(config: AgentVelocityConfig) -> Self {
-        Self {
-            agent_buckets: Mutex::new(HashMap::new()),
-            session_buckets: Mutex::new(HashMap::new()),
+        Self::with_bucket_cap(
             config,
+            chio_kernel::MemoryBudgetConfig::defaults().velocity_bucket_cap,
+        )
+    }
+
+    /// Create an `AgentVelocityGuard` whose combined-bucket cap comes from a
+    /// CONFIGURED process memory budget (RFC-0004 F38). Threading the operator's
+    /// [`chio_kernel::MemoryBudgetConfig`] (rather than a fresh `defaults()` read
+    /// inside [`Self::new`]) means lowering `velocity_bucket_cap` actually tightens
+    /// this long-lived collection on the policy-compiled and origin-budget paths
+    /// instead of being silently ignored (codex finding 3555410392).
+    pub fn from_memory_budget(
+        config: AgentVelocityConfig,
+        budget: &chio_kernel::MemoryBudgetConfig,
+    ) -> Self {
+        Self::with_bucket_cap(config, budget.velocity_bucket_cap)
+    }
+
+    /// Create an `AgentVelocityGuard` with an explicit TOTAL bucket cap across
+    /// BOTH the agent and session maps. Because both maps share one mutex, the
+    /// combined-cap check and the insert are atomic: no evaluate() reads a stale
+    /// sibling-map size, so the combined bucket count is bounded by `bucket_cap`
+    /// even under concurrent evaluate() calls for distinct ids.
+    pub fn with_bucket_cap(config: AgentVelocityConfig, bucket_cap: usize) -> Self {
+        Self {
+            state: Mutex::new(AgentVelocityState {
+                agent_buckets: HashMap::new(),
+                session_buckets: HashMap::new(),
+            }),
+            config,
+            bucket_cap: bucket_cap.max(1),
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn combined_bucket_count(&self) -> usize {
+        match self.state.lock() {
+            Ok(g) => g.agent_buckets.len() + g.session_buckets.len(),
+            Err(poisoned) => {
+                let g = poisoned.into_inner();
+                g.agent_buckets.len() + g.session_buckets.len()
+            }
+        }
+    }
+}
+
+impl AgentVelocityState {
+    /// Combined bucket count across both maps.
+    fn combined_len(&self) -> usize {
+        self.agent_buckets
+            .len()
+            .saturating_add(self.session_buckets.len())
+    }
+
+    /// Drop EXPIRED (out-of-window) buckets from BOTH maps to reclaim slots. A
+    /// bucket idle for a full window has refilled to capacity and is semantically
+    /// fresh, so dropping it can never reset an in-flight limit. Bounded: touches
+    /// at most the live buckets (<= `bucket_cap` once saturated).
+    fn prune_expired(&mut self, window_secs: u64) {
+        let idle = std::time::Duration::from_secs(window_secs);
+        self.agent_buckets
+            .retain(|_, bucket| bucket.last_refill.elapsed() < idle);
+        self.session_buckets
+            .retain(|_, bucket| bucket.last_refill.elapsed() < idle);
+    }
+
+    /// Reserve `new_slots` free slots in the COMBINED table (across both maps)
+    /// without exceeding `bucket_cap`. Returns `true` when the caller may insert
+    /// that many genuinely-new keys, `false` when the guard must DENY fail-closed.
+    /// A request with both limits enabled needs TWO new slots for a brand-new
+    /// (agent, session) pair, so they are reserved TOGETHER; a request that cannot
+    /// fit both is denied before inserting either. EXPIRED buckets are pruned
+    /// first; if only ACTIVE buckets remain the request is DENIED rather than
+    /// evicting an active bucket.
+    fn reserve_slots(&mut self, new_slots: usize, window_secs: u64, bucket_cap: usize) -> bool {
+        if new_slots == 0 {
+            return true;
+        }
+        if self.combined_len().saturating_add(new_slots) > bucket_cap {
+            self.prune_expired(window_secs);
+            if self.combined_len().saturating_add(new_slots) > bucket_cap {
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -133,37 +239,68 @@ impl Guard for AgentVelocityGuard {
         let cap_id = ctx.request.capability.id.clone();
         let window_secs = self.config.window_secs.max(1);
 
-        // Check per-agent rate limit.
-        if let Some(max_per_agent) = self.config.max_requests_per_agent {
-            let capacity =
-                ((max_per_agent as f64 * self.config.burst_factor).round() as u64).max(1);
+        let agent_limit = self.config.max_requests_per_agent;
+        let session_limit = self.config.max_requests_per_session;
+        let session_key = (agent_id.clone(), cap_id);
 
-            let mut buckets = self.agent_buckets.lock().map_err(|_| {
-                KernelError::Internal("agent-velocity agent lock poisoned".to_string())
-            })?;
-            let bucket = buckets
-                .entry(agent_id.clone())
-                .or_insert_with(|| TokenBucket::new(capacity, max_per_agent as u64, window_secs));
-            if !bucket.try_consume(1) {
-                return Ok(GuardDecision::deny(Vec::new()));
-            }
+        // Both maps share ONE lock, held for the whole evaluate, so the
+        // combined-cap check and the insert are atomic across both maps.
+        let mut state = self.state.lock().map_err(|_| {
+            KernelError::Internal("agent-velocity guard state lock poisoned".to_string())
+        })?;
+
+        // Phase 1 - RESERVE. Secure a slot for EVERY genuinely-new bucket this
+        // request needs across BOTH maps before consuming from EITHER, so a request
+        // denied for lack of capacity never inserts an unpaired bucket or burns a
+        // token for a call that never ran.
+        let agent_new = agent_limit.is_some() && !state.agent_buckets.contains_key(&agent_id);
+        let session_new =
+            session_limit.is_some() && !state.session_buckets.contains_key(&session_key);
+        let new_slots = usize::from(agent_new) + usize::from(session_new);
+        if !state.reserve_slots(new_slots, window_secs, self.bucket_cap) {
+            return Ok(GuardDecision::deny(Vec::new()));
         }
 
-        // Check per-session rate limit.
-        if let Some(max_per_session) = self.config.max_requests_per_session {
-            let capacity =
-                ((max_per_session as f64 * self.config.burst_factor).round() as u64).max(1);
-
-            let session_key = (agent_id, cap_id);
-            let mut buckets = self.session_buckets.lock().map_err(|_| {
-                KernelError::Internal("agent-velocity session lock poisoned".to_string())
-            })?;
-            let bucket = buckets
-                .entry(session_key)
-                .or_insert_with(|| TokenBucket::new(capacity, max_per_session as u64, window_secs));
-            if !bucket.try_consume(1) {
-                return Ok(GuardDecision::deny(Vec::new()));
+        // Phase 2 - obtain both buckets (creating the reserved new ones).
+        let state = &mut *state;
+        let mut agent_bucket: Option<&mut TokenBucket> = match agent_limit {
+            Some(max_per_agent) => {
+                let capacity =
+                    ((max_per_agent as f64 * self.config.burst_factor).round() as u64).max(1);
+                Some(state.agent_buckets.entry(agent_id).or_insert_with(|| {
+                    TokenBucket::new(capacity, max_per_agent as u64, window_secs)
+                }))
             }
+            None => None,
+        };
+        let mut session_bucket: Option<&mut TokenBucket> = match session_limit {
+            Some(max_per_session) => {
+                let capacity =
+                    ((max_per_session as f64 * self.config.burst_factor).round() as u64).max(1);
+                Some(state.session_buckets.entry(session_key).or_insert_with(|| {
+                    TokenBucket::new(capacity, max_per_session as u64, window_secs)
+                }))
+            }
+            None => None,
+        };
+
+        // Phase 3 - peek BOTH before consuming from EITHER, then commit both.
+        let agent_ok = agent_bucket
+            .as_mut()
+            .map(|b| b.can_consume(1))
+            .unwrap_or(true);
+        let session_ok = session_bucket
+            .as_mut()
+            .map(|b| b.can_consume(1))
+            .unwrap_or(true);
+        if !agent_ok || !session_ok {
+            return Ok(GuardDecision::deny(Vec::new()));
+        }
+        if let Some(bucket) = agent_bucket.as_mut() {
+            bucket.consume(1);
+        }
+        if let Some(bucket) = session_bucket.as_mut() {
+            bucket.consume(1);
         }
 
         Ok(GuardDecision::allow())
@@ -453,5 +590,45 @@ mod tests {
         let result = guard.evaluate(&ctx2);
         assert!(result.is_ok());
         assert_eq!(result.expect("ok"), Verdict::Deny);
+    }
+
+    #[test]
+    fn from_memory_budget_bounds_combined_bucket_table() {
+        // codex finding 3555410392 (RFC-0004 F38): the origin-budget / policy-
+        // compiled AgentVelocityGuard was unbounded. The CONFIGURED process memory
+        // budget must now bound the COMBINED agent+session bucket table. A budget
+        // that lowers `velocity_bucket_cap` to 4 must cap the table at 4 even under
+        // a flood of distinct agent + capability ids. RED (pre-fix): the maps grew
+        // one entry per distinct id without bound.
+        let budget = chio_kernel::MemoryBudgetConfig {
+            velocity_bucket_cap: 4,
+            ..chio_kernel::MemoryBudgetConfig::defaults()
+        };
+        let guard = AgentVelocityGuard::from_memory_budget(
+            AgentVelocityConfig {
+                max_requests_per_agent: Some(1000),
+                max_requests_per_session: Some(1000),
+                window_secs: 60,
+                burst_factor: 1.0,
+            },
+            &budget,
+        );
+        let scope = ChioScope::default();
+        let server = "srv".to_string();
+        // Distinct agent id AND distinct capability id per iteration, so each
+        // mints both an agent bucket and a session bucket.
+        for i in 0..500u64 {
+            let kp = Keypair::generate();
+            let agent = format!("{}-{i}", kp.public_key().to_hex());
+            let cap = signed_cap(&kp, &format!("cap-{i}"));
+            let request = make_request(&cap, &agent, &server);
+            let ctx = guard_ctx(&request, &scope, &agent, &server);
+            let _ = guard.evaluate(&ctx);
+        }
+        assert!(
+            guard.combined_bucket_count() <= 4,
+            "configured velocity_bucket_cap did not bound the agent-velocity table: {} buckets",
+            guard.combined_bucket_count()
+        );
     }
 }

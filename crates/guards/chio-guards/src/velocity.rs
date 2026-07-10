@@ -377,7 +377,10 @@ impl Guard for VelocityGuard {
         // from EITHER, then commit both. Peeking (`can_consume`) before consuming
         // means a denial from one limit never depletes the other bucket.
         let spend_cost = spend_units.unwrap_or(0);
-        let inv_ok = inv_bucket.as_mut().map(|b| b.can_consume(1)).unwrap_or(true);
+        let inv_ok = inv_bucket
+            .as_mut()
+            .map(|b| b.can_consume(1))
+            .unwrap_or(true);
         let spend_ok = spend_bucket
             .as_mut()
             .map(|b| b.can_consume(spend_cost))
