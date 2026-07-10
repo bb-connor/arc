@@ -430,8 +430,9 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         // the hold open would let the TTL reaper later forfeit it at the reserved
         // worst case for a request the API reported as failed. Reconcile it at
         // zero through the minted nonce so the hold closes and the reserved
-        // budget is freed, and release the request-id claim so the caller may
-        // retry. A denied or pending verdict placed no hold, so it needs no
+        // budget is freed, and release the in-memory request-id claim. The closed
+        // hold still backs this request-id durably, so a retry must use a fresh
+        // request-id. A denied or pending verdict placed no hold, so it needs no
         // rollback.
         if let (chio_kernel::Verdict::Allow, Some(nonce)) =
             (&response.verdict, response.execution_nonce.as_deref())
@@ -476,9 +477,10 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
 /// about to return an error), so the caller can never reconcile the hold and the
 /// TTL reaper would otherwise forfeit it at the reserved worst case. Reconciling
 /// at zero through that nonce consumes it and settles the hold at zero, releasing
-/// the full reserved amount back to the grant; the request-id claim is released
-/// so the caller may retry with the same id. Best-effort and fail-closed: any
-/// step that cannot complete is logged and leaves the TTL reaper as the backstop.
+/// the full reserved amount back to the grant, and releases the in-memory
+/// request-id claim. The settled hold still backs this request-id durably, so a
+/// retry must use a fresh request-id. Best-effort and fail-closed: any step that
+/// cannot complete is logged and leaves the TTL reaper as the backstop.
 async fn release_unpersisted_reservation(
     state: &Arc<ProxyState>,
     mediation_kernel: &Mutex<ChioKernel>,
