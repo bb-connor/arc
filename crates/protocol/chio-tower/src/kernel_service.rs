@@ -100,9 +100,32 @@ impl Service<KernelRequest> for KernelService {
         let kernel = Arc::clone(&self.kernel);
 
         Box::pin(async move {
-            let response = kernel.evaluate_tool_call(&req.call).await?;
+            // Translate the kernel error explicitly rather than via the blanket
+            // `?`/`From` conversion so an RSS soft-ceiling shed surfaces as the
+            // retryable service overload variant (see `map_kernel_error`).
+            let response = kernel
+                .evaluate_tool_call(&req.call)
+                .await
+                .map_err(map_kernel_error)?;
             Ok(response)
         })
+    }
+}
+
+/// Translate a kernel evaluation error into the tower service error.
+///
+/// The RSS soft ceiling sheds new admissions with
+/// [`chio_kernel::KernelError::Overloaded`] (RFC-0004 section 5). The blanket
+/// `From<KernelError>` maps that into the opaque [`KernelServiceError::Kernel`],
+/// which callers keying retry/backpressure on [`KernelServiceError::Overloaded`]
+/// (the variant tower load shedding produces) would treat as an ordinary kernel
+/// failure. Map `Overloaded` explicitly to the retryable service overload variant
+/// so an RSS shed reaches the same shed edge as tower-side load shedding (codex
+/// finding 3555410403). Every other kernel error keeps the `Kernel` shape.
+fn map_kernel_error(error: chio_kernel::KernelError) -> KernelServiceError {
+    match error {
+        chio_kernel::KernelError::Overloaded { .. } => KernelServiceError::Overloaded,
+        other => KernelServiceError::Kernel(other),
     }
 }
 
@@ -658,5 +681,35 @@ mod tests {
         };
 
         assert!(matches!(error, KernelServiceError::Timeout));
+    }
+
+    #[test]
+    fn rss_shed_kernel_overload_maps_to_service_overloaded() {
+        // codex finding 3555410403 (RFC-0004 section 5): an RSS soft-ceiling shed
+        // surfaces as KernelError::Overloaded and must reach the RETRYABLE service
+        // overload variant, not the opaque Kernel wrapper, so callers keying
+        // retry/backpressure on Overloaded treat the shed as backpressure.
+        let mapped = map_kernel_error(KernelError::Overloaded {
+            resource: chio_kernel::OverloadResource::Allocation,
+        });
+        assert!(
+            matches!(mapped, KernelServiceError::Overloaded),
+            "an RSS shed must map to the retryable Overloaded variant, got {mapped:?}"
+        );
+
+        // RED contrast: the blanket `From`/`?` conversion the call path used before
+        // this fix maps the same shed to the opaque Kernel variant.
+        let via_from: KernelServiceError = KernelError::Overloaded {
+            resource: chio_kernel::OverloadResource::Allocation,
+        }
+        .into();
+        assert!(
+            matches!(via_from, KernelServiceError::Kernel(_)),
+            "the blanket From maps Overloaded to Kernel; call() must use map_kernel_error"
+        );
+
+        // Every other kernel error keeps the Kernel shape.
+        let other = map_kernel_error(KernelError::Internal("boom".to_string()));
+        assert!(matches!(other, KernelServiceError::Kernel(_)));
     }
 }
