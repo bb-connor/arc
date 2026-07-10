@@ -306,14 +306,17 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     let request_id = parsed
         .request_id
         .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
-    // Durable over-subscription guard that survives a restart, which the
-    // in-memory window below cannot: after a restart the window is empty, but a
-    // reservation opened before the restart persists as an open budget hold. The
-    // kernel derives the hold id from (request_id, capability id, matched grant
-    // index), so reconstruct each candidate and reject fail-closed (409) when the
-    // hold-capable store already carries an open hold under this request_id. This
-    // stops a reused id from collapsing into an idempotent authorize that mints a
-    // second nonce against one open reservation without reserving more budget.
+    // Durable reuse guard that survives a restart, which the in-memory window
+    // below cannot: after a restart the window is empty, but a reservation opened
+    // before it persists as a budget hold. The kernel derives the hold id from
+    // (request_id, capability id, matched grant index), so reconstruct each
+    // candidate and reject fail-closed (409) when the hold-capable store already
+    // carries ANY hold under this request_id, open or closed. An open hold means a
+    // reused id would collapse into an idempotent authorize that mints a second
+    // nonce against one reservation without reserving more budget; a closed
+    // (settled or reaped) hold means the kernel would reject the duplicate hold id
+    // on creation and turn an otherwise valid later authorization into a 500
+    // instead of the documented bounded-reuse 409.
     let Some(budget_store) = state.budget_store.as_ref() else {
         return internal_json_error_response(
             "chio_mediation_requires_local_budget_store",
@@ -334,18 +337,18 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
             request_id, parsed.capability.id, grant_index
         );
         match budget_store.get_budget_hold(&hold_id) {
-            Ok(Some(hold)) if hold.disposition.is_open() => {
+            Ok(Some(_)) => {
                 return (
                     StatusCode::CONFLICT,
                     axum::Json(serde_json::json!({
                         "error": "chio_request_id_reused",
                         "message":
-                            "request_id already backs an open reservation; choose a fresh request_id",
+                            "request_id already backs a reservation; choose a fresh request_id",
                     })),
                 )
                     .into_response();
             }
-            Ok(_) => {}
+            Ok(None) => {}
             Err(error) => {
                 warn!("durable hold lookup failed: {error}");
                 return internal_json_error_response("chio_mediation_failed", &error.to_string());
@@ -619,9 +622,16 @@ pub(crate) async fn sidecar_reconcile_handler(
                 .into_response();
         }
     };
+    // The settle already consumed the nonce and closed the reserved hold, and that
+    // is irreversible: a retry cannot recreate this authoritative receipt. If
+    // durable persistence then fails, returning 500 would discard the only proof
+    // of a settled spend, leaving the tool server and operator audit with nothing
+    // to reconcile against. Log the failure and return the signed receipt so the
+    // caller can persist or retry it. This is the opposite of /v1/evaluate, whose
+    // reservation is still open and reversible when persistence fails; here the
+    // spend is done, so the receipt must reach the caller.
     if let Err(error) = record_tool_receipt(&state, &reconciled.receipt).await {
-        warn!("failed to persist reconcile receipt: {error}");
-        return internal_json_error_response("chio_receipt_persistence_failed", &error.to_string());
+        warn!("reconcile settled but receipt persistence failed; returning authoritative receipt to caller: {error}");
     }
     (
         StatusCode::OK,
@@ -2451,5 +2461,187 @@ mod tests {
             handle.await.is_err(),
             "aborting the retained handle must cancel the reaper task"
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn reconcile_returns_authoritative_receipt_when_persistence_fails() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let signer_pub = signer.public_key();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 150, "USD");
+        let cap_value = serde_json::to_value(&cap).unwrap();
+
+        // A working receipt store so the evaluate that mints the nonce persists.
+        let (db, receipt_store) = open_temp_receipt_store();
+        let state = mediated_test_state_inner(
+            signer,
+            Arc::clone(&budget),
+            Vec::new(),
+            Some(MEDIATED_CONTROL_TOKEN.to_string()),
+            Some(receipt_store),
+            true,
+        );
+        let params = serde_json::json!({ "invoice": "inv-1" });
+
+        let body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": params,
+            "request_id": "recon-persist-fail",
+        });
+        let (status, authorized) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(authorized["status"], "authorized");
+        let nonce_json = authorized["execution_nonce"].clone();
+        assert!(nonce_json.is_object());
+
+        // The reconcile consumes the nonce and settles the reserved hold
+        // IRREVERSIBLY before persisting its receipt. Drop the receipt table so the
+        // post-settle append fails: unlike a reversible reservation, the settled
+        // spend cannot be undone, so the authoritative receipt is the only proof.
+        let dropper = rusqlite::Connection::open(&db).unwrap();
+        dropper.execute("DROP TABLE tool_receipts", []).unwrap();
+        drop(dropper);
+
+        let reconcile_body = serde_json::json!({
+            "execution_nonce": nonce_json.clone(),
+            "arguments": params,
+            "realized_cost": { "units": 30, "currency": "USD" },
+        });
+        let (status, reconciled) = post_reconcile(Arc::clone(&state), &reconcile_body).await;
+
+        // The settlement already happened, so the caller must receive the
+        // authoritative receipt rather than a 500 that discards the only proof.
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(reconciled["status"], "reconciled");
+        let receipt: ChioReceipt = serde_json::from_value(reconciled["receipt"].clone()).unwrap();
+        let nonce: SignedExecutionNonce = serde_json::from_value(nonce_json).unwrap();
+        assert_eq!(
+            is_authoritative_spend_receipt(&receipt, &[signer_pub], &nonce),
+            Ok(()),
+            "a persistence failure after settlement must still return the authoritative receipt"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn reconcile_still_fails_closed_on_replayed_nonce_when_persistence_fails() {
+        // The receipt-persistence carve-out is scoped to a SUCCESSFUL settle: a
+        // real reconcile ERROR (here a replayed, already-consumed nonce) must still
+        // fail closed, never reaching receipt persistence.
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 150, "USD");
+        let cap_value = serde_json::to_value(&cap).unwrap();
+        let (db, receipt_store) = open_temp_receipt_store();
+        let state = mediated_test_state_inner(
+            signer,
+            Arc::clone(&budget),
+            Vec::new(),
+            Some(MEDIATED_CONTROL_TOKEN.to_string()),
+            Some(receipt_store),
+            true,
+        );
+        let params = serde_json::json!({ "invoice": "inv-1" });
+
+        let body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": params,
+            "request_id": "recon-replay-persist-fail",
+        });
+        let (_, authorized) = post_evaluate(Arc::clone(&state), &body).await;
+        let nonce_json = authorized["execution_nonce"].clone();
+
+        let reconcile_body = serde_json::json!({
+            "execution_nonce": nonce_json,
+            "arguments": params,
+            "realized_cost": { "units": 30, "currency": "USD" },
+        });
+        // First reconcile settles the hold and consumes the nonce.
+        let (status, _) = post_reconcile(Arc::clone(&state), &reconcile_body).await;
+        assert_eq!(status, StatusCode::OK);
+
+        // Even with receipt persistence broken, a replayed nonce is a reconcile
+        // ERROR: it is rejected 4xx and never returns a receipt.
+        let dropper = rusqlite::Connection::open(&db).unwrap();
+        dropper.execute("DROP TABLE tool_receipts", []).unwrap();
+        drop(dropper);
+        let (status, replay) = post_reconcile(Arc::clone(&state), &reconcile_body).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(replay["error"], "chio_reconcile_rejected");
+        assert!(replay.get("receipt").is_none());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_durable_hold_rejects_request_id_reuse_after_settle() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        // The durable budget store survives a restart; the ProxyState (and its
+        // in-memory request-id window) is rebuilt fresh.
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
+        let cap_value = serde_json::to_value(&cap).unwrap();
+        let state = mediated_test_state(signer.clone(), Arc::clone(&budget), Vec::new());
+        let params = serde_json::json!({ "invoice": "inv-1" });
+
+        // Reserve a hold under a caller-chosen request_id, then settle it: the
+        // durable hold row persists but is no longer open.
+        let body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": params,
+            "request_id": "settled-reuse",
+        });
+        let (_, authorized) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(authorized["status"], "authorized");
+        let nonce_json = authorized["execution_nonce"].clone();
+
+        let reconcile_body = serde_json::json!({
+            "execution_nonce": nonce_json,
+            "arguments": params,
+            "realized_cost": { "units": 30, "currency": "USD" },
+        });
+        let (status, _) = post_reconcile(Arc::clone(&state), &reconcile_body).await;
+        assert_eq!(status, StatusCode::OK);
+
+        // Restart: a fresh ProxyState with an EMPTY in-memory window sharing only
+        // the durable budget store, so the durable reuse guard is the only defense.
+        let after = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+
+        // Reusing the settled request_id must be rejected 409: the durable hold id
+        // is already spent, so passing it through would let the kernel reject the
+        // duplicate hold id and turn a valid later authorization into a 500.
+        let (status, replay) = post_evaluate(Arc::clone(&after), &body).await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(replay["error"], "chio_request_id_reused");
+        assert_ne!(replay["status"], "authorized");
+        assert!(
+            replay["execution_nonce"].is_null(),
+            "a reused settled request_id must not mint a second nonce"
+        );
+
+        // A fresh request_id still authorizes on the restarted sidecar.
+        let fresh_body = serde_json::json!({
+            "capability": cap_value,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-2" },
+            "request_id": "settled-reuse-fresh",
+        });
+        let (status, fresh) = post_evaluate(after, &fresh_body).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(fresh["status"], "authorized");
+        assert!(fresh["execution_nonce"].is_object());
     }
 }
