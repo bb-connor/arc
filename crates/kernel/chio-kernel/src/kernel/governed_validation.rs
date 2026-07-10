@@ -370,9 +370,9 @@ impl ChioKernel {
     }
 
     /// Units that a MustPrepay intent will actually prepay, if the intent mandates
-    /// prepayment. This is `quote.quoted_cost` when the grant carries no monetary
-    /// ceiling, so it is the amount that gates approval and max-amount checks in
-    /// the no-charge path.
+    /// prepayment. This is `quote.quoted_cost`: the amount that is authorized and
+    /// prepaid regardless of any smaller provisional budget charge, so it gates the
+    /// approval and max-amount checks in both the with-charge and no-charge paths.
     fn mustprepay_prepaid_units(
         intent: &chio_core::capability::governance::GovernedTransactionIntent,
     ) -> Option<u64> {
@@ -1088,15 +1088,13 @@ impl ChioKernel {
             }
         }
 
-        // No-charge MustPrepay path: the amount that will actually be prepaid is the
-        // quote, not the provisional charge (there is none). Bound it by any declared
-        // max_amount so a small ceiling cannot understate the prepaid cost. The quote
-        // currency is already reconciled against max_amount in metered validation.
-        let mustprepay_prepaid_units = if charge_result.is_none() {
-            Self::mustprepay_prepaid_units(intent)
-        } else {
-            None
-        };
+        // A MustPrepay intent authorizes and prepays its quote, so the quote (not a
+        // smaller provisional charge or declared ceiling) is the amount actually
+        // committed. It gates the max_amount and approval checks in both the
+        // with-charge and no-charge paths; a declared max_amount below it under-states
+        // the prepaid cost and is rejected fail-closed. The quote currency is already
+        // reconciled against max_amount in metered validation.
+        let mustprepay_prepaid_units = Self::mustprepay_prepaid_units(intent);
         if let (Some(intent_amount), Some(prepaid_units)) =
             (intent.max_amount.as_ref(), mustprepay_prepaid_units)
         {
@@ -1107,16 +1105,20 @@ impl ChioKernel {
             }
         }
 
-        let requested_units = charge_result
-            .map(|charge| charge.cost_charged)
-            .or_else(|| {
-                let declared = intent.max_amount.as_ref().map(|amount| amount.units);
-                match (mustprepay_prepaid_units, declared) {
-                    (Some(prepaid), Some(declared)) => Some(prepaid.max(declared)),
-                    (prepaid, declared) => prepaid.or(declared),
-                }
-            })
-            .unwrap_or(0);
+        let requested_units = {
+            // Base gate amount: the provisional charge when one applies, otherwise the
+            // declared monetary ceiling.
+            let base = charge_result
+                .map(|charge| charge.cost_charged)
+                .or_else(|| intent.max_amount.as_ref().map(|amount| amount.units));
+            // A MustPrepay intent prepays its quote, so the gate must reflect at least
+            // the quoted cost even when a smaller provisional charge or ceiling is
+            // present. Fail-closed: take the larger of the two.
+            match (base, mustprepay_prepaid_units) {
+                (Some(base), Some(prepaid)) => base.max(prepaid),
+                (base, prepaid) => base.or(prepaid).unwrap_or(0),
+            }
+        };
         let approval_required = approval_threshold_units
             .map(|threshold_units| requested_units >= threshold_units)
             .unwrap_or(false);

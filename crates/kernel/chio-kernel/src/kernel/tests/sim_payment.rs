@@ -544,6 +544,109 @@ fn governed_mustprepay_quote_above_threshold_requires_approval() {
     );
 }
 
+// Request-building helpers for the with-charge MustPrepay gating tests. A grant
+// with a small per-invocation ceiling yields a provisional budget charge below
+// the approval threshold, while the MustPrepay quote (the amount actually
+// prepaid) sits above it.
+fn mustprepay_request_without_token(
+    request_id: &str,
+    cap: &CapabilityToken,
+    agent_kp: &Keypair,
+    intent: GovernedTransactionIntent,
+) -> ToolCallRequest {
+    ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability: cap.clone(),
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: Some(intent),
+        approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    }
+}
+
+// The amount actually authorized and prepaid for a MustPrepay intent is the
+// quote, so a small provisional budget charge must not understate the approval
+// gate: a quote above RequireApprovalAbove is denied without an approval token
+// even when a charge is present, and admitted with one.
+#[test]
+fn governed_mustprepay_with_charge_gates_on_quote_not_charge() {
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 5, "USD")));
+
+    let agent_kp = Keypair::generate();
+    // Provisional charge = max_cost_per_invocation = 10, below the 50 threshold.
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 10, 1000, "USD", 50);
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    // Quote 100 > threshold 50, no declared ceiling: only the prepaid quote can
+    // raise the gate above the 10-unit provisional charge.
+    let mut intent =
+        make_mustprepay_intent("intent-charge-quote-gate", "cost-srv", "compute", 100, "USD");
+    intent.max_amount = None;
+
+    let no_token =
+        mustprepay_request_without_token("req-charge-quote-deny", &cap, &agent_kp, intent.clone());
+    let denied = kernel.evaluate_tool_call_blocking(&no_token).unwrap();
+    assert_eq!(
+        denied.verdict,
+        Verdict::Deny,
+        "a MustPrepay quote above the approval threshold must be denied without an approval token, \
+         even when a smaller provisional charge is present"
+    );
+    let reason = denied.reason.as_deref().unwrap_or("");
+    assert!(
+        reason.contains("approval token required"),
+        "denial must cite the missing approval token; got: {reason}"
+    );
+
+    let with_token =
+        mustprepay_tool_call("req-charge-quote-allow", &cap, &agent_kp, intent, &kernel);
+    let allowed = kernel.evaluate_tool_call_blocking(&with_token).unwrap();
+    assert_eq!(
+        allowed.verdict,
+        Verdict::Allow,
+        "a valid approval token must admit the prepaid MustPrepay quote with a charge present"
+    );
+}
+
+// A MustPrepay whose quote and provisional charge both sit below the approval
+// threshold still passes without a token: the fix must not over-gate.
+#[test]
+fn governed_mustprepay_with_charge_below_threshold_passes_without_token() {
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 5, "USD")));
+
+    let agent_kp = Keypair::generate();
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 10, 1000, "USD", 50);
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    // Quote 40 < threshold 50 and charge 10 < 50: no approval token is required.
+    let mut intent =
+        make_mustprepay_intent("intent-charge-under-gate", "cost-srv", "compute", 40, "USD");
+    intent.max_amount = None;
+
+    let no_token =
+        mustprepay_request_without_token("req-charge-under-allow", &cap, &agent_kp, intent);
+    let allowed = kernel.evaluate_tool_call_blocking(&no_token).unwrap();
+    assert_eq!(
+        allowed.verdict,
+        Verdict::Allow,
+        "a MustPrepay quote below the approval threshold must pass without an approval token"
+    );
+}
+
 // Authorizes an unsettled hold whose capture always fails, exercising the
 // fail-closed settlement path. Counts releases so a leaked hold is observable.
 #[derive(Debug, Clone, Default)]
