@@ -149,10 +149,9 @@ pub(crate) async fn handle_internal_budgets_delta(
     // Abandoned/tombstoned seqs within the pulled range, so the puller can treat
     // those slots as filled (no demote on a legitimately gappy stream). Bounded to
     // the page's max event so the puller only verifies contiguity up to what it is
-    // importing (codex #965 round-5 P1), AND capped at BUDGET_DELTA_MAX_RECORDS + 1
-    // rows so a rollback storm that packs an enormous abandoned window before the
-    // next live event cannot blow past MAX_PEER_RESPONSE_BYTES (codex #965 Finding:
-    // bound abandoned seqs). An importable page carries at most
+    // importing, AND capped at BUDGET_DELTA_MAX_RECORDS + 1 rows so a rollback storm
+    // that packs an enormous abandoned window before the next live event cannot blow
+    // past MAX_PEER_RESPONSE_BYTES. An importable page carries at most
     // BUDGET_DELTA_MAX_RECORDS records total, so its abandoned list is never
     // truncated (limit > cap); a truncated list only ever occurs on an over-cap
     // window, and returning cap + 1 abandoned rows guarantees the client's
@@ -235,7 +234,7 @@ pub(crate) async fn run_cluster_sync_loop(state: TrustServiceState) {
         }
         // The loop is the sole sync driver: race the inter-round sleep against a
         // writer kick so a waiting budget write is served promptly without
-        // spawning its own sync storm (RFC-0011 D3, F14).
+        // spawning its own sync storm.
         match state.cluster_progress.as_ref() {
             Some(progress) => {
                 tokio::select! {
@@ -250,7 +249,7 @@ pub(crate) async fn run_cluster_sync_loop(state: TrustServiceState) {
 
 /// Bump the cluster-progress tick so any parked budget-write waiter rechecks the
 /// quorum view now. Safe to call mid-round: it drives no sync, just wakes waiters
-/// (the same tick the background loop bumps at round end) (codex #965 round-3).
+/// (the same tick the background loop bumps at round end).
 pub(crate) fn notify_cluster_progress(state: &TrustServiceState) {
     if let Some(progress) = state.cluster_progress.as_ref() {
         progress.notify_round_complete();
@@ -303,10 +302,9 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
     // holds. `clamp_down_peer_budget_acks` only ever SHRINKS the recorded acks
     // (recorded = min(recorded, advertised), dropped origins removed); an INCREASE
     // stays deferred to finalize_peer_sync_round below until this peer's pull round
-    // validates (codex #965 deltas.rs:403).
+    // validates.
     clamp_down_peer_budget_acks(state, peer_url, &peer_status.budget_ack_heads);
-    // Do NOT record or wake on the peer's freshly-advertised budget acks yet
-    // (codex #965 Finding P1 "do not commit on acks before validation"): a high
+    // Do NOT record or wake on the peer's freshly-advertised budget acks yet: a high
     // ack head advertised via cluster_status must not be counted for a quorum
     // commit until this peer's pull round completes WITHOUT demotion. Recording it
     // here (before the pullers run) and waking parked writers let a writer commit
@@ -326,7 +324,7 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
     // budget FIRST (quorum-critical). Run each puller only while round budget
     // remains; once a stream exhausts the shared budget (pages/records/deadline),
     // skip the rest so we do not issue more blocking peer fetches just to
-    // rediscover the same exhausted budget (codex #965 round-4 P2). A Protocol
+    // rediscover the same exhausted budget. A Protocol
     // violation demotes the peer; on ANY stream error the shared lane stops (break)
     // but revocations (lane 2) still run below unless the peer was demoted.
     let mut round = PullRoundBudget::new();
@@ -348,8 +346,7 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
     // Lane 2: revocations replicate on their OWN round budget, INDEPENDENT of the
     // shared budget/receipt round, so a sustained budget backlog (shared-round
     // exhaustion) or a broken/slow budget-delta endpoint can never starve
-    // security-critical revocation propagation (codex #965 Finding: avoid starving
-    // revocation pulls behind budget backlog). It is skipped ONLY when the peer was
+    // security-critical revocation propagation. It is skipped ONLY when the peer was
     // demoted by lane 1 (fail-closed: a peer that violated the wire contract is
     // untrusted, so we pull nothing more from it).
     if !peer_was_demoted(state, peer_url) {
@@ -391,12 +388,12 @@ pub(crate) fn peer_was_demoted(state: &TrustServiceState, peer_url: &str) -> boo
 /// parked budget-write waiters - the SINGLE site that records a peer's acks, run
 /// AFTER its pull round.
 ///
-/// Fail-closed (codex #965 Finding P1): skips every success side effect when the
-/// peer was demoted this round (its fresh, unvalidated ack must never be counted
-/// for a quorum commit - that would be an over-count / budget double-spend) or is
-/// pending a forced snapshot (it is excluded from witnesses until it re-syncs, and
-/// `update_peer_success` would prematurely clear that pending-snapshot flag, codex
-/// #965 Finding 1). Deferring the ack record to here closes the window where an
+/// Fail-closed: skips every success side effect when the peer was demoted this
+/// round (its fresh, unvalidated ack must never be counted for a quorum commit -
+/// that would be an over-count / budget double-spend) or is pending a forced
+/// snapshot (it is excluded from witnesses until it re-syncs, and
+/// `update_peer_success` would prematurely clear that pending-snapshot flag).
+/// Deferring the ack record to here closes the window where an
 /// early progress wake let a parked writer commit on an ack the fail-closed path
 /// was about to remove.
 pub(crate) fn finalize_peer_sync_round(
@@ -420,8 +417,7 @@ pub(crate) fn finalize_peer_sync_round(
 /// Healthy but record the error; on `PullError::ForceSnapshot` keep the peer
 /// Healthy but flag it for a full snapshot resync (an honest, unpageable delta
 /// window). Every error arm short-circuits the round BEFORE `update_peer_success`
-/// runs, so a `ForceSnapshot` flag survives to the next round's snapshot probe
-/// (codex #965 Finding 1).
+/// runs, so a `ForceSnapshot` flag survives to the next round's snapshot probe.
 pub(crate) fn route_pull(
     state: &TrustServiceState,
     peer_url: &str,
@@ -450,7 +446,7 @@ pub(crate) fn route_pull(
             // skipping the window WITHOUT a delta cursor jump. Returning Err
             // short-circuits the round before update_peer_success would clear the
             // flag. A force_snapshot peer is excluded from witnesses until it
-            // re-syncs, so this cannot over-count (codex #965 Finding 1).
+            // re-syncs, so this cannot over-count.
             request_peer_snapshot_recovery(state, peer_url, error.to_string());
             Err(error)
         }
@@ -483,7 +479,7 @@ fn sync_peer_revocations(
     let mut applied = 0u64;
     loop {
         // Check the shared round budget BEFORE the next blocking fetch so an
-        // exhausted stream stops without one more peer request (codex #965 round-4).
+        // exhausted stream stops without one more peer request.
         if round.is_exhausted() {
             break;
         }
@@ -497,7 +493,7 @@ fn sync_peer_revocations(
             break;
         }
         // Stop the round (not demote) when the local per-round pull cap is hit:
-        // a large well-ordered backlog resumes next sync round (codex #965 round-3).
+        // a large well-ordered backlog resumes next sync round.
         if round.charge_page(response.records.len() as u64).is_err() {
             break;
         }
@@ -506,8 +502,7 @@ fn sync_peer_revocations(
         // require the page to be STRICTLY ascending from the current cursor. A
         // reorder (e.g. [high, low]) is a protocol violation that demotes the peer,
         // rather than silently persisting a cursor behind page_max and replaying
-        // already-applied revocations every round (codex #965 Finding: reject
-        // out-of-order revocation pages). The returned head equals page_max.
+        // already-applied revocations every round. The returned head equals page_max.
         let page_head = ensure_revocation_page_ascending(cursor.as_ref(), &response.records)?;
         for record in &response.records {
             store
@@ -547,7 +542,7 @@ fn sync_peer_tool_receipts(
             break;
         }
         // Stop the round (not demote) when the local per-round pull cap is hit:
-        // a large well-ordered backlog resumes next sync round (codex #965 round-3).
+        // a large well-ordered backlog resumes next sync round.
         if round.charge_page(response.records.len() as u64).is_err() {
             break;
         }
@@ -556,7 +551,7 @@ fn sync_peer_tool_receipts(
         // and pruned by retention, so legitimate gaps (rows 1 and 3, no 2)
         // occur. A gap-free contiguity guard would demote an honest peer, so
         // only forward progress + within-page monotonicity is required; a
-        // legitimate gap is accepted (RFC-0011 D1, codex #965 Finding 2).
+        // legitimate gap is accepted.
         let seqs = response
             .records
             .iter()
@@ -602,14 +597,14 @@ fn sync_peer_child_receipts(
             break;
         }
         // Stop the round (not demote) when the local per-round pull cap is hit:
-        // a large well-ordered backlog resumes next sync round (codex #965 round-3).
+        // a large well-ordered backlog resumes next sync round.
         if round.charge_page(response.records.len() as u64).is_err() {
             break;
         }
         // Child receipts are a NON-DENSE append-only seq stream (AUTOINCREMENT +
         // ON CONFLICT DO NOTHING, retention-pruned), so gaps are legitimate.
         // Require only forward progress + within-page monotonicity; a gap-free
-        // guard would demote an honest peer (RFC-0011 D1, codex #965 Finding 2).
+        // guard would demote an honest peer.
         let seqs = response
             .records
             .iter()
@@ -665,8 +660,8 @@ fn sync_peer_budgets(
 /// events + 200 usages + one abandoned seq = 401 records trips the cap even though
 /// a 199-event page would import fine. Routing that STRAIGHT to a full snapshot is
 /// wasteful and, in a large ledger whose full snapshot itself exceeds the response
-/// byte cap, is a wedge: the snapshot fetch fails and the cursor repeats the same
-/// over-large incremental page forever (codex #965 deltas.rs:713).
+/// byte cap, is a permanent stall: the snapshot fetch fails and the cursor repeats
+/// the same over-large incremental page forever.
 ///
 /// So on `PullError::ForceSnapshot` (the over-cap signal from
 /// `import_budget_delta_response`) we RETRY the same cursor with a SMALLER event
@@ -757,11 +752,10 @@ pub(crate) fn import_budget_delta_response(
     // Honest budget deltas pair usage projections with the mutation events they
     // derive from; a records-only page can never advance the global event cursor
     // without importing unverified events, so reject it as a protocol violation
-    // (demote) rather than pinning the cursor past unreplicated seqs (codex #965
-    // round-3 P1). Checked BEFORE the oversized-page cap below so a malformed
-    // records-only page always DEMOTES and never gets routed to snapshot recovery:
-    // the ForceSnapshot path is reserved for honest, genuinely unpageable event
-    // windows (codex #965 Finding 1).
+    // (demote) rather than pinning the cursor past unreplicated seqs. Checked
+    // BEFORE the oversized-page cap below so a malformed records-only page always
+    // DEMOTES and never gets routed to snapshot recovery: the ForceSnapshot path
+    // is reserved for honest, genuinely unpageable event windows.
     if response.mutation_events.is_empty() {
         return Err(PullError::Protocol(
             PeerProtocolError::RecordsWithoutMutationEvents {
@@ -786,9 +780,9 @@ pub(crate) fn import_budget_delta_response(
         // BEFORE the next live event (and an events-empty page is rejected above), so
         // no cursor-anchored page makes forward progress. Routing THAT window through
         // the snapshot path (which resets the cursor to the source's global head)
-        // rather than a bare Transient is what unwedges it: a Transient neither
-        // advances the cursor nor bumps delta_records_since_snapshot, so force_snapshot
-        // recovery would never trigger (codex #965 Finding 1, deltas.rs:713). Fail-
+        // rather than a bare Transient is what lets recovery proceed: a Transient
+        // neither advances the cursor nor bumps delta_records_since_snapshot, so
+        // force_snapshot recovery would never trigger. Fail-
         // closed and sound: the snapshot skips the window WITHOUT a delta cursor jump,
         // so it cannot over-count or skip unreplicated rows, and a force_snapshot peer
         // is excluded from witnesses until it re-syncs.
@@ -797,7 +791,7 @@ pub(crate) fn import_budget_delta_response(
         ))));
     }
     // Local per-round pull cap: stop the round WITHOUT demoting; the next sync
-    // round resumes from the unchanged cursor (codex #965 round-3 P2).
+    // round resumes from the unchanged cursor.
     if round.charge_page(record_count as u64).is_err() {
         return Ok(BudgetDeltaImportOutcome {
             applied_count: 0,
@@ -818,8 +812,8 @@ pub(crate) fn import_budget_delta_response(
     // contiguity from the cursor: the pulled page, in global-seq order, must run
     // gap-free from previous_cursor_seq + 1 with no skipped global seq.
     //
-    // A per-origin compaction floor MUST NOT authorize a jump here (codex #965
-    // Finding 3): the cursor spans all origins, so anchoring at the floor of the
+    // A per-origin compaction floor MUST NOT authorize a jump here: the cursor
+    // spans all origins, so anchoring at the floor of the
     // authority on the page head could advance the global cursor past global
     // seqs owned by a DIFFERENT origin that this node has not yet replicated,
     // permanently omitting them. A genuine global floor (a seq below which ALL
@@ -837,7 +831,7 @@ pub(crate) fn import_budget_delta_response(
             .collect::<Vec<_>>();
         // Events must arrive in strictly ASCENDING received order: the importer
         // applies them in order, so a release-before-authorize reorder must be
-        // rejected (codex #965 round-3 P2). Forward progress and gap-freeness are
+        // rejected. Forward progress and gap-freeness are
         // checked by the union guard below.
         let mut previous: Option<u64> = None;
         for &seq in &event_seqs {
@@ -855,9 +849,9 @@ pub(crate) fn import_budget_delta_response(
         // must be gap-free from the cursor. An abandoned seq legitimately fills a
         // hole left by a rolled-back-then-re-appended write, so it is NOT a skip;
         // a seq that is neither an event nor abandoned IS a skip and stays a
-        // NonContiguousPage that demotes the peer (codex #965 round-5 P1).
+        // NonContiguousPage that demotes the peer.
         //
-        // TRUST BOUNDARY (codex #965 Finding 2): honoring the source peer's
+        // TRUST BOUNDARY: honoring the source peer's
         // `abandoned_seqs` lets it make THIS follower skip seq S (treat S as filled
         // without importing an event for it) with NO independent verification that S
         // is genuinely abandoned. This is SAFE ONLY under the crash-fault
@@ -901,9 +895,9 @@ pub(crate) fn import_budget_delta_response(
         .map_err(CliError::from)?;
     // Record the page's abandoned slots so this follower's contiguous ack head
     // treats them as filled even if it never held (and so never deleted) the
-    // original event (codex #965 round-5 P1). This trusts the source peer's
+    // original event. This trusts the source peer's
     // abandonment claim without independent verification; see the TRUST BOUNDARY
-    // note at the contiguity union above (codex #965 Finding 2): it is sound only
+    // note at the contiguity union above: it is sound only
     // under the crash-fault honest-peer model and sits outside the strict
     // require_contiguous_page guarantee, with the periodic snapshot as backstop.
     if !response.abandoned_seqs.is_empty() {
@@ -915,7 +909,7 @@ pub(crate) fn import_budget_delta_response(
     // The global event cursor advances ONLY from mutation events (guaranteed
     // non-empty here: a records-only page was rejected above). Usage `seq`s never
     // move the event cursor, so a peer cannot pin the cursor past unimported
-    // events via usage projections alone (codex #965 round-3 P1).
+    // events via usage projections alone.
     let mut next_cursor = current_cursor;
     for event in &response.mutation_events {
         next_cursor = Some(merge_budget_cursor(
@@ -969,7 +963,7 @@ fn sync_peer_lineage(
             break;
         }
         // Stop the round (not demote) when the local per-round pull cap is hit:
-        // a large well-ordered backlog resumes next sync round (codex #965 round-3).
+        // a large well-ordered backlog resumes next sync round.
         if round.charge_page(response.records.len() as u64).is_err() {
             break;
         }
@@ -977,7 +971,7 @@ fn sync_peer_lineage(
         // NON-DENSE: an upsert on an existing capability_id keeps its rowid and
         // deletes leave holes, so gaps are legitimate. Require only forward
         // progress + within-page monotonicity; a gap-free guard would demote an
-        // honest peer (RFC-0011 D1, codex #965 Finding 2).
+        // honest peer.
         let seqs = response
             .records
             .iter()
@@ -1114,7 +1108,7 @@ fn budget_write_quorum_commit_view_locked(
         // origin is at least the write's event_seq. An event from a different
         // origin is grouped under a different key and cannot witness; a legacy
         // NULL-authority event is excluded from budget_ack_heads and so never
-        // witnesses (RFC-0011 D2, F16).
+        // witnesses.
         let acked = peer_state
             .budget_import_acks
             .get(&write.origin_id)
@@ -1122,8 +1116,7 @@ fn budget_write_quorum_commit_view_locked(
         // A peer pending a forced snapshot (demoted by a protocol error, then
         // probed reachable again before its snapshot + delta re-sync completed)
         // carries stale, untrusted ack heads: it must NOT witness until it has
-        // re-synced, even though a bare reachability probe flipped it Healthy
-        // (codex #965 round-3 P1).
+        // re-synced, even though a bare reachability probe flipped it Healthy.
         if peer_state.health.is_reachable()
             && !peer_state.partitioned
             && !peer_state.force_snapshot
@@ -1137,7 +1130,7 @@ fn budget_write_quorum_commit_view_locked(
     // AUTHORED this write, not the current consensus leader: leadership can change
     // while the write waits (a lex-earlier node becomes reachable), and pairing
     // the write's term with a different leader would mint a lease_id for an
-    // authority that never wrote the event (codex #965 round-2 P2). The write
+    // authority that never wrote the event. The write
     // token already carries origin_id; fall back to the consensus leader only for
     // a placeholder (unclustered) token that has no origin.
     let authority_id = if write.origin_id.is_empty() {
@@ -1174,13 +1167,12 @@ type Puller = fn(
 /// The per-peer SHARED-ROUND pull order. Budget replication is quorum-critical
 /// (HA budget writes wait on peers' budget_ack_heads), so it is pulled FIRST: a
 /// sustained receipt/lineage backlog must not spend the shared round budget and
-/// starve the budget pull, timing out otherwise-committable writes (codex #965
-/// round-5 P1).
+/// starve the budget pull, timing out otherwise-committable writes.
 ///
 /// Revocations are NOT in this shared list: they replicate on their own
 /// independent round budget in `sync_peer` so budget churn (shared-round
 /// exhaustion) or a broken budget endpoint cannot starve security-critical
-/// revocation propagation (codex #965 Finding: avoid starving revocation pulls).
+/// revocation propagation.
 fn peer_pullers() -> [Puller; 4] {
     [
         sync_peer_budgets,
@@ -1211,8 +1203,8 @@ fn cluster_peer_count(state: &TrustServiceState) -> usize {
 /// bounded by its wall-clock budget. If a slow-but-reachable peer is visited
 /// before the peer whose ack makes quorum, the wait must outlast a full serial
 /// visit for every preceding peer, or it 503s a write the next peer would have
-/// committed in the same round (codex #965 Finding: account for all per-peer
-/// fetches). The old bound budgeted only ONE `CONTROL_HTTP_TIMEOUT` per peer.
+/// committed in the same round. The bound must account for a fetch to every peer,
+/// not just one `CONTROL_HTTP_TIMEOUT`.
 ///
 /// The bound scales with the peer count (inherently bounded by cluster size) and
 /// is capped so a misconfigured huge peer list cannot make it unbounded. A GENUINE
@@ -1252,7 +1244,7 @@ fn budget_write_quorum_commit_timeout(sync_interval: Duration, peer_count: usize
 /// Outcome when the `ClusterProgress` watch closes while a budget write is
 /// parked on it (the sync/progress task died mid-wait).
 ///
-/// Fail-closed (codex #962): a node that is STILL clustered must return a 503
+/// Fail-closed: a node that is STILL clustered must return a 503
 /// so the caller (`handle_try_charge_cost`) rolls back the local exposure. The
 /// caller only rolls back on `Err`; returning `Ok(None)` here would render as a
 /// successful leader-visible write with NO `budgetCommit`, indistinguishable
@@ -1291,7 +1283,7 @@ pub(crate) async fn wait_for_budget_write_quorum_commit(
     // Park on the progress watch under a single wall-clock bound and drive no
     // sync directly: the background loop is the sole sync driver, so one slow
     // peer can no longer multiply N concurrent writes into N sync storms; the
-    // write waits out the bound and fails closed (RFC-0011 D3, F14).
+    // write waits out the bound and fails closed.
     let waited = tokio::time::timeout(timeout, async {
         loop {
             let Some(view) = budget_write_quorum_commit_view(state, &write) else {
@@ -1311,7 +1303,7 @@ pub(crate) async fn wait_for_budget_write_quorum_commit(
             }
             if rx.changed().await.is_err() {
                 // The ClusterProgress sender was dropped: the sync/progress task
-                // died mid-write. Fail closed while still clustered (codex #962);
+                // died mid-write. Fail closed while still clustered;
                 // see budget_write_progress_closed_outcome.
                 return budget_write_progress_closed_outcome(state, &write);
             }
@@ -1494,9 +1486,8 @@ mod deltas_tests {
 
     #[test]
     fn budget_pull_is_prioritized_first() {
-        // codex #965 round-5 P1: budget replication is pulled FIRST so a
-        // receipt/lineage backlog cannot spend the shared round budget and starve
-        // the quorum-critical budget pull.
+        // Budget replication is pulled FIRST so a receipt/lineage backlog cannot
+        // spend the shared round budget and starve the quorum-critical budget pull.
         assert_eq!(
             peer_pullers()[0] as usize,
             sync_peer_budgets as Puller as usize,
@@ -1506,11 +1497,11 @@ mod deltas_tests {
 
     #[test]
     fn revocations_are_not_in_the_shared_budget_round() {
-        // codex #965 Finding (avoid starving revocation pulls): revocations must
-        // replicate on their OWN round budget in sync_peer, NOT share the
-        // budget/receipt round. If they were in this shared list a sustained budget
-        // backlog (shared-round exhaustion) or a broken budget endpoint could starve
-        // security-critical revocation propagation. Budget stays first here.
+        // Revocations must replicate on their OWN round budget in sync_peer, NOT
+        // share the budget/receipt round. If they were in this shared list a
+        // sustained budget backlog (shared-round exhaustion) or a broken budget
+        // endpoint could starve security-critical revocation propagation. Budget
+        // stays first here.
         let shared = peer_pullers();
         assert_eq!(
             shared[0] as usize, sync_peer_budgets as Puller as usize,
@@ -1526,18 +1517,18 @@ mod deltas_tests {
 
     #[test]
     fn quorum_commit_timeout_covers_full_per_peer_sync_and_is_bounded() {
-        // codex #965 Finding (account for all per-peer fetches): the wait must
-        // outlast a FULL serial sync_peer visit for every peer preceding the quorum
-        // peer, not just one CONTROL_HTTP_TIMEOUT per peer. A full visit is the three
-        // fixed blocking stages plus the two wall-clock-bounded delta rounds.
+        // The wait must outlast a FULL serial sync_peer visit for every peer
+        // preceding the quorum peer, not just one CONTROL_HTTP_TIMEOUT per peer. A
+        // full visit is the three fixed blocking stages plus the two
+        // wall-clock-bounded delta rounds.
         let interval = Duration::from_millis(25);
         let per_peer_sync =
             CONTROL_HTTP_TIMEOUT * 3 + PEER_ROUND_WALL_CLOCK_BUDGET + PEER_ROUND_WALL_CLOCK_BUDGET;
 
         assert!(budget_write_quorum_commit_timeout(interval, 0) >= Duration::from_secs(5));
 
-        // One preceding peer must be budgeted a full sync_peer visit. The OLD bound
-        // gave only CONTROL_HTTP_TIMEOUT * 2 = 30s here, far short of a full visit.
+        // One preceding peer must be budgeted a full sync_peer visit. A bound of one
+        // CONTROL_HTTP_TIMEOUT per peer would give only 30s here, far short of it.
         let one = budget_write_quorum_commit_timeout(interval, 1);
         assert!(
             one >= per_peer_sync,
@@ -1586,14 +1577,12 @@ mod deltas_tests {
 
     #[test]
     fn oversized_budget_page_retries_smaller_before_snapshotting() {
-        // codex #965 deltas.rs:713 (retry smaller budget pages before snapshotting):
-        // a page can exceed BUDGET_DELTA_MAX_RECORDS just because we asked for a full
+        // A page can exceed BUDGET_DELTA_MAX_RECORDS just because we asked for a full
         // MAX_LIST_LIMIT window (events + their usages + abandoned seqs). Such a
         // large-but-PAGEABLE window must be delivered incrementally via a SMALLER
-        // event limit, NOT routed straight to a full snapshot. RED before the fix:
-        // the first over-cap page returns ForceSnapshot and the whole drain fails.
-        // GREEN: the drain refetches the SAME cursor with a smaller limit and imports
-        // the window (still contiguity-checked, so no skip / no over-count).
+        // event limit, not routed straight to a full snapshot: the drain refetches
+        // the SAME cursor with a smaller limit and imports the window (still
+        // contiguity-checked, so no skip / no over-count).
         use chio_test_support::prelude::*;
         let db = temp_budget_db("retry-smaller-budget-page");
         let mut store = SqliteBudgetStore::open(&db).test_unwrap();
@@ -1637,7 +1626,7 @@ mod deltas_tests {
             |_cursor| {},
         );
 
-        // GREEN: the window drained incrementally; no ForceSnapshot escaped the drain.
+        // The window drained incrementally; no ForceSnapshot escaped the drain.
         let applied = match result {
             Ok(applied) => applied,
             Err(other) => {
@@ -1645,7 +1634,7 @@ mod deltas_tests {
             }
         };
         assert_eq!(applied, 3, "the smaller page's events were imported");
-        // TEETH: the drain retried the same cursor with a limit strictly below
+        // The drain retried the same cursor with a limit strictly below
         // MAX_LIST_LIMIT before ever force-snapshotting.
         let calls = calls.into_inner();
         assert!(
@@ -1662,11 +1651,10 @@ mod deltas_tests {
 
     #[test]
     fn unpageable_single_event_budget_page_still_force_snapshots() {
-        // codex #965 deltas.rs:713: a GENUINELY unpageable window - a single live
-        // event preceded by a dense rollback burst of abandoned seqs that alone
-        // exceeds the record cap - cannot be split smaller, so the drain must still
-        // route the peer to full snapshot recovery (ForceSnapshot) rather than
-        // shrink-looping forever.
+        // A GENUINELY unpageable window - a single live event preceded by a dense
+        // rollback burst of abandoned seqs that alone exceeds the record cap -
+        // cannot be split smaller, so the drain must still route the peer to full
+        // snapshot recovery (ForceSnapshot) rather than shrink-looping forever.
         use chio_test_support::prelude::*;
         let db = temp_budget_db("unpageable-budget-page");
         let mut store = SqliteBudgetStore::open(&db).test_unwrap();

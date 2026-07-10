@@ -1,7 +1,7 @@
 use super::*;
 
 /// Quorum-witness identity of a stored budget mutation event: its `event_seq`,
-/// origin `authority_id`, and origin `lease_epoch` (codex #965 round-5 P1).
+/// origin `authority_id`, and origin `lease_epoch`.
 pub type BudgetEventWitness = (u64, Option<String>, Option<u64>);
 
 impl SqliteBudgetStore {
@@ -100,8 +100,7 @@ impl SqliteBudgetStore {
             -- not GROUP BY the full mutation history every call. Each entry is the
             -- highest event_seq that origin has WITHIN the verified global contiguous
             -- prefix (<= the watermark); a DELETE clears it (see the trigger) so a
-            -- hole forces a rebuild rather than leaving a stale-high per-origin head
-            -- (codex #965 round-3 P2).
+            -- hole forces a rebuild rather than leaving a stale-high per-origin head.
             CREATE TABLE IF NOT EXISTS budget_origin_ack_heads (
                 authority_id TEXT PRIMARY KEY,
                 head_seq     INTEGER NOT NULL,
@@ -114,11 +113,10 @@ impl SqliteBudgetStore {
             -- rolled-back authorize and re-append it under a fresh higher seq,
             -- permanently abandoning the original seq. Recording the abandoned seq
             -- lets the global contiguous ack head treat it as FILLED so it does not
-            -- wedge cluster-wide at the hole. This never over-counts: an abandoned
+            -- stall cluster-wide at the hole. This never over-counts: an abandoned
             -- seq is never a live write (its write was rolled back / superseded), so
             -- no witness targets it; a genuinely MISSING event (never received, never
-            -- deleted here) is not recorded and still caps the head (codex #965
-            -- round-5 P1).
+            -- deleted here) is not recorded and still caps the head.
             CREATE TABLE IF NOT EXISTS budget_abandoned_event_seqs (
                 seq INTEGER PRIMARY KEY,
                 CHECK (seq > 0)
@@ -162,7 +160,7 @@ impl SqliteBudgetStore {
 
     /// Highest budget mutation event_seq, or 0 when empty. Mirrors the private
     /// max_budget_mutation_event_seq helper (replication.rs) but is a public
-    /// head read for the status path (RFC-0011 D4).
+    /// head read for the status path.
     pub fn max_mutation_event_seq(&self) -> Result<u64, BudgetStoreError> {
         let connection = self.connection()?;
         let seq: i64 = connection.query_row(
@@ -178,7 +176,7 @@ impl SqliteBudgetStore {
     /// local (leader) write to build the write's quorum-witness token: it is
     /// always >= the just-written event's own seq (a concurrent same-origin
     /// write can only raise it), so the per-origin contiguous witness can only
-    /// under-count witnesses, never over-count one (fail-closed, RFC-0011 D2).
+    /// under-count witnesses, never over-count one (fail-closed).
     pub fn max_mutation_event_seq_for_authority(
         &self,
         authority_id: &str,
@@ -201,7 +199,7 @@ impl SqliteBudgetStore {
     /// seq, making the quorum wait target the wrong (higher) seq and roll back a
     /// write that itself reached quorum. Looked up by the unique event_id, this
     /// is race-free and, for an idempotent retry, returns the ORIGINAL event's
-    /// seq (codex #965 round-2 P1).
+    /// seq.
     pub fn mutation_event_seq_for_event_id(
         &self,
         event_id: &str,
@@ -224,7 +222,7 @@ impl SqliteBudgetStore {
     /// are a sparse subsequence of one global stream; a per-origin gaps-and-
     /// islands run (partitioned by authority) mis-models this: an origin whose
     /// block starts mid-sequence after a leadership change looks like a gap and is
-    /// wrongly dropped, wedging its writes.
+    /// wrongly dropped, stalling its writes.
     ///
     /// Instead this first computes the GLOBAL contiguous head H (the largest seq
     /// such that every global event_seq in `1..=H` is present with no hole) as a
@@ -235,8 +233,8 @@ impl SqliteBudgetStore {
     /// It then reports, per origin, `MAX(event_seq)` among that origin's events
     /// with `event_seq <= H`.
     ///
-    /// Sound because global-contiguity enforcement on the puller (codex #965
-    /// Finding 3) means holding H implies holding EVERY event (all origins) at
+    /// Sound because global-contiguity enforcement on the puller means holding H
+    /// implies holding EVERY event (all origins) at
     /// seq `<= H`, so `head[origin] >= write.event_seq` iff the peer durably holds
     /// that write and all its predecessors. Fail-closed: a global hole caps H, so
     /// no origin is ever reported past a missing global predecessor, and a missing
@@ -244,15 +242,14 @@ impl SqliteBudgetStore {
     ///
     /// NOTE: genesis anchoring assumes budget mutation events are never
     /// bulk-compacted below seq 1 (they are not today); if such compaction is
-    /// added, anchor at a durable global floor instead (codex #965 Finding 1).
+    /// added, anchor at a durable global floor instead.
     ///
     /// NOTE: a rollback-retry that abandons a seq (existing_event_allowed)
-    /// leaves a permanent interior hole that caps this GLOBAL head, wedging
+    /// leaves a permanent interior hole that caps this GLOBAL head, stalling
     /// quorum budget-writes above the hole for EVERY origin cluster-wide (not
     /// per-origin) until operator intervention - it does not self-heal, since a
     /// snapshot from the holed leader carries the hole. Fail-closed (a hole
-    /// withholds quorum and never over-counts). See the plan's rollback-retry
-    /// residual and its seq-preserving follow-up.
+    /// withholds quorum and never over-counts).
     /// PERF: this runs on every cluster status request (once per sync round, an
     /// interval clamped as low as 50ms), so it must not rescan the whole ledger.
     /// The GLOBAL contiguous head is maintained incrementally against a durable
@@ -264,7 +261,7 @@ impl SqliteBudgetStore {
     /// by the `budget_mutation_events_reset_ack_head_watermark` AFTER DELETE
     /// trigger so a future or out-of-band delete site cannot skip the reset),
     /// forcing the next call to re-verify from genesis so a hole punched below W
-    /// can never leave a stale-high head that over-counts (codex #965 round-2 P2).
+    /// can never leave a stale-high head that over-counts.
     pub fn budget_ack_heads(&self) -> Result<Vec<(String, u64)>, BudgetStoreError> {
         let mut connection = self.connection()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -281,10 +278,10 @@ impl SqliteBudgetStore {
         // new head is MAX(seq) in that island, or W when W+1 is neither present nor
         // abandoned. Treating abandoned seqs as filled lets the head advance past a
         // rollback-retry hole; a genuinely MISSING event (never recorded as
-        // abandoned) is NOT filled and still caps the head (codex #965 round-5 P1).
+        // abandoned) is NOT filled and still caps the head.
         // NULL-authority events still occupy a slot for contiguity but are never
         // reported as an ack below.
-        // Fast path (codex #965 Finding: avoid rescanning the ledger after a gap):
+        // Fast path (avoid rescanning the ledger after a gap):
         // the contiguous run can only advance when the very next slot (W+1) is
         // FILLED (a mutation event or a recorded abandoned seq). When a real hole
         // sits at W+1 (data loss, or a legacy snapshot that lacks abandoned slots),
@@ -346,8 +343,7 @@ impl SqliteBudgetStore {
             // per-origin heads, so the status path never GROUPs the full history:
             // steady-state cost is O(new rows). MAX keeps each origin monotone
             // within a hole-free window; a DELETE clears this table (trigger +
-            // reset helper), so a per-origin head can never sit above a hole
-            // (codex #965 round-3 P2).
+            // reset helper), so a per-origin head can never sit above a hole.
             transaction.execute(
                 r#"
                 INSERT INTO budget_origin_ack_heads (authority_id, head_seq)
@@ -383,7 +379,7 @@ impl SqliteBudgetStore {
     /// `budget_ack_heads` call to re-verify the global run from genesis. Called
     /// whenever a mutation event is DELETED (a hole may have been punched at or
     /// below the watermark): re-verification caps the head below the hole so a
-    /// stale-high watermark can never over-count a witness (codex #965 round-2 P2).
+    /// stale-high watermark can never over-count a witness.
     ///
     /// This is redundant with the `budget_mutation_events_reset_ack_head_watermark`
     /// AFTER DELETE trigger created in `open` (defense-in-depth): the trigger fires
@@ -407,8 +403,8 @@ impl SqliteBudgetStore {
     /// original seqs) that `budget_ack_heads` treats as filled slots. Replicated
     /// in the cluster snapshot so a FRESH follower - which never held the original
     /// event and so never fired the delete-trigger that records it locally - still
-    /// learns the slot is abandoned and does not wedge its contiguous head at the
-    /// hole (codex #965 round-5 P1).
+    /// learns the slot is abandoned and does not stall its contiguous head at the
+    /// hole.
     pub fn list_abandoned_event_seqs(&self) -> Result<Vec<u64>, BudgetStoreError> {
         let connection = self.connection()?;
         let mut statement =
@@ -425,12 +421,12 @@ impl SqliteBudgetStore {
     /// consecutive seqs (ascending, non-overlapping).
     ///
     /// The cluster snapshot carries the abandoned set this way instead of one entry
-    /// per seq (codex #965 Finding: bound abandoned seqs in snapshots). A rollback
-    /// storm abandons a long CONTIGUOUS run of seqs; enumerated, that is millions of
-    /// integers that push the snapshot body past MAX_PEER_RESPONSE_BYTES, so the
-    /// force-snapshot recovery path fails to decode cluster_snapshot() and the peer
-    /// wedges in force_snapshot forever (unlike the delta path, the snapshot backstop
-    /// has no further fallback). Range-encoded, each contiguous run collapses to one
+    /// per seq. A rollback storm abandons a long CONTIGUOUS run of seqs; enumerated,
+    /// that is millions of integers that push the snapshot body past
+    /// MAX_PEER_RESPONSE_BYTES, so the force-snapshot recovery path fails to decode
+    /// cluster_snapshot() and the peer stalls in force_snapshot forever (unlike the
+    /// delta path, the snapshot backstop has no further fallback). Range-encoded,
+    /// each contiguous run collapses to one
     /// small pair, and the run count is bounded by the number of live mutation events
     /// (a run is separated from the next by a filled non-abandoned slot), which the
     /// snapshot already carries and which dominate the byte budget - so if the events
@@ -466,8 +462,8 @@ impl SqliteBudgetStore {
     /// origin authority, not the current lease: an idempotent retry after
     /// leadership moved re-reads the already-written event, and peers advertise it
     /// under its ORIGINAL authority, so keying the wait on the current leader would
-    /// look under the wrong origin and time out a write that already committed
-    /// (codex #965 round-5 P1). A null-seq (legacy) row returns None so the caller
+    /// look under the wrong origin and time out a write that already committed.
+    /// A null-seq (legacy) row returns None so the caller
     /// falls back to the authority MAX rather than witnessing on seq 0.
     pub fn mutation_event_witness_for_event_id(
         &self,
@@ -500,7 +496,7 @@ impl SqliteBudgetStore {
     /// Abandoned event_seqs strictly above `after_seq` (ascending). The budget
     /// delta endpoint returns these alongside the pulled events so the puller can
     /// treat the abandoned slots as filled and not reject the leader's legitimately
-    /// gappy stream (codex #965 round-5 P1).
+    /// gappy stream.
     pub fn list_abandoned_event_seqs_after(
         &self,
         after_seq: u64,
@@ -520,8 +516,8 @@ impl SqliteBudgetStore {
     /// Abandoned event_seqs in `(after_seq, up_to_seq]` (ascending), at most
     /// `limit` entries.
     ///
-    /// The budget delta endpoint uses this to BOUND the abandoned list it serves
-    /// (codex #965 Finding: bound abandoned seqs). A rollback storm can pack an
+    /// The budget delta endpoint uses this to BOUND the abandoned list it serves.
+    /// A rollback storm can pack an
     /// arbitrarily large abandoned window between the follower cursor and the next
     /// live event; serializing all of it (the old unbounded
     /// `list_abandoned_event_seqs_after` + in-memory `<= page_max` filter) could
@@ -583,7 +579,7 @@ impl SqliteBudgetStore {
     /// millions of seqs) as an in-memory Vec just to insert it row by row. The stored
     /// rows are identical to `record_abandoned_event_seqs` fed the enumerated set, so
     /// the head-advance semantics are unchanged; this is purely how the WIRE avoids
-    /// the per-seq blow-up (codex #965 Finding: bound abandoned seqs in snapshots).
+    /// the per-seq blow-up.
     /// Fail-closed: an abandoned seq is never a live write, so it can only ADD filled
     /// slots, and the watermark is reset so `budget_ack_heads` recomputes.
     pub fn record_abandoned_event_seq_ranges(
@@ -625,7 +621,7 @@ impl SqliteBudgetStore {
 
     /// The durable trusted floor for one origin (0 when none recorded).
     ///
-    /// IMPORTANT (codex #965 Finding 4): this floor does NOT gate the budget ack
+    /// IMPORTANT: this floor does NOT gate the budget ack
     /// head. `budget_ack_heads` is GENESIS-anchored: it walks the contiguous global
     /// event prefix from seq 1 (over `budget_mutation_events` UNION the recorded
     /// abandoned seqs, from a watermark that resets to 0 on any delete) and never
@@ -653,7 +649,7 @@ impl SqliteBudgetStore {
     /// Raise each origin's trusted floor to (min covered event_seq) - 1 for the
     /// events in a freshly installed snapshot. Never lowers a floor. A
     /// puller-introduced gap can never raise the floor because the puller never
-    /// calls this; only snapshot install does (RFC-0011 D2).
+    /// calls this; only snapshot install does.
     pub fn record_budget_import_floors(
         &self,
         events: &[BudgetMutationRecord],
@@ -824,7 +820,7 @@ impl SqliteBudgetStore {
                 // would otherwise be short-circuited as a duplicate below and the
                 // follower would never store the re-appended row - stalling its
                 // contiguous ack head at the rollback marker until a full snapshot
-                // rebuild (codex #965). Gating on `record.event_seq > existing.event_seq`
+                // rebuild. Gating on `record.event_seq > existing.event_seq`
                 // keeps this FORWARD-ONLY: a genuine idempotent re-delivery (equal seq)
                 // or a stale lower-seq replay falls through to the duplicate no-op below
                 // and never regresses or double-tombstones the head. This also covers the
@@ -843,8 +839,8 @@ impl SqliteBudgetStore {
                     // ALREADY-SYNCED follower (whose pull cursor is already past the old
                     // seq, so the delta's abandoned_seqs excludes it) then self-heals
                     // immediately - its contiguous ack head advances past the filled slot
-                    // instead of wedging at the hole until a snapshot (codex #965
-                    // round-5). Only the SPECIFICALLY-superseded seq is recorded (not an
+                    // instead of stalling at the hole until a snapshot. Only the
+                    // SPECIFICALLY-superseded seq is recorded (not an
                     // arbitrary gap), so a genuine missing event still caps the head;
                     // never over-counts.
                     if existing.event_seq > 0 && existing.event_seq != record.event_seq {
@@ -865,8 +861,7 @@ impl SqliteBudgetStore {
                     // actually holds the retried write. Without this insert the follower's
                     // contiguous ack head halts at the abandoned marker and never reaches
                     // the re-appended seq, so it never witnesses the retried write and
-                    // quorum waits time out even though the delta was applied (codex #965:
-                    // insert replacement events after tombstoning). This never
+                    // quorum waits time out even though the delta was applied. This never
                     // over-counts: the superseded old seq stays abandoned (a
                     // FILLED-but-not-live slot, contributing no origin ack), while the
                     // re-appended event is a genuine leader-committed write, so witnessing
@@ -1730,12 +1725,11 @@ impl SqliteBudgetStore {
             // This is a GENUINE rollback-retry: the rolled-back authorize is
             // deleted and the caller re-appends it under a fresh higher seq. Record
             // the freed seq as abandoned/tombstoned BEFORE the delete so the global
-            // contiguous ack head treats it as filled and does not wedge cluster-
+            // contiguous ack head treats it as filled and does not stall cluster-
             // wide at the resulting hole. This recording is deliberately ONLY at the
             // rollback-retry site (not the AFTER DELETE trigger), so that a data-loss
             // delete still caps the head (fail-closed). Never over-counts: the
-            // abandoned seq's write was superseded, so no live write targets it
-            // (codex #965 round-5 P1).
+            // abandoned seq's write was superseded, so no live write targets it.
             let abandoned_seq: Option<i64> = transaction
                 .query_row(
                     "SELECT event_seq FROM budget_mutation_events WHERE event_id = ?1",

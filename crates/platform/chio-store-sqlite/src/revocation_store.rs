@@ -115,7 +115,7 @@ impl SqliteRevocationStore {
 
     /// The head of the revocation stream as the pagination cursor tuple
     /// (revoked_at, capability_id), or None when empty. list_revocations_after
-    /// paginates ascending, so the head is the descending row (RFC-0011 D4).
+    /// paginates ascending, so the head is the descending row.
     pub fn latest_revocation_cursor(&self) -> Result<Option<(i64, String)>, RevocationStoreError> {
         let connection = self.connection()?;
         let row = connection

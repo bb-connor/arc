@@ -366,7 +366,7 @@ impl SqliteReceiptStore {
 
     /// Highest lineage snapshot seq (capability_lineage rowid), or 0 when empty.
     /// list_capability_snapshots_after_seq paginates on rowid, so the head is
-    /// MAX(rowid) (RFC-0011 D4). Returns ReceiptStoreError so the cluster status
+    /// MAX(rowid). Returns ReceiptStoreError so the cluster status
     /// path converts it through the same CliError variant as the receipt heads.
     pub fn max_lineage_seq(&self) -> Result<u64, chio_kernel::ReceiptStoreError> {
         let connection = self.connection()?;

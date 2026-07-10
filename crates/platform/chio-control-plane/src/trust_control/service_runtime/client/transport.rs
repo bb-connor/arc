@@ -423,7 +423,7 @@ impl TrustControlClient {
 
 /// Read at most `cap` bytes from a peer response body and decode as JSON.
 /// Reading `cap + 1` and rejecting on overflow bounds the buffer even for a
-/// peer that streams forever (RFC-0011 D4).
+/// peer that streams forever.
 fn read_capped_json<T>(reader: impl std::io::Read, cap: u64) -> Result<T, CliError>
 where
     T: for<'de> Deserialize<'de>,

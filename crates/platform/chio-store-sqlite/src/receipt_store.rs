@@ -494,7 +494,7 @@ impl SqliteReceiptStore {
     }
 
     /// Highest tool-receipt replication seq, or 0 on an empty store. Single
-    /// indexed MAX read; does not materialize the store (RFC-0011 D4).
+    /// indexed MAX read; does not materialize the store.
     pub fn max_tool_receipt_seq(&self) -> Result<u64, ReceiptStoreError> {
         let connection = self.connection()?;
         let seq: i64 = connection.query_row(

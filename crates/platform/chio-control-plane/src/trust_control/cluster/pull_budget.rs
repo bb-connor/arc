@@ -26,7 +26,7 @@ pub(crate) enum PeerProtocolError {
     /// A budget delta page carried usage records with NO mutation events. The
     /// honest leader only emits usage projections alongside the mutation events
     /// they derive from, so a records-only page cannot advance the global event
-    /// cursor without importing unverified events (codex #965 round-3 P1).
+    /// cursor without importing unverified events.
     RecordsWithoutMutationEvents {
         record_count: usize,
     },
@@ -54,8 +54,7 @@ impl std::fmt::Display for PeerProtocolError {
 /// The per-round pull budget was reached. This is a LOCAL cap on how much a
 /// single peer is pulled per sync round, NOT peer misbehavior: a large but
 /// well-ordered backlog legitimately exceeds it. The puller stops the round and
-/// resumes from the advanced cursor next round WITHOUT demoting the peer
-/// (codex #965 round-3 P2).
+/// resumes from the advanced cursor next round WITHOUT demoting the peer.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum RoundLimit {
     Pages,
@@ -80,8 +79,8 @@ impl PullRoundBudget {
 
     /// Whether the round budget is already spent, checked BEFORE issuing the next
     /// (blocking) peer fetch so an exhausted stream stops without one more fetch,
-    /// and so `sync_peer` can skip the remaining streams' fetches entirely
-    /// (codex #965 round-4 P2). This is a read-only pre-check; `charge_page` still
+    /// and so `sync_peer` can skip the remaining streams' fetches entirely.
+    /// This is a read-only pre-check; `charge_page` still
     /// does the authoritative decrement + records accounting after the page lands.
     pub(crate) fn is_exhausted(&self) -> bool {
         self.pages_left == 0 || self.records_left == 0 || Instant::now() >= self.deadline
@@ -90,8 +89,7 @@ impl PullRoundBudget {
     /// Charge one page of `records`. An `Err(RoundLimit)` means the LOCAL per-round
     /// cap (pages, records, or wall-clock deadline) was reached: the caller stops
     /// this round and resumes next sync round, keeping the peer Healthy. It is NOT
-    /// a peer protocol violation, so it must never route through the demotion path
-    /// (codex #965 round-3 P2).
+    /// a peer protocol violation, so it must never route through the demotion path.
     pub(crate) fn charge_page(&mut self, records: u64) -> Result<(), RoundLimit> {
         if Instant::now() >= self.deadline {
             return Err(RoundLimit::Deadline);
@@ -128,7 +126,7 @@ pub(crate) fn require_contiguous_page(
     // authorize before its release) must arrive already ascending. Sorting here
     // would let an out-of-order page pass the guard and then import wrong (a
     // release before its hold exists), surfacing as a retryable store error
-    // instead of demoting the malformed peer (codex #965 round-2 P2). Requiring
+    // instead of demoting the malformed peer. Requiring
     // strictly ascending, gap-free-from-expected order rejects both a skip and a
     // reorder as a NonContiguousPage.
     let mut expected = expected_next_seq;
@@ -210,8 +208,7 @@ pub(crate) fn require_forward_progress(
 /// round budget forever instead of demoting the malformed peer. Requiring every
 /// row to be strictly after the previous one rejects both a rewind past the cursor
 /// and an interior reorder as a `NonAdvancingPage` protocol violation, and
-/// guarantees the returned head equals `page_max` (codex #965 Finding: reject
-/// out-of-order revocation pages).
+/// guarantees the returned head equals `page_max`.
 pub(crate) fn ensure_revocation_page_ascending(
     cursor: Option<&RevocationCursor>,
     records: &[RevocationRecordView],
@@ -268,7 +265,7 @@ pub(crate) enum PullError {
     /// progress. This is NOT peer misbehavior: route the peer through the full
     /// snapshot recovery path (which resets the cursor to the snapshot head, skipping
     /// the unpageable window WITHOUT a delta cursor jump) rather than pinning the
-    /// cursor forever with a bare `Transient` (codex #965 Finding 1, deltas.rs:713).
+    /// cursor forever with a bare `Transient`.
     ForceSnapshot(CliError),
 }
 
@@ -337,7 +334,7 @@ mod pull_budget_tests {
         // An empty page is vacuously contiguous ("caught up").
         assert!(require_contiguous_page(11, &[]).is_ok());
         // Out-of-order is REJECTED (the importer applies events in received
-        // order, so a reorder must not pass; codex #965 round-2 P2).
+        // order, so a reorder must not pass).
         assert!(matches!(
             require_contiguous_page(11, &[13, 11, 12]),
             Err(PeerProtocolError::NonContiguousPage {
@@ -409,9 +406,9 @@ mod pull_budget_tests {
 
     #[test]
     fn revocation_page_must_be_strictly_ascending_and_returns_page_head() {
-        // codex #965 Finding: the puller persists the page HEAD as the next cursor,
-        // so an out-of-order page that a max-only advance check would accept must be
-        // rejected here, or the cursor lands behind page_max and replays forever.
+        // The puller persists the page HEAD as the next cursor, so an out-of-order
+        // page that a max-only advance check would accept must be rejected here, or
+        // the cursor lands behind page_max and replays forever.
         let rec = |revoked_at: i64, cap: &str| RevocationRecordView {
             capability_id: cap.to_string(),
             revoked_at,

@@ -65,7 +65,7 @@ mod cluster_and_reports_tests {
             cluster_progress,
         };
         // A fresh peer starts with force_snapshot = true (it must snapshot before
-        // its acks are trusted, per codex #965 round-3 P1). Witness tests model
+        // its acks are trusted). Witness tests model
         // peers that have ALREADY completed their initial sync, so clear it here;
         // the force_snapshot exclusion itself is covered by its own test.
         for peer in peer_urls {
@@ -465,17 +465,16 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn regressed_ack_head_is_cleared_before_validation_not_witnessed_at_old_high() {
-        // codex #965 deltas.rs:403 (clear regressed ack heads before validation):
-        // the per-peer sync round records a peer's freshly-advertised acks only at
+        // The per-peer sync round records a peer's freshly-advertised acks only at
         // the END (finalize_peer_sync_round). If a peer REGRESSED its ack head
         // (lost/restored its budget DB and now advertises a lower or absent head),
         // the stale-HIGH recorded value would keep witnessing for the WHOLE round,
         // so a budget write that checks the quorum view mid-round could commit
         // against a peer that already disavowed the write - an over-count.
         // `clamp_down_peer_budget_acks` applies the DECREASE/CLEAR immediately at the
-        // TOP of the round (sync_peer, right after update_peer_reachable). TEETH:
-        // RED if the clamp is a no-op or max-merges (node-b still witnesses seq 8);
-        // GREEN after the down-clamp (node-b drops out at the old-high seq).
+        // TOP of the round (sync_peer, right after update_peer_reachable): a no-op or
+        // max-merge would leave node-b witnessing seq 8; the down-clamp drops it out
+        // at the old-high seq.
         let state = state_with_cluster(
             "http://node-a",
             &["http://node-b", "http://node-c"],
@@ -524,7 +523,7 @@ mod cluster_and_reports_tests {
                 event_seq: 5,
             }],
         );
-        // TEETH: node-b no longer witnesses at seq 8 (5 < 8); the stale-high 10 is
+        // node-b no longer witnesses at seq 8 (5 < 8); the stale-high 10 is
         // gone the instant the peer disavowed it, not at the end of the round.
         let after = budget_write_quorum_commit_view(&state, &write).test_unwrap();
         assert!(
@@ -642,8 +641,8 @@ mod cluster_and_reports_tests {
         }
     }
 
-    /// End-to-end proof of codex #965 Finding 1: budget_ack_heads (the store
-    /// SQL) -> update_peer_budget_acks -> witness. Two authorities share one
+    /// End-to-end proof that budget_ack_heads (the store SQL) ->
+    /// update_peer_budget_acks -> witness holds across an authority change. Two authorities share one
     /// global event_seq stream; origin B's block starts mid-sequence (a
     /// leadership change). A peer that has durably imported the contiguous
     /// global prefix MUST witness B's write (no false time-out), and a global
@@ -740,13 +739,13 @@ mod cluster_and_reports_tests {
             let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
             assert!(
                 commit.quorum_committed,
-                "the authority-change write must witness on a fully-imported quorum (Finding 1)"
+                "the authority-change write must witness on a fully-imported quorum"
             );
             assert_eq!(commit.committed_nodes, 3);
         }
         let _ = std::fs::remove_file(&db1);
 
-        // --- Case 2 (teeth): a global hole caps the head. origin A owns 1..=3,
+        // --- Case 2: a global hole caps the head. origin A owns 1..=3,
         // origin B owns 5..=6, so global seq 4 is MISSING. A MAX-per-origin ack
         // head would report B = 6 and wrongly witness a write at 5; the
         // contiguous global head is 3, so B must not be acked at all.
@@ -787,7 +786,7 @@ mod cluster_and_reports_tests {
             let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
             assert!(
                 !commit.quorum_committed,
-                "a write above a global hole must not witness (teeth: a MAX-per-origin ack head would)"
+                "a write above a global hole must not witness (a MAX-per-origin ack head would)"
             );
             assert_eq!(
                 commit.committed_nodes, 1,
@@ -799,8 +798,8 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn peer_ack_regression_drops_stale_head_and_stops_witnessing() {
-        // codex #965 round-2 P1: a peer that restored an older budget DB (or lost
-        // a prefix) re-advertises a LOWER or empty ack set. The stored ack must
+        // A peer that restored an older budget DB (or lost a prefix) re-advertises
+        // a LOWER or empty ack set. The stored ack must
         // REGRESS (replace, not max-merge) so that data-losing peer stops being
         // counted as a witness for writes it no longer durably holds.
         let origin = "http://node-a";
@@ -853,9 +852,9 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn commit_metadata_names_the_write_authority_not_the_current_leader() {
-        // codex #965 round-2 P2: if leadership changes while a write waits, the
-        // commit metadata must name the authority that AUTHORED the write, not
-        // the current consensus leader (which never wrote the event).
+        // If leadership changes while a write waits, the commit metadata must name
+        // the authority that AUTHORED the write, not the current consensus leader
+        // (which never wrote the event).
         let state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
         update_peer_reachable(&state, "http://node-b");
         let write = BudgetWriteToken {
@@ -874,8 +873,8 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn force_snapshot_peer_is_excluded_from_witnesses_until_resynced() {
-        // codex #965 round-3 P1: a peer demoted by a protocol error and pending a
-        // forced snapshot carries stale, untrusted acks. Even after a bare
+        // A peer demoted by a protocol error and pending a forced snapshot carries
+        // stale, untrusted acks. Even after a bare
         // reachability probe flips it Healthy and it re-advertises acks, it must
         // NOT witness until the snapshot + delta re-sync clears force_snapshot.
         let origin = "http://node-a";
@@ -921,16 +920,16 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn peer_applying_a_snapshot_does_not_witness_at_its_old_high_ack() {
-        // codex #965 Finding (clear stale budget acks on snapshot recovery): a peer
-        // that is force_snapshot carries a stale-high ack head that is excluded from
-        // witnesses ONLY by the force_snapshot flag. apply_cluster_snapshot clears
-        // force_snapshot; if it left the old ack in place, any early return before
-        // finalize_peer_sync_round (an authority-sync error, a puller error) would
-        // leave the peer Healthy, NOT force_snapshot, and WITNESSING at an ack head
-        // this round never validated - an OVER-COUNT / budget double-spend. The fix
-        // clears budget_import_acks atomically with force_snapshot in
-        // apply_cluster_snapshot, so a peer coming out of snapshot recovery witnesses
-        // NOTHING until a completed pull round's finalize re-records a validated ack.
+        // A peer that is force_snapshot carries a stale-high ack head that is
+        // excluded from witnesses ONLY by the force_snapshot flag.
+        // apply_cluster_snapshot clears force_snapshot; if it left the old ack in
+        // place, any early return before finalize_peer_sync_round (an authority-sync
+        // error, a puller error) would leave the peer Healthy, NOT force_snapshot,
+        // and WITNESSING at an ack head this round never validated - an OVER-COUNT /
+        // budget double-spend. apply_cluster_snapshot instead clears
+        // budget_import_acks atomically with force_snapshot, so a peer coming out of
+        // snapshot recovery witnesses NOTHING until a completed pull round's finalize
+        // re-records a validated ack.
         let origin = "http://node-a";
         // A 2-node cluster (quorum 2): self + node-a is quorum, so node-a's witness
         // decision alone flips quorum_committed.
@@ -964,9 +963,9 @@ mod cluster_and_reports_tests {
             "a force_snapshot peer must not witness"
         );
 
-        // Apply a snapshot: force_snapshot clears. RED (pre-fix): the stale ack
-        // survives and node-a now witnesses at 100, committing quorum on an ack this
-        // round never validated. GREEN (fix): the ack map is cleared with it.
+        // Apply a snapshot: force_snapshot clears. If the stale ack survived, node-a
+        // would now witness at 100, committing quorum on an ack this round never
+        // validated; the ack map must be cleared atomically with force_snapshot.
         let snapshot = build_cluster_state_snapshot(&source_state).test_unwrap();
         apply_cluster_snapshot(&state, "http://node-a", snapshot).test_unwrap();
 
@@ -982,7 +981,7 @@ mod cluster_and_reports_tests {
             !peer_should_force_snapshot(&state, "http://node-a"),
             "the snapshot cleared force_snapshot"
         );
-        // TEETH: the peer is Healthy and no longer force_snapshot, yet it must NOT
+        // The peer is Healthy and no longer force_snapshot, yet it must NOT
         // witness at its old-high ack until a validated finalize re-records one.
         let commit = budget_write_quorum_commit_view(&state, &write).test_unwrap();
         assert!(
@@ -997,9 +996,8 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn finalize_records_fresh_acks_only_when_the_peer_was_not_demoted() {
-        // codex #965 Finding P1 (do not commit on acks before validation): a peer's
-        // freshly-advertised budget acks must become countable for a quorum commit
-        // ONLY after its pull round completes without demotion.
+        // A peer's freshly-advertised budget acks must become countable for a quorum
+        // commit ONLY after its pull round completes without demotion.
         // finalize_peer_sync_round is the SINGLE ack-record site and runs after the
         // pull round, so a peer demoted mid-round (a Protocol violation ->
         // update_peer_failure -> Unhealthy) never has its fresh, unvalidated ack
@@ -1065,8 +1063,8 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn a_transient_budget_error_leaves_the_peer_healthy_so_revocations_still_run() {
-        // codex #965 Finding (avoid starving revocation pulls): the independent
-        // revocation lane in sync_peer runs unless the peer was DEMOTED. A transient
+        // The independent revocation lane in sync_peer runs unless the peer was
+        // DEMOTED. A transient
         // budget-delta error (broken/slow budget endpoint) keeps the peer Healthy,
         // so peer_was_demoted stays false and revocations still replicate. A Protocol
         // violation demotes the peer, so revocations are skipped (fail-closed: an
@@ -1108,8 +1106,8 @@ mod cluster_and_reports_tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn clearing_force_snapshot_then_notifying_wakes_a_parked_waiter() {
-        // codex #965 round-4 P2: a peer whose acks were recorded while still
-        // force_snapshot is excluded from witnesses; when its snapshot CLEARS
+        // A peer whose acks were recorded while still force_snapshot is excluded
+        // from witnesses; when its snapshot CLEARS
         // force_snapshot, sync_peer must notify so the parked write re-checks and
         // counts the now-valid peer, instead of timing out while the next peer in
         // the round stalls. In a 3-node cluster (quorum 2), self + the just-cleared
@@ -1173,8 +1171,8 @@ mod cluster_and_reports_tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn notify_cluster_progress_wakes_a_parked_waiter_on_quorum() {
-        // codex #965 round-3 P2: a waiter must wake as soon as the ack needed for
-        // quorum lands, not only when the whole sync round finishes. In a 3-node
+        // A waiter must wake as soon as the ack needed for quorum lands, not only
+        // when the whole sync round finishes. In a 3-node
         // cluster (quorum 2), self + one peer is quorum: recording ONE peer's ack
         // mid-round and bumping progress must commit the parked write promptly,
         // well within the multi-second timeout, even though the other peer never
@@ -1226,8 +1224,8 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn budget_write_progress_close_fails_closed_while_clustered() {
-        // codex #962: if the ClusterProgress sender is lost mid-write, a node
-        // that is STILL clustered must fail closed (503) so the caller rolls back
+        // If the ClusterProgress sender is lost mid-write, a node that is STILL
+        // clustered must fail closed (503) so the caller rolls back
         // the local exposure. Returning Ok(None) would render as a committed-
         // looking leader-visible write with no quorum budgetCommit (fail-open).
         // A genuinely unclustered node returns Ok(None).
@@ -1255,7 +1253,7 @@ mod cluster_and_reports_tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn writer_wait_never_wedges_sync_loop() {
+    async fn writer_wait_never_stalls_sync_loop() {
         // Two peers, quorum_size 2. The writer parks on the progress watch; a
         // simulated background round records an ack and notifies, and the writer
         // observes the committed view without ever driving a sync itself.
@@ -1945,15 +1943,15 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn cluster_snapshot_range_encodes_a_huge_abandoned_run_and_the_follower_advances() {
-        // codex #965 Finding (bound abandoned seqs in snapshots): the snapshot's
-        // abandoned-seq field is RANGE-ENCODED, so a rollback storm's long contiguous
-        // abandoned run stays a single small (start, end) pair instead of an unbounded
-        // integer list. Enumerated, a real storm's millions-to-billions of seqs blow
-        // past MAX_PEER_RESPONSE_BYTES, the client fails to decode cluster_snapshot(),
-        // and the force-snapshot recovery path wedges the peer forever (the snapshot
-        // backstop has no further fallback like the delta path does). Range-encoded,
-        // the snapshot stays tiny AND a fresh follower still learns every abandoned
-        // slot, so its contiguous ack head advances across the whole run.
+        // The snapshot's abandoned-seq field is RANGE-ENCODED, so a rollback storm's
+        // long contiguous abandoned run stays a single small (start, end) pair
+        // instead of an unbounded integer list. Enumerated, a real storm's
+        // millions-to-billions of seqs blow past MAX_PEER_RESPONSE_BYTES, the client
+        // fails to decode cluster_snapshot(), and the force-snapshot recovery path
+        // permanently stalls the peer (the snapshot backstop has no further fallback
+        // like the delta path does). Range-encoded, the snapshot stays tiny AND a
+        // fresh follower still learns every abandoned slot, so its contiguous ack
+        // head advances across the whole run.
         let source_budget_db = unique_temp_path("cluster-source-abandoned-storm", "sqlite3");
         let target_budget_db = unique_temp_path("cluster-target-abandoned-storm", "sqlite3");
 
@@ -2032,9 +2030,9 @@ mod cluster_and_reports_tests {
             "range-encoded snapshot must fit under the peer-response cap, got {} bytes",
             encoded.len()
         );
-        // The SAME run enumerated (the pre-fix wire) is orders of magnitude larger and
-        // grows linearly with the run length; a real storm crosses the 64 MiB cap and
-        // wedges recovery. Here the abandoned field ALONE dwarfs the whole ranged
+        // The SAME run enumerated (one integer per seq) is orders of magnitude larger
+        // and grows linearly with the run length; a real storm crosses the 64 MiB cap
+        // and stalls recovery. Here the abandoned field ALONE dwarfs the whole ranged
         // snapshot.
         let enumerated_len = serde_json::to_vec(&(2..=RUN_END).collect::<Vec<u64>>())
             .test_unwrap()
@@ -2047,8 +2045,8 @@ mod cluster_and_reports_tests {
 
         apply_cluster_snapshot(&target_state, "http://node-a", snapshot).test_unwrap();
 
-        // TEETH: the follower learned every abandoned slot, so its contiguous ack head
-        // advances across the whole run to the tail event (no wedge at the hole).
+        // The follower learned every abandoned slot, so its contiguous ack head
+        // advances across the whole run to the tail event (no stall at the hole).
         let target_store = SqliteBudgetStore::open(&target_budget_db).test_unwrap();
         let head = target_store
             .budget_ack_heads()
@@ -2177,8 +2175,8 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn budget_delta_import_rejects_records_without_mutation_events() {
-        // codex #965 round-3 P1: the honest leader only emits usage projections
-        // alongside the mutation events they derive from. A records-only page
+        // The honest leader only emits usage projections alongside the mutation
+        // events they derive from. A records-only page
         // would pin the global cursor past unimported events, so it must be a
         // protocol violation (demote), NOT an accepted cursor advance.
         let budget_db = unique_temp_path("cluster-records-only-budget-delta", "sqlite3");
@@ -2217,12 +2215,12 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn budget_delta_import_routes_oversized_page_to_snapshot_recovery() {
-        // codex #965 Finding 1: an HONEST but unpageable budget delta page (a
-        // rollback storm packs more abandoned seqs into the covered range than a
-        // single page's BUDGET_DELTA_MAX_RECORDS cap) must route the peer through
-        // the full snapshot recovery path, NOT return a bare Transient that pins the
-        // cursor and wedges the peer's whole sync forever. The signal is
-        // PullError::ForceSnapshot; route_pull turns it into a force_snapshot flag
+        // An HONEST but unpageable budget delta page (a rollback storm packs more
+        // abandoned seqs into the covered range than a single page's
+        // BUDGET_DELTA_MAX_RECORDS cap) must route the peer through the full snapshot
+        // recovery path, NOT return a bare Transient that pins the cursor and stalls
+        // the peer's whole sync forever. The signal is PullError::ForceSnapshot;
+        // route_pull turns it into a force_snapshot flag
         // (see oversized_budget_delta_routes_peer_to_force_snapshot_not_wedge).
         let budget_db = unique_temp_path("cluster-oversized-budget-delta", "sqlite3");
         let mut store = SqliteBudgetStore::open(&budget_db).test_unwrap();
@@ -2265,14 +2263,14 @@ mod cluster_and_reports_tests {
         let record_count = response.mutation_events.len() + response.abandoned_seqs.len();
         assert!(
             record_count > BUDGET_DELTA_MAX_RECORDS,
-            "the crafted page must exceed the record cap to exercise the wedge path"
+            "the crafted page must exceed the record cap to exercise the oversized-page path"
         );
 
         let result =
             import_budget_delta_response(&mut store, &response, None, &mut PullRoundBudget::new());
         let Err(PullError::ForceSnapshot(error)) = result else {
             panic!(
-                "an oversized budget page must route to snapshot recovery, not wedge as Transient: {result:?}"
+                "an oversized budget page must route to snapshot recovery, not stall as Transient: {result:?}"
             );
         };
         assert!(error.to_string().contains("full snapshot recovery"));
@@ -2285,11 +2283,11 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn oversized_budget_delta_routes_peer_to_force_snapshot_not_wedge() {
-        // codex #965 Finding 1: route_pull must turn a ForceSnapshot into a
-        // force_snapshot flag (so the next sync round full-resyncs and makes forward
-        // progress) while keeping the peer Healthy (honest backlog, not misbehavior),
-        // and short-circuit the round. Contrast with a bare Transient, which flags
-        // nothing: that is the indefinite wedge this fix removes.
+        // route_pull must turn a ForceSnapshot into a force_snapshot flag (so the
+        // next sync round full-resyncs and makes forward progress) while keeping the
+        // peer Healthy (honest backlog, not misbehavior), and short-circuit the
+        // round. A bare Transient flags nothing, leaving the cursor pinned
+        // indefinitely.
         let state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
         update_peer_reachable(&state, "http://node-b");
         assert!(
@@ -2297,24 +2295,24 @@ mod cluster_and_reports_tests {
             "a freshly reachable, already-synced peer has no pending snapshot"
         );
 
-        // RED baseline: a bare Transient (the OLD oversized behavior) neither demotes
-        // nor flags a snapshot, so the cursor stays pinned and the peer wedges.
+        // A bare Transient neither demotes nor flags a snapshot, so the cursor stays
+        // pinned and the peer stalls.
         let mut records = 0u64;
         let transient = route_pull(
             &state,
             "http://node-b",
             Err(PullError::Transient(CliError::cli_other_error(
-                "oversized (old behavior)",
+                "oversized transient",
             ))),
             &mut records,
         );
         assert!(transient.is_err(), "a Transient short-circuits the round");
         assert!(
             !peer_should_force_snapshot(&state, "http://node-b"),
-            "a bare Transient does NOT trigger snapshot recovery: this is the wedge"
+            "a bare Transient does NOT trigger snapshot recovery: this is the stall"
         );
 
-        // GREEN: ForceSnapshot flags the peer for a full resync without demoting it.
+        // ForceSnapshot flags the peer for a full resync without demoting it.
         let mut records = 0u64;
         let routed = route_pull(
             &state,
@@ -2471,8 +2469,8 @@ mod cluster_and_reports_tests {
         assert_eq!(outcome.next_cursor.test_unwrap().seq, 3);
 
         // The budget cursor is a single GLOBAL event_seq. A per-origin
-        // compaction floor must NOT authorize a global cursor jump (codex #965
-        // Finding 3): recording origin-j's floor at 9 does not license a page
+        // compaction floor must NOT authorize a global cursor jump: recording
+        // origin-j's floor at 9 does not license a page
         // that starts at event_seq 10 from a cursor of 3, because the skipped
         // global seqs 4..9 could carry a DIFFERENT origin's unreplicated events.
         // The jump is a protocol violation regardless of any per-origin floor;

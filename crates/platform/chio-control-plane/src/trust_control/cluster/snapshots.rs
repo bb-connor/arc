@@ -135,9 +135,8 @@ pub(crate) fn build_cluster_state_snapshot(
     // Range-encode the abandoned seqs (inclusive (start, end) runs) so a rollback
     // storm's long contiguous abandoned window stays a few small pairs rather than an
     // unbounded integer list that would push the snapshot body past
-    // MAX_PEER_RESPONSE_BYTES and wedge force-snapshot recovery forever (codex #965
-    // Finding: bound abandoned seqs in snapshots). Computed in SQL, so the full seq
-    // set is never materialized here either.
+    // MAX_PEER_RESPONSE_BYTES and permanently break force-snapshot recovery. Computed
+    // in SQL, so the full seq set is never materialized here either.
     let budget_abandoned_seq_ranges = if let Some(path) = state.config.budget_db_path.as_deref() {
         SqliteBudgetStore::open(path)?
             .list_abandoned_event_seq_ranges()?
@@ -253,10 +252,9 @@ pub(crate) fn apply_cluster_snapshot(
             .record_budget_import_floors(&mutation_records)
             .map_err(|error| CliError::cli_other_error(error.to_string()))?;
         // Learn the leader's abandoned/tombstoned seqs so a fresh follower's
-        // contiguous ack head treats those holes as filled instead of wedging at
-        // them (codex #965 round-5 P1). Carried range-encoded and expanded in SQL, so
-        // a rollback-storm run is never materialized as a huge in-memory list here
-        // (codex #965 Finding: bound abandoned seqs in snapshots).
+        // contiguous ack head treats those holes as filled instead of stalling at
+        // them. Carried range-encoded and expanded in SQL, so a rollback-storm run
+        // is never materialized as a huge in-memory list here.
         let abandoned_ranges = budget_abandoned_seq_ranges
             .iter()
             .map(|range| (range.start, range.end))
@@ -287,8 +285,7 @@ pub(crate) fn apply_cluster_snapshot(
         peer.last_snapshot_at = Some(generated_at);
         peer.delta_records_since_snapshot = 0;
         // Clear the peer's cached witness acks ATOMICALLY with clearing
-        // `force_snapshot` (codex #965 Finding: clear stale budget acks on snapshot
-        // recovery). `force_snapshot` was the ONLY thing excluding this peer's stale
+        // `force_snapshot`. `force_snapshot` was the ONLY thing excluding this peer's stale
         // ack head from the witness set (`budget_write_quorum_commit_view`), and this
         // is the single site that clears it WITHOUT going through
         // `finalize_peer_sync_round` (which re-records a validated ack via
@@ -494,7 +491,7 @@ fn collect_budget_mutation_event_views(
     // Page the FULL mutation-event history in MAX_LIST_LIMIT chunks (like the
     // receipt/lineage/usage collectors above) rather than one unbounded
     // i64::MAX-limit query, so a very large budget history does not load in a
-    // single giant query (codex #965 Finding 3). Semantics are unchanged: the
+    // single giant query. Semantics are unchanged: the
     // dense event_seq column is strictly increasing and unique, and both
     // `list_mutation_events` and `list_mutation_events_after_seq` order by
     // event_seq ASC, so this yields the identical full, ascending event set.

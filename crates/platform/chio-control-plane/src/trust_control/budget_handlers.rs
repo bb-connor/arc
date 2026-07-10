@@ -114,7 +114,7 @@ pub(crate) async fn handle_try_increment_budget(
 /// up THIS write's exact event_seq instead of falling back to the authority MAX
 /// (which a concurrent same-authority write to another capability can raise,
 /// making the quorum wait target a later event and spuriously roll back / 503 a
-/// write that itself reached quorum) (codex #965 round-4 P2).
+/// write that itself reached quorum).
 ///
 /// Uniqueness: a process-local monotonic counter + wall-clock nanos + pid, so it
 /// cannot collide with a concurrent write or a caller-supplied id. An omitted
@@ -143,14 +143,14 @@ fn generated_budget_event_id() -> String {
 /// MAX(event_seq) for the authority would be wrong: a concurrent same-authority
 /// commit (or a retry while later same-origin events exist) raises that MAX
 /// above this write's seq, so the quorum wait would target a later event and
-/// `handle_try_charge_cost` would roll back a write that itself reached quorum
-/// (codex #965 round-2 P1). The handlers now always mint an event_id when the
+/// `handle_try_charge_cost` would roll back a write that itself reached quorum.
+/// The handlers now always mint an event_id when the
 /// caller omitted one (`generated_budget_event_id`), so the by-id lookup is
 /// precise; the authority-MAX fallback remains only as a defensive path (row not
 /// found) and can only OVER-target the seq (wait longer), never under-target it,
 /// so the witness still never over-counts (fail-closed). A single-node write (no
 /// authority) carries a placeholder token and the quorum wait short-circuits when
-/// unclustered (RFC-0011 D2, F16).
+/// unclustered.
 fn budget_write_token(
     store: &SqliteBudgetStore,
     authority: Option<&BudgetEventAuthority>,
@@ -170,8 +170,7 @@ fn budget_write_token(
             let (event_seq, origin_id, budget_term) = match stored {
                 // Existing event with a stored authority: use ITS origin + term so
                 // an idempotent retry after leadership moved targets the ORIGINAL
-                // origin peers advertise it under, not the current leader (codex
-                // #965 round-5 P1).
+                // origin peers advertise it under, not the current leader.
                 Some((seq, Some(authority_id), lease_epoch)) => (
                     seq,
                     authority_id,
@@ -226,8 +225,7 @@ pub(crate) async fn handle_try_charge_cost(
     };
     // Mint an event_id when the caller omitted one, and use it for BOTH the write
     // and the witness token so the quorum wait targets THIS write's exact
-    // event_seq, never a concurrent same-authority write's higher seq (codex #965
-    // round-4 P2).
+    // event_seq, never a concurrent same-authority write's higher seq.
     let effective_event_id = payload
         .event_id
         .clone()
@@ -362,7 +360,7 @@ pub(crate) async fn handle_reverse_charge_cost(
             Err(response) => return response,
         };
     // Mint an event_id when omitted so the witness waits on this reverse's exact
-    // event_seq, not the authority MAX (codex #965 round-4 P2).
+    // event_seq, not the authority MAX.
     let effective_event_id = payload
         .event_id
         .clone()
@@ -440,7 +438,7 @@ pub(crate) async fn handle_reduce_charge_cost(
             Err(response) => return response,
         };
     // Mint an event_id when omitted so the witness waits on this reconcile's exact
-    // event_seq, not the authority MAX (codex #965 round-4 P2).
+    // event_seq, not the authority MAX.
     let effective_event_id = payload
         .event_id
         .clone()
@@ -539,7 +537,7 @@ mod budget_handlers_tests {
     fn generated_budget_event_id_is_unique_per_call() {
         // Each omitted-eventId write must get a distinct id so the mutation event
         // is stored under a known, unique key and the witness can look up THIS
-        // write's exact event_seq (codex #965 round-4 P2).
+        // write's exact event_seq.
         let first = generated_budget_event_id();
         let second = generated_budget_event_id();
         assert_ne!(first, second, "consecutive ids must differ");

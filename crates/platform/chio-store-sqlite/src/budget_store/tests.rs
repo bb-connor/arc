@@ -1616,8 +1616,8 @@ fn budget_ack_heads_caps_partial_head_at_interior_gap() -> Result<(), Box<dyn st
 #[test]
 fn budget_ack_heads_stays_pinned_at_a_post_watermark_gap() -> Result<(), Box<dyn std::error::Error>>
 {
-    // codex #965 Finding (avoid rescanning the ledger after a gap): once the
-    // watermark W has advanced over a contiguous prefix and a REAL hole sits at
+    // Once the watermark W has advanced over a contiguous prefix and a REAL hole
+    // sits at
     // W+1, the head is pinned at W. The status-path fast path probes only the
     // single W+1 slot and short-circuits the O(suffix) window scan, so it must
     // (a) keep returning W across repeated polls (never advance over the gap) and
@@ -1688,8 +1688,8 @@ fn budget_ack_heads_stays_pinned_at_a_post_watermark_gap() -> Result<(), Box<dyn
 #[test]
 fn list_abandoned_event_seqs_in_range_bounds_upper_and_limit(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // codex #965 Finding (bound abandoned seqs): the budget delta endpoint must
-    // never serialize an unbounded abandoned window. The bounded query enforces
+    // The budget delta endpoint must never serialize an unbounded abandoned window.
+    // The bounded query enforces
     // BOTH an upper bound (<= page_max) and a row cap in SQL, so a rollback storm
     // cannot materialize millions of tombstones into one response and blow past
     // the peer-response byte cap.
@@ -1707,8 +1707,8 @@ fn list_abandoned_event_seqs_in_range_bounds_upper_and_limit(
     let capped = store.list_abandoned_event_seqs_in_range(0, 1000, 5)?;
     assert_eq!(capped, vec![1, 2, 3, 4, 5]);
 
-    // Contrast: the unbounded method returns the whole window (the wedge risk the
-    // bounded query removes).
+    // Contrast: the unbounded method returns the whole window (the oversized-response
+    // risk the bounded query removes).
     assert_eq!(store.list_abandoned_event_seqs_after(0)?.len(), 1000);
 
     let _ = fs::remove_file(&path);
@@ -1718,10 +1718,10 @@ fn list_abandoned_event_seqs_in_range_bounds_upper_and_limit(
 #[test]
 fn abandoned_seq_ranges_round_trip_and_advance_the_head() -> Result<(), Box<dyn std::error::Error>>
 {
-    // codex #965 Finding (bound abandoned seqs in snapshots): the cluster snapshot
-    // carries abandoned seqs RANGE-ENCODED so a rollback storm's long contiguous run
-    // stays a handful of small pairs instead of an unbounded integer list that could
-    // exceed MAX_PEER_RESPONSE_BYTES and wedge recovery. list_abandoned_event_seq_ranges
+    // The cluster snapshot carries abandoned seqs RANGE-ENCODED so a rollback storm's
+    // long contiguous run stays a handful of small pairs instead of an unbounded
+    // integer list that could exceed MAX_PEER_RESPONSE_BYTES and stall recovery.
+    // list_abandoned_event_seq_ranges
     // must COLLAPSE contiguous runs, and record_abandoned_event_seq_ranges must EXPAND
     // them back to the identical seq set so the filled-or-abandoned head advance is
     // preserved bit-for-bit.
@@ -1788,9 +1788,9 @@ fn abandoned_seq_ranges_round_trip_and_advance_the_head() -> Result<(), Box<dyn 
 fn budget_ack_heads_recognizes_multi_authority_global_contiguity(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // event_seq is a single store-wide sequence, so multiple authorities share
-    // one global stream and an origin's events are a sparse subsequence of it
-    // (codex #965 Finding 1). budget_ack_heads must anchor on the GLOBAL
-    // contiguous head, not a per-origin island.
+    // one global stream and an origin's events are a sparse subsequence of it.
+    // budget_ack_heads must anchor on the GLOBAL contiguous head, not a per-origin
+    // island.
     let path = unique_db_path("chio-ack-heads-multi");
     let store = SqliteBudgetStore::open(&path)?;
 
@@ -1853,7 +1853,7 @@ fn budget_ack_heads_recognizes_multi_authority_global_contiguity(
 
     let _ = fs::remove_file(&path);
 
-    // Global hole (teeth): A owns {1,2}, B owns {4,5} -> global seq 3 missing.
+    // Global hole: A owns {1,2}, B owns {4,5} -> global seq 3 missing.
     // The global head is 2, so A -> 2 and B is ABSENT. A naive MAX-per-origin
     // ack head would over-report B = 5 past the hole (a double-spend risk).
     let path = unique_db_path("chio-ack-heads-multi-hole");
@@ -1905,9 +1905,9 @@ fn ack_head_event(seq: u64, event_id: &str, origin: &str) -> BudgetMutationRecor
 #[test]
 fn mutation_event_seq_for_event_id_returns_this_events_seq_not_authority_max(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // codex #965 round-2 P1: the quorum-witness token must wait on THIS write's
-    // own event_seq (looked up by event_id), not MAX(event_seq) for the
-    // authority, which a later same-authority commit raises.
+    // The quorum-witness token must wait on THIS write's own event_seq (looked up
+    // by event_id), not MAX(event_seq) for the authority, which a later
+    // same-authority commit raises.
     let path = unique_db_path("chio-event-seq-by-id");
     let store = SqliteBudgetStore::open(&path)?;
     // Two events under the SAME authority: e1 at seq 1, e2 at seq 2.
@@ -1932,8 +1932,8 @@ fn mutation_event_seq_for_event_id_returns_this_events_seq_not_authority_max(
 #[test]
 fn budget_ack_head_watermark_recomputes_after_delete_caps_below_hole(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // codex #965 round-2 P2: budget_ack_heads maintains the contiguous head from
-    // a durable watermark for O(new rows) cost, but a DELETE that punches a hole
+    // budget_ack_heads maintains the contiguous head from a durable watermark for
+    // O(new rows) cost, but a DELETE that punches a hole
     // below the watermark must reset it so the next call re-verifies and caps the
     // head below the hole (never a stale-high head that over-counts).
     let path = unique_db_path("chio-ack-watermark-delete");
@@ -2052,8 +2052,8 @@ fn budget_mutation_events_delete_trigger_resets_watermark_even_without_manual_ca
 #[test]
 fn ack_head_reset_trigger_is_idempotent_across_reopens_and_concurrent_opens(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // codex #965 round-4 P2: open() no longer DROP+CREATEs the ack-reset trigger
-    // on every open. Repeated and concurrent opens must not error (no "trigger
+    // open() must not DROP+CREATE the ack-reset trigger on every open. Repeated and
+    // concurrent opens must not error (no "trigger
     // already exists" race) and must not churn the trigger, while it still exists
     // exactly once with the current per-origin-clearing body.
     let path = unique_db_path("chio-trigger-idempotent");
@@ -2127,11 +2127,10 @@ fn ack_head_reset_trigger_is_idempotent_across_reopens_and_concurrent_opens(
 #[test]
 fn abandoned_seqs_advance_the_head_but_genuine_gaps_still_cap(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // codex #965 round-5 P1: an abandoned/tombstoned seq (a rolled-back-then-
-    // re-appended write's original seq) is treated as FILLED so the global
-    // contiguous ack head advances past it (no permanent wedge). A GENUINELY
-    // missing seq (never recorded abandoned) still caps the head (never
-    // over-counts a data-losing node).
+    // An abandoned/tombstoned seq (a rolled-back-then-re-appended write's original
+    // seq) is treated as FILLED so the global contiguous ack head advances past it
+    // (no permanent stall). A GENUINELY missing seq (never recorded abandoned) still
+    // caps the head (never over-counts a data-losing node).
     let path = unique_db_path("chio-abandoned-fills-hole");
     let store = SqliteBudgetStore::open(&path)?;
     let head_for = |heads: &[(String, u64)], origin: &str| {
@@ -2174,13 +2173,12 @@ fn abandoned_seqs_advance_the_head_but_genuine_gaps_still_cap(
 }
 
 #[test]
-fn rollback_retry_records_abandoned_seq_and_head_does_not_wedge() {
-    // codex #965 round-5 P1 (end-to-end): an authorize, its rollback, and a retry
-    // under a new lease. The retry auto-deletes the rolled-back authorize and
-    // re-appends it at a fresh seq; the freed seq is recorded abandoned so the
-    // global contiguous ack head advances to the re-appended event instead of
-    // wedging at the hole.
-    let path = unique_db_path("chio-rollback-retry-no-wedge");
+fn rollback_retry_records_abandoned_seq_and_head_does_not_stall() {
+    // End-to-end: an authorize, its rollback, and a retry under a new lease. The
+    // retry auto-deletes the rolled-back authorize and re-appends it at a fresh seq;
+    // the freed seq is recorded abandoned so the global contiguous ack head advances
+    // to the re-appended event instead of stalling at the hole.
+    let path = unique_db_path("chio-rollback-retry-no-stall");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let hold_id = "hold-x";
     let event_id = "evt-x:authorize";
@@ -2237,7 +2235,7 @@ fn rollback_retry_records_abandoned_seq_and_head_does_not_wedge() {
     );
 
     // The contiguous ack head advances to the max present event_seq (the re-
-    // appended authorize): the abandoned seq 1 is filled, so no permanent wedge.
+    // appended authorize): the abandoned seq 1 is filled, so no permanent stall.
     let max_seq = store.max_mutation_event_seq().unwrap();
     let heads = store.budget_ack_heads().unwrap();
     let origin_head = heads
@@ -2247,7 +2245,7 @@ fn rollback_retry_records_abandoned_seq_and_head_does_not_wedge() {
     assert_eq!(
         origin_head,
         Some(max_seq),
-        "the ack head must advance past the abandoned seq to the re-appended event, not wedge"
+        "the ack head must advance past the abandoned seq to the re-appended event, not stall"
     );
 
     let _ = fs::remove_file(&path);
@@ -2255,8 +2253,8 @@ fn rollback_retry_records_abandoned_seq_and_head_does_not_wedge() {
 
 #[test]
 fn follower_replace_self_records_abandoned_seq_and_head_advances() {
-    // codex #965 round-5 (follower-replace wedge): an ALREADY-SYNCED follower
-    // holds E@X before the leader's rollback-retry, so its pull cursor is already
+    // An ALREADY-SYNCED follower holds E@X before the leader's rollback-retry, so
+    // its pull cursor is already
     // past X and the delta's abandoned_seqs (which are strictly ABOVE the cursor)
     // exclude X. When it later imports the re-appended E@Y, the REPLACE path
     // deletes its local E@X; it must self-record X abandoned in the same
@@ -2337,7 +2335,7 @@ fn follower_replace_self_records_abandoned_seq_and_head_advances() {
     follower.import_mutation_record(&reappended).unwrap();
 
     // The follower self-recorded the superseded seq 1 abandoned, so its head
-    // advances to the re-appended event instead of wedging at the hole.
+    // advances to the re-appended event instead of stalling at the hole.
     assert_eq!(
         follower.list_abandoned_event_seqs().unwrap(),
         vec![1],
@@ -2361,30 +2359,29 @@ fn follower_replace_self_records_abandoned_seq_and_head_advances() {
 
 #[test]
 fn follower_replace_inserts_reappended_event_and_head_reaches_new_seq() {
-    // codex #965 (insert replacement events after tombstoning): TEETH-TEST for the
-    // follower REPLACE path. An ALREADY-SYNCED follower holds the ORIGINAL authorize
-    // E@1 (its pull cursor is already past 1). When it imports the leader's
-    // re-appended E@new (same event_id, fresh higher seq), the REPLACE path deletes
-    // E@1 and tombstones seq 1, then MUST re-insert E@new so the follower actually
-    // holds the retried write and its budget_ack_heads head ADVANCES to the new seq.
-    // RED before the fix: the REPLACE branch tombstoned + returned without inserting,
-    // so E@new was ABSENT and the head halted at the rollback marker (never
-    // witnessing the retried write -> quorum waits time out). This pins the ABSOLUTE
-    // new seq (not head == max, which passed even with E@new missing because both
-    // degraded to the rollback marker together).
-    let leader_path = unique_db_path("chio-follower-replace-teeth-leader");
-    let follower_path = unique_db_path("chio-follower-replace-teeth-follower");
+    // Exercises the follower REPLACE path. An ALREADY-SYNCED follower holds the
+    // ORIGINAL authorize E@1 (its pull cursor is already past 1). When it imports
+    // the leader's re-appended E@new (same event_id, fresh higher seq), the REPLACE
+    // path deletes E@1 and tombstones seq 1, then MUST re-insert E@new so the
+    // follower actually holds the retried write and its budget_ack_heads head
+    // ADVANCES to the new seq. Without the re-insert, E@new is ABSENT and the head
+    // halts at the rollback marker (never witnessing the retried write -> quorum
+    // waits time out). This asserts the ABSOLUTE new seq (not head == max, which
+    // passes even with E@new missing because both degrade to the rollback marker
+    // together).
+    let leader_path = unique_db_path("chio-follower-replace-leader");
+    let follower_path = unique_db_path("chio-follower-replace-follower");
     let leader = SqliteBudgetStore::open(&leader_path).unwrap();
     let follower = SqliteBudgetStore::open(&follower_path).unwrap();
-    let hold_id = "hold-teeth";
-    let event_id = "evt-teeth:authorize";
+    let hold_id = "hold-fr";
+    let event_id = "evt-fr:authorize";
     let initial = authority("budget-primary", "lease-1", 1);
     let changed = authority("budget-primary", "lease-2", 2);
 
     // Leader authorizes E (seq 1), then rolls it back (rollback marker at seq 2).
     assert!(leader
         .try_charge_cost_with_ids_and_authority(
-            "cap-teeth",
+            "cap-fr",
             0,
             Some(10),
             100,
@@ -2397,11 +2394,11 @@ fn follower_replace_inserts_reappended_event_and_head_reaches_new_seq() {
         .unwrap());
     leader
         .reverse_charge_cost_with_ids_and_authority(
-            "cap-teeth",
+            "cap-fr",
             0,
             100,
             Some(hold_id),
-            Some("evt-teeth:authorize:rollback:1"),
+            Some("evt-fr:authorize:rollback:1"),
             Some(&initial),
         )
         .unwrap();
@@ -2420,7 +2417,7 @@ fn follower_replace_inserts_reappended_event_and_head_reaches_new_seq() {
     // Leader retries under the NEW lease: deletes E@1 (abandons 1), re-appends E@new.
     assert!(leader
         .try_charge_cost_with_ids_and_authority(
-            "cap-teeth",
+            "cap-fr",
             0,
             Some(10),
             100,
@@ -2444,10 +2441,10 @@ fn follower_replace_inserts_reappended_event_and_head_reaches_new_seq() {
     );
 
     // Follower imports the re-appended authorize. The REPLACE path deletes E@1,
-    // tombstones seq 1, and (with the fix) re-inserts E@new.
+    // tombstones seq 1, and re-inserts E@new.
     follower.import_mutation_record(&reappended).unwrap();
 
-    // TEETH: the re-appended event is PRESENT at its new seq (exactly one row: the
+    // The re-appended event is PRESENT at its new seq (exactly one row: the
     // unique event_seq index would reject a duplicate).
     assert_eq!(
         follower.mutation_event_seq_for_event_id(event_id).unwrap(),
@@ -2460,7 +2457,7 @@ fn follower_replace_inserts_reappended_event_and_head_reaches_new_seq() {
         new_seq,
         "the follower's max advances to the re-appended seq"
     );
-    // TEETH: the contiguous ack head ADVANCES to the ABSOLUTE new seq, so the
+    // The contiguous ack head ADVANCES to the ABSOLUTE new seq, so the
     // follower witnesses the retried write.
     let head = follower
         .budget_ack_heads()
@@ -2487,17 +2484,16 @@ fn follower_replace_inserts_reappended_event_and_head_reaches_new_seq() {
 
 #[test]
 fn same_authority_rollback_retry_reinserts_reappended_event_and_head_advances() {
-    // codex #965 (reinsert same-authority rollback retries): TEETH-TEST for the
-    // SAME-AUTHORITY re-append. When the leader keeps its lease and retries a
-    // rolled-back authorize, the re-appended event is byte-identical to the
-    // original EXCEPT its fresh higher event_seq, so `same_imported_mutation`
-    // (authority/content-only, ignores event_seq) reports it a duplicate. Before
-    // the fix the importer short-circuited and never stored the re-appended row,
-    // so the follower's ack head stalled at the rollback marker (seq 2) and it
-    // could not witness the retried write until a full snapshot rebuild. The fix
-    // gates the replace path on `record.event_seq > existing.event_seq`, so a
-    // differing seq forces the replace + reinsert even when authority/content
-    // match. RED before the fix: the follower still holds E@1 and its head is 2.
+    // Exercises the SAME-AUTHORITY re-append. When the leader keeps its lease and
+    // retries a rolled-back authorize, the re-appended event is byte-identical to
+    // the original EXCEPT its fresh higher event_seq, so `same_imported_mutation`
+    // (authority/content-only, ignores event_seq) reports it a duplicate. If the
+    // importer short-circuited on that, it would never store the re-appended row, so
+    // the follower's ack head would stall at the rollback marker (seq 2) and it could
+    // not witness the retried write until a full snapshot rebuild. Gating the replace
+    // path on `record.event_seq > existing.event_seq` makes a differing seq force the
+    // replace + reinsert even when authority/content match; without it the follower
+    // still holds E@1 and its head is 2.
     let leader_path = unique_db_path("chio-same-authority-retry-leader");
     let follower_path = unique_db_path("chio-same-authority-retry-follower");
     let leader = SqliteBudgetStore::open(&leader_path).unwrap();
@@ -2572,7 +2568,7 @@ fn same_authority_rollback_retry_reinserts_reappended_event_and_head_advances() 
         "re-appended strictly above the rollback marker (leader really re-appended, not idempotent)"
     );
     // Sanity: the re-appended event carries the SAME authority as the original, so
-    // `same_imported_mutation` would (wrongly) call it a duplicate without the fix.
+    // `same_imported_mutation` would call it a duplicate on authority/content alone.
     assert_eq!(
         reappended.authority.as_ref(),
         Some(&leased),
@@ -2582,7 +2578,7 @@ fn same_authority_rollback_retry_reinserts_reappended_event_and_head_advances() 
     // Follower imports the same-authority re-append.
     follower.import_mutation_record(&reappended).unwrap();
 
-    // TEETH: the re-appended event is PRESENT at its new seq (exactly one row: the
+    // The re-appended event is PRESENT at its new seq (exactly one row: the
     // unique event_seq index would reject a duplicate).
     assert_eq!(
         follower.mutation_event_seq_for_event_id(event_id).unwrap(),
@@ -2594,7 +2590,7 @@ fn same_authority_rollback_retry_reinserts_reappended_event_and_head_advances() 
         new_seq,
         "the follower's max advances to the re-appended seq"
     );
-    // TEETH: the contiguous ack head ADVANCES to the ABSOLUTE new seq (not the
+    // The contiguous ack head ADVANCES to the ABSOLUTE new seq (not the
     // rollback marker), so the follower witnesses the retried write.
     let head = follower
         .budget_ack_heads()
@@ -2622,8 +2618,8 @@ fn same_authority_rollback_retry_reinserts_reappended_event_and_head_advances() 
 #[test]
 fn mutation_event_witness_returns_stored_origin_authority() -> Result<(), Box<dyn std::error::Error>>
 {
-    // codex #965 round-5 P1: the witness identity for an idempotent retry comes
-    // from the event's STORED origin authority, not the current lease, so a retry
+    // The witness identity for an idempotent retry comes from the event's STORED
+    // origin authority, not the current lease, so a retry
     // after leadership moved targets the origin peers advertise it under.
     let path = unique_db_path("chio-stored-witness");
     let store = SqliteBudgetStore::open(&path)?;

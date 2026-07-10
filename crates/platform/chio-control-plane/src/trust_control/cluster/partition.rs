@@ -167,7 +167,7 @@ pub(crate) fn update_peer_sync_error(state: &TrustServiceState, peer_url: &str, 
 /// (`peer_should_force_snapshot`) resyncs it next round, resetting the cursor to the
 /// snapshot head and skipping the unpageable window WITHOUT a delta cursor jump. A
 /// force_snapshot peer is excluded from witnesses until the snapshot + delta
-/// re-sync clears the flag, so this cannot over-count (codex #965 Finding 1).
+/// re-sync clears the flag, so this cannot over-count.
 pub(crate) fn request_peer_snapshot_recovery(
     state: &TrustServiceState,
     peer_url: &str,
@@ -232,8 +232,8 @@ pub(crate) fn update_peer_budget_cursor(
 /// origin entirely). A monotonic max would retain the stale higher head forever
 /// and keep counting that data-losing peer as a witness for writes it no longer
 /// durably holds, i.e. a double-spend risk. Replacing lets a regressed or absent
-/// origin drop so `budget_write_quorum_commit_view` stops counting it (codex
-/// #965 round-2 P1). Within a single advertisement, duplicate origins collapse
+/// origin drop so `budget_write_quorum_commit_view` stops counting it. Within a
+/// single advertisement, duplicate origins collapse
 /// to their max (defensive; `budget_ack_heads` already groups by origin).
 pub(crate) fn update_peer_budget_acks(
     state: &TrustServiceState,
@@ -256,12 +256,12 @@ pub(crate) fn update_peer_budget_acks(
 ///
 /// The full replace (`update_peer_budget_acks`) is deferred to
 /// `finalize_peer_sync_round` so an INCREASE is not counted until the peer's pull
-/// round validates (codex #965 round-6). But a DECREASE or CLEAR must take effect
+/// round validates. But a DECREASE or CLEAR must take effect
 /// AT ONCE: a peer that lost/restored its budget DB and now advertises a lower (or
 /// absent) head no longer durably holds those writes, so leaving the stale-high
 /// value in place for the whole round would let a budget write that checks the
 /// quorum view mid-round commit against a peer that has already disavowed the write
-/// (an over-count / double-spend, codex #965 deltas.rs:403).
+/// (an over-count / double-spend).
 ///
 /// Per origin the recorded head becomes `min(recorded, advertised)`; an origin the
 /// peer no longer advertises drops to 0 and is removed (it can never witness). An

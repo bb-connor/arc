@@ -9,7 +9,7 @@ pub(crate) struct TrustServiceState {
     pub(crate) cluster: Option<Arc<Mutex<ClusterRuntimeState>>>,
     /// Progress signal for the single background cluster-sync loop. `Some`
     /// exactly when `cluster` is `Some`. A budget-write handler parks on this
-    /// watch instead of driving its own inline sync (RFC-0011 D3, F14).
+    /// watch instead of driving its own inline sync.
     pub(crate) cluster_progress: Option<Arc<ClusterProgress>>,
 }
 
@@ -17,8 +17,7 @@ pub(crate) struct TrustServiceState {
 /// waiters. `tick` increments once per completed sync round (waiters watch it);
 /// `kick` lets a waiter ask the loop to run a round now instead of sleeping out
 /// its interval. The loop is the sole driver of cursor and ack advancement, so
-/// N concurrent writes share one sync stream rather than each spawning its own
-/// (RFC-0011 D3, F14).
+/// N concurrent writes share one sync stream rather than each spawning its own.
 pub(crate) struct ClusterProgress {
     tick: tokio::sync::watch::Sender<u64>,
     kick: tokio::sync::Notify,
