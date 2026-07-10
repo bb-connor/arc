@@ -27,6 +27,11 @@ pub struct TrustServiceConfig {
     pub peer_urls: Vec<String>,
     pub cluster_sync_interval: Duration,
     pub roster_policy: Option<RosterPolicy>,
+    /// Process memory budget for the trust control service. Its
+    /// `admission_key_cap` bounds the federation admission rate limiter, so
+    /// lowering it here actually tightens that guard rather than being silently
+    /// overridden by the compiled-in default.
+    pub memory_budget: chio_kernel::MemoryBudgetConfig,
 }
 
 impl TrustServiceConfig {
@@ -125,6 +130,7 @@ mod service_config_tests {
             peer_urls: Vec::new(),
             cluster_sync_interval: Duration::from_millis(25),
             roster_policy: None,
+            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         }
     }
 

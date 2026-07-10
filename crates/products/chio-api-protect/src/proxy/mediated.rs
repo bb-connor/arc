@@ -173,6 +173,7 @@ pub(crate) fn build_mediation_kernel(
         allow_ephemeral_receipt_log: true,
         checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
+        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
     });
     kernel.set_budget_store_handle(budget_store);
     let nonce_cfg = ExecutionNonceConfig {

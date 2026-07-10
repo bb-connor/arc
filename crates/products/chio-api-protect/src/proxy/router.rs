@@ -77,9 +77,41 @@ pub(crate) fn build_app(state: Arc<ProxyState>) -> Router {
         // reserved-minus-realized difference back to the grant. Behind the
         // reconcile control gate (see `reconcile_routes` above).
         .merge(reconcile_routes)
+        // Admin-gated Prometheus scrape endpoint. Mounted before the catch-all
+        // so axum prefers this specific route, and gated by the same
+        // sidecar-control posture as the approval routes.
+        .route(
+            "/metrics",
+            get(handle_metrics).route_layer(middleware::from_fn_with_state(
+                Arc::clone(&state),
+                require_sidecar_control_middleware,
+            )),
+        )
         .route("/{*path}", any(proxy_handler))
         .route("/", any(proxy_handler))
         .with_state(state)
+}
+
+/// Compose the Prometheus scrape body from the kernel guard families, the
+/// http-core mediation-edge families, and the alert-pack families.
+async fn handle_metrics() -> impl axum::response::IntoResponse {
+    let alert_pack = || {
+        let mut out = String::new();
+        chio_metrics_spec::runtime::render_alert_pack_families(&mut out);
+        out
+    };
+    let body = chio_metrics_spec::runtime::compose_metrics_body(&[
+        &chio_kernel::render_guard_metrics_prometheus,
+        &chio_http_core::metrics::render_http_core_metrics_prometheus,
+        &alert_pack,
+    ]);
+    (
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; version=0.0.4",
+        )],
+        body,
+    )
 }
 
 pub(crate) async fn require_sidecar_control_middleware(

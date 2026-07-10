@@ -24,6 +24,21 @@ impl StructuredErrorReport {
     }
 }
 
+/// Which bounded resource shed. Included in the receipt deny reason and the
+/// structured error report so operators can see which policy fired.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OverloadResource {
+    ReceiptMirror,
+    FederationCache,
+    VelocityBuckets,
+    AdmissionKeys,
+    ConcurrencyBuckets,
+    SessionJournal,
+    StreamBytes,
+    StreamChunks,
+    Allocation,
+}
+
 /// Errors that can occur during kernel operations.
 #[derive(Debug, thiserror::Error)]
 pub enum KernelError {
@@ -211,6 +226,11 @@ pub enum KernelError {
          point mints nonces, it does not settle them"
     )]
     ReservingAuthorizationRejectsPresentedNonce,
+
+    /// The kernel shed load to stay within its memory budget. Always a deny;
+    /// never admits a call and never grows a collection.
+    #[error("kernel overloaded: {resource:?} at capacity")]
+    Overloaded { resource: OverloadResource },
 }
 
 impl KernelError {
@@ -225,6 +245,12 @@ impl KernelError {
 
     pub fn report(&self) -> StructuredErrorReport {
         match self {
+            Self::Overloaded { resource } => self.report_with_context(
+                "CHIO-KERNEL-OVERLOADED",
+                serde_json::json!({ "resource": format!("{resource:?}") }),
+                "The kernel shed load to stay within its memory budget. Retry with backoff; \
+                 if sustained, raise the process memory budget or scale out.",
+            ),
             Self::UnknownSession(session_id) => self.report_with_context(
                 "CHIO-KERNEL-UNKNOWN-SESSION",
                 serde_json::json!({ "session_id": session_id.to_string() }),
@@ -487,5 +513,28 @@ impl KernelError {
                 "Submit the reserving authorization request without a presented execution nonce; present the minted nonce to the tool server for settlement instead.",
             ),
         }
+    }
+}
+
+#[cfg(test)]
+mod overload_tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+    use super::*;
+
+    #[test]
+    fn overloaded_reports_resource_and_fail_closed_code() {
+        let err = KernelError::Overloaded {
+            resource: OverloadResource::AdmissionKeys,
+        };
+        let report = err.report();
+        assert_eq!(report.code, "CHIO-KERNEL-OVERLOADED");
+        assert!(
+            err.to_string().contains("AdmissionKeys"),
+            "display must name the shed resource: {err}"
+        );
+        assert_eq!(
+            report.context.get("resource").and_then(|v| v.as_str()),
+            Some("AdmissionKeys")
+        );
     }
 }

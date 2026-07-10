@@ -114,6 +114,7 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
         allow_ephemeral_receipt_log: true,
         checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
+        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
     });
     kernel.register_tool_server(Box::new(SimFlatCostServer));
 

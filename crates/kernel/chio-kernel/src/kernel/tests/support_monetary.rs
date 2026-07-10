@@ -279,6 +279,7 @@ fn make_monetary_config() -> KernelConfig {
         allow_ephemeral_receipt_log: true,
         checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
+        memory_budget: crate::MemoryBudgetConfig::defaults(),
     }
 }
 
@@ -1253,6 +1254,7 @@ fn make_dpop_kernel_and_cap(
         allow_ephemeral_receipt_log: true,
         checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
+        memory_budget: crate::MemoryBudgetConfig::defaults(),
     };
     let mut kernel = make_kernel(config);
     kernel.register_tool_server(Box::new(EchoServer::new(server, vec![tool])));
