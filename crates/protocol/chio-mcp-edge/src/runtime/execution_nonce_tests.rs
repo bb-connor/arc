@@ -53,6 +53,7 @@ fn make_nonce_kernel() -> ChioKernel {
         allow_ephemeral_receipt_log: true,
         checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
+        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
     };
     let mut kernel = ChioKernel::new(config);
     kernel.register_tool_server(Box::new(NonceEchoServer));
@@ -104,6 +105,7 @@ fn make_bridge_nonce_request(kernel: &ChioKernel, agent: &Keypair) -> BridgeMcpT
         arguments: json!({}),
         agent_id: agent.public_key().to_hex(),
         execution_nonce: None,
+        governed_intent: None,
         model_metadata: None,
         route_selection_metadata: None,
         peer_supports_chio_tool_streaming: false,

@@ -52,6 +52,7 @@ fn refresh_workflow_step_parent_chain(steps: &mut [StepRecord]) -> Result<(), Ch
 }
 
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
+use chio_core_types::receipt::signing::ReceiptSigningHandle;
 use chio_selective_disclosure::{
     derive_selective_disclosure_proof_from_receipt, sign_chio_receipt_with_bbs,
     BBS_CIPHERSUITE_SHA256, PROJECTION_VERSION_RECEIPT_V1,
@@ -132,7 +133,10 @@ fn receipt_v1_runtime_package() -> (
         let vendor_key = Keypair::from_seed(&vendor.seed);
         let body = receipt_body(vendor, &vendor_key).expect("receipt body builds");
         let receipt = if index == 0 {
-            sign_chio_receipt_with_bbs(body, &vendor_key, &bbs_keypair)
+            // WYSIWYS handle bound to the exact preimage the body's
+            // content_hash is defined over (sha256_hex(vendor.output_label)).
+            let handle = ReceiptSigningHandle::from_content_preimage(vendor.output_label.to_vec());
+            sign_chio_receipt_with_bbs(body, &vendor_key, &bbs_keypair, handle)
                 .expect("receipt signs with BBS")
         } else {
             ChioReceipt::sign(body, &vendor_key).expect("receipt signs")
@@ -251,6 +255,57 @@ fn authority_issuance_request_hashes_signed_receipt_body_for_governance(
         destructive_step.step_sha256.as_deref(),
         Some(governance_receipt.body.step_sha256.as_str())
     );
+    Ok(())
+}
+
+#[test]
+fn authority_issuance_request_for_package_uses_package_receipt_hashes(
+) -> Result<(), ChioPackageError> {
+    let package = fixture_proof_package()?;
+    let request = authority_issuance_request_for_package(&package)?;
+
+    for request_step in &request.steps {
+        let workflow_step = package
+            .workflow_receipt
+            .steps
+            .iter()
+            .find(|step| step.step_index == request_step.step_index)
+            .ok_or_else(|| ChioPackageError::Inconsistent("workflow step missing".into()))?;
+        let tool_receipt_id = workflow_step
+            .tool_receipt_id
+            .as_ref()
+            .ok_or_else(|| ChioPackageError::Inconsistent("tool receipt id missing".into()))?;
+        let receipt = package
+            .tool_receipts
+            .iter()
+            .find(|receipt| &receipt.id == tool_receipt_id)
+            .ok_or_else(|| ChioPackageError::Inconsistent("tool receipt missing".into()))?;
+
+        assert_eq!(request_step.tool_args_hash, receipt.action.parameter_hash);
+        if request_step.destructive {
+            let governance_receipt_id =
+                workflow_step
+                    .governance_receipt_id
+                    .as_ref()
+                    .ok_or_else(|| {
+                        ChioPackageError::Inconsistent("governance receipt id missing".into())
+                    })?;
+            let governance_receipt = package
+                .governance_receipts
+                .iter()
+                .find(|receipt| &receipt.body.receipt_id == governance_receipt_id)
+                .ok_or_else(|| {
+                    ChioPackageError::Inconsistent("governance receipt missing".into())
+                })?;
+            let step_sha256 = canonical_sha256(&receipt.body())?;
+
+            assert_eq!(
+                request_step.step_sha256.as_deref(),
+                Some(step_sha256.as_str())
+            );
+            assert_eq!(governance_receipt.body.step_sha256, step_sha256);
+        }
+    }
     Ok(())
 }
 

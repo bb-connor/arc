@@ -3,32 +3,31 @@
 //! The signing channel remains bounded and backpressured. This test asserts
 //! that a producer attempting to submit while the queue is full increments
 //! `chio_signing_queue_block_total` rather than dropping the request.
+//!
+//! (case 2): a producer that hits a full queue no longer PARKS
+//! holding the preimage; it signs INLINE through the same WYSIWYS primitive and
+//! completes immediately. The block counter still increments (the queue bound was
+//! hit), but the request is neither dropped nor blocked: it is served off-queue,
+//! so retained memory stays bounded.
 
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll, Wake, Waker};
-use std::time::Duration;
 
 use chio_core::crypto::{sha256_hex, Keypair};
 use chio_core::receipt::{
     body::chio_receipt_id, body::ChioReceipt, body::ChioReceiptBody, decision::Decision,
     decision::ToolCallAction, kinds::TrustLevel, signing::CHIO_RECEIPT_SIGNING_NONCE_METADATA_KEY,
 };
-use chio_kernel::KernelError;
+// `DEFAULT_MAX_STREAM_TOTAL_BYTES` is consumed by the `#[path]`-included
+// `signing_task.rs` via `crate::DEFAULT_MAX_STREAM_TOTAL_BYTES`.
+use chio_kernel::{KernelError, DEFAULT_MAX_STREAM_TOTAL_BYTES};
 use serde_json::json;
 
 #[allow(dead_code)]
 #[path = "../src/kernel/signing_task.rs"]
 pub(crate) mod signing_task;
-
-mod kernel {
-    pub(crate) use crate::signing_task;
-}
-
-#[allow(dead_code)]
-#[path = "../src/observability/metrics.rs"]
-mod metrics;
 
 const KERNEL_SEED: [u8; 32] = [
     0x91, 0x82, 0x73, 0x64, 0x55, 0x46, 0x37, 0x28, 0x19, 0x0A, 0xB1, 0xC2, 0xD3, 0xE4, 0xF5, 0x06,
@@ -49,14 +48,18 @@ fn make_keypair() -> Keypair {
     Keypair::from_seed(&KERNEL_SEED)
 }
 
-fn make_body(n: usize, kernel_key: &Keypair) -> Result<ChioReceiptBody, String> {
+/// Returns a signable body together with the exact canonical-content preimage
+/// its `content_hash` was derived from, so the signing-task WYSIWYS recompute
+/// accepts it.
+fn make_body(n: usize, kernel_key: &Keypair) -> Result<(ChioReceiptBody, Vec<u8>), String> {
     let nonce = format!("block-counter-{n:04}");
     let action = ToolCallAction::from_parameters(json!({
         "n": n,
         "label": nonce,
     }))
     .map_err(|error| format!("payload canonicalisation failed: {error}"))?;
-    let content_hash = sha256_hex(action.parameter_hash.as_bytes());
+    let canonical_content = action.parameter_hash.as_bytes().to_vec();
+    let content_hash = sha256_hex(&canonical_content);
     let policy_hash = sha256_hex(format!("policy:{nonce}").as_bytes());
     // The input body carries the producer's pre-binding id.
     // `sign_one_with_backend` (via `chio_kernel_core::sign_receipt`) binds the
@@ -89,7 +92,7 @@ fn make_body(n: usize, kernel_key: &Keypair) -> Result<ChioReceiptBody, String> 
     };
     body.id =
         chio_receipt_id(&body).map_err(|error| format!("canonical receipt id failed: {error}"))?;
-    Ok(body)
+    Ok((body, canonical_content))
 }
 
 /// Bind the `chio_receipt_signing_nonce` metadata key to the pre-binding
@@ -129,16 +132,19 @@ fn expected_signed_id(body: &ChioReceiptBody) -> Result<String, String> {
 }
 
 fn rendered_signing_queue_block_total() -> Result<u64, String> {
-    let body = metrics::render_guard_metrics_prometheus();
-    body.lines()
-        .find_map(|line| {
-            line.strip_prefix("chio_signing_queue_block_total ")
-                .map(str::parse::<u64>)
-        })
-        .ok_or_else(|| {
-            "rendered Prometheus metrics omitted chio_signing_queue_block_total".to_string()
-        })?
-        .map_err(|error| format!("rendered chio_signing_queue_block_total was invalid: {error}"))
+    // The signing-queue block counter carries a `reason` label; a full bounded
+    // channel records reason="channel_full". An absent series means zero blocks
+    // so far (the runtime family only renders series that exist).
+    let body = chio_kernel::render_guard_metrics_prometheus();
+    match body.lines().find_map(|line| {
+        line.strip_prefix("chio_signing_queue_block_total{reason=\"channel_full\"} ")
+            .map(str::parse::<u64>)
+    }) {
+        Some(parsed) => parsed.map_err(|error| {
+            format!("rendered chio_signing_queue_block_total was invalid: {error}")
+        }),
+        None => Ok(0),
+    }
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -146,44 +152,57 @@ async fn full_signing_queue_increments_block_counter_without_dropping() -> Resul
     let keypair = make_keypair();
     let handle = signing_task::SigningTaskHandle::with_capacity(keypair.clone(), 1);
 
-    let queued_body = make_body(1, &keypair)?;
+    let (queued_body, queued_content) = make_body(1, &keypair)?;
     // The signer binds the signing nonce and recomputes the id before
     // signing, so capture the expected post-binding id (not `body.id`) for the
     // post-sign assertions below. This keeps the test from hardcoding the
     // SHA-256 hash of the fixture.
     let queued_expected_id = expected_signed_id(&queued_body)?;
     let queued = handle
-        .try_sign(queued_body)
+        .try_sign(queued_body, queued_content)
         .map_err(|_| "first request should queue before spawned task runs".to_string())?;
     let before = rendered_signing_queue_block_total()?;
 
-    let blocked_body = make_body(2, &keypair)?;
+    let (blocked_body, blocked_content) = make_body(2, &keypair)?;
     let blocked_expected_id = expected_signed_id(&blocked_body)?;
-    let mut blocked = Box::pin(handle.sign(blocked_body));
+    let mut blocked = Box::pin(handle.sign(blocked_body, blocked_content));
     let waker = noop_waker();
     let mut context = Context::from_waker(&waker);
-    assert!(
-        matches!(Pin::new(&mut blocked).poll(&mut context), Poll::Pending),
-        "producer should wait when the bounded signing queue is full"
+    // (case 2): a full queue routes the producer to the INLINE
+    // fallback instead of parking. The future therefore resolves on the FIRST
+    // poll (Ready) rather than returning Pending. The request is served off-queue,
+    // so it neither blocks holding the preimage nor is dropped.
+    let inline_signed = match Pin::new(&mut blocked).poll(&mut context) {
+        Poll::Ready(result) => {
+            result.map_err(|error| format!("full-queue inline fallback failed: {error}"))?
+        }
+        Poll::Pending => {
+            return Err(
+                "producer must inline-sign when the bounded queue is full, not park".to_string(),
+            )
+        }
+    };
+    assert_eq!(
+        inline_signed.id, blocked_expected_id,
+        "inline-served request emits the same authoritative id as the queued path",
     );
+    assert!(inline_signed
+        .verify_signature()
+        .map_err(|error| format!("inline-served signature check failed: {error}"))?);
 
     assert_eq!(
         rendered_signing_queue_block_total()?,
         before + 1,
-        "rendered Prometheus metrics should expose chio_signing_queue_block_total increment"
+        "a full queue still increments chio_signing_queue_block_total (the bound was hit)",
     );
 
+    // The queued request still drains and signs normally; the inline fallback did
+    // not disturb the in-flight queued request.
     let signed = queued
         .await
         .map_err(|error| format!("queued signer reply channel closed: {error}"))?
         .map_err(|error| format!("queued request failed to sign: {error}"))?;
     assert_eq!(signed.id, queued_expected_id);
-
-    let blocked_signed = tokio::time::timeout(Duration::from_secs(1), &mut blocked)
-        .await
-        .map_err(|_| "blocked producer did not finish after queue capacity freed".to_string())?
-        .map_err(|error| format!("blocked request failed to sign: {error}"))?;
-    assert_eq!(blocked_signed.id, blocked_expected_id);
 
     handle.shutdown().await;
     Ok(())

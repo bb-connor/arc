@@ -5,22 +5,53 @@
 #[cfg(feature = "bbs")]
 use chio_core_types::receipt::{
     body::prepare_receipt_body_for_signing, body::ChioReceipt, signing::BbsReceiptSignature,
+    signing::ContentHashMismatch, signing::ReceiptSigningHandle,
     signing::CHIO_RECEIPT_BBS_SIGNATURE_ALGORITHM, signing::CHIO_RECEIPT_BBS_SIGNATURE_SCHEMA,
 };
 use chio_core_types::receipt::{body::ChioReceiptBody, kinds::TrustLevel};
 use chio_workflow::receipt::{StepRecord, WorkflowReceiptBody};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 #[cfg(feature = "bbs")]
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 
+mod crypto_context;
 mod encoding;
+mod projection_manifest;
 
 #[cfg(feature = "bbs")]
 use encoding::decode_message_hex;
 use encoding::{
     bool_byte, canonical_bytes, decode_hx_field, hash_canonical, opt_string_bytes, push_message,
     sha256_hex_bytes, subject_sha256_hex, u64_le,
+};
+
+pub use chio_disclosure_lineage::{
+    compute_signed_lineage_subgraph_digest, sign_crypto_context_report, sign_lineage_subgraph,
+    verify_crypto_context_report_signature_with_trust, verify_disclosure_lineage_bundle,
+    verify_disclosure_lineage_bundle_with_trust, DisclosureCapsule, DisclosureHiddenPredicate,
+    DisclosureLeakageLedger, DisclosureLeakageLedgerEntry, DisclosureLineageBundle,
+    DisclosureLineageError, DisclosureLineageVerifierReport, DisclosureLineageVerifierTrust,
+    DisclosureProfileLeakageBudget, DisclosureSensitivityClass, DisclosureSignedLineageEdge,
+    DisclosureSignedLineageNode, DisclosureSignedLineageRedaction, SignedLineageSubgraph,
+    DISCLOSURE_CAPSULE_SCHEMA_V1, DISCLOSURE_LEAKAGE_LEDGER_SCHEMA_V1,
+    DISCLOSURE_LINEAGE_VERIFIER_REPORT_SCHEMA_V1, LINEAGE_SIGNED_SUBGRAPH_SCHEMA_V1,
+};
+#[cfg(feature = "bbs")]
+pub use crypto_context::verify_selective_disclosure_with_context;
+pub use crypto_context::{
+    CryptoVerificationContext, DisclosureContextCheck, DisclosureContextVerdict,
+    DisclosureCryptoContextError, DisclosureCryptoContextReport, DisclosureKeyState,
+    DisclosureRevocationSnapshot, DisclosureVerifierPrivacyProfile, HolderBindingStatus,
+    KeyStateStatus, NonceReplayStatus, RevocationSnapshotStatus, TransparencyState,
+    CRYPTO_VERIFICATION_CONTEXT_SCHEMA_V1, DISCLOSURE_CRYPTO_CONTEXT_REPORT_SCHEMA_V1,
+    DISCLOSURE_VERIFIER_PRIVACY_PROFILE_SCHEMA_V1, TRUST_KEY_STATE_SCHEMA_V1,
+    TRUST_REVOCATION_SNAPSHOT_SCHEMA_V1,
+};
+pub use projection_manifest::{
+    BbsProjectionDisclosure, BbsProjectionHiddenPredicate, BbsProjectionManifest,
+    BbsProjectionMessageSlot, BBS_PROJECTION_MANIFEST_SCHEMA_V2,
 };
 
 /// Receipt-body projection version used for BBS message vectors.
@@ -65,6 +96,26 @@ pub struct Projection {
     pub version: String,
     pub subject_sha256_hex: String,
     pub messages: Vec<ProjectionMessage>,
+}
+
+/// Schema for a transparency log inclusion proof over the disclosed artifact.
+pub const TRANSPARENCY_INCLUSION_PROOF_SCHEMA_V1: &str = "chio.transparency.inclusion-proof.v1";
+
+/// Merkle inclusion proof binding a selective disclosure artifact to a log root.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TransparencyInclusionProof {
+    pub schema: String,
+    pub proof_id: String,
+    pub log_id: String,
+    pub artifact_ref: String,
+    pub root_hash: String,
+    pub leaf_hash: String,
+    pub tree_size: u64,
+    pub leaf_index: u64,
+    pub checkpoint: String,
+    pub inclusion_path: Vec<String>,
+    pub verified_at: u64,
 }
 
 /// Message indices to disclose to a buyer or auditor.
@@ -175,6 +226,12 @@ pub enum SelectiveDisclosureError {
     ReceiptBbsSignatureMissing,
     #[error("receipt BBS binding is invalid: {0}")]
     ReceiptBbsBindingInvalid(String),
+    #[error("BBS projection manifest {0}")]
+    ProjectionManifestInvalid(String),
+    #[error("transparency inclusion proof {0}")]
+    TransparencyInclusionInvalid(String),
+    #[error("receipt content_hash does not match the bound canonical content (WYSIWYS): {0}")]
+    ContentHashMismatch(String),
     #[error("issuer {0} is not registered")]
     UnknownIssuer(String),
     #[error("issuer public key does not match registry")]
@@ -518,6 +575,309 @@ fn validate_disclosure_set(
     Ok(seen)
 }
 
+pub fn bbs_projection_manifest_from_projection(projection: &Projection) -> BbsProjectionManifest {
+    BbsProjectionManifest {
+        schema: BBS_PROJECTION_MANIFEST_SCHEMA_V2.to_string(),
+        manifest_id: projection.version.clone(),
+        artifact_ref: projection.subject_sha256_hex.clone(),
+        canonicalization: "jcs".to_string(),
+        hash_algorithm: "sha-256".to_string(),
+        message_slots: projection
+            .messages
+            .iter()
+            .map(|message| BbsProjectionMessageSlot {
+                slot: message.index,
+                field: message.field.clone(),
+                message_class: projection_message_class(message).to_string(),
+                sensitivity_class: projection_sensitivity_class(message).to_string(),
+                encoding: message.encoding.clone(),
+                disclosure: if message.wholesale_only
+                    || exact_timing_direct_disclosure_field(&message.field)
+                {
+                    BbsProjectionDisclosure::Hidden
+                } else {
+                    BbsProjectionDisclosure::Disclosed
+                },
+                wholesale_only: message.wholesale_only
+                    || exact_timing_direct_disclosure_field(&message.field),
+                value_sha256: None,
+            })
+            .collect(),
+        hidden_predicates: Vec::new(),
+        issuer_key_ref: None,
+        signature_ref: None,
+    }
+}
+
+fn projection_message_class(message: &ProjectionMessage) -> &'static str {
+    match message.field.as_str() {
+        "action" => "governed_action",
+        "agent_id" => "agent_identity",
+        "allowed" => "decision_state",
+        "capability_id" => "capability_identifier",
+        "completed_at" | "started_at" | "timestamp" => "timing",
+        "content_hash" | "policy_hash" => "content_integrity",
+        "decision" | "outcome" => "decision_state",
+        "duration_ms" | "total_cost" => "measurement",
+        "evidence" | "metadata" | "steps" => "evidence_digest",
+        "id" | "workflow_id" => "artifact_identity",
+        "kernel_key" => "runtime_assurance",
+        "schema" => "schema_identity",
+        "session_id" | "tenant_id" => "tenant_context",
+        "skill_id" | "skill_version" => "skill_identity",
+        "tool_name" | "tool_server" => "tool_identity",
+        "trust_level" => "trust_state",
+        _ if message.wholesale_only => "wholesale_field",
+        _ => "public_field",
+    }
+}
+
+fn projection_sensitivity_class(message: &ProjectionMessage) -> &'static str {
+    match message.field.as_str() {
+        "capability_id" => "capability_identifier",
+        "tenant_id" | "session_id" => "tenant_context",
+        "tool_name" | "tool_server" => "tool_identity",
+        "completed_at" | "duration_ms" | "started_at" | "timestamp" => "timing",
+        "kernel_key" | "trust_level" => "runtime_assurance",
+        _ if message.wholesale_only => "wholesale_only",
+        _ => "public",
+    }
+}
+
+fn exact_timing_direct_disclosure_field(field: &str) -> bool {
+    field == "duration_ms"
+}
+
+pub fn verify_bbs_projection_manifest(
+    proof: &SelectiveDisclosureProof,
+    manifest: &BbsProjectionManifest,
+) -> Result<(), SelectiveDisclosureError> {
+    if manifest.schema != BBS_PROJECTION_MANIFEST_SCHEMA_V2 {
+        return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+            format!("schema expected {BBS_PROJECTION_MANIFEST_SCHEMA_V2}"),
+        ));
+    }
+    if manifest.manifest_id != proof.projection_version {
+        return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+            "manifest id does not match proof projection version".to_string(),
+        ));
+    }
+    if manifest.artifact_ref != proof.subject_sha256_hex {
+        return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+            "artifact ref does not match proof subject".to_string(),
+        ));
+    }
+    if manifest.canonicalization != "jcs" {
+        return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+            "canonicalization must be jcs".to_string(),
+        ));
+    }
+    if manifest.hash_algorithm != "sha-256" {
+        return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+            "hash algorithm must be sha-256".to_string(),
+        ));
+    }
+    if manifest.message_slots.len() != proof.message_count {
+        return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+            "message slot count does not match proof message count".to_string(),
+        ));
+    }
+    let mut seen_slots = Vec::with_capacity(manifest.message_slots.len());
+    for slot in &manifest.message_slots {
+        if usize::from(slot.slot) >= proof.message_count {
+            return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+                format!("slot {} is outside proof message count", slot.slot),
+            ));
+        }
+        if seen_slots.contains(&slot.slot) {
+            return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+                format!("duplicate slot {}", slot.slot),
+            ));
+        }
+        seen_slots.push(slot.slot);
+        if slot.field.trim().is_empty()
+            || slot.message_class.trim().is_empty()
+            || slot.sensitivity_class.trim().is_empty()
+            || slot.encoding.trim().is_empty()
+        {
+            return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+                "message slot field, class, sensitivity, and encoding must not be empty"
+                    .to_string(),
+            ));
+        }
+        if exact_timing_direct_disclosure_field(&slot.field)
+            && slot.disclosure == BbsProjectionDisclosure::Disclosed
+        {
+            return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+                format!(
+                    "exact timing field {} cannot be directly disclosed",
+                    slot.field
+                ),
+            ));
+        }
+    }
+
+    let mut seen_predicates = Vec::with_capacity(manifest.hidden_predicates.len());
+    for predicate in &manifest.hidden_predicates {
+        if predicate.predicate_id.trim().is_empty()
+            || predicate.field.trim().is_empty()
+            || predicate.operator.trim().is_empty()
+        {
+            return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+                "hidden predicate id, field, and operator must not be empty".to_string(),
+            ));
+        }
+        if seen_predicates.contains(&predicate.predicate_id) {
+            return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+                format!("duplicate hidden predicate {}", predicate.predicate_id),
+            ));
+        }
+        seen_predicates.push(predicate.predicate_id.clone());
+    }
+
+    for disclosed in &proof.disclosed {
+        let slot = projection_manifest_slot(manifest, disclosed.index)?;
+        if slot.wholesale_only {
+            return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+                "wholesale-only slot disclosed".to_string(),
+            ));
+        }
+        if slot.disclosure != BbsProjectionDisclosure::Disclosed {
+            return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+                format!("slot {} is not marked disclosed", disclosed.index),
+            ));
+        }
+        if slot.field != disclosed.field {
+            return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+                format!("slot {} field does not match proof", disclosed.index),
+            ));
+        }
+        if slot.encoding != disclosed.encoding {
+            return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+                format!("slot {} encoding does not match proof", disclosed.index),
+            ));
+        }
+    }
+    for slot in manifest
+        .message_slots
+        .iter()
+        .filter(|slot| slot.disclosure == BbsProjectionDisclosure::Disclosed)
+    {
+        if !proof
+            .disclosed
+            .iter()
+            .any(|disclosed| disclosed.index == slot.slot)
+        {
+            return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+                format!(
+                    "slot {} is marked disclosed but missing from proof",
+                    slot.slot
+                ),
+            ));
+        }
+    }
+    Ok(())
+}
+
+pub fn verify_transparency_inclusion_proof(
+    proof: &SelectiveDisclosureProof,
+    inclusion: &TransparencyInclusionProof,
+) -> Result<(), SelectiveDisclosureError> {
+    if inclusion.schema != TRANSPARENCY_INCLUSION_PROOF_SCHEMA_V1 {
+        return Err(SelectiveDisclosureError::TransparencyInclusionInvalid(
+            format!("schema expected {TRANSPARENCY_INCLUSION_PROOF_SCHEMA_V1}"),
+        ));
+    }
+    for (field, value) in [
+        ("proof_id", inclusion.proof_id.as_str()),
+        ("log_id", inclusion.log_id.as_str()),
+        ("checkpoint", inclusion.checkpoint.as_str()),
+    ] {
+        if value.trim().is_empty() {
+            return Err(SelectiveDisclosureError::TransparencyInclusionInvalid(
+                format!("{field} must not be empty"),
+            ));
+        }
+    }
+    if inclusion.verified_at == 0 {
+        return Err(SelectiveDisclosureError::TransparencyInclusionInvalid(
+            "verified_at must be greater than zero".to_string(),
+        ));
+    }
+    if inclusion.artifact_ref != proof.subject_sha256_hex {
+        return Err(SelectiveDisclosureError::TransparencyInclusionInvalid(
+            "artifact ref mismatch".to_string(),
+        ));
+    }
+    let expected_leaf = sha256_hex_bytes(proof.subject_sha256_hex.as_bytes());
+    if inclusion.leaf_hash != expected_leaf {
+        return Err(SelectiveDisclosureError::TransparencyInclusionInvalid(
+            "leaf hash mismatch".to_string(),
+        ));
+    }
+    if inclusion.tree_size == 0 {
+        return Err(SelectiveDisclosureError::TransparencyInclusionInvalid(
+            "tree size must be greater than zero".to_string(),
+        ));
+    }
+    if inclusion.leaf_index >= inclusion.tree_size {
+        return Err(SelectiveDisclosureError::TransparencyInclusionInvalid(
+            "leaf index outside tree size".to_string(),
+        ));
+    }
+
+    let mut current = decode_hx_field("leaf_hash", &inclusion.leaf_hash)?;
+    let mut index = inclusion.leaf_index;
+    let mut width = inclusion.tree_size;
+    for (level, sibling_hex) in inclusion.inclusion_path.iter().enumerate() {
+        if width <= 1 {
+            return Err(SelectiveDisclosureError::TransparencyInclusionInvalid(
+                "inclusion path exceeds tree height".to_string(),
+            ));
+        }
+        let sibling = decode_hx_field(&format!("inclusion_path[{level}]"), sibling_hex)?;
+        current = merkle_parent_hash(index, &current, &sibling);
+        index /= 2;
+        width = width.div_ceil(2);
+    }
+    if index != 0 || width != 1 {
+        return Err(SelectiveDisclosureError::TransparencyInclusionInvalid(
+            "inclusion path did not reach the root".to_string(),
+        ));
+    }
+    if hex::encode(&current) != inclusion.root_hash {
+        return Err(SelectiveDisclosureError::TransparencyInclusionInvalid(
+            "root mismatch".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn merkle_parent_hash(index: u64, current: &[u8], sibling: &[u8]) -> Vec<u8> {
+    let mut hasher = Sha256::new();
+    if index.is_multiple_of(2) {
+        hasher.update(current);
+        hasher.update(sibling);
+    } else {
+        hasher.update(sibling);
+        hasher.update(current);
+    }
+    hasher.finalize().to_vec()
+}
+
+fn projection_manifest_slot(
+    manifest: &BbsProjectionManifest,
+    index: u16,
+) -> Result<&BbsProjectionMessageSlot, SelectiveDisclosureError> {
+    manifest
+        .message_slots
+        .iter()
+        .find(|slot| slot.slot == index)
+        .ok_or_else(|| {
+            SelectiveDisclosureError::ProjectionManifestInvalid(format!("missing slot {index}"))
+        })
+}
+
 #[cfg(feature = "bbs")]
 fn message_count_from_bbs_sha256_proof(
     proof_bytes: &[u8],
@@ -745,20 +1105,54 @@ pub fn receipt_bbs_signature_from_signed_projection(
 
 /// Sign a receipt body with Ed25519 and embed BBS material over its final
 /// projected receipt body.
+///
+/// WYSIWYS: the `handle` is a one-time [`ReceiptSigningHandle`] bound to the
+/// exact canonical content the producer evaluated. The signer recomputes
+/// `content_hash` over that content and refuses to sign (fail-closed) when the
+/// body's claimed `content_hash` differs, exactly like the classical
+/// ([`ChioReceipt::sign_with_handle`]) and backend
+/// ([`ChioReceipt::sign_with_backend_using_handle`]) signers. This closes the
+/// render-A / sign-B forgery at the BBS / selective-disclosure boundary: a
+/// body claiming the hash of content `B` while the producer rendered content
+/// `A` is rejected before any BBS material is produced.
+///
+/// `prepare_receipt_body_for_signing` does not mutate `content_hash`, so the
+/// gate is checked against the prepared body's `content_hash` and is equivalent
+/// to checking the caller's input.
+///
+/// # Errors
+///
+/// Returns [`SelectiveDisclosureError::ContentHashMismatch`] when the body's
+/// `content_hash` does not equal the hash recomputed over the handle's bound
+/// canonical content; otherwise propagates preparation, projection, BBS, and
+/// Ed25519 signing errors.
 #[cfg(feature = "bbs")]
 pub fn sign_chio_receipt_with_bbs(
     mut body: ChioReceiptBody,
     receipt_keypair: &chio_core_types::crypto::Keypair,
     bbs_keypair: &BbsKeyPair,
+    handle: ReceiptSigningHandle,
 ) -> Result<ChioReceipt, SelectiveDisclosureError> {
     body.bbs_projection_version = Some(PROJECTION_VERSION_RECEIPT_V1.to_string());
     let prepared = prepare_receipt_body_for_signing(body)
         .map_err(|error| SelectiveDisclosureError::CanonicalJson(error.to_string()))?;
+    // Recompute-and-refuse BEFORE producing any BBS material so a render-A /
+    // sign-B body can never yield a BBS signature.
+    handle
+        .ensure_body_matches(&prepared)
+        .map_err(|mismatch: ContentHashMismatch| {
+            SelectiveDisclosureError::ContentHashMismatch(mismatch.message())
+        })?;
     let projection = project_receipt_body(&prepared)?;
     let signed = sign_projection(&projection, bbs_keypair)?;
     let bbs_signature = receipt_bbs_signature_from_signed_projection(&signed);
-    ChioReceipt::sign_prepared_with_bbs(prepared, receipt_keypair, bbs_signature)
-        .map_err(|error| SelectiveDisclosureError::CanonicalJson(error.to_string()))
+    ChioReceipt::sign_prepared_with_bbs_using_handle(
+        prepared,
+        receipt_keypair,
+        bbs_signature,
+        handle,
+    )
+    .map_err(|error| SelectiveDisclosureError::CanonicalJson(error.to_string()))
 }
 
 /// Reconstruct the full signed projection carrier from a receipt-bound BBS

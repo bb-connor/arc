@@ -35,70 +35,115 @@ impl ChioKernel {
         })
     }
 
-    pub(crate) fn has_local_receipt_id(&self, receipt_id: &str) -> bool {
+    pub(crate) fn has_local_receipt_id(&self, receipt_id: &str) -> Result<bool, KernelError> {
+        // Store-authoritative: a durable store is a point lookup by id, not an
+        // O(n) mirror scan. On a store MISS fall back to the local mirror below: a
+        // store may implement append without point loads (for example an
+        // append-only or remote store), so a receipt appended and mirrored locally
+        // must still resolve. A store READ ERROR fails closed and PROPAGATES; only
+        // a genuine miss (`Ok(None)`) falls through to the mirror, so a store
+        // verification failure is never masked by a mirror hit.
+        //
+        // Boundary: if that append-only/remote store does not implement point
+        // loads, the bounded mirror is the ONLY lookup source.
+        // Once the mirror evicts a receipt past `receipt_mirror_capacity`, this
+        // returns `Ok(false)` and the dependent call-chain claim is denied
+        // (fail-closed, never a false allow). Such deployments must implement
+        // `ReceiptStore::load_chio_receipt` so older parent receipts stay
+        // point-loadable after eviction.
+        if self.receipt_store.is_some() {
+            if self
+                .with_receipt_store(|store| Ok(store.load_chio_receipt(receipt_id)?))?
+                .flatten()
+                .is_some()
+            {
+                return Ok(true);
+            }
+            if self
+                .with_receipt_store(|store| Ok(store.load_child_receipt(receipt_id)?))?
+                .flatten()
+                .is_some()
+            {
+                return Ok(true);
+            }
+            // Store miss: fall through to the local mirror scan.
+        }
+        // Local mirror scan (no store, or store missed).
         let chio_receipt_match = match self.receipt_log.lock() {
-            Ok(log) => log
-                .receipts()
-                .iter()
-                .any(|receipt| receipt.id == receipt_id),
+            Ok(log) => log.iter().any(|receipt| receipt.id == receipt_id),
             Err(poisoned) => poisoned
                 .into_inner()
-                .receipts()
                 .iter()
                 .any(|receipt| receipt.id == receipt_id),
         };
         if chio_receipt_match {
-            return true;
+            return Ok(true);
         }
 
-        match self.child_receipt_log.lock() {
-            Ok(log) => log
-                .receipts()
-                .iter()
-                .any(|receipt| receipt.id == receipt_id),
+        Ok(match self.child_receipt_log.lock() {
+            Ok(log) => log.iter().any(|receipt| receipt.id == receipt_id),
             Err(poisoned) => poisoned
                 .into_inner()
-                .receipts()
                 .iter()
                 .any(|receipt| receipt.id == receipt_id),
-        }
+        })
     }
 
-    pub(crate) fn local_receipt_artifact(&self, receipt_id: &str) -> Option<LocalReceiptArtifact> {
+    pub(crate) fn local_receipt_artifact(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<LocalReceiptArtifact>, KernelError> {
+        // Consult the durable store first; on a MISS fall back to the local
+        // mirror (append-only / remote stores may not implement point loads, so
+        // a receipt appended and mirrored locally must still resolve). A store
+        // READ ERROR fails closed and PROPAGATES; only a genuine miss
+        // (`Ok(None)`) falls through to the mirror, so a store verification
+        // failure can never be accepted from the bounded mirror.
+        if self.receipt_store.is_some() {
+            if let Some(receipt) = self
+                .with_receipt_store(|store| Ok(store.load_chio_receipt(receipt_id)?))?
+                .flatten()
+            {
+                return Ok(Some(LocalReceiptArtifact::Tool(Box::new(receipt))));
+            }
+            if let Some(child) = self
+                .with_receipt_store(|store| Ok(store.load_child_receipt(receipt_id)?))?
+                .flatten()
+            {
+                return Ok(Some(LocalReceiptArtifact::Child(Box::new(child))));
+            }
+            // Store miss: fall through to the local mirror scan.
+        }
         let tool_match = match self.receipt_log.lock() {
             Ok(log) => log
-                .receipts()
                 .iter()
                 .find(|receipt| receipt.id == receipt_id)
                 .cloned()
                 .map(|receipt| LocalReceiptArtifact::Tool(Box::new(receipt))),
             Err(poisoned) => poisoned
                 .into_inner()
-                .receipts()
                 .iter()
                 .find(|receipt| receipt.id == receipt_id)
                 .cloned()
                 .map(|receipt| LocalReceiptArtifact::Tool(Box::new(receipt))),
         };
         if tool_match.is_some() {
-            return tool_match;
+            return Ok(tool_match);
         }
 
-        match self.child_receipt_log.lock() {
+        Ok(match self.child_receipt_log.lock() {
             Ok(log) => log
-                .receipts()
                 .iter()
                 .find(|receipt| receipt.id == receipt_id)
                 .cloned()
                 .map(|receipt| LocalReceiptArtifact::Child(Box::new(receipt))),
             Err(poisoned) => poisoned
                 .into_inner()
-                .receipts()
                 .iter()
                 .find(|receipt| receipt.id == receipt_id)
                 .cloned()
                 .map(|receipt| LocalReceiptArtifact::Child(Box::new(receipt))),
-        }
+        })
     }
 
     pub(crate) fn is_trusted_governed_continuation_signer(
@@ -325,6 +370,7 @@ impl ChioKernel {
     pub(crate) fn run_runtime_admission_hook(
         &self,
         request: &ToolCallRequest,
+        extra_metadata: Option<&serde_json::Value>,
         now: u64,
         now_unix_ms: u64,
         matched_grant_index: Option<usize>,
@@ -335,12 +381,9 @@ impl ChioKernel {
                 .as_ref()
                 .and_then(|intent| intent.context.as_ref())
                 .is_some_and(|context| {
-                    let retired_admission_key = ["chio", "dos", "Admission"].concat();
-                    let retired_treaty_key = ["chio", "dos", "Treaty"].concat();
                     context.get("chioAdmission").is_some()
                         || context.get("chioTreaty").is_some()
-                        || context.get(retired_admission_key.as_str()).is_some()
-                        || context.get(retired_treaty_key.as_str()).is_some()
+                        || context.get("chioSwarm").is_some()
                 });
             if has_runtime_context {
                 return RuntimeAdmissionDecision::deny(
@@ -368,6 +411,7 @@ impl ChioKernel {
         };
         let context = RuntimeAdmissionContext {
             request,
+            extra_metadata,
             now_unix_secs: now,
             now_unix_ms,
             matched_grant_index,
@@ -402,6 +446,72 @@ impl ChioKernel {
             return Ok(());
         };
         hook.release_reserved(metadata)
+    }
+
+    /// Record, in receipt metadata, that runtime-admission reservations
+    /// consumed at admission were deliberately NOT released because a tool
+    /// side effect may have executed. The reserved ids are copied so an
+    /// operator can locate and re-issue the burned lease/continuation from
+    /// the signed receipt alone. Fail-closed: metadata without a
+    /// `chio_runtime` block, or a `chio_runtime` block that carries no real
+    /// reservation (no present, non-empty `reserved_*` id), is returned
+    /// unchanged. Marking such metadata retained would claim a reservation was
+    /// burned when there was nothing to recover, which misleads operators.
+    pub(crate) fn mark_runtime_admission_reservations_retained_fail_closed(
+        &self,
+        metadata: Option<serde_json::Value>,
+    ) -> Option<serde_json::Value> {
+        let mut retained = serde_json::Map::new();
+        {
+            let Some(runtime) = metadata
+                .as_ref()
+                .and_then(|value| value.get("chio_runtime"))
+                .and_then(serde_json::Value::as_object)
+            else {
+                return metadata;
+            };
+            // Copy across only the ids that name a REAL reservation: a present,
+            // non-empty reserved lease/continuation id. A `chio_runtime` route
+            // block that merely carries the key with no (or an empty) value had
+            // nothing to burn.
+            for (source, target) in [
+                (
+                    "reserved_destructive_lease_id",
+                    "retained_destructive_lease_id",
+                ),
+                (
+                    "reserved_treaty_continuation_id",
+                    "retained_treaty_continuation_id",
+                ),
+                (
+                    "reserved_swarm_continuation_id",
+                    "retained_swarm_continuation_id",
+                ),
+            ] {
+                if let Some(id) = runtime
+                    .get(source)
+                    .and_then(serde_json::Value::as_str)
+                    .filter(|id| !id.is_empty())
+                {
+                    retained.insert(target.to_string(), serde_json::json!(id));
+                }
+            }
+            // Only mark retained when at least one real reservation was actually
+            // retained. An observe-only admission or a metadata-only
+            // `chio_runtime` route block has no `reserved_*` id to recover, so
+            // it must not carry the fail-closed marker.
+            if retained.is_empty() {
+                return metadata;
+            }
+            retained.insert(
+                "reservations_retained_fail_closed".to_string(),
+                serde_json::Value::Bool(true),
+            );
+        }
+        merge_metadata_objects(
+            metadata,
+            Some(serde_json::json!({ "chio_runtime": retained })),
+        )
     }
 
     pub(crate) fn release_runtime_admission_reservations_for_pre_dispatch_denial(
@@ -459,6 +569,43 @@ impl ChioKernel {
         })?;
 
         // Try streaming first regardless of monetary mode.
+        //
+        // Why the kernel cannot bound stream memory "as chunks arrive" at THIS
+        // seam, and where the actual bounds live.
+        //
+        // `ToolServerConnection::invoke_stream` returns a FULLY MATERIALIZED
+        // `ToolServerStreamResult` (which owns a `ToolCallStream { chunks: Vec<..>
+        // }`). The connector is in-process trusted code that drains its transport
+        // and builds the entire Vec BEFORE returning; the kernel receives control
+        // only after materialization. There is no incremental per-chunk arrival at
+        // this seam, so `push_chunk_bounded` cannot be driven here to bound the
+        // stream as it accumulates. True accumulation-time bounding would require
+        // changing the trait contract to a kernel-driven pull model (invoke_stream
+        // yielding a chunk source the kernel pulls), a public runtime-API change
+        // affecting every implementor; and even then a malicious in-process
+        // connector could allocate before yielding. So the transient peak
+        // allocation of a non-cooperating out-of-tree connector is a genuine
+        // connector-trust-boundary limit, bounded only by the process RSS ceiling
+        // (cgroup/ulimit).
+        //
+        // Layered bounds that DO apply:
+        //   - Accumulation is bounded by the ACCUMULATOR. In-tree connectors cap
+        //     it (A2A: `parse_sse_stream_with_limit`, MAX_SSE_TOTAL_BYTES = 1 MiB).
+        //     `enforce_stream_byte_limit` / `push_chunk_bounded` (crate::runtime)
+        //     are pub fail-closed Overloaded { StreamBytes / StreamChunks }
+        //     primitives (bounding total bytes AND retained chunk count) so
+        //     out-of-tree connector authors can bound their own invoke_stream.
+        //   - Retained memory is bounded at finalize by `apply_stream_limits` /
+        //     `truncate_stream_to_limits`: the stream is truncated to
+        //     `max_stream_total_bytes` / `max_stream_chunks` and the receipt is
+        //     marked incomplete,
+        //     PRESERVING the charge-for-work-done and financial metadata on
+        //     governed monetary streams (pinned by
+        //     `governed_monetary_incomplete_receipt_keeps_financial_and_governed_metadata`
+        //     and `streamed_tool_byte_limit_truncates_output_and_marks_receipt_incomplete`).
+        //     A hard-deny (Err) here was deliberately reverted because it unwinds
+        //     the monetary charge for an already-executed stream, so this seam
+        //     does not hard-deny.
         if let Some(stream) = server
             .invoke_stream(&request.tool_name, request.arguments.clone(), None)
             .await?
@@ -488,16 +635,9 @@ impl ChioKernel {
             let receipt_store_write = self.receipt_store_write_lock.lock().map_err(|_| {
                 KernelError::Internal("receipt store write lock poisoned".to_string())
             })?;
-            if let Some(seq) = self
-                .with_receipt_store(
-                    |store| Ok(store.append_child_receipt_returning_seq(&receipt)?),
-                )?
-                .flatten()
-            {
-                if self.should_checkpoint_after_seq(seq) {
-                    self.maybe_trigger_checkpoint_locked(seq)?;
-                }
-            }
+            self.with_receipt_store(|store| {
+                Ok(store.append_child_receipt_returning_seq(&receipt)?)
+            })?;
             drop(receipt_store_write);
             self.append_child_receipt_to_local_log(receipt);
         }

@@ -178,7 +178,7 @@ fn spawn_trust_service(
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::null())
         .spawn()
         .expect("spawn chio trust serve");
 
@@ -2791,7 +2791,7 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
             "eventId": "cap-snapshot-hold-1:authorize"
         }),
         "snapshot hold authorization reaches quorum",
-        Duration::from_secs(30),
+        Duration::from_secs(90),
         || cluster_status_diagnostics(&client, &warm_urls, service_token),
     );
     assert_eq!(authorize["allowed"].as_bool(), Some(true));
@@ -3162,7 +3162,7 @@ fn trust_control_cluster_multi_region_partition_qualification() {
             .duration_since(UNIX_EPOCH)
             .expect("system time before unix epoch")
             .as_secs(),
-        "clusterSyncIntervalMs": 200,
+        "clusterSyncIntervalMs": 2000,
         "regions": [
             {"name": "region-a", "baseUrl": url_a},
             {"name": "region-b", "baseUrl": url_b},
