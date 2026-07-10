@@ -915,3 +915,51 @@ fn remote_receipt_store_point_load_miss_returns_none() {
         .test_expect("point load must not error on a miss");
     assert!(loaded.is_none(), "a remote miss must resolve to None");
 }
+
+#[test]
+fn remote_tool_point_load_rejects_mismatched_receipt_id() {
+    // codex finding 3555410415 (SECURITY, RFC-0004 F03/F25): a rolling-upgrade or
+    // non-conforming control-plane can ignore the `receiptId` filter and return an
+    // unrelated receipt as the first row. `has_local_receipt_id` treats any Some(_)
+    // as "the requested parent exists", so accepting a mismatched id would let a
+    // governed parent-receipt existence check pass on the WRONG receipt. The store
+    // must verify the returned id and treat a mismatch as a fail-closed miss.
+    let receipt = sample_tool_receipt("actually-returned-receipt");
+    let returned_id = receipt.id.clone();
+    let value = serde_json::to_value(&receipt).test_expect("serialize tool receipt");
+    let body = receipt_list_response_body("tool", vec![value]);
+    let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
+
+    let store = super::super::remote_stores::build_remote_receipt_store(&server.url, "secret")
+        .test_expect("build remote receipt store");
+    // Ask for a DIFFERENT id than the server returns.
+    let requested_id = format!("{returned_id}-not-this-one");
+    let loaded = store
+        .load_chio_receipt(&requested_id)
+        .test_expect("point load must not error");
+    // RED (pre-fix): the first row was accepted verbatim, so this returned the
+    // mismatched receipt. GREEN: a mismatched id is a fail-closed miss.
+    assert!(
+        loaded.is_none(),
+        "a receipt whose id does not match the requested id must be rejected as a miss"
+    );
+}
+
+#[test]
+fn remote_child_point_load_rejects_mismatched_receipt_id() {
+    // Same id-verification requirement as the tool point load, for child receipts.
+    let receipt = sample_child_receipt("actually-returned-child");
+    let value = serde_json::to_value(&receipt).test_expect("serialize child receipt");
+    let body = receipt_list_response_body("child", vec![value]);
+    let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
+
+    let store = super::super::remote_stores::build_remote_receipt_store(&server.url, "secret")
+        .test_expect("build remote receipt store");
+    let loaded = store
+        .load_child_receipt("a-different-child-id")
+        .test_expect("point load must not error");
+    assert!(
+        loaded.is_none(),
+        "a child receipt whose id does not match the requested id must be rejected as a miss"
+    );
+}

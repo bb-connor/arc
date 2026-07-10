@@ -70,7 +70,23 @@ impl ReceiptStore for RemoteReceiptStore {
             })
             .map_err(into_receipt_store_error)?;
         match response.receipts.into_iter().next() {
-            Some(value) => Ok(Some(serde_json::from_value(value)?)),
+            Some(value) => {
+                let receipt: ChioReceipt = serde_json::from_value(value)?;
+                // Verify the returned id matches the REQUESTED id before accepting
+                // the hit. A rolling-upgrade or non-conforming control-plane that
+                // ignores the `receiptId` filter can return an unrelated receipt as
+                // the first row. `has_local_receipt_id` treats any `Some(_)` as
+                // "the requested parent exists", so an unverified hit would let a
+                // governed parent-receipt existence check pass on the WRONG receipt
+                // after the mirror evicts the real one. A mismatch is treated as a
+                // miss (fail-closed): the caller then denies the dependent claim
+                // rather than trusting a substituted receipt (RFC-0004 F03/F25,
+                // codex finding 3555410415).
+                if receipt.id != receipt_id {
+                    return Ok(None);
+                }
+                Ok(Some(receipt))
+            }
             None => Ok(None),
         }
     }
@@ -90,7 +106,18 @@ impl ReceiptStore for RemoteReceiptStore {
             })
             .map_err(into_receipt_store_error)?;
         match response.receipts.into_iter().next() {
-            Some(value) => Ok(Some(serde_json::from_value(value)?)),
+            Some(value) => {
+                let receipt: ChildRequestReceipt = serde_json::from_value(value)?;
+                // Same returned-id-must-match-requested-id check as
+                // [`Self::load_chio_receipt`]: a non-conforming control-plane that
+                // ignores the filter cannot substitute a different child receipt
+                // for a governed existence check. A mismatch is a fail-closed miss
+                // (codex finding 3555410415).
+                if receipt.id != receipt_id {
+                    return Ok(None);
+                }
+                Ok(Some(receipt))
+            }
             None => Ok(None),
         }
     }
