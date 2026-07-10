@@ -1010,10 +1010,16 @@ impl ChioKernel {
             )
             .map_err(|e| KernelError::Internal(format!("bilateral DSSE co-sign failed: {e}")))?;
 
-        // Write through to the durable artifact store (if one is installed via
-        // set_federation_artifact_store) BEFORE the bounded caches so an evicted
-        // entry is still resolvable by dual_signed_receipt / federation_dsse_envelope.
-        let artifact_store_installed = self.federation_artifact_store.is_some();
+        // Write through to the artifact store (if one is installed via
+        // set_federation_artifact_store) BEFORE the bounded caches. An entry
+        // evicted from a cache is only guaranteed resolvable when the store
+        // DURABLY retains it: a bounded in-memory store can evict the same id the
+        // caches did, so only a store that reports itself durable suppresses the
+        // evidence-loss signal below.
+        let durable_store_installed = self
+            .federation_artifact_store
+            .as_ref()
+            .is_some_and(|store| store.is_durable());
         if let Some(store) = self.federation_artifact_store.as_ref() {
             store.put_dual_signed(&receipt.id, &dual)?;
             store.put_dsse(&receipt.id, &dsse_envelope)?;
@@ -1024,13 +1030,13 @@ impl ChioKernel {
                 Ok(g) => g,
                 Err(poisoned) => poisoned.into_inner(),
             };
-            // Evicted entry (if any) is durable via the store above. With no
-            // store installed the drop is lossy by policy (bounded drop-oldest);
-            // log it so the evidence loss is explicit for operators.
-            if cache.insert(receipt.id.clone(), dual, now).is_some() && !artifact_store_installed {
+            // An evicted entry survives only through a durable store. Without one
+            // the drop is lossy by policy (bounded drop-oldest); log it so the
+            // evidence loss is explicit for operators.
+            if cache.insert(receipt.id.clone(), dual, now).is_some() && !durable_store_installed {
                 debug!(
                     request_id = %request.request_id,
-                    "dropping an evicted dual-signed co-sign artifact: bounded federation cache is full and no FederationArtifactStore is installed"
+                    "dropping an evicted dual-signed co-sign artifact: bounded federation cache is full and no durable FederationArtifactStore is installed"
                 );
             }
         }
@@ -1042,11 +1048,11 @@ impl ChioKernel {
             if cache
                 .insert(receipt.id.clone(), dsse_envelope, now)
                 .is_some()
-                && !artifact_store_installed
+                && !durable_store_installed
             {
                 debug!(
                     request_id = %request.request_id,
-                    "dropping an evicted co-sign DSSE envelope: bounded federation cache is full and no FederationArtifactStore is installed"
+                    "dropping an evicted co-sign DSSE envelope: bounded federation cache is full and no durable FederationArtifactStore is installed"
                 );
             }
         }

@@ -17,6 +17,19 @@ pub trait FederationArtifactStore: Send + Sync {
     fn get_dual_signed(&self, id: &str) -> Result<Option<DualSignedReceipt>, KernelError>;
     fn put_dsse(&self, id: &str, envelope: &DsseEnvelope) -> Result<(), KernelError>;
     fn get_dsse(&self, id: &str) -> Result<Option<DsseEnvelope>, KernelError>;
+
+    /// Whether a written artifact survives once the kernel's bounded front caches
+    /// evict it, so an evicted `id` is still resolvable through this store. Only a
+    /// persistent backend (database, object store) whose writes outlive eviction
+    /// returns `true`; a bounded, drop-evicting in-memory store returns `false`
+    /// because it can evict the same `id` the front caches did.
+    ///
+    /// The default is `false` so a store is never assumed durable unless it
+    /// explicitly guarantees it: treating a bounded cache as durable storage would
+    /// silently drop bilateral evidence with no operator signal.
+    fn is_durable(&self) -> bool {
+        false
+    }
 }
 
 /// Hard cap and idle sweep for [`InMemoryFederationArtifactStore`]'s backing
@@ -199,6 +212,51 @@ mod tests {
             Box::new(InMemoryFederationArtifactStore::default());
         assert!(store.get_dual_signed("missing").unwrap().is_none());
         assert!(store.get_dsse("missing").unwrap().is_none());
+    }
+
+    #[test]
+    fn in_memory_store_reports_non_durable() {
+        // The bundled in-memory store is a bounded, drop-evicting cache, so it must
+        // report itself NOT durable: an artifact evicted from the kernel's front
+        // caches is not guaranteed recoverable here, and claiming durability would
+        // silently drop bilateral evidence.
+        let store = InMemoryFederationArtifactStore::default();
+        assert!(
+            !store.is_durable(),
+            "a bounded, drop-evicting store must not claim durability"
+        );
+        let as_trait: &dyn FederationArtifactStore = &store;
+        assert!(!as_trait.is_durable());
+    }
+
+    #[test]
+    fn durable_backend_can_opt_into_durability() {
+        // The contract discriminates: a persistent backend overrides is_durable to
+        // advertise that evicted artifacts remain resolvable.
+        struct DurableStub;
+        impl FederationArtifactStore for DurableStub {
+            fn put_dual_signed(
+                &self,
+                _id: &str,
+                _receipt: &DualSignedReceipt,
+            ) -> Result<(), KernelError> {
+                Ok(())
+            }
+            fn get_dual_signed(&self, _id: &str) -> Result<Option<DualSignedReceipt>, KernelError> {
+                Ok(None)
+            }
+            fn put_dsse(&self, _id: &str, _envelope: &DsseEnvelope) -> Result<(), KernelError> {
+                Ok(())
+            }
+            fn get_dsse(&self, _id: &str) -> Result<Option<DsseEnvelope>, KernelError> {
+                Ok(None)
+            }
+            fn is_durable(&self) -> bool {
+                true
+            }
+        }
+        let as_trait: &dyn FederationArtifactStore = &DurableStub;
+        assert!(as_trait.is_durable());
     }
 
     #[test]
