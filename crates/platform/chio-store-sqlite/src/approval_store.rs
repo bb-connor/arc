@@ -32,6 +32,10 @@ pub struct SqliteApprovalStore {
 
 /// Approval-store schema revision. Bump on every schema-affecting change.
 const APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+/// Stable key under which this store records its schema revision in the shared
+/// keyed metadata table. Distinct from the co-located receipt store's key so the
+/// two track their revisions independently in the one sidecar file.
+const APPROVAL_STORE_SCHEMA_KEY: &str = "approval";
 /// Tables shipped before schema stamping existed, used to adopt a pre-stamping
 /// approval database rather than reject it as foreign. `chio api protect`
 /// co-locates the approval store and the receipt store in one sidecar file and
@@ -85,6 +89,7 @@ impl SqliteApprovalStore {
             .map_err(|e| ApprovalStoreError::Backend(format!("pool get: {e}")))?;
         crate::check_schema_version(
             &conn,
+            APPROVAL_STORE_SCHEMA_KEY,
             APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION,
             APPROVAL_STORE_LEGACY_ANCHOR_TABLES,
         )
@@ -133,8 +138,12 @@ impl SqliteApprovalStore {
             "#,
         )
         .map_err(|e| ApprovalStoreError::Backend(format!("migration: {e}")))?;
-        crate::stamp_schema_version(&conn, APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION)
-            .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
+        crate::stamp_schema_version(
+            &conn,
+            APPROVAL_STORE_SCHEMA_KEY,
+            APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION,
+        )
+        .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
         Ok(())
     }
 }

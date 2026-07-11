@@ -71,6 +71,9 @@ pub struct SqliteExecutionNonceStore {
 
 /// Execution-nonce-store schema revision. Bump on every schema-affecting change.
 const EXECUTION_NONCE_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+/// Stable key under which this store records its schema revision in the shared
+/// keyed metadata table, distinct from any co-located store's key.
+const EXECUTION_NONCE_STORE_SCHEMA_KEY: &str = "execution_nonce";
 /// Tables shipped before schema stamping existed, used to adopt a pre-stamping
 /// execution-nonce database rather than reject it as foreign.
 const EXECUTION_NONCE_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["chio_execution_nonces"];
@@ -108,6 +111,7 @@ impl SqliteExecutionNonceStore {
             .map_err(|e| SqliteExecutionNonceStoreError(format!("pool acquire: {e}")))?;
         crate::check_schema_version(
             &conn,
+            EXECUTION_NONCE_STORE_SCHEMA_KEY,
             EXECUTION_NONCE_STORE_SUPPORTED_SCHEMA_VERSION,
             EXECUTION_NONCE_STORE_LEGACY_ANCHOR_TABLES,
         )
@@ -128,8 +132,12 @@ impl SqliteExecutionNonceStore {
                 ON chio_execution_nonces(expires_at);
             "#,
         )?;
-        crate::stamp_schema_version(&conn, EXECUTION_NONCE_STORE_SUPPORTED_SCHEMA_VERSION)
-            .map_err(|error| SqliteExecutionNonceStoreError(error.to_string()))?;
+        crate::stamp_schema_version(
+            &conn,
+            EXECUTION_NONCE_STORE_SCHEMA_KEY,
+            EXECUTION_NONCE_STORE_SUPPORTED_SCHEMA_VERSION,
+        )
+        .map_err(|error| SqliteExecutionNonceStoreError(error.to_string()))?;
         Ok(())
     }
 

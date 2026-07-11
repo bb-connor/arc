@@ -101,7 +101,9 @@ fn sqlite_receipt_store_configures_durable_pragmas() {
 fn sqlite_receipt_store_stamps_application_id_and_refuses_future_database() {
     let path = unique_db_path("chio-receipts-schema-stamp");
 
-    // A fresh open stamps the Chio application_id and schema version 0.
+    // A fresh open stamps the Chio application_id and leaves the database-wide
+    // user_version untouched: the schema revision lives in keyed metadata so
+    // co-located stores can version independently.
     {
         let store = SqliteReceiptStore::open(&path).test_unwrap();
         let connection = store.connection().test_unwrap();
@@ -116,12 +118,12 @@ fn sqlite_receipt_store_stamps_application_id_and_refuses_future_database() {
     }
 
     // Simulate a database written by a newer binary and confirm the older binary
-    // refuses to open it rather than silently misreading a future schema.
+    // refuses to open it rather than silently misreading a future schema. The
+    // receipt store records its revision under its own key in the shared metadata
+    // table, so the future revision is staged there.
     {
         let connection = rusqlite::Connection::open(&path).test_unwrap();
-        connection
-            .execute_batch("PRAGMA user_version = 99;")
-            .test_unwrap();
+        crate::stamp_schema_version(&connection, "receipt", 99).test_unwrap();
     }
     assert!(
         SqliteReceiptStore::open_existing(&path).is_err(),

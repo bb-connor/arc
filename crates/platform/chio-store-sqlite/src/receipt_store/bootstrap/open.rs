@@ -4,6 +4,11 @@ use super::*;
 /// older binary refuses to open a database it cannot fully interpret.
 const RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
 
+/// Stable key under which this store records its schema revision in the shared
+/// keyed metadata table. Distinct from the co-located approval store's key so the
+/// two track their revisions independently in the one sidecar file.
+const RECEIPT_STORE_SCHEMA_KEY: &str = "receipt";
+
 /// Tables that identify a database this receipt store may open. `chio_tool_receipts`
 /// is the store's own anchor (also the table it shipped before schema stamping
 /// existed). The remaining tables belong to the approval store, which
@@ -153,6 +158,7 @@ impl SqliteReceiptStore {
             // header, so a mistargeted path is never mutated into WAL mode.
             crate::check_schema_version(
                 &connection,
+                RECEIPT_STORE_SCHEMA_KEY,
                 RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
                 RECEIPT_STORE_LEGACY_ANCHOR_TABLES,
             )
@@ -190,6 +196,7 @@ impl SqliteReceiptStore {
         // header, so a mistargeted path is never mutated into WAL mode.
         crate::check_schema_version(
             &connection,
+            RECEIPT_STORE_SCHEMA_KEY,
             RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
             RECEIPT_STORE_LEGACY_ANCHOR_TABLES,
         )
@@ -1124,8 +1131,12 @@ impl SqliteReceiptStore {
             }
         }
 
-        crate::stamp_schema_version(&connection, RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION)
-            .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+        crate::stamp_schema_version(
+            &connection,
+            RECEIPT_STORE_SCHEMA_KEY,
+            RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
+        )
+        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
 
         drop(connection);
 

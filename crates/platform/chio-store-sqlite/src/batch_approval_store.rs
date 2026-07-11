@@ -20,6 +20,9 @@ pub struct SqliteBatchApprovalStore {
 
 /// Batch-approval-store schema revision. Bump on every schema-affecting change.
 const BATCH_APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+/// Stable key under which this store records its schema revision in the shared
+/// keyed metadata table, distinct from any co-located store's key.
+const BATCH_APPROVAL_STORE_SCHEMA_KEY: &str = "batch_approval";
 /// Tables shipped before schema stamping existed, used to adopt a pre-stamping
 /// batch-approval database rather than reject it as foreign.
 const BATCH_APPROVAL_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["chio_hitl_batches"];
@@ -61,6 +64,7 @@ impl SqliteBatchApprovalStore {
             .map_err(|e| ApprovalStoreError::Backend(format!("pool get: {e}")))?;
         crate::check_schema_version(
             &conn,
+            BATCH_APPROVAL_STORE_SCHEMA_KEY,
             BATCH_APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION,
             BATCH_APPROVAL_STORE_LEGACY_ANCHOR_TABLES,
         )
@@ -93,8 +97,12 @@ impl SqliteBatchApprovalStore {
             "#,
         )
         .map_err(|e| ApprovalStoreError::Backend(format!("migration: {e}")))?;
-        crate::stamp_schema_version(&conn, BATCH_APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION)
-            .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
+        crate::stamp_schema_version(
+            &conn,
+            BATCH_APPROVAL_STORE_SCHEMA_KEY,
+            BATCH_APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION,
+        )
+        .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
         Ok(())
     }
 }

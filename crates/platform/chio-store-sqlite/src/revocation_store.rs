@@ -44,6 +44,9 @@ fn path_opens_in_memory(path: &Path) -> bool {
 
 /// Revocation-store schema revision. Bump on every schema-affecting change.
 const REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+/// Stable key under which this store records its schema revision in the shared
+/// keyed metadata table, distinct from any co-located store's key.
+const REVOCATION_STORE_SCHEMA_KEY: &str = "revocation";
 /// Tables shipped before schema stamping existed, used to adopt a pre-stamping
 /// revocation database rather than reject it as foreign.
 const REVOCATION_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["revoked_capabilities"];
@@ -63,6 +66,7 @@ impl SqliteRevocationStore {
         let connection = Connection::open(path)?;
         crate::check_schema_version(
             &connection,
+            REVOCATION_STORE_SCHEMA_KEY,
             REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION,
             REVOCATION_STORE_LEGACY_ANCHOR_TABLES,
         )
@@ -82,8 +86,12 @@ impl SqliteRevocationStore {
                 ON revoked_capabilities(revoked_at);
             "#,
         )?;
-        crate::stamp_schema_version(&connection, REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION)
-            .map_err(|error| RevocationStoreError::Sync(error.to_string()))?;
+        crate::stamp_schema_version(
+            &connection,
+            REVOCATION_STORE_SCHEMA_KEY,
+            REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION,
+        )
+        .map_err(|error| RevocationStoreError::Sync(error.to_string()))?;
 
         Ok(Self {
             connection: Mutex::new(connection),

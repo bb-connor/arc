@@ -292,6 +292,9 @@ pub struct SqliteEncryptedBlobStore {
 
 /// Encrypted-blob-store schema revision. Bump on every schema-affecting change.
 const ENCRYPTED_BLOB_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+/// Stable key under which this store records its schema revision in the shared
+/// keyed metadata table, distinct from any co-located store's key.
+const ENCRYPTED_BLOB_STORE_SCHEMA_KEY: &str = "encrypted_blob";
 /// Tables shipped before schema stamping existed, used to adopt a pre-stamping
 /// encrypted-blob database rather than reject it as foreign.
 const ENCRYPTED_BLOB_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["chio_encrypted_blobs"];
@@ -325,6 +328,7 @@ impl SqliteEncryptedBlobStore {
         let conn = self.pool.get()?;
         crate::check_schema_version(
             &conn,
+            ENCRYPTED_BLOB_STORE_SCHEMA_KEY,
             ENCRYPTED_BLOB_STORE_SUPPORTED_SCHEMA_VERSION,
             ENCRYPTED_BLOB_STORE_LEGACY_ANCHOR_TABLES,
         )
@@ -347,8 +351,12 @@ impl SqliteEncryptedBlobStore {
                 ON chio_encrypted_blobs(tenant_id, created_at);
             "#,
         )?;
-        crate::stamp_schema_version(&conn, ENCRYPTED_BLOB_STORE_SUPPORTED_SCHEMA_VERSION)
-            .map_err(|error| BlobStoreError::Sqlite(error.to_string()))?;
+        crate::stamp_schema_version(
+            &conn,
+            ENCRYPTED_BLOB_STORE_SCHEMA_KEY,
+            ENCRYPTED_BLOB_STORE_SUPPORTED_SCHEMA_VERSION,
+        )
+        .map_err(|error| BlobStoreError::Sqlite(error.to_string()))?;
         Ok(())
     }
 

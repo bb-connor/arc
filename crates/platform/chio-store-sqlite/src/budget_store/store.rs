@@ -6,6 +6,9 @@ pub type BudgetEventWitness = (u64, Option<String>, Option<u64>);
 
 /// Budget-store schema revision. Bump on every schema-affecting change.
 const BUDGET_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+/// Stable key under which this store records its schema revision in the shared
+/// keyed metadata table, distinct from any co-located store's key.
+const BUDGET_STORE_SCHEMA_KEY: &str = "budget";
 /// Tables shipped before schema stamping existed, used to adopt a pre-stamping
 /// budget database rather than reject it as foreign.
 const BUDGET_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["capability_grant_budgets"];
@@ -20,6 +23,7 @@ impl SqliteBudgetStore {
         let mut connection = Connection::open(path)?;
         crate::check_schema_version(
             &connection,
+            BUDGET_STORE_SCHEMA_KEY,
             BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
             BUDGET_STORE_LEGACY_ANCHOR_TABLES,
         )
@@ -158,8 +162,12 @@ impl SqliteBudgetStore {
         ensure_budget_mutation_event_authority_columns(&connection)?;
         ensure_budget_mutation_event_seq_column(&connection)?;
         initialize_budget_replication_seq(&mut connection)?;
-        crate::stamp_schema_version(&connection, BUDGET_STORE_SUPPORTED_SCHEMA_VERSION)
-            .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+        crate::stamp_schema_version(
+            &connection,
+            BUDGET_STORE_SCHEMA_KEY,
+            BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
+        )
+        .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
 
         Ok(Self {
             connection: Mutex::new(connection),
