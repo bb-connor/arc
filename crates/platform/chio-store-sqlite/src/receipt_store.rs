@@ -2398,8 +2398,16 @@ impl SqliteReceiptStore {
                 ReceiptStoreError::Sqlite(error)
             }
         })?;
-        let latest_committed_entry_seq = latest_claim_log_entry_seq(&connection)?;
+        let live_committed_entry_seq = latest_claim_log_entry_seq(&connection)?;
         let retention_watermark_entry_seq = support::retention_watermark(&connection)?;
+        // A full rotation deletes every live claim-log row, so the live
+        // MAX(entry_seq) drops to 0 while the latest checkpoint still sits at the
+        // archived watermark. Committed progress must fold in the archived prefix,
+        // otherwise this read-only watchdog reports a healthy, fully-archived
+        // store as behind its checkpoints (committed 0 < checkpointed W). Floor
+        // the committed seq at the watermark.
+        let latest_committed_entry_seq =
+            live_committed_entry_seq.max(retention_watermark_entry_seq.unwrap_or(0));
         // Catch a checkpoint-chain-integrity failure into a report with the
         // checkpoint_error set rather than propagating Err. The watchdog samples
         // this on a fixed interval; if corruption made this return Err, the

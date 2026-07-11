@@ -1218,6 +1218,52 @@ fn catch_up_honors_archival_watermark_exemption() -> Result<(), Box<dyn std::err
     Ok(())
 }
 
+/// A full-prefix rotation deletes every live claim-log row, so the read-only
+/// watchdog sees a live MAX(entry_seq) of 0 while the latest checkpoint still
+/// sits at the archived watermark. Committed progress must fold in the archived
+/// prefix so a healthy, fully-archived store is not reported as behind.
+#[test]
+fn read_only_health_floors_committed_at_watermark() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("read-only-fully-archived");
+    let archive = unique_db_path("read-only-fully-archived-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+        for i in 0..4u64 {
+            let r = super::support::sample_receipt_with_keypair_and_timestamp(
+                &format!("fa-{i}"),
+                i + 1,
+                100,
+                &keypair,
+            );
+            store.append_chio_receipt_returning_seq(&r)?;
+        }
+        store.flush_receipt_writes()?;
+        // Archive the entire checkpointed history: every live claim-log row goes.
+        let archived = store.archive_receipts_before(150, archive_path)?;
+        assert_eq!(archived, 4, "the whole history archives");
+        store.flush_receipt_writes()?;
+    }
+
+    let report = SqliteReceiptStore::receipt_store_health_read_only(&path)?;
+    assert!(
+        report.healthy,
+        "a fully-archived store must read healthy from the read-only watchdog"
+    );
+    assert_eq!(report.retention_watermark_entry_seq, Some(4));
+    assert_eq!(
+        report.latest_committed_entry_seq, 4,
+        "committed progress must be floored at the archival watermark"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// Primary correctness proof: a state-machine proptest that drives random
 /// interleaved sequences of tool/child appends (non-monotonic
 /// timestamps within an aged band, to exercise the MAX(timestamp)-over-prefix
