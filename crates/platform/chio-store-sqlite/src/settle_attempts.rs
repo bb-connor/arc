@@ -63,8 +63,26 @@ BEGIN
     SELECT RAISE(ABORT, 'settlement receipt already dead-lettered');
 END;
 
+CREATE TRIGGER IF NOT EXISTS trg_settle_attempts_reject_terminal_update
+BEFORE UPDATE OF receipt_id ON settle_attempts
+WHEN EXISTS (
+    SELECT 1 FROM settle_dead_letters WHERE receipt_id = NEW.receipt_id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'settlement receipt already dead-lettered');
+END;
+
 CREATE TRIGGER IF NOT EXISTS trg_settle_dead_letters_reject_attempt_insert
 BEFORE INSERT ON settle_dead_letters
+WHEN EXISTS (
+    SELECT 1 FROM settle_attempts WHERE receipt_id = NEW.receipt_id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'settlement receipt still has active work');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_settle_dead_letters_reject_attempt_update
+BEFORE UPDATE OF receipt_id ON settle_dead_letters
 WHEN EXISTS (
     SELECT 1 FROM settle_attempts WHERE receipt_id = NEW.receipt_id
 )
@@ -420,6 +438,23 @@ fn read_attempt_state(
     tx: &rusqlite::Transaction<'_>,
     receipt_id: &str,
 ) -> Result<Option<AttemptState>, SettlementRouteError> {
+    let overlaps_terminal = tx
+        .query_row(
+            "SELECT EXISTS(\
+                 SELECT 1 FROM settle_attempts AS attempt \
+                 INNER JOIN settle_dead_letters AS terminal USING (receipt_id) \
+                 WHERE attempt.receipt_id = ?1\
+             )",
+            [receipt_id],
+            |row| row.get::<_, bool>(0),
+        )
+        .map_err(attempt_row_error)?;
+    if overlaps_terminal {
+        return Err(invalid_record(
+            "settlement attempt overlaps terminal dead-letter state",
+        ));
+    }
+
     let stored = tx
         .query_row(
             "SELECT finalized_at, attempts, row_version, next_visible_at_ms, lease_owner, \
@@ -960,6 +995,55 @@ mod tests {
         SettlementFailureReason::from_detail(SettlementFailureCode::Rpc, detail)
     }
 
+    fn dead_letter(receipt_id: &str) -> DeadLetterRecord {
+        DeadLetterRecord::new(
+            receipt_id,
+            10,
+            1,
+            SettlementFailureReason::from_detail(
+                SettlementFailureCode::InvalidBinding,
+                "binding mismatch",
+            ),
+        )
+    }
+
+    fn seed_overlap(pool: &Pool<SqliteConnectionManager>, attempt_id: &str, terminal_id: &str) {
+        seed(pool, attempt_id, 0);
+        let dead_letters =
+            SqliteDeadLetterStore::open_with_pool(pool.clone()).test_expect("dead letters open");
+        assert!(dead_letters
+            .insert(&dead_letter(terminal_id))
+            .test_expect("dead letter inserts"));
+
+        let connection = pool.get().test_expect("test connection");
+        connection
+            .execute_batch("DROP TRIGGER IF EXISTS trg_settle_attempts_reject_terminal_update;")
+            .test_expect("update guard drops");
+        connection
+            .execute(
+                "UPDATE settle_attempts SET receipt_id = ?1 WHERE receipt_id = ?2",
+                params![terminal_id, attempt_id],
+            )
+            .test_expect("corrupt overlap seeds");
+        connection
+            .execute_batch(SETTLE_ATTEMPTS_MIGRATION)
+            .test_expect("attempt migration reinstalls");
+    }
+
+    fn assert_attempt_unleased(pool: &Pool<SqliteConnectionManager>, receipt_id: &str) {
+        let state: (i64, Option<String>, Option<String>, Option<i64>) = pool
+            .get()
+            .test_expect("test connection")
+            .query_row(
+                "SELECT row_version, lease_owner, lease_token, lease_until_ms \
+                 FROM settle_attempts WHERE receipt_id = ?1",
+                [receipt_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .test_expect("attempt state reads");
+        assert_eq!(state, (0, None, None, None));
+    }
+
     fn claim(
         store: &SqliteSettlementOutcomeStore,
         receipt_id: &str,
@@ -1068,15 +1152,7 @@ mod tests {
         seed(&pool, "receipt-1", 0);
         let dead_letters =
             SqliteDeadLetterStore::open_with_pool(pool.clone()).test_expect("dead letters open");
-        let record = chio_settle::DeadLetterRecord::new(
-            "receipt-1",
-            10,
-            1,
-            SettlementFailureReason::from_detail(
-                SettlementFailureCode::InvalidBinding,
-                "binding mismatch",
-            ),
-        );
+        let record = dead_letter("receipt-1");
 
         assert!(matches!(
             dead_letters.insert(&record),
@@ -1099,6 +1175,75 @@ mod tests {
             insert_attempt_zero_tx(&tx, "receipt-1", 10, 0),
             Err(ReceiptStoreError::Conflict(_))
         ));
+    }
+
+    #[test]
+    fn settlement_tables_reject_receipt_id_updates_that_create_overlap() {
+        let pool = pool();
+        SqliteSettlementOutcomeStore::open_with_pool(pool.clone()).test_expect("store opens");
+        seed(&pool, "attempt-1", 0);
+        seed(&pool, "attempt-2", 0);
+        let dead_letters =
+            SqliteDeadLetterStore::open_with_pool(pool.clone()).test_expect("dead letters open");
+        assert!(dead_letters
+            .insert(&dead_letter("terminal-1"))
+            .test_expect("first dead letter inserts"));
+        assert!(dead_letters
+            .insert(&dead_letter("terminal-2"))
+            .test_expect("second dead letter inserts"));
+        let connection = pool.get().test_expect("test connection");
+
+        let attempt_error = connection
+            .execute(
+                "UPDATE settle_attempts SET receipt_id = 'terminal-1' \
+                 WHERE receipt_id = 'attempt-1'",
+                [],
+            )
+            .test_expect_err("attempt overlap update rejects");
+        assert_eq!(
+            attempt_error.sqlite_error_code(),
+            Some(rusqlite::ErrorCode::ConstraintViolation)
+        );
+
+        let terminal_error = connection
+            .execute(
+                "UPDATE settle_dead_letters SET receipt_id = 'attempt-2' \
+                 WHERE receipt_id = 'terminal-2'",
+                [],
+            )
+            .test_expect_err("terminal overlap update rejects");
+        assert_eq!(
+            terminal_error.sqlite_error_code(),
+            Some(rusqlite::ErrorCode::ConstraintViolation)
+        );
+    }
+
+    #[test]
+    fn claim_receipt_rejects_preexisting_attempt_dead_letter_overlap() {
+        let pool = pool();
+        let store =
+            SqliteSettlementOutcomeStore::open_with_pool(pool.clone()).test_expect("store opens");
+        seed_overlap(&pool, "attempt-1", "terminal-1");
+
+        assert!(matches!(
+            store.claim_receipt("terminal-1", "worker", 0, 100),
+            Err(SettlementRouteError::InvalidRecord { .. })
+        ));
+        assert_attempt_unleased(&pool, "terminal-1");
+    }
+
+    #[test]
+    fn claim_due_rejects_preexisting_attempt_dead_letter_overlap() {
+        let pool = pool();
+        let store =
+            SqliteSettlementOutcomeStore::open_with_pool(pool.clone()).test_expect("store opens");
+        seed_overlap(&pool, "attempt-1", "terminal-1");
+
+        assert!(matches!(
+            store.claim_due("worker", 0, 100, 1),
+            Err(SettlementRouteError::InvalidRecord { .. })
+        ));
+        assert_attempt_unleased(&pool, "terminal-1");
     }
 
     #[test]
