@@ -6,6 +6,7 @@ use crate::config::{backoff_delay, SupervisedOutcome, SupervisorConfig};
 use crate::health::HealthFlag;
 use crate::time::now_unix_ms;
 use std::future::Future;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use tokio::task::JoinHandle;
 
 /// A supervised tokio task that owns its join handle and a [`HealthFlag`]. Retaining
@@ -68,10 +69,21 @@ where
 {
     tokio::spawn(async move {
         loop {
-            let outcome = match tokio::spawn(iteration()).await {
-                Ok(outcome) => outcome,
-                Err(join_error) if join_error.is_panic() => SupervisedOutcome::Restart,
-                Err(_cancelled) => return,
+            // Build the iteration future OUTSIDE the child task, but under
+            // `catch_unwind`. A closure that panics while producing its future
+            // (work that runs synchronously before the first `.await`) would
+            // otherwise unwind THIS supervisor task, ending the loop while the
+            // retained health flag still reads Healthy: a dead worker
+            // masquerading as live. Catch that panic and classify it exactly like
+            // a panic inside the future (a restart-worthy failure).
+            let spawned = catch_unwind(AssertUnwindSafe(&mut iteration)).map(tokio::spawn);
+            let outcome = match spawned {
+                Ok(handle) => match handle.await {
+                    Ok(outcome) => outcome,
+                    Err(join_error) if join_error.is_panic() => SupervisedOutcome::Restart,
+                    Err(_cancelled) => return,
+                },
+                Err(_panic) => SupervisedOutcome::Restart,
             };
             match outcome {
                 SupervisedOutcome::Shutdown => return,
@@ -152,6 +164,31 @@ mod tests {
         let task = SupervisedTask::spawn(fast_config("panic", true, 3), || async {
             panic!("iteration blew up");
         });
+        let health = task.health();
+        tokio::time::timeout(Duration::from_secs(3), async {
+            while health.level() != HealthLevel::Failed {
+                tokio::time::sleep(Duration::from_millis(2)).await;
+            }
+        })
+        .await
+        .unwrap_or(());
+        assert_eq!(health.level(), HealthLevel::Failed);
+        assert!(health.is_serving_closed());
+        assert!(task.is_finished());
+    }
+
+    #[tokio::test]
+    async fn panic_building_the_iteration_is_recorded_and_escalates() {
+        // A closure that panics BEFORE returning its future panics inside the
+        // supervisor task itself, not inside a child task, so no JoinError is
+        // produced. The supervisor must still record it as a failure and escalate
+        // to Failed rather than leaving a dead loop that reads Healthy.
+        let task = SupervisedTask::spawn(
+            fast_config("build-panic", true, 3),
+            || -> std::future::Ready<SupervisedOutcome> {
+                panic!("closure blew up before building the future");
+            },
+        );
         let health = task.health();
         tokio::time::timeout(Duration::from_secs(3), async {
             while health.level() != HealthLevel::Failed {
