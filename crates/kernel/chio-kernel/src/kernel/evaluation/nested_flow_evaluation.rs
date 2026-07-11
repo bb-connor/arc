@@ -660,13 +660,19 @@ impl ChioKernel {
             }
             _ => dispatch_call.await,
         };
+        // Persist the buffered child receipts while the guard is still armed. If
+        // the commit writer is saturated and the bounded append times out, the
+        // `?` returns with the guard armed and dispatch marked started, so its
+        // drop runs the post-dispatch abort cleanup: reverse the pre-execution
+        // monetary hold, retain the runtime reservations fail-closed, and record
+        // a signed cancellation receipt. Recording after disarming would instead
+        // return the timeout error with those holds still admitted and no
+        // terminal receipt on the log. `take_child_receipts` empties the buffer,
+        // so the disarmed drop on the success path flushes nothing and the
+        // receipts are never double-recorded.
+        self.record_child_receipts(post_admission_drop_guard.take_child_receipts())?;
         post_admission_drop_guard.disarm();
-        // Take the buffered child receipts out of the guard before dropping it.
-        // The guard is now disarmed AND holds an empty buffer, so its Drop
-        // records nothing and the receipts cannot be double-recorded.
-        let child_receipts = post_admission_drop_guard.take_child_receipts();
         drop(post_admission_drop_guard);
-        self.record_child_receipts(child_receipts)?;
         let tool_output = match tool_output_result {
             Ok(output) => output,
             Err(error @ KernelError::UrlElicitationsRequired { .. }) => {
