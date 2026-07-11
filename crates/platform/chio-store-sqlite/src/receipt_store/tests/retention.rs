@@ -739,6 +739,97 @@ fn co_archival_rejects_conflicting_stale_archive() -> Result<(), Box<dyn std::er
     Ok(())
 }
 
+/// Co-archival must verify capability lineage by identity too. The delete
+/// removes the archived receipts but leaves the live lineage rows, so the
+/// archive becomes the only standalone copy of those receipts' subject/issuer/
+/// grants. A reused archive holding the same capability_id under divergent
+/// lineage bytes is kept by the idempotent `INSERT OR IGNORE` copy, so a
+/// count-only check would pass while the archived attribution diverges.
+/// Verification must FAIL fail-closed before any delete.
+#[test]
+fn co_archival_rejects_conflicting_capability_lineage() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("co-archival-cap-lineage");
+    let archive = unique_db_path("co-archival-cap-lineage-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    for i in 0..2u64 {
+        let receipt = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("cl-{i}"),
+            i + 1,
+            100,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    assert!(store.load_checkpoint_by_seq(1)?.is_some());
+
+    // The sample receipts all carry capability_id "cap-1"; give it a live
+    // lineage row so the co-archival copy has an attribution row to archive.
+    store.writer_handle().run_write(|connection| {
+        connection.execute(
+            "INSERT INTO capability_lineage \
+             (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, parent_capability_id) \
+             VALUES ('cap-1', 'subject-live', 'issuer-live', 1, 100, '[]', 0, NULL)",
+            [],
+        )?;
+        Ok(())
+    })?;
+
+    // Pre-seed the archive with a CONFLICTING lineage row for the same
+    // capability_id but divergent identity bytes. The rotation's INSERT OR
+    // IGNORE copy keeps this stale row, so without an identity check the delete
+    // would proceed and the standalone archive would misattribute the receipts.
+    {
+        let seed = rusqlite::Connection::open(&archive)?;
+        seed.execute_batch(
+            r#"
+            CREATE TABLE capability_lineage (
+                capability_id TEXT PRIMARY KEY, subject_key TEXT NOT NULL,
+                issuer_key TEXT NOT NULL, issued_at INTEGER NOT NULL,
+                expires_at INTEGER NOT NULL, grants_json TEXT NOT NULL,
+                delegation_depth INTEGER NOT NULL DEFAULT 0, parent_capability_id TEXT
+            );
+            "#,
+        )?;
+        seed.execute(
+            "INSERT INTO capability_lineage \
+             (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, parent_capability_id) \
+             VALUES ('cap-1', 'subject-stale', 'issuer-stale', 1, 100, '[]', 0, NULL)",
+            [],
+        )?;
+    }
+
+    // Rotate: the capability-lineage identity check must reject the divergent
+    // archive and abort fail-closed BEFORE any delete.
+    let result = store.archive_receipts_before(150, archive_path);
+    let message = result
+        .err()
+        .ok_or("expected RetentionArchiveIncomplete over a conflicting capability lineage")?
+        .to_string();
+    assert!(
+        message.contains("co-archival incomplete for capability_lineage"),
+        "unexpected error: {message}"
+    );
+
+    // The live receipts are intact: the abort happened before any delete.
+    let live = store.reader_connection_for_test()?;
+    let live_tool: i64 = live.query_row("SELECT COUNT(*) FROM chio_tool_receipts", [], |row| {
+        row.get(0)
+    })?;
+    assert_eq!(
+        live_tool, 2,
+        "tool receipts intact when capability-lineage verify fails"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// The operator recovery path (`chio receipt retention repair --archive`): a
 /// store bricked by source rows deleted with the claim-log projection rows left
 /// behind can be repaired back to a writable, reopenable, healthy store.

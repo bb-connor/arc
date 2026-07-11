@@ -750,15 +750,19 @@ fn copy_archived_prefix(
 /// and `raw_json`, and the claim-log projection, checkpoint rows, and
 /// settlement/metered/consumption reconciliations by a NULL-safe (`IS`)
 /// full-column compare of the live prefix rows against their archive
-/// counterparts (keyed on each table's primary key). The compare is bounded to
-/// the archived prefix (`O(archived rows)`, a primary-key lookup per row, never
-/// `O(full history)`). Any shortfall aborts before any delete (fail-closed,
-/// `RetentionArchiveIncomplete`).
+/// counterparts (keyed on each table's primary key). Capability lineage is
+/// verified the same way even though the delete leaves the live lineage rows in
+/// place: the archived receipts ARE deleted, so the archive becomes the only
+/// standalone-authoritative copy of their capability subject/issuer/grants, and
+/// a divergent archived lineage row would misattribute them. The compare is
+/// bounded to the archived prefix (`O(archived rows)`, a primary-key lookup per
+/// row, never `O(full history)`). Any shortfall aborts before any delete
+/// (fail-closed, `RetentionArchiveIncomplete`).
 fn verify_co_archival_complete(
     connection: &rusqlite::Connection,
     w: i64,
 ) -> Result<(), ReceiptStoreError> {
-    let checks: [(&'static str, String, String); 7] = [
+    let checks: [(&'static str, String, String); 8] = [
         (
             // Present AND byte-identical: `archive_sql` counts only live prefix
             // rows that have an archive row with the same `receipt_id` and
@@ -872,6 +876,34 @@ fn verify_co_archival_complete(
                  AND a.session_id IS m.session_id AND a.tool_call_id IS m.tool_call_id \
                  AND a.tenant_id IS m.tenant_id AND a.parameter_hash IS m.parameter_hash \
                  AND a.consumed_at_unix_ms IS m.consumed_at_unix_ms)"
+            ),
+        ),
+        (
+            // Identity keyed on capability_id (PK). The delete removes the live
+            // receipts but NOT the live lineage rows, so the archive becomes the
+            // ONLY copy of the archived receipts' capability lineage (subject,
+            // issuer, grants). The idempotent `INSERT OR IGNORE` copy keeps a
+            // pre-existing archive row on a capability_id conflict, so a reused
+            // archive holding the same capability under divergent lineage bytes
+            // would silently misattribute the archived receipts' subject/issuer/
+            // grants and agent-subject filtering. Verify every lineage row
+            // referenced by an archived tool receipt matches the live row before
+            // the delete.
+            "capability_lineage",
+            format!(
+                "SELECT COUNT(*) FROM main.capability_lineage m WHERE m.capability_id IN \
+                 (SELECT r.capability_id FROM main.chio_tool_receipts r WHERE r.seq IN \
+                  (SELECT source_seq FROM main.claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt'))"
+            ),
+            format!(
+                "SELECT COUNT(*) FROM main.capability_lineage m WHERE m.capability_id IN \
+                 (SELECT r.capability_id FROM main.chio_tool_receipts r WHERE r.seq IN \
+                  (SELECT source_seq FROM main.claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt')) \
+                 AND EXISTS (SELECT 1 FROM archive.capability_lineage a WHERE a.capability_id = m.capability_id \
+                 AND a.subject_key IS m.subject_key AND a.issuer_key IS m.issuer_key \
+                 AND a.issued_at IS m.issued_at AND a.expires_at IS m.expires_at \
+                 AND a.grants_json IS m.grants_json AND a.delegation_depth IS m.delegation_depth \
+                 AND a.parent_capability_id IS m.parent_capability_id)"
             ),
         ),
     ];
