@@ -5,6 +5,8 @@ use chio_http_serve::{
     apply_server_hygiene, run_until_drained, MaxConnListener, ServeHygieneConfig,
     ShutdownController,
 };
+use std::sync::OnceLock;
+use std::time::{Duration, Instant};
 
 pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
     config.validate()?;
@@ -37,6 +39,20 @@ pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliErr
         .cluster
         .is_some()
         .then(|| tokio::spawn(run_cluster_sync_loop(state.clone(), controller.subscribe())));
+
+    // Record when the stop signal fires so the post-drain cluster-loop join can
+    // share the one drain budget with the HTTP drain instead of adding a second
+    // wait on top of it (see the join below). The observer sets the instant once,
+    // the moment shutdown is requested.
+    let shutdown_at: Arc<OnceLock<Instant>> = Arc::new(OnceLock::new());
+    {
+        let shutdown_at = Arc::clone(&shutdown_at);
+        let signalled = controller.signalled();
+        tokio::spawn(async move {
+            signalled.await;
+            let _ = shutdown_at.set(Instant::now());
+        });
+    }
 
     // Trust-control is the single service hosting capability revocation and
     // budget authority for the cluster, so it takes a body cap, the concurrency
@@ -75,16 +91,57 @@ pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliErr
     )
     .await;
 
-    // The cluster sync loop watches the same shutdown signal and returns after its
-    // current per-peer call; join it (bounded) once the HTTP server has drained so
-    // a blocking peer sync cannot keep occupying the runtime past the platform stop
-    // window. The bound covers one in-flight peer call plus a small margin.
+    // The cluster sync loop watches the same shutdown signal and reacts to it
+    // concurrently with the HTTP drain. Once the server has drained, join the loop
+    // within whatever remains of the drain window, never a fresh wait on top of it:
+    // one in-flight peer call can outlast any bound worth waiting for, and outbound
+    // peer sync is best-effort catch-up that resumes on the next boot, so abandoning
+    // a still-running call at the deadline never loses a receipt. Anchoring the join
+    // at the stop signal keeps the whole teardown inside one drain budget, which the
+    // platform stop grace is already sized to cover.
     if let Some(task) = cluster_sync_task {
-        let join_bound = CONTROL_HTTP_TIMEOUT.saturating_add(std::time::Duration::from_secs(5));
-        let _ = tokio::time::timeout(join_bound, task).await;
+        let join_budget = shutdown_at.get().map_or(hygiene.drain_timeout, |observed| {
+            cluster_join_budget(hygiene.drain_timeout, observed.elapsed())
+        });
+        let _ = tokio::time::timeout(join_budget, task).await;
     }
 
     serve_result.map(|_outcome| ()).map_err(|error| {
         CliError::cli_other_error(format!("trust control service failed: {error}"))
     })
+}
+
+/// Time budget for the post-drain cluster-loop join: whatever remains of the
+/// drain window once the HTTP drain returns. `elapsed` is measured from the stop
+/// signal, and the HTTP drain returns within `drain_timeout` of that signal, so
+/// the drain time already spent plus this budget never exceeds one drain window.
+/// Both teardown phases therefore share the single deadline the platform stop
+/// grace is sized to cover, instead of stacking two independent waits.
+fn cluster_join_budget(drain_timeout: Duration, elapsed_since_signal: Duration) -> Duration {
+    drain_timeout.saturating_sub(elapsed_since_signal)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::cluster_join_budget;
+    use std::time::Duration;
+
+    /// The cluster-loop join must not add a second wait on top of the HTTP drain:
+    /// for every point at which the drain could return, the drain time already
+    /// spent plus the join budget it hands out stays within one drain window, so
+    /// the whole teardown fits the platform stop grace rather than overrunning it
+    /// and being escalated to a kill.
+    #[test]
+    fn cluster_join_never_extends_teardown_past_the_drain_window() {
+        let drain = Duration::from_secs(25);
+        // A drain that ran to its deadline leaves no budget at all.
+        assert_eq!(cluster_join_budget(drain, drain), Duration::ZERO);
+        for elapsed_ms in [0u64, 1_000, 12_500, 24_000, 25_000] {
+            let elapsed = Duration::from_millis(elapsed_ms).min(drain);
+            assert!(
+                elapsed + cluster_join_budget(drain, elapsed) <= drain,
+                "teardown at elapsed={elapsed:?} must stay within the drain window"
+            );
+        }
+    }
 }
