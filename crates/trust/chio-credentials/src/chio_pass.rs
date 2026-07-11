@@ -924,7 +924,7 @@ mod chio_pass_tests {
         let pass = issued_pass(&issuer, &subject, &window, &table);
 
         let mut wrong_schema = pass.clone();
-        wrong_schema.unsigned.schema = "chio.pass.v2".to_string();
+        wrong_schema.unsigned.schema = "chio.pass.wrong".to_string();
         assert!(matches!(
             verify_chio_pass(&wrong_schema, MID_JUNE_2026, &table),
             Err(CredentialError::InvalidChioPassSchema)
