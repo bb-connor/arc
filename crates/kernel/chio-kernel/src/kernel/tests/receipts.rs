@@ -36,6 +36,45 @@ fn dead_commit_writer_denies_before_the_tool_executes() {
 }
 
 #[test]
+fn serving_closed_store_deny_is_not_masked_by_its_own_receipt_append() {
+    let mut kernel = make_kernel(make_config());
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "srv-a",
+        vec!["read_file"],
+        std::sync::Arc::clone(&invocations),
+    )));
+    // A serving-closed store whose appends actually fail, like a real
+    // poisoned-head or dead writer (the earlier double still accepts appends).
+    kernel
+        .set_receipt_store(Box::new(RejectingDeadWriterReceiptStore))
+        .unwrap();
+
+    let agent_kp = make_keypair();
+    let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+    let request = make_request("req-rejecting-writer", &cap, "read_file", "srv-a");
+
+    // The pre-dispatch gate denies because the writer is serving-closed. Building
+    // that deny must NOT try to persist the deny receipt through the same closed
+    // store: that append would fail and surface a 500 instead of the clean signed
+    // Deny verdict. The verdict is what callers must see.
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    let reason = response.reason.unwrap_or_default();
+    assert!(
+        reason.contains("commit writer is not serving"),
+        "expected a receipt-persistence-degraded deny, got: {reason}"
+    );
+    assert_eq!(
+        invocations.load(Ordering::SeqCst),
+        0,
+        "a serving-closed writer must deny before the tool executes"
+    );
+}
+
+#[test]
 fn dead_commit_writer_denies_before_the_capability_lineage_write() {
     let mut kernel = make_kernel(make_config());
     let invocations = std::sync::Arc::new(AtomicU64::new(0));

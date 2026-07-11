@@ -1932,6 +1932,35 @@ impl ReceiptStore for DeadWriterReceiptStore {
     }
 }
 
+/// A receipt store whose supervised commit writer is serving-closed AND whose
+/// appends now fail, modelling a real poisoned-head or dead-writer store rather
+/// than one that still silently accepts writes. The pre-dispatch gate must deny
+/// before any tool executes, and the fail-closed deny it builds must not be
+/// masked into an error by attempting to persist itself through the same closed
+/// writer.
+struct RejectingDeadWriterReceiptStore;
+
+impl ReceiptStore for RejectingDeadWriterReceiptStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Err(ReceiptStoreError::Pool(
+            "receipt append rejected by a serving-closed commit writer".to_string(),
+        ))
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Err(ReceiptStoreError::Pool(
+            "child receipt append rejected by a serving-closed commit writer".to_string(),
+        ))
+    }
+
+    fn writer_serving_closed(&self) -> bool {
+        true
+    }
+}
+
 /// A commit writer that is always serving closed and, once armed, fails every
 /// capability-lineage write like a poisoned writer. It records whether the
 /// lineage write was attempted so a test can prove the pre-dispatch gate denies
