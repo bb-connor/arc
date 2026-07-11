@@ -576,6 +576,11 @@ impl HttpAuthority {
                 binding.requested_tool_name.as_deref(),
                 binding.requested_arguments.as_ref(),
                 input.model_metadata,
+                &|capability_id| {
+                    self.kernel
+                        .is_capability_revoked(capability_id)
+                        .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))
+                },
             )
         };
 
@@ -939,6 +944,7 @@ fn decision_status(verdict: &Verdict) -> u16 {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn validate_presented_capability(
     capability_id_hint: Option<&str>,
     presented_capability: Option<&str>,
@@ -947,6 +953,7 @@ fn validate_presented_capability(
     requested_tool_name: Option<&str>,
     requested_arguments: Option<&Value>,
     model_metadata: Option<&ModelMetadata>,
+    is_revoked: &dyn Fn(&str) -> Result<bool, HttpAuthorityError>,
 ) -> PresentedCapabilityState {
     let requested_tool = match (requested_tool_server, requested_tool_name) {
         (Some(server_id), Some(tool_name)) => Some(RequestedToolInvocation {
@@ -989,9 +996,20 @@ fn validate_presented_capability(
                     };
                 }
             }
-            PresentedCapabilityState {
-                capability_id: Some(token.id),
-                invalid_reason: None,
+            // The kernel's revocation check runs against the internal authority
+            // capability minted per request, never against the caller's token,
+            // so a presented capability that has been revoked (directly or via a
+            // revoked delegation ancestor) must be rejected here before it is
+            // projected as authorized.
+            match presented_capability_revocation(&token, is_revoked) {
+                Ok(None) => PresentedCapabilityState {
+                    capability_id: Some(token.id),
+                    invalid_reason: None,
+                },
+                Ok(Some(reason)) | Err(reason) => PresentedCapabilityState {
+                    capability_id: None,
+                    invalid_reason: Some(reason),
+                },
             }
         }
         Err(reason) => PresentedCapabilityState {
@@ -999,6 +1017,33 @@ fn validate_presented_capability(
             invalid_reason: Some(reason),
         },
     }
+}
+
+/// Reject a presented capability whose id, or any id in its delegation chain,
+/// is revoked. Returns `Ok(None)` when nothing is revoked, `Ok(Some(reason))`
+/// when a revoked id is found, and `Err(reason)` when the revocation store
+/// cannot be consulted, so an unavailable revocation store denies (fail-closed)
+/// rather than silently projecting the capability as valid.
+fn presented_capability_revocation(
+    token: &CapabilityToken,
+    is_revoked: &dyn Fn(&str) -> Result<bool, HttpAuthorityError>,
+) -> Result<Option<String>, String> {
+    let chain_ids = token
+        .delegation_chain
+        .iter()
+        .map(|link| link.capability_id.as_str());
+    for capability_id in std::iter::once(token.id.as_str()).chain(chain_ids) {
+        match is_revoked(capability_id) {
+            Ok(false) => {}
+            Ok(true) => {
+                return Ok(Some(format!(
+                    "presented capability {capability_id} has been revoked"
+                )))
+            }
+            Err(error) => return Err(format!("capability revocation status unavailable: {error}")),
+        }
+    }
+    Ok(None)
 }
 
 fn projected_verdict(

@@ -535,6 +535,67 @@ fn configured_external_issuer_allows_deny_by_default() {
 }
 
 #[test]
+fn revoked_presented_capability_denies_deny_by_default() -> Result<(), Box<dyn std::error::Error>> {
+    let dir = tempfile::tempdir()?;
+    let receipt_store: Arc<dyn chio_kernel::ReceiptStore> = Arc::new(
+        chio_store_sqlite::SqliteReceiptStore::open(dir.path().join("receipts.db"))?,
+    );
+    let revocation_store: Arc<dyn chio_kernel::RevocationStore> = Arc::new(
+        chio_store_sqlite::SqliteRevocationStore::open(dir.path().join("revocations.db"))?,
+    );
+    // The caller presents a validly-signed capability whose id has since been
+    // revoked in the durable store.
+    revocation_store.revoke("cap-revoked")?;
+
+    let external_issuer = Keypair::generate();
+    let authority = HttpAuthority::builder()
+        .receipt_store(receipt_store)
+        .revocation_store(revocation_store)
+        .trusted_capability_issuers(vec![external_issuer.public_key()])
+        .build(Keypair::generate(), "policy-hash".to_string())?;
+
+    let capability = signed_capability_token_json(&external_issuer, "cap-revoked");
+    let query = HashMap::new();
+    let result = authority
+        .evaluate(HttpAuthorityInput {
+            request_id: "req-revoked".to_string(),
+            method: HttpMethod::Post,
+            route_pattern: "/pets".to_string(),
+            path: "/pets",
+            query: &query,
+            caller: caller(),
+            body_hash: Some("revoked".to_string()),
+            body_length: 7,
+            session_id: None,
+            capability_id_hint: None,
+            presented_capability: Some(&capability),
+            requested_tool_server: None,
+            requested_tool_name: None,
+            requested_arguments: None,
+            model_metadata: None,
+            execution_nonce: None,
+            policy: HttpAuthorityPolicy::DenyByDefault,
+        })
+        .test_unwrap();
+
+    assert!(
+        result.verdict.is_denied(),
+        "a revoked presented capability must be denied"
+    );
+    assert!(result.receipt.capability_id.is_none());
+    assert!(
+        result.receipt.evidence[0]
+            .details
+            .as_deref()
+            .is_some_and(|details| details.contains("revoked")),
+        "evidence should record the revocation, got {:?}",
+        result.receipt.evidence
+    );
+
+    Ok(())
+}
+
+#[test]
 fn finalized_receipt_links_decision_receipt_and_kernel_receipt() {
     let query = HashMap::new();
     let shared = authority();
