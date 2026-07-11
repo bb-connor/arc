@@ -288,7 +288,7 @@ pub struct ChioKernel {
     pub(super) post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline,
     pub(super) budget_store: Arc<dyn BudgetStore>,
     pub(super) budget_store_lock: Mutex<()>,
-    /// Optional Phase-0 free-tier compute pool (M0 Pass CONTROL 1). When set,
+    /// Optional free-tier compute pool ceiling. When set,
     /// every private-use (free-tier) per-Pass charge also debits one aggregate
     /// `freetier:global:<YYYY-MM>` budget row, capping liability at
     /// `min(N x allotment, pool)`. `None` keeps the kernel pool-free.
@@ -495,8 +495,8 @@ impl ChioKernel {
     }
 }
 
-/// Board-approved configuration for the Phase-0 free-tier compute pool (M0 Pass
-/// CONTROL 1). It bounds aggregate free-tier liability to a hard monthly ceiling
+/// Board-approved configuration for the free-tier compute pool. It bounds
+/// aggregate free-tier liability to a hard monthly ceiling
 /// so the gift degrades to "the pool shrinks", never "the treasury drains": when
 /// the aggregate term is exhausted the kernel denies fail-closed.
 ///
@@ -627,7 +627,7 @@ mod free_tier_pool_config_tests {
 
     #[test]
     fn validate_rejects_non_xcc_pool_unit() {
-        // PR957 codex P2: the pool unit must be the canonical Pass allotment unit
+        // The pool unit must be the canonical Pass allotment unit
         // (XCC). A shape-valid but pinned currency like USD would never match a real
         // Pass charge, silently disabling the monthly liability cap, so it is rejected
         // fail-closed even though it is three uppercase letters. Any other private-use
