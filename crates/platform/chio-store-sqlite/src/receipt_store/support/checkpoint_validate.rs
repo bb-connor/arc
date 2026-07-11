@@ -355,9 +355,38 @@ pub(crate) fn verify_checkpoint_chain_integrity(
     let mut expected_witness_ids = BTreeSet::new();
     let mut expected_publication_ids = BTreeSet::new();
 
+    // SECURITY: the watermark ledger's DB triggers enforce monotonicity only,
+    // not that W is a genuine archived-checkpoint boundary. The archival path
+    // only ever advances W to some checkpoint's batch_end_seq
+    // (`compute_archival_watermark`), and kernel_checkpoints is immutable and
+    // signature-verified in the loop below, so a real W always matches a
+    // persisted checkpoint boundary. A forged, strictly-larger W written past
+    // the latest real checkpoint would otherwise skip the live Merkle rebuild
+    // for never-archived live ranges. Trust W as a skip-verification exemption
+    // only when it matches a persisted checkpoint's batch_end_seq; otherwise
+    // fall back to full verification (effective watermark 0, fail-closed).
+    // Bounded to the already-loaded checkpoint rows (O(number of checkpoints),
+    // never O(log length)).
+    let raw_watermark = retention_watermark(connection)?.unwrap_or(0);
+    let watermark =
+        if raw_watermark != 0 && rows.iter().any(|row| row.batch_end_seq == raw_watermark) {
+            raw_watermark
+        } else {
+            0
+        };
     for row in rows {
-        let checkpoint = parse_persisted_checkpoint_row(row.clone())?;
-        validate_checkpoint_against_claim_log(connection, &checkpoint)?;
+        let checkpoint = parse_persisted_checkpoint_row(row.clone())?; // signature + column consistency
+                                                                       // Checkpoints fully covered by a persisted archival watermark have
+                                                                       // had their claim-log rows co-archived and deleted; their deep Merkle
+                                                                       // re-verification is served from the archive. Skip only the live
+                                                                       // Merkle rebuild for them; everything else (signature above, projection
+                                                                       // rows, predecessor linkage below) still runs. Because W is always
+                                                                       // some checkpoint's batch_end_seq and batches tile the prefix
+                                                                       // contiguously (ADR-0008), no checkpoint range straddles the
+                                                                       // watermark, so the exemption is all-or-nothing per checkpoint.
+        if checkpoint.body.batch_end_seq > watermark {
+            validate_checkpoint_against_claim_log(connection, &checkpoint)?;
+        }
         validate_checkpoint_projection_rows(connection, &row, &checkpoint)?;
         let (_, expected_witness, _) = expected_checkpoint_projection_rows(&row, &checkpoint)?;
         expected_head_ids.insert(row.checkpoint_seq);

@@ -399,6 +399,10 @@ impl ReceiptStore for SqliteReceiptStore {
         .map(|()| true)
     }
 
+    fn rotate_receipts(&self, config: &RetentionConfig) -> Result<u64, ReceiptStoreError> {
+        self.rotate_if_needed(config)
+    }
+
     fn record_capability_snapshot(
         &self,
         token: &CapabilityToken,
