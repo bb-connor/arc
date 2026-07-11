@@ -476,6 +476,16 @@ pub fn assert_pass_capability_id_deterministic(cap: &CapabilityToken) -> Result<
             "Pass capability id is not the canonical window-scoped id",
         ));
     }
+
+    // Admission-side mirror of the mint-choke scope check: a Pass admitted here
+    // must still carry EXACTLY the canonical baseline scope (one metered XCC
+    // grant, the five baseline resource grants, no prompt grants). The mint choke
+    // is the primary defense; re-running the predicate at admission means a Pass
+    // signed by any other trusted-authority path, or narrowed via delegation,
+    // cannot smuggle an inflated (or attenuated, hence non-canonical) scope past
+    // the id equality above. Soulbound Passes have no legitimate delegated or
+    // reshaped form, so any deviation denies fail-closed.
+    validate_pass_scope_is_baseline(&cap.scope, &subject_did)?;
     Ok(())
 }
 
@@ -921,14 +931,52 @@ mod tests {
         let subject_did = format!("did:chio:{}", subject.public_key().to_hex());
         let window = june_window();
         let id = window_scoped_capability_id(&subject_did, &window).expect("id");
+        // The mint choke builds the baseline against the subject DID itself, so a
+        // mint-shaped fixture must bind its own-data URIs to the same DID.
         let token = signed_token(
             id,
             &subject,
-            baseline_scope(TENANT),
+            baseline_scope(&subject_did),
             window.since,
             window.until,
         );
         assert!(assert_pass_capability_id_deterministic(&token).is_ok());
+    }
+
+    #[test]
+    fn admission_rejects_pass_scope_that_is_not_the_canonical_baseline() {
+        let subject = Keypair::generate();
+        let subject_did = format!("did:chio:{}", subject.public_key().to_hex());
+        let window = june_window();
+        let id = window_scoped_capability_id(&subject_did, &window).expect("id");
+
+        // Inflated: one resource grant beyond the canonical baseline.
+        let mut inflated = baseline_scope(&subject_did);
+        inflated.resource_grants.push(ResourceGrant {
+            uri_pattern: "chio://receipts/*".to_string(),
+            operations: vec![Operation::Read],
+        });
+        let token = signed_token(
+            id.clone(),
+            &subject,
+            inflated,
+            window.since,
+            window.until,
+        );
+        assert!(matches!(
+            assert_pass_capability_id_deterministic(&token),
+            Err(KernelError::PassScopeInflation(_))
+        ));
+
+        // Attenuated: one baseline resource grant removed. A narrowed Pass is
+        // still non-canonical and denies (soulbound Passes have no reshaped form).
+        let mut attenuated = baseline_scope(&subject_did);
+        attenuated.resource_grants.pop();
+        let token = signed_token(id, &subject, attenuated, window.since, window.until);
+        assert!(matches!(
+            assert_pass_capability_id_deterministic(&token),
+            Err(KernelError::PassScopeInflation(_))
+        ));
     }
 
     #[test]
