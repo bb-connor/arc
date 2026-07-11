@@ -388,3 +388,91 @@ async fn wedged_writer_denies_before_evaluation_capability_snapshot(
     );
     Ok(())
 }
+
+/// A healthy store that records how the evaluation hot path invokes the
+/// observed-capability snapshot: the budget passed to the bounded writer path,
+/// and any use of the unbounded path.
+struct SnapshotBudgetStore {
+    bounded_budget_ms: Arc<AtomicU64>,
+    unbounded_calls: Arc<AtomicU64>,
+}
+
+impl ReceiptStore for SnapshotBudgetStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+    fn record_capability_snapshot(
+        &self,
+        _token: &CapabilityToken,
+        _parent_capability_id: Option<&str>,
+    ) -> Result<(), ReceiptStoreError> {
+        self.unbounded_calls.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+    fn record_capability_snapshot_with_timeout(
+        &self,
+        _token: &CapabilityToken,
+        _parent_capability_id: Option<&str>,
+        budget: std::time::Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        self.bounded_budget_ms
+            .store(budget.as_millis() as u64, Ordering::SeqCst);
+        Ok(())
+    }
+    fn writer_liveness(&self, _stall_threshold: std::time::Duration) -> ReceiptWriterLiveness {
+        ReceiptWriterLiveness::Healthy
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn healthy_writer_records_capability_snapshot_through_the_bounded_path(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // A writer that is healthy at the pre-dispatch gate can still stall on the
+    // observed-capability snapshot, which commits through the receipt writer.
+    // The hot path must take that write through the bounded writer path with the
+    // append budget, not the unbounded one, so it fails closed rather than hangs.
+    let bounded_budget_ms = Arc::new(AtomicU64::new(0));
+    let unbounded_calls = Arc::new(AtomicU64::new(0));
+    let config = make_config();
+    let expected_budget_ms =
+        u64::try_from(config.deadlines.receipt_append_budget().as_millis()).unwrap_or(u64::MAX);
+    let mut kernel = make_kernel(config);
+    kernel.set_receipt_store(Box::new(SnapshotBudgetStore {
+        bounded_budget_ms: Arc::clone(&bounded_budget_ms),
+        unbounded_calls: Arc::clone(&unbounded_calls),
+    }))?;
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-snap-budget", vec!["noop"])));
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-snap-budget", "noop")]),
+        300,
+    );
+    // Isolate the dispatch-time snapshot from the issuance-time snapshot above.
+    bounded_budget_ms.store(0, Ordering::SeqCst);
+    unbounded_calls.store(0, Ordering::SeqCst);
+    let request = make_request("req-snap-budget", &cap, "noop", "srv-snap-budget");
+    let kernel = Arc::new(kernel);
+
+    let response = kernel.evaluate_tool_call(&request).await?;
+
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(
+        bounded_budget_ms.load(Ordering::SeqCst),
+        expected_budget_ms,
+        "the observed-capability snapshot must use the bounded writer path with the append budget"
+    );
+    assert_eq!(
+        unbounded_calls.load(Ordering::SeqCst),
+        0,
+        "the hot-path snapshot must not use the unbounded writer path"
+    );
+    Ok(())
+}

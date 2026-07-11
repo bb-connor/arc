@@ -467,7 +467,37 @@ impl WriterHandle {
         F: FnOnce(&mut SqliteStoreConnection) -> Result<T, ReceiptStoreError> + Send + 'static,
         T: Send + 'static,
     {
-        let result = self.enqueue_write_job(job, true)?;
+        self.run_write_kind_with_timeout(job, true, timeout)
+    }
+
+    /// Bounded variant of [`run_write`]: a metadata-only write (capability
+    /// lineage, session anchors) whose response wait is capped at `timeout`.
+    /// Fail-closed and inflight-preserving on expiry exactly like
+    /// [`run_write_receipt_with_timeout`], so a hot-path metadata write cannot
+    /// hang the caller on a wedged writer.
+    pub(crate) fn run_write_with_timeout<T, F>(
+        &self,
+        job: F,
+        timeout: Duration,
+    ) -> Result<T, ReceiptStoreError>
+    where
+        F: FnOnce(&mut SqliteStoreConnection) -> Result<T, ReceiptStoreError> + Send + 'static,
+        T: Send + 'static,
+    {
+        self.run_write_kind_with_timeout(job, false, timeout)
+    }
+
+    fn run_write_kind_with_timeout<T, F>(
+        &self,
+        job: F,
+        appends_receipts: bool,
+        timeout: Duration,
+    ) -> Result<T, ReceiptStoreError>
+    where
+        F: FnOnce(&mut SqliteStoreConnection) -> Result<T, ReceiptStoreError> + Send + 'static,
+        T: Send + 'static,
+    {
+        let result = self.enqueue_write_job(job, appends_receipts)?;
         match result.recv_timeout(timeout) {
             Ok(outcome) => outcome,
             Err(mpsc::RecvTimeoutError::Timeout) => {
@@ -3351,6 +3381,41 @@ mod receipt_commit_actor_tests {
         let start = std::time::Instant::now();
         let error =
             handle.run_write_receipt_with_timeout(|_connection| Ok(()), Duration::from_millis(250));
+        assert!(start.elapsed() < Duration::from_secs(2));
+
+        match error.err().ok_or("expected write timeout error")? {
+            ReceiptStoreError::Timeout { operation, .. } => {
+                assert_eq!(operation, "sqlite receipt commit write");
+            }
+            other => {
+                return Err(
+                    std::io::Error::other(format!("expected timeout error, got {other}")).into(),
+                );
+            }
+        }
+        // Ownership of the queued job stays with the actor, so the timeout side
+        // must leave inflight elevated (the honest wedged-writer signal).
+        assert_eq!(health.inflight.load(Ordering::SeqCst), inflight_before + 1);
+        assert!(health.failed_total.load(Ordering::SeqCst) >= 1);
+        Ok(())
+    }
+
+    #[test]
+    fn run_write_with_timeout_fails_closed_when_writer_never_drains(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // The hot-path capability snapshot persists through `run_write_with_timeout`.
+        // Its bounded metadata variant must fail closed on a wedged writer instead
+        // of blocking the caller forever.
+        let (sender, _receiver) = receipt_commit_channel();
+        let health = Arc::new(ReceiptCommitWriterHealth::default());
+        let handle = WriterHandle {
+            sender,
+            health: Arc::clone(&health),
+        };
+        let inflight_before = health.inflight.load(Ordering::SeqCst);
+
+        let start = std::time::Instant::now();
+        let error = handle.run_write_with_timeout(|_connection| Ok(()), Duration::from_millis(250));
         assert!(start.elapsed() < Duration::from_secs(2));
 
         match error.err().ok_or("expected write timeout error")? {

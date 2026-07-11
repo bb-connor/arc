@@ -5,7 +5,7 @@ pub use chio_kernel::capability_lineage::{
 use rusqlite::types::Type;
 use rusqlite::{params, OptionalExtension, Row};
 
-use crate::receipt_store::SqliteReceiptStore;
+use crate::receipt_store::{SqliteReceiptStore, SqliteStoreConnection};
 
 fn snapshot_from_row(row: &Row<'_>) -> rusqlite::Result<CapabilitySnapshot> {
     Ok(CapabilitySnapshot {
@@ -61,6 +61,28 @@ impl SqliteReceiptStore {
         token: &CapabilityToken,
         parent_capability_id: Option<&str>,
     ) -> Result<(), CapabilityLineageError> {
+        self.record_capability_snapshot_bounded(token, parent_capability_id, None)
+    }
+
+    /// Bounded variant of [`record_capability_snapshot`]: the writer round trip
+    /// is capped at `budget`. The evaluation hot path uses this so a wedged or
+    /// dying commit writer that passed the pre-dispatch liveness check but stalls
+    /// on this snapshot cannot hang the request inside an unbounded write.
+    pub fn record_capability_snapshot_with_timeout(
+        &self,
+        token: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+        budget: std::time::Duration,
+    ) -> Result<(), CapabilityLineageError> {
+        self.record_capability_snapshot_bounded(token, parent_capability_id, Some(budget))
+    }
+
+    fn record_capability_snapshot_bounded(
+        &self,
+        token: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+        budget: Option<std::time::Duration>,
+    ) -> Result<(), CapabilityLineageError> {
         let grants_json = serde_json::to_string(&token.scope)?;
         let subject_key = token.subject.to_hex();
         let issuer_key = token.issuer.to_hex();
@@ -85,7 +107,7 @@ impl SqliteReceiptStore {
         let issued_at = token.issued_at;
         let expires_at = token.expires_at;
         let parent_capability_id = parent_capability_id.map(ToString::to_string);
-        self.writer_handle().run_write(move |connection| {
+        let job = move |connection: &mut SqliteStoreConnection| {
             connection.execute(
                 r#"
                 INSERT OR IGNORE INTO capability_lineage (
@@ -111,7 +133,11 @@ impl SqliteReceiptStore {
                 ],
             )?;
             Ok(())
-        })?;
+        };
+        match budget {
+            Some(budget) => self.writer_handle().run_write_with_timeout(job, budget)?,
+            None => self.writer_handle().run_write(job)?,
+        }
 
         Ok(())
     }

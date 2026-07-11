@@ -461,6 +461,21 @@ pub trait ReceiptStore: Send + Sync {
         Ok(())
     }
 
+    /// Record a capability snapshot, failing closed with
+    /// `ReceiptStoreError::Timeout` if the writer round trip exceeds `budget`.
+    /// The default ignores the budget and keeps the unbounded behavior for stores
+    /// without an async writer; a store with a commit actor overrides this so a
+    /// writer that stalls after the pre-dispatch liveness check cannot hang the
+    /// evaluation hot path inside the snapshot write.
+    fn record_capability_snapshot_with_timeout(
+        &self,
+        token: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+        _budget: std::time::Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        self.record_capability_snapshot(token, parent_capability_id)
+    }
+
     fn get_capability_snapshot(
         &self,
         _capability_id: &str,

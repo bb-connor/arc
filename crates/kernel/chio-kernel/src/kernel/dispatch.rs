@@ -358,8 +358,17 @@ impl ChioKernel {
             .delegation_chain
             .last()
             .map(|link| link.capability_id.as_str());
+        // Bound the snapshot write by the receipt append budget. The
+        // pre-dispatch liveness gate denies an already-wedged writer, but a
+        // writer that passes the check and then stalls on this write must fail
+        // closed within budget rather than hang the request before dispatch.
+        let budget = self.config.deadlines.receipt_append_budget();
         let _ = self.with_receipt_store(|store| {
-            Ok(store.record_capability_snapshot(capability, parent_capability_id)?)
+            Ok(store.record_capability_snapshot_with_timeout(
+                capability,
+                parent_capability_id,
+                budget,
+            )?)
         })?;
         Ok(())
     }

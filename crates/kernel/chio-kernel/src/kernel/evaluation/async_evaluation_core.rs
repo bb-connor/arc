@@ -235,10 +235,11 @@ impl ChioKernel {
             );
         }
 
-        // Bound the hot path before the writer-backed capability snapshot below:
-        // that snapshot commits through the receipt writer with an unbounded
-        // wait, so a wedged, saturated, or dead writer must be denied here rather
-        // than allowed to hang the request inside the write.
+        // Deny a writer that is already wedged, saturated, or dead before the
+        // writer-backed capability snapshot below. The snapshot write is itself
+        // bounded by the append budget, so a writer that passes this check and
+        // then stalls still fails closed rather than hanging; this gate keeps a
+        // known-bad writer from reaching the write at all.
         if let Err(error) = self.ensure_receipt_persistence_ready() {
             let msg = error.to_string();
             warn!(

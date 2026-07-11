@@ -1,5 +1,15 @@
 use super::*;
 
+/// Flatten a capability-lineage error into the receipt-store error the
+/// `ReceiptStore` trait surface speaks.
+fn capability_lineage_store_error(error: chio_kernel::CapabilityLineageError) -> ReceiptStoreError {
+    match error {
+        chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
+        chio_kernel::CapabilityLineageError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
+        chio_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
+    }
+}
+
 impl SqliteReceiptStore {
     pub fn record_session_anchor_record(
         &self,
@@ -451,15 +461,23 @@ impl ReceiptStore for SqliteReceiptStore {
         token: &CapabilityToken,
         parent_capability_id: Option<&str>,
     ) -> Result<(), ReceiptStoreError> {
-        SqliteReceiptStore::record_capability_snapshot(self, token, parent_capability_id).map_err(
-            |error| match error {
-                chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
-                chio_kernel::CapabilityLineageError::Sqlite(error) => {
-                    ReceiptStoreError::Sqlite(error)
-                }
-                chio_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
-            },
+        SqliteReceiptStore::record_capability_snapshot(self, token, parent_capability_id)
+            .map_err(capability_lineage_store_error)
+    }
+
+    fn record_capability_snapshot_with_timeout(
+        &self,
+        token: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+        budget: std::time::Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::record_capability_snapshot_with_timeout(
+            self,
+            token,
+            parent_capability_id,
+            budget,
         )
+        .map_err(capability_lineage_store_error)
     }
 
     fn get_capability_snapshot(
