@@ -2951,36 +2951,6 @@ mod receipt_commit_actor_tests {
         Ok(())
     }
 
-    #[test]
-    fn run_write_fails_closed_when_queue_is_full() -> Result<(), Box<dyn std::error::Error>> {
-        let (sender, _receiver) = receipt_commit_channel();
-        let health = Arc::new(ReceiptCommitWriterHealth::default());
-        for _ in 0..RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY {
-            let (response, _result) = mpsc::sync_channel(1);
-            sender.try_send(ReceiptCommitCommand::Flush(response))?;
-        }
-        let handle = WriterHandle {
-            sender,
-            health: Arc::clone(&health),
-            settlement_store_binding: None,
-        };
-
-        let error = handle.run_write(|_connection| Ok(()));
-
-        assert!(error
-            .err()
-            .ok_or("expected queue saturation error")?
-            .to_string()
-            .contains("sqlite receipt commit queue saturated"));
-        assert_eq!(
-            health.inflight.load(Ordering::SeqCst),
-            0,
-            "speculative inflight increment must be undone on saturation"
-        );
-        assert_eq!(health.saturated_total.load(Ordering::SeqCst), 1);
-        Ok(())
-    }
-
     /// A writer-routed `Write` job (liability write, manual checkpoint creation)
     /// must keep `writer_inflight` nonzero for the DURATION of the job, not just
     /// at enqueue, so a health poll during a slow or stuck Write does not report

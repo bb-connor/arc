@@ -121,6 +121,36 @@ fn append_batch_panic_does_not_kill_the_actor() -> Result<(), Box<dyn std::error
     Ok(())
 }
 
+#[test]
+fn run_write_fails_closed_when_queue_is_full() -> Result<(), Box<dyn std::error::Error>> {
+    let (sender, _receiver) = receipt_commit_channel();
+    let health = Arc::new(ReceiptCommitWriterHealth::default());
+    for _ in 0..RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY {
+        let (response, _result) = mpsc::sync_channel(1);
+        sender.try_send(ReceiptCommitCommand::Flush(response))?;
+    }
+    let handle = WriterHandle {
+        sender,
+        health: Arc::clone(&health),
+        settlement_store_binding: None,
+    };
+
+    let error = handle.run_write(|_connection| Ok(()));
+
+    assert!(error
+        .err()
+        .ok_or("expected queue saturation error")?
+        .to_string()
+        .contains("sqlite receipt commit queue saturated"));
+    assert_eq!(
+        health.inflight.load(Ordering::SeqCst),
+        0,
+        "speculative inflight increment must be undone on saturation"
+    );
+    assert_eq!(health.saturated_total.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
 /// {Append, Write, Flush} from many threads: every Write closure executes on
 /// exactly one thread (single-writer serialization), all appends commit, and
 /// inflight accounting drains to zero (no lost pre-send increments).
