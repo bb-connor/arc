@@ -144,25 +144,59 @@ pub(crate) fn cmd_run(
     }
 }
 
+/// Whether a `--receipt-store` value opens a SQLite database that lives only in
+/// memory for the life of the process. rusqlite enables URI filenames, so the
+/// bare `:memory:` sentinel, `file::memory:`, and any `file:...?mode=memory`
+/// URI all open a non-durable database that loses every receipt on restart and
+/// must not be mistaken for a durable audit log.
+fn is_in_memory_sqlite_path(path: &Path) -> bool {
+    let Some(value) = path.to_str() else {
+        return false;
+    };
+    if value.eq_ignore_ascii_case(":memory:") {
+        return true;
+    }
+    let Some(rest) = value.strip_prefix("file:") else {
+        return false;
+    };
+    let (name, query) = match rest.split_once('?') {
+        Some((name, query)) => (name, Some(query)),
+        None => (rest, None),
+    };
+    if name.eq_ignore_ascii_case(":memory:") {
+        return true;
+    }
+    query.is_some_and(|query| {
+        query
+            .split('&')
+            .any(|param| param.eq_ignore_ascii_case("mode=memory"))
+    })
+}
+
 /// Refuse to boot without a durable receipt store unless the operator has
 /// explicitly opted into ephemeral receipts, and warn when the sidecar cannot
 /// deliver its audit guarantee. A durable audit log is the product's core
-/// promise; a manifest that forgets `--receipt-store` should fail loudly at
-/// startup rather than run and silently lose every receipt on restart.
+/// promise; a missing `--receipt-store` or an in-memory SQLite path should fail
+/// loudly at startup rather than run and silently lose every receipt on restart.
 fn require_durable_or_ephemeral_optin(
     receipt_store: Option<&Path>,
     allow_ephemeral_receipts: bool,
     authority_seed_path: Option<&Path>,
 ) -> Result<(), CliError> {
-    if receipt_store.is_none() && !allow_ephemeral_receipts {
+    // A durable receipt store is a real filesystem path. A missing path and
+    // SQLite's in-memory sentinels are equally ephemeral (both lose the audit
+    // log on restart), so both require the explicit ephemeral opt-in.
+    let ephemeral_receipts = receipt_store.is_none_or(is_in_memory_sqlite_path);
+
+    if ephemeral_receipts && !allow_ephemeral_receipts {
         return Err(CliError::cli_other_error(
             "refusing to start without durable receipts: pass --receipt-store <path> for a \
-             durable audit log, or --allow-ephemeral-receipts to run with in-memory receipts \
-             that are lost on every restart"
+             durable audit log on a filesystem path, or --allow-ephemeral-receipts to run with \
+             in-memory receipts that are lost on every restart"
                 .to_string(),
         ));
     }
-    if receipt_store.is_none() {
+    if ephemeral_receipts {
         tracing::warn!(
             target: "chio::sidecar",
             "running with in-memory receipts (--allow-ephemeral-receipts): audit evidence is lost on every restart"
@@ -1215,6 +1249,46 @@ mod runtime_local_error_domain_tests {
         );
 
         assert_registry_error(&error, "urn:chio:error:cli:other", "cli");
+    }
+
+    #[test]
+    fn in_memory_receipt_store_is_refused_without_ephemeral_optin() {
+        for sentinel in [
+            ":memory:",
+            "file::memory:",
+            "file:audit?mode=memory&cache=shared",
+        ] {
+            let error = must_err(
+                require_durable_or_ephemeral_optin(Some(Path::new(sentinel)), false, None),
+                "an in-memory receipt store must fail closed without --allow-ephemeral-receipts",
+            );
+            let message = error.to_string();
+            assert!(
+                message.contains("without durable receipts"),
+                "unexpected error for {sentinel}: {message}"
+            );
+        }
+    }
+
+    #[test]
+    fn in_memory_receipt_store_boots_only_with_the_ephemeral_optin() {
+        assert!(
+            require_durable_or_ephemeral_optin(Some(Path::new(":memory:")), true, None).is_ok(),
+            "an in-memory receipt store is allowed once ephemeral receipts are opted into"
+        );
+    }
+
+    #[test]
+    fn durable_receipt_path_boots_without_the_ephemeral_optin() {
+        assert!(
+            require_durable_or_ephemeral_optin(
+                Some(Path::new("/var/lib/chio/receipts.db")),
+                false,
+                None,
+            )
+            .is_ok(),
+            "a filesystem receipt path is durable and needs no ephemeral opt-in"
+        );
     }
 
     #[test]
