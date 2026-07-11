@@ -5,6 +5,9 @@
 //   ghcr.io/backbay-labs/chio-sidecar    -- replace with the sidecar image you pushed
 //   Key Vault secrets must be created before deploy; the Container Apps
 //   environment's managed identity needs GET on those secrets.
+//   AzureFile-backed environment storages (specStorageName, receiptStorageName)
+//   must be registered on the managed environment before deploy; the receipt
+//   storage must be durable so the audit log survives revision recycles.
 //
 // Deploy:
 //   az deployment group create \
@@ -33,14 +36,17 @@ param appImage string = 'APP_IMAGE_PLACEHOLDER'
 @description('Chio sidecar container image.')
 param chioSidecarImage string = 'ghcr.io/backbay-labs/chio-sidecar:latest'
 
-@description('Key Vault URI that holds the Chio signing key secret.')
-param chioSigningKeySecretUri string
-
-@description('Key Vault URI that holds the capability authority URL secret.')
-param chioCapabilityAuthoritySecretUri string
+@description('Key Vault URI that holds the authority signing seed, delivered to the sidecar as a mounted secret file.')
+param chioAuthoritySeedSecretUri string
 
 @description('User-assigned managed identity resource ID with Key Vault read access.')
 param userAssignedIdentityId string
+
+@description('Container Apps environment storage name backing the read-only OpenAPI spec share.')
+param specStorageName string
+
+@description('Container Apps environment storage name backing the durable receipt audit share.')
+param receiptStorageName string
 
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
@@ -68,13 +74,8 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       }
       secrets: [
         {
-          name: 'chio-signing-key'
-          keyVaultUrl: chioSigningKeySecretUri
-          identity: userAssignedIdentityId
-        }
-        {
-          name: 'chio-capability-authority-url'
-          keyVaultUrl: chioCapabilityAuthoritySecretUri
+          name: 'chio-authority-seed'
+          keyVaultUrl: chioAuthoritySeedSecretUri
           identity: userAssignedIdentityId
         }
       ]
@@ -129,8 +130,14 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             'protect'
             '--upstream'
             'http://127.0.0.1:8080'
+            '--spec'
+            '/etc/chio/spec/openapi.yaml'
             '--listen'
             '0.0.0.0:9090'
+            '--receipt-store'
+            '/var/lib/chio/receipts.db'
+            '--authority-seed-file'
+            '/etc/chio/seed/authority.seed'
           ]
           resources: {
             cpu: json('0.25')
@@ -141,13 +148,19 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'CHIO_LOG_LEVEL'
               value: 'info'
             }
+          ]
+          volumeMounts: [
             {
-              name: 'CHIO_SIGNING_KEY'
-              secretRef: 'chio-signing-key'
+              volumeName: 'chio-openapi-spec'
+              mountPath: '/etc/chio/spec'
             }
             {
-              name: 'CHIO_CAPABILITY_AUTHORITY_URL'
-              secretRef: 'chio-capability-authority-url'
+              volumeName: 'chio-authority-seed'
+              mountPath: '/etc/chio/seed'
+            }
+            {
+              volumeName: 'chio-receipts'
+              mountPath: '/var/lib/chio'
             }
           ]
           probes: [
@@ -180,6 +193,35 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               failureThreshold: 3
             }
           ]
+        }
+      ]
+      volumes: [
+        // OpenAPI spec share (read-only). The kernel derives its route and
+        // scope table from this operator-provided document, never from the
+        // upstream.
+        {
+          name: 'chio-openapi-spec'
+          storageType: 'AzureFile'
+          storageName: specStorageName
+        }
+        // Authority signing seed, delivered from Key Vault as a mounted file.
+        {
+          name: 'chio-authority-seed'
+          storageType: 'Secret'
+          secrets: [
+            {
+              secretRef: 'chio-authority-seed'
+              path: 'authority.seed'
+            }
+          ]
+        }
+        // Durable audit store. This share must be backed by durable Azure Files
+        // storage so the receipt log survives revision recycles; an emptyDir
+        // volume is ephemeral and would break audit continuity.
+        {
+          name: 'chio-receipts'
+          storageType: 'AzureFile'
+          storageName: receiptStorageName
         }
       ]
       scale: {

@@ -5,7 +5,9 @@
 #   ghcr.io/backbay-labs/chio-sidecar      -- replace with the sidecar image you pushed
 #   PROJECT_ID / REGION              -- substitute for your GCP project and region
 #   projects/PROJECT_ID/secrets/...  -- create the secrets in Secret Manager first
-#   chio-kernel-config / chio-openapi-spec -- Secret Manager secrets mounted below
+#   chio-openapi-spec / chio-authority-seed -- Secret Manager secrets mounted below
+#   FILESTORE_IP                     -- Filestore instance IP backing the durable
+#                                       receipt volume (see volumes: below)
 #   chio-sidecar-control-token       -- bearer token gating /metrics + control
 #                                       endpoints (a metrics scraper presents it)
 #
@@ -103,19 +105,13 @@ spec:
             - "/etc/chio/spec/openapi.yaml"
             - "--listen"
             - "0.0.0.0:9090"
+            - "--receipt-store"
+            - "/var/lib/chio/receipts.db"
+            - "--authority-seed-file"
+            - "/etc/chio/seed/authority.seed"
           env:
             - name: CHIO_LOG_LEVEL
               value: "info"
-            - name: CHIO_CAPABILITY_AUTHORITY_URL
-              valueFrom:
-                secretKeyRef:
-                  name: chio-capability-authority-url
-                  key: latest
-            - name: CHIO_SIGNING_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: chio-signing-key
-                  key: latest
             # Sidecar-control bearer token that gates /metrics and the control
             # endpoints. A remote metrics scraper must send it as
             # `Authorization: Bearer <token>`; a co-located loopback collector
@@ -127,10 +123,12 @@ spec:
                   name: chio-sidecar-control-token
                   key: latest
           volumeMounts:
-            - name: chio-kernel-config
-              mountPath: /etc/chio/kernel
             - name: chio-openapi-spec
               mountPath: /etc/chio/spec
+            - name: chio-authority-seed
+              mountPath: /etc/chio/seed
+            - name: chio-receipts
+              mountPath: /var/lib/chio
           resources:
             limits:
               cpu: "500m"
@@ -149,15 +147,26 @@ spec:
             periodSeconds: 10
             failureThreshold: 3
       volumes:
-        - name: chio-kernel-config
-          secret:
-            secretName: chio-kernel-config
-            items:
-              - key: latest
-                path: kernel.yaml
         - name: chio-openapi-spec
           secret:
             secretName: chio-openapi-spec
             items:
               - key: latest
                 path: openapi.yaml
+        - name: chio-authority-seed
+          secret:
+            secretName: chio-authority-seed
+            items:
+              - key: latest
+                path: authority.seed
+        # Durable audit store. This volume MUST be backed by durable storage
+        # (a Filestore/NFS share, as below, or a Cloud Storage FUSE bucket); an
+        # emptyDir is ephemeral and drops the receipt log on every revision
+        # recycle, breaking audit continuity. A SQLite audit log needs POSIX
+        # file locking, so a Filestore-backed NFS share is preferred over
+        # object-storage FUSE.
+        - name: chio-receipts
+          nfs:
+            server: FILESTORE_IP
+            path: /chio-receipts
+            readOnly: false

@@ -93,14 +93,25 @@ spec:
           image: gcr.io/my-project/chio-sidecar:latest
           ports:
             - containerPort: 9090
-          env:
-            - name: CHIO_POLICY_SOURCE
-              value: "gs://my-bucket/chio-policy.yaml"
-            - name: CHIO_RECEIPT_SINK
-              value: "bigquery://my-project.chio_receipts.receipts"
+          # Routes and scopes derive from the operator-provided OpenAPI spec;
+          # receipts are written to a durable SQLite audit log; the signing
+          # seed is read from a mounted secret file.
+          args:
+            - "api"
+            - "protect"
+            - "--upstream"
+            - "http://127.0.0.1:8080"
+            - "--spec"
+            - "/etc/chio/spec/openapi.yaml"
+            - "--listen"
+            - "0.0.0.0:9090"
+            - "--receipt-store"
+            - "/var/lib/chio/receipts.db"
+            - "--authority-seed-file"
+            - "/etc/chio/seed/authority.seed"
           startupProbe:
             httpGet:
-              path: /health
+              path: /chio/health
               port: 9090
             initialDelaySeconds: 1
             periodSeconds: 1
@@ -181,12 +192,22 @@ spec:
       "portMappings": [
         { "containerPort": 9090, "protocol": "tcp" }
       ],
-      "environment": [
-        { "name": "CHIO_POLICY_SOURCE", "value": "s3://my-bucket/chio-policy.yaml" },
-        { "name": "CHIO_RECEIPT_SINK", "value": "dynamodb://chio-receipts" }
+      "command": [
+        "api",
+        "protect",
+        "--upstream",
+        "http://127.0.0.1:8080",
+        "--spec",
+        "/etc/chio/spec/openapi.yaml",
+        "--listen",
+        "0.0.0.0:9090",
+        "--receipt-store",
+        "/var/lib/chio/receipts.db",
+        "--authority-seed-file",
+        "/etc/chio/seed/authority.seed"
       ],
       "healthCheck": {
-        "command": ["CMD-SHELL", "curl -f http://localhost:9090/health || exit 1"],
+        "command": ["CMD-SHELL", "curl -f http://localhost:9090/chio/health || exit 1"],
         "interval": 10,
         "timeout": 5,
         "retries": 3,
@@ -217,14 +238,24 @@ const app = taskDef.addContainer("app", {
 });
 
 const sidecar = taskDef.addContainer("chio-sidecar", {
-  image: ecs.ContainerImage.fromEcrRepository(arcSidecarRepo),
+  image: ecs.ContainerImage.fromEcrRepository(chioSidecarRepo),
   portMappings: [{ containerPort: 9090 }],
-  environment: {
-    CHIO_POLICY_SOURCE: `s3://${policyBucket.bucketName}/chio-policy.yaml`,
-    CHIO_RECEIPT_SINK: `dynamodb://${receiptTable.tableName}`,
-  },
+  command: [
+    "api",
+    "protect",
+    "--upstream",
+    "http://127.0.0.1:8080",
+    "--spec",
+    "/etc/chio/spec/openapi.yaml",
+    "--listen",
+    "0.0.0.0:9090",
+    "--receipt-store",
+    "/var/lib/chio/receipts.db",
+    "--authority-seed-file",
+    "/etc/chio/seed/authority.seed",
+  ],
   healthCheck: {
-    command: ["CMD-SHELL", "curl -f http://localhost:9090/health || exit 1"],
+    command: ["CMD-SHELL", "curl -f http://localhost:9090/chio/health || exit 1"],
     interval: cdk.Duration.seconds(10),
     startPeriod: cdk.Duration.seconds(10),
   },
@@ -277,8 +308,19 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             cpu: json('0.25')
             memory: '0.5Gi'
           }
-          env: [
-            { name: 'CHIO_POLICY_SOURCE', value: 'https://mystorageaccount.blob.core.windows.net/config/chio-policy.yaml' }
+          args: [
+            'api'
+            'protect'
+            '--upstream'
+            'http://127.0.0.1:8080'
+            '--spec'
+            '/etc/chio/spec/openapi.yaml'
+            '--listen'
+            '0.0.0.0:9090'
+            '--receipt-store'
+            '/var/lib/chio/receipts.db'
+            '--authority-seed-file'
+            '/etc/chio/seed/authority.seed'
           ]
         }
       ]
@@ -318,29 +360,30 @@ ENTRYPOINT ["/usr/local/bin/chio"]
 
 ### 6.2 Configuration
 
-> **Proposed surface -- not consumed today.** The shipped `chio` binary does not
-> read the environment variables in the table below. Today the sidecar is
-> configured with CLI flags (for example
-> `chio api protect --upstream <url> --listen 0.0.0.0:9090`, or
-> `chio mcp serve-http --policy <file> -- <server cmd>`). Secrets and log level
-> reach a loaded config/policy file via `${VAR}` interpolation
-> (e.g. `${CHIO_SIGNING_KEY}`, `${CHIO_LOG_LEVEL}`). The variables below are an
-> aspirational configuration surface for a future dedicated sidecar binary.
+The shipped `chio` binary is configured with CLI flags, not environment
+variables. The reverse-proxy sidecar subcommand (`chio api protect`) takes its
+upstream, listen address, route/scope table, durable audit log, and signing
+seed from flags:
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `CHIO_LISTEN_ADDR` | HTTP listen address | `0.0.0.0:9090` |
-| `CHIO_POLICY_SOURCE` | Policy location (file, s3://, gs://) | `/etc/chio/policy.yaml` |
-| `CHIO_RECEIPT_SINK` | Receipt destination | `stdout` |
-| `CHIO_LOG_LEVEL` | Log level | `info` |
-| `CHIO_HEALTH_PATH` | Health check endpoint | `/health` |
-| `CHIO_GRANT_TOKEN` | Pre-loaded grant token | (none) |
-| `CHIO_POLICY_REFRESH` | Policy refresh interval | `5m` |
+| Flag | Description | Notes |
+|------|-------------|-------|
+| `--upstream <url>` | Base URL of the protected upstream | Localhost within the task/service |
+| `--listen <addr>` | Bind address for the kernel ingress | Defaults to `127.0.0.1:9090`; the manifests bind `0.0.0.0:9090` |
+| `--spec <path>` | OpenAPI document the kernel derives its route and scope table from | The operator-provided spec, not the upstream |
+| `--receipt-store <path>` | Path to the durable SQLite audit log | Backed by the `chio_store_sqlite` backend; place it on a durable read-write volume |
+| `--authority-seed-file <path>` | Path to the signing seed used to sign receipts | Delivered as a mounted secret file |
+
+The receipt store is a local SQLite database (the `chio_store_sqlite` backend).
+Point `--receipt-store` at a path on a durable volume so the audit log survives
+container restarts, revision recycles, and scale-to-zero. The reference
+manifests set only `CHIO_LOG_LEVEL` in the environment; the route table,
+receipts, and signing material are all supplied through the flags above and the
+mounted spec, seed, and receipt volumes.
 
 ### 6.3 Health Check
 
 ```
-GET /health
+GET /chio/health
 
 200 OK
 {
@@ -352,36 +395,26 @@ GET /health
 }
 ```
 
-## 7. Receipt Sinks by Platform
+## 7. Durable Receipt Store
 
-Each cloud platform has a natural receipt destination:
+The sidecar writes its audit receipts to a local SQLite database (the
+`chio_store_sqlite` backend) at the path given by `--receipt-store`. There is a
+single on-disk format across platforms; durability is a property of the volume
+the database lives on, not of a platform-specific remote sink.
 
-| Platform | Primary Sink | Secondary Sink |
-|----------|-------------|----------------|
-| GCP Cloud Run | BigQuery | Cloud Storage |
-| AWS ECS | DynamoDB | S3 |
-| Azure Container Apps | Cosmos DB | Blob Storage |
-| Any | Chio Control Plane | stdout (CloudWatch/Cloud Logging) |
+Place `--receipt-store` on a read-write volume backed by durable storage so the
+log survives container restarts, revision recycles, and scale-to-zero:
 
-The sidecar supports pluggable sinks. The `CHIO_RECEIPT_SINK` env var
-selects the sink:
+| Platform | Durable volume for `/var/lib/chio` |
+|----------|-------------------------------------|
+| GCP Cloud Run | Filestore (NFS) or a Cloud Storage FUSE volume |
+| AWS ECS | EFS access point |
+| Azure Container Apps | Azure Files share |
 
-```
-# DynamoDB
-CHIO_RECEIPT_SINK=dynamodb://table-name
-
-# BigQuery
-CHIO_RECEIPT_SINK=bigquery://project.dataset.table
-
-# S3 (buffered, flushed on shutdown)
-CHIO_RECEIPT_SINK=s3://bucket-name/prefix/
-
-# Chio Control Plane
-CHIO_RECEIPT_SINK=https://control.chio-protocol.io/v1/receipts
-
-# stdout (for structured log ingestion)
-CHIO_RECEIPT_SINK=stdout
-```
+Do not point `--receipt-store` at an ephemeral (emptyDir-tier) path: the audit
+log would be lost on every recycle, breaking receipt continuity. To move
+receipts onward (analytics, long-term retention), export from the SQLite store
+out of band rather than writing to a remote destination on the hot path.
 
 ## 8. Scale-to-Zero Considerations
 
@@ -390,46 +423,25 @@ request arrives after a cold start:
 
 1. Platform starts both containers
 2. Chio sidecar starts first (dependency ordering)
-3. Sidecar loads policy (bundled: ~2ms, cloud storage: ~40-80ms)
+3. Sidecar loads its OpenAPI spec and opens the receipt store
 4. Health check passes
 5. Application container starts
 6. First request served
 
 **Mitigation for cold start latency:**
 
-- Bundle policy in the container image (eliminates storage fetch)
+- Bundle or mount the OpenAPI spec so no remote fetch is needed at cold start
 - Set `minScale: 1` for latency-sensitive services
 - Use pre-compiled WASM guards bundled in the image
 - Consider the Lambda Extension model for truly ephemeral workloads
 
 ## 9. Terraform Module
 
-```hcl
-# Reference Terraform module for deploying Chio-governed services
-
-module "chio_cloud_run" {
-  source = "github.com/backbay-labs/chio//terraform/modules/cloud-run-sidecar"
-
-  project_id    = var.project_id
-  region        = var.region
-  service_name  = "agent-tool-server"
-
-  app_image     = "gcr.io/${var.project_id}/agent-tool-server:latest"
-  app_port      = 8080
-  app_cpu       = "1"
-  app_memory    = "512Mi"
-
-  chio_image     = "gcr.io/${var.project_id}/chio-sidecar:latest"
-  chio_cpu       = "0.25"
-  chio_memory    = "64Mi"
-
-  policy_source = "gs://${var.policy_bucket}/chio-policy.yaml"
-  receipt_sink  = "bigquery://${var.project_id}.chio.receipts"
-
-  min_instances = 1
-  max_instances = 100
-}
-```
+> **Not yet implemented.** There is no `terraform/` module in this repository
+> today. Deploy with the platform-native manifests under `deploy/`: Cloud Run
+> `service.yaml`, ECS `task-definition.json`, and Azure `container-app.bicep`. A
+> reusable Terraform module that wraps those manifests (wiring the durable
+> receipt volume and the mounted spec and seed) is a candidate for future work.
 
 ## 10. Package Structure
 
@@ -437,30 +449,20 @@ This is not a new SDK -- it is reference infrastructure:
 
 ```
 deploy/
+  README.md                   # Overview, placeholders, and quickstarts
+  SIDECAR_BUILD_GUIDE.md       # Sidecar image build guide
+
   cloud-run/
     service.yaml              # Cloud Run multi-container service
-    job.yaml                  # Cloud Run Job with sidecar
-    README.md
 
   ecs/
     task-definition.json      # ECS Fargate task definition
-    cdk/                      # CDK constructs
-      lib/chio-sidecar.ts
-    README.md
 
   azure/
     container-app.bicep       # Azure Container Apps
-    README.md
 
   sidecar/
-    Dockerfile                # Chio sidecar container
-    Dockerfile.distroless     # Minimal image
-
-  terraform/
-    modules/
-      cloud-run-sidecar/      # GCP module
-      ecs-sidecar/            # AWS module
-      aca-sidecar/            # Azure module
+    Dockerfile                # Chio sidecar container image
 ```
 
 ## 11. Open Questions
