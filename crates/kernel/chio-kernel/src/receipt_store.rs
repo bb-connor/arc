@@ -196,9 +196,10 @@ pub enum ReceiptStoreError {
 }
 
 /// Point-in-time liveness of a receipt store's commit writer. `Unknown` keeps
-/// stores with no async writer (or no watchdog wired) behaving exactly as they
-/// did before liveness existed: the pre-dispatch readiness gate treats it as
-/// permissive.
+/// stores with no async writer behaving exactly as they did before liveness
+/// existed: the pre-dispatch readiness gate treats it as permissive. A store
+/// that does have an async writer reports a concrete verdict, which the gate
+/// samples directly even when no background watchdog is running.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ReceiptWriterLiveness {
     Healthy,

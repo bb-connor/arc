@@ -234,6 +234,43 @@ async fn wedged_writer_watchdog_denies_before_side_effect(
     Ok(())
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn wedged_writer_denies_before_dispatch_without_a_running_watchdog(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // No watchdog is started and no test refresh is published, mirroring a
+    // freshly attached durable store on an edge that never calls
+    // `spawn_receipt_writer_watchdog`. The gate must still sample the writer's
+    // liveness directly and fail closed on a wedged writer, rather than admitting
+    // on the not-yet-probed `Unknown` verdict and reaching a tool side effect.
+    let invocations = Arc::new(AtomicU64::new(0));
+    let mut kernel = make_kernel(make_config());
+    kernel.set_receipt_store(Box::new(WedgedLivenessStore))?;
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "srv-no-watchdog",
+        vec!["noop"],
+        Arc::clone(&invocations),
+    )));
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-no-watchdog", "noop")]),
+        300,
+    );
+    let request = make_request("req-no-watchdog", &cap, "noop", "srv-no-watchdog");
+    let kernel = Arc::new(kernel);
+
+    let response = kernel.evaluate_tool_call(&request).await?;
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        invocations.load(Ordering::SeqCst),
+        0,
+        "no tool side effect may occur while the writer is wedged"
+    );
+    Ok(())
+}
+
 /// A wedged store that also counts capability-snapshot writes, to prove the
 /// snapshot path denies before entering the (unbounded) writer-backed write.
 struct SnapshotCountingWedgedStore {

@@ -327,8 +327,10 @@ impl ChioKernel {
         }
         // A configured store is not enough: if the commit writer is wedged,
         // saturated, or dead, dispatching would run a tool side effect that
-        // could never be durably receipted. Deny before that happens. `Unknown`
-        // (no watchdog installed) preserves the prior config-presence behavior.
+        // could never be durably receipted. Deny before that happens.
+        // `receipt_writer_liveness` samples the store directly when no watchdog
+        // has published a verdict, so the gate fails closed on a wedged writer
+        // whether or not the host started the background watchdog.
         let liveness = self.receipt_writer_liveness();
         if liveness.healthy() {
             Ok(())
@@ -339,10 +341,33 @@ impl ChioKernel {
         }
     }
 
-    /// Latest receipt-writer liveness verdict published by the watchdog.
-    /// `Unknown` when no watchdog has been spawned.
+    /// Receipt-writer liveness verdict the pre-dispatch gate reads. Prefers the
+    /// watchdog's most recent published verdict; when no watchdog is running the
+    /// published verdict stays `Unknown`, which the gate would otherwise treat as
+    /// permissive. Fall back to sampling the installed store directly in that
+    /// case so a durable store with a wedged commit writer is denied regardless
+    /// of whether the host started the watchdog. A store without an async writer
+    /// reports `Unknown` from the sample too, preserving the permissive behavior
+    /// for writer-less stores.
     pub(crate) fn receipt_writer_liveness(&self) -> crate::receipt_store::ReceiptWriterLiveness {
-        self.receipt_writer_watchdog.current()
+        let published = self.receipt_writer_watchdog.current();
+        if published != crate::receipt_store::ReceiptWriterLiveness::Unknown {
+            return published;
+        }
+        self.sample_receipt_writer_liveness()
+    }
+
+    /// Sample the installed store's commit-writer liveness against the configured
+    /// stall threshold. Reads the store's in-memory writer counters, so it is
+    /// cheap enough to run inline on the pre-dispatch path. Returns `Unknown`
+    /// when no store is installed or the store has no async writer.
+    fn sample_receipt_writer_liveness(&self) -> crate::receipt_store::ReceiptWriterLiveness {
+        let stall_threshold =
+            std::time::Duration::from_millis(self.config.deadlines.receipt_writer_stall_ms);
+        match self.with_receipt_store(|store| Ok(store.writer_liveness(stall_threshold))) {
+            Ok(Some(verdict)) => verdict,
+            _ => crate::receipt_store::ReceiptWriterLiveness::Unknown,
+        }
     }
 
     /// Sample the installed store's writer liveness once and publish it into the
@@ -350,14 +375,8 @@ impl ChioKernel {
     /// the pre-dispatch gate can be exercised deterministically.
     #[cfg(test)]
     pub(crate) fn refresh_receipt_writer_liveness_for_test(&self) {
-        let stall_threshold =
-            std::time::Duration::from_millis(self.config.deadlines.receipt_writer_stall_ms);
-        let verdict =
-            match self.with_receipt_store(|store| Ok(store.writer_liveness(stall_threshold))) {
-                Ok(Some(verdict)) => verdict,
-                _ => crate::receipt_store::ReceiptWriterLiveness::Unknown,
-            };
-        self.receipt_writer_watchdog.publish(verdict);
+        self.receipt_writer_watchdog
+            .publish(self.sample_receipt_writer_liveness());
     }
 
     /// Start the receipt-writer liveness watchdog. Opt-in: the hosting edge
@@ -366,19 +385,12 @@ impl ChioKernel {
     pub fn spawn_receipt_writer_watchdog(self: &std::sync::Arc<Self>) {
         let poll =
             std::time::Duration::from_millis(self.config.deadlines.receipt_writer_poll_ms.max(1));
-        let stall_threshold =
-            std::time::Duration::from_millis(self.config.deadlines.receipt_writer_stall_ms);
         let kernel = std::sync::Arc::clone(self);
         let handle = tokio::spawn(async move {
             let mut ticker = tokio::time::interval(poll);
             loop {
                 ticker.tick().await;
-                let verdict = match kernel
-                    .with_receipt_store(|store| Ok(store.writer_liveness(stall_threshold)))
-                {
-                    Ok(Some(verdict)) => verdict,
-                    _ => crate::receipt_store::ReceiptWriterLiveness::Unknown,
-                };
+                let verdict = kernel.sample_receipt_writer_liveness();
                 kernel.receipt_writer_watchdog.publish(verdict);
             }
         });
