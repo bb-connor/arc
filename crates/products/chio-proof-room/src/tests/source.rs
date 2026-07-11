@@ -1,8 +1,9 @@
 use super::support::*;
 use super::*;
 use crate::{
-    embedded_swarm_authority_bundle, source_verifier_context_with_options,
-    verify_source_standalone_risk_report_with_keys,
+    embedded_swarm_authority_bundle, ensure_source_policy_required_claims_verified,
+    is_agent_web_evidence_graph_node, merge_source_family_verifier_reports,
+    source_verifier_context_with_options, verify_source_standalone_risk_report_with_keys,
 };
 use chio_core_types::PublicKey;
 
@@ -351,6 +352,126 @@ fn source_family_verifier_rejects_tampered_claim_set_artifact() -> Result<(), Bo
     Ok(())
 }
 
+#[test]
+fn source_family_verifier_rejects_claim_set_required_claim_not_verified(
+) -> Result<(), Box<dyn Error>> {
+    configure_proof_room_fixture_trust();
+    let root = repo_root()?;
+    let source = root
+        .join("fixtures/proof-room/public-stages/commerce-transaction-passport/proof-room-bundle");
+    let work = tempfile::tempdir()?;
+    copy_dir_all(&source, work.path())?;
+
+    let claim_set_path = work.path().join("roots/claim-set.json");
+    let mut claim_set: serde_json::Value = serde_json::from_slice(&fs::read(&claim_set_path)?)?;
+    let claims = claim_set["claims"]
+        .as_array_mut()
+        .ok_or("claim set claims missing")?;
+    let claim = claims
+        .iter_mut()
+        .find(|claim| {
+            claim.get("claim_id").and_then(serde_json::Value::as_str)
+                == Some("claim.commerce.order_replay_consistent")
+        })
+        .ok_or("commerce replay claim missing")?;
+    claim["status"] = serde_json::Value::String("omitted".to_string());
+    fs::write(&claim_set_path, json_bytes(&claim_set)?)?;
+
+    let claim_set_sha256 = sha256_file(&claim_set_path)?;
+    update_evidence_graph_node_hash(work.path(), "claim-set.json", &claim_set_sha256)?;
+    refresh_source_roots_and_manifest(work.path(), Some(("claim-set.json", claim_set_sha256)))?;
+
+    let passport_path = work.path().join("roots/transaction-passport.json");
+    let error = verify_transaction_passport_family_report(work.path(), &passport_path)
+        .err()
+        .ok_or("claim set with omitted required claim unexpectedly verified")?;
+
+    assert!(
+        error
+            .to_string()
+            .contains("claim set required claim was not verified"),
+        "{error}"
+    );
+    Ok(())
+}
+
+#[test]
+fn source_standalone_verifier_can_skip_passport_signature_check() -> Result<(), Box<dyn Error>> {
+    let root = repo_root()?;
+    let source = root.join("fixtures/proof-room/minimal-passport/valid");
+    let work = tempfile::tempdir()?;
+    copy_dir_all(&source, work.path())?;
+
+    let passport_path = work.path().join("transaction-passport.json");
+    let mut passport: serde_json::Value = serde_json::from_slice(&fs::read(&passport_path)?)?;
+    passport["signature"] = serde_json::Value::String("00".repeat(64));
+    fs::write(
+        &passport_path,
+        [serde_json::to_vec_pretty(&passport)?.as_slice(), b"\n"].concat(),
+    )?;
+
+    let error = verify_transaction_passport_file_with_options(work.path(), &passport_path, true)
+        .err()
+        .ok_or("tampered signature unexpectedly verified")?;
+    assert!(
+        error.contains("transaction passport signature invalid"),
+        "{error}"
+    );
+
+    let report = verify_transaction_passport_file_with_options(work.path(), &passport_path, false)?;
+
+    assert_eq!(report["verdict"], "verified");
+
+    let receipt_path = work.path().join("kernel-receipt.json");
+    let mut receipt: serde_json::Value = serde_json::from_slice(&fs::read(&receipt_path)?)?;
+    receipt["receipt_id"] = serde_json::Value::String("receipt-minimal-tampered".to_string());
+    fs::write(
+        &receipt_path,
+        [serde_json::to_vec_pretty(&receipt)?.as_slice(), b"\n"].concat(),
+    )?;
+
+    let error = verify_transaction_passport_file_with_options(work.path(), &passport_path, false)
+        .err()
+        .ok_or("tampered governed-action artifact unexpectedly verified")?;
+    assert!(
+        error.contains("evidence graph artifact digest mismatch")
+            && error.contains("kernel-receipt.json"),
+        "{error}"
+    );
+    Ok(())
+}
+
+#[test]
+fn source_family_required_claims_accept_verified_transaction_root_claims(
+) -> Result<(), Box<dyn Error>> {
+    let report = serde_json::json!({
+        "schema": "chio.transaction.verifier-report.v1",
+        "verdict": "verified",
+        "verified_claims": ["claim.commerce.order_replay_consistent"]
+    });
+    let required_claims = vec![
+        "claim.transaction.passport_root_verified".to_string(),
+        "claim.commerce.order_replay_consistent".to_string(),
+    ];
+
+    ensure_source_policy_required_claims_verified(&required_claims, &report)
+        .map_err(|error| format!("verified transaction root claim rejected: {error}"))?;
+    Ok(())
+}
+
+#[test]
+fn source_agent_web_receipt_scope_uses_schema_not_fixture_filename() {
+    let node = serde_json::json!({
+        "id": "receipt-webhook-allow",
+        "schema": "chio.receipt.v1",
+        "path": "receipts/webhook-allow.json",
+        "sha256": "4b53ccf5a08beb7e3331e90d6f782b6b2dc77ba29d1324481802ade3c775fba4",
+        "role": "receipt"
+    });
+
+    assert!(is_agent_web_evidence_graph_node(&node));
+}
+
 #[tokio::test]
 async fn quickstart_router_serves_enterprise_fixture_verifier_report() -> Result<(), Box<dyn Error>>
 {
@@ -521,6 +642,39 @@ fn source_standalone_risk_rejects_untrusted_comptroller_signer() -> Result<(), B
     assert!(error
         .to_string()
         .contains("risk comptroller report signer untrusted"));
+    Ok(())
+}
+
+#[test]
+fn merge_source_family_reports_rejects_ok_but_unverified_family_report(
+) -> Result<(), Box<dyn Error>> {
+    let context = runtime_regeneration_context(false)?;
+    // An Ok (non-error) family report whose own verdict is not "verified"
+    // must downgrade the merged report; the merge must not hardcode verified.
+    let rejected_family_report = serde_json::json!({
+        "schema": "chio.transaction.verifier-report.v1",
+        "id": "verifier-report-rejected-family",
+        "verdict": "failed",
+        "accepted": false,
+        "state": "failed",
+        "verified_claims": []
+    });
+
+    let merged = merge_source_family_verifier_reports(&context, vec![rejected_family_report])?;
+
+    assert_ne!(
+        merged.get("verdict").and_then(serde_json::Value::as_str),
+        Some("verified"),
+        "merge must not report verified when a family report is not verified"
+    );
+    assert_eq!(
+        merged.get("accepted").and_then(serde_json::Value::as_bool),
+        Some(false)
+    );
+    assert_ne!(
+        merged.get("state").and_then(serde_json::Value::as_str),
+        Some("verified")
+    );
     Ok(())
 }
 
@@ -818,6 +972,22 @@ fn rejects_source_report_for_unhandled_market_required_claim() -> Result<(), Box
     copy_dir_all(&source, work.path())?;
 
     add_required_claim_to_verifier_policy(work.path(), "claim.market.not_routed")?;
+    let claim_set_path = work.path().join("roots/claim-set.json");
+    let mut claim_set: serde_json::Value = serde_json::from_slice(&fs::read(&claim_set_path)?)?;
+    claim_set["claims"]
+        .as_array_mut()
+        .ok_or("claim set claims missing")?
+        .push(serde_json::json!({
+            "claim_id": "claim.market.not_routed",
+            "status": "verified",
+            "verifier_module": "chio proof verify",
+            "evidence_refs": ["transaction-passport.json"],
+            "required_evidence": ["transaction-passport.json"]
+        }));
+    fs::write(&claim_set_path, json_bytes(&claim_set)?)?;
+    let claim_set_sha256 = sha256_file(&claim_set_path)?;
+    update_evidence_graph_node_hash(work.path(), "claim-set.json", &claim_set_sha256)?;
+    refresh_source_roots_and_manifest(work.path(), Some(("claim-set.json", claim_set_sha256)))?;
 
     let error = verify_proof_room_bundle(&work.path().join("manifest.json"))
         .err()

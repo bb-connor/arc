@@ -726,3 +726,4 @@ fn genuine_pass_xcc_denied_when_no_pool_configured() {
         "a genuine XCC Pass charge must fail closed when no aggregate pool is configured"
     );
 }
+

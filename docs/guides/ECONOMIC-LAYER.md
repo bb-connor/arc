@@ -75,7 +75,7 @@ projection, derivation, or anchor of receipts.
 
 Every allowed tool call produces an `ChioReceipt` signed by the kernel. When
 the call is cost-bearing, the receipt carries `FinancialReceiptMetadata`
-(see `crates/core/chio-core/src/receipt.rs`) plus a `CostMetadata` block from
+(see `crates/core/chio-core`) plus a `CostMetadata` block from
 `chio-metering` (`crates/economy/chio-metering/src/lib.rs`). The financial fields
 include:
 
@@ -214,7 +214,7 @@ actual transfer happens off-chain.
 
 ### 5.2 EVM path
 
-Primary entry points (`crates/economy/chio-settle/src/evm.rs`):
+Primary entry points (`crates/economy/chio-settle/src/evm`):
 
 - `prepare_web3_escrow_dispatch` + `finalize_escrow_dispatch`
 - `prepare_bond_lock` / `prepare_bond_release` / `prepare_bond_impair` /
@@ -638,7 +638,7 @@ first-class `chio` subcommands. The relevant entry points:
 - `chio-anchor::prepare_solana_memo_publication` -- `crates/economy/chio-anchor/src/solana.rs`
 - `chio-anchor::verify_proof_bundle` -- `crates/economy/chio-anchor/src/bundle.rs`
 - `chio-settle::prepare_web3_escrow_dispatch` and bond functions --
-  `crates/economy/chio-settle/src/evm.rs`
+  `crates/economy/chio-settle/src/evm`
 - `chio-settle::prepare_solana_settlement` -- `crates/economy/chio-settle/src/solana.rs`
 - `chio-settle::prepare_ccip_settlement_message` -- `crates/economy/chio-settle/src/ccip.rs`
 - `chio-settle::build_x402_payment_requirements` -- `crates/economy/chio-settle/src/payments.rs`
@@ -659,7 +659,6 @@ is at `docs/standards/CHIO_SETTLE_PROFILE.md`.
 - `docs/MONETARY_BUDGETS_GUIDE.md` -- denominated budget policies.
 - `docs/ECONOMIC_INTEROP_GUIDE.md` -- interoperability with external systems.
 - `docs/release/CHIO_SETTLE_RUNBOOK.md` -- operator runbook for settlement.
-- `docs/research/CHIO_SETTLE_PROTOCOL_DECISIONS.md` -- design history.
 
 When this guide and any referenced source disagree, the source is
 authoritative; file an issue so the guide can be updated.

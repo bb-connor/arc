@@ -28,7 +28,7 @@
 //! own-receipts/own-lineage gift (streams `3..=4`) MUST be emitted as a verified
 //! [`DisclosureLineageBundle`], routed ONLY through
 //! [`chio_disclosure_lineage::verify_disclosure_lineage_bundle`]. That artifact
-//! is a pinned-key (`TRUSTED_LINEAGE_SIGNER_PUBLIC_KEYS`) signed lineage subgraph
+//! is a lineage subgraph signed by a caller-pinned trusted key
 //! bound to a transaction-passport ref, a verifier privacy profile, a MANDATORY
 //! leakage ledger (present even when empty), a sha256 `tenant_hash` (never the
 //! plaintext tenant), and accounted issuer-status / revocation-freshness /
@@ -54,7 +54,8 @@ use chio_core_types::capability::token::{
 };
 use chio_core_types::crypto::SigningAlgorithm;
 use chio_disclosure_lineage::{
-    verify_disclosure_lineage_bundle, DisclosureLeakageLedger, DisclosureLineageBundle,
+    verify_disclosure_lineage_bundle_with_trust, DisclosureLeakageLedger, DisclosureLineageBundle,
+    DisclosureLineageVerifierTrust,
     DisclosureLineageVerifierReport,
 };
 
@@ -490,6 +491,16 @@ pub fn assert_pass_capability_id_deterministic(cap: &CapabilityToken) -> Result<
             "Pass capability id is not the canonical window-scoped id",
         ));
     }
+
+    // Admission-side mirror of the mint-choke scope check: a Pass admitted here
+    // must still carry EXACTLY the canonical baseline scope (one metered XCC
+    // grant, the five baseline resource grants, no prompt grants). The mint choke
+    // is the primary defense; re-running the predicate at admission means a Pass
+    // signed by any other trusted-authority path, or narrowed via delegation,
+    // cannot smuggle an inflated (or attenuated, hence non-canonical) scope past
+    // the id equality above. Soulbound Passes have no legitimate delegated or
+    // reshaped form, so any deviation denies fail-closed.
+    validate_pass_scope_is_baseline(&cap.scope, &subject_did)?;
     Ok(())
 }
 
@@ -615,10 +626,11 @@ pub fn emit_pass_stream_gift(
     stream: ChioPassStream,
     subject_tenant: &str,
     selection: PassStreamSelection<'_>,
+    trust: &DisclosureLineageVerifierTrust,
 ) -> Result<PassStreamGift, KernelError> {
     match (stream.is_own_tenant(), selection) {
         (true, PassStreamSelection::OwnDataBundle(bundle)) => {
-            let report = emit_own_data_gift_bundle(stream, subject_tenant, bundle)?;
+            let report = emit_own_data_gift_bundle(stream, subject_tenant, bundle, trust)?;
             // Return the VERIFIED bundle (the gifted own data the holder receives)
             // alongside its report, so a serving path wired through this
             // dispatcher can actually emit the own receipts/lineage rather than
@@ -646,10 +658,11 @@ pub fn emit_pass_stream_gift(
 ///
 /// This is the disclosed-artifact boundary for the holder's own receipts and own
 /// lineage. The bundle is routed ONLY through
-/// [`chio_disclosure_lineage::verify_disclosure_lineage_bundle`] (a pinned-key
-/// `TRUSTED_LINEAGE_SIGNER_PUBLIC_KEYS` signed subgraph bound to a
+/// [`chio_disclosure_lineage::verify_disclosure_lineage_bundle_with_trust`]: the
+/// caller pins the trusted lineage-signer set (empty trust verifies nothing,
+/// fail-closed) and the subgraph must be signed by a pinned key and bound to a
 /// transaction-passport ref, a verifier privacy profile, and a mandatory leakage
-/// ledger). On TOP of the verifier, the kernel binds, fail-closed:
+/// ledger. On TOP of the verifier, the kernel binds, fail-closed:
 ///
 /// 1. the stream is one of the two OWN streams (receipts, lineage);
 /// 2. the holder tenant is carried ONLY as a sha256 `tenant_hash`: every lineage
@@ -669,6 +682,7 @@ pub fn emit_own_data_gift_bundle(
     stream: ChioPassStream,
     subject_tenant: &str,
     bundle: &DisclosureLineageBundle,
+    trust: &DisclosureLineageVerifierTrust,
 ) -> Result<DisclosureLineageVerifierReport, KernelError> {
     if !stream.is_own_tenant() {
         return Err(KernelError::PassOwnDataGiftInvalid(
@@ -679,7 +693,7 @@ pub fn emit_own_data_gift_bundle(
     let tenant = validated_tenant(subject_tenant)?;
     // The pinned-key signed subgraph, verifier privacy profile, leakage ledger,
     // and crypto-context report are all verified here. Any failure denies.
-    let report = verify_disclosure_lineage_bundle(bundle)
+    let report = verify_disclosure_lineage_bundle_with_trust(bundle, trust)
         .map_err(|error| KernelError::PassOwnDataGiftInvalid(error.to_string()))?;
     bind_own_data_bundle_to_tenant(bundle, tenant)?;
     require_own_data_leakage_ledger(&bundle.leakage_ledger)?;
@@ -1124,14 +1138,46 @@ mod tests {
         let subject_did = format!("did:chio:{}", subject.public_key().to_hex());
         let window = june_window();
         let id = window_scoped_capability_id(&subject_did, &window).expect("id");
+        // The mint choke builds the baseline against the subject DID itself, so a
+        // mint-shaped fixture must bind its own-data URIs to the same DID.
         let token = signed_token(
             id,
             &subject,
-            baseline_scope(TENANT),
+            baseline_scope(&subject_did),
             window.since,
             window.until,
         );
         assert!(assert_pass_capability_id_deterministic(&token).is_ok());
+    }
+
+    #[test]
+    fn admission_rejects_pass_scope_that_is_not_the_canonical_baseline() {
+        let subject = Keypair::generate();
+        let subject_did = format!("did:chio:{}", subject.public_key().to_hex());
+        let window = june_window();
+        let id = window_scoped_capability_id(&subject_did, &window).expect("id");
+
+        // Inflated: one resource grant beyond the canonical baseline.
+        let mut inflated = baseline_scope(&subject_did);
+        inflated.resource_grants.push(ResourceGrant {
+            uri_pattern: "chio://receipts/*".to_string(),
+            operations: vec![Operation::Read],
+        });
+        let token = signed_token(id.clone(), &subject, inflated, window.since, window.until);
+        assert!(matches!(
+            assert_pass_capability_id_deterministic(&token),
+            Err(KernelError::PassScopeInflation(_))
+        ));
+
+        // Attenuated: one baseline resource grant removed. A narrowed Pass is
+        // still non-canonical and denies (soulbound Passes have no reshaped form).
+        let mut attenuated = baseline_scope(&subject_did);
+        attenuated.resource_grants.pop();
+        let token = signed_token(id, &subject, attenuated, window.since, window.until);
+        assert!(matches!(
+            assert_pass_capability_id_deterministic(&token),
+            Err(KernelError::PassScopeInflation(_))
+        ));
     }
 
     #[test]
@@ -1308,9 +1354,17 @@ mod tests {
         DISCLOSURE_VERIFIER_PRIVACY_PROFILE_SCHEMA_V1, LINEAGE_SIGNED_SUBGRAPH_SCHEMA_V1,
     };
 
-    /// The pinned `TRUSTED_LINEAGE_SIGNER_PUBLIC_KEYS` keypair (seed `[29u8; 32]`).
+    /// The test lineage-signer keypair (seed `[29u8; 32]`), pinned into the
+    /// verifier trust by [`lineage_trust`].
     fn lineage_signer() -> Keypair {
         Keypair::from_seed(&[29u8; 32])
+    }
+
+    fn lineage_trust() -> DisclosureLineageVerifierTrust {
+        let key = lineage_signer().public_key();
+        DisclosureLineageVerifierTrust::new()
+            .with_trusted_lineage_signer_keys(vec![key.clone()])
+            .with_trusted_crypto_context_report_signer_keys(vec![key])
     }
 
     fn digest(value: &str) -> String {
@@ -1610,14 +1664,20 @@ mod tests {
         let bundle = own_data_bundle(TENANT);
         for stream in [ChioPassStream::OwnReceipts, ChioPassStream::OwnLineage] {
             let report =
-                emit_own_data_gift_bundle(stream, TENANT, &bundle).expect("own-data gift verifies");
+                emit_own_data_gift_bundle(stream, TENANT, &bundle, &lineage_trust())
+                    .expect("own-data gift verifies");
             assert_eq!(report.verdict, "verified");
             assert_eq!(report.transaction_passport_ref, "passport-own-data");
 
             // Routed through the per-stream dispatcher it yields the bundle gift:
             // the VERIFIED bundle (the emittable own data) AND its report.
             let gift =
-                emit_pass_stream_gift(stream, TENANT, PassStreamSelection::OwnDataBundle(&bundle))
+                emit_pass_stream_gift(
+                    stream,
+                    TENANT,
+                    PassStreamSelection::OwnDataBundle(&bundle),
+                    &lineage_trust(),
+                )
                     .expect("dispatcher emits bundle");
             let PassStreamGift::OwnDataBundle {
                 bundle: emitted_bundle,
@@ -1647,7 +1707,8 @@ mod tests {
                 emit_pass_stream_gift(
                     stream,
                     TENANT,
-                    PassStreamSelection::AggregateBody(&raw_receipt)
+                    PassStreamSelection::AggregateBody(&raw_receipt),
+                    &lineage_trust(),
                 ),
                 Err(KernelError::PassOwnDataGiftInvalid(_))
             ));
@@ -1657,7 +1718,8 @@ mod tests {
                 emit_pass_stream_gift(
                     stream,
                     TENANT,
-                    PassStreamSelection::AggregateBody(&stripped)
+                    PassStreamSelection::AggregateBody(&stripped),
+                    &lineage_trust(),
                 ),
                 Err(KernelError::PassOwnDataGiftInvalid(_))
             ));
@@ -1676,8 +1738,13 @@ mod tests {
             ChioPassStream::PheromoneConcentration,
         ] {
             let gift =
-                emit_pass_stream_gift(stream, TENANT, PassStreamSelection::AggregateBody(&body))
-                    .expect("aggregate view");
+                emit_pass_stream_gift(
+                    stream,
+                    TENANT,
+                    PassStreamSelection::AggregateBody(&body),
+                    &lineage_trust(),
+                )
+                .expect("aggregate view");
             let PassStreamGift::AggregateView(view) = gift else {
                 panic!("aggregate stream must emit a redacted view");
             };
@@ -1688,7 +1755,12 @@ mod tests {
             // A disclosure bundle is never an aggregate-stream emission.
             let bundle = own_data_bundle(TENANT);
             assert!(matches!(
-                emit_pass_stream_gift(stream, TENANT, PassStreamSelection::OwnDataBundle(&bundle)),
+                emit_pass_stream_gift(
+                    stream,
+                    TENANT,
+                    PassStreamSelection::OwnDataBundle(&bundle),
+                    &lineage_trust(),
+                ),
                 Err(KernelError::PassRedactionFailed(_))
             ));
         }
@@ -1700,7 +1772,7 @@ mod tests {
         // served as this holder's own-data gift.
         let bundle = own_data_bundle("did:chioother");
         assert!(matches!(
-            emit_own_data_gift_bundle(ChioPassStream::OwnReceipts, TENANT, &bundle),
+            emit_own_data_gift_bundle(ChioPassStream::OwnReceipts, TENANT, &bundle, &lineage_trust()),
             Err(KernelError::PassOwnDataGiftInvalid(_))
         ));
     }
@@ -1712,9 +1784,9 @@ mod tests {
         // into the emitted artifact: only the sha256 tenant hash may appear.
         let mut bundle = own_data_bundle(TENANT);
         bundle.privacy_profile.required_holder_binding = Some(format!("holder:{TENANT}"));
-        assert!(verify_disclosure_lineage_bundle(&bundle).is_ok());
+        assert!(verify_disclosure_lineage_bundle_with_trust(&bundle, &lineage_trust()).is_ok());
         assert!(matches!(
-            emit_own_data_gift_bundle(ChioPassStream::OwnReceipts, TENANT, &bundle),
+            emit_own_data_gift_bundle(ChioPassStream::OwnReceipts, TENANT, &bundle, &lineage_trust()),
             Err(KernelError::PassOwnDataGiftInvalid(_))
         ));
     }
@@ -1728,7 +1800,7 @@ mod tests {
             ChioPassStream::PheromoneConcentration,
         ] {
             assert!(matches!(
-                emit_own_data_gift_bundle(stream, TENANT, &bundle),
+                emit_own_data_gift_bundle(stream, TENANT, &bundle, &lineage_trust()),
                 Err(KernelError::PassOwnDataGiftInvalid(_))
             ));
         }

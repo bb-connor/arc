@@ -1024,6 +1024,7 @@ pub(crate) fn cmd_trust_serve(
         certification_public_metadata_ttl_seconds,
         peer_urls: peer_urls.to_vec(),
         cluster_sync_interval: std::time::Duration::from_millis(cluster_sync_interval_ms.max(50)),
+        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
     })
 }
 
@@ -1117,7 +1118,12 @@ pub(crate) fn cmd_trust_status(
                 capability_id: Some(capability_id.to_string()),
                 limit: Some(1),
             })?;
-        (response.revoked.unwrap_or(false), url.to_string())
+        let revoked = response.revoked.ok_or_else(|| {
+            CliError::cli_other_error(format!(
+                "trust-control revocation response omitted revoked status for {capability_id}"
+            ))
+        })?;
+        (revoked, url.to_string())
     } else {
         let path = require_revocation_db_path(revocation_db_path)?;
         let store = chio_store_sqlite::SqliteRevocationStore::open(path)?;

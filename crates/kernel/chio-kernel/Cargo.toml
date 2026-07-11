@@ -41,6 +41,7 @@ delegation = ["chio-core-types/delegation"]
 
 [dependencies]
 chio-appraisal = { workspace = true }
+chio-bounded = { workspace = true }
 chio-core = { workspace = true }
 chio-core-types = { workspace = true }
 # The workspace declares chio-custody-hw with `default-features = false` so
@@ -57,15 +58,11 @@ chio-credit = { workspace = true }
 # chio-credentials nor chio-did and keeps the kernel trust boundary intact.
 chio-disclosure-lineage = { workspace = true }
 chio-federation = { workspace = true }
-chio-governance = { workspace = true }
 chio-link = { path = "../../economy/chio-link", default-features = false }
 chio-log-redact = { workspace = true }
 chio-metrics-spec = { workspace = true }
 chio-tool-call-fabric = { workspace = true }
 lru = "0.16.3"
-chio-listing = { workspace = true }
-chio-market = { workspace = true }
-chio-open-market = { workspace = true }
 chio-settle = { workspace = true }
 arc-swap = { workspace = true }
 async-trait = { workspace = true }
@@ -84,6 +81,12 @@ uuid = { workspace = true, features = ["v7"] }
 ureq = { version = "2.10", features = ["json"] }
 rand = { workspace = true }
 base64 = { workspace = true }
+
+# Linux-only: read the real page size via sysconf(_SC_PAGESIZE) for the RSS
+# soft-ceiling sampler. Already present in the workspace lockfile transitively,
+# so this adds no new supply-chain surface.
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
 
 [dev-dependencies]
 chio-store-sqlite = { workspace = true }

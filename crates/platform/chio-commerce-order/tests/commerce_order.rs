@@ -82,6 +82,7 @@ fn mandate_protocol_payloads() -> Vec<chio_commerce_order::CommerceMandateProtoc
         ("ap2", "payment_mandate"),
         ("acp-commerce", "delegated_payment_token"),
         ("x402", "payment_requirements"),
+        ("chio", "authority_projection"),
     ]
     .into_iter()
     .map(
@@ -484,7 +485,7 @@ fn require_trust_market_context(bundle: &mut chio_commerce_order::CommerceOrderV
             collateral_position_ref: "collateral-trust-market-valid".to_string(),
             guarantee_decision_ref: "guarantee-trust-market-valid".to_string(),
             adjudication_jurisdiction_ref: "jurisdiction-trust-market-valid".to_string(),
-            selected_provider_subject: "did:chio:provider-alpha".to_string(),
+            selected_provider_subject: "merchant:stripe:coffee-shop".to_string(),
         });
 }
 
@@ -593,6 +594,46 @@ fn commerce_order_replay_rejects_marketplace_refs_without_verified_trust_market_
     assert!(error
         .to_string()
         .contains("trust-market verifier context missing"));
+}
+
+#[test]
+fn commerce_order_replay_rejects_trust_market_refs_with_required_false() {
+    let mut bundle = load_bundle("offline-psp-valid");
+    require_trust_market_context(&mut bundle);
+    add_all_trust_market_context_refs(&mut bundle);
+    bundle
+        .order_context
+        .trust_market_requirement
+        .as_mut()
+        .test_expect("trust-market requirement")
+        .required = false;
+    bundle.verified_trust_market_context = None;
+
+    let error = chio_commerce_order::verify_commerce_order(&bundle)
+        .test_expect_err("marketplace refs must not self-disable trust-market verification");
+
+    assert!(error
+        .to_string()
+        .contains("trust-market refs cannot disable verifier"));
+}
+
+#[test]
+fn commerce_order_replay_rejects_marketplace_selected_provider_subject_mismatch() {
+    let mut bundle = load_bundle("offline-psp-valid");
+    require_trust_market_context(&mut bundle);
+    add_all_trust_market_context_refs(&mut bundle);
+    bundle
+        .verified_trust_market_context
+        .as_mut()
+        .test_expect("verified trust-market context")
+        .selected_provider_subject = "did:chio:provider-other".to_string();
+
+    let error = chio_commerce_order::verify_commerce_order(&bundle)
+        .test_expect_err("selected trust-market provider must match the order provider");
+
+    assert!(error
+        .to_string()
+        .contains("trust-market selected provider subject mismatch"));
 }
 
 #[test]
@@ -1026,6 +1067,26 @@ fn commerce_order_replay_rejects_mandate_missing_x402_projection() {
 }
 
 #[test]
+fn commerce_order_replay_rejects_mandate_missing_chio_projection() {
+    let mut bundle = load_bundle("offline-psp-valid");
+    mutate_mandate_ledger(&mut bundle, |mandate_ledger| {
+        let projections = mandate_ledger["protocol_projections"]
+            .as_array_mut()
+            .test_expect("mandate projections array");
+        projections.retain(|projection| {
+            projection["protocol"] != "chio" || projection["purpose"] != "authority_projection"
+        });
+    });
+
+    let error = chio_commerce_order::verify_commerce_order(&bundle)
+        .test_expect_err("missing Chio-native mandate projection must fail");
+
+    assert!(error
+        .to_string()
+        .contains("mandate projection missing: chio/authority_projection"));
+}
+
+#[test]
 fn commerce_order_replay_rejects_mandate_protocol_digest_mismatch() {
     let mut bundle = load_bundle("offline-psp-valid");
     mutate_mandate_ledger(&mut bundle, |mandate_ledger| {
@@ -1454,6 +1515,63 @@ fn commerce_order_replay_rejects_settlement_packet_digest_mismatch() {
 }
 
 #[test]
+fn commerce_order_replay_rejects_unverified_settlement_dispatch_receipt_ref() {
+    let mut bundle = load_bundle("offline-psp-valid");
+    mutate_settlement_packet(&mut bundle, |settlement_packet| {
+        settlement_packet["dispatch_receipt_ref"] =
+            serde_json::json!("receipt-settlement-dispatch-missing");
+    });
+
+    let error = chio_commerce_order::verify_commerce_order(&bundle)
+        .test_expect_err("settlement dispatch receipt ref must resolve to signed receipt");
+
+    assert!(error
+        .to_string()
+        .contains("settlement dispatch receipt missing"));
+}
+
+#[test]
+fn commerce_order_replay_rejects_unused_settlement_dispatch_receipt_ref() {
+    let mut bundle = load_bundle("offline-psp-valid");
+    let event_log: serde_json::Value =
+        serde_json::from_slice(&bundle.event_log_bytes).test_expect("event log parses");
+    let dispatch_event = event_log["events"]
+        .as_array()
+        .test_expect("event log has events")
+        .iter()
+        .find(|event| event["next_state"] == "settlement_dispatched")
+        .test_expect("settlement dispatch event exists");
+    let mut unused_dispatch_event = dispatch_event.clone();
+    unused_dispatch_event["event_id"] =
+        serde_json::json!("event-commerce-001-unused-settlement-dispatch");
+    unused_dispatch_event["authority_receipt_ref"] =
+        serde_json::json!("receipt-settlement-dispatch-unused");
+    unused_dispatch_event["idempotency_key"] =
+        serde_json::json!("idem-event-commerce-001-unused-settlement-dispatch");
+    unused_dispatch_event
+        .as_object_mut()
+        .test_expect("unused dispatch event object")
+        .remove("event_sha256");
+    let canonical = chio_core_types::canonical_json_bytes(&unused_dispatch_event)
+        .test_expect("unused dispatch event canonicalizes");
+    unused_dispatch_event["event_sha256"] = serde_json::json!(sha256_hex(&canonical));
+    bundle
+        .event_authority_receipts
+        .push(event_authority_receipt_artifact(&unused_dispatch_event));
+    mutate_settlement_packet(&mut bundle, |settlement_packet| {
+        settlement_packet["dispatch_receipt_ref"] =
+            serde_json::json!("receipt-settlement-dispatch-unused");
+    });
+
+    let error = chio_commerce_order::verify_commerce_order(&bundle)
+        .test_expect_err("settlement packet must bind the replayed dispatch receipt");
+
+    assert!(error
+        .to_string()
+        .contains("settlement dispatch receipt does not match replayed dispatch event"));
+}
+
+#[test]
 fn commerce_order_replay_rejects_settlement_packet_order_mismatch() {
     let mut bundle = load_bundle("offline-psp-valid");
     mutate_settlement_packet(&mut bundle, |settlement_packet| {
@@ -1466,6 +1584,19 @@ fn commerce_order_replay_rejects_settlement_packet_order_mismatch() {
     assert!(error
         .to_string()
         .contains("settlement packet order mismatch"));
+}
+
+#[test]
+fn commerce_order_replay_rejects_settlement_packet_psp_mismatch() {
+    let mut bundle = load_bundle("offline-psp-valid");
+    mutate_settlement_packet(&mut bundle, |settlement_packet| {
+        settlement_packet["psp"] = serde_json::json!("offline-psp-other");
+    });
+
+    let error = chio_commerce_order::verify_commerce_order(&bundle)
+        .test_expect_err("settlement packet must bind the payment PSP");
+
+    assert!(error.to_string().contains("settlement packet PSP mismatch"));
 }
 
 #[test]
@@ -1701,11 +1832,11 @@ fn pin_escrow_digest_via_accept(
             trusted_reservation_authorities: vec![reservation_authority.public_key()],
             settlement: chio_commerce_order::CommerceSettlementDispatch {
                 issued_at: "2026-06-10T00:05:30Z".to_string(),
-                psp: "stripe".to_string(),
+                psp: "stripe-shaped-offline".to_string(),
                 payment_intent_id: "pi_commerce_001".to_string(),
                 settlement_rail: "ach".to_string(),
                 settlement_account_ref: "acct-commerce-001".to_string(),
-                dispatch_receipt_ref: "dispatch-commerce-001".to_string(),
+                dispatch_receipt_ref: "receipt-settlement-dispatch-commerce-001".to_string(),
                 status: "dispatched".to_string(),
             },
             settlement_authority: &settlement_authority,
@@ -1735,6 +1866,31 @@ fn pin_escrow_digest_via_accept(
         chio_core_types::canonical_json_bytes(&acceptance.settlement_packet.body)
             .test_expect("emitted settlement packet canonicalizes");
     bundle.order_context = acceptance.updated_context;
+
+    // The shipped verifier only replays a settlement packet GREEN once the
+    // order reaches settlement_dispatched (the packet status set is
+    // dispatched/reconciled/settled and the dispatch receipt is bound to the
+    // replayed dispatch event), so drive the assembled order through the
+    // allowed assembled -> dispatched transition with the escrow digest still
+    // pinned in the carried context.
+    mutate_event_log(bundle, |event_log| {
+        let events = event_log["events"]
+            .as_array_mut()
+            .test_expect("event log events array");
+        events.push(serde_json::json!({
+            "actor": "agent:single-call-authority",
+            "authority_receipt_ref": "receipt-settlement-dispatch-commerce-001",
+            "event_id": "event-commerce-001-dispatch",
+            "evidence_refs": ["settlement-packet-commerce-001"],
+            "idempotency_key": "idem-event-commerce-001-dispatch",
+            "next_state": "settlement_dispatched",
+            "occurred_at": "2026-06-10T00:06:00Z",
+            "order_id": "order-commerce-001",
+            "prior_state": "settlement_packet_assembled",
+            "transition": "dispatch_settlement"
+        }));
+    });
+    bundle.order_context.current_state = "settlement_dispatched".to_string();
     acceptance.escrow_digest
 }
 
@@ -1755,7 +1911,7 @@ fn order_passport_replay_green_with_escrow_digest_pinned() {
 
     // GREEN: verified verdict, replayed to the escrow-bound assembly state.
     assert_eq!(report.verdict, "verified");
-    assert_eq!(report.current_state, "settlement_packet_assembled");
+    assert_eq!(report.current_state, "settlement_dispatched");
     assert!(report
         .verified_claims
         .contains(&"claim.commerce.order_replay_consistent".to_string()));

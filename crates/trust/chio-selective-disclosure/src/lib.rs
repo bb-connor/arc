@@ -5,6 +5,7 @@
 #[cfg(feature = "bbs")]
 use chio_core_types::receipt::{
     body::prepare_receipt_body_for_signing, body::ChioReceipt, signing::BbsReceiptSignature,
+    signing::ContentHashMismatch, signing::ReceiptSigningHandle,
     signing::CHIO_RECEIPT_BBS_SIGNATURE_ALGORITHM, signing::CHIO_RECEIPT_BBS_SIGNATURE_SCHEMA,
 };
 use chio_core_types::receipt::{body::ChioReceiptBody, kinds::TrustLevel};
@@ -28,13 +29,14 @@ use encoding::{
 
 pub use chio_disclosure_lineage::{
     compute_signed_lineage_subgraph_digest, sign_crypto_context_report, sign_lineage_subgraph,
-    verify_disclosure_lineage_bundle, DisclosureCapsule, DisclosureHiddenPredicate,
+    verify_crypto_context_report_signature_with_trust, verify_disclosure_lineage_bundle,
+    verify_disclosure_lineage_bundle_with_trust, DisclosureCapsule, DisclosureHiddenPredicate,
     DisclosureLeakageLedger, DisclosureLeakageLedgerEntry, DisclosureLineageBundle,
-    DisclosureLineageError, DisclosureLineageVerifierReport, DisclosureProfileLeakageBudget,
-    DisclosureSensitivityClass, DisclosureSignedLineageEdge, DisclosureSignedLineageNode,
-    DisclosureSignedLineageRedaction, SignedLineageSubgraph, DISCLOSURE_CAPSULE_SCHEMA_V1,
-    DISCLOSURE_LEAKAGE_LEDGER_SCHEMA_V1, DISCLOSURE_LINEAGE_VERIFIER_REPORT_SCHEMA_V1,
-    LINEAGE_SIGNED_SUBGRAPH_SCHEMA_V1,
+    DisclosureLineageError, DisclosureLineageVerifierReport, DisclosureLineageVerifierTrust,
+    DisclosureProfileLeakageBudget, DisclosureSensitivityClass, DisclosureSignedLineageEdge,
+    DisclosureSignedLineageNode, DisclosureSignedLineageRedaction, SignedLineageSubgraph,
+    DISCLOSURE_CAPSULE_SCHEMA_V1, DISCLOSURE_LEAKAGE_LEDGER_SCHEMA_V1,
+    DISCLOSURE_LINEAGE_VERIFIER_REPORT_SCHEMA_V1, LINEAGE_SIGNED_SUBGRAPH_SCHEMA_V1,
 };
 #[cfg(feature = "bbs")]
 pub use crypto_context::verify_selective_disclosure_with_context;
@@ -228,6 +230,8 @@ pub enum SelectiveDisclosureError {
     ProjectionManifestInvalid(String),
     #[error("transparency inclusion proof {0}")]
     TransparencyInclusionInvalid(String),
+    #[error("receipt content_hash does not match the bound canonical content (WYSIWYS): {0}")]
+    ContentHashMismatch(String),
     #[error("issuer {0} is not registered")]
     UnknownIssuer(String),
     #[error("issuer public key does not match registry")]
@@ -587,12 +591,15 @@ pub fn bbs_projection_manifest_from_projection(projection: &Projection) -> BbsPr
                 message_class: projection_message_class(message).to_string(),
                 sensitivity_class: projection_sensitivity_class(message).to_string(),
                 encoding: message.encoding.clone(),
-                disclosure: if message.wholesale_only {
+                disclosure: if message.wholesale_only
+                    || exact_timing_direct_disclosure_field(&message.field)
+                {
                     BbsProjectionDisclosure::Hidden
                 } else {
                     BbsProjectionDisclosure::Disclosed
                 },
-                wholesale_only: message.wholesale_only,
+                wholesale_only: message.wholesale_only
+                    || exact_timing_direct_disclosure_field(&message.field),
                 value_sha256: None,
             })
             .collect(),
@@ -637,6 +644,10 @@ fn projection_sensitivity_class(message: &ProjectionMessage) -> &'static str {
     }
 }
 
+fn exact_timing_direct_disclosure_field(field: &str) -> bool {
+    field == "duration_ms"
+}
+
 pub fn verify_bbs_projection_manifest(
     proof: &SelectiveDisclosureProof,
     manifest: &BbsProjectionManifest,
@@ -671,12 +682,6 @@ pub fn verify_bbs_projection_manifest(
             "message slot count does not match proof message count".to_string(),
         ));
     }
-    if !manifest.hidden_predicates.is_empty() {
-        return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
-            "hidden predicates require cryptographic predicate proof".to_string(),
-        ));
-    }
-
     let mut seen_slots = Vec::with_capacity(manifest.message_slots.len());
     for slot in &manifest.message_slots {
         if usize::from(slot.slot) >= proof.message_count {
@@ -700,6 +705,34 @@ pub fn verify_bbs_projection_manifest(
                     .to_string(),
             ));
         }
+        if exact_timing_direct_disclosure_field(&slot.field)
+            && slot.disclosure == BbsProjectionDisclosure::Disclosed
+        {
+            return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+                format!(
+                    "exact timing field {} cannot be directly disclosed",
+                    slot.field
+                ),
+            ));
+        }
+    }
+
+    let mut seen_predicates = Vec::with_capacity(manifest.hidden_predicates.len());
+    for predicate in &manifest.hidden_predicates {
+        if predicate.predicate_id.trim().is_empty()
+            || predicate.field.trim().is_empty()
+            || predicate.operator.trim().is_empty()
+        {
+            return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+                "hidden predicate id, field, and operator must not be empty".to_string(),
+            ));
+        }
+        if seen_predicates.contains(&predicate.predicate_id) {
+            return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+                format!("duplicate hidden predicate {}", predicate.predicate_id),
+            ));
+        }
+        seen_predicates.push(predicate.predicate_id.clone());
     }
 
     for disclosed in &proof.disclosed {
@@ -722,6 +755,24 @@ pub fn verify_bbs_projection_manifest(
         if slot.encoding != disclosed.encoding {
             return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
                 format!("slot {} encoding does not match proof", disclosed.index),
+            ));
+        }
+    }
+    for slot in manifest
+        .message_slots
+        .iter()
+        .filter(|slot| slot.disclosure == BbsProjectionDisclosure::Disclosed)
+    {
+        if !proof
+            .disclosed
+            .iter()
+            .any(|disclosed| disclosed.index == slot.slot)
+        {
+            return Err(SelectiveDisclosureError::ProjectionManifestInvalid(
+                format!(
+                    "slot {} is marked disclosed but missing from proof",
+                    slot.slot
+                ),
             ));
         }
     }
@@ -789,7 +840,7 @@ pub fn verify_transparency_inclusion_proof(
         index /= 2;
         width = width.div_ceil(2);
     }
-    if index != 0 {
+    if index != 0 || width != 1 {
         return Err(SelectiveDisclosureError::TransparencyInclusionInvalid(
             "inclusion path did not reach the root".to_string(),
         ));
@@ -1054,20 +1105,54 @@ pub fn receipt_bbs_signature_from_signed_projection(
 
 /// Sign a receipt body with Ed25519 and embed BBS material over its final
 /// projected receipt body.
+///
+/// WYSIWYS: the `handle` is a one-time [`ReceiptSigningHandle`] bound to the
+/// exact canonical content the producer evaluated. The signer recomputes
+/// `content_hash` over that content and refuses to sign (fail-closed) when the
+/// body's claimed `content_hash` differs, exactly like the classical
+/// ([`ChioReceipt::sign_with_handle`]) and backend
+/// ([`ChioReceipt::sign_with_backend_using_handle`]) signers. This closes the
+/// render-A / sign-B forgery at the BBS / selective-disclosure boundary: a
+/// body claiming the hash of content `B` while the producer rendered content
+/// `A` is rejected before any BBS material is produced.
+///
+/// `prepare_receipt_body_for_signing` does not mutate `content_hash`, so the
+/// gate is checked against the prepared body's `content_hash` and is equivalent
+/// to checking the caller's input.
+///
+/// # Errors
+///
+/// Returns [`SelectiveDisclosureError::ContentHashMismatch`] when the body's
+/// `content_hash` does not equal the hash recomputed over the handle's bound
+/// canonical content; otherwise propagates preparation, projection, BBS, and
+/// Ed25519 signing errors.
 #[cfg(feature = "bbs")]
 pub fn sign_chio_receipt_with_bbs(
     mut body: ChioReceiptBody,
     receipt_keypair: &chio_core_types::crypto::Keypair,
     bbs_keypair: &BbsKeyPair,
+    handle: ReceiptSigningHandle,
 ) -> Result<ChioReceipt, SelectiveDisclosureError> {
     body.bbs_projection_version = Some(PROJECTION_VERSION_RECEIPT_V1.to_string());
     let prepared = prepare_receipt_body_for_signing(body)
         .map_err(|error| SelectiveDisclosureError::CanonicalJson(error.to_string()))?;
+    // Recompute-and-refuse BEFORE producing any BBS material so a render-A /
+    // sign-B body can never yield a BBS signature.
+    handle
+        .ensure_body_matches(&prepared)
+        .map_err(|mismatch: ContentHashMismatch| {
+            SelectiveDisclosureError::ContentHashMismatch(mismatch.message())
+        })?;
     let projection = project_receipt_body(&prepared)?;
     let signed = sign_projection(&projection, bbs_keypair)?;
     let bbs_signature = receipt_bbs_signature_from_signed_projection(&signed);
-    ChioReceipt::sign_prepared_with_bbs(prepared, receipt_keypair, bbs_signature)
-        .map_err(|error| SelectiveDisclosureError::CanonicalJson(error.to_string()))
+    ChioReceipt::sign_prepared_with_bbs_using_handle(
+        prepared,
+        receipt_keypair,
+        bbs_signature,
+        handle,
+    )
+    .map_err(|error| SelectiveDisclosureError::CanonicalJson(error.to_string()))
 }
 
 /// Reconstruct the full signed projection carrier from a receipt-bound BBS

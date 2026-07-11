@@ -153,10 +153,18 @@ def _shell_requires_approval(handle: RuntimeHandle, command: str) -> bool:
         return False
     try:
         return bool(policy.check_shell(command))
-    except Exception:  # noqa: BLE001
-        # Conservative: when the policy raises, treat as not requiring
-        # approval and let the downstream call surface the real error.
-        return False
+    except Exception as exc:  # noqa: BLE001
+        try:
+            from chio_code_agent.errors import (
+                ChioCodeAgentDeniedError as denied_error_type,
+            )
+        except Exception:
+            denied_error_type = None
+        if denied_error_type is not None and isinstance(exc, denied_error_type):
+            raise
+        # Fail closed for HITL: a broken approval policy must not let the
+        # command bypass the approval queue.
+        return True
 
 
 async def _maybe_submit_for_approval(
@@ -183,7 +191,7 @@ async def _maybe_submit_for_approval(
     cap_id = handle.capability_id
     if client is None or not cap_id:
         # No client / capability means we cannot hold the call; fall
-        # through to the legacy deny so the model still gets a typed
+        # through to the typed deny so the model still gets a typed
         # rejection.
         return
 
@@ -319,7 +327,7 @@ def _wrap_envelope(
             _LAST_RECEIPT_ID.reset(token)
             return _typed_error("chio_error", str(exc))
         except Exception as exc:  # noqa: BLE001 - last resort
-            # Receipt id precedence: explicit attribute (legacy) wins,
+            # Receipt id precedence: explicit exception attribute wins,
             # else the captured most-recent allow verdict.
             receipt_id = getattr(exc, "receipt_id", None)
             if receipt_id is None:
@@ -656,9 +664,24 @@ def _factory_git_log(handle: RuntimeHandle) -> ToolHandler:
     return _wrap_envelope(handle, "chio_git_log", inner)
 
 
+def _coerce_git_add_paths(raw_paths: Any) -> list[str]:
+    if isinstance(raw_paths, str):
+        return [raw_paths]
+    if not isinstance(raw_paths, list) or not all(isinstance(path, str) for path in raw_paths):
+        from chio_code_agent.errors import ChioCodeAgentDeniedError
+
+        raise ChioCodeAgentDeniedError(
+            "chio_git_add requires paths to be an array of strings",
+            tool_name="git_add",
+            reason="invalid_paths",
+            guard="invalid_args",
+        )
+    return list(raw_paths)
+
+
 def _factory_git_add(handle: RuntimeHandle) -> ToolHandler:
     async def inner(args: dict[str, Any]) -> Any:
-        paths = list(_require(args, "paths"))
+        paths = _coerce_git_add_paths(_require(args, "paths"))
         # `git add src/**` can expand to forbidden paths (`.env`,
         # `.git/**`); resolve via `git ls-files` and policy-check.
         await _reject_git_add_forbidden_expansion(handle, paths)
