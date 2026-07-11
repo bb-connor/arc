@@ -191,7 +191,7 @@ impl ChioPassConfig {
             window_token_capacity: 10_000,  // placeholder
             active_population_cap: 100_000, // placeholder
             // The committed spec genuine-use floor. Whether the launch floor is the
-            // >= 1 default or a stricter >= 3 is board-decidable (Open Questions 1/5);
+            // >= 1 default or a stricter >= 3 is board-decidable;
             // both are honored by `refresh_chio_pass_window` without touching the
             // const inside `chio_pass_refresh_decision`.
             min_genuine_use_receipts: MIN_GENUINE_USE_RECEIPTS,
