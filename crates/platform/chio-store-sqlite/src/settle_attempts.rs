@@ -1237,13 +1237,15 @@ mod tests {
         let pool = pool();
         let store =
             SqliteSettlementOutcomeStore::open_with_pool(pool.clone()).test_expect("store opens");
-        seed_overlap(&pool, "attempt-1", "terminal-1");
+        seed(&pool, "a-valid", 0);
+        seed_overlap(&pool, "attempt-1", "z-terminal");
 
         assert!(matches!(
-            store.claim_due("worker", 0, 100, 1),
+            store.claim_due("worker", 0, 100, 2),
             Err(SettlementRouteError::InvalidRecord { .. })
         ));
-        assert_attempt_unleased(&pool, "terminal-1");
+        assert_attempt_unleased(&pool, "a-valid");
+        assert_attempt_unleased(&pool, "z-terminal");
     }
 
     #[test]
